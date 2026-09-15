@@ -15,6 +15,7 @@ import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { PRESELECT_CLOUD_RUN_ON } from '@/lib/run-on-destination';
+import { dismissTour } from '@/lib/tour/tour-dismiss';
 import { useTourCompletion } from '@/lib/tour/tour-completion';
 
 /**
@@ -27,7 +28,8 @@ import { useTourCompletion } from '@/lib/tour/tour-completion';
  * decision and replaces the tour, so the tour never re-opens. Skip and Android
  * hardware Back are the one other decision — record it the instant the person
  * dismisses, then pop back to the screen that opened the tour (Home on
- * auto-open, Profile on the Tutorial replay). Nothing here ever clears the
+ * auto-open, Profile on the Tutorial replay); a tour with nothing beneath it
+ * lands on Home instead (see `dismissTour`). Nothing here ever clears the
  * decision.
  */
 
@@ -118,10 +120,13 @@ export function TourScreen() {
 
   // One dismissal decision: record it synchronously (the hook flips its
   // in-memory state before returning and persists in the background), then
-  // return to whoever opened the tour.
+  // leave the tour. The navigation half is guarded (see `dismissTour`): a tour
+  // opened as the app's first route has nothing beneath it, and an unguarded
+  // `router.back()` there would leave the modal up behind a development-only
+  // GO_BACK banner instead of dismissing.
   const dismiss = useCallback(() => {
     recordCompleted();
-    router.back();
+    dismissTour(router);
   }, [recordCompleted, router]);
 
   // The hand-off ends the tour: record the decision, then replace the tour

@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount the hook under vitest (node env, no jsdom) */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake mutate/outbox factories settle without await */
 import * as React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 

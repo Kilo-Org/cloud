@@ -1,9 +1,8 @@
 /* eslint-disable max-lines -- Keep the detail trigger and real SDK request regressions with their shared screen fixture. */
-/* eslint-disable typescript-eslint/no-deprecated -- The repository uses react-test-renderer for DOM-free native component tests. */
 import { type ComponentProps, createElement, Fragment, type ReactNode } from 'react';
 import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { act, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { type Pressable } from 'react-native';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
@@ -27,12 +26,19 @@ import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { assistantMessage } from '@/components/agents/message-bubble-test-utils';
+import {
+  exitRemoteSessionWithFeedback,
+  type RetryableExitFailure,
+} from '@/components/agents/exit-remote-session-with-feedback';
+import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import {
@@ -145,6 +151,12 @@ vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/agents/part-detail-sheet-host', () => ({
   PartDetailSheetHost: 'PartDetailSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-sheet-host', () => ({
+  ToolRunSheetHost: 'ToolRunSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-rows', () => ({
+  CondensedToolRunRow: 'CondensedToolRunRow',
 }));
 vi.mock('@/components/agents/message-error-boundary', () => ({
   MessageErrorBoundary: 'MessageErrorBoundary',
@@ -308,6 +320,14 @@ vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   useKeepScreenOnPreference: () => ({ keepScreenOn: false, hasLoaded: true }),
 }));
+const condensePreference = vi.hoisted(() => ({ value: false }));
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  useCondenseToolCallsPreference: () => ({
+    condenseToolCalls: condensePreference.value,
+    hasLoaded: true,
+    setCondenseToolCalls: vi.fn(),
+  }),
+}));
 vi.mock('@/lib/hooks/use-session-model-options', () => ({
   useSessionModelOptions: () => ({ options: [], selectedValue: '', selectedVariant: '' }),
 }));
@@ -427,6 +447,35 @@ function childMessage(sessionId: KiloSessionId, text: string): StoredMessage {
   };
 }
 
+/** An assistant message of consecutive `read` tool parts that condense into one run. */
+function toolRunMessage(
+  sessionId: KiloSessionId,
+  messageId: string,
+  partIds: readonly string[]
+): StoredMessage {
+  const message = assistantMessage(messageId);
+  message.info = { ...message.info, sessionID: sessionId };
+  message.parts = partIds.map(
+    (partId, index): ToolPart => ({
+      id: partId,
+      sessionID: sessionId,
+      messageID: messageId,
+      type: 'tool',
+      callID: `call-${partId}`,
+      tool: 'read',
+      state: {
+        status: 'completed',
+        input: { filePath: `/repo/${partId}.ts` },
+        output: '',
+        title: 'read',
+        metadata: {},
+        time: { start: index, end: index + 1 },
+      },
+    })
+  );
+  return message;
+}
+
 function page(
   sessionId: KiloSessionId,
   messages: StoredMessage[],
@@ -449,15 +498,26 @@ beforeEach(() => {
   goalMountOptions = {};
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
+  condensePreference.value = false;
 });
 
+type MountDetailsOptions = {
+  metadataReady?: Promise<undefined>;
+  displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
+  cachedRows?: StoredMessage[] | null;
+};
+
 async function mountDetails(
-  rootMessages = [taskMessage(ROOT_ID, CHILD_IDS)],
-  metadataReady?: Promise<undefined>,
-  displayScope: ComponentProps<typeof SessionDetailContent>['displayScope'] = PERSONAL_DISPLAY_SCOPE
+  rootMessages: StoredMessage[] | null = [taskMessage(ROOT_ID, CHILD_IDS)],
+  options: MountDetailsOptions = {}
 ) {
+  const { metadataReady, displayScope = PERSONAL_DISPLAY_SCOPE, cachedRows = null } = options;
   const store = createStore();
-  const rootPages = new Map([[ROOT_ID, rootMessages]]);
+  // `null` stalls the root page: the request never resolves, so the open never
+  // receives first content (the endless-skeleton case).
+  const rootPages = new Map<KiloSessionId, StoredMessage[]>(
+    rootMessages === null ? [] : [[ROOT_ID, rootMessages]]
+  );
   const requests: {
     id: KiloSessionId;
     response: ReturnType<typeof Promise.withResolvers<SessionSnapshotPageOutcome | null>>;
@@ -488,6 +548,14 @@ async function mountDetails(
       const outcome = await response.promise;
       return outcome;
     },
+    readCachedSnapshotPage: cachedRows
+      ? vi.fn().mockResolvedValue({
+          info: { id: ROOT_ID },
+          messages: cachedRows,
+          nextCursor: null,
+          omittedItemCount: 0,
+        })
+      : undefined,
     api: {
       send: vi.fn(),
       interrupt: vi.fn(),
@@ -618,9 +686,11 @@ describe('SessionDetailContent display scope', () => {
     { organizationId: 'missing-org', isResolved: true, label: i18n.t('common.organization') },
     { organizationId: null, isResolved: false, label: i18n.t('profile.selectAccount') },
   ])('omits the $label context label and preserves header actions', async state => {
-    const { renderer } = await mountDetails([], undefined, {
-      organizationId: state.organizationId,
-      isResolved: state.isResolved,
+    const { renderer } = await mountDetails([], {
+      displayScope: {
+        organizationId: state.organizationId,
+        isResolved: state.isResolved,
+      },
     });
     const header = renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
@@ -673,6 +743,166 @@ describe('session detail status placement', () => {
       expect(view.renderer.root.findAllByType(EmptyState)).toHaveLength(0);
     }
   );
+});
+
+describe('session detail slow load', () => {
+  it('swaps the endless skeleton for taking-longer copy and a working Retry', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails(null);
+      expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.takingLonger'));
+
+      await act(async () => {
+        vi.advanceTimersByTime(SESSION_SLOW_LOAD_MS);
+        await Promise.resolve();
+      });
+
+      expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.takingLonger'));
+      const retry = view.renderer.root.find(
+        node =>
+          Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+      );
+      const switchSession = vi.spyOn(view.manager, 'switchSession');
+      act(() => {
+        (retry.props.onPress as () => void)();
+      });
+      expect(switchSession).toHaveBeenCalledWith(ROOT_ID);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps a terminal error ahead of the slow state', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails(null);
+      await act(async () => {
+        vi.advanceTimersByTime(SESSION_SLOW_LOAD_MS);
+        await Promise.resolve();
+      });
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.takingLonger'));
+
+      act(() => {
+        view.store.set<string | null, [string | null], unknown>(
+          view.manager.atoms.error,
+          'fetch failed'
+        );
+      });
+
+      const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+        typeof QueryError
+      >;
+      expect(error.title).toBe(i18n.t('agentChat.session.couldNotLoadThisSession'));
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.takingLonger'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('acknowledges a slow-state Retry tap with a disabled spinner until content lands', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails(null);
+      await act(async () => {
+        vi.advanceTimersByTime(SESSION_SLOW_LOAD_MS);
+        await Promise.resolve();
+      });
+      const findRetry = () =>
+        view.renderer.root.find(
+          node =>
+            Object.is(node.type, 'Button') &&
+            node.props.accessibilityLabel === i18n.t('common.retry')
+        );
+      const before = findRetry();
+      expect(before.props.loading).toBe(false);
+
+      act(() => {
+        (before.props.onPress as () => void)();
+      });
+      // The tap is acknowledged immediately: the control shows its retrying
+      // (loading + disabled) state before any content or error arrives.
+      expect(findRetry().props.loading).toBe(true);
+
+      // Let the retry's open settle through metadata + resolve so the fresh
+      // transport's page request is the newest one, then answer it.
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      await view.respond(ROOT_ID, [childMessage(ROOT_ID, 'recovered row')]);
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+        await Promise.resolve();
+      });
+      // Content ends the acknowledgment: the slow card is gone and the
+      // transcript paints.
+      expect(renderedText(view.renderer.root)).not.toContain(i18n.t('common.takingLonger'));
+      expect(renderedText(view.renderer.root)).toContain('recovered row');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('hands the Retry action back when the retried open also stalls', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const view = await mountDetails(null);
+      await act(async () => {
+        vi.advanceTimersByTime(SESSION_SLOW_LOAD_MS);
+        await Promise.resolve();
+      });
+      const findRetry = () =>
+        view.renderer.root.find(
+          node =>
+            Object.is(node.type, 'Button') &&
+            node.props.accessibilityLabel === i18n.t('common.retry')
+        );
+      act(() => {
+        (findRetry().props.onPress as () => void)();
+      });
+      expect(findRetry().props.loading).toBe(true);
+
+      // The retried open stalls again: no content and no error arrive. The
+      // acknowledgment is bounded, so after one more threshold the button is
+      // usable again instead of spinning in its disabled state forever.
+      await act(async () => {
+        vi.advanceTimersByTime(SESSION_SLOW_LOAD_MS);
+        await Promise.resolve();
+      });
+      expect(findRetry().props.loading).toBe(false);
+      expect(renderedText(view.renderer.root)).toContain(i18n.t('common.takingLonger'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('session detail cached metadata refresh', () => {
+  it('paints cached rows and offers a refresh Retry when the metadata read fails', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails(cachedRows, { metadataReady: metadata.promise, cachedRows });
+
+    // The persisted transcript paints before the metadata read settles: no
+    // skeleton, and the rows are on screen.
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain('cached root row');
+
+    await act(async () => {
+      metadata.reject(new Error('offline'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // A retryable metadata failure keeps the rows mounted and repoints the
+    // connection banner at a metadata refresh Retry instead of blanking them.
+    expect(renderedText(view.renderer.root)).toContain('cached root row');
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
+    const indicator = view.renderer.root.findAllByType(SessionConnectionIndicator)[0];
+    expect(indicator?.props.sessionRefresh).toMatchObject({ isLoading: false });
+  });
 });
 
 describe('session detail bottom strip', () => {
@@ -869,7 +1099,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
     { state: 'terminal access denial', code: 'UNAUTHORIZED' },
   ] as const)('leaves $state without changing its feedback', async ({ code }) => {
     const metadata = Promise.withResolvers<undefined>();
-    const view = await mountDetails([], metadata.promise);
+    const view = await mountDetails([], { metadataReady: metadata.promise });
     expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(1);
     if (code) {
       await act(async () => {
@@ -1190,6 +1420,55 @@ describe('child transcript requests', () => {
   });
 });
 
+describe('SessionDetailContent condensed tool runs', () => {
+  it('wraps the condensed run row in MessageErrorBoundary like the per-part path', async () => {
+    condensePreference.value = true;
+    const view = await mountDetails([toolRunMessage(ROOT_ID, 'm-tool-run', ['t1', 't2'])]);
+
+    const runRows = view.renderer.root.findAll(node => Object.is(node.type, 'CondensedToolRunRow'));
+    expect(runRows).toHaveLength(1);
+    expect(runRows[0]?.parent?.type).toBe('MessageErrorBoundary');
+  });
+});
+
+describe('session detail exit retry row', () => {
+  it('drops the row when a retry fails with a non-retryable SDK message', async () => {
+    const failureHandlers: {
+      retryable?: (failure: RetryableExitFailure) => void;
+      nonRetryable?: () => void;
+    } = {};
+    vi.mocked(exitRemoteSessionWithFeedback).mockImplementation(async input => {
+      failureHandlers.retryable = input.onRetryableFailure;
+      failureHandlers.nonRetryable = input.onNonRetryableFailure;
+      input.onRetryableFailure?.({ message: 'connection reset', retry: vi.fn() });
+      await Promise.resolve();
+    });
+
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    const onExitSession = composer.props.onExitSession as (
+      onAccepted: () => void,
+      lock: { current: boolean },
+      settleVoiceInput: () => Promise<boolean>
+    ) => Promise<void>;
+
+    await act(async () => {
+      await onExitSession(vi.fn<() => void>(), { current: false }, async () => {
+        await Promise.resolve();
+        return true;
+      });
+    });
+    expect(view.renderer.root.findAllByType(RemoteSessionExitFailure)).toHaveLength(1);
+
+    // A retry that lands on a permanent SDK error must release the durable row
+    // instead of leaving a stale message and a retry that can never succeed.
+    act(() => {
+      failureHandlers.nonRetryable?.();
+    });
+    expect(view.renderer.root.findAllByType(RemoteSessionExitFailure)).toHaveLength(0);
+  });
+});
+
 describe('hide thinking preference', () => {
   function partMessage(id: string, parts: StoredMessage['parts']): StoredMessage {
     return { info: { ...assistantMessage(id).info, sessionID: ROOT_ID }, parts };
@@ -1376,7 +1655,7 @@ describe('SessionDetailContent goal visibility', () => {
 
   it('shows the fixed goal row for a live session whose snapshot carries a goal', async () => {
     goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
-    const view = await mountDetails([], undefined, PERSONAL_DISPLAY_SCOPE);
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
     const section = view.renderer.root.findAllByType(SessionGoalSection);
     expect(section).toHaveLength(1);
     expect(section[0]?.props.goal).toEqual(pausedGoal);
@@ -1384,7 +1663,7 @@ describe('SessionDetailContent goal visibility', () => {
 
   it('hides the fixed goal row for a read-only session whose snapshot carries a goal', async () => {
     goalMountOptions = { goal: pausedGoal, resolvedType: 'read-only' };
-    const view = await mountDetails([], undefined, PERSONAL_DISPLAY_SCOPE);
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
     expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
   });
 });

@@ -66,12 +66,19 @@ describe('selectSessionListIsLoading', () => {
       isError: false,
       hasAnySessions: false,
       hasHistoryContent: false,
+      // No active query and no rows delivered by this mount: the branch's
+      // extended surface input. Required by `selectSessionListContentSurface`
+      // after the FlashList merge.
+      hasActiveQuery: false,
+      hasFreshHistory: false,
     };
 
     it('selects skeletons, never the history-empty surface, before the request settles', () => {
       const isLoading = loading({ isSearching: false, storedIsPending: true });
       expect(selectSessionListContentSurface({ isLoading, ...surfaceInput })).toEqual({
-        kind: 'section-list',
+        // The FlashList branch renamed the body kind from `section-list` to
+        // `session-list`; keep main's cold-open assertion against the new kind.
+        kind: 'session-list',
         listEmpty: 'loading-skeletons',
       });
     });

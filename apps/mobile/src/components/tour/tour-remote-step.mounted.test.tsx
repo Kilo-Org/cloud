@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
-import { act, createElement, type ElementType } from 'react';
-import { type ReactTestInstance } from 'react-test-renderer';
+import { createElement, type ElementType } from 'react';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type UseQueryOptions } from '@tanstack/react-query';
 import type * as ReactI18next from 'react-i18next';
@@ -225,6 +224,10 @@ describe('TourRemoteStep', () => {
     await act(async () => {
       await queryClient.refetchQueries({ queryKey: QUERY_KEY });
     });
+    // TanStack Query batches observer notifications onto a macrotask, so the
+    // failing state reaches the tree one turn later: yield it inside `act`
+    // before reading the tree back.
+    await waitFor(() => hasTextIn(layoutSlot(renderer), 'agents.sessionList.couldNotRefresh'));
 
     // The failure must not blank the list: the detected computer stays
     // tappable and the failure surfaces as a compact inline status with Retry,

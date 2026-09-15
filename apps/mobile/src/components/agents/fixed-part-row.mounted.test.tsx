@@ -1,11 +1,20 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
+/* eslint-disable max-lines -- one cohesive mounted suite pins every FixedPartRow state through the shared render harness, the tool-summary translation states, and the label/detail alignment cases */
 import '@/i18n';
 import { Eye } from '@/components/ui/icons';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { act, TestRenderer } from '@/test/renderer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 
 import { FixedPartRow } from './fixed-part-row';
+import { ToolSummaryTranslationScope } from './tool-summary-translation-scope';
+
+const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
+
+vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
+  requestToolSummaryTranslation: requestMock,
+}));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
@@ -51,6 +60,27 @@ function findHost(
   type: string
 ): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => node.type === type);
+}
+
+/** The inner row that carries the label and, when present, the badge. */
+function findContentRow(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  const row = findHost(root, 'View').find(
+    node =>
+      typeof node.props.className === 'string' &&
+      node.props.className.includes('flex-1') &&
+      node.props.className.includes('flex-row')
+  );
+  if (!row) {
+    throw new Error('label/badge content row not found');
+  }
+  return row;
+}
+
+function textWithContent(
+  root: TestRenderer.ReactTestInstance,
+  content: string
+): TestRenderer.ReactTestInstance[] {
+  return findHost(root, 'Text').filter(node => node.props.children === content);
 }
 
 describe('FixedPartRow mounted', () => {
@@ -211,5 +241,222 @@ describe('FixedPartRow mounted', () => {
     expect(className).toContain('border-dashed');
     expect(className).not.toContain('rounded-xl');
     expect(className).not.toContain('border-[1.5px]');
+  });
+});
+
+const MODEL = { id: 'kilo-auto/small', name: 'Auto Small' };
+
+function rowLabel(renderer: TestRenderer.ReactTestRenderer): string | undefined {
+  return findHost(renderer.root, 'Text').find(node => typeof node.props.children === 'string')
+    ?.props.children as string | undefined;
+}
+
+function rowAccessibilityLabel(renderer: TestRenderer.ReactTestRenderer): unknown {
+  return findHost(renderer.root, 'Pressable')[0]?.props.accessibilityLabel;
+}
+
+/**
+ * Sync-commit mount so the pre-resolution render is observable: the dynamic
+ * import cannot resolve inside a synchronous `act`, which is exactly the
+ * original-label-first state under test.
+ */
+function renderScopedRowSync(props: RowProps): TestRenderer.ReactTestRenderer {
+  const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+    current: undefined,
+  };
+  act(() => {
+    rendererRef.current = TestRenderer.create(
+      createElement(ToolSummaryTranslationScope, null, createElement(FixedPartRow, props))
+    );
+  });
+  const renderer = rendererRef.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+async function settleTranslation(): Promise<void> {
+  await act(async () => {
+    for (let i = 0; i < 5; i += 1) {
+      // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the dynamic import and request
+      await new Promise<void>(resolve => {
+        setImmediate(resolve);
+      });
+    }
+  });
+}
+
+describe('FixedPartRow tool-summary translation', () => {
+  beforeEach(() => {
+    requestMock.mockReset();
+    setConfig({ enabled: false, model: MODEL });
+  });
+
+  it('translates the visible label and the spoken summary inside the scope', async () => {
+    requestMock.mockResolvedValue('Lire le fichier');
+    setConfig({ enabled: true, model: MODEL });
+    const renderer = renderScopedRowSync({
+      icon: Eye,
+      label: 'Read app.ts',
+      status: 'completed',
+      accessibilityLabel: 'Read app.ts tool, completed',
+    });
+
+    // Uncached: the original label renders first, then swaps in place.
+    expect(rowLabel(renderer)).toBe('Read app.ts');
+    await settleTranslation();
+
+    expect(rowLabel(renderer)).toBe('Lire le fichier');
+    expect(rowAccessibilityLabel(renderer)).toBe('Lire le fichier tool, completed');
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the raw label and makes no request outside the scope while enabled', async () => {
+    requestMock.mockResolvedValue('Traduit');
+    setConfig({ enabled: true, model: MODEL });
+    const renderer = await renderRow({
+      icon: Eye,
+      label: 'Unscoped summary',
+      status: 'completed',
+      accessibilityLabel: 'Unscoped summary tool, completed',
+    });
+
+    await settleTranslation();
+
+    expect(rowLabel(renderer)).toBe('Unscoped summary');
+    expect(rowAccessibilityLabel(renderer)).toBe('Unscoped summary tool, completed');
+    expect(requestMock).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the raw label when the translation request rejects', async () => {
+    requestMock.mockRejectedValue(new Error('gateway down'));
+    setConfig({ enabled: true, model: MODEL });
+    const renderer = renderScopedRowSync({
+      icon: Eye,
+      label: 'Rejected summary',
+      status: 'completed',
+      accessibilityLabel: 'Rejected summary tool, completed',
+    });
+
+    await settleTranslation();
+
+    expect(rowLabel(renderer)).toBe('Rejected summary');
+    expect(rowAccessibilityLabel(renderer)).toBe('Rejected summary tool, completed');
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the raw label and makes no request inside the scope while disabled', async () => {
+    requestMock.mockResolvedValue('Traduit');
+    setConfig({ enabled: false, model: MODEL });
+    const renderer = renderScopedRowSync({
+      icon: Eye,
+      label: 'Disabled summary',
+      status: 'completed',
+      accessibilityLabel: 'Disabled summary tool, completed',
+    });
+
+    await settleTranslation();
+
+    expect(rowLabel(renderer)).toBe('Disabled summary');
+    expect(rowAccessibilityLabel(renderer)).toBe('Disabled summary tool, completed');
+    expect(requestMock).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the raw label and makes no request for a non-translatable label', async () => {
+    requestMock.mockResolvedValue('Traduit');
+    setConfig({ enabled: true, model: MODEL });
+    const renderer = renderScopedRowSync({
+      icon: Eye,
+      label: 'Read todos',
+      translatable: false,
+      status: 'completed',
+      accessibilityLabel: 'Read todos tool, completed',
+    });
+
+    // The i18n fallback is already in the app language: no gateway request.
+    await settleTranslation();
+
+    expect(rowLabel(renderer)).toBe('Read todos');
+    expect(rowAccessibilityLabel(renderer)).toBe('Read todos tool, completed');
+    expect(requestMock).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('FixedPartRow label and detail alignment', () => {
+  it('shares one baseline between the tool name and its detail', async () => {
+    const renderer = await renderRow({
+      icon: Eye,
+      label: 'fleet.py',
+      badge: 'L2600 i redova: 75',
+      status: 'completed',
+      accessibilityLabel: 'fleet.py tool, completed',
+    });
+
+    const content = findContentRow(renderer.root);
+    expect(content.props.className).toContain('items-baseline');
+    expect(content.props.className).not.toContain('items-center');
+
+    const label = textWithContent(renderer.root, 'fleet.py');
+    const badge = textWithContent(renderer.root, 'L2600 i redova: 75');
+    expect(label).toHaveLength(1);
+    expect(badge).toHaveLength(1);
+    // The two pieces keep their existing styles and truncation.
+    expect(label[0]?.props.className).toContain('text-sm');
+    expect(label[0]?.props.className).toContain('text-muted-foreground');
+    expect(badge[0]?.props.className).toContain('text-xs');
+    expect(label[0]?.props.numberOfLines).toBe(1);
+    expect(badge[0]?.props.numberOfLines).toBe(1);
+  });
+
+  it('keeps the alignment for a long name and a long detail', async () => {
+    const renderer = await renderRow({
+      icon: Eye,
+      label: 'a-very-long-tool-name-that-should-truncate-at-the-tail.tsx',
+      badge: 'L1234567890 i redova: 999999',
+      status: 'completed',
+      accessibilityLabel: 'long tool, completed',
+    });
+
+    const content = findContentRow(renderer.root);
+    expect(content.props.className).toContain('items-baseline');
+  });
+
+  it('keeps the alignment for a row with no detail', async () => {
+    const renderer = await renderRow({
+      icon: Eye,
+      label: 'fleet.py',
+      status: 'completed',
+      accessibilityLabel: 'fleet.py tool, completed',
+    });
+
+    const content = findContentRow(renderer.root);
+    expect(content.props.className).toContain('items-baseline');
+    expect(textWithContent(renderer.root, 'fleet.py')).toHaveLength(1);
+  });
+
+  it('keeps the alignment for an eyebrow label', async () => {
+    const renderer = await renderRow({
+      label: 'Thought',
+      labelKind: 'eyebrow',
+      badge: '3',
+      accessibilityLabel: 'Thought',
+    });
+
+    const content = findContentRow(renderer.root);
+    expect(content.props.className).toContain('items-baseline');
   });
 });

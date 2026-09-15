@@ -1,9 +1,9 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import { createElement, type ElementType } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { act, type ReactTestInstance } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { HOME_TAB_ROOT } from '@/lib/tour/tour-dismiss';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { TourScreen } from './tour-screen';
@@ -12,6 +12,9 @@ import { TourScreen } from './tour-screen';
 
 const routerBack = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
+// Models the navigator's own history: false means the tour is the app's first
+// route, where a GO_BACK has nothing to pop.
+const routerCanGoBack = vi.hoisted(() => ({ value: true }));
 const recordCompleted = vi.hoisted(() => vi.fn());
 const completionState = vi.hoisted(() => ({ isLoaded: true, isCompleted: false }));
 // Models React Native's BackHandler as a set of live subscriptions so a test
@@ -57,7 +60,11 @@ vi.mock('expo-router', async () => {
     useEffect: (effect: () => undefined | (() => void), deps: readonly unknown[]) => void;
   }>('react');
   return {
-    useRouter: () => ({ back: routerBack, replace: routerReplace }),
+    useRouter: () => ({
+      back: routerBack,
+      replace: routerReplace,
+      canGoBack: () => routerCanGoBack.value,
+    }),
     // `useFocusEffect` runs the callback while the route is focused and tears
     // it down on blur, matching React Navigation.
     useFocusEffect: (effect: () => undefined | (() => void)) => {
@@ -183,6 +190,7 @@ describe('TourScreen', () => {
   beforeEach(() => {
     routerBack.mockReset();
     routerReplace.mockReset();
+    routerCanGoBack.value = true;
     recordCompleted.mockReset();
     backHandler.reset();
     focusState.active = true;
@@ -267,6 +275,31 @@ describe('TourScreen', () => {
     expect(recordCompleted).toHaveBeenCalledTimes(1);
     expect(routerBack).toHaveBeenCalledTimes(1);
     expect(routerReplace).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('lands on Home instead of an unhandled GO_BACK when nothing is beneath the tour', async () => {
+    // A tour reached as the app's first route (deep link / restored pending
+    // navigation) has no screen to pop: an unguarded `router.back()` would
+    // dispatch a GO_BACK nothing handles, leaving the modal up behind the
+    // development-only banner. Skip and hard Back land on Home instead.
+    routerCanGoBack.value = false;
+    const { renderer, unmount } = await mountTour();
+
+    pressControl(renderer, 'Button', 'tour.skip');
+
+    expect(recordCompleted).toHaveBeenCalledTimes(1);
+    expect(routerBack).not.toHaveBeenCalled();
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+    expect(routerReplace).toHaveBeenCalledWith(HOME_TAB_ROOT);
+
+    // Hardware Back dismisses through the same guarded path.
+    act(() => {
+      backHandler.press();
+    });
+    expect(routerBack).not.toHaveBeenCalled();
+    expect(routerReplace).toHaveBeenCalledTimes(2);
 
     unmount();
   });

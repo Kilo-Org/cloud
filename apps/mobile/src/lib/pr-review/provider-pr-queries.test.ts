@@ -73,6 +73,7 @@ function loose(options: unknown) {
     procedure: string;
     input: Record<string, unknown>;
     enabled?: boolean;
+    select?: (result: unknown) => unknown;
     getNextPageParam?: (page: { nextCursor: string | null }) => unknown;
   };
 }
@@ -244,9 +245,52 @@ describe('normalizeProviderChecks', () => {
       ['completed', null],
       ['in_progress', null],
     ]);
-    // The skipped verdict rolls up as skipped; only the never-started pipeline
-    // is pending.
-    expect(result.rollup).toEqual({ total: 3, success: 0, failure: 0, pending: 1, skipped: 1 });
+    // The skipped verdict rolls up as skipped; the manual pipeline that never
+    // reported a verdict, and the pipeline that never started, both count as
+    // pending, so every run the checks section renders as a row is also in a
+    // bucket.
+    expect(result.rollup).toEqual({ total: 3, success: 0, failure: 0, pending: 2, skipped: 1 });
+  });
+
+  it('never counts a completed run in `total` without a bucket, so the rollup line matches the rows', () => {
+    // A GitLab `manual` head pipeline is terminal (`manual` is in the mobile
+    // terminal set) but carries no verdict the read layer maps, so it arrives
+    // as `completed` + `conclusion: null`. One passed plus one manual renders
+    // two rows; if the manual run only reached `total`, the line above them
+    // would read "1 passed".
+    const result = normalizeProviderChecks({
+      checks: [
+        { name: 'build', status: 'success', conclusion: 'success', detailsUrl: null },
+        { name: 'publish', status: 'manual', conclusion: null, detailsUrl: null },
+      ],
+    });
+    const { total, success, failure, pending, skipped } = result.rollup;
+    expect({ total, success, failure, pending, skipped }).toEqual({
+      total: 2,
+      success: 1,
+      failure: 0,
+      pending: 1,
+      skipped: 0,
+    });
+    expect(success + failure + pending + skipped).toBe(total);
+  });
+
+  it('routes the provider checks arm through that normalizer, so the section reads the bucketed rollup', () => {
+    const { trpc } = makeTrpc();
+    const select = loose(buildPrChecksQueryOptions(trpc, gitlabScope, 'head')).select;
+    if (typeof select !== 'function') {
+      throw new TypeError('the provider checks arm carries no select');
+    }
+    const model = select({
+      checks: [
+        { name: 'build', status: 'success', conclusion: 'success', detailsUrl: null },
+        { name: 'publish', status: 'manual', conclusion: null, detailsUrl: null },
+      ],
+    }) as {
+      rollup: { total: number; success: number; failure: number; pending: number; skipped: number };
+    };
+    const { total, success, failure, pending, skipped } = model.rollup;
+    expect(success + failure + pending + skipped).toBe(total);
   });
 });
 

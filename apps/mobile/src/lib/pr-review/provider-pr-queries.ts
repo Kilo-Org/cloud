@@ -92,8 +92,13 @@ function normalizeConclusion(conclusion: string | null): string | null {
   return conclusion === 'canceled' ? 'cancelled' : conclusion;
 }
 
-// Which rollup counter a completed run lands in; anything else (a neutral
-// or provider-specific verdict) counts only towards the total.
+// Which rollup counter a completed run lands in. A verdict no bucket names —
+// GitLab's finished `manual` pipeline, or any provider-specific one — counts
+// as pending, which is the bucket GitHub's own rollup puts a completed run
+// with an unmapped conclusion in (`rollupState` in
+// apps/web/src/lib/github-pr-review/mappers.ts). Every run that reaches
+// `total` is therefore also in a bucket, so the rollup line can never print
+// fewer checks than the rows the section renders below it.
 const ROLLUP_BUCKETS = new Map<string, 'success' | 'failure' | 'skipped'>([
   ['success', 'success'],
   ['failure', 'failure'],
@@ -139,10 +144,10 @@ export function normalizeProviderChecks(result: ProviderPrChecksResult): PrCheck
     if (run.status !== 'completed') {
       rollup.pending += 1;
     } else {
+      // An unmapped verdict counts as pending, never as nothing: the fallback
+      // is what keeps `total` equal to the sum of the buckets.
       const bucket = run.conclusion === null ? undefined : ROLLUP_BUCKETS.get(run.conclusion);
-      if (bucket) {
-        rollup[bucket] += 1;
-      }
+      rollup[bucket ?? 'pending'] += 1;
     }
   }
   return { checkRuns, rollup };

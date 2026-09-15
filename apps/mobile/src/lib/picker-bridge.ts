@@ -71,6 +71,13 @@ export type RepoPickerBridge = {
   repositories: RepoOption[];
   /** Grouped sections (recents, then providers) shown when the search box is empty. */
   sections: RepoPickerSection[];
+  /**
+   * The organization scope the rows were loaded under; `null` is personal.
+   * The picker keys its Bitbucket organization-only note on THIS, not on the
+   * app's globally selected organization: a Continue screen opened with a
+   * session's organization must not be described by the global selection.
+   */
+  organizationId: string | null;
   currentValue: string;
   onSelect: (repo: string) => void;
 };

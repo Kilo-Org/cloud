@@ -87,6 +87,8 @@ type NewSessionConfigureFormProps = {
   /** Recently used rows, threaded to the picker's "Recently used" section. */
   recents: NewSessionRepository[];
   selectedRepo: string;
+  /** The route's organization scope; `undefined` is a personal session. */
+  organizationId: string | undefined;
   // Environment profile (Cloud Agent only).
   profile: EffectiveAgentProfile | null;
   isProfileLoading: boolean;
@@ -153,6 +155,7 @@ export function NewSessionConfigureForm({
   repositories,
   recents,
   selectedRepo,
+  organizationId,
   profile,
   isProfileLoading,
   isProfileError,
@@ -281,6 +284,8 @@ export function NewSessionConfigureForm({
           repositories={repositories}
           recents={recents}
           value={selectedRepo}
+          organizationId={organizationId}
+          isCloneEntry={isCloneEntry}
         />
       ) : null}
 

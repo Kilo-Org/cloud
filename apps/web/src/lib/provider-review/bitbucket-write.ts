@@ -464,8 +464,19 @@ export async function unresolveThread(
 
 /**
  * Re-fetch the PR and compare the current head against the caller's fence.
- * A moved head is refused BEFORE any merge call, so a stale revision can
- * never merge another commit or be redirected.
+ * A moved head is refused BEFORE any merge call, so an already-stale revision
+ * is never merged.
+ *
+ * This read is a PREFLIGHT, not an atomic precondition: Bitbucket Cloud's
+ * merge endpoint
+ * (POST /repositories/{workspace}/{repo_slug}/pullrequests/{pull_request_id}/merge)
+ * accepts no revision field — its `pullrequest_merge_parameters` carries only
+ * `type`, `message`, `close_source_branch`, and `merge_strategy` — so this
+ * layer cannot pin the merge to `expectedHeadSha` the way GitLab's `sha` and
+ * GitHub's `sha` do. The merge request itself is the authoritative ref check:
+ * Bitbucket re-validates the refs while merging and answers 409 ("Unable to
+ * merge because one of the refs involved changed while attempting to merge"),
+ * which `classifyBitbucketStatus` surfaces as `stale_head`.
  */
 function requireHeadShaFence(
   pr: z.infer<typeof BitbucketPullRequestWriteSchema>,
@@ -478,9 +489,14 @@ function requireHeadShaFence(
 }
 
 /**
- * Merge the pull request. The caller's `expectedHeadSha` is re-verified
- * against a fresh fetch BEFORE any merge call, so the merge can only land the
- * exact revision the reviewer saw. `closeSourceBranch` is honored.
+ * Merge the pull request. `closeSourceBranch` is honored.
+ *
+ * `expectedHeadSha` is re-verified against a fresh fetch BEFORE any merge
+ * call, which refuses a head that already moved. It is NOT an atomic fence:
+ * Bitbucket Cloud exposes no client-supplied revision on its merge endpoint,
+ * so the merge request's own ref re-validation (409 → `stale_head`, via
+ * `classifyBitbucketStatus`) is what this layer can rely on, and it does not
+ * assert the preflight guarantees only the reviewed revision can land.
  */
 export async function mergePullRequest(
   target: BitbucketPrTarget & {

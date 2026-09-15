@@ -314,14 +314,36 @@ export type AddPrCommentInput = {
 // retry is ledger-deduped if the original write eventually lands.
 const PR_COMMENT_UI_DEADLINE_MS = 15_000;
 
-export function useAddPrCommentMutation() {
+export function useAddPrCommentMutation(ref?: ProviderPrRef) {
   const queryClient = useQueryClient();
-  const keys = useGithubDiscussionKeys();
+  const scope = useDiscussionScope(ref);
+  const keys = useDiscussionKeys(scope);
   const { getKey, rotateKey } = useHoistedOperationKey();
 
   return useMutation({
     mutationFn: async (input: AddPrCommentInput) => {
       try {
+        if (scope.ref.platform !== 'github') {
+          // The provider arm posts an unanchored top-level note: a
+          // conversation comment is not pinned to a diff position, so no
+          // `anchor` rides the input or the fingerprint.
+          const identity = providerWriteIdentity(scope);
+          const result = await withUiDeadline(
+            trpcClient.providerReview.addComment.mutate({
+              ...identity,
+              body: input.body,
+              operationKey: getKey(
+                prIntentFingerprint(
+                  'create_review_comment',
+                  providerFingerprintInput(scope.ref, { body: input.body })
+                )
+              ),
+            }),
+            PR_COMMENT_UI_DEADLINE_MS
+          );
+          rotateKey();
+          return result;
+        }
         const result = await withUiDeadline(
           trpcClient.githubPrReview.addIssueComment.mutate({
             ...input,
@@ -400,7 +422,9 @@ function useResolveToggleMutation(
             if (!isPrMutationRetryable(error)) {
               rotateKey();
             }
-            throw mapPrOperationError(error, 'reply');
+            // Not 'reply': the ledger's `operation_in_progress` copy must name
+            // the resolve/unresolve the user just repeated, not a reply.
+            throw mapPrOperationError(error, 'resolve');
           }
         }
       ),

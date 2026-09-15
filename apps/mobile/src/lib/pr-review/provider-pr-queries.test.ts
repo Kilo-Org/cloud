@@ -227,6 +227,27 @@ describe('normalizeProviderChecks', () => {
     const empty = { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 };
     expect(normalizeProviderChecks({ checks: [] })).toEqual({ checkRuns: [], rollup: empty });
   });
+
+  it('reads a finished-but-unmapped provider pipeline as completed, never as in progress', () => {
+    // gitlab-read resolves a conclusion only for success/failed/canceled, so a
+    // finished `skipped`/`manual` head pipeline arrives with `conclusion: null`
+    // and must not read as still running forever.
+    const result = normalizeProviderChecks({
+      checks: [
+        { name: 'docs', status: 'skipped', conclusion: null, detailsUrl: null },
+        { name: 'publish', status: 'manual', conclusion: null, detailsUrl: null },
+        { name: 'e2e', status: 'created', conclusion: null, detailsUrl: null },
+      ],
+    });
+    expect(result.checkRuns.map(run => [run.status, run.conclusion])).toEqual([
+      ['completed', 'skipped'],
+      ['completed', null],
+      ['in_progress', null],
+    ]);
+    // The skipped verdict rolls up as skipped; only the never-started pipeline
+    // is pending.
+    expect(result.rollup).toEqual({ total: 3, success: 0, failure: 0, pending: 1, skipped: 1 });
+  });
 });
 
 describe('normalizeProviderThreadsPage', () => {

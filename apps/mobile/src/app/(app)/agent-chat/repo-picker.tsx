@@ -9,7 +9,6 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useOrganization } from '@/lib/organization-context';
 import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
@@ -22,7 +21,6 @@ export default function RepoPickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { organizationId } = useOrganization();
   const [search, setSearch] = useState('');
   // The input stays urgent; the filtered list trails behind so a typing burst
   // on a large repository list does not filter/reconcile on every key.
@@ -197,12 +195,16 @@ export default function RepoPickerScreen() {
   /**
    * Personal Bitbucket never lists repositories (organization-only), so the
    * grouped list would end at GitLab with nothing explaining the gap. The
-   * note renders once, after the provider sections, in Personal context only.
+   * note renders once, after the provider sections, for the scope the rows
+   * were published under — the global organization selection can differ from
+   * the opening screen's scope (a Continue screen carries the session's own
+   * organization), and keying on the global one would contradict real
+   * Bitbucket rows or hide the explanation for the scope actually listed.
    * An absent Bitbucket section says nothing about scope: all its rows may
    * be in Recents, or an organization may have no Bitbucket repositories.
    */
   function renderBitbucketNote() {
-    if (search.trim() || !bridge || organizationId !== null) {
+    if (search.trim() || bridge?.organizationId !== null) {
       return null;
     }
     return (

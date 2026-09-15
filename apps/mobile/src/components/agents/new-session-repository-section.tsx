@@ -1,4 +1,4 @@
-import { Fragment, type ReactElement, useEffect } from 'react';
+import { Fragment, type ReactElement } from 'react';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +14,6 @@ import {
   type NewSessionRepository,
   type RepositoryGroup,
   type RepositoryPlatform,
-  resetSelectedBranchOverrides,
 } from './new-session-repository-state';
 
 type NewSessionRepositorySectionProps = {
@@ -28,6 +27,18 @@ type NewSessionRepositorySectionProps = {
   recents: NewSessionRepository[];
   groups: RepositoryGroup[];
   value: string;
+  /**
+   * The route's organization scope; `undefined` is a personal session. The
+   * branch query and the picker's Bitbucket note read it from here, so both
+   * match the rows this section was given.
+   */
+  organizationId: string | undefined;
+  /**
+   * The Continue clone entry reuses the repository picker but submits through
+   * the clone path, which has no `upstreamBranch` field: a branch row there
+   * would show a choice the submit silently drops, so it is not rendered.
+   */
+  isCloneEntry: boolean;
 };
 
 const PROVIDER_COPY = {
@@ -92,6 +103,8 @@ export function NewSessionRepositorySection({
   recents,
   groups,
   value,
+  organizationId,
+  isCloneEntry,
 }: Readonly<NewSessionRepositorySectionProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -107,14 +120,6 @@ export function NewSessionRepositorySection({
     repositories.find(repository => `${repository.platform}:${repository.fullName}` === value) ??
     null;
 
-  // The branch choice belongs to this screen: clear it when the section mounts
-  // and when it goes away, so a branch picked for one draft can never reach the
-  // next one.
-  useEffect(() => {
-    resetSelectedBranchOverrides();
-    return resetSelectedBranchOverrides;
-  }, []);
-
   return (
     <View className="mt-5">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">
@@ -127,12 +132,19 @@ export function NewSessionRepositorySection({
           repositories={repositories}
           recents={recents}
           isLoading={!hasRepos && anyLoading}
+          organizationId={organizationId ?? null}
           onChange={onChange}
           disabled={disabled}
         />
       )}
 
-      <RepositoryBranchSelector repository={selectedRepository} disabled={disabled} />
+      {isCloneEntry ? null : (
+        <RepositoryBranchSelector
+          repository={selectedRepository}
+          organizationId={organizationId}
+          disabled={disabled}
+        />
+      )}
 
       {groups.map(group => (
         <Fragment key={group.key}>{renderGroupCard(group.key, group.status)}</Fragment>

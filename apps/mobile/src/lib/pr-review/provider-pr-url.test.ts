@@ -58,6 +58,20 @@ describe('parseProviderPrUrl — GitLab', () => {
     );
   });
 
+  it('prefers the real marker when the project path itself contains merge_requests', () => {
+    // The first `merge_requests` segment is part of the project path; the
+    // trailing `-/merge_requests/7` is the marker. Returning the first match
+    // would open and comment on merge request 5 in `team/sub`.
+    expect(
+      parseProviderPrUrl('https://gitlab.com/team/sub/merge_requests/5/-/merge_requests/7')
+    ).toEqual({
+      platform: 'gitlab',
+      projectPath: 'team/sub/merge_requests/5',
+      mrIid: 7,
+      instanceHint: 'https://gitlab.com',
+    });
+  });
+
   it('tolerates trailing subpaths, queries and fragments', () => {
     expect(
       parseProviderPrUrl('https://gitlab.com/g/r/-/merge_requests/5/diffs?w=1#note_2')

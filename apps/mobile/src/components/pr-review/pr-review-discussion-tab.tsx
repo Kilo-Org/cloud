@@ -62,6 +62,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
 import { PrCommentCta } from '@/components/pr-review/discussion/pr-comment-cta';
+import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
@@ -268,6 +269,14 @@ export function PrReviewDiscussionTab({
   });
 
   const openConversationComment = () => {
+    // The provider route registers its own `conversation-comment` sheet: the
+    // GitHub literal would leave the provider scope and mount the GitHub
+    // layout with the GitHub-shaped triple (a GitLab project path has no
+    // `owner`/`repo` split).
+    if (ref.platform !== 'github') {
+      router.push(providerPrSheetHref(ref, 'conversation-comment'));
+      return;
+    }
     const href: Href = {
       pathname: CONVERSATION_COMMENT_PATH,
       params: { owner, repo, number },

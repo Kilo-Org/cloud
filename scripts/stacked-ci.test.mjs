@@ -9,18 +9,24 @@ const rootPath = '.github/workflows/ci.yml';
 const mobilePath = '.github/workflows/kilo-app-ci.yml';
 const checkPath = 'scripts/stacked-ci.test.mjs';
 const command = `node --test ${checkPath}`;
-const originalMobilePaths = [
-  'apps/mobile/**',
-  'packages/trpc/**',
-  'apps/web/src/routers/**',
-  'packages/app-shared/**',
-  'packages/kilo-chat/**',
-  'packages/kilo-chat-hooks/**',
-  'packages/event-service/**',
-  'packages/notifications/**',
-  'packages/cloud-agent-sdk/**',
-  'pnpm-lock.yaml',
-  mobilePath,
+// The path families the mobile change-detection grep must recognise. The PR
+// admission and the `push` trigger carry no filter, so this grep is the only
+// thing that gates the suite; a dropped or mistyped family silently reports
+// `mobile=false` and skips every required check, so it must be pinned.
+const mobilePathFragments = [
+  /apps\/mobile\//,
+  /packages\/trpc\//,
+  /apps\/web\/src\/routers\//,
+  /packages\/app-shared\//,
+  /packages\/kilo-chat\//,
+  /packages\/kilo-chat-hooks\//,
+  /packages\/event-service\//,
+  /packages\/notifications\//,
+  /packages\/cloud-agent-sdk\//,
+  /pnpm-lock\\?\.yaml/,
+  /kilo-app-ci\\?\.yml/,
+  /ci\\?\.yml/,
+  /stacked-ci\\?\.test\\?\.mjs/,
 ];
 
 function readWorkflows() {
@@ -79,6 +85,14 @@ function validateCheck(workflow, jobName) {
   if (jobName === 'mobile-changes') {
     const detectIndex = steps.findIndex(item => item.id === 'detect');
     assert.ok(detectIndex > checkIndex, 'mobile-changes: check before change detection');
+    const detect = steps[detectIndex];
+    for (const fragment of mobilePathFragments) {
+      assert.match(
+        detect.run ?? '',
+        fragment,
+        `mobile change-detection step must recognise ${fragment}`
+      );
+    }
   }
 }
 
@@ -102,7 +116,11 @@ function validate(root, mobile) {
   assert.deepEqual(root.permissions, { contents: 'read', 'pull-requests': 'read' });
   assert.deepEqual(mobile.permissions, { contents: 'read' });
   assert.ok('workflow_call' in mobile.on, 'mobile release caller must remain enabled');
-  assert.deepEqual(mobile.on.push.paths, [...originalMobilePaths, rootPath, checkPath]);
+  assert.equal(
+    mobile.on.push.paths,
+    undefined,
+    'push must not filter by path: the required suite checks must report on every main push'
+  );
   assert.equal(mobile.on.push['paths-ignore'], undefined);
   validateCheck(root, 'changes');
   validateCheck(mobile, 'mobile-changes');
@@ -122,15 +140,14 @@ for (const base of ['main', 'stack/level-one', 'arbitrary/parent-42']) {
   }
 }
 
-test('mobile keeps every existing push path, admits every PR, and stays main-only on push', () => {
+test('mobile admits every PR and every main push, stays main-only on push', () => {
   const [root, mobile] = readWorkflows();
-  for (const pattern of originalMobilePaths) {
-    const file = pattern.replace('**', 'fixture.ts');
+  for (const file of [mobilePath, 'apps/mobile/src/app/_layout.tsx', 'README.md']) {
+    assert.equal(admits(mobile, 'pull_request', 'stack/parent', [file]), true);
     assert.equal(admits(mobile, 'push', 'main', [file]), true);
     assert.equal(admits(mobile, 'push', 'stack/parent', [file]), false);
   }
   assert.equal(admits(root, 'push', 'stack/parent', [rootPath]), false);
-  assert.equal(admits(mobile, 'pull_request', 'stack/parent', ['README.md']), true);
 });
 
 test('mobile catches an isolated root main-only regression on a stacked base', () => {

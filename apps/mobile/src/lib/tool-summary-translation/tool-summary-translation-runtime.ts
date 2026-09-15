@@ -132,12 +132,7 @@ function emit(): void {
  * second surface each resolve on their own entry instead of evicting the other.
  */
 // eslint-disable-next-line max-params -- the language, model, part id and source text form the key
-function translationKey(
-  language: string,
-  modelId: string,
-  itemId: string,
-  text: string
-): string {
+function translationKey(language: string, modelId: string, itemId: string, text: string): string {
   return `${language}\u0000${modelId}\u0000${itemId}\u0000${text}`;
 }
 
@@ -183,12 +178,7 @@ function startHydration(): void {
       let seeded = false;
       for (const stored of entries) {
         const expiresAt = stored.storedAt + TOOL_SUMMARY_TRANSLATION_TTL_MS;
-        const key = translationKey(
-          stored.language,
-          stored.modelId,
-          stored.itemId,
-          stored.text
-        );
+        const key = translationKey(stored.language, stored.modelId, stored.itemId, stored.text);
         if (expiresAt > now && !cache.has(key)) {
           makeCacheRoom();
           cache.set(key, { translation: stored.translation, text: stored.text, expiresAt });

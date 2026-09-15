@@ -3023,22 +3023,13 @@
     "remoteOptionBody": "透過 `kilo remote` CLI 在你自己的電腦上執行 Kilo。",
     "skip": "跳過導覽",
     "tutorialLabel": "教學",
-    "cloudTitle": "開始你的第一個雲端工作階段",
-    "cloudBody": "建立新的工作階段，Kilo 會在雲端執行它。",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "正在等待你的雲端工作階段啟動…",
-    "cloudCheck": "你的第一個雲端工作階段正在執行。",
     "remoteTitle": "開始你的第一個遠端工作階段",
     "remoteBody": "連線你的電腦，然後從這裡啟動工作階段。",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "在你的電腦上啟動工作階段",
-    "remoteWaiting": "正在等待你的電腦啟動工作階段…",
-    "remoteCheck": "你的第一個遠端工作階段正在執行。",
     "remoteEmptyTitle": "尚未連線任何電腦",
     "remoteEmptyBody": "請在你的電腦上執行 `kilo remote` 以完成連線。",
     "remoteFound": "電腦已連線",
     "checkAgain": "重新檢查",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

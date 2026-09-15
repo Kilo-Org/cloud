@@ -3023,22 +3023,13 @@
     "remoteOptionBody": "Kjør Kilo på din egen maskin via `kilo remote`-CLI-en.",
     "skip": "Hopp over omvisning",
     "tutorialLabel": "Opplæring",
-    "cloudTitle": "Start din første sky-økt",
-    "cloudBody": "Opprett en ny økt, så kjører Kilo den i skyen.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Venter på at sky-økten skal starte…",
-    "cloudCheck": "Den første sky-økten kjører.",
     "remoteTitle": "Start din første remote-økt",
     "remoteBody": "Koble til datamaskinen din, og start økten herfra.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Start en økt på datamaskinen din",
-    "remoteWaiting": "Venter på at datamaskinen din skal starte økten…",
-    "remoteCheck": "Den første remote-økten kjører.",
     "remoteEmptyTitle": "Ingen datamaskin er koblet til ennå",
     "remoteEmptyBody": "For å koble den til, kjør `kilo remote` på datamaskinen din.",
     "remoteFound": "Datamaskin tilkoblet",
     "checkAgain": "Sjekk igjen",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

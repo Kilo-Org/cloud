@@ -3023,22 +3023,13 @@
     "remoteOptionBody": "`kilo remote` በሚባለው CLI በመጠቀም Kiloን በራስዎ ማሽን ላይ ያስኪዱ።",
     "skip": "ጉዞውን ዕለጥ",
     "tutorialLabel": "መመሪያ",
-    "cloudTitle": "የመጀመሪያውን የዳመና ክፍለ ጊዜ ይጀምሩ",
-    "cloudBody": "አዲስ ክፍለ ጊዜ ይፍጠሩ፤ Kilo ደግሞ በዳመና ውስጥ ያሰማራዋል።",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "የዳመና ክፍለ ጊዜዎ ለመጀመር እየጠበቀ ነው…",
-    "cloudCheck": "የመጀመሪያው የዳመና ክፍለ ጊዜዎ እየሠራ ነው።",
     "remoteTitle": "የመጀመሪያውን ሩቅ ክፍለ ጊዜ ይጀምሩ",
     "remoteBody": "ኮምፒውተርዎን ያገናኙ፣ ከዚያ ክፍለ ጊዜውን ከዚህ ይጀምሩ።",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "በኮምፒውተርዎ ላይ ክፍለ ጊዜ ይጀምሩ",
-    "remoteWaiting": "ኮምፒውተርዎ ክፍለ ጊዜውን ለማስጀመር እየጠበቀ ነው…",
-    "remoteCheck": "የመጀመሪያው ሩቅ ክፍለ ጊዜዎ እየሠራ ነው።",
     "remoteEmptyTitle": "እስካሁን የተገናኘ ኮምፒውተር የለም",
     "remoteEmptyBody": "ለማገናኘት በኮምፒውተርዎ ላይ `kilo remote`ን ያስኪዱ።",
     "remoteFound": "ኮምፒውተር ተገናኝቷል",
     "checkAgain": "እንደገና ይፈትሹ",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

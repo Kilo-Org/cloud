@@ -3023,22 +3023,13 @@
     "remoteOptionBody": "Kilo'ni o'z mashinangizda `kilo remote` CLI orqali ishga tushiring.",
     "skip": "Sayohatni o'tkazib yuborish",
     "tutorialLabel": "Qo'llanma",
-    "cloudTitle": "Birinchi bulut seansingizni boshlang",
-    "cloudBody": "Yangi seans yarating, Kilo uni bulutda ishga tushiradi.",
-    "cloudNewSession": "$t(common.newSession)",
-    "cloudWaiting": "Bulut seansingiz boshlanishi kutilmoqda…",
-    "cloudCheck": "Birinchi bulut seansingiz ishlayapti.",
     "remoteTitle": "Birinchi masofaviy seansingizni boshlang",
     "remoteBody": "Kompyuteringizni ulang, so'ng seansni shu yerdan boshlang.",
     "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteStart": "Kompyuteringizda seans boshlash",
-    "remoteWaiting": "Kompyuteringiz seansni boshlashi kutilmoqda…",
-    "remoteCheck": "Birinchi masofaviy seansingiz ishlayapti.",
     "remoteEmptyTitle": "Hozircha ulangan kompyuter yo'q",
     "remoteEmptyBody": "Uni ulash uchun kompyuteringizda `kilo remote` buyrug'ini bajaring.",
     "remoteFound": "Kompyuter ulandi",
     "checkAgain": "Yana tekshirish",
-    "networkError": "$t(authErrors.networkError)",
-    "retry": "$t(common.retry)"
+    "networkError": "$t(authErrors.networkError)"
   }
 }

@@ -255,7 +255,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "תמלול דרך Kilo Gateway",
     "gatewayTranscriptionSubtitle": "תמלל את ההכתבה בעזרת מודל של Kilo Gateway במקום זיהוי הדיבור של המכשיר. ההקלטה נשלחת ל־Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "כיווץ קריאות כלים",
+    "condenseToolCallsSubtitle": "קבץ קריאות כלים רצופות לשורה אחת שתוכל לפתוח.",
+    "toolSummaryTranslation": "תרגם סיכומי כלים",
+    "toolSummaryTranslationSubtitle": "שלח כל סיכום כלי למודל כדי לתרגם אותו לשפת האפליקציה שלך. המקור יוצג אם התרגום ייכשל.",
+    "toolSummaryTranslationModelUnavailableNotice": "המודל הזה כבר לא מוצע. הקש על $t(common.model) כדי לבחור אחר."
   },
   "notifications": {
     "liveActivities": "פעילויות בזמן אמת",
@@ -2072,6 +2077,10 @@
       "tapToListHint": "הקש על תיקייה כדי להציג את התוכן שלה.",
       "unsupportedDescription": "ה-CLI הזה אינו יכול להציג רשימת תיקיות. לחיצה על סיום תשמור את תיקיית ההפעלה. לחיצה על התחלת סשן תתחיל את הסשן בתיקייה הזו.",
       "unsupportedTitle": "לא ניתן להציג את התיקיות"
+    },
+    "toolRun": {
+      "sheetTitle": "קריאות כלים",
+      "condensedLabel": "{{itemCount}} פריטים; {{last}}"
     }
   },
   "bootstrap": {

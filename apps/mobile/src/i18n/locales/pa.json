@@ -255,7 +255,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ਰਾਹੀਂ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣਾ",
     "gatewayTranscriptionSubtitle": "ਡਿਵਾਈਸ ਦੀ ਸਪੀਚ ਰੈਕਗਨੀਸ਼ਨ ਦੀ ਥਾਂ Kilo Gateway ਮਾਡਲ ਨਾਲ ਵੌਇਸ ਇਨਪੁਟ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲੋ। ਤੁਹਾਡੀ ਰਿਕਾਰਡਿੰਗ Kilo Gateway ਨੂੰ ਭੇਜੀ ਜਾਂਦੀ ਹੈ।",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ਟੂਲ ਕਾਲਾਂ ਨੂੰ ਸੰਘਣਾ ਕਰੋ",
+    "condenseToolCallsSubtitle": "ਲਗਾਤਾਰ ਟੂਲ ਕਾਲਾਂ ਨੂੰ ਇੱਕ ਕਤਾਰ ਵਿੱਚ ਸਮੂਹਬੱਧ ਕਰੋ ਜਿਸਨੂੰ ਤੁਸੀਂ ਖੋਲ੍ਹ ਸਕਦੇ ਹੋ।",
+    "toolSummaryTranslation": "ਟੂਲ ਸਾਰਾਂਸ਼ਾਂ ਦਾ ਅਨੁਵਾਦ ਕਰੋ",
+    "toolSummaryTranslationSubtitle": "ਹਰ ਟੂਲ ਸਾਰਾਂਸ਼ ਨੂੰ ਤੁਹਾਡੀ ਐਪ ਦੀ ਭਾਸ਼ਾ ਵਿੱਚ ਅਨੁਵਾਦ ਕਰਨ ਲਈ ਮਾਡਲ ਨੂੰ ਭੇਜੋ। ਜੇ ਅਨੁਵਾਦ ਅਸਫਲ ਹੋਵੇ ਤਾਂ ਅਸਲ ਦਿਖਾਇਆ ਜਾਂਦਾ ਹੈ।",
+    "toolSummaryTranslationModelUnavailableNotice": "ਇਹ ਮਾਡਲ ਹੁਣ ਪੇਸ਼ ਨਹੀਂ ਕੀਤਾ ਜਾਂਦਾ। ਹੋਰ ਚੁਣਨ ਲਈ $t(common.model) 'ਤੇ ਟੈਪ ਕਰੋ।"
   },
   "prReview": {
     "pullRequestUnavailable": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
@@ -2492,6 +2497,10 @@
       "retryableDescription": "ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ। ‘ਹੋ ਗਿਆ’ 'ਤੇ ਟੈਪ ਕਰਕੇ ਅਜੇ ਵੀ ਇਸ ਫੋਲਡਰ ਦੀ ਚੋਣ ਦੀ ਪੁਸ਼ਟੀ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।",
       "unsupportedTitle": "ਫੋਲਡਰਾਂ ਦੀ ਸੂਚੀ ਨਹੀਂ ਦਿਖਾਈ ਜਾ ਸਕਦੀ",
       "unsupportedDescription": "ਇਹ CLI ਫੋਲਡਰਾਂ ਦੀ ਸੂਚੀ ਨਹੀਂ ਦਿਖਾ ਸਕਦਾ। ‘ਹੋ ਗਿਆ’ 'ਤੇ ਟੈਪ ਕਰਨ ਨਾਲ ਸ਼ੁਰੂਆਤੀ ਫੋਲਡਰ ਹੀ ਚੁਣਿਆ ਰਹੇਗਾ। ‘ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ’ 'ਤੇ ਟੈਪ ਕਰਨ ਨਾਲ ਸੈਸ਼ਨ ਉਸੇ ਫੋਲਡਰ ਵਿੱਚ ਸ਼ੁਰੂ ਹੋਵੇਗਾ।"
+    },
+    "toolRun": {
+      "sheetTitle": "ਟੂਲ ਕਾਲਾਂ",
+      "condensedLabel": "{{itemCount}} ਆਈਟਮਾਂ; {{last}}"
     }
   },
   "bootstrap": {

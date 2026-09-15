@@ -165,6 +165,28 @@ function findElementByType(node: Node, typeName: string): Record<string, unknown
   return null;
 }
 
+function findElementByClassName(
+  node: Node,
+  predicate: (className: string) => boolean
+): Record<string, unknown> | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const props = node.props ?? {};
+  const className = props.className;
+  if (typeof className === 'string' && predicate(className)) {
+    return props;
+  }
+  const children = props.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findElementByClassName(child as Node, predicate);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 /** Height of the first node carrying an explicit `style.height` (the clearance spacer). */
 function findElementHeight(node: Node): number | null {
   if (node === null || typeof node !== 'object') {
@@ -891,8 +913,46 @@ describe('NewSessionConfigureForm sandbox section', () => {
     ).toBe(true);
     expect(findTextContent(element, text => text === 'Use Default')).toBe(true);
     expect(findTextContent(element, text => text === 'Retry')).toBe(false);
-    expect(findElementByType(element, 'SandboxSelector')).toBeNull();
+    expect(findElementByType(element, 'SandboxSelector')).toMatchObject({
+      value: undefined,
+      capabilities: SANDBOX_CAPABILITIES,
+      disabled: false,
+    });
     expect(findElementByType(element, 'Button')?.onPress).toBe(onUseDefault);
+  });
+
+  it('keeps the reason row in the field slot with the selector rendered below it', async () => {
+    const element = await renderForm({
+      sandbox: sandboxState({ error: 'not-offered' }),
+    });
+    const column = findElementByClassName(element, className => className === 'gap-2');
+    expect(column).not.toBeNull();
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    const children = column!.children as { type?: string; props?: Record<string, unknown> }[];
+    expect(children).toHaveLength(2);
+    // Reason first, keeping the field's own 50px slot.
+    expect(children[0]?.type).toBe('View');
+    expect(children[0]?.props?.className).toBe('min-h-[50px] flex-row items-center gap-2');
+    // The selector sits below the reason so "choose another sandbox" is possible.
+    expect(children[1]?.type).toBe('SandboxSelector');
+  });
+
+  it('renders the reason, Use Default and the selector while Start is gated on a disabled verdict', async () => {
+    const element = await renderForm({
+      sandbox: sandboxState({
+        error: 'selection-unavailable',
+        capabilities: { enabled: false, options: [] },
+      }),
+    });
+    expect(findTextContent(element, text => text === 'Sandbox')).toBe(true);
+    expect(
+      findTextContent(
+        element,
+        text => text === 'This sandbox is unavailable. Choose another sandbox or Default.'
+      )
+    ).toBe(true);
+    expect(findTextContent(element, text => text === 'Use Default')).toBe(true);
+    expect(findElementByType(element, 'SandboxSelector')).not.toBeNull();
   });
 
   it('disables Use Default while the session is starting', async () => {

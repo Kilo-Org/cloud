@@ -33,14 +33,16 @@ type RenderSandboxSectionArgs = NewSessionSandboxState & {
 
 /**
  * The new-session Sandbox section, between the repository and Changes blocks.
- * The empty state renders no section at all: disabled capabilities mean there
- * is nothing to choose between, so the section has no CTA. Loading and both
- * failures render in the field's own slot so the sections below never move.
+ * The empty state (feature off, nothing picked) renders no section at all:
+ * there is nothing to choose between and no recovery to offer. With a settled
+ * error the pick may still be set, so the section stays to show the reason and
+ * the way out. Loading and the retryable failure render in the field's own
+ * slot so the sections below never move.
  * Lives in this module so the configure form stays under its line limit.
  */
 export function renderSandboxSection(args: Readonly<RenderSandboxSectionArgs>): ReactNode {
-  const { t, status, capabilities } = args;
-  if (status === 'ready' && capabilities?.enabled !== true) {
+  const { t, status, capabilities, error } = args;
+  if (status === 'ready' && capabilities?.enabled !== true && !error) {
     return null;
   }
   return (
@@ -81,20 +83,35 @@ function renderSandboxField({
     );
   }
   if (error) {
+    // Non-retryable: the picked sandbox is unavailable (or the feature is off
+    // with a pick still set). The reason row keeps the field's slot and Use
+    // Default is the one-tap way out; the selector stays rendered below so
+    // the copy's "choose another sandbox" is actually satisfiable.
     return (
-      <View className="min-h-[50px] flex-row items-center gap-2">
-        <Text className="flex-1 text-sm text-destructive">
-          {t('agentChat.newSession.sandboxUnavailable')}
-        </Text>
-        <Button
-          variant="link"
-          size="sm"
-          onPress={onUseDefault}
-          disabled={disabled}
-          accessibilityLabel={t('agentChat.newSession.sandboxUseDefault')}
-        >
-          <Text>{t('agentChat.newSession.sandboxUseDefault')}</Text>
-        </Button>
+      <View className="gap-2">
+        <View className="min-h-[50px] flex-row items-center gap-2">
+          <Text className="flex-1 text-sm text-destructive">
+            {t('agentChat.newSession.sandboxUnavailable')}
+          </Text>
+          <Button
+            variant="link"
+            size="sm"
+            onPress={onUseDefault}
+            disabled={disabled}
+            accessibilityLabel={t('agentChat.newSession.sandboxUseDefault')}
+          >
+            <Text>{t('agentChat.newSession.sandboxUseDefault')}</Text>
+          </Button>
+        </View>
+        {capabilities ? (
+          <SandboxSelector
+            value={value}
+            capabilities={capabilities}
+            organizationId={organizationId}
+            onChange={onChange}
+            disabled={disabled}
+          />
+        ) : null}
       </View>
     );
   }

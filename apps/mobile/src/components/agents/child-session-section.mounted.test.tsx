@@ -12,7 +12,7 @@ import { ChildSessionSection } from './child-session-section';
 const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
 
 vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
-  requestToolSummaryTranslation: requestMock,
+  requestToolSummaryTranslations: requestMock,
 }));
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -79,9 +79,9 @@ async function mountSection(
 async function settleTranslation(): Promise<void> {
   await act(async () => {
     for (let i = 0; i < 5; i += 1) {
-      // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the dynamic import and request
+      // eslint-disable-next-line no-await-in-loop -- real time for the batch window, then the macrotask that settles the dynamic import and request
       await new Promise<void>(resolve => {
-        setImmediate(resolve);
+        setTimeout(resolve, 20);
       });
     }
   });
@@ -105,7 +105,7 @@ describe('ChildSessionSection tool-summary translation gate', () => {
   });
 
   it('never requests a translation for the already-localized fallback task label', async () => {
-    requestMock.mockResolvedValue('Tâche');
+    requestMock.mockResolvedValue(['Tâche']);
     setConfig({ enabled: true, model: MODEL });
 
     const renderer = await mountSection({});
@@ -120,14 +120,14 @@ describe('ChildSessionSection tool-summary translation gate', () => {
   });
 
   it('requests a translation for a description-derived task name', async () => {
-    requestMock.mockResolvedValue('Tâche enfant');
+    requestMock.mockResolvedValue(['Tâche enfant']);
     setConfig({ enabled: true, model: MODEL });
 
     const renderer = await mountSection({ description: 'child task' });
     await settleTranslation();
 
     expect(requestMock).toHaveBeenCalledWith(
-      expect.objectContaining({ text: 'child task', model: MODEL.id })
+      expect.objectContaining({ texts: ['child task'], model: MODEL.id })
     );
     expect(textValues(renderer.root)).toContain('Tâche enfant');
     act(() => {
@@ -136,13 +136,13 @@ describe('ChildSessionSection tool-summary translation gate', () => {
   });
 
   it('requests a translation for a prompt-derived task name', async () => {
-    requestMock.mockResolvedValue('Faire la chose');
+    requestMock.mockResolvedValue(['Faire la chose']);
     setConfig({ enabled: true, model: MODEL });
 
     const renderer = await mountSection({ prompt: 'do the thing' });
     await settleTranslation();
 
-    expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ text: 'do the thing' }));
+    expect(requestMock).toHaveBeenCalledWith(expect.objectContaining({ texts: ['do the thing'] }));
     act(() => {
       renderer.unmount();
     });

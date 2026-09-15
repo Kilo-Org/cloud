@@ -5,20 +5,13 @@ import type * as runtimeModule from './tool-summary-translation-runtime';
 const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
 
 vi.mock('./tool-summary-translation-client', () => ({
-  requestToolSummaryTranslation: requestMock,
+  requestToolSummaryTranslations: requestMock,
 }));
 
 const MODEL = { id: 'kilo-auto/small', name: 'Auto Small' };
+const OTHER_MODEL = { id: 'kilo-auto/frontier', name: 'Auto Frontier' };
 
-/** Two macrotask rounds let the dynamic import and the mocked request settle. */
-// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-function flush(): Promise<void> {
-  return new Promise(resolve => {
-    setImmediate(() => {
-      setImmediate(resolve);
-    });
-  });
-}
+type BatchRequest = { texts: readonly string[]; targetLanguage: string; model: string };
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
 function loadRuntime(): Promise<typeof runtimeModule> {
@@ -26,62 +19,52 @@ function loadRuntime(): Promise<typeof runtimeModule> {
   return import('./tool-summary-translation-runtime');
 }
 
-type TranslationRequest = { text: string; targetLanguage: string; model: string };
-
-function requestCalls(): TranslationRequest[] {
-  return (requestMock.mock.calls as [TranslationRequest][]).map(args => args[0]);
+function requestCalls(): BatchRequest[] {
+  return (requestMock.mock.calls as [BatchRequest][]).map(args => args[0]);
 }
 
-/**
- * Resolve the client module's dynamic import once before the batch: vitest's
- * module runner resolves concurrent imports of the same mocked module slowly
- * and nondeterministically, which would make the in-flight count flaky.
- */
-async function warmClientImport(mod: typeof runtimeModule): Promise<void> {
-  requestMock.mockResolvedValueOnce('warm');
-  mod.ensureTranslation({ text: 'warmup', language: 'de', model: MODEL });
-  await vi.waitFor(() => {
-    expect(mod.getTranslation('warmup', 'de', MODEL.id)).toBe('warm');
-  });
-  requestMock.mockClear();
-}
-
-/**
- * Queue six items — more than MAX_CONCURRENT — so at least two are provably
- * still queued: items 0-3 occupy the four concurrency slots (even while
- * stuck on their lazy import), so items 4 and 5 cannot have started. Each
- * request stays pending until the test resolves it.
- */
-function queueSixPendingRequests(mod: typeof runtimeModule): (() => void)[] {
-  const resolveRequest: (() => void)[] = [];
+/** The mocked client echoes one translation per text of the batch. */
+function echoBatch(): void {
   requestMock.mockImplementation(
-    // eslint-disable-next-line typescript-eslint/promise-function-async -- the mock returns a promise the test resolves later
-    () =>
-      new Promise<string>(resolve => {
-        resolveRequest.push(() => {
-          resolve('translated');
-        });
+    // eslint-disable-next-line typescript-eslint/require-await -- the mock answers the batch synchronously
+    async ({ texts }: BatchRequest) => texts.map(text => `de:${text}`)
+  );
+}
+
+/**
+ * A client call that stays pending until the test resolves it, one resolver per
+ * call. Used by the in-flight generation cases.
+ */
+function pendingBatches(): ((results: (string | null)[]) => void)[] {
+  const resolvers: ((results: (string | null)[]) => void)[] = [];
+  requestMock.mockImplementation(
+    // eslint-disable-next-line typescript-eslint/require-await -- the mock hands back a promise the test resolves later
+    async () =>
+      new Promise<(string | null)[]>(resolve => {
+        resolvers.push(resolve);
       })
   );
-  for (let i = 0; i < 6; i += 1) {
-    mod.ensureTranslation({ text: `summary-${i}`, language: 'de', model: MODEL });
-  }
-  return resolveRequest;
+  return resolvers;
 }
 
-/** Long enough for a slow mocked client import to hand its item to the gateway mock. */
-async function quietPeriod(): Promise<void> {
+/** Longer than the 40 ms batch window plus the lazy client import. */
+async function flushBatch(): Promise<void> {
   await new Promise<void>(resolve => {
     setTimeout(resolve, 150);
   });
 }
 
-/** Resolve every request the mock has accepted so far, then let it settle. */
-async function settleRequests(resolveRequest: (() => void)[]): Promise<void> {
-  for (const resolve of resolveRequest.splice(0)) {
-    resolve();
-  }
-  await quietPeriod();
+/** Wait until every text of the batch is cached. */
+// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+function waitForTranslations(mod: typeof runtimeModule, texts: readonly string[]): Promise<void> {
+  return vi.waitFor(
+    () => {
+      for (const text of texts) {
+        expect(mod.getTranslation(text, 'de', MODEL.id)).toBe(`de:${text}`);
+      }
+    },
+    { timeout: 5000, interval: 20 }
+  );
 }
 
 beforeEach(() => {
@@ -98,163 +81,173 @@ describe('tool summary translation runtime', () => {
     });
   });
 
-  it('caches a resolved translation and bumps the version', async () => {
+  it('batches ten summaries enqueued in one tick into ONE client call', async () => {
     const mod = await loadRuntime();
-    requestMock.mockResolvedValue('übersetzt');
+    echoBatch();
+    const texts = Array.from({ length: 10 }, (_unused, index) => `summary ${index}`);
+
+    for (const text of texts) {
+      mod.ensureTranslation({ text, language: 'de', model: MODEL });
+    }
+    await waitForTranslations(mod, texts);
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(requestCalls()[0]).toEqual({
+      texts,
+      targetLanguage: 'de',
+      model: MODEL.id,
+    });
+    // Every row caches its own result, not the batch's first entry.
+    for (const text of texts) {
+      expect(mod.getTranslation(text, 'de', MODEL.id)).toBe(`de:${text}`);
+    }
+  });
+
+  it('caches a resolved translation and bumps the version once per batch', async () => {
+    const mod = await loadRuntime();
+    echoBatch();
     const before = mod.getVersion();
 
     mod.ensureTranslation({ text: 'hello', language: 'de', model: MODEL });
-    await flush();
+    await waitForTranslations(mod, ['hello']);
 
-    expect(requestMock).toHaveBeenCalledWith({
-      text: 'hello',
-      targetLanguage: 'de',
-      model: 'kilo-auto/small',
-    });
-    expect(mod.getTranslation('hello', 'de', MODEL.id)).toBe('übersetzt');
+    expect(mod.getTranslation('hello', 'de', MODEL.id)).toBe('de:hello');
     expect(mod.getVersion()).toBeGreaterThan(before);
   });
 
-  it('leaves no translation before the request settles', async () => {
+  it('makes a second request for a summary enqueued after the window', async () => {
     const mod = await loadRuntime();
-    requestMock.mockImplementation(
-      // eslint-disable-next-line typescript-eslint/promise-function-async -- the mock returns a pending promise the client resolves later
-      () =>
-        new Promise<string>(resolve => {
-          setTimeout(() => {
-            resolve('fertig');
-          }, 10);
-        })
-    );
+    echoBatch();
 
-    mod.ensureTranslation({ text: 'pending summary', language: 'de', model: MODEL });
-    expect(mod.getTranslation('pending summary', 'de', MODEL.id)).toBeUndefined();
+    mod.ensureTranslation({ text: 'first', language: 'de', model: MODEL });
+    await waitForTranslations(mod, ['first']);
+    mod.ensureTranslation({ text: 'second', language: 'de', model: MODEL });
+    await waitForTranslations(mod, ['second']);
 
-    await vi.waitFor(() => {
-      expect(mod.getTranslation('pending summary', 'de', MODEL.id)).toBe('fertig');
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(requestCalls()[1]).toEqual({
+      texts: ['second'],
+      targetLanguage: 'de',
+      model: MODEL.id,
     });
   });
 
-  it('does not cache a rejected translation and never throws', async () => {
+  it('carries the same text once in the batch', async () => {
+    const mod = await loadRuntime();
+    echoBatch();
+
+    mod.ensureTranslation({ text: 'same summary', language: 'de', model: MODEL });
+    mod.ensureTranslation({ text: 'same summary', language: 'de', model: MODEL });
+    await waitForTranslations(mod, ['same summary']);
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(requestCalls()[0]?.texts).toEqual(['same summary']);
+    expect(mod.getTranslation('same summary', 'de', MODEL.id)).toBe('de:same summary');
+  });
+
+  it('sends a full batch of 20 distinct texts in one request', async () => {
+    const mod = await loadRuntime();
+    echoBatch();
+    const first = Array.from({ length: 20 }, (_unused, index) => `summary ${index}`);
+
+    for (const text of first) {
+      mod.ensureTranslation({ text, language: 'de', model: MODEL });
+    }
+    await waitForTranslations(mod, first);
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(requestCalls()[0]?.texts).toHaveLength(20);
+
+    // A summary enqueued after that batch still goes out in its own request.
+    mod.ensureTranslation({ text: 'summary 20', language: 'de', model: MODEL });
+    await waitForTranslations(mod, ['summary 20']);
+
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(requestCalls()[1]).toEqual({
+      texts: ['summary 20'],
+      targetLanguage: 'de',
+      model: MODEL.id,
+    });
+  });
+
+  it('does not cache a rejected batch and never throws', async () => {
     const mod = await loadRuntime();
     requestMock.mockRejectedValue(new Error('gateway down'));
 
     mod.ensureTranslation({ text: 'broken summary', language: 'de', model: MODEL });
-    await flush();
+    await flushBatch();
 
     expect(mod.getTranslation('broken summary', 'de', MODEL.id)).toBeUndefined();
   });
 
-  it('dedupes identical concurrent requests into one client call', async () => {
+  it('keeps the original summaries when the batch resolves with nulls', async () => {
     const mod = await loadRuntime();
-    requestMock.mockImplementation(
-      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-      () =>
-        new Promise<string>(resolve => {
-          setTimeout(() => {
-            resolve('same');
-          }, 10);
-        })
-    );
+    requestMock.mockResolvedValue([null, null]);
 
-    mod.ensureTranslation({ text: 'same summary', language: 'de', model: MODEL });
-    mod.ensureTranslation({ text: 'same summary', language: 'de', model: MODEL });
+    mod.ensureTranslation({ text: 'summary-0', language: 'de', model: MODEL });
+    mod.ensureTranslation({ text: 'summary-1', language: 'de', model: MODEL });
+    await flushBatch();
 
-    await vi.waitFor(() => {
-      expect(requestMock).toHaveBeenCalledTimes(1);
-    });
-    await vi.waitFor(() => {
-      expect(mod.getTranslation('same summary', 'de', MODEL.id)).toBe('same');
-    });
-    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(mod.getTranslation('summary-0', 'de', MODEL.id)).toBeUndefined();
+    expect(mod.getTranslation('summary-1', 'de', MODEL.id)).toBeUndefined();
   });
 
   it('skips blank text', async () => {
     const mod = await loadRuntime();
 
     mod.ensureTranslation({ text: '   ', language: 'de', model: MODEL });
-    await flush();
+    await flushBatch();
 
     expect(requestMock).not.toHaveBeenCalled();
   });
 
-  it('drops queued work when the opt-in is disabled before the first request completes', async () => {
+  it('drops queued work when the opt-in is disabled before the window closes', async () => {
     const mod = await loadRuntime();
     mod.setConfig({ enabled: true, model: MODEL });
-    await warmClientImport(mod);
+    echoBatch();
 
-    const resolveRequest = queueSixPendingRequests(mod);
+    mod.ensureTranslation({ text: 'summary-0', language: 'de', model: MODEL });
     mod.setConfig({ enabled: false, model: MODEL });
-    await settleRequests(resolveRequest);
-    await settleRequests(resolveRequest);
+    await flushBatch();
 
-    // The two queued summaries never reach the gateway: only the four items
-    // holding the concurrency slots can be sent (vitest resolves the lazy
-    // client imports one at a time, so fewer may start within the window).
-    expect(requestCalls().length).toBeGreaterThanOrEqual(1);
-    expect(requestCalls().length).toBeLessThanOrEqual(4);
-    const texts = requestCalls().map(args => args.text);
-    expect(texts).not.toContain('summary-4');
-    expect(texts).not.toContain('summary-5');
-    // And the in-flight results are discarded: they belong to a prior generation.
-    for (let i = 0; i < 6; i += 1) {
-      expect(mod.getTranslation(`summary-${i}`, 'de', MODEL.id)).toBeUndefined();
-    }
+    // The queued summary was captured under the previous opt-in and never
+    // reaches the gateway.
+    expect(requestMock).not.toHaveBeenCalled();
+    expect(mod.getTranslation('summary-0', 'de', MODEL.id)).toBeUndefined();
   });
 
-  it('drops queued work when the model changes before the first request completes', async () => {
+  it('discards a batch that resolves after the model changed', async () => {
     const mod = await loadRuntime();
     mod.setConfig({ enabled: true, model: MODEL });
-    await warmClientImport(mod);
+    const resolvers = pendingBatches();
 
-    const resolveRequest = queueSixPendingRequests(mod);
-    const otherModel = { id: 'kilo-auto/frontier', name: 'Auto Frontier' };
-    mod.setConfig({ enabled: true, model: otherModel });
-    await settleRequests(resolveRequest);
-    await settleRequests(resolveRequest);
-
-    // No stale queued item is sent, and nothing from the old generation caches.
-    expect(requestCalls().length).toBeGreaterThanOrEqual(1);
-    expect(requestCalls().length).toBeLessThanOrEqual(4);
-    expect(requestCalls().every(args => args.model === MODEL.id)).toBe(true);
-    for (let i = 0; i < 6; i += 1) {
-      expect(mod.getTranslation(`summary-${i}`, 'de', MODEL.id)).toBeUndefined();
-    }
-
-    // The runtime still works under the new generation: the discarded summary
-    // is re-requested with the current model.
-    mod.ensureTranslation({ text: 'summary-0', language: 'de', model: otherModel });
+    mod.ensureTranslation({ text: 'summary-0', language: 'de', model: MODEL });
     await vi.waitFor(() => {
-      expect(requestCalls().some(args => args.model === otherModel.id)).toBe(true);
+      expect(requestMock).toHaveBeenCalledTimes(1);
     });
-    await settleRequests(resolveRequest);
-    expect(mod.getTranslation('summary-0', 'de', otherModel.id)).toBe('translated');
+
+    // The model changes while the batch is in flight: its results belong to the
+    // previous generation and must not cache.
+    mod.setConfig({ enabled: true, model: OTHER_MODEL });
+    resolvers[0]?.(['translated']);
+    await flushBatch();
+
+    expect(mod.getTranslation('summary-0', 'de', MODEL.id)).toBeUndefined();
+    expect(requestCalls().every(call => call.model === MODEL.id)).toBe(true);
   });
 
-  it('re-requests a summary whose stale request is still in flight after a config change', async () => {
+  it('re-requests a summary whose stale batch is still in flight after a config change', async () => {
     const mod = await loadRuntime();
     mod.setConfig({ enabled: true, model: MODEL });
-    await warmClientImport(mod);
+    const resolvers = pendingBatches();
 
-    const resolveRequest: (() => void)[] = [];
-    requestMock.mockImplementation(
-      // eslint-disable-next-line typescript-eslint/promise-function-async -- the mock returns a promise the test resolves later
-      () =>
-        new Promise<string>(resolve => {
-          resolveRequest.push(() => {
-            resolve('translated');
-          });
-        })
-    );
-
-    // One request for the key, left pending so it is still in flight.
     mod.ensureTranslation({ text: 'summary-0', language: 'de', model: MODEL });
     await vi.waitFor(() => {
       expect(requestMock).toHaveBeenCalledTimes(1);
     });
 
     // The opt-in goes off and back on: the key is unchanged, but the pending
-    // request belongs to the previous generation and its result is discarded.
+    // batch belongs to the previous generation and its result is discarded.
     mod.setConfig({ enabled: false, model: MODEL });
     mod.setConfig({ enabled: true, model: MODEL });
 
@@ -265,14 +258,16 @@ describe('tool summary translation runtime', () => {
       expect(requestMock).toHaveBeenCalledTimes(2);
     });
 
-    // The stale call resolves first and is discarded without caching.
-    const [staleResolve] = resolveRequest.splice(0, 1);
-    staleResolve?.();
-    await quietPeriod();
+    // The stale batch resolves first: it caches nothing, and its bookkeeping
+    // must not delete the replacement's in-flight entry.
+    resolvers[0]?.(['stale']);
+    await flushBatch();
     expect(mod.getTranslation('summary-0', 'de', MODEL.id)).toBeUndefined();
 
-    // The current-generation call resolves and translates the row.
-    await settleRequests(resolveRequest);
-    expect(mod.getTranslation('summary-0', 'de', MODEL.id)).toBe('translated');
+    // The current-generation batch resolves and translates the row.
+    resolvers[1]?.(['translated']);
+    await vi.waitFor(() => {
+      expect(mod.getTranslation('summary-0', 'de', MODEL.id)).toBe('translated');
+    });
   });
 });

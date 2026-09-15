@@ -19,7 +19,7 @@ import { ToolSummaryTranslationScope } from './tool-summary-translation-scope';
 const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
 
 vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
-  requestToolSummaryTranslation: requestMock,
+  requestToolSummaryTranslations: requestMock,
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -288,9 +288,9 @@ function renderScopedRowSync(props: RowProps): TestRenderer.ReactTestRenderer {
 async function settleTranslation(): Promise<void> {
   await act(async () => {
     for (let i = 0; i < 5; i += 1) {
-      // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the dynamic import and request
+      // eslint-disable-next-line no-await-in-loop -- real time for the batch window, then the macrotask that settles the dynamic import and request
       await new Promise<void>(resolve => {
-        setImmediate(resolve);
+        setTimeout(resolve, 20);
       });
     }
   });
@@ -303,7 +303,7 @@ describe('FixedPartRow tool-summary translation', () => {
   });
 
   it('translates the visible label and the spoken summary inside the scope', async () => {
-    requestMock.mockResolvedValue('Lire le fichier');
+    requestMock.mockResolvedValue(['Lire le fichier']);
     setConfig({ enabled: true, model: MODEL });
     const renderer = renderScopedRowSync({
       icon: Eye,
@@ -324,7 +324,7 @@ describe('FixedPartRow tool-summary translation', () => {
   });
 
   it('keeps the raw label and makes no request outside the scope while enabled', async () => {
-    requestMock.mockResolvedValue('Traduit');
+    requestMock.mockResolvedValue(['Traduit']);
     setConfig({ enabled: true, model: MODEL });
     const renderer = await renderRow({
       icon: Eye,
@@ -363,7 +363,7 @@ describe('FixedPartRow tool-summary translation', () => {
   });
 
   it('keeps the raw label and makes no request inside the scope while disabled', async () => {
-    requestMock.mockResolvedValue('Traduit');
+    requestMock.mockResolvedValue(['Traduit']);
     setConfig({ enabled: false, model: MODEL });
     const renderer = renderScopedRowSync({
       icon: Eye,
@@ -383,7 +383,7 @@ describe('FixedPartRow tool-summary translation', () => {
   });
 
   it('keeps the raw label and makes no request for a non-translatable label', async () => {
-    requestMock.mockResolvedValue('Traduit');
+    requestMock.mockResolvedValue(['Traduit']);
     setConfig({ enabled: true, model: MODEL });
     const renderer = renderScopedRowSync({
       icon: Eye,

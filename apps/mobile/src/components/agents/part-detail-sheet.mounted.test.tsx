@@ -26,7 +26,7 @@ import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translati
 const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
 
 vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
-  requestToolSummaryTranslation: requestMock,
+  requestToolSummaryTranslations: requestMock,
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -737,9 +737,9 @@ function makeToolPartWithInput(id: string, tool: string, input: Record<string, u
 async function settleTranslation(): Promise<void> {
   await act(async () => {
     for (let i = 0; i < 5; i += 1) {
-      // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the dynamic import and request
+      // eslint-disable-next-line no-await-in-loop -- real time for the batch window, then the macrotask that settles the dynamic import and request
       await new Promise<void>(resolve => {
-        setImmediate(resolve);
+        setTimeout(resolve, 20);
       });
     }
   });
@@ -752,7 +752,7 @@ describe('PartDetailSheet tool-summary translation gate', () => {
   });
 
   it('never requests a translation for a deliberately non-translatable tool header', async () => {
-    requestMock.mockResolvedValue('Liste des tâches');
+    requestMock.mockResolvedValue(['Liste des tâches']);
     setConfig({ enabled: true, model: TRANSLATION_MODEL });
 
     const renderer = await mountSheet(makeToolPartWithInput('todo-1', 'todoread', {}));
@@ -763,7 +763,7 @@ describe('PartDetailSheet tool-summary translation gate', () => {
   });
 
   it('requests a translation for a content-bearing tool header', async () => {
-    requestMock.mockResolvedValue('lire : app.ts');
+    requestMock.mockResolvedValue(['lire : app.ts']);
     setConfig({ enabled: true, model: TRANSLATION_MODEL });
 
     const renderer = await mountSheet(
@@ -772,7 +772,7 @@ describe('PartDetailSheet tool-summary translation gate', () => {
     await settleTranslation();
 
     expect(requestMock).toHaveBeenCalledWith(
-      expect.objectContaining({ text: 'read: app.ts', model: TRANSLATION_MODEL.id })
+      expect.objectContaining({ texts: ['read: app.ts'], model: TRANSLATION_MODEL.id })
     );
     await unmount(renderer);
   });

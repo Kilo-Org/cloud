@@ -8,7 +8,7 @@ import { useTranslatedToolSummary } from './use-translated-tool-summary';
 const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
 
 vi.mock('./tool-summary-translation-client', () => ({
-  requestToolSummaryTranslation: requestMock,
+  requestToolSummaryTranslations: requestMock,
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ i18n: { language: 'de' } }) }));
 
@@ -55,9 +55,9 @@ function mount(text: string, enabled?: boolean): { latest: () => string; unmount
 async function settle(): Promise<void> {
   await act(async () => {
     for (let i = 0; i < 5; i += 1) {
-      // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the dynamic import and request
+      // eslint-disable-next-line no-await-in-loop -- real time for the batch window, then the macrotask that settles the dynamic import and request
       await new Promise<void>(resolve => {
-        setImmediate(resolve);
+        setTimeout(resolve, 20);
       });
     }
   });
@@ -69,7 +69,7 @@ beforeEach(() => {
 
 describe('useTranslatedToolSummary', () => {
   it('renders the raw text when the preference is off', async () => {
-    requestMock.mockResolvedValue('translated');
+    requestMock.mockResolvedValue(['translated']);
     setConfig({ enabled: false, model: MODEL });
     const { latest, unmount } = mount('Off summary');
 
@@ -81,7 +81,7 @@ describe('useTranslatedToolSummary', () => {
   });
 
   it('renders the raw text when disabled for this row', async () => {
-    requestMock.mockResolvedValue('translated');
+    requestMock.mockResolvedValue(['translated']);
     setConfig({ enabled: true, model: MODEL });
     const { latest, unmount } = mount('Row-disabled summary', false);
 
@@ -93,7 +93,7 @@ describe('useTranslatedToolSummary', () => {
   });
 
   it('shows the translation once it resolves', async () => {
-    requestMock.mockResolvedValue('Bonjour');
+    requestMock.mockResolvedValue(['Bonjour']);
     setConfig({ enabled: true, model: MODEL });
     const { latest, unmount } = mount('Hello');
 

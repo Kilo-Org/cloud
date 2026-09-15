@@ -31,7 +31,9 @@ export type ToolSummaryTranslation = {
  * `pending` is true only while translation is on for this text and the runtime
  * holds no translation for it: a row that embeds the summary in a sentence of
  * its own (`CondensedToolRunRow`) has nowhere to put the original English while
- * it waits, so it reads this flag instead of the fallback text.
+ * it waits, so it reads this flag instead of the fallback text. The runtime
+ * re-requests a summary whose request failed or timed out, with backoff, so
+ * this flag clears on its own once the gateway answers.
  */
 export function useToolSummaryTranslation(text: string, enabled = true): ToolSummaryTranslation {
   const { i18n } = useTranslation();

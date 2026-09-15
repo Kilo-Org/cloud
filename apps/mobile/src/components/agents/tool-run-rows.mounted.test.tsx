@@ -3,7 +3,7 @@ import '@/i18n';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 
@@ -152,6 +152,36 @@ describe('CondensedToolRunRow label', () => {
 
     expect(textWithContent(renderer.root, '3 items')).toHaveLength(1);
     expect(texts(renderer).some(text => text.includes('untranslated.ts'))).toBe(false);
+    renderer.unmount();
+  });
+
+  it('re-requests a summary whose translation failed so the count-only label can resolve', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    // One gateway hiccup, then a healthy answer: the row must ask again rather
+    // than keep the count-only label for the rest of its life.
+    requestMock.mockRejectedValueOnce(new Error('gateway down')).mockResolvedValue('Nouveau');
+    setConfig({ enabled: true, model: MODEL });
+    const renderer = renderCondensed(runOf('flaky.ts'));
+
+    await settleTranslation();
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(textWithContent(renderer.root, '3 items')).toHaveLength(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+      for (let i = 0; i < 5; i += 1) {
+        // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the retried request
+        await new Promise<void>(resolve => {
+          setImmediate(resolve);
+        });
+      }
+    });
+
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(textWithContent(renderer.root, '3 items; Nouveau')).toHaveLength(1);
     renderer.unmount();
   });
 

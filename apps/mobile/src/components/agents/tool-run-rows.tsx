@@ -60,7 +60,8 @@ export function ToolOneLineRow({
  * count keeps the localized `condensedLabel` copy. While that translation is on
  * its way the label carries the count alone: the raw English summary inside an
  * otherwise translated sentence reads as a glitch, so the row waits for the
- * summary the app would show.
+ * summary the app would show. That wait is bounded by the runtime, which
+ * re-requests a summary whose translation failed or timed out.
  */
 export function CondensedToolRunRow({ parts }: Readonly<{ parts: readonly ToolPart[] }>) {
   const { t } = useTranslation();

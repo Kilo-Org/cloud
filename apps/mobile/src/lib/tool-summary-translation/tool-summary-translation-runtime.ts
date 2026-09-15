@@ -32,6 +32,15 @@ type QueueItem = {
 const CACHE_CAP = 500;
 const MAX_CONCURRENT = 4;
 
+/**
+ * First retry delay for a summary whose request produced no translation. Each
+ * further attempt for the same key doubles it, capped at
+ * `TOOL_SUMMARY_TRANSLATION_RETRY_MAX_MS`.
+ */
+export const TOOL_SUMMARY_TRANSLATION_RETRY_BASE_MS = 2000;
+/** Ceiling for the retry backoff: a gateway that stays down is polled slowly. */
+export const TOOL_SUMMARY_TRANSLATION_RETRY_MAX_MS = 30_000;
+
 let config: ToolSummaryTranslationConfig = {
   enabled: false,
   model: DEFAULT_TOOL_SUMMARY_TRANSLATION_MODEL,
@@ -43,6 +52,13 @@ const cache = new Map<string, string>();
 // must not delete the entry its replacement just stored.
 const inFlight = new Map<string, symbol>();
 const queue: QueueItem[] = [];
+/**
+ * Per-key retry attempts, the delay exponent for `scheduleRetry`. A request
+ * that settles with no translation leaves nothing cached and is not re-queued
+ * by anyone else, so without this a failed summary would keep a row's
+ * count-only label for the row's whole life.
+ */
+const retryAttempts = new Map<string, number>();
 let active = 0;
 let version = 0;
 /**
@@ -99,6 +115,7 @@ export function setConfig(next: ToolSummaryTranslationConfig): void {
   generation += 1;
   queue.length = 0;
   inFlight.clear();
+  retryAttempts.clear();
   version += 1;
   emit();
 }
@@ -123,8 +140,19 @@ function remember(key: string, translated: string): void {
   emit();
 }
 
-/** Fallback contract: nothing thrown here may reach a transcript row. */
+/**
+ * Fallback contract: nothing thrown here may reach a transcript row. A request
+ * that settles without a translation (`null`, or a thrown client) is asked
+ * again later: the runtime is the only thing that ever requests a summary, so
+ * without a retry one gateway hiccup would leave every row that embeds the
+ * summary in its own copy (`CondensedToolRunRow`) on the count-only label for
+ * the row's whole life. Rows that can fall back in place show the original
+ * meanwhile.
+ */
 async function run(item: QueueItem, token: symbol): Promise<void> {
+  // Retry only work the current configuration still wants: a config change
+  // supersedes this request, and that generation re-requests on its own.
+  let retry = false;
   try {
     const { requestToolSummaryTranslation } = await import('./tool-summary-translation-client');
     const translated = await requestToolSummaryTranslation({
@@ -133,10 +161,13 @@ async function run(item: QueueItem, token: symbol): Promise<void> {
       model: item.model.id,
     });
     if (translated !== null && item.generation === generation) {
+      retryAttempts.delete(item.key);
       remember(item.key, translated);
+    } else {
+      retry = item.generation === generation;
     }
   } catch {
-    // Leave it uncached; the original summary stays visible (layout is fixed).
+    retry = item.generation === generation;
   } finally {
     active -= 1;
     // Delete only this request's entry: a config change clears the map and a
@@ -144,8 +175,32 @@ async function run(item: QueueItem, token: symbol): Promise<void> {
     if (inFlight.get(item.key) === token) {
       inFlight.delete(item.key);
     }
+    if (retry) {
+      scheduleRetry(item);
+    }
     pump();
   }
+}
+
+/**
+ * Re-queue a summary whose request settled without a translation, after a
+ * per-summary backoff so a gateway that stays down is polled slowly rather
+ * than hammered. The wait checks the generation, exactly like queued work, so
+ * a config change during the wait drops the retry.
+ */
+function scheduleRetry(item: QueueItem): void {
+  const attempt = (retryAttempts.get(item.key) ?? 0) + 1;
+  retryAttempts.set(item.key, attempt);
+  const delay = Math.min(
+    TOOL_SUMMARY_TRANSLATION_RETRY_BASE_MS * 2 ** (attempt - 1),
+    TOOL_SUMMARY_TRANSLATION_RETRY_MAX_MS
+  );
+  setTimeout(() => {
+    if (item.generation !== generation) {
+      return;
+    }
+    ensureTranslation({ text: item.text, language: item.language, model: item.model });
+  }, delay);
 }
 
 function pump(): void {

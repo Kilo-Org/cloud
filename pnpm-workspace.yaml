@@ -195,6 +195,16 @@ patchedDependencies:
   expo-task-manager@57.0.16: patches/expo-task-manager@57.0.16.patch
   expo-widgets@57.0.18: patches/expo-widgets@57.0.18.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
+  # Android cold-start SIGSEGV in MountingCoordinator::pullTransaction: the
+  # JS-thread pull locks the coordinator's weak_ptr to react-native-screens'
+  # ScreenRemovalListener while NativeProxy teardown frees it, and the virtual
+  # call lands on freed memory. Carries the upstream process-lifetime listener
+  # fix verbatim (software-mansion/react-native-screens#4413, shipped in
+  # 4.28.0); screens compiles its C++ from source on Android, so the patch
+  # reaches the crash without a from-source RN build. See
+  # patches/react-native-screens@4.26.2.patch and
+  # dev/local/react-native-screens-mounting-crash-patch.test.ts.
+  react-native-screens@4.26.2: patches/react-native-screens@4.26.2.patch
   # Fabric mounting race: RCTComponentViewFactory registers component views from
   # the JS thread without the class-map mutex, so a mounting transaction can
   # dereference an unregistered handle and crash (EXC_BAD_ACCESS 0x18,

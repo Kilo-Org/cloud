@@ -1,7 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { QWEN37_MAX_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
 import { GET } from './route';
 import { GET as openRouterV1GET } from '@/app/api/openrouter/v1/models/[provider]/[model]/endpoints/route';
 import { GET as gatewayV1GET } from '@/app/api/gateway/v1/models/[provider]/[model]/endpoints/route';
@@ -110,11 +110,11 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
 
   test('applies custom pricing to every priced endpoint', async () => {
     const model = {
-      id: QWEN37_MAX_MODEL_ID,
-      name: 'Qwen: Qwen3.7 Max',
+      id: GEMINI_FLASH_CURRENT_MODEL_ID,
+      name: 'Google: Gemini 3.8 Flash',
       endpoints: [
         {
-          provider_name: 'Alibaba',
+          provider_name: 'Google',
           pricing: { prompt: '0.000001', completion: '0.000002' },
         },
         {
@@ -135,21 +135,21 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     const data = (await response.json()).data;
     expect(data.endpoints).toEqual([
       {
-        provider_name: 'Alibaba',
+        provider_name: 'Google',
         pricing: {
-          prompt: '0.000001250000',
+          prompt: '0.000000750000',
           completion: '0.000003750000',
-          input_cache_read: '0.000000125000',
-          input_cache_write: '0.000001562500',
+          input_cache_read: '0.000000075000',
+          input_cache_write: '0.000000041667',
         },
       },
       {
         provider_name: 'Another provider',
         pricing: {
-          prompt: '0.000001250000',
+          prompt: '0.000000750000',
           completion: '0.000003750000',
-          input_cache_read: '0.000000125000',
-          input_cache_write: '0.000001562500',
+          input_cache_read: '0.000000075000',
+          input_cache_write: '0.000000041667',
         },
       },
       { provider_name: 'Unpriced' },

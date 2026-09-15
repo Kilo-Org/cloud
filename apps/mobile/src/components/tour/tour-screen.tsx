@@ -14,6 +14,7 @@ import { Cloud, type LucideIcon, Monitor, Sparkles } from '@/components/ui/icons
 import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { PRESELECT_CLOUD_RUN_ON } from '@/lib/run-on-destination';
 import { dismissTour } from '@/lib/tour/tour-dismiss';
 import { useTourCompletion } from '@/lib/tour/tour-completion';
@@ -111,7 +112,10 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
 
 export function TourScreen() {
   const { t } = useTranslation();
+  // `dismissTour` needs `canGoBack`/`back`; the hand-off needs the stack-safe
+  // replace, so the two exits use two routers.
   const router = useRouter();
+  const stackSafeRouter = useStackSafeReplace();
   const insets = useSafeAreaInsets();
   const { userId } = useCurrentUserId();
   const { recordCompleted } = useTourCompletion(userId);
@@ -129,16 +133,22 @@ export function TourScreen() {
     dismissTour(router);
   }, [recordCompleted, router]);
 
-  // The hand-off ends the tour: record the decision, then replace the tour
-  // with the new-session page. `replace` (never `push`) so Back from the form
-  // lands on the screen that opened the tour, not back on the fork. The route
-  // param is transient — the stored run-on preference is never written here.
+  // The hand-off ends the tour: record the decision, then open the
+  // new-session page over the tour. The tour route and `/agent-chat/new` are
+  // screens of the same native Stack, so a literal `router.replace` would swap
+  // both in one native-stack commit — the Android Fabric `addViewAt` crash the
+  // stack-safe replace exists for (KILO-APP-25). It pushes instead and drops
+  // the tour route once the push transition has ended, the same end state
+  // `replace` produces. The route param is transient — the stored run-on
+  // preference is never written here.
   const handOff = useCallback(
     (value: string) => {
       recordCompleted();
-      router.replace(`/(app)/agent-chat/new?preselectRunOn=${encodeURIComponent(value)}` as Href);
+      stackSafeRouter.replace(
+        `/(app)/agent-chat/new?preselectRunOn=${encodeURIComponent(value)}` as Href
+      );
     },
-    [recordCompleted, router]
+    [recordCompleted, stackSafeRouter]
   );
 
   const choosePath = useCallback(

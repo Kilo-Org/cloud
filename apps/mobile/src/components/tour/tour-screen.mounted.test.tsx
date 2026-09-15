@@ -12,6 +12,11 @@ import { TourScreen } from './tour-screen';
 
 const routerBack = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
+// The hand-off's router. A literal `router.replace` swaps the tour and the
+// new-session page in one native-stack commit, which crashes Android Fabric
+// (KILO-APP-25), so the shell must route the hand-off through the stack-safe
+// replace instead.
+const stackSafeReplace = vi.hoisted(() => vi.fn());
 // Models the navigator's own history: false means the tour is the app's first
 // route, where a GO_BACK has nothing to pop.
 const routerCanGoBack = vi.hoisted(() => ({ value: true }));
@@ -81,6 +86,14 @@ vi.mock('expo-router', async () => {
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
+}));
+
+// The push + post-transition cleanup that keeps Android's native stack alive is
+// covered by src/lib/navigation/stack-safe-replace.mounted.test.tsx; here it
+// stands in so the shell's hand-off can be asserted to use it (and not a
+// literal `router.replace`, which is what KILO-APP-25 crashed on).
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: stackSafeReplace }),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -190,6 +203,7 @@ describe('TourScreen', () => {
   beforeEach(() => {
     routerBack.mockReset();
     routerReplace.mockReset();
+    stackSafeReplace.mockReset();
     routerCanGoBack.value = true;
     recordCompleted.mockReset();
     backHandler.reset();
@@ -229,8 +243,11 @@ describe('TourScreen', () => {
     // The Cloud card does not open a step: it completes the tour by handing
     // straight to the form, and it never pops the tour.
     expect(recordCompleted).toHaveBeenCalledTimes(1);
-    expect(routerReplace).toHaveBeenCalledTimes(1);
-    expect(routerReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=cloud');
+    // The hand-off goes through the stack-safe replace, not a literal
+    // `router.replace`, so the tour and the form never swap in one commit.
+    expect(stackSafeReplace).toHaveBeenCalledTimes(1);
+    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=cloud');
+    expect(routerReplace).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();
     expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(0);
 
@@ -247,6 +264,7 @@ describe('TourScreen', () => {
     // Opening the page is not a decision: nothing is recorded until a
     // computer is tapped or the person skips.
     expect(recordCompleted).not.toHaveBeenCalled();
+    expect(stackSafeReplace).not.toHaveBeenCalled();
     expect(routerReplace).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();
 
@@ -260,8 +278,9 @@ describe('TourScreen', () => {
     chooseComputer(renderer, 'conn-1');
 
     expect(recordCompleted).toHaveBeenCalledTimes(1);
-    expect(routerReplace).toHaveBeenCalledTimes(1);
-    expect(routerReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=conn-1');
+    expect(stackSafeReplace).toHaveBeenCalledTimes(1);
+    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=conn-1');
+    expect(routerReplace).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();
 
     unmount();
@@ -363,7 +382,7 @@ describe('TourScreen', () => {
     expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(1);
 
     chooseComputer(renderer, 'conn-1');
-    expect(routerReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=conn-1');
+    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=conn-1');
 
     unmount();
   });

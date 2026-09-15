@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 
+const mockedWarnExceptInTest = jest.fn();
+
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   ...jest.requireActual<typeof GatewayModelsCache>(
     '@/lib/ai-gateway/providers/gateway-models-cache'
   ),
   getOpenRouterModelsFromDatabase: jest.fn(),
+}));
+
+jest.mock('@/lib/utils.server', () => ({
+  warnExceptInTest: (...args: unknown[]) => mockedWarnExceptInTest(...args),
 }));
 
 import type * as AutoModelResolution from './resolution';
@@ -47,6 +53,10 @@ const sampleDecision: AutoRoutingDecision = {
 };
 
 describe('resolveAutoModel — kilo-auto/efficient branch', () => {
+  beforeEach(() => {
+    mockedWarnExceptInTest.mockClear();
+  });
+
   it('resolves kilo-auto/balanced as an alias of kilo-auto/efficient', async () => {
     const result = await resolveAutoModel(
       {
@@ -118,6 +128,15 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     );
 
     expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
+    expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+      'Kilo Auto model falling back to primary default',
+      {
+        cause: 'decision_resolver_unavailable',
+        requestedModel: KILO_AUTO_EFFICIENT_MODEL.id,
+        fallbackModel: PRIMARY_DEFAULT_MODEL,
+        apiKind: 'responses',
+      }
+    );
   });
 
   it('falls back to PRIMARY_DEFAULT_MODEL when no thunk is provided and apiKind=messages', async () => {
@@ -155,6 +174,15 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       );
 
       expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
+      expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+        'Kilo Auto model falling back to primary default',
+        {
+          cause: 'no_decision_returned',
+          requestedModel: model,
+          fallbackModel: PRIMARY_DEFAULT_MODEL,
+          apiKind: 'chat_completions',
+        }
+      );
     }
   );
 
@@ -173,6 +201,16 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     );
 
     expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
+    expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+      'Kilo Auto model falling back to primary default',
+      {
+        cause: 'virtual_auto_model_returned',
+        requestedModel: KILO_AUTO_EFFICIENT_MODEL.id,
+        fallbackModel: PRIMARY_DEFAULT_MODEL,
+        apiKind: 'chat_completions',
+        decisionModel: KILO_AUTO_EFFICIENT_MODEL.id,
+      }
+    );
   });
 
   it('does not call the thunk more than once', async () => {
@@ -283,6 +321,17 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     );
 
     expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
+    expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+      'Kilo Auto model falling back to primary default',
+      {
+        cause: 'decision_variant_unavailable',
+        requestedModel: KILO_AUTO_EFFICIENT_MODEL.id,
+        fallbackModel: PRIMARY_DEFAULT_MODEL,
+        apiKind: 'chat_completions',
+        decisionModel: 'anthropic/claude-sonnet-5',
+        decisionVariant: 'thinking',
+      }
+    );
   });
 
   it('falls back to PRIMARY_DEFAULT_MODEL when the model exposes no variants but decision has a variant', async () => {

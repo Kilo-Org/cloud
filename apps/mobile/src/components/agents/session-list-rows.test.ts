@@ -5,7 +5,6 @@ import {
   SESSION_LIST_SKELETON_COUNT,
   type SessionListRow,
   skeletonSessionRows,
-  stickySessionHeaderIndices,
 } from './session-list-rows';
 import { type SessionSection } from './session-list-helpers';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
@@ -143,33 +142,5 @@ describe('skeletonSessionRows', () => {
       'skeleton:1',
       'skeleton:2',
     ]);
-  });
-
-  it('never carries section-header rows, so sticky indices stay empty while loading', () => {
-    expect(stickySessionHeaderIndices(skeletonSessionRows(8))).toEqual([]);
-  });
-});
-
-describe('stickySessionHeaderIndices', () => {
-  it('returns empty for empty input', () => {
-    expect(stickySessionHeaderIndices([])).toEqual([]);
-  });
-
-  it('returns the layout index of every section-header row, in order', () => {
-    const rows = flattenSessionSections([
-      section('Today', ['a', 'b']),
-      section('Yesterday', ['c']),
-      section('Older', []),
-    ]);
-    // header:Today=0, a=1, b=2, header:Yesterday=3, c=4, header:Older=5
-    expect(stickySessionHeaderIndices(rows)).toEqual([0, 3, 5]);
-    for (const index of stickySessionHeaderIndices(rows)) {
-      expect(rows[index]?.kind).toBe('section-header');
-    }
-  });
-
-  it('keeps the (possibly empty) trailing section header sticky', () => {
-    const rows = flattenSessionSections([section('Today', ['a']), section('Older', [])]);
-    expect(stickySessionHeaderIndices(rows)).toEqual([0, 2]);
   });
 });

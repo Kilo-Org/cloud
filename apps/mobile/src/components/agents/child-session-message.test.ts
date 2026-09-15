@@ -60,6 +60,11 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('./message-error-boundary', () => ({
   MessageErrorBoundary: ({ children }: { children?: unknown }) => children,
 }));
+// Two cases below invoke `ChildSessionSection` directly (outside React); stub the
+// translation hook so the direct call does not trip the rules of hooks.
+vi.mock('@/lib/tool-summary-translation/use-translated-tool-summary', () => ({
+  useTranslatedToolSummary: (text: string) => text,
+}));
 
 const taskCompletedState: Extract<ToolPart['state'], { status: 'completed' }> = {
   status: 'completed',

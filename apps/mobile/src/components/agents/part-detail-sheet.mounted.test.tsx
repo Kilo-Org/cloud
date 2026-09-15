@@ -13,7 +13,7 @@ import {
   useImperativeHandle,
 } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { describe, expect, it, type Mock, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 // Real block, imported before the sheet: the hoisted body-mock factory runs
 // while the sheet module loads, so its binding must already be initialized.
@@ -21,6 +21,13 @@ import { MonoScrollBlock } from './mono-scroll-block';
 import { PartDetailSheet } from './part-detail-sheet';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
 import { useOpenPartDetail } from './open-part-detail-context';
+import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
+
+const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
+
+vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
+  requestToolSummaryTranslation: requestMock,
+}));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000' }),
@@ -47,6 +54,23 @@ vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurf
 vi.mock('./tool-card-image-cache', () => ({ useToolCardImageUri: () => undefined }));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
+}));
+// `tool-card-display` imports the Lucide icon components; the node project cannot
+// parse their Flow-sourced react-native runtime, so stub the icon module.
+vi.mock('@/components/ui/icons', () => ({
+  Cpu: 'Cpu',
+  Eye: 'Eye',
+  FileDiff: 'FileDiff',
+  FilePlus: 'FilePlus',
+  FileSearch: 'FileSearch',
+  FolderOpen: 'FolderOpen',
+  Globe: 'Globe',
+  ListTodo: 'ListTodo',
+  Pencil: 'Pencil',
+  Plug: 'Plug',
+  Search: 'Search',
+  Sparkles: 'Sparkles',
+  Terminal: 'Terminal',
 }));
 vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
@@ -525,6 +549,19 @@ describe('PartDetailSheet mounted', () => {
     expect(unavailable).toHaveLength(1);
     await unmount(nullPart);
   });
+
+  it('opts its header out of the iOS pageSheet top inset', async () => {
+    const renderer = await mountSheet(makeBashPart('bash-1', 'echo hi'));
+
+    // The tool detail sheet is a native pageSheet: the header drops the window
+    // top inset on iOS so the title row sits under the grabber, while Android
+    // keeps the clearance (read at the SheetHeader boundary, mocked above).
+    const headers = findByType(renderer.root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(propOf(headers[0], 'topInset')).toBe('ios-page-sheet');
+
+    await unmount(renderer);
+  });
 });
 
 describe('PartDetailSheet auto-follow', () => {
@@ -671,6 +708,72 @@ describe('PartDetailSheet auto-follow', () => {
     });
     expect(scrollToEnd).toHaveBeenCalled();
 
+    await unmount(renderer);
+  });
+});
+
+const TRANSLATION_MODEL = { id: 'kilo-auto/small', name: 'Auto Small' };
+
+function makeToolPartWithInput(id: string, tool: string, input: Record<string, unknown>): ToolPart {
+  return {
+    id,
+    sessionID: 's1',
+    messageID: 'm1',
+    type: 'tool',
+    callID: `call-${id}`,
+    tool,
+    state: {
+      status: 'completed',
+      input,
+      output: '',
+      title: tool,
+      metadata: {},
+      time: { start: 1, end: 2 },
+    },
+  };
+}
+
+/** Flush the dynamic client import and the queued request. */
+async function settleTranslation(): Promise<void> {
+  await act(async () => {
+    for (let i = 0; i < 5; i += 1) {
+      // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the dynamic import and request
+      await new Promise<void>(resolve => {
+        setImmediate(resolve);
+      });
+    }
+  });
+}
+
+describe('PartDetailSheet tool-summary translation gate', () => {
+  beforeEach(() => {
+    requestMock.mockReset();
+    setConfig({ enabled: false, model: TRANSLATION_MODEL });
+  });
+
+  it('never requests a translation for a deliberately non-translatable tool header', async () => {
+    requestMock.mockResolvedValue('Liste des tâches');
+    setConfig({ enabled: true, model: TRANSLATION_MODEL });
+
+    const renderer = await mountSheet(makeToolPartWithInput('todo-1', 'todoread', {}));
+    await settleTranslation();
+
+    expect(requestMock).not.toHaveBeenCalled();
+    await unmount(renderer);
+  });
+
+  it('requests a translation for a content-bearing tool header', async () => {
+    requestMock.mockResolvedValue('lire : app.ts');
+    setConfig({ enabled: true, model: TRANSLATION_MODEL });
+
+    const renderer = await mountSheet(
+      makeToolPartWithInput('read-1', 'read', { filePath: 'src/app.ts' })
+    );
+    await settleTranslation();
+
+    expect(requestMock).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'read: app.ts', model: TRANSLATION_MODEL.id })
+    );
     await unmount(renderer);
   });
 });

@@ -195,7 +195,6 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-// Log method, path, status, and duration for every request
 app.use('*', async (c, next) => {
   const start = performance.now();
   const method = c.req.method;
@@ -208,7 +207,6 @@ app.use('*', async (c, next) => {
   console[level](`[control-server] <-- ${method} ${path} ${status} ${duration}ms`);
 });
 
-// GET /health
 app.get('/health', c => {
   // When the TownDO is draining, it passes the drain nonce and town
   // ID via headers so idle containers (no running agents) can
@@ -312,7 +310,6 @@ app.post('/sync-config', async c => {
   return c.json({ synced: true });
 });
 
-// POST /agents/start
 app.post('/agents/start', async c => {
   if (isDraining()) {
     console.warn('[control-server] /agents/start: rejected — container is draining');
@@ -374,7 +371,6 @@ app.post('/agents/start', async c => {
   }
 });
 
-// POST /agents/:agentId/stop
 app.post('/agents/:agentId/stop', async c => {
   const { agentId } = c.req.param();
   if (!getAgentStatus(agentId)) {
@@ -388,7 +384,6 @@ app.post('/agents/:agentId/stop', async c => {
   return c.json({ stopped: true });
 });
 
-// POST /agents/:agentId/message
 app.post('/agents/:agentId/message', async c => {
   const { agentId } = c.req.param();
   if (!getAgentStatus(agentId)) {
@@ -468,7 +463,6 @@ app.put('/agents/:agentId/system-prompt', async c => {
   return c.json({ updated: true });
 });
 
-// GET /agents/:agentId/status
 app.get('/agents/:agentId/status', c => {
   const { agentId } = c.req.param();
   const agent = getAgentStatus(agentId);
@@ -515,7 +509,6 @@ app.post('/agents/:agentId/stream-ticket', c => {
   const expiresAt = Date.now() + 60_000;
   streamTickets.set(ticket, { agentId, expiresAt });
 
-  // Clean up expired tickets and enforce cap
   for (const [t, v] of streamTickets) {
     if (v.expiresAt < Date.now()) streamTickets.delete(t);
   }
@@ -754,7 +747,6 @@ app.post('/agents/:agentId/nudge-delivered', async c => {
   }
 });
 
-// ── PTY proxy routes ──────────────────────────────────────────────────
 // Proxy PTY operations to the agent's internal SDK server.
 // The SDK server (kilo serve) exposes /pty/* routes on 127.0.0.1:<port>.
 
@@ -794,7 +786,6 @@ app.post('/agents/:agentId/pty', async c => {
     return c.json({ error: `Agent ${agentId} not found or not running` }, 404);
   }
 
-  // Check for an existing running PTY session we can reuse
   try {
     const listResp = await fetch(listUrl);
     if (listResp.ok) {
@@ -838,7 +829,6 @@ app.post('/agents/:agentId/pty', async c => {
     return c.json({ error: `Agent ${agentId} not found or not running` }, 404);
   }
 
-  // Forward config env vars for the kilo attach process
   const ptyEnv: Record<string, string> = {};
   for (const key of [
     'KILO_CONFIG_CONTENT',
@@ -887,19 +877,16 @@ app.post('/agents/:agentId/pty', async c => {
   });
 });
 
-// GET /agents/:agentId/pty — list PTY sessions
 app.get('/agents/:agentId/pty', c => {
   const { agentId } = c.req.param();
   return proxyToSDK(agentId, '/pty');
 });
 
-// GET /agents/:agentId/pty/:ptyId — get PTY session info
 app.get('/agents/:agentId/pty/:ptyId', c => {
   const { agentId, ptyId } = c.req.param();
   return proxyToSDK(agentId, `/pty/${ptyId}`);
 });
 
-// PUT /agents/:agentId/pty/:ptyId — resize PTY
 app.put('/agents/:agentId/pty/:ptyId', async c => {
   const { agentId, ptyId } = c.req.param();
   const body = await c.req.text();
@@ -910,7 +897,6 @@ app.put('/agents/:agentId/pty/:ptyId', async c => {
   });
 });
 
-// DELETE /agents/:agentId/pty/:ptyId — destroy PTY session
 app.delete('/agents/:agentId/pty/:ptyId', c => {
   const { agentId, ptyId } = c.req.param();
   return proxyToSDK(agentId, `/pty/${ptyId}`, { method: 'DELETE' });
@@ -973,10 +959,8 @@ export function startControlServer(): void {
 
   // Agent stream URL patterns (the container receives the full path from the worker)
   const AGENT_STREAM_RE = /\/agents\/([^/]+)\/stream$/;
-  // PTY WebSocket URL pattern: /agents/:agentId/pty/:ptyId/connect
   const PTY_CONNECT_RE = /\/agents\/([^/]+)\/pty\/([^/]+)\/connect$/;
 
-  // Register an event sink that forwards agent events to WS clients
   registerEventSink((agentId, event, data) => {
     const frame = JSON.stringify({
       agentId,
@@ -986,7 +970,6 @@ export function startControlServer(): void {
     });
     for (const ws of wsClients) {
       try {
-        // If the client subscribed to a specific agent, only send that agent's events
         const filter = ws.data.agentId;
         if (filter && filter !== agentId) continue;
         ws.send(frame);
@@ -1013,10 +996,8 @@ export function startControlServer(): void {
       const url = new URL(req.url);
       const pathname = url.pathname;
 
-      // WebSocket upgrade: match /ws, /agents/:id/stream, or /agents/:id/pty/:ptyId/connect
       const isWsUpgrade = req.headers.get('upgrade')?.toLowerCase() === 'websocket';
       if (isWsUpgrade) {
-        // PTY connect — bidirectional raw byte proxy
         const ptyMatch = pathname.match(PTY_CONNECT_RE);
         if (ptyMatch) {
           const agentId = ptyMatch[1];
@@ -1035,7 +1016,6 @@ export function startControlServer(): void {
           if (match) agentId = match[1];
         }
 
-        // Accept upgrade if the path matches any WS pattern
         if (pathname === '/ws' || AGENT_STREAM_RE.test(pathname)) {
           const upgraded = server.upgrade(req, { data: { agentId } });
           if (upgraded) return undefined;
@@ -1043,12 +1023,10 @@ export function startControlServer(): void {
         }
       }
 
-      // All other requests go through Hono
       return app.fetch(req);
     },
     websocket: {
       open(ws) {
-        // PTY proxy connection — connect to the SDK server's PTY WS
         if (ws.data.ptyId) {
           const agent = getAgentStatus(ws.data.agentId ?? '');
           if (!agent || !agent.serverPort) {
@@ -1071,7 +1049,6 @@ export function startControlServer(): void {
           };
           upstream.onmessage = (e: MessageEvent) => {
             try {
-              // Forward raw bytes from SDK → browser
               ws.send(e.data instanceof ArrayBuffer ? e.data : String(e.data));
             } catch {
               // Client disconnected
@@ -1094,14 +1071,12 @@ export function startControlServer(): void {
           return;
         }
 
-        // Event stream connection
         wsClients.add(ws);
         const agentFilter = ws.data.agentId ?? 'all';
         console.log(
           `[control-server] WebSocket connected: agent=${agentFilter} (${wsClients.size} total)`
         );
 
-        // Send in-memory backfill for this session's events.
         if (ws.data.agentId) {
           const events = getAgentEvents(ws.data.agentId, 0);
           for (const evt of events) {
@@ -1121,7 +1096,6 @@ export function startControlServer(): void {
         }
       },
       message(ws, message) {
-        // PTY proxy — forward browser input to SDK
         if (ws.data.ptyId) {
           const upstream = ptyUpstreamMap.get(ws);
           if (upstream && upstream.readyState === WebSocket.OPEN) {
@@ -1130,7 +1104,6 @@ export function startControlServer(): void {
           return;
         }
 
-        // Event stream — handle subscribe messages
         try {
           const msg = JSON.parse(String(message)) as unknown;
           const rec =
@@ -1144,7 +1117,6 @@ export function startControlServer(): void {
         }
       },
       close(ws) {
-        // PTY proxy — close upstream
         if (ws.data.ptyId) {
           const upstream = ptyUpstreamMap.get(ws);
           if (upstream) {

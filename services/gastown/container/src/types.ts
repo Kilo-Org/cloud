@@ -1,11 +1,7 @@
 import { z } from 'zod';
 
-// ── Agent roles (mirrors worker types) ──────────────────────────────────
-
 export const AgentRole = z.enum(['mayor', 'polecat', 'refinery', 'triage']);
 export type AgentRole = z.infer<typeof AgentRole>;
-
-// ── Control server request/response schemas ─────────────────────────────
 
 export const StartAgentRequest = z.object({
   agentId: z.string(),
@@ -85,8 +81,6 @@ export const UpdateAgentModelRequest = z.object({
 });
 export type UpdateAgentModelRequest = z.infer<typeof UpdateAgentModelRequest>;
 
-// ── Agent lifecycle ─────────────────────────────────────────────────────
-
 export const AgentStatus = z.enum(['starting', 'running', 'stopping', 'exited', 'failed']);
 export type AgentStatus = z.infer<typeof AgentStatus>;
 
@@ -94,10 +88,6 @@ export type AgentStatus = z.infer<typeof AgentStatus>;
 export const ProcessStatus = AgentStatus;
 export type ProcessStatus = AgentStatus;
 
-/**
- * Tracks a managed agent: a kilo serve session backed by an SSE subscription.
- * Replaces the old AgentProcess (raw child process + stdin pipe).
- */
 export type ManagedAgent = {
   agentId: string;
   rigId: string;
@@ -171,8 +161,6 @@ export type HealthResponse = {
   mayorReadyAt?: string;
 };
 
-// ── Kilo serve instance ─────────────────────────────────────────────────
-
 export type KiloServerInstance = {
   /** Port the kilo serve process is listening on */
   port: number;
@@ -185,8 +173,6 @@ export type KiloServerInstance = {
   /** Tracks whether the server is healthy (responded to /global/health) */
   healthy: boolean;
 };
-
-// ── Kilo serve API response schemas ──────────────────────────────────────
 
 /** POST /session, GET /session/:id */
 export const KiloSession = z.object({
@@ -201,8 +187,6 @@ export const KiloHealthResponse = z.object({
   version: z.string(),
 });
 export type KiloHealthResponse = z.infer<typeof KiloHealthResponse>;
-
-// ── SSE events ──────────────────────────────────────────────────────────
 
 /**
  * Known kilo serve SSE event types as a Zod discriminated union.
@@ -293,8 +277,6 @@ export type KiloSSEEvent = {
   data: KiloSSEEventData;
 };
 
-// ── Git manager ─────────────────────────────────────────────────────────
-
 export type CloneOptions = {
   rigId: string;
   gitUrl: string;
@@ -320,8 +302,6 @@ export type WorktreeOptions = {
   gitUrl?: string;
 };
 
-// ── Repo setup (proactive clone + browse worktree) ──────────────────────
-
 export const SetupRepoRequest = z.object({
   rigId: z.string().min(1),
   gitUrl: z.string().min(1),
@@ -331,8 +311,6 @@ export const SetupRepoRequest = z.object({
   platformIntegrationId: z.string().optional(),
 });
 export type SetupRepoRequest = z.infer<typeof SetupRepoRequest>;
-
-// ── Heartbeat ───────────────────────────────────────────────────────────
 
 export type HeartbeatPayload = {
   agentId: string;
@@ -348,8 +326,6 @@ export type HeartbeatPayload = {
   /** Unique ID for this container instance, used to detect restarts. */
   containerInstanceId?: string;
 };
-
-// ── Stream ticket (for WebSocket streaming) ─────────────────────────────
 
 export type StreamTicketResponse = {
   ticket: string;

@@ -114,7 +114,7 @@ function getUpdatedSince(days: number): string {
  * `INFINITE_QUERY_MAX_PAGES` (5) trims the oldest page from the front on every
  * forward fetch (`addToEnd(..., max)` slices index 0), so past five pages the
  * top of the history is evicted and the list can never scroll back to it: the
- * pinned oldest date header becomes the top of the list. This bound holds the
+ * oldest date header becomes the top of the list. This bound holds the
  * e2e history (8 pages of 30 sessions) with headroom while still stopping a
  * server that keeps handing out cursors from growing the cache without bound.
  *

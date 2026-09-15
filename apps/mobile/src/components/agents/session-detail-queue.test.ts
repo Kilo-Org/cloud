@@ -71,6 +71,11 @@ vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
   fetchMobileSessionSnapshotPage: vi.fn(),
 }));
+// Keep the real queue-error classifier without loading the native encrypted KV.
+vi.mock('@/lib/persist/session-transcript-cache', () => ({
+  readSessionTranscriptPage: vi.fn(async () => null),
+  writeSessionTranscriptPage: vi.fn(async () => undefined),
+}));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
   CLOUD_AGENT_WS_URL: 'wss://ws.test',
@@ -218,6 +223,13 @@ vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
 }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   useKeepScreenOnPreference: () => ({ hasLoaded: true, keepScreenOn: false }),
+}));
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  useCondenseToolCallsPreference: () => ({
+    condenseToolCalls: false,
+    hasLoaded: true,
+    setCondenseToolCalls: vi.fn(),
+  }),
 }));
 // The real hook reaches SecureStore via `@sentry/react-native`, which imports
 // the native react-native entry; mock the preference the way the other
@@ -422,6 +434,12 @@ vi.mock('@/components/agents/child-session-sheet', () => ({
 }));
 vi.mock('@/components/agents/part-detail-sheet-host', () => ({
   PartDetailSheetHost: 'PartDetailSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-sheet-host', () => ({
+  ToolRunSheetHost: 'ToolRunSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-rows', () => ({
+  CondensedToolRunRow: 'CondensedToolRunRow',
 }));
 vi.mock('@/components/agents/part-renderer', () => ({
   PartRenderer: 'PartRenderer',

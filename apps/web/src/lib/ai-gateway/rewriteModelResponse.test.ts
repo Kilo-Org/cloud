@@ -62,7 +62,7 @@ beforeEach(() => {
   mockedPutApiRequestLogPayload.mockReset();
   process.env.API_REQUEST_LOG_STORAGE_MODE = 'r2';
   mockedValues = jest.fn().mockReturnValue({
-    returning: jest.fn().mockResolvedValue([{ id: 1n }]),
+    returning: jest.fn().mockResolvedValue([{ id: BigInt(1) }]),
   });
   mockedDbInsert.mockReturnValue({ values: mockedValues } as never);
 });

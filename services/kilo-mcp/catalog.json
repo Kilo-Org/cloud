@@ -1313,6 +1313,42 @@
     ],
     "searchBlob": "cloudAgentNext.getComputeBillingStatus Get billing status and compute usage information for a cloud agent session. cloudagentnext getcomputebillingstatus cloudagentsessionid cloudAgentSessionId"
   },
+  "cloudAgentNext.getMessageResult": {
+    "path": "cloudAgentNext.getMessageResult",
+    "kind": "query",
+    "summary": "Check the processing status and outcome of a specific message sent to a cloud agent session, such as whether it is queued, running, completed, failed, or interrupted.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string",
+          "pattern": "^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "expectedWorktreeId": {
+          "type": "string",
+          "pattern": "^worktree_([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "messageId": {
+          "type": "string",
+          "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId",
+        "expectedWorktreeId",
+        "messageId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getmessageresult",
+      "cloudagentsessionid",
+      "expectedworktreeid",
+      "messageid"
+    ],
+    "searchBlob": "cloudAgentNext.getMessageResult Check the processing status and outcome of a specific message sent to a cloud agent session, such as whether it is queued, running, completed, failed, or interrupted. cloudagentnext getmessageresult cloudagentsessionid expectedworktreeid messageid cloudAgentSessionId expectedWorktreeId messageId"
+  },
   "cloudAgentNext.getSandboxSelectionOptions": {
     "path": "cloudAgentNext.getSandboxSelectionOptions",
     "kind": "query",
@@ -5096,6 +5132,32 @@
       "organizationid"
     ],
     "searchBlob": "organizations.cloudAgentNext.getComputeBillingStatus Get the compute billing status for an organization's cloud agent session. organizations cloudagentnext getcomputebillingstatus organizationid organizationId"
+  },
+  "organizations.cloudAgentNext.getMessageResult": {
+    "path": "organizations.cloudAgentNext.getMessageResult",
+    "kind": "query",
+    "summary": "Fetch the result and status of a specific message in an organization's cloud agent session, returning null if the result is not yet available.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getmessageresult",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getMessageResult Fetch the result and status of a specific message in an organization's cloud agent session, returning null if the result is not yet available. organizations cloudagentnext getmessageresult organizationid organizationId"
   },
   "organizations.cloudAgentNext.getSandboxSelectionOptions": {
     "path": "organizations.cloudAgentNext.getSandboxSelectionOptions",

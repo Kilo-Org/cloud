@@ -37,6 +37,9 @@ jest.mock('react-markdown', () => ({
     React.createElement('p', null, children),
 }));
 jest.mock('remark-gfm', () => ({ __esModule: true, default: () => undefined }));
+jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', () => ({
+  iterateOverDiff: () => [],
+}));
 
 import { ConversationMessages } from './ConversationMessages';
 import { commitsByMessageAnchor } from './message-presentation';

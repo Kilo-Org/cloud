@@ -27,6 +27,29 @@ import {
   ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
 } from '@/lib/autoTopUpConstants';
+import {
+  attachPreparedAutoTopUpInvoiceFee,
+  mergeServiceFeeCommercialMetadata,
+  prepareAutoTopUpInvoiceFee,
+  type ServiceFeeCheckoutDependencies,
+} from '@/lib/service-fees/checkout';
+import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
+import { getEffectiveOrganizationServiceFeeExemption } from '@/lib/service-fees/organization-exemptions';
+
+function createAutoTopUpFeeDeps(): ServiceFeeCheckoutDependencies {
+  const stores = createServiceFeeStores();
+  return {
+    store: stores.assessments,
+    findEffectiveExemption: async (organizationId, at) =>
+      getEffectiveOrganizationServiceFeeExemption({
+        store: stores.exemptions,
+        organizationId,
+        at,
+      }),
+    stripe: client,
+    createInvoiceItem: params => client.invoiceItems.create(params),
+  };
+}
 
 const ATTEMPT_LOCK_TIMEOUT_SECONDS = 60 * 60 * 2; // 2 hours (covers delayed webhook delivery)
 
@@ -264,12 +287,47 @@ async function performAutoTopUpForEntity(
         ? { type: 'auto-topup', kiloUserId: entity.user.id, traceId }
         : { type: 'org-auto-topup', organizationId: entity.organization.id, traceId };
 
+    const flow = entity.type === 'user' ? 'personal_auto_top_up' : 'organization_auto_top_up';
     const invoice = await client.invoices.create({
       customer: stripe_customer_id,
       auto_advance: false,
-      metadata: invoiceMetadata,
+      metadata: {
+        ...invoiceMetadata,
+        serviceFeePrincipalMinor: String(amountCents),
+        serviceFeeFlow: flow,
+      },
       description: 'Kilo automatic top up',
     });
+
+    const feeDeps = createAutoTopUpFeeDeps();
+    const preparedFee = await prepareAutoTopUpInvoiceFee({
+      flow,
+      invoiceId: invoice.id,
+      principalMinor: amountCents,
+      kiloUserId: entity.type === 'user' ? entity.user.id : undefined,
+      organizationId: entity.type === 'organization' ? entity.organization.id : undefined,
+      stripeCustomerId: stripe_customer_id,
+      invoiceCreated: invoice.created ? new Date(invoice.created * 1000) : undefined,
+      taxPrincipal: { kind: 'inline' },
+      deps: feeDeps,
+    });
+
+    try {
+      await client.invoices.update(invoice.id, {
+        metadata: mergeServiceFeeCommercialMetadata(
+          {
+            ...invoiceMetadata,
+            serviceFeePrincipalMinor: String(amountCents),
+          },
+          preparedFee.commercialMetadata
+        ),
+      });
+    } catch (metadataError) {
+      captureException(metadataError, {
+        tags: { source: 'auto_top_up_service_fee_metadata' },
+        extra: { invoice_id: invoice.id, flow },
+      });
+    }
 
     // Attach the line item directly to this invoice.
     // (Creating a pending invoice item and then creating an invoice can produce a $0 invoice,
@@ -280,6 +338,10 @@ async function performAutoTopUpForEntity(
       amount: amountCents,
       currency: 'usd',
       description: 'Kilo automatic top up',
+    });
+    await attachPreparedAutoTopUpInvoiceFee({
+      prepared: preparedFee,
+      deps: feeDeps,
     });
 
     // Pay the invoice. The PaymentIntent is created during payment, not finalization.

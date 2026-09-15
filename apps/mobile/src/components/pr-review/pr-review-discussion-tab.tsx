@@ -103,6 +103,10 @@ type PrReviewDiscussionTabProps = {
 
 const SKELETON_ROW_COUNT = 4;
 
+// The GitHub conversation-comment formSheet. GitLab and Bitbucket reach their
+// own sibling route inside the provider layout (providerPrSheetHref) so
+// the sheet mounts under the live provider scope; GitHub keeps the exact
+// object-form push it shipped with (PR 6023).
 const CONVERSATION_COMMENT_PATH =
   '/(app)/pr-review/[owner]/[repo]/[number]/conversation-comment' as const;
 

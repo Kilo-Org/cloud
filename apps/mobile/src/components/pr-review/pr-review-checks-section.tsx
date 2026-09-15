@@ -13,6 +13,10 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
+import {
+  type PrReviewChecksStatus,
+  PrReviewChecksStatusRow,
+} from '@/components/pr-review/pr-review-checks-status-row';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,7 +24,7 @@ import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
-import { formatList, formatNumber } from '@/lib/format';
+import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
@@ -51,8 +55,11 @@ function classifyCheckTone(status: string, conclusion: string | null): CheckTone
     case 'success': {
       return 'success';
     }
+    // GitHub's commit-status `error` state is a real API conclusion the
+    // server already counts as failure (mappers.ts rollupState).
     case 'failure':
-    case 'startup_failure': {
+    case 'startup_failure':
+    case 'error': {
       return 'failure';
     }
     case 'skipped':
@@ -137,39 +144,44 @@ function CheckRow({ run }: Readonly<{ run: CheckRun }>) {
   );
 }
 
-function rollupCountOptions(count: number) {
-  return {
-    count,
-    displayCount: formatNumber(count, i18n.language),
-  };
-}
+// The row order the rollup line has always summarised, kept for the groups.
+const STATUS_ORDER = ['success', 'failure', 'pending', 'skipped'] as const;
 
-function buildRollupLine(rollup: {
-  total: number;
-  success: number;
-  failure: number;
-  pending: number;
-  skipped: number;
-}): string {
-  if (rollup.total === 0) {
-    return i18n.t('prReview.checks.noChecksReported');
+// Every tone maps to exactly one status, so the row counts always sum to the
+// card total and no run is dropped (the promise provider-pr-queries keeps).
+const TONE_STATUS = {
+  success: 'success',
+  failure: 'failure',
+  warning: 'failure',
+  pending: 'pending',
+  skipped: 'skipped',
+  neutral: 'skipped',
+} satisfies Record<CheckTone, PrReviewChecksStatus>;
+
+type CheckRunGroup = {
+  status: PrReviewChecksStatus;
+  runs: CheckRun[];
+};
+
+/**
+ * Group the run list by rollup status, dropping statuses with no runs: a
+ * status the head commit has no checks for renders no row.
+ */
+function groupRunsByStatus(runList: readonly CheckRun[]): CheckRunGroup[] {
+  const byStatus = new Map<PrReviewChecksStatus, CheckRun[]>();
+  for (const run of runList) {
+    const status = TONE_STATUS[classifyCheckTone(run.status, run.conclusion)];
+    const bucket = byStatus.get(status);
+    if (bucket) {
+      bucket.push(run);
+    } else {
+      byStatus.set(status, [run]);
+    }
   }
-  const parts: string[] = [];
-  if (rollup.success > 0) {
-    parts.push(i18n.t('prReview.checks.passed', rollupCountOptions(rollup.success)));
-  }
-  if (rollup.failure > 0) {
-    parts.push(i18n.t('prReview.checks.failed', rollupCountOptions(rollup.failure)));
-  }
-  if (rollup.pending > 0) {
-    parts.push(i18n.t('prReview.checks.pending', rollupCountOptions(rollup.pending)));
-  }
-  if (rollup.skipped > 0) {
-    parts.push(i18n.t('prReview.checks.skipped', rollupCountOptions(rollup.skipped)));
-  }
-  return parts.length > 0
-    ? formatList(parts, i18n.language)
-    : i18n.t('prReview.checks.checksCount', rollupCountOptions(rollup.total));
+  return STATUS_ORDER.flatMap(status => {
+    const runs = byStatus.get(status);
+    return runs ? [{ status, runs }] : [];
+  });
 }
 
 export function PrReviewChecksSection({
@@ -285,8 +297,7 @@ export function PrReviewChecksSection({
 
   const data = checks.data;
   const runList = data?.checkRuns ?? [];
-  const rollup = data?.rollup ?? { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 };
-  const rollupLine = buildRollupLine(rollup);
+  const groups = groupRunsByStatus(runList);
 
   if (runList.length === 0) {
     return (
@@ -295,7 +306,9 @@ export function PrReviewChecksSection({
           {t('prReview.checks.title')}
         </Text>
         <View className="gap-3 rounded-lg bg-secondary p-4">
-          <Text className="text-sm text-muted-foreground">{rollupLine}</Text>
+          <Text className="text-sm text-muted-foreground">
+            {t('prReview.checks.noChecksReported')}
+          </Text>
           {prUrl ? (
             <Button
               variant="outline"
@@ -323,16 +336,27 @@ export function PrReviewChecksSection({
       <View className="overflow-hidden rounded-lg bg-secondary">
         <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
           <Text variant="muted" className="text-xs">
-            {rollupLine}
+            {t('prReview.checks.checksCount', {
+              displayCount: formatNumber(runList.length, i18n.language),
+            })}
           </Text>
         </View>
-        {runList.map((run, index) => (
-          <View key={`${run.name}-${index}`}>
-            <CheckRow run={run} />
-            {index < runList.length - 1 ? (
-              <View className="ml-4 border-b-[0.5px] border-hair-soft" />
-            ) : null}
-          </View>
+        {groups.map((group, groupIndex) => (
+          <PrReviewChecksStatusRow
+            key={group.status}
+            status={group.status}
+            count={group.runs.length}
+            showSeparator={groupIndex < groups.length - 1}
+          >
+            {group.runs.map((run, runIndex) => (
+              <View key={`${run.name}-${runIndex}`}>
+                <CheckRow run={run} />
+                {runIndex < group.runs.length - 1 ? (
+                  <View className="ml-4 border-b-[0.5px] border-hair-soft" />
+                ) : null}
+              </View>
+            ))}
+          </PrReviewChecksStatusRow>
         ))}
       </View>
     </View>

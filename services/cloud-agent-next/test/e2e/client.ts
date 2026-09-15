@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import { z } from 'zod';
 import { mintApiToken, mintStreamTicket, type TestUser } from './auth.js';
+import { resolveFakeAdminToken } from './fake-llm-admin.js';
 import type { FakeScenarioStatus } from './fake-llm-server.js';
 
 /**
@@ -540,6 +541,17 @@ export async function deleteSession(
 // ---------------------------------------------------------------------------
 
 /**
+ * Headers for the fake LLM `/test/*` side channel.
+ *
+ * The token comes from `resolveFakeAdminToken()` — the same resolver the local
+ * Node fake server uses — so one `FAKE_LLM_ADMIN_TOKEN` value reaches both ends.
+ * A deployed fake Worker needs the driver's value configured as its secret.
+ */
+function fakeControlHeaders(): Record<string, string> {
+  return { Authorization: `Bearer ${resolveFakeAdminToken()}` };
+}
+
+/**
  * Release a `gate:<tag>` scenario parked on the fake LLM server. The driver
  * uses this to unblock a turn that's been holding the wrapper busy, typically
  * after queueing follow-up messages.
@@ -550,7 +562,7 @@ export async function releaseGate(
   signal?: AbortSignal
 ): Promise<void> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/release?tag=${encodeURIComponent(tag)}`;
-  const res = await fetch(url, { method: 'POST', signal });
+  const res = await fetch(url, { method: 'POST', signal, headers: fakeControlHeaders() });
   if (!res.ok) {
     throw new Error(`releaseGate(${tag}) failed: ${res.status} ${res.statusText}`);
   }
@@ -567,7 +579,7 @@ export type FakeWaitersSnapshot = {
 
 export async function fetchFakeWaiters(fakeLlmUrl: string): Promise<FakeWaitersSnapshot> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/waiters`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: fakeControlHeaders() });
   if (!res.ok) {
     throw new Error(`fetchFakeWaiters failed: ${res.status} ${res.statusText}`);
   }
@@ -580,7 +592,7 @@ export type FakeRequestSnapshot = {
 
 export async function fetchFakeRequests(fakeLlmUrl: string): Promise<FakeRequestSnapshot> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/requests`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: fakeControlHeaders() });
   if (!res.ok) {
     throw new Error(`fetchFakeRequests failed: ${res.status} ${res.statusText}`);
   }
@@ -592,7 +604,7 @@ export async function fetchFakeScenarioStatus(
   tag: string
 ): Promise<FakeScenarioStatus> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/scenario-status?tag=${encodeURIComponent(tag)}`;
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: fakeControlHeaders() });
   if (!response.ok) {
     throw new Error(`fetchFakeScenarioStatus(${tag}) failed: ${response.status}`);
   }
@@ -615,7 +627,7 @@ export async function waitForGateEngaged(
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: fakeControlHeaders() });
       if (res.ok) {
         const body = (await res.json()) as { engaged?: boolean };
         if (body.engaged === true) return true;

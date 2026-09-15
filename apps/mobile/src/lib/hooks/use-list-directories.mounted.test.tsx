@@ -1,4 +1,5 @@
 import { createElement } from 'react';
+import { type QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -7,7 +8,11 @@ import {
 } from '@kilocode/cloud-agent-sdk/list-directories';
 
 import { act } from '@/test/renderer';
-import { renderWithProviders, waitFor } from '@/test/render-with-providers';
+import {
+  createTestQueryClient,
+  renderWithProviders,
+  waitFor,
+} from '@/test/render-with-providers';
 
 import { useListDirectories, type UseListDirectoriesResult } from './use-list-directories';
 
@@ -28,9 +33,11 @@ function Harness({ connectionId, probe }: { connectionId: string | null; probe: 
 }
 
 /** Mount the hook inside the app's QueryClientProvider and expose the latest API. */
-async function mount(connectionId: string | null = 'conn-1') {
+async function mount(connectionId: string | null = 'conn-1', queryClient?: QueryClient) {
   const probe: Probe = { current: null };
-  const rendered = await renderWithProviders(createElement(Harness, { connectionId, probe }));
+  const rendered = await renderWithProviders(createElement(Harness, { connectionId, probe }), {
+    queryClient,
+  });
   return {
     ...rendered,
     api: () => {
@@ -111,6 +118,39 @@ describe('useListDirectories', () => {
     });
     expect(listFn).toHaveBeenCalledTimes(2);
     unmount();
+  });
+
+  it('lists the launch path again after the picker reopens', async () => {
+    // The listing cache must end with the sheet: a reopen must show the
+    // skeleton and fetch the launch path again, exactly as the replaced
+    // per-hook `cacheRef` did. Reuse one client so the app-wide query cache
+    // survives the first unmount (the harness `unmount({ clear })` would hide
+    // the defect); unmount through the renderer so the hook's cleanup runs.
+    const client = createTestQueryClient();
+    listFn.mockResolvedValue({ ok: true, path: '', directories: [src] });
+
+    const first = await mount('conn-1', client);
+    act(() => {
+      first.api().list('');
+    });
+    await waitFor(() => first.api().state?.phase === 'ready');
+    expect(first.api().state).toEqual({ phase: 'ready', path: '', directories: [src] });
+    expect(listFn).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      first.renderer.unmount();
+    });
+
+    const second = await mount('conn-1', client);
+    act(() => {
+      second.api().list('');
+    });
+    // Step 4: the reopen must not serve the previous session's listing.
+    expect(second.api().state).toEqual({ phase: 'skeleton', path: '' });
+    await waitFor(() => second.api().state?.phase === 'ready');
+    expect(second.api().state).toEqual({ phase: 'ready', path: '', directories: [src] });
+    expect(listFn).toHaveBeenCalledTimes(2);
+    second.unmount();
   });
 
   it('keeps list referentially stable so the picker mount effect runs once', async () => {

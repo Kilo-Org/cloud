@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listDirectoriesOnConnection } from '@kilocode/cloud-agent-sdk/list-directories';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
@@ -58,6 +58,7 @@ class DirectoryListingUnsupported extends Error {}
  */
 export function useListDirectories(connectionId: string | null): UseListDirectoriesResult {
   const connection = useUserWebConnection();
+  const queryClient = useQueryClient();
   const [path, setPath] = useState<string | null>(null);
 
   const query = useQuery<DirectoryEntry[]>({
@@ -88,6 +89,18 @@ export function useListDirectories(connectionId: string | null): UseListDirector
     staleTime: Infinity,
     retry: false,
   });
+
+  // The replaced `cacheRef` lived exactly as long as the picker screen, so a
+  // reopen listed the launch path again. The query cache is app-wide; drop this
+  // connection's listings with the hook that asked for them. `removeQueries`
+  // matches the `['list-directories', connectionId]` prefix, so every path
+  // listed by this sheet goes too.
+  useEffect(
+    () => () => {
+      queryClient.removeQueries({ queryKey: ['list-directories', connectionId] });
+    },
+    [queryClient, connectionId]
+  );
 
   // Keep the latest query in a ref so `list` stays referentially stable: the
   // picker's mount effect depends on it and re-running that effect would

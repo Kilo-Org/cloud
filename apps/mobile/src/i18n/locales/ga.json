@@ -3045,14 +3045,6 @@
     "revoke": "Bain {{host}} de na hóstaigh iontaofa",
     "backToPreferences": "Ar ais go dtí na roghanna"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Tosaigh comhrá",
-      "description": "Seol teachtaireacht chun labhairt le samhail."
-    },
-    "historyRetry": "Níorbh fhéidir stair an chomhrá a lódáil.",
-    "sendError": "Níorbh fhéidir an teachtaireacht a sheoladh. Bain triail as arís."
-  },
   "glanceable": {
     "waiting": "Gníomhairí á nuashonrú",
     "empty": "Níl aon obair ar siúl",
@@ -3097,5 +3089,18 @@
     "remoteFound": "Ríomhaire ceangailte",
     "checkAgain": "Seiceáil arís",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Tosaigh comhrá",
+      "description": "Seol teachtaireacht chun labhairt le samhail."
+    },
+    "list": {
+      "loadFailed": "Níorbh fhéidir stair an chomhrá a lódáil.",
+      "new": "Comhrá nua",
+      "openHint": "Osclaíonn sé an comhrá. Brúigh go fada chun scriosadh.",
+      "deleteTitle": "An comhrá seo a scriosadh?"
+    },
+    "beta": "Béite"
   }
 }

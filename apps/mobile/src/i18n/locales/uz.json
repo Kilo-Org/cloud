@@ -2668,7 +2668,7 @@
     "legalConnectorPrivacy": " va quyidagi hujjat bilan tanishganingizni tasdiqlaysiz: ",
     "manageFailed": "App Store obunalarini boshqarish sahifasini ochib bo'lmadi.",
     "kiloPassSetup": "Kilo Passni sozlash",
-    "subscriptionHeaderDescription": "Kilo App'idagi AI kodlash sessiyalari.",
+    "subscriptionHeaderDescription": "Kilo App ilovasida sun'iy intellekt yordamida kod yozish uchun Kilo balansingizga kreditlar qo'shadigan oylik obuna.",
     "tierDescription": "Kilo App ilovasidan foydalanish uchun har oy {{price}} qiymatidagi pulli kreditlar qo'shiladi.",
     "subscribe": "Obuna bo'lish",
     "subscribeDescription": "Bonusga yaqinlashtiradigan oylik kreditlar",
@@ -2979,14 +2979,6 @@
     "revoke": "{{host}} saytiga berilgan ishonchni bekor qilish",
     "backToPreferences": "Sozlamalarga qaytish"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Suhbatni boshlang",
-      "description": "Model bilan gaplashish uchun xabar yuboring."
-    },
-    "historyRetry": "Suhbat tarixini yuklab bo'lmadi.",
-    "sendError": "Xabarni yuborib bo'lmadi. Qayta urinib ko'ring."
-  },
   "glanceable": {
     "waiting": "Agentlar yangilanmoqda",
     "empty": "Bajarilayotgan ish yo'q",
@@ -3031,5 +3023,18 @@
     "remoteFound": "Kompyuter ulandi",
     "checkAgain": "Yana tekshirish",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Suhbatni boshlang",
+      "description": "Model bilan gaplashish uchun xabar yuboring."
+    },
+    "list": {
+      "loadFailed": "Suhbat tarixini yuklab bo'lmadi.",
+      "new": "Yangi chat",
+      "openHint": "Chatni ochadi. Oʻchirish uchun bosib turing.",
+      "deleteTitle": "Bu chat oʻchirilsinmi?"
+    },
+    "beta": "Beta"
   }
 }

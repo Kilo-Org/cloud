@@ -3001,14 +3001,6 @@
     "revoke": "ביטול האמון באתר {{host}}",
     "backToPreferences": "חזרה להעדפות"
   },
-  "quickChat": {
-    "empty": {
-      "title": "התחלת שיחה",
-      "description": "שלח הודעה כדי לשוחח עם מודל."
-    },
-    "historyRetry": "לא ניתן לטעון את היסטוריית השיחה.",
-    "sendError": "לא ניתן לשלוח את ההודעה. נסה שוב."
-  },
   "glanceable": {
     "waiting": "נתוני הסוכנים מתעדכנים",
     "empty": "אין משימות בביצוע",
@@ -3053,5 +3045,18 @@
     "remoteFound": "המחשב חובר",
     "checkAgain": "בדוק שוב",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "התחל שיחה",
+      "description": "שלח הודעה כדי לשוחח עם מודל."
+    },
+    "list": {
+      "loadFailed": "לא ניתן היה לטעון את היסטוריית השיחה.",
+      "new": "צ'אט חדש",
+      "openHint": "פותח את הצ'אט. לחיצה ארוכה למחיקה.",
+      "deleteTitle": "למחוק את הצ'אט הזה?"
+    },
+    "beta": "בטא"
   }
 }

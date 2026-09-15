@@ -8,6 +8,13 @@
       "when": 1786968532800,
       "tag": "0000_material_toad",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788574828397,
+      "tag": "0001_safe_hellfire_club",
+      "breakpoints": true
     }
   ]
 }

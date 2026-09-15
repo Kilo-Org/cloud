@@ -2979,14 +2979,6 @@
     "revoke": "Afturkalla traust á {{host}}",
     "backToPreferences": "Til baka í stillingar"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Byrjaðu spjall",
-      "description": "Sendu skilaboð til að spjalla við líkan."
-    },
-    "historyRetry": "Ekki tókst að sækja spjallferilinn.",
-    "sendError": "Ekki tókst að senda skilaboðin. Reyndu aftur."
-  },
   "glanceable": {
     "waiting": "Uppfæri fulltrúa",
     "empty": "Engin vinna í gangi",
@@ -3031,5 +3023,18 @@
     "remoteFound": "Tölva tengd",
     "checkAgain": "Athuga aftur",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Byrjaðu spjall",
+      "description": "Sendu skilaboð til að tala við líkan."
+    },
+    "list": {
+      "loadFailed": "Ekki tókst að hlaða samtalsferilinn.",
+      "new": "Nýtt spjall",
+      "openHint": "Opnar spjallið. Haltu inni til að eyða.",
+      "deleteTitle": "Eyða þessu spjalli?"
+    },
+    "beta": "Beta"
   }
 }

@@ -2979,14 +2979,6 @@
     "revoke": "پر {{host}} باور لغوه کړئ",
     "backToPreferences": "بېرته تنظیماتو ته ورشئ"
   },
-  "quickChat": {
-    "empty": {
-      "title": "خبرې اترې پیل کړئ",
-      "description": "له ماډل سره د خبرو لپاره پیغام ولېږئ."
-    },
-    "historyRetry": "د خبرو اترو تاریخچه بار نه شوه.",
-    "sendError": "پیغام و نه لېږل شو. بیا هڅه وکړئ."
-  },
   "glanceable": {
     "waiting": "اجنټان تازه کېږي",
     "empty": "هېڅ کار روان نه دی",
@@ -3031,5 +3023,18 @@
     "remoteFound": "کمپیوټر وڌل شو",
     "checkAgain": "بیا وګورئ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "چټ پیل کړئ",
+      "description": "د ماډل سره د خبرو کولو لپاره پیغام ولېږئ."
+    },
+    "list": {
+      "loadFailed": "د چټ تاریخ بار کیدلای نه شو.",
+      "new": "نوې خبرې اترې",
+      "openHint": "خبرې اترې پرانیزي. د حذف لپاره اوږده کېکاږئ.",
+      "deleteTitle": "دا خبرې اترې حذف کړئ؟"
+    },
+    "beta": "بیټا"
   }
 }

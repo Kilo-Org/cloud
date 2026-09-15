@@ -13,7 +13,6 @@ export const DIRECT_BYOK_PROVIDER_IDS = [
   'alibaba-token-plan',
   'byteplus-coding',
   'chutes-byok',
-  'crofai',
   'edenai',
   'kimi-coding',
   'inceptron-byok',

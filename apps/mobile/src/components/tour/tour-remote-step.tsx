@@ -1,10 +1,9 @@
 import { type ReactNode, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
-import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
 import { TourStepHeader } from '@/components/tour/tour-step-header';
 import { Button } from '@/components/ui/button';
@@ -173,26 +172,28 @@ export function TourRemoteStep({ onChooseComputer }: Readonly<TourRemoteStepProp
   }
 
   return (
-    <CenteredState>
-      {/* Scrolls the whole step body: the discovered-computer list grows with
-          every connected machine, and on a short screen or a large system font
-          the fixed content slot plus that list exceeded the space between the
-          header and the action bar. Without a scroll container the overflow
-          covered the Skip bar. */}
-      <View className="items-center gap-6 px-6">
-        <TourStepHeader
-          icon={<Server size={36} color={colors.foreground} />}
-          title={t('tour.remoteTitle')}
-          body={t('tour.remoteBody')}
-        />
+    <ScrollView
+      className="flex-1"
+      contentContainerClassName="items-center gap-6 px-6 pt-4 pb-6"
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Top-aligned, matching the app's own modal first-run flow: the body
+          starts directly under the header instead of being centred in the band
+          between the header and the action bar. It still scrolls, so the
+          discovered-computer list growing with every connected machine (or a
+          short screen or a large system font) cannot cover the Skip bar. */}
+      <TourStepHeader
+        icon={<Server size={36} color={colors.foreground} />}
+        title={t('tour.remoteTitle')}
+        body={t('tour.remoteBody')}
+      />
 
-        {
-          // One reserved content slot: the skeleton, the empty card, the error
-          // and the computer list all render into the same space, so no load,
-          // retry or state swap moves the header above it.
-        }
-        <View className="min-h-[240px] w-full items-stretch justify-center">{content}</View>
-      </View>
-    </CenteredState>
+      {
+        // One reserved content slot: the skeleton, the empty card, the error
+        // and the computer list all render into the same space, so no load,
+        // retry or state swap moves the header above it.
+      }
+      <View className="min-h-[240px] w-full items-stretch justify-center">{content}</View>
+    </ScrollView>
   );
 }

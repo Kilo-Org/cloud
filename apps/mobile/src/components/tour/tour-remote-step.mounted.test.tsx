@@ -36,6 +36,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   View: 'View',
   Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
 }));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -52,6 +53,13 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     good: '#24784A',
   }),
 }));
+// Load-bearing, not leftover: the error branch renders `QueryError`, whose
+// `EmptyState` imports `@/components/centered-state`. That real module pulls
+// `expo`/`@sentry/react-native` through the native surface-geometry hook, and
+// those externalized packages load the real `react-native` index, which the
+// node-env harness cannot parse. The step itself no longer renders
+// `CenteredState`, so the zero-count assertion below still proves the body is
+// top-aligned rather than centred.
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -149,6 +157,20 @@ describe('TourRemoteStep', () => {
     // The header sits above the slot, never inside it: a state swap inside the
     // slot cannot move the illustration and heading.
     layoutSlot(renderer);
+
+    unmount();
+  });
+
+  it('starts the step body under the header in one top-aligned scroll container', async () => {
+    fetchInstances.mockResolvedValue({ instances: [] });
+    const { renderer, unmount } = await mountStep();
+
+    // The body begins directly under the header — it is not vertically centred
+    // in the space between the header and the action bar. One ScrollView owns
+    // the whole step body, top-aligned with the app's own first-run rhythm.
+    const scroller = renderer.root.findByType('ScrollView' as ElementType);
+    expect(scroller.props.contentContainerClassName).toBe('items-center gap-6 px-6 pt-4 pb-6');
+    expect(renderer.root.findAllByType('CenteredState' as ElementType)).toHaveLength(0);
 
     unmount();
   });

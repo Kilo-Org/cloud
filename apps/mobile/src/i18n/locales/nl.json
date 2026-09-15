@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Zet spraakinvoer om met een Kilo Gateway-model in plaats van de spraakherkenning van het apparaat. Je opname wordt naar Kilo Gateway verzonden.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Tool-aanroepen comprimeren",
-    "condenseToolCallsSubtitle": "Groepeer opeenvolgende tool-aanroepen in één rij die je kunt openen."
+    "condenseToolCallsSubtitle": "Groepeer opeenvolgende tool-aanroepen in één rij die je kunt openen.",
+    "toolSummaryTranslation": "Hulpmiddelsamenvattingen vertalen",
+    "toolSummaryTranslationSubtitle": "Stuur elke hulpmiddelsamenvatting naar een model om die naar je app-taal te vertalen. Het origineel wordt getoond als de vertaling mislukt.",
+    "toolSummaryTranslationModelUnavailableNotice": "Dit model wordt niet meer aangeboden. Tik op $t(common.model) om een ander te kiezen."
   },
   "notifications": {
     "channel": {
@@ -3009,5 +3012,24 @@
     "loadFailed": "Kan de talen die dit apparaat ondersteunt niet laden.",
     "emptyTitle": "Geen ondersteunde talen",
     "emptyDescription": "De spraakherkenning van dit apparaat meldt geen ondersteunde talen."
+  },
+  "tour": {
+    "eyebrow": "Snelle rondleiding",
+    "forkTitle": "Waar wil je Kilo uitvoeren?",
+    "forkSubtitle": "Kies waar Kilo je eerste sessie uitvoert.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Voer Kilo uit in een geïsoleerde cloudomgeving zonder iets te installeren.",
+    "remoteOptionTitle": "Je computer",
+    "remoteOptionBody": "Voer Kilo uit op je eigen machine via de `kilo remote`-CLI.",
+    "skip": "Tour overslaan",
+    "tutorialLabel": "Zelfstudie",
+    "remoteTitle": "Start je eerste externe sessie",
+    "remoteBody": "Verbind je computer en start de sessie vanaf hier.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Nog geen computer verbonden",
+    "remoteEmptyBody": "Voer `kilo remote` uit op je computer om hem te verbinden.",
+    "remoteFound": "Computer verbonden",
+    "checkAgain": "Opnieuw controleren",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

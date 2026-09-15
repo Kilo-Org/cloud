@@ -40,11 +40,19 @@ export function createNativeUserWebConnectionLifecycleHooks(
       });
     },
     onOnline: onOnline => {
-      // Boot is unknown: until NetInfo settles we cannot claim the socket is
-      // reachable, so the first confirmed online is a recovery from unknown.
-      let previousStatus: 'online' | 'offline' | 'unknown' = 'unknown';
+      // NetInfo replays the current connectivity to every new listener, so the
+      // first emission after subscribing is a baseline, not a recovery. Only a
+      // later offline/unknown → online transition is a real recovery. Firing on
+      // the baseline re-entered the SDK metadata-recovery retry on every failed
+      // open (the hook is re-registered per failure), an endless retry loop
+      // that kept the skeleton up and never surfaced the terminal load error.
+      let previousStatus: 'online' | 'offline' | 'unknown' | null = null;
       return sources.onConnectivityChange(state => {
         const status = connectivityStatus(state);
+        if (previousStatus === null) {
+          previousStatus = status;
+          return;
+        }
         // Resume only on a real recovery: offline → online, or the first
         // online after an unknown boot. Never while unknown, and never on
         // unknown → offline.

@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Η φωνητική πληκτρολόγηση μετατρέπεται σε κείμενο με ένα μοντέλο του Kilo Gateway αντί για την αναγνώριση ομιλίας της συσκευής. Η ηχογράφηση αποστέλλεται στο Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Συμπίεση κλήσεων εργαλείων",
-    "condenseToolCallsSubtitle": "Ομαδοποιήστε διαδοχικές κλήσεις εργαλείων σε μία γραμμή που μπορείτε να ανοίξετε."
+    "condenseToolCallsSubtitle": "Ομαδοποιήστε διαδοχικές κλήσεις εργαλείων σε μία γραμμή που μπορείτε να ανοίξετε.",
+    "toolSummaryTranslation": "Μετάφραση συνόψεων εργαλείων",
+    "toolSummaryTranslationSubtitle": "Στείλε κάθε σύνοψη εργαλείου σε ένα μοντέλο για να μεταφραστεί στη γλώσσα της εφαρμογής σου. Το πρωτότυπο εμφανίζεται αν αποτύχει η μετάφραση.",
+    "toolSummaryTranslationModelUnavailableNotice": "Αυτό το μοντέλο δεν προσφέρεται πλέον. Πατήστε $t(common.model) για να διαλέξετε άλλο."
   },
   "prReview": {
     "pullRequestUnavailable": "Μη διαθέσιμο αίτημα ενσωμάτωσης",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Δεν ήταν δυνατή η φόρτωση των γλωσσών που υποστηρίζει αυτή η συσκευή.",
     "emptyTitle": "Καμία υποστηριζόμενη γλώσσα",
     "emptyDescription": "Η αναγνώριση ομιλίας αυτής της συσκευής δεν αναφέρει καμία υποστηριζόμενη γλώσσα."
+  },
+  "tour": {
+    "eyebrow": "Γρήγορη ξενάγηση",
+    "forkTitle": "Πού θα ήθελες να εκτελέσεις το Kilo;",
+    "forkSubtitle": "Διάλεξε πού θα εκτελείται το Kilo για την πρώτη σου συνεδρία.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Εκτέλεσε το Kilo σε ένα απομονωμένο περιβάλλον cloud χωρίς να εγκαθιστάς τίποτα.",
+    "remoteOptionTitle": "Ο υπολογιστής σου",
+    "remoteOptionBody": "Εκτέλεσε το Kilo στο δικό σου μηχάνημα μέσω του CLI `kilo remote`.",
+    "skip": "Παράλειξη ξενάγησης",
+    "tutorialLabel": "Οδηγός",
+    "remoteTitle": "Ξεκίνα την πρώτη απομακρυσμένη συνεδρία σου",
+    "remoteBody": "Σύνδεσε τον υπολογιστή σου και μετά ξεκίνα τη συνεδρία από εδώ.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Δεν έχει συνδεθεί υπολογιστής ακόμα",
+    "remoteEmptyBody": "Για να τον συνδέσεις, εκτέλεσε `kilo remote` στον υπολογιστή σου.",
+    "remoteFound": "Ο υπολογιστής συνδέθηκε",
+    "checkAgain": "Έλεγχος ξανά",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Guqula ukufaka ngezwi kube umbhalo usebenzisa imodeli ye-Kilo Gateway kunokubona inkulumo kwedivayisi. Ukuqopha kwakho kuthunyelwa ku-Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Finyeza izingcingo zamathuluzi",
-    "condenseToolCallsSubtitle": "Hlanganisa izingcingo zamathuluzi ezilandelanayo zibe umugqa owodwa ongawuvula."
+    "condenseToolCallsSubtitle": "Hlanganisa izingcingo zamathuluzi ezilandelanayo zibe umugqa owodwa ongawuvula.",
+    "toolSummaryTranslation": "Humusha izifinyezo zamathuluzi",
+    "toolSummaryTranslationSubtitle": "Thumela isifinyezo sethuluzi ngasinye kumodeli ukuze siyihumushele olimini lohlelo lwakho. Okwangempela kuyaboniswa uma ukuhumusha kwehluleka.",
+    "toolSummaryTranslationModelUnavailableNotice": "Le modeli ayisanikezwa. Thepha $t(common.model) ukukhetha enye."
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokuhlanganisa asitholakali",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Izilimi ezisekelwa yile divayisi azikwazanga ukulayishwa.",
     "emptyTitle": "Azikho izilimi ezisekelwayo",
     "emptyDescription": "Ukubona inkulumo kwale divayisi akubiki zilimi ezisekelwayo."
+  },
+  "tour": {
+    "eyebrow": "Uhambo olusheshayo",
+    "forkTitle": "Ufuna ukusebenzisa i-Kilo kuphi?",
+    "forkSubtitle": "Khetha ukuthi i-Kilo izosebenza kuphi eseshini yakho yokuqala.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Sebenzisa i-Kilo endaweni yefu ehlukanisiwe ngaphandle kokufaka lutho.",
+    "remoteOptionTitle": "Ikhompyutha yakho",
+    "remoteOptionBody": "Sebenzisa i-Kilo ekhompyutheni yakho ngokusebenzisa i-CLI ethi `kilo remote`.",
+    "skip": "Qeda uhambo",
+    "tutorialLabel": "Uqeqesho",
+    "remoteTitle": "Qala iseshini yakho yokuqala ekude",
+    "remoteBody": "Xhuma ikhompyutha yakho, bese uqala iseshini lapha.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Akukho khompyutha exhunyiwe okwamanje",
+    "remoteEmptyBody": "Ukuze uyixhume, qalisa `kilo remote` ekhompyutheni yakho.",
+    "remoteFound": "Ikhompyutha ixhunyiwe",
+    "checkAgain": "Phinda uhlole",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

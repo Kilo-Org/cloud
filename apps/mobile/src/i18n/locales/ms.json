@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Transkripsikan input suara dengan model Kilo Gateway dan bukan pengecaman pertuturan peranti. Rakaman anda dihantar ke Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Padatkan panggilan alat",
-    "condenseToolCallsSubtitle": "Kumpulkan panggilan alat berturut-turut dalam satu baris yang boleh anda buka."
+    "condenseToolCallsSubtitle": "Kumpulkan panggilan alat berturut-turut dalam satu baris yang boleh anda buka.",
+    "toolSummaryTranslation": "Terjemah ringkasan alat",
+    "toolSummaryTranslationSubtitle": "Hantar setiap ringkasan alat kepada model untuk menterjemahkannya ke dalam bahasa aplikasi anda. Yang asal dipaparkan jika terjemahan gagal.",
+    "toolSummaryTranslationModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketik $t(common.model) untuk memilih yang lain."
   },
   "prReview": {
     "pullRequestUnavailable": "Permintaan tarik tidak tersedia",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Bahasa yang disokong peranti ini tidak dapat dimuatkan.",
     "emptyTitle": "Tiada bahasa yang disokong",
     "emptyDescription": "Pengecaman pertuturan peranti ini tidak melaporkan sebarang bahasa yang disokong."
+  },
+  "tour": {
+    "eyebrow": "Lawatan ringkas",
+    "forkTitle": "Di mana anda ingin menjalankan Kilo?",
+    "forkSubtitle": "Pilih tempat Kilo menjalankan sesi pertama anda.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Jalankan Kilo dalam persekitaran cloud terasing tanpa perlu memasang apa-apa.",
+    "remoteOptionTitle": "Komputer anda",
+    "remoteOptionBody": "Jalankan Kilo pada mesin anda sendiri melalui CLI `kilo remote`.",
+    "skip": "Langkau lawatan",
+    "tutorialLabel": "Tutorial",
+    "remoteTitle": "Mulakan sesi remote pertama anda",
+    "remoteBody": "Sambungkan komputer anda, kemudian mulakan sesi dari sini.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Tiada komputer bersambung lagi",
+    "remoteEmptyBody": "Untuk menyambungkannya, jalankan `kilo remote` pada komputer anda.",
+    "remoteFound": "Komputer bersambung",
+    "checkAgain": "Semak semula",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

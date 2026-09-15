@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "የድምፅ ግብዓትን በመሣሪያው የንግግር ማውቂያ ምትክ በKilo Gateway ሞዴል ወደ ጽሑፍ ቀይሩ። ቀረጻዎ ወደ Kilo Gateway ይላካል።",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "የመሳሪያ ጥሪዎችን መጨመቅ",
-    "condenseToolCallsSubtitle": "ተከታታይ የመሳሪያ ጥሪዎችን መክፈት በሚችሉት አንድ ረድፍ ውስጥ ይሰብስቡ።"
+    "condenseToolCallsSubtitle": "ተከታታይ የመሳሪያ ጥሪዎችን መክፈት በሚችሉት አንድ ረድፍ ውስጥ ይሰብስቡ።",
+    "toolSummaryTranslation": "የመሳሪያ ማጠቃለያዎችን ተርጉም",
+    "toolSummaryTranslationSubtitle": "እያንዳንዱን የመሳሪያ ማጠቃለያ ወደ መተግበሪያዎ ቋንቋ ለመተርጎም ወደ ሞዴል ላክ። ትርጉሙ ካልተሳካ ዋናው ይታያል።",
+    "toolSummaryTranslationModelUnavailableNotice": "ይህ ሞዴል ከእንግዲህ አይቀርብም። ሌላ ለመምረጥ $t(common.model) ይንኩ።"
   },
   "prReview": {
     "pullRequestUnavailable": "የማዋሃድ ጥያቄው አይገኝም",
@@ -3009,5 +3012,24 @@
     "loadFailed": "ይህ መሣሪያ የሚደግፋቸውን ቋንቋዎች መጫን አልተቻለም።",
     "emptyTitle": "የሚደገፉ ቋንቋዎች የሉም",
     "emptyDescription": "የዚህ መሣሪያ የድምፅ መለያ የሚደገፍ ቋንቋ አልዘረዘረም።"
+  },
+  "tour": {
+    "eyebrow": "ፈጣን ጉዞ",
+    "forkTitle": "Kiloን የት ማስኬድ ይፈልጋሉ?",
+    "forkSubtitle": "ለመጀመሪያ ክፍለ ጊዜዎ Kilo የት እንደሚሮጥ ይምረጡ።",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "ምንም ነገር ሳያስገቡ Kiloን በተጠበቀ የዳመና አካባቢ ውስጥ ያስኪዱ።",
+    "remoteOptionTitle": "የእርስዎ ኮምፒውተር",
+    "remoteOptionBody": "`kilo remote` በሚባለው CLI በመጠቀም Kiloን በራስዎ ማሽን ላይ ያስኪዱ።",
+    "skip": "ጉዞውን ዕለጥ",
+    "tutorialLabel": "መመሪያ",
+    "remoteTitle": "የመጀመሪያውን ሩቅ ክፍለ ጊዜ ይጀምሩ",
+    "remoteBody": "ኮምፒውተርዎን ያገናኙ፣ ከዚያ ክፍለ ጊዜውን ከዚህ ይጀምሩ።",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "እስካሁን የተገናኘ ኮምፒውተር የለም",
+    "remoteEmptyBody": "ለማገናኘት በኮምፒውተርዎ ላይ `kilo remote`ን ያስኪዱ።",
+    "remoteFound": "ኮምፒውተር ተገናኝቷል",
+    "checkAgain": "እንደገና ይፈትሹ",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

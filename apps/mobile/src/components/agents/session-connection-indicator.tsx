@@ -14,22 +14,32 @@ import { resolveSessionConnectionState } from './session-connection-indicator-st
 type SessionConnectionIndicatorProps = {
   activeSessionType?: ResolvedSession['type'] | null;
   agentStatusType?: AgentStatus['type'];
+  /** Cached transcript is readable, but session metadata still needs a refresh. */
+  sessionRefresh?: { isLoading: boolean; onRetry: () => void };
 };
+
+/** A pending metadata refresh reads as connecting; a failed one reads as lost. */
+function resolveSessionRefreshState({ isLoading }: { isLoading: boolean }): 'down' | 'exhausted' {
+  return isLoading ? 'down' : 'exhausted';
+}
 
 export function SessionConnectionIndicator({
   activeSessionType = null,
   agentStatusType = 'idle',
+  sessionRefresh,
 }: Readonly<SessionConnectionIndicatorProps>) {
   const { isConnected: userWebConnected, reconnectExhausted } = useUserWebConnectionHealth();
   const connection = useUserWebConnection();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const state = resolveSessionConnectionState({
-    activeSessionType,
-    agentStatusType,
-    userWebConnected,
-    reconnectExhausted,
-  });
+  const state = sessionRefresh
+    ? resolveSessionRefreshState(sessionRefresh)
+    : resolveSessionConnectionState({
+        activeSessionType,
+        agentStatusType,
+        userWebConnected,
+        reconnectExhausted,
+      });
   // "Ever up" is a committed-state ref (written in an effect), so a drop
   // after the first committed up reads "Reconnecting…" while a cold start
   // reads "Connecting…". Writing it during render would leak abandoned
@@ -54,7 +64,15 @@ export function SessionConnectionIndicator({
   // reachable for assistive technology.
   const interactive = state === 'exhausted';
   return (
+    // Keying the row on blank/labelled forces a fresh Android view when the
+    // label clears. React Native does not always clear a view's previously
+    // committed `contentDescription` when `accessibilityLabel` becomes
+    // `undefined`, so the row kept announcing "Connecting…" to accessibility
+    // services (and uiautomator) after the metadata refresh settled — a
+    // phantom "Connecting…" that never cleared (p7). Remounting the row drops
+    // the stale description while keeping the fixed h-6 slot.
     <View
+      key={label === null ? 'blank' : 'label'}
       className="h-6 flex-row items-center justify-center gap-1.5"
       accessibilityElementsHidden={label === null}
       importantForAccessibility={label === null ? 'no-hide-descendants' : 'auto'}
@@ -68,7 +86,11 @@ export function SessionConnectionIndicator({
           {interactive ? (
             <Pressable
               onPress={() => {
-                connection.retryConnection();
+                if (sessionRefresh) {
+                  sessionRefresh.onRetry();
+                } else {
+                  connection.retryConnection();
+                }
               }}
               hitSlop={8}
               className="active:opacity-70"

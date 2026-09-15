@@ -115,8 +115,6 @@ export function thinkingEffortLabel(variant: string): string {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-const MODEL_REQUEST_TIMEOUT_MS = 15_000;
-
 /**
  * Wire contract for the openrouter / org models endpoints. The response is a
  * `data` array of model descriptors matching the `ModelResponse` fields.
@@ -144,41 +142,30 @@ export const OpenRouterModelsResponseSchema = z.object({
  */
 export const OrganizationDefaultsResponseSchema = z.object({ defaultModel: z.string() });
 
+/**
+ * The catalogue is a small static list from our own API, and the row that
+ * consumes it shows a loading caption while the request is pending. A wall-clock
+ * abort turned a slow-but-alive backend into a hard "could not load models"
+ * error before the list could arrive, so the fetch has no client timeout: a
+ * refused or reset connection still rejects and surfaces the error + Retry,
+ * while a stalled response resolves when the backend answers.
+ */
 async function fetchModels(organizationId: string | undefined): Promise<ModelResponse> {
   const token = await getAuthTokenForRequest();
   const url = organizationId
     ? `${API_BASE_URL}/api/organizations/${organizationId}/models`
     : `${API_BASE_URL}/api/openrouter/models`;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, MODEL_REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch models: ${response.status} ${response.statusText}`);
-    }
-
-    const data = OpenRouterModelsResponseSchema.parse(await response.json());
-    return data;
-  } catch (error) {
-    if (controller.signal.aborted) {
-      throw new Error(`Timed out fetching models after ${MODEL_REQUEST_TIMEOUT_MS}ms`, {
-        cause: error,
-      });
-    }
-
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch models: ${response.status} ${response.statusText}`);
   }
+
+  return OpenRouterModelsResponseSchema.parse(await response.json());
 }
 
 async function fetchOrgDefaults(organizationId: string): Promise<{ defaultModel: string }> {
@@ -214,7 +201,7 @@ export function useOrgDefaultModel(organizationId: string | undefined) {
 }
 
 export function useAvailableModels(organizationId: string | undefined) {
-  const { data, isLoading, isError, error, refetch } = useQuery({
+  const { data, isLoading, isError, isFetching, isFetched, error, refetch } = useQuery({
     queryKey: ['available-models', organizationId] as const,
     queryFn: fetchModels.bind(null, organizationId),
     staleTime: 60_000,
@@ -222,5 +209,11 @@ export function useAvailableModels(organizationId: string | undefined) {
 
   const models = useMemo(() => toModelOptions(data), [data]);
 
-  return { models, isLoading, isError, error, refetch };
+  // `isFetching` covers every in-flight request; `isLoading` is only the first
+  // load (it turns true again during a no-data refetch, so it cannot tell a
+  // retry from the initial load). `isFetched` records that the query settled at
+  // least once, letting a caller keep the error state through a retry: v5
+  // downgrades a no-data refetch back to pending and clears `error`, so
+  // `isError` alone would drop the error block. See `use-current-user-id`.
+  return { models, isLoading, isError, isFetching, isFetched, error, refetch };
 }

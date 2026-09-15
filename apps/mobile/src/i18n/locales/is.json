@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Umritið raddinnsláttinn með Kilo Gateway líkani í stað talaþekkingar tækisins. Upptakan er send í Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Þjappa tólaköllum",
-    "condenseToolCallsSubtitle": "Flokkaðu samfelld tólaköll í eina röð sem þú getur opnað."
+    "condenseToolCallsSubtitle": "Flokkaðu samfelld tólaköll í eina röð sem þú getur opnað.",
+    "toolSummaryTranslation": "Þýða samantektir tóla",
+    "toolSummaryTranslationSubtitle": "Sendu hverja samantekt tóls til líkans til að þýða hana á tungumál appsins þíns. Upprunalega textinn birtist ef þýðing mistekst.",
+    "toolSummaryTranslationModelUnavailableNotice": "Þetta líkan er ekki lengur í boði. Ýttu á $t(common.model) til að velja annað."
   },
   "prReview": {
     "pullRequestUnavailable": "Sameiningarbeiðni ekki tiltæk",
@@ -3009,5 +3012,24 @@
     "loadFailed": "Ekki tókst að hlaða tungumálunum sem þetta tæki styður.",
     "emptyTitle": "Engin studd tungumál",
     "emptyDescription": "Talgreining þessa tækis tilkynnir engin studd tungumál."
+  },
+  "tour": {
+    "eyebrow": "Fljótleg kynning",
+    "forkTitle": "Hvar viltu keyra Kilo?",
+    "forkSubtitle": "Veldu hvar Kilo keyrir fyrstu lotuna þína.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Keyrðu Kilo í einangruðu skýjumhverfi án þess að innsetja eitthvað.",
+    "remoteOptionTitle": "Tölvan þín",
+    "remoteOptionBody": "Keyrðu Kilo á eigin tölvu í gegnum `kilo remote` CLI-ið.",
+    "skip": "Sleppa kynningu",
+    "tutorialLabel": "Leiðbeiningar",
+    "remoteTitle": "Hafðu uppi fyrstu fjarlotu þína",
+    "remoteBody": "Tengdu tölvuna þína og vertu svo að byrja lotuna héðan.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Engin tölva tengd ennþá",
+    "remoteEmptyBody": "Til að tengja hana skaltu keyra `kilo remote` á tölvunni þinni.",
+    "remoteFound": "Tölva tengd",
+    "checkAgain": "Athuga aftur",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

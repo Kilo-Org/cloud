@@ -257,7 +257,10 @@
     "gatewayTranscriptionSubtitle": "Glasovni vnos prepiši z modelom Kilo Gateway namesto prepoznavanja govora naprave. Posnetje se pošlje v Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Strni klice orodij",
-    "condenseToolCallsSubtitle": "Združi zaporedne klice orodij v eno vrstico, ki jo lahko odpreš."
+    "condenseToolCallsSubtitle": "Združi zaporedne klice orodij v eno vrstico, ki jo lahko odpreš.",
+    "toolSummaryTranslation": "Prevedi povzetke orodij",
+    "toolSummaryTranslationSubtitle": "Pošlji vsak povzetek orodja modelu, da ga prevede v jezik tvoje aplikacije. Če prevajanje ne uspe, se prikaže izvirnik.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ta model se ne ponuja več. Dotaknite se $t(common.model) in izberite drugega."
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtevek za združitev ni na voljo",
@@ -3053,5 +3056,24 @@
     "loadFailed": "Jezikov, ki jih podpira ta naprava, ni bilo mogoče naložiti.",
     "emptyTitle": "Ni podprtih jezikov",
     "emptyDescription": "Prepoznavanje govora te naprave ne poroča o podprtih jezikih."
+  },
+  "tour": {
+    "eyebrow": "Hitri ogled",
+    "forkTitle": "Kje želite pognati Kilo?",
+    "forkSubtitle": "Izberi, kje bo Kilo pognal tvojo prvo sejo.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Zaženi Kilo v izoliranem oblačnem okolju, brez namestitve.",
+    "remoteOptionTitle": "Vaš računalnik",
+    "remoteOptionBody": "Zaženi Kilo na svojem računalniku prek CLI-ja `kilo remote`.",
+    "skip": "Preskoči ogled",
+    "tutorialLabel": "Vodič",
+    "remoteTitle": "Zaženite svojo prvo oddaljeno sejo",
+    "remoteBody": "Poveži svoj računalnik, nato pa tu zaženi sejo.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Še ni povezanega računalnika",
+    "remoteEmptyBody": "Če ga želite povezati, zaženite `kilo remote` na svojem računalniku.",
+    "remoteFound": "Računalnik povezan",
+    "checkAgain": "Preveri znova",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

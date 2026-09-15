@@ -7,6 +7,9 @@ import { useTranslation } from 'react-i18next';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
+
+import { useIsToolSummaryRow } from './tool-summary-translation-scope';
 
 import { useMessageLongPress } from './message-long-press-context';
 
@@ -24,6 +27,12 @@ type FixedPartRowProps = {
   variant?: 'solid' | 'dashed';
   /** Presence makes the row pressable and adds the chevron and details hint. */
   onPress?: () => void;
+  /**
+   * Whether the label carries tool content worth translating. Defaults to true;
+   * tool cards pass the display projection's `translatable` so a label that is
+   * already-localized UI copy or a raw tool id is never sent to the gateway.
+   */
+  translatable?: boolean;
   accessibilityLabel: string;
 };
 
@@ -47,11 +56,20 @@ export function FixedPartRow({
   status,
   variant = 'solid',
   onPress,
+  translatable = true,
   accessibilityLabel,
 }: Readonly<FixedPartRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const messageLongPress = useMessageLongPress();
+  const isToolSummaryRow = useIsToolSummaryRow();
+  const shownLabel = useTranslatedToolSummary(label, isToolSummaryRow && translatable);
+  // Keep the spoken summary in step with the visible one without a second
+  // translation request: only the embedded label changes.
+  const shownAccessibilityLabel =
+    label !== '' && shownLabel !== label
+      ? accessibilityLabel.split(label).join(shownLabel)
+      : accessibilityLabel;
 
   return (
     <View
@@ -67,7 +85,7 @@ export function FixedPartRow({
         onLongPress={messageLongPress ?? undefined}
         disabled={!onPress}
         accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
+        accessibilityLabel={shownAccessibilityLabel}
         accessibilityHint={onPress ? t('agentChat.partDetail.showDetails') : undefined}
         accessibilityState={{ disabled: !onPress }}
       >
@@ -82,11 +100,11 @@ export function FixedPartRow({
         <View className="flex-1 flex-row items-baseline gap-1.5">
           {labelKind === 'eyebrow' ? (
             <Eyebrow className="shrink" numberOfLines={1}>
-              {label}
+              {shownLabel}
             </Eyebrow>
           ) : (
             <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
-              {label}
+              {shownLabel}
             </Text>
           )}
           {badge ? (

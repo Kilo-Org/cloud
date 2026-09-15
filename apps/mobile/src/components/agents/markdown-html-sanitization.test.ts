@@ -42,7 +42,9 @@ describe('htmlSanitizesToEmpty', () => {
     }
     for (const chunk of chunks) {
       if (chunk.includes('<')) {
-        expect(typeof htmlSanitizesToEmpty(chunk)).toBe('boolean');
+        // Every '<'-chunk above keeps non-whitespace text after the removals,
+        // so the slow path must report visible content.
+        expect(htmlSanitizesToEmpty(chunk)).toBe(false);
       }
     }
   });

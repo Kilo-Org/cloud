@@ -10,7 +10,7 @@ import { WRAPPER_VERSION } from '../src/shared/wrapper-version.js';
 
 export const SNAPSHOT_RUNTIME = 'node24';
 export const PINNED_BUN_VERSION = '1.3.14';
-export const PINNED_KILO_VERSION = '7.4.20';
+export const PINNED_KILO_VERSION = '7.6.2';
 export const SNAPSHOT_MANIFEST_PATH = '/usr/local/share/kilo/runtime-manifest.json';
 export const SNAPSHOT_WRAPPER_PATH = '/usr/local/bin/kilocode-wrapper.js';
 export const SNAPSHOT_CONTROL_WRAPPER_PATH = '/usr/local/bin/kilocode-control-wrapper.js';

@@ -7,6 +7,7 @@ import {
   controlFrameSchema,
   sandboxHeartbeatPayloadSchema,
   sandboxEventPublicationPayloadSchema,
+  sandboxEventBatchPayloadSchema,
   sandboxHelloPayloadSchema,
   sandboxReconcilePayloadSchema,
   sandboxReadyPayloadSchema,
@@ -50,6 +51,7 @@ const REQUEST_PAYLOAD_SCHEMAS: Record<ControlOperation, z.ZodType> = {
   'sandbox.status': sandboxStatusPayloadSchema,
   'sandbox.reconcile': sandboxReconcilePayloadSchema,
   'sandbox.event.publish': sandboxEventPublicationPayloadSchema,
+  'sandbox.event.publishBatch': sandboxEventBatchPayloadSchema,
   'sandbox.shutdown': sandboxShutdownPayloadSchema,
   'worktree.prepareDeletion': worktreeDeletePayloadSchema,
   'worktree.delete': worktreeDeletePayloadSchema,
@@ -188,6 +190,7 @@ export function errorResponse(
 export function helloResult(capabilities?: {
   connectionRecovery?: boolean;
   eventReceipts?: boolean;
+  eventBatches?: boolean;
   scopedCleanupResult?: boolean;
 }): SandboxHelloResult {
   return {
@@ -200,6 +203,7 @@ export function helloResult(capabilities?: {
       nativeRuntimeRetirement: true,
       ...(capabilities?.connectionRecovery ? { connectionRecovery: true } : {}),
       ...(capabilities?.eventReceipts ? { eventReceipts: true } : {}),
+      ...(capabilities?.eventBatches ? { eventBatches: true } : {}),
       ...(capabilities?.scopedCleanupResult ? { scopedCleanupResult: true } : {}),
     },
   };

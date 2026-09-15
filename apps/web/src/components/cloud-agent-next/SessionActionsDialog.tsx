@@ -9,11 +9,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Copy, Check, Share2, GitFork } from 'lucide-react';
+import { Loader2, Copy, Check, Share2, GitFork, Cloud } from 'lucide-react';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
 import { CopyableCommand } from '@/components/CopyableCommand';
 import { OpenInEditorButton } from '@/app/share/[shareId]/open-in-editor-button';
+import { useCloudSessionFork } from './use-cloud-session-fork';
 
 type SessionActionsDialogProps = {
   open: boolean;
@@ -22,6 +23,8 @@ type SessionActionsDialogProps = {
   kiloSessionId?: string;
   sessionTitle?: string;
   repository?: string;
+  /** Organization context the dialog renders in; omitted for personal sessions. */
+  organizationId?: string;
 };
 
 export function SessionActionsDialog({
@@ -30,11 +33,14 @@ export function SessionActionsDialog({
   kiloSessionId,
   sessionTitle,
   repository,
+  organizationId,
 }: SessionActionsDialogProps) {
   const [isSharing, setIsSharing] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const trpc = useRawTRPCClient();
+  const { forkSessionToNewCloudSession, forkingSessionId } = useCloudSessionFork(organizationId);
+  const isForkingToCloud = forkingSessionId === kiloSessionId;
 
   const handleShare = async () => {
     if (!kiloSessionId) {
@@ -80,6 +86,14 @@ export function SessionActionsDialog({
       setShareUrl(null);
       setIsCopied(false);
     }, 200);
+  };
+
+  const handleForkToCloud = async () => {
+    if (!kiloSessionId) return;
+    const forked = await forkSessionToNewCloudSession(kiloSessionId);
+    if (forked) {
+      handleClose();
+    }
   };
 
   const truncateId = (id: string, length: number = 8): string => {
@@ -183,11 +197,29 @@ export function SessionActionsDialog({
               <h3 className="text-sm font-medium">Fork Session</h3>
             </div>
             <p className="text-muted-foreground text-xs">
-              Fork this session to continue working on it in your editor or CLI
+              Fork this session to continue working on it in your editor, CLI, or a new Cloud Agent
+              session
             </p>
 
             {kiloSessionId ? (
               <div className="space-y-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2"
+                  disabled={isForkingToCloud}
+                  onClick={() => void handleForkToCloud()}
+                >
+                  {isForkingToCloud ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Cloud className="h-4 w-4" />
+                  )}
+                  {isForkingToCloud
+                    ? 'Forking to a new Cloud Agent session...'
+                    : 'Fork to a new Cloud Agent session'}
+                </Button>
+
                 <div className="flex justify-center">
                   <OpenInEditorButton
                     sessionId={kiloSessionId}

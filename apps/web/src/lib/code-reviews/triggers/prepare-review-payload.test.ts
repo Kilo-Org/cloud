@@ -1,3 +1,5 @@
+import { captureException } from '@sentry/nextjs';
+import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 const mockGenerateGitHubInstallationToken = jest.fn();
 const mockFindKiloReviewComment = jest.fn();
 const mockFetchPRInlineComments = jest.fn();
@@ -261,6 +263,41 @@ describe('prepareReviewPayload', () => {
     await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
     await db.delete(organizations).where(eq(organizations.id, testOrganizationId));
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('captures explicit runtime rejection diagnostics alongside the review ID', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    const diagnostics = {
+      installationId: integration.platform_installation_id ?? 'installation-1',
+      appType: 'standard' as const,
+      integrationIds: [integration.id],
+    };
+    const error = new GitHubRuntimeAuthorizationError('blocked_personal_owner', diagnostics);
+    mockGenerateGitHubInstallationToken.mockRejectedValueOnce(error);
+    const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner,
+        agentConfig: { config: baseAgentConfig },
+        platform: 'github',
+      })
+    ).rejects.toBe(error);
+    expect(captureException).toHaveBeenCalledWith(error, {
+      tags: {
+        operation: 'prepareReviewPayload',
+        githubRuntimeAuthorizationReason: 'blocked_personal_owner',
+      },
+      extra: {
+        reviewId: review.id,
+        owner,
+        platform: 'github',
+        githubRuntimeAuthorization: { reason: 'blocked_personal_owner', ...diagnostics },
+      },
+    });
   });
 
   it('fetches GitHub REVIEW.md from the base ref when enabled and persists used metadata', async () => {

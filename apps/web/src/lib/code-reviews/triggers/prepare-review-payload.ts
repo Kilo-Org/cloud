@@ -8,6 +8,7 @@
  */
 
 import { captureException } from '@sentry/nextjs';
+import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 import { z } from 'zod';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
@@ -912,8 +913,20 @@ export async function prepareReviewPayload(
   } catch (error) {
     errorExceptInTest('[prepareReviewPayload] Error preparing payload:', error);
     captureException(error, {
-      tags: { operation: 'prepareReviewPayload' },
-      extra: { reviewId, owner, platform },
+      tags: {
+        operation: 'prepareReviewPayload',
+        ...(error instanceof GitHubRuntimeAuthorizationError && {
+          githubRuntimeAuthorizationReason: error.reason,
+        }),
+      },
+      extra: {
+        reviewId,
+        owner,
+        platform,
+        ...(error instanceof GitHubRuntimeAuthorizationError && {
+          githubRuntimeAuthorization: { reason: error.reason, ...error.diagnostics },
+        }),
+      },
     });
     throw error;
   }

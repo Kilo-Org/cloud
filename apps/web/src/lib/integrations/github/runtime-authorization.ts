@@ -73,7 +73,15 @@ type RuntimeAssociation = {
 };
 
 export function getGitHubRuntimeAssociationRejectionReason(
-  association: RuntimeAssociation | null | undefined
+  association: RuntimeAssociation | null | undefined,
+  options?: {
+    /**
+     * Allow a shared (`web_cloud_agent`) canonical installation. Only valid when the caller
+     * resolved one exact tenant association; the generic, installation-wide path must stay
+     * exclusive-only.
+     */
+    allowShared?: boolean;
+  }
 ): GitHubRuntimeAuthorizationRejectionReason | null {
   if (!association) return 'missing_association';
 
@@ -96,9 +104,10 @@ export function getGitHubRuntimeAssociationRejectionReason(
   if (integration.github_disconnected_at != null) return 'disconnected';
 
   // An association bound to a canonical installation must have that installation active, not
-  // suspended/deleted/auth-invalid, and (shared installations are not authorized on this
-  // generic runtime path) exclusively owned. An association with no canonical binding yet
-  // (github_installation_id is null) has nothing further to check here.
+  // suspended/deleted/auth-invalid, and exclusively owned UNLESS the caller resolved one exact
+  // tenant association and explicitly opted into the shared (web_cloud_agent) carve-out. An
+  // association with no canonical binding yet (github_installation_id is null) has nothing
+  // further to check here.
   if (integration.github_installation_id !== null) {
     if (
       installation === null ||
@@ -109,16 +118,22 @@ export function getGitHubRuntimeAssociationRejectionReason(
     ) {
       return 'installation_unavailable';
     }
-    if (installation.sharing_mode !== 'exclusive') return 'sharing_not_allowed';
+    if (
+      installation.sharing_mode !== 'exclusive' &&
+      !(options?.allowShared === true && installation.sharing_mode === 'web_cloud_agent')
+    ) {
+      return 'sharing_not_allowed';
+    }
   }
 
   return null;
 }
 
 export function isGitHubRuntimeAssociationAuthorized(
-  association: RuntimeAssociation | null | undefined
+  association: RuntimeAssociation | null | undefined,
+  options?: { allowShared?: boolean }
 ): boolean {
-  return getGitHubRuntimeAssociationRejectionReason(association) === null;
+  return getGitHubRuntimeAssociationRejectionReason(association, options) === null;
 }
 
 export async function assertGitHubInstallationRuntimeAuthorized(
@@ -126,6 +141,18 @@ export async function assertGitHubInstallationRuntimeAuthorized(
   appType: GitHubAppType,
   expectedIntegrationId?: string
 ): Promise<void> {
+  // A non-empty expectedIntegrationId means the caller already resolved the tenant association
+  // it is about to act as. That association still has to pass ownership (org membership / user
+  // ownership) and local + canonical health below; only the sharing-mode requirement relaxes so
+  // a legitimately attached shared association can read its own inventory. Without one (the
+  // generic, installation-wide path) shared installations stay rejected.
+  //
+  // This single normalized value drives the id predicate, the row limit, and the sharing-mode
+  // carve-out so they can never diverge: an empty-string id is the generic path, not an exact
+  // association.
+  const exactAssociationId =
+    expectedIntegrationId && expectedIntegrationId.length > 0 ? expectedIntegrationId : undefined;
+  const allowShared = exactAssociationId !== undefined;
   const associations = await db
     .select({
       integration: platform_integrations,
@@ -148,7 +175,9 @@ export async function assertGitHubInstallationRuntimeAuthorized(
         isNull(platform_integrations.github_disconnected_at),
         isNull(platform_integrations.suspended_at),
         isNull(platform_integrations.auth_invalid_at),
-        expectedIntegrationId ? eq(platform_integrations.id, expectedIntegrationId) : undefined,
+        exactAssociationId !== undefined
+          ? eq(platform_integrations.id, exactAssociationId)
+          : undefined,
         eq(platform_integrations.platform_installation_id, installationId),
         effectiveAppTypeCondition(appType),
         // Candidacy for THIS query: an unhealthy row must not count toward ambiguous-association
@@ -179,7 +208,12 @@ export async function assertGitHubInstallationRuntimeAuthorized(
             eq(github_app_installations.github_app_type, appType),
             eq(github_app_installations.installation_id, installationId),
             eq(github_app_installations.lifecycle_state, 'active'),
-            eq(github_app_installations.sharing_mode, 'exclusive'),
+            allowShared
+              ? or(
+                  eq(github_app_installations.sharing_mode, 'exclusive'),
+                  eq(github_app_installations.sharing_mode, 'web_cloud_agent')
+                )
+              : eq(github_app_installations.sharing_mode, 'exclusive'),
             isNull(github_app_installations.suspended_at),
             isNull(github_app_installations.deleted_at),
             isNull(github_app_installations.auth_invalid_at)
@@ -187,12 +221,12 @@ export async function assertGitHubInstallationRuntimeAuthorized(
         )
       )
     )
-    .limit(expectedIntegrationId ? 1 : 2);
+    .limit(exactAssociationId !== undefined ? 1 : 2);
 
   const reason =
     associations.length > 1
       ? 'ambiguous_association'
-      : getGitHubRuntimeAssociationRejectionReason(associations[0]);
+      : getGitHubRuntimeAssociationRejectionReason(associations[0], { allowShared });
   if (reason) {
     throw new GitHubRuntimeAuthorizationError(reason, {
       installationId,

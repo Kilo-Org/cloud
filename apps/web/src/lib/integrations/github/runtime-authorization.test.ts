@@ -45,6 +45,40 @@ describe('isGitHubRuntimeAssociationAuthorized', () => {
     ).toBe(false);
   });
 
+  it('rejects a shared canonical installation even with allowShared unset or false', () => {
+    const shared = {
+      ...association,
+      installation: { ...association.installation!, sharing_mode: 'web_cloud_agent' as const },
+    };
+    expect(isGitHubRuntimeAssociationAuthorized(shared)).toBe(false);
+    expect(isGitHubRuntimeAssociationAuthorized(shared, { allowShared: false })).toBe(false);
+    expect(getGitHubRuntimeAssociationRejectionReason(shared)).toBe('sharing_not_allowed');
+  });
+
+  it('allows a shared canonical installation only when allowShared is explicitly true', () => {
+    const shared = {
+      ...association,
+      installation: { ...association.installation!, sharing_mode: 'web_cloud_agent' as const },
+    };
+    expect(isGitHubRuntimeAssociationAuthorized(shared, { allowShared: true })).toBe(true);
+    expect(getGitHubRuntimeAssociationRejectionReason(shared, { allowShared: true })).toBeNull();
+  });
+
+  it('still enforces exclusive-mode installations even when allowShared is true', () => {
+    // allowShared only widens the accepted sharing_mode set; it never loosens the
+    // exclusive-mode requirements (lifecycle_state/suspended_at/deleted_at/auth_invalid_at).
+    expect(isGitHubRuntimeAssociationAuthorized(association, { allowShared: true })).toBe(true);
+    expect(
+      isGitHubRuntimeAssociationAuthorized(
+        {
+          ...association,
+          installation: { ...association.installation!, suspended_at: '2026-09-04' },
+        },
+        { allowShared: true }
+      )
+    ).toBe(false);
+  });
+
   it('preserves an unbound healthy legacy association without accepting a broken canonical link', () => {
     expect(
       isGitHubRuntimeAssociationAuthorized({
@@ -308,5 +342,47 @@ describe('runtime rejection diagnostics', () => {
     // An empty string is falsy, so it must behave exactly like "no expectedIntegrationId"
     // (the generic, exclusive-only path) rather than being treated as an exact id to match.
     expect(limit).toHaveBeenCalledWith(2);
+  });
+
+  it('authorizes a shared canonical installation only through the exact-id path', async () => {
+    const sharedAssociation = {
+      ...association,
+      installation: { ...association.installation!, sharing_mode: 'web_cloud_agent' as const },
+    };
+    const query = {
+      from: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([sharedAssociation]),
+    };
+    jest
+      .mocked(db.select)
+      .mockClear()
+      .mockReturnValue(query as never);
+
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('installation-1', 'lite', 'integration-1')
+    ).resolves.toBeUndefined();
+  });
+
+  it('rejects a shared canonical installation on the generic (no exact id) path', async () => {
+    const sharedAssociation = {
+      ...association,
+      installation: { ...association.installation!, sharing_mode: 'web_cloud_agent' as const },
+    };
+    const query = {
+      from: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([sharedAssociation]),
+    };
+    jest
+      .mocked(db.select)
+      .mockClear()
+      .mockReturnValue(query as never);
+
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('installation-1', 'lite')
+    ).rejects.toMatchObject({ reason: 'sharing_not_allowed' });
   });
 });

@@ -2086,8 +2086,8 @@ importers:
         specifier: 0.18.6
         version: 0.18.6(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@kilocode/sdk':
-        specifier: 7.4.20
-        version: 7.4.20
+        specifier: 7.6.2
+        version: 7.6.2
       '@types/jsonwebtoken':
         specifier: 'catalog:'
         version: 9.0.10
@@ -2125,8 +2125,8 @@ importers:
   services/cloud-agent-next/wrapper:
     dependencies:
       '@kilocode/sdk':
-        specifier: 7.4.20
-        version: 7.4.20
+        specifier: 7.6.2
+        version: 7.6.2
       fuzzysort:
         specifier: 3.1.0
         version: 3.1.0
@@ -6179,8 +6179,8 @@ packages:
   '@kilocode/sdk@7.2.52':
     resolution: {integrity: sha512-j8w6ewvo7dyu/qxjJAg0bcjHGUGGvIZ4F2f5tJnpMwLzPTAu26DJoO/08aoxf1BhfuZLzNS9tA2q+ZPdzPT8Jg==}
 
-  '@kilocode/sdk@7.4.20':
-    resolution: {integrity: sha512-Dl1gBNAtZ3z8FWl4+Q08d7iP+mr8Rg2tqqn6kU9NJLlhuVtKUlp6PyIXqutam2zn+hu5xdRfbHwNauy4yHufmw==}
+  '@kilocode/sdk@7.6.2':
+    resolution: {integrity: sha512-m9fSEUEY8Jg3VN3ZSsgu3aeSOJY0dNzXsUjSlCKbf/BFA33/jv5s255tzRXp925ReJ7qyf2XHs/eu0hpjz6SaA==}
 
   '@lexical/clipboard@0.35.0':
     resolution: {integrity: sha512-ko7xSIIiayvDiqjNDX6fgH9RlcM6r9vrrvJYTcfGVBor5httx16lhIi0QJZ4+RNPvGtTjyFv4bwRmsixRRwImg==}
@@ -23563,7 +23563,7 @@ snapshots:
     dependencies:
       cross-spawn: 7.0.6
 
-  '@kilocode/sdk@7.4.20':
+  '@kilocode/sdk@7.6.2':
     dependencies:
       cross-spawn: 7.0.6
 

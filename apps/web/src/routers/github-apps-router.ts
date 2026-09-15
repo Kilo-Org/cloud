@@ -8,6 +8,7 @@ import {
   getGitHubIntegrationById,
   upsertPlatformIntegrationForOwner,
   updateRepositoriesForIntegration,
+  syncIntegrationInstallationDetails,
 } from '@/lib/integrations/db/platform-integrations';
 import {
   fetchGitHubInstallationDetails,
@@ -44,8 +45,11 @@ import {
 } from '@/lib/integrations/platforms/github/user-authorization';
 import { seedUserGithubToken } from '@/lib/github-pr-review/dev-seed';
 import { createInstallState } from '@/lib/integrations/github/install-state';
-import { canOrganizationUseMultipleGitHubInstallations } from '@/lib/integrations/github/multiple-installations';
-import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
+import {
+  canOrganizationCreateSharedGitHubConnection,
+  canOrganizationUseMultipleGitHubInstallations,
+  isGitHubConnectionManagementEnabled,
+} from '@/lib/integrations/github/multiple-installations';
 import {
   createGitHubConnectionAttempt,
   getGitHubConnectionAttempt,
@@ -187,10 +191,24 @@ export const githubAppsRouter = createTRPCRouter({
       });
       const primaryId = integrations.find(isPlatformIntegrationHealthy)?.id ?? null;
       const canManageModel = canManageOrganizationBilling(role);
+      const canManageConnections =
+        canManageOrganization(role) && isGitHubConnectionManagementEnabled();
+      const sharingApproved = canOrganizationCreateSharedGitHubConnection(input.organizationId);
+      const multipleInstallationsApproved =
+        integrations.length === 0 ||
+        canOrganizationUseMultipleGitHubInstallations(input.organizationId);
+      const existingConnectionAdmission = !canManageConnections
+        ? { allowed: false as const, reason: 'not_authorized' as const }
+        : !sharingApproved
+          ? { allowed: false as const, reason: 'sharing_not_approved' as const }
+          : !multipleInstallationsApproved
+            ? { allowed: false as const, reason: 'multiple_installations_not_approved' as const }
+            : { allowed: true as const, reason: null };
 
       return {
         connectionManagementEnabled: isGitHubConnectionManagementEnabled(),
-        canConnectExisting: canManageOrganization(role) && isGitHubConnectionManagementEnabled(),
+        canConnectExisting: existingConnectionAdmission.allowed,
+        existingConnectionAdmission,
         canAdd:
           canManageOrganization(role) &&
           (integrations.length === 0 ||
@@ -674,30 +692,6 @@ export const githubAppsRouter = createTRPCRouter({
         });
       }
 
-      const upsertResult = await upsertPlatformIntegrationForOwner(owner, {
-        platform: 'github',
-        integrationType: 'app',
-        platformInstallationId: installationId,
-        platformAccountId: installationDetails.account.id.toString(),
-        platformAccountLogin: installationDetails.account.login,
-        permissions: installationDetails.permissions,
-        scopes: installationDetails.events,
-        repositoryAccess: installationDetails.repository_selection,
-        installedAt: installationDetails.created_at,
-        // Keep the integration's app type so a lite refresh is never matched
-        // against (or converted into) the standard app's row.
-        githubAppType: appType,
-      });
-
-      if (!upsertResult.ok) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'This GitHub installation is already claimed by another account.',
-        });
-      }
-
-      const repositories = await fetchGitHubRepositories(installationId, appType);
-      await updateRepositoriesForIntegration(integration.id, repositories);
       await observeGitHubInstallationLifecycle({
         installationId,
         appType,
@@ -714,6 +708,19 @@ export const githubAppsRouter = createTRPCRouter({
         installationId,
         appType,
       });
+      // Keep this association's own cached account/permissions/scopes fields
+      // fresh too: `githubAppsService.getInstallation`/`listIntegrations` read
+      // them straight off `platform_integrations`, not the canonical row.
+      await syncIntegrationInstallationDetails(integration.id, {
+        platformAccountId: installationDetails.account.id.toString(),
+        platformAccountLogin: installationDetails.account.login,
+        permissions: installationDetails.permissions,
+        scopes: installationDetails.events,
+        repositoryAccess: installationDetails.repository_selection,
+        installedAt: installationDetails.created_at,
+      });
+      const repositories = await fetchGitHubRepositories(installationId, appType, integration.id);
+      await updateRepositoriesForIntegration(integration.id, repositories);
 
       if (input?.organizationId) {
         await createAuditLog({

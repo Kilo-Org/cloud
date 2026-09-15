@@ -869,6 +869,35 @@ describe('cloudAgentNextRouter helper procedures', () => {
     );
     expect(mockOrderRepositoriesByUsage).not.toHaveBeenCalled();
   });
+
+  it('does not strip platformIntegrationId/githubAppType from GitHub repositories in the response', async () => {
+    // Regression test: the tRPC .output() schema previously omitted these
+    // fields, so Zod silently stripped them even though the picker (and its
+    // "Select the GitHub repository again" guard) depends on them.
+    const repositories = [
+      {
+        id: 1,
+        name: 'repo',
+        fullName: 'acme/repo',
+        private: false,
+        platformIntegrationId: '11111111-1111-4111-8111-111111111111',
+        platformAccountLogin: 'acme',
+        githubAppType: 'lite' as const,
+      },
+    ];
+    mockFetchGitHubRepositoriesForUser.mockResolvedValue({
+      repositories,
+      integrationInstalled: true,
+      syncedAt: null,
+    });
+    const caller = createCaller({ user: { id: 'user-repositories', is_admin: false } as User });
+
+    await expect(caller.listGitHubRepositories({ forceRefresh: false })).resolves.toEqual({
+      repositories,
+      integrationInstalled: true,
+      syncedAt: null,
+    });
+  });
 });
 
 describe('cloudAgentNextRouter.getSandboxSelectionOptions', () => {

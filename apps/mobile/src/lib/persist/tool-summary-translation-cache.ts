@@ -113,6 +113,33 @@ export async function writeToolSummaryTranslation(
 }
 
 /**
+ * Sign-out cleanup: drop the whole translation scope.
+ *
+ * The stored entries carry the signed-out account's tool text (file paths,
+ * bash commands, descriptions), and a translation is refetchable — it is a
+ * cache row, not a draft ("cache rows are deleted on sign-out, drafts are
+ * not", `drafts.ts`). So the previous account's tool content must not survive
+ * the teardown. This mirrors {@link clearSessionAttentionForSignOut}, which
+ * clears its own scope in the same sign-out batch.
+ *
+ * The runtime's in-memory cache needs no reset here and this function does not
+ * reach it: its entries are keyed by the server-issued `ToolPart.id`, unique
+ * per part and owned by exactly one account's session, so a stale in-memory
+ * entry can never match the next account's row — and the map dies with the
+ * process anyway.
+ *
+ * Best effort: a storage failure is swallowed so it can never abort sign-out.
+ * A stale blob only costs a future cache hit; it is never a source of truth.
+ */
+export async function clearToolSummaryTranslationsForSignOut(): Promise<void> {
+  try {
+    await encryptedKv.clearScope(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE);
+  } catch {
+    // Best effort: sign-out continues; the orphaned blob is re-fetched away.
+  }
+}
+
+/**
  * Keeps at most {@link TOOL_SUMMARY_TRANSLATION_CACHE_CAP} entries. This scope
  * holds nothing but translations, so every listed entry counts and no key
  * prefix filter is needed. `listEntries` is oldest-first by `updated_at`, so

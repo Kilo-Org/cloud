@@ -24,6 +24,9 @@ const kvMock = vi.hoisted(() => {
     removeItem: vi.fn(async (scope: string, k: string) => {
       scopes.get(scope)?.delete(k);
     }),
+    clearScope: vi.fn(async (scope: string) => {
+      scopes.delete(scope);
+    }),
     listEntries: vi.fn(async (scope: string) =>
       [...(scopes.get(scope)?.entries() ?? [])]
         .map(([k, entry]) => ({ k, updatedAt: entry.updatedAt }))
@@ -36,6 +39,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: kvMock.getItem,
   setItem: kvMock.setItem,
   removeItem: kvMock.removeItem,
+  clearScope: kvMock.clearScope,
   listEntries: kvMock.listEntries,
 }));
 
@@ -43,6 +47,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
 import { TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE } from '@/lib/storage-keys';
 import {
   type CachedToolSummaryTranslation,
+  clearToolSummaryTranslationsForSignOut,
   readToolSummaryTranslations,
   TOOL_SUMMARY_TRANSLATION_CACHE_CAP,
   writeToolSummaryTranslation,
@@ -166,5 +171,27 @@ describe('tool summary translation cache', () => {
       'tt:de:kilo-auto/small:item-2',
       JSON.stringify(makeEntry({ itemId: 'item-2' }))
     );
+  });
+
+  it('sign-out clear drops the whole scope', async () => {
+    await writeToolSummaryTranslation(makeEntry({ itemId: 'item-1' }));
+    await writeToolSummaryTranslation(makeEntry({ itemId: 'item-2' }));
+
+    await clearToolSummaryTranslationsForSignOut();
+
+    expect(kvMock.clearScope).toHaveBeenCalledWith(SCOPE);
+    await expect(readToolSummaryTranslations()).resolves.toEqual([]);
+  });
+
+  it('clears a missing scope as a no-op', async () => {
+    await expect(clearToolSummaryTranslationsForSignOut()).resolves.toBeUndefined();
+    expect(kvMock.clearScope).toHaveBeenCalledWith(SCOPE);
+  });
+
+  it('swallows a KV clear failure so sign-out can continue', async () => {
+    await writeToolSummaryTranslation(makeEntry());
+    kvMock.clearScope.mockRejectedValueOnce(new Error('kv down'));
+
+    await expect(clearToolSummaryTranslationsForSignOut()).resolves.toBeUndefined();
   });
 });

@@ -3120,5 +3120,24 @@
     "loadFailed": "Nie udało się załadować języków obsługiwanych przez to urządzenie.",
     "emptyTitle": "Brak obsługiwanych języków",
     "emptyDescription": "Rozpoznawanie mowy tego urządzenia nie zgłasza żadnych obsługiwanych języków."
+  },
+  "tour": {
+    "eyebrow": "Szybki przewodnik",
+    "forkTitle": "Gdzie chcesz uruchomić Kilo?",
+    "forkSubtitle": "Wybierz, gdzie Kilo uruchomi twoją pierwszą sesję.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Uruchom Kilo w izolowanym środowisku chmury, bez niczego do instalowania.",
+    "remoteOptionTitle": "Twój komputer",
+    "remoteOptionBody": "Uruchom Kilo na własnej maszynie za pomocą CLI `kilo remote`.",
+    "skip": "Pomiń przewodnik",
+    "tutorialLabel": "Samouczek",
+    "remoteTitle": "Rozpocznij swoją pierwszą sesję zdalną",
+    "remoteBody": "Połącz swój komputer, a następnie uruchom sesję stąd.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Brak podłączonego komputera",
+    "remoteEmptyBody": "Aby go połączyć, uruchom `kilo remote` na swoim komputerze.",
+    "remoteFound": "Komputer połączony",
+    "checkAgain": "Sprawdź ponownie",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

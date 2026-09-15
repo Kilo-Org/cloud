@@ -3074,5 +3074,24 @@
     "loadFailed": "Enweghị ike ibudata asụsụ ngwaọrụ a na-akwado.",
     "emptyTitle": "Enweghị asụsụ akwadoro",
     "emptyDescription": "Nchọpụta okwu nke ngwaọrụ a anaghị ekwupụta asụsụ ọ bụla akwadoro."
+  },
+  "tour": {
+    "eyebrow": "Njegharị ọsọ",
+    "forkTitle": "Ebe ịchọrọ ịgba Kilo?",
+    "forkSubtitle": "Họrọ ebe Kilo ga-agba nnọkọ mbụ gị.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Gbaa Kilo n'ime gburugburu cloud a kapịrị iche n'ejighị ihe ọbụla ịwụnye.",
+    "remoteOptionTitle": "Kọmputa gị",
+    "remoteOptionBody": "Gbaa Kilo na igwe gị site na CLI nke `kilo remote`.",
+    "skip": "Kwụsị njem",
+    "tutorialLabel": "Ntuziaka",
+    "remoteTitle": "Malite nnọkọ remote mbụ gị",
+    "remoteBody": "Jikọta kọmputa gị, mesịa malitee nnọkọ ahụ site ebe a.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Onweghị kọmputa jikọrọ ruo ugbu a",
+    "remoteEmptyBody": "Iji jikọta ya, gbaa `kilo remote` na kọmputa gị.",
+    "remoteFound": "Ejikọrọ kọmputa",
+    "checkAgain": "Lelee ọzọ",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

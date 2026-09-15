@@ -3120,5 +3120,24 @@
     "loadFailed": "Nepodařilo se načíst jazyky, které toto zařízení podporuje.",
     "emptyTitle": "Žádné podporované jazyky",
     "emptyDescription": "Rozpoznávání řeči tohoto zařízení nehlásí žádné podporované jazyky."
+  },
+  "tour": {
+    "eyebrow": "Rychlá prohlídka",
+    "forkTitle": "Kde chcete Kilo spustit?",
+    "forkSubtitle": "Vyberte, kde bude Kilo běžet pro vaši první relaci.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Spusťte Kilo v izolovaném cloudovém prostředí, aniž byste něco instalovali.",
+    "remoteOptionTitle": "Váš počítač",
+    "remoteOptionBody": "Spusťte Kilo na vlastním stroji prostřednictvím CLI `kilo remote`.",
+    "skip": "Přeskočit prohlídku",
+    "tutorialLabel": "Návod",
+    "remoteTitle": "Spusťte svou první vzdálenou relaci",
+    "remoteBody": "Připojte svůj počítač a pak spusťte relaci odtud.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Zatím žádný připojený počítač",
+    "remoteEmptyBody": "Chcete-li ho připojit, spusťte na počítači `kilo remote`.",
+    "remoteFound": "Počítač připojen",
+    "checkAgain": "Zkontrolovat znovu",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

@@ -3074,5 +3074,24 @@
     "loadFailed": "Hindi ma-load ang mga wikang sinusuportahan ng device na ito.",
     "emptyTitle": "Walang sinusuportahang wika",
     "emptyDescription": "Walang sinusuportahang wikang iniuulat ng pagkilala sa pagsasalita ng device na ito."
+  },
+  "tour": {
+    "eyebrow": "Mabilisang tour",
+    "forkTitle": "Saan mo gustong patakbuhin ang Kilo?",
+    "forkSubtitle": "Piliin kung saan tatakbo ang Kilo para sa iyong unang sesyon.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Patakbuhin ang Kilo sa isang isolated na cloud environment nang walang dapat i-install.",
+    "remoteOptionTitle": "Iyong computer",
+    "remoteOptionBody": "Patakbuhin ang Kilo sa iyong sariling machine gamit ang `kilo remote` CLI.",
+    "skip": "Laktawan ang tour",
+    "tutorialLabel": "Tutorial",
+    "remoteTitle": "Simulan ang iyong unang remote session",
+    "remoteBody": "Ikonekta ang iyong computer, pagkatapos simulan ang sesyon mula rito.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Walang konektadong computer pa",
+    "remoteEmptyBody": "Para ikonekta ito, patakbuhin ang `kilo remote` sa iyong computer.",
+    "remoteFound": "Konektado ang computer",
+    "checkAgain": "Tingnan muli",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

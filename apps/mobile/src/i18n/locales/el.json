@@ -3074,5 +3074,24 @@
     "loadFailed": "Δεν ήταν δυνατή η φόρτωση των γλωσσών που υποστηρίζει αυτή η συσκευή.",
     "emptyTitle": "Καμία υποστηριζόμενη γλώσσα",
     "emptyDescription": "Η αναγνώριση ομιλίας αυτής της συσκευής δεν αναφέρει καμία υποστηριζόμενη γλώσσα."
+  },
+  "tour": {
+    "eyebrow": "Γρήγορη ξενάγηση",
+    "forkTitle": "Πού θα ήθελες να εκτελέσεις το Kilo;",
+    "forkSubtitle": "Διάλεξε πού θα εκτελείται το Kilo για την πρώτη σου συνεδρία.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Εκτέλεσε το Kilo σε ένα απομονωμένο περιβάλλον cloud χωρίς να εγκαθιστάς τίποτα.",
+    "remoteOptionTitle": "Ο υπολογιστής σου",
+    "remoteOptionBody": "Εκτέλεσε το Kilo στο δικό σου μηχάνημα μέσω του CLI `kilo remote`.",
+    "skip": "Παράλειξη ξενάγησης",
+    "tutorialLabel": "Οδηγός",
+    "remoteTitle": "Ξεκίνα την πρώτη απομακρυσμένη συνεδρία σου",
+    "remoteBody": "Σύνδεσε τον υπολογιστή σου και μετά ξεκίνα τη συνεδρία από εδώ.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Δεν έχει συνδεθεί υπολογιστής ακόμα",
+    "remoteEmptyBody": "Για να τον συνδέσεις, εκτέλεσε `kilo remote` στον υπολογιστή σου.",
+    "remoteFound": "Ο υπολογιστής συνδέθηκε",
+    "checkAgain": "Έλεγχος ξανά",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

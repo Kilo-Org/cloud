@@ -3074,5 +3074,24 @@
     "loadFailed": "Bu qurilma qo'llab-quvvatlaydigan tillar yuklanmadi.",
     "emptyTitle": "Qo'llab-quvvatlanadigan tillar yo'q",
     "emptyDescription": "Bu qurilmaning nutqni aniqlashi qo'llab-quvvatlanadigan tillar haqida xabar bermaydi."
+  },
+  "tour": {
+    "eyebrow": "Tezkor sayohat",
+    "forkTitle": "Kilo'ni qayerda ishga tushirmoqchisiz?",
+    "forkSubtitle": "Birinchi seansingiz uchun Kilo qayerda ishlashini tanlang.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Hech narsa o'rnatmasdan Kilo'ni izolyatsiya qilingan bulut muhitida ishga tushiring.",
+    "remoteOptionTitle": "Kompyuteringiz",
+    "remoteOptionBody": "Kilo'ni o'z mashinangizda `kilo remote` CLI orqali ishga tushiring.",
+    "skip": "Sayohatni o'tkazib yuborish",
+    "tutorialLabel": "Qo'llanma",
+    "remoteTitle": "Birinchi masofaviy seansingizni boshlang",
+    "remoteBody": "Kompyuteringizni ulang, so'ng seansni shu yerdan boshlang.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Hozircha ulangan kompyuter yo'q",
+    "remoteEmptyBody": "Uni ulash uchun kompyuteringizda `kilo remote` buyrug'ini bajaring.",
+    "remoteFound": "Kompyuter ulandi",
+    "checkAgain": "Yana tekshirish",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

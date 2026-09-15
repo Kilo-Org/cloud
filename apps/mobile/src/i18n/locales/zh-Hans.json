@@ -3074,5 +3074,24 @@
     "loadFailed": "无法加载此设备支持的语言。",
     "emptyTitle": "没有支持的语言",
     "emptyDescription": "此设备的语音识别未报告任何支持的语言。"
+  },
+  "tour": {
+    "eyebrow": "快速导览",
+    "forkTitle": "你想在哪里运行 Kilo？",
+    "forkSubtitle": "选择你的首个会话在哪里运行。",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "在隔离的云端环境中运行 Kilo，无需安装任何内容。",
+    "remoteOptionTitle": "你的电脑",
+    "remoteOptionBody": "通过 `kilo remote` CLI 在你自己的电脑上运行 Kilo。",
+    "skip": "跳过导览",
+    "tutorialLabel": "教程",
+    "remoteTitle": "开始你的首个远程会话",
+    "remoteBody": "连接你的电脑，然后从这里启动会话。",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "尚未连接电脑",
+    "remoteEmptyBody": "在你的电脑上运行 `kilo remote` 以完成连接。",
+    "remoteFound": "电脑已连接",
+    "checkAgain": "重新检查",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

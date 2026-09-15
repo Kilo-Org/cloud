@@ -3074,5 +3074,24 @@
     "loadFailed": "Nuk u ngarkuan dot gjuhët që mbështet kjo pajisje.",
     "emptyTitle": "Asnjë gjuhë e mbështetur",
     "emptyDescription": "Njohja e të folurit e kësaj pajisjeje nuk raporton asnjë gjuhë të mbështetur."
+  },
+  "tour": {
+    "eyebrow": "Tur i shpejtë",
+    "forkTitle": "Ku dëshiron ta ekzekutosh Kilo-n?",
+    "forkSubtitle": "Zgjidh ku ekzekuton Kilo sesionin tënd të parë.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Ekzekuto Kilo në një mjedis re të izoluar, pa asgjë për t'u instaluar.",
+    "remoteOptionTitle": "Kompjuteri yt",
+    "remoteOptionBody": "Ekzekuto Kilo në makinën tënde përmes CLI-së `kilo remote`.",
+    "skip": "Kapërce turin",
+    "tutorialLabel": "Tutoriali",
+    "remoteTitle": "Nis sesionin tënd të parë në distancë",
+    "remoteBody": "Lidh kompjuterin tënd, pastaj nis sesionin nga këtu.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Ende pa kompjuter të lidhur",
+    "remoteEmptyBody": "Për ta lidhur, ekzekuto `kilo remote` në kompjuterin tënd.",
+    "remoteFound": "Kompjuteri u lidh",
+    "checkAgain": "Kontrollo përsëri",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

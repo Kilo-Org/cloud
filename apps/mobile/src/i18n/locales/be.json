@@ -3120,5 +3120,24 @@
     "loadFailed": "Не ўдалося загрузіць мовы, якія падтрымлівае гэта прылада.",
     "emptyTitle": "Няма падтрымліваемых моў",
     "emptyDescription": "Распазнаванне маўлення гэтай прылады не паведамляе ніводнай падтрымліваемай мовы."
+  },
+  "tour": {
+    "eyebrow": "Хуткі агляд",
+    "forkTitle": "Дзе вы хацелі б запускаць Kilo?",
+    "forkSubtitle": "Выберыце, дзе Kilo будзе працаваць у вашым першым сеансе.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Запускайце Kilo ў асобленым воблачным асяроддзі, не ўсталёўваючы нічога.",
+    "remoteOptionTitle": "Ваш камп'ютар",
+    "remoteOptionBody": "Запускайце Kilo на ўласнай машыне праз CLI `kilo remote`.",
+    "skip": "Прапусціць агляд",
+    "tutorialLabel": "Навучанне",
+    "remoteTitle": "Пачніце свой першы аддалены сеанс",
+    "remoteBody": "Падключыце свой камп'ютар, а затым пачніце сеанс адсюль.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Яшчэ няма падключанага камп'ютара",
+    "remoteEmptyBody": "Каб падключыць яго, выканайце `kilo remote` на сваім камп'ютары.",
+    "remoteFound": "Камп'ютар падключаны",
+    "checkAgain": "Праверыць яшчэ раз",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

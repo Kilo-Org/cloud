@@ -3012,5 +3012,33 @@
     "loadFailed": "यो यन्त्रले समर्थन गर्ने भाषाहरू लोड गर्न सकिएन।",
     "emptyTitle": "कुनै समर्थित भाषा छैन",
     "emptyDescription": "यो यन्त्रको वाणी पहिचानले कुनै समर्थित भाषा जानकारी दिँदैन।"
+  },
+  "tour": {
+    "eyebrow": "द्रुत भ्रमण",
+    "forkTitle": "तपाईं Kilo कहाँ चलाउन चाहनुहुन्छ?",
+    "forkSubtitle": "तपाईंको पहिलो सत्रका लागि Kilo कहाँ चल्छ भन्ने रोज्नुहोस्।",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "केही पनि इन्स्टल नगरी Kilo लाई आइसोलेटेड क्लाउड वातावरणमा चलाउनुहोस्।",
+    "remoteOptionTitle": "तपाईंको कम्प्युटर",
+    "remoteOptionBody": "आफ्नो मेसिनमा `kilo remote` CLI मार्फत Kilo चलाउनुहोस्।",
+    "skip": "भ्रमण छोड्नुहोस्",
+    "tutorialLabel": "ट्युटोरियल",
+    "cloudTitle": "तपाईंको पहिलो क्लाउड सत्र सुरु गर्नुहोस्",
+    "cloudBody": "नयाँ सत्र सिर्जना गर्नुहोस्, Kilo ले त्यसलाई क्लाउडमा चलाउनेछ।",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "तपाईंको क्लाउड सत्र सुरु हुन पर्खिरहेको छ…",
+    "cloudCheck": "तपाईंको पहिलो क्लाउड सत्र चलिरहेको छ।",
+    "remoteTitle": "तपाईंको पहिलो रिमोट सत्र सुरु गर्नुहोस्",
+    "remoteBody": "तपाईंको कम्प्युटर जोड्नुहोस्, त्यसपछि यहाँबाट सत्र सुरु गर्नुहोस्।",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "तपाईंको कम्प्युटरमा सत्र सुरु गर्नुहोस्",
+    "remoteWaiting": "तपाईंको कम्प्युटरले सत्र सुरु गर्न पर्खिरहेको छ…",
+    "remoteCheck": "तपाईंको पहिलो रिमोट सत्र चलिरहेको छ।",
+    "remoteEmptyTitle": "अहिलेसम्म कुनै कम्प्युटर जडान भएको छैन",
+    "remoteEmptyBody": "यसलाई जोड्न तपाईंको कम्प्युटरमा `kilo remote` चलाउनुहोस्।",
+    "remoteFound": "कम्प्युटर जडान भयो",
+    "checkAgain": "फेरि जाँच गर्नुहोस्",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

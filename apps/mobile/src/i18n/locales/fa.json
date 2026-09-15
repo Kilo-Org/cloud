@@ -3012,5 +3012,33 @@
     "loadFailed": "زبان‌هایی که این دستگاه پشتیبانی می‌کند بارگذاری نشدند.",
     "emptyTitle": "هیچ زبان پشتیبانی‌شده‌ای نیست",
     "emptyDescription": "تشخیص گفتار این دستگاه هیچ زبان پشتیبانی‌شده‌ای گزارش نمی‌کند."
+  },
+  "tour": {
+    "eyebrow": "تور سریع",
+    "forkTitle": "Kilo را کجا می‌خواهید اجرا کنید؟",
+    "forkSubtitle": "انتخاب کنید Kilo برای نخستین نشست شما کجا اجرا شود.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Kilo را در یک محیط ابری ایزوله اجرا کنید، بدون آنکه چیزی نصب کنید.",
+    "remoteOptionTitle": "رایانهٔ شما",
+    "remoteOptionBody": "Kilo را با دستور `kilo remote` روی ماشین خودتان اجرا کنید.",
+    "skip": "رد کردن تور",
+    "tutorialLabel": "آموزش",
+    "cloudTitle": "نخستین نشست ابری خود را شروع کنید",
+    "cloudBody": "یک نشست جدید بسازید؛ Kilo آن را در ابر اجرا می‌کند.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "در انتظار شروع نشست ابری شما…",
+    "cloudCheck": "نخستین نشست ابری شما در حال اجرا است.",
+    "remoteTitle": "نخستین نشست راه دور خود را شروع کنید",
+    "remoteBody": "رایانهٔ خود را متصل کنید، سپس نشست را از همین‌جا شروع کنید.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "شروع یک نشست روی رایانهٔ شما",
+    "remoteWaiting": "در انتظار شروع نشست توسط رایانهٔ شما…",
+    "remoteCheck": "نخستین نشست راه دور شما در حال اجرا است.",
+    "remoteEmptyTitle": "هنوز رایانه‌ای متصل نشده است",
+    "remoteEmptyBody": "برای اتصال آن، دستور `kilo remote` را روی رایانهٔ خود اجرا کنید.",
+    "remoteFound": "رایانه متصل شد",
+    "checkAgain": "دوباره بررسی کنید",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

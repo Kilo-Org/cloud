@@ -3012,5 +3012,33 @@
     "loadFailed": "Осы құрылғы қолдайтын тілдер жүктелмеді.",
     "emptyTitle": "Қолдау көрсетілетін тілдер жоқ",
     "emptyDescription": "Бұл құрылғының сөйлеуді тануы қолдау көрсетілетін тілдер туралы хабарламайды."
+  },
+  "tour": {
+    "eyebrow": "Жылдам тур",
+    "forkTitle": "Kilo-ны қайда іске қосқыңыз келеді?",
+    "forkSubtitle": "Бірінші сессияңыз үшін Kilo қайда жұмыс істейтінін таңдаңыз.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Kilo-ны оқшауланған бұлтты ортада ештеңе орнатпай-ақ іске қосыңыз.",
+    "remoteOptionTitle": "Сіздің компьютеріңіз",
+    "remoteOptionBody": "Kilo-ны өз машинаңызда `kilo remote` CLI арқылы іске қосыңыз.",
+    "skip": "Турды өткізу",
+    "tutorialLabel": "Оқу",
+    "cloudTitle": "Бірінші бұлттық сессияңызды бастаңыз",
+    "cloudBody": "Жаңа сессия жасаңыз, Kilo оны бұлтта іске қосады.",
+    "cloudNewSession": "$t(common.newSession)",
+    "cloudWaiting": "Бұлттық сессияңыздың басталуы күтілуде…",
+    "cloudCheck": "Бірінші бұлттық сессияңыз жұмыс істеп тұр.",
+    "remoteTitle": "Бірінші қашық сессияңызды бастаңыз",
+    "remoteBody": "Компьютеріңізді қосып, сессияны осы жерден бастаңыз.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteStart": "Компьютеріңізде сессия бастау",
+    "remoteWaiting": "Компьютеріңіз сессияны бастағаны күтілуде…",
+    "remoteCheck": "Бірінші қашық сессияңыз жұмыс істеп тұр.",
+    "remoteEmptyTitle": "Әлі компьютер қосылмаған",
+    "remoteEmptyBody": "Оны қосу үшін компьютеріңізде `kilo remote` пәрменін орындаңыз.",
+    "remoteFound": "Компьютер қосылды",
+    "checkAgain": "Қайта тексеру",
+    "networkError": "$t(authErrors.networkError)",
+    "retry": "$t(common.retry)"
   }
 }

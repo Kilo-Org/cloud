@@ -542,6 +542,19 @@ describe('PartDetailSheet mounted', () => {
     expect(unavailable).toHaveLength(1);
     await unmount(nullPart);
   });
+
+  it('opts its header out of the iOS pageSheet top inset', async () => {
+    const renderer = await mountSheet(makeBashPart('bash-1', 'echo hi'));
+
+    // The tool detail sheet is a native pageSheet: the header drops the window
+    // top inset on iOS so the title row sits under the grabber, while Android
+    // keeps the clearance (read at the SheetHeader boundary, mocked above).
+    const headers = findByType(renderer.root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(propOf(headers[0], 'topInset')).toBe('ios-page-sheet');
+
+    await unmount(renderer);
+  });
 });
 
 describe('PartDetailSheet auto-follow', () => {

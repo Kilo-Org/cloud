@@ -127,6 +127,7 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
         title={part ? getPartDetailTitle(part) : t('common.details')}
         onDone={onClose}
         doneLabel={t('common.done')}
+        topInset="ios-page-sheet"
       />
 
       {monoCount > 0 ? (

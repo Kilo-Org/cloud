@@ -915,7 +915,7 @@ export async function autoCompleteInstallation(
     pendingApproval?.github_requester?.id
   );
 
-  await db
+  await (transaction ?? db)
     .update(platform_integrations)
     .set({
       platform_installation_id: installationData.installation_id,
@@ -1266,9 +1266,9 @@ export async function upsertPlatformIntegrationForOwner(
     .limit(1);
 
   if (existing) {
-  await (transaction ?? db)
-    .update(platform_integrations)
-    .set({
+    await db
+      .update(platform_integrations)
+      .set({
         platform_account_id: values.platform_account_id,
         platform_account_login: values.platform_account_login,
         permissions: values.permissions,

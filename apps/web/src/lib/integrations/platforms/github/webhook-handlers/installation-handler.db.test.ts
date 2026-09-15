@@ -8,6 +8,7 @@ import {
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import type * as GitHubInstallationsModule from '@/lib/integrations/db/github-installations';
 import type * as PlatformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
 import type { InstallationCreatedPayload } from '../webhook-schemas';
 import { handleInstallationCreated } from './installation-handler';
@@ -31,7 +32,24 @@ const autoCompleteGateState: {
   entered: Promise<void> | null;
   release: (() => void) | null;
   markEntered: (() => void) | null;
-} = { gate: null, entered: null, release: null, markEntered: null };
+  failBind: boolean;
+} = { gate: null, entered: null, release: null, markEntered: null, failBind: false };
+
+jest.mock('@/lib/integrations/db/github-installations', () => {
+  const actual =
+    jest.requireActual<typeof GitHubInstallationsModule>(
+      '@/lib/integrations/db/github-installations'
+    );
+  return {
+    ...actual,
+    bindGitHubIntegrationToCanonicalInstallation: async (
+      ...args: Parameters<typeof actual.bindGitHubIntegrationToCanonicalInstallation>
+    ) => {
+      if (autoCompleteGateState.failBind) throw new Error('bind failed');
+      return actual.bindGitHubIntegrationToCanonicalInstallation(...args);
+    },
+  };
+});
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => {
   const actual =
@@ -265,5 +283,29 @@ describe('handleInstallationCreated sharing-admission serialization', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.owned_by_organization_id).toBe(organizationA.id);
     await expect(canonicalSharingMode(installationId)).resolves.toBe('exclusive');
+  });
+
+  test('rolls back the pending completion when the canonical binding fails', async () => {
+    const organization = await createTestOrganization('Handler DB Rollback', ownerId, 0);
+    const installationId = '525252';
+
+    const pending = await insertPendingRequest(organization.id);
+    autoCompleteGateState.failBind = true;
+    await expect(
+      handleInstallationCreated(createdPayload(installationId), 'standard')
+    ).rejects.toThrow('bind failed');
+    autoCompleteGateState.failBind = false;
+
+    // The completion ran inside the same transaction as the binding, so a
+    // binding failure must leave nothing partially applied.
+    const [pendingAfter] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, pending.id));
+    expect(pendingAfter).toMatchObject({
+      integration_status: 'pending',
+      platform_installation_id: null,
+      github_installation_id: null,
+    });
   });
 });

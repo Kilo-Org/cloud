@@ -24,26 +24,20 @@ describe('htmlSanitizesToEmpty', () => {
   });
 
   it('agrees with the slow path across mixed streamed chunks', () => {
-    const chunks = [
-      'plain reasoning',
-      '<b>bold reasoning',
-      '</b>',
-      'ampersand & entity &amp;',
-      'trailing <',
-      '',
-      '   ',
-    ];
-    // Fast path (no '<') and slow path (with '<') are one function; this
-    // pins the streamed no-'<' case against the removal cases.
-    for (const chunk of chunks) {
-      if (!chunk.includes('<')) {
-        expect(htmlSanitizesToEmpty(chunk)).toBe(chunk.trim() === '');
-      }
+    // Fast path (no '<'): there is no HTML to remove, so the predicate is
+    // exactly "the chunk holds only whitespace".
+    for (const chunk of ['plain reasoning', 'ampersand & entity &amp;', '', '   ']) {
+      expect(htmlSanitizesToEmpty(chunk)).toBe(chunk.trim() === '');
     }
-    for (const chunk of chunks) {
-      if (chunk.includes('<')) {
-        expect(typeof htmlSanitizesToEmpty(chunk)).toBe('boolean');
-      }
+    // Slow path (with '<'): only a chunk the removals empty out is true.
+    const htmlChunks: [text: string, sanitizesToEmpty: boolean][] = [
+      ['<b>bold reasoning', false],
+      ['</b>', false],
+      ['trailing <', false],
+      ['<div></div>', true],
+    ];
+    for (const [chunk, sanitizesToEmpty] of htmlChunks) {
+      expect(htmlSanitizesToEmpty(chunk)).toBe(sanitizesToEmpty);
     }
   });
 });

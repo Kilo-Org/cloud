@@ -9,9 +9,12 @@ import {
 const PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
 
 function unsupported(capabilities: ProviderReviewCapabilities) {
-  return [capabilities.autoMerge, capabilities.reactions, capabilities.reviewStatus].filter(
-    capability => !capability.supported
-  );
+  return [
+    capabilities.canMerge,
+    capabilities.autoMerge,
+    capabilities.reactions,
+    capabilities.reviewStatus,
+  ].filter(capability => !capability.supported);
 }
 
 describe('PROVIDER_REVIEW_CAPABILITIES', () => {
@@ -36,6 +39,7 @@ describe('PROVIDER_REVIEW_CAPABILITIES', () => {
     for (const platform of PLATFORMS) {
       const capabilities = PROVIDER_REVIEW_CAPABILITIES[platform];
       for (const capability of [
+        capabilities.canMerge,
         capabilities.autoMerge,
         capabilities.reactions,
         capabilities.reviewStatus,

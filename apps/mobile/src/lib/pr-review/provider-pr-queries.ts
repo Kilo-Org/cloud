@@ -83,8 +83,8 @@ function providerIdentity(scope: ProviderPrScope) {
 
 // GitHub's check vocabulary, which the checks section classifies against:
 // GitLab reports `failed` and Bitbucket `canceled`; every other verdict the
-// two report already spells the same as GitHub's, or is provider-specific and
-// counts only towards the total.
+// two report already spells the same as GitHub's, or is provider-specific
+// (GitLab's `manual`) and the section renders as a neutral finished run.
 function normalizeConclusion(conclusion: string | null): string | null {
   if (conclusion === 'failed') {
     return 'failure';
@@ -92,14 +92,35 @@ function normalizeConclusion(conclusion: string | null): string | null {
   return conclusion === 'canceled' ? 'cancelled' : conclusion;
 }
 
-// Which rollup counter a completed run lands in; anything else (a neutral
-// or provider-specific verdict) counts only towards the total.
-const ROLLUP_BUCKETS = new Map<string, 'success' | 'failure' | 'skipped'>([
+// The provider run states that mean the run is over. `status` is the
+// provider's own vocabulary (`ProviderPrCheck`), so both providers' terminal
+// states are named here: Bitbucket reports `completed`, and GitLab reports
+// `success`/`failed`/`canceled` for a resolved pipeline and `skipped`/`manual`
+// for one that finished with no GitHub-mappable verdict (gitlab-read resolves
+// no conclusion for those two). Deriving the row state from `conclusion`
+// alone therefore left a finished pipeline spinning forever; a run in any
+// other state is genuinely still going.
+const FINISHED_RUN_STATUSES = new Set([
+  'completed',
+  'success',
+  'failed',
+  'canceled',
+  'skipped',
+  'manual',
+]);
+
+// Which rollup counter a run lands in, mirroring the GitHub checks mapper
+// (`rollupState` in apps/web/src/lib/github-pr-review/mappers.ts): one verdict
+// must reach the same bucket on every provider, where a cancelled run is a
+// failure. A run that has not completed, or completed with a verdict this
+// model does not know, counts as pending so no check is dropped.
+const ROLLUP_BUCKETS = new Map<string, 'success' | 'failure' | 'pending' | 'skipped'>([
   ['success', 'success'],
   ['failure', 'failure'],
   ['error', 'failure'],
-  ['cancelled', 'skipped'],
+  ['cancelled', 'failure'],
   ['skipped', 'skipped'],
+  ['neutral', 'skipped'],
 ]);
 
 export function normalizeProviderChecks(result: ProviderPrChecksResult): PrChecksModel {
@@ -107,17 +128,22 @@ export function normalizeProviderChecks(result: ProviderPrChecksResult): PrCheck
     name: check.name,
     // A provider reports its own run states; the rollup and the row icons
     // read GitHub's, where `conclusion` is set only once a run completed.
-    status: check.conclusion === null ? 'in_progress' : 'completed',
+    // The run state comes from the provider's `status`, never from the
+    // conclusion alone.
+    status: FINISHED_RUN_STATUSES.has(check.status.toLowerCase())
+      ? ('completed' as const)
+      : ('in_progress' as const),
     conclusion: normalizeConclusion(check.conclusion),
     detailsUrl: check.detailsUrl,
     appName: null,
   }));
   const rollup = { total: checkRuns.length, success: 0, failure: 0, pending: 0, skipped: 0 };
   for (const run of checkRuns) {
-    const bucket = run.conclusion === null ? 'pending' : ROLLUP_BUCKETS.get(run.conclusion);
-    if (bucket) {
-      rollup[bucket] += 1;
-    }
+    const bucket =
+      run.status === 'completed'
+        ? (ROLLUP_BUCKETS.get(run.conclusion ?? '') ?? 'pending')
+        : 'pending';
+    rollup[bucket] += 1;
   }
   return { checkRuns, rollup };
 }
@@ -246,8 +272,8 @@ export function normalizeProviderOverview(summary: ProviderPrSummary): PrOvervie
     mergedBy: null,
     commentCount: 0,
     repo: {
-      allowMergeCommit: capabilities.canMerge,
-      allowSquashMerge: capabilities.canMerge,
+      allowMergeCommit: capabilities.canMerge.supported,
+      allowSquashMerge: capabilities.canMerge.supported,
       allowRebaseMerge: false,
       allowAutoMerge: capabilities.autoMerge.supported,
       deleteBranchOnMerge: false,

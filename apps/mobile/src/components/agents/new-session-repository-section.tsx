@@ -1,4 +1,4 @@
-import { Fragment, type ReactElement, useEffect } from 'react';
+import { Fragment, type ReactElement } from 'react';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
@@ -14,10 +14,11 @@ import {
   type NewSessionRepository,
   type RepositoryGroup,
   type RepositoryPlatform,
-  resetSelectedBranchOverrides,
 } from './new-session-repository-state';
 
 type NewSessionRepositorySectionProps = {
+  /** The screen's organization scope, threaded to the branch query. */
+  organizationId: string | undefined;
   disabled: boolean;
   isRetrying: boolean;
   onChange: (fullName: string) => void;
@@ -83,6 +84,7 @@ function connectNoteKey(platform: RepositoryPlatform): string | undefined {
  * repository plus the Recently used rows when any provider has rows.
  */
 export function NewSessionRepositorySection({
+  organizationId,
   disabled,
   isRetrying,
   onChange,
@@ -107,14 +109,10 @@ export function NewSessionRepositorySection({
     repositories.find(repository => `${repository.platform}:${repository.fullName}` === value) ??
     null;
 
-  // The branch choice belongs to this screen: clear it when the section mounts
-  // and when it goes away, so a branch picked for one draft can never reach the
-  // next one.
-  useEffect(() => {
-    resetSelectedBranchOverrides();
-    return resetSelectedBranchOverrides;
-  }, []);
-
+  // The branch choice belongs to the screen, not to this conditionally
+  // rendered section: switching the run target to a remote instance unmounts
+  // the section, and clearing here dropped a branch the user had already
+  // picked. `new-session-screen-body` owns the draft, so it clears instead.
   return (
     <View className="mt-5">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">
@@ -132,7 +130,11 @@ export function NewSessionRepositorySection({
         />
       )}
 
-      <RepositoryBranchSelector repository={selectedRepository} disabled={disabled} />
+      <RepositoryBranchSelector
+        repository={selectedRepository}
+        organizationId={organizationId}
+        disabled={disabled}
+      />
 
       {groups.map(group => (
         <Fragment key={group.key}>{renderGroupCard(group.key, group.status)}</Fragment>

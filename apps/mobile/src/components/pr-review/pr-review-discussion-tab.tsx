@@ -85,6 +85,7 @@ import {
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
@@ -268,6 +269,15 @@ export function PrReviewDiscussionTab({
   });
 
   const openConversationComment = () => {
+    // This tab renders for GitLab and Bitbucket scopes too. The GitHub literal
+    // below would leave the published provider scope and mount the GitHub
+    // layout with the GitHub-shaped triple, so the provider arm pushes the
+    // provider route's own sheet (`providerPrSheetHref`), which keeps the ref
+    // the layout published.
+    if (ref.platform !== 'github') {
+      router.push(providerPrSheetHref(ref, 'conversation-comment'));
+      return;
+    }
     const href: Href = {
       pathname: CONVERSATION_COMMENT_PATH,
       params: { owner, repo, number },

@@ -115,10 +115,11 @@ export default function ProviderPrReviewLayout() {
                 this the initial screen is the comment-composer formSheet
                 instead of the PR/MR overview. */}
             <Stack.Screen name="index" />
-            {/* The three write sheets (s6) are siblings of the GitHub route's
+            {/* The four write sheets (s6) are siblings of the GitHub route's
                 sheets: they mount inside this layout, so they see the provider
                 scope and this PR's single `PendingReviewProvider` queue. */}
             <Stack.Screen name="comment-composer" options={sheetOptions} />
+            <Stack.Screen name="conversation-comment" options={sheetOptions} />
             <Stack.Screen name="review-submit" options={sheetOptions} />
             <Stack.Screen name="merge" options={sheetOptions} />
             <Stack.Screen name="file-navigator" options={sheetOptions} />

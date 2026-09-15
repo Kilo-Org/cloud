@@ -5,13 +5,15 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  getNewSessionBranchState,
   getSelectedBranchOverride,
   type NewSessionRepository,
-  setNewSessionBranchScope,
   setSelectedBranchOverride,
 } from '@/components/agents/new-session-repository-state';
-import { useNewSessionRepos, useRepositoryBranches } from './use-new-session-repos';
+import {
+  useNewSessionBranchOverrideScope,
+  useNewSessionRepos,
+  useRepositoryBranches,
+} from './use-new-session-repos';
 
 const mocks = vi.hoisted(() => ({
   fetchQuery: vi.fn(async (_opts: unknown): Promise<unknown> => ({})),
@@ -241,21 +243,42 @@ const bitbucketRepo: NewSessionRepository = {
 
 function BranchHarness({
   repository,
+  organizationId,
   resultRef,
 }: {
   repository: NewSessionRepository | null;
+  organizationId: string | undefined;
   resultRef: { current: BranchesResult | null };
 }) {
-  resultRef.current = useRepositoryBranches(repository);
+  resultRef.current = useRepositoryBranches(repository, organizationId);
   return null;
 }
 
-function mountBranches(repository: NewSessionRepository | null) {
+function mountBranchesWithScope(
+  repository: NewSessionRepository | null,
+  organizationId: string | undefined
+) {
   const resultRef: { current: BranchesResult | null } = { current: null };
+  const renderer = { current: null as TestRenderer.ReactTestRenderer | null };
   act(() => {
-    TestRenderer.create(React.createElement(BranchHarness, { repository, resultRef }));
+    renderer.current = TestRenderer.create(
+      React.createElement(BranchHarness, { repository, organizationId, resultRef })
+    );
   });
-  const result = resultRef.current;
+  return { resultRef, renderer, organizationId };
+}
+
+function mountBranches(repository: NewSessionRepository | null) {
+  const mounted = mountBranchesWithScope(repository, undefined);
+  const result = mounted.resultRef.current;
+  if (result === null) {
+    throw new Error('useRepositoryBranches did not run');
+  }
+  return result;
+}
+
+function branchResult(mounted: { resultRef: { current: BranchesResult | null } }) {
+  const result = mounted.resultRef.current;
   if (result === null) {
     throw new Error('useRepositoryBranches did not run');
   }
@@ -273,7 +296,6 @@ function branchQueryOptions() {
 
 describe('useRepositoryBranches', () => {
   it('does not query until a repository is selected', () => {
-    setNewSessionBranchScope(undefined);
     const result = mountBranches(null);
 
     expect(branchQueryOptions().enabled).toBe(false);
@@ -282,7 +304,6 @@ describe('useRepositoryBranches', () => {
   });
 
   it('queries the personal procedure for a selected repository', () => {
-    setNewSessionBranchScope(undefined);
     const result = mountBranches(githubRepo);
 
     expect(result.isEnabled).toBe(true);
@@ -291,8 +312,7 @@ describe('useRepositoryBranches', () => {
   });
 
   it('queries the organization procedure inside an organization', () => {
-    setNewSessionBranchScope('org-1');
-    mountBranches(githubRepo);
+    mountBranchesWithScope(githubRepo, 'org-1');
 
     expect(branchQueryOptions().queryKey?.[0]).toBe('org-branches');
     expect(branchQueryOptions().queryKey?.[1]).toMatchObject({
@@ -303,44 +323,54 @@ describe('useRepositoryBranches', () => {
   });
 
   it('keys the cache by the full repository identity, uuids included', () => {
-    setNewSessionBranchScope('org-1');
-    mountBranches(bitbucketRepo);
+    mountBranchesWithScope(bitbucketRepo, 'org-1');
     const first = branchQueryOptions().queryKey;
-    mountBranches({ ...bitbucketRepo, workspaceUuid: 'ws-2', repositoryUuid: 'id-2' });
+    mountBranchesWithScope(
+      { ...bitbucketRepo, workspaceUuid: 'ws-2', repositoryUuid: 'id-2' },
+      'org-1'
+    );
     const second = branchQueryOptions().queryKey;
 
     expect(first).not.toEqual(second);
   });
 
   it('never queries a personal Bitbucket repository (organizations only)', () => {
-    setNewSessionBranchScope(undefined);
     const result = mountBranches(bitbucketRepo);
 
     expect(result.isEnabled).toBe(false);
     expect(branchQueryOptions().enabled).toBe(false);
   });
 
-  it('waits for the route to publish the organization scope before querying', async () => {
-    // `undefined` is a real scope (a personal session), so "not published yet"
-    // has to be its own state — otherwise the first render would query the
-    // personal procedure for what is about to be an organization session.
-    vi.resetModules();
-    const fresh = await import('./use-new-session-repos');
-    const resultRef: { current: BranchesResult | null } = { current: null };
-    function FreshHarness() {
-      resultRef.current = fresh.useRepositoryBranches(githubRepo);
-      return null;
-    }
+  it('never runs a query under the previous scope after the prop changes', () => {
+    // The organization scope is a prop, so an in-place change from org-1 to
+    // org-2 must reach the query in the same render: no committed render may
+    // keep querying (or hold a cache key for) the organization the screen has
+    // left. A passively published scope left exactly that window open.
+    mocks.queryCalls.length = 0;
+    const mounted = mountBranchesWithScope(githubRepo, 'org-1');
+    expect(branchQueryOptions().queryKey?.[1]).toMatchObject({ organizationId: 'org-1' });
+
+    mocks.queryCalls.length = 0;
     act(() => {
-      TestRenderer.create(React.createElement(FreshHarness));
+      mounted.renderer.current?.update(
+        React.createElement(BranchHarness, {
+          repository: githubRepo,
+          organizationId: 'org-2',
+          resultRef: mounted.resultRef,
+        })
+      );
     });
 
-    expect(resultRef.current?.isEnabled).toBe(false);
-    expect(branchQueryOptions().enabled).toBe(false);
+    const options = branchQueryOptions();
+    expect(options.queryKey?.[1]).toMatchObject({ organizationId: 'org-2' });
+    expect(options.enabled).toBe(true);
+    // No render of the tree queried org-1 after the prop changed: the rerender
+    // produced one query call and it carries the new scope.
+    expect(mocks.queryCalls).toHaveLength(1);
+    expect(branchResult(mounted).isEnabled).toBe(true);
   });
 
   it('reports a transient failure as retryable', () => {
-    setNewSessionBranchScope(undefined);
     mocks.branchQueryResult = {
       isError: true,
       error: { data: { code: 'BAD_GATEWAY' } },
@@ -352,7 +382,6 @@ describe('useRepositoryBranches', () => {
   });
 
   it('reports a refusal a retry cannot fix as permanent', () => {
-    setNewSessionBranchScope(undefined);
     mocks.branchQueryResult = { isError: true, error: { data: { code: 'FORBIDDEN' } } };
     const result = mountBranches(githubRepo);
 
@@ -361,7 +390,6 @@ describe('useRepositoryBranches', () => {
   });
 
   it('reports the provider default and an empty list without an override', () => {
-    setNewSessionBranchScope(undefined);
     mocks.branchQueryResult = { data: { defaultBranch: null, branches: [] } };
     const result = mountBranches(githubRepo);
 
@@ -371,8 +399,7 @@ describe('useRepositoryBranches', () => {
   });
 
   it('fetches through the organization procedure when the query runs', async () => {
-    setNewSessionBranchScope('org-1');
-    mountBranches(githubRepo);
+    mountBranchesWithScope(githubRepo, 'org-1');
     const queryFn = (branchQueryOptions() as { queryFn?: () => Promise<unknown> }).queryFn;
 
     await queryFn?.();
@@ -393,34 +420,49 @@ describe('branch overrides across a repository change', () => {
   });
 });
 
-describe('useNewSessionRepos published branch scope', () => {
-  it('drops the organization scope on unmount so a remount cannot query the previous screen’s org', () => {
-    const resultRef: { current: ReposResult | null } = { current: null };
+describe('useNewSessionBranchOverrideScope', () => {
+  function ScopeHarness() {
+    useNewSessionBranchOverrideScope();
+    return null;
+  }
+
+  function mountScopeHarness() {
     const renderer: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
     act(() => {
-      renderer.current = TestRenderer.create(
-        React.createElement(Harness, { organizationId: 'org-1', resultRef })
-      );
+      renderer.current = TestRenderer.create(React.createElement(ScopeHarness));
     });
-    expect(getNewSessionBranchState()).toMatchObject({
-      isScopeReady: true,
-      organizationId: 'org-1',
-    });
+    return renderer;
+  }
+
+  it('clears a stale branch override when the screen mounts', () => {
+    setSelectedBranchOverride(githubRepo, 'release/2.0');
+
+    mountScopeHarness();
+
+    expect(getSelectedBranchOverride(githubRepo)).toBeNull();
+  });
+
+  it('clears the branch override when the screen unmounts, so a remount cannot reuse it', () => {
+    const renderer = mountScopeHarness();
+    setSelectedBranchOverride(githubRepo, 'release/2.0');
 
     act(() => {
       renderer.current?.unmount();
     });
 
-    // The scope is "not ready" again, not a stale organization and not an
-    // implicit personal scope: the next screen publishes its own.
-    expect(getNewSessionBranchState()).toMatchObject({
-      isScopeReady: false,
-      organizationId: undefined,
+    expect(getSelectedBranchOverride(githubRepo)).toBeNull();
+  });
+
+  it('keeps the override while the screen stays mounted', () => {
+    // The repository section unmounts when the run target switches, and the
+    // screen must not lose the pick with it.
+    const renderer = mountScopeHarness();
+    setSelectedBranchOverride(githubRepo, 'release/2.0');
+
+    act(() => {
+      renderer.current?.update(React.createElement(ScopeHarness));
     });
 
-    mocks.queryCalls.length = 0;
-    const branches = mountBranches(githubRepo);
-    expect(branches.isEnabled).toBe(false);
-    expect(branchQueryOptions().enabled).toBe(false);
+    expect(getSelectedBranchOverride(githubRepo)).toBe('release/2.0');
   });
 });

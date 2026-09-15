@@ -2,8 +2,7 @@
  * Bitbucket Cloud pull-request WRITE layer for the provider review surfaces.
  *
  * Every mutation resolves credentials through bitbucket-authorization (the
- * workspace identity and token are server-derived), fences against the
- * caller's expected head sha where a revision matters, and returns an
+ * workspace identity and token are server-derived) and returns an
  * idempotent-ready `{ done, replayed }` result: `replayed` is true when the
  * provider already holds the target state, so the s4 router can run the call
  * through the operation ledger without a duplicate effect. `operationKey` is
@@ -54,11 +53,14 @@ export const BITBUCKET_THREAD_RESOLUTION_UNSUPPORTED_REASON =
   'Bitbucket Cloud does not expose thread resolution for inline threads without tasks';
 
 /**
- * The stale-head fence reason, shared with classifyBitbucketStatus so a
- * locally detected moved head and a provider 409 read identically on mobile.
+ * The exact reason merging is refused on Bitbucket Cloud: its merge endpoint
+ * (`POST .../pullrequests/{id}/merge`) accepts no revision or head parameter,
+ * so the provider itself cannot check the head the reviewer saw — a source
+ * update between any preflight read and the merge would land commits nobody
+ * reviewed. The capability carries the same copy to the UI, which shows it in
+ * place of a merge affordance.
  */
-export const BITBUCKET_STALE_HEAD_REASON =
-  'The pull request changed since it was loaded. Reload the pull request and try again.';
+export const BITBUCKET_MERGE_UNSUPPORTED_REASON = BITBUCKET_REVIEW_CAPABILITIES.canMerge.reason;
 
 /** The PR a write acts on. */
 export type BitbucketPrTarget = {
@@ -76,20 +78,6 @@ export type BitbucketMutationResult = {
   /** True when the provider already held the target state — nothing changed. */
   replayed: boolean;
 };
-
-const BitbucketPullRequestWriteSchema = z.object({
-  id: z.number(),
-  state: z.enum(['OPEN', 'MERGED', 'DECLINED', 'SUPERSEDED']),
-  source: z
-    .object({
-      commit: z
-        .object({ hash: z.string().min(1) })
-        .nullable()
-        .optional(),
-    })
-    .nullable()
-    .optional(),
-});
 
 /**
  * The comment fetch is an existence check only: Bitbucket comment payloads
@@ -455,61 +443,6 @@ export async function unresolveThread(
       // Reopening is the mirror of resolution: Bitbucket only reads `state`,
       // so `{ resolved: false }` left the task resolved while reporting done.
       body: { state: 'UNRESOLVED' },
-    });
-    return { done: true, replayed: false };
-  } catch (error) {
-    throw classifyBitbucketError(error);
-  }
-}
-
-/**
- * Re-fetch the PR and compare the current head against the caller's fence.
- * A moved head is refused BEFORE any merge call, so a stale revision can
- * never merge another commit or be redirected.
- */
-function requireHeadShaFence(
-  pr: z.infer<typeof BitbucketPullRequestWriteSchema>,
-  expectedHeadSha: string
-): void {
-  const currentHead = pr.source?.commit?.hash ?? '';
-  if (currentHead !== expectedHeadSha) {
-    throw new BitbucketReviewError('stale_head', BITBUCKET_STALE_HEAD_REASON);
-  }
-}
-
-/**
- * Merge the pull request. The caller's `expectedHeadSha` is re-verified
- * against a fresh fetch BEFORE any merge call, so the merge can only land the
- * exact revision the reviewer saw. `closeSourceBranch` is honored.
- */
-export async function mergePullRequest(
-  target: BitbucketPrTarget & {
-    expectedHeadSha: string;
-    closeSourceBranch?: boolean;
-    commitMessage?: string;
-  } & BitbucketMutationInput
-): Promise<BitbucketMutationResult> {
-  const access = await targetAccess(target);
-  try {
-    const pr = BitbucketPullRequestWriteSchema.parse(
-      await requestBitbucketJson<unknown>(access, prPath(access, target.prId))
-    );
-    if (pr.state === 'MERGED') {
-      // The target state already holds: report the replay, run no effect.
-      return { done: true, replayed: true };
-    }
-    requireHeadShaFence(pr, target.expectedHeadSha);
-    if (pr.state !== 'OPEN') {
-      throw new BitbucketReviewError('bad_request', 'The pull request is closed.');
-    }
-    await requestBitbucketJson(access, `${prPath(access, target.prId)}/merge`, {
-      method: 'POST',
-      body: {
-        close_source_branch: target.closeSourceBranch ?? false,
-        // Bitbucket's merge endpoint names the commit message `message`
-        // (GitHub's `commit_message` field name is not read by Bitbucket).
-        ...(target.commitMessage ? { message: target.commitMessage } : {}),
-      },
     });
     return { done: true, replayed: false };
   } catch (error) {

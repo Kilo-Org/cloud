@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the loading, empty, error, keyboard-lift, and provider comment-CTA suites share one tab harness */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -300,6 +301,54 @@ describe('PrReviewDiscussionTab full-body states', () => {
       const cta = renderer.root.find(node => String(node.type) === 'PrCommentCta');
       (cta.props.onPress as () => void)();
     });
+    expect(pushMock).toHaveBeenCalledWith({
+      pathname: '/(app)/pr-review/[owner]/[repo]/[number]/conversation-comment',
+      params: { owner: 'octocat', repo: 'hello-world', number: 7 },
+    });
+  });
+});
+
+// The tab renders for GitLab merge requests and Bitbucket pull requests too,
+// so its only write affordance must stay inside the provider route: the GitHub
+// literal would leave the published provider scope and mount the GitHub layout
+// with the GitHub-shaped triple.
+describe('PrReviewDiscussionTab provider comment CTA', () => {
+  const GITLAB_SCOPE: ProviderPrRef = {
+    platform: 'gitlab',
+    projectPath: 'group/sub/repo',
+    mrIid: 12,
+  };
+  const BITBUCKET_SCOPE: ProviderPrRef = {
+    platform: 'bitbucket',
+    workspace: 'acme',
+    repoSlug: 'api',
+    prId: 42,
+  };
+
+  function pressCommentCta(renderer: TestRenderer.ReactTestRenderer): void {
+    act(() => {
+      const cta = renderer.root.find(node => String(node.type) === 'PrCommentCta');
+      (cta.props.onPress as () => void)();
+    });
+  }
+
+  it.each([
+    ['gitlab', GITLAB_SCOPE, '/(app)/pr-review/gitlab/group/sub/repo/12/conversation-comment'],
+    ['bitbucket', BITBUCKET_SCOPE, '/(app)/pr-review/bitbucket/acme/api/42/conversation-comment'],
+  ] as const)("opens the %s route's own conversation-comment sheet", (_platform, scope, href) => {
+    pressCommentCta(mountTab(scope));
+
+    expect(pushMock).toHaveBeenCalledWith(href);
+    expect(pushMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/pr-review/[owner]/[repo]/[number]/conversation-comment',
+      })
+    );
+  });
+
+  it('keeps the GitHub triple on the GitHub route (no scope published)', () => {
+    pressCommentCta(mountTab());
+
     expect(pushMock).toHaveBeenCalledWith({
       pathname: '/(app)/pr-review/[owner]/[repo]/[number]/conversation-comment',
       params: { owner: 'octocat', repo: 'hello-world', number: 7 },

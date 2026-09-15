@@ -222,10 +222,47 @@ describe('normalizeProviderChecks', () => {
       ['in_progress', null],
       ['completed', 'cancelled'],
     ]);
-    expect(result.rollup).toEqual({ total: 4, success: 1, failure: 1, pending: 1, skipped: 1 });
+    // A cancelled run is a failure in GitHub's own rollup, so the provider
+    // rollup must count it the same way.
+    expect(result.rollup).toEqual({ total: 4, success: 1, failure: 2, pending: 1, skipped: 0 });
     // Empty: a provider with no pipeline at all reports a zeroed rollup.
     const empty = { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 };
     expect(normalizeProviderChecks({ checks: [] })).toEqual({ checkRuns: [], rollup: empty });
+  });
+
+  it('finishes a GitLab pipeline whose provider status has no GitHub verdict', () => {
+    // gitlab-read resolves a conclusion only for success/failed/canceled, so a
+    // `skipped` or `manual` head pipeline arrives with the provider's own
+    // status as its verdict. Reading the run state off the conclusion alone
+    // spun it forever.
+    const result = normalizeProviderChecks({
+      checks: [
+        { name: 'skip', status: 'skipped', conclusion: 'skipped', detailsUrl: null },
+        { name: 'blocked', status: 'manual', conclusion: 'manual', detailsUrl: null },
+      ],
+    });
+    expect(result.checkRuns.map(run => run.status)).toEqual(['completed', 'completed']);
+    // The skipped verdict keeps its own bucket; the provider-specific `manual`
+    // verdict stays pending — the same bucket GitHub's mapper gives it.
+    expect(result.rollup).toEqual({ total: 2, success: 0, failure: 0, pending: 1, skipped: 1 });
+  });
+
+  it('finishes a GitLab pipeline that reports no conclusion at all', () => {
+    // The mapper must not depend on `conclusion` for the run state: a finished
+    // provider status with no verdict is finished, not still running.
+    const result = normalizeProviderChecks({
+      checks: [{ name: 'skip', status: 'skipped', conclusion: null, detailsUrl: null }],
+    });
+    expect(result.checkRuns.map(run => run.status)).toEqual(['completed']);
+    expect(result.rollup).toEqual({ total: 1, success: 0, failure: 0, pending: 1, skipped: 0 });
+  });
+
+  it('leaves a Bitbucket run state that the read layer reports as pending in progress', () => {
+    const result = normalizeProviderChecks({
+      checks: [{ name: 'build', status: 'pending', conclusion: null, detailsUrl: null }],
+    });
+    expect(result.checkRuns.map(run => run.status)).toEqual(['in_progress']);
+    expect(result.rollup).toEqual({ total: 1, success: 0, failure: 0, pending: 1, skipped: 0 });
   });
 });
 
@@ -369,9 +406,11 @@ describe('normalizeProviderOverview', () => {
       ref: { platform: 'bitbucket', workspace: 'group', repoSlug: 'repo', prId: 12 },
     });
     expect(gitlab.repo.allowAutoMerge).toBe(true);
-    // Bitbucket Cloud does not expose auto-merge in its API (s1 capability).
+    expect(gitlab.repo.allowMergeCommit).toBe(true);
+    // Bitbucket Cloud exposes neither auto-merge nor a merge revision
+    // precondition (s1 capability), so neither affordance is offered here.
     expect(bitbucket.repo.allowAutoMerge).toBe(false);
-    expect(bitbucket.repo.allowMergeCommit).toBe(true);
+    expect(bitbucket.repo.allowMergeCommit).toBe(false);
     // Two same-named repositories on different providers stay apart.
     expect(gitlab.prNodeId).not.toBe(bitbucket.prNodeId);
   });

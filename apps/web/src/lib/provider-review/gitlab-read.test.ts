@@ -598,6 +598,43 @@ describe('listChecks', () => {
     ]);
   });
 
+  it('resolves the provider verdict of a pipeline that finished without a GitHub status', async () => {
+    // `skipped` and `manual` are finished pipelines with no GitHub verdict:
+    // their own status is the verdict the checks mapper reads, so a skipped
+    // head pipeline never reads as a run still in progress.
+    const pipelines = [
+      {
+        id: 43,
+        sha: 'sha-head',
+        ref: 'feature/skip',
+        status: 'skipped',
+        web_url: `${INSTANCE_URL}/-/pipelines/43`,
+        name: 'skip',
+      },
+      {
+        id: 44,
+        sha: 'sha-head',
+        ref: 'feature/manual',
+        status: 'manual',
+        web_url: `${INSTANCE_URL}/-/pipelines/44`,
+        name: 'manual',
+      },
+    ];
+    fetchMock.mockImplementation(url => {
+      if (new URL(String(url)).pathname.endsWith('/pipelines')) {
+        return Promise.resolve(jsonResponse(pipelines));
+      }
+      return Promise.resolve(jsonResponse([]));
+    });
+
+    const result = await listChecks(OWNER, PROJECT_PATH, 12);
+
+    expect(result.checks.map(check => [check.status, check.conclusion])).toEqual([
+      ['skipped', 'skipped'],
+      ['manual', 'manual'],
+    ]);
+  });
+
   it('folds every page of MR pipelines, not only the first', async () => {
     const pageOne = Array.from({ length: 50 }, (_, index) => ({
       id: index + 1,

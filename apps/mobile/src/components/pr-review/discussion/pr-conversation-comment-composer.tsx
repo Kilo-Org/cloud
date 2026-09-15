@@ -1,8 +1,13 @@
 // Composer for a regular PR conversation (issue) comment, opened from the
-// Discussion tab's bottom CTA bar. Body-only sibling of
-// pr-review-comment-composer.tsx: an issue comment needs no path/side/line
-// anchor and no commit sha, so there is no getPullRequest fetch, no
-// Add-to-review, and no suggestion insert.
+// Discussion tab's bottom CTA bar — on the GitHub route and on the provider
+// routes alike. Body-only sibling of pr-review-comment-composer.tsx: an issue
+// comment needs no path/side/line anchor and no commit sha, so there is no
+// getPullRequest fetch, no Add-to-review, and no suggestion insert.
+//
+// A provider ref makes the write a provider write: the tab pushes this
+// composer through the provider route (the GitHub route would leave the
+// published scope and write to GitHub), and the comment lands on the GitLab MR
+// / Bitbucket PR the ref names.
 //
 // The durable draft (per account and PR) survives dismissal and failed
 // submissions; it is cleared only on a successful post or a confirmed
@@ -33,12 +38,24 @@ import {
   isPrOperationPersistenceFailed,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { useAddPrCommentMutation } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
+import { type ProviderPrRef, providerPrRefLabel } from '@/lib/pr-review/provider-pr-ref';
 import { i18n } from '@/i18n';
 
 type PrConversationCommentComposerProps = Readonly<{
   owner: string;
   repo: string;
   number: number;
+  /**
+   * The provider MR/PR this composer writes to. Absent on the GitHub route,
+   * where the GitHub-shaped triple is the identity.
+   */
+  prRef?: ProviderPrRef;
+  /**
+   * The provider ref's collision-free key, folded into the draft key so a
+   * same-named GitLab and Bitbucket PR never share one draft. Absent on the
+   * GitHub route, whose draft bytes stay as they were.
+   */
+  providerRefKey?: string;
   onDismiss: () => void;
 }>;
 
@@ -46,15 +63,18 @@ export function PrConversationCommentComposer({
   owner,
   repo,
   number,
+  prRef,
+  providerRefKey,
   onDismiss,
 }: PrConversationCommentComposerProps) {
   const { t } = useTranslation();
-  const addComment = useAddPrCommentMutation();
+  const addComment = useAddPrCommentMutation(prRef);
 
   // Durable comment draft, keyed by account and PR. Nothing is saved or
   // restored while the user id is unknown.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
-  const commentDraftKey = prConversationCommentDraftKey(owner, repo, number);
+  const githubDraftKey = prConversationCommentDraftKey(owner, repo, number);
+  const commentDraftKey = providerRefKey ? `${githubDraftKey}@${providerRefKey}` : githubDraftKey;
   const draft = useFencedDraftLoad({ userId, isIdentityLoading, entityKey: commentDraftKey });
   useDraftFlushOnBackground(userId, commentDraftKey, true);
 
@@ -219,6 +239,8 @@ export function PrConversationCommentComposer({
       return;
     }
     try {
+      // On a provider route the ref is the identity and the triple is only the
+      // draft/eyebrow label; the provider arm ignores it.
       await addComment.mutateAsync({ owner, repo, number, body });
       if (userId) {
         void clearDraft(userId, commentDraftKey);
@@ -325,7 +347,7 @@ export function PrConversationCommentComposer({
     <>
       <PrFormSheetHeader
         title={t('prReview.composer.addTitle')}
-        eyebrow={`${owner}/${repo}#${number}`}
+        eyebrow={prRef ? providerPrRefLabel(prRef) : `${owner}/${repo}#${number}`}
         onBack={handleCancel}
       />
       <ScrollView

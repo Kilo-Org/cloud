@@ -21,7 +21,7 @@ describe('Expo Router provider review routes', () => {
     expect(module).toContain('class ExpoRouterModule');
   });
 
-  it.each(['comment-composer', 'review-submit', 'merge', 'file-navigator'])(
+  it.each(['comment-composer', 'conversation-comment', 'review-submit', 'merge', 'file-navigator'])(
     'keeps the static %s suffix ahead of the catch-all index',
     screen => {
       function config(name: string) {
@@ -89,6 +89,7 @@ describe('Expo Router provider review routes', () => {
     expect(screens.map(screen => screen.route.route)).toEqual([
       'index',
       'comment-composer',
+      'conversation-comment',
       'review-submit',
       'merge',
       'file-navigator',

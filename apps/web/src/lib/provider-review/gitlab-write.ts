@@ -82,7 +82,7 @@ export const GITLAB_MR_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
   canComment: true,
   reviewEvents: ['approve', 'comment'],
   canResolveThreads: true,
-  canMerge: true,
+  canMerge: { supported: true, reason: '' },
   autoMerge: { supported: true, reason: '' },
   reactions: { supported: true, reason: '' },
   reviewStatus: { supported: true, reason: '' },

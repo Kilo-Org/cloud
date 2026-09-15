@@ -59,7 +59,7 @@ import { resolvePersistedRunOn } from '@/lib/run-on-destination';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { peekSharePayload } from '@/lib/share-payload';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
-import { useNewSessionRepos } from '@/lib/use-new-session-repos';
+import { useNewSessionBranchOverrideScope, useNewSessionRepos } from '@/lib/use-new-session-repos';
 import { useTRPC } from '@/lib/trpc';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
@@ -243,6 +243,11 @@ export function NewSessionScreenBody() {
       ) ?? null
     );
   }, [repositories, selectedRepo]);
+
+  // The chosen branch belongs to this screen's draft, not to the repository
+  // section: that section unmounts when the run target switches to a remote
+  // instance, and clearing there dropped a branch the user had already picked.
+  useNewSessionBranchOverrideScope();
 
   const {
     profile,
@@ -689,6 +694,7 @@ export function NewSessionScreenBody() {
         onChangeFolderPath={setFolderPath}
         runOnInlineNote={runOnInlineNote}
         isCloneEntry={isCloneEntry}
+        organizationId={organizationId}
         groups={groups}
         isRetrying={isRetrying}
         onChangeRepo={setSelectedRepo}

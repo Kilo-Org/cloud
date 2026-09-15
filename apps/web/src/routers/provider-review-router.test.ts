@@ -14,6 +14,7 @@ import { GitLabReviewError } from '@/lib/provider-review/gitlab-authorization';
 import { GITLAB_STALE_HEAD_REASON } from '@/lib/provider-review/gitlab-write';
 import {
   BITBUCKET_AUTO_MERGE_UNSUPPORTED_REASON,
+  BITBUCKET_MERGE_UNSUPPORTED_REASON,
   BITBUCKET_PR_REVIEW_CAPABILITIES,
 } from '@/lib/provider-review/bitbucket-write';
 import { GITLAB_MR_REVIEW_CAPABILITIES } from '@/lib/provider-review/gitlab-write';
@@ -950,6 +951,27 @@ describe('providerReviewRouter merge head fence', () => {
 });
 
 // ----- capabilities and auto-merge --------------------------------------------------
+
+// Bitbucket Cloud's merge endpoint takes no revision precondition, so no
+// server-side preflight read can pin the merge to the head the reviewer saw:
+// the router refuses the input rather than merging a revision nobody reviewed.
+describe('providerReviewRouter Bitbucket merge refusal', () => {
+  it('refuses a Bitbucket merge with the capability reason and opens no ledger row', async () => {
+    await expect(
+      caller.mergePullRequest({
+        ...bitbucketBase,
+        expectedHeadSha: 'a'.repeat(40),
+        deleteBranch: true,
+        operationKey: 'key-merge',
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: BITBUCKET_MERGE_UNSUPPORTED_REASON,
+    });
+    expect(bitbucketWrite.mergePullRequest).not.toHaveBeenCalled();
+    expect(mockAdmitOperation).not.toHaveBeenCalled();
+  });
+});
 
 describe('providerReviewRouter capabilities', () => {
   it('answers GitLab with the MR capability list (no request-changes event)', async () => {

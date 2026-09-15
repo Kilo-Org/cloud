@@ -60,9 +60,9 @@ import {
 import * as bitbucketRead from '@/lib/provider-review/bitbucket-read';
 import {
   BITBUCKET_AUTO_MERGE_UNSUPPORTED_REASON,
+  BITBUCKET_MERGE_UNSUPPORTED_REASON,
   BITBUCKET_PR_REVIEW_CAPABILITIES,
   addComment as bitbucketAddComment,
-  mergePullRequest as bitbucketMerge,
   replyToComment as bitbucketReplyToComment,
   resolveThread as bitbucketResolveThread,
   submitReview as bitbucketSubmitReview,
@@ -1294,12 +1294,20 @@ export const providerReviewRouter = createTRPCRouter({
   }),
 
   /**
-   * Merge a PR/MR. `expectedHeadSha` is the optimistic-concurrency fence: the
-   * write layer re-fetches the authoritative head and refuses a moved head
-   * with the exact stale-head reason BEFORE any merge call, so a stale
-   * revision can never merge another commit.
+   * Merge a merge request. `expectedHeadSha` is the optimistic-concurrency
+   * fence: the write layer re-fetches the authoritative head and refuses a
+   * moved head with the exact stale-head reason BEFORE any merge call, so a
+   * stale revision can never merge another commit.
+   *
+   * Bitbucket pull requests are refused up front with the capability reason:
+   * Bitbucket Cloud's merge endpoint takes no revision precondition, so no
+   * server-side check can pin the merge to the head the reviewer saw. The UI
+   * shows the same reason in place of a merge affordance.
    */
   mergePullRequest: baseProcedure.input(MergePullRequestInput).mutation(async ({ ctx, input }) => {
+    if (input.platform === 'bitbucket') {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: BITBUCKET_MERGE_UNSUPPORTED_REASON });
+    }
     const ref = providerRef(input);
     const base: ProviderLedgerBase = {
       userId: ctx.user.id,
@@ -1308,75 +1316,26 @@ export const providerReviewRouter = createTRPCRouter({
       startedAt: Date.now(),
       platform: input.platform,
     };
-    const mergeFields = {
-      expectedHeadSha: input.expectedHeadSha,
-      deleteBranch: input.deleteBranch,
+    const fingerprintInput = gitlabFingerprintInput(input, {
+      method: input.squash ? 'squash' : 'merge',
+      commitTitle: input.commitTitle,
       commitMessage: input.commitMessage,
-      commitTitle: input.platform === 'gitlab' ? input.commitTitle : undefined,
-      squash: input.platform === 'gitlab' ? input.squash : undefined,
-    };
-    const fingerprintInput =
-      input.platform === 'gitlab'
-        ? gitlabFingerprintInput(input, {
-            method: input.squash ? 'squash' : 'merge',
-            commitTitle: input.commitTitle,
-            commitMessage: input.commitMessage,
-            deleteBranch: input.deleteBranch,
-            expectedHeadSha: input.expectedHeadSha,
-          })
-        : bitbucketFingerprintInput(input, {
-            method: 'merge',
-            commitMessage: input.commitMessage,
-            deleteBranch: input.deleteBranch,
-            expectedHeadSha: input.expectedHeadSha,
-          });
+      deleteBranch: input.deleteBranch,
+      expectedHeadSha: input.expectedHeadSha,
+    });
 
-    if (input.platform === 'gitlab') {
-      const owner = await gitlabOwner(ctx, input);
-      const write = () =>
-        gitlabMerge({
-          owner,
-          projectPath: input.projectPath,
-          mrIid: input.mrIid,
-          instanceHint: input.instanceHint,
-          expectedHeadSha: mergeFields.expectedHeadSha,
-          squash: mergeFields.squash,
-          shouldRemoveSourceBranch: mergeFields.deleteBranch,
-          commitTitle: mergeFields.commitTitle,
-          commitMessage: mergeFields.commitMessage,
-        });
-      if (input.operationKey === undefined) {
-        return providerCall(write);
-      }
-      const execute = (row: OperationLedgerRow) => executeProviderWrite(base, row, write);
-      return runProviderLedgerMutation({
-        ...base,
-        operationKey: input.operationKey,
-        resourceKey: providerLedgerResourceKey('merge', ref, fingerprintInput),
-        execute,
-        reconcile: row =>
-          reconcileMergeProviderRow(base, row, {
-            expectedHeadSha: input.expectedHeadSha,
-            // The authoritative read runs through the SAME owner-bound
-            // authorization as the write — a client hint can never steer
-            // the reconcile to another instance or project.
-            readSummary: () =>
-              gitlabRead.getMergeRequest(owner, input.projectPath, input.mrIid, input.instanceHint),
-            execute: write,
-          }),
-      });
-    }
-
-    const owner = await bitbucketOwner(ctx, input);
+    const owner = await gitlabOwner(ctx, input);
     const write = () =>
-      bitbucketMerge({
+      gitlabMerge({
         owner,
-        workspace: input.workspace,
-        repoSlug: input.repoSlug,
-        prId: input.prId,
-        expectedHeadSha: mergeFields.expectedHeadSha,
-        closeSourceBranch: mergeFields.deleteBranch,
-        commitMessage: mergeFields.commitMessage,
+        projectPath: input.projectPath,
+        mrIid: input.mrIid,
+        instanceHint: input.instanceHint,
+        expectedHeadSha: input.expectedHeadSha,
+        squash: input.squash,
+        shouldRemoveSourceBranch: input.deleteBranch,
+        commitTitle: input.commitTitle,
+        commitMessage: input.commitMessage,
       });
     if (input.operationKey === undefined) {
       return providerCall(write);
@@ -1390,9 +1349,11 @@ export const providerReviewRouter = createTRPCRouter({
       reconcile: row =>
         reconcileMergeProviderRow(base, row, {
           expectedHeadSha: input.expectedHeadSha,
-          // Owner-bound authoritative read — same identity as the write.
+          // The authoritative read runs through the SAME owner-bound
+          // authorization as the write — a client hint can never steer
+          // the reconcile to another instance or project.
           readSummary: () =>
-            bitbucketRead.getPullRequest(owner, input.workspace, input.repoSlug, input.prId),
+            gitlabRead.getMergeRequest(owner, input.projectPath, input.mrIid, input.instanceHint),
           execute: write,
         }),
     });

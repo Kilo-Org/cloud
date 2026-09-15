@@ -32,7 +32,12 @@ export type ProviderReviewCapabilities = {
   /** The review events the provider accepts, in display order. */
   reviewEvents: ProviderReviewEvent[];
   canResolveThreads: boolean;
-  canMerge: boolean;
+  /**
+   * Whether the app can merge the PR/MR itself. Bitbucket Cloud is
+   * unsupported: its merge endpoint takes no revision precondition, so the
+   * app cannot pin a merge to the revision the reviewer saw (see the reason).
+   */
+  canMerge: ProviderReviewCapability;
   autoMerge: ProviderReviewCapability;
   reactions: ProviderReviewCapability;
   /** Whether the provider exposes per-reviewer approval states. */
@@ -45,7 +50,7 @@ export const GITHUB_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
   canComment: true,
   reviewEvents: ['approve', 'request_changes', 'comment'],
   canResolveThreads: true,
-  canMerge: true,
+  canMerge: SUPPORTED,
   autoMerge: SUPPORTED,
   reactions: SUPPORTED,
   reviewStatus: SUPPORTED,
@@ -55,7 +60,7 @@ export const GITLAB_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
   canComment: true,
   reviewEvents: ['approve', 'request_changes', 'comment'],
   canResolveThreads: true,
-  canMerge: true,
+  canMerge: SUPPORTED,
   autoMerge: SUPPORTED,
   reactions: SUPPORTED,
   reviewStatus: SUPPORTED,
@@ -65,7 +70,11 @@ export const BITBUCKET_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
   canComment: true,
   reviewEvents: ['approve', 'request_changes', 'comment'],
   canResolveThreads: true,
-  canMerge: true,
+  canMerge: {
+    supported: false,
+    reason:
+      'Bitbucket Cloud does not expose a merge revision precondition, so a merge cannot be pinned to the revision you reviewed. Merge the pull request in Bitbucket Cloud.',
+  },
   autoMerge: {
     supported: false,
     reason: 'Bitbucket Cloud does not expose auto-merge in its API',

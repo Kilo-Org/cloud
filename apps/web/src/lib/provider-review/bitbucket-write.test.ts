@@ -3,10 +3,9 @@ import {
   addComment,
   BITBUCKET_AUTO_MERGE_UNSUPPORTED_REASON,
   BITBUCKET_PR_REVIEW_CAPABILITIES,
+  BITBUCKET_MERGE_UNSUPPORTED_REASON,
   BITBUCKET_REACTIONS_UNSUPPORTED_REASON,
-  BITBUCKET_STALE_HEAD_REASON,
   BITBUCKET_THREAD_RESOLUTION_UNSUPPORTED_REASON,
-  mergePullRequest,
   replyToComment,
   resolveThread,
   submitReview,
@@ -968,114 +967,6 @@ describe('unresolveThread', () => {
   });
 });
 
-describe('mergePullRequest', () => {
-  it('re-fetches the PR, fences the head, and merges the exact revision', async () => {
-    const result = await mergePullRequest({
-      owner: ORG_OWNER,
-      workspace: 'acme',
-      repoSlug: 'repo',
-      prId: 12,
-      expectedHeadSha: HEAD_SHA,
-      closeSourceBranch: true,
-      commitMessage: 'Merged in feature/retry',
-    });
-
-    expect(result).toEqual({ done: true, replayed: false });
-    const post = bitbucketCalls().find(call => call.init.method === 'POST');
-    expect(post?.url.pathname).toBe('/2.0/repositories/acme/repo/pullrequests/12/merge');
-    // Bitbucket's merge endpoint names the commit message `message`
-    // (GitHub's `commit_message` field is silently ignored by Bitbucket).
-    expect(JSON.parse(String(post?.init.body))).toEqual({
-      close_source_branch: true,
-      message: 'Merged in feature/retry',
-    });
-  });
-
-  it('refuses a stale revision with the exact reason and never merges', async () => {
-    const error = await captureRejection(
-      mergePullRequest({
-        owner: ORG_OWNER,
-        workspace: 'acme',
-        repoSlug: 'repo',
-        prId: 12,
-        expectedHeadSha: 'stale-sha',
-      })
-    );
-
-    expect(error.kind).toBe('stale_head');
-    expect(error.message).toBe(BITBUCKET_STALE_HEAD_REASON);
-    expect(bitbucketCalls().some(call => call.url.pathname.endsWith('/merge'))).toBe(false);
-  });
-
-  it('reports replayed when the PR is already merged', async () => {
-    fetchMock.mockImplementation(async (url: string | URL) => {
-      const full = url.toString();
-      if (full.includes('token-service.example.com')) {
-        return jsonResponse({
-          status: 'available',
-          token: 'at-mock-token',
-          workspace: WORKSPACE,
-        });
-      }
-      const parsed = new URL(full);
-      if (parsed.pathname.endsWith('/pullrequests/12')) {
-        return jsonResponse({
-          id: 12,
-          state: 'MERGED',
-          source: { commit: { hash: HEAD_SHA } },
-        });
-      }
-      return jsonResponse({ pagelen: 50, values: [], next: null });
-    });
-
-    const result = await mergePullRequest({
-      owner: ORG_OWNER,
-      workspace: 'acme',
-      repoSlug: 'repo',
-      prId: 12,
-      expectedHeadSha: HEAD_SHA,
-    });
-
-    expect(result).toEqual({ done: true, replayed: true });
-    expect(bitbucketCalls().some(call => call.init.method === 'POST')).toBe(false);
-  });
-
-  it('refuses a closed PR with a non-retryable bad_request', async () => {
-    fetchMock.mockImplementation(async (url: string | URL) => {
-      const full = url.toString();
-      if (full.includes('token-service.example.com')) {
-        return jsonResponse({
-          status: 'available',
-          token: 'at-mock-token',
-          workspace: WORKSPACE,
-        });
-      }
-      const parsed = new URL(full);
-      if (parsed.pathname.endsWith('/pullrequests/12')) {
-        return jsonResponse({
-          id: 12,
-          state: 'DECLINED',
-          source: { commit: { hash: HEAD_SHA } },
-        });
-      }
-      return jsonResponse({ pagelen: 50, values: [], next: null });
-    });
-
-    const error = await captureRejection(
-      mergePullRequest({
-        owner: ORG_OWNER,
-        workspace: 'acme',
-        repoSlug: 'repo',
-        prId: 12,
-        expectedHeadSha: HEAD_SHA,
-      })
-    );
-
-    expect(error.kind).toBe('bad_request');
-    expect(error.retryable).toBe(false);
-  });
-});
-
 describe('capabilities and reasons', () => {
   it('auto-merge is always unsupported with the provider reason', () => {
     expect(BITBUCKET_PR_REVIEW_CAPABILITIES.autoMerge).toEqual({
@@ -1088,6 +979,17 @@ describe('capabilities and reasons', () => {
     expect(BITBUCKET_PR_REVIEW_CAPABILITIES.reactions).toEqual({
       supported: false,
       reason: 'Bitbucket Cloud does not expose reactions on pull request comments',
+    });
+  });
+
+  it('merging is unsupported with the provider reason', () => {
+    // Bitbucket Cloud's merge endpoint takes no revision or head parameter,
+    // so the provider cannot check the head the reviewer saw: the merge flow
+    // is refused rather than merging a revision nobody reviewed.
+    expect(BITBUCKET_PR_REVIEW_CAPABILITIES.canMerge).toEqual({
+      supported: false,
+      reason:
+        'Bitbucket Cloud does not expose a merge revision precondition, so a merge cannot be pinned to the revision you reviewed. Merge the pull request in Bitbucket Cloud.',
     });
   });
 
@@ -1105,6 +1007,9 @@ describe('capabilities and reasons', () => {
     );
     expect(BITBUCKET_REACTIONS_UNSUPPORTED_REASON).toBe(
       BITBUCKET_PR_REVIEW_CAPABILITIES.reactions.reason
+    );
+    expect(BITBUCKET_MERGE_UNSUPPORTED_REASON).toBe(
+      BITBUCKET_PR_REVIEW_CAPABILITIES.canMerge.reason
     );
   });
 });

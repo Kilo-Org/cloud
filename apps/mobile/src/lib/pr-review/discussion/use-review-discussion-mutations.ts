@@ -314,14 +314,40 @@ export type AddPrCommentInput = {
 // retry is ledger-deduped if the original write eventually lands.
 const PR_COMMENT_UI_DEADLINE_MS = 15_000;
 
-export function useAddPrCommentMutation() {
+export function useAddPrCommentMutation(ref?: ProviderPrRef) {
   const queryClient = useQueryClient();
-  const keys = useGithubDiscussionKeys();
+  const scope = useDiscussionScope(ref);
+  const keys = useDiscussionKeys(scope);
   const { getKey, rotateKey } = useHoistedOperationKey();
 
   return useMutation({
     mutationFn: async (input: AddPrCommentInput) => {
       try {
+        // With an explicit provider ref this is the conversation (top-level)
+        // comment on the provider route: `providerReview.addComment` without
+        // an anchor is the provider's own issue comment, and the identity
+        // comes from the ref — never from the GitHub-shaped triple.
+        if (scope.ref.platform !== 'github') {
+          const identity = providerWriteIdentity(scope);
+          const result = await withUiDeadline(
+            trpcClient.providerReview.addComment.mutate({
+              ...identity,
+              body: input.body,
+              // The server hashes the same intent for an unanchored comment
+              // (provider-review-router addComment → 'create_review_comment'),
+              // so a same-key retry reconciles instead of posting twice.
+              operationKey: getKey(
+                prIntentFingerprint(
+                  'create_review_comment',
+                  providerFingerprintInput(scope.ref, { body: input.body })
+                )
+              ),
+            }),
+            PR_COMMENT_UI_DEADLINE_MS
+          );
+          rotateKey();
+          return result;
+        }
         const result = await withUiDeadline(
           trpcClient.githubPrReview.addIssueComment.mutate({
             ...input,
@@ -400,7 +426,7 @@ function useResolveToggleMutation(
             if (!isPrMutationRetryable(error)) {
               rotateKey();
             }
-            throw mapPrOperationError(error, 'reply');
+            throw mapPrOperationError(error, 'resolve');
           }
         }
       ),

@@ -591,7 +591,11 @@ export async function listDiscussions(
   }
 }
 
-const FINISHED_PIPELINE_STATUSES = new Set(['success', 'failed', 'canceled']);
+// A pipeline in one of these states is over. `skipped` and `manual` are
+// finished without a GitHub verdict: their own status is the verdict the
+// mapper reads, so `skipped` keeps its own rollup bucket instead of counting
+// as a run still in progress.
+const FINISHED_PIPELINE_STATUSES = new Set(['success', 'failed', 'canceled', 'skipped', 'manual']);
 
 /**
  * The pipelines OF the merge request, as the shared checks DTO. The MR

@@ -101,6 +101,7 @@ const replyMutateMock = vi.fn();
 const addCommentMutateMock = vi.fn();
 const resolveMutateMock = vi.fn();
 const unresolveMutateMock = vi.fn();
+const providerAddCommentMutateMock = vi.fn();
 const providerReplyMutateMock = vi.fn();
 const providerResolveMutateMock = vi.fn();
 const providerUnresolveMutateMock = vi.fn();
@@ -150,6 +151,8 @@ vi.mock('@/lib/trpc', () => ({
       unresolveThread: { mutate: (vars: unknown) => unresolveMutateMock(vars) },
     },
     providerReview: {
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      addComment: { mutate: (vars: unknown) => providerAddCommentMutateMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       replyToComment: { mutate: (vars: unknown) => providerReplyMutateMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -227,6 +230,7 @@ function resetMocks() {
   replyMutateMock.mockReset();
   resolveMutateMock.mockReset();
   unresolveMutateMock.mockReset();
+  providerAddCommentMutateMock.mockReset();
   providerReplyMutateMock.mockReset();
   providerResolveMutateMock.mockReset();
   providerUnresolveMutateMock.mockReset();
@@ -417,6 +421,8 @@ describe('reply_comment fingerprint (P1-A-08c changed-input)', () => {
 describe('useAddPrCommentMutation (regular PR conversation comment wiring)', () => {
   beforeEach(() => {
     lastCapturedOptions = null;
+    // No provider scope published: the GitHub arm is the subject here.
+    scopeOverride = null;
     addCommentMutateMock.mockReset();
     invalidateQueriesMock.mockReset();
     toastErrorMock.mockReset();
@@ -912,5 +918,60 @@ describe('scope.id network serialization (real MutationCache)', () => {
     gate.resolve(null);
     await Promise.all([p1, p2]);
     expect(order).toEqual(['first-start', 'first-end', 'second-start']);
+  });
+});
+
+describe('useAddPrCommentMutation (s6 provider conversation comment)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('gitlab: posts the conversation comment through providerReview.addComment', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useAddPrCommentMutation(GITLAB_REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT)).resolves.toEqual({
+      done: true,
+      replayed: false,
+    });
+
+    expect(addCommentMutateMock).not.toHaveBeenCalled();
+    expect(providerAddCommentMutateMock).toHaveBeenCalledWith({
+      ...GITLAB_IDENTITY,
+      body: 'a regular comment',
+      operationKey: 'hoisted-op-key',
+    });
+    // An unanchored provider comment is the router's `create_review_comment`
+    // intent, with no anchor fields in the fingerprint.
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["gitlab","https://gl.example.com","group/sub/app",12],"body":"a regular comment"}'
+    );
+  });
+
+  it('bitbucket: posts the conversation comment through providerReview.addComment', async () => {
+    scopeOverride = { ref: BITBUCKET_REF, organizationId: 'org-9' };
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useAddPrCommentMutation(BITBUCKET_REF);
+
+    await lastCapturedOptions?.mutationFn?.(ADD_COMMENT_INPUT);
+
+    expect(addCommentMutateMock).not.toHaveBeenCalled();
+    expect(providerAddCommentMutateMock).toHaveBeenCalledWith({
+      ...BITBUCKET_IDENTITY,
+      body: 'a regular comment',
+      operationKey: 'hoisted-op-key',
+    });
+  });
+
+  it('gitlab: invalidates the provider discussions cache and toasts the comment copy', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    useAddPrCommentMutation(GITLAB_REF);
+
+    await lastCapturedOptions?.onSettled?.();
+    lastCapturedOptions?.onError?.(new Error('boom'));
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith(['providerReview', 'listDiscussions']);
+    expect(toastErrorMock).toHaveBeenCalledWith('Could not post comment.');
   });
 });

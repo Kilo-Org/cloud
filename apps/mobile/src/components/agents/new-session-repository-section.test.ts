@@ -51,6 +51,7 @@ const group = (
 
 function mountSection(overrides: {
   value?: string;
+  organizationId?: string;
   repositories?: NewSessionRepository[];
   groups?: RepositoryGroup[];
 }) {
@@ -58,6 +59,7 @@ function mountSection(overrides: {
   act(() => {
     renderer.current = TestRenderer.create(
       createElement(NewSessionRepositorySection, {
+        organizationId: overrides.organizationId,
         disabled: false,
         isRetrying: false,
         onChange: vi.fn(() => undefined),
@@ -80,6 +82,7 @@ function mountSection(overrides: {
 function branchSelectorProps(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root.findAllByType('RepositoryBranchSelector' as never)[0]?.props as {
     repository: NewSessionRepository | null;
+    organizationId: string | undefined;
     disabled: boolean;
   };
 }
@@ -114,15 +117,12 @@ describe('NewSessionRepositorySection branch row', () => {
     expect(branchSelectorProps(renderer).repository).toBeNull();
   });
 
-  it('clears a stale branch override when the section mounts', () => {
-    setSelectedBranchOverride(githubRow, 'release/2.0');
-
-    mountSection({ value: 'github:owner/repo' });
-
-    expect(getSelectedBranchOverride(githubRow)).toBeNull();
-  });
-
-  it('clears the branch override when the section unmounts', () => {
+  it('keeps the chosen branch when the run target unmounts the section', () => {
+    // The section renders only while the run target is the cloud agent:
+    // switching to a remote instance unmounts it. Clearing the override here
+    // dropped a branch the user had already picked for the repository the
+    // parent still had selected; the new-session screen owns that clear
+    // (`useNewSessionBranchOverrideScope`).
     const renderer = mountSection({ value: 'github:owner/repo' });
     setSelectedBranchOverride(githubRow, 'release/2.0');
 
@@ -130,7 +130,13 @@ describe('NewSessionRepositorySection branch row', () => {
       renderer.unmount();
     });
 
-    expect(getSelectedBranchOverride(githubRow)).toBeNull();
+    expect(getSelectedBranchOverride(githubRow)).toBe('release/2.0');
+  });
+
+  it('hands the branch selector the screen organization scope', () => {
+    const renderer = mountSection({ value: 'github:owner/repo', organizationId: 'org-2' });
+
+    expect(branchSelectorProps(renderer).organizationId).toBe('org-2');
   });
 });
 

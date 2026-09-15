@@ -19,6 +19,7 @@ export type PrMutationSurface =
   | 'create-comment'
   | 'submit-review'
   | 'reply'
+  | 'resolve'
   | 'merge'
   | 'pr-comment';
 
@@ -29,6 +30,11 @@ const PR_SURFACE_RETRYABLE_COPY = {
   'create-comment': 'prReview.mutationError.couldNotPostComment',
   'submit-review': 'prReview.mutationError.couldNotSubmitReview',
   reply: 'prReview.operation.couldNotReply',
+  // A resolve/unresolve is not a reply, so it must not borrow the reply copy.
+  // No resolution-specific key exists in the catalog, and adding one would
+  // need all 86 translated catalogs, so the surface reuses the generic action
+  // copy the ledger already shows for an unclassifiable failure.
+  resolve: 'prReview.operation.couldNotCompleteAction',
   merge: 'prReview.merge.couldNotMerge',
   'pr-comment': 'prReview.mutationError.couldNotPostComment',
 } satisfies Record<PrMutationSurface, string>;

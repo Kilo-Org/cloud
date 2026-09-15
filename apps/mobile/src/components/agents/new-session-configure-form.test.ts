@@ -202,6 +202,7 @@ function defaultProps() {
     showInstanceDisconnectedNote: false,
     folderPath: '',
     onChangeFolderPath: vi.fn(),
+    organizationId: 'org-1',
     groups: [] as RepositoryGroup[],
     isRetrying: false,
     onChangeRepo: vi.fn(),

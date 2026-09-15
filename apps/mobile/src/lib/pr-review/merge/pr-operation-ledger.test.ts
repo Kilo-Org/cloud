@@ -47,6 +47,7 @@ describe('mapPrOperationError', () => {
     ['create-comment', 'Could not post comment.'],
     ['submit-review', 'Could not submit review. Check your connection and try again.'],
     ['reply', 'Could not reply.'],
+    ['resolve', 'Could not complete this action.'],
     ['merge', 'Could not merge pull request.'],
     ['pr-comment', 'Could not post comment.'],
   ] as const)(
@@ -58,7 +59,7 @@ describe('mapPrOperationError', () => {
     }
   );
 
-  it.each(['create-comment', 'submit-review', 'reply', 'merge', 'pr-comment'] as const)(
+  it.each(['create-comment', 'submit-review', 'reply', 'resolve', 'merge', 'pr-comment'] as const)(
     'maps the ambiguous outcome onto the verify-before-retrying copy for %s',
     surface => {
       const mapped = mapPrOperationError(AMBIGUOUS, surface);
@@ -67,7 +68,7 @@ describe('mapPrOperationError', () => {
     }
   );
 
-  it.each(['create-comment', 'submit-review', 'reply', 'merge', 'pr-comment'] as const)(
+  it.each(['create-comment', 'submit-review', 'reply', 'resolve', 'merge', 'pr-comment'] as const)(
     'maps the persistence-failure marker onto the terminal could-not-record copy for %s',
     surface => {
       const mapped = mapPrOperationError(PERSISTENCE_FAILED, surface);
@@ -87,6 +88,10 @@ describe('mapPrOperationError', () => {
 describe('prOperationToastMessage', () => {
   it('returns the mapped surface copy for an in-progress marker', () => {
     expect(prOperationToastMessage(IN_PROGRESS, 'merge')).toBe('Could not merge pull request.');
+  });
+
+  it('never tells a resolve/unresolve duplicate it could not reply', () => {
+    expect(prOperationToastMessage(IN_PROGRESS, 'resolve')).toBe('Could not complete this action.');
   });
 
   it('returns the ambiguous copy for the ambiguous marker', () => {

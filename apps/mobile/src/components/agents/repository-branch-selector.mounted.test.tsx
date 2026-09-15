@@ -82,7 +82,11 @@ function mountSelector(
   const renderer: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
   act(() => {
     renderer.current = TestRenderer.create(
-      createElement(RepositoryBranchSelector, { repository, disabled })
+      createElement(RepositoryBranchSelector, {
+        repository,
+        organizationId: 'org-1',
+        disabled,
+      })
     );
   });
   const created = renderer.current;
@@ -123,6 +127,14 @@ beforeEach(() => {
 });
 
 describe('RepositoryBranchSelector', () => {
+  it('queries the branches with the scope of this render', () => {
+    // The scope is a prop, so the query key and the request can never come
+    // from a scope the parent published after this row rendered.
+    mountSelector(githubRow);
+
+    expect(vi.mocked(useRepositoryBranches)).toHaveBeenCalledWith(githubRow, 'org-1');
+  });
+
   it('renders nothing until a repository is selected', () => {
     const renderer = mountSelector(null);
 
@@ -250,7 +262,11 @@ describe('RepositoryBranchSelector', () => {
     vi.mocked(useRepositoryBranches).mockReturnValue(branchesState());
     act(() => {
       renderer.update(
-        createElement(RepositoryBranchSelector, { repository: githubRow, disabled: false })
+        createElement(RepositoryBranchSelector, {
+          repository: githubRow,
+          organizationId: 'org-1',
+          disabled: false,
+        })
       );
     });
 

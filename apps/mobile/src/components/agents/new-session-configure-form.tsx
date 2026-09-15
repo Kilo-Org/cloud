@@ -78,6 +78,8 @@ type NewSessionConfigureFormProps = {
   /** True for the Continue clone entry: hides Changes and Environment. */
   isCloneEntry?: boolean;
   // Repository (Cloud Agent only).
+  /** The screen's organization scope, threaded to the branch query. */
+  organizationId: string | undefined;
   groups: RepositoryGroup[];
   isRetrying: boolean;
   onChangeRepo: (fullName: string) => void;
@@ -145,6 +147,7 @@ export function NewSessionConfigureForm({
   onChangeFolderPath,
   runOnInlineNote,
   isCloneEntry = false,
+  organizationId,
   groups,
   isRetrying,
   onChangeRepo,
@@ -272,6 +275,7 @@ export function NewSessionConfigureForm({
 
       {!isRemote ? (
         <NewSessionRepositorySection
+          organizationId={organizationId}
           disabled={isCreating}
           groups={groups}
           isRetrying={isRetrying}

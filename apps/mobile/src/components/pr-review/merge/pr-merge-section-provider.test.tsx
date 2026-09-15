@@ -1,9 +1,9 @@
 // The provider merge section (s6): the overview's merge affordance on a
 // GitLab MR / Bitbucket PR. The merge CTA always pushes the ref's own sheet
-// route (the sheet renders the s2/s3 restrictions); the auto-merge row
-// follows the capability list — GitLab gets the enable CTA, Bitbucket gets
-// the explicit capability banner instead of a dead button or a silent
-// absence. A terminal PR renders the terminal chip and no CTAs.
+// route (the sheet renders the s2/s3 restrictions); the merge and auto-merge
+// rows follow the capability list — GitLab gets the CTAs, Bitbucket gets the
+// explicit capability banners instead of dead buttons or a silent absence. A
+// terminal PR renders the terminal chip and no CTAs.
 
 import * as React from 'react';
 import { createElement } from 'react';
@@ -108,21 +108,30 @@ describe('PrMergeSectionProvider (s6)', () => {
     renderer.unmount();
   });
 
-  it('offers merge with the explicit capability banner on Bitbucket (auto-merge unsupported)', async () => {
+  it('shows capability banners instead of merge CTAs on Bitbucket (no merge precondition, no auto-merge)', async () => {
     const renderer = await mount(BITBUCKET_REF, 'open');
-    expect(findButtons(renderer, 'Merge pull request')).toBe(1);
+    // Bitbucket Cloud's merge endpoint takes no revision precondition, so no
+    // merge CTA is offered; auto-merge has no API either. Both unsupported
+    // capabilities state their reason instead of rendering a dead button.
+    expect(findButtons(renderer, 'Merge pull request')).toBe(0);
     expect(findButtons(renderer, 'Enable auto-merge')).toBe(0);
-    const banner = renderer.root.find(
-      node =>
-        typeof node.type === 'function' &&
-        (node.type as { name?: string }).name === 'PrReviewCapabilityBanner'
-    );
-    expect(
-      (banner.props as { capability: { supported: boolean; reason: string } }).capability
-    ).toEqual({
-      supported: false,
-      reason: 'Bitbucket Cloud does not expose auto-merge in its API',
-    });
+    const banners = renderer.root
+      .findAll(
+        node =>
+          typeof node.type === 'function' &&
+          (node.type as { name?: string }).name === 'PrReviewCapabilityBanner'
+      )
+      .map(
+        node => (node.props as { capability: { supported: boolean; reason: string } }).capability
+      );
+    expect(banners).toEqual([
+      {
+        supported: false,
+        reason:
+          'Bitbucket Cloud does not expose a merge revision precondition, so a merge cannot be pinned to the revision you reviewed. Merge the pull request in Bitbucket Cloud.',
+      },
+      { supported: false, reason: 'Bitbucket Cloud does not expose auto-merge in its API' },
+    ]);
     renderer.unmount();
   });
 

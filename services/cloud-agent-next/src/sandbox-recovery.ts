@@ -1,3 +1,4 @@
+import { getErrorMessage } from '@kilocode/worker-utils';
 import { logger } from './logger.js';
 import {
   SandboxCapacityInspectionError,
@@ -54,11 +55,6 @@ function getNumberProperty(value: unknown, key: string): number | undefined {
 function getNestedProperty(value: unknown, key: string): unknown {
   if (!isRecord(value)) return undefined;
   return value[key];
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
 }
 
 export const SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE =

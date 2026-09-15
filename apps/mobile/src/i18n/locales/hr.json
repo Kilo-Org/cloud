@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Prepiši glasovni unos modelom Kilo Gatewaya umjesto prepoznavanja govora na uređaju. Snimka se šalje na Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Sažmi pozive alata",
-    "condenseToolCallsSubtitle": "Grupiraj uzastopne pozive alata u jedan redak koji možeš otvoriti."
+    "condenseToolCallsSubtitle": "Grupiraj uzastopne pozive alata u jedan redak koji možeš otvoriti.",
+    "toolSummaryTranslation": "Prevedi sažetke alata",
+    "toolSummaryTranslationSubtitle": "Pošalji svaki sažetak alata modelu da ga prevede na jezik tvoje aplikacije. Ako prijevod ne uspije, prikazuje se izvornik.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ovaj se model više ne nudi. Dodirni $t(common.model) da odabereš drugi."
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtjev za spajanje nije dostupan",

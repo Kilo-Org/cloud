@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Transkribatu ahots-sarrera gailuaren hitz-sorgailuaren ordez Kilo Gateway eredu batekin. Zure grabaketa Kilo Gatewayra bidaltzen da.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Tresna-deiak txikitu",
-    "condenseToolCallsSubtitle": "Elkartu jarraian dauden tresna-deiak ireki dezakezun errenkada batean."
+    "condenseToolCallsSubtitle": "Elkartu jarraian dauden tresna-deiak ireki dezakezun errenkada batean.",
+    "toolSummaryTranslation": "Itzuli tresnen laburpenak",
+    "toolSummaryTranslationSubtitle": "Bidali tresna-laburpen bakoitza eredu batera zure aplikazioaren hizkuntzara itzultzeko. Jatorrizkoa erakutsiko da itzulpenak huts eginez gero.",
+    "toolSummaryTranslationModelUnavailableNotice": "Eredu hau jada ez da eskaintzen. Sakatu $t(common.model) beste bat hautatzeko."
   },
   "prReview": {
     "pullRequestUnavailable": "Bateratze-eskaera ez dago eskuragarri",

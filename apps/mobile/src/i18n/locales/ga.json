@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Déan an t-ionchur gutha a thras-scríobh le samhail Kilo Gateway in ionad aithint cainte an ghléis. Seoltar do thaifeadadh chuig an Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Comhdhlúthaigh glaonna uirlise",
-    "condenseToolCallsSubtitle": "Grúpáil glaonna uirlise as a chéile i ró amháin ar féidir leat a oscailt."
+    "condenseToolCallsSubtitle": "Grúpáil glaonna uirlise as a chéile i ró amháin ar féidir leat a oscailt.",
+    "toolSummaryTranslation": "Aistrigh achoimrí uirlisí",
+    "toolSummaryTranslationSubtitle": "Seol gach achoimre uirlise chuig samhail chun í a aistriú go teanga do aipe. Taispeántar an bunleagan má theipeann ar an aistriúchán.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ní thairgtear an tsamhail seo a thuilleadh. Tapáil $t(common.model) chun ceann eile a roghnú."
   },
   "prReview": {
     "pullRequestUnavailable": "Iarratas tarraingthe gan fáil",

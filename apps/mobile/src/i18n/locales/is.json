@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Umritið raddinnsláttinn með Kilo Gateway líkani í stað talaþekkingar tækisins. Upptakan er send í Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Þjappa tólaköllum",
-    "condenseToolCallsSubtitle": "Flokkaðu samfelld tólaköll í eina röð sem þú getur opnað."
+    "condenseToolCallsSubtitle": "Flokkaðu samfelld tólaköll í eina röð sem þú getur opnað.",
+    "toolSummaryTranslation": "Þýða samantektir tóla",
+    "toolSummaryTranslationSubtitle": "Sendu hverja samantekt tóls til líkans til að þýða hana á tungumál appsins þíns. Upprunalega textinn birtist ef þýðing mistekst.",
+    "toolSummaryTranslationModelUnavailableNotice": "Þetta líkan er ekki lengur í boði. Ýttu á $t(common.model) til að velja annað."
   },
   "prReview": {
     "pullRequestUnavailable": "Sameiningarbeiðni ekki tiltæk",

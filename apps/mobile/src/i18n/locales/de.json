@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Transkribiere die Spracheingabe mit einem Kilo-Gateway-Modell statt mit der Spracherkennung des Geräts. Deine Aufnahme wird an das Kilo Gateway gesendet.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Tool-Aufrufe komprimieren",
-    "condenseToolCallsSubtitle": "Aufeinanderfolgende Tool-Aufrufe in einer Zeile zusammenfassen, die sich öffnen lässt."
+    "condenseToolCallsSubtitle": "Aufeinanderfolgende Tool-Aufrufe in einer Zeile zusammenfassen, die sich öffnen lässt.",
+    "toolSummaryTranslation": "Werkzeugzusammenfassungen übersetzen",
+    "toolSummaryTranslationSubtitle": "Sende jede Werkzeugzusammenfassung an ein Modell, um sie in deine App-Sprache zu übersetzen. Wenn die Übersetzung fehlschlägt, wird das Original angezeigt.",
+    "toolSummaryTranslationModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(common.model), um ein anderes zu wählen."
   },
   "notifications": {
     "liveActivities": "Live-Aktivitäten",

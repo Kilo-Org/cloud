@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "غږیز لیکل د وسیلې د ویې پېژندنې پر ځای د Kilo Gateway ماډل سره متن ته واړوئ. غږیز ریکارډ مو د Kilo Gateway ته لیږل کېږي.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "د وسیلې غوښتنې یوځای کړئ",
-    "condenseToolCallsSubtitle": "پرله‌پسې د وسیلې غوښتنې په یوه کرښه کې یوځای کړئ چې تاسو یې خلاصولی شئ."
+    "condenseToolCallsSubtitle": "پرله‌پسې د وسیلې غوښتنې په یوه کرښه کې یوځای کړئ چې تاسو یې خلاصولی شئ.",
+    "toolSummaryTranslation": "د وسایلو لنډیزونه وژباړه",
+    "toolSummaryTranslationSubtitle": "هر د وسیلې لنډیز یو ماډل ته واستوه ترڅو یې ستاسو د اپلیکیشن ژبې ته وژباړي. که ژباړه ناکامه شي، اصلي نسخه ښودل کیږي.",
+    "toolSummaryTranslationModelUnavailableNotice": "دا ماډل نور وړاندې نه کېږي. د بل غوره کولو لپاره $t(common.model) ته ټک ووهئ."
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسټ نشته",

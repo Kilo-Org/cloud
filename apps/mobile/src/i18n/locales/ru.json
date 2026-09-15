@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "Распознавайте голосовой ввод с помощью модели Kilo Gateway вместо распознавания речи на устройстве. Запись отправляется в Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "Сжимать вызовы инструментов",
-    "condenseToolCallsSubtitle": "Объединяйте последовательные вызовы инструментов в одну строку, которую можно открыть."
+    "condenseToolCallsSubtitle": "Объединяйте последовательные вызовы инструментов в одну строку, которую можно открыть.",
+    "toolSummaryTranslation": "Переводить сводки инструментов",
+    "toolSummaryTranslationSubtitle": "Отправляйте каждый обзор инструмента модели, чтобы перевести его на язык вашего приложения. Если перевод не удался, показывается оригинал.",
+    "toolSummaryTranslationModelUnavailableNotice": "Эта модель больше не предлагается. Нажмите $t(common.model), чтобы выбрать другую."
   },
   "notifications": {
     "liveActivities": "Эфир активности",

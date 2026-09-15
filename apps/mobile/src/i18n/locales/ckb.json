@@ -258,7 +258,10 @@
     "gatewayTranscriptionSubtitle": "دەنگەکانت بە مۆدێلێکی Kilo Gateway بگۆڕە بۆ دەق، نەک بە ناسینەوەی قسەکردنی ئامێرەکەت. تۆمارەکەت بۆ Kilo Gateway دەنێردرێت.",
     "transcriptionModel": "$t(transcriptionModel.title)",
     "condenseToolCalls": "کورتکردنەوەی بانگەکانی ئامراز",
-    "condenseToolCallsSubtitle": "بانگەکانی ئامرازی یەک لەدوای یەک بخە ناو یەک ڕیز کە دەتوانیت بیکەیتەوە."
+    "condenseToolCallsSubtitle": "بانگەکانی ئامرازی یەک لەدوای یەک بخە ناو یەک ڕیز کە دەتوانیت بیکەیتەوە.",
+    "toolSummaryTranslation": "وەرگێڕانی کورتەکانی ئامرازەکان",
+    "toolSummaryTranslationSubtitle": "هەر کورتەیەکی ئامراز بۆ مۆدێلێک بنێرە بۆ ئەوەی وەریگێڕێتە سەر زمانی ئەپەکەت. ئەگەر وەرگێڕانەکە سەرنەکەوێت، ڕەسەنەکە پیشان دەدرێت.",
+    "toolSummaryTranslationModelUnavailableNotice": "ئەم مۆدێلە چیتر پێشکەش ناکرێت. دەست بدە بە $t(common.model) بۆ هەڵبژاردنی یەکی تر."
   },
   "prReview": {
     "pullRequestUnavailable": "داواکاری ڕاکێشان بەردەست نییە",

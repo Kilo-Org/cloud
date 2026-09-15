@@ -12,17 +12,25 @@ export type AppStateStore = {
  * subscription and one snapshot instead of mirroring the emitter into its own
  * `useState`. Pairs with `useSyncExternalStore`.
  *
- * The value starts `true`, matching the per-hook state this replaces: a screen
- * that mounts while the app is backgrounded has never observed a
- * background -> active edge, and must not start observing one now. The source
- * listener is added with the first subscriber and removed with the last, and
- * the last unsubscribe resets the value to `true` so the next mount starts
- * from the same place today's `useState(true)` did.
+ * `readInitialActive` supplies the seed, read once at construction and again
+ * on the last unsubscribe. `use-app-lifecycle` keeps the default `true`: a
+ * screen that mounts while the app is backgrounded has never observed a
+ * background -> active edge, and must not start observing one now. The
+ * kilo-chat store seeds from the live `AppState.currentState` instead, so a
+ * remount while backgrounded reads the live value, like today's
+ * `useState(AppState.currentState === 'active')` did.
+ *
+ * The source listener is added with the first subscriber and removed with the
+ * last, and the last unsubscribe re-reads the seed so the next mount starts
+ * from the same live value today's per-hook state did.
  */
-export function createAppStateStore(source: AppStateSource): AppStateStore {
+export function createAppStateStore(
+  source: AppStateSource,
+  readInitialActive: () => boolean = () => true
+): AppStateStore {
   const listeners = new Set<() => void>();
   let subscription: { remove(): void } | undefined = undefined;
-  let active = true;
+  let active = readInitialActive();
 
   return {
     subscribe: listener => {
@@ -46,7 +54,7 @@ export function createAppStateStore(source: AppStateSource): AppStateStore {
         }
         subscription?.remove();
         subscription = undefined;
-        active = true;
+        active = readInitialActive();
       };
     },
 

@@ -42,6 +42,34 @@ describe('createAppStateStore', () => {
     expect(source.handlerCount()).toBe(0);
   });
 
+  it('seeds from readInitialActive and resets to not-active on the last unsubscribe', () => {
+    const source = createFakeSource();
+    const store = createAppStateStore(source, () => false);
+
+    expect(store.isActive()).toBe(false);
+
+    const unsubscribe = store.subscribe(() => undefined);
+    source.emit('active');
+    expect(store.isActive()).toBe(true);
+
+    unsubscribe();
+    expect(store.isActive()).toBe(false);
+    expect(source.handlerCount()).toBe(0);
+  });
+
+  it('re-reads readInitialActive on the last unsubscribe instead of pinning the seed', () => {
+    const source = createFakeSource();
+    let live = false;
+    const store = createAppStateStore(source, () => live);
+    expect(store.isActive()).toBe(false);
+
+    const unsubscribe = store.subscribe(() => undefined);
+    live = true;
+    unsubscribe();
+
+    expect(store.isActive()).toBe(true);
+  });
+
   it('tracks background and inactive as not active, and notifies', () => {
     const source = createFakeSource();
     const store = createAppStateStore(source);

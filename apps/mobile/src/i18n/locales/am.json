@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} በመጠባበቅ ላይ",
       "skipped": "{{displayCount}} ተዘልለዋል",
       "checksCount": "{{displayCount}} ፍተሻዎች",
+      "checksCount_one": "{{displayCount}} ፍተሻ",
+      "checksCount_other": "{{displayCount}} ፍተሻዎች",
       "checkDetails": "የፍተሻ ዝርዝሮች"
     },
     "inbox": {

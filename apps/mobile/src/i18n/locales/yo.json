@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} ń dúró",
       "skipped": "a fo {{displayCount}} kọjá",
       "checksCount": "àyẹ̀wò {{displayCount}}",
+      "checksCount_one": "àyẹ̀wò {{displayCount}}",
+      "checksCount_other": "àyẹ̀wò {{displayCount}}",
       "checkDetails": "àlàyé àyẹ̀wò"
     },
     "inbox": {

@@ -2388,6 +2388,9 @@
     "checkConnection": "Verifica la connessione",
     "checks": {
       "checksCount": "{{displayCount}} controlli",
+      "checksCount_one": "{{displayCount}} controllo",
+      "checksCount_many": "{{displayCount}} controlli",
+      "checksCount_other": "{{displayCount}} controlli",
       "couldNotLoad": "Impossibile caricare i controlli.",
       "failed": "{{displayCount}} non superati",
       "noAccess": "Non hai accesso ai controlli di questo repository.",

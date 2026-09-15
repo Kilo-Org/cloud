@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} ఇంకా పూర్తి కాలేదు",
       "skipped": "{{displayCount}} దాటవేయబడ్డాయి",
       "checksCount": "{{displayCount}} తనిఖీలు",
+      "checksCount_one": "{{displayCount}} తనిఖీ",
+      "checksCount_other": "{{displayCount}} తనిఖీలు",
       "checkDetails": "తనిఖీ వివరాలు"
     },
     "inbox": {

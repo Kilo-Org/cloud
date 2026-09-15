@@ -349,6 +349,10 @@ export function PrReviewChecksSection({
     );
   }
 
+  // i18n-dup-ok: 'prReview.checks.checksCount_other' repeats the bare
+  // 'prReview.checks.checksCount' by i18next convention — the bare key is the
+  // plural fallback that must carry the `other` copy, so the family is one key
+  // with a plural stem, not two keys for one string.
   return (
     <View className="gap-2">
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">

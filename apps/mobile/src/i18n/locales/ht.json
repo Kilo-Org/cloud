@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} ap tann",
       "skipped": "{{displayCount}} sote",
       "checksCount": "{{displayCount}} verifikasyon",
+      "checksCount_one": "{{displayCount}} verifikasyon",
+      "checksCount_other": "{{displayCount}} verifikasyon",
       "checkDetails": "detay verifikasyon an"
     },
     "inbox": {

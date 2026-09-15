@@ -2374,6 +2374,8 @@
     "checkConnection": "Verbindung prüfen",
     "checks": {
       "checksCount": "{{displayCount}} Prüfungen",
+      "checksCount_one": "{{displayCount}} Prüfung",
+      "checksCount_other": "{{displayCount}} Prüfungen",
       "couldNotLoad": "Die Prüfungen konnten nicht geladen werden.",
       "failed": "{{displayCount}} fehlgeschlagen",
       "noAccess": "Du hast keinen Zugriff auf die Prüfungen dieses Repositorys.",

@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} odottaa",
       "skipped": "{{displayCount}} ohitettu",
       "checksCount": "{{displayCount}} tarkistusta",
+      "checksCount_one": "{{displayCount}} tarkistus",
+      "checksCount_other": "{{displayCount}} tarkistusta",
       "checkDetails": "tarkistuksen tiedot"
     },
     "inbox": {

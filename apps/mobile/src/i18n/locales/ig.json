@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} na-echere",
       "skipped": "{{displayCount}} a hapụrụ",
       "checksCount": "nnwale {{displayCount}}",
+      "checksCount_one": "nnwale {{displayCount}}",
+      "checksCount_other": "nnwale {{displayCount}}",
       "checkDetails": "nkọwa nnwale"
     },
     "inbox": {

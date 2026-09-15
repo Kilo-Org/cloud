@@ -3346,7 +3346,9 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       const kiloConfig = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
         snapshot?: boolean;
       };
-      const opencodeConfig = JSON.parse(result.readyRequest.materialized.env.OPENCODE_CONFIG_CONTENT);
+      const opencodeConfig = JSON.parse(
+        result.readyRequest.materialized.env.OPENCODE_CONFIG_CONTENT
+      );
 
       expect(kiloConfig.snapshot).toBe(false);
       expect(opencodeConfig).toEqual(kiloConfig);

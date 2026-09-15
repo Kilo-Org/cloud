@@ -1,6 +1,8 @@
+import '@/i18n';
+
 import { describe, expect, it } from 'vitest';
 
-import { selectShareReviewPr } from './share-review-pr';
+import { selectShareReviewPr, selectShareReviewPrSubtitle } from './share-review-pr';
 
 const PR_URL = 'https://github.com/octocat/hello-world/pull/42';
 const GITLAB_MR_URL = 'https://gitlab.com/group/sub/repo/-/merge_requests/7';
@@ -107,5 +109,44 @@ describe('selectShareReviewPr', () => {
       repo: 'hello-world',
       number: 42,
     });
+  });
+});
+
+describe('selectShareReviewPrSubtitle', () => {
+  it('numbers a GitLab merge request with the provider separator', () => {
+    expect(
+      selectShareReviewPrSubtitle({ platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 7 })
+    ).toBe('group/sub/repo!7');
+  });
+
+  it('numbers a pasted GitLab merge request with the provider separator', () => {
+    const ref = selectShareReviewPr({
+      text: GITLAB_MR_URL,
+      prReviewEnabled: true,
+      showNewSession: true,
+    });
+    if (ref === null) {
+      throw new Error('expected the GitLab MR URL to parse');
+    }
+    expect(selectShareReviewPrSubtitle(ref)).toBe('group/sub/repo!7');
+  });
+
+  it('keeps the GitHub and Bitbucket identity line', () => {
+    expect(
+      selectShareReviewPrSubtitle({
+        platform: 'github',
+        owner: 'octocat',
+        repo: 'hello-world',
+        number: 42,
+      })
+    ).toBe('octocat/hello-world #42');
+    expect(
+      selectShareReviewPrSubtitle({
+        platform: 'bitbucket',
+        workspace: 'acme',
+        repoSlug: 'api',
+        prId: 42,
+      })
+    ).toBe('acme/api #42');
   });
 });

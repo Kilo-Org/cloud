@@ -23,7 +23,7 @@ import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useHoistedOperationKey } from '@/lib/operation-key';
-import { providerPrRoutePath, providerPrTriple } from '@/lib/pr-review/provider-pr-ref';
+import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
 import {
@@ -50,7 +50,7 @@ import { ShareDestinationList } from './share-destination-list';
 import { isShareCommitEnabled, selectShareGateState } from './share-gate-state';
 import { SharePayloadPreview } from './share-payload-preview';
 import { type SharePayloadValidation, validateSharePayload } from './share-payload-validation';
-import { selectShareReviewPr } from './share-review-pr';
+import { selectShareReviewPr, selectShareReviewPrSubtitle } from './share-review-pr';
 
 type ShareGateSheetProps = {
   shareId: string | undefined;
@@ -409,7 +409,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         <DestinationOptionRow
           icon={GitPullRequest}
           title={t('common.reviewPr')}
-          subtitle={t('share.reviewPrSubtitle', providerPrTriple(reviewPr))}
+          subtitle={selectShareReviewPrSubtitle(reviewPr)}
           accessibilityLabel={t('common.reviewPr')}
           onPress={handleReviewPr}
         />

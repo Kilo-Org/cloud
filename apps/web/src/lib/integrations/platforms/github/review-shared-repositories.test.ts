@@ -54,8 +54,8 @@ jest.mock('@octokit/rest', () => ({
 }));
 import { fetchGitHubRepositories } from './adapter';
 test('REVIEW: fetch repository inventory for an exact healthy shared association', async () => {
-  // Even allowing the SQL query to return the shared row, the real runtime
-  // predicate rejects it; the actual SQL also filters shared rows out.
+  // End-to-end through the real adapter: with a non-empty expectedIntegrationId, the shared
+  // (web_cloud_agent) canonical installation must be authorized and the inventory fetched.
   await expect(
     fetchGitHubRepositories('123456', 'standard', '00000000-0000-4000-8000-000000000002')
   ).resolves.toHaveLength(1);

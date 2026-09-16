@@ -572,6 +572,8 @@
       "pending": "รอดำเนินการ {{displayCount}} รายการ",
       "skipped": "ข้าม {{displayCount}} รายการ",
       "checksCount": "การตรวจสอบ {{displayCount}} รายการ",
+      "checksCount_one": "การตรวจสอบ {{displayCount}} รายการ",
+      "checksCount_other": "การตรวจสอบ {{displayCount}} รายการ",
       "checkDetails": "รายละเอียดการตรวจสอบ"
     },
     "inbox": {

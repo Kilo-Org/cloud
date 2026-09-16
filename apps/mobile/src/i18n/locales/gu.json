@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} બાકી",
       "skipped": "{{displayCount}} છોડેલી",
       "checksCount": "{{displayCount}} તપાસો",
+      "checksCount_one": "{{displayCount}} તપાસ",
+      "checksCount_other": "{{displayCount}} તપાસો",
       "checkDetails": "તપાસની વિગતો"
     },
     "inbox": {

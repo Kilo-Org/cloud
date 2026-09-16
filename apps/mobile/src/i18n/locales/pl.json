@@ -2402,6 +2402,10 @@
     "checkConnection": "Sprawdź połączenie",
     "checks": {
       "checksCount": "kontrole: {{displayCount}}",
+      "checksCount_one": "kontrola: {{displayCount}}",
+      "checksCount_few": "kontrole: {{displayCount}}",
+      "checksCount_many": "kontroli: {{displayCount}}",
+      "checksCount_other": "kontrole: {{displayCount}}",
       "couldNotLoad": "Nie udało się wczytać kontroli.",
       "failed": "nieudane: {{displayCount}}",
       "noAccess": "Nie masz dostępu do kontroli tego repozytorium.",

@@ -577,6 +577,9 @@
       "pending": "na čekanju: {{displayCount}}",
       "skipped": "preskočeno: {{displayCount}}",
       "checksCount": "provjera: {{displayCount}}",
+      "checksCount_one": "provjera: {{displayCount}}",
+      "checksCount_few": "provjere: {{displayCount}}",
+      "checksCount_other": "provjera: {{displayCount}}",
       "checkDetails": "detalji provjere"
     },
     "inbox": {

@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} په تمه",
       "skipped": "{{displayCount}} پرېښودل شوې",
       "checksCount": "{{displayCount}} ازموینې",
+      "checksCount_one": "{{displayCount}} ازموینه",
+      "checksCount_other": "{{displayCount}} ازموینې",
       "checkDetails": "د ازموینې جزئیات"
     },
     "inbox": {

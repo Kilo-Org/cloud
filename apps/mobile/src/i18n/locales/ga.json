@@ -587,6 +587,11 @@
       "pending": "{{displayCount}} ar feitheamh",
       "skipped": "{{displayCount}} scipeáilte",
       "checksCount": "seiceálacha: {{displayCount}}",
+      "checksCount_one": "seiceáil: {{displayCount}}",
+      "checksCount_two": "sheiceáil: {{displayCount}}",
+      "checksCount_few": "seiceálacha: {{displayCount}}",
+      "checksCount_many": "seiceálacha: {{displayCount}}",
+      "checksCount_other": "seiceálacha: {{displayCount}}",
       "checkDetails": "sonraí seiceála"
     },
     "inbox": {

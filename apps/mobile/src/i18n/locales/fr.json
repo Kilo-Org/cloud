@@ -2388,6 +2388,9 @@
     "checkConnection": "Vérifier la connexion",
     "checks": {
       "checksCount": "{{displayCount}} vérifications",
+      "checksCount_one": "{{displayCount}} vérification",
+      "checksCount_many": "{{displayCount}} vérifications",
+      "checksCount_other": "{{displayCount}} vérifications",
       "couldNotLoad": "Impossible de charger les vérifications.",
       "failed": "{{displayCount}} en échec",
       "noAccess": "Vous n'avez pas accès aux vérifications de ce dépôt.",

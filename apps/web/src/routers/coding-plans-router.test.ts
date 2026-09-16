@@ -535,7 +535,7 @@ describe('coding plans router', () => {
 
     expect(request).toHaveBeenCalledTimes(1);
     for (const call of request.mock.calls) {
-      expect(call[0]).toBe('https://www.minimax.io/v1/token_plan/remains');
+      expect(call[0]).toBe('https://api.minimax.io/v1/token_plan/remains');
       expect(call[1]?.headers).toEqual(
         expect.objectContaining({ Authorization: `Bearer ${managedKey}` })
       );

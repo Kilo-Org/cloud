@@ -8,13 +8,10 @@ import {
   type CodingPlanQuotaWindow,
 } from '@/lib/coding-plans/usage-contract';
 
-const MINIMAX_USAGE_URLS = [
-  'https://www.minimax.io/v1/token_plan/remains',
-  'https://api.minimax.io/v1/token_plan/remains',
-] as const;
+const MINIMAX_USAGE_URL = 'https://api.minimax.io/v1/token_plan/remains';
 const MINIMAX_USAGE_TIMEOUT_MS = 5_000;
 
-const NativePercentSchema = z.number().finite();
+const NativePercentSchema = z.number().finite().min(0).max(100);
 const NativeIntegerSchema = z.number().int().safe();
 
 const MiniMaxModelRemainsSchema = z.object({
@@ -31,14 +28,13 @@ const MiniMaxModelRemainsSchema = z.object({
   current_weekly_status: NativeIntegerSchema.optional(),
 });
 
-// `model_remains` is optional so a non-zero application status without quota
-// rows still parses and maps to an `application` failure instead of
-// `invalid_response`.
+// MiniMax returns `model_remains: null` with a zero status code when it holds
+// no quota rows for the key, so the field must accept null as well as absence.
 const MiniMaxUsageResponseSchema = z.object({
   base_resp: z.object({
     status_code: NativeIntegerSchema,
   }),
-  model_remains: z.array(MiniMaxModelRemainsSchema).max(64).optional(),
+  model_remains: z.array(MiniMaxModelRemainsSchema).max(64).nullish(),
 });
 
 type MiniMaxModelRemains = z.infer<typeof MiniMaxModelRemainsSchema>;
@@ -64,39 +60,22 @@ function quotaWindow(input: {
 
   const boost =
     input.boostPermille !== undefined && input.boostPermille > 0 ? input.boostPermille / 1000 : 1;
-  const percent = Math.min(100, Math.max(0, input.percent));
   const startsAt = isoTimestamp(input.start);
   return {
     id: input.id,
-    remainingPercent: input.status === 2 ? 0 : percent * boost,
+    remainingPercent: input.status === 2 ? 0 : input.percent * boost,
     resetsAt,
     ...(startsAt ? { startsAt } : {}),
     period: input.period,
   };
 }
 
-const AGGREGATE_MODEL_NAME = 'general';
-
-function isMiniMaxModelRow(modelName: string): boolean {
-  return /^minimax-m/i.test(modelName.trim());
-}
-
 function normalizeUsage(rows: MiniMaxModelRemains[]): CodingPlanQuotaWindow[] {
-  const aggregateRows = rows.filter(
-    row => row.model_name.trim().toLowerCase() === AGGREGATE_MODEL_NAME
-  );
-  // MiniMax has returned the aggregate pool under `general` and, on the
-  // gateway host, under the `MiniMax-M*` family name. Accept both, but keep
-  // rejecting ambiguous responses that carry several `general` rows.
-  const aggregate =
-    aggregateRows.length === 1
-      ? aggregateRows[0]
-      : aggregateRows.length === 0
-        ? rows.find(row => isMiniMaxModelRow(row.model_name))
-        : undefined;
-  if (!aggregate) {
+  const aggregateRows = rows.filter(row => row.model_name === 'general');
+  if (aggregateRows.length !== 1) {
     throw new CodingPlanUsageError('invalid_response');
   }
+  const aggregate = aggregateRows[0];
   const windows = [
     quotaWindow({
       id: 'short_term',
@@ -124,8 +103,8 @@ function normalizeUsage(rows: MiniMaxModelRemains[]): CodingPlanQuotaWindow[] {
   return result.data;
 }
 
-async function fetchUsageJson(url: string, apiKey: string): Promise<unknown> {
-  const response = await fetch(url, {
+export async function getMiniMaxUsage(apiKey: string) {
+  const response = await fetch(MINIMAX_USAGE_URL, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -143,33 +122,22 @@ async function fetchUsageJson(url: string, apiKey: string): Promise<unknown> {
     throw new CodingPlanUsageError('http');
   }
 
-  return response.json().catch(() => {
+  const json: unknown = await response.json().catch(() => {
     throw new CodingPlanUsageError('invalid_response');
   });
-}
-
-export async function getMiniMaxUsage(apiKey: string) {
-  let failure: CodingPlanUsageError | undefined;
-
-  for (const url of MINIMAX_USAGE_URLS) {
-    try {
-      const json = await fetchUsageJson(url, apiKey);
-      const result = MiniMaxUsageResponseSchema.safeParse(json);
-      if (!result.success) {
-        throw new CodingPlanUsageError('invalid_response');
-      }
-      if (result.data.base_resp.status_code !== 0) {
-        throw new CodingPlanUsageError('application');
-      }
-      return {
-        fetchedAt: new Date().toISOString(),
-        windows: normalizeUsage(result.data.model_remains ?? []),
-      };
-    } catch (error) {
-      if (!(error instanceof CodingPlanUsageError)) throw error;
-      failure ??= error;
-    }
+  const result = MiniMaxUsageResponseSchema.safeParse(json);
+  if (!result.success) {
+    throw new CodingPlanUsageError('invalid_response');
   }
-
-  throw failure ?? new CodingPlanUsageError('invalid_response');
+  if (result.data.base_resp.status_code !== 0) {
+    throw new CodingPlanUsageError('application');
+  }
+  const rows = result.data.model_remains ?? [];
+  if (rows.length === 0) {
+    throw new CodingPlanUsageError('subscription_inactive');
+  }
+  return {
+    fetchedAt: new Date().toISOString(),
+    windows: normalizeUsage(rows),
+  };
 }

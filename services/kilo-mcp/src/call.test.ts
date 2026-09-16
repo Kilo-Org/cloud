@@ -30,6 +30,48 @@ const testCatalog: Catalog = {
     searchBlob:
       'cliSessions.search Search the user CLI sessions by keyword. clisessions search query limit',
   },
+  'organizations.create': {
+    path: 'organizations.create',
+    kind: 'mutation',
+    summary: 'Create an organization.',
+    inputSchema: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      properties: { name: { type: 'string', minLength: 1 } },
+      required: ['name'],
+      additionalProperties: false,
+    },
+    tags: ['organizations'],
+    searchBlob: 'organizations.create Create an organization. organizations create name',
+  },
+  'cliSessions.revokeAll': {
+    path: 'cliSessions.revokeAll',
+    kind: 'mutation',
+    summary: 'Revoke every CLI session for the user.',
+    inputSchema: {},
+    tags: ['clisessions'],
+    searchBlob: 'cliSessions.revokeAll Revoke every CLI session for the user. clisessions revoke',
+  },
+  // A void-returning mutation, like the real agentProfiles.bindToRepo: its tRPC
+  // success body is `{"result":{}}` because JSON.stringify drops `undefined`.
+  'agentProfiles.bindToRepo': {
+    path: 'agentProfiles.bindToRepo',
+    kind: 'mutation',
+    summary: 'Bind an agent profile to a repository.',
+    inputSchema: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      properties: {
+        profileId: { type: 'string', minLength: 1 },
+        repoFullName: { type: 'string', minLength: 1 },
+      },
+      required: ['profileId', 'repoFullName'],
+      additionalProperties: false,
+    },
+    tags: ['agentprofiles'],
+    searchBlob:
+      'agentProfiles.bindToRepo Bind an agent profile to a repository. agentprofiles bind repo',
+  },
 };
 
 const auth: ForwardedAuth = {
@@ -181,6 +223,155 @@ describe('callCatalogEndpoint', () => {
     expect(headers['x-kilocode-organizationid']).toBe('org-uuid-1');
   });
 
+  it('forwards a valid mutation as a POST with a JSON body, no input param, and the same headers as the GET case', async () => {
+    const fetchImpl = vi.fn(async () => upstreamResponse({ result: { data: { id: 'org-new' } } }));
+    const outcome = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'organizations.create',
+      input: { name: 'acme' },
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    });
+    expect(outcome).toEqual({ text: '{"id":"org-new"}', truncated: false });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    const parsed = new URL(url);
+    expect(parsed.origin).toBe(WEB_BASE_URL);
+    expect(parsed.pathname).toBe('/api/trpc/organizations.create');
+    // tRPC accepts a mutation only on POST, so the input must not ride the URL.
+    expect(parsed.searchParams.has('input')).toBe(false);
+    expect(init.method).toBe('POST');
+    const headers = init.headers as Record<string, string>;
+    expect(headers['Content-Type']).toBe('application/json');
+    expect(headers['Accept']).toBe('application/json');
+    expect(headers['Authorization']).toBe('Bearer tok_123');
+    expect(headers['x-kilocode-organizationid']).toBe('org-uuid-1');
+    expect(init.body).toBe('{"name":"acme"}');
+  });
+
+  it('posts {} for a no-input mutation (an empty body would be a 400)', async () => {
+    const fetchImpl = vi.fn(async () => upstreamResponse({ result: { data: { revoked: 3 } } }));
+    const outcome = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'cliSessions.revokeAll',
+      input: undefined,
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    });
+    expect(outcome).toEqual({ text: '{"revoked":3}', truncated: false });
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(new URL(url).searchParams.has('input')).toBe(false);
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe('{}');
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+  });
+
+  it('rejects schema-invalid mutation input before any request', async () => {
+    const fetchImpl = vi.fn();
+    const error = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'organizations.create',
+      input: { name: '' },
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonRpcFailure);
+    expect((error as JsonRpcFailure).code).toBe(-32602);
+    expect((error as Error).message).toContain('published schema');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('treats a void mutation result as success: {"result":{}} is not a missing body', async () => {
+    // tRPC serializes a void procedure to `{"result":{}}` (JSON.stringify drops
+    // the undefined `data` field), and the published bindToRepo/unbindRepo
+    // mutations return nothing. Reporting an error after the write landed would
+    // make an agent re-apply it.
+    const fetchImpl = vi.fn(async () => upstreamResponse({ result: {} }));
+    const outcome = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'agentProfiles.bindToRepo',
+      input: { profileId: 'prof-1', repoFullName: 'acme/widgets' },
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    });
+    expect(outcome).toEqual({ text: 'null', truncated: false });
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(new URL(url).searchParams.has('input')).toBe(false);
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe('{"profileId":"prof-1","repoFullName":"acme/widgets"}');
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+  });
+
+  it('a mutation network failure is ambiguous, never a blind retry, and leaks no token', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError('fetch failed: https://tok_123@secret.invalid');
+    });
+    const error = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'organizations.create',
+      input: { name: 'acme' },
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonRpcFailure);
+    expect((error as JsonRpcFailure).data).toMatchObject({ ambiguous: true });
+    // Ambiguous is not retryable: the mutation may have landed.
+    expect((error as JsonRpcFailure).data?.['retryable']).toBeUndefined();
+    expect((error as Error).message).toContain('may or may not have been applied');
+    expect((error as Error).message).toContain('check the current state');
+    expect((error as Error).message).not.toContain('Retry the call');
+    expect((error as Error).message).not.toContain('tok_123');
+  });
+
+  it('maps a mutation upstream 4xx to a JSON-RPC error preserving code and httpStatus, and a corrected retry succeeds', async () => {
+    const fetchImpl = vi.fn(async () =>
+      upstreamResponse(
+        {
+          error: {
+            message: 'Organization name already taken',
+            code: -32004,
+            data: { code: 'CONFLICT', httpStatus: 409, path: 'organizations.create' },
+          },
+        },
+        409
+      )
+    );
+    const error = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'organizations.create',
+      input: { name: 'acme' },
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonRpcFailure);
+    expect((error as JsonRpcFailure).message).toBe('Organization name already taken');
+    expect((error as JsonRpcFailure).data).toMatchObject({
+      trpcCode: 'CONFLICT',
+      httpStatus: 409,
+    });
+    // The app answered, so the outcome is known: no ambiguity wording.
+    expect((error as Error).message).not.toContain('may or may not');
+
+    // a corrected retry succeeds
+    const retryFetch = vi.fn(async () => upstreamResponse({ result: { data: { id: 'org-new' } } }));
+    await expect(
+      callCatalogEndpoint({
+        catalog: testCatalog,
+        path: 'organizations.create',
+        input: { name: 'acme-2' },
+        auth,
+        webBaseUrl: WEB_BASE_URL,
+        fetchImpl: retryFetch,
+      })
+    ).resolves.toEqual({ text: '{"id":"org-new"}', truncated: false });
+  });
+
   it('omits the input param for a no-input procedure called without input', async () => {
     const fetchImpl = vi.fn(async () => upstreamResponse({ result: { data: [{ id: 'org-1' }] } }));
     const outcome = await callCatalogEndpoint({
@@ -270,6 +461,9 @@ describe('callCatalogEndpoint', () => {
     }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(JsonRpcFailure);
     expect((error as JsonRpcFailure).data).toMatchObject({ retryable: true });
+    // A GET changed nothing, so a blind retry is safe and the message says so.
+    expect((error as Error).message).toContain('Retry the call');
+    expect((error as JsonRpcFailure).data?.['ambiguous']).toBeUndefined();
     expect((error as Error).message).not.toContain('tok_123');
   });
 
@@ -283,6 +477,117 @@ describe('callCatalogEndpoint', () => {
         auth,
         webBaseUrl: WEB_BASE_URL,
         fetchImpl,
+      })
+    ).rejects.toThrow(/without a tRPC result body/);
+  });
+
+  it('reports a mutation gateway 5xx with no tRPC error body as ambiguous, never a blind retry', async () => {
+    // app.kilo.ai answers a function timeout with a non-tRPC 504
+    // (FUNCTION_INVOCATION_TIMEOUT) or a 502 at the edge. The POST reached the
+    // platform, so the write may have landed: the agent must check state, not
+    // retry. The same holds for a JSON body that is not a tRPC error envelope.
+    const bodies: Array<() => Response> = [
+      () => new Response('bad gateway', { status: 502 }),
+      () => new Response('An error occurred with your deployment', { status: 504 }),
+      () => upstreamResponse({ error: 'FUNCTION_INVOCATION_TIMEOUT' }, 504),
+    ];
+    for (const makeResponse of bodies) {
+      const fetchImpl = vi.fn(async () => makeResponse());
+      const error = await callCatalogEndpoint({
+        catalog: testCatalog,
+        path: 'organizations.create',
+        input: { name: 'acme' },
+        auth,
+        webBaseUrl: WEB_BASE_URL,
+        fetchImpl,
+      }).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(JsonRpcFailure);
+      expect((error as JsonRpcFailure).data).toMatchObject({
+        path: 'organizations.create',
+        ambiguous: true,
+      });
+      // Ambiguous is not retryable: the mutation may have applied.
+      expect((error as JsonRpcFailure).data?.['retryable']).toBeUndefined();
+      expect((error as Error).message).toContain('may or may not have been applied');
+      expect((error as Error).message).toContain('check the current state');
+      expect((error as JsonRpcFailure).data?.['httpStatus']).toBeUndefined();
+    }
+  });
+
+  it('leaves a query gateway 5xx without a tRPC error body as an ordinary upstream error', async () => {
+    // A GET changed nothing, so the retry guidance stays honest and non-ambiguous.
+    const fetchImpl = vi.fn(async () => new Response('bad gateway', { status: 502 }));
+    const error = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'organizations.list',
+      input: undefined,
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonRpcFailure);
+    expect((error as Error).message).toContain('failed with HTTP 502');
+    expect((error as JsonRpcFailure).data?.['ambiguous']).toBeUndefined();
+  });
+
+  it('reports a mutation 2xx body it cannot read as ambiguous instead of a false failure', async () => {
+    // A landed write whose success body cannot be parsed must not read as a
+    // failure, or the agent re-applies the mutation.
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input');
+      },
+    }));
+    const error = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'organizations.create',
+      input: { name: 'acme' },
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonRpcFailure);
+    expect((error as JsonRpcFailure).data).toMatchObject({
+      path: 'organizations.create',
+      ambiguous: true,
+    });
+    expect((error as Error).message).toContain('may or may not have been applied');
+    expect((error as Error).message).not.toContain('without a tRPC result body');
+  });
+
+  it('reports a mutation 2xx body without a tRPC result as ambiguous, not a false failure', async () => {
+    const fetchImpl = vi.fn(async () => upstreamResponse({ nonsense: true }));
+    const error = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'organizations.create',
+      input: { name: 'acme' },
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonRpcFailure);
+    expect((error as JsonRpcFailure).data).toMatchObject({ ambiguous: true });
+    expect((error as Error).message).toContain('may or may not have been applied');
+  });
+
+  it('reports a query 2xx body it cannot read as the existing missing-result error', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input');
+      },
+    }));
+    await expect(
+      callCatalogEndpoint({
+        catalog: testCatalog,
+        path: 'organizations.list',
+        input: undefined,
+        auth,
+        webBaseUrl: WEB_BASE_URL,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
       })
     ).rejects.toThrow(/without a tRPC result body/);
   });

@@ -117,7 +117,7 @@ const TOOLS = [
   {
     name: 'search',
     description:
-      'Search the Kilo API catalog for endpoints that match a task. ALWAYS run search first: the call tool only accepts paths this catalog publishes, and search returns the path, summary, and input schema you need for the call.',
+      'Search the Kilo API catalog for endpoints that match a task. ALWAYS run search first: the call tool only accepts paths this catalog publishes, and search returns the path, summary, and input schema you need for the call. Every result carries a kind: "query" reads data, "mutation" changes it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -139,7 +139,7 @@ const TOOLS = [
   {
     name: 'call',
     description:
-      'Call a Kilo API endpoint by its catalog path. Run search first to find a valid path and its input schema — paths outside the catalog and inputs that violate the published schema are rejected before any request is made.',
+      'Call a Kilo API endpoint by its catalog path. Run search first to find a valid path and its input schema — paths outside the catalog and inputs that violate the published schema are rejected before any request is made. A call to a "mutation" path changes data, so call one only when the user asked for that change; if such a call fails with an ambiguous transport error, check the current state before retrying.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -317,7 +317,7 @@ async function handleRpcMessage(
           capabilities: { tools: {} },
           serverInfo: SERVER_INFO,
           instructions:
-            'This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call.',
+            'This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying.',
         });
       }
       case 'ping':

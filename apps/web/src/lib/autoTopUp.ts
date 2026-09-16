@@ -23,12 +23,11 @@ import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-s
 import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
 
 import {
+  AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS,
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
 } from '@/lib/autoTopUpConstants';
-
-const ATTEMPT_LOCK_TIMEOUT_SECONDS = 60 * 60 * 2; // 2 hours (covers delayed webhook delivery)
 
 type AutoTopUpResult = Result<{ stripe_id: string }, string>;
 
@@ -201,7 +200,7 @@ async function performAutoTopUpForEntity(
           isNull(auto_top_up_configs.attempt_started_at),
           lt(
             auto_top_up_configs.attempt_started_at,
-            sql`NOW() - INTERVAL '${sql.raw(String(ATTEMPT_LOCK_TIMEOUT_SECONDS))} second'`
+            sql`NOW() - INTERVAL '${sql.raw(String(AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS))} second'`
           )
         )
       )

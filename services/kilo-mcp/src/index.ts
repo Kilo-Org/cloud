@@ -9,7 +9,7 @@ import {
 } from './analytics';
 import { forwardedAuthFromProps } from './auth';
 import { MCP_SCOPE, scopeTokens } from './auth/http';
-import { callCatalogEndpoint } from './call';
+import { callCatalogEndpoint, serializeWithCap } from './call';
 import { createDefaultHandler } from './oauth/consent';
 import { onError, tokenExchangeCallback } from './oauth/provider-hooks';
 import { createRefreshReuseHandler, isTokenRequest } from './oauth/refresh-reuse';
@@ -201,8 +201,15 @@ type ToolResult = {
   truncated?: true;
 };
 
-function textResult(text: string): ToolResult {
-  return { content: [{ type: 'text', text }] };
+/**
+ * Wrap a capped serialized payload as a tool result, marking it truncated when
+ * the cap cut it so the client knows the text is incomplete.
+ */
+function toolResult(outcome: { text: string; truncated: boolean }): ToolResult {
+  return {
+    content: [{ type: 'text', text: outcome.text }],
+    ...(outcome.truncated ? { truncated: true as const } : {}),
+  };
 }
 
 /** JSON object guard used only to recover the JSON-RPC `id` from a malformed envelope. */
@@ -242,14 +249,17 @@ async function runTool(
     });
     if (results.length === 0) {
       // Empty state, not an error: tell the agent how to recover.
-      return textResult(
-        JSON.stringify({
+      return toolResult(
+        serializeWithCap({
           results: [],
           message: `No endpoints matched "${query.trim()}". Refine your query: use fewer or different keywords, or describe the task in plain language.`,
         })
       );
     }
-    return textResult(JSON.stringify({ results }));
+    // Every hit carries its published input schema, and a 50-row result can
+    // exceed the tool-result cap: cut and mark the payload like the call tool
+    // instead of handing the client an unbounded body.
+    return toolResult(serializeWithCap({ results }));
   }
   if (name === 'call') {
     const parsed = callArgsSchema.safeParse(args);
@@ -268,10 +278,7 @@ async function runTool(
       webBaseUrl: deps.webBaseUrl,
       ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
     });
-    return {
-      content: [{ type: 'text', text: outcome.text }],
-      ...(outcome.truncated ? { truncated: true as const } : {}),
-    };
+    return toolResult(outcome);
   }
   throw new JsonRpcFailure(
     INVALID_PARAMS,

@@ -172,10 +172,14 @@ function shapeRow(leaf: CatalogLeaf, summary: string): CatalogRow {
  * is provided keep it byte-for-byte; the rest come back as `missing` for LLM
  * generation.
  *
- * Rot guard: an allowlisted path that no longer matches a mutation leaf throws
- * (naming the offending paths) instead of vanishing from the catalog. It is
- * scoped to enumerations that actually carry mutations, so a synthetic or
- * query-only leaf set (unit fixtures) has nothing to compare against.
+ * Rot guard: an allowlisted path that does not reach the catalog as a mutation
+ * throws (naming the offending paths) instead of vanishing from the catalog —
+ * whether it was renamed or deleted, its top-level segment is withheld by the
+ * denylist, or its procedure was demoted to a query. The guard therefore
+ * compares the allowlist against the paths that survived the denylist *and*
+ * published with kind `mutation`, and is scoped to enumerations that actually
+ * carry mutations, so a synthetic or query-only leaf set (unit fixtures) has
+ * nothing to compare against.
  */
 export function buildCatalogRows(
   leaves: CatalogLeaf[],
@@ -183,6 +187,8 @@ export function buildCatalogRows(
 ): { rows: CatalogRow[]; missing: CatalogLeaf[] } {
   const denylisted = new Set<string>(DENYLISTED_TOP_LEVEL_SEGMENTS);
   const mutationPaths = new Set<string>();
+  /** Every allowlisted path the catalog will publish with kind `mutation`. */
+  const publishedMutationPaths = new Set<string>();
   const rows: CatalogRow[] = [];
   const missing: CatalogLeaf[] = [];
   for (const leaf of leaves) {
@@ -191,6 +197,9 @@ export function buildCatalogRows(
       leaf.type === 'query' || (leaf.type === 'mutation' && isAllowedMutation(leaf.path));
     if (!kept) continue;
     if (denylisted.has(leaf.path.split('.')[0] ?? '')) continue;
+    // Only a mutation leaf counts: a demoted query leaf must not satisfy the
+    // guard, or an allowlisted path could stop being a mutation unnoticed.
+    if (leaf.type === 'mutation') publishedMutationPaths.add(leaf.path);
     const summary = summaries.get(leaf.path);
     if (typeof summary === 'string' && summary !== '') {
       rows.push(shapeRow(leaf, summary));
@@ -199,11 +208,11 @@ export function buildCatalogRows(
     }
   }
   if (mutationPaths.size > 0) {
-    const stale = MCP_MUTATION_ALLOWLIST.filter(path => !mutationPaths.has(path));
+    const stale = MCP_MUTATION_ALLOWLIST.filter(path => !publishedMutationPaths.has(path));
     if (stale.length > 0) {
       throw new Error(
-        `MCP mutation allowlist entries no longer match a mutation procedure: ${stale.join(', ')}. ` +
-          'A renamed or deleted procedure must never silently vanish from the catalog — ' +
+        `MCP mutation allowlist entries are not published as mutations: ${stale.join(', ')}. ` +
+          'A renamed, deleted, denylisted, or demoted procedure must never silently vanish from the catalog — ' +
           'update MCP_MUTATION_ALLOWLIST in apps/web/src/scripts/mcp-catalog/mutations.ts.'
       );
     }

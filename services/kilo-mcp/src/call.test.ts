@@ -530,6 +530,85 @@ describe('callCatalogEndpoint', () => {
     expect((error as JsonRpcFailure).data?.['ambiguous']).toBeUndefined();
   });
 
+  it('reports a mutation 5xx-class app-level tRPC error as ambiguous, never a blind retry', async () => {
+    // tRPC raises a 5xx-class error AFTER the resolver returned — output
+    // validation, a post-resolver middleware — so a committed write can still
+    // come back as an error envelope. The app answered, but the outcome is
+    // unknown: reporting a known failure here invites a duplicate write.
+    for (const [status, code] of [
+      [500, 'INTERNAL_SERVER_ERROR'],
+      [501, 'NOT_IMPLEMENTED'],
+    ] as const) {
+      const fetchImpl = vi.fn(async () =>
+        upstreamResponse(
+          {
+            error: {
+              message: 'Output validation failed',
+              code: -32603,
+              data: { code, httpStatus: status, path: 'organizations.create' },
+            },
+          },
+          status
+        )
+      );
+      const error = await callCatalogEndpoint({
+        catalog: testCatalog,
+        path: 'organizations.create',
+        input: { name: 'acme' },
+        auth,
+        webBaseUrl: WEB_BASE_URL,
+        fetchImpl,
+      }).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(JsonRpcFailure);
+      expect((error as JsonRpcFailure).data).toMatchObject({
+        path: 'organizations.create',
+        ambiguous: true,
+        httpStatus: status,
+      });
+      // Ambiguous is not retryable, and the tRPC code must not read as a known
+      // upstream failure either: the mutation may have applied.
+      expect((error as JsonRpcFailure).data?.['retryable']).toBeUndefined();
+      expect((error as JsonRpcFailure).data?.['trpcCode']).toBeUndefined();
+      expect((error as Error).message).toContain('may or may not have been applied');
+      expect((error as Error).message).toContain('check the current state');
+      expect((error as Error).message).not.toContain('Retry the call');
+    }
+  });
+
+  it('leaves a query 5xx-class app-level tRPC error as an ordinary upstream error', async () => {
+    // Only a mutation can have landed: a GET changed nothing, so its ordinary
+    // mapping (message, trpcCode, httpStatus) stays and no ambiguity wording
+    // is added.
+    const fetchImpl = vi.fn(async () =>
+      upstreamResponse(
+        {
+          error: {
+            message: 'Something went wrong',
+            code: -32603,
+            data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500, path: 'organizations.list' },
+          },
+        },
+        500
+      )
+    );
+    const error = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'organizations.list',
+      input: undefined,
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonRpcFailure);
+    expect((error as JsonRpcFailure).message).toBe('Something went wrong');
+    expect((error as JsonRpcFailure).data).toMatchObject({
+      trpcCode: 'INTERNAL_SERVER_ERROR',
+      httpStatus: 500,
+    });
+    expect((error as JsonRpcFailure).data?.['ambiguous']).toBeUndefined();
+    expect((error as Error).message).not.toContain('may or may not');
+  });
+
   it('reports a mutation 2xx body it cannot read as ambiguous instead of a false failure', async () => {
     // A landed write whose success body cannot be parsed must not read as a
     // failure, or the agent re-applies the mutation.

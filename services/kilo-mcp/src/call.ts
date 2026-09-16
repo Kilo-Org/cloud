@@ -144,6 +144,25 @@ function ambiguousMutationFailure(path: string): JsonRpcFailure {
 }
 
 /**
+ * The failure for a mutation whose app-level error cannot be pinned to a
+ * pre-write rejection. tRPC raises a 5xx-class error (INTERNAL_SERVER_ERROR,
+ * NOT_IMPLEMENTED) *after* the resolver returned — output validation, a
+ * post-resolver middleware, a serialization failure — so the write can have
+ * committed and still come back as an error envelope. The outcome is unknown:
+ * say so instead of inviting a duplicate write. A 4xx-class tRPC error is a
+ * rejection the app returns before the write (validation, authorization,
+ * not-found, precondition), so it keeps the ordinary mapping. Safe to surface —
+ * no token in it.
+ */
+function ambiguousMutationAppError(path: string, status: number): JsonRpcFailure {
+  return new JsonRpcFailure(
+    INTERNAL_ERROR,
+    `The Kilo API failed on "${path}" (HTTP ${status}). This mutation may or may not have been applied — check the current state before retrying.`,
+    { path, ambiguous: true, httpStatus: status }
+  );
+}
+
+/**
  * Validate `input` against the endpoint's published schema and forward the
  * call to apps/web over its public tRPC transport, chosen by the catalog row's
  * `kind`:
@@ -159,8 +178,13 @@ function ambiguousMutationFailure(path: string): JsonRpcFailure {
  *   failure (a non-2xx with no tRPC error message, like app.kilo.ai's
  *   FUNCTION_INVOCATION_TIMEOUT 504) and a 2xx whose result cannot be read are
  *   the same unknown-outcome case: the POST reached the platform, so a
- *   mutation reports them as ambiguous too. A query keeps its plain upstream
- *   error: a GET changed nothing.
+ *   mutation reports them as ambiguous too. An app-level tRPC error does not
+ *   settle it either: tRPC raises a 5xx-class error after the resolver returned
+ *   (output validation, post-resolver middleware), so a committed write can
+ *   come back as an error envelope — a mutation reports a 5xx-class tRPC error
+ *   as ambiguous as well. A 4xx-class tRPC error is raised before the write
+ *   (validation, authorization, not-found, precondition) and keeps the ordinary
+ *   mapping. A query keeps its plain upstream error: a GET changed nothing.
  *
  * apps/web resolves identity from the forwarded bearer and the organization
  * header — both come from the verified grant props (see
@@ -280,11 +304,22 @@ export async function callCatalogEndpoint(options: {
     // FUNCTION_INVOCATION_TIMEOUT 504, a 502 edge error — comes back non-2xx
     // with no tRPC error message. The POST reached the platform, so the write
     // may have landed: report it as ambiguous, like a rejected fetch, instead
-    // of an ordinary upstream error that invites a blind retry. An app-level
-    // tRPC error response answered the request, so its outcome is known and it
-    // keeps the ordinary mapping (queries are never ambiguous).
-    if (row.kind === 'mutation' && !hasTrpcErrorMessage(body as TrpcErrorBody | null)) {
-      throw ambiguousMutationFailure(path);
+    // of an ordinary upstream error that invites a blind retry.
+    //
+    // An app-level tRPC error is not proof the write did not land either: tRPC
+    // raises a 5xx-class error AFTER the resolver returned (output validation,
+    // a post-resolver middleware), so a committed mutation can still come back
+    // as an error envelope. A 4xx-class tRPC error is a rejection raised before
+    // the write, so it keeps the ordinary mapping. Queries are never ambiguous.
+    if (row.kind === 'mutation') {
+      if (hasTrpcErrorMessage(body as TrpcErrorBody | null)) {
+        // The app answered: a 5xx-class error can have landed the write, so it
+        // is ambiguous; a 4xx-class error was raised before the write and keeps
+        // the ordinary mapping below.
+        if (response.status >= 500) throw ambiguousMutationAppError(path, response.status);
+      } else {
+        throw ambiguousMutationFailure(path);
+      }
     }
     throw toTrpcFailure(response.status, body as TrpcErrorBody, path);
   }

@@ -401,6 +401,79 @@ describe('tools/call search', () => {
       expect('result' in (json as Record<string, unknown>)).toBe(true);
     }
   });
+
+  it('caps a search payload over the tool-result cap and marks it truncated', async () => {
+    // Every hit now carries its full input schema, so a result set can exceed
+    // the cap the call tool already enforces: the payload must be cut and
+    // marked, never handed to the client unbounded.
+    const big = 'z'.repeat(20_000);
+    const blobCatalog: Catalog = {
+      'blob.get': {
+        path: 'blob.get',
+        kind: 'query',
+        summary: 'Get the stored blob.',
+        inputSchema: {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: { blob: { type: 'string', examples: [big] } },
+        },
+        tags: ['blob'],
+        searchBlob: 'blob.get Get the stored blob. blob get',
+      },
+    };
+    const response = await rpc(
+      createMcpHandler({ catalog: blobCatalog, webBaseUrl: 'https://app.kilo.ai' }),
+      {
+        jsonrpc: '2.0',
+        id: 22,
+        method: 'tools/call',
+        params: { name: 'search', arguments: { query: 'stored blob' } },
+      }
+    );
+    const result = (
+      (await response.json()) as {
+        result: { content: Array<{ text: string }>; truncated?: boolean };
+      }
+    ).result;
+    expect(result.truncated).toBe(true);
+    expect(result.content[0]!.text.endsWith('[truncated]')).toBe(true);
+    expect(new TextEncoder().encode(result.content[0]!.text).byteLength).toBeLessThanOrEqual(
+      16 * 1024
+    );
+  });
+
+  it('caps the empty-results payload too', async () => {
+    // The empty state echoes the query back, and the query has no length bound,
+    // so that payload must be capped as well.
+    const { json } = await rpcResult({
+      jsonrpc: '2.0',
+      id: 23,
+      method: 'tools/call',
+      params: { name: 'search', arguments: { query: 'z'.repeat(20_000) } },
+    });
+    const result = (json as { result: { content: Array<{ text: string }>; truncated?: boolean } })
+      .result;
+    expect(result.truncated).toBe(true);
+    expect(result.content[0]!.text.endsWith('[truncated]')).toBe(true);
+    expect(new TextEncoder().encode(result.content[0]!.text).byteLength).toBeLessThanOrEqual(
+      16 * 1024
+    );
+  });
+
+  it('does not mark a small search payload truncated', async () => {
+    const { json } = await rpcResult({
+      jsonrpc: '2.0',
+      id: 24,
+      method: 'tools/call',
+      params: { name: 'search', arguments: { query: 'organizations list' } },
+    });
+    const result = (json as { result: { content: Array<{ text: string }>; truncated?: boolean } })
+      .result;
+    expect(result.truncated).toBeUndefined();
+    // The payload stays parseable JSON, so the agent can build the call.
+    const payload = JSON.parse(result.content[0]!.text) as { results: unknown[] };
+    expect(payload.results.length).toBeGreaterThan(0);
+  });
 });
 
 describe('tools/call call', () => {
@@ -1233,6 +1306,46 @@ describe('analytics wiring (s2)', () => {
     await post(handler, {
       jsonrpc: '2.0',
       id: 17,
+      method: 'tools/call',
+      params: { name: 'call', arguments: { path: 'teams.create', input: { name: 'core' } } },
+    });
+    await settle(promises);
+
+    const toolEvents = eventsNamed(captured, 'kilo_mcp_tool_called');
+    expect(toolEvents).toHaveLength(1);
+    expect(propertiesOf(toolEvents[0]!)).toMatchObject({
+      tool: 'call',
+      path: 'teams.create',
+      success: false,
+      errorClass: 'upstream_unreachable_ambiguous',
+    });
+    expect(eventsNamed(captured, 'kilo_mcp_call_rejected')).toHaveLength(0);
+  });
+
+  it('a mutation app-level 5xx error emits upstream_unreachable_ambiguous, not upstream_error', async () => {
+    // The app answered, but a 5xx-class tRPC error can follow a committed
+    // write: the class must say the outcome is unknown, not that the request
+    // failed cleanly.
+    const upstream = vi.fn(() =>
+      Promise.resolve(
+        Response.json(
+          {
+            error: {
+              message: 'Output validation failed',
+              code: -32603,
+              data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500, path: 'teams.create' },
+            },
+          },
+          { status: 500 }
+        )
+      )
+    );
+    const { captured, promises, handler } = createHarness({
+      upstreamFetchImpl: upstream as unknown as typeof fetch,
+    });
+    await post(handler, {
+      jsonrpc: '2.0',
+      id: 18,
       method: 'tools/call',
       params: { name: 'call', arguments: { path: 'teams.create', input: { name: 'core' } } },
     });

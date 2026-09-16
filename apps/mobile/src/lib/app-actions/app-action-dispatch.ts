@@ -6,8 +6,6 @@
 // async and reports a real outcome — `StartAgent` is the only action that can
 // fail in a way the caller has to hear about.
 
-import * as Sentry from '@sentry/react-native';
-
 import { i18n } from '@/i18n';
 
 import {
@@ -16,20 +14,21 @@ import {
   type AppActionResult,
   parseAppActionPayload,
 } from './app-action-contract';
-import { registerNativeAppActionDispatcher } from './native-bridge';
 import { setPendingAppAction } from './pending-app-action';
 
 /** The `StartAgent` request without its discriminant: what `start-agent.ts` takes. */
 type StartAgentInput = Omit<Extract<AppActionRequest, { action: 'StartAgent' }>, 'action'>;
 
 /**
- * The headless create, owned by `start-agent.ts`.
+ * The headless create, the native bridge, and Sentry — loaded on demand rather
+ * than imported.
  *
- * Loaded on demand rather than imported: `index.js` registers this dispatcher at
- * boot, before any screen mounts, and a static import would evaluate the create
- * module — its tRPC client, outbox and query graph — on every launch, including
- * the ones that run no action. The app's other native surfaces load the same way
- * (`notifications.ts`, `deep-link-launch.ts`).
+ * `index.js` registers this dispatcher at boot, before any screen mounts, and
+ * the tabs layout imports it on every launch. A static import would evaluate
+ * the create module (its tRPC client, outbox and query graph), the native
+ * bridge's optional module lookup, and Sentry's React Native graph on every one
+ * of those launches, including the ones that run no action and the screens that
+ * mount without one failing.
  */
 export type AppActionDispatcherDeps = {
   startAgent: (input: StartAgentInput) => Promise<AppActionResult>;
@@ -37,15 +36,24 @@ export type AppActionDispatcherDeps = {
 
 const defaultDeps: AppActionDispatcherDeps = {
   startAgent: async input => {
-    const startAgent = loadStartAgent();
-    const result = await startAgent(input);
-    return result;
+    const { startAgent } = await import('./start-agent');
+    return startAgent(input);
   },
 };
 
-function loadStartAgent(): AppActionDispatcherDeps['startAgent'] {
-  // eslint-disable-next-line typescript-eslint/no-require-imports, typescript-eslint/no-var-requires, unicorn/prefer-module -- lazy boot-graph load; see above
-  return (require('./start-agent') as AppActionDispatcherDeps).startAgent;
+/**
+ * Reports one error to Sentry. A failed report is swallowed: it is cosmetic,
+ * and must not mask the dispatch outcome it is reporting.
+ */
+async function captureAppActionError(error: unknown, operation: string): Promise<void> {
+  try {
+    const { captureException } = await import('@sentry/react-native');
+    captureException(error, {
+      tags: { 'error.subsystem': 'app_actions', 'error.operation': operation },
+    });
+  } catch {
+    // Reporting is cosmetic; a failed report must not mask the dispatch outcome.
+  }
 }
 
 /**
@@ -116,9 +124,7 @@ async function runStartAgent(
   try {
     return await deps.startAgent(input);
   } catch (error) {
-    Sentry.captureException(error, {
-      tags: { 'error.subsystem': 'app_actions', 'error.operation': 'start_agent' },
-    });
+    await captureAppActionError(error, 'start_agent');
     return {
       ok: false,
       action: 'StartAgent',
@@ -140,17 +146,26 @@ async function runStartAgent(
  */
 export async function registerAppActionDispatcher(): Promise<void> {
   try {
-    const buffered = await registerNativeAppActionDispatcher(handleNativeAppActionPayload);
+    const { registerNativeAppActionDispatcher } = await import('./native-bridge');
+    const { handle, buffered } = await registerNativeAppActionDispatcher(
+      handleNativeAppActionPayload
+    );
     // Replayed in arrival order: a StartAgent has to finish — and park the
-    // session it created — before the request behind it acts.
-    for (const request of buffered) {
-      // eslint-disable-next-line no-await-in-loop -- arrival order is the contract
-      await dispatchAppActionRequest(request);
+    // session it created — before the request behind it acts. Each one runs
+    // through the registered handler, so a payload that arrived while the app
+    // was cold answers its waiting caller exactly like a live dispatch.
+    for (const payload of buffered) {
+      try {
+        // eslint-disable-next-line no-await-in-loop -- arrival order is the contract
+        await handle(payload);
+      } catch {
+        // A buffered payload the contract does not recognize is dropped rather
+        // than failing the replay: the buffer is a delivery buffer, not a
+        // validation surface.
+      }
     }
   } catch (error) {
-    Sentry.captureException(error, {
-      tags: { 'error.subsystem': 'app_actions', 'error.operation': 'register_dispatcher' },
-    });
+    await captureAppActionError(error, 'register_dispatcher');
   }
 }
 

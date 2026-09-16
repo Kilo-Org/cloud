@@ -133,6 +133,16 @@ describe('dispatchAppActionRequest', () => {
 });
 
 describe('registerAppActionDispatcher', () => {
+  /** The mock bridge echoing the dispatcher-registration shape the real one returns. */
+  function mockRegistration(buffered: unknown[]): void {
+    mocks.registerNativeAppActionDispatcher.mockImplementation(
+      (handler: (payload: unknown) => Promise<AppActionResult>) => ({
+        handle: handler,
+        buffered,
+      })
+    );
+  }
+
   it('replays the buffered payloads in order and keeps dispatching in-app', async () => {
     const parked: AppActionRequest[] = [];
     const unsubscribe = subscribePendingAppAction(() => {
@@ -141,7 +151,7 @@ describe('registerAppActionDispatcher', () => {
         parked.push(request);
       }
     });
-    mocks.registerNativeAppActionDispatcher.mockResolvedValue([
+    mockRegistration([
       { action: 'OpenPullRequest', pullRequest: 'https://github.com/o/r/pull/7' },
       { action: 'OpenSession', sessionId: 'ses_last' },
     ]);
@@ -154,13 +164,19 @@ describe('registerAppActionDispatcher', () => {
     unsubscribe();
   });
 
+  it('drops a buffered payload the contract rejects and still replays the rest', async () => {
+    mockRegistration([{ action: 'NotAnAction' }, { action: 'OpenSession', sessionId: 'ses_2' }]);
+    await registerAppActionDispatcher();
+    expect(takePendingAppAction()).toEqual({ action: 'OpenSession', sessionId: 'ses_2' });
+  });
+
   it('answers the live payloads the native module hands the registered handler', async () => {
     const registered: ((payload: unknown) => Promise<AppActionResult>)[] = [];
     mocks.registerNativeAppActionDispatcher.mockImplementation(
       async (handler: (payload: unknown) => Promise<AppActionResult>) => {
         registered.push(handler);
         await Promise.resolve();
-        return [];
+        return { handle: handler, buffered: [] };
       }
     );
     await registerAppActionDispatcher();
@@ -177,7 +193,7 @@ describe('registerAppActionDispatcher', () => {
   });
 
   it('works with no native module at all', async () => {
-    mocks.registerNativeAppActionDispatcher.mockResolvedValue([]);
+    mockRegistration([]);
     await expect(registerAppActionDispatcher()).resolves.toBeUndefined();
     await expect(
       dispatchAppActionRequest({ action: 'OpenSession', sessionId: 'ses_1' })

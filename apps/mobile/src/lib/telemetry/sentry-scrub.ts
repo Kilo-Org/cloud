@@ -22,28 +22,50 @@ function stripQuery(url: unknown): string {
   return idx === -1 ? url : url.slice(0, idx);
 }
 
-/** True when the value looks like a secret token. */
-function isTokenShape(value: unknown): boolean {
-  if (typeof value !== 'string') {
-    return false;
-  }
-  if (value.startsWith('Bearer ')) {
-    return true;
-  }
-  // 20+ consecutive base64url characters (A-Z a-z 0-9 - _)
-  return /[A-Za-z0-9_-]{20,}/.test(value);
+/** One run of 20+ consecutive base64url characters (A-Z a-z 0-9 - _). */
+const TOKEN_RUN_PATTERN = /[A-Za-z0-9_-]{20,}/g;
+
+/** A chain of lowercase words: `agent-message-render`, `render_part`. */
+const LOWERCASE_WORD_CHAIN_PATTERN = /^[a-z]+(?:[-_][a-z]+)+$/;
+
+/** A chain of CapitalizedWords: React's `MessageErrorBoundary`. */
+const CAPITALIZED_WORD_CHAIN_PATTERN = /^[A-Z][a-z]+(?:[A-Z][a-z]+)+$/;
+
+/** True when a token-shaped run is a word chain, i.e. a name, not a secret. */
+function isIdentifierRun(run: string): boolean {
+  return LOWERCASE_WORD_CHAIN_PATTERN.test(run) || CAPITALIZED_WORD_CHAIN_PATTERN.test(run);
 }
 
 /**
- * Redact token-shaped string values at any depth in a value tree, returning a
- * scrubbed copy. `seen` maps each visited object to its scrubbed copy, so a
- * repeated or aliased reference resolves to that copy rather than the original
- * (returning the original would leak its unredacted values) and a cycle is
- * bounded.
+ * Redact every token-shaped run inside one string, keeping the rest of the
+ * string so a diagnostic that embeds a long identifier stays readable.
+ *
+ * A run is 20+ consecutive base64url characters. A run that is instead a chain
+ * of words is a name, not a credential: the app's own `error.subsystem` /
+ * `error.operation` tags (`agent-message-render`, `write_logout_tombstone`) and
+ * React's component stacks (`MessageErrorBoundary`) are full of them, and
+ * redacting those destroys the only copy of the diagnostic the app sends. A
+ * credential is a random run — it mixes cases or carries digits — so a
+ * word-chain run is left alone. Same rationale as the structured contexts
+ * `scrubEvent` leaves intact. A `Bearer ` prefix names the whole value a
+ * credential, so it redacts whole.
+ */
+function redactString(value: string): string {
+  if (value.startsWith('Bearer ')) {
+    return '[redacted]';
+  }
+  return value.replace(TOKEN_RUN_PATTERN, run => (isIdentifierRun(run) ? run : '[redacted]'));
+}
+
+/**
+ * Redact token-shaped runs at any depth in a value tree, returning a scrubbed
+ * copy. `seen` maps each visited object to its scrubbed copy, so a repeated or
+ * aliased reference resolves to that copy rather than the original (returning
+ * the original would leak its unredacted values) and a cycle is bounded.
  */
 function redactValue(value: unknown, seen: WeakMap<object, unknown>): unknown {
   if (typeof value === 'string') {
-    return isTokenShape(value) ? '[redacted]' : value;
+    return redactString(value);
   }
   if (value === null || typeof value !== 'object') {
     return value;
@@ -109,11 +131,11 @@ function exceptionContextNames(event: Record<string, unknown>): string[] {
  *
  * - Strips query strings from request URL and contexts.response URL.
  * - Deletes `user.email`, `user.username`, and `user.ip_address`.
- * - Redacts token-shaped values (20+ base64url chars or `Bearer ` prefix) at
+ * - Redacts token-shaped runs (20+ base64url chars, or any `Bearer ` value) at
  *   any depth in `event.extra`, `event.tags`, and the exception-name context
- *   `extraErrorDataIntegration` attaches. Sentry's structured contexts are
- *   left intact: their identifiers trip the token heuristic without holding
- *   secrets.
+ *   `extraErrorDataIntegration` attaches; word-chain runs are identifiers and
+ *   stay. Sentry's structured contexts are left intact: their identifiers trip
+ *   the token heuristic without holding secrets.
  */
 export function scrubEvent<T>(event: T): T {
   try {

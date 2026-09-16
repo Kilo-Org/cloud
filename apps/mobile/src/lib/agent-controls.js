@@ -183,12 +183,16 @@ export function agentControlsSwift({ copy, urls }) {
     const name = controlTypeName(control.id);
     const label = swiftLiteral(englishCopy(copy, control.copyKey));
     const description = swiftLiteral(englishCopy(copy, descriptionCopyKey(control.copyKey)));
+    // AppIntents' `OpenURLIntent` (iOS 18) opens the url through its single
+    // initializer, `init(_:)`. The labeled `OpenURLIntent(url:)` does not exist:
+    // the extension fails to compile with "extraneous argument label 'url:' in
+    // call", which fails the whole iOS build.
     return `@available(${CONTROL_AVAILABILITY}, *)
 struct ${name}Intent: AppIntent {
   static var title: LocalizedStringResource = ${label}
 
   func perform() async throws -> some IntentResult & OpensIntent {
-    return .result(opensIntent: OpenURLIntent(url: URL(string: ${swiftLiteral(control.url)})!))
+    return .result(opensIntent: OpenURLIntent(URL(string: ${swiftLiteral(control.url)})!))
   }
 }
 

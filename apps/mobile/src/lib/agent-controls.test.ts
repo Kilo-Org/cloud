@@ -131,7 +131,11 @@ describe('the generated control surfaces', () => {
     expect(swift).toContain('ControlWidgetButton(action: AgentNewAgentIntent())');
     expect(swift).toContain('ControlWidgetButton(action: AgentWaitingAgentIntent())');
     expect(swift).toContain('struct AgentControlsBundle: WidgetBundle');
-    expect(swift).toContain('OpenURLIntent(url: URL(string:');
+    // AppIntents' OpenURLIntent is `init(_:)`; the labeled form does not exist
+    // and fails the widget extension compile ("extraneous argument label
+    // 'url:' in call"), which fails the whole iOS build.
+    expect(swift).toContain('opensIntent: OpenURLIntent(URL(string:');
+    expect(swift).not.toContain('OpenURLIntent(url:');
   });
 
   it('the Swift binds the English copy as the .strings keys', () => {

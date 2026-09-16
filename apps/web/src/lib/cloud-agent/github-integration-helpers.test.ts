@@ -63,6 +63,12 @@ const buildIntegration = (overrides: Partial<PlatformIntegration> = {}): Platfor
     ...overrides,
   }) as PlatformIntegration;
 
+const githubHttpError = (status: number): Error =>
+  Object.assign(new Error('GitHub request failed'), {
+    status,
+    response: { status, headers: {} },
+  });
+
 describe('github-integration-helpers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -173,6 +179,75 @@ describe('github-integration-helpers', () => {
       expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-1', [
         { id: 2, name: 'fresh', full_name: 'org/fresh', private: true },
       ]);
+    });
+
+    it('keeps a 404 from the GitHub adapter as a server error', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration({ repositories: null }));
+      mockFetchGitHubRepositories.mockRejectedValue(githubHttpError(404));
+
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+
+      await expect(fetchGitHubRepositoriesForUser('user-123')).rejects.toThrow(
+        'Failed to fetch GitHub repositories'
+      );
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+
+    it('keeps a 404 from the GitHub adapter as a server error on a forced refresh', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration());
+      mockFetchGitHubRepositories.mockRejectedValue(githubHttpError(404));
+
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+
+      await expect(fetchGitHubRepositoriesForUser('user-123', true)).rejects.toThrow(
+        'Failed to fetch GitHub repositories'
+      );
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+
+    it('keeps other upstream failures as server errors', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration({ repositories: null }));
+      mockFetchGitHubRepositories.mockRejectedValue(githubHttpError(500));
+
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+
+      await expect(fetchGitHubRepositoriesForUser('user-123')).rejects.toThrow(
+        'Failed to fetch GitHub repositories'
+      );
+    });
+
+    it('keeps a repository cache write failure as a server error', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration({ repositories: null }));
+      mockFetchGitHubRepositories.mockResolvedValue([
+        { id: 2, name: 'fresh', full_name: 'org/fresh', private: true },
+      ]);
+      mockUpdateRepositoriesForIntegration.mockRejectedValue(githubHttpError(404));
+
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+
+      await expect(fetchGitHubRepositoriesForUser('user-123')).rejects.toThrow(
+        'Failed to fetch GitHub repositories'
+      );
+    });
+
+    it('reports cached repositories after a failed forced refresh', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration());
+      mockFetchGitHubRepositories.mockRejectedValue(githubHttpError(404));
+
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+
+      await expect(fetchGitHubRepositoriesForUser('user-123', true)).rejects.toThrow(
+        'Failed to fetch GitHub repositories'
+      );
+
+      const cached = await fetchGitHubRepositoriesForUser('user-123');
+
+      expect(mockFetchGitHubRepositories).toHaveBeenCalledTimes(1);
+      expect(cached).toEqual({
+        integrationInstalled: true,
+        repositories: [{ id: 1, name: 'repo', fullName: 'org/repo', private: false }],
+        syncedAt: '2024-01-01T00:00:00Z',
+      });
     });
   });
 

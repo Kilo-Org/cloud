@@ -10,6 +10,7 @@ const {
   injectAgentControlBundle,
   retainOneSourceFileEntry,
   sourceFileEntryCount,
+  sourcePhaseDefects,
   targetSourcesBuildPhases,
 } = require('../src/lib/agent-controls.js');
 
@@ -141,9 +142,14 @@ module.exports = function withAgentControls(config) {
     }
 
     // The state XCBuild accepts: one Sources phase, carrying each source file
-    // exactly once. A doubled entry compiles one file twice — the same
-    // "Unexpected duplicate tasks" failure a second phase causes — so the
-    // count, not the file's presence, is what this assert proves.
+    // exactly once, through a `PBXBuildFile` the project still holds. A doubled
+    // entry compiles one source twice — the same "Unexpected duplicate tasks"
+    // failure a second phase causes — so what this proves is the phase, not
+    // this plugin's file alone. The file's own presence is checked first, then
+    // every entry of the phase: `addBuildSourceFileToGroup` appends, so the
+    // next writer that doubles an entry, or a heal that drops one while leaving
+    // its `PBXBuildFile` behind, fails the prebuild here instead of reaching
+    // the runner.
     const after = targetSourcesBuildPhases(project, targetUuid);
     if (after.length !== 1) {
       throw new Error(
@@ -154,6 +160,12 @@ module.exports = function withAgentControls(config) {
     if (entries !== 1) {
       throw new Error(
         `withAgentControls: ${SWIFT_FILE} appears ${entries} times in the ${TARGET_NAME} Sources build phase, expected exactly one — XCBuild fails a target that compiles one source twice ("Unexpected duplicate tasks")`
+      );
+    }
+    const defects = sourcePhaseDefects(project, after[0]);
+    if (defects.length > 0) {
+      throw new Error(
+        `withAgentControls: the ${TARGET_NAME} Sources build phase would fail XCBuild ("Unexpected duplicate tasks"): ${defects.join('; ')}`
       );
     }
     return projectConfig;

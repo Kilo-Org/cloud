@@ -20,7 +20,12 @@ export function widgetTargetProject(phaseCount: number) {
   const buildFiles: Record<string, unknown> = {};
   for (let index = 0; index < phaseCount; index += 1) {
     const uuid = `phase-sources-${index}`;
-    phases[uuid] = { files: [{ value: `bf-index-${index}`, comment: 'index.swift in Sources' }] };
+    const buildFile = `bf-index-${index}`;
+    // Every phase entry resolves to a `PBXBuildFile` object, the way the xcode
+    // library writes one — an entry without one is the dangling reference the
+    // plugin's phase proof rejects.
+    buildFiles[buildFile] = {};
+    phases[uuid] = { files: [{ value: buildFile, comment: 'index.swift in Sources' }] };
     buildPhases.push({ value: uuid, comment: 'Sources' });
   }
   buildPhases.push({ value: 'phase-frameworks', comment: 'Frameworks' });
@@ -56,7 +61,9 @@ export function attachMock(project: ReturnType<typeof widgetTargetProject>, time
   return vi.spyOn(IOSConfig.XcodeUtils, 'addBuildSourceFileToGroup').mockImplementation(() => {
     const files = targetSourcesBuildPhases(project, TARGET_UUID)[0]?.files;
     for (let index = 0; index < times; index += 1) {
-      files?.push({ value: `bf-controls-${index}`, comment: `${SWIFT_FILE} in Sources` });
+      const uuid = `bf-controls-${index}`;
+      project.hash.project.objects.PBXBuildFile[uuid] = {};
+      files?.push({ value: uuid, comment: `${SWIFT_FILE} in Sources` });
     }
     return project as never;
   });

@@ -188,7 +188,10 @@ export function sourceFileEntryCount(phase, file) {
  * Keep at most one `` `${file} in Sources` `` entry on the phase and return the
  * number kept. Every surplus entry is dropped together with the `PBXBuildFile`
  * object it points at — the object a doubled `addBuildSourceFileToGroup` left
- * behind. Idempotent: a phase that already carries one entry is untouched, so a
+ * behind. The kept entry's own `PBXBuildFile` is never deleted, even when a
+ * surplus entry names the same object: the phase would then reference a build
+ * file the project does not carry, and Xcode reads that as a damaged project.
+ * Idempotent: a phase that already carries one entry is untouched, so a
  * prebuild that runs the mod twice, or one that meets a project a staler run
  * doubled, still ends with exactly one entry.
  * @param {{ hash: { project: { objects: { PBXBuildFile?: Record<string, unknown> | undefined } } } }} project
@@ -202,11 +205,17 @@ export function retainOneSourceFileEntry(project, phase, file) {
   }
   const comment = `${file} in Sources`;
   const matching = phase.files.filter(entry => entry.comment === comment);
-  const surplus = matching
-    .slice(1)
-    .map(entry => entry.value)
-    .filter(value => value !== undefined);
-  if (surplus.length > 0) {
+  if (matching.length === 0) {
+    return 0;
+  }
+  const [kept] = matching;
+  const surplus = new Set(
+    matching
+      .slice(1)
+      .map(entry => entry.value)
+      .filter(value => value !== undefined && value !== kept.value)
+  );
+  if (surplus.size > 0) {
     // Drop the `PBXBuildFile` section entries the doubled attach left behind:
     // the phase no longer references them. `Reflect.deleteProperty` is the
     // computed-key delete (`delete section[uuid]` is the lint-forbidden form).
@@ -216,13 +225,49 @@ export function retainOneSourceFileEntry(project, phase, file) {
       Reflect.deleteProperty(buildFiles, `${uuid}_comment`);
     }
   }
-  if (matching.length === 0) {
-    return 0;
-  }
-  const [kept] = matching;
   // The first match stays; every later one is dropped from the phase.
   phase.files = phase.files.filter(entry => entry.comment !== comment || entry === kept);
   return 1;
+}
+
+/**
+ * The reasons the phase would fail XCBuild's plan as it now stands: a comment
+ * that appears more than once (one source compiled twice), or an entry whose
+ * `PBXBuildFile` the project does not carry (a reference Xcode reads as a
+ * damaged project). An empty list is the state the plugin accepts, and it is
+ * what `plugins/withAgentControls.js` proves after its edit — the phase, not
+ * just this plugin's own file, because `addBuildSourceFileToGroup` appends and
+ * a doubled attach leaves a doubled comment and a surplus `PBXBuildFile`
+ * behind.
+ * @param {{ hash: { project: { objects: { PBXBuildFile?: Record<string, unknown> | undefined } } } }} project
+ * @param {SourcesBuildPhase | undefined} phase
+ * @returns {string[]}
+ */
+export function sourcePhaseDefects(project, phase) {
+  const entries = phase?.files ?? [];
+  /** @type {Map<string, number>} */
+  const comments = new Map();
+  for (const entry of entries) {
+    const comment = entry.comment;
+    if (comment !== undefined) {
+      comments.set(comment, (comments.get(comment) ?? 0) + 1);
+    }
+  }
+  const defects = [];
+  for (const [comment, count] of comments) {
+    if (count > 1) {
+      defects.push(`${comment} appears ${count} times`);
+    }
+  }
+  const buildFiles = project.hash.project.objects.PBXBuildFile ?? {};
+  for (const entry of entries) {
+    if (entry.value !== undefined && buildFiles[entry.value] === undefined) {
+      defects.push(
+        `${entry.comment ?? entry.value} points at a PBXBuildFile the project does not carry`
+      );
+    }
+  }
+  return defects;
 }
 
 /**

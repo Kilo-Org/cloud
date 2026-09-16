@@ -57,8 +57,8 @@ if (sourcesPhaseIds.length === 0) {
   process.exit(1);
 }
 
-/** The `name in Sources` comments the given phase's `files` list carries. */
-function phaseSourceFiles(phaseId) {
+/** The build-file uuid and `in Sources` name each entry of the phase's files list carries. */
+function phaseSourceEntries(phaseId) {
   const pattern = new RegExp(
     `${phaseId} \\/\\* Sources \\*\\/ = \\{\\s*isa = PBXSourcesBuildPhase;[\\s\\S]*?files = \\(([\\s\\S]*?)\\);`
   );
@@ -66,20 +66,37 @@ function phaseSourceFiles(phaseId) {
   if (files === undefined) {
     return undefined;
   }
-  return [...files.matchAll(/\/\* (.+?) in Sources \*\//g)].map(match => match[1]);
+  return [...files.matchAll(/([0-9A-F]{24}) \/\* (.+?) in Sources \*\//g)].map(match => ({
+    uuid: match[1],
+    file: match[2],
+  }));
 }
+
+/** Every uuid the `PBXBuildFile` section carries, `_comment` keys excluded. */
+const liveBuildFiles = new Set(
+  [...project.matchAll(/^\t\t([0-9A-F]{24}) \/\* [^*]+ \*\/ = \{isa = PBXBuildFile;/gm)].map(
+    match => match[1]
+  )
+);
 
 /** @type {Map<string, number>} */
 const counts = new Map();
+const dangling = [];
 let resolvedPhases = 0;
 for (const phaseId of sourcesPhaseIds) {
-  const files = phaseSourceFiles(phaseId);
-  if (files === undefined) {
+  const entries = phaseSourceEntries(phaseId);
+  if (entries === undefined) {
     continue;
   }
   resolvedPhases += 1;
-  for (const file of files) {
+  for (const { uuid, file } of entries) {
     counts.set(file, (counts.get(file) ?? 0) + 1);
+    // An entry whose build file the project no longer carries is the dangling
+    // reference a heal leaves when it deletes the `PBXBuildFile` the surviving
+    // entry still points at; Xcode reads it as a damaged project.
+    if (!liveBuildFiles.has(uuid)) {
+      dangling.push(`${file} in Sources (${uuid})`);
+    }
   }
 }
 
@@ -93,6 +110,9 @@ for (const [file, count] of counts) {
   if (count !== 1) {
     failures.push(`${file} in Sources appears ${count} times, expected exactly one`);
   }
+}
+for (const entry of dangling) {
+  failures.push(`${entry} points at a PBXBuildFile the project does not carry`);
 }
 if ((counts.get(SWIFT_FILE) ?? 0) === 0) {
   failures.push(`${SWIFT_FILE} in Sources is missing`);

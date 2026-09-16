@@ -10,7 +10,9 @@
  * closed — through `runNeedsInputInteraction` (the same mobile session manager
  * the in-app blocking card drives), and this module replaces the acted-on
  * notification with the result: the confirmation, the retryable failure with
- * the actions kept, or the unavailable body with no buttons.
+ * the actions kept, or the unavailable body with no buttons. Only the
+ * retryable failure keeps the raise's time-sensitive break-through — the
+ * user's own action has been taken, so its confirmation stays quiet.
  */
 
 import { z } from 'zod';
@@ -326,6 +328,12 @@ type ResultPresentation = {
   categoryIdentifier: string | null;
   /** Whether the raise's presentation is over (release the foreground suppression). */
   raiseCleared: boolean;
+  /**
+   * The raise's Focus break-through, kept only while the result still needs
+   * the user (the retryable failure). A confirmation of the user's own action
+   * (`ok` / `unavailable`) is ordinary progress and must not break through.
+   */
+  interruptionLevel: 'timeSensitive' | null;
 };
 
 function resultPresentationFor(
@@ -343,6 +351,7 @@ function resultPresentationFor(
         ),
         categoryIdentifier: null,
         raiseCleared: true,
+        interruptionLevel: null,
       };
     }
     case 'unavailable': {
@@ -350,6 +359,7 @@ function resultPresentationFor(
         body: i18n.t('notifications.needsInputAction.unavailable'),
         categoryIdentifier: null,
         raiseCleared: true,
+        interruptionLevel: null,
       };
     }
     case 'retryable': {
@@ -357,6 +367,7 @@ function resultPresentationFor(
         body: i18n.t('notifications.needsInputAction.failed'),
         categoryIdentifier: originalCategoryIdentifier ?? null,
         raiseCleared: false,
+        interruptionLevel: 'timeSensitive',
       };
     }
     default: {
@@ -407,6 +418,7 @@ async function runAnswerAction(args: {
     body: presentation.body,
     data,
     categoryIdentifier: presentation.categoryIdentifier,
+    interruptionLevel: presentation.interruptionLevel,
   });
 }
 
@@ -416,6 +428,10 @@ async function runAnswerAction(args: {
  * sync's plan dismisses — and the notification the user actually acted on is
  * dismissed when it is a different one (a server push carries an OS-assigned
  * identifier), so one raise never ends with two notifications.
+ *
+ * `interruptionLevel` is outcome-derived: the retryable failure keeps the
+ * raise's time-sensitive break-through because it still needs the user; the
+ * `ok` / `unavailable` confirmations are quiet.
  */
 async function replaceNotification(args: {
   resultIdentifier: string;
@@ -424,8 +440,17 @@ async function replaceNotification(args: {
   body: string;
   data: NeedsInputRaiseData;
   categoryIdentifier: string | null;
+  interruptionLevel: 'timeSensitive' | null;
 }): Promise<void> {
-  const { resultIdentifier, originalIdentifier, title, body, data, categoryIdentifier } = args;
+  const {
+    resultIdentifier,
+    originalIdentifier,
+    title,
+    body,
+    data,
+    categoryIdentifier,
+    interruptionLevel,
+  } = args;
   try {
     await Notifications.scheduleNotificationAsync({
       identifier: resultIdentifier,
@@ -434,7 +459,7 @@ async function replaceNotification(args: {
         body,
         data,
         ...(categoryIdentifier === null ? {} : { categoryIdentifier }),
-        interruptionLevel: 'timeSensitive',
+        ...(interruptionLevel === null ? {} : { interruptionLevel }),
       },
       // A channel-aware trigger delivers immediately on both platforms: Android
       // routes to the shared attention channel, iOS reads it as a null trigger.

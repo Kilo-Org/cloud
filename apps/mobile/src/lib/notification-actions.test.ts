@@ -218,13 +218,13 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
       kiloSessionId: 'ses_1',
       action: 'approve',
     });
+    // A quiet confirmation of the user's own action: no break-through field.
     expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith({
       identifier: 'needs-input:ses_1',
       content: {
         title: 'Fix the bug',
         body: 'Request approved',
         data: raiseData(),
-        interruptionLevel: 'timeSensitive',
       },
       trigger: { channelId: 'agent-attention' },
     });
@@ -288,7 +288,6 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
         title: 'Fix the bug',
         body: 'This request is no longer waiting.',
         data: raiseData(),
-        interruptionLevel: 'timeSensitive',
       },
       trigger: { channelId: 'agent-attention' },
     });

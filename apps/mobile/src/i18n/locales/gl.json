@@ -3093,5 +3093,9 @@
     "remoteFound": "Computador conectado",
     "checkAgain": "Comprobar de novo",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Novo axente",
+    "openLastSession": "Abrir a última sesión"
   }
 }

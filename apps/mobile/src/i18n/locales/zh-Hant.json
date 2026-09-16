@@ -3093,5 +3093,9 @@
     "remoteFound": "電腦已連線",
     "checkAgain": "重新檢查",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "新增代理程式",
+    "openLastSession": "開啟上次工作階段"
   }
 }

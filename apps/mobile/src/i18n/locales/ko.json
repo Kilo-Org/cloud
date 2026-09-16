@@ -3093,5 +3093,9 @@
     "remoteFound": "컴퓨터 연결됨",
     "checkAgain": "다시 확인",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "새 에이전트",
+    "openLastSession": "마지막 세션 열기"
   }
 }

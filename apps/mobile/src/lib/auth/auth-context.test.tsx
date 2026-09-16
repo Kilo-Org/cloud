@@ -126,6 +126,16 @@ const consentMock = vi.hoisted(() => ({
   clearPendingConsentOutcome: vi.fn(),
 }));
 
+// Hoisted so the sign-out suite can assert the launcher-surface clears without
+// loading the last-opened store's secure-store chain or the native module.
+const lastOpenedSessionMock = vi.hoisted(() => ({
+  clearLastOpenedSession: vi.fn(),
+}));
+
+const nativeLauncherSurfacesMock = vi.hoisted(() => ({
+  clearLauncherSurfaces: vi.fn(),
+}));
+
 const ownerProducer = vi.hoisted(() => ({
   getMe: vi.fn<() => Promise<{ id: string }>>().mockResolvedValue({ id: 'user-a' }),
   ticket: vi.fn().mockResolvedValue({ token: 'ingest-ticket' }),
@@ -214,6 +224,10 @@ vi.mock('@/lib/auth/logout-cleanup', () => logoutCleanupMock);
 vi.mock('@/lib/consent', () => ({
   clearPendingConsentOutcome: consentMock.clearPendingConsentOutcome,
 }));
+
+vi.mock('@/lib/last-opened-session', () => lastOpenedSessionMock);
+
+vi.mock('@/lib/native-launcher-surfaces', () => nativeLauncherSurfacesMock);
 
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({
   setTrpcUnauthorizedHandler: vi.fn(),
@@ -667,6 +681,19 @@ describe('sign-out teardown ordering', () => {
     const { clearRunOnDestinationPreference } =
       await import('@/lib/hooks/use-persisted-run-on-destination');
     expect(clearRunOnDestinationPreference).toHaveBeenCalled();
+  });
+
+  it('clears the last-opened session and the launcher surfaces on sign-out', async () => {
+    const { ctx } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    // The dynamic shortcuts/tile are dropped natively and the durable record is
+    // deleted locally, so the next account never sees the previous session.
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+    expect(lastOpenedSessionMock.clearLastOpenedSession).toHaveBeenCalledTimes(1);
   });
 
   it('closes the ownership gate before any await and blocks a late persist', async () => {

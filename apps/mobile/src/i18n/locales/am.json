@@ -3093,5 +3093,9 @@
     "remoteFound": "ኮምፒውተር ተገናኝቷል",
     "checkAgain": "እንደገና ይፈትሹ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "አዲስ ወኪል",
+    "openLastSession": "የመጨረሻውን ክፍለ ጊዜ ክፈት"
   }
 }

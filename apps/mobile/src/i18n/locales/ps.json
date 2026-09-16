@@ -3093,5 +3093,9 @@
     "remoteFound": "کمپیوټر وڌل شو",
     "checkAgain": "بیا وګورئ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "نوی اجنټ",
+    "openLastSession": "وروستۍ ناسته پرانیزئ"
   }
 }

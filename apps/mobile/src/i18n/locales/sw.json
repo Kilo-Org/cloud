@@ -3093,5 +3093,9 @@
     "remoteFound": "Kompyuta imeunganishwa",
     "checkAgain": "Angalia tena",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Wakala mpya",
+    "openLastSession": "Fungua kikao cha mwisho"
   }
 }

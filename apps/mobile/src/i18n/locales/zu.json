@@ -3093,5 +3093,9 @@
     "remoteFound": "Ikhompyutha ixhunyiwe",
     "checkAgain": "Phinda uhlole",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "I-ejenti entsha",
+    "openLastSession": "Vula iseshini yokugcina"
   }
 }

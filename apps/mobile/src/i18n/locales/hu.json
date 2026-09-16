@@ -3093,5 +3093,9 @@
     "remoteFound": "Számítógép csatlakoztatva",
     "checkAgain": "Ellenőrzés újra",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Új ügynök",
+    "openLastSession": "Utolsó munkamenet megnyitása"
   }
 }

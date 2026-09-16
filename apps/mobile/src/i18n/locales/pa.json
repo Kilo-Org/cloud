@@ -3093,5 +3093,9 @@
     "remoteFound": "ਕੰਪਿਊਟਰ ਕਨੈਕਟ ਹੋਇਆ",
     "checkAgain": "ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "ਨਵਾਂ ਏਜੰਟ",
+    "openLastSession": "ਆਖਰੀ ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ"
   }
 }

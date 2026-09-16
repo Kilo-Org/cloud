@@ -3093,5 +3093,9 @@
     "remoteFound": "Đã kết nối máy tính",
     "checkAgain": "Kiểm tra lại",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Trợ lý mới",
+    "openLastSession": "Mở phiên gần nhất"
   }
 }

@@ -3093,5 +3093,9 @@
     "remoteFound": "رایانه متصل شد",
     "checkAgain": "دوباره بررسی کنید",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "عامل جدید",
+    "openLastSession": "باز کردن آخرین نشست"
   }
 }

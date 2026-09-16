@@ -3139,5 +3139,9 @@
     "remoteFound": "Kompiuteris prijungtas",
     "checkAgain": "Kartoti patikrinimą",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Naujas agentas",
+    "openLastSession": "Atidaryti paskutinę sesiją"
   }
 }

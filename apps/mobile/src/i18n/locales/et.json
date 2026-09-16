@@ -3093,5 +3093,9 @@
     "remoteFound": "Arvuti ühendatud",
     "checkAgain": "Kontrolli uuesti",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Uus agent",
+    "openLastSession": "Ava viimane seanss"
   }
 }

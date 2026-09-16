@@ -3116,5 +3116,9 @@
     "remoteFound": "Ordenador conectado",
     "checkAgain": "Volver a comprobar",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Nuevo agente",
+    "openLastSession": "Abrir última sesión"
   }
 }

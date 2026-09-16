@@ -3093,5 +3093,9 @@
     "remoteFound": "Kua honoa te rorohiko",
     "checkAgain": "Tirohia anō",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Kaiāwhina hōu",
+    "openLastSession": "Whakatuwheratia te wātū whakamutunga"
   }
 }

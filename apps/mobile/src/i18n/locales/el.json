@@ -3093,5 +3093,9 @@
     "remoteFound": "Ο υπολογιστής συνδέθηκε",
     "checkAgain": "Έλεγχος ξανά",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Νέος πράκτορας",
+    "openLastSession": "Άνοιγμα τελευταίας συνεδρίας"
   }
 }

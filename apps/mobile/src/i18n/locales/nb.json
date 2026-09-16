@@ -3093,5 +3093,9 @@
     "remoteFound": "Datamaskin tilkoblet",
     "checkAgain": "Sjekk igjen",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Ny agent",
+    "openLastSession": "Åpne siste økt"
   }
 }

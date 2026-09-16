@@ -3093,5 +3093,9 @@
     "remoteFound": "ကွန်ပျူတာ ချိတ်ဆက်ပြီး",
     "checkAgain": "ထပ်စစ်ပါ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "အေးဂျင့်အသစ်",
+    "openLastSession": "နောက်ဆုံးဆက်ရှင်ကို ဖွင့်ပါ"
   }
 }

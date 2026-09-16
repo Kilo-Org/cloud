@@ -3139,5 +3139,9 @@
     "remoteFound": "Počítač připojen",
     "checkAgain": "Zkontrolovat znovu",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Nový agent",
+    "openLastSession": "Otevřít poslední relaci"
   }
 }

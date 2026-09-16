@@ -56,7 +56,11 @@ export function toWindowHours(value: number | null | undefined): SpendAlertWindo
 
 /** Inline error for the limit field, or `null` while the value is valid. */
 export function thresholdError(value: string): string | null {
-  return parseThreshold(value) == null ? i18n.t('spendAlerts.limitError') : null;
+  // Reuses the billing alert's copy: the same sentence, so the two fields can
+  // never drift apart in a translation.
+  return parseThreshold(value) == null
+    ? i18n.t('organization.lowBalanceAlert.thresholdError')
+    : null;
 }
 
 /** Inline error for the multiplier field, or `null` while the value is valid. */

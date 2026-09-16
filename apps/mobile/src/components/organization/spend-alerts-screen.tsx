@@ -123,7 +123,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
   if (!scopeResolved) {
     return (
       <OrganizationBoundary
-        title={t('spendAlerts.title')}
+        title={t('notifications.channel.spend')}
         organizationIdOverride={organizationId}
       />
     );
@@ -138,7 +138,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
   if (query.isError && query.data == null) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('spendAlerts.title')} />
+        <ScreenHeader title={t('notifications.channel.spend')} />
         <QueryError
           className="bg-background"
           message={t('spendAlerts.loadError')}
@@ -155,7 +155,7 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('spendAlerts.title')} />
+      <ScreenHeader title={t('notifications.channel.spend')} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pt-4"
@@ -509,11 +509,11 @@ function RuleCard({
 
       <View className="rounded-lg bg-secondary px-3">
         <View className="min-h-11 flex-row items-center justify-between border-b-[0.5px] border-hair-soft">
-          <Text className="text-sm">{t('spendAlerts.emailChannel')}</Text>
+          <Text className="text-sm">{t('common.email')}</Text>
           {/* The row's own label names the channel; the card's switch directly
               above announces the kind, so the two Email rows stay ordered. */}
           <Switch
-            accessibilityLabel={t('spendAlerts.emailChannel')}
+            accessibilityLabel={t('common.email')}
             value={emailEnabled}
             onValueChange={onEmailChange}
           />
@@ -524,7 +524,7 @@ function RuleCard({
             accessibilityRole="button"
             className="min-h-11 flex-row items-center justify-between active:opacity-70"
           >
-            <Text className="text-sm text-muted-foreground">{t('spendAlerts.pushChannel')}</Text>
+            <Text className="text-sm text-muted-foreground">{t('notifications.push')}</Text>
             <View className="flex-row items-center gap-1">
               <Text className="text-xs text-muted-foreground">
                 {t('spendAlerts.pushOffByCategory')}
@@ -534,9 +534,9 @@ function RuleCard({
           </Pressable>
         ) : (
           <View className="min-h-11 flex-row items-center justify-between">
-            <Text className="text-sm">{t('spendAlerts.pushChannel')}</Text>
+            <Text className="text-sm">{t('notifications.push')}</Text>
             <Switch
-              accessibilityLabel={t('spendAlerts.pushChannel')}
+              accessibilityLabel={t('notifications.push')}
               value={pushEnabled}
               onValueChange={onPushChange}
             />
@@ -565,7 +565,7 @@ function SpendAlertsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('spendAlerts.title')} />
+      <ScreenHeader title={t('notifications.channel.spend')} />
       <ScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
         <Skeleton className="h-4 w-64 rounded" />
         <Skeleton className="h-[52px] rounded-lg" />

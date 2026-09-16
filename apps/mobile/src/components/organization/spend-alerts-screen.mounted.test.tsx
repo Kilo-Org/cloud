@@ -254,13 +254,13 @@ function type(renderer: ReactTestRenderer, label: string, value: string): void {
   });
 }
 
-const LIMIT = 'spendAlerts.limitLabel';
-const MULTIPLIER = 'spendAlerts.multiplierLabel';
+const LIMIT = i18n.t('spendAlerts.limitLabel');
+const MULTIPLIER = i18n.t('spendAlerts.multiplierLabel');
 
 async function mountLoaded(overrides: Record<string, unknown> = {}) {
   getQueryFn.mockResolvedValue(settingsFixture(overrides));
   const view = await mountScreen();
-  await waitFor(() => texts(view.renderer).includes('spendAlerts.subtitle'));
+  await waitFor(() => texts(view.renderer).includes(i18n.t('spendAlerts.subtitle')));
   return view;
 }
 
@@ -279,8 +279,8 @@ describe('SpendAlertsScreen happy state', () => {
     expect(fieldByLabel(renderer, LIMIT).props.defaultValue).toBe('25');
     expect(fieldByLabel(renderer, MULTIPLIER).props.defaultValue).toBe('2');
     expect(byType(renderer, 'KvRow')[0]?.props.value).toBe('$1.5');
-    expect(switchByLabel(renderer, 'spendAlerts.enable')?.props.value).toBe(true);
-    expect(switchByLabel(renderer, 'spendAlerts.thresholdTitle')?.props.value).toBe(true);
+    expect(switchByLabel(renderer, i18n.t('spendAlerts.enable'))?.props.value).toBe(true);
+    expect(switchByLabel(renderer, i18n.t('spendAlerts.thresholdTitle'))?.props.value).toBe(true);
     expect(byType(renderer, 'SegmentedControl')[0]?.props.value).toBe('24');
 
     press(buttonByVariant(renderer));
@@ -307,7 +307,7 @@ describe('SpendAlertsScreen happy state', () => {
       ],
     });
     await waitFor(() => announced.success.mock.calls.length === 1);
-    expect(announced.success).toHaveBeenCalledWith('spendAlerts.saved');
+    expect(announced.success).toHaveBeenCalledWith(i18n.t('spendAlerts.saved'));
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
@@ -316,7 +316,7 @@ describe('SpendAlertsScreen happy state', () => {
       spend: { spend24hMicrodollars: 0, spend7dMicrodollars: 0, baselineHourlyMicrodollars: null },
     });
 
-    expect(byType(renderer, 'KvRow')[0]?.props.value).toBe('spendAlerts.noSpend');
+    expect(byType(renderer, 'KvRow')[0]?.props.value).toBe(i18n.t('spendAlerts.noSpend'));
   });
 });
 
@@ -327,7 +327,7 @@ describe('SpendAlertsScreen retryable states', () => {
 
     await waitFor(() => byType(renderer, 'QueryError').length === 1);
     const error = byType(renderer, 'QueryError')[0];
-    expect(error?.props.message).toBe('spendAlerts.loadError');
+    expect(error?.props.message).toBe(i18n.t('spendAlerts.loadError'));
     expect(typeof error?.props.onRetry).toBe('function');
     expect(byType(renderer, 'Skeleton')).toHaveLength(0);
 
@@ -346,7 +346,9 @@ describe('SpendAlertsScreen retryable states', () => {
     press(buttonByVariant(renderer));
 
     await waitFor(() => byType(renderer, 'AccessibleStatus')[0]?.props.message != null);
-    expect(byType(renderer, 'AccessibleStatus')[0]?.props.message).toBe('spendAlerts.saveError');
+    expect(byType(renderer, 'AccessibleStatus')[0]?.props.message).toBe(
+      i18n.t('spendAlerts.saveError')
+    );
 
     const retryButton = buttonByVariant(renderer, 'outline');
     expect(retryButton.props.accessibilityLabel).toBe('Retry');
@@ -380,7 +382,7 @@ describe('SpendAlertsScreen non-retryable states', () => {
 
     expect(fieldByLabel(renderer, LIMIT).props.validate).toBe(thresholdError);
     expect((fieldByLabel(renderer, LIMIT).props.validate as (value: string) => string)('0')).toBe(
-      'spendAlerts.limitError'
+      i18n.t('organization.lowBalanceAlert.thresholdError')
     );
 
     type(renderer, LIMIT, '0');
@@ -395,14 +397,14 @@ describe('SpendAlertsScreen empty state', () => {
   it('shows the off copy with the master switch as the only call to action', async () => {
     const { renderer } = await mountLoaded({ enabled: false });
 
-    expect(texts(renderer)).toContain('spendAlerts.empty');
+    expect(texts(renderer)).toContain(i18n.t('spendAlerts.empty'));
     expect(byType(renderer, 'Button')).toHaveLength(0);
     expect(byType(renderer, 'FormField')).toHaveLength(0);
     expect(byType(renderer, 'Switch')).toHaveLength(1);
 
-    toggle(switchByLabel(renderer, 'spendAlerts.enable'), true);
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.enable')), true);
 
-    expect(texts(renderer)).not.toContain('spendAlerts.empty');
+    expect(texts(renderer)).not.toContain(i18n.t('spendAlerts.empty'));
     expect(byType(renderer, 'FormField')).toHaveLength(2);
     expect(byType(renderer, 'Button')).toHaveLength(1);
   });
@@ -410,9 +412,9 @@ describe('SpendAlertsScreen empty state', () => {
   it('keeps Save with the switch when it is turned off, so the disable can be posted', async () => {
     const { renderer } = await mountLoaded();
 
-    toggle(switchByLabel(renderer, 'spendAlerts.enable'), false);
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.enable')), false);
 
-    expect(texts(renderer)).toContain('spendAlerts.empty');
+    expect(texts(renderer)).toContain(i18n.t('spendAlerts.empty'));
     expect(byType(renderer, 'FormField')).toHaveLength(0);
 
     const saveButton = buttonByVariant(renderer);
@@ -429,7 +431,7 @@ describe('SpendAlertsScreen push agreement', () => {
     const { renderer } = await mountLoaded();
 
     // [0] threshold push, [1] anomaly push
-    toggle(channelSwitches(renderer, 'spendAlerts.pushChannel')[0], true);
+    toggle(channelSwitches(renderer, i18n.t('notifications.push'))[0], true);
 
     await waitFor(() => saveMutationFn.mock.calls.length === 1);
     const input = saveMutationFn.mock.calls[0]?.[0] as {
@@ -446,9 +448,9 @@ describe('SpendAlertsScreen push agreement', () => {
   it('points the push row at Notifications when the category is off', async () => {
     const { renderer } = await mountLoaded({ pushCategoryEnabled: false });
 
-    expect(texts(renderer)).toContain('spendAlerts.pushOffByCategory');
-    expect(channelSwitches(renderer, 'spendAlerts.pushChannel')).toHaveLength(0);
-    expect(channelSwitches(renderer, 'spendAlerts.emailChannel')).toHaveLength(2);
+    expect(texts(renderer)).toContain(i18n.t('spendAlerts.pushOffByCategory'));
+    expect(channelSwitches(renderer, i18n.t('notifications.push'))).toHaveLength(0);
+    expect(channelSwitches(renderer, i18n.t('common.email'))).toHaveLength(2);
 
     press(byType(renderer, 'Pressable')[0]);
 
@@ -458,7 +460,7 @@ describe('SpendAlertsScreen push agreement', () => {
   it('points the push row at Notifications when the viewer has no device', async () => {
     const { renderer } = await mountLoaded({ pushChannelBlocked: true });
 
-    expect(channelSwitches(renderer, 'spendAlerts.pushChannel')).toHaveLength(0);
+    expect(channelSwitches(renderer, i18n.t('notifications.push'))).toHaveLength(0);
     expect(byType(renderer, 'Pressable')).toHaveLength(2);
   });
 });

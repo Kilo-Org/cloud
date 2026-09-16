@@ -446,24 +446,24 @@ describe('NotificationsScreen spend alerts row', () => {
   it('happy: renders the row with its capability and flipping it sends exactly spendAlerts', async () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     const { renderer } = await renderScreen();
-    await waitForEnabledSwitch(renderer, 'Toggle spend alerts');
+    await waitForEnabledSwitch(renderer, 'Spend alerts category');
 
     // The row renders beside balance alerts, enabled because the server
     // reported the spend capability available.
     expect(textWithChildren(renderer.root, 'Spend alerts').length).toBe(1);
-    expect(switchesByLabel(renderer.root, 'Toggle spend alerts')[0]?.props.value).toBe(true);
-    expect(switchesByLabel(renderer.root, 'Toggle spend alerts')[0]?.props.disabled).toBe(false);
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.value).toBe(true);
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(false);
 
     // Exactly one category key per call: the payload is what the spend view's
     // own column write must agree with.
     prefsQueryFn.mockResolvedValue(fullPrefs({ spendAlerts: false }));
     act(() => {
-      switchOnValueChange(renderer.root, 'Toggle spend alerts')?.(false);
+      switchOnValueChange(renderer.root, 'Spend alerts category')?.(false);
     });
     await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
     expect(setPreferenceMutationFn.mock.calls[0]?.[0]).toEqual({ spendAlerts: false });
     await waitFor(
-      () => switchesByLabel(renderer.root, 'Toggle spend alerts')[0]?.props.value === false
+      () => switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.value === false
     );
     expect(toastError).not.toHaveBeenCalled();
   });
@@ -485,7 +485,7 @@ describe('NotificationsScreen spend alerts row', () => {
     // spend row's disabled state below is the server capability, not the gate.
     await waitForEnabledSwitch(renderer, 'Chat messages');
 
-    expect(switchesByLabel(renderer.root, 'Toggle spend alerts')[0]?.props.disabled).toBe(true);
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(true);
     expect(textWithChildren(renderer.root, 'Spend alerts are unavailable.').length).toBe(1);
   });
 
@@ -496,16 +496,16 @@ describe('NotificationsScreen spend alerts row', () => {
       message: 'boom',
     });
     const { renderer } = await renderScreen();
-    await waitForEnabledSwitch(renderer, 'Toggle spend alerts');
+    await waitForEnabledSwitch(renderer, 'Spend alerts category');
 
     act(() => {
-      switchOnValueChange(renderer.root, 'Toggle spend alerts')?.(false);
+      switchOnValueChange(renderer.root, 'Spend alerts category')?.(false);
     });
     await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
     await waitFor(() => activityIndicators(renderer.root).length === 0);
 
     // The switch returns to the unchanged server value and the error surfaces.
-    expect(switchesByLabel(renderer.root, 'Toggle spend alerts')[0]?.props.value).toBe(true);
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.value).toBe(true);
     expect(toastError).toHaveBeenCalledWith('boom');
   });
 });
@@ -601,7 +601,7 @@ describe('NotificationsScreen category availability', () => {
 
     expect(switchesByLabel(renderer.root, 'Chat messages')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(false);
-    expect(switchesByLabel(renderer.root, 'Toggle spend alerts')[0]?.props.disabled).toBe(false);
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'KiloClaw activity')[0]?.props.disabled).toBe(false);
   });
 

@@ -207,7 +207,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               />
               <ConfigureRow
                 icon={Wallet}
-                title={t('spendAlerts.title')}
+                title={t('notifications.channel.spend')}
                 last
                 onPress={() => {
                   router.push(

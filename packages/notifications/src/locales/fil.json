@@ -7,6 +7,7 @@
       "instanceLifecycle": "May update ang iyong instance",
       "scheduledAction": "May update ang isang naka-schedule na aksyon",
       "lowBalance": "Kailangan ng atensyon ang iyong balance",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Kailangan ng atensyon ang isang security finding",
       "activeAgentsGlanceable": "May update ang mga aktibong agent"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Low balance alert",
       "body": "Bumaba sa ibaba ng ${{minimumBalanceUsd}} ang balance ng {{organizationName}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Bagong security finding ({{severity}})",

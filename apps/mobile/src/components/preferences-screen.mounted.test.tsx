@@ -97,7 +97,7 @@ describe('PreferencesScreen hub', () => {
       subtitle: 'Push preferences',
       last: true,
     });
-    expect(row(renderer, i18n.t('spendAlerts.title')).props).toMatchObject({
+    expect(row(renderer, i18n.t('notifications.channel.spend')).props).toMatchObject({
       icon: 'Wallet',
       last: true,
     });
@@ -109,7 +109,7 @@ describe('PreferencesScreen hub', () => {
     ['Translate tool summaries', '/(app)/(tabs)/(3_profile)/tool-summary-translation'],
     ['Account', '/(app)/(tabs)/(3_profile)/account'],
     ['Notifications', '/(app)/(tabs)/(3_profile)/notifications'],
-    [i18n.t('spendAlerts.title'), '/(app)/(tabs)/(3_profile)/spend-alerts'],
+    [i18n.t('notifications.channel.spend'), '/(app)/(tabs)/(3_profile)/spend-alerts'],
   ])('pushes the %s subpage from its row', async (title, route) => {
     const renderer = await mountPreferences();
 

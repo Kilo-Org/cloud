@@ -104,7 +104,7 @@ export function PreferencesScreen() {
         />
         <ConfigureRow
           icon={Wallet}
-          title={t('spendAlerts.title')}
+          title={t('notifications.channel.spend')}
           className="rounded-lg bg-secondary px-3"
           last
           onPress={() => {

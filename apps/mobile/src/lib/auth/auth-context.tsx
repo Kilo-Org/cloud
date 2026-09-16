@@ -63,6 +63,7 @@ import {
 } from '@/lib/auth/sign-out-state';
 import { clearCacheScopeForSignOut, readCachedUserId } from '@/lib/persist/read-cache';
 import { clearToolSummaryTranslationsForSignOut } from '@/lib/persist/tool-summary-translation-cache';
+import { clearToolSummaryTranslationMemory } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 import { clearSessionAttentionForSignOut } from '@/lib/session-attention';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { clearViewedFiles } from '@/lib/pr-review/viewed-files';
@@ -493,6 +494,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearSessionScopedState();
           clearPrReviewFooterPreference();
           clearCondenseToolCallsPreference();
+          // The runtime's in-memory retry memory and cache hold the signed-out
+          // account's tool text: without this, the next account's retry
+          // (`retryUnresolvedTranslations`) re-sends it to the gateway.
+          clearToolSummaryTranslationMemory();
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

@@ -529,3 +529,156 @@ describe('tool summary translation hydration', () => {
     expect(writtenIds).toEqual(['part-a', 'part-b']);
   });
 });
+
+describe('retry of unresolved summaries after a connection recovery', () => {
+  it('re-queues a failed batch when retryUnresolvedTranslations runs', async () => {
+    const mod = await loadRuntime();
+    requestMock.mockRejectedValueOnce(new Error('gateway down'));
+    echoBatch();
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await flushBatch();
+    expect(mod.getTranslation('part-1', 'hello', 'de', MODEL.id)).toBeUndefined();
+
+    mod.retryUnresolvedTranslations();
+    await waitForTranslations(mod, [{ itemId: 'part-1', text: 'hello' }]);
+
+    // The recovery went through the normal batch path: one request for the
+    // failed summary, and the row now resolves from the cache.
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(requestCalls()[1]?.texts).toEqual(['hello']);
+  });
+
+  it('re-queues only the positions whose entries came back null', async () => {
+    const mod = await loadRuntime();
+    requestMock.mockResolvedValueOnce(['de:Alpha', null]);
+    echoBatch();
+
+    mod.ensureTranslation({ itemId: 'part-a', text: 'Alpha', language: 'de', model: MODEL });
+    mod.ensureTranslation({ itemId: 'part-b', text: 'Beta', language: 'de', model: MODEL });
+    await waitForTranslations(mod, [{ itemId: 'part-a', text: 'Alpha' }]);
+    expect(mod.getTranslation('part-b', 'Beta', 'de', MODEL.id)).toBeUndefined();
+
+    mod.retryUnresolvedTranslations();
+    await waitForTranslations(mod, [{ itemId: 'part-b', text: 'Beta' }]);
+
+    expect(requestCalls().at(-1)?.texts).toEqual(['Beta']);
+  });
+
+  it('makes no request on a retry when every summary already resolved', async () => {
+    const mod = await loadRuntime();
+    echoBatch();
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await waitForTranslations(mod, [{ itemId: 'part-1', text: 'hello' }]);
+
+    mod.retryUnresolvedTranslations();
+    await flushBatch();
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not duplicate a request that is still in flight when the retry fires', async () => {
+    const mod = await loadRuntime();
+    const resolvers = pendingBatches();
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await vi.waitFor(() => {
+      expect(requestMock).toHaveBeenCalledTimes(1);
+    });
+
+    mod.retryUnresolvedTranslations();
+    await flushBatch();
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    resolvers[0]?.(['de:hello']);
+    await waitForTranslations(mod, [{ itemId: 'part-1', text: 'hello' }]);
+    expect(requestMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the retry memory when the configuration changes', async () => {
+    const mod = await loadRuntime();
+    mod.setConfig({ enabled: true, model: MODEL });
+    requestMock.mockRejectedValueOnce(new Error('gateway down'));
+    echoBatch();
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await flushBatch();
+
+    // The user switches models: work remembered under the old one must never
+    // reach the gateway again; the mounted row re-requests under the new model.
+    mod.setConfig({ enabled: true, model: OTHER_MODEL });
+    mod.retryUnresolvedTranslations();
+    await flushBatch();
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(mod.getTranslation('part-1', 'hello', 'de', OTHER_MODEL.id)).toBeUndefined();
+  });
+
+  it('drops the remembered summaries when the authenticated account changes', async () => {
+    const mod = await loadRuntime();
+    requestMock.mockRejectedValueOnce(new Error('gateway down'));
+    echoBatch();
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await flushBatch();
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    // Sign-out or a direct account switch: the remembered summary carries the
+    // previous account's tool text, so the next account's retry must not send
+    // it to the gateway.
+    mod.clearToolSummaryTranslationMemory();
+    mod.retryUnresolvedTranslations();
+    await flushBatch();
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the in-memory cache when the authenticated account changes', async () => {
+    const mod = await loadRuntime();
+    echoBatch();
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await waitForTranslations(mod, [{ itemId: 'part-1', text: 'hello' }]);
+
+    mod.clearToolSummaryTranslationMemory();
+
+    expect(mod.getTranslation('part-1', 'hello', 'de', MODEL.id)).toBeUndefined();
+  });
+
+  it('caps the retry memory, evicting the oldest unresolved summaries', async () => {
+    const mod = await loadRuntime();
+    requestMock.mockRejectedValue(new Error('gateway down'));
+    const items = Array.from({ length: 201 }, (_unused, index) => ({
+      itemId: `part-${index}`,
+      text: `summary ${index}`,
+    }));
+
+    for (const item of items) {
+      mod.ensureTranslation({ ...item, language: 'de', model: MODEL });
+    }
+    await vi.waitFor(
+      () => {
+        // 201 texts arrive in 11 batches of at most 20; all fail.
+        expect(requestMock).toHaveBeenCalledTimes(11);
+      },
+      { timeout: 3000, interval: 20 }
+    );
+
+    mod.retryUnresolvedTranslations();
+    await vi.waitFor(
+      () => {
+        // At most 200 entries are remembered, so the retry sends 10 batches.
+        expect(requestMock).toHaveBeenCalledTimes(21);
+      },
+      { timeout: 3000, interval: 20 }
+    );
+    await flushBatch();
+    const retried = requestCalls()
+      .slice(11)
+      .flatMap(call => call.texts);
+    expect(retried).toHaveLength(200);
+    expect(retried).not.toContain('summary 0');
+    expect(retried).toContain('summary 200');
+  });
+});

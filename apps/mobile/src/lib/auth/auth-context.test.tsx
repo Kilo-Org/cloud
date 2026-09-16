@@ -119,6 +119,12 @@ const toolSummaryTranslationCacheMock = vi.hoisted(() => ({
   clearToolSummaryTranslationsForSignOut: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Hoisted so the sign-out test can assert the runtime's in-memory retry memory
+// is dropped with the disk scope, without loading the transcript graph.
+const toolSummaryTranslationRuntimeMock = vi.hoisted(() => ({
+  clearToolSummaryTranslationMemory: vi.fn(),
+}));
+
 // Hoisted so the FIFO and failure-matrix tests can hold remote cleanup open or
 // force it to reject without loading the tRPC/notifications chain.
 const logoutCleanupMock = vi.hoisted(() => ({
@@ -216,6 +222,15 @@ vi.mock('@/lib/query-client', () => ({
 vi.mock('@/lib/persist/read-cache', () => readCacheMock);
 
 vi.mock('@/lib/persist/tool-summary-translation-cache', () => toolSummaryTranslationCacheMock);
+
+vi.mock(
+  '@/lib/tool-summary-translation/tool-summary-translation-runtime',
+  async importOriginal => ({
+    ...(await importOriginal()),
+    clearToolSummaryTranslationMemory:
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemory,
+  })
+);
 
 vi.mock('@/lib/auth/logout-cleanup', () => logoutCleanupMock);
 
@@ -793,6 +808,11 @@ describe('sign-out teardown ordering', () => {
     // batch, before the query client is cleared.
     expect(
       toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut
+    ).toHaveBeenCalledTimes(1);
+    // The runtime's in-memory retry memory and cache hold the same tool text:
+    // without this reset the next account's retry re-sends it to the gateway.
+    expect(
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemory
     ).toHaveBeenCalledTimes(1);
     const translationClearOrder: number =
       toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut.mock

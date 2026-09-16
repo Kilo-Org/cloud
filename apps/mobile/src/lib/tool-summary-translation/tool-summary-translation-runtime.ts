@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the runtime owns the full batch/hydration/retry state machine; splitting it would scatter the invariants its generation, in-flight and retry bookkeeping share. */
 /**
  * Pure module state for tool-summary translation.
  *
@@ -9,6 +10,8 @@
  * encrypted-KV cache through `tool-summary-translation-store`, so this module
  * stays importable anywhere.
  */
+
+import type * as toolSummaryTranslationClient from './tool-summary-translation-client';
 
 import { type CachedToolSummaryTranslation } from '@/lib/persist/tool-summary-translation-cache';
 
@@ -87,6 +90,13 @@ const BATCH_WINDOW_MS = 40;
 const MAX_BATCH_TEXTS = 20;
 /** At most this many requests are in flight; the rest wait in the queue. */
 const MAX_IN_FLIGHT_BATCHES = 2;
+/**
+ * Upper bound on remembered unresolved summaries. Re-entry to an already
+ * mounted transcript is a navigation no-op, so failed work is remembered here
+ * for `retryUnresolvedTranslations` instead of waiting for a remount; the cap
+ * keeps that memory bounded to more than any single screen shows.
+ */
+const MAX_RETRYABLE_ENTRIES = 200;
 
 let config: ToolSummaryTranslationConfig = {
   enabled: false,
@@ -99,6 +109,28 @@ const cache = new Map<string, CacheEntry>();
 // the map, so a stale batch must not delete the entry its replacement stored.
 const inFlight = new Map<string, symbol>();
 const queue: QueueItem[] = [];
+// Every summary that was asked for but has not resolved, keyed like the cache.
+// A failed batch leaves its items here so `retryUnresolvedTranslations` can
+// re-queue them when the session transport comes back; a resolving batch
+// removes them. Insertion order is oldest-first, so eviction is `keys().next()`.
+const retryable = new Map<string, QueueItem>();
+// The client module loads through one memoized dynamic import, like the
+// store's: concurrent batches share the single in-flight load instead of each
+// re-importing, and a failed load is retried by the next batch.
+let clientPromise: Promise<typeof toolSummaryTranslationClient> | null = null;
+
+async function loadClient(): Promise<typeof toolSummaryTranslationClient> {
+  const pending = (clientPromise ??= import('./tool-summary-translation-client'));
+  try {
+    return await pending;
+  } catch (error) {
+    if (clientPromise === pending) {
+      clientPromise = null;
+    }
+    throw error;
+  }
+}
+
 let activeBatches = 0;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let version = 0;
@@ -231,9 +263,14 @@ export function setConfig(next: ToolSummaryTranslationConfig): void {
   // entries are cleared too: their result is discarded by `runBatch`, and
   // leaving them would make `ensureTranslation` dedupe a fresh request against
   // a summary that will never resolve, so the row would stay untranslated.
+  // The retry memory is cleared with them: mounted rows re-request under the
+  // new generation through the hook effect, so remembering the old model's
+  // failures would only make `retryUnresolvedTranslations` re-send work the
+  // user just invalidated.
   generation += 1;
   queue.length = 0;
   inFlight.clear();
+  retryable.clear();
   if (config.enabled) {
     // Warm the disk read as soon as the opt-in is on, in parallel with the
     // first transcript mount, so a cached summary is known before the flush.
@@ -269,6 +306,8 @@ function remember(resolved: ResolvedTranslation[]): void {
   for (const { key, text, translation } of resolved) {
     makeCacheRoom();
     cache.set(key, { translation, text, expiresAt });
+    // Resolved: it is no longer a retry candidate.
+    retryable.delete(key);
   }
   version += 1;
   emit();
@@ -288,12 +327,18 @@ function takeBatch(): FlushBatch | null {
   // switch) is stale, same as a key that already resolved or is in flight. An
   // expired entry or one made from different text is not "already resolved".
   const now = Date.now();
-  const eligible = queue.filter(
-    item =>
-      item.generation === generation &&
-      !isFreshCacheEntry(item.key, item.text, now) &&
-      !inFlight.has(item.key)
-  );
+  const eligible = queue.filter(item => {
+    if (item.generation !== generation) {
+      return false;
+    }
+    if (isFreshCacheEntry(item.key, item.text, now)) {
+      // Resolved through hydration or a duplicate request while this item
+      // waited: no retry memory is needed for a summary already translated.
+      retryable.delete(item.key);
+      return false;
+    }
+    return !inFlight.has(item.key);
+  });
   const head = eligible[0];
   if (head === undefined) {
     queue.length = 0;
@@ -340,7 +385,7 @@ async function runBatch(batch: FlushBatch): Promise<void> {
     inFlight.set(item.key, token);
   }
   try {
-    const { requestToolSummaryTranslations } = await import('./tool-summary-translation-client');
+    const { requestToolSummaryTranslations } = await loadClient();
     const results = await requestToolSummaryTranslations({
       texts: batch.texts,
       targetLanguage: batch.language,
@@ -437,6 +482,59 @@ export function ensureTranslation(input: {
   if (isFreshCacheEntry(key, text, Date.now()) || inFlight.has(key)) {
     return;
   }
-  queue.push({ key, itemId, text, language, model, generation });
+  const item: QueueItem = { key, itemId, text, language, model, generation };
+  queue.push(item);
+  // Remember the unresolved summary so `retryUnresolvedTranslations` can
+  // re-queue it after a connection recovery. Resolution removes it (`remember`)
+  // and the map is capped, so failures cannot grow without bound.
+  if (retryable.size >= MAX_RETRYABLE_ENTRIES) {
+    const oldest = retryable.keys().next().value;
+    if (oldest !== undefined) {
+      retryable.delete(oldest);
+    }
+  }
+  retryable.set(key, item);
   scheduleFlush();
+}
+
+/**
+ * Re-queue every summary that was asked for but never resolved. The session
+ * transport calls this when it reconnects: a batch that failed while the
+ * gateway was unreachable left its items in `retryable`, and re-entering an
+ * already-mounted transcript is a navigation no-op, so no remount would
+ * re-request them and the rows would keep showing the source language.
+ * Idempotent while a request is still in flight: `takeBatch` drops keys
+ * another batch already owns. The opt-in lifecycle needs no check here:
+ * `setConfig` clears this memory on any change, so what remains was asked
+ * for under the current configuration.
+ */
+export function retryUnresolvedTranslations(): void {
+  if (retryable.size === 0) {
+    return;
+  }
+  for (const item of retryable.values()) {
+    queue.push(item);
+  }
+  scheduleFlush();
+}
+
+/**
+ * Drop every remembered-but-unresolved summary, the queue, the in-flight
+ * bookkeeping and the in-memory cache when the authenticated account changes
+ * (sign-out or a direct account switch). The retry memory and the cache
+ * entries carry the previous account's tool text, and
+ * `retryUnresolvedTranslations` runs from the retry mount on a deep link or a
+ * connection recovery, so without this the signed-out account's summaries
+ * would be sent to the gateway under the next account's token. The generation
+ * bump discards a batch that is still in flight under the old account, and
+ * the emitted version drops every mounted row back to its source text.
+ */
+export function clearToolSummaryTranslationMemory(): void {
+  generation += 1;
+  queue.length = 0;
+  inFlight.clear();
+  retryable.clear();
+  cache.clear();
+  version += 1;
+  emit();
 }

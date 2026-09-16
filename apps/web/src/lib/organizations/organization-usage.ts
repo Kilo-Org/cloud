@@ -221,10 +221,10 @@ export async function getBalanceForOrganizationUser(
     balance: fromMicrodollars(cappedBalance),
     settings,
     plan,
-    // The cap binds when the member's remaining allowance is no larger than the
-    // organization balance. In that case the block is a per-user limit, which an
-    // organization top-up cannot resolve.
-    balanceLimitedByUserAllowance: remainingAllowance <= organization_balance,
+    // An organization top-up raises only the organization balance, so it clears
+    // the block only while the member still has allowance left. An exhausted
+    // allowance (remainingAllowance <= 0) is a per-user limit no top-up fixes.
+    balanceLimitedByUserAllowance: remainingAllowance <= 0,
   };
 }
 

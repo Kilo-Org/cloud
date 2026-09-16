@@ -151,7 +151,7 @@ describe('detectRefreshTokenReuse', () => {
     expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('stored-grant', 'stored-user');
   });
 
-  it('still detects a superseded token 41 days into the session', async () => {
+  it('still detects a superseded token late in the one-month session', async () => {
     vi.useFakeTimers();
     try {
       // Day 0: the code exchange issues the first token, then one rotation.
@@ -160,10 +160,11 @@ describe('detectRefreshTokenReuse', () => {
       await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
       await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
 
-      // Day 41: with a history that only lived 30 days this superseded row is
-      // gone, the guard forwards the replay to the provider, and the provider
-      // answers it. The history must outlive the grant the provider serves.
-      vi.setSystemTime(Date.UTC(2026, 1, 11, 12));
+      // Day 29: the last full day of the session. With a history shorter than
+      // the session this superseded row would be gone, the guard would forward
+      // the replay to the provider, and the provider would answer it. The
+      // history must cover the whole session the provider serves.
+      vi.setSystemTime(Date.UTC(2026, 0, 30, 12));
       const response = await detectRefreshTokenReuse(refreshRequest('u:g:first'), deps);
       expect(response?.status).toBe(400);
       expect(await response?.json()).toEqual({

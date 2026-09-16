@@ -1,15 +1,27 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, Tabs, usePathname, useRouter, useSegments } from 'expo-router';
 import { Bot, House, MessageCircle, MessageSquare, UserRound } from '@/components/ui/icons';
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner-native';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
 import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
+import {
+  appActionHref,
+  type AppActionRequest,
+  resolveNeedsInputHref,
+} from '@/lib/app-actions/app-action-contract';
+import { dispatchAppActionRequest } from '@/lib/app-actions/app-action-dispatch';
+import {
+  getPendingAppAction,
+  subscribePendingAppAction,
+  takePendingAppAction,
+} from '@/lib/app-actions/pending-app-action';
 import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
@@ -37,9 +49,25 @@ const TAB_BAR_ICON_STYLE = {
   alignItems: 'center',
   justifyContent: 'center',
 } satisfies ViewStyle;
+
+/** The plain tab press: the same feedback for every tab without its own move. */
+const TAB_PRESS_HAPTICS = { tabPress: () => void Haptics.selectionAsync() };
+
 export const unstable_settings = {
   initialRouteName: '(0_home)',
 };
+
+/**
+ * A `StartAgent` the OS asked for through a URL runs once the shell is up. A
+ * failure is the app's own feedback — `AGENTS.md` has every failed mutation show
+ * `result.message` — because this layout owns no screen of its own to show it.
+ */
+async function runStartAgentRequest(request: AppActionRequest): Promise<void> {
+  const result = await dispatchAppActionRequest(request);
+  if (!result.ok) {
+    toast.error(result.message);
+  }
+}
 
 function TabBarBackground() {
   return (
@@ -100,15 +128,61 @@ export default function TabsLayout() {
       reconcileSessionAttention(session.id, session.status, null);
     }
   }, [activeSessions, orgLoaded, attentionRevision]);
-  const needsInputCount = activeSessions.filter(session =>
+  const needsInputRows = activeSessions.map(session => ({
+    id: session.id,
+    status: session.status,
+    isAcked: isAttentionAcked(session.id, session.status),
+  }));
+  const needsInputCount = needsInputRows.filter(session =>
     shouldShowNeedsInput({
       status: session.status,
       raiseId: session.status,
-      isAcked: isAttentionAcked(session.id, session.status),
+      isAcked: session.isAcked,
     })
   ).length;
   const needsInputBadge =
     orgLoaded && !isLoading && !isError && needsInputCount > 0 ? needsInputCount : undefined;
+
+  // The in-app consumer for an action another surface asked for: the URL rails
+  // park one (`action-url-handler.ts`), and a completed StartAgent parks the
+  // session it created. The destination is decided here and nowhere else
+  // because this layout owns both the router and the live session list.
+  //
+  // Each branch takes the request before it acts, so a later back-gesture or an
+  // unrelated re-render cannot re-fire it. The layout shows no error of its own
+  // for an open action: the destination screen's own loading, error/retry and
+  // empty states are the states of the action.
+  const pendingAppAction = useSyncExternalStore(subscribePendingAppAction, getPendingAppAction);
+  useEffect(() => {
+    if (pendingAppAction === null) {
+      return;
+    }
+    // Wait for the live list to settle before answering "the one waiting
+    // session, or the list" — and treat a failed query as settled, because the
+    // list screen owns that error and its retry.
+    if (pendingAppAction.action === 'OpenNeedsInput' && !(orgLoaded && (!isLoading || isError))) {
+      return;
+    }
+    // Act on what this run consumed, not on the snapshot it rendered with: an
+    // effect replay (StrictMode) or a concurrent arrival can consume the slot
+    // between this render and this run, and a second navigate or a second
+    // StartAgent would be a real duplicate.
+    const request = takePendingAppAction();
+    if (request === null) {
+      return;
+    }
+    const href =
+      request.action === 'OpenNeedsInput'
+        ? resolveNeedsInputHref(needsInputRows)
+        : appActionHref(request);
+    if (href !== null) {
+      router.navigate(href);
+      return;
+    }
+    if (request.action === 'StartAgent') {
+      void runStartAgentRequest(request);
+    }
+  }, [pendingAppAction, orgLoaded, isLoading, isError, needsInputRows, router]);
 
   // If the flag flips off while the Chat tab is focused, its `href` becomes
   // null but the route is still mounted — move to Home instead.
@@ -157,11 +231,7 @@ export default function TabsLayout() {
               <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={{
-            tabPress: () => {
-              void Haptics.selectionAsync();
-            },
-          }}
+          listeners={TAB_PRESS_HAPTICS}
         />
         <Tabs.Screen
           name="(1_kiloclaw)"
@@ -212,11 +282,7 @@ export default function TabsLayout() {
               <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={{
-            tabPress: () => {
-              void Haptics.selectionAsync();
-            },
-          }}
+          listeners={TAB_PRESS_HAPTICS}
         />
         <Tabs.Screen
           name="(4_chat)"
@@ -233,11 +299,7 @@ export default function TabsLayout() {
               <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={{
-            tabPress: () => {
-              void Haptics.selectionAsync();
-            },
-          }}
+          listeners={TAB_PRESS_HAPTICS}
         />
         <Tabs.Screen
           name="(3_profile)"

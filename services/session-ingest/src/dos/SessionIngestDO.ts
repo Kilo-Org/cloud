@@ -22,6 +22,7 @@ import {
   extractStatusFromItem,
 } from './session-ingest-extractors';
 import {
+  attentionKindForNeedsInputStatus,
   buildAssistantExcerpt,
   completedAssistantMessageIdFromItemData,
   isCompletedStatus,
@@ -731,6 +732,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       attentionSignals.push({
         signalId: `status:${statusChange.value}:${ingestedAt ?? Date.now()}`,
         kind: 'needs_input',
+        attentionKind: attentionKindForNeedsInputStatus(statusChange.value),
         messageExcerpt: '',
       });
     }

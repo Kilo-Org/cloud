@@ -3105,7 +3105,8 @@
     "openAgents": "Atidaryti agentus",
     "needsInput": "Laukia atsakymo",
     "channelName": "Aktyvūs agentai",
-    "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus."
+    "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
+    "newestResult": "Naujausias rezultatas"
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",

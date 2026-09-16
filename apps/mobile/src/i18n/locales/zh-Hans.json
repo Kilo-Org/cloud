@@ -3059,7 +3059,8 @@
     "openAgents": "打开智能体",
     "needsInput": "等待输入",
     "channelName": "运行中的智能体",
-    "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。"
+    "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。",
+    "newestResult": "最新结果"
   },
   "transcriptionModel": {
     "title": "转写模型",

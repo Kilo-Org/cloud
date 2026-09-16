@@ -3059,7 +3059,8 @@
     "openAgents": "ወኪሎችን ክፈት",
     "needsInput": "ምላሽ ይፈልጋል",
     "channelName": "ንቁ ወኪሎች",
-    "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።"
+    "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።",
+    "newestResult": "አዲሱ ውጤት"
   },
   "transcriptionModel": {
     "title": "የድምጽ ወደ ጽሑፍ ሞዴል",

@@ -3059,7 +3059,8 @@
     "openAgents": "Agents openen",
     "needsInput": "Invoer nodig",
     "channelName": "Actieve agents",
-    "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien."
+    "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
+    "newestResult": "Nieuwste resultaat"
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",

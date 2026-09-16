@@ -3082,7 +3082,8 @@
     "openAgents": "Apri gli agenti",
     "needsInput": "In attesa di risposta",
     "channelName": "Agenti attivi",
-    "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco."
+    "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco.",
+    "newestResult": "Risultato più recente"
   },
   "transcriptionModel": {
     "title": "Modello di trascrizione",

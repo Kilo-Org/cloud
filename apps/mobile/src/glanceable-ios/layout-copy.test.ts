@@ -163,6 +163,7 @@ describe('withGlanceableCopy', () => {
       'idle',
       'locale',
       'needsInput',
+      'newestResult',
       'openAgents',
       'privacy',
       'running',

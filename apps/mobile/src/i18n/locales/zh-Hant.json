@@ -2374,6 +2374,8 @@
     "checkConnection": "檢查連線",
     "checks": {
       "checksCount": "{{displayCount}} 項檢查",
+      "checksCount_one": "{{displayCount}} 項檢查",
+      "checksCount_other": "{{displayCount}} 項檢查",
       "couldNotLoad": "無法載入檢查。",
       "failed": "{{displayCount}} 項失敗",
       "noAccess": "你沒有權限檢視此存放庫的檢查結果。",

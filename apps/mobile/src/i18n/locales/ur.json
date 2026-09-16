@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} زیر التوا",
       "skipped": "{{displayCount}} چھوڑی گئیں",
       "checksCount": "{{displayCount}} جانچیں",
+      "checksCount_one": "{{displayCount}} جانچ",
+      "checksCount_other": "{{displayCount}} جانچیں",
       "checkDetails": "جانچ کی تفصیلات"
     },
     "inbox": {

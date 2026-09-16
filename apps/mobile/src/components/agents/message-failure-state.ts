@@ -49,6 +49,13 @@ export type MessageFailure = {
   kind: 'delivery' | 'assistant';
   title: string;
   detail: string;
+  /**
+   * The untranslated transport text for a failed delivery ("Unauthorized:
+   * Unauthorized"), for the copy action only — same split as the terminal
+   * error's untranslated original. Never rendered; empty for an assistant
+   * failure, whose `error.data` is provider text with no diagnostic value.
+   */
+  copyDetail: string;
   canRetry: boolean;
   canCopy: boolean;
 };
@@ -64,6 +71,7 @@ export function selectMessageFailure(input: {
       kind: 'delivery',
       title: i18n.t('agentChat.messageFailure.deliveryTitle'),
       detail: i18n.t(DELIVERY_DETAIL_KEY_BY_REASON[deliveryState.reason]),
+      copyDetail: deliveryState.error,
       canRetry: true,
       canCopy: true,
     };
@@ -75,6 +83,7 @@ export function selectMessageFailure(input: {
       kind: 'assistant',
       title: i18n.t('agentChat.messageFailure.assistantTitle'),
       detail: assistantDetail(errorName),
+      copyDetail: '',
       canRetry: !NON_RETRYABLE_ASSISTANT_ERRORS.includes(errorName),
       canCopy: false,
     };

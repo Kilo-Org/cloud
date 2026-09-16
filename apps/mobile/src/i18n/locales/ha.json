@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} suna jira",
       "skipped": "an tsallake {{displayCount}}",
       "checksCount": "gwaje-gwaje {{displayCount}}",
+      "checksCount_one": "gwaji {{displayCount}}",
+      "checksCount_other": "gwaje-gwaje {{displayCount}}",
       "checkDetails": "cikakken bayanin gwaji"
     },
     "inbox": {

@@ -1,15 +1,19 @@
-import { parseGitHubPrUrl } from '@/lib/github-pr-url';
+import { type Href } from 'expo-router';
 
-type CodeReviewerOpenPrDestination =
-  | { kind: 'in-app'; owner: string; repo: string; number: number }
-  | { kind: 'browser' };
+import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
+import { parseProviderPrUrl } from '@/lib/pr-review/provider-pr-url';
+
+type CodeReviewerOpenPrDestination = { kind: 'in-app'; href: Href } | { kind: 'browser' };
 
 /**
  * Decide whether "Open pull request" should navigate in-app or open the browser.
  *
- * In-app only when the PR-review feature flag is on and `prUrl` is a parseable
- * github.com PR URL. Everything else (flag off, Enterprise/GitLab/Bitbucket,
- * malformed) keeps today's browser path.
+ * In-app only when the PR-review feature flag is on and `prUrl` names a review
+ * the provider routes serve: a github.com pull request, a GitLab merge request
+ * (gitlab.com or a self-managed host) or a Bitbucket pull request. The URL
+ * parses through the one provider resolver and the path comes from the one
+ * provider route builder, so all three providers land on the same screen tree.
+ * Anything else (flag off, GitHub Enterprise, malformed) keeps the browser path.
  */
 export function resolveCodeReviewerOpenPrDestination(
   prUrl: string,
@@ -18,9 +22,9 @@ export function resolveCodeReviewerOpenPrDestination(
   if (!prReviewEnabled) {
     return { kind: 'browser' };
   }
-  const parsed = parseGitHubPrUrl(prUrl);
-  if (!parsed) {
+  const ref = parseProviderPrUrl(prUrl);
+  if (!ref) {
     return { kind: 'browser' };
   }
-  return { kind: 'in-app', owner: parsed.owner, repo: parsed.repo, number: parsed.number };
+  return { kind: 'in-app', href: providerPrRoutePath(ref) };
 }

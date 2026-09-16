@@ -2374,6 +2374,8 @@
     "checkConnection": "연결 확인",
     "checks": {
       "checksCount": "검사 {{displayCount}}개",
+      "checksCount_one": "검사 {{displayCount}}개",
+      "checksCount_other": "검사 {{displayCount}}개",
       "couldNotLoad": "검사 결과를 불러오지 못했습니다.",
       "failed": "{{displayCount}}개 실패",
       "noAccess": "이 저장소의 검사 결과를 볼 권한이 없습니다.",

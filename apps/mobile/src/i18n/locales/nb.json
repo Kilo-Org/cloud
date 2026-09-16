@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} venter",
       "skipped": "{{displayCount}} hoppet over",
       "checksCount": "{{displayCount}} sjekker",
+      "checksCount_one": "{{displayCount}} sjekk",
+      "checksCount_other": "{{displayCount}} sjekker",
       "checkDetails": "detaljer om sjekken"
     },
     "inbox": {

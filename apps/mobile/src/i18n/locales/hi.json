@@ -2374,6 +2374,8 @@
     "checkConnection": "कनेक्शन जाँचें",
     "checks": {
       "checksCount": "{{displayCount}} जाँचें",
+      "checksCount_one": "{{displayCount}} जाँच",
+      "checksCount_other": "{{displayCount}} जाँचें",
       "couldNotLoad": "जाँचें लोड नहीं हो सकीं।",
       "failed": "{{displayCount}} विफल",
       "noAccess": "आपको इस रिपॉज़िटरी की जाँचें देखने की अनुमति नहीं है।",

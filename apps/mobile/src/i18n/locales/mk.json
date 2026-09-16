@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} на чекање",
       "skipped": "{{displayCount}} прескокнати",
       "checksCount": "{{displayCount}} проверки",
+      "checksCount_one": "{{displayCount}} проверка",
+      "checksCount_other": "{{displayCount}} проверки",
       "checkDetails": "детали за проверката"
     },
     "inbox": {

@@ -393,10 +393,13 @@ private class JetpackSearchBackend(context: Context) : SearchBackend {
   }
 
   override fun clear() {
-    // A remove-by-query answers with a batch result: a wipe the store could not
-    // finish for every document is a failure, not a success, so the sign-out
-    // clear reports it instead of resolving without an error.
-    checkBatch(session.removeAsync("", jetpackNamespaceSpec()).awaitFuture())
+    // Unlike `put` and `remove` by id, a remove-by-query answers with the wipe's
+    // own completion rather than a batch result: `removeAsync(queryExpression,
+    // searchSpec)` resolves to `Void` and fails the future when the store cannot
+    // finish the wipe, so awaiting it — not `checkBatch` — is what makes a
+    // failed clear throw instead of resolving as success. The platform store's
+    // remove-by-query answers a completion too.
+    session.removeAsync("", jetpackNamespaceSpec()).awaitFuture()
   }
 
   override fun stored(): List<StoredDocument> {

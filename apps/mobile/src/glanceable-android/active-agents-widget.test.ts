@@ -29,7 +29,7 @@ type MockElement = {
     clickAction?: string;
     clickActionData?: { uri?: string };
     accessibilityLabel?: string;
-    style?: { backgroundColor?: string };
+    style?: { backgroundColor?: string; height?: number };
     children?: unknown;
   };
 };
@@ -358,6 +358,33 @@ describe('renderActiveAgentsWidget', () => {
 
     expect(approve?.props.accessibilityLabel).toBe('Approve');
     expect(collectText(approve)).toEqual(['Approve']);
+  });
+
+  // The chip is the widget's only in-place action, and its whole box is the tap
+  // target, so it holds Android's 48 dp minimum instead of sizing to the label.
+  it('gives both action chips a full-height tap target', () => {
+    const approveProps = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'question' }], 0),
+      {},
+      translate
+    );
+    const emptyProps = buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate);
+
+    const chips = [
+      findElement(
+        render(approveProps, { width: 250 }).light,
+        element => element.props.clickAction === 'approve'
+      ),
+      findElement(
+        render(emptyProps, { width: 250 }).light,
+        element => element.props.clickAction === 'new-agent'
+      ),
+    ];
+
+    for (const chip of chips) {
+      expect(chip?.props.style?.height).toBeGreaterThanOrEqual(44);
+      expect(chip?.props.style?.height).toBeLessThanOrEqual(48);
+    }
   });
 
   it('draws the New agent row for the empty state, and no Approve row', () => {

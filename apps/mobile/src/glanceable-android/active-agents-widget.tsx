@@ -215,6 +215,13 @@ const NEWEST_LINE_DP = { compact: 15, row: 16, stack: 18 } satisfies Record<Size
 const NEWEST_FONT_DP = { compact: 11, row: 12, stack: 12 } satisfies Record<Size, number>;
 /** One action-row size in every bucket, so the rows themselves never reflow. */
 const ACTION_FONT_DP = 12;
+/**
+ * The action chip's tap target, in dp. The chip is the widget's only in-place
+ * action, so it holds Android's 48 dp minimum target; a 12 dp label with 4 dp
+ * of vertical padding drew a ~25 dp chip and a hurried tap missed it. The
+ * label is centered in the taller chip.
+ */
+const ACTION_TARGET_DP = 48;
 
 function renderCounts(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
   if (props.countLines.length === 0) {
@@ -281,6 +288,9 @@ function newestSlot(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
  * One in-place action. A custom `clickAction` string makes the library launch a
  * headless task (`register.ts`) instead of opening the app, so the body keeps
  * its own `OPEN_URI` deep link and a tap beside the rows still opens Kilo.
+ *
+ * The chip is `ACTION_TARGET_DP` tall with the label centered: the target is
+ * the whole chip, so the old padded-to-the-text height made taps miss.
  */
 function actionRow(label: string, clickAction: 'approve' | 'new-agent', palette: Palette) {
   return (
@@ -291,8 +301,8 @@ function actionRow(label: string, clickAction: 'approve' | 'new-agent', palette:
       style={{
         flexDirection: 'row',
         alignItems: 'center',
+        height: ACTION_TARGET_DP,
         paddingHorizontal: 10,
-        paddingVertical: 4,
         borderWidth: 1,
         borderColor: palette.muted,
         borderRadius: 8,

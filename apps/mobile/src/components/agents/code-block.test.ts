@@ -89,6 +89,20 @@ function chunkLineCount(chunk: TestRenderer.ReactTestInstance): number {
   return Array.isArray(children) ? children.length : 0;
 }
 
+/** Every string in a node's rendered children, depth first. */
+function renderedStrings(node: unknown): string[] {
+  if (typeof node === 'string') {
+    return [node];
+  }
+  if (Array.isArray(node)) {
+    return node.flatMap(item => renderedStrings(item));
+  }
+  if (node && typeof node === 'object' && 'props' in node) {
+    return renderedStrings((node as { props: { children?: unknown } }).props.children);
+  }
+  return [];
+}
+
 /** The intrinsic-width content wrapper of the sheet scroll mode. */
 function codeScrollContent(
   root: TestRenderer.ReactTestInstance
@@ -529,6 +543,18 @@ describe('CodeBlock', () => {
     expect(chunks.length).toBeGreaterThan(0);
     expect(chunks.length).toBeLessThan(100);
     expect(colorRuns(renderer.root)).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('renders no blank code line for an empty fence', async () => {
+    // Regression: the blank-line placeholder keeps the box of a blank line
+    // that sits among other lines. An empty fence has no other line, so it
+    // keeps the zero-height empty code Text the whole-fence RNText rendered
+    // instead of gaining a blank code line.
+    const renderer = await mount(blockElement({ code: '', language: 'typescript' }));
+    const [fence] = codeLines(renderer.root);
+    expect(fence).toBeDefined();
+    expect(renderedStrings(propOf(fence, 'children'))).not.toContain(' ');
     await unmount(renderer);
   });
 

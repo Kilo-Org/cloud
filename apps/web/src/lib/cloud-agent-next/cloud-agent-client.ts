@@ -318,6 +318,12 @@ export type GetSessionInput = {
   cloudAgentSessionId: string;
 };
 
+/** Interactions a cloud-agent session currently waits on. */
+export type GetPendingInteractionsOutput = {
+  questions: unknown[];
+  permissions: unknown[];
+};
+
 export type GetWorktreeFileInput = GetSessionInput & WorktreeFileQuery;
 
 /** Execution status for getSession response */
@@ -606,6 +612,9 @@ type CloudAgentNextTRPCClient = {
   };
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
+  };
+  getPendingInteractions: {
+    query: (input: GetSessionInput) => Promise<GetPendingInteractionsOutput>;
   };
   getWorktreeChanges: {
     query: (input: GetSessionInput) => Promise<unknown>;
@@ -1149,6 +1158,21 @@ export class CloudAgentNextClient {
           endpoint: 'answerPermission',
         },
         extra: { sessionId: input.sessionId, permissionId: input.permissionId },
+      });
+      throw error;
+    }
+  }
+
+  async getPendingInteractions(cloudAgentSessionId: string): Promise<GetPendingInteractionsOutput> {
+    try {
+      return await this.client.getPendingInteractions.query({ cloudAgentSessionId });
+    } catch (error) {
+      captureException(error, {
+        tags: {
+          source: 'cloud-agent-next-client',
+          endpoint: 'getPendingInteractions',
+        },
+        extra: { cloudAgentSessionId },
       });
       throw error;
     }

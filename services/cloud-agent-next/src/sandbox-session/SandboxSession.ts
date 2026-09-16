@@ -1592,6 +1592,10 @@ export class SandboxSession extends DurableObject<Env> {
     }
   }
 
+  async getPendingInteractions(): Promise<{ questions: unknown[]; permissions: unknown[] }> {
+    return this.derivePendingInteractions() ?? { questions: [], permissions: [] };
+  }
+
   async getWorktreeChanges(): Promise<GetWorktreeChangesOutput> {
     if (this.deletedWorktreeId || this.terminalLifecycle.isBlocked()) return { snapshot: null };
     return this.worktreeChanges.get();

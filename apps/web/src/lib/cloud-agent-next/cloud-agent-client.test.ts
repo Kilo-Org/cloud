@@ -1104,6 +1104,33 @@ describe('CloudAgentNextClient.getSandboxStatus', () => {
   });
 });
 
+describe('CloudAgentNextClient.getPendingInteractions', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const query = jest.fn<(input: { cloudAgentSessionId: string }) => Promise<unknown>>();
+  const { CloudAgentNextClient } =
+    jest.requireActual<typeof CloudAgentClientModule>('./cloud-agent-client');
+  let client: InstanceType<typeof CloudAgentNextClient>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    query.mockReset();
+    jest.mocked(createTRPCClient).mockReturnValue({ getPendingInteractions: { query } } as never);
+    client = new CloudAgentNextClient('test-token');
+  });
+
+  it('calls the Worker procedure and unwraps the pending interactions it returns', async () => {
+    const pending = {
+      questions: [{ id: 'q_1', sessionID: 'ses_root' }],
+      permissions: [{ id: 'perm_1', sessionID: 'ses_root' }],
+    };
+    query.mockResolvedValue(pending);
+
+    await expect(client.getPendingInteractions(cloudAgentSessionId)).resolves.toEqual(pending);
+    expect(query).toHaveBeenCalledWith({ cloudAgentSessionId });
+    expect(captureException).not.toHaveBeenCalled();
+  });
+});
+
 describe('closeCloudAgentOrgStreams', () => {
   const originalFetch = global.fetch;
 

@@ -11,6 +11,7 @@ import type { WrapperClient } from '../../kilo/wrapper-client.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { sessionPlaneFromId } from '../../session-plane.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
+import { withDORetry } from '../../utils/do-retry.js';
 
 type InteractiveSessionTarget =
   | { kind: 'control'; stub: ReturnType<typeof getSandboxSessionStub> }
@@ -165,6 +166,33 @@ export function createSessionQuestionHandlers() {
             });
           }
         });
+      }),
+
+    /**
+     * Read the interactions a control-plane session currently waits on. A
+     * caller must own the session: an unauthorized read fails rather than
+     * reporting an empty pending set.
+     */
+    getPendingInteractions: protectedProcedure
+      .input(z.object({ cloudAgentSessionId: sessionIdSchema }))
+      .output(
+        z.object({
+          questions: z.array(z.unknown()),
+          permissions: z.array(z.unknown()),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        const { userId, env } = ctx;
+        await requireCurrentSessionAccess({
+          env,
+          kiloUserId: userId,
+          cloudAgentSessionId: input.cloudAgentSessionId,
+        });
+        return await withDORetry(
+          () => getSandboxSessionStub(env, userId, input.cloudAgentSessionId),
+          stub => stub.getPendingInteractions(),
+          'getPendingInteractions'
+        );
       }),
   };
 }

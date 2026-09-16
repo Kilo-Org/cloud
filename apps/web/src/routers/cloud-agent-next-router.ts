@@ -38,6 +38,8 @@ import {
   baseGetSessionNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
+  baseGetPendingInteractionsNextSchema,
+  baseGetPendingInteractionsNextOutputSchema,
   baseWorktreeChangesNextSchema,
   baseWorktreeFileNextSchema,
   baseAnswerQuestionNextSchema,
@@ -617,6 +619,20 @@ export const cloudAgentNextRouter = createTRPCRouter({
       return await createCloudAgentNextClient(
         await createCloudAgentControlToken(ctx.user, ctx.headersList)
       ).getSandboxStatus(input.cloudAgentSessionId);
+    }),
+
+  /**
+   * Read the interactions a session currently waits on. Ownership is checked
+   * first, so a foreign session fails instead of reading an empty set.
+   */
+  getPendingInteractions: baseProcedure
+    .input(baseGetPendingInteractionsNextSchema)
+    .output(baseGetPendingInteractionsNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.getPendingInteractions(input.cloudAgentSessionId);
     }),
 
   getComputeBillingStatus: baseProcedure

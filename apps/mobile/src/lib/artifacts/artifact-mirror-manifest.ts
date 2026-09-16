@@ -46,7 +46,7 @@ const artifactMirrorSessionSchema = z.object({
   files: z.array(artifactMirrorFileSchema),
 });
 
-export const artifactMirrorManifestSchema = z.object({
+const artifactMirrorManifestSchema = z.object({
   version: z.literal(ARTIFACT_MIRROR_MANIFEST_VERSION),
   updatedAt: z.string(),
   sessions: z.array(artifactMirrorSessionSchema),

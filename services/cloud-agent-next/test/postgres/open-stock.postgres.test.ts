@@ -16,8 +16,16 @@ const { getPgDbMock } = vi.hoisted(() => ({ getPgDbMock: vi.fn() }));
 
 vi.mock('../../src/db/pg.js', () => ({ getPgDb: getPgDbMock }));
 
-const STOCK_RETENTION_CUTOFF = '2020-01-01T00:00:00.000Z';
-const SESSION_CREATED_AT = '2026-02-01T00:00:00.000Z';
+// Fixture timestamps sit above the real retained reporting population, so
+// pre-existing rows are excluded by the reader's own retention predicate rather
+// than by an empty table. Exact counts assume nothing else creates sessions in
+// this reserved post-2095 range and that two runs of this suite do not share a
+// database concurrently. These fixtures are cleaned up per test, but the
+// terminal-exclusion fixture still carries a real 2026 terminal_at, so normal
+// serialized execution with per-test cleanup is what keeps the sibling outcome
+// suite unaffected.
+const FIXTURE_RETENTION_CUTOFF = '2095-01-01T00:00:00.000Z';
+const FIXTURE_CREATED_AT = '2096-02-01T00:00:00.000Z';
 
 let connectionString: string;
 let reader: WorkerDb;
@@ -63,7 +71,7 @@ async function insertRun(values: {
   });
 }
 
-async function readStock(cutoff = STOCK_RETENTION_CUTOFF): Promise<OpenStockQueryRow[]> {
+async function readStock(cutoff = FIXTURE_RETENTION_CUTOFF): Promise<OpenStockQueryRow[]> {
   return readOpenStock(reader, { retentionCutoff: cutoff });
 }
 
@@ -117,7 +125,7 @@ afterAll(async () => {
 describe('cloud agent open stock against PostgreSQL', () => {
   it('counts a null-age queued row beside a timestamped one in the same session', async () => {
     const sessionId = uniqueSessionId('agent');
-    await insertSession(sessionId, SESSION_CREATED_AT);
+    await insertSession(sessionId, FIXTURE_CREATED_AT);
     const queuedAt = '2026-02-01T00:05:00.000Z';
     await insertRun({ cloudAgentSessionId: sessionId, status: 'queued', queuedAt });
     await insertRun({ cloudAgentSessionId: sessionId, status: 'queued', queuedAt: null });
@@ -132,11 +140,11 @@ describe('cloud agent open stock against PostgreSQL', () => {
 
   it('keeps an all-null queued group and an all-null accepted group with null ages', async () => {
     const queuedSession = uniqueSessionId('agent');
-    await insertSession(queuedSession, SESSION_CREATED_AT);
+    await insertSession(queuedSession, FIXTURE_CREATED_AT);
     await insertRun({ cloudAgentSessionId: queuedSession, status: 'queued', queuedAt: null });
 
     const acceptedSession = uniqueSessionId('agent');
-    await insertSession(acceptedSession, SESSION_CREATED_AT);
+    await insertSession(acceptedSession, FIXTURE_CREATED_AT);
     await insertRun({
       cloudAgentSessionId: acceptedSession,
       status: 'accepted',
@@ -164,7 +172,7 @@ describe('cloud agent open stock against PostgreSQL', () => {
 
   it('excludes terminal statuses and non-terminal rows that carry a terminal_at', async () => {
     const sessionId = uniqueSessionId('agent');
-    await insertSession(sessionId, SESSION_CREATED_AT);
+    await insertSession(sessionId, FIXTURE_CREATED_AT);
     const terminalAt = '2026-02-01T00:05:00.000Z';
     await insertRun({ cloudAgentSessionId: sessionId, status: 'completed', terminalAt });
     await insertRun({ cloudAgentSessionId: sessionId, status: 'failed', terminalAt });
@@ -192,11 +200,11 @@ describe('cloud agent open stock against PostgreSQL', () => {
       `Workspace_${randomUUID()}`,
     ];
     for (const sessionId of sessionIds) {
-      await insertSession(sessionId, SESSION_CREATED_AT);
+      await insertSession(sessionId, FIXTURE_CREATED_AT);
       await insertRun({
         cloudAgentSessionId: sessionId,
         status: 'queued',
-        queuedAt: SESSION_CREATED_AT,
+        queuedAt: FIXTURE_CREATED_AT,
       });
     }
 
@@ -209,7 +217,7 @@ describe('cloud agent open stock against PostgreSQL', () => {
 
   it('keeps the queued and accepted ages separate with discriminating timestamps', async () => {
     const sessionId = uniqueSessionId('agent');
-    await insertSession(sessionId, SESSION_CREATED_AT);
+    await insertSession(sessionId, FIXTURE_CREATED_AT);
     const queuedAt = '2026-02-01T00:00:00.000Z';
     const acceptedQueuedAt = '2026-01-01T00:00:00.000Z';
     const dispatchAcceptedAt = '2026-02-01T00:05:00.000Z';
@@ -232,7 +240,7 @@ describe('cloud agent open stock against PostgreSQL', () => {
 
   it('counts two open turns in one session as two turns and one session', async () => {
     const sessionId = uniqueSessionId('agent');
-    await insertSession(sessionId, SESSION_CREATED_AT);
+    await insertSession(sessionId, FIXTURE_CREATED_AT);
     await insertRun({
       cloudAgentSessionId: sessionId,
       status: 'queued',
@@ -253,7 +261,7 @@ describe('cloud agent open stock against PostgreSQL', () => {
   });
 
   it('retains only sessions created strictly after the cutoff', async () => {
-    const cutoff = '2026-01-15T00:00:00.000Z';
+    const cutoff = '2096-01-15T00:00:00.000Z';
     const atCutoff = uniqueSessionId('agent');
     const older = uniqueSessionId('agent');
     const newer = uniqueSessionId('agent');
@@ -264,7 +272,7 @@ describe('cloud agent open stock against PostgreSQL', () => {
       await insertRun({
         cloudAgentSessionId: sessionId,
         status: 'queued',
-        queuedAt: SESSION_CREATED_AT,
+        queuedAt: FIXTURE_CREATED_AT,
       });
     }
 
@@ -275,7 +283,7 @@ describe('cloud agent open stock against PostgreSQL', () => {
 
   it('returns exact finite epoch milliseconds and numeric counts from the raw reader', async () => {
     const sessionId = uniqueSessionId('agent');
-    await insertSession(sessionId, SESSION_CREATED_AT);
+    await insertSession(sessionId, FIXTURE_CREATED_AT);
     const queuedAt = '2026-02-01T00:02:00.000Z';
     const dispatchAcceptedAt = '2026-02-01T00:07:00.000Z';
     await insertRun({ cloudAgentSessionId: sessionId, status: 'queued', queuedAt });
@@ -286,7 +294,7 @@ describe('cloud agent open stock against PostgreSQL', () => {
     });
 
     const controlSessionId = uniqueSessionId('workspace');
-    await insertSession(controlSessionId, SESSION_CREATED_AT);
+    await insertSession(controlSessionId, FIXTURE_CREATED_AT);
     await insertRun({
       cloudAgentSessionId: controlSessionId,
       status: 'accepted',

@@ -110,17 +110,6 @@ type ServiceState = {
 
 const INITIAL_ACTIVITY: SessionActivity = { type: 'connecting' };
 const IDLE_STATUS: AgentStatus = { type: 'idle' };
-/**
- * Fixed English copy for the session status a failed message delivery raises.
- * The transport error text (`event.error`) is raw ("Unauthorized:
- * Unauthorized") and must never reach the screen: the failed row's typed
- * failure footer renders the localized copy and keeps the original behind its
- * copy action, so the status the transcript area renders gets this line
- * instead. Never matched by `classifyTerminalError`'s service strings — an
- * unknown class shows the generic line, same as any unclassified transport
- * text did.
- */
-const MESSAGE_DELIVERY_FAILED_STATUS = 'Message delivery failed';
 
 /**
  * FIFO upsert. A repeat of the same requestId replaces the entry in place —
@@ -669,23 +658,25 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     // cancelling, not a failure, so it clears the stale status instead of
     // raising an error banner.
     if (preparingWithoutActiveTurn) {
-      cloudStatus =
-        event.reason === 'interrupted'
-          ? null
-          : { type: 'error', message: MESSAGE_DELIVERY_FAILED_STATUS };
+      cloudStatus = event.reason === 'interrupted' ? null : { type: 'error', message: event.error };
     }
     if (isActiveMessage || (preparingWithoutActiveTurn && event.reason === 'interrupted')) {
       activeMessageId = null;
       activity = { type: 'idle' };
       cloudStatus = null;
       setupLog = [];
-      // The raw transport error (`event.error`) stays out of the status the
-      // transcript area renders; the failed row's typed footer carries the
-      // user-facing copy and the original rides behind its copy action.
+      // The status carries `event.error`, the Durable Object's own safe
+      // projection of the failure ("Assistant request failed: insufficient
+      // credits", "Workspace setup failed", "No model was selected", a repo
+      // auth failure), so a client that renders the status verbatim — web and
+      // the extension — keeps the specific reason and the extension's credits
+      // detection still matches. The mobile transcript maps the text to the
+      // app's classified copy and the failed row's typed footer keeps the
+      // original behind its copy action.
       status =
         event.reason === 'interrupted'
           ? { type: 'interrupted' }
-          : { type: 'error', message: MESSAGE_DELIVERY_FAILED_STATUS };
+          : { type: 'error', message: event.error };
       terminated = true;
       disconnectedSource = null;
       completed = false;

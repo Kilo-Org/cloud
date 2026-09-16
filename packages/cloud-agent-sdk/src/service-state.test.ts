@@ -1949,12 +1949,13 @@ describe('createServiceState', () => {
         reason: 'exhausted',
       });
 
-      // The status the transcript area renders never carries the raw transport
-      // text; the failed row's typed footer does, and its Copy action keeps the
-      // original (same split as the accepted-turn settlement below).
+      // The status carries `event.error`, the Durable Object's safe projection
+      // of the failure, so the specific reason survives to the clients that
+      // render it; the failed row's typed footer and its Copy action keep the
+      // reader's copy.
       expect(state.getCloudStatus()).toEqual({
         type: 'error',
-        message: 'Message delivery failed',
+        message: 'Environment preparation failed',
       });
       expect(state.getPendingMessages().get('m1')).toEqual({
         status: 'failed',

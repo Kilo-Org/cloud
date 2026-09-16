@@ -638,8 +638,10 @@ describe('authoritative message failure settlement', () => {
         reason: 'wrapper_disconnected',
         error: 'The message failed',
       },
-      // Raw transport text must not reach the screen; the fixed delivery copy does.
-      expectedStatus: { type: 'error', message: 'Message delivery failed' },
+      // The status carries `event.error`, the Durable Object's safe projection
+      // of the failure; web and the extension render it, and the mobile
+      // transcript maps it to its own classified copy.
+      expectedStatus: { type: 'error', message: 'The message failed' },
       expectedReason: 'execution',
     },
     {
@@ -832,8 +834,8 @@ describe('authoritative message failure settlement', () => {
         const failureStatus =
           reason === 'interrupted'
             ? { type: 'interrupted' }
-            : // The raw transport text stays out of the status the screen renders.
-              { type: 'error', message: 'Message delivery failed' };
+            : // The status carries the failure's own safe projection (`error`).
+              { type: 'error', message: 'Previous turn failed' };
         expect(snapshot().agentStatus).toEqual(failureStatus);
         const failedDelivery = store.get(manager.atoms.pendingMessages).get('previous-turn');
         const failureIndicator = store.get(manager.atoms.statusIndicator);
@@ -925,7 +927,7 @@ describe('authoritative message failure settlement', () => {
       );
       expect(snapshot()).toMatchObject({
         activity: { type: 'idle' },
-        agentStatus: { type: 'error', message: 'Message delivery failed' },
+        agentStatus: { type: 'error', message: 'The message failed' },
         isStreaming: false,
         canSend: true,
         pendingQuestions: [],

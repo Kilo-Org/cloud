@@ -95,19 +95,21 @@ export function mergeSessionTranscript(
   for (const message of messages) {
     messageIds.add(message.info.id);
     const failed = deliveryStates?.get(message.info.id)?.status === 'failed';
-    // An unconfirmed row with nothing to render stays invisible: unlike a
+    // An unconfirmed row with no parts at all stays invisible: unlike a
     // confirmed user row (whose parts may still stream in, so a zero-part row
-    // stays transient), a client materialised row that lost its text will not
-    // gain content on its own — it would otherwise leave the reported empty
-    // yellow stub above the submitted text. The row is keyed by the id the
-    // client sent (the server honors `messageId`), so the run that failed it
-    // attaches here and a failed submission keeps its one row with the typed
-    // footer. Two rows with the same prompt are two submissions and stay two
-    // rows. If the server later confirms the id, the authoritative record
+    // stays transient), a client materialised row that never received its parts
+    // will not gain content on its own — it would otherwise leave the reported
+    // empty yellow stub above the submitted text. A synthetic row whose parts
+    // exist but render nothing is already dropped by `messageRendersContent`
+    // below, so this rule only has to name the zero-part case. The row is keyed
+    // by the id the client sent (the server honors `messageId`), so the run that
+    // failed it attaches here and a failed submission keeps its one row with the
+    // typed footer. Two rows with the same prompt are two submissions and stay
+    // two rows. If the server later confirms the id, the authoritative record
     // replaces the info and the row re-renders through the normal path.
-    const permanentlyInvisible =
-      isUnconfirmedSubmission(message) && !failed && !message.parts.some(partRendersContent);
-    if (!permanentlyInvisible && (messageRendersContent(message) || failed)) {
+    const unconfirmedWithoutParts =
+      isUnconfirmedSubmission(message) && !failed && message.parts.length === 0;
+    if (!unconfirmedWithoutParts && (messageRendersContent(message) || failed)) {
       const created = message.info.time.created;
       // One validity rule, shared with the marker component: a timestamp the label
       // cannot format must never produce a marker row.

@@ -111,23 +111,46 @@ function retryableClass(cls: TerminalErrorClass): boolean {
 }
 
 /**
- * The SDK's own fixed string for an exhausted delivery failure
- * (session-manager.ts `onMessageFailed`). It is app copy, not provider text, and
- * already has translated copy of its own.
+ * The SDK's own fixed strings for an exhausted delivery failure. Both are app
+ * copy, not provider text, and already have translated copy of their own:
+ * `session-manager.ts`'s `onMessageFailed` writes the first for a retry
+ * exhaustion, and the status the SDK stores for a failed delivery — the
+ * `cloud.message.failed` status plus the normalizer's fallback when that event
+ * carries no error — carries the second. The web and extension status
+ * indicators render the same second string.
  */
-const DELIVERY_FAILED_INDICATOR = 'Message failed to deliver';
+const DELIVERY_FAILED_INDICATORS = new Set([
+  'Message failed to deliver',
+  'Message delivery failed',
+]);
+
+/**
+ * The SDK's own fixed error copy. The SDK writes these strings itself
+ * (service-state.ts, session-manager.ts) rather than forwarding a provider's or
+ * the transport's text, so they are already the reader's copy: the indicator
+ * shows them as-is, exactly as it shows the SDK's `progress` and `info`
+ * messages. Only text the SDK merely forwards goes through the classifier.
+ */
+const SDK_FIXED_ERROR_MESSAGES = new Set([
+  'Agent connection lost',
+  'Session terminated',
+  'Failed to stop execution',
+]);
 
 /**
  * The reader's own copy for a session error in the transcript's status slot
- * (session-status-indicator.tsx). The message is the provider's or the
- * transport's own English string; the reader sees the classified copy instead,
- * never the original — the same rule `resolveSessionTerminalError` follows for
- * the empty-transcript state. An unrecognized string is still a failed agent
- * run, so it gets the assistant-failure line rather than a generic one.
+ * (session-status-indicator.tsx). A provider's or the transport's own English
+ * string never reaches the reader; the classified copy does instead — the same
+ * rule `resolveSessionTerminalError` follows for the empty-transcript state. An
+ * unrecognized string is still a failed agent run, so it gets the
+ * assistant-failure line rather than a generic one.
  */
 export function sessionStatusErrorMessage(raw: string): string {
-  if (raw === DELIVERY_FAILED_INDICATOR) {
+  if (DELIVERY_FAILED_INDICATORS.has(raw)) {
     return i18n.t('agentChat.messageFailure.deliveryTitle');
+  }
+  if (SDK_FIXED_ERROR_MESSAGES.has(raw)) {
+    return raw;
   }
   const cls = classifyTerminalError(raw);
   return cls === 'unknown'

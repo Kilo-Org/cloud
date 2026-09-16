@@ -70,6 +70,22 @@ describe('SessionStatusIndicator mounted', () => {
     ).resolves.toEqual(['Not enough credits to run Cloud Agent. Add credits and try again.']);
   });
 
+  // The SDK writes these lines itself; they are its own fixed copy, not a
+  // provider or transport string, so the indicator shows them as-is.
+  it.each([
+    ['Agent connection lost'],
+    ['Session terminated'],
+    ['Failed to stop execution'],
+  ] as const)('renders the SDK fixed copy for %s', async message => {
+    await expect(textNodes({ type: 'error', message, timestamp: 0 })).resolves.toEqual([message]);
+  });
+
+  it('renders the delivery copy for the SDK delivery status', async () => {
+    await expect(
+      textNodes({ type: 'error', message: 'Message delivery failed', timestamp: 0 })
+    ).resolves.toEqual(['Failed to deliver']);
+  });
+
   it('renders fixed retry copy, never the provider text, while the agent retries', async () => {
     const texts = await textNodes({
       type: 'warning',

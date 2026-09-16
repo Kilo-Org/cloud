@@ -189,9 +189,23 @@ describe('sessionStatusErrorMessage', () => {
       'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
       'Not enough credits to run Cloud Agent. Add credits and try again.',
     ],
+    // Both SDK status strings for a failed delivery reach the delivery copy:
+    // session-manager's exhaustion indicator and the cloud status written for
+    // `cloud.message.failed` (also the normalizer's fallback).
     ['Message failed to deliver', 'Failed to deliver'],
+    ['Message delivery failed', 'Failed to deliver'],
   ] as const)('maps %s to typed copy', (raw, expected) => {
     expect(sessionStatusErrorMessage(raw)).toBe(expected);
+  });
+
+  // The SDK writes these strings itself, so they are already the reader's copy
+  // and must not be replaced by the generic failure line.
+  it.each([
+    ['Agent connection lost'],
+    ['Session terminated'],
+    ['Failed to stop execution'],
+  ] as const)('shows the SDK fixed copy for %s', raw => {
+    expect(sessionStatusErrorMessage(raw)).toBe(raw);
   });
 
   it('never returns the raw text', () => {

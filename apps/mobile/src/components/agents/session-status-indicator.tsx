@@ -27,9 +27,11 @@ function IndicatorContent({ indicator }: Readonly<SessionStatusIndicatorProps>) 
 
   switch (indicator.type) {
     case 'error': {
-      // The SDK message is the provider's or the transport's own English text
-      // ("Unauthorized: Unauthorized", "simulated error"). The transcript shows
-      // the app's classified copy; the original is never the reader's copy.
+      // The SDK message is usually the provider's or the transport's own
+      // English text ("Unauthorized: Unauthorized", "simulated error"). The
+      // transcript shows the app's classified copy; the original is never the
+      // reader's copy. The SDK's own fixed copy is the exception:
+      // `sessionStatusErrorMessage` returns it unchanged.
       return (
         <View className="flex-row items-center gap-2">
           <AlertCircle size={14} color={colors.destructive} />

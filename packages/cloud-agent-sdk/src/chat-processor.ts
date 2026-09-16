@@ -1,4 +1,8 @@
-import { normalizeMissingPartText, stripPartContentIfFile } from './part-utils';
+import {
+  normalizeMissingPartText,
+  normalizeMissingPatchFiles,
+  stripPartContentIfFile,
+} from './part-utils';
 import type { ChatEvent } from './normalizer';
 import type { SessionStorage } from './storage/types';
 import type { UserMessage, TextPart, Part } from '@kilocode/app-shared/opencode';
@@ -110,10 +114,11 @@ function createChatProcessor(
           break;
         case 'message.part.updated': {
           // Normalize BEFORE the strip/guard logic: the wire can omit `text` on
-          // text/reasoning parts (KILO-APP-99), and the empty-text guard below
-          // must also see textless updates so they cannot clobber already
-          // streamed text. Identity-preserving for everything else.
-          const normalized = normalizeMissingPartText(event.part);
+          // text/reasoning parts (KILO-APP-99) and `files` on patch parts
+          // (KILO-APP-BZ), and the empty-text guard below must also see
+          // textless updates so they cannot clobber already streamed text.
+          // Identity-preserving for everything else.
+          const normalized = normalizeMissingPatchFiles(normalizeMissingPartText(event.part));
           if (options?.onToolAttachment) {
             emitToolAttachmentsBeforeStrip(normalized, options.onToolAttachment);
           }

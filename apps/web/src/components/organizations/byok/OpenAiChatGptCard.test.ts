@@ -75,6 +75,19 @@ const STATES: Array<{ label: string; html: string }> = [
     html: render({ status: { state: 'disconnected' }, authErrorCode: 'connect_failed' }),
   },
   {
+    label: 'declined reconnect with a stored connection',
+    html: render({
+      status: {
+        state: 'error',
+        email: 'user@example.com',
+        subject: 'subject-1',
+        connectedAt: CONNECTED_AT,
+        errorMessage: RECONNECT_MESSAGE,
+      },
+      authErrorCode: 'access_denied',
+    }),
+  },
+  {
     label: 'disconnect failed',
     html: render({
       status: {
@@ -188,25 +201,62 @@ describe('OpenAiChatGptCard disconnect failure', () => {
 });
 
 describe('OpenAiChatGptCard returned authorization errors', () => {
-  it('shows the declined copy with one try-again action for access_denied', () => {
-    const html = render({ status: undefined, authErrorCode: 'access_denied' });
+  const STORED_RECONNECT_STATUS: OpenAiChatGptStatus = {
+    state: 'error',
+    email: 'user@example.com',
+    subject: 'subject-1',
+    connectedAt: CONNECTED_AT,
+    errorMessage: RECONNECT_MESSAGE,
+  };
 
-    expect(html).toContain('ChatGPT was not connected. Try again.');
-    expect(html.match(/>Try again</g)).toHaveLength(1);
+  it('shows the declined copy as an alert above the stored reconnect state', () => {
+    const html = render({
+      status: STORED_RECONNECT_STATUS,
+      authErrorCode: 'access_denied',
+    });
+
+    expect(html.replace(/&#x27;/g, "'")).toContain('ChatGPT was not connected. Try again.');
+    expect(html).toContain('data-slot="alert"');
+    // The stored connection keeps its badge, its message and one-click disconnect.
+    expect(html).toContain('Needs reconnect');
+    expect(html).toContain(RECONNECT_MESSAGE);
+    expect(html.match(/Reconnect with ChatGPT/g)).toHaveLength(1);
+    expect(html.match(/>Disconnect</g)).toHaveLength(1);
+    // The alert is rendered above the stored status body.
+    expect(html.indexOf('ChatGPT was not connected')).toBeLessThan(html.indexOf(RECONNECT_MESSAGE));
   });
 
-  it('shows the generic copy with the same action for any other code', () => {
-    const html = render({ status: undefined, authErrorCode: 'server_error' });
+  it('shows the generic copy above the stored status for any other code', () => {
+    const html = render({ status: STORED_RECONNECT_STATUS, authErrorCode: 'server_error' });
 
     expect(html.replace(/&#x27;/g, "'")).toContain("We couldn't connect ChatGPT. Try again.");
-    expect(html.match(/>Try again</g)).toHaveLength(1);
+    expect(html).toContain('Needs reconnect');
+    expect(html.match(/Reconnect with ChatGPT/g)).toHaveLength(1);
+    expect(html.match(/>Disconnect</g)).toHaveLength(1);
   });
 
-  it('shows the generic copy with one try-again action when the linking session fails', () => {
-    const html = render({ status: undefined, authErrorCode: 'connect_failed' });
+  it('uses the stored body CTA as the retry when the linking session fails', () => {
+    const html = render({ status: { state: 'disconnected' }, authErrorCode: 'connect_failed' });
 
     expect(html.replace(/&#x27;/g, "'")).toContain("We couldn't connect ChatGPT. Try again.");
-    expect(html.match(/>Try again</g)).toHaveLength(1);
+    expect(html.match(/Sign in with ChatGPT/g)).toHaveLength(1);
+    expect(html).not.toContain('>Try again<');
+  });
+
+  it('keeps the stored identity and disconnect action when a reconnect is declined', () => {
+    const html = render({
+      status: {
+        state: 'connected',
+        email: 'user@example.com',
+        subject: 'subject-1',
+        connectedAt: CONNECTED_AT,
+      },
+      authErrorCode: 'access_denied',
+    });
+
+    expect(html).toContain('data-slot="alert"');
+    expect(html).toContain('Connected as user@example.com');
+    expect(html.match(/>Disconnect</g)).toHaveLength(1);
   });
 });
 
@@ -255,7 +305,7 @@ describe('OpenAiChatGptCard in-progress states', () => {
     expect(html).not.toContain('>Reconnect with ChatGPT<');
   });
 
-  it('shows the redirecting label for the try-again action after a failed authorization', () => {
+  it('shows the redirecting label on the stored connect action after a failed authorization', () => {
     const html = render({
       status: { state: 'disconnected' },
       authErrorCode: 'connect_failed',
@@ -304,7 +354,7 @@ describe('OpenAiChatGptCard layout', () => {
     const cardClasses = new Set(STATES.map(state => cardClass(state.html)));
     const bodyClasses = new Set(STATES.map(state => bodyClass(state.html)));
 
-    expect(STATES).toHaveLength(10);
+    expect(STATES).toHaveLength(11);
     expect(cardClasses.size).toBe(1);
     expect(bodyClasses.size).toBe(1);
     expect([...cardClasses][0]).toBeDefined();

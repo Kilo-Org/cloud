@@ -6,6 +6,7 @@ import { signIn } from 'next-auth/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -100,7 +101,11 @@ function connectionIdentity(status: OpenAiChatGptStatus): string {
 export type OpenAiChatGptCardViewProps = {
   /** `undefined` while the status query is loading. */
   status: OpenAiChatGptStatus | undefined;
-  /** A returned `openai_error` code, shown instead of the stored status. */
+  /**
+   * A returned `openai_error` code. It renders as an alert above the stored
+   * status body so the connection's indicator, identity and Disconnect action
+   * stay visible (and usable) while the failure is reported.
+   */
   authErrorCode?: string | null;
   /** The status query failed: show a message and a retry instead of a skeleton. */
   hasLoadError?: boolean;
@@ -113,11 +118,8 @@ export type OpenAiChatGptCardViewProps = {
   isDisconnecting?: boolean;
 };
 
-function CardIndicator({
-  status,
-  authErrorCode,
-}: Pick<OpenAiChatGptCardViewProps, 'status' | 'authErrorCode'>) {
-  if (authErrorCode || !status) {
+function CardIndicator({ status }: Pick<OpenAiChatGptCardViewProps, 'status'>) {
+  if (!status) {
     return null;
   }
   if (status.state === 'connected') {
@@ -129,9 +131,21 @@ function CardIndicator({
   return null;
 }
 
+/**
+ * The returned authorization error, shown as an alert above the stored status
+ * body. The status body keeps its own actions, so the stored connection's
+ * reconnect or connect CTA is the retry and Disconnect stays one click away.
+ */
+function AuthErrorAlert({ code }: { code: string }) {
+  return (
+    <Alert variant="destructive">
+      <AlertDescription>{openAiChatGptAuthErrorMessage(code)}</AlertDescription>
+    </Alert>
+  );
+}
+
 function CardBody({
   status,
-  authErrorCode,
   hasLoadError,
   hasDisconnectError,
   onConnect,
@@ -140,19 +154,6 @@ function CardBody({
   isConnecting,
   isDisconnecting,
 }: OpenAiChatGptCardViewProps) {
-  if (authErrorCode) {
-    return (
-      <>
-        <p className="type-body text-muted-foreground">
-          {openAiChatGptAuthErrorMessage(authErrorCode)}
-        </p>
-        <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect} disabled={isConnecting}>
-          {isConnecting ? CONNECTING_LABEL : TRY_AGAIN_LABEL}
-        </Button>
-      </>
-    );
-  }
-
   if (hasLoadError) {
     return (
       <>
@@ -265,10 +266,11 @@ export function OpenAiChatGptCardView(props: OpenAiChatGptCardViewProps) {
         <div className="flex flex-col gap-2">
           <CardTitle>{CARD_TITLE}</CardTitle>
         </div>
-        <CardIndicator status={props.status} authErrorCode={props.authErrorCode} />
+        <CardIndicator status={props.status} />
       </CardHeader>
       <CardContent>
         <div className={CARD_BODY_CLASS}>
+          {props.authErrorCode ? <AuthErrorAlert code={props.authErrorCode} /> : null}
           <CardBody {...props} />
         </div>
       </CardContent>

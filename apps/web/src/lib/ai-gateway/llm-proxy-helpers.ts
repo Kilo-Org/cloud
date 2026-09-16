@@ -161,14 +161,20 @@ export function topUpInProgressResponse() {
  * entity has no available balance. If an auto-top-up is in flight, the block is
  * transient and reported as retryable; otherwise it is the terminal
  * low-credits response.
+ *
+ * A block caused by an exhausted per-user allowance is never retryable: an
+ * organization top-up restores the organization balance, not the member's
+ * allowance, so the retry would not resolve.
  */
 export async function creditsBlockedResponse(params: {
   user: User;
   balance?: number;
   organizationId?: string;
+  balanceLimitedByUserAllowance?: boolean;
 }) {
   if (
-    await isAutoTopUpInFlight({ userId: params.user.id, organizationId: params.organizationId })
+    !params.balanceLimitedByUserAllowance &&
+    (await isAutoTopUpInFlight({ userId: params.user.id, organizationId: params.organizationId }))
   ) {
     return topUpInProgressResponse();
   }

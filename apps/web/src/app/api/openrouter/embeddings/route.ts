@@ -204,10 +204,16 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
-    const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
+    const { balance, settings, plan, balanceLimitedByUserAllowance } =
+      await getBalanceAndOrgSettings(organizationId, user);
 
     if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
-      return await creditsBlockedResponse({ user, balance, organizationId });
+      return await creditsBlockedResponse({
+        user,
+        balance,
+        organizationId,
+        balanceLimitedByUserAllowance,
+      });
     }
 
     const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({

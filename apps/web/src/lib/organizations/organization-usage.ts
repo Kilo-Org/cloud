@@ -42,11 +42,12 @@ export async function getBalanceAndOrgSettings(
   balance: number;
   settings?: OrganizationSettings;
   plan?: OrganizationPlan;
+  balanceLimitedByUserAllowance?: boolean;
 }> {
   const balanceSpan = startInactiveSpan({ name: 'balance-check' });
   const result = organizationId
     ? await getBalanceForOrganizationUser(organizationId, user.id, { fromDb })
-    : await getBalanceForUser(user);
+    : { ...(await getBalanceForUser(user)), balanceLimitedByUserAllowance: false };
   balanceSpan.end();
   return result;
 }
@@ -60,7 +61,12 @@ export async function getBalanceForOrganizationUser(
     /** Database instance to use (defaults to primary db, pass readDb for replica) */
     fromDb?: typeof db;
   } = {}
-): Promise<{ balance: number; settings?: OrganizationSettings; plan?: OrganizationPlan }> {
+): Promise<{
+  balance: number;
+  settings?: OrganizationSettings;
+  plan?: OrganizationPlan;
+  balanceLimitedByUserAllowance?: boolean;
+}> {
   const { limitType = 'daily', fromDb = db } = options;
   const startTime = performance.now();
   logExceptInTest(
@@ -117,7 +123,7 @@ export async function getBalanceForOrganizationUser(
       `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: 0 (not a member)`
     );
 
-    return { balance: 0, settings: {} };
+    return { balance: 0, settings: {}, balanceLimitedByUserAllowance: false };
   }
 
   const {
@@ -174,7 +180,12 @@ export async function getBalanceForOrganizationUser(
       `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(organization_balance)} (require_seats: ignoring limits)`
     );
 
-    return { balance: fromMicrodollars(organization_balance), settings, plan };
+    return {
+      balance: fromMicrodollars(organization_balance),
+      settings,
+      plan,
+      balanceLimitedByUserAllowance: false,
+    };
   }
 
   if (microdollar_limit == null) {
@@ -184,7 +195,12 @@ export async function getBalanceForOrganizationUser(
       `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(organization_balance)} (no limits)`
     );
 
-    return { balance: fromMicrodollars(organization_balance), settings, plan };
+    return {
+      balance: fromMicrodollars(organization_balance),
+      settings,
+      plan,
+      balanceLimitedByUserAllowance: false,
+    };
   }
 
   const usageAmount = microdollar_usage || 0;
@@ -201,7 +217,15 @@ export async function getBalanceForOrganizationUser(
     `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(cappedBalance)} (allowance: ${fromMicrodollars(remainingAllowance)}, org balance: ${fromMicrodollars(organization_balance)})`
   );
 
-  return { balance: fromMicrodollars(cappedBalance), settings, plan };
+  return {
+    balance: fromMicrodollars(cappedBalance),
+    settings,
+    plan,
+    // The cap binds when the member's remaining allowance is no larger than the
+    // organization balance. In that case the block is a per-user limit, which an
+    // organization top-up cannot resolve.
+    balanceLimitedByUserAllowance: remainingAllowance <= organization_balance,
+  };
 }
 
 export type OrganizationUsageMutationResult = {

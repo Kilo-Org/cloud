@@ -287,26 +287,44 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
   // The newest-session slot and the action row are Home Screen families only:
   // the Lock Screen families keep their generic layout, which is what the
   // snapshot privacy contract protects. While a press is unanswered, the App
-  // Intent's patch owns the slot with the approving copy, so the press is
-  // visible in place before the app answers; when the app answers it pushes
+  // Intent's patch owns the slot with the pressed action's copy, so the press
+  // is visible in place before the app answers; when the app answers it pushes
   // fresh props, and the slot shows the failure line or the newest session.
-  const newestLine =
-    props.pendingActionVisible === true ? COPY.approving : (props.newestTitle ?? null);
+  //
+  // The height is declared inside this function, not at module scope: the
+  // widget transform stringifies this function's source alone and the widget
+  // process evaluates it against widget globals, so a module-scope binding
+  // would be a `ReferenceError` at render. The literal copy fallbacks follow
+  // the same rule as `COPY` above: the widget process is the only consumer.
+  const NEWEST_SLOT_HEIGHT = 14;
+  // The press patch carries which action was pressed, so the slot names it
+  // instead of always reading "Approving..." under a New agent tap.
+  const pressCopy =
+    props.pendingAction === 'new-agent'
+      ? (COPY.starting ?? 'Starting...')
+      : (COPY.approving ?? 'Approving...');
+  const newestLine = props.pendingActionVisible === true ? pressCopy : (props.newestTitle ?? null);
   const actions = props.actions ?? { approve: false, newAgent: false };
-  const newestSlot =
-    newestLine === null ? null : (
-      <Text
-        modifiers={[
-          font({ textStyle: 'caption' }),
-          lineLimit(1),
-          minimumScaleFactor(0.6),
-          allowsTightening(true),
-          mutedForeground,
-        ]}
-      >
-        {newestLine}
-      </Text>
-    );
+  // The slot is laid out whether or not it carries a line, so a title arriving
+  // after a process restart, the press line taking the slot, and the answer
+  // replacing it move neither the count rows above nor the actions below.
+  const newestSlot = (
+    <VStack alignment="leading" spacing={0} modifiers={[frame({ height: NEWEST_SLOT_HEIGHT })]}>
+      {newestLine === null ? null : (
+        <Text
+          modifiers={[
+            font({ textStyle: 'caption' }),
+            lineLimit(1),
+            minimumScaleFactor(0.6),
+            allowsTightening(true),
+            mutedForeground,
+          ]}
+        >
+          {newestLine}
+        </Text>
+      )}
+    </VStack>
+  );
 
   // The patch a press returns marks the action in the pressed entry's props;
   // the app sweeps it up, runs it, and pushes the answer. `onPress` is the
@@ -374,8 +392,9 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
         <Spacer />
       </HStack>
       {/* The mark sits at the top and the counts at the bottom, so the card
-          reads as one composed block. The newest slot and the actions keep
-          their own rows, so an appearing line moves nothing above it. */}
+          reads as one composed block. The newest slot reserves its line in
+          every state, so an arriving title or an action's progress line moves
+          nothing above it. */}
       <Spacer />
       {systemRows}
       {newestSlot}

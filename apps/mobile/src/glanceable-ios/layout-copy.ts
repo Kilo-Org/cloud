@@ -58,11 +58,14 @@ export function glanceableLayoutCopy() {
     idle: i18n.t('common.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
     // The in-place widget actions. Their copy is baked, not pushed through
-    // props: the press-patch display ("Approving…") has to show before any app
-    // push can answer it, and the gallery placeholder has no props at all.
+    // props: the press-patch display has to show before any app push can
+    // answer it, and the gallery placeholder has no props at all. The two
+    // press lines are picked by the patch's action marker, so a New agent tap
+    // reads "Starting…" rather than the approving line the approve tap shows.
     approve: i18n.t('common.approve'),
     newAgent: i18n.t('glanceable.newAgent'),
     approving: i18n.t('glanceable.approving'),
+    starting: i18n.t('common.starting'),
     locale: resolveGlanceableLocale(i18n.language),
     digits: glanceableDigits(),
   };

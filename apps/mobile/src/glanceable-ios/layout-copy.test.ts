@@ -79,6 +79,7 @@ describe('withGlanceableCopy', () => {
       'running',
       'signed_out',
       'stale',
+      'starting',
       'waiting',
     ]);
   });

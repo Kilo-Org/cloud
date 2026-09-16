@@ -18,7 +18,11 @@ import {
   registerWidgetActionHandling,
   runPendingWidgetActions,
 } from './widget-actions';
-import { buildGlanceableViewProps, type GlanceableViewProps } from './view-props';
+import {
+  buildGlanceableViewProps,
+  type GlanceableViewProps,
+  type GlanceableWidgetProps,
+} from './view-props';
 
 // The widget surfaces are unreachable under vitest: the swift-ui primitives are
 // recording stubs, react-native is stubbed, and expo-widgets' factories are
@@ -538,12 +542,44 @@ describe('runPendingWidgetActions', () => {
 
 // ── the stringified layout ──────────────────────────────────────────────────
 
-function renderWidget(props: Partial<GlanceableViewProps>, family: WidgetFamily): MockElement {
+function renderWidget(props: GlanceableWidgetProps, family: WidgetFamily): MockElement {
   return activeAgentsWidgetLayout(props, {
     widgetFamily: family,
     date: new Date(0),
     configuration: undefined,
   }) as unknown as MockElement;
+}
+
+/** A recorded swift-ui modifier, typed the way the mock stubs record it. */
+type MockModifier = { $type?: string; args?: Record<string, unknown> };
+
+/** The recorded modifiers on an element, never any other prop. */
+function mockModifiers(element: MockElement | undefined): MockModifier[] {
+  const modifiers = element?.props.modifiers;
+  return Array.isArray(modifiers) ? (modifiers as MockModifier[]) : [];
+}
+
+/**
+ * The reserved newest-session slot: the one container whose `frame` pins a
+ * height and nothing else. The mark's own frame pins both a width and a
+ * height, so this finds the slot by shape rather than by position.
+ */
+function reservedSlot(tree: unknown): MockElement | undefined {
+  return collect(tree).find(element =>
+    mockModifiers(element).some(
+      modifier =>
+        modifier.$type === 'frame' &&
+        modifier.args !== undefined &&
+        'height' in modifier.args &&
+        !('width' in modifier.args)
+    )
+  );
+}
+
+/** The height the slot's frame pins, or undefined when it pins none. */
+function slotHeight(element: MockElement | undefined): number | undefined {
+  const frameModifier = mockModifiers(element).find(modifier => modifier.$type === 'frame');
+  return frameModifier?.args?.height as number | undefined;
 }
 
 describe('activeAgentsWidgetLayout', () => {
@@ -574,6 +610,46 @@ describe('activeAgentsWidgetLayout', () => {
     expect(collectText(tree)).toContain('Newest: Fix the flaky test');
     // The body keeps its own deep link: a tap beside the buttons opens Kilo.
     expect(widgetURLs(tree)).toEqual(['kiloapp:///cloud/sessions']);
+  });
+
+  it('reserves the newest-session slot with and without a line in both Home Screen families', () => {
+    for (const family of ['systemSmall', 'systemMedium'] as WidgetFamily[]) {
+      const filled = renderWidget(HAPPY_WAITING_PROPS, family);
+      // The same props with no title: the state a process restart starts from,
+      // before the first snapshot answers with a session.
+      const blank = renderWidget({ ...HAPPY_WAITING_PROPS, newestTitle: null }, family);
+
+      const filledSlot = reservedSlot(filled);
+      const blankSlot = reservedSlot(blank);
+      // The slot is its own container with a fixed height in every state, so a
+      // title arriving late, the press line taking the slot, and the answer
+      // replacing it move neither the count rows above nor the action row below.
+      expect(filledSlot?.kind).toBe('VStack');
+      expect(blankSlot?.kind).toBe('VStack');
+      expect(slotHeight(filledSlot)).toBe(slotHeight(blankSlot));
+      expect(slotHeight(filledSlot)).toBeGreaterThan(0);
+
+      // Only the line differs, never the space reserved around it.
+      expect(collectText(filled)).toContain('Newest: Fix the flaky test');
+      expect(collectText(blank)).not.toContain('Newest: Fix the flaky test');
+    }
+  });
+
+  it('names the pressed action in the reserved slot while the press is unanswered', () => {
+    const approving = renderWidget(
+      { ...EMPTY_WIDGET_PROPS, pendingAction: 'approve', pendingActionVisible: true },
+      'systemSmall'
+    );
+    const starting = renderWidget(
+      { ...EMPTY_WIDGET_PROPS, pendingAction: 'new-agent', pendingActionVisible: true },
+      'systemSmall'
+    );
+
+    // The patch carries which button was pressed, so a New agent tap reads its
+    // own line instead of the approving one, in the same reserved slot.
+    expect(collectText(approving)).toContain('Approving...');
+    expect(collectText(starting)).toContain('Starting...');
+    expect(slotHeight(reservedSlot(starting))).toBe(slotHeight(reservedSlot(approving)));
   });
 
   it('draws the New agent button for the empty state and no Approve button', () => {

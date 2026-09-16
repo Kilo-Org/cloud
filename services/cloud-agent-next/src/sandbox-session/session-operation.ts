@@ -28,6 +28,7 @@ import {
   completeSessionOperationAttachment,
   recordSessionOperationDispatch,
   recordSessionOperationExecutionDeadline,
+  releaseUnconfirmedAttach,
   type SessionMessageRecord,
 } from './session-message-queue.js';
 import { applyControlPlanePreparingEvent } from './control-plane-preparing.js';
@@ -202,19 +203,28 @@ export async function dispatchSessionOperation(
           },
         }
       );
-      if (lookup.state !== 'completed') return lookup;
-      if (!lookup.delivery.result.ok)
-        return {
-          state: 'rejected',
-          error: lookup.delivery.result.error,
-          rejectionReceived: true,
-        };
-      if (kind === 'attach') {
-        const completed = completeSessionOperationAttachment(messages.read(), authorization);
-        if (!completed || !messages.commit(completed))
-          return { state: 'uncertain', reason: 'unverified' };
+      if (lookup.state === 'completed') {
+        if (!lookup.delivery.result.ok)
+          return {
+            state: 'rejected',
+            error: lookup.delivery.result.error,
+            rejectionReceived: true,
+          };
+        if (kind === 'attach') {
+          const completed = completeSessionOperationAttachment(messages.read(), authorization);
+          if (!completed || !messages.commit(completed))
+            return { state: 'uncertain', reason: 'unverified' };
+        }
+        return { state: 'completed', result: lookup.delivery.result.result };
       }
-      return { state: 'completed', result: lookup.delivery.result.result };
+      // A dispatched attach the current runtime has no record of never executed
+      // there. Retire that unconfirmed proof and fall through to dispatch a fresh
+      // attach rather than failing preparation on an outcome it cannot confirm.
+      // A dispatched prompt is never recovered this way: it may already have run.
+      if (kind !== 'attach' || lookup.state !== 'uncertain' || lookup.reason !== 'missing')
+        return lookup;
+      const released = releaseUnconfirmedAttach(messages.read(), authorization);
+      if (released === undefined || !messages.commit(released)) return lookup;
     }
     assertAdmissionCurrent();
     const payload = structuredClone(

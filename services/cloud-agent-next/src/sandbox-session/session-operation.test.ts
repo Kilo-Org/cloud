@@ -200,6 +200,91 @@ describe('dispatchSessionOperation', () => {
     expect(request.mock.calls.map(([input]) => input.operation)).toEqual(['session.operation.get']);
   });
 
+  it('retires a dispatched attach the runtime has no record of and dispatches a fresh attach', async () => {
+    const attach: SessionOperationAuthorization = {
+      operation: 'session.attach',
+      operationId: 'attempt-attach',
+      messageId: 'msg_attach',
+      session: {
+        sessionId: 'workspace_attach',
+        kiloSessionId: 'kilo_attach',
+        directory: '/workspace/attach',
+      },
+      wrapperInstanceId: '22222222-2222-4222-8222-222222222222',
+      dispatchDeadlineAt: Date.now() + 60_000,
+    };
+    const attachResult = {
+      attached: true as const,
+      nativeRuntimeId: '33333333-3333-4333-8333-333333333333',
+    };
+    const seeded = recordSessionOperationDispatch(
+      [
+        {
+          ...messages()[0]!,
+          messageId: attach.messageId,
+          wrapperInstanceId: attach.wrapperInstanceId,
+        },
+      ],
+      attach
+    );
+    if (!seeded) throw new Error('Failed to create attach dispatch proof');
+    let stored = seeded;
+    const request = vi.fn(async (input: SandboxControlOutboundRequest) => {
+      if (input.operation === 'session.operation.get') return response({ state: 'missing' });
+      if (input.operation === 'session.attach') return response(attachResult);
+      throw new Error(`Unexpected operation ${input.operation}`);
+    });
+
+    await expect(
+      dispatchSessionOperation(
+        { authorization: attach, payload: {} },
+        { read: () => stored, commit: next => ((stored = next), true) },
+        {
+          request,
+          persistResult: async () => undefined,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => true,
+        }
+      )
+    ).resolves.toEqual({ state: 'response', result: attachResult });
+    expect(request.mock.calls.map(([input]) => input.operation)).toEqual([
+      'session.operation.get',
+      'session.attach',
+    ]);
+    expect(stored[0]?.operations?.attach?.dispatched).toBe(true);
+    expect(stored[0]?.operations?.retiredAttach).toMatchObject({ authorization: attach });
+  });
+
+  it('keeps a dispatched prompt when the runtime has no record of it', async () => {
+    const dispatched = recordSessionOperationDispatch(messages(), authorization);
+    if (!dispatched) throw new Error('Failed to create dispatch proof');
+    let stored = dispatched;
+    const request = vi.fn(async (input: SandboxControlOutboundRequest) => {
+      if (input.operation === 'session.operation.get') return response({ state: 'missing' });
+      throw new Error(`Unexpected operation ${input.operation}`);
+    });
+
+    await expect(
+      dispatchSessionOperation(
+        { authorization, payload },
+        { read: () => stored, commit: next => ((stored = next), true) },
+        {
+          request,
+          persistResult: async () => undefined,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => true,
+        }
+      )
+    ).resolves.toEqual({ state: 'uncertain', reason: 'missing' });
+    expect(request.mock.calls.map(([input]) => input.operation)).toEqual(['session.operation.get']);
+    expect(stored[0]?.operations?.prompt?.dispatched).toBe(true);
+    expect(stored[0]?.operations?.retiredAttach).toBeUndefined();
+  });
+
   it('does not replay a prompt after its admission response is lost before application', async () => {
     let stored = messages();
     const request = vi.fn(async (input: SandboxControlOutboundRequest) => {

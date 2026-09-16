@@ -573,26 +573,107 @@ api.get('/session/:sessionId/messages', async c => {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
 
-  const rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
-    () =>
-      getSessionIngestDO(c.env, {
-        kiloUserId,
-        sessionId: inputParse.data.kiloSessionId,
-      }),
-    stub =>
-      stub.readKiloSdkMessages({
-        limit: inputParse.data.limit,
-        before: inputParse.data.before,
-      }),
-    'SessionIngestDO.readKiloSdkMessages'
-  );
+  const readStartedAt = Date.now();
+  let rawHistory: unknown;
+  try {
+    rawHistory = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+      () =>
+        getSessionIngestDO(c.env, {
+          kiloUserId,
+          sessionId: inputParse.data.kiloSessionId,
+        }),
+      stub =>
+        stub.readKiloSdkMessages({
+          limit: inputParse.data.limit,
+          before: inputParse.data.before,
+        }),
+      'SessionIngestDO.readKiloSdkMessages'
+    );
+  } catch (error) {
+    // A DO isolate reset is `retryable:false` upstream and would otherwise
+    // leave the read unattributable in production. Log it once, then rethrow
+    // so the response is unchanged.
+    console.warn({
+      event: 'kilo_sdk_history_read_failed',
+      sessionId: inputParse.data.kiloSessionId,
+      limit: inputParse.data.limit,
+      hasCursor: inputParse.data.before !== undefined,
+      error: error instanceof Error ? error.message : String(error),
+      durationMs: Date.now() - readStartedAt,
+    });
+    throw error;
+  }
   const history = persistedKiloSdkMessageHistorySchema.nullable().safeParse(rawHistory);
+  const page =
+    history.success && history.data !== null && !('kind' in history.data) ? history.data : null;
+  const outcome = !history.success
+    ? 'invalid_data'
+    : history.data === null
+      ? 'none'
+      : 'kind' in history.data
+        ? history.data.kind
+        : 'ok';
+  // Exactly one structured read-outcome line per request, in the same plain
+  // object shape as `direct_ingest_ok`, so `cloudflare-logpush` names the read
+  // (and its typed outcome) that a stale-transcript report blames.
+  console.log({
+    event: 'kilo_sdk_history_read',
+    sessionId: inputParse.data.kiloSessionId,
+    limit: inputParse.data.limit,
+    hasCursor: inputParse.data.before !== undefined,
+    outcome,
+    messageCount: page?.messages.length ?? 0,
+    omittedItemCount: page?.omittedItemCount ?? 0,
+    hasNextCursor: page ? page.nextCursor !== null : false,
+    durationMs: Date.now() - readStartedAt,
+  });
+
+  // Session-level state travels with the bounded message page so a client can
+  // restore it on open and on reconnect without a second snapshot round trip.
+  // The CLI goal lives in `session.info.metadata`, so only the metadata is
+  // forwarded (never the whole session info). Only the initial page (no
+  // cursor) carries it: older-message pages never rebuild the session header.
+  // Best-effort: a snapshot read failure must not fail the message page; the
+  // live session events still carry goal updates.
+  let sessionMetadata: Record<string, unknown> | null = null;
+  if (inputParse.data.before === undefined) {
+    try {
+      const rawSessionInfo = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+        () =>
+          getSessionIngestDO(c.env, {
+            kiloUserId,
+            sessionId: inputParse.data.kiloSessionId,
+          }),
+        stub => stub.readKiloSdkSessionSnapshot(),
+        'SessionIngestDO.readKiloSdkSessionSnapshot'
+      );
+      if (
+        typeof rawSessionInfo === 'object' &&
+        rawSessionInfo !== null &&
+        (rawSessionInfo as { kind?: unknown }).kind === 'value'
+      ) {
+        const info = (rawSessionInfo as { info?: unknown }).info;
+        if (typeof info === 'object' && info !== null) {
+          const metadata = (info as { metadata?: unknown }).metadata;
+          if (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) {
+            sessionMetadata = metadata as Record<string, unknown>;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(
+        `Failed to fetch session snapshot for session ${inputParse.data.kiloSessionId}:`,
+        error instanceof Error ? error.message : error
+      );
+    }
+  }
 
   return c.json(
     {
       success: true,
       kiloSessionId: inputParse.data.kiloSessionId,
       history: history.success ? history.data : { kind: 'invalid_data' },
+      sessionMetadata,
     },
     200
   );

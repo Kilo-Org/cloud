@@ -36,6 +36,7 @@
     "cost": "ખર્ચ",
     "discard": "કાઢી નાખો",
     "findings": "તારણો",
+    "mergeRequest": "મર્જ રિક્વેસ્ટ",
     "notConnected": "જોડાયેલું નથી",
     "notifications": "સૂચનાઓ",
     "pullRequest": "પુલ રિક્વેસ્ટ",
@@ -227,8 +228,12 @@
     "providerEnterpriseSso": "એન્ટરપ્રાઇઝ SSO"
   },
   "preferences": {
+    "general": "સામાન્ય",
+    "voiceInput": "વૉઇસ ઇનપુટ",
     "autoExpandThinking": "વિચારપ્રક્રિયા આપમેળે ખોલો",
     "autoExpandThinkingSubtitle": "એજન્ટની વિચારપ્રક્રિયા પૂરી થાય ત્યારે તેની વિગતો ખોલીને બતાવો.",
+    "hideThinking": "વિચારપ્રક્રિયાની વિગતો છુપાવો",
+    "hideThinkingSubtitle": "સત્ર પૃષ્ઠ પર એજન્ટની વિચારપ્રક્રિયા બતાવશો નહીં.",
     "keepScreenOn": "સત્ર પૃષ્ઠ પર હોય ત્યારે સ્ક્રીન ચાલુ રાખો",
     "keepScreenOnSubtitle": "સત્રમાં કામ ચાલુ હોય ત્યાં સુધી સ્ક્રીન ચાલુ રાખો.",
     "appearance": "દેખાવ",
@@ -237,6 +242,7 @@
     "appearanceLight": "લાઇટ",
     "appearanceDark": "ડાર્ક",
     "account": "એકાઉન્ટ",
+    "accountSubtitle": "ભાષા, વિશ્વસનીય હોસ્ટ અને ઉપકરણનાં સત્રો",
     "prReviewAttribution": "PR સમીક્ષાઓમાં એપનો ઉલ્લેખ ઉમેરો",
     "prReviewAttributionSubtitle": "સમીક્ષા મોકલો ત્યારે અંતે “Kilo દ્વારા સમીક્ષા કરેલી” લખાણ ઉમેરો.",
     "returnSendsMessage": "રિટર્ન કી સંદેશ મોકલે છે",
@@ -250,7 +256,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway દ્વારા અવાજને લખાણમાં ફેરવવું",
     "gatewayTranscriptionSubtitle": "ઉપકરણની સ્પીચ રિકગ્નિશનને બદલે Kilo Gateway મોડેલ વડે વૉઇસ ઇનપુટને લખાણમાં ફેરવો. તમારું રેકોર્ડિંગ Kilo Gateway પર મોકલાય છે.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ટૂલ કૉલ્સ સંકોચો",
+    "condenseToolCallsSubtitle": "સતત ટૂલ કૉલ્સને એક પંક્તિમાં જૂથબદ્ધ કરો જે તમે ખોલી શકો.",
+    "toolSummaryTranslation": "ટૂલ સારાંશનું ભાષાંતર કરો",
+    "toolSummaryTranslationSubtitle": "દરેક ટૂલ સારાંશને તમારી ઍપની ભાષામાં ભાષાંતર કરવા મોડેલ પર મોકલો. ભાષાંતર નિષ્ફળ થાય તો મૂળ દર્શાવવામાં આવે છે.",
+    "toolSummaryTranslationModelUnavailableNotice": "આ મોડેલ હવે ઑફર કરવામાં આવતું નથી. બીજું પસંદ કરવા $t(common.model) પર ટૅપ કરો."
   },
   "prReview": {
     "pullRequestUnavailable": "પુલ રિક્વેસ્ટ ઉપલબ્ધ નથી",
@@ -347,6 +358,7 @@
       "merge": "મર્જ",
       "mergeNow": "હવે મર્જ કરો",
       "mergePullRequest": "પુલ રિક્વેસ્ટ મર્જ",
+      "mergeTermTitle": "{{term}} મર્જ",
       "enableAutoMerge": "ઓટો-મર્જ ચાલુ કરો",
       "disableAutoMerge": "ઓટો-મર્જ બંધ કરો",
       "autoMergeOn": "ઓટો-મર્જ ચાલુ છે",
@@ -365,9 +377,12 @@
       "deleteBranchAfterMerge": "મર્જ પછી બ્રાન્ચ કાઢી નાખો",
       "noEnabledMethods": "આ રિપોઝિટરીમાં મર્જ કરવાની કોઈ પદ્ધતિ ચાલુ નથી. રિપોઝિટરીના એડમિનને મર્જ, સ્ક્વોશ અથવા રીબેઝ પદ્ધતિ ચાલુ કરવા કહો.",
       "confirmTitle": "પુલ રિક્વેસ્ટ મર્જ કરવી છે?",
+      "confirmTitleTerm": "{{term}} મર્જ કરવી છે?",
       "confirmMessage": "તમારા ફેરફારો બેઝ બ્રાન્ચમાં મર્જ થશે.",
       "enableAutoMergeConfirmTitle": "ઓટો-મર્જ ચાલુ કરવું છે?",
       "enableAutoMergeConfirmMessage": "બધી જરૂરી તપાસો સફળ થયા પછી GitHub આ પુલ રિક્વેસ્ટ આપમેળે મર્જ કરશે.",
+      "enableAutoMergeConfirmMessageTerm": "પાઇપલાઇન સફળ થતાં {{term}} આપોઆપ મર્જ થઈ જશે.",
+      "enableAutoMergeDescriptionTerm": "પાઇપલાઇન સફળ થતાં GitLab આ {{term}} આપોઆપ મર્જ કરે છે.",
       "forbidden": "તમને આ પુલ રિક્વેસ્ટ મર્જ કરવાની પરવાનગી નથી.",
       "cannotMerge": "આ પુલ રિક્વેસ્ટ હાલની સ્થિતિમાં મર્જ કરી શકાતી નથી.",
       "couldNotMerge": "પુલ રિક્વેસ્ટ મર્જ કરી શકાઈ નહીં.",
@@ -378,7 +393,8 @@
       },
       "terminal": {
         "alreadyMerged": "પહેલેથી મર્જ થયેલી",
-        "closed": "આ પુલ રિક્વેસ્ટ બંધ છે"
+        "closed": "આ પુલ રિક્વેસ્ટ બંધ છે",
+        "closedMergeRequest": "આ મર્જ રિક્વેસ્ટ બંધ છે"
       },
       "partialSuccessBanner": {
         "body": "બ્રાન્ચ કાઢી નાખી શકાઈ નહીં: {{reason}}.",
@@ -403,6 +419,18 @@
         "behindDetail": "હેડ બ્રાન્ચ બેઝ બ્રાન્ચ કરતાં પાછળ છે. મર્જ કરતાં પહેલાં બ્રાન્ચ રીબેઝ કરો અથવા અપડેટ કરો.",
         "notMergeableTitle": "આ પુલ રિક્વેસ્ટ હજુ મર્જ કરી શકાતી નથી",
         "notMergeableDetail": "GitHubએ મર્જ કરવાની સ્થિતિ {{state}} દર્શાવી છે."
+      },
+      "restrictions": {
+        "title": "મર્જ મર્યાદાઓ",
+        "approvalsRequired_one": "{{displayCount}} મંજૂરી જરૂરી",
+        "approvalsRequired_other": "{{displayCount}} મંજૂરીઓ જરૂરી",
+        "pipelineMustSucceed": "મર્જ કરતાં પહેલાં પાઇપલાઇન સફળ થવી જરૂરી છે."
+      },
+      "providerBlocked": {
+        "failingPipeline": "તાજેતરની કમિટ પર પાઇપલાઇન નિષ્ફળ થઈ રહી છે.",
+        "pendingPipeline": "તાજેતરની કમિટ પર પાઇપલાઇન હજી ચાલી રહી છે.",
+        "permission": "તમને આ {{term}} મર્જ કરવાની પરવાનગી નથી.",
+        "draft": "મર્જ કરતાં પહેલાં {{term}}ને સમીક્ષા માટે તૈયાર તરીકે ચિહ્નિત કરો."
       },
       "methodLabels": {
         "merge": "મર્જ કમિટ બનાવો",
@@ -502,7 +530,8 @@
         "outdatedOnLines": "{{lines}} પર જૂનું",
         "outdatedOnPath": "{{path}} પર જૂનું"
       },
-      "deletedUser": "કાઢી નાખેલો વપરાશકર્તા"
+      "deletedUser": "કાઢી નાખેલો વપરાશકર્તા",
+      "replyForbiddenTerm": "તમને આ {{term}} પર જવાબ આપવાની પરવાનગી નથી."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ઍપનાં સેટિંગ્સ ખોલી શકાયાં નહીં.",
     "installKiloGitHubApp": "Kilo GitHub એપ ઇન્સ્ટોલ કરો",
@@ -514,17 +543,19 @@
     "reviewPullRequest": "પુલ રિક્વેસ્ટની સમીક્ષા કરો",
     "headLine": "{{counts}} · હેડ {{sha}}",
     "entry": {
-      "eyebrow": "URL પરથી પુલ રિક્વેસ્ટ ખોલો.",
-      "pastePrLink": "PR લિંક પેસ્ટ કરો",
-      "noRecentPrs": "તાજેતરમાં કોઈ PR નથી",
-      "noRecentPrsDescription": "સમીક્ષા શરૂ કરવા ઉપર PR લિંક પેસ્ટ કરો — તે આગલી વખતે અહીં દેખાશે.",
+      "eyebrow": "URL દ્વારા પુલ રિક્વેસ્ટ કે મર્જ રિક્વેસ્ટ ખોલો",
+      "pastePrLink": "પુલ રિક્વેસ્ટ કે મર્જ રિક્વેસ્ટનો લિંક પેસ્ટ કરો",
+      "noRecentPrs": "કોઈ તાજેતરની સમીક્ષા નથી",
+      "noRecentPrsDescription": "સમીક્ષા શરૂ કરવા ઉપર લિંક પેસ્ટ કરો — આગલી વારે તે અહીં દેખાશે.",
       "couldNotLoad": "લોડ કરી શકાયું નહીં.",
       "removeFromRecentsTitle": "તાજેતરની યાદીમાંથી દૂર કરવી છે?",
-      "removeFromRecentsMessage": "આ પુલ રિક્વેસ્ટ તમારી તાજેતરની યાદીમાંથી દૂર થશે.",
+      "removeFromRecentsMessage": "આ સમીક્ષા તમારી તાજેતરની યાદીમાંથી દૂર કરવામાં આવશે.",
       "removeRecentAccessibility": "{{repo}}ને તાજેતરની યાદીમાંથી દૂર કરો",
-      "urlAccessibility": "GitHub પુલ રિક્વેસ્ટનું URL",
-      "clearLink": "પુલ રિક્વેસ્ટની લિંક દૂર કરો",
-      "pasteLink": "પુલ રિક્વેસ્ટની લિંક પેસ્ટ કરો",
+      "urlAccessibility": "પુલ રિક્વેસ્ટ કે મર્જ રિક્વેસ્ટનો URL દાખલ કરો",
+      "urlPlaceholder": "પુલ રિક્વેસ્ટ કે મર્જ રિક્વેસ્ટ URL",
+      "openAccessibility": "પુલ રિક્વેસ્ટ કે મર્જ રિક્વેસ્ટ ખોલો",
+      "clearLink": "લિંક સાફ કરો",
+      "pasteLink": "પુલ રિક્વેસ્ટ કે મર્જ રિક્વેસ્ટનો લિંક પેસ્ટ કરો",
       "open": "ખોલો"
     },
     "checks": {
@@ -541,6 +572,8 @@
       "pending": "{{displayCount}} બાકી",
       "skipped": "{{displayCount}} છોડેલી",
       "checksCount": "{{displayCount}} તપાસો",
+      "checksCount_one": "{{displayCount}} તપાસ",
+      "checksCount_other": "{{displayCount}} તપાસો",
       "checkDetails": "તપાસની વિગતો"
     },
     "inbox": {
@@ -573,9 +606,15 @@
     "connect": {
       "checkFailedTitle": "GitHub કનેક્શન તપાસી શકાયું નહીં.",
       "checkFailedMessage": "આ લોડ ન થાય ત્યાં સુધી સાઇન ઇનની સ્થિતિ જાણી શકાતી નથી.",
+      "checkFailedTitleGitLab": "GitLab કનેક્શન તપાસી શકાયું નહીં.",
+      "checkFailedTitleBitbucket": "Bitbucket કનેક્શન તપાસી શકાયું નહીં.",
+      "providerCheckFailedMessage": "આ લોડ થાય ત્યાં સુધી કનેક્શનની સ્થિતિ ઉપલબ્ધ નથી.",
       "reconnectTitle": "GitHub સાથે ફરી કનેક્ટ કરો",
       "reconnectDescription": "તમારું GitHub કનેક્શન રદ થયું છે. મોબાઇલ પર પુલ રિક્વેસ્ટની સમીક્ષા ચાલુ રાખવા ફરી કનેક્ટ કરો.",
-      "description": "મોબાઇલ પર પુલ રિક્વેસ્ટની સમીક્ષા કરવા તમારું GitHub એકાઉન્ટ કનેક્ટ કરો."
+      "description": "મોબાઇલ પર પુલ રિક્વેસ્ટની સમીક્ષા કરવા તમારું GitHub એકાઉન્ટ કનેક્ટ કરો.",
+      "gitlabDescription": "મોબાઇલ પર મર્જ રિક્વેસ્ટની સમીક્ષા કરવા માટે તમારું GitLab ખાતું કનેક્ટ કરો.",
+      "bitbucketDescription": "મોબાઇલ પર પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે આ સંસ્થાને Bitbucket સાથે કનેક્ટ કરો.",
+      "bitbucketOrgOnlyDescription": "તેની Bitbucket પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે તમારી પ્રોફાઇલમાં એક સંસ્થા પસંદ કરો."
     },
     "screen": {
       "title": "#{{number}}",
@@ -597,7 +636,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub સાથેના જોડાણની મુદત પૂરી થઈ ગઈ છે.",
-      "message": "તમારું GitHub કનેક્શન હવે માન્ય નથી. તમારું કનેક્શન ફરી તપાસો — જરૂર પડે તો તમને ફરી કનેક્ટ થવા કહેવામાં આવશે."
+      "message": "તમારું GitHub કનેક્શન હવે માન્ય નથી. તમારું કનેક્શન ફરી તપાસો — જરૂર પડે તો તમને ફરી કનેક્ટ થવા કહેવામાં આવશે.",
+      "gitlabTitle": "GitLab સાથેના જોડાણની મુદત પૂરી થઈ ગઈ છે.",
+      "bitbucketTitle": "Bitbucket સાથેના જોડાણની મુદત પૂરી થઈ ગઈ છે.",
+      "providerMessage": "તમારું {{provider}} કનેક્શન હવે માન્ય નથી. તમારું કનેક્શન ફરી તપાસો — જરૂર પડે તો તમને ફરી કનેક્ટ થવા કહેવામાં આવશે."
     },
     "eventChips": {
       "comment": "ટિપ્પણી",
@@ -665,7 +707,7 @@
       "emptyLine": "(ખાલી)"
     },
     "linkPasteClipboardEmpty": "ક્લિપબોર્ડ ખાલી છે.",
-    "linkPasteNotAPullRequest": "આ GitHub પુલ રિક્વેસ્ટની લિંક નથી.",
+    "linkPasteNotAPullRequest": "આ પુલ રિક્વેસ્ટ કે મર્જ રિક્વેસ્ટનો લિંક નથી",
     "announce": {
       "commentPosted": "ટિપ્પણી પોસ્ટ થઈ",
       "reviewSubmitted": "સમીક્ષા મોકલાઈ",
@@ -674,6 +716,7 @@
     "mutationError": {
       "commentNotPosted": "આ ટિપ્પણી પોસ્ટ કરી શકાતી નથી. કદાચ પસંદ કરેલી લીટી બદલાઈ છે અથવા PR અપડેટ થઈ છે.",
       "reviewNotSubmitted": "આ સમીક્ષા હાલની સ્થિતિમાં મોકલી શકાતી નથી. કદાચ PR બદલાઈ છે અથવા આ તમારી પોતાની પુલ રિક્વેસ્ટ છે, જેની તમે સમીક્ષા કરી શકતા નથી.",
+      "reviewNotSubmittedTerm": "આ સમીક્ષા એવીની એવી સબમિટ થઈ શકે નહીં. કદાચ {{term}} બદલાઈ ગઈ હોય, અથવા તમે તમારી પોતાની {{term}}ની સમીક્ષા કરી શકો નહીં.",
       "couldNotPostComment": "ટિપ્પણી પોસ્ટ કરી શકાઈ નહીં.",
       "couldNotSubmitReview": "સમીક્ષા મોકલી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો."
     },
@@ -681,9 +724,31 @@
       "couldNotReply": "જવાબ આપી શકાયો નહીં.",
       "couldNotCompleteAction": "આ ક્રિયા પૂર્ણ કરી શકાઈ નહીં.",
       "mergeResultDefaultError": "GitHubએ મર્જ પૂર્ણ કર્યું નથી.",
+      "mergeResultNotCompleted": "{{term}} મર્જ થઈ નથી. તેની સ્થિતિ તપાસો અને ફરી પ્રયાસ કરો.",
       "ambiguous": "પુષ્ટિ કરી શકાઈ નહીં — ફરી પ્રયત્ન કરતાં પહેલાં PR તપાસો.",
       "persistenceFailed": "આ ક્રિયાની નોંધ કરી શકાઈ નહીં. કૃપા કરીને પછીથી ફરી પ્રયત્ન કરો.",
       "forbidden": "આ માટે પરવાનગી નથી."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "આ પ્રદાતા પર ઉપલબ્ધ નથી",
+        "accessibility": "આ પ્રદાતા પર ઉપલબ્ધ નથી: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "પુલ રિક્વેસ્ટ",
+      "mergeRequest": "મર્જ રિક્વેસ્ટ",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "મર્જ રિક્વેસ્ટ શેર કરો",
+      "viewOnProvider": "{{provider}} પર જુઓ",
+      "mergeRequestUnavailable": "મર્જ રિક્વેસ્ટ ઉપલબ્ધ નથી",
+      "unavailableDescription": "કદાચ તે કાઢી નાખવામાં આવી હોય, અથવા તમારી પાસે તેની એક્સેસ ન હોય.",
+      "accessDeniedMergeRequest": "તમને આ મર્જ રિક્વેસ્ટ જોવાની પરવાનગી નથી.",
+      "couldNotLoadMergeRequest": "મર્જ રિક્વેસ્ટ લોડ કરી શકાઈ નહીં.",
+      "discussionAccessDenied": "તમને આ મર્જ રિક્વેસ્ટની ચર્ચા જોવાની પરવાનગી નથી.",
+      "discussionUnavailableMessage": "આ મર્જ રિક્વેસ્ટ કાઢી નાખવામાં આવી હોઈ શકે છે.",
+      "noDiscussionDescription": "આ મર્જ રિક્વેસ્ટ પર હજી સમીક્ષાનો કોઈ થ્રેડ કે ચર્ચાની કોઈ ટિપ્પણી નથી.",
+      "noFilesChangedDescription": "આ મર્જ રિક્વેસ્ટમાં કોઈ ફાઇલમાં ફેરફાર નથી."
     }
   },
   "notifications": {
@@ -1993,12 +2058,48 @@
       "connectionLost": "કનેક્શન તૂટી ગયું",
       "retryConnection": "કનેક્ટ કરવા ફરી પ્રયાસ કરો"
     },
+    "goal": {
+      "title": "ધ્યેય",
+      "statusActive": "સક્રિય ધ્યેય",
+      "statusPaused": "થોભેલું ધ્યેય",
+      "statusComplete": "ધ્યેય પૂર્ણ",
+      "statusBlocked": "ધ્યેય અવરોધિત",
+      "edit": "ધ્યેય સંપાદિત કરો",
+      "remove": "ધ્યેય દૂર કરો",
+      "pause": "ધ્યેય થોભાવો",
+      "resume": "ધ્યેય ફરી શરૂ કરો",
+      "editPlaceholder": "ધ્યેયનું વર્ણન કરો",
+      "removeConfirmTitle": "ધ્યેય દૂર કરવું?",
+      "removeConfirmMessage": "CLI આ સત્રનું ધ્યેય સાફ કરે છે.",
+      "updateFailed": "ધ્યેય અપડેટ કરી શકાયું નહીં.",
+      "sectionAccessibility": "{{status}}. ધ્યેય: {{text}}"
+    },
     "newSession": {
+      "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું",
+      "couldNotLoadGithubRepositories": "GitHub રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં.",
+      "couldNotLoadGitlabRepositories": "GitLab રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં.",
       "connectGithubDescription": "તમારા બ્રાઉઝરમાં GitHub કનેક્ટ કરો, પછી રિપોઝિટરી પસંદ કરવા અહીં પાછા આવો.",
+      "connectGitlabDescription": "તમારા બ્રાઉઝરમાં GitLab કનેક્ટ કરો, પછી રિપોઝિટરી પસંદ કરવા અહીં પાછા આવો.",
+      "connectBitbucketDescription": "તમારા બ્રાઉઝરમાં Bitbucket કનેક્ટ કરો, પછી રિપોઝિટરી પસંદ કરવા અહીં પાછા આવો.",
       "openGithub": "GitHub ખોલો",
+      "openGitlab": "GitLab ખોલો",
+      "openBitbucket": "Bitbucket ખોલો",
       "refreshRepositories": "રિપોઝિટરીઓ રિફ્રેશ કરો",
       "githubConnected": "GitHub કનેક્ટ થયું",
+      "gitlabConnected": "GitLab કનેક્ટ થયું",
       "noRepositoriesVisible": "કોઈ રિપોઝિટરી દેખાતી નથી. Kilo GitHub એપને રિપોઝિટરીનો ઍક્સેસ છે કે નહીં તે તપાસો, પછી રિફ્રેશ કરો.",
+      "noRepositoriesVisibleGitlab": "કોઈ રિપોઝિટરી દેખાતી નથી. GitLab માટે રિપોઝિટરીનો ઍક્સેસ તપાસો, પછી રિફ્રેશ કરો.",
+      "noRepositoriesVisibleBitbucket": "કોઈ રિપોઝિટરી દેખાતી નથી. Bitbucket માટે રિપોઝિટરીનો ઍક્સેસ તપાસો, પછી રિફ્રેશ કરો.",
+      "bitbucketOrganizationsOnly": "Bitbucket ફક્ત સંસ્થાઓ માટે ઉપલબ્ધ છે.",
+      "branchPickerTitle": "બ્રાંચ પસંદ કરો",
+      "branchDefault": "ડિફૉલ્ટ",
+      "branchAccessibility": "બ્રાંચ: {{label}}",
+      "branchLoading": "બ્રાંચ લોડ થાય છે",
+      "branchLoadError": "બ્રાંચ લોડ થઈ શક્યાં નહીં",
+      "branchUnavailable": "આ રિપોઝિટરી માટે બ્રાંચ ઉપલબ્ધ નથી. પ્રદાતા પાસે તમારી એક્સેસ તપાસો, પછી બીજી રિપોઝિટરી પસંદ કરો.",
+      "branchEmpty": "કોઈ બ્રાંચ ઉપલબ્ધ નથી",
+      "branchPlaceholder": "એક બ્રાંચ પસંદ કરો",
       "runOnWithTarget": "{{target}} પર ચલાવો",
       "environment": "કાર્યપરિસર",
       "couldNotLoadEnvironment": "તમારું કાર્યપરિસર લોડ કરી શકાયું નહીં.",
@@ -2019,24 +2120,13 @@
       "couldNotRefreshRepositories": "રિપોઝિટરીઓ રિફ્રેશ કરી શકાઈ નહીં. ફરી પ્રયાસ કરો.",
       "discardDraftTitle": "ડ્રાફ્ટ કાઢી નાખવો?",
       "discardDraftMessage": "તમારો પ્રોમ્પ્ટ કાઢી નાખવામાં આવશે.",
+      "discardWithUploadsMessage": "તમારો પ્રોમ્પ્ટ અને હજી કોઈ સંદેશમાં જોડાઈ ન હોય તેવી અપલોડ કરેલી ફાઇલો કાઢી નાખવામાં આવશે.",
       "discardFailed": "ડ્રાફ્ટ કાઢી શકાયો નહીં. ફરી પ્રયાસ કરો.",
       "remoteHint": "સ્થાનિક kilo પ્રક્રિયાને નિયંત્રિત કરવા તમારા કમ્પ્યુટર પર `kilo remote` ચલાવો, અથવા ચાલુ CLI સત્રમાં `/remote` વાપરો.",
-      "connectBitbucketDescription": "તમારા બ્રાઉઝરમાં Bitbucket કનેક્ટ કરો, પછી રિપોઝિટરી પસંદ કરવા અહીં પાછા આવો.",
-      "connectGitlabDescription": "તમારા બ્રાઉઝરમાં GitLab કનેક્ટ કરો, પછી રિપોઝિટરી પસંદ કરવા અહીં પાછા આવો.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં.",
-      "couldNotLoadGithubRepositories": "GitHub રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં.",
-      "couldNotLoadGitlabRepositories": "GitLab રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં.",
-      "gitlabConnected": "GitLab કનેક્ટ થયું",
-      "noRepositoriesVisibleBitbucket": "કોઈ રિપોઝિટરી દેખાતી નથી. Bitbucket માટે રિપોઝિટરીનો ઍક્સેસ તપાસો, પછી રિફ્રેશ કરો.",
-      "noRepositoriesVisibleGitlab": "કોઈ રિપોઝિટરી દેખાતી નથી. GitLab માટે રિપોઝિટરીનો ઍક્સેસ તપાસો, પછી રિફ્રેશ કરો.",
-      "openBitbucket": "Bitbucket ખોલો",
-      "openGitlab": "GitLab ખોલો",
-      "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું",
       "continueFrom": "{{title}} સત્ર આગળ ચાલુ થઈ રહ્યું છે.",
       "importingSession": "સત્ર આયાત થઈ રહ્યું છે",
       "cliCannotContinue": "આ CLI સત્ર ચાલુ રાખી શકતું નથી. Cloud Agent અથવા બીજું CLI પસંદ કરો.",
-      "importFailed": "આ સત્ર આયાત કરી શકાયું નહીં.",
-      "discardWithUploadsMessage": "તમારો પ્રોમ્પ્ટ અને હજી કોઈ સંદેશમાં જોડાઈ ન હોય તેવી અપલોડ કરેલી ફાઇલો કાઢી નાખવામાં આવશે."
+      "importFailed": "આ સત્ર આયાત કરી શકાયું નહીં."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ થઈ.",
@@ -2436,6 +2526,11 @@
       "stepsCount_other": "{{steps}} પગલાં",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "સ્વતઃ મંજૂરી",
+      "description": "આ સત્ર માટેની પરવાનગી વિનંતીઓને આપમેળે મંજૂર કરો. પછી સાધનો કોઈ પ્રોમ્પ્ટ વિના ચાલે છે.",
+      "unavailable": "આ સત્ર પરવાનગી વિનંતીઓ પ્રાપ્ત કરી શકતું નથી."
+    },
     "prBadge": {
       "open": "પુલ રિક્વેસ્ટ ખોલો",
       "closed": "બંધ થયેલી પુલ રિક્વેસ્ટ",
@@ -2466,6 +2561,10 @@
       "tapToListHint": "ફોલ્ડરની સામગ્રી જોવા તેના પર ટેપ કરો.",
       "unsupportedDescription": "આ CLI ફોલ્ડરની યાદી બતાવી શકતું નથી. “થઈ ગયું” પર ટેપ કરવાથી શરૂઆતનું ફોલ્ડર જ પસંદ રહેશે. “સત્ર શરૂ કરો” પર ટેપ કરવાથી સત્ર ત્યાં શરૂ થશે.",
       "unsupportedTitle": "ફોલ્ડરની યાદી બતાવી શકાતી નથી"
+    },
+    "toolRun": {
+      "sheetTitle": "ટૂલ કૉલ્સ",
+      "condensedLabel": "{{itemCount}} વસ્તુઓ; {{last}}"
     }
   },
   "bootstrap": {
@@ -2576,8 +2675,12 @@
     "gatewayUnreachable": "Kilo Gateway સાથે સંપર્ક થઈ શક્યો નથી. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
     "gatewayTimeout": "અવાજને લખાણમાં ફેરવવામાં બહુ સમય લાગ્યો. ફરી પ્રયાસ કરો.",
     "gatewayModelUnavailable": "અવાજને લખાણમાં ફેરવતું આ મોડેલ ઉપલબ્ધ નથી. પસંદગીઓમાં બીજું પસંદ કરો.",
+    "gatewayModelUnavailableNotice": "આ મોડેલ હવે ઑફર કરવામાં આવતું નથી. બીજું પસંદ કરવા $t(transcriptionModel.title) પર ટૅપ કરો.",
     "gatewaySignInRequired": "Kilo Gateway દ્વારા લખાણ વાપરવા સાઇન ઇન કરો.",
-    "gatewayNoModel": "પહેલા પસંદગીઓમાં અવાજને લખાણમાં ફેરવતું મોડેલ પસંદ કરો."
+    "gatewayNoModel": "પહેલા પસંદગીઓમાં અવાજને લખાણમાં ફેરવતું મોડેલ પસંદ કરો.",
+    "testTitle": "વૉઇસ ઇનપુટનું પરીક્ષણ કરો",
+    "testPlaceholder": "માઇક્રોફોન પર ટૅપ કરો અને બોલવાનું શરૂ કરો.",
+    "testClear": "લખાણ સાફ કરો"
   },
   "share": {
     "title": "Kilo પર શેર",
@@ -2966,5 +3069,31 @@
     "emptyTitle": "અવાજને લખાણમાં ફેરવતાં કોઈ મોડેલ નથી",
     "emptyDescription": "Kilo Gateway હાલમાં અવાજને લખાણમાં ફેરવતાં કોઈ મોડેલ આપતું નથી.",
     "loadFailed": "અવાજને લખાણમાં ફેરવતાં મોડેલ લોડ કરી શકાયાં નહીં."
+  },
+  "voiceLanguage": {
+    "title": "વૉઇસ ઇનપુટની ભાષા",
+    "automatic": "આપમેળે",
+    "loadFailed": "આ ઉપકરણ સમર્થન આપે છે તે ભાષાઓ લોડ કરી શકાઈ નથી.",
+    "emptyTitle": "કોઈ સમર્થિત ભાષા નથી",
+    "emptyDescription": "આ ઉપકરણની વાણી ઓળખ કોઈ સમર્થિત ભાષા નોંધાવતી નથી."
+  },
+  "tour": {
+    "eyebrow": "ઝડપી ટૂર",
+    "forkTitle": "તમે Kilo ક્યાં ચલાવવા માંગો છો?",
+    "forkSubtitle": "તમારા પ્રથમ સત્ર માટે Kilo ક્યાં ચાલે તે પસંદ કરો.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "કંઈ ઇન્સ્ટોલ કર્યા વગર Kilo ને સૅન્ડબૉક્સ કરેલા ક્લાઉડ પર્યાવરણમાં ચલાવો.",
+    "remoteOptionTitle": "તમારું કમ્પ્યુટર",
+    "remoteOptionBody": "તમારા પોતાના મશીન પર `kilo remote` CLI દ્વારા Kilo ચલાવો.",
+    "skip": "ટૂર છોડી દો",
+    "tutorialLabel": "ટ્યુટોરિયલ",
+    "remoteTitle": "તમારી પહેલી રિમોટ સત્ર શરૂ કરો",
+    "remoteBody": "તમારું કમ્પ્યુટર કનેક્ટ કરો, પછી અહીંથી સત્ર શરૂ કરો.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "હજુ કોઈ કમ્પ્યુટર કનેક્ટ થયું નથી",
+    "remoteEmptyBody": "તેને કનેક્ટ કરવા તમારા કમ્પ્યુટર પર `kilo remote` ચલાવો.",
+    "remoteFound": "કમ્પ્યુટર કનેક્ટ થયું",
+    "checkAgain": "ફરી તપાસો",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

@@ -1,44 +1,30 @@
-/**
- * AI Adoption Score Calculation Module
- *
- * This module contains pure functions for calculating AI adoption metrics.
- * These functions are separated from the database layer to enable unit testing.
- */
-
-// Score maximums for each metric category
 export const MAX_FREQUENCY_SCORE = 40;
 export const MAX_DEPTH_SCORE = 40;
 export const MAX_COVERAGE_SCORE = 20;
 export const MAX_TOTAL_SCORE = 100;
 
-// Points allocated per component within each metric
-export const FREQUENCY_POINTS_PER_COMPONENT = 10; // 4 components × 10 = 40
+export const FREQUENCY_POINTS_PER_COMPONENT = 10;
 export const DEPTH_POINTS_PER_COMPONENT = 13.33; // 3 components × 13.33 ≈ 40
-export const COVERAGE_POINTS_PER_COMPONENT = 5; // 4 components × 5 = 20
+export const COVERAGE_POINTS_PER_COMPONENT = 5;
 
-// Coverage metric calculation constants
 export const COVERAGE_LOOKBACK_DAYS = 7;
 export const DAYS_IN_WEEK = 7;
 export const MIN_AGENT_TYPES_FOR_TWO_PLUS = 2;
 export const MIN_AGENT_TYPES_FOR_FOUR_PLUS = 4;
 
-// Depth metric calculation constants
 export const STANDARD_WORKDAY_HOURS = 8;
 export const MOCK_SUGGESTIONS_ACCEPTED_PERCENT = 70;
 
-// Trend calculation constants
 export const MIN_DATA_POINTS_FOR_TRENDS = 2;
 export const TREND_NEUTRAL_THRESHOLD_PERCENT = 1;
 
-// Score rounding precision
 export const SCORE_DECIMAL_PLACES = 1;
-export const SCORE_ROUNDING_MULTIPLIER = 10; // For rounding to 1 decimal place
+export const SCORE_ROUNDING_MULTIPLIER = 10;
 
-// Define thresholds for maximum scores
 export const AI_ADOPTION_THRESHOLDS = {
   frequency: {
     agentInteractionsPerDay: 10,
-    autocompleteAcceptance: 20, // 20 accepted suggestions per day
+    autocompleteAcceptance: 20,
     cloudAgentSessions: 1,
     reviewerAgentRuns: 1,
   },
@@ -56,16 +42,13 @@ export const AI_ADOPTION_THRESHOLDS = {
 } as const;
 
 export type UserMetrics = {
-  // Frequency components (raw values)
   agentInteractionsPerDay: number;
   autocompleteAcceptance: number;
   cloudAgentSessions: number;
   reviewerAgentRuns: number;
-  // Depth components (raw values)
   queriesPerHourWorked: number;
   suggestionsAcceptedPercent: number;
   multiAgentChains: number;
-  // Coverage components (raw percentages 0-100)
   weeklyAIUsagePercent: number;
   twoAgentAdoptionPercent: number;
   fourAgentAdoptionPercent: number;
@@ -84,9 +67,6 @@ export type MemberInfo = {
   email: string;
 };
 
-/**
- * Calculate normalized component score for a single user
- */
 export function normalizeComponentScore(
   rawValue: number,
   threshold: number,
@@ -95,9 +75,6 @@ export function normalizeComponentScore(
   return Math.min(1, rawValue / threshold) * pointsPerComponent;
 }
 
-/**
- * Check if a user has any activity (non-zero values for any Frequency component)
- */
 export function hasActivity(userMetrics: UserMetrics): boolean {
   return (
     userMetrics.agentInteractionsPerDay > 0 ||
@@ -107,9 +84,6 @@ export function hasActivity(userMetrics: UserMetrics): boolean {
   );
 }
 
-/**
- * Build activity data maps from raw query results
- */
 export function buildActivityDataMaps(
   agentInteractionsData: Array<{ userId: string; date: string; requestCount: number }>,
   autocompleteData: Array<{ userId: string; date: string; acceptedCount: number }>,
@@ -168,16 +142,12 @@ export function buildActivityDataMaps(
   return activityData;
 }
 
-/**
- * Calculate user metrics for a specific date
- */
 export function calculateUserMetricsForDate(
   member: MemberInfo,
   dateStr: string,
   currentDate: Date,
   activityData: DailyActivityData
 ): UserMetrics {
-  // Get real data for all Frequency components for this specific day
   const agentInteractionsForDay =
     activityData.agentInteractions.get(dateStr)?.get(member.userId) || 0;
   const autocompleteAcceptedCountForDay =
@@ -186,22 +156,16 @@ export function calculateUserMetricsForDate(
     activityData.cloudAgentSessions.get(dateStr)?.get(member.userId) || 0;
   const codeReviewsForDay = activityData.codeReviews.get(dateStr)?.get(member.userId) || 0;
 
-  // Calculate Depth components
-  // 1. Queries per hour worked: agent interactions / STANDARD_WORKDAY_HOURS (normalize for 8-hour workday)
-  // Note: We don't include autocomplete here since it's now a rate, not a count
+  // Autocomplete is excluded from queries-per-hour because it is a rate, not a count.
   const queriesPerHourWorked = agentInteractionsForDay / STANDARD_WORKDAY_HOURS;
 
-  // 2. Suggestions accepted percent: mock data for now (static value)
   const suggestionsAcceptedPercent = MOCK_SUGGESTIONS_ACCEPTED_PERCENT;
 
-  // 3. Multi-agent chains: minimum count across all three sources
-  // Only counts if user has activity in all three areas
   const multiAgentChains =
     agentInteractionsForDay > 0 && cloudAgentSessionsForDay > 0 && codeReviewsForDay > 0
       ? Math.min(agentInteractionsForDay, cloudAgentSessionsForDay, codeReviewsForDay)
       : 0;
 
-  // Calculate Coverage components based on previous COVERAGE_LOOKBACK_DAYS
   let daysWithActivity = 0;
   const agentTypesUsed = new Set<string>();
   const weekdayActivity = new Set<number>(); // 0-6 for days of week
@@ -227,38 +191,30 @@ export function calculateUserMetricsForDate(
       weekdayActivity.add(checkDate.getDay());
     }
 
-    // Track which agent types were used
     if (hasAgentInteractions) agentTypesUsed.add('agent');
     if (hasAutocomplete) agentTypesUsed.add('autocomplete');
     if (hasCloudAgent) agentTypesUsed.add('cloud');
     if (hasCodeReview) agentTypesUsed.add('review');
   }
 
-  // 1. Weekly AI usage: percentage of days with any AI activity
   const weeklyAIUsagePercent = (daysWithActivity / COVERAGE_LOOKBACK_DAYS) * 100;
 
-  // 2. 2+ agents adoption: percentage (0 or 100 based on whether they used 2+ types)
   const twoAgentAdoptionPercent = agentTypesUsed.size >= MIN_AGENT_TYPES_FOR_TWO_PLUS ? 100 : 0;
 
-  // 3. 4+ agents adoption: percentage (0 or 100 based on whether they used all 4 types)
   const fourAgentAdoptionPercent = agentTypesUsed.size >= MIN_AGENT_TYPES_FOR_FOUR_PLUS ? 100 : 0;
 
-  // 4. Weekday usage breadth: percentage of unique weekdays with activity
   const weekdayUsageBreadth = (weekdayActivity.size / DAYS_IN_WEEK) * 100;
 
   return {
-    // Frequency components - ALL REAL DATA
     agentInteractionsPerDay: agentInteractionsForDay,
-    autocompleteAcceptance: autocompleteAcceptedCountForDay, // Count of accepted suggestions
+    autocompleteAcceptance: autocompleteAcceptedCountForDay,
     cloudAgentSessions: cloudAgentSessionsForDay,
     reviewerAgentRuns: codeReviewsForDay,
 
-    // Depth components - REAL DATA (except suggestions accepted)
     queriesPerHourWorked,
     suggestionsAcceptedPercent,
     multiAgentChains,
 
-    // Coverage components - ALL REAL DATA (based on 7-day lookback)
     weeklyAIUsagePercent,
     twoAgentAdoptionPercent,
     fourAgentAdoptionPercent,
@@ -266,11 +222,6 @@ export function calculateUserMetricsForDate(
   };
 }
 
-/**
- * Calculate average metric score across all ACTIVE users for a given day
- * Users with zero interactions are excluded from the calculation
- * Each user's components are normalized first, then averaged
- */
 export function calculateMetricScore(
   metricsForDay: Map<string, UserMetrics>,
   getUserValue: (metrics: UserMetrics) => number,
@@ -279,7 +230,6 @@ export function calculateMetricScore(
 ): number {
   if (metricsForDay.size === 0) return 0;
 
-  // Filter to only active users, normalize their component values, then average
   const normalizedScores = Array.from(metricsForDay.values())
     .filter(hasActivity)
     .map(userMetrics => {
@@ -287,7 +237,6 @@ export function calculateMetricScore(
       return normalizeComponentScore(rawValue, threshold, pointsPerComponent);
     });
 
-  // If no active users, return 0
   if (normalizedScores.length === 0) return 0;
 
   const avgScore =
@@ -295,9 +244,6 @@ export function calculateMetricScore(
   return avgScore;
 }
 
-/**
- * Calculate frequency score (max 40 points)
- */
 export function calculateFrequencyScore(metricsForDay: Map<string, UserMetrics>): number {
   return Math.min(
     MAX_FREQUENCY_SCORE,
@@ -328,9 +274,6 @@ export function calculateFrequencyScore(metricsForDay: Map<string, UserMetrics>)
   );
 }
 
-/**
- * Calculate depth score (max 40 points)
- */
 export function calculateDepthScore(metricsForDay: Map<string, UserMetrics>): number {
   return Math.min(
     MAX_DEPTH_SCORE,
@@ -355,9 +298,6 @@ export function calculateDepthScore(metricsForDay: Map<string, UserMetrics>): nu
   );
 }
 
-/**
- * Calculate coverage score (max 20 points)
- */
 export function calculateCoverageScore(metricsForDay: Map<string, UserMetrics>): number {
   return Math.min(
     MAX_COVERAGE_SCORE,
@@ -388,9 +328,6 @@ export function calculateCoverageScore(metricsForDay: Map<string, UserMetrics>):
   );
 }
 
-/**
- * Generate daily AI adoption timeseries data
- */
 export function generateDailyTimeseries(
   startDate: string,
   endDate: string,
@@ -415,7 +352,6 @@ export function generateDailyTimeseries(
     const timestamp = currentDate.toISOString();
     const dateStr = currentDate.toISOString().split('T')[0];
 
-    // Calculate user metrics for this date
     if (!userMetricsByDate.has(dateStr)) {
       const metricsForDate = new Map<string, UserMetrics>();
       members.forEach(member => {
@@ -431,7 +367,6 @@ export function generateDailyTimeseries(
       continue;
     }
 
-    // Calculate daily scores
     const frequency = calculateFrequencyScore(metricsForDay);
     const depth = calculateDepthScore(metricsForDay);
     const coverage = calculateCoverageScore(metricsForDay);
@@ -449,9 +384,6 @@ export function generateDailyTimeseries(
   return { timeseries, userMetricsByDate };
 }
 
-/**
- * Calculate user-specific scores for a single user across all their active days
- */
 export function calculateUserScore(
   userId: string,
   userMetricsByDate: Map<string, Map<string, UserMetrics>>
@@ -466,12 +398,10 @@ export function calculateUserScore(
   let coverageSum = 0;
   let daysWithActivity = 0;
 
-  // Iterate through all days and accumulate scores
   userMetricsByDate.forEach(metricsForDay => {
     const metrics = metricsForDay.get(userId);
     if (!metrics || !hasActivity(metrics)) return;
 
-    // Calculate this day's scores for this user
     const dayFrequency = Math.min(
       MAX_FREQUENCY_SCORE,
       normalizeComponentScore(
@@ -563,9 +493,6 @@ export function calculateUserScore(
   };
 }
 
-/**
- * Calculate weekly trends by comparing last day to first day
- */
 export function calculateWeeklyTrends(
   data: Array<{ frequency: number; depth: number; coverage: number }>
 ) {

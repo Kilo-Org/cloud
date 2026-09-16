@@ -106,6 +106,123 @@ describe('control diagnostics', () => {
     );
   });
 
+  it('runs snapshots from the cadence and final drain without re-entering flush', async () => {
+    let snapshotCalls = 0;
+    const uploads: string[] = [];
+    const diagnostics = createControlDiagnostics({
+      uploadUrl,
+      uploadGrant,
+      intervalMs: 5,
+      fetch: async (_url, init) => {
+        uploads.push(requestBody(init));
+        return new Response(null, { status: 204 });
+      },
+    });
+    const receiptId = crypto.randomUUID();
+    diagnostics.setSnapshot(() => {
+      snapshotCalls += 1;
+      diagnostics.onDiagnostic('control.event', {
+        phase: 'publication_summary',
+        category: 'session_event',
+        receiptId,
+        wrapperInstanceId: crypto.randomUUID(),
+        nativeRuntimeId: 'native_runtime_1',
+        failureReason: 'socket_overflow',
+        failureCount: snapshotCalls,
+        queueWaitMs: 12,
+        preparedAt: 5,
+        neverSentCount: 1,
+        sentWithoutResponseCount: 0,
+      });
+    });
+    diagnostics.start();
+    await diagnostics.flush();
+    expect(snapshotCalls).toBe(1);
+
+    await Bun.sleep(20);
+    expect(snapshotCalls).toBeGreaterThan(1);
+    const beforeFinal = snapshotCalls;
+    await diagnostics.finalize();
+    expect(snapshotCalls).toBe(beforeFinal + 1);
+
+    const batches = uploads.map(body => controlLogBatchSchema.parse(JSON.parse(body)));
+    expect(batches.length).toBeGreaterThan(0);
+    const summaries = batches
+      .flatMap(batch => batch.records)
+      .filter(record => record.fields.phase === 'publication_summary');
+    expect(summaries).toHaveLength(snapshotCalls);
+    expect(summaries.at(-1)?.fields).toMatchObject({
+      phase: 'publication_summary',
+      category: 'session_event',
+      receiptId,
+      nativeRuntimeId: 'native_runtime_1',
+      failureReason: 'socket_overflow',
+      failureCount: snapshotCalls,
+      queueWaitMs: 12,
+      preparedAt: 5,
+      neverSentCount: 1,
+      sentWithoutResponseCount: 0,
+    });
+  });
+
+  it('accepts legacy and extended publication fields through the uploader', async () => {
+    const uploads: string[] = [];
+    const diagnostics = createControlDiagnostics({
+      uploadUrl,
+      uploadGrant,
+      fetch: async (_url, init) => {
+        uploads.push(requestBody(init));
+        return new Response(null, { status: 204 });
+      },
+    });
+    const receiptId = crypto.randomUUID();
+    diagnostics.onDiagnostic('control.heartbeat', { phase: 'sent', sequence: 1 });
+    diagnostics.onDiagnostic('control.event', {
+      phase: 'publication_failed',
+      category: 'session_event',
+      receiptId,
+      wrapperInstanceId: crypto.randomUUID(),
+      nativeRuntimeId: 'native_runtime_1',
+      failureReason: 'event_receipt_timeout',
+      queueWaitMs: 40,
+      preparedAt: 10,
+      sentAt: 50,
+      requestWaitMs: 0,
+      neverSent: false,
+      sentWithoutResponse: true,
+      detail: 'no_response',
+    });
+    await diagnostics.finalize();
+
+    const records = uploads
+      .map(body => controlLogBatchSchema.parse(JSON.parse(body)))
+      .flatMap(batch => batch.records);
+    expect(records).toContainEqual(
+      expect.objectContaining({
+        event: 'control.heartbeat',
+        fields: expect.objectContaining({ phase: 'sent', sequence: 1 }),
+      })
+    );
+    expect(records).toContainEqual(
+      expect.objectContaining({
+        event: 'control.event',
+        fields: expect.objectContaining({
+          phase: 'publication_failed',
+          category: 'session_event',
+          receiptId,
+          nativeRuntimeId: 'native_runtime_1',
+          failureReason: 'event_receipt_timeout',
+          queueWaitMs: 40,
+          preparedAt: 10,
+          sentAt: 50,
+          requestWaitMs: 0,
+          neverSent: false,
+          sentWithoutResponse: true,
+        }),
+      })
+    );
+  });
+
   it('serializes uploads and retries the same immutable batch before newer records', async () => {
     const uploads: Array<{ url: string; body: string }> = [];
     const response = Promise.withResolvers<Response>();

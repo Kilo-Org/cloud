@@ -16,11 +16,9 @@ import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
-import {
-  OPENROUTER,
-  tryGetProviderById,
-  VERCEL_AI_GATEWAY,
-} from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { tryGetProviderById } from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';

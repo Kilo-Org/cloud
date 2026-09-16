@@ -18,6 +18,7 @@
     "./runtime-proxy-attestation": "./src/runtime-proxy-attestation.ts",
     "./kilo-auth-middleware": "./src/kilo-auth-middleware.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
+    "./sandbox-allocation": "./src/sandbox-allocation.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./deployment-slug": "./src/deployment-slug.ts",
     "./redact-headers": "./src/redact-headers.ts",
@@ -30,6 +31,7 @@
     "./cloud-agent-next-client": "./src/cloud-agent-next-client.ts",
     "./cloud-agent-session-access": "./src/cloud-agent-session-access.ts",
     "./cloud-agent-worktree-changes": "./src/cloud-agent-worktree-changes.ts",
+    "./cloud-agent-commits": "./src/cloud-agent-commits.ts",
     "./kilo-model-id": "./src/kilo-model-id.ts",
     "./extract-bearer-token": "./src/extract-bearer-token.ts",
     "./cloud-agent-queue-report": "./src/cloud-agent-queue-report.ts",
@@ -43,7 +45,8 @@
     "./review-agents": "./src/review-agents.ts",
     "./code-review-council": "./src/code-review-council.ts",
     "./scheduled-job-observability": "./src/scheduled-job-observability.ts",
-    "./r2-client": "./src/r2-client.ts"
+    "./r2-client": "./src/r2-client.ts",
+    "./direct-byok-model": "./src/direct-byok-model.ts"
   },
   "scripts": {
     "test": "vitest run",

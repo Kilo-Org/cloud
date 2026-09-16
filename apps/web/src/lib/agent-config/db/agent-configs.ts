@@ -5,6 +5,7 @@ import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
+import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 
 type AgentConfigOwner = { type: 'org'; id: string } | { type: 'user'; id: string };
 
@@ -84,24 +85,29 @@ export async function upsertAgentConfig(
     ...(data.isEnabled !== undefined ? { is_enabled: data.isEnabled } : {}),
   };
 
-  await db
-    .insert(agent_configs)
-    .values({
-      owned_by_organization_id: data.organizationId,
-      agent_type: data.agentType,
-      platform: data.platform,
-      config: data.config,
-      is_enabled: data.isEnabled ?? false,
-      created_by: data.createdBy,
-    })
-    .onConflictDoUpdate({
-      target: [
-        agent_configs.owned_by_organization_id,
-        agent_configs.agent_type,
-        agent_configs.platform,
-      ],
-      set: updateSet,
-    });
+  await db.transaction(async tx => {
+    if (data.platform === 'github' && data.isEnabled === true) {
+      await assertGitHubAutomationCanBeEnabled({ type: 'org', id: data.organizationId }, tx);
+    }
+    await tx
+      .insert(agent_configs)
+      .values({
+        owned_by_organization_id: data.organizationId,
+        agent_type: data.agentType,
+        platform: data.platform,
+        config: data.config,
+        is_enabled: data.isEnabled ?? false,
+        created_by: data.createdBy,
+      })
+      .onConflictDoUpdate({
+        target: [
+          agent_configs.owned_by_organization_id,
+          agent_configs.agent_type,
+          agent_configs.platform,
+        ],
+        set: updateSet,
+      });
+  });
 
   // Create bot user for code review agents
   if (data.agentType === 'code_review') {
@@ -127,19 +133,24 @@ export async function setAgentEnabled(
   platform: string,
   isEnabled: boolean
 ) {
-  await db
-    .update(agent_configs)
-    .set({
-      is_enabled: isEnabled,
-      updated_at: new Date().toISOString(),
-    })
-    .where(
-      and(
-        eq(agent_configs.owned_by_organization_id, organizationId),
-        eq(agent_configs.agent_type, agentType),
-        eq(agent_configs.platform, platform)
-      )
-    );
+  await db.transaction(async tx => {
+    if (platform === 'github' && isEnabled) {
+      await assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationId }, tx);
+    }
+    await tx
+      .update(agent_configs)
+      .set({
+        is_enabled: isEnabled,
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(agent_configs.owned_by_organization_id, organizationId),
+          eq(agent_configs.agent_type, agentType),
+          eq(agent_configs.platform, platform)
+        )
+      );
+  });
 }
 
 /**
@@ -237,9 +248,14 @@ export async function upsertAgentConfigForOwner(
       ? [agent_configs.owned_by_organization_id, agent_configs.agent_type, agent_configs.platform]
       : [agent_configs.owned_by_user_id, agent_configs.agent_type, agent_configs.platform];
 
-  await db.insert(agent_configs).values(values).onConflictDoUpdate({
-    target: targetColumns,
-    set: updateSet,
+  await db.transaction(async tx => {
+    if (data.platform === 'github' && data.isEnabled === true) {
+      await assertGitHubAutomationCanBeEnabled(data.owner, tx);
+    }
+    await tx.insert(agent_configs).values(values).onConflictDoUpdate({
+      target: targetColumns,
+      set: updateSet,
+    });
   });
 
   // Create bot user for code review agents (only for organizations)
@@ -279,13 +295,18 @@ export async function setAgentEnabledForOwner(
     conditions.push(eq(agent_configs.owned_by_user_id, owner.id));
   }
 
-  await db
-    .update(agent_configs)
-    .set({
-      is_enabled: isEnabled,
-      updated_at: new Date().toISOString(),
-    })
-    .where(and(...conditions));
+  await db.transaction(async tx => {
+    if (platform === 'github' && isEnabled) {
+      await assertGitHubAutomationCanBeEnabled(owner, tx);
+    }
+    await tx
+      .update(agent_configs)
+      .set({
+        is_enabled: isEnabled,
+        updated_at: new Date().toISOString(),
+      })
+      .where(and(...conditions));
+  });
 }
 
 /**

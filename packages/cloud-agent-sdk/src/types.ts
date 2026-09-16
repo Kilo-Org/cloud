@@ -64,6 +64,16 @@ export type ProcessedMessage = {
   parts: Part[];
 };
 
+/** Goal status reported by the CLI in session metadata. */
+export type SessionGoalStatus = 'active' | 'complete' | 'blocked' | 'paused';
+
+/** Session goal projected from CLI metadata under `kilo.goal`. */
+export type SessionGoal = {
+  text: string;
+  status: SessionGoalStatus;
+  reason?: string | undefined;
+};
+
 /** Minimal session metadata — only the fields the SDK actually reads. */
 export type SessionInfo = {
   id: string;
@@ -75,6 +85,7 @@ export type SessionInfo = {
         variant?: string | undefined;
       }
     | undefined;
+  goal?: SessionGoal | undefined;
 };
 
 export type SessionPhase =
@@ -100,7 +111,7 @@ export type SessionActivity =
 /** Lifecycle outcome — drives bottom bar content (one thing at a time). */
 export type AgentStatus =
   | { type: 'idle' }
-  | { type: 'autocommit'; step: string; message: string }
+  | { type: 'autocommit'; step: string; message: string; commitHash?: string }
   | { type: 'error'; message: string }
   | { type: 'disconnected' }
   | { type: 'interrupted' };
@@ -164,6 +175,17 @@ export type MessageDeliveryState =
       attempts?: number | undefined;
     };
 
+export type SessionCommit = {
+  commitHash: string;
+  commitMessage: string;
+  messageId: string;
+  userMessageId: string;
+  committedAt: string;
+  timestamp?: string | undefined;
+  pushStatus: 'pushed' | 'failed' | 'not_attempted' | 'unknown';
+  commitMessageTruncated?: true | undefined;
+};
+
 export type PreparationAttemptStatus = 'running' | 'completed' | 'failed';
 export type PreparationStepKind = 'phase' | 'setup_command';
 export type PreparationStepStatus = 'running' | 'completed' | 'failed';
@@ -206,6 +228,7 @@ export type ServiceStateSnapshot = {
   /** @deprecated Legacy transient setup output. v2 preparation uses preparationAttempts. */
   setupLog: readonly string[];
   preparationAttempts: readonly PreparationAttempt[];
+  commits: readonly SessionCommit[];
   sessionInfo: SessionInfo | null;
   question: QuestionState | null;
   permission: PermissionState | null;

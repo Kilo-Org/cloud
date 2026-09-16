@@ -107,7 +107,10 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `GITHUB_LITE_APP_PRIVATE_KEY` - Private key for the lite GitHub App. `[SECRET]`
 - `GITHUB_LITE_APP_CLIENT_ID` - OAuth Client ID for the lite GitHub App install/login flow. [PUBLIC]
 - `GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS` - Comma-separated Kilo organization UUIDs allowed to connect multiple GitHub App installations. Unset or empty disables multiple installations for all organizations. [SERVER]
+- `GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS` - Comma-separated destination Kilo organization UUIDs allowed to create an association to a GitHub App installation already associated elsewhere. Unset or empty disables new shared associations without revoking existing ones. [SERVER]
 - `GITHUB_CONNECTION_MANAGEMENT_ENABLED` - Set to exact `true` to admit new existing-installation connection management and local disconnect. Unset or any other value keeps new management admission disabled without changing incumbent GitHub integration workflows. [SERVER]
+  - Keep disabled for at least one OAuth state TTL (10 minutes) after deploying reservation-aware callbacks so purpose-less states issued by the previous version can complete.
+  - During the migration-to-app promotion window, old pending-install callbacks may fail against the replaced pending indexes. Keep the window brief, monitor deploy health, and retry the GitHub connection after promotion completes.
 - `PER_REPO_SETTINGS` - Set to exactly `true` to reveal the Repository Customizations UI (per-installation default AI model / PR review mode, plus per-repository overrides) on the GitHub integration settings pages, for both personal accounts and organizations. Defaults to disabled so the feature can ship dark. [SERVER]
 - `GITHUB_ADMIN_STATS_TOKEN` - Token for admin GitHub API stats lookups; used in `apps/web/src/scripts/backfill-pr-author-github-ids.ts`. `[SECRET]`
 - `GITHUB_CLI_PAT` - GitHub personal access token for `gh` CLI operations inside contractors; used in `services/gastown/container/src/process-manager.ts`. `[SECRET]`
@@ -264,11 +267,11 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 ### AI Providers
 
-- `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
+- `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/definitions/openrouter.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
 - `OPENAI_API_KEY` - OpenAI API key supplied as a managed BYOK credential when managed inference requests route through the Vercel AI Gateway and permit the OpenAI provider. `[SECRET]`
 - `MISTRAL_API_KEY` - Mistral API key; used in `apps/web/src/lib/ai-gateway/embeddings/embedding-providers.ts` for `codestral-embed-2505` and `mistral-embed` embeddings, in the FIM completions proxy at `apps/web/src/app/api/fim/completions/route.ts` (routes Mistral Codestral vs. La Plateforme keys), and as a provider config in `apps/web/src/lib/config.server.ts`. `[SECRET]`
-- `LONGCAT_API_KEY` - LongCat API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
-- `STREAMLAKE_API_KEY` - StreamLake API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
+- `LONGCAT_API_KEY` - LongCat API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/definitions/longcat.ts`. `[SECRET]`
+- `STREAMLAKE_API_KEY` - StreamLake API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/definitions/streamlake.ts`. `[SECRET]`
 - `PERPLEXITY_API_KEY` - Perplexity API key for percentage-routed Kimi K3 inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/partner/providers.ts`. `[SECRET]`
 - `INCEPTION_API_KEY` - Inception Labs API key; used in `apps/web/src/app/api/fim/completions/route.ts` and `apps/web/src/app/api/edit/completions/route.ts` as a fill-in-the-middle (FIM) provider, with endpoint `https://api.inceptionlabs.ai/v1/fim/completions`. Defined in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `AI_ATTRIBUTION_ADMIN_SECRET` - Admin secret for the AI Attribution service (`apps/web/src/lib/ai-attribution-service.ts`); sent as `X-Admin-Secret` header. `[SECRET]`
@@ -394,6 +397,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]
 - `CONTROL_PLANE_IDS` - Comma-separated user or org IDs admitted to the call-home control plane at interactive web (`cloud-agent-web`) session creation. Empty admits nobody. `*` includes personal accounts. Omitted from production `wrangler.jsonc` so the Cloudflare dashboard value survives deploy; unset admits nobody. Wrangler `dev` and `.dev.vars.example` default to `*`. Non-interactive origins (Slack, scheduled, code review, and similar) keep legacy `agent_` sessions even when enrolled. Does not enable new worktree creation by itself; that also requires `WORKTREE_CREATION_ENABLED_IDS` enrollment. [SERVER]
 - `WORKTREE_CREATION_ENABLED_IDS` - Comma-separated user or org IDs allowed to create new worktrees, or `*` for all, including personal accounts. Omitted from production `wrangler.jsonc` so the Cloudflare dashboard value survives deploy; unset is off. Wrangler `dev` and `.dev.vars.example` default to `*`. Also requires enrollment in `CONTROL_PLANE_IDS`. Disabling it does not block existing worktrees or sibling chats in them. [SERVER]
+- `SANDBOX_SELECTION_IDS` - Comma-separated user or org IDs allowed to pick a Cloud Agent sandbox destination on the new-session page. Empty admits nobody. `*` includes personal accounts. Omitted from production `wrangler.jsonc` so the Cloudflare dashboard value survives deploy; unset admits nobody. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
 - `VERCEL_SANDBOX_ORG_IDS` - Comma-separated org IDs routed to Vercel sandboxes. Empty is off. `*` includes personal accounts. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
 

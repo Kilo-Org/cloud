@@ -7,6 +7,11 @@ import { useTranslation } from 'react-i18next';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
+
+import { useIsToolSummaryRow } from './tool-summary-translation-scope';
+
+import { useMessageLongPress } from './message-long-press-context';
 
 type FixedPartRowProps = {
   /** Tool icon, shown in the completed slot. Never passed for reasoning rows. */
@@ -22,6 +27,12 @@ type FixedPartRowProps = {
   variant?: 'solid' | 'dashed';
   /** Presence makes the row pressable and adds the chevron and details hint. */
   onPress?: () => void;
+  /**
+   * Whether the label carries tool content worth translating. Defaults to true;
+   * tool cards pass the display projection's `translatable` so a label that is
+   * already-localized UI copy or a raw tool id is never sent to the gateway.
+   */
+  translatable?: boolean;
   accessibilityLabel: string;
 };
 
@@ -30,6 +41,12 @@ type FixedPartRowProps = {
  * and single-line: the row never expands inline and never changes height from
  * streaming state transitions. A completed row without an `icon` renders no
  * leading element (a valid no-op, never an undefined component).
+ *
+ * A long press opens the message-details sheet through
+ * `MessageLongPressContext`: the row's tap responder would otherwise swallow
+ * the bubble's long-press contract on the row's surface. When no handler is
+ * mounted (rows outside a message bubble) the pressable keeps tap-only
+ * behavior; a disabled row already falls through to the bubble pressable.
  */
 export function FixedPartRow({
   icon: Icon,
@@ -39,10 +56,20 @@ export function FixedPartRow({
   status,
   variant = 'solid',
   onPress,
+  translatable = true,
   accessibilityLabel,
 }: Readonly<FixedPartRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const messageLongPress = useMessageLongPress();
+  const isToolSummaryRow = useIsToolSummaryRow();
+  const shownLabel = useTranslatedToolSummary(label, isToolSummaryRow && translatable);
+  // Keep the spoken summary in step with the visible one without a second
+  // translation request: only the embedded label changes.
+  const shownAccessibilityLabel =
+    label !== '' && shownLabel !== label
+      ? accessibilityLabel.split(label).join(shownLabel)
+      : accessibilityLabel;
 
   return (
     <View
@@ -55,9 +82,10 @@ export function FixedPartRow({
       <Pressable
         className="flex-row items-center gap-2 px-3 py-2 active:bg-secondary"
         onPress={onPress}
+        onLongPress={messageLongPress ?? undefined}
         disabled={!onPress}
         accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
+        accessibilityLabel={shownAccessibilityLabel}
         accessibilityHint={onPress ? t('agentChat.partDetail.showDetails') : undefined}
         accessibilityState={{ disabled: !onPress }}
       >
@@ -67,14 +95,16 @@ export function FixedPartRow({
         {status === 'error' ? <XCircle size={16} color={colors.destructive} /> : null}
         {status === 'completed' && Icon ? <Icon size={16} color={colors.mutedForeground} /> : null}
 
-        <View className="flex-1 flex-row items-center gap-1.5">
+        {/* Baseline, not center: the label is text-sm and the badge text-xs, so
+            centering the line boxes drops the badge below the label. */}
+        <View className="flex-1 flex-row items-baseline gap-1.5">
           {labelKind === 'eyebrow' ? (
             <Eyebrow className="shrink" numberOfLines={1}>
-              {label}
+              {shownLabel}
             </Eyebrow>
           ) : (
             <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
-              {label}
+              {shownLabel}
             </Text>
           )}
           {badge ? (

@@ -87,6 +87,28 @@ function applyTextDelta(part: Part, delta: string): Part {
   return { ...part, text: part.text + delta };
 }
 
+/**
+ * Append a batch of streamed chunks to a text part with a single allocation.
+ *
+ * The delta path buffers every `message.part.delta` and joins the batch once
+ * per publication, so the per-token cost stays O(1) (a buffer push) instead of
+ * re-copying the whole accumulated text — which is O(n) per token and
+ * quadratic over a long reasoning/text stream.
+ */
+function applyTextDeltas(part: Part, deltas: readonly string[]): Part {
+  if (!('text' in part) || typeof part.text !== 'string') {
+    return part;
+  }
+  if (deltas.length === 0) {
+    return part;
+  }
+  const delta = deltas.length === 1 ? (deltas[0] ?? '') : deltas.join('');
+  if (delta === '') {
+    return part;
+  }
+  return { ...part, text: part.text + delta };
+}
+
 function createSeedTextPart(messageId: string, partId: string, text: string): TextPart {
   return {
     id: partId,
@@ -109,6 +131,7 @@ const EMPTY_PARTS: readonly Part[] = Object.freeze([]);
 export {
   EMPTY_PARTS,
   applyTextDelta,
+  applyTextDeltas,
   clonePart,
   createReadonlyPartView,
   createSeedTextPart,

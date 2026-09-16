@@ -36,6 +36,7 @@
     "cost": "Spiża",
     "discard": "Warrab",
     "findings": "Sejbiet",
+    "mergeRequest": "merge request",
     "notConnected": "Mhux imqabbad",
     "notifications": "Notifiki",
     "pullRequest": "pR",
@@ -227,8 +228,12 @@
     "providerEnterpriseSso": "SSO tal-intrapriża"
   },
   "preferences": {
+    "general": "Ġenerali",
+    "voiceInput": "Input tal-vuċi",
     "autoExpandThinking": "Espandi awtomatikament il-ħsieb",
     "autoExpandThinkingSubtitle": "Uri l-ħsieb tal-aġent espandut meta jispiċċa.",
+    "hideThinking": "Aħbi d-dettalji tal-ħsieb",
+    "hideThinkingSubtitle": "Turix il-ħsieb tal-aġent fil-paġna tas-sessjoni.",
     "keepScreenOn": "Żomm l-iskrin mixgħul fil-paġna tas-sessjoni",
     "keepScreenOnSubtitle": "Żomm l-iskrin mixgħul waqt li s-sessjoni tkun qed taħdem.",
     "appearance": "Dehra",
@@ -237,6 +242,7 @@
     "appearanceLight": "Ċar",
     "appearanceDark": "Skur",
     "account": "Kont",
+    "accountSubtitle": "Lingwa, ospitanti fdati u sessjonijiet tal-apparat",
     "prReviewAttribution": "Żid attribuzzjoni tal-applikazzjoni mar-reviżjonijiet tal-PR",
     "prReviewAttributionSubtitle": "Żid nota fil-qiegħ li tgħid Rivedut permezz ta' Kilo meta tibgħat reviżjoni.",
     "returnSendsMessage": "It-tast tar-ritorn jibgħat il-messaġġ",
@@ -250,7 +256,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Traskrizzjoni permezz ta' Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Ittraskrivi d-dħul bil-vuċi b'mudell ta' Kilo Gateway minflok ir-rikonoxximent tal-vuċi tal-apparat. Ir-reġistrazzjoni tiegħek tintbagħat lil Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Ikkondensa s-sejħiet tal-għodda",
+    "condenseToolCallsSubtitle": "Iġbor is-sejħiet tal-għodda konsekuttivi f'ringiela waħda li tista' tiftaħ.",
+    "toolSummaryTranslation": "Ittraduċi s-sommarji tal-għodod",
+    "toolSummaryTranslationSubtitle": "Ibgħat kull sommarju tal-għodda lil mudell biex jittraduċih fil-lingwa tal-app tiegħek. L-oriġinal jintwera jekk it-traduzzjoni tfalli.",
+    "toolSummaryTranslationModelUnavailableNotice": "Dan il-mudell m'għadux disponibbli. Agħfas $t(common.model) biex tagħżel ieħor."
   },
   "prReview": {
     "pullRequestUnavailable": "It-talba għall-għaqda mhix disponibbli",
@@ -353,6 +364,7 @@
       "merge": "Għaqda",
       "mergeNow": "Għaqqad issa",
       "mergePullRequest": "Għaqda tat-talba",
+      "mergeTermTitle": "Għaqda tal-{{term}}",
       "enableAutoMerge": "Attiva l-għaqda awtomatika",
       "disableAutoMerge": "Iddiżattiva l-għaqda awtomatika",
       "autoMergeOn": "Għaqda awtomatika attiva",
@@ -371,9 +383,12 @@
       "deleteBranchAfterMerge": "Ħassar il-fergħa wara l-għaqda",
       "noEnabledMethods": "Dan ir-repożitorju m'għandu l-ebda metodu ta' għaqda attiv. Itlob lil amministratur tar-repożitorju biex jattiva l-għaqda, il-konsolidazzjoni jew it-tibdil tal-bażi.",
       "confirmTitle": "Trid tgħaqqad it-talba?",
+      "confirmTitleTerm": "Trid tgħaqqad il-{{term}}?",
       "confirmMessage": "Dan se jgħaqqad il-bidliet tiegħek mal-fergħa bażi.",
       "enableAutoMergeConfirmTitle": "Trid tattiva l-għaqda awtomatika?",
       "enableAutoMergeConfirmMessage": "GitHub se jgħaqqad din it-talba għall-għaqda awtomatikament meta jgħaddu l-kontrolli kollha meħtieġa.",
+      "enableAutoMergeConfirmMessageTerm": "Il-{{term}} se jiġi mgħaqqad awtomatikament ladarba l-pipeline tirnexxi.",
+      "enableAutoMergeDescriptionTerm": "GitLab igħaqqad dan il-{{term}} awtomatikament ladarba l-pipeline tirnexxi.",
       "forbidden": "M'għandekx permess biex tgħaqqad din it-talba għall-għaqda.",
       "cannotMerge": "Din it-talba għall-għaqda ma tistax tingħaqad kif inhi.",
       "couldNotMerge": "It-talba għall-għaqda ma setgħetx tingħaqad.",
@@ -384,7 +399,8 @@
       },
       "terminal": {
         "alreadyMerged": "Diġà magħquda",
-        "closed": "Din it-talba għall-għaqda hija magħluqa"
+        "closed": "Din it-talba għall-għaqda hija magħluqa",
+        "closedMergeRequest": "Dan il-merge request huwa magħluq"
       },
       "partialSuccessBanner": {
         "body": "Ma setgħetx titħassar il-fergħa: {{reason}}.",
@@ -409,6 +425,21 @@
         "behindDetail": "Il-fergħa tas-sors tinsab lura mill-fergħa bażi. Ibdel il-bażi tagħha jew aġġornaha qabel ma tagħmel l-għaqda.",
         "notMergeableTitle": "Din it-talba għall-għaqda għadha ma tistax tingħaqad",
         "notMergeableDetail": "GitHub irrapporta l-istat {{state}} għall-possibbiltà tal-għaqda."
+      },
+      "restrictions": {
+        "title": "Restrizzjonijiet fuq l-għaqda",
+        "approvalsRequired_one": "Hemm bżonn {{displayCount}} approvazzjoni",
+        "approvalsRequired_other": "Hemm bżonn {{displayCount}} approvazzjonijiet",
+        "pipelineMustSucceed": "Il-pipeline trid tirnexxi qabel l-għaqda.",
+        "approvalsRequired_many": "Hemm bżonn {{displayCount}} approvazzjonijiet",
+        "approvalsRequired_few": "Hemm bżonn {{displayCount}} approvazzjonijiet",
+        "approvalsRequired_two": "Hemm bżonn {{displayCount}} approvazzjonijiet"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Il-pipeline qed tfalli fl-aħħar reġistrazzjoni.",
+        "pendingPipeline": "Il-pipeline għadha sejra fl-aħħar reġistrazzjoni.",
+        "permission": "M'għandekx permess biex tgħaqqad dan il-{{term}}.",
+        "draft": "Immarka l-{{term}} bħala lest għar-reviżjoni qabel ma tgħaqqdu."
       },
       "methodLabels": {
         "merge": "Oħloq reġistrazzjoni tal-għaqda",
@@ -514,7 +545,8 @@
         "outdatedOnLines": "Mhux aġġornat fuq {{lines}}",
         "outdatedOnPath": "Mhux aġġornat fuq {{path}}"
       },
-      "deletedUser": "utent imħassar"
+      "deletedUser": "utent imħassar",
+      "replyForbiddenTerm": "M'għandekx permess biex tirrispondi għal dan il-{{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Ma stajniex niftħu l-issettjar tal-app ta' GitHub.",
     "installKiloGitHubApp": "Installa l-app ta' Kilo għal GitHub",
@@ -526,17 +558,19 @@
     "reviewPullRequest": "Irrevedi t-talba għall-għaqda",
     "headLine": "{{counts}} · l-aħħar reġistrazzjoni {{sha}}",
     "entry": {
-      "eyebrow": "Iftaħ talba għall-għaqda permezz ta' URL.",
-      "pastePrLink": "Waħħal ħolqa ta' PR",
-      "noRecentPrs": "L-ebda PR riċenti",
-      "noRecentPrsDescription": "Waħħal ħolqa ta' PR hawn fuq biex tibda reviżjoni — il-PR jidher hawn id-darba li jmiss.",
+      "eyebrow": "Iftaħ PR jew merge request permezz ta' URL",
+      "pastePrLink": "Waħħal ħolqa ta' PR jew merge request",
+      "noRecentPrs": "L-ebda reviżjoni riċenti",
+      "noRecentPrsDescription": "Waħħal ħolqa hawn fuq biex tibda reviżjoni — id-darba li jmiss tidher hawn.",
       "couldNotLoad": "Ma setax jitgħabba l-kontenut.",
       "removeFromRecentsTitle": "Trid tneħħiha mir-riċenti?",
-      "removeFromRecentsMessage": "Din it-talba għall-għaqda se titneħħa mil-lista tar-riċenti tiegħek.",
+      "removeFromRecentsMessage": "Din ir-reviżjoni se titneħħa mil-lista tar-riċenti tiegħek.",
       "removeRecentAccessibility": "Neħħi {{repo}} mir-riċenti",
-      "urlAccessibility": "URL ta' talba għall-għaqda fuq GitHub",
-      "clearLink": "Neħħi l-ħolqa tat-talba għall-għaqda",
-      "pasteLink": "Waħħal il-ħolqa tat-talba għall-għaqda",
+      "urlAccessibility": "Daħħal URL ta' PR jew merge request",
+      "urlPlaceholder": "URL ta' PR jew merge request",
+      "openAccessibility": "Iftaħ PR jew merge request",
+      "clearLink": "Neħħi l-ħolqa",
+      "pasteLink": "Waħħal il-ħolqa ta' PR jew merge request",
       "open": "Ftuħ"
     },
     "checks": {
@@ -553,6 +587,11 @@
       "pending": "{{displayCount}} pendenti",
       "skipped": "{{displayCount}} maqbuża",
       "checksCount": "{{displayCount}} kontrolli",
+      "checksCount_one": "{{displayCount}} kontroll",
+      "checksCount_two": "{{displayCount}} kontrolli",
+      "checksCount_few": "{{displayCount}} kontrolli",
+      "checksCount_many": "{{displayCount}}-il kontroll",
+      "checksCount_other": "{{displayCount}} kontrolli",
       "checkDetails": "dettalji tal-kontroll"
     },
     "inbox": {
@@ -585,9 +624,15 @@
     "connect": {
       "checkFailedTitle": "Ma setgħetx tiġi ċċekkjata l-konnessjoni ma' GitHub.",
       "checkFailedMessage": "L-istatus tad-dħul mhux disponibbli sakemm jitgħabba dan il-kontenut.",
+      "checkFailedTitleGitLab": "Ma setgħetx tiġi ċċekkjata l-konnessjoni ma' GitLab.",
+      "checkFailedTitleBitbucket": "Ma setgħetx tiġi ċċekkjata l-konnessjoni ma' Bitbucket.",
+      "providerCheckFailedMessage": "L-istat tal-konnessjoni mhux disponibbli sakemm jitgħabba.",
       "reconnectTitle": "Erġa' kkonnetta GitHub",
       "reconnectDescription": "L-aċċess tiegħek għal GitHub ġie revokat. Erġa' kkonnetta biex tkompli tirrevedi t-talbiet għall-għaqda fuq il-mowbajl.",
-      "description": "Ikkonnetta l-kont ta' GitHub tiegħek biex tirrevedi t-talbiet għall-għaqda fuq il-mowbajl."
+      "description": "Ikkonnetta l-kont ta' GitHub tiegħek biex tirrevedi t-talbiet għall-għaqda fuq il-mowbajl.",
+      "gitlabDescription": "Ikkonnettja l-kont GitLab tiegħek biex tirrevedi l-merge requests fuq il-mowbajl.",
+      "bitbucketDescription": "Ikkonnettja Bitbucket ma' din l-organizzazzjoni biex tirrevedi l-PRs fuq il-mowbajl.",
+      "bitbucketOrgOnlyDescription": "Agħżel organizzazzjoni fil-profil tiegħek biex tirrevedi l-PRs tagħha fuq Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -612,7 +657,10 @@
     },
     "reconnectNotice": {
       "title": "Il-konnessjoni ma' GitHub skadiet.",
-      "message": "Il-konnessjoni tiegħek ma' GitHub m'għadhiex valida. Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja."
+      "message": "Il-konnessjoni tiegħek ma' GitHub m'għadhiex valida. Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja.",
+      "gitlabTitle": "Il-konnessjoni ma' GitLab skadiet.",
+      "bitbucketTitle": "Il-konnessjoni ma' Bitbucket skadiet.",
+      "providerMessage": "Il-konnessjoni tiegħek ma' {{provider}} m'għadhiex valida. Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja."
     },
     "eventChips": {
       "comment": "Kumment",
@@ -686,7 +734,7 @@
       "emptyLine": "(vojt)"
     },
     "linkPasteClipboardEmpty": "Il-klibbord huwa vojt.",
-    "linkPasteNotAPullRequest": "Din mhix ħolqa ta' talba għall-għaqda fuq GitHub.",
+    "linkPasteNotAPullRequest": "Din mhix ħolqa ta' PR jew merge request",
     "announce": {
       "commentPosted": "Il-kumment ġie ppubblikat",
       "reviewSubmitted": "Ir-reviżjoni ntbagħtet",
@@ -695,6 +743,7 @@
     "mutationError": {
       "commentNotPosted": "Dan il-kumment ma jistax jiġi ppubblikat. Il-linja magħżula setgħet inbidlet, jew il-PR seta' ġie aġġornat.",
       "reviewNotSubmitted": "Din ir-reviżjoni ma tistax tintbagħat kif inhi. Il-PR seta' nbidel, jew ma tistax tirrevedi t-talba għall-għaqda tiegħek stess.",
+      "reviewNotSubmittedTerm": "Din ir-reviżjoni ma tistax tintbagħat hekk kif inhi. Il-{{term}} fori nbidel, jew ma tistax tirrevedi l-{{term}} tiegħek stess.",
       "couldNotPostComment": "Ma setax jiġi ppubblikat il-kumment.",
       "couldNotSubmitReview": "Ma setgħetx tintbagħat ir-reviżjoni. Iċċekkja l-konnessjoni tiegħek u erġa' pprova."
     },
@@ -702,9 +751,31 @@
       "couldNotReply": "Ma stajniex nibagħtu t-tweġiba.",
       "couldNotCompleteAction": "Ma setgħetx titlesta din l-azzjoni.",
       "mergeResultDefaultError": "GitHub ma temmx l-għaqda.",
+      "mergeResultNotCompleted": "Il-{{term}} ma ngħaqadx. Iċċekkja l-istat tiegħu u erġa' pprova.",
       "ambiguous": "Ma stajniex nikkonfermaw ir-riżultat — iċċekkja l-PR qabel terġa' tipprova.",
       "persistenceFailed": "Ma stajniex nirreġistraw din l-azzjoni. Jekk jogħġbok erġa' pprova aktar tard.",
       "forbidden": "Din l-azzjoni mhix permessa."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Mhux disponibbli ma' dan il-fornitur",
+        "accessibility": "Mhux disponibbli ma' dan il-fornitur: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Aqsam il-merge request",
+      "viewOnProvider": "Ara fuq {{provider}}",
+      "mergeRequestUnavailable": "Il-merge request mhux disponibbli",
+      "unavailableDescription": "Fori ġiet imħassra, jew fori m'għandekx aċċess għaliha.",
+      "accessDeniedMergeRequest": "M'għandekx permess biex tara dan il-merge request.",
+      "couldNotLoadMergeRequest": "Ma setgħax jitgħabba l-merge request.",
+      "discussionAccessDenied": "M'għandekx permess biex tara d-diskussjoni ta' dan il-merge request.",
+      "discussionUnavailableMessage": "Dan il-merge request setgħa tneħħa.",
+      "noDiscussionDescription": "Dan il-merge request għadu m'għandhu l-ebda sensiela ta' kummenti ta' reviżjoni jew kummenti fid-diskussjoni.",
+      "noFilesChangedDescription": "Dan il-merge request m'għandux bidliet fil-fajls."
     }
   },
   "notifications": {
@@ -2041,12 +2112,48 @@
       "connectionLost": "Il-konnessjoni ntilfet",
       "retryConnection": "Erġa' pprova taqbad"
     },
+    "goal": {
+      "title": "Għan",
+      "statusActive": "Għan attiv",
+      "statusPaused": "Għan imwaqqaf",
+      "statusComplete": "Għan komplut",
+      "statusBlocked": "Għan imblukkat",
+      "edit": "Editja l-għan",
+      "remove": "Neħħi l-għan",
+      "pause": "Waqqaf l-għan",
+      "resume": "Ibda l-għan mill-ġdid",
+      "editPlaceholder": "Iddeskrivi l-għan",
+      "removeConfirmTitle": "Neħħi l-għan?",
+      "removeConfirmMessage": "Il-CLI iħassar l-għan ta' din is-sessjoni.",
+      "updateFailed": "Ma setax jiġi aġġornat l-għan.",
+      "sectionAccessibility": "{{status}}. Għan: {{text}}"
+    },
     "newSession": {
+      "recentlyUsed": "Użati reċentement",
+      "couldNotLoadGithubRepositories": "Ma setgħux jitgħabbew ir-repożitorji ta' GitHub.",
+      "couldNotLoadGitlabRepositories": "Ma setgħux jitgħabbew ir-repożitorji ta' GitLab.",
+      "couldNotLoadBitbucketRepositories": "Ma setgħux jitgħabbew ir-repożitorji ta' Bitbucket.",
       "connectGithubDescription": "Qabbad GitHub fil-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju.",
+      "connectGitlabDescription": "Qabbad GitLab fil-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju.",
+      "connectBitbucketDescription": "Qabbad Bitbucket fil-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju.",
       "openGithub": "Iftaħ GitHub",
+      "openGitlab": "Iftaħ GitLab",
+      "openBitbucket": "Iftaħ Bitbucket",
       "refreshRepositories": "Aġġorna r-repożitorji",
       "githubConnected": "GitHub imqabbad",
+      "gitlabConnected": "GitLab imqabbad",
       "noRepositoriesVisible": "Ma jidher l-ebda repożitorju. Iċċekkja l-aċċess għar-repożitorji tal-applikazzjoni Kilo għal GitHub, imbagħad aġġorna.",
+      "noRepositoriesVisibleGitlab": "Ma jidher l-ebda repożitorju. Iċċekkja l-aċċess għar-repożitorji għal GitLab, imbagħad aġġorna.",
+      "noRepositoriesVisibleBitbucket": "Ma jidher l-ebda repożitorju. Iċċekkja l-aċċess għar-repożitorji għal Bitbucket, imbagħad aġġorna.",
+      "bitbucketOrganizationsOnly": "Bitbucket huwa disponibbli għall-organizzazzjonijiet biss.",
+      "branchPickerTitle": "Agħżel fergħa",
+      "branchDefault": "Predefinit",
+      "branchAccessibility": "Fergħa: {{label}}",
+      "branchLoading": "Tagħbija tal-fergħat",
+      "branchLoadError": "Ma setgħetx titgħabba l-fergħat",
+      "branchUnavailable": "M'hemmx fergħat disponibbli għal dan ir-repożitorju. Iċċekkja l-aċċess tiegħek mal-fornitur, imbagħad agħżel repożitorju ieħor.",
+      "branchEmpty": "Ebda fergħa disponibbli",
+      "branchPlaceholder": "Agħżel fergħa",
       "runOnWithTarget": "Ħaddem fuq: {{target}}",
       "environment": "Ambjent",
       "couldNotLoadEnvironment": "Ma setax jitgħabba l-ambjent tiegħek.",
@@ -2067,24 +2174,13 @@
       "couldNotRefreshRepositories": "Ma setgħux jiġu aġġornati r-repożitorji. Erġa' pprova.",
       "discardDraftTitle": "Twarrab l-abbozz?",
       "discardDraftMessage": "L-istruzzjoni tiegħek se tintilef.",
+      "discardWithUploadsMessage": "L-istruzzjoni tiegħek u kull fajl imtella' li għadu mhux mehmuż ma' messaġġ mibgħut se jitħassru.",
       "discardFailed": "Ma setax jitwarrab l-abbozz. Erġa' pprova.",
       "remoteHint": "Ħaddem `kilo remote` fuq il-kompjuter tiegħek, jew `/remote` f'sessjoni CLI li għaddejja, biex tikkontrolla proċess lokali ta' kilo.",
-      "connectBitbucketDescription": "Qabbad Bitbucket fil-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju.",
-      "connectGitlabDescription": "Qabbad GitLab fil-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju.",
-      "couldNotLoadBitbucketRepositories": "Ma setgħux jitgħabbew ir-repożitorji ta' Bitbucket.",
-      "couldNotLoadGithubRepositories": "Ma setgħux jitgħabbew ir-repożitorji ta' GitHub.",
-      "couldNotLoadGitlabRepositories": "Ma setgħux jitgħabbew ir-repożitorji ta' GitLab.",
-      "gitlabConnected": "GitLab imqabbad",
-      "noRepositoriesVisibleBitbucket": "Ma jidher l-ebda repożitorju. Iċċekkja l-aċċess għar-repożitorji għal Bitbucket, imbagħad aġġorna.",
-      "noRepositoriesVisibleGitlab": "Ma jidher l-ebda repożitorju. Iċċekkja l-aċċess għar-repożitorji għal GitLab, imbagħad aġġorna.",
-      "openBitbucket": "Iftaħ Bitbucket",
-      "openGitlab": "Iftaħ GitLab",
-      "recentlyUsed": "Użati reċentement",
       "continueFrom": "Qed tkompli s-sessjoni {{title}}.",
       "importingSession": "Qed tiġi importata s-sessjoni",
       "cliCannotContinue": "Dan il-CLI ma jistax ikompli sessjoni. Agħżel Cloud Agent jew CLI ieħor.",
-      "importFailed": "Ma setgħetx tiġi importata din is-sessjoni.",
-      "discardWithUploadsMessage": "L-istruzzjoni tiegħek u kull fajl imtella' li għadu mhux mehmuż ma' messaġġ mibgħut se jitħassru."
+      "importFailed": "Ma setgħetx tiġi importata din is-sessjoni."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ġie aġġornat {{displayCount}} fajl.",
@@ -2499,6 +2595,11 @@
       "stepsCount_few": "{{steps}} passi",
       "stepsCount_many": "{{steps}}-il pass"
     },
+    "autoApprove": {
+      "title": "Approvazzjoni awtomatika",
+      "description": "Approva awtomatikament it-talbiet għall-permess għal din is-sessjoni. L-għodda mbagħad taħdem mingħajr talba.",
+      "unavailable": "Din is-sessjoni ma tistax tirċievi talbiet għall-permess."
+    },
     "prBadge": {
       "open": "ftuħ tal-PR",
       "closed": "talba għall-integrazzjoni magħluqa",
@@ -2529,6 +2630,10 @@
       "tapToListHint": "Tektek direttorju biex tara l-kontenut tiegħu.",
       "unsupportedDescription": "Dan il-CLI ma jistax jelenka d-direttorji. Tektek Lest biex iżżomm id-direttorju tat-tnedija, imbagħad Ibda s-sessjoni biex tibda minn hemm.",
       "unsupportedTitle": "Ma jistgħux jiġu elenkati d-direttorji"
+    },
+    "toolRun": {
+      "sheetTitle": "Sejħiet tal-għodda",
+      "condensedLabel": "{{itemCount}} elementi; {{last}}"
     }
   },
   "bootstrap": {
@@ -2639,8 +2744,12 @@
     "gatewayUnreachable": "Ma setgħetx tasal għal Kilo Gateway. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
     "gatewayTimeout": "It-traskrizzjoni ħadet wisq ħin. Erġa' pprova.",
     "gatewayModelUnavailable": "Dan il-mudell ta' traskrizzjoni mhux disponibbli. Agħżel ieħor fil-Preferenzi.",
+    "gatewayModelUnavailableNotice": "Dan il-mudell m'għadux disponibbli. Agħfas $t(transcriptionModel.title) biex tagħżel ieħor.",
     "gatewaySignInRequired": "Idħol biex tuża t-traskrizzjoni permezz ta' Kilo Gateway.",
-    "gatewayNoModel": "L-ewwel agħżel mudell ta' traskrizzjoni fil-Preferenzi."
+    "gatewayNoModel": "L-ewwel agħżel mudell ta' traskrizzjoni fil-Preferenzi.",
+    "testTitle": "Ittestja d-dħul bil-vuċi",
+    "testPlaceholder": "Ikketti l-mikrofonu u ibda tkellem.",
+    "testClear": "Neħħi t-test"
   },
   "share": {
     "title": "Aqsam ma' Kilo",
@@ -3032,5 +3141,31 @@
     "emptyTitle": "L-ebda mudell ta' traskrizzjoni",
     "emptyDescription": "Kilo Gateway bħalissa ma joffri l-ebda mudell ta' traskrizzjoni.",
     "loadFailed": "Ma setgħetx titgħabba l-mudelli ta' traskrizzjoni."
+  },
+  "voiceLanguage": {
+    "title": "Lingwa tad-dħul bil-vuċi",
+    "automatic": "Awtomatika",
+    "loadFailed": "Il-lingwi li jappoġġja dan l-apparat ma setgħux jitgħabbu.",
+    "emptyTitle": "L-ebda lingwa appoġġjata",
+    "emptyDescription": "Ir-rikonoxximent tal-kitba ta' dan l-apparat ma jirrapporta l-ebda lingwa appoġġjata."
+  },
+  "tour": {
+    "eyebrow": "Żjara mgħaġġla",
+    "forkTitle": "Fejn trid tħaddem lil Kilo?",
+    "forkSubtitle": "Agħżel fejn Kilo jaħdem għall-ewwel sessjoni tiegħek.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Ħaddem Kilo f'ambjent cloud iżolat, mingħajr xejn x'tinstalla.",
+    "remoteOptionTitle": "Il-kompjuter tiegħek",
+    "remoteOptionBody": "Ħaddem Kilo fuq il-magna tiegħek permezz tal-CLI `kilo remote`.",
+    "skip": "Aqbeż it-tour",
+    "tutorialLabel": "Tutorial",
+    "remoteTitle": "Ibda l-ewwel sessjoni remota tiegħek",
+    "remoteBody": "Ikkonetta l-kompjuter tiegħek, imbagħad ibda s-sessjoni minn hawn.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Għad m'hemmx kompjuter konness",
+    "remoteEmptyBody": "Biex tikkonnettjah, ħaddem `kilo remote` fuq il-kompjuter tiegħek.",
+    "remoteFound": "Kompjuter konness",
+    "checkAgain": "Iċċekkja mill-ġdid",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

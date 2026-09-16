@@ -31,7 +31,7 @@ import {
   getOpenRouterModelsMetadataFromDatabase,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { createGateway, generateText } from 'ai';
-import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
 import { decryptByokRow } from '@/lib/ai-gateway/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
@@ -418,6 +418,14 @@ export const byokRouter = createTRPCRouter({
         if (existingKey.kilo_user_id !== ctx.user.id) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
         }
+      }
+
+      const providerId = UserByokProviderIdSchema.safeParse(existingKey.provider_id);
+      if (!providerId.success) {
+        return {
+          success: false,
+          message: `Provider ${existingKey.provider_id} is no longer supported.`,
+        };
       }
 
       const decryptedKey = decryptByokRow(existingKey);

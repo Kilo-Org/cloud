@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { getProvider, getTranscriptionProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { OPENROUTER, VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { User } from '@kilocode/db/schema';

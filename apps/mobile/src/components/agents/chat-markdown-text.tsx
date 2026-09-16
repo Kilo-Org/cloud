@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { openExternalUrl } from '@/lib/external-link';
-import { parseGitHubPrUrl } from '@/lib/github-pr-url';
+import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
+import { parseProviderPrUrl } from '@/lib/pr-review/provider-pr-url';
 
 import {
   buildChatLinkActionSheet,
@@ -17,8 +18,12 @@ import {
 } from './chat-link-actions';
 import { formatLinkHost } from './markdown-link-confirm';
 import { MarkdownText, type MarkdownTextProps } from './markdown-text';
+import { performCopy } from './use-message-copy';
 
-type ChatMarkdownTextProps = Omit<MarkdownTextProps, 'onLongPressLink' | 'onPressLink'>;
+type ChatMarkdownTextProps = Omit<
+  MarkdownTextProps,
+  'onLongPressLink' | 'onPressLink' | 'onCopyCode'
+>;
 
 /** Sheet message: host then full href, so the host is visible above the URL. */
 function sheetMessage(href: string): string {
@@ -27,18 +32,8 @@ function sheetMessage(href: string): string {
 }
 
 function buildPrReviewHref(href: string): Href | null {
-  const parsed = parseGitHubPrUrl(href);
-  if (!parsed) {
-    return null;
-  }
-  return {
-    pathname: '/(app)/pr-review/[owner]/[repo]/[number]',
-    params: {
-      owner: parsed.owner,
-      repo: parsed.repo,
-      number: String(parsed.number),
-    },
-  };
+  const ref = parseProviderPrUrl(href);
+  return ref ? providerPrRoutePath(ref) : null;
 }
 
 export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
@@ -52,7 +47,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
     (href: string) => {
       // When PR Review is off, PR links behave like any other link (default
       // open-in-browser) instead of showing the Review-PR tap sheet.
-      if (!prReviewEnabled || !parseGitHubPrUrl(href)) {
+      if (!prReviewEnabled || !parseProviderPrUrl(href)) {
         return false;
       }
       // Tap on a PR link shows exactly four options: Review PR / Open in
@@ -92,7 +87,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
   const handleLongPressLink = useCallback(
     (href: string, event?: GestureResponderEvent) => {
       event?.stopPropagation();
-      const isPrLink = prReviewEnabled && parseGitHubPrUrl(href) !== null;
+      const isPrLink = prReviewEnabled && parseProviderPrUrl(href) !== null;
       const sheet = buildChatLinkActionSheet({ isPrLink });
       showActionSheetWithOptions(
         {
@@ -120,7 +115,18 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
     [bottom, prReviewEnabled, router, showActionSheetWithOptions, t]
   );
 
+  // Code fences in the transcript copy through the shared clipboard helper, so
+  // success/failure feedback (haptic + toast) matches every other copy action.
+  const handleCopyCode = useCallback((code: string) => {
+    void performCopy(code);
+  }, []);
+
   return (
-    <MarkdownText {...props} onLongPressLink={handleLongPressLink} onPressLink={handlePressLink} />
+    <MarkdownText
+      {...props}
+      onLongPressLink={handleLongPressLink}
+      onPressLink={handlePressLink}
+      onCopyCode={handleCopyCode}
+    />
   );
 }

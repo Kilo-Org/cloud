@@ -3093,5 +3093,9 @@
     "remoteFound": "Kompyuter ulandi",
     "checkAgain": "Yana tekshirish",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Yangi agent",
+    "openLastSession": "Oxirgi seansni ochish"
   }
 }

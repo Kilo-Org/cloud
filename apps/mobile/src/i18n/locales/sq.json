@@ -3093,5 +3093,9 @@
     "remoteFound": "Kompjuteri u lidh",
     "checkAgain": "Kontrollo përsëri",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Agjent i ri",
+    "openLastSession": "Hap sesionin e fundit"
   }
 }

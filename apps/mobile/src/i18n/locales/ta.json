@@ -3093,5 +3093,9 @@
     "remoteFound": "கணினி இணைக்கப்பட்டது",
     "checkAgain": "மீண்டும் சரிபார்",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "புதிய முகவர்",
+    "openLastSession": "கடைசி அமர்வைத் திறக்கவும்"
   }
 }

@@ -3093,5 +3093,9 @@
     "remoteFound": "संगणक जोडला",
     "checkAgain": "पुन्हा तपासा",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "नवीन एजंट",
+    "openLastSession": "शेवटचे सत्र उघडा"
   }
 }

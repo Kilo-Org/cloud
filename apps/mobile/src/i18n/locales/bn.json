@@ -3093,5 +3093,9 @@
     "remoteFound": "কম্পিউটার সংযুক্ত",
     "checkAgain": "আবার যাচাই করুন",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "নতুন এজেন্ট",
+    "openLastSession": "শেষ সেশন খুলুন"
   }
 }

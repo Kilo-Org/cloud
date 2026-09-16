@@ -3093,5 +3093,9 @@
     "remoteFound": "Kombiyuutarka la xidhay",
     "checkAgain": "Mar kale hubi",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Wakiil cusub",
+    "openLastSession": "Fur kalfadhigii ugu dambeeyay"
   }
 }

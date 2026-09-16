@@ -3093,5 +3093,9 @@
     "remoteFound": "კომპიუტერი მიერთებულია",
     "checkAgain": "ხელახლა შემოწმება",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "ახალი აგენტი",
+    "openLastSession": "ბოლო სესიის გახსნა"
   }
 }

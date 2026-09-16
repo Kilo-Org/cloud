@@ -3093,5 +3093,9 @@
     "remoteFound": "បានភ្ជាប់កុំព្យូទ័រ",
     "checkAgain": "ពិនិត្យម្តងទៀត",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "ភ្នាក់ងារថ្មី",
+    "openLastSession": "បើកវគ្គចុងក្រោយ"
   }
 }

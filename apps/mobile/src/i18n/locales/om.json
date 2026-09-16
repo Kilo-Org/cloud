@@ -3093,5 +3093,9 @@
     "remoteFound": "Kompiitaraan walqabate",
     "checkAgain": "Irra deebi'ii ilaali",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Eejentii haaraa",
+    "openLastSession": "Turtii dhumaa bani"
   }
 }

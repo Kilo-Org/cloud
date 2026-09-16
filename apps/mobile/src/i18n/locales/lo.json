@@ -3093,5 +3093,9 @@
     "remoteFound": "ຄອມພິວເຕີເຊື່ອມຕໍ່ແລ້ວ",
     "checkAgain": "ກວດສອບອີກຄັ້ງ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "ເອເຈນໃໝ່",
+    "openLastSession": "ເປີດເຊສຊັນລ່າສຸດ"
   }
 }

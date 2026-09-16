@@ -3093,5 +3093,9 @@
     "remoteFound": "Kọ̀ǹpútà ti so pọ̀",
     "checkAgain": "Tún ṣe àyẹ̀wò",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Aṣojú tuntun",
+    "openLastSession": "Ṣí ìgbà iṣẹ́ tó kẹ́yìn"
   }
 }

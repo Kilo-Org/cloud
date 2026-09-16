@@ -55,6 +55,8 @@ import { clearHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-prefe
 import { clearSessionScopedState } from '@/lib/auth/session-scoped-state';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
+import { clearLastOpenedSession } from '@/lib/last-opened-session';
+import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import {
   isSignOutActive,
@@ -128,6 +130,19 @@ function readUserIdFromToken(token: string): string | null {
     return parsed.success && parsed.data.kiloUserId ? parsed.data.kiloUserId : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Run one synchronous best-effort teardown step. Sign-out's local cleanups are
+ * independent: a throw in one must never abort the transition or reject
+ * `signOut`, so each call site is guarded by this wrapper.
+ */
+function runBestEffortTeardown(step: () => void): void {
+  try {
+    step();
+  } catch {
+    // Best effort: a failed clear never aborts sign-out.
   }
 }
 
@@ -487,6 +502,13 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearSessionScopedState();
           clearPrReviewFooterPreference();
           clearCondenseToolCallsPreference();
+          // The launcher surfaces belong to the signed-out account: drop the
+          // dynamic shortcuts/tile natively and the durable last-opened record,
+          // so the next account never sees the previous account's session.
+          // Both are synchronous best-effort clears, guarded so neither can
+          // throw into sign-out.
+          runBestEffortTeardown(clearLauncherSurfaces);
+          runBestEffortTeardown(clearLastOpenedSession);
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

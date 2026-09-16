@@ -3093,5 +3093,9 @@
     "remoteFound": "Komputer terhubung",
     "checkAgain": "Periksa lagi",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Agen baru",
+    "openLastSession": "Buka sesi terakhir"
   }
 }

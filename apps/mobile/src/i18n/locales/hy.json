@@ -3093,5 +3093,9 @@
     "remoteFound": "Համակարգիչը միացված է",
     "checkAgain": "Կրկին ստուգիր",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Նոր գործակալ",
+    "openLastSession": "Բացել վերջին աշխատաշրջանը"
   }
 }

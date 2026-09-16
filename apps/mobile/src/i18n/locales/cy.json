@@ -3185,5 +3185,9 @@
     "remoteFound": "Cyfrifiadur wedi'i gysylltu",
     "checkAgain": "Gwirio eto",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Asiant newydd",
+    "openLastSession": "Agor y sesiwn ddiwethaf"
   }
 }

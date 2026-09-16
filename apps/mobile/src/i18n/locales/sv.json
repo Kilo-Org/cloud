@@ -3093,5 +3093,9 @@
     "remoteFound": "Dator ansluten",
     "checkAgain": "Kontrollera igen",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Ny agent",
+    "openLastSession": "Öppna senaste sessionen"
   }
 }

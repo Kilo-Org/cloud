@@ -3093,5 +3093,9 @@
     "remoteFound": "Компьютер қосылды",
     "checkAgain": "Қайта тексеру",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Жаңа агент",
+    "openLastSession": "Соңғы сессияны ашу"
   }
 }

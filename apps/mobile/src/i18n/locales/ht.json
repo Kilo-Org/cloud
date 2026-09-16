@@ -3093,5 +3093,9 @@
     "remoteFound": "Òdinatè konekte",
     "checkAgain": "Tcheke ankò",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Nouvo ajan",
+    "openLastSession": "Louvri dènye sesyon an"
   }
 }

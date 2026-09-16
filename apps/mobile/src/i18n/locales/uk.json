@@ -3139,5 +3139,9 @@
     "remoteFound": "Комп'ютер підключено",
     "checkAgain": "Перевірити ще раз",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Новий агент",
+    "openLastSession": "Відкрити останній сеанс"
   }
 }

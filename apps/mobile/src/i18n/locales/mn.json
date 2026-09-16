@@ -3093,5 +3093,9 @@
     "remoteFound": "Компьютер холбогдлоо",
     "checkAgain": "Дахин шалгах",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Шинэ агент",
+    "openLastSession": "Сүүлийн сессийг нээх"
   }
 }

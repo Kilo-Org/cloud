@@ -3093,5 +3093,9 @@
     "remoteFound": "Ejikọrọ kọmputa",
     "checkAgain": "Lelee ọzọ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Onye enyemaka ọhụrụ",
+    "openLastSession": "Mepee nnọkọ ikpeazụ"
   }
 }

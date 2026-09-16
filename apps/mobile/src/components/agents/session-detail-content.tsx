@@ -172,6 +172,7 @@ import {
   buildContinueHref,
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
+import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -533,7 +534,12 @@ export function SessionDetailContent({
     }
     viewTrackedRef.current = sessionId;
     captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
-  }, [fetchedData, sessionId, analyticsSurface, openedVia]);
+    // Record the session the person actually viewed (not one merely fetched) so
+    // the launcher's 'Open last session' reopens it. Lockstep with the analytics
+    // event above: the same once-per-session ref guards both, so adding `userId`
+    // to the deps cannot re-capture or re-record.
+    recordLastOpenedSession(sessionId, userId ?? null);
+  }, [fetchedData, sessionId, analyticsSurface, openedVia, userId]);
 
   useEffect(
     () => () => {

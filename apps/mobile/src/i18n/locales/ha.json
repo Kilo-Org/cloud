@@ -3093,5 +3093,9 @@
     "remoteFound": "An haɗa kwamfuta",
     "checkAgain": "Sake dubawa",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Sabon wakili",
+    "openLastSession": "Buɗe zaman ƙarshe"
   }
 }

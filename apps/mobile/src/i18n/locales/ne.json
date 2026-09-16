@@ -3093,5 +3093,9 @@
     "remoteFound": "कम्प्युटर जडान भयो",
     "checkAgain": "फेरि जाँच गर्नुहोस्",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "नयाँ एजेन्ट",
+    "openLastSession": "पछिल्लो सत्र खोल्नुहोस्"
   }
 }

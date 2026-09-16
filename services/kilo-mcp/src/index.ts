@@ -9,7 +9,7 @@ import {
 } from './analytics';
 import { forwardedAuthFromProps } from './auth';
 import { MCP_SCOPE, scopeTokens } from './auth/http';
-import { callCatalogEndpoint, serializeWithCap } from './call';
+import { callCatalogEndpoint, MAX_RESULT_BYTES, serializeWithCap } from './call';
 import { createDefaultHandler } from './oauth/consent';
 import { onError, tokenExchangeCallback } from './oauth/provider-hooks';
 import { createRefreshReuseHandler, isTokenRequest } from './oauth/refresh-reuse';
@@ -35,6 +35,7 @@ import {
   type Catalog,
   type ForwardedAuth,
   type GrantProps,
+  type SearchResult,
   type SemanticCandidates,
 } from './types';
 import OAuthProvider, {
@@ -212,6 +213,38 @@ function toolResult(outcome: { text: string; truncated: boolean }): ToolResult {
   };
 }
 
+/** UTF-8 byte length, the unit `MAX_RESULT_BYTES` measures. */
+function utf8ByteLength(text: string): number {
+  return new TextEncoder().encode(text).byteLength;
+}
+
+/**
+ * Serialize search hits so an over-cap payload is still valid JSON.
+ *
+ * Every hit carries its published input schema, so a 50-row result can pass the
+ * tool-result cap. Cutting the serialized text at a byte boundary (what
+ * `serializeWithCap` does for the call tool's opaque upstream data) leaves the
+ * agent with unparseable JSON and no count of what was dropped. Drop hits from
+ * the end instead — the ranking already puts the best matches first — and say
+ * in the payload how many were dropped, so nothing is lost silently.
+ */
+function cappedSearchResults(results: SearchResult[]): { text: string; truncated: boolean } {
+  const full = JSON.stringify({ results });
+  if (utf8ByteLength(full) <= MAX_RESULT_BYTES) return { text: full, truncated: false };
+  for (let kept = results.length - 1; kept >= 0; kept -= 1) {
+    const dropped = results.length - kept;
+    const text = JSON.stringify({
+      results: results.slice(0, kept),
+      truncated: true,
+      message: `Dropped ${dropped} of ${results.length} results to stay within the ${MAX_RESULT_BYTES}-byte tool-result cap. Use a narrower query or a lower "limit" to see them.`,
+    });
+    if (utf8ByteLength(text) <= MAX_RESULT_BYTES) return { text, truncated: true };
+  }
+  // Unreachable in practice: an empty result list with the drop notice is far
+  // under the cap.
+  return { text: JSON.stringify({ results: [], truncated: true }), truncated: true };
+}
+
 /** JSON object guard used only to recover the JSON-RPC `id` from a malformed envelope. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -257,9 +290,9 @@ async function runTool(
       );
     }
     // Every hit carries its published input schema, and a 50-row result can
-    // exceed the tool-result cap: cut and mark the payload like the call tool
-    // instead of handing the client an unbounded body.
-    return toolResult(serializeWithCap({ results }));
+    // exceed the tool-result cap: drop the lowest-ranked hits so the payload
+    // stays parseable JSON and names how many were dropped.
+    return toolResult(cappedSearchResults(results));
   }
   if (name === 'call') {
     const parsed = callArgsSchema.safeParse(args);

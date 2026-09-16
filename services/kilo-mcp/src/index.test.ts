@@ -402,10 +402,11 @@ describe('tools/call search', () => {
     }
   });
 
-  it('caps a search payload over the tool-result cap and marks it truncated', async () => {
+  it('keeps an over-cap search payload parseable JSON instead of cutting it mid-token', async () => {
     // Every hit now carries its full input schema, so a result set can exceed
-    // the cap the call tool already enforces: the payload must be cut and
-    // marked, never handed to the client unbounded.
+    // the cap the call tool already enforces. A lone hit whose schema alone
+    // passes the cap must still yield valid JSON: the hit is dropped and the
+    // payload says so, never left as text cut at a byte boundary.
     const big = 'z'.repeat(20_000);
     const blobCatalog: Catalog = {
       'blob.get': {
@@ -436,10 +437,65 @@ describe('tools/call search', () => {
       }
     ).result;
     expect(result.truncated).toBe(true);
-    expect(result.content[0]!.text.endsWith('[truncated]')).toBe(true);
     expect(new TextEncoder().encode(result.content[0]!.text).byteLength).toBeLessThanOrEqual(
       16 * 1024
     );
+    // Parseable, unlike a payload cut at a byte boundary.
+    const payload = JSON.parse(result.content[0]!.text) as {
+      results: Array<{ path: string }>;
+      truncated: boolean;
+      message: string;
+    };
+    expect(payload.truncated).toBe(true);
+    expect(payload.results).toEqual([]);
+    expect(payload.message).toContain('Dropped 1 of 1');
+  });
+
+  it('drops only the lowest-ranked hits when part of the results fit', async () => {
+    // Three equally scored hits (ties break by path ascending) of ~6 KB each:
+    // the top two fit under the cap, the third does not, so the payload must
+    // keep blob.alpha and blob.beta and report the one dropped.
+    const filler = 'z'.repeat(6_000);
+    const row = (path: string): Catalog[string] => ({
+      path,
+      kind: 'query',
+      summary: 'Get the stored blob.',
+      inputSchema: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: { blob: { type: 'string', examples: [filler] } },
+      },
+      tags: ['blob'],
+      searchBlob: `${path} Get the stored blob. stored blob`,
+    });
+    const catalog: Catalog = {
+      'blob.alpha': row('blob.alpha'),
+      'blob.beta': row('blob.beta'),
+      'blob.gamma': row('blob.gamma'),
+    };
+    const response = await rpc(createMcpHandler({ catalog, webBaseUrl: 'https://app.kilo.ai' }), {
+      jsonrpc: '2.0',
+      id: 25,
+      method: 'tools/call',
+      params: { name: 'search', arguments: { query: 'stored blob' } },
+    });
+    const result = (
+      (await response.json()) as {
+        result: { content: Array<{ text: string }>; truncated?: boolean };
+      }
+    ).result;
+    expect(result.truncated).toBe(true);
+    const text = result.content[0]!.text;
+    expect(new TextEncoder().encode(text).byteLength).toBeLessThanOrEqual(16 * 1024);
+    const payload = JSON.parse(text) as {
+      results: Array<{ path: string; inputSchema: Record<string, unknown> }>;
+      truncated: boolean;
+      message: string;
+    };
+    expect(payload.results.map(hit => hit.path)).toEqual(['blob.alpha', 'blob.beta']);
+    // Kept hits are whole rows, schema included.
+    expect(payload.results[1]!.inputSchema).toEqual(catalog['blob.beta']!.inputSchema);
+    expect(payload.message).toContain('Dropped 1 of 3');
   });
 
   it('caps the empty-results payload too', async () => {

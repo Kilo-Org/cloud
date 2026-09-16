@@ -17,8 +17,10 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { kiloId, stubTextPart, stubUserMessage } from '@kilocode/cloud-agent-sdk/test-helpers';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
+import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import { AgentSessionProvider, useSessionManager } from '@/components/agents/session-provider';
+import { SessionCopyLinkAction } from '@/components/agents/session-copy-link-action';
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { QueryError } from '@/components/query-error';
@@ -53,6 +55,12 @@ const authState = vi.hoisted(() => ({
 }));
 
 const CHILD_ID = kiloId('ses_child_scope_probe');
+// Copy-link action boundaries: the native clipboard/haptics modules and the
+// toast host cannot load in the node-mounted harness.
+const clipboardSetStringAsync = vi.hoisted(() => vi.fn());
+const hapticsSelection = vi.hoisted(() => vi.fn());
+const toastSuccess = vi.hoisted(() => vi.fn());
+const toastError = vi.hoisted(() => vi.fn());
 const childPageMock = vi.fn<NonNullable<SessionManagerConfig['fetchSnapshotPage']>>();
 // Root transcript override: the default implementation serves the standard
 // root page, so one test can replace it without disturbing siblings.
@@ -109,11 +117,16 @@ vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   ChevronDown: 'ChevronDown',
   Clock: 'Clock',
+  Link2: 'Link2',
   Lock: 'Lock',
   SearchX: 'SearchX',
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
 }));
+vi.mock('expo-clipboard', () => ({ setStringAsync: clipboardSetStringAsync }));
+vi.mock('expo-haptics', () => ({ selectionAsync: hapticsSelection }));
+vi.mock('sonner-native', () => ({ toast: { success: toastSuccess, error: toastError } }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 
 // Leaves of the real bubble pipeline that the KILO-APP-99 repro mode mounts:
 // their own render trees are irrelevant to the defect, only the visibility
@@ -660,6 +673,80 @@ describe('SessionDetailScreen valid session-id', () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
     const renderer = await mountRoute();
     expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'resumeAt')).toBeNull();
+  });
+});
+
+// The session header's Copy-link action copies the same universal link the OS
+// handoff advertises, anchored at the position the transcript is showing.
+describe('SessionDetailScreen copy link action', () => {
+  beforeEach(() => {
+    clipboardSetStringAsync.mockReset();
+    hapticsSelection.mockReset();
+    toastSuccess.mockReset();
+    toastError.mockReset();
+  });
+
+  async function mountCopyAction(anchorMessageId: string | null) {
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    await act(async () => {
+      ref.current = TestRenderer.create(
+        createElement(SessionCopyLinkAction, { sessionId: 'sess-1', anchorMessageId })
+      );
+      await Promise.resolve();
+    });
+    if (!ref.current) {
+      throw new Error('copy action did not render');
+    }
+    return ref.current;
+  }
+
+  function copyControl(renderer: TestRenderer.ReactTestRenderer) {
+    return renderer.root.findByProps({ accessibilityLabel: i18n.t('common.copyLink') });
+  }
+
+  it('copies the resume URL of the shown position and confirms it', async () => {
+    clipboardSetStringAsync.mockResolvedValue(true);
+    const renderer = await mountCopyAction('msg_42');
+
+    await act(async () => {
+      pressControl(copyControl(renderer));
+      await Promise.resolve();
+    });
+
+    expect(clipboardSetStringAsync).toHaveBeenCalledWith(
+      sessionResumeUrl({ sessionId: 'sess-1', anchorMessageId: 'msg_42' })
+    );
+    expect(toastSuccess).toHaveBeenCalledWith(i18n.t('agentChat.chatLink.linkCopied'));
+    expect(hapticsSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces a retryable failure when the clipboard rejects', async () => {
+    clipboardSetStringAsync.mockRejectedValueOnce(new Error('clipboard unavailable'));
+    const renderer = await mountCopyAction('msg_42');
+
+    await act(async () => {
+      pressControl(copyControl(renderer));
+      await Promise.resolve();
+    });
+
+    expect(toastError).toHaveBeenCalledWith(i18n.t('agentChat.chatLink.couldNotCopyLink'), {
+      action: { label: i18n.t('common.tryAgain'), onClick: expect.any(Function) },
+    });
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it('copies the session link without a position when the position is unknown', async () => {
+    clipboardSetStringAsync.mockResolvedValue(true);
+    const renderer = await mountCopyAction(null);
+
+    await act(async () => {
+      pressControl(copyControl(renderer));
+      await Promise.resolve();
+    });
+
+    expect(clipboardSetStringAsync).toHaveBeenCalledWith(
+      sessionResumeUrl({ sessionId: 'sess-1', anchorMessageId: null })
+    );
   });
 });
 

@@ -8,6 +8,8 @@ import {
 } from 'react';
 import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
+import * as Clipboard from 'expo-clipboard';
+import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { type Pressable } from 'react-native';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
@@ -75,6 +77,10 @@ vi.mock('@/components/agents/session-provider', () => ({
 // Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
 // rendering and unrelated composer, account, model-picker, and router dependencies.
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
+const routerSetParams = vi.hoisted(() => vi.fn());
+const handoffAdvertiserCalls = vi.hoisted(() => ({
+  props: [] as { anchorMessageId?: string | null }[],
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 // The header's offline-banner reservation reads the committed connectivity
 // hook; these states are online, and the hook module pulls NetInfo (unmocked
@@ -114,6 +120,7 @@ vi.mock('expo-router', () => ({
     push: (href: string) => {
       navigationRoutes.push(href);
     },
+    setParams: routerSetParams,
   }),
 }));
 // `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
@@ -137,12 +144,13 @@ vi.mock('expo-haptics', () => ({
 vi.mock('@/components/agents/mobile-session-manager', () => ({
   isCancelQueuedUpgradeRequired: vi.fn(),
 }));
-vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   ChevronDown: 'ChevronDown',
   CircleDot: 'CircleDot',
   Clock: 'Clock',
+  Link2: 'Link2',
   Loader2: 'Loader2',
   MessageSquare: 'MessageSquare',
 }));
@@ -193,8 +201,20 @@ vi.mock('@/components/agents/context-usage-ring', () => ({
 // The real context sheet (rendered so the auto-approve row can be asserted)
 // reaches `copySessionId`, which imports the native `expo-clipboard` module that
 // cannot load in this DOM-free node suite. Mock the boundary, as the mounted
-// context-sheet suite does.
+// context-sheet suite does. The session header's copy-link action reaches the
+// same native module through the real chat-link copy path.
+vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('@/components/agents/session-row-actions', () => ({ copySessionId: vi.fn() }));
+// The copy-link path reaches the browser helper; its native module cannot load here.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+// The handoff advertiser is a platform boundary with its own mounted suites;
+// recording its props here proves the screen hands it the live position.
+vi.mock('@/lib/session-handoff', () => ({
+  SessionHandoffAdvertiser: (props: { anchorMessageId?: string | null }) => {
+    handoffAdvertiserCalls.props.push(props);
+    return null;
+  },
+}));
 vi.mock('@/components/agents/session-pr-badge', () => ({ SessionPrBadge: 'SessionPrBadge' }));
 vi.mock('@/components/agents/session-status-indicator', () => ({
   SessionStatusIndicator: 'SessionStatusIndicator',
@@ -1770,5 +1790,48 @@ describe('SessionDetailContent goal visibility', () => {
     goalMountOptions = { goal: pausedGoal, resolvedType: 'read-only' };
     const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
     expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+  });
+});
+
+// The screen's live position: the transcript list reports the topmost visible
+// message, and the screen publishes it to the OS handoff, the copy-link action,
+// and the route's search params.
+describe('SessionDetailContent live position', () => {
+  it('publishes the transcript position to the handoff, the copy action, and the route', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+    routerSetParams.mockClear();
+    handoffAdvertiserCalls.props.length = 0;
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange?.('msg-77');
+    });
+
+    // The handoff advertises the position the transcript is showing.
+    expect(handoffAdvertiserCalls.props.at(-1)?.anchorMessageId).toBe('msg-77');
+
+    // The header's copy action copies that same position's universal link.
+    const copy = view.renderer.root.findByProps({
+      accessibilityLabel: i18n.t('common.copyLink'),
+    });
+    await act(async () => {
+      (copy.props as { onPress: () => void }).onPress();
+      await Promise.resolve();
+    });
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
+      sessionResumeUrl({ sessionId: ROOT_ID, anchorMessageId: 'msg-77' })
+    );
+
+    // The route's search params carry it after the publish debounce.
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+    expect(routerSetParams).toHaveBeenCalledWith({ at: 'msg-77' });
   });
 });

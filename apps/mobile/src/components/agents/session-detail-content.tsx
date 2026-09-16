@@ -70,6 +70,7 @@ import {
   useSessionAutoApproveEnabled,
 } from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
+import { SessionCopyLinkAction } from '@/components/agents/session-copy-link-action';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
@@ -180,6 +181,7 @@ import {
 } from '@/lib/picker-bridge';
 import { trpcClient } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
+import { SessionHandoffAdvertiser } from '@/lib/session-handoff';
 
 const GOAL_ACTION_LABEL_KEY = {
   edit: 'agentChat.goal.edit',
@@ -187,6 +189,13 @@ const GOAL_ACTION_LABEL_KEY = {
   resume: 'agentChat.goal.resume',
   remove: 'agentChat.goal.remove',
 } as const satisfies Record<GoalAction, string>;
+
+/**
+ * How long the live viewport has to settle before it is written to the route's
+ * search params. The transcript list already reports at most once a second; the
+ * debounce keeps a burst of reports from issuing several navigations.
+ */
+const ANCHOR_PUBLISH_DEBOUNCE_MS = 500;
 
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
@@ -296,6 +305,31 @@ export function SessionDetailContent({
   const [detailsMessageId, setDetailsMessageId] = useState<string | null>(null);
   const detailsMessageIdRef = useRef<string | null>(null);
   const [isGoalEditOpen, setIsGoalEditOpen] = useState(false);
+  // The live viewport position (the topmost visible message), reported by the
+  // transcript list. It feeds the OS handoff advertiser and the route's search
+  // params so another device resumes the session where the user left it.
+  const [anchor, setAnchor] = useState<string | null>(null);
+  const handleAnchorChange = useCallback((messageId: string) => {
+    setAnchor(messageId);
+  }, []);
+  // The route's own `at` is the initial position only. Freeze the first value so
+  // the list's resume latch keeps seeing it while the live anchor is published
+  // through `router.setParams`; a later param must not re-scroll the viewport.
+  const initialResumeAnchorRef = useRef<string | null>(resumeAt ?? null);
+  const resumeAnchor = initialResumeAnchorRef.current;
+  const publishedAnchorRef = useRef<string | null>(resumeAnchor);
+  useEffect(() => {
+    if (anchor === null || anchor === publishedAnchorRef.current) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      publishedAnchorRef.current = anchor;
+      router.setParams({ at: anchor });
+    }, ANCHOR_PUBLISH_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [anchor, router]);
 
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -1384,6 +1418,7 @@ export function SessionDetailContent({
             : undefined
         }
       />
+      <SessionCopyLinkAction sessionId={sessionId} anchorMessageId={anchor ?? resumeAnchor} />
     </View>
   );
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
@@ -1733,6 +1768,17 @@ export function SessionDetailContent({
     <PartDetailSheetHost messages={messages}>
       <ToolRunSheetHost messages={messages}>
         <View className="flex-1 bg-background">
+          {/* Advertise the session and its position to the OS (iOS Handoff,
+              Android launcher entry point). Only once the session is loaded:
+              before that there is no title to advertise and the route is still
+              the skeleton. */}
+          {isSessionLoaded ? (
+            <SessionHandoffAdvertiser
+              sessionId={sessionId}
+              anchorMessageId={anchor ?? resumeAnchor}
+              title={rename.title}
+            />
+          ) : null}
           <ScreenHeader
             title={rename.title}
             reserveTitleSpace
@@ -2210,8 +2256,9 @@ export function SessionDetailContent({
           onReachedBottom={() => {
             manager.trimRetainedHistory();
           }}
+          onAnchorChange={handleAnchorChange}
           renderItem={renderItem}
-          resumeAt={resumeAt}
+          resumeAt={resumeAnchor}
         />
       </Animated.View>
     );

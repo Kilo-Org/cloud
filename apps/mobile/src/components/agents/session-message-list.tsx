@@ -15,6 +15,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
+import { useSessionListAnchorReport } from '@/components/agents/use-session-list-anchor-report';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
 import {
@@ -60,6 +61,13 @@ type SessionMessageListProps<T> = {
    */
   resumeAt?: string | null;
   /**
+   * Optional callback fired when the topmost viewable row's message changes.
+   * The host publishes it as the session's position (route search params and
+   * the OS handoff entry point). Absent keeps every existing caller
+   * byte-identical: no viewability wiring is attached at all.
+   */
+  onAnchorChange?: (messageId: string) => void;
+  /**
    * Extra bottom padding (in dp) applied to the list's content container.
    * The default (undefined) keeps the legacy `paddingVertical: 8` behavior
    * exactly, so the main session view is unaffected. Hosts that render
@@ -91,6 +99,7 @@ export function SessionMessageList<T>({
   ListFooterComponent,
   contentBottomInset,
   onReachedBottom,
+  onAnchorChange,
   resumeAt,
 }: Readonly<SessionMessageListProps<T>>) {
   // Rows are already present when the list mounts (the resume never mounts a
@@ -170,6 +179,10 @@ export function SessionMessageList<T>({
   useEffect(() => {
     inFlightRef.current = false;
   }, [sessionId]);
+
+  // Report the viewport's topmost message to the host. Absent `onAnchorChange`,
+  // nothing is wired: no viewability callback, no config.
+  const anchorReport = useSessionListAnchorReport<T>({ sessionId, onAnchorChange });
 
   // Resume-position scroll for a `?at=` deep link. Runs once per
   // (sessionId, resumeAt) pair: an anchor among the rendered rows scrolls to
@@ -355,6 +368,9 @@ export function SessionMessageList<T>({
         scrollEventThrottle={16}
         onStartReached={hasOlderMessages ? handleStartReached : undefined}
         onStartReachedThreshold={ON_START_REACHED_THRESHOLD}
+        // Viewability is only wired when a host asked for the position, so
+        // every other caller's list stays byte-identical.
+        {...anchorReport}
         maintainVisibleContentPosition={{
           // Start rendering from the bottom so the newest message is visible
           // on first render. `autoscrollToTopThreshold` is left at its default

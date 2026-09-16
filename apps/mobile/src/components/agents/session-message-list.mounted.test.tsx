@@ -380,3 +380,151 @@ describe('SessionMessageList resume anchor', () => {
     });
   });
 });
+
+// The list hands the host the viewport's position through `onAnchorChange`.
+// These drive the FlashList `onViewableItemsChanged` prop directly, which is
+// the same event FlashList raises on device.
+type AnchorViewToken = { item: SessionTranscriptItem; index: number };
+
+describe('SessionMessageList anchor reporting', () => {
+  const baseProps = {
+    sessionId: 'session-1',
+    keyExtractor: (item: SessionTranscriptItem) => getSessionTranscriptItemKey(item),
+    hasOlderMessages: false,
+    isLoadingOlderMessages: false,
+    olderMessagesError: null,
+    olderMessagesOmittedItemCount: 0,
+    onLoadOlderMessages: () => undefined,
+    renderItem: () => null,
+  };
+
+  type AnchorProps = Parameters<typeof SessionMessageList<SessionTranscriptItem>>[0];
+
+  function mountAnchorList(overrides: Partial<AnchorProps>): void {
+    act(() => {
+      TestRenderer.create(
+        createElement(SessionMessageList<SessionTranscriptItem>, {
+          ...baseProps,
+          ...overrides,
+          items: overrides.items ?? [],
+        })
+      );
+    });
+  }
+
+  function fireViewability(tokens: readonly AnchorViewToken[]): void {
+    const handler = flashListProps.current?.onViewableItemsChanged as
+      | ((info: { viewableItems: unknown[] }) => void)
+      | undefined;
+    if (handler === undefined) {
+      throw new Error('viewability callback is not wired');
+    }
+    act(() => {
+      handler({
+        viewableItems: tokens.map(token => ({
+          item: token.item,
+          index: token.index,
+          key: `row-${token.index}`,
+          isViewable: true,
+          timestamp: 0,
+        })),
+      });
+    });
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('wires viewability only when the host asked for the position', () => {
+    mountAnchorList({ items: [resumeItem('msg-1')] });
+    expect(flashListProps.current?.viewabilityConfig).toBeUndefined();
+    expect(flashListProps.current?.onViewableItemsChanged).toBeUndefined();
+
+    mountAnchorList({
+      items: [resumeItem('msg-1')],
+      onAnchorChange: vi.fn<(id: string) => void>(),
+    });
+    expect(flashListProps.current?.viewabilityConfig).toEqual({
+      itemVisiblePercentThreshold: 50,
+    });
+    expect(typeof flashListProps.current?.onViewableItemsChanged).toBe('function');
+  });
+
+  it('reports the topmost viewable row message id', () => {
+    const onAnchorChange = vi.fn<(messageId: string) => void>();
+    const first = resumeItem('msg-1');
+    const second = resumeItem('msg-2');
+    mountAnchorList({ items: [first, second], onAnchorChange });
+
+    // FlashList's token array is not guaranteed to be index-ordered: the
+    // topmost row is the lowest index, not the first array entry.
+    fireViewability([
+      { item: second, index: 1 },
+      { item: first, index: 0 },
+    ]);
+
+    expect(onAnchorChange).toHaveBeenCalledTimes(1);
+    expect(onAnchorChange).toHaveBeenCalledWith('msg-1');
+  });
+
+  it('reports nothing while the topmost viewable row is unchanged', () => {
+    const onAnchorChange = vi.fn<(messageId: string) => void>();
+    const first = resumeItem('msg-1');
+    const second = resumeItem('msg-2');
+    mountAnchorList({ items: [first, second], onAnchorChange });
+
+    fireViewability([{ item: first, index: 0 }]);
+    fireViewability([{ item: first, index: 0 }]);
+
+    expect(onAnchorChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('coalesces changes to one report per second and publishes the settled value', () => {
+    vi.useFakeTimers();
+    const onAnchorChange = vi.fn<(messageId: string) => void>();
+    const first = resumeItem('msg-1');
+    const second = resumeItem('msg-2');
+    mountAnchorList({ items: [first, second], onAnchorChange });
+
+    fireViewability([{ item: first, index: 0 }]);
+    expect(onAnchorChange).toHaveBeenLastCalledWith('msg-1');
+
+    // A scroll that immediately moves the viewport on must not report per
+    // event; the trailing report carries the position the viewport settled on.
+    fireViewability([{ item: second, index: 1 }]);
+    expect(onAnchorChange).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(onAnchorChange).toHaveBeenCalledTimes(2);
+    expect(onAnchorChange).toHaveBeenLastCalledWith('msg-2');
+  });
+
+  it('drops a scheduled report when the viewport settles back on the last reported row', () => {
+    vi.useFakeTimers();
+    const onAnchorChange = vi.fn<(messageId: string) => void>();
+    const first = resumeItem('msg-1');
+    const second = resumeItem('msg-2');
+    mountAnchorList({ items: [first, second], onAnchorChange });
+
+    fireViewability([{ item: first, index: 0 }]);
+    expect(onAnchorChange).toHaveBeenCalledTimes(1);
+    expect(onAnchorChange).toHaveBeenLastCalledWith('msg-1');
+
+    // The viewport moves on, scheduling a trailing report for `msg-2`...
+    fireViewability([{ item: second, index: 1 }]);
+    expect(onAnchorChange).toHaveBeenCalledTimes(1);
+
+    // ...then settles back onto the row the host already knows about before
+    // the timer fires. The scheduled report must publish nothing: reporting
+    // `msg-2` would tell the host the user is looking at a row they scrolled
+    // away from and put that stale position in the resume link.
+    fireViewability([{ item: first, index: 0 }]);
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(onAnchorChange).toHaveBeenCalledTimes(1);
+  });
+});

@@ -21,7 +21,7 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: 'User not found: ' + userId }, { status: 404 });
   }
-  await getBalanceForUser(user, { forceRefresh: true });
+  await getBalanceForUser(user);
 
   return NextResponse.json({ success: true });
 }

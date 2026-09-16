@@ -489,6 +489,10 @@ export const kilocode_users = pgTable(
     index('IDX_kilocode_users_signup_ip_created_at').on(table.signup_ip, table.created_at),
     index('IDX_kilocode_users_blocked_at').on(table.blocked_at),
     index('IDX_kilocode_users_blocked_by_kilo_user_id').on(table.blocked_by_kilo_user_id),
+    index('IDX_kilocode_users_next_credit_expiration_at')
+      .on(table.next_credit_expiration_at)
+      .concurrently()
+      .where(sql`${table.next_credit_expiration_at} IS NOT NULL`),
     // Prevent empty strings
     check('blocked_reason_not_empty', sql`length(blocked_reason) > 0`),
     check(
@@ -3219,6 +3223,10 @@ export const organizations = pgTable(
     ),
     index('IDX_organizations_sso_domain').on(table.sso_domain),
     index('IDX_organizations_parent_organization_id').on(table.parent_organization_id),
+    index('IDX_organizations_next_credit_expiration_at')
+      .on(table.next_credit_expiration_at)
+      .concurrently()
+      .where(sql`${table.next_credit_expiration_at} IS NOT NULL`),
     uniqueIndex('UQ_organizations_live_sales_demo_per_owner')
       .on(table.created_by_kilo_user_id)
       .where(

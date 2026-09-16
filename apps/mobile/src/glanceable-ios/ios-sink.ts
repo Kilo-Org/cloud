@@ -6,7 +6,6 @@ import {
   isEligibleGlanceableWork,
   isStartableGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
 import { i18n } from '@/i18n';
 import {
@@ -15,6 +14,7 @@ import {
   type GlanceableSinkContext,
 } from '@/lib/glanceable/sink-registry';
 import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
+import { getWaitingAsk } from '@/lib/glanceable/waiting-ask';
 
 import { ActiveAgentsLiveActivity, OPEN_AGENTS_URL } from './active-agents-live-activity';
 import {
@@ -31,6 +31,7 @@ import {
   buildExpiredWidgetProps,
   buildGlanceableLiveActivityContentState,
   buildGlanceableViewProps,
+  type GlanceableLiveActivityProps,
   staleTimelineFrame,
   toWidgetProps,
 } from './view-props';
@@ -43,10 +44,23 @@ let activity: Activity | null = null;
 let revision = 0;
 /** In-flight native `update`; `end` awaits it so its contentDate is never older. */
 let inFlightUpdate: Promise<void> | null = null;
-let lastProps: Partial<GlanceableLiveActivityContentState> | null = null;
+let lastProps: GlanceableLiveActivityProps | null = null;
 
 function translate(key: string): string {
   return i18n.t(key);
+}
+
+/**
+ * True while the recorded ask is one Approve can answer. The count this
+ * content state carries includes questions and retried asks, which
+ * `runGlanceableApprove` resolves to `none`, so the layout needs this fact to
+ * avoid offering a control that cannot act. The read is synchronous and the
+ * publisher records the ask before it emits, so the flag matches the counts in
+ * the same state.
+ */
+function isApprovableAskRecorded(): boolean {
+  const ask = getWaitingAsk();
+  return ask?.status === 'permission' && ask.isCloudAgent;
 }
 
 /**
@@ -65,7 +79,7 @@ function isActivityKitUnavailable(error: unknown): boolean {
 let pendingStart: Promise<void> | null = null;
 /** What that deferred start will raise; a newer snapshot replaces it before it runs. */
 let pendingStartInput: {
-  contentState: Partial<GlanceableLiveActivityContentState>;
+  contentState: GlanceableLiveActivityProps;
   snapshot: GlanceableAgentsSnapshot;
   ctx: GlanceableSinkContext;
 } | null = null;
@@ -73,7 +87,7 @@ let pendingStartAt = 0;
 
 /** Raise the card. Shared by the immediate start and the one deferred behind a dismissal. */
 function startCard(
-  contentState: Partial<GlanceableLiveActivityContentState>,
+  contentState: GlanceableLiveActivityProps,
   snapshot: GlanceableAgentsSnapshot,
   ctx: GlanceableSinkContext
 ): void {
@@ -167,7 +181,7 @@ function refreshActivity(): boolean {
  */
 function endNow(
   dismissMs: number | null = null,
-  props: Partial<GlanceableLiveActivityContentState> | null = lastProps,
+  props: GlanceableLiveActivityProps | null = lastProps,
   reachEnded = dismissMs === null
 ): Promise<void> | null {
   const targets = new Map<string, Activity>();
@@ -312,7 +326,10 @@ export const iosSink: GlanceableSink = {
         { date: new Date(snapshot.expiresAt), props: buildExpiredWidgetProps(snapshot, translate) },
       ]);
     }
-    const contentState = buildGlanceableLiveActivityContentState(snapshot);
+    const contentState = buildGlanceableLiveActivityContentState(
+      snapshot,
+      isApprovableAskRecorded()
+    );
     if (!isEligibleGlanceableWork(snapshot)) {
       // ActivityKit owns removal after this call, even if JavaScript stops.
       // The after-date retains Lock Screen content, not the Dynamic Island.
@@ -342,7 +359,10 @@ export const iosSink: GlanceableSink = {
       return;
     }
 
-    const contentState = buildGlanceableLiveActivityContentState(snapshot);
+    const contentState = buildGlanceableLiveActivityContentState(
+      snapshot,
+      isApprovableAskRecorded()
+    );
 
     if (pendingStart !== null) {
       // A start is already waiting on a dismissal. There is no card to update

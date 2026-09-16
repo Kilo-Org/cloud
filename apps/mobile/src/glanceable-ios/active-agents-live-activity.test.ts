@@ -43,9 +43,18 @@ describe('Active Agents Live Activity actions', () => {
     expect(source).not.toMatch(/\bi18n\./);
   });
 
-  it('offers Approve only while something waits', () => {
-    expect(source).toContain('const canApprove = (props.needsInput ?? 0) > 0;');
+  it('offers Approve only while an approvable ask waits', () => {
+    expect(source).toContain(
+      'const canApprove = (props.needsInput ?? 0) > 0 && props.canApprove !== false;'
+    );
     expect(source).toMatch(/canApprove \? \([\s\S]*?target="approve"[\s\S]*?\) : null/);
+  });
+
+  it('keeps the count gate when a server push omits the flag', () => {
+    // An absent field is a server-written state, where this process cannot know
+    // better, so only an explicit `false` withholds Approve.
+    expect(source).toContain('props.canApprove !== false');
+    expect(source).not.toMatch(/props\.canApprove === true/);
   });
 
   it('always offers Open', () => {

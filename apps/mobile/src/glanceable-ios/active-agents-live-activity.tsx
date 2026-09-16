@@ -39,7 +39,12 @@ import { withWidgetLogo } from './widget-logo';
 // state because the notifications Worker pushes the same raw shape and knows
 // no locale.
 
-type ContentState = Partial<GlanceableLiveActivityContentState>;
+// The pushed content state plus the one fact the widget extension cannot
+// derive: whether the recorded ask is one Approve can answer. It stays a local
+// type rather than an import from `./view-props`, because Babel stringifies
+// this function's source and every imported binding would be an undefined
+// global in the widget process.
+type ContentState = Partial<GlanceableLiveActivityContentState> & { canApprove?: boolean };
 
 // Babel replaces the annotated arrow with its source string, so `layout` is a
 // string at runtime while TypeScript still checks it as a component — the same
@@ -114,10 +119,14 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // blocked agent is the one interval the user can act on. Working and idle
   // durations tell the user nothing they can use.
   const needsInputSince = (props.needsInput ?? 0) > 0 ? (props.needsInputSince ?? null) : null;
-  // Approval is offered only while an ask actually waits: an Approve that
-  // cannot answer anything is a dead control, and a card whose ask was just
-  // answered elsewhere would keep offering the tap that answered it.
-  const canApprove = (props.needsInput ?? 0) > 0;
+  // Approval is offered only while an ask actually waits and the app recorded
+  // one Approve can answer: an Approve that cannot answer anything is a dead
+  // control, and a card whose ask was just answered elsewhere would keep
+  // offering the tap that answered it. `needsInput` counts questions and
+  // retried asks too, so the count alone must not offer a control that cannot
+  // act. An absent field is a server-written state, where this process cannot
+  // know better and the count gate stands.
+  const canApprove = (props.needsInput ?? 0) > 0 && props.canApprove !== false;
 
   // Spoken label: status word, numeric counts, then Open agents. The whole
   // surface deep-links to the agents list, so "Open agents" stays in the

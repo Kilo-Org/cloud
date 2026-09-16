@@ -19,6 +19,11 @@ import {
   setGlanceableDelivery,
   unregisterGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
+import {
+  _resetWaitingAskForTests,
+  recordWaitingAsk,
+  type WaitingAsk,
+} from '@/lib/glanceable/waiting-ask';
 
 import {
   _resetIosSinkForTests,
@@ -198,6 +203,7 @@ function snapshotFor(
 beforeEach(() => {
   _resetLiveActivitySwitchForTests();
   _resetIosSinkForTests();
+  _resetWaitingAskForTests();
   mockAppState.currentState = 'active';
   mockAppState.listeners.clear();
   subscriptions.clear();
@@ -970,6 +976,52 @@ describe('iosSink Live Activity content-state', () => {
     ]);
     expect(mockState.updated.length).toBe(0);
     expect(subscriptions.has('activity')).toBe(false);
+  });
+});
+
+describe('iosSink Approve gate', () => {
+  const recordedAsk = (overrides: Partial<WaitingAsk> = {}): WaitingAsk => ({
+    kiloSessionId: 'session-1',
+    status: 'permission',
+    isCloudAgent: true,
+    scopeKey: 'scope',
+    organizationId: null,
+    userId: 'u1',
+    recordedAt: NOW,
+    ...overrides,
+  });
+
+  it('carries canApprove only while a cloud-agent permission ask waits', () => {
+    recordWaitingAsk(recordedAsk());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+    expect(mockState.started.at(-1)?.props).toMatchObject({ canApprove: true });
+
+    // A question ask resolves to `none`, so the layout must not offer Approve.
+    recordWaitingAsk(recordedAsk({ status: 'question' }));
+    iosSink.startOrUpdate(snapshotFor([{ status: 'question' }], 1), CTX);
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+
+    // A legacy wrapper session has no single approval either.
+    recordWaitingAsk(recordedAsk({ isCloudAgent: false }));
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 2), CTX);
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+
+    recordWaitingAsk(null);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 3), CTX);
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+  });
+
+  it('carries the flag through a publish update', () => {
+    recordWaitingAsk(recordedAsk());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+
+    recordWaitingAsk(null);
+    iosSink.publish(snapshotFor([{ status: 'permission' }], 1));
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+
+    recordWaitingAsk(recordedAsk());
+    iosSink.publish(snapshotFor([{ status: 'permission' }], 2));
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: true });
   });
 });
 

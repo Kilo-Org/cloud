@@ -78,6 +78,7 @@ import {
   OPENAI_REDIRECT_URI,
   OPENAI_RESOURCE,
 } from '@/lib/auth/openai/config';
+import { saveOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import {
   GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET,
@@ -279,6 +280,43 @@ function createOpenAiAccountInfo(
     provider_account_id: `${OPENAI_ISSUER}#${sub}`,
     display_name: null,
   };
+}
+
+/**
+ * Persists the delegated tokens a completed ChatGPT authorization issued, so
+ * the same consent that signs a person in also connects OpenAI BYOK. A storage
+ * failure is reported to Sentry without any token value and never fails the
+ * sign-in: the person is still signed in and can connect again from BYOK.
+ */
+async function persistOpenAiChatGptConnection(
+  userId: string,
+  account: Account,
+  profile: Profile | undefined
+): Promise<void> {
+  try {
+    const accessToken = account.access_token;
+    const subject = (profile as { sub?: unknown } | undefined)?.sub;
+    if (!accessToken || typeof subject !== 'string' || subject.trim() === '') return;
+
+    const email = (profile as { email?: unknown } | undefined)?.email;
+    await saveOpenAiChatGptConnection(userId, {
+      access_token: accessToken,
+      ...(account.refresh_token ? { refresh_token: account.refresh_token } : {}),
+      expires_at: account.expires_at ?? Math.floor(Date.now() / 1000) + 3600,
+      ...(account.scope ? { scope: account.scope } : {}),
+      ...(account.token_type ? { token_type: account.token_type } : {}),
+      issuer: OPENAI_ISSUER,
+      client_id: OPENAI_CLIENT_ID,
+      subject,
+      ...(typeof email === 'string' && email ? { email } : {}),
+      connected_at: new Date().toISOString(),
+      status: 'connected',
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'openai_chatgpt_connection_persist' },
+    });
+  }
 }
 
 function createAppleAccountInfo(
@@ -1113,6 +1151,12 @@ export const authOptions: NextAuthOptions = {
         assert(existingUser, `TRAP: No existing user found for ${accountInfo.google_user_email}`);
 
         token.kiloUserId = existingUser.id;
+
+        // The ChatGPT authorization carries the delegated tokens that are the
+        // OpenAI BYOK credential; store them on the same flow that signs in.
+        if (account.provider === 'openai' && account.access_token) {
+          await persistOpenAiChatGptConnection(existingUser.id, account, profile);
+        }
 
         token.version = JWT_TOKEN_VERSION;
         token.exp = Math.floor(Date.now() / 1000) + secondsInDay * 30;

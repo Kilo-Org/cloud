@@ -5,6 +5,7 @@ import PostHogClient from '@/lib/posthog';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
+import { clearOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
 import {
@@ -2284,6 +2285,13 @@ export async function unlinkAuthProviderFromUser(
       .update(kilocode_users)
       .set({ discord_server_membership_verified_at: null })
       .where(eq(kilocode_users.id, kiloUserId));
+  }
+
+  // Unlinking OpenAI also drops the delegated ChatGPT credential: it proves the
+  // same external identity, so keeping it would leave a usable key for an
+  // account the person just detached.
+  if (provider === 'openai') {
+    await clearOpenAiChatGptConnection(kiloUserId);
   }
 
   return successResult();

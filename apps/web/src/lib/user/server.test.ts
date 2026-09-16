@@ -42,10 +42,12 @@ import {
 import { db } from '@/lib/drizzle';
 import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
 import {
+  byok_api_keys,
   kilocode_users,
   organization_domain_claims,
   organization_seats_purchases,
   organizations,
+  user_auth_provider,
 } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
@@ -53,9 +55,11 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import { generateApiToken, JWT_TOKEN_VERSION } from '@/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
 import jwt from 'jsonwebtoken';
+import type { Profile } from 'next-auth';
+import type { JWT } from 'next-auth/jwt';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
@@ -63,7 +67,10 @@ import {
 import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET, OPENAI_CLIENT_ID } from '@/lib/config.server';
-import { OPENAI_REDIRECT_URI } from '@/lib/auth/openai/config';
+import { OPENAI_ISSUER, OPENAI_REDIRECT_URI } from '@/lib/auth/openai/config';
+import { hosted_domain_specials } from '@/lib/auth/constants';
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
+import { getOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 
 // Same namespace UUID used in user.server.ts
 const USER_UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
@@ -391,6 +398,98 @@ describe('OpenAI (ChatGPT) OAuth provider', () => {
     // in the token exchange.
     expect(provider?.client.redirect_uris).toEqual([OPENAI_REDIRECT_URI]);
     expect(provider?.token.request).toBeInstanceOf(Function);
+  });
+});
+
+describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
+  const jwtCallback = authOptions.callbacks?.jwt;
+
+  async function seedOpenAiUser(sub: string) {
+    const email = `openai-${crypto.randomUUID()}@example.com`;
+    const user = await insertTestUser({
+      google_user_email: email,
+      google_user_name: 'ChatGPT User',
+    });
+    await db.insert(user_auth_provider).values({
+      kilo_user_id: user.id,
+      provider: 'openai',
+      provider_account_id: `${OPENAI_ISSUER}#${sub}`,
+      email,
+      avatar_url: '',
+      hosted_domain: hosted_domain_specials.openai,
+    });
+    return { user, email };
+  }
+
+  function openAiSignInArgs(userId: string, email: string, sub: string) {
+    return {
+      token: {} as JWT,
+      account: {
+        provider: 'openai',
+        type: 'oauth' as const,
+        providerAccountId: `openai-account-${sub}`,
+        access_token: 'signin-access-token',
+        refresh_token: 'signin-refresh-token',
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        scope: 'openid profile email offline_access',
+        token_type: 'Bearer',
+      },
+      user: { id: userId, email, name: 'ChatGPT User', image: null },
+      profile: { sub, email, name: 'ChatGPT User' } as Profile,
+      trigger: 'signIn' as const,
+    };
+  }
+
+  test('persists the delegated connection for the resolved user', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+
+    const token = await jwtCallback!(openAiSignInArgs(user.id, email, sub));
+
+    expect(token.kiloUserId).toBe(user.id);
+    await expect(getOpenAiChatGptConnection(user.id)).resolves.toMatchObject({
+      access_token: 'signin-access-token',
+      refresh_token: 'signin-refresh-token',
+      issuer: OPENAI_ISSUER,
+      client_id: OPENAI_CLIENT_ID,
+      subject: sub,
+      email,
+      status: 'connected',
+    });
+
+    const [row] = await db
+      .select()
+      .from(byok_api_keys)
+      .where(
+        and(
+          eq(byok_api_keys.kilo_user_id, user.id),
+          eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+        )
+      );
+    expect(row?.is_enabled).toBe(true);
+  });
+
+  test('does not fail the sign-in when storing the connection fails', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+    const originalInsert = (db.insert as unknown as (table: unknown) => unknown).bind(db);
+    const insertSpy = jest.spyOn(db, 'insert').mockImplementation(((table: unknown) => {
+      if (table === byok_api_keys) throw new Error('simulated storage failure');
+      return originalInsert(table);
+    }) as unknown as typeof db.insert);
+
+    try {
+      const token = await jwtCallback!(openAiSignInArgs(user.id, email, sub));
+      expect(token.kiloUserId).toBe(user.id);
+    } finally {
+      insertSpy.mockRestore();
+    }
+
+    const rows = await db
+      .select()
+      .from(byok_api_keys)
+      .where(eq(byok_api_keys.kilo_user_id, user.id));
+    expect(rows).toHaveLength(0);
   });
 });
 

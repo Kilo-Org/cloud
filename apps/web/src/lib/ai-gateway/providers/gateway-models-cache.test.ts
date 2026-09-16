@@ -64,11 +64,15 @@ describe('extractVercelInferenceProviderIdsFromModel', () => {
 describe('isValidOpenRouterModelId', () => {
   async function loadValidator() {
     jest.resetModules();
-    const { isValidOpenRouterModelId, getCachedVercelInferenceProviderIdsForModel } =
-      await import('@/lib/ai-gateway/providers/gateway-models-cache');
+    const {
+      isValidOpenRouterModelId,
+      getCachedVercelInferenceProviderIdsForModel,
+      resolveOpenRouterModelAlias,
+    } = await import('@/lib/ai-gateway/providers/gateway-models-cache');
     return {
       isValidOpenRouterModelId,
       getCachedVercelInferenceProviderIdsForModel,
+      resolveOpenRouterModelAlias,
     };
   }
 
@@ -149,5 +153,39 @@ describe('isValidOpenRouterModelId', () => {
     await expect(
       getCachedVercelInferenceProviderIdsForModel('anthropic/claude-sonnet-4.5')
     ).resolves.toEqual(['anthropic', 'bedrock']);
+  });
+
+  it('resolves an OpenRouter alias from the database catalog', async () => {
+    const { resolveOpenRouterModelAlias } = await loadValidator();
+    mockLimit.mockResolvedValue([
+      {
+        models: {
+          '~deepseek/deepseek-pro-latest': storedModel({
+            id: '~deepseek/deepseek-pro-latest',
+            alias_target: { slug: 'deepseek/deepseek-v4-pro-0813' },
+          }),
+        },
+      },
+    ]);
+
+    await expect(resolveOpenRouterModelAlias('~deepseek/deepseek-pro-latest')).resolves.toBe(
+      'deepseek/deepseek-v4-pro-0813'
+    );
+  });
+
+  it('returns an unresolved OpenRouter alias unchanged', async () => {
+    const { resolveOpenRouterModelAlias } = await loadValidator();
+    mockLimit.mockResolvedValue([]);
+
+    await expect(resolveOpenRouterModelAlias('~vendor/model-latest')).resolves.toBe(
+      '~vendor/model-latest'
+    );
+  });
+
+  it('returns an ordinary model id without consulting the database', async () => {
+    const { resolveOpenRouterModelAlias } = await loadValidator();
+
+    await expect(resolveOpenRouterModelAlias('vendor/model')).resolves.toBe('vendor/model');
+    expect(mockLimit).not.toHaveBeenCalled();
   });
 });

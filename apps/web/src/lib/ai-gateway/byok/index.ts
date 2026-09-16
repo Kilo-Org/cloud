@@ -10,7 +10,7 @@ import {
   type UserByokProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
-import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { resolveModelIdForVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
 import { getVercelModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
@@ -22,9 +22,10 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
     console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
     return [];
   }
+  const vercelModelId = await resolveModelIdForVercel(modelId);
   const providers: UserByokProviderId[] = [
     ...new Set(
-      vercelModelMetadata[mapModelIdToVercel(modelId)]?.endpoints
+      vercelModelMetadata[vercelModelId]?.endpoints
         .map(ep => getVercelUserByokProviderIdForEndpoint(ep.provider_name ?? ep.tag))
         .filter(providerId => providerId !== undefined) ?? []
     ),

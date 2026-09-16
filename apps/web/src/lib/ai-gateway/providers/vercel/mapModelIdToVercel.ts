@@ -1,4 +1,5 @@
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { resolveOpenRouterModelAlias } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import {
   CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,
@@ -131,4 +132,13 @@ export function mapModelIdToVercel(modelId: string) {
 
   const firstPartyProvider = inferVercelFirstPartyInferenceProviderForModel(internalId);
   return firstPartyProvider ? firstPartyProvider + internalId.slice(slashIndex) : internalId;
+}
+
+export async function resolveModelIdForVercel(modelId: string): Promise<string> {
+  if (!modelId.startsWith('~')) {
+    return mapModelIdToVercel(modelId);
+  }
+
+  const resolvedModelId = await resolveOpenRouterModelAlias(modelId);
+  return mapModelIdToVercel(resolvedModelId);
 }

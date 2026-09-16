@@ -178,6 +178,15 @@ describe('the native handshake', () => {
     expect(bridge).toContain('func perform(payload: [String: String]) async throws -> String');
   });
 
+  it('drops the registered dispatcher when the runtime goes away, like Android', () => {
+    // The singleton outlives the module, so nothing else can release the
+    // dispatcher and runtime it holds: the module's `OnDestroy` is the teardown,
+    // the mirror of `KiloAppActionsModule.kt`'s `OnDestroy` clear.
+    expect(bridge).toContain('func unregister()');
+    expect(actionsModule).toContain('OnDestroy');
+    expect(actionsModule).toContain('KiloAppActionBridge.shared.unregister()');
+  });
+
   it('reads the result fields the JS contract answers with', () => {
     // The `AppActionResult` fields of src/lib/app-actions/app-action-contract.ts:
     // a renamed field here would silently turn every run into a malformed result.

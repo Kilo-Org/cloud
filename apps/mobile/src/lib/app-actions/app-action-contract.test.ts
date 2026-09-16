@@ -126,10 +126,27 @@ describe('parseAppActionPayload', () => {
     });
   });
 
-  it('rejects an unknown action, blank required fields and non-objects', () => {
+  it('keeps a blank StartAgent as that action so its empty-prompt refusal reaches the caller', () => {
+    // An OS caller named `START_AGENT`, so the payload is not unrecognized: the
+    // action path classifies the empty required input and reports the contract's
+    // non-retryable `empty-prompt` result back to it.
+    expect(parseAppActionPayload({ action: 'start-agent', prompt: '   ' })).toEqual({
+      action: 'StartAgent',
+      prompt: '   ',
+    });
+    expect(parseAppActionPayload({ action: 'StartAgent' })).toEqual({
+      action: 'StartAgent',
+      prompt: '',
+    });
+    expect(parseAppActionPayload({ action: 'StartAgent', sessionId: ' ' })).toEqual({
+      action: 'StartAgent',
+      prompt: '',
+    });
+  });
+
+  it('rejects an unknown action, blank other required fields and non-objects', () => {
     expect(parseAppActionPayload({ action: 'Nope' })).toBeNull();
     expect(parseAppActionPayload({ action: 'open-session', sessionId: ' ' })).toBeNull();
-    expect(parseAppActionPayload({ action: 'start-agent', prompt: '   ' })).toBeNull();
     expect(parseAppActionPayload('not json')).toBeNull();
     expect(parseAppActionPayload(null)).toBeNull();
     expect(parseAppActionPayload(7)).toBeNull();

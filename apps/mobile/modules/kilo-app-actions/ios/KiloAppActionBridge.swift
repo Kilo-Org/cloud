@@ -72,6 +72,21 @@ final class KiloAppActionBridge: @unchecked Sendable {
     lock.unlock()
   }
 
+  /// Drops the registered dispatcher and runtime when the JS runtime goes away.
+  ///
+  /// The mirror of the Android module's `OnDestroy` clear: a singleton that kept
+  /// a torn-down runtime would let a later App Intent execute on it. Clearing
+  /// makes the next run wait for the replacement registration, which
+  /// `waitUntilRegistered` already bounds. The parked buffer goes with it — a
+  /// payload delivered to a dead runtime is not replayed against the next one.
+  func unregister() {
+    lock.lock()
+    dispatcher = nil
+    runtime = nil
+    parkedPayloads = []
+    lock.unlock()
+  }
+
   /// Hands back the parked payloads and clears the buffer.
   func drainParkedPayloads() -> [[String: String]] {
     lock.lock()

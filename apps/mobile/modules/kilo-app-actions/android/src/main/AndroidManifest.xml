@@ -8,8 +8,10 @@
     the iOS App Intents provider.
 
     Assistant surfacing additionally needs the Play Console capability
-    configuration (`res/xml/actions.xml` names the capabilities). The part the
-    app itself provides is the exported intent entry point, which is what
+    configuration, and the capability declarations the launcher and the
+    Assistant read are the `res/xml/shortcuts.xml` this activity's
+    `android.app.shortcuts` meta-data points at. The part the app itself
+    provides is the exported intent entry point, which is what
     `adb shell am start`, the launcher, another app, or the Assistant can reach.
   -->
   <application>

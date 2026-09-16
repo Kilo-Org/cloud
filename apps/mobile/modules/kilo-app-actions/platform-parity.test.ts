@@ -42,7 +42,6 @@ const iosModuleSource = readSource(`${IOS_DIRECTORY}KiloAppActionsModule.swift`)
 const manifestSource = readSource(`${ANDROID_MAIN}AndroidManifest.xml`);
 const androidModuleSource = readSource(`${ANDROID_KOTLIN}KiloAppActionsModule.kt`);
 const activitySource = readSource(`${ANDROID_KOTLIN}KiloActionActivity.kt`);
-const actionsXml = readSource(`${ANDROID_MAIN}res/xml/actions.xml`);
 const shortcutsXml = readSource(`${ANDROID_MAIN}res/xml/shortcuts.xml`);
 
 /** One native source file, with the name failure messages cite. */
@@ -58,7 +57,6 @@ const ANDROID_SOURCES: readonly NamedSource[] = [
   ['AndroidManifest.xml', manifestSource],
   ['KiloAppActionsModule.kt', androidModuleSource],
   ['KiloActionActivity.kt', activitySource],
-  ['actions.xml', actionsXml],
   ['shortcuts.xml', shortcutsXml],
 ];
 
@@ -239,14 +237,13 @@ describe('the same native identifiers on both platforms', () => {
     expect(sorted(declared)).toEqual(sorted(APP_ACTION_IDS.map(action => actionString(action))));
   });
 
-  it.each([
-    ['actions.xml', actionsXml],
-    ['shortcuts.xml', shortcutsXml],
-  ] as const)('%s declares one capability per action', (file, xml) => {
-    const capabilities = [...xml.matchAll(/<capability\s+android:name="([^"]+)"/g)].map(
+  it('declares one capability per action in the file the manifest references', () => {
+    // `shortcuts.xml` is the single capability declaration file; the manifest's
+    // `android.app.shortcuts` meta-data is what makes it effective.
+    const capabilities = [...shortcutsXml.matchAll(/<capability\s+android:name="([^"]+)"/g)].map(
       match => match[1] ?? ''
     );
-    expect(sorted(capabilities), file).toEqual(
+    expect(sorted(capabilities)).toEqual(
       sorted(APP_ACTION_IDS.map(action => actionString(action)))
     );
   });
@@ -261,6 +258,16 @@ describe('one code path on both platforms', () => {
     expect(androidModuleSource).toContain('Function("registerAppActionDispatcher")');
     expect(iosModuleSource).toContain('Name("KiloAppActions")');
     expect(androidModuleSource).toContain('Name("KiloAppActions")');
+  });
+
+  it('drops the registered dispatcher when the runtime goes away, on both platforms', () => {
+    // The bridge/dispatcher outlives the module on both platforms, so each
+    // module's `OnDestroy` is what releases the JS dispatcher it registered.
+    expect(androidModuleSource).toContain('OnDestroy');
+    expect(androidModuleSource).toContain('AppActionDispatcher.clear()');
+    expect(iosModuleSource).toContain('OnDestroy');
+    expect(iosModuleSource).toContain('KiloAppActionBridge.shared.unregister()');
+    expect(bridgeSource).toContain('func unregister()');
   });
 
   it('carries an action URL the contract parses in every literal of either tree', () => {

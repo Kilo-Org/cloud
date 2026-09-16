@@ -22,6 +22,15 @@ public final class KiloAppActionsModule: Module {
       KiloAppActionBridge.shared.register(dispatcher: dispatcher, runtime: runtime)
       return KiloAppActionBridge.shared.drainParkedPayloads()
     }
+
+    /// The bridge outlives the module (an App Intent reaches it before, or
+    /// without, one), so the runtime's teardown has to drop what it registered:
+    /// the mirror of the Android module's `OnDestroy` clear. A later run then
+    /// waits for the replacement registration instead of executing on a dead
+    /// runtime.
+    OnDestroy {
+      KiloAppActionBridge.shared.unregister()
+    }
   }
 }
 

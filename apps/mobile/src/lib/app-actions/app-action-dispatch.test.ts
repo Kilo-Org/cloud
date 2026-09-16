@@ -17,11 +17,17 @@ import {
 const mocks = vi.hoisted(() => ({
   registerNativeAppActionDispatcher: vi.fn(),
   captureException: vi.fn(),
+  startAgent: vi.fn(),
 }));
 
 vi.mock('./native-bridge', () => ({
   registerNativeAppActionDispatcher: mocks.registerNativeAppActionDispatcher,
 }));
+
+// The registered handler dispatches with the default deps, which import the
+// real action path lazily. This suite stubs that one entry so a run does not
+// load the create graph; the real classification is `start-agent.test.ts`'s.
+vi.mock('./start-agent', () => ({ startAgent: mocks.startAgent }));
 
 vi.mock('@sentry/react-native', () => ({ captureException: mocks.captureException }));
 
@@ -232,6 +238,36 @@ describe('registerAppActionDispatcher', () => {
     await expect(handle?.('not a payload')).rejects.toThrow(
       'does not match the app action contract'
     );
+  });
+
+  it('answers a blank StartAgent payload with the empty-prompt refusal', async () => {
+    // The OS caller named START_AGENT, so the payload is a request the action
+    // path classifies — not an unrecognized payload the handler throws on. The
+    // refusal is the real result the native side reports through
+    // `completeAppAction`, instead of the entry point timing out.
+    mocks.startAgent.mockResolvedValue({
+      ok: false,
+      action: 'StartAgent',
+      retryable: false,
+      code: 'empty-prompt',
+      message: i18n.t('appActions.start.promptRequired'),
+    });
+    const registered: ((payload: unknown) => Promise<AppActionResult>)[] = [];
+    mocks.registerNativeAppActionDispatcher.mockImplementation(
+      (handler: (payload: unknown) => Promise<AppActionResult>) => {
+        registered.push(handler);
+        return { handle: handler, buffered: [] };
+      }
+    );
+    await registerAppActionDispatcher();
+    await expect(registered[0]?.({ action: 'start-agent', prompt: '   ' })).resolves.toEqual({
+      ok: false,
+      action: 'StartAgent',
+      retryable: false,
+      code: 'empty-prompt',
+      message: i18n.t('appActions.start.promptRequired'),
+    });
+    expect(mocks.startAgent).toHaveBeenCalledExactlyOnceWith({ prompt: '   ' });
   });
 
   it('works with no native module at all', async () => {

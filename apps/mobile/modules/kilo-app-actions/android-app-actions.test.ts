@@ -1,5 +1,5 @@
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, runs in node, never bundled into the app
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, runs in node, never bundled into the app
 import { fileURLToPath } from 'node:url';
 
@@ -30,7 +30,6 @@ function readSource(path: string): string {
 const MANIFEST = readSource(`${ANDROID}/AndroidManifest.xml`);
 const MODULE_SOURCE = readSource(`${KOTLIN}/KiloAppActionsModule.kt`);
 const ACTIVITY_SOURCE = readSource(`${KOTLIN}/KiloActionActivity.kt`);
-const ACTIONS_XML = readSource(`${ANDROID}/res/xml/actions.xml`);
 const SHORTCUTS_XML = readSource(`${ANDROID}/res/xml/shortcuts.xml`);
 
 /** The custom intent action prefix the exported entry point answers. */
@@ -89,7 +88,6 @@ describe('the action URLs in the sources', () => {
       ['AndroidManifest.xml', MANIFEST],
       ['KiloAppActionsModule.kt', MODULE_SOURCE],
       ['KiloActionActivity.kt', ACTIVITY_SOURCE],
-      ['actions.xml', ACTIONS_XML],
       ['shortcuts.xml', SHORTCUTS_XML],
     ] as const;
     const covered = new Set<AppActionId>();
@@ -206,12 +204,19 @@ function parseXml(xml: string): XmlElement {
   return root;
 }
 
-const DECLARATIONS = [
-  { file: 'actions.xml', xml: ACTIONS_XML, root: 'actions' },
-  { file: 'shortcuts.xml', xml: SHORTCUTS_XML, root: 'shortcuts' },
-] as const;
+const DECLARATIONS = [{ file: 'shortcuts.xml', xml: SHORTCUTS_XML, root: 'shortcuts' }] as const;
 
 describe('the capability declarations', () => {
+  it('ships only the capability file the manifest references', () => {
+    // A capability declaration is only effective under the meta-data that
+    // points at it. `actions.xml` carried a second, identical copy of the same
+    // four capabilities with no reference to any of them from the manifest, so
+    // it declared nothing and only duplicated `shortcuts.xml` — the file
+    // `android.app.shortcuts` names.
+    const directory = fileURLToPath(new URL(`${ANDROID}/res/xml/`, import.meta.url));
+    expect(readdirSync(directory).toSorted()).toEqual(['shortcuts.xml']);
+  });
+
   it.each(DECLARATIONS)('$file is well-formed under a $root root element', ({ xml, root }) => {
     expect(parseXml(xml).name).toBe(root);
   });

@@ -147,7 +147,9 @@ const jsonTextSchema = z.string();
 /**
  * Parse the JSON-object form the native bridge sends. A bridge that hands the
  * object through as JSON text is accepted too. Returns null when the payload
- * is not a known action or a required field is missing or blank.
+ * is not a known action or a required field is missing or blank — except a
+ * `StartAgent` with no prompt and no session, which is returned as that action
+ * so its `empty-prompt` refusal reaches the caller (see `requestFromPayload`).
  */
 export function parseAppActionPayload(value: unknown): AppActionRequest | null {
   const direct = appActionPayloadSchema.safeParse(value);
@@ -389,7 +391,17 @@ function parseJsonPayloadText(text: string): AppActionRequest | null {
   }
 }
 
-/** Map a decoded payload object onto a request, or null. */
+/**
+ * Map a decoded payload object onto a request, or null.
+ *
+ * A `StartAgent` payload with no prompt and no session is still the
+ * `StartAgent` action — the caller named an action whose required input is
+ * empty, not an action this payload grammar does not know. It resolves to the
+ * request with the empty prompt, so the action path classifies it as the
+ * contract's non-retryable `empty-prompt` result and the OS caller hears that
+ * outcome. A blank `sessionId` or `pullRequest` on any other action is still no
+ * request at all.
+ */
 function requestFromPayload(payload: AppActionPayload): AppActionRequest | null {
   const id = actionIdFromPayload(payload.action);
   if (id === null) {
@@ -408,5 +420,15 @@ function requestFromPayload(payload: AppActionPayload): AppActionRequest | null 
   if (payload.pullRequest !== undefined) {
     fields.pullRequest = payload.pullRequest;
   }
-  return buildRequest(id, field => fields[field]);
+  const request = buildRequest(id, field => fields[field]);
+  if (request !== null) {
+    return request;
+  }
+  // `buildRequest` for `StartAgent` is null exactly when neither a prompt nor a
+  // session was usable: hand it to the action path for the `empty-prompt`
+  // refusal instead of rejecting the whole payload as unrecognized.
+  if (id === 'StartAgent') {
+    return { action: 'StartAgent', prompt: fields.prompt ?? '' };
+  }
+  return null;
 }

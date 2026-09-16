@@ -5,7 +5,7 @@ import {
 } from '@/lib/integrations/db/github-installations';
 import { db } from '@/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, or } from 'drizzle-orm';
 import {
   autoCompleteInstallation,
   deleteGitHubInstallationRecords,
@@ -124,6 +124,23 @@ export async function handleInstallationCreated(
     if (legacyMatches.length === 1) pending = legacyMatches[0];
   }
   if (pending) {
+    const [existingAssociation] = await db
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          appTypeCondition,
+          eq(platform_integrations.platform_installation_id, installationData.installation_id),
+          isNotNull(platform_integrations.github_installation_id)
+        )
+      );
+    if (existingAssociation) {
+      return NextResponse.json(
+        { message: 'Installation association requires verified connection confirmation' },
+        { status: 200 }
+      );
+    }
     await autoCompleteInstallation({
       integrationId: pending.id,
       installationData,
@@ -158,6 +175,15 @@ export async function handleInstallationDeleted(
 ) {
   const installationIdStr = payload.installation.id.toString();
 
+  await observeGitHubInstallationLifecycle({
+    installationId: installationIdStr,
+    appType,
+    state: 'deleted',
+  });
+  if (!isGitHubConnectionManagementEnabled()) {
+    await deleteGitHubInstallationRecords(installationIdStr, appType);
+  }
+
   try {
     // The bot identity store has no app-type dimension and the lite app has no
     // bot-link flow, so only the standard app unlinks team bot identities.
@@ -170,15 +196,6 @@ export async function handleInstallationDeleted(
       tags: { component: 'kilo-bot', op: 'github-installation-deleted-unlink' },
       extra: { installationId: installationIdStr },
     });
-  }
-
-  await observeGitHubInstallationLifecycle({
-    installationId: installationIdStr,
-    appType,
-    state: 'deleted',
-  });
-  if (!isGitHubConnectionManagementEnabled()) {
-    await deleteGitHubInstallationRecords(installationIdStr, appType);
   }
 
   return NextResponse.json({ message: 'Installation removed' }, { status: 200 });

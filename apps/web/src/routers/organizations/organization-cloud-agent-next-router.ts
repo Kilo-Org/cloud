@@ -975,6 +975,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
             defaultBranch: z.string().optional(),
             platformIntegrationId: z.string().uuid().optional(),
             platformAccountLogin: z.string().optional(),
+            githubAppType: z.enum(['standard', 'lite']).optional(),
           })
         ),
         integrationInstalled: z.boolean(),

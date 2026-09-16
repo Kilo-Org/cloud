@@ -1292,6 +1292,41 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
     ).rejects.toThrow('provider down');
     expect(mockOrderRepositoriesByUsage).not.toHaveBeenCalled();
   });
+
+  it('does not strip platformIntegrationId/githubAppType from organization GitHub repositories in the response', async () => {
+    // Regression test: the tRPC .output() schema previously omitted
+    // githubAppType, so Zod silently stripped it even though the picker's
+    // "Lite" badge depends on it, and platformIntegrationId is required for
+    // the "Select the GitHub repository again" guard to resolve correctly.
+    const repositories = [
+      {
+        id: 1,
+        name: 'repo',
+        fullName: 'acme/repo',
+        private: false,
+        platformIntegrationId: '11111111-1111-4111-8111-111111111111',
+        platformAccountLogin: 'acme',
+        githubAppType: 'lite' as const,
+      },
+    ];
+    mockFetchGitHubRepositoriesForOrganization.mockResolvedValue({
+      repositories,
+      integrationInstalled: true,
+      syncedAt: null,
+    });
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+    await expect(
+      caller.listGitHubRepositories({
+        organizationId: ORGANIZATION_ID,
+        forceRefresh: false,
+      })
+    ).resolves.toEqual({
+      repositories,
+      integrationInstalled: true,
+      syncedAt: null,
+    });
+  });
 });
 
 describe('organizationCloudAgentNextRouter terminal ownership', () => {

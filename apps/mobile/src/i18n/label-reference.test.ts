@@ -201,10 +201,22 @@ describe('plural forms', () => {
     'prReview.checks.checksCount',
   ] as const;
   const COUNTS = [1, 2, 5, 21] as const;
+  /** The languages the defect report named: "1 stavki" and "2 stavki". */
+  const REPORTED_LANGUAGES = ['sr', 'ru', 'pl'] as const;
+  /**
+   * The two families whose counted noun itself changes form. The checks count
+   * is a head-noun construction ("broj provera: N") in the reported languages,
+   * invariant at every count like the Slovenian findings count, so it keeps
+   * only the read-back assertion.
+   */
+  const INFLECTING_KEYS = [
+    'agentChat.toolRun.condensedLabel',
+    'securityAgent.dashboard.daysOverdue',
+  ] as const;
 
-  function render(key: string, count: number) {
+  function render(language: SupportedLanguage, key: string, count: number) {
     return i18n.t(key, {
-      lng: 'en',
+      lng: language,
       count,
       itemCount: String(count),
       displayCount: String(count),
@@ -214,13 +226,13 @@ describe('plural forms', () => {
   }
 
   /**
-   * The English catalog's own template for `key`, with the row's values in
-   * place — the expected string comes from the catalog, never from this test.
+   * A catalog's own template for `key`, with the row's values in place — the
+   * expected string comes from the catalog, never from this test.
    */
-  function catalogForm(key: string, count: number): string {
-    const value = i18n.getResource('en', 'translation', key);
+  function catalogForm(language: SupportedLanguage, key: string, count: number): string {
+    const value = i18n.getResource(language, 'translation', key);
     if (typeof value !== 'string') {
-      throw new TypeError(`en declares no ${key}`);
+      throw new TypeError(`${language} declares no ${key}`);
     }
     return value
       .replaceAll('{{itemCount}}', String(count))
@@ -230,10 +242,10 @@ describe('plural forms', () => {
 
   it.each(COUNTED_KEYS)('selects the English count form for %s', key => {
     for (const count of COUNTS) {
-      const details = render(key, count);
+      const details = render('en', key, count);
       const expected = `${key}_${category('en', count)}`;
       expect(details.exactUsedKey, `${key} ${count}`).toBe(expected);
-      expect(details.res, `${key} ${count}`).toBe(catalogForm(expected, count));
+      expect(details.res, `${key} ${count}`).toBe(catalogForm('en', expected, count));
     }
   });
 
@@ -241,9 +253,65 @@ describe('plural forms', () => {
     // The count itself interpolates into the row, so mask it before
     // comparing: the defect was one form for every count, and the two
     // unmasked rows differ by the number alone.
-    const form = (count: number) => render(key, count).res.replace(String(count), '');
+    const form = (count: number) => render('en', key, count).res.replace(String(count), '');
     expect(form(1), key).not.toBe(form(5));
   });
+
+  /**
+   * The defect report's own languages, on the side the catalogs own: at count
+   * 1 the family must select `_one`; "1 stavki" was the `_other` form rendered
+   * for every count. `exactUsedKey` proves which category i18next picked and
+   * the expected string is read back out of that language's catalog, so the
+   * test never restates a translation.
+   */
+  it.each(COUNTED_KEYS)(
+    'selects the Serbian, Russian and Polish count form at 1, 2, 5 and 21 for %s',
+    key => {
+      for (const language of REPORTED_LANGUAGES) {
+        for (const count of COUNTS) {
+          const details = render(language, key, count);
+          const usedKey = `${key}_${category(language, count)}`;
+          expect(details.exactUsedKey, `${language} ${key} ${count}`).toBe(usedKey);
+          expect(details.res, `${language} ${key} ${count}`).toBe(
+            catalogForm(language, usedKey, count)
+          );
+        }
+      }
+    }
+  );
+
+  it.each(INFLECTING_KEYS)(
+    'inflects the Serbian, Russian and Polish row at 1 and at 2 for %s',
+    key => {
+      // The count itself interpolates into the row, so mask it before
+      // comparing: the owner's "1 stavka" must differ from "2 stavke".
+      for (const language of REPORTED_LANGUAGES) {
+        const form = (count: number) => render(language, key, count).res.replace(String(count), '');
+        expect(form(1), `${language} ${key}`).not.toBe(form(2));
+      }
+    }
+  );
+
+  /**
+   * Every catalog is checked at 1, 2, 5 and 21, not only the three the defect
+   * report named: i18next must select the language's own category and the row
+   * must equal that catalog's own form for it.
+   */
+  it.each(SUPPORTED_LANGUAGES)(
+    'selects the count form its catalog declares in %s at 1, 2, 5 and 21',
+    language => {
+      for (const key of COUNTED_KEYS) {
+        for (const count of COUNTS) {
+          const details = render(language, key, count);
+          const usedKey = `${key}_${category(language, count)}`;
+          expect(details.exactUsedKey, `${language} ${key} ${count}`).toBe(usedKey);
+          expect(details.res, `${language} ${key} ${count}`).toBe(
+            catalogForm(language, usedKey, count)
+          );
+        }
+      }
+    }
+  );
 
   /**
    * The review caught the Slovenian findings count: the head "Število" (the

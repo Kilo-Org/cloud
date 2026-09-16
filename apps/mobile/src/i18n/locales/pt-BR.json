@@ -2135,6 +2135,7 @@
     "couldNotLoadActiveSessions": "Não foi possível carregar as sessões ativas.",
     "agentSessions": "Em andamento agora",
     "newCodingTask": "Nova tarefa de programação",
+    "newTaskFromPicture": "Nova tarefa a partir de uma imagem",
     "explore": "Explorar",
     "seeAll": "Ver tudo",
     "noLiveSessions": "Nada em execução no momento"

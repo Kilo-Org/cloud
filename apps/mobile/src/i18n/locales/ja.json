@@ -2121,6 +2121,7 @@
     "couldNotLoadActiveSessions": "実行中のセッションを読み込めませんでした。",
     "agentSessions": "現在実行中",
     "newCodingTask": "新しいコーディングタスク",
+    "newTaskFromPicture": "画像から新しいタスク",
     "explore": "機能を探す",
     "seeAll": "すべて表示",
     "noLiveSessions": "現在実行中のセッションはありません"

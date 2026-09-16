@@ -2350,7 +2350,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     }
   );
 
-  it('returns a runtime credential proxy fence only for the current ready routed allocation', async () => {
+  it('returns the runtime credential proxy fence from the established wrapper incarnation across a control reconnect', async () => {
     const h = await harness();
     const input = {
       ownerId: OWNER,
@@ -2358,20 +2358,64 @@ describe('SandboxControl lifecycle boundaries', () => {
       kiloSessionId: ROUTE.kiloSessionId,
       directory: ROUTE.directory,
     };
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+
     await h.create();
-    const identity = await h.ready();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+    expect((await h.control.getStatus()).connection).toBe('ready');
     const physical = await h.control.getPhysicalRecord();
     expect(physical.createIntent).not.toBeNull();
     expect(await h.control.getRuntimeCredentialProxyFence(input)).toEqual({
       plane: 'control',
       allocationId: physical.createIntent?.intentId,
-      providerInstanceId: identity.providerInstanceId,
-      connectionId: identity.connectionId,
-      wrapperInstanceId: identity.wrapperInstanceId,
+      providerInstanceId: first.providerInstanceId,
+      connectionId: first.connectionId,
+      wrapperInstanceId: first.wrapperInstanceId,
     });
     await expect(
       h.control.getRuntimeCredentialProxyFence({ ...input, directory: '/workspace/other' })
     ).resolves.toBeNull();
+
+    await h.hooks.onSocketClosed?.(true, first);
+    expect(await h.control.getRuntimeCredentialProxyFence(input)).toEqual({
+      plane: 'control',
+      allocationId: physical.createIntent?.intentId,
+      providerInstanceId: first.providerInstanceId,
+      connectionId: first.connectionId,
+      wrapperInstanceId: first.wrapperInstanceId,
+    });
+
+    const reconnected = { ...first, connectionId: crypto.randomUUID() };
+    h.replaceConnection(reconnected);
+    await h.hooks.onHandshakeComplete?.(reconnected);
+    expect(await h.control.getRuntimeCredentialProxyFence(input)).toEqual({
+      plane: 'control',
+      allocationId: physical.createIntent?.intentId,
+      providerInstanceId: reconnected.providerInstanceId,
+      connectionId: reconnected.connectionId,
+      wrapperInstanceId: reconnected.wrapperInstanceId,
+    });
 
     await h.control.beginStop('idle');
     await expect(h.control.getRuntimeCredentialProxyFence(input)).resolves.toBeNull();
@@ -2388,7 +2432,11 @@ describe('SandboxControl lifecycle boundaries', () => {
       ...replacement,
       connectionId: crypto.randomUUID(),
     });
-    await expect(h.control.getRuntimeCredentialProxyFence(input)).resolves.toBeNull();
+    expect(await h.control.getRuntimeCredentialProxyFence(input)).toMatchObject({
+      providerInstanceId: replacement.providerInstanceId,
+      connectionId: replacement.connectionId,
+      wrapperInstanceId: replacement.wrapperInstanceId,
+    });
   });
 
   it.each(['session.attach', 'session.prompt'] as const)(

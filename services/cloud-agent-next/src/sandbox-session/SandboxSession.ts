@@ -31,6 +31,7 @@ import {
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyGrantSchema,
   RUNTIME_PROXY_GRANT_KEY,
+  sameRuntimeProxyControlBinding,
   verifyRuntimeCredentialProxyHandle,
 } from '../runtime-credential-proxy.js';
 import { z } from 'zod';
@@ -1467,13 +1468,7 @@ export class SandboxSession extends DurableObject<Env> {
       readFence(),
     ]);
     const authorization = RuntimeAuthorizationSchema.safeParse(storedAuthorization);
-    if (
-      !latestFence ||
-      latestFence.allocationId !== fence.allocationId ||
-      latestFence.providerInstanceId !== fence.providerInstanceId ||
-      latestFence.connectionId !== fence.connectionId ||
-      latestFence.wrapperInstanceId !== fence.wrapperInstanceId
-    ) {
+    if (!latestFence || !sameRuntimeProxyControlBinding(fence, latestFence)) {
       return null;
     }
     return issuePersistedRuntimeProxyGrant({

@@ -45,6 +45,7 @@ import {
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
+import { clearCollapsedConnectCtasPreference } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
 import { clearCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
 import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
@@ -502,6 +503,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearSessionScopedState();
           clearPrReviewFooterPreference();
           clearCondenseToolCallsPreference();
+          clearCollapsedConnectCtasPreference();
           // The launcher surfaces belong to the signed-out account: drop the
           // dynamic shortcuts/tile natively and the durable last-opened record,
           // so the next account never sees the previous account's session.

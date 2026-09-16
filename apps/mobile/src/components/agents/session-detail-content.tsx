@@ -65,6 +65,7 @@ import { SessionContextMetrics } from '@/components/agents/session-context-metri
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import {
   canAutoApprovePermissions,
+  canAutoApproveReply,
   resolveSessionAutoApproveState,
   setSessionAutoApproveEnabled,
   useSessionAutoApproveEnabled,
@@ -90,7 +91,7 @@ import {
 import {
   countInFlightMessages,
   resolveRetryPrompt,
-  retryMessageAndClear,
+  retryFailedMessage,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
 import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
@@ -272,10 +273,13 @@ export function SessionDetailContent({
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
   // Per-session auto-approve lives in an in-memory store keyed by session id.
-  // Availability follows the transport (and the read-only flag); an unresolved
-  // transport is unavailable, so the row shows disabled without a fetch.
+  // The setting stays reachable while the transport is unresolved (metadata and
+  // the transcript resolve after it), so only a session known to be read-only
+  // shows it unavailable. Auto-reply eligibility is separate: an unresolved
+  // transport cannot deliver a permission ask.
   const autoApproveEnabled = useSessionAutoApproveEnabled(sessionId);
   const autoApproveAvailable = canAutoApprovePermissions({ activeSessionType, isReadOnly });
+  const autoApproveReplyAvailable = canAutoApproveReply({ activeSessionType, isReadOnly });
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
@@ -359,7 +363,7 @@ export function SessionDetailContent({
   // reach the hook, so a clarification question is never auto-answered.
   const { suppressedRequestId } = useSessionAutoApprove({
     enabled: autoApproveState === 'on',
-    available: autoApproveAvailable,
+    available: autoApproveReplyAvailable,
     requestId: activePermission?.requestId ?? null,
     respond: async () => {
       const outcome = await handleRespondToPermission('once');
@@ -1028,16 +1032,11 @@ export function SessionDetailContent({
         void handleSend(prompt);
         return;
       }
-      void retryMessageAndClear(
-        async () => {
-          await handleSend(prompt);
-        },
-        () => {
-          manager.clearFailedMessage(message.info.id);
-        }
-      );
+      void retryFailedMessage(async () => {
+        await handleSend(prompt);
+      });
     },
-    [messages, requiresModel, pinned.model, currentModel, handleSend, manager]
+    [messages, requiresModel, pinned.model, currentModel, handleSend]
   );
 
   const handleCancelQueued = useCallback(
@@ -1383,17 +1382,17 @@ export function SessionDetailContent({
         hasMessages={messages.length > 0}
         autoApproveAvailable={autoApproveAvailable}
         loading={shouldShowLoading}
-        onPress={
-          contextInfo || autoApproveAvailable
-            ? () => {
-                setOpenContextSheetIdentity({
-                  sessionId,
-                  providerID: contextInfo?.providerID,
-                  modelID: contextInfo?.modelID,
-                });
-              }
-            : undefined
-        }
+        // The sheet is the session's own context/permission surface, so the
+        // control opens it in every state of this screen — including while the
+        // transcript is still loading and after a failed open. A state that
+        // hides the control locks the user out of the settings behind it.
+        onPress={() => {
+          setOpenContextSheetIdentity({
+            sessionId,
+            providerID: contextInfo?.providerID,
+            modelID: contextInfo?.modelID,
+          });
+        }}
       />
     </View>
   );
@@ -1832,6 +1831,7 @@ export function SessionDetailContent({
             visible={detailsMessageId !== null}
             message={detailsMessage ?? null}
             modelOptions={modelOptions}
+            deliveryState={detailsDelivery}
             onClose={handleCloseDetails}
             canCancelQueued={canCancelSelected}
             isCancelingQueued={isCancelingSelected}

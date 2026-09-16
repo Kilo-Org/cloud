@@ -1051,6 +1051,64 @@ describe('session detail per-session auto-approve', () => {
     expect(hapticsSelection).toHaveBeenCalledTimes(2);
   });
 
+  it('opens the header sheet while an answerable session is still loading', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      // No message has landed yet: the header control is the only way to the
+      // session's permission settings, so it must still register a tap.
+      view.store.set(view.manager.atoms.isLoading, true);
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as {
+      accessibilityRole?: string;
+      onPress?: () => void;
+    };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    act(() => {
+      metricsProps.onPress?.();
+    });
+    const contextSheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(contextSheet.props.visible).toBe(true);
+    expect(view.renderer.root.findByProps({ testID: 'session-auto-approve-switch' })).toBeDefined();
+  });
+
+  it('opens the header sheet with usable settings after a failed open left the transport unresolved', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      // A failed session open leaves the transport unresolved and puts the
+      // screen on its terminal error. The settings still live behind the
+      // header control, so it must open the sheet instead of going dead.
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.isLoading, false);
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        'connect ECONNREFUSED 127.0.0.1:12000'
+      );
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as {
+      accessibilityRole?: string;
+      onPress?: () => void;
+    };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    act(() => {
+      metricsProps.onPress?.();
+    });
+    const contextSheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(contextSheet.props.visible).toBe(true);
+    const toggle = view.renderer.root.findByProps({ testID: 'session-auto-approve-switch' });
+    expect((toggle.props as { disabled?: boolean }).disabled).toBe(false);
+  });
+
   it('keeps the composer mounted, visible, and enabled while the auto-reply is in flight', async () => {
     const view = await mountDetails([]);
     makeSessionAnswerable(view);

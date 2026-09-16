@@ -28,6 +28,16 @@ enum KiloLauncherSurfacesStore {
     UserDefaults.standard.set(url, forKey: pendingLaunchUrlKey)
   }
 
+  /**
+   * Sign-out drop for the parked cold-start url. `consumePendingLaunchUrl` runs
+   * on the signed-in mount, so a url parked for the account that is signing out
+   * would otherwise outlive it and route the next account to the previous
+   * account's session.
+   */
+  static func clearPendingLaunchUrl() {
+    UserDefaults.standard.removeObject(forKey: pendingLaunchUrlKey)
+  }
+
   /** Reads and clears the parked url, so a cold start is consumed exactly once. */
   static func consumePendingLaunchUrl() -> String? {
     let url = UserDefaults.standard.string(forKey: pendingLaunchUrlKey)

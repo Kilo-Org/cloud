@@ -48,6 +48,12 @@ export default function SandboxPickerScreen() {
   }
 
   function handleSelect(allocation: SandboxAllocation | undefined) {
+    // A selection haptic is a capability both iOS and Android have, so this is
+    // one implementation for both: this route owns the pick commit and fires
+    // the single `Haptics.selectionAsync()` for it. expo-haptics is the app's
+    // own cross-platform haptics library (the iOS haptics engine, the Android
+    // vibrator), so no platform branch and no platform-specific module belongs
+    // on this path.
     void Haptics.selectionAsync();
     bridge?.onSelect(allocation);
     sandboxPickerSlot.clear(UNFENCED_ROUTE_KEY);

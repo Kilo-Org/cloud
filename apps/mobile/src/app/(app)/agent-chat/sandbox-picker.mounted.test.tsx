@@ -13,6 +13,7 @@ import SandboxPickerScreen from './sandbox-picker';
 
 const router = vi.hoisted(() => ({ back: vi.fn() }));
 const haptics = vi.hoisted(() => ({ selectionAsync: vi.fn() }));
+const platformMock = vi.hoisted(() => ({ OS: 'ios' as 'ios' | 'android' }));
 const refetch = vi.hoisted(() => vi.fn());
 const selection = vi.hoisted(() => ({
   capabilities: undefined as SandboxSelectionCapabilities | undefined,
@@ -29,6 +30,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('expo-haptics', () => haptics);
 vi.mock('react-native', () => ({
+  Platform: platformMock,
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -166,6 +168,7 @@ function setBridge(overrides: Partial<SandboxPickerBridge> = {}) {
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  platformMock.OS = 'ios';
   slot.bridge = undefined;
   selection.capabilities = CAPABILITIES;
   selection.status = 'ready';
@@ -228,6 +231,46 @@ describe('SandboxPickerScreen', () => {
 
     expect(onSelect).toHaveBeenCalledWith(undefined);
     expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders and selects identically on iOS and Android: one row set, one haptic per pick', () => {
+    const onSelect = vi.fn(() => undefined);
+
+    function observe(os: 'ios' | 'android') {
+      platformMock.OS = os;
+      onSelect.mockClear();
+      haptics.selectionAsync.mockClear();
+      slot.clear.mockClear();
+      router.back.mockClear();
+      setBridge({ onSelect });
+      const renderer = mount();
+      const screen = {
+        labels: rows(renderer).map(node => node.props.accessibilityLabel),
+        checked: checkedStates(renderer),
+        texts: texts(renderer),
+      };
+      press(row(renderer, 'Vercel · Large'));
+      return {
+        screen,
+        selected: onSelect.mock.calls,
+        haptics: haptics.selectionAsync.mock.calls.length,
+        clearedBridges: slot.clear.mock.calls,
+        dismissed: router.back.mock.calls.length,
+      };
+    }
+
+    const ios = observe('ios');
+    const android = observe('android');
+
+    // One implementation for both platforms: the haptics capability both
+    // platforms have is fired once per pick, with the same rows, the same
+    // checked row and the same dismissal, so a platform branch added to this
+    // route fails here instead of passing silently.
+    expect(android).toStrictEqual(ios);
+    expect(ios.selected).toEqual([[VERCEL_LARGE]]);
+    expect(ios.haptics).toBe(1);
+    expect(ios.clearedBridges).toHaveLength(1);
+    expect(ios.dismissed).toBe(1);
   });
 
   it('renders skeleton rows without rows or an empty result while the capabilities load', () => {

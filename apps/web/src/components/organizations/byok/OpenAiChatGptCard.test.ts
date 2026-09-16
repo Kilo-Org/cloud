@@ -85,6 +85,22 @@ const STATES: Array<{ label: string; html: string }> = [
     label: 'status query failed',
     html: render({ status: undefined, hasLoadError: true }),
   },
+  {
+    label: 'connecting',
+    html: render({ status: { state: 'disconnected' }, isConnecting: true }),
+  },
+  {
+    label: 'disconnecting',
+    html: render({
+      status: {
+        state: 'connected',
+        email: 'user@example.com',
+        subject: 'subject-1',
+        connectedAt: CONNECTED_AT,
+      },
+      isDisconnecting: true,
+    }),
+  },
 ];
 
 describe('OpenAiChatGptCard disconnected state', () => {
@@ -202,12 +218,80 @@ describe('OpenAiChatGptCard loading state', () => {
   });
 });
 
+describe('OpenAiChatGptCard in-progress states', () => {
+  it('shows the redirecting label and blocks a second connect click while connecting', () => {
+    const html = render({ status: { state: 'disconnected' }, isConnecting: true });
+
+    expect(html).toContain('Redirecting to ChatGPT...');
+    expect(html).not.toContain('>Sign in with ChatGPT<');
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Redirecting to ChatGPT\.\.\.<\/button>/);
+  });
+
+  it('shows the redirecting label for the reconnect action', () => {
+    const html = render({
+      status: {
+        state: 'error',
+        email: 'user@example.com',
+        connectedAt: CONNECTED_AT,
+        errorMessage: RECONNECT_MESSAGE,
+      },
+      isConnecting: true,
+    });
+
+    expect(html).toContain('Redirecting to ChatGPT...');
+    expect(html).not.toContain('>Reconnect with ChatGPT<');
+  });
+
+  it('shows the redirecting label for the try-again action after a failed authorization', () => {
+    const html = render({
+      status: { state: 'disconnected' },
+      authErrorCode: 'connect_failed',
+      isConnecting: true,
+    });
+
+    expect(html).toContain('Redirecting to ChatGPT...');
+    expect(html).not.toContain('>Try again<');
+  });
+
+  it('shows the disconnecting label and blocks a second disconnect click while disconnecting', () => {
+    const html = render({
+      status: {
+        state: 'connected',
+        email: 'user@example.com',
+        subject: 'subject-1',
+        connectedAt: CONNECTED_AT,
+      },
+      isDisconnecting: true,
+    });
+
+    expect(html).toContain('Disconnecting...');
+    expect(html).not.toContain('>Disconnect<');
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Disconnecting\.\.\.<\/button>/);
+  });
+
+  it('shows the disconnecting label on the failed-disconnect retry action', () => {
+    const html = render({
+      status: {
+        state: 'connected',
+        email: 'user@example.com',
+        subject: 'subject-1',
+        connectedAt: CONNECTED_AT,
+      },
+      hasDisconnectError: true,
+      isDisconnecting: true,
+    });
+
+    expect(html).toContain('Disconnecting...');
+    expect(html).not.toContain('>Disconnect<');
+  });
+});
+
 describe('OpenAiChatGptCard layout', () => {
   it('keeps the same card and body container classes in every state', () => {
     const cardClasses = new Set(STATES.map(state => cardClass(state.html)));
     const bodyClasses = new Set(STATES.map(state => bodyClass(state.html)));
 
-    expect(STATES).toHaveLength(8);
+    expect(STATES).toHaveLength(10);
     expect(cardClasses.size).toBe(1);
     expect(bodyClasses.size).toBe(1);
     expect([...cardClasses][0]).toBeDefined();

@@ -33,6 +33,15 @@ const CONNECT_LABEL = 'Sign in with ChatGPT';
 const RECONNECT_LABEL = 'Reconnect with ChatGPT';
 const TRY_AGAIN_LABEL = 'Try again';
 const DISCONNECT_LABEL = 'Disconnect';
+/**
+ * Pending labels. The connect round-trip leaves the app for OpenAI, so the
+ * button stays in its busy state until the browser navigates (or the attempt
+ * fails) instead of returning to its idle label while the redirect is in
+ * flight. Same shape as the canonical Linear card's
+ * 'Loading...'/'Disconnecting...' pair.
+ */
+const CONNECTING_LABEL = 'Redirecting to ChatGPT...';
+const DISCONNECTING_LABEL = 'Disconnecting...';
 const CONNECTED_LABEL = 'Connected';
 const RECONNECT_BADGE_LABEL = 'Needs reconnect';
 const FALLBACK_ERROR_MESSAGE = 'Your ChatGPT connection is not available. Reconnect to continue.';
@@ -131,7 +140,7 @@ function CardBody({
           {openAiChatGptAuthErrorMessage(authErrorCode)}
         </p>
         <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect} disabled={isConnecting}>
-          {TRY_AGAIN_LABEL}
+          {isConnecting ? CONNECTING_LABEL : TRY_AGAIN_LABEL}
         </Button>
       </>
     );
@@ -174,7 +183,7 @@ function CardBody({
           onClick={onDisconnect}
           disabled={isDisconnecting}
         >
-          {DISCONNECT_LABEL}
+          {isDisconnecting ? DISCONNECTING_LABEL : DISCONNECT_LABEL}
         </Button>
       </>
     );
@@ -185,7 +194,7 @@ function CardBody({
       <>
         <p className="type-body text-muted-foreground">{CONNECT_DESCRIPTION}</p>
         <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect} disabled={isConnecting}>
-          {CONNECT_LABEL}
+          {isConnecting ? CONNECTING_LABEL : CONNECT_LABEL}
         </Button>
       </>
     );
@@ -209,7 +218,7 @@ function CardBody({
           onClick={onDisconnect}
           disabled={isDisconnecting}
         >
-          {DISCONNECT_LABEL}
+          {isDisconnecting ? DISCONNECTING_LABEL : DISCONNECT_LABEL}
         </Button>
       </>
     );
@@ -225,7 +234,7 @@ function CardBody({
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect} disabled={isConnecting}>
-          {RECONNECT_LABEL}
+          {isConnecting ? CONNECTING_LABEL : RECONNECT_LABEL}
         </Button>
         <Button
           variant="outline"
@@ -234,7 +243,7 @@ function CardBody({
           onClick={onDisconnect}
           disabled={isDisconnecting}
         >
-          {DISCONNECT_LABEL}
+          {isDisconnecting ? DISCONNECTING_LABEL : DISCONNECT_LABEL}
         </Button>
       </div>
     </>
@@ -268,6 +277,11 @@ function OpenAiChatGptCardConnected() {
   const openaiError = searchParams.get(AUTH_ERROR_PARAM);
   const [authErrorCode, setAuthErrorCode] = useState<string | null>(null);
   const [hasDisconnectError, setHasDisconnectError] = useState(false);
+  // Held from the connect click until the browser leaves for OpenAI. The
+  // linking-session mutation settles before `signIn` finishes the redirect, so
+  // `linkMutation.isPending` alone would drop the busy state too early and make
+  // the button look idle (and clickable) while the redirect is still in flight.
+  const [isConnecting, setIsConnecting] = useState(false);
 
   // Show the returned error once, then strip it from the URL so a refresh does
   // not repeat the message.
@@ -298,8 +312,12 @@ function OpenAiChatGptCardConnected() {
     // A retry starts from a clean state so the failure copy never overlaps the
     // new attempt.
     setAuthErrorCode(null);
+    setIsConnecting(true);
     void startOpenAiChatGptConnect(() => linkMutation.mutateAsync({ provider: 'openai' })).catch(
       () => {
+        // Only a failed attempt releases the busy state; a successful one
+        // navigates away with the label still pending.
+        setIsConnecting(false);
         setAuthErrorCode(CONNECT_FAILED_CODE);
       }
     );
@@ -323,7 +341,7 @@ function OpenAiChatGptCardConnected() {
       onConnect={handleConnect}
       onDisconnect={handleDisconnect}
       onRetry={handleRetryLoad}
-      isConnecting={linkMutation.isPending}
+      isConnecting={isConnecting}
       isDisconnecting={disconnectMutation.isPending}
     />
   );

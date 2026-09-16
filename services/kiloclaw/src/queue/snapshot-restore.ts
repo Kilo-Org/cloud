@@ -25,27 +25,33 @@ import * as fly from '../fly/client';
 const BYTES_PER_GIB = 1024 ** 3;
 
 /**
- * Resolve the source volume size of a snapshot, in GiB, by scanning the app's volumes.
+ * Resolve the source volume size of a snapshot, in GiB.
  *
  * Fly requires an explicit `size_gb` when creating a volume from a snapshot, and it
  * rejects a size smaller than the snapshot's source volume. The snapshot can come from
  * a volume other than the current one (for example a retained previous or recovery
  * volume), so the restore volume must not be sized from the current volume alone.
+ *
+ * Only volumes at least as large as the current volume can raise the restore size, so
+ * smaller volumes are skipped to bound the scan as retained volumes accumulate.
  */
 async function resolveSnapshotVolumeSizeGb(
   flyConfig: { apiToken: string; appName: string },
-  snapshotId: string
+  snapshotId: string,
+  currentSizeGb: number
 ): Promise<number | null> {
   const volumes = await fly.listVolumes(flyConfig);
+  const candidates = volumes.filter(volume => volume.size_gb >= currentSizeGb);
   const sizes = await Promise.all(
-    volumes.map(async volume => {
+    candidates.map(async volume => {
       try {
         const snapshots = await fly.listVolumeSnapshots(flyConfig, volume.id);
         const snapshot = snapshots.find(candidate => candidate.id === snapshotId);
         return snapshot ? Math.ceil(snapshot.volume_size / BYTES_PER_GIB) : null;
       } catch (err) {
-        // A volume can disappear between listing and snapshot lookup.
-        if (fly.isFlyNotFound(err)) return null;
+        // A volume can disappear between listing and snapshot lookup. Fly reports a
+        // vanished volume as 400, 404, or 422 depending on the endpoint.
+        if (fly.isFlyMissingVolume(err)) return null;
         throw err;
       }
     })
@@ -60,7 +66,11 @@ async function createRestoreVolume(
   region: string
 ) {
   const existingVolume = await fly.getVolume(flyConfig, previousVolumeId);
-  const snapshotVolumeSizeGb = await resolveSnapshotVolumeSizeGb(flyConfig, snapshotId);
+  const snapshotVolumeSizeGb = await resolveSnapshotVolumeSizeGb(
+    flyConfig,
+    snapshotId,
+    existingVolume.size_gb
+  );
   const newVolume = await fly.createVolume(flyConfig, {
     name: existingVolume.name,
     region,

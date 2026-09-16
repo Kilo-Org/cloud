@@ -109,8 +109,9 @@ describe('handleSnapshotRestoreQueue', () => {
     expect(message.ack).toHaveBeenCalled();
   });
 
-  it('keeps the current volume size when the snapshot source is smaller', async () => {
+  it('keeps the current volume size when the snapshot is smaller than the current volume', async () => {
     flyMock.getVolume.mockResolvedValue(volume({ size_gb: 20 }));
+    flyMock.listVolumes.mockResolvedValue([volume({ id: 'vol-current', size_gb: 20 })]);
     flyMock.listVolumeSnapshots.mockResolvedValue([snapshot({ volume_size: 11 * GIB })]);
 
     const { batch } = makeBatch();
@@ -119,6 +120,46 @@ describe('handleSnapshotRestoreQueue', () => {
     expect(flyMock.createVolume).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ size_gb: 20 })
+    );
+  });
+
+  it('tolerates a volume that vanishes during the snapshot scan', async () => {
+    flyMock.listVolumes.mockResolvedValue([
+      volume({ id: 'vol-current', size_gb: 10 }),
+      volume({ id: 'vol-gone', size_gb: 11 }),
+      volume({ id: 'vol-previous', size_gb: 11 }),
+    ]);
+    flyMock.listVolumeSnapshots.mockImplementation(async (_config, volumeId) => {
+      if (volumeId === 'vol-gone') {
+        throw new fly.FlyApiError('volume not found', 400, '{"error":"volume not found"}');
+      }
+      return volumeId === 'vol-previous' ? [snapshot({ volume_size: 11 * GIB })] : [];
+    });
+
+    const { batch, message } = makeBatch();
+    await handleSnapshotRestoreQueue(batch, makeEnv(makeStub()));
+
+    expect(flyMock.createVolume).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ size_gb: 11 })
+    );
+    expect(message.ack).toHaveBeenCalled();
+  });
+
+  it('does not scan volumes smaller than the current volume', async () => {
+    flyMock.listVolumes.mockResolvedValue([
+      volume({ id: 'vol-current', size_gb: 10 }),
+      volume({ id: 'vol-small', size_gb: 5 }),
+    ]);
+
+    const { batch } = makeBatch();
+    await handleSnapshotRestoreQueue(batch, makeEnv(makeStub()));
+
+    expect(flyMock.listVolumeSnapshots).toHaveBeenCalledWith(expect.anything(), 'vol-current');
+    expect(flyMock.listVolumeSnapshots).not.toHaveBeenCalledWith(expect.anything(), 'vol-small');
+    expect(flyMock.createVolume).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ size_gb: 10 })
     );
   });
 

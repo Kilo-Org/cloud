@@ -2158,7 +2158,20 @@
       "continueFrom": "Tęsiama sesija „{{title}}“.",
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šioje CLI sesijos tęsti negalima. Pasirinkite „Cloud Agent“ arba kitą CLI.",
-      "importFailed": "Nepavyko importuoti šios sesijos."
+      "importFailed": "Nepavyko importuoti šios sesijos.",
+      "sandbox": "Smėlio dėžė",
+      "sandboxAccessibility": "Smėlio dėžė: {{label}}",
+      "sandboxDefaultWithDestination": "Numatytasis · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Mažas",
+      "sandboxInstanceShared": "Bendras",
+      "sandboxInstanceLarge": "Didelis",
+      "sandboxInstanceDevcontainer": "Kūrimo konteineris",
+      "sandboxInstanceProviderDefault": "Tiekėjo numatytasis",
+      "sandboxCouldNotLoad": "Nepavyko įkelti smėlio dėžės parinkčių",
+      "sandboxUnavailable": "Ši smėlio dėžė neprieinama. Pasirinkite kitą smėlio dėžę arba Numatytąjį.",
+      "sandboxUseDefault": "Naudoti Numatytąjį"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujintas {{displayCount}} failas.",

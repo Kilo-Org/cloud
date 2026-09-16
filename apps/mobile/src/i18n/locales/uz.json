@@ -2124,7 +2124,20 @@
       "continueFrom": "{{title}} sessiyasi davom ettirilmoqda.",
       "importingSession": "Sessiya import qilinmoqda",
       "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent xizmatini yoki boshqa CLI dasturini tanlang.",
-      "importFailed": "Bu sessiyani import qilib bo'lmadi."
+      "importFailed": "Bu sessiyani import qilib bo'lmadi.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Standart · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Kichik",
+      "sandboxInstanceShared": "Ulashilgan",
+      "sandboxInstanceLarge": "Katta",
+      "sandboxInstanceDevcontainer": "Dev konteyner",
+      "sandboxInstanceProviderDefault": "Provayder standarti",
+      "sandboxCouldNotLoad": "Sandbox sozlamalarini yuklash amalga oshmadi",
+      "sandboxUnavailable": "Bu sandbox mavjud emas. Boshqa sandbox yoki Standartni tanlang.",
+      "sandboxUseDefault": "Standartdan foydalaning"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi.",

@@ -2124,7 +2124,20 @@
       "continueFrom": "Продължаваш сесията {{title}}.",
       "importingSession": "Импортиране на сесията",
       "cliCannotContinue": "Този CLI не може да продължи сесия. Избери Cloud Agent или друг CLI.",
-      "importFailed": "Тази сесия не можа да бъде импортирана."
+      "importFailed": "Тази сесия не можа да бъде импортирана.",
+      "sandbox": "Пясъчник",
+      "sandboxAccessibility": "Пясъчник: {{label}}",
+      "sandboxDefaultWithDestination": "По подразбиране · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Малка",
+      "sandboxInstanceShared": "Споделена",
+      "sandboxInstanceLarge": "Голяма",
+      "sandboxInstanceDevcontainer": "Контейнер за разработка",
+      "sandboxInstanceProviderDefault": "По подразбиране от доставчика",
+      "sandboxCouldNotLoad": "Опциите за пясъчника не можаха да се заредят",
+      "sandboxUnavailable": "Този пясъчник е недостъпен. Изберете друг пясъчник или По подразбиране.",
+      "sandboxUseDefault": "Използвай По подразбиране"
     },
     "partRenderer": {
       "updatedFileCount_one": "Актуализиран е {{displayCount}} файл.",

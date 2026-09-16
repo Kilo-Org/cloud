@@ -9,12 +9,13 @@ import {
 } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { isoBase64URL, isoCBOR } from '@simplewebauthn/server/helpers';
-import type {
-  AuthenticationResponseJSON,
-  RegistrationResponseJSON,
-} from '@simplewebauthn/server';
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 
-import { passkey_challenges, passkey_credentials, passkey_sign_in_tickets } from '@kilocode/db/schema';
+import {
+  passkey_challenges,
+  passkey_credentials,
+  passkey_sign_in_tickets,
+} from '@kilocode/db/schema';
 import { NEXTAUTH_URL } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 
@@ -109,7 +110,11 @@ function buildAuthenticatorData(opts: {
   return Buffer.concat(parts);
 }
 
-function buildClientDataJSON(type: 'webauthn.create' | 'webauthn.get', challenge: string, origin: string) {
+function buildClientDataJSON(
+  type: 'webauthn.create' | 'webauthn.get',
+  challenge: string,
+  origin: string
+) {
   return isoBase64URL.fromUTF8String(JSON.stringify({ type, challenge, origin }));
 }
 
@@ -224,18 +229,16 @@ async function insertCredential(
 
 describe('passkey', () => {
   beforeEach(async () => {
-    await db.delete(passkey_sign_in_tickets).where(eq(passkey_sign_in_tickets.kilo_user_id, userId));
+    await db
+      .delete(passkey_sign_in_tickets)
+      .where(eq(passkey_sign_in_tickets.kilo_user_id, userId));
     await db
       .delete(passkey_sign_in_tickets)
       .where(eq(passkey_sign_in_tickets.kilo_user_id, otherUserId));
     await db.delete(passkey_credentials).where(eq(passkey_credentials.kilo_user_id, userId));
-    await db
-      .delete(passkey_credentials)
-      .where(eq(passkey_credentials.kilo_user_id, otherUserId));
+    await db.delete(passkey_credentials).where(eq(passkey_credentials.kilo_user_id, otherUserId));
     await db.delete(passkey_challenges).where(eq(passkey_challenges.kilo_user_id, userId));
-    await db
-      .delete(passkey_challenges)
-      .where(eq(passkey_challenges.kilo_user_id, otherUserId));
+    await db.delete(passkey_challenges).where(eq(passkey_challenges.kilo_user_id, otherUserId));
   });
 
   describe('createRegistrationOptions', () => {

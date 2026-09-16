@@ -87,15 +87,17 @@ describe('POST /api/auth/passkey/register', () => {
 
   it('returns 400 for an invalid request', async () => {
     expect((await POST(createRequest({ action: 'nope' }))).status).toBe(400);
-    expect((await POST(createRequest({ action: 'verify', challengeId: 'not-a-uuid' }))).status).toBe(
-      400
-    );
+    expect(
+      (await POST(createRequest({ action: 'verify', challengeId: 'not-a-uuid' }))).status
+    ).toBe(400);
     expect((await POST(createRequest('not-an-object'))).status).toBe(400);
     expect(mockCreateRegistrationOptions).not.toHaveBeenCalled();
   });
 
   it('returns 401 with the stable code when verification is refused', async () => {
-    mockVerifyRegistration.mockRejectedValue(new PasskeyVerificationError('CHALLENGE_ALREADY_USED'));
+    mockVerifyRegistration.mockRejectedValue(
+      new PasskeyVerificationError('CHALLENGE_ALREADY_USED')
+    );
 
     const response = await POST(
       createRequest({ action: 'verify', challengeId, response: { id: 'credential-1' } })

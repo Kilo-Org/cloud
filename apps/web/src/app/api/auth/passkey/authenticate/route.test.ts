@@ -8,7 +8,11 @@ jest.mock('@/lib/auth/passkey', () => ({
   verifyAuthentication: jest.fn(),
 }));
 
-import { createAuthenticationOptions, verifyAuthentication, PasskeyVerificationError } from '@/lib/auth/passkey';
+import {
+  createAuthenticationOptions,
+  verifyAuthentication,
+  PasskeyVerificationError,
+} from '@/lib/auth/passkey';
 import { POST } from './route';
 
 const mockCreateAuthenticationOptions = jest.mocked(createAuthenticationOptions);

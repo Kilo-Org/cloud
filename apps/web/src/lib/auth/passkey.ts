@@ -131,7 +131,9 @@ async function consumeChallenge(
  * only to name a mismatch precisely; verification still runs against the
  * challenge stored on the row.
  */
-function readPresentedChallenge(response: { response?: { clientDataJSON?: unknown } }): string | null {
+function readPresentedChallenge(response: {
+  response?: { clientDataJSON?: unknown };
+}): string | null {
   const clientDataJSON = response.response?.clientDataJSON;
   if (typeof clientDataJSON !== 'string') {
     return null;

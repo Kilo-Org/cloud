@@ -22,7 +22,22 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 const fetchCloudAgentStreamTicket = vi.fn();
-vi.mock('@/lib/cloud-agent-stream-ticket', () => ({ fetchCloudAgentStreamTicket }));
+/** Mirrors the real class: the suite replaces the module, so `instanceof` here is the SUT's. */
+class StreamTicketHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'StreamTicketHttpError';
+    this.status = status;
+  }
+}
+vi.mock('@/lib/cloud-agent-stream-ticket', () => ({
+  fetchCloudAgentStreamTicket,
+  StreamTicketHttpError,
+}));
+const performRefresh = vi.fn();
+vi.mock('@/lib/auth/credentials', () => ({ performRefresh }));
 const createConnection = vi.fn();
 vi.mock('@kilocode/cloud-agent-sdk', () => ({ createConnection }));
 vi.mock('@/lib/config', () => ({
@@ -244,6 +259,7 @@ describe('runGlanceableApprove', () => {
     getSessionQuery.mockResolvedValue({ cloud_agent_session_id: 'agent_1' });
     fetchCloudAgentStreamTicket.mockImplementation(resolveTicket);
     createConnection.mockImplementation(fakeStream([connectedFrame(['perm_1'])]).open);
+    performRefresh.mockResolvedValue({ ok: false, refused: false });
   });
 
   it('is none when no ask is recorded', async () => {
@@ -304,6 +320,58 @@ describe('runGlanceableApprove', () => {
     getSessionQuery.mockResolvedValue({ cloud_agent_session_id: null });
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone' });
     expect(answerPermissionMutate).not.toHaveBeenCalled();
+  });
+
+  it.each([400, 403, 404, 410])(
+    'is gone when the stream ticket is refused with %s: the ask can never be streamed',
+    async status => {
+      readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+      fetchCloudAgentStreamTicket.mockRejectedValue(
+        new StreamTicketHttpError(status, 'Session not found or access denied')
+      );
+      await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone' });
+      expect(answerPermissionMutate).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([new Error('network down'), new StreamTicketHttpError(500, 'server exploded')])(
+    'is retryable when the stream ticket fails transiently (%s)',
+    async rejection => {
+      readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+      fetchCloudAgentStreamTicket.mockRejectedValue(rejection);
+      await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
+      expect(recordWaitingAsk).not.toHaveBeenCalled();
+    }
+  );
+
+  it('is retryable when a rotated token can be refreshed', async () => {
+    readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+    getSessionQuery.mockRejectedValue(withCode('UNAUTHORIZED'));
+    performRefresh.mockResolvedValue({
+      ok: true,
+      token: 't',
+      refreshToken: 'r',
+      expiresIn: 60,
+      sessionVersion: 1,
+    });
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
+    expect(performRefresh).toHaveBeenCalledTimes(1);
+    expect(recordWaitingAsk).not.toHaveBeenCalled();
+  });
+
+  it('is retryable when the refresh itself is only transiently unavailable', async () => {
+    readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+    getSessionQuery.mockRejectedValue(withCode('UNAUTHORIZED'));
+    performRefresh.mockResolvedValue({ ok: false, refused: false, superseded: true });
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
+  });
+
+  it('is gone when the session cannot be recovered at all: no retry can ever succeed', async () => {
+    readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+    getSessionQuery.mockRejectedValue(withCode('UNAUTHORIZED'));
+    performRefresh.mockResolvedValue({ ok: false, refused: true });
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone' });
+    expect(recordWaitingAsk).not.toHaveBeenCalled();
   });
 });
 
@@ -411,6 +479,36 @@ describe('refreshGlanceableSnapshot', () => {
       userId: 'user_1',
       organizationId: 'org_9',
     });
+  });
+
+  it('drops the answered session from the ask so a stale row cannot re-offer it', async () => {
+    const publisher = makePublisher();
+    listActiveSessionsQuery.mockResolvedValue({
+      sessions: [{ id: 'ses_1', status: 'permission' }],
+    });
+    createGlanceablePublisher.mockReturnValue(publisher);
+
+    await refreshGlanceableSnapshot({
+      userId: 'user_1',
+      organizationId: null,
+      answeredKiloSessionId: 'ses_1',
+    });
+
+    const options = createGlanceablePublisher.mock.calls[0]?.[0] as {
+      onWaitingAskChange: (ask: Record<string, unknown> | null) => void;
+    };
+    expect(options.onWaitingAskChange).toBeTypeOf('function');
+
+    // The tray still reports the answered session as waiting: recording it
+    // would put Approve back on the notification the user just actioned.
+    options.onWaitingAskChange({ kiloSessionId: 'ses_1' });
+    expect(recordWaitingAsk).not.toHaveBeenCalled();
+
+    // Another session's ask is untouched, and dropping the ask still lands.
+    options.onWaitingAskChange({ kiloSessionId: 'ses_2' });
+    expect(recordWaitingAsk).toHaveBeenCalledWith({ kiloSessionId: 'ses_2' });
+    options.onWaitingAskChange(null);
+    expect(recordWaitingAsk).toHaveBeenCalledWith(null);
   });
 
   it('reads the tray through the same trpc client surface the manager uses', () => {

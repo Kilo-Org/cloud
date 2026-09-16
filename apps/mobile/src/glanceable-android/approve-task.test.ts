@@ -129,21 +129,31 @@ describe('handleApproveTask', () => {
     await handleApproveTask();
 
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
-    expect(mocks.setGlanceableActionNotice).toHaveBeenCalledTimes(1);
-    expect(mocks.setGlanceableActionNotice).toHaveBeenCalledWith(APPROVE_FAILED);
-    // The notice goes into the text before the sink renders the stored
-    // snapshot, so the failure line reaches the surface even when the
-    // republish below cannot reach the backend.
-    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(1);
-    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledWith({
+    expect(mocks.setGlanceableActionNotice).toHaveBeenCalledTimes(2);
+    expect(mocks.setGlanceableActionNotice).toHaveBeenNthCalledWith(1, APPROVE_FAILED);
+    expect(mocks.setGlanceableActionNotice).toHaveBeenNthCalledWith(2, APPROVE_FAILED);
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(2);
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenNthCalledWith(1, {
       userId: 'u1',
       organizationId: 'org_1',
     });
-    const noticeOrder = mocks.setGlanceableActionNotice.mock.invocationCallOrder[0];
-    const renderOrder = mocks.renderStoredSnapshotWithNotice.mock.invocationCallOrder[0];
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenNthCalledWith(2, {
+      userId: 'u1',
+      organizationId: 'org_1',
+    });
+    // The failure line reaches the notification twice: once immediately, so the
+    // user does not wait out the refresh's poll budget, and once after the
+    // republish, which writes the notification again and re-selects the ask from
+    // the tray — a line drawn only first could be pruned by that render.
+    const firstNotice = mocks.setGlanceableActionNotice.mock.invocationCallOrder[0];
+    const firstRender = mocks.renderStoredSnapshotWithNotice.mock.invocationCallOrder[0];
     const refreshOrder = mocks.refreshGlanceableSnapshot.mock.invocationCallOrder[0];
-    expect(noticeOrder).toBeLessThan(renderOrder ?? Number.POSITIVE_INFINITY);
-    expect(renderOrder).toBeLessThan(refreshOrder ?? Number.POSITIVE_INFINITY);
+    const lastNotice = mocks.setGlanceableActionNotice.mock.invocationCallOrder[1];
+    const lastRender = mocks.renderStoredSnapshotWithNotice.mock.invocationCallOrder[1];
+    expect(firstNotice).toBeLessThan(firstRender ?? Number.POSITIVE_INFINITY);
+    expect(firstRender).toBeLessThan(refreshOrder ?? Number.POSITIVE_INFINITY);
+    expect(refreshOrder).toBeLessThan(lastNotice ?? Number.POSITIVE_INFINITY);
+    expect(lastNotice).toBeLessThan(lastRender ?? Number.POSITIVE_INFINITY);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
   });
 

@@ -56,10 +56,9 @@ async function republish(ask: WaitingAsk): Promise<void> {
 }
 
 /**
- * Show the retryable failure line. The backend that answers the ask is the one
- * the republish below fetches from, so a failed refresh would leave the notice
- * unrendered; the sink renders the last stored snapshot instead, which already
- * carries the counts the notification shows, and the notice reaches the text.
+ * Show the retryable failure line: prefix it to the stored snapshot the app last
+ * published, so a headless tap that cannot reach the backend still reports the
+ * failure the user's tap produced.
  */
 function showApproveFailed(ask: WaitingAsk): void {
   setGlanceableActionNotice(translate(APPROVE_FAILED_KEY));
@@ -74,9 +73,16 @@ function showApproveFailed(ask: WaitingAsk): void {
  * the worker completes from the headless task's finish, so a rejection would
  * only lose the failure state the user needs to see. A thrown error is a
  * retryable failure — keep the ask, show the line, leave Approve for another tap.
+ *
+ * The failure line is drawn twice: before the republish, so the user does not
+ * wait out the refresh's poll budget to learn the tap failed, and again after it,
+ * because the republish writes the notification and re-selects the ask from the
+ * tray — a line drawn only first can be pruned by the render that follows it,
+ * and the user would then see the failure nowhere.
  */
 export async function handleApproveTask(): Promise<void> {
   let ask: WaitingAsk | null = null;
+  let failed = false;
   try {
     // A headless run has no app root, so nothing else applies the stored
     // language — and both the failure line below and the notification the
@@ -93,15 +99,20 @@ export async function handleApproveTask(): Promise<void> {
       recordWaitingAsk(null);
     } else if (result.kind === 'retryable') {
       // Keep the record: the notification keeps Approve for another tap.
-      showApproveFailed(ask);
+      failed = true;
     }
   } catch {
-    if (ask !== null) {
-      // Keep the recorded ask and its Approve; only the failure line is needed.
-      showApproveFailed(ask);
-    }
+    // Keep the recorded ask and its Approve; only the failure line is needed.
+    failed = ask !== null;
   }
-  if (ask !== null) {
-    await republish(ask);
+  if (ask === null) {
+    return;
+  }
+  if (failed) {
+    showApproveFailed(ask);
+  }
+  await republish(ask);
+  if (failed) {
+    showApproveFailed(ask);
   }
 }

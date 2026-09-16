@@ -7,7 +7,11 @@ import { type GlanceableSessionRow } from '@kilocode/app-shared/glanceable-agent
 import { z } from 'zod';
 
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
-import { fetchCloudAgentStreamTicket } from '@/lib/cloud-agent-stream-ticket';
+import { performRefresh } from '@/lib/auth/credentials';
+import {
+  fetchCloudAgentStreamTicket,
+  StreamTicketHttpError,
+} from '@/lib/cloud-agent-stream-ticket';
 import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import { trpcClient } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -228,12 +232,43 @@ const GONE_TRPC_CODES: ReadonlySet<string> = new Set([
   'NOT_APPROVABLE',
 ]);
 
+/** The code the API answers when the request carried no usable session. */
+const UNAUTHORIZED_CODE = 'UNAUTHORIZED';
+
+/**
+ * The stream-ticket statuses that mean this caller can never stream the ask's
+ * session: the route answers 403 for a session the user does not own and 404
+ * for one it cannot find, and neither changes on a second tap.
+ */
+const GONE_TICKET_STATUSES: ReadonlySet<number> = new Set([400, 403, 404, 410]);
+
 function classifyApproveFailure(error: unknown): GlanceableApproveResult {
+  if (error instanceof StreamTicketHttpError && GONE_TICKET_STATUSES.has(error.status)) {
+    return { kind: 'gone' };
+  }
   const code = readTrpcErrorField(error, 'code');
   if (code !== undefined && GONE_TRPC_CODES.has(code)) {
     return { kind: 'gone' };
   }
   // A transport, timeout, or 5xx failure is worth another tap.
+  return { kind: 'retryable' };
+}
+
+/**
+ * A tap that arrives unauthenticated, and what that means for the ask.
+ *
+ * The background contexts have no app root and no foreground refresh timer, so
+ * this is the path that first sees a rotated access token; a refresh is the
+ * only way to tell a rotation (retryable) from credentials that cannot be
+ * recovered at all. An unrecoverable session can never answer this ask from the
+ * surface, so the action is dropped like any other terminal answer instead of
+ * offering an "tap Approve to try again" that can never succeed.
+ */
+async function classifyUnauthorized(): Promise<GlanceableApproveResult> {
+  const refreshed = await performRefresh();
+  if (!refreshed.ok && refreshed.refused) {
+    return { kind: 'gone' };
+  }
   return { kind: 'retryable' };
 }
 
@@ -268,6 +303,9 @@ export async function runGlanceableApprove(
     recordWaitingAsk(null);
     return { kind: 'approved' };
   } catch (error) {
+    if (readTrpcErrorField(error, 'code') === UNAUTHORIZED_CODE) {
+      return classifyUnauthorized();
+    }
     return classifyApproveFailure(error);
   }
 }
@@ -350,7 +388,21 @@ export async function refreshGlanceableSnapshot(
 ): Promise<void> {
   const fetchRows = deps?.fetchRows ?? defaultFetchTrayRows;
   const createPublisher: () => GlanceableSnapshotPublisher =
-    deps?.createPublisher ?? createGlanceablePublisher;
+    deps?.createPublisher ??
+    (() =>
+      createGlanceablePublisher({
+        // The tray's row for the session this refresh just answered can still
+        // read permission/question while the control plane's status sync lands.
+        // Recording that row again would put Approve back on the notification
+        // the user already actioned, so the answered session is dropped here
+        // for this refresh only; the counts still come from the tray.
+        onWaitingAskChange: ask => {
+          if (ask !== null && ask.kiloSessionId === input.answeredKiloSessionId) {
+            return;
+          }
+          recordWaitingAsk(ask);
+        },
+      }));
   const sleep = deps?.sleep ?? defaultSleep;
   const pollMs = deps?.pollIntervalMs ?? GLANCEABLE_REFRESH_POLL_MS;
   const deadlineMs = deps?.deadlineMs ?? GLANCEABLE_REFRESH_DEADLINE_MS;

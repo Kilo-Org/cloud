@@ -108,7 +108,7 @@ function needsInputActionFor(actionId: NeedsInputActionId): Notifications.Notifi
 }
 
 /** The headless approve/reply runner, injectable so suites skip the RN graph. */
-export type NeedsInputInteractionRunner = (input: {
+type NeedsInputInteractionRunner = (input: {
   kiloSessionId: string;
   action: NeedsInputAction;
   text?: string;

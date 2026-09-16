@@ -43,7 +43,7 @@ import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { i18n } from '@/i18n';
 
 /** The two raise kinds a cached row can be in. */
-export type NeedsInputAttentionKind = 'question' | 'permission';
+type NeedsInputAttentionKind = 'question' | 'permission';
 
 /** One published notification, as the next plan remembers it. */
 export type NeedsInputNotificationRow = {

@@ -83,6 +83,17 @@ describe('resolveLiveSessionsHold', () => {
     expect(result.releaseDelayMs).toBeNull();
   });
 
+  it('does not stretch the window when the clock steps backwards', () => {
+    const rows = [session('a')];
+    const previousHold = held(rows, { emptySince: 1000 });
+
+    const steppedBack = resolve({ current: [], previousHold, now: 1000 - 60_000 });
+
+    expect(steppedBack.sessions).toBe(rows);
+    expect(steppedBack.releaseDelayMs).toBe(LIVE_SESSIONS_EMPTY_HOLD_MS);
+    expect(steppedBack.hold?.emptySince).toBe(1000 - 60_000);
+  });
+
   it('retires the hold immediately when the rows come back inside the window', () => {
     const rows = [session('a')];
     const reconnected = [session('a'), session('b')];

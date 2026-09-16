@@ -17,7 +17,9 @@
  * than tied to the next server answer, because the refresh that follows a
  * disconnect reads the same transiently empty live set; once it expires the
  * empty state appears, so a genuinely finished session is still reported as
- * empty and no stale rows are pinned forever.
+ * empty and no stale rows are pinned forever. The window is measured on a
+ * monotonic reading, so a device clock correction cannot stretch it; a reading
+ * behind the recorded start restarts the window instead.
  *
  * The hold is scoped to the query key: a context (personal/organization)
  * change builds a new key and must keep its designed loading state instead of
@@ -33,8 +35,8 @@ export type LiveSessionsHold<T> = {
   /** Last non-empty rows to keep rendering while the live set is empty. */
   sessions: T[];
   /**
-   * Clock reading when the live set first went empty inside this hold, or
-   * null while rows are being delivered.
+   * Monotonic clock reading when the live set first went empty inside this
+   * hold, or null while rows are being delivered.
    */
   emptySince: number | null;
 };
@@ -71,7 +73,13 @@ export function resolveLiveSessionsHold<T>(input: {
   if (!canHold || previousHold?.key !== scopeKey || previousHold.sessions.length === 0) {
     return { sessions: current, hold: null, releaseDelayMs: null };
   }
-  const emptySince = previousHold.emptySince ?? now;
+  // A reading behind the recorded one means the caller's clock stepped
+  // backwards (an NTP correction, a manual clock change): start the window
+  // over from here instead of letting the step stretch it past its end.
+  const emptySince =
+    previousHold.emptySince !== null && previousHold.emptySince <= now
+      ? previousHold.emptySince
+      : now;
   const elapsedMs = now - emptySince;
   if (elapsedMs >= LIVE_SESSIONS_EMPTY_HOLD_MS) {
     return { sessions: current, hold: null, releaseDelayMs: null };

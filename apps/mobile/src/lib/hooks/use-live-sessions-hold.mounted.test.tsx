@@ -88,6 +88,22 @@ describe('useLiveSessionsHold', () => {
     expect(heldIds()).toBe('a1,b2');
   });
 
+  it('releases on its own schedule when the wall clock steps backwards', async () => {
+    await render({ current: [row('a1')], scopeKey: 'k1', canHold: true });
+    await render({ current: [], scopeKey: 'k1', canHold: true });
+    expect(heldIds()).toBe('a1');
+
+    // A device clock correction steps Date.now() backwards mid-window: the
+    // hold must still end when its own window ends, not a step later.
+    await advanceBy(1000);
+    vi.setSystemTime(new Date(Date.now() - 60_000));
+    await render({ current: [], scopeKey: 'k1', canHold: true });
+    expect(heldIds()).toBe('a1');
+
+    await advanceBy(LIVE_SESSIONS_EMPTY_HOLD_MS - 1000);
+    expect(heldIds()).toBe('');
+  });
+
   it('never holds across a context change or without read access', async () => {
     await render({ current: [row('a1')], scopeKey: 'k1', canHold: true });
 

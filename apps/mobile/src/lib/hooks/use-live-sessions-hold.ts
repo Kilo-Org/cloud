@@ -33,7 +33,9 @@ export function useLiveSessionsHold<T>(input: {
     current,
     scopeKey,
     canHold,
-    now: Date.now(),
+    // Monotonic, so a device clock correction cannot step the reading back and
+    // stretch the window: `Date.now()` would hold the stale rows longer.
+    now: performance.now(),
     previousHold: holdRef.current,
   });
 

@@ -77,7 +77,6 @@ describe('createWrapperKiloClient prompt handoff', () => {
       variant: 'high',
       system: 'Review only',
       tools: { bash: false },
-      snapshotInitialization: 'wait',
     };
 
     const result = await client.sendPrompt(opts);
@@ -102,7 +101,6 @@ describe('createWrapperKiloClient prompt handoff', () => {
         variant: 'high',
         system: 'Review only',
         tools: { bash: false },
-        snapshotInitialization: 'wait',
       });
     }
   });
@@ -404,25 +402,6 @@ describe('createWrapperKiloClient prompt handoff', () => {
     ).rejects.toThrow('Async prompt for session kilo_sess_rejected failed: HTTP 409');
   });
 
-  it('passes snapshot wait policy through async prompt requests', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
-    vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
-
-    await client.sendPromptAsync({
-      sessionId: 'kilo_sess_wait',
-      messageId: 'msg_wait',
-      prompt: 'queue this prompt',
-      snapshotInitialization: 'wait',
-    });
-
-    const request = fetchMock.mock.calls[0]?.[0];
-    expect(request).toBeInstanceOf(Request);
-    await expect((request as Request).clone().json()).resolves.toMatchObject({
-      snapshotInitialization: 'wait',
-    });
-  });
-
   it('lists exact deduplicated effective model IDs for the requested provider', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
@@ -467,36 +446,7 @@ describe('createWrapperKiloClient prompt handoff', () => {
     expect(url.searchParams.get('workspace')).toBe(workspacePath);
   });
 
-  it('passes snapshot wait policy through command requests', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(completion), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      })
-    );
-    vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
-
-    await client.sendCommand({
-      sessionId: 'kilo_sess_wait',
-      command: 'review',
-      args: 'selected changes',
-      messageId: 'msg_wait',
-      snapshotInitialization: 'wait',
-    });
-
-    const request = fetchMock.mock.calls[0]?.[0];
-    expect(request).toBeInstanceOf(Request);
-    expect(new URL((request as Request).url).pathname).toBe('/session/kilo_sess_wait/command');
-    await expect((request as Request).clone().json()).resolves.toEqual({
-      command: 'review',
-      arguments: 'selected changes',
-      messageID: 'msg_wait',
-      snapshotInitialization: 'wait',
-    });
-  });
-
-  it('omits snapshot wait policy from default command requests', async () => {
+  it('serializes default command requests with only command and arguments', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(completion), {
         status: 200,

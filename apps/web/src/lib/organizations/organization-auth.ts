@@ -54,7 +54,6 @@ export async function getAuthorizedOrgContext(
   // due to the way next module loading works
   getUserFromAuthOverride?: typeof getUserFromAuth
 ): Promise<DataOrNextError<{ user: UserWithRole; organization: Organization }>> {
-  // Only use the override function in test environment
   const getUserFromAuthFn =
     process.env.NODE_ENV === 'test' && getUserFromAuthOverride
       ? getUserFromAuthOverride
@@ -73,7 +72,6 @@ export async function getAuthorizedOrgContext(
   }
   const organizationId = data;
 
-  // admin user allowed to edit everything
   if (user.is_admin) {
     // Recorded before the lookup so an admin probing a non-existent organization
     // is still attributed, rather than vanishing into the 404 below.

@@ -53,12 +53,14 @@ vi.mock('react-native-reanimated', () => ({
 }));
 
 const OUTER_CLASSES = 'gap-2 rounded-lg bg-secondary p-3';
+const BODY_CLASSES = 'gap-2';
+const SECTION_BODY = 'section body';
 
 let mounted: ReactTestRenderer | undefined = undefined;
 
 function mountSection(
   props: Partial<Omit<ComponentProps<typeof CollapsibleSection>, 'children'>> = {},
-  children: ReactNode = 'section body'
+  children: ReactNode = SECTION_BODY
 ): ReactTestRenderer {
   act(() => {
     mounted = TestRenderer.create(
@@ -78,6 +80,21 @@ function animatedView(renderer: ReactTestRenderer, className: string) {
   return renderer.root.find(
     node => node.type === ('Animated.View' as ElementType) && node.props.className === className
   );
+}
+
+/** How many `Animated.View`s resolve to the given className (0 when collapsed). */
+function animatedViewCount(renderer: ReactTestRenderer, className: string) {
+  return renderer.root.findAll(
+    node => node.type === ('Animated.View' as ElementType) && node.props.className === className
+  ).length;
+}
+
+function title(renderer: ReactTestRenderer) {
+  return renderer.root.findByType('Text' as ElementType);
+}
+
+function pressableNode(renderer: ReactTestRenderer) {
+  return renderer.root.findByType('Pressable' as ElementType);
 }
 
 function toggle(renderer: ReactTestRenderer) {
@@ -165,5 +182,68 @@ describe('CollapsibleSection reduce-motion gate', () => {
 
     const toggled = toggle(renderer);
     expect(toggled.props.accessibilityState).toEqual({ expanded: true });
+  });
+});
+
+describe('CollapsibleSection controlled expanded state and class overrides', () => {
+  beforeEach(() => {
+    policy.reducedMotion = false;
+    reanimated.sharedValues = [];
+    reanimated.withTiming.mockClear();
+  });
+
+  afterEach(() => {
+    act(() => mounted?.unmount());
+    mounted = undefined;
+  });
+
+  it('renders the controlled value and only the parent can change it', () => {
+    const onToggle = vi.fn<() => void>();
+    const renderer = mountSection({ expanded: true, onToggle });
+
+    expect(title(renderer).props.children).toBe('Source');
+    expect(pressableNode(renderer).props.accessibilityState).toEqual({ expanded: true });
+    expect(animatedViewCount(renderer, BODY_CLASSES)).toBe(1);
+
+    // A press notifies the parent but leaves the rendered state where the
+    // parent put it — the section never flips its own controlled state.
+    toggle(renderer);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(pressableNode(renderer).props.accessibilityState).toEqual({ expanded: true });
+    expect(animatedViewCount(renderer, BODY_CLASSES)).toBe(1);
+
+    // The parent flipping the prop is what collapses the section.
+    act(() => {
+      renderer.update(
+        <CollapsibleSection title="Source" expanded={false} onToggle={onToggle}>
+          {SECTION_BODY}
+        </CollapsibleSection>
+      );
+    });
+    expect(pressableNode(renderer).props.accessibilityState).toEqual({ expanded: false });
+    expect(animatedViewCount(renderer, BODY_CLASSES)).toBe(0);
+    expect(title(renderer).props.children).toBe('Source');
+  });
+
+  it('keeps the title and reports collapsed for expanded={false}', () => {
+    const renderer = mountSection({ expanded: false });
+
+    // Collapsed means reduced, never deleted: the title row stays.
+    expect(title(renderer).props.children).toBe('Source');
+    expect(pressableNode(renderer).props.accessibilityState).toEqual({ expanded: false });
+    expect(animatedViewCount(renderer, BODY_CLASSES)).toBe(0);
+  });
+
+  it('merges titleClassName and contentClassName through cn', () => {
+    const renderer = mountSection({
+      expanded: true,
+      titleClassName: 'text-base font-semibold',
+      contentClassName: 'bg-card p-4 gap-3',
+    });
+
+    expect(title(renderer).props.className).toBe(
+      'flex-1 text-sm font-medium text-base font-semibold'
+    );
+    expect(animatedView(renderer, 'gap-2 bg-card p-4 gap-3')).toBeDefined();
   });
 });

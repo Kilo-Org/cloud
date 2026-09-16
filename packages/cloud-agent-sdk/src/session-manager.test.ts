@@ -114,6 +114,8 @@ const mockSession = {
     getStatus: jest.fn<{ type: 'idle' | 'disconnected' }, []>(() => ({ type: 'idle' })),
     getCloudStatus: jest.fn<CloudStatus | null, []>(() => null),
     getSetupLog: jest.fn<readonly string[], []>(() => []),
+    getCommits: jest.fn(() => []),
+    clearCommits: jest.fn(),
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
@@ -2432,6 +2434,59 @@ describe('createSessionManager', () => {
       expect((storage!.getParts(messageId!)[0] as TextPart).text).toBe('Hello');
     });
 
+    it('marks the optimistic row unconfirmed until the authoritative record wins the id', async () => {
+      // Production (ses_f58dc0cebfffJoPUmXs05c76pv): the client's three sends
+      // were each accepted ("Sending V2 message to existing session" at
+      // 22:25:21.412Z, 22:25:57.431Z, 22:25:59.068Z) while the wrapper's event
+      // publications were rejected wholesale (`event_batch_rejected`,
+      // rejectedCount 732), so the authoritative `message.updated` for a
+      // prompt never landed. The row the client materialises for the prompt
+      // must stay marked unconfirmed — the flag the transcript's
+      // one-row rendering and typed failure footer key on — and a confirmed
+      // record for the same id must win the role and the parts.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({
+        payload: { type: 'prompt', prompt: 'Continue', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
+
+      const storage = mockSession.storage;
+      expect(storage).not.toBeNull();
+      const [messageId] = storage!.getMessageIds();
+      expect(messageId).toBeDefined();
+
+      // The unconfirmed row carries the marker on the message and on the
+      // placeholder text part, exactly as the mobile selector reads it.
+      expect(storage!.getMessageInfo(messageId!)).toMatchObject({ role: 'user', synthetic: true });
+      expect(storage!.getParts(messageId!)[0]).toMatchObject({
+        type: 'text',
+        text: 'Continue',
+        synthetic: true,
+      });
+
+      // A confirmed record for the id wins: the authoritative update replaces
+      // the info wholesale, dropping the unconfirmed marker and with it the
+      // transcript's unconfirmed-row treatment. The failed-run delivery state
+      // is keyed by that same id — the server honors the `messageId` the client
+      // sent, so the failed row and the run that failed it are one row.
+      const authoritative = stubUserMessage({
+        id: messageId!,
+        sessionID: kiloId('ses-1'),
+        time: { created: 2 },
+        agent: 'test-agent',
+        model: { providerID: 'test-provider', modelID: 'test-model' },
+      });
+      createChatProcessor(storage!).process({ type: 'message.updated', info: authoritative });
+
+      const confirmedInfo = storage!.getMessageInfo(messageId!);
+      expect(confirmedInfo).toBe(authoritative);
+      expect(confirmedInfo?.role === 'user' ? confirmedInfo.synthetic : undefined).toBeUndefined();
+    });
+
     it('deletes the optimistic row on transport failure', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -3795,6 +3850,126 @@ describe('createSessionManager', () => {
         mgr.atoms.childSessionHydrationState
       );
       expect(state('child-fail')).toEqual(expect.objectContaining({ status: 'error' }));
+    });
+
+    it('clears a stored first-page hydration error when a live child chat event arrives', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () => ({
+        kind: 'retryable_failure' as const,
+      }));
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-streams'));
+
+      const readState = () =>
+        atomValue<(childSessionId: string) => { status: string }>(
+          config.store,
+          mgr.atoms.childSessionHydrationState
+        );
+      expect(readState()('child-streams')).toEqual(expect.objectContaining({ status: 'error' }));
+
+      // A live child message reaches the manager as a chat event carrying the
+      // child's session id. The session's chat processor writes the row into
+      // storage before the manager sees the event, so the event is proof the
+      // child has rows and the load failure is stale.
+      const liveMessage = createStoredMessage('msg-child-streams', 'child-streams', 'assistant');
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(liveMessage.info);
+      mockSessionCallbacks.onEvent?.({ type: 'message.updated', info: liveMessage.info });
+
+      expect(readState()('child-streams')).toEqual({ status: 'idle' });
+    });
+
+    it('keeps a stored first-page hydration error while no child chat event arrives', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () => ({
+        kind: 'retryable_failure' as const,
+      }));
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-silent'));
+
+      // An event for a different child must not clear this child's error.
+      const otherMessage = createStoredMessage('msg-child-other', 'child-other', 'assistant');
+      mockSessionCallbacks.onEvent?.({ type: 'message.updated', info: otherMessage.info });
+
+      const state = atomValue<(childSessionId: string) => { status: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      expect(state('child-silent')).toEqual(expect.objectContaining({ status: 'error' }));
+    });
+
+    it('keeps a stored first-page hydration error when only a part for the child arrives', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () => ({
+        kind: 'retryable_failure' as const,
+      }));
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-part-only'));
+
+      const readState = () =>
+        atomValue<(childSessionId: string) => { status: string }>(
+          config.store,
+          mgr.atoms.childSessionHydrationState
+        );
+      expect(readState()('child-part-only')).toEqual(expect.objectContaining({ status: 'error' }));
+
+      // A part without its `message.updated` info writes no message row —
+      // `getChildMessages` only sees ids with stored info. Dropping the stored
+      // failure here would leave the sheet with no rows, no error, and no retry
+      // path, so the clear requires the same row proof the failure store does.
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertPart(
+        'msg-child-part-only',
+        stubTextPart({
+          id: 'part-child-part-only',
+          sessionID: 'child-part-only',
+          messageID: 'msg-child-part-only',
+          text: 'streaming',
+        })
+      );
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.part.delta',
+        sessionId: 'child-part-only',
+        messageId: 'msg-child-part-only',
+        partId: 'part-child-part-only',
+        field: 'text',
+        delta: 'streaming',
+      });
+
+      expect(readState()('child-part-only')).toEqual(expect.objectContaining({ status: 'error' }));
+    });
+
+    it('does not store a first-page hydration error once the child already streamed rows', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () => ({
+        kind: 'retryable_failure' as const,
+      }));
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      // A live child chat event already arrived: its row landed in storage
+      // before the first-page fetch settles.
+      const liveMessage = createStoredMessage('msg-child-live', 'child-live', 'assistant');
+      latestStorage.upsertMessage(liveMessage.info);
+      mockSessionCallbacks.onEvent?.({ type: 'message.updated', info: liveMessage.info });
+
+      await mgr.hydrateChildSession(kiloId('child-live'));
+
+      const state = atomValue<(childSessionId: string) => { status: string; message?: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      // The streamed rows are the truth: the failure must not become a stored
+      // "could not load" error that reappears once the child stops streaming.
+      expect(state('child-live')).not.toEqual(expect.objectContaining({ status: 'error' }));
     });
 
     it('loadOlderChildMessages pages by the child cursor and updates only per-child state', async () => {

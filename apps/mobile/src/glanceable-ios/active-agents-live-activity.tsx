@@ -1,4 +1,4 @@
-import { HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
+import { Button, HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   accessibilityElement,
   accessibilityLabel,
@@ -112,6 +112,16 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // blocked agent is the one interval the user can act on. Working and idle
   // durations tell the user nothing they can use.
   const needsInputSince = (props.needsInput ?? 0) > 0 ? (props.needsInputSince ?? null) : null;
+  // The Approve control rides the count block only while the card still draws a
+  // wait AND that wait is approvable. The wait gate is what keeps the control
+  // off the retained expired frame: `withStatus` zeroes every count on expiry
+  // but keeps `needsApproval`, so a gate on that count alone drew an Approve
+  // button on a card that reads Expired and shows no waiting agent. A question
+  // or a retry counts as needs-input but has no approve-without-choosing
+  // answer, so `needsApproval` is narrower than the needs-input row above it; a
+  // content state from an older producer omits the field and the control stays
+  // hidden.
+  const needsApproval = hasCounts && (props.needsApproval ?? 0) > 0;
 
   // Spoken label: status word, numeric counts, then Open agents. The whole
   // surface deep-links to the agents list, so "Open agents" stays in the
@@ -148,7 +158,9 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // without color), a fixed-width count, then the label. Every row shares one
   // type size so the counts line up on a grid; only the label dims to rank
   // them, because a second font size in a two-line banner reads as a mistake.
-  const countRow = (line: (typeof countLines)[number], isPrimary: boolean) => (
+  // `showWait` is false for the small family, which draws one line and keeps
+  // the relative wait off it; the phone banner and the expanded island keep it.
+  const countRow = (line: (typeof countLines)[number], isPrimary: boolean, showWait = true) => (
     <HStack key={line.label} alignment="center" spacing={7}>
       <Image systemName={line.icon} color={line.color} size={13} />
       <Text
@@ -180,7 +192,7 @@ const layout: LiveActivityComponent<ContentState> = props => {
       >
         {line.label}
       </Text>
-      {line.kind === 'needsInput' && needsInputSince !== null ? (
+      {showWait && line.kind === 'needsInput' && needsInputSince !== null ? (
         <Text
           date={new Date(needsInputSince)}
           dateStyle="relative"
@@ -204,18 +216,44 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // user at the state with nothing in it.
   const countRows = countLines.map(line => countRow(line, line === primary));
 
-  // The mark, then the rows. The Lock Screen banner and the expanded Dynamic
-  // Island draw the same block, so one glance teaches both surfaces.
+  // The mark, then the rows, then the Approve control while the card still
+  // draws a wait and an approvable one exists. The Lock Screen banner and the
+  // expanded Dynamic Island draw the same block, so one glance teaches both
+  // surfaces. The Apple Watch and CarPlay draw the `bannerSmall` section
+  // instead: their activity family is `.small`, so they get one compact row
+  // plus the same control rather than this stacked block.
   const markAndRows = (markSize: number) => (
     <HStack alignment="center" spacing={12}>
       {logo(markSize)}
-      {hasCounts ? (
-        <VStack alignment="leading" spacing={5}>
-          {countRows}
-        </VStack>
-      ) : (
-        <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>{statusLine}</Text>
-      )}
+      {/* The combined label sits on the counts/status block alone, the way the
+          watch `bannerSmall` scopes it to its count row, so the Approve Button
+          below stays a separate, focusable element. `combine` on the whole row
+          merged the control into one element whose spoken label named only the
+          counts and "Open agents", which is how the Lock Screen banner lost the
+          action for VoiceOver. */}
+      <HStack
+        alignment="center"
+        spacing={7}
+        modifiers={[accessibilityElement('combine'), accessibilityLabel(accessibility)]}
+      >
+        {hasCounts ? (
+          <VStack alignment="leading" spacing={5}>
+            {countRows}
+          </VStack>
+        ) : (
+          <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>
+            {statusLine}
+          </Text>
+        )}
+      </HStack>
+      {needsApproval ? (
+        // The target is the literal, not the imported `APPROVE_TARGET`: this
+        // function's source is stringified and re-evaluated in the widget
+        // process, where an imported binding is an undefined global.
+        // `layout-copy.test.ts` keeps it equal to the constant the interaction
+        // handler matches.
+        <Button label={COPY.approve} target="approve" />
+      ) : null}
       <Spacer />
     </HStack>
   );
@@ -231,11 +269,52 @@ const layout: LiveActivityComponent<ContentState> = props => {
           // without this the relative wait would be formatted in a different
           // language than the baked labels.
           environment({ key: 'locale', value: locale }),
-          accessibilityElement('combine'),
-          accessibilityLabel(accessibility),
         ]}
       >
         {markAndRows(26)}
+      </HStack>
+    ),
+    // The Apple Watch and CarPlay small family draws this section, not the
+    // phone `banner`: expo-widgets' banner view prefers the `bannerSmall` node
+    // whenever the activity family is `.small`, falling back to `banner`
+    // otherwise, so the phone Lock Screen and Dynamic Island never read it. One
+    // compact row plus the Approve control, so the wait count and the wrist
+    // control fit the small region instead of the phone's stacked block. The
+    // ranked primary row only — the small family draws one line — and no
+    // relative wait: the medium banner and the accessory rectangle carry it. The
+    // trailing Spacer pins the row to the leading edge, so the count keeps its
+    // place when the control appears and disappears, the way the phone block is
+    // spaced; the row draws unconditionally, and only the control is gated.
+    bannerSmall: (
+      <HStack alignment="center" spacing={10}>
+        <HStack
+          alignment="center"
+          spacing={7}
+          modifiers={[
+            // The combined label sits on the count row alone, so VoiceOver on
+            // the watch can still focus and activate the Approve button
+            // separately.
+            accessibilityElement('combine'),
+            accessibilityLabel(accessibility),
+          ]}
+        >
+          {hasCounts ? (
+            countRow(primary, true, false)
+          ) : (
+            <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>
+              {statusLine}
+            </Text>
+          )}
+        </HStack>
+        {needsApproval ? (
+          // The target is the literal, not the imported `APPROVE_TARGET`: this
+          // function's source is stringified and re-evaluated in the widget
+          // process, where an imported binding is an undefined global.
+          // `layout-copy.test.ts` keeps it equal to the constant the interaction
+          // handler matches.
+          <Button label={COPY.approve} target="approve" />
+        ) : null}
+        <Spacer />
       </HStack>
     ),
     // The Dynamic Island's leading slot is the app-identity slot, so it holds
@@ -270,7 +349,9 @@ const layout: LiveActivityComponent<ContentState> = props => {
     // The whole expanded island is the bottom region: it is the only one wide
     // enough for a labelled row, and it clears the rounded corners that clip
     // the flanking regions. The leading and trailing regions stay empty and
-    // take no height.
+    // take no height. The row carries its own combined label on the count block
+    // and none sits here, so the Approve control inside it stays focusable
+    // instead of being merged into the island's spoken label.
     expandedBottom: (
       <HStack
         modifiers={[
@@ -278,7 +359,6 @@ const layout: LiveActivityComponent<ContentState> = props => {
           // mark needs an inset the banner gets from its own padding.
           padding({ vertical: 2, leading: 14 }),
           environment({ key: 'locale', value: locale }),
-          accessibilityLabel(accessibility),
         ]}
       >
         {markAndRows(24)}

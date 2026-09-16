@@ -228,9 +228,32 @@ export type ContextSheetIdentity = {
 };
 
 /**
+ * Whether an open request still matches the model usage currently reports.
+ *
+ * An open request recorded before the first usage report carries no model, and
+ * must keep matching whatever model usage later names — otherwise the sheet
+ * dismisses itself on arrival of the very report it was opened to read. An
+ * open request that did record a model stops matching once usage names another.
+ */
+function isOpenIdentityForModel(
+  info: SessionContextInfo | undefined,
+  openIdentity: ContextSheetIdentity | null
+): boolean {
+  const providerID = openIdentity?.providerID;
+  const modelID = openIdentity?.modelID;
+  if (providerID === undefined || modelID === undefined) {
+    return true;
+  }
+  return providerID === info?.providerID && modelID === info.modelID;
+}
+
+/**
  * Controls when the native Modal is mounted and when it is visible. Keeping
- * the sheet mounted while usage or permission controls are available lets
- * `visible` transition from true → false for native dismissal. Permission
+ * the sheet mounted after it has been opened lets `visible` transition from
+ * true → false for native dismissal. The sheet is the session's own
+ * context/permission surface — it always has the session identity and the
+ * auto-approve row to show — so an open request mounts it even before usage is
+ * reported or permission controls are known to be available. Permission
  * controls belong to the session, not the model reporting the latest usage.
  */
 export function getContextSheetMountState(
@@ -238,12 +261,11 @@ export function getContextSheetMountState(
   openIdentity: ContextSheetIdentity | null,
   { sessionId, autoApproveAvailable = false }: { sessionId: string; autoApproveAvailable?: boolean }
 ): SheetMountState {
-  if (!info && !autoApproveAvailable) {
+  const openedForSession = openIdentity?.sessionId === sessionId;
+  if (!info && !autoApproveAvailable && !openedForSession) {
     return { mounted: false };
   }
   const visible =
-    openIdentity?.sessionId === sessionId &&
-    (autoApproveAvailable ||
-      (openIdentity.providerID === info?.providerID && openIdentity.modelID === info?.modelID));
+    openedForSession && (autoApproveAvailable || isOpenIdentityForModel(info, openIdentity));
   return { mounted: true, visible, info };
 }

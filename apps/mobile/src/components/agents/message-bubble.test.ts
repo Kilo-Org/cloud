@@ -604,6 +604,60 @@ describe('MessageBubble user text join', () => {
   );
 });
 
+describe('MessageBubble assistant treatment', () => {
+  // The user treatment (Bubble side="user": right-aligned accent tile) is
+  // reserved for a user-role info. An assistant message at any point of its
+  // life — before the first token, mid-stream, completed — and a message whose
+  // role is missing or unknown must never take it.
+  async function findUserBubble(tree: unknown): Promise<{ side: unknown } | null> {
+    const { Bubble: MockBubble } = await import('@/components/ui/bubble');
+    const element = findElementByTypeFn(tree, MockBubble);
+    return element ? { side: element.props.side } : null;
+  }
+
+  it('renders streaming assistant text through the part renderer, never the user bubble', async () => {
+    const { PartRenderer: MockPartRenderer } = await import('./part-renderer');
+    const message = assistantMessage('m-treatment-streaming');
+    message.parts = [
+      {
+        id: 'm-treatment-streaming-text',
+        sessionID: 'ses_1',
+        messageID: 'm-treatment-streaming',
+        type: 'text',
+        text: 'AI Gateway abuse classification is an external, fail-mostly-open integration',
+      },
+    ] as typeof message.parts;
+
+    const tree = await renderBubble(message);
+    expect(await findUserBubble(tree)).toBeNull();
+    expect(findElementByTypeFn(tree, MockPartRenderer)).not.toBeNull();
+  });
+
+  it('renders an assistant message with no content yet without the user bubble', async () => {
+    // Before the first token the assistant row has no visible parts; the
+    // transcript drops it, and the bubble itself must not render user ink.
+    const tree = await renderBubble(assistantMessage('m-treatment-empty'));
+    expect(await findUserBubble(tree)).toBeNull();
+  });
+
+  it('renders a message with an undefined role without the user bubble', async () => {
+    // A payload quirk must never fall back to the user treatment: the missing
+    // role renders the assistant path (no bubble), never Bubble side="user".
+    const message = assistantMessage('m-treatment-unknown-role');
+    (message.info as { role?: string }).role = undefined;
+
+    const tree = await renderBubble(message);
+    expect(await findUserBubble(tree)).toBeNull();
+  });
+
+  it('reserves Bubble side="user" for a user-role message', async () => {
+    const tree = await renderBubble(userMessage('m-treatment-user'));
+    const userBubble = await findUserBubble(tree);
+    expect(userBubble).not.toBeNull();
+    expect(userBubble?.side).toBe('user');
+  });
+});
+
 describe('MessageBubble in-bubble text selection context', () => {
   it('wraps the assistant parts view in InMessageBubbleContext.Provider with value true', async () => {
     const { InMessageBubbleContext } = await import('./bubble-text-selection-context');
@@ -621,6 +675,29 @@ describe('MessageBubble in-bubble text selection context', () => {
     const provider = findProvider(tree, InMessageBubbleContext.Provider);
     expect(provider).not.toBeNull();
     expect(provider?.props.value).toBe(true);
+  });
+});
+
+describe('MessageBubble part-row long-press context', () => {
+  it('mounts the message long-press provider on the assistant parts when the details sheet is wired', async () => {
+    const onLongPressDetails = vi.fn<(m: StoredMessage) => void>();
+    const message = assistantMessage('m-long-press');
+    const tree = await renderBubbleWithHandlers(message, { onLongPressDetails });
+
+    const { MessageLongPressProvider } = await import('./message-long-press-context');
+    const provider = findElementByTypeFn(tree, MessageLongPressProvider);
+    expect(provider).not.toBeNull();
+    expect(provider?.props.message).toBe(message);
+    expect(provider?.props.onLongPressDetails).toBe(onLongPressDetails);
+  });
+
+  it('keeps assistant part rows tap-only when no details sheet is wired', async () => {
+    const tree = await renderBubble(assistantMessage('m-long-press-plain'));
+
+    const { MessageLongPressProvider } = await import('./message-long-press-context');
+    const provider = findElementByTypeFn(tree, MessageLongPressProvider);
+    expect(provider).not.toBeNull();
+    expect(provider?.props.onLongPressDetails).toBeUndefined();
   });
 });
 

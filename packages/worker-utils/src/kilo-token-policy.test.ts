@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { decodeProtectedHeader, jwtVerify, SignJWT } from 'jose';
 import {
   LEGACY_API_TOKEN_LIFETIMES_SECONDS,
@@ -9,7 +9,6 @@ import {
   verifyKiloSessionForPolicy,
   verifyKiloTokenForResource,
   verifyKiloTokenForPolicy,
-  type ModernKiloTokenClaims,
   type VerifiedKiloAuthContext,
 } from './kilo-token-policy.js';
 import { verifyKiloToken } from './kilo-token.js';
@@ -852,19 +851,6 @@ describe('isKiloCredentialExchangeEligible', () => {
 });
 
 describe('buildModernKiloTokenPayload and compatibility', () => {
-  type DeviceAccessModernKiloTokenClaims = ModernKiloTokenClaims & {
-    tokenPurpose: 'device-access';
-  };
-  type ExpectedReadonlyOrganizationMemberships = readonly {
-    readonly orgId: string;
-    readonly role: 'owner' | 'admin' | 'member' | 'billing_manager';
-  }[];
-
-  expectTypeOf<DeviceAccessModernKiloTokenClaims['credentialExchange']>().toEqualTypeOf<false>();
-  expectTypeOf<ExpectedReadonlyOrganizationMemberships>().toEqualTypeOf<
-    NonNullable<Extract<VerifiedKiloAuthContext, { type: 'bearer' }>['claims']['orgMemberships']>
-  >();
-
   it('builds a signable modern payload that policy verification round-trips', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);

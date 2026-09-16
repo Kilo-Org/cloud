@@ -3339,22 +3339,21 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
   });
 
-  it.each([
-    ['cloud-agent-web', true],
-    [undefined, false],
-    ['app-builder', false],
-    ['code-review', false],
-    ['slack', false],
-  ])('sets Kilo snapshots for %s-origin sessions to %s', async (createdOnPlatform, snapshot) => {
-    const result = await buildPromptWrapperRequests(createMetadata({ createdOnPlatform }));
-    const kiloConfig = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
-      snapshot?: boolean;
-    };
-    const opencodeConfig = JSON.parse(result.readyRequest.materialized.env.OPENCODE_CONFIG_CONTENT);
+  it.each(['cloud-agent-web', undefined, 'app-builder', 'code-review', 'slack'])(
+    'disables Kilo snapshots for %s-origin sessions',
+    async createdOnPlatform => {
+      const result = await buildPromptWrapperRequests(createMetadata({ createdOnPlatform }));
+      const kiloConfig = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+        snapshot?: boolean;
+      };
+      const opencodeConfig = JSON.parse(
+        result.readyRequest.materialized.env.OPENCODE_CONFIG_CONTENT
+      );
 
-    expect(kiloConfig.snapshot).toBe(snapshot);
-    expect(opencodeConfig).toEqual(kiloConfig);
-  });
+      expect(kiloConfig.snapshot).toBe(false);
+      expect(opencodeConfig).toEqual(kiloConfig);
+    }
+  );
 
   it.each(['fake-deterministic', 'kilo/fake-deterministic'])(
     'pins small_model and title model when the session model is %s',

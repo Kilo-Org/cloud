@@ -1,3 +1,7 @@
+import {
+  logRuntimeAuthorizationDiagnostic,
+  runtimeAuthorizationRecoveryDenied,
+} from '../session/runtime-authorization-diagnostics.js';
 import jwt from 'jsonwebtoken';
 import { DurableObject } from 'cloudflare:workers';
 import type {
@@ -27,6 +31,7 @@ import {
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyGrantSchema,
   RUNTIME_PROXY_GRANT_KEY,
+  sameRuntimeProxyControlBinding,
   verifyRuntimeCredentialProxyHandle,
 } from '../runtime-credential-proxy.js';
 import { z } from 'zod';
@@ -1266,6 +1271,12 @@ export class SandboxSession extends DurableObject<Env> {
           authorization,
           secret,
           connectionString: this.env.HYPERDRIVE.connectionString,
+          onBindingRejected: reason =>
+            logRuntimeAuthorizationDiagnostic(
+              metadata?.identity.sessionId,
+              'binding_check',
+              reason
+            ),
         }),
     });
   }
@@ -1306,9 +1317,12 @@ export class SandboxSession extends DurableObject<Env> {
     runtimeToken: string;
   }): Promise<{ status: 'recovered' | 'not-needed' | 'denied' | 'busy' | 'retry' }> {
     const metadata = await this.getMetadata();
-    if (!metadata || metadata.identity.userId !== input.ownerId) return { status: 'denied' };
+    const denied = (reason: Parameters<typeof runtimeAuthorizationRecoveryDenied>[1]) =>
+      runtimeAuthorizationRecoveryDenied(metadata?.identity.sessionId ?? this.sessionId, reason);
+    if (!metadata) return denied('metadata_unavailable');
+    if (metadata.identity.userId !== input.ownerId) return denied('owner_mismatch');
     const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) return { status: 'denied' };
+    if (!secret) return denied('missing_secret');
     let fresh: RuntimeAuthorization;
     try {
       fresh = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
@@ -1318,14 +1332,14 @@ export class SandboxSession extends DurableObject<Env> {
         organizationId: metadata.identity.orgId,
       });
     } catch {
-      return { status: 'denied' };
+      return denied('invalid_seal');
     }
-    if (fresh.state !== 'active') return { status: 'denied' };
-    if (!metadata.auth.kiloSessionId) return { status: 'denied' };
+    if (fresh.state !== 'active') return denied('fresh_authorization_inactive');
+    if (!metadata.auth.kiloSessionId) return denied('kilo_session_missing');
     const current = await this.getRuntimeAuthorizationRecoveryState();
     if (current.state === 'legacy' || current.state === 'active') return { status: 'not-needed' };
     if (current.state !== 'expired' || current.id !== input.expectedOldId)
-      return { status: 'denied' };
+      return denied('authorization_state_changed');
     if (
       this.loadMessages().some(
         message => message.state === 'accepted' || message.state === 'queued'
@@ -1454,13 +1468,7 @@ export class SandboxSession extends DurableObject<Env> {
       readFence(),
     ]);
     const authorization = RuntimeAuthorizationSchema.safeParse(storedAuthorization);
-    if (
-      !latestFence ||
-      latestFence.allocationId !== fence.allocationId ||
-      latestFence.providerInstanceId !== fence.providerInstanceId ||
-      latestFence.connectionId !== fence.connectionId ||
-      latestFence.wrapperInstanceId !== fence.wrapperInstanceId
-    ) {
+    if (!latestFence || !sameRuntimeProxyControlBinding(fence, latestFence)) {
       return null;
     }
     return issuePersistedRuntimeProxyGrant({
@@ -2164,18 +2172,21 @@ export class SandboxSession extends DurableObject<Env> {
     this.ctx.storage.transactionSync(() => {
       this.ctx.storage.kv.put(DELETED_WORKTREE_KEY, worktreeId);
       this.terminalLifecycle.beginDeletion(metadata);
-      this.worktreeChanges.purge();
       this.snapshotDeletedMessages(metadata);
     });
     if (this.messageCallbacks.pendingCallbackCount() > 0) this.scheduleCallbackRepair();
     if (this.reportOutbox.pendingCount() > 0) this.scheduleReportRepair();
     this.deletedWorktreeId = worktreeId;
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
-    if (
-      this.messageCallbacks.pendingCallbackCount() === 0 &&
-      this.reportOutbox.pendingCount() === 0
-    )
-      await this.ctx.storage.deleteAlarm();
+    try {
+      this.ctx.storage.transactionSync(() => this.worktreeChanges.purge());
+    } finally {
+      if (
+        this.messageCallbacks.pendingCallbackCount() === 0 &&
+        this.reportOutbox.pendingCount() === 0
+      )
+        await this.ctx.storage.deleteAlarm();
+    }
     if (!metadata) return null;
     return cloudAgentWorktreeLocationSchema.parse({
       sandboxId: metadata.workspace?.sandboxId,
@@ -2467,7 +2478,6 @@ export class SandboxSession extends DurableObject<Env> {
     const records = this.ctx.storage.transactionSync(() => {
       if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const records = this.terminalLifecycle.beginDeletion(metadata);
-      this.worktreeChanges.purge();
       if (preparing?.wrapperInstanceId && preparing.deliveryRetryScope !== 'message' && metadata) {
         this.retainRuntimeCleanup(metadata, preparing.wrapperInstanceId, 'preparation_interrupted');
       }
@@ -2479,14 +2489,36 @@ export class SandboxSession extends DurableObject<Env> {
     for (const ws of this.ctx.getWebSockets('stream')) {
       ws.close(1000, 'session access revoked');
     }
-    if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
-    else await this.interruptDeletedMessage(metadata, accepted);
-    await this.terminalLifecycle.cleanupSession(metadata, records);
+    const errors: unknown[] = [];
+    try {
+      this.ctx.storage.transactionSync(() => this.worktreeChanges.purge());
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
+      else await this.interruptDeletedMessage(metadata, accepted);
+      await this.terminalLifecycle.cleanupSession(metadata, records);
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, 'Session cleanup failed');
     await this.ingestPublicationChain.catch(() => undefined);
     if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     const callbacksPending = this.messageCallbacks.pendingCallbackCount() > 0;
     const reportsPending = this.reportOutbox.pendingCount() > 0;
     if (!callbacksPending && !reportsPending) await this.ctx.storage.deleteAlarm();
+    const sandboxId = metadata?.workspace?.sandboxId;
+    if (sandboxId && metadata) {
+      try {
+        await sandboxControlRpc(this.env, sandboxId).forgetSessionReference(
+          metadata.identity.sessionId
+        );
+      } catch {
+        // Tombstone remains; over-blocking is safe.
+      }
+    }
     this.ctx.storage.transactionSync(() => {
       if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const pendingCleanup = this.pendingRuntimeCleanup();

@@ -450,7 +450,7 @@ describe('runNeedsInputInteraction', () => {
       expect(createManager).not.toHaveBeenCalled();
     });
 
-    it('returns unavailable when no matching request appears in the budget and sends nothing', async () => {
+    it('returns unavailable when no raise of either kind appears in the budget and sends nothing', async () => {
       const fake = createFakeManager();
       const ack = vi.fn<(kiloSessionId: string) => void>();
 
@@ -467,7 +467,7 @@ describe('runNeedsInputInteraction', () => {
       expect(fake.destroy).toHaveBeenCalledTimes(1);
     });
 
-    it('returns unavailable when the raise does not match the action', async () => {
+    it('returns retryable when the raise does not match the action, so the raise keeps its actions', async () => {
       const approveFake = createFakeManager({
         onSwitch: seeds => {
           seeds.store.set(seeds.activeQuestion, { requestId: 'question-1' });
@@ -478,26 +478,63 @@ describe('runNeedsInputInteraction', () => {
           seeds.store.set(seeds.activePermission, { requestId: 'perm-1' });
         },
       });
+      const approveAck = vi.fn<(kiloSessionId: string) => void>();
+      const replyAck = vi.fn<(kiloSessionId: string) => void>();
 
       const approveOnQuestion = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
         action: 'approve',
-        deps: fakeManagerDeps(approveFake),
+        deps: fakeManagerDeps(approveFake, { ack: approveAck }),
       });
       const replyOnPermission = await runNeedsInputInteraction({
         kiloSessionId: SESSION_ID,
         action: 'reply',
         text: 'answer',
-        deps: fakeManagerDeps(replyFake),
+        deps: fakeManagerDeps(replyFake, { ack: replyAck }),
       });
 
-      expect(approveOnQuestion).toBe('unavailable');
+      expect(approveOnQuestion).toBe('retryable');
       expect(approveFake.respondToPermission).not.toHaveBeenCalled();
-      expect(replyOnPermission).toBe('unavailable');
+      expect(approveAck).not.toHaveBeenCalled();
+      expect(replyOnPermission).toBe('retryable');
       expect(replyFake.answerQuestion).not.toHaveBeenCalled();
+      expect(replyAck).not.toHaveBeenCalled();
     });
 
-    it('returns unavailable for a reply with no answer text, before building a manager', async () => {
+    it('returns retryable when only the opposite kind is pending at the deadline, and sends nothing', async () => {
+      const fake = createFakeManager();
+      const clock = createFakeClock();
+      let seeded = false;
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        deps: {
+          createManager: () => fake.manager,
+          store: fake.store,
+          ack,
+          now: clock.now,
+          sleep: async ms => {
+            clock.advance(ms);
+            if (!seeded) {
+              seeded = true;
+              fake.store.set(fake.activeQuestion, { requestId: 'question-late' });
+            }
+          },
+          waitBudgetMs: WAIT_BUDGET_MS,
+          pollIntervalMs: POLL_INTERVAL_MS,
+        },
+      });
+
+      expect(outcome).toBe('retryable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(fake.answerQuestion).not.toHaveBeenCalled();
+      expect(ack).not.toHaveBeenCalled();
+      expect(fake.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns retryable for a reply with no answer text, before building a manager', async () => {
       const createManager = vi.fn();
 
       const outcome = await runNeedsInputInteraction({
@@ -507,8 +544,26 @@ describe('runNeedsInputInteraction', () => {
         deps: { createManager },
       });
 
-      expect(outcome).toBe('unavailable');
+      expect(outcome).toBe('retryable');
       expect(createManager).not.toHaveBeenCalled();
+    });
+
+    it('returns unavailable for a reply when neither kind is pending at the deadline', async () => {
+      const fake = createFakeManager();
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'reply',
+        text: 'answer',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('unavailable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(fake.answerQuestion).not.toHaveBeenCalled();
+      expect(ack).not.toHaveBeenCalled();
+      expect(fake.destroy).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -13,9 +13,11 @@
  *
  * Outcomes:
  * - `ok` — the matching raise was answered and acked.
- * - `retryable` — a transport / tRPC failure; the caller may offer a retry.
- * - `unavailable` — the session is gone (`NOT_FOUND`), no request matching the
- *   action appeared within the budget, or there was no answer text to send.
+ * - `retryable` — a transport / tRPC failure, or the tap carried no answer
+ *   while the raise is still live (blank reply text, or a pending raise of the
+ *   other kind): nothing was sent, so the caller may offer a retry.
+ * - `unavailable` — the session is gone (`NOT_FOUND`), or no raise of either
+ *   kind appeared within the budget.
  */
 
 import { type Atom, createStore } from 'jotai';
@@ -109,9 +111,10 @@ export async function runNeedsInputInteraction({
 }: NeedsInputInteractionInput): Promise<NeedsInputActionOutcome> {
   const replyText = text ?? '';
   // A reply with no answer text has nothing to send. Nothing is created and
-  // nothing is retried: the caller needs an answer before replying.
+  // the raise is untouched: the notification keeps its actions so the user can
+  // tap Reply again with text, so the outcome is retryable, not gone.
   if (action === 'reply' && replyText.trim() === '') {
-    return 'unavailable';
+    return 'retryable';
   }
 
   const now = deps?.now ?? Date.now;
@@ -152,8 +155,14 @@ export async function runNeedsInputInteraction({
         pollIntervalMs,
       });
       if (requestId === null) {
-        // No raise of this kind inside the budget: nothing was sent.
-        return 'unavailable';
+        // No raise of this kind inside the budget: nothing was sent. When the
+        // session instead holds a raise of the other kind, that raise is still
+        // live and untouched — the user tapped the wrong control — so the
+        // notification must keep its actions for a tap on the right one.
+        const oppositeRequest = store.get(
+          action === 'approve' ? manager.atoms.activeQuestion : manager.atoms.activePermission
+        );
+        return oppositeRequest === null ? 'unavailable' : 'retryable';
       }
       await (action === 'approve'
         ? manager.respondToPermission(requestId, 'once')

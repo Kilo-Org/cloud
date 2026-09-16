@@ -17,19 +17,23 @@ const AUTHENTICATE_ROUTE = '/api/auth/passkey/authenticate';
  * Why a passkey sign-in attempt did not produce a session.
  *
  * - `cancelled`: the ceremony did not finish (the user dismissed the sheet, the
- *   browser timed out, or the options request failed). The same button is a
- *   working retry.
+ *   browser timed out, or a request never reached the server). The same button
+ *   is a working retry.
+ * - `expired`: the server refused the assertion for a reason a fresh ceremony
+ *   resolves — the challenge expired, was already used, or did not match — or
+ *   the verify response was not one this client recognizes. Retrying mints a
+ *   new challenge, so the same button keeps working.
  * - `no_passkey`: the server refused the assertion because no passkey for this
  *   relying party belongs to the credential the authenticator offered. Retrying
  *   the same device cannot help; the other sign-in methods are the way out.
- * - `failed`: the ceremony completed but the server refused the assertion
- *   (replayed or expired challenge, signature that did not verify). Retrying the
- *   same passkey cannot help either.
+ * - `failed`: the assertion named a known passkey and the signature did not
+ *   verify against it. Retrying the same passkey cannot help either.
  *
  * A retryable failure must never be reported as a non-retryable one, and the
- * other way round: only `cancelled` keeps the button available for another try.
+ * other way round: `cancelled` and `expired` keep the button available for
+ * another try, `no_passkey` and `failed` do not.
  */
-export type PasskeySignInFailure = 'cancelled' | 'no_passkey' | 'failed';
+export type PasskeySignInFailure = 'cancelled' | 'expired' | 'no_passkey' | 'failed';
 
 export class PasskeySignInError extends Error {
   readonly failure: PasskeySignInFailure;
@@ -108,12 +112,22 @@ export async function runPasskeySignIn(callbackUrl: string): Promise<void> {
       if (body?.error === 'UNKNOWN_CREDENTIAL') {
         throw new PasskeySignInError('no_passkey');
       }
-      throw new PasskeySignInError('failed');
+      // A known passkey whose signature did not verify cannot be retried into a
+      // success on the same device.
+      if (body?.error === 'VERIFICATION_FAILED') {
+        throw new PasskeySignInError('failed');
+      }
+      // Everything else — an expired, replayed or mismatched challenge, and any
+      // refusal this client does not recognize — is resolved by a fresh
+      // ceremony, so the same button stays a working retry.
+      throw new PasskeySignInError('expired');
     }
 
     const { ticket } = (await verifyResponse.json()) as { ticket?: unknown };
     if (typeof ticket !== 'string') {
-      throw new PasskeySignInError('failed');
+      // A 2xx without a ticket refused nothing about the credential, so a new
+      // attempt can still succeed.
+      throw new PasskeySignInError('expired');
     }
 
     await signIn('passkey', { ticket, callbackUrl });

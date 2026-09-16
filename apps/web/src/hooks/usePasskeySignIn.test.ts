@@ -140,6 +140,39 @@ describe('runPasskeySignIn', () => {
     await expect(runPasskeySignIn('/next')).rejects.toMatchObject({ failure: 'failed' });
   });
 
+  // A stale or replayed challenge is fixed by minting a fresh one, so the same
+  // button is a working retry.
+  it.each(['CHALLENGE_EXPIRED', 'CHALLENGE_ALREADY_USED', 'WRONG_CHALLENGE'])(
+    'reports a retryable refusal when the server refuses the challenge with %s',
+    async error => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse({ challengeId: 'c', options: {} }))
+        .mockResolvedValueOnce(jsonResponse({ error }, false));
+      mockStartAuthentication.mockResolvedValue(ASSERTION);
+
+      await expect(runPasskeySignIn('/next')).rejects.toMatchObject({ failure: 'expired' });
+      expect(mockSignIn).not.toHaveBeenCalled();
+    }
+  );
+
+  it('reports a retryable refusal when the verify response carries an unknown error code', async () => {
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse({ challengeId: 'c', options: {} }))
+      .mockResolvedValueOnce(jsonResponse({ error: 'SOMETHING_NEW' }, false));
+    mockStartAuthentication.mockResolvedValue(ASSERTION);
+
+    await expect(runPasskeySignIn('/next')).rejects.toMatchObject({ failure: 'expired' });
+  });
+
+  it('reports a retryable refusal when a non-2xx verify response carries no body', async () => {
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse({ challengeId: 'c', options: {} }))
+      .mockResolvedValueOnce({ ok: false, json: async () => Promise.reject(new Error('no body')) });
+    mockStartAuthentication.mockResolvedValue(ASSERTION);
+
+    await expect(runPasskeySignIn('/next')).rejects.toMatchObject({ failure: 'expired' });
+  });
+
   it('reports a retryable refusal when the verify request cannot be sent', async () => {
     mockFetch
       .mockResolvedValueOnce(jsonResponse({ challengeId: 'c', options: {} }))
@@ -149,13 +182,13 @@ describe('runPasskeySignIn', () => {
     await expect(runPasskeySignIn('/next')).rejects.toMatchObject({ failure: 'cancelled' });
   });
 
-  it('reports a non-retryable refusal when the server returns no ticket', async () => {
+  it('reports a retryable refusal when the verify response is not the expected shape', async () => {
     mockFetch
       .mockResolvedValueOnce(jsonResponse({ challengeId: 'c', options: {} }))
       .mockResolvedValueOnce(jsonResponse({}));
     mockStartAuthentication.mockResolvedValue(ASSERTION);
 
-    await expect(runPasskeySignIn('/next')).rejects.toMatchObject({ failure: 'failed' });
+    await expect(runPasskeySignIn('/next')).rejects.toMatchObject({ failure: 'expired' });
   });
 
   it('reports a retryable refusal when the options payload is malformed', async () => {

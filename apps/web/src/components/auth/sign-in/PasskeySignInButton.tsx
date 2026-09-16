@@ -14,10 +14,18 @@ import { usePasskeySignIn, type PasskeySignInFailure } from '@/hooks/usePasskeyS
  */
 const FAILURE_MESSAGES: Record<PasskeySignInFailure, string> = {
   cancelled: 'Sign-in was cancelled or could not start. Try again.',
+  expired: 'That sign-in attempt expired. Try again.',
   no_passkey:
     'No passkey was found on this device. Sign in another way, then add one from Connected Accounts.',
   failed: 'That passkey could not sign you in. Use another sign-in method.',
 };
+
+/**
+ * The failures the same button can resolve. `cancelled` and `expired` are both
+ * fixed by starting a fresh ceremony; the other two name a passkey this device
+ * cannot use, so offering the button again would only fail the same way.
+ */
+const RETRYABLE_FAILURES = new Set<PasskeySignInFailure>(['cancelled', 'expired']);
 
 type PasskeySignInButtonProps = {
   /** Where the other providers land; the passkey path uses the same destination. */
@@ -37,7 +45,7 @@ export function PasskeySignInButton({ callbackUrl }: PasskeySignInButtonProps) {
   // Empty state: no `window.PublicKeyCredential`, so no dead control appears.
   if (!isSupported) return null;
 
-  const isRetryable = failure === null || failure === 'cancelled';
+  const isRetryable = failure === null || RETRYABLE_FAILURES.has(failure);
 
   return (
     <div className="space-y-2">

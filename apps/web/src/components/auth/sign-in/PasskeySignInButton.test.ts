@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 const mockHookResult: {
   isSupported: boolean;
   isPending: boolean;
-  failure: 'cancelled' | 'no_passkey' | 'failed' | null;
+  failure: 'cancelled' | 'expired' | 'no_passkey' | 'failed' | null;
   signInWithPasskey: () => Promise<void>;
 } = {
   isSupported: true,
@@ -62,6 +62,15 @@ describe('PasskeySignInButton', () => {
 
     expect(html).toContain('Sign in with a passkey');
     expect(html).toContain('Sign-in was cancelled or could not start. Try again.');
+    expect(html).toContain('role="alert"');
+  });
+
+  it('keeps the button available after an expired or replayed challenge', () => {
+    mockHookResult.failure = 'expired';
+    const html = render();
+
+    expect(html).toContain('Sign in with a passkey');
+    expect(html).toContain('That sign-in attempt expired. Try again.');
     expect(html).toContain('role="alert"');
   });
 

@@ -779,7 +779,7 @@
     "previewFullDescription": "As notificacións mostran o texto da mensaxe na pantalla de bloqueo.",
     "previewGenericDescription": "As notificacións indican que houbo actividade. Abre Kilo para ver os detalles.",
     "channel": {
-      "agent": "Sesións de axente",
+      "agentProgress": "Progreso do axente",
       "chat": "Mensaxes de conversa",
       "kiloclaw": "Actividade de KiloClaw",
       "balance": "Alertas de saldo",

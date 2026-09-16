@@ -787,7 +787,7 @@
     "previewFullDescription": "Paziņojumos ir redzams ziņojuma teksts arī bloķēšanas ekrānā.",
     "previewGenericDescription": "Paziņojumi informē par jaunu notikumu. Atver Kilo, lai izlasītu ziņojumu.",
     "channel": {
-      "agent": "Aģenta sesijas",
+      "agentProgress": "Aģenta norise",
       "chat": "Tērzēšanas ziņojumi",
       "kiloclaw": "KiloClaw darbība",
       "balance": "Brīdinājumi par atlikumu",

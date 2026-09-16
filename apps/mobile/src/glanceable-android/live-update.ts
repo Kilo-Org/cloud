@@ -3,12 +3,16 @@ import {
   glanceableAgentsSnapshotSchema,
   isEligibleGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type AndroidNotificationChannelId } from '@kilocode/notifications';
 import { requireOptionalNativeModule } from 'expo';
 
 /**
  * JS wrapper over the local `ActiveAgentsLiveUpdate` native module. The native
- * side owns the notification id, the channel, and the promotion gate; the JS
- * side owns the translated copy and the revision guard (see android-sink).
+ * side owns the notification id and the promotion gate; the JS side owns the
+ * translated copy, the notification kind's channel, the alert decision, and the
+ * revision guard (see android-sink). Channel creation stays on the JS side too:
+ * `ensureAndroidNotificationChannels` in `@/lib/notifications` owns the names,
+ * importance, and Do Not Disturb override.
  */
 
 type LiveUpdateNativeModule = {
@@ -18,6 +22,8 @@ type LiveUpdateNativeModule = {
     text: string,
     openAgentsLabel: string,
     compactText: string | null,
+    channelId: AndroidNotificationChannelId,
+    alerting: boolean,
     promotion: boolean
   ): void;
   update(
@@ -25,6 +31,8 @@ type LiveUpdateNativeModule = {
     text: string,
     openAgentsLabel: string,
     compactText: string | null,
+    channelId: AndroidNotificationChannelId,
+    alerting: boolean,
     promotion: boolean,
     timeoutMs: number
   ): void;
@@ -48,9 +56,19 @@ export function start(
   title: string,
   text: string,
   openAgentsLabel: string,
-  compactText: string | null
+  compactText: string | null,
+  channelId: AndroidNotificationChannelId,
+  alerting: boolean
 ): void {
-  nativeModule?.start(title, text, openAgentsLabel, compactText, isPromotionCapable());
+  nativeModule?.start(
+    title,
+    text,
+    openAgentsLabel,
+    compactText,
+    channelId,
+    alerting,
+    isPromotionCapable()
+  );
 }
 
 // eslint-disable-next-line max-params -- translated bridge fields plus the native terminal timeout
@@ -59,9 +77,20 @@ export function update(
   text: string,
   openAgentsLabel: string,
   compactText: string | null,
+  channelId: AndroidNotificationChannelId,
+  alerting: boolean,
   timeoutMs = 0
 ): void {
-  nativeModule?.update(title, text, openAgentsLabel, compactText, isPromotionCapable(), timeoutMs);
+  nativeModule?.update(
+    title,
+    text,
+    openAgentsLabel,
+    compactText,
+    channelId,
+    alerting,
+    isPromotionCapable(),
+    timeoutMs
+  );
 }
 
 export function end(): void {

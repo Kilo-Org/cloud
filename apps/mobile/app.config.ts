@@ -1,10 +1,15 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
 import { SUPPORTED_LANGUAGES } from './src/i18n/languages.ts';
+import {
+  buildFocusFilterLocales,
+  buildFocusFilterStringsFiles,
+} from './src/i18n/focus-filter-locales.ts';
 import { buildPermissionPromptLocales } from './src/i18n/permission-prompt-locales.ts';
 // Prebuild-time native copy, not app copy — see the widget gallery precedent in
 // plugins/withWidgetLocalizations.js. Kept in plugins/ so the runtime i18next
 // catalogs (src/i18n/locales) stay free of non-runtime strings.
+import FOCUS_FILTER_COPY from './plugins/focus-filter-copy.json';
 import PERMISSION_PROMPT_COPY from './plugins/permission-prompt-copy.json';
 // The widget gallery's own copy. Native bundle metadata, not app copy — see
 // plugins/withWidgetLocalizations.js.
@@ -66,6 +71,26 @@ const googleSignInPlugins: NonNullable<ExpoConfig['plugins']> = googleIosUrlSche
   ? [['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }]]
   : [];
 
+// Prebuild-time native copy, one `ios` entry per supported language. Expo's
+// built-in `withLocales` plugin writes the usage-description keys into
+// `<tag>.lproj/InfoPlist.strings` and the special `Localizable.strings` entry
+// into `<tag>.lproj/Localizable.strings`, which is where the out-of-process
+// Focus filter resolves its title, description, and parameter label. The
+// prompt copy keys by plist key and the filter copy keys by the English literal
+// its Swift intent carries, so the two merge into one map per language. Expo
+// registers the Localizable.strings file but writes its keys bare, so
+// `withFocusFilterLocalizations` replaces the content with the quoted catalog
+// below.
+const permissionLocales = buildPermissionPromptLocales(PERMISSION_PROMPT_COPY);
+const focusFilterLocales = buildFocusFilterLocales(FOCUS_FILTER_COPY);
+const focusFilterCatalog = buildFocusFilterStringsFiles(FOCUS_FILTER_COPY);
+const nativeLocales: ExpoConfig['locales'] = Object.fromEntries(
+  SUPPORTED_LANGUAGES.map(tag => [
+    tag,
+    { ios: { ...permissionLocales[tag].ios, ...focusFilterLocales[tag].ios } },
+  ])
+);
+
 const config: ExpoConfig = {
   name: 'Kilo',
   owner: 'kilocode',
@@ -81,14 +106,16 @@ const config: ExpoConfig = {
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
   userInterfaceStyle: 'automatic',
-  // Per-locale Info.plist overrides for the five iOS permission usage
-  // descriptions. Expo's built-in `withLocales` writes a
-  // `<tag>.lproj/InfoPlist.strings` per tag at prebuild; the plugin options
-  // below stay as the base Info.plist value. `ios`-nested so Android's
-  // `withLocales` resolves each tag to nothing. The location copy spells the
-  // app name out: `.lproj` strings are not build-expanded, so the upstream
-  // `$(PRODUCT_NAME)` would render literally there.
-  locales: buildPermissionPromptLocales(PERMISSION_PROMPT_COPY),
+  // Per-locale native strings. Expo's built-in `withLocales` writes a
+  // `<tag>.lproj/InfoPlist.strings` per tag at prebuild from the
+  // usage-description keys (the plugin options below stay as the base Info.plist
+  // value) and a `<tag>.lproj/Localizable.strings` from the Focus-filter copy,
+  // whose content `withFocusFilterLocalizations` then rewrites.
+  // `ios`-nested so Android's `withLocales` resolves each tag to nothing. The
+  // location copy spells the app name out: `.lproj` strings are not
+  // build-expanded, so the upstream `$(PRODUCT_NAME)` would render literally
+  // there.
+  locales: nativeLocales,
   ios: {
     // iOS 18+ appearance variants. `light` is the existing icon unchanged; `dark` keeps the
     // canonical mobile brand yellow on a dark backdrop; `tinted` is grayscale because iOS
@@ -110,6 +137,12 @@ const config: ExpoConfig = {
       // production environment still attests, it just uses Apple's dev servers
       // when the app is signed with a development profile.
       'com.apple.developer.devicecheck.appattest-environment': 'production',
+      // Needs-input pushes are sent with the `time-sensitive` interruption
+      // level so they break through Do Not Disturb and a Focus. iOS grants
+      // that level only to an app entitled to it, and the same capability must
+      // be enabled on the App ID (`com.kilocode.kiloapp`) in the Apple
+      // Developer portal for a provisioning profile to include it.
+      'com.apple.developer.usernotifications.time-sensitive': true,
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -154,6 +187,17 @@ const config: ExpoConfig = {
       'android.permission.READ_MEDIA_VIDEO',
       'android.permission.READ_MEDIA_AUDIO',
     ],
+    // Android drops a channel's app-requested `bypassDnd` unless the app has Do
+    // Not Disturb policy access: AOSP resets bypassDnd to false when
+    // NotificationManagerService reports hasDndAccess false, and the user-facing
+    // Do Not Disturb access list (Settings > Special app access) is built from
+    // exactly the packages holding this normal-protection marker permission. The
+    // user grants that system row; only then does the needs-input channel's
+    // `bypassDnd: true` (src/lib/notifications.ts) survive, and the next launch
+    // re-asserts it because `ensureAndroidNotificationChannels()` runs at
+    // startup (src/app/_layout.tsx). Deliberately no in-app screen or prompt:
+    // the system owns this choice.
+    permissions: ['android.permission.ACCESS_NOTIFICATION_POLICY'],
     intentFilters: [
       {
         action: 'VIEW',
@@ -344,6 +388,22 @@ const config: ExpoConfig = {
           },
         ],
       },
+    ],
+    // The iOS notification service extension that drops an agent-progress push
+    // the active Focus excluded. The foreground handler in
+    // src/lib/notifications.ts cannot see a background delivery, so this
+    // extension is the delivery path the per-Focus choice holds on. The server
+    // marks exactly the pushes it may drop with `mutable-content`
+    // (iosMutableContentForPushData in @kilocode/notifications). Appears in
+    // PlugIns as Kilo's extension, and reads the same app group as the widget.
+    ['./plugins/withNotificationFocusFilter', { appGroupIdentifier: 'group.com.kilocode.kiloapp' }],
+    // Replaces the Focus-filter `Localizable.strings` `withLocales` registered
+    // with the quoted, escaped catalog iOS can parse. A finalized mod runs after
+    // every other iOS mod, so the replacement is the last write. See the plugin
+    // for why Expo's own writer cannot ship.
+    [
+      './plugins/withFocusFilterLocalizations',
+      { languages: [...SUPPORTED_LANGUAGES], files: focusFilterCatalog },
     ],
     // Local Expo module for Android Live Updates (no-op until slice `and`).
     './plugins/withActiveAgentsLiveUpdate',

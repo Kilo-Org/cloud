@@ -779,7 +779,7 @@
     "previewFullDescription": "सूचनांमध्ये तुमच्या लॉक स्क्रीनवर संदेशाचा मजकूर दिसतो.",
     "previewGenericDescription": "सूचनांमध्ये फक्त काहीतरी घडल्याचे कळते. संदेश वाचण्यासाठी Kilo उघडा.",
     "channel": {
-      "agent": "एजंटची सत्रे",
+      "agentProgress": "एजंटची प्रगती",
       "chat": "चॅटमधील संदेश",
       "kiloclaw": "KiloClaw मधील घडामोडी",
       "balance": "शिल्लक रकमेच्या सूचना",

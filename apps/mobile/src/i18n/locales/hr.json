@@ -787,7 +787,7 @@
     "previewFullDescription": "Obavijesti prikazuju tekst poruke na zaključanom zaslonu.",
     "previewGenericDescription": "Obavijesti samo javljaju da se nešto dogodilo. Otvori Kilo za prikaz sadržaja.",
     "channel": {
-      "agent": "Sesije agenata",
+      "agentProgress": "Napredak agenata",
       "chat": "Poruke u razgovoru",
       "kiloclaw": "Aktivnost u KiloClawu",
       "balance": "Upozorenja o stanju računa",

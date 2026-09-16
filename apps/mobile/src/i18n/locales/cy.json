@@ -811,7 +811,7 @@
     "previewFullDescription": "Mae hysbysiadau'n dangos testun y neges ar eich sgrin clo.",
     "previewGenericDescription": "Mae hysbysiadau'n dangos bod rhywbeth wedi digwydd. Agorwch Kilo i'w ddarllen.",
     "channel": {
-      "agent": "Sesiynau asiant",
+      "agentProgress": "Cynnydd asiant",
       "chat": "Negeseuon sgwrs",
       "kiloclaw": "Gweithgaredd KiloClaw",
       "balance": "Rhybuddion balans",

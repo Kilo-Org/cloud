@@ -795,7 +795,7 @@
     "previewFullDescription": "Upozornenia zobrazujú text správy na uzamknutej obrazovke.",
     "previewGenericDescription": "Upozornenia oznámia novú udalosť bez zobrazenia obsahu. Správu si prečítaš v aplikácii Kilo.",
     "channel": {
-      "agent": "Relácie agentov",
+      "agentProgress": "Priebeh agenta",
       "chat": "Správy v čete",
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornenia na zostatok",

@@ -110,6 +110,12 @@ const config: ExpoConfig = {
       // production environment still attests, it just uses Apple's dev servers
       // when the app is signed with a development profile.
       'com.apple.developer.devicecheck.appattest-environment': 'production',
+      // Needs-input pushes are sent with the `time-sensitive` interruption
+      // level so they break through Do Not Disturb and a Focus. iOS grants
+      // that level only to an app entitled to it, and the same capability must
+      // be enabled on the App ID (`com.kilocode.kiloapp`) in the Apple
+      // Developer portal for a provisioning profile to include it.
+      'com.apple.developer.usernotifications.time-sensitive': true,
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,

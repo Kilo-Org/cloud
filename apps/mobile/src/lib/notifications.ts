@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 import * as Sentry from '@sentry/react-native';
 import {
+  agentNotificationKindForPushData,
   ANDROID_NOTIFICATION_CHANNELS,
   type AndroidNotificationChannelId,
   type PushData,
@@ -43,6 +44,7 @@ import { chainSave } from '@/lib/hooks/save-chain';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
+import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
 import { notificationPathForData } from './notification-path';
 
 const easConfigSchema = z.object({ projectId: z.string().min(1) });
@@ -311,6 +313,17 @@ export function setupNotificationHandler() {
           }, 0);
         }
         return { ...suppressed, shouldSetBadge: applied };
+      }
+
+      // A per-Focus choice covers agent progress only. The glanceable carrier
+      // above already returned (it must still reach the sinks), and anything
+      // the user has not excluded stays visible.
+      if (
+        data &&
+        agentNotificationKindForPushData(data) === 'progress' &&
+        !isAgentProgressAllowedInActiveFocus()
+      ) {
+        return suppressed;
       }
 
       if (

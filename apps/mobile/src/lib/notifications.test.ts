@@ -57,6 +57,7 @@ const mocks = vi.hoisted(() => ({
   defineTask: vi.fn(),
   registerTaskAsync: vi.fn(),
   captureEvent: vi.fn(),
+  requireNativeModule: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -68,6 +69,10 @@ vi.mock('react-native', () => ({
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),
   },
 }));
+
+// The Focus filter reads through `requireNativeModule`; the per-test return
+// value stands in for what the active iOS Focus stored.
+vi.mock('expo', () => ({ requireNativeModule: mocks.requireNativeModule }));
 
 vi.mock('expo-notifications', () => ({
   setBadgeCountAsync: mocks.setBadgeCountAsync,
@@ -219,6 +224,7 @@ beforeEach(() => {
   mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
   mocks.requestPermissionsAsync.mockResolvedValue({ status: 'denied' });
   mocks.getExpoPushTokenAsync.mockResolvedValue({ data: 'expo-token' });
+  mocks.requireNativeModule.mockReturnValue({ isAgentProgressAllowed: () => true });
   mocks.lastResponse = null;
   mocks.listeners.clear();
   mocks.clearLastNotificationResponse.mockImplementation(() => {
@@ -804,6 +810,119 @@ describe('glanceable app badge sink', () => {
     });
     await flushMicrotasks();
     expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2], [3]]);
+  });
+});
+
+// The registered foreground handler, as `setupNotificationHandler` passes it to
+// expo-notifications.
+type ForegroundHandler = (notification: { request: { content: { data: unknown } } }) => Promise<{
+  shouldPlaySound: boolean;
+  shouldSetBadge: boolean;
+  shouldShowBanner: boolean;
+  shouldShowList: boolean;
+}>;
+
+async function loadForegroundHandler(): Promise<ForegroundHandler> {
+  const loaded = await loadNotifications();
+  loaded.setupNotificationHandler();
+  const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as
+    | { handleNotification: ForegroundHandler }
+    | undefined;
+  if (!registration) {
+    throw new Error('The foreground notification handler was not registered');
+  }
+  return registration.handleNotification;
+}
+
+const SUPPRESSED_BEHAVIOR = {
+  shouldPlaySound: false,
+  shouldSetBadge: false,
+  shouldShowBanner: false,
+  shouldShowList: false,
+};
+const SHOWN_BEHAVIOR = {
+  shouldPlaySound: true,
+  shouldSetBadge: true,
+  shouldShowBanner: true,
+  shouldShowList: true,
+};
+
+const progressPush = {
+  type: 'cloud_agent_session',
+  cliSessionId: 'session-1',
+  category: 'status',
+};
+const needsInputPush = {
+  type: 'cloud_agent_session',
+  cliSessionId: 'session-1',
+  category: 'attention',
+};
+
+describe('per-Focus agent-progress suppression', () => {
+  it('suppresses an agent-progress push on iOS when the active Focus excludes it', async () => {
+    mocks.platform.OS = 'ios';
+    mocks.requireNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { data: progressPush } } })
+    ).resolves.toEqual(SUPPRESSED_BEHAVIOR);
+  });
+
+  it('shows an agent-progress push on iOS when the active Focus allows it', async () => {
+    mocks.platform.OS = 'ios';
+    mocks.requireNativeModule.mockReturnValue({ isAgentProgressAllowed: () => true });
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { data: progressPush } } })
+    ).resolves.toEqual(SHOWN_BEHAVIOR);
+  });
+
+  it('never suppresses a needs-input push, even when the Focus excludes progress', async () => {
+    mocks.platform.OS = 'ios';
+    mocks.requireNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { data: needsInputPush } } })
+    ).resolves.toEqual(SHOWN_BEHAVIOR);
+  });
+
+  it('does not consult the native Focus module on Android', async () => {
+    mocks.platform.OS = 'android';
+    mocks.requireNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { data: progressPush } } })
+    ).resolves.toEqual(SHOWN_BEHAVIOR);
+    expect(mocks.requireNativeModule).not.toHaveBeenCalled();
+  });
+
+  it('never suppresses the glanceable carrier under an excluding Focus', async () => {
+    mocks.platform.OS = 'ios';
+    mocks.requireNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
+    const loaded = await loadNotifications();
+    loaded.persist._setLastGlanceableSnapshotForTests(glanceableSnapshot({ needsInput: 2 }));
+    mockSecureStoreKeys();
+    loaded.setupNotificationHandler();
+    const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
+      handleNotification: ForegroundHandler;
+    };
+
+    // needsInput 0 is the progress kind, exactly what the Focus excluded; the
+    // carrier must still reach the sinks instead of being dropped.
+    const behavior = await registration.handleNotification({
+      request: {
+        content: {
+          data: activeGlanceablePush({ updatedAt: '2026-01-02T00:00:00.000Z', needsInput: 0 }),
+        },
+      },
+    });
+
+    expect(behavior.shouldSetBadge).toBe(true);
+    expect(mocks.refreshActiveSessionsFromPush).toHaveBeenCalledOnce();
   });
 });
 

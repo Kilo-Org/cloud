@@ -243,6 +243,7 @@ export function createSessionFixture(
     attachSession: vi.fn(async () => ({})),
     bindRuntimeCredentialProxyHandle: vi.fn(async () => ({ bound: true as const })),
     detachSession: vi.fn(async () => ({ existed: true })),
+    forgetSessionReference: vi.fn(async () => undefined),
     quarantineRuntime: vi.fn(
       async (
         _input: Parameters<Control['quarantineRuntime']>[0]

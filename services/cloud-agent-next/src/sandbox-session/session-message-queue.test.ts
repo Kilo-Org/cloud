@@ -5651,6 +5651,17 @@ describe('SandboxSession orchestration', () => {
     );
   });
 
+  it('does not block session deletion on a stalled reference-forget RPC', async () => {
+    const fixture = sessionFixture();
+    fixture.control.forgetSessionReference.mockImplementation(() => new Promise(() => {}));
+    const deletion = fixture.session.deleteSession();
+    await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
+    await deletion;
+    await fixture.flush();
+    expect(fixture.control.forgetSessionReference).toHaveBeenCalledTimes(1);
+    expect(await fixture.session.getMetadata()).toBeNull();
+  });
+
   it.each(['completed', 'failed', 'cancelled'] as const)(
     'settles an early %s outcome once without resurrecting work on acknowledgement',
     async status => {

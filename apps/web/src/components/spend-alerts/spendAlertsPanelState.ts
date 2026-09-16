@@ -43,6 +43,7 @@ export const SPEND_ALERTS_LOAD_ERROR = "Couldn't load spend alerts.";
 export const SPEND_ALERTS_SAVE_ERROR = "Couldn't save spend alerts.";
 export const SPEND_ALERTS_FORBIDDEN = "You don't have permission to manage spend alerts.";
 export const SPEND_ALERTS_OFF_IN_NOTIFICATIONS = 'Off in Notifications';
+export const SPEND_ALERTS_PUSH_NEEDS_DEVICE = 'Get the mobile app';
 export const SPEND_ALERTS_OFF_COPY =
   "Spend alerts are off. Turn them on to alert this scope's billing contacts.";
 export const SPEND_ALERTS_SAVED = 'Spend alert settings saved';
@@ -50,12 +51,15 @@ export const THRESHOLD_FIELD_ERROR = 'Enter a limit over 0 and at most 1,000,000
 export const MULTIPLIER_FIELD_ERROR = 'Enter a spike multiplier between 1x and 50x.';
 
 /**
- * Deep link into the mobile app's notification settings, where this account's
- * spend-alerts push category lives. The app registers the `kiloapp` scheme
- * (`apps/mobile/app.config.ts`) and serves the screen at `/notifications`
- * (`apps/mobile/src/app/(app)/(tabs)/(3_profile)/notifications.tsx`).
+ * Where the web panel sends a viewer to fix a blocked push channel: the Kilo
+ * mobile app page, which installs the app whose notification settings own the
+ * spend-alerts category and whose device registration push delivery needs.
+ *
+ * A browser URL on purpose. The mobile app's own surface can deep-link to its
+ * notification settings (`kiloapp:///notifications`), but on a desktop browser
+ * that scheme is a dead end; the web remedy has to resolve over http(s).
  */
-export const MOBILE_NOTIFICATION_SETTINGS_HREF = 'kiloapp:///notifications';
+export const MOBILE_APP_SETUP_HREF = 'https://kilo.ai/mobile';
 
 /** One rule as the router returns it: USD threshold, basis-point multiplier. */
 export type SpendAlertRuleWire = {
@@ -78,6 +82,12 @@ export type SpendAlertsQueryData = {
   canManage: boolean;
   /** The viewer's own mobile notification category, the push delivery gate. */
   pushCategoryEnabled: boolean;
+  /**
+   * True when the viewer has no registered mobile device, so push cannot reach
+   * them whatever the category says (`isPushChannelBlocked` in
+   * `apps/web/src/routers/spend-alert-router.ts`).
+   */
+  pushChannelBlocked: boolean;
   enabled?: boolean;
   rules?: SpendAlertRuleWire[];
 };
@@ -159,9 +169,7 @@ function formatMultiplierInput(basisPoints: number): string {
 export function hasSettingsRow(data: SpendAlertsQueryData): boolean {
   return (data.rules ?? []).some(
     rule =>
-      rule.threshold !== null ||
-      rule.windowHours !== null ||
-      rule.multiplierBasisPoints !== null
+      rule.threshold !== null || rule.windowHours !== null || rule.multiplierBasisPoints !== null
   );
 }
 
@@ -257,10 +265,12 @@ export function toSaveInput(draft: SpendAlertsDraft): SpendAlertValidation {
 }
 
 /**
- * Whether a rule's push would actually reach this viewer. Mirrors
+ * Whether a rule's push passes the viewer's own category gate. Mirrors
  * `effectivePushFor` in `apps/web/src/lib/spend-alerts/settings.ts` (s3) — that
  * module is `server-only` (it opens the database), so the client panel cannot
- * import it and keeps the one-line rule here instead.
+ * import it and keeps the one-line rule here instead. A registered device is
+ * the other half of delivery; that gate blocks every rule and is the
+ * `pushChannelBlocked` input of {@link pushChannelNote}.
  */
 export function effectivePushFor(
   viewerCategoryEnabled: boolean,
@@ -270,22 +280,47 @@ export function effectivePushFor(
 }
 
 export type ChannelAgreement = {
+  /** Short reason the push control is not effective; rendered as the link text. */
   message: string;
+  /** Browser-resolvable destination that fixes it. */
   href: string;
 };
 
 /**
- * The agreement note for a rule's push row: shown only when the rule asks for
- * push but the viewer's own mobile category is off, so the control reads as
- * effective either way. `null` when push is effective (or not wanted).
+ * The note beside a rule's push row, whenever push would not reach the viewer.
+ *
+ * - No registered device: push cannot reach them whatever the rule says, so
+ *   every row's switch is disabled and each one says where to register one.
+ * - A registered device but the viewer's own mobile category off: the rule's
+ *   push is stored, not delivered, so the rows that ask for push say so.
+ *
+ * Both remedies live in the mobile app, and both hrefs resolve in a browser:
+ * the web spend view has no notification settings of its own, so it must not
+ * send the viewer to the mobile-only `kiloapp://` scheme. `null` when push is
+ * effective or not wanted — the control reads as effective either way.
  */
 export function pushChannelNote(
   viewerCategoryEnabled: boolean,
+  pushChannelBlocked: boolean,
   rule: Pick<SpendAlertRuleDraft, 'pushEnabled'>
 ): ChannelAgreement | null {
-  if (effectivePushFor(viewerCategoryEnabled, rule)) return null;
-  if (!rule.pushEnabled) return null;
-  return { message: SPEND_ALERTS_OFF_IN_NOTIFICATIONS, href: MOBILE_NOTIFICATION_SETTINGS_HREF };
+  if (pushChannelBlocked) {
+    return { message: SPEND_ALERTS_PUSH_NEEDS_DEVICE, href: MOBILE_APP_SETUP_HREF };
+  }
+  if (rule.pushEnabled && !effectivePushFor(viewerCategoryEnabled, rule)) {
+    return { message: SPEND_ALERTS_OFF_IN_NOTIFICATIONS, href: MOBILE_APP_SETUP_HREF };
+  }
+  return null;
+}
+
+/**
+ * Whether a rule's push switch is unusable. Two reasons, both ending in the
+ * note above: the panel is showing its read-only empty-state rules, or the
+ * viewer has no registered device — a push choice that could never be
+ * delivered, so the panel must not record one and report it as enabled.
+ */
+export function pushControlDisabled(panelDisabled: boolean, pushChannelBlocked: boolean): boolean {
+  return panelDisabled || pushChannelBlocked;
 }
 
 export type SpendAlertsPanelView =

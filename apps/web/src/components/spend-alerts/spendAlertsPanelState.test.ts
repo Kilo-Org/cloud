@@ -1,10 +1,11 @@
 import {
   MAX_THRESHOLD_USD,
-  MOBILE_NOTIFICATION_SETTINGS_HREF,
+  MOBILE_APP_SETUP_HREF,
   MULTIPLIER_FIELD_ERROR,
   SPEND_ALERTS_FORBIDDEN,
   SPEND_ALERTS_LOAD_ERROR,
   SPEND_ALERTS_OFF_IN_NOTIFICATIONS,
+  SPEND_ALERTS_PUSH_NEEDS_DEVICE,
   SPEND_ALERTS_SAVE_ERROR,
   THRESHOLD_FIELD_ERROR,
   derivePanelView,
@@ -12,6 +13,7 @@ import {
   hasSettingsRow,
   panelControlsVisible,
   pushChannelNote,
+  pushControlDisabled,
   toDraft,
   toSaveInput,
   type SpendAlertRuleDraft,
@@ -49,6 +51,7 @@ function queryData(overrides: Partial<SpendAlertsQueryData> = {}): SpendAlertsQu
   return {
     canManage: true,
     pushCategoryEnabled: true,
+    pushChannelBlocked: false,
     enabled: true,
     rules: [],
     ...overrides,
@@ -108,7 +111,7 @@ describe('derivePanelView states', () => {
       {
         isLoading: false,
         isError: false,
-        data: { canManage: false, pushCategoryEnabled: true },
+        data: { canManage: false, pushCategoryEnabled: true, pushChannelBlocked: false },
       },
       undefined,
       idleMutation
@@ -121,7 +124,7 @@ describe('derivePanelView states', () => {
       {
         isLoading: false,
         isError: false,
-        data: { canManage: true, pushCategoryEnabled: true },
+        data: { canManage: true, pushCategoryEnabled: true, pushChannelBlocked: false },
       },
       undefined,
       idleMutation
@@ -235,17 +238,38 @@ describe('channel agreement note', () => {
     expect(effectivePushFor(true, quietRule)).toBe(false);
   });
 
-  it('points at the app notification settings when a rule wants push but the category is off', () => {
-    expect(pushChannelNote(false, pushRule)).toEqual({
+  it('offers a browser-resolvable remedy when a rule wants push but the category is off', () => {
+    expect(pushChannelNote(false, false, pushRule)).toEqual({
       message: SPEND_ALERTS_OFF_IN_NOTIFICATIONS,
-      href: MOBILE_NOTIFICATION_SETTINGS_HREF,
+      href: MOBILE_APP_SETUP_HREF,
     });
   });
 
+  it('points at the mobile app on every rule when the viewer has no device', () => {
+    for (const rule of [pushRule, quietRule]) {
+      expect(pushChannelNote(true, true, rule)).toEqual({
+        message: SPEND_ALERTS_PUSH_NEEDS_DEVICE,
+        href: MOBILE_APP_SETUP_HREF,
+      });
+    }
+  });
+
+  it('never sends the web panel to the mobile-only app scheme', () => {
+    expect(MOBILE_APP_SETUP_HREF.startsWith('https://')).toBe(true);
+  });
+
+  it('disables the push control on every rule when the viewer has no device', () => {
+    expect(pushControlDisabled(false, true)).toBe(true);
+    expect(pushControlDisabled(false, false)).toBe(false);
+    // The empty state's read-only rules disable it too.
+    expect(pushControlDisabled(true, false)).toBe(true);
+    expect(pushControlDisabled(true, true)).toBe(true);
+  });
+
   it('stays silent when push is effective or unwanted', () => {
-    expect(pushChannelNote(true, pushRule)).toBeNull();
-    expect(pushChannelNote(false, quietRule)).toBeNull();
-    expect(pushChannelNote(true, quietRule)).toBeNull();
+    expect(pushChannelNote(true, false, pushRule)).toBeNull();
+    expect(pushChannelNote(false, false, quietRule)).toBeNull();
+    expect(pushChannelNote(true, false, quietRule)).toBeNull();
   });
 });
 
@@ -412,11 +436,16 @@ describe('saved settings vs the never-configured empty state', () => {
   const savedButOff: SpendAlertsQueryData = {
     canManage: true,
     pushCategoryEnabled: true,
+    pushChannelBlocked: false,
     enabled: false,
     rules: savedRules,
   };
 
-  const neverConfigured: SpendAlertsQueryData = { canManage: true, pushCategoryEnabled: true };
+  const neverConfigured: SpendAlertsQueryData = {
+    canManage: true,
+    pushCategoryEnabled: true,
+    pushChannelBlocked: false,
+  };
 
   it('reads a scope that has never saved as having no settings row', () => {
     expect(hasSettingsRow(neverConfigured)).toBe(false);

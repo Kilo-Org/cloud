@@ -30,6 +30,7 @@ import {
   derivePanelView,
   panelControlsVisible,
   pushChannelNote,
+  pushControlDisabled,
   toDraft,
   toSaveInput,
   type SpendAlertFieldErrors,
@@ -209,6 +210,7 @@ export function SpendAlertsPanel({ organizationId, callerRole }: SpendAlertsPane
             disabled={!controlsVisible}
             errors={validation.errors}
             pushCategoryEnabled={query.data?.pushCategoryEnabled ?? true}
+            pushChannelBlocked={query.data?.pushChannelBlocked ?? false}
             onChange={patch => updateRule(rule.kind, patch)}
           />
         ))}
@@ -252,6 +254,8 @@ type RuleEditorProps = {
   disabled: boolean;
   errors: SpendAlertFieldErrors;
   pushCategoryEnabled: boolean;
+  /** The viewer has no registered device, so no push can be delivered. */
+  pushChannelBlocked: boolean;
   onChange: (patch: Partial<SpendAlertRuleDraft>) => void;
 };
 
@@ -261,10 +265,16 @@ function RuleEditor({
   disabled,
   errors,
   pushCategoryEnabled,
+  pushChannelBlocked,
   onChange,
 }: RuleEditorProps) {
   const isThreshold = rule.kind === 'threshold';
-  const channelNote = disabled ? null : pushChannelNote(pushCategoryEnabled, rule);
+  // Push with nowhere to deliver: the row disables its switch and the note is
+  // that switch's explanation, so the reason is never hidden.
+  const pushDisabled = pushControlDisabled(disabled, pushChannelBlocked);
+  const channelNote = disabled
+    ? null
+    : pushChannelNote(pushCategoryEnabled, pushChannelBlocked, rule);
   // A disabled rule is not being edited, so its bounds are not the caller's
   // problem yet: only an editable field reports what is wrong with it.
   const fieldError = disabled ? undefined : isThreshold ? errors.threshold : errors.multiplier;
@@ -373,7 +383,7 @@ function RuleEditor({
               id={`${id}-push`}
               checked={rule.pushEnabled}
               onCheckedChange={pushEnabled => onChange({ pushEnabled })}
-              disabled={disabled}
+              disabled={pushDisabled}
             />
             <Label htmlFor={`${id}-push`} className="font-normal">
               Push
@@ -381,6 +391,8 @@ function RuleEditor({
             {channelNote && (
               <a
                 href={channelNote.href}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="type-label text-muted-foreground hover:text-foreground inline-flex items-center gap-1 underline underline-offset-2"
               >
                 <ExternalLink className="size-3.5" aria-hidden="true" />

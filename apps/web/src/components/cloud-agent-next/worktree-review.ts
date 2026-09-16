@@ -603,11 +603,9 @@ export function rebaseWorktreeReviewCommentsForFile(
     if (comment.anchor.capture.sourceCloudAgentSessionId !== capture.sourceCloudAgentSessionId) {
       return [comment];
     }
-    if (!diff) {
-      return sameWorktreeReviewCapture(comment.anchor.capture, capture) ? [comment] : [];
-    }
+    if (!diff) return [comment];
     const next = rebaseWorktreeReviewComment(comment, capture, file, diff);
-    return next ? [next] : [];
+    return next ? [next] : [comment];
   });
 }
 

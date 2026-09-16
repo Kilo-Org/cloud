@@ -1063,4 +1063,72 @@ describe('worktree review rendering readiness', () => {
     act(() => root.unmount());
     dom.cleanup();
   });
+
+  it('keeps a stale comment at its original capture when its quote cannot be rebased', () => {
+    const replaced: Array<readonly WorktreeReviewComment[]> = [];
+    const stale = comment('stale-quote');
+    stale.anchor.capture = { ...capture, revision: capture.revision - 1 };
+    stale.anchor.quote.lines = stale.anchor.quote.lines.map(line => ({
+      ...line,
+      text: 'missing from the new capture\n',
+    }));
+    const review: WorktreeFileReviewBindings = Object.freeze({
+      comments: Object.freeze([stale]),
+      editor: null,
+      onEditorChange() {
+        assert.fail('Rebasing comments must not change the editor.');
+      },
+      onSaveEditor() {
+        assert.fail('Rebasing comments must not save comments.');
+      },
+      onRemoveComment() {
+        assert.fail('Rebasing comments must not remove comments.');
+      },
+      onReplacePathComments(_path, comments) {
+        replaced.push(comments);
+      },
+    });
+    const dom = installDom();
+    const root: Root = createRoot(dom.container);
+    act(() => {
+      root.render(
+        createElement(WorktreeReviewEditor, {
+          file,
+          diff,
+          capture,
+          review,
+          renderStatus: 'ready',
+          children() {
+            return null;
+          },
+        })
+      );
+    });
+    assert.deepEqual(replaced, []);
+    assert.equal(stale.anchor.capture.revision, capture.revision - 1);
+    act(() => root.unmount());
+    dom.cleanup();
+  });
+
+  it('keeps an editor whose quote cannot be rebased onto the current capture', () => {
+    const editors: Array<WorktreeFileReviewBindings['editor']> = [];
+    const stale = comment('stale-editor');
+    stale.anchor.capture = { ...capture, revision: capture.revision - 1 };
+    stale.anchor.quote.lines = stale.anchor.quote.lines.map(line => ({
+      ...line,
+      text: 'missing from the new capture\n',
+    }));
+    const editor = { anchor: stale.anchor, text: 'Unsaved feedback' };
+    const mounted = mountReview('ready', editor, next => editors.push(next));
+    assert.deepEqual(editors, []);
+    assert.equal(editor.text, 'Unsaved feedback');
+    assert.equal(
+      mounted.props.lineAnnotations?.some(annotation =>
+        annotation.metadata.some(item => item.kind === 'editor')
+      ),
+      false
+    );
+    act(() => mounted.root.unmount());
+    mounted.dom.cleanup();
+  });
 });

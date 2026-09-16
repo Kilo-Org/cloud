@@ -85,6 +85,11 @@ export function WorktreeReviewDialog({
           <WorktreeReviewList
             comments={draft.comments}
             compact
+            editor={draft.editor}
+            editorError={draft.error}
+            editorDisabled={Boolean(review.disabledReason)}
+            onEditorChange={review.setEditor}
+            onSaveEditor={review.saveEditor}
             onOpenComment={comment => onOpenComment(comment)}
           />
         </div>

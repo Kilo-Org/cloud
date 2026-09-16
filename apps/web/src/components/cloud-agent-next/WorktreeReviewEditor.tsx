@@ -143,17 +143,15 @@ export function WorktreeReviewEditor({
     if (!editor || editor.anchor.path !== file.path) return;
     if (sameWorktreeReviewCapture(editor.anchor.capture, stableCapture)) return;
     if (renderStatus !== 'ready') return;
-    if (!diff || unavailableReason) {
-      reviewRef.current.onEditorChange(null);
-      return;
-    }
+    if (!diff || unavailableReason) return;
     const next = rebaseWorktreeReviewComment(
       { id: editor.commentId ?? 'editor', anchor: editor.anchor, text: editor.text || '.' },
       stableCapture,
       file,
       diff
     );
-    reviewRef.current.onEditorChange(next ? { ...editor, anchor: next.anchor } : null);
+    if (!next) return;
+    reviewRef.current.onEditorChange({ ...editor, anchor: next.anchor });
   }, [diff, editor, file, renderStatus, stableCapture, unavailableReason]);
 
   useEffect(

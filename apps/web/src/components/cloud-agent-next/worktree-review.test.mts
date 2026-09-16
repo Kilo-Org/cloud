@@ -794,7 +794,7 @@ describe('worktree review rebase', () => {
     assert.equal(next.find(comment => comment.id === reviewed.id)?.anchor.capture.revision, 4);
   });
 
-  it('does not drop another-source comments when the current file diff is missing', () => {
+  it('keeps every comment at its original capture when the current file diff is missing', () => {
     const source = fixture();
     const reviewed = comment();
     const otherCapture = { ...capture, sourceCloudAgentSessionId: 'another-source' };
@@ -810,9 +810,29 @@ describe('worktree review rebase', () => {
     );
     assert.deepEqual(
       next.map(comment => comment.id),
-      ['other']
+      ['comment-one', 'other']
     );
-    assert.equal(next[0]?.anchor.capture.sourceCloudAgentSessionId, 'another-source');
+    assert.equal(next[0]?.anchor.capture.revision, capture.revision);
+    assert.equal(next[1]?.anchor.capture.sourceCloudAgentSessionId, 'another-source');
+  });
+
+  it('keeps a comment at its original capture when the range text no longer matches', () => {
+    const source = fixture();
+    const reviewed = comment();
+    const nextCapture = { ...capture, revision: 4, capturedAt: '2026-09-01T11:00:00Z' };
+    const changed = {
+      ...source.diff,
+      additionLines: source.diff.additionLines.map(() => 'different\n'),
+    };
+    const next = rebaseWorktreeReviewCommentsForFile(
+      [reviewed],
+      nextCapture,
+      { ...source.file, revision: 4 },
+      changed
+    );
+    assert.equal(next.length, 1);
+    assert.equal(next[0]?.id, reviewed.id);
+    assert.deepEqual(next[0]?.anchor.capture, reviewed.anchor.capture);
   });
 });
 

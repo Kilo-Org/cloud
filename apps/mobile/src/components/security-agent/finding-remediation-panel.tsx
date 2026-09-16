@@ -28,7 +28,6 @@ import {
   useStartSecurityRemediation,
 } from '@/lib/hooks/use-security-remediation';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -180,7 +179,7 @@ export function FindingRemediationPanel({
   const openPullRequest = (url: string) => {
     const destination = resolveCodeReviewerOpenPrDestination(url, prReviewEnabled);
     if (destination.kind === 'in-app') {
-      router.push(getPrReviewPath(destination.owner, destination.repo, destination.number));
+      router.push(destination.href);
       return;
     }
     void openExternalUrl(url, { label: t('common.pullRequest') });

@@ -26,7 +26,3 @@ export function getCodeReviewerProfilePath(scope: string): Href {
 export function getPrReviewEntryPath(): Href {
   return '/(app)/pr-review' as Href;
 }
-
-export function getPrReviewPath(owner: string, repo: string, number: number): Href {
-  return `/(app)/pr-review/${owner}/${repo}/${number}` as Href;
-}

@@ -206,8 +206,11 @@ export async function runPendingWidgetActions(
 
 /**
  * Subscribe the live path and sweep once at startup. The root layout imports
- * this on both platforms; iOS owns the registration, and the sweep itself is
- * guarded to iOS too.
+ * this on both platforms. Only iOS has the App Intent widget extension whose
+ * press marker rides the `expo-widgets` timeline, so the registration and the
+ * sweep stay guarded to the platform that has the capability; Android runs the
+ * same action from the widget host's headless task
+ * (`glanceable-android/register.ts`).
  */
 export function registerWidgetActionHandling(): void {
   if (Platform.OS !== 'ios') {

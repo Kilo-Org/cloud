@@ -4,12 +4,12 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import * as Crypto from 'expo-crypto';
-import * as SecureStore from 'expo-secure-store';
 
 import { detectRepositoryPlatform } from '@/components/agents/new-session-repository-state';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
 import { buildActiveSessionsTrayInput, isAttentionStatus } from '@/lib/active-sessions-live';
+import { readStoredValue } from '@/lib/auth/secure-store-value';
 import { contextKey, parseStoredModelPreference } from '@/lib/hooks/agent-model-preference';
 import { clearDraft, isStringDraft, loadDraft, NEW_SESSION_DRAFT_KEY } from '@/lib/persist/drafts';
 import {
@@ -39,8 +39,12 @@ import {
  *
  * The scope (personal vs organization) comes from SecureStore, exactly as
  * `components/agents/mobile-session-manager.ts` picks org-scoped procedures
- * from the selected organization. `trpcClient` reads the stored token headlessly
- * through `getAuthTokenForRequest`, so a task with no Activity can authenticate.
+ * from the selected organization. `expo-secure-store` exists on both iOS and
+ * Android, so neither platform lacks the capability and no per-platform storage
+ * branch is kept: every read goes through `readStoredValue`, the app's one
+ * cross-platform entry point, the same one `lib/glanceable/scope` reads.
+ * `trpcClient` reads the stored token headlessly through
+ * `getAuthTokenForRequest`, so a task with no Activity can authenticate.
  */
 
 export type WidgetAction = 'approve' | 'new-agent';
@@ -167,8 +171,8 @@ export function oldestPendingPermissionId(permissions: readonly unknown[]): stri
 
 async function readStoredScope(): Promise<WidgetScope> {
   const [organizationId, userId] = await Promise.all([
-    SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY),
-    SecureStore.getItemAsync(ACTIVE_USER_ID_KEY),
+    readStoredValue(ORGANIZATION_STORAGE_KEY),
+    readStoredValue(ACTIVE_USER_ID_KEY),
   ]);
   return { organizationId: organizationId ?? null, userId: userId ?? null };
 }
@@ -297,7 +301,7 @@ async function resolveRecentRepository(
 async function readPersistedModel(
   organizationId: string | null
 ): Promise<{ model: string; variant: string } | null> {
-  const raw = await SecureStore.getItemAsync(AGENT_MODEL_PREFERENCE_KEY);
+  const raw = await readStoredValue(AGENT_MODEL_PREFERENCE_KEY);
   const entry = parseStoredModelPreference(raw)[contextKey(organizationId ?? undefined)];
   return entry ?? null;
 }

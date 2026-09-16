@@ -1,8 +1,9 @@
 /* eslint-disable max-lines -- one cohesive headless-action suite sharing the trpcClient harness */
-import * as SecureStore from 'expo-secure-store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+
+import { readStoredValue } from '@/lib/auth/secure-store-value';
 
 import {
   type GlanceableSink,
@@ -43,14 +44,10 @@ vi.mock('./cleanup', () => ({
   isGlanceableOrgLost: () => mocks.orgLost,
 }));
 
-vi.mock('expo-secure-store', () => ({
-  getItemAsync: vi.fn(async (key: string) => {
+vi.mock('@/lib/auth/secure-store-value', () => ({
+  readStoredValue: vi.fn(async (key: string) => {
     await Promise.resolve();
     return mocks.secure.get(key) ?? null;
-  }),
-  setItemAsync: vi.fn(async (key: string, value: string) => {
-    await Promise.resolve();
-    mocks.secure.set(key, value);
   }),
 }));
 
@@ -264,7 +261,7 @@ describe('runWidgetAction', () => {
 
   it('reports failed, not a rejection, when the stored scope cannot be read', async () => {
     wireTrpc({ sessions: [{ id: 'waiting', status: 'permission' }] });
-    vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain locked'));
+    vi.mocked(readStoredValue).mockRejectedValueOnce(new Error('keychain locked'));
 
     // A rejected read used to escape the container and leave the widget on its
     // progress line, because nothing settled the action's own line.

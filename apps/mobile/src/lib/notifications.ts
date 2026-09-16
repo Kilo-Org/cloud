@@ -43,6 +43,7 @@ import { chainSave } from '@/lib/hooks/save-chain';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
+import { BACKGROUND_NOTIFICATION_TASK } from './notification-background-task';
 import {
   handleNeedsInputNotificationResponse,
   isNeedsInputActionIdentifier,
@@ -340,8 +341,6 @@ export function setupNotificationHandler() {
   });
 }
 
-const GLANCEABLE_BACKGROUND_TASK = 'active-agents-glanceable-background-task';
-
 // Expo wraps the data payload of a background notification in a JSON string on
 // both platforms; decode that envelope before parsing the push data itself.
 const headlessTaskDataSchema = z.object({ dataString: z.string() });
@@ -439,9 +438,24 @@ async function handleBackgroundNotificationTask(
     : Notifications.BackgroundNotificationTaskResult.NoData;
 }
 
+/**
+ * Executor entry for the background notification task, exported for
+ * `notification-background-task.ts`, whose task executor lazy-loads this module
+ * when a task fires (a headless start evaluates only the app entry, so this
+ * graph must not load at entry). Loads the glanceable sinks — a fresh headless
+ * process has none registered — then dispatches.
+ */
+// eslint-disable-next-line promise-function-async -- passthrough dispatch: the executor is the async boundary
+export function runBackgroundNotificationTask(
+  body: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>
+): Promise<Notifications.BackgroundNotificationTaskResult> {
+  ensureGlanceableSinksLoaded();
+  return handleBackgroundNotificationTask(body);
+}
+
 async function registerBackgroundNotificationTask(): Promise<void> {
   try {
-    await Notifications.registerTaskAsync(GLANCEABLE_BACKGROUND_TASK);
+    await Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
   } catch (error) {
     Sentry.captureException(error, {
       tags: {
@@ -458,13 +472,19 @@ async function registerBackgroundNotificationTask(): Promise<void> {
  * killed, and a notification response (an Approve / Reply tap with the app
  * closed) is dispatched headless. One name only: the native side delivers a
  * response to every registered consumer, so a second name would run the action
- * twice. `defineTask` must run at module scope of the root layout, not inside a
- * React effect.
+ * twice.
+ *
+ * The same task name is also defined and registered from the app entry
+ * (`notification-background-task.ts`, executor lazy-loading this module): a
+ * headless JS start — an action tap with the app closed — evaluates only the
+ * entry and never this module, so the entry must define the task too or the
+ * app-closed path never runs. Both definitions overwrite the same name, and
+ * the native registration is idempotent.
  */
 export function setupNotificationBackgroundHandler(): void {
   ensureGlanceableSinksLoaded();
   TaskManager.defineTask<Notifications.NotificationTaskPayload>(
-    GLANCEABLE_BACKGROUND_TASK,
+    BACKGROUND_NOTIFICATION_TASK,
     handleBackgroundNotificationTask
   );
   void registerBackgroundNotificationTask();

@@ -580,3 +580,69 @@ describe('handleNeedsInputNotificationResponse — default action', () => {
     expect(mocks.clearLastNotificationResponse).not.toHaveBeenCalled();
   });
 });
+
+describe('handleNeedsInputNotificationResponse — one interaction per tap', () => {
+  it('shares one interaction when a warm-background tap arrives through both the listener and the headless task', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+    // Expo delivers the same response twice with the app alive in the
+    // background: once to the JS response listener, once to the registered
+    // background task — two separately deserialized objects with one OS
+    // identity (notification identifier + action).
+    const first = handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+    const second = handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+
+    expect(firstResult).toBe(true);
+    expect(secondResult).toBe(true);
+    expect(mocks.runNeedsInputInteraction).toHaveBeenCalledTimes(1);
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers a later tap on the replaced notification again after the first settles', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+
+    // The retryable result replaces the raise under the same identifier with
+    // the actions kept, so a second tap carries the same OS identity — and
+    // must run again.
+    await handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+    await handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+
+    expect(mocks.runNeedsInputInteraction).toHaveBeenCalledTimes(2);
+  });
+
+  it('deduplicates concurrent dispatches of every needs-input action id, not only approve', async () => {
+    for (const actionIdentifier of [
+      NEEDS_INPUT_ACTION_IDS.approve,
+      NEEDS_INPUT_ACTION_IDS.reply,
+      NEEDS_INPUT_ACTION_IDS.openPr,
+      NEEDS_INPUT_ACTION_IDS.openSession,
+    ]) {
+      mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+      // One tap per action id: the iterations must run sequentially so each
+      // key's dispatches stay in flight together and never overlap another id.
+      // eslint-disable-next-line no-await-in-loop -- sequential per-action-id taps
+      await Promise.all([
+        handleNeedsInputNotificationResponse(raiseResponse({ actionIdentifier }), {
+          runInteraction: mocks.runNeedsInputInteraction,
+        }),
+        handleNeedsInputNotificationResponse(raiseResponse({ actionIdentifier }), {
+          runInteraction: mocks.runNeedsInputInteraction,
+        }),
+      ]);
+    }
+
+    // One interaction per action id: approve once, reply once; the two opens
+    // never reach the runner.
+    expect(mocks.runNeedsInputInteraction).toHaveBeenCalledTimes(2);
+  });
+});

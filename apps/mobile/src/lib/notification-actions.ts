@@ -158,10 +158,60 @@ const headlessStringDataSchema = z.string();
  * `notificationPathForData` goes into the pending slot, the gated consumer in
  * `_layout.tsx` owns every navigation. Returns true when one of our four ids
  * dispatched, so the headless task can distinguish handled actions from taps.
+ *
+ * With the app alive in the background, Expo hands the same response to both
+ * the JS response listener and the registered background task
+ * (ExpoHandlingDelegate.handleNotificationResponse), so one tap can arrive
+ * twice. Concurrent dispatches of one response share the first interaction;
+ * once it settles, a later tap — on the replaced result notification — is
+ * answered again.
  */
-export async function handleNeedsInputNotificationResponse(
+// eslint-disable-next-line promise-function-async -- passthrough dispatch: one interaction per tap shares an in-flight promise
+export function handleNeedsInputNotificationResponse(
   response: Notifications.NotificationResponse,
   deps: NeedsInputActionDeps = {}
+): Promise<boolean> {
+  const key = actionDispatchKey(response);
+  if (key === null) {
+    return dispatchNeedsInputResponse(response, deps);
+  }
+  const inFlight = inFlightActionDispatches.get(key);
+  if (inFlight) {
+    return inFlight;
+  }
+  const dispatch = trackActionDispatch(key, dispatchNeedsInputResponse(response, deps));
+  inFlightActionDispatches.set(key, dispatch);
+  return dispatch;
+}
+
+// One interaction per tap: the in-flight dispatch for each OS response, keyed
+// by its notification identifier and action. Entries are removed on settle so
+// a retry tap on the replaced notification runs again.
+const inFlightActionDispatches = new Map<string, Promise<boolean>>();
+
+/** The OS identity of a response, or null for identifiers outside our four actions. */
+function actionDispatchKey(response: Notifications.NotificationResponse): string | null {
+  if (!isNeedsInputActionIdentifier(response.actionIdentifier)) {
+    return null;
+  }
+  return `${response.notification.request.identifier}:${response.actionIdentifier}`;
+}
+
+/** Forget the in-flight dispatch once it settles, without disturbing its result. */
+async function trackActionDispatch(key: string, dispatch: Promise<boolean>): Promise<boolean> {
+  try {
+    const result = await dispatch;
+    inFlightActionDispatches.delete(key);
+    return result;
+  } catch (error) {
+    inFlightActionDispatches.delete(key);
+    throw error;
+  }
+}
+
+async function dispatchNeedsInputResponse(
+  response: Notifications.NotificationResponse,
+  deps: NeedsInputActionDeps
 ): Promise<boolean> {
   const data = parseResponseData(response);
 

@@ -102,14 +102,20 @@ class KiloLauncherSurfacesModule : Module() {
     shortcutManager().setDynamicShortcuts(shortcuts)
   }
 
-  private fun shortcut(id: String, label: String?, url: String): ShortcutInfo =
-    ShortcutInfo.Builder(context, id)
-      .setShortLabel(label ?: id)
-      .setLongLabel(label ?: id)
-      .setIcon(Icon.createWithResource(context, R.drawable.kilo_launcher_surfaces_shortcut))
-      .setLongLived(true)
-      .setIntent(actionIntent(context, url))
-      .build()
+  private fun shortcut(id: String, label: String?, url: String): ShortcutInfo {
+    val builder =
+      ShortcutInfo.Builder(context, id)
+        .setShortLabel(label ?: id)
+        .setLongLabel(label ?: id)
+        .setIcon(Icon.createWithResource(context, R.drawable.kilo_launcher_surfaces_shortcut))
+        .setIntent(actionIntent(context, url))
+    // setLongLived(boolean) is API 29: unguarded it throws NoSuchMethodError on an
+    // API 25-28 device and the whole shortcut publish (and the tile refresh) is lost.
+    if (Build.VERSION.SDK_INT >= 29) {
+      builder.setLongLived(true)
+    }
+    return builder.build()
+  }
 
   private fun shortcutManager(): ShortcutManager =
     context.getSystemService(Context.SHORTCUT_SERVICE) as ShortcutManager

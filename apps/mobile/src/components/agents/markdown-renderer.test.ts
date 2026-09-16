@@ -635,8 +635,9 @@ describe('MarkdownRenderer empty fence mounting', () => {
     if (!mounted) {
       throw new Error('renderer was not created');
     }
-    // The real CodeBlock renders its mono Text with no token runs; the mount
-    // itself is the regression guard for an empty fence.
+    // An empty fence collapses: it has no line to draw, so the real CodeBlock
+    // mounts no mono Text for it. The accessible host is what proves the real
+    // CodeBlock mounted (the stubbed module renders no host).
     const codeTexts = mounted.root.findAll(
       node => {
         const className = propOf(node, 'className');
@@ -648,7 +649,9 @@ describe('MarkdownRenderer empty fence mounting', () => {
       },
       { deep: true }
     );
-    expect(codeTexts).toHaveLength(1);
+    expect(codeTexts).toHaveLength(0);
+    const hosts = mounted.root.findAll(node => propOf(node, 'accessible') === true, { deep: true });
+    expect(hosts).toHaveLength(1);
 
     await act(async () => {
       await Promise.resolve();

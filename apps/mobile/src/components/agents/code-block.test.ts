@@ -547,6 +547,16 @@ describe('CodeBlock', () => {
     await unmount(renderer);
   });
 
+  it('collapses an empty fence instead of drawing a blank code line', async () => {
+    // Regression: the blank-line placeholder keeps a blank source line's line
+    // box inside its chunk. An empty fence has no line at all, so the
+    // placeholder drew a blank code line the fence never had: an empty fence
+    // collapses.
+    const renderer = await mount(blockElement({ code: '', language: null, selectable: false }));
+    expect(codeLines(renderer.root)).toHaveLength(0);
+    await unmount(renderer);
+  });
+
   it('applies tokenColorFor to tagged runs and baseColor to the line text', async () => {
     const baseColor = '#112233';
     const renderer = await mount(blockElement({ baseColor }));

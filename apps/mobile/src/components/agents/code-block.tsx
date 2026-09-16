@@ -210,8 +210,12 @@ function CodeBlockImpl({
   const { t } = useTranslation();
   const isDark = colors.background === '#0E0E10';
   const { displayText, isTruncated } = prepareMonoScrollContent(code, maxLength);
+  // An empty fence draws no code line. `BLANK_CODE_LINE` (below) keeps a blank
+  // SOURCE line's box inside its chunk, but an empty fence — a streamed fence
+  // before its first token, or an empty one — has no line to keep, so the
+  // placeholder would draw a blank code line the fence never had.
   const tokenLines = useMemo(
-    () => tokenizeCodeLines(displayText, language),
+    () => (displayText.length === 0 ? [] : tokenizeCodeLines(displayText, language)),
     [displayText, language]
   );
   // Memoized so the chunk array keeps its identity and the code content below

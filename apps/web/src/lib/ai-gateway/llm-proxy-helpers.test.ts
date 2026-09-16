@@ -1070,29 +1070,6 @@ describe('makeErrorReadable', () => {
     expect(result).toBeUndefined();
   });
 
-  it('redacts errors for experiment provider', async () => {
-    const response = Response.json(
-      { error: { message: 'Internal experiment failure' } },
-      { status: 500 }
-    );
-
-    const result = await makeErrorReadable({
-      providerId: 'experiment',
-      requestedModel: 'experiment/test-model',
-      request,
-      response,
-      userByokProviderIds: null,
-    });
-
-    expect(result).toBeDefined();
-    expect(result?.status).toBe(500);
-    await expect(result?.json()).resolves.toEqual({
-      error: 'The upstream provider was unable to process the request',
-      error_type: 'upstream_error',
-      message: 'The upstream provider was unable to process the request',
-    });
-  });
-
   it('redacts errors for stealth models', async () => {
     const response = Response.json(
       { error: { message: 'Upstream vendor secret error' } },

@@ -9,12 +9,7 @@ const R2_CLI_SESSIONS_BUCKET_NAME = getEnvVariable('R2_CLI_SESSIONS_BUCKET_NAME'
 const CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME = getEnvVariable(
   'CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME'
 );
-// Per-environment buckets:
-//   dev:   kilo-experiment-prompts-dev
-//   prod:  kilo-experiment-prompts-prod
-// Optional: when unset, the experiment prompt-storage path is a no-op and
-// `model_experiment_request` rows record the `__failed__` sentinel for the
-// affected side. Experiment attribution still lands.
+// Optional historical model-experiment prompt archive.
 const R2_EXPERIMENT_PROMPTS_BUCKET_NAME = getEnvVariable('R2_EXPERIMENT_PROMPTS_BUCKET_NAME');
 
 if (!R2_ACCOUNT_ID) {

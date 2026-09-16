@@ -35,7 +35,6 @@ import {
   isDirectByokOnlyModel,
   isDraftDirty,
   isEligiblePoolModel,
-  isExperimentSelectorModel,
   mapPoolEntryDisplayStatus,
   modeEndpoint,
   NOT_SAVED_ENTRY_LABEL,
@@ -708,7 +707,7 @@ describe('tryAddPoolEntry', () => {
 // Eligibility
 // ---------------------------------------------------------------------------
 
-describe('isDirectByokOnlyModel / isExperimentSelectorModel / isEligiblePoolModel', () => {
+describe('isDirectByokOnlyModel / isEligiblePoolModel', () => {
   it('excludes direct-BYOK-only entries via hasUserByokAvailable + provider prefix', () => {
     expect(
       isDirectByokOnlyModel({
@@ -740,32 +739,6 @@ describe('isDirectByokOnlyModel / isExperimentSelectorModel / isEligiblePoolMode
     ).toBe(true);
   });
 
-  it('excludes experiment selector entries via zero pricing without isFree', () => {
-    const experiment = {
-      id: 'partner/preview-model',
-      isFree: undefined,
-      pricing: { prompt: '0.0000000' },
-    };
-    expect(isExperimentSelectorModel(experiment)).toBe(true);
-    expect(isEligiblePoolModel(experiment)).toBe(false);
-
-    // Managed free models set isFree: true and must stay eligible.
-    expect(
-      isExperimentSelectorModel({
-        id: 'openrouter/free-ish',
-        isFree: true,
-        pricing: { prompt: '0' },
-      })
-    ).toBe(false);
-    expect(
-      isEligiblePoolModel({
-        id: 'openrouter/free-ish',
-        isFree: true,
-        pricing: { prompt: '0' },
-      })
-    ).toBe(true);
-  });
-
   it('still excludes virtual and custom ids', () => {
     expect(isEligiblePoolModel({ id: 'anthropic/claude' })).toBe(true);
     expect(isEligiblePoolModel({ id: 'kilo-auto/efficient' })).toBe(false);
@@ -774,7 +747,7 @@ describe('isDirectByokOnlyModel / isExperimentSelectorModel / isEligiblePoolMode
 });
 
 describe('toEligibleModelOptions', () => {
-  it('excludes kilo-auto, custom LLM, BYOK-only, experiments, and pairs already in the draft', () => {
+  it('excludes kilo-auto, custom LLM, BYOK-only, and pairs already in the draft', () => {
     const options = toEligibleModelOptions(
       [
         { id: 'kilo-auto/efficient', name: 'Efficient' },
@@ -783,11 +756,6 @@ describe('toEligibleModelOptions', () => {
           id: 'chutes-byok/direct-only',
           name: 'Direct BYOK',
           hasUserByokAvailable: true,
-        },
-        {
-          id: 'partner/preview-model',
-          name: 'Experiment',
-          pricing: { prompt: '0.0000000' },
         },
         {
           id: 'anthropic/claude-sonnet-4',

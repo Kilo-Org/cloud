@@ -40,7 +40,7 @@ import {
   useSwapVariantVersion,
   useRotateApiKey,
 } from '@/app/admin/api/model-experiments/hooks';
-import { parseMetadataJson } from '@/lib/ai-gateway/experiments/metadata-json';
+import { parseMetadataJson } from '@/app/admin/model-experiments/metadata-json';
 import {
   type CustomLlmApiConfig,
   CustomLlmApiConfigSchema,

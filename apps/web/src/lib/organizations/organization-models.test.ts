@@ -29,7 +29,6 @@ const mockDecision = jest.fn(async (_policy: unknown, id: string) => ({
 }));
 const mockByok = jest.fn<Promise<OpenRouterModel[]>, [string]>();
 const mockCustom = jest.fn<Promise<OpenRouterModel[]>, [string, readonly string[]]>();
-const mockExperiments = jest.fn<Promise<OpenRouterModel[]>, []>();
 const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) => ['openai']);
 const mockAvailability = jest.fn(async (models: OpenRouterModel[], _providers: string[]) =>
   models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
@@ -64,9 +63,6 @@ jest.mock('@/lib/ai-gateway/custom-llm/listAvailableCustomLlms', () => ({
 }));
 jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForOrganization: mockByok,
-}));
-jest.mock('@/lib/ai-gateway/experiments/list-available-experiment-models', () => ({
-  listAvailableExperimentModels: mockExperiments,
 }));
 jest.mock('@/lib/ai-gateway/auto-model', () => ({ ORG_AUTO_MODEL: { id: 'kilo-auto/org' } }));
 jest.mock('@/lib/organizations/organization-auto-model', () => ({
@@ -195,7 +191,6 @@ beforeEach(async () => {
   mockCustom
     .mockReset()
     .mockResolvedValue([catalogModel('kilo-internal/private', { mayTrainOnYourPrompts: true })]);
-  mockExperiments.mockReset().mockResolvedValue([catalogModel('partner/experiment')]);
   [producer, cache, enkrypt] = await Promise.all([
     import('./organization-models'),
     import('@/lib/model-stats/model-stats-cache'),
@@ -348,7 +343,6 @@ describe('organization model producer publication', () => {
       expect(result.data[0].enkrypt?.lastCheckedAt).toBe(checkedAt);
       expect(result.data[2]).not.toHaveProperty('enkrypt');
     }
-    expect(mockExperiments).not.toHaveBeenCalled();
     expect(mockReadRows).toHaveBeenCalledTimes(1);
   });
 
@@ -364,17 +358,14 @@ describe('organization model producer publication', () => {
         mayTrainOnYourPrompts: true,
       });
       const byok = catalogModel('morph-byok/private', { enkrypt: raw, hasUserByokAvailable: true });
-      const experiment = catalogModel('partner/experiment', { enkrypt: raw });
       mockCustom.mockResolvedValue([custom]);
       mockByok.mockResolvedValue([byok]);
-      mockExperiments.mockResolvedValue([experiment]);
       const result = await resultFor();
       expect(result.data.some(model => model.id === 'provider/training')).toBe(
         mode !== 'teams-deny'
       );
-      expect(result.data.some(model => model.id === experiment.id)).toBe(mode === 'teams-allow');
       expect(result.data.some(model => model.id === 'provider/blocked')).toBe(false);
-      for (const input of [custom, byok, ...(mode === 'teams-allow' ? [experiment] : [])]) {
+      for (const input of [custom, byok]) {
         const expected = { ...input };
         delete expected.enkrypt;
         expect(result.data.find(model => model.id === input.id)).toEqual(expected);

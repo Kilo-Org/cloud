@@ -697,79 +697,6 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['google']);
   });
 
-  it('allows an explicitly granted model through an enterprise experiment', async () => {
-    mockedGetUserFromAuth.mockResolvedValue({
-      user: {
-        id: 'user-123',
-        google_user_email: 'test@example.com',
-        microdollars_used: 0,
-      } as User,
-      authFailedResponse: null,
-      organizationId: 'org-1',
-    });
-    mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
-      settings: { model_deny_list: ['openai/gpt-4o'] },
-      plan: 'enterprise',
-    });
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider: { ...provider, id: 'perplexity' },
-      userByok: null,
-      bypassAccessCheck: false,
-      experiment: {
-        experimentId: 'experiment-1',
-        variantId: 'variant-1',
-        variantVersionId: 'version-1',
-        allocationSubject: 'user',
-      },
-    });
-    mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
-
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeBody()) as never);
-
-    expect(response.status).toBe(200);
-  });
-
-  it('blocks an enterprise experiment outside the effective provider routes', async () => {
-    mockedGetUserFromAuth.mockResolvedValue({
-      user: {
-        id: 'user-123',
-        google_user_email: 'test@example.com',
-        microdollars_used: 0,
-      } as User,
-      authFailedResponse: null,
-      organizationId: 'org-1',
-    });
-    mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
-      settings: { provider_allow_list: ['openai'] },
-      plan: 'enterprise',
-    });
-    mockedGetProvider.mockResolvedValue({
-      kind: 'provider',
-      provider: { ...provider, id: 'perplexity' },
-      userByok: null,
-      bypassAccessCheck: false,
-      experiment: {
-        experimentId: 'experiment-1',
-        variantId: 'variant-1',
-        variantVersionId: 'version-1',
-        allocationSubject: 'user',
-      },
-    });
-    mockedGetEffectiveModelDecision.mockResolvedValue({
-      allowed: true,
-      eligibleProviderRoutes: new Set(['openai']),
-    });
-
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeBody()) as never);
-
-    expect(response.status).toBe(404);
-  });
-
   it('returns 404 when the OpenRouter model id is unknown', async () => {
     mockedIsValidOpenRouterModelId.mockResolvedValue(false);
 
@@ -923,33 +850,6 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
       abuse_delay: 6000,
       abuse_downgraded_from: null,
     });
-  });
-
-  it('applies delay before returning error when quarantine-3 model-override provider fails', async () => {
-    jest.useFakeTimers();
-    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-3'));
-    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-3'));
-    mockedGetProvider
-      .mockResolvedValueOnce({
-        kind: 'provider',
-        provider,
-        userByok: null,
-        bypassAccessCheck: false,
-      })
-      .mockResolvedValueOnce({ kind: 'not-found' });
-
-    const { POST } = await import('./route');
-    const responsePromise = POST(makeRequest(makeBody()) as never);
-
-    await jest.advanceTimersByTimeAsync(5999);
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-
-    await jest.advanceTimersByTimeAsync(1);
-    const response = await responsePromise;
-
-    expect(response.status).toBe(404);
-    expect(mockedGetProvider).toHaveBeenCalledTimes(2);
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it('applies delay before returning error when quarantine-3 override API kind is unsupported', async () => {

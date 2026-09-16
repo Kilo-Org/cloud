@@ -5,7 +5,7 @@
 
 /**
  * Public-id namespace prefixes for Kilo-owned models. These are reserved and
- * must not be claimed by partner experiment public ids or custom upstreams.
+ * must not be claimed by custom upstreams.
  *
  * The names look swapped but are intentional: Kilo Code (the extension) selects
  * Kilo-hosted models under `kilo/`, while KiloClaw selects them under

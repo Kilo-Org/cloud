@@ -42,6 +42,8 @@ import {
   organization_audit_logs,
   organization_recommendation_dismissals,
   magic_link_tokens,
+  passkey_credentials,
+  passkey_challenges,
   device_auth_requests,
   device_sessions,
   native_attested_keys,
@@ -1236,6 +1238,17 @@ export async function anonymizeCloudUserData(
     );
   await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
   await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
+  // Passkey credentials are PII: the credential id, public key and user-facing
+  // label identify the user's device. Drop any challenge still open for a
+  // ceremony so a deleted account cannot complete a pending registration or
+  // authentication. Usernameless challenges (kilo_user_id IS NULL) are not
+  // attributable to this user and expire on their own.
+  await tx.delete(passkey_credentials).where(eq(passkey_credentials.kilo_user_id, userId));
+  await tx
+    .delete(passkey_challenges)
+    .where(
+      and(eq(passkey_challenges.kilo_user_id, userId), isNull(passkey_challenges.consumed_at))
+    );
 
   // Remove from organizations
   await tx

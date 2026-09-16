@@ -785,6 +785,15 @@
       "balance": "Advarsler om saldo",
       "security": "Sikkerhedsfund"
     },
+    "action": {
+      "openSession": "Åbn session"
+    },
+    "needsInputAction": {
+      "approved": "Anmodning godkendt",
+      "replied": "Svar sendt",
+      "failed": "Kunne ikke svare. Tryk igen for at prøve igen.",
+      "unavailable": "Denne anmodning venter ikke længere."
+    },
     "category": {
       "chatMessagesSubtitle": "svar i dine samtaler",
       "agentAttentionTitle": "Agenten har brug for dig",

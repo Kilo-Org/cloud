@@ -785,6 +785,15 @@
       "balance": "Ngā matohi mō te toenga pūtea",
       "security": "Ngā kitenga haumarutanga"
     },
+    "action": {
+      "openSession": "Whakatuwheratia te wātū"
+    },
+    "needsInputAction": {
+      "approved": "Kua whakaaetia te tono",
+      "replied": "Kua tukuna te whakautu",
+      "failed": "Kāore i tutuki te whakautu. Pātia anō hei ngana anō.",
+      "unavailable": "Kāore te tono nei e tatari anō."
+    },
     "category": {
       "chatMessagesSubtitle": "ngā whakautu i ō kōrerorero",
       "agentAttentionTitle": "E hiahia ana te māngai ki a koe",

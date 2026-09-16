@@ -235,6 +235,15 @@
       "balance": "Avvisi sul saldo",
       "security": "Problemi di sicurezza"
     },
+    "action": {
+      "openSession": "Apri la sessione"
+    },
+    "needsInputAction": {
+      "approved": "Richiesta approvata",
+      "replied": "Risposta inviata",
+      "failed": "Impossibile rispondere. Tocca di nuovo per riprovare.",
+      "unavailable": "Questa richiesta non è più in attesa."
+    },
     "category": {
       "chatMessagesSubtitle": "risposte nelle tue conversazioni",
       "agentAttentionTitle": "L'agente ha bisogno di te",

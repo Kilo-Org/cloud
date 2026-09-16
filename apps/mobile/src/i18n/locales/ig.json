@@ -785,6 +785,15 @@
       "balance": "Ọkwa gbasara ego fọdụrụ",
       "security": "Ihe achọpụtara gbasara nchebe"
     },
+    "action": {
+      "openSession": "Mepee nnọkọ"
+    },
+    "needsInputAction": {
+      "approved": "Arịrịọ ahụ ekwenyere",
+      "replied": "Eziterela azịza",
+      "failed": "Enweghị ike izaghachi. Pịa ọzọ ka ị nwaa ọzọ.",
+      "unavailable": "Arịrịọ a anaghịzi eche."
+    },
     "category": {
       "chatMessagesSubtitle": "azịza na mkparịta ụka gị",
       "agentAttentionTitle": "Onye nnọchi anya chọrọ gị",

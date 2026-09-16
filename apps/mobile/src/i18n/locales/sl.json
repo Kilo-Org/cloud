@@ -801,6 +801,15 @@
       "balance": "Opozorila o stanju dobroimetja",
       "security": "Varnostne ugotovitve"
     },
+    "action": {
+      "openSession": "Odpri sejo"
+    },
+    "needsInputAction": {
+      "approved": "Zahteva odobrena",
+      "replied": "Odgovor poslan",
+      "failed": "Odgovoriti ni uspelo. Znova se dotaknite, da poskusite znova.",
+      "unavailable": "Ta zahteva ne čaka več."
+    },
     "category": {
       "chatMessagesSubtitle": "odgovori v tvojih pogovorih",
       "agentAttentionTitle": "Agent te potrebuje",

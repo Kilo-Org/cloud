@@ -785,6 +785,15 @@
       "balance": "Faɗakarwar ragowar kuɗi",
       "security": "Sakamakon binciken tsaro"
     },
+    "action": {
+      "openSession": "Buɗe zaman"
+    },
+    "needsInputAction": {
+      "approved": "An amince da buƙatar",
+      "replied": "An tura amsa",
+      "failed": "Ba a iya amsawa ba. Sake danna don sake gwadawa.",
+      "unavailable": "Wannan buƙatar ba ta jira ba."
+    },
     "category": {
       "chatMessagesSubtitle": "amsoshi a cikin tattaunawarka",
       "agentAttentionTitle": "Wakili yana buƙatar ka",

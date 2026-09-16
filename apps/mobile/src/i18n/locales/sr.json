@@ -793,6 +793,15 @@
       "balance": "Upozorenja o stanju kredita",
       "security": "Bezbednosni nalazi"
     },
+    "action": {
+      "openSession": "Otvori sesiju"
+    },
+    "needsInputAction": {
+      "approved": "Zahtev je odobren",
+      "replied": "Odgovor je poslat",
+      "failed": "Nije uspelo odgovoriti. Dodirnite ponovo da pokušate.",
+      "unavailable": "Ovaj zahtev više ne čeka."
+    },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",
       "agentAttentionTitle": "Agent te čeka",

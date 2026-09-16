@@ -785,6 +785,15 @@
       "balance": "بیلنس کی تنبیہات",
       "security": "شناخت شدہ سیکیورٹی مسائل"
     },
+    "action": {
+      "openSession": "سیشن کھولیں"
+    },
+    "needsInputAction": {
+      "approved": "درخواست منظور ہو گئی",
+      "replied": "جواب بھیج دیا گیا",
+      "failed": "جواب دینا ممکن نہیں ہو سکا۔ دوبارہ کوشش کے لیے دوبارہ ٹیپ کریں۔",
+      "unavailable": "یہ درخواست اب انتظار نہیں کر رہی۔"
+    },
     "category": {
       "chatMessagesSubtitle": "آپ کی گفتگو میں جوابات",
       "agentAttentionTitle": "ایجنٹ کو آپ کی ضرورت ہے",

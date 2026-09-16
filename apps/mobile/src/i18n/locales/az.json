@@ -785,6 +785,15 @@
       "balance": "Balans bildirişləri",
       "security": "Təhlükəsizlik problemləri"
     },
+    "action": {
+      "openSession": "Sessiyanı aç"
+    },
+    "needsInputAction": {
+      "approved": "Sorğu təsdiqləndi",
+      "replied": "Cavab göndərildi",
+      "failed": "Cavab vermək olmadı. Yenidən cəhd etmək üçün yenidən toxunun.",
+      "unavailable": "Bu sorğu artıq gözləmir."
+    },
     "category": {
       "chatMessagesSubtitle": "söhbətlərindəki cavablar",
       "agentAttentionTitle": "Agentin sənə ehtiyacı var",

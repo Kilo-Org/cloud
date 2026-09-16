@@ -83,6 +83,28 @@ export function notificationIdentifierForSession(kiloSessionId: string): string 
   return `needs-input:${kiloSessionId}`;
 }
 
+const IDENTIFIER_PREFIX = 'needs-input:';
+
+// The sessions whose app-owned needs-input notification is currently posted.
+// In-memory like the mount's notified set: a fresh process posts nothing until
+// the cached rows raise again, so a restart can only under-report (a duplicate
+// server push may show once), never suppress a raise that has no notification.
+const postedSessions = new Set<string>();
+
+/**
+ * Whether the app's own needs-input notification for this session is currently
+ * on screen. Read by the foreground handler to suppress the server's attention
+ * push — the app's notification is already the presentation.
+ */
+export function isNeedsInputNotificationPosted(kiloSessionId: string): boolean {
+  return postedSessions.has(kiloSessionId);
+}
+
+/** Drop the posted marker once the raise's presentation is gone (result or dismissal). */
+export function clearPostedNeedsInputNotification(kiloSessionId: string): void {
+  postedSessions.delete(kiloSessionId);
+}
+
 /** The raise kind, or null when the row is not waiting for input. */
 function attentionKindFor(status: string | null | undefined): NeedsInputAttentionKind | null {
   if (!isAttentionStatus(status)) {
@@ -239,6 +261,7 @@ async function publishRow(row: NeedsInputNotificationRow): Promise<void> {
       // routes to the shared attention channel, iOS reads it as a null trigger.
       trigger: { channelId: androidChannelIdForPushData(data) },
     });
+    postedSessions.add(row.sessionId);
   } catch (error) {
     reportFailure('publish', error);
   }
@@ -247,6 +270,9 @@ async function publishRow(row: NeedsInputNotificationRow): Promise<void> {
 async function dismissIdentifier(identifier: string): Promise<void> {
   try {
     await Notifications.dismissNotificationAsync(identifier);
+    if (identifier.startsWith(IDENTIFIER_PREFIX)) {
+      postedSessions.delete(identifier.slice(IDENTIFIER_PREFIX.length));
+    }
   } catch (error) {
     reportFailure('dismiss', error);
   }

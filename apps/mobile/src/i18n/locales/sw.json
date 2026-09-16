@@ -785,6 +785,15 @@
       "balance": "Tahadhari za salio",
       "security": "Matokeo ya ukaguzi wa usalama"
     },
+    "action": {
+      "openSession": "Fungua kikao"
+    },
+    "needsInputAction": {
+      "approved": "Ombi limeidhinishwa",
+      "replied": "Jibu limetumwa",
+      "failed": "Imeshindikana kujibu. Gusa tena kujaribu tena.",
+      "unavailable": "Ombi hili halisubiri tena."
+    },
     "category": {
       "chatMessagesSubtitle": "majibu kwenye mazungumzo yako",
       "agentAttentionTitle": "Wakala anakuhitaji",

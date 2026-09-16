@@ -299,6 +299,15 @@
       "balance": "Peringatan saldo",
       "security": "Temuan keamanan"
     },
+    "action": {
+      "openSession": "Buka sesi"
+    },
+    "needsInputAction": {
+      "approved": "Permintaan disetujui",
+      "replied": "Balasan terkirim",
+      "failed": "Tidak dapat menjawab. Ketuk lagi untuk mencoba lagi.",
+      "unavailable": "Permintaan ini tidak lagi menunggu."
+    },
     "category": {
       "chatMessagesSubtitle": "balasan dalam percakapanmu",
       "agentAttentionTitle": "Agen membutuhkanmu",

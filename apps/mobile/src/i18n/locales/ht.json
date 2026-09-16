@@ -785,6 +785,15 @@
       "balance": "Alèt balans",
       "security": "Pwoblèm sekirite detekte"
     },
+    "action": {
+      "openSession": "Louvri sesyon an"
+    },
+    "needsInputAction": {
+      "approved": "Demann an apwouve",
+      "replied": "Repons an voye",
+      "failed": "Pa ka reponn. Touche ankò pou eseye ankò.",
+      "unavailable": "Demann sa a pa tann ankò."
+    },
     "category": {
       "chatMessagesSubtitle": "repons nan konvèsasyon ou yo",
       "agentAttentionTitle": "Ajan an bezwen ou",

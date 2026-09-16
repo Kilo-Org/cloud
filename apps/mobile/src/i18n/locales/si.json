@@ -785,6 +785,15 @@
       "balance": "ශේෂය පිළිබඳ ඇඟවීම්",
       "security": "හඳුනාගත් ආරක්ෂක ගැටලු"
     },
+    "action": {
+      "openSession": "සැසිය විවෘත කරන්න"
+    },
+    "needsInputAction": {
+      "approved": "ඉල්ලීම අනුමත විය",
+      "replied": "පිළිතුර යවන ලදී",
+      "failed": "පිළිතුරු දීමට නොහැකි විය. නැවත උත්සාහ කිරීමට නැවත තට්ටු කරන්න.",
+      "unavailable": "මෙම ඉල්ලීම තවදුරටත් බලා නොසිටී."
+    },
     "category": {
       "chatMessagesSubtitle": "ඔබේ සංවාදවල පිළිතුරු",
       "agentAttentionTitle": "නියෝජිතයාට ඔබේ සහාය අවශ්‍යයි",

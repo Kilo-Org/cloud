@@ -793,6 +793,15 @@
       "balance": "Alertas de saldo",
       "security": "Ocorrências de segurança"
     },
+    "action": {
+      "openSession": "Abrir sessão"
+    },
+    "needsInputAction": {
+      "approved": "Pedido aprovado",
+      "replied": "Resposta enviada",
+      "failed": "Não foi possível responder. Toque novamente para tentar de novo.",
+      "unavailable": "Este pedido já não está à espera."
+    },
     "category": {
       "chatMessagesSubtitle": "respostas nas suas conversas",
       "agentAttentionTitle": "O agente precisa de si",

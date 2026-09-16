@@ -785,6 +785,15 @@
       "balance": "Egyenlegértesítések",
       "security": "Biztonsági találatok"
     },
+    "action": {
+      "openSession": "Munkamenet megnyitása"
+    },
+    "needsInputAction": {
+      "approved": "Kérelem jóváhagyva",
+      "replied": "Válasz elküldve",
+      "failed": "Nem sikerült válaszolni. Koppintson újra az újrapróbálkozáshoz.",
+      "unavailable": "Ez a kérelem már nem várakozik."
+    },
     "category": {
       "chatMessagesSubtitle": "válaszok a beszélgetéseidben",
       "agentAttentionTitle": "Az ügynök rád vár",

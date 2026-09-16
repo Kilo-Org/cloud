@@ -299,6 +299,15 @@
       "balance": "余额提醒",
       "security": "安全问题"
     },
+    "action": {
+      "openSession": "打开会话"
+    },
+    "needsInputAction": {
+      "approved": "请求已批准",
+      "replied": "回复已发送",
+      "failed": "无法回答。再次点按即可重试。",
+      "unavailable": "该请求已不再等待。"
+    },
     "category": {
       "chatMessagesSubtitle": "对话中的回复",
       "agentAttentionTitle": "智能体需要你处理",

@@ -785,6 +785,15 @@
       "balance": "Akeekkachiisa haftee maallaqaa",
       "security": "Argannoowwan nageenyaa"
     },
+    "action": {
+      "openSession": "Turtii bani"
+    },
+    "needsInputAction": {
+      "approved": "Gaaffiin mirkanaa’eera",
+      "replied": "Deebbiin ergameera",
+      "failed": "Deebuu kennuu hin dandeenye. Yaaluuf irra deebi’i cuqaasi.",
+      "unavailable": "Gaaffiin kun eegamaa hin oolu."
+    },
     "category": {
       "chatMessagesSubtitle": "deebiiwwan mariiwwan kee keessatti",
       "agentAttentionTitle": "Ergamaan si barbaada",

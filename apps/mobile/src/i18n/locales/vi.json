@@ -299,6 +299,15 @@
       "balance": "Cảnh báo số dư",
       "security": "Vấn đề bảo mật"
     },
+    "action": {
+      "openSession": "Mở phiên"
+    },
+    "needsInputAction": {
+      "approved": "Yêu cầu đã được phê duyệt",
+      "replied": "Phản hồi đã được gửi",
+      "failed": "Không thể trả lời. Nhấn lại để thử lại.",
+      "unavailable": "Yêu cầu này không còn chờ đợi nữa."
+    },
     "category": {
       "chatMessagesSubtitle": "câu trả lời trong các cuộc trò chuyện của bạn",
       "agentAttentionTitle": "Tác nhân cần bạn phản hồi",

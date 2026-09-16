@@ -299,6 +299,15 @@
       "balance": "تنبيهات الرصيد",
       "security": "ملاحظات الأمان"
     },
+    "action": {
+      "openSession": "فتح الجلسة"
+    },
+    "needsInputAction": {
+      "approved": "تمت الموافقة على الطلب",
+      "replied": "تم إرسال الرد",
+      "failed": "تعذّرت الإجابة. انقر مجددًا لإعادة المحاولة.",
+      "unavailable": "لم يعد هذا الطلب قيد الانتظار."
+    },
     "category": {
       "chatMessagesSubtitle": "الردود في محادثاتك",
       "agentAttentionTitle": "الوكيل بحاجة إليك",

@@ -785,6 +785,15 @@
       "balance": "Saldovarsler",
       "security": "Sikkerhetsfunn"
     },
+    "action": {
+      "openSession": "Åpne økt"
+    },
+    "needsInputAction": {
+      "approved": "Forespørsel godkjent",
+      "replied": "Svar sendt",
+      "failed": "Kunne ikke svare. Trykk på nytt for å prøve igjen.",
+      "unavailable": "Denne forespørselen venter ikke lenger."
+    },
     "category": {
       "chatMessagesSubtitle": "svar i samtalene dine",
       "agentAttentionTitle": "Agenten trenger deg",

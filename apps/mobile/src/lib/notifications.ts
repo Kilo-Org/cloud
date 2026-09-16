@@ -43,7 +43,12 @@ import { chainSave } from '@/lib/hooks/save-chain';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
+import {
+  handleNeedsInputNotificationResponse,
+  isNeedsInputActionIdentifier,
+} from './notification-actions';
 import { notificationPathForData } from './notification-path';
+import { isNeedsInputNotificationPosted } from './needs-input-notification';
 
 const easConfigSchema = z.object({ projectId: z.string().min(1) });
 
@@ -320,6 +325,16 @@ export function setupNotificationHandler() {
       ) {
         return suppressed;
       }
+      // The app's own needs-input notification is already the presentation for
+      // this raise: suppressing the server's attention push keeps one OS
+      // notification per raise instead of a duplicate banner.
+      if (
+        data?.type === 'cloud_agent_session' &&
+        data.category === 'attention' &&
+        isNeedsInputNotificationPosted(data.cliSessionId)
+      ) {
+        return suppressed;
+      }
       return shown;
     },
   });
@@ -378,9 +393,15 @@ function parseHeadlessPushData(data: unknown): PushData | null {
 
 /**
  * Headless background-notification executor. Runs when a data-only push is
- * delivered while the app is backgrounded or killed. Reuses
+ * delivered while the app is backgrounded or killed, and when the app is closed
+ * and the user taps a needs-input action button. Reuses
  * `applyGlanceablePushData` so the scope-key fence, revision discard, and org
  * re-register behave identically to the foreground path.
+ *
+ * One task name serves both payload shapes: the native side hands a
+ * notification *response* to every registered consumer, so a second name would
+ * run an Approve / Reply twice (the second run rewrites the result or answers
+ * again). Keep exactly one registered name.
  */
 async function handleBackgroundNotificationTask(
   body: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>
@@ -389,10 +410,17 @@ async function handleBackgroundNotificationTask(
   if (error) {
     return Notifications.BackgroundNotificationTaskResult.Failed;
   }
-  // A notification *response* (a tap) is not a delivered push; the glanceable
-  // apply runs only for a delivered data-only push.
+  // A notification *response* (an action button or a body tap) is not a
+  // delivered push: dispatch it to the needs-input action handler — this is
+  // the app-closed path on Android — and keep the glanceable apply for
+  // delivered data-only pushes only.
   if ('actionIdentifier' in data) {
-    return Notifications.BackgroundNotificationTaskResult.NoData;
+    const handled = await handleNeedsInputNotificationResponse(data);
+    // An answered raise replaced its notification: report NewData so iOS does
+    // not throttle later content-available wakes (repeated NoData reduces them).
+    return handled
+      ? Notifications.BackgroundNotificationTaskResult.NewData
+      : Notifications.BackgroundNotificationTaskResult.NoData;
   }
 
   const pushData = parseHeadlessPushData(data.data);
@@ -427,8 +455,11 @@ async function registerBackgroundNotificationTask(): Promise<void> {
 /**
  * Register the background notification task so a data-only
  * `active_agents_glanceable` push is applied while the app is backgrounded or
- * killed. `defineTask` must run at module scope of the root layout, not inside
- * a React effect.
+ * killed, and a notification response (an Approve / Reply tap with the app
+ * closed) is dispatched headless. One name only: the native side delivers a
+ * response to every registered consumer, so a second name would run the action
+ * twice. `defineTask` must run at module scope of the root layout, not inside a
+ * React effect.
  */
 export function setupNotificationBackgroundHandler(): void {
   ensureGlanceableSinksLoaded();
@@ -441,18 +472,9 @@ export function setupNotificationBackgroundHandler(): void {
 
 export function setupNotificationResponseHandler() {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-    const data = parseNotificationData(response.notification.request.content.data);
-    if (!data) {
-      return;
-    }
-
-    const path = notificationPathForData(data);
-    Notifications.clearLastNotificationResponse();
-    // Always stash: the gated consumer in `_layout.tsx` owns every navigation.
-    // `router.navigate` queues rather than throws when the router is unmounted,
-    // so a tap while at the consent/force-update/login gate would navigate past
-    // the gate and be dropped by the root redirect.
-    setPendingDeepLink(path, 'notification');
+    // Our four action ids run headless or stash the deep link; any other
+    // identifier keeps the tap path inside the handler.
+    void handleNeedsInputNotificationResponse(response);
   });
 
   return subscription;
@@ -462,6 +484,12 @@ export function setupNotificationResponseHandler() {
 export function checkInitialNotification(): void {
   const response = Notifications.getLastNotificationResponse();
   if (!response) {
+    return;
+  }
+  // An action response that launched the app (Open PR / Open session
+  // foreground it) goes through the same dispatch as a warm response.
+  if (isNeedsInputActionIdentifier(response.actionIdentifier)) {
+    void handleNeedsInputNotificationResponse(response);
     return;
   }
   const data = parseNotificationData(response.notification.request.content.data);

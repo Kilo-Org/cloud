@@ -785,6 +785,15 @@
       "balance": "ਬਚੀ ਰਕਮ ਬਾਰੇ ਚੇਤਾਵਨੀਆਂ",
       "security": "ਸੁਰੱਖਿਆ ਜਾਂਚ ਦੇ ਨਤੀਜੇ"
     },
+    "action": {
+      "openSession": "ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ"
+    },
+    "needsInputAction": {
+      "approved": "ਬੇਨਤੀ ਮਨਜ਼ੂਰ ਹੋ ਗਈ",
+      "replied": "ਜਵਾਬ ਭੇਜ ਦਿੱਤਾ ਗਿਆ",
+      "failed": "ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਦੁਬਾਰਾ ਟੈਪ ਕਰੋ।",
+      "unavailable": "ਇਹ ਬੇਨਤੀ ਹੁਣ ਉਡੀਕ ਨਹੀਂ ਕਰਦੀ।"
+    },
     "category": {
       "chatMessagesSubtitle": "ਤੁਹਾਡੀਆਂ ਗੱਲਬਾਤਾਂ ਵਿੱਚ ਜਵਾਬ",
       "agentAttentionTitle": "ਏਜੰਟ ਨੂੰ ਤੁਹਾਡੀ ਲੋੜ ਹੈ",

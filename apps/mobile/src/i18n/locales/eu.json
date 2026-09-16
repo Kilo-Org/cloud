@@ -785,6 +785,15 @@
       "balance": "Saldoari buruzko alertak",
       "security": "Antzemandako segurtasun-arazoak"
     },
+    "action": {
+      "openSession": "Ireki saioa"
+    },
+    "needsInputAction": {
+      "approved": "Eskaera onartu da",
+      "replied": "Erantzuna bidali da",
+      "failed": "Ezin izan da erantzun. Ukitu berriro saiatzeko.",
+      "unavailable": "Eskaera honek jada ez du itxaroten."
+    },
     "category": {
       "chatMessagesSubtitle": "zure elkarrizketetako erantzunak",
       "agentAttentionTitle": "Agenteak zure beharra du",

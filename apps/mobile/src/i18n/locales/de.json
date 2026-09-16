@@ -299,6 +299,15 @@
       "balance": "Guthaben-Warnungen",
       "security": "Sicherheitsbefunde"
     },
+    "action": {
+      "openSession": "Sitzung öffnen"
+    },
+    "needsInputAction": {
+      "approved": "Anfrage genehmigt",
+      "replied": "Antwort gesendet",
+      "failed": "Konnte nicht antworten. Zum Wiederholen erneut antippen.",
+      "unavailable": "Diese Anfrage wartet nicht mehr."
+    },
     "category": {
       "chatMessagesSubtitle": "antworten in deinen Unterhaltungen",
       "agentAttentionTitle": "Der Agent braucht dich",

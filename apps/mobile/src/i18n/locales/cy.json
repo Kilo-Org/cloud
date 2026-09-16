@@ -817,6 +817,15 @@
       "balance": "Rhybuddion balans",
       "security": "Canfyddiadau diogelwch"
     },
+    "action": {
+      "openSession": "Agor y sesiwn"
+    },
+    "needsInputAction": {
+      "approved": "Cais wedi’i gymeradwyo",
+      "replied": "Anfonwyd yr ymateb",
+      "failed": "Methwyd ag ateb. Tapwch eto i roi cynnig arall.",
+      "unavailable": "Nid yw’r cais hwn yn aros mwyach."
+    },
     "category": {
       "chatMessagesSubtitle": "atebion yn eich sgyrsiau",
       "agentAttentionTitle": "Mae'r asiant angen eich sylw",

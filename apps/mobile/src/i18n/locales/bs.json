@@ -793,6 +793,15 @@
       "balance": "Upozorenja o stanju",
       "security": "Sigurnosni nalazi"
     },
+    "action": {
+      "openSession": "Otvori sesiju"
+    },
+    "needsInputAction": {
+      "approved": "Zahtjev je odobren",
+      "replied": "Odgovor je poslan",
+      "failed": "Nije uspjelo odgovoriti. Dodirnite ponovo da pokušate.",
+      "unavailable": "Ovaj zahtjev više ne čeka."
+    },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",
       "agentAttentionTitle": "Agent te treba",

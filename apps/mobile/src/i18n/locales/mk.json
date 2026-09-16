@@ -785,6 +785,15 @@
       "balance": "Предупредувања за салдо",
       "security": "Безбедносни наоди"
     },
+    "action": {
+      "openSession": "Отвори сесија"
+    },
+    "needsInputAction": {
+      "approved": "Барањето е одобрено",
+      "replied": "Одговорот е испратен",
+      "failed": "Не можеше да се одговори. Допрете повторно за да пробате.",
+      "unavailable": "Ова барање веќе не чека."
+    },
     "category": {
       "chatMessagesSubtitle": "одговори во твоите разговори",
       "agentAttentionTitle": "На агентот му требаш ти",

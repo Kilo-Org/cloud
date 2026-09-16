@@ -785,6 +785,15 @@
       "balance": "Alertas de saldo",
       "security": "Problemas de seguridade"
     },
+    "action": {
+      "openSession": "Abrir a sesión"
+    },
+    "needsInputAction": {
+      "approved": "Solicitude aprobada",
+      "replied": "Resposta enviada",
+      "failed": "Non se puido responder. Toca de novo para tentalo de novo.",
+      "unavailable": "Esta solicitude xa non está á espera."
+    },
     "category": {
       "chatMessagesSubtitle": "respostas nas túas conversas",
       "agentAttentionTitle": "O axente precisa de ti",

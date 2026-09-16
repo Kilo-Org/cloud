@@ -92,6 +92,7 @@ import {
   subscribeToPendingDeepLink,
 } from '@/lib/deep-link-launch';
 import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
+import { registerNeedsInputCategories } from '@/lib/notification-actions';
 import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
@@ -161,6 +162,9 @@ function preloadStartupFonts(): void {
 
 void SplashScreen.preventAutoHideAsync();
 void ensureAndroidNotificationChannels();
+// The Approve / Reply / Open PR / Open session buttons a needs-input
+// notification carries; idempotent, one pass per launch.
+void registerNeedsInputCategories();
 setupNotificationHandler();
 // Applies the aggregate glanceable push while backgrounded/killed via a
 // headless expo-notifications task; see setupNotificationBackgroundHandler.

@@ -785,6 +785,15 @@
       "balance": "การแจ้งเตือนยอดเงิน",
       "security": "ข้อค้นพบด้านความปลอดภัย"
     },
+    "action": {
+      "openSession": "เปิดเซสชัน"
+    },
+    "needsInputAction": {
+      "approved": "อนุมัติคำขอแล้ว",
+      "replied": "ส่งคำตอบกลับแล้ว",
+      "failed": "ตอบกลับไม่สำเร็จ แตะอีกครั้งเพื่อลองใหม่",
+      "unavailable": "คำขอนี้ไม่ได้รออยู่อีกต่อไป"
+    },
     "category": {
       "chatMessagesSubtitle": "การตอบกลับในการสนทนาของคุณ",
       "agentAttentionTitle": "เอเจนต์รอการตอบกลับ",

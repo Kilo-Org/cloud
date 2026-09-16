@@ -785,6 +785,15 @@
       "balance": "Izexwayiso zebhalansi",
       "security": "Okutholakele kwezokuphepha"
     },
+    "action": {
+      "openSession": "Vula iseshini"
+    },
+    "needsInputAction": {
+      "approved": "Isicelo sigunyaziwe",
+      "replied": "Impendulo ithunyelwe",
+      "failed": "Ayikwazanga ukuphendula. Thepha kabusha ukuze uzame kabusha.",
+      "unavailable": "Lesi sicelo asisalindile."
+    },
     "category": {
       "chatMessagesSubtitle": "izimpendulo ezingxoxweni zakho",
       "agentAttentionTitle": "Umenzeli uyakudinga",

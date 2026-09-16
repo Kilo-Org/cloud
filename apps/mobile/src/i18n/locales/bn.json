@@ -785,6 +785,15 @@
       "balance": "ব্যালেন্সের সতর্কতা",
       "security": "শনাক্ত নিরাপত্তা সমস্যা"
     },
+    "action": {
+      "openSession": "সেশন খুলুন"
+    },
+    "needsInputAction": {
+      "approved": "অনুরোধ অনুমোদিত হয়েছে",
+      "replied": "উত্তর পাঠানো হয়েছে",
+      "failed": "উত্তর দেওয়া যায়নি। আবার চেষ্টা করতে আবার ট্যাপ করুন।",
+      "unavailable": "এই অনুরোধ আর অপেক্ষা করছে না।"
+    },
     "category": {
       "chatMessagesSubtitle": "আপনার কথোপকথনে উত্তর",
       "agentAttentionTitle": "আপনার সাড়া প্রয়োজন",

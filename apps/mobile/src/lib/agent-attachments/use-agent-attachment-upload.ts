@@ -438,6 +438,11 @@ export function useAgentAttachmentUpload(
       }
       const accepted = candidates.slice(0, limit.acceptedCount);
       if (limit.truncated) {
+        // The admitted count selects the plural category, because that is the
+        // numeral a catalog's own grammar inflects the warning's noun on
+        // ("1 of 2 files", French "Ajout de 1 fichier …"). The total the user
+        // selected is interpolated beside it, and English carries the plural
+        // noun in every category, so the sentence still reads "1 of 2 files".
         toast.warning(
           i18n.t('agentChat.attachmentPicker.onlyAddingFiles', {
             count: limit.acceptedCount,

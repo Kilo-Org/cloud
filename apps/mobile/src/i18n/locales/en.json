@@ -2492,7 +2492,7 @@
       "maxFilesAllowed_one": "Maximum {{displayCount}} file allowed",
       "maxFilesAllowed": "Maximum {{displayCount}} files allowed",
       "maxFilesAllowed_other": "Maximum {{displayCount}} files allowed",
-      "onlyAddingFiles_one": "Only adding {{accepted}} of {{total}} file (max {{max}})",
+      "onlyAddingFiles_one": "Only adding {{accepted}} of {{total}} files (max {{max}})",
       "onlyAddingFiles": "Only adding {{accepted}} of {{total}} files (max {{max}})",
       "onlyAddingFiles_other": "Only adding {{accepted}} of {{total}} files (max {{max}})"
     },

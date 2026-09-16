@@ -4422,6 +4422,32 @@
     ],
     "searchBlob": "organizations.admin.getMetrics Admin metrics counting active paying organizations by plan (teams/enterprise) and total seats. organizations admin getmetrics"
   },
+  "organizations.admin.getServiceFeeExemption": {
+    "path": "organizations.admin.getServiceFeeExemption",
+    "kind": "query",
+    "summary": "View an organization's current service-fee exemption and its audit history.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "admin",
+      "getservicefeeexemption",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.admin.getServiceFeeExemption View an organization's current service-fee exemption and its audit history. organizations admin getservicefeeexemption organizationid organizationId"
+  },
   "organizations.admin.list": {
     "path": "organizations.admin.list",
     "kind": "query",

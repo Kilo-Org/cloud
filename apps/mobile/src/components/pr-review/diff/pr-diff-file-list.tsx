@@ -228,6 +228,17 @@ export function PrReviewFileList({
 
   const items = useMemo(() => [...fileItems, paginationItem], [fileItems, paginationItem]);
 
+  // FlashList reports the end as reached as soon as its content fits the
+  // viewport, so a first page shorter than the screen used to be replaced by
+  // the next pages before the partial-load row (`prReview.hunkRows
+  // .loadedOfTotalFiles`, "1 of 5 files loaded") and its Load all action could
+  // be read. Latch the user's own drag so the row is the resting state until
+  // then; a programmatic scroll (scroll-to-file) must not pull pages either.
+  const userScrolled = useRef(false);
+  const handleScrollBeginDrag = useCallback(() => {
+    userScrolled.current = true;
+  }, []);
+
   const stickyHeaderIndices = useMemo(() => stickyFileHeaderIndices(items), [items]);
 
   usePrDiffListScroll({
@@ -345,8 +356,9 @@ export function PrReviewFileList({
             maintainVisibleContentPosition={{ disabled: true }}
             // Re-measure rows when the bounded font scale changes.
             extraData={diffFontMetrics.scale}
+            onScrollBeginDrag={handleScrollBeginDrag}
             onEndReached={() => {
-              if (query.hasNextPage && !query.isFetchingNextPage) {
+              if (userScrolled.current && query.hasNextPage && !query.isFetchingNextPage) {
                 void query.fetchNextPage();
               }
             }}

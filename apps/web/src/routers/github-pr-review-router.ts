@@ -1607,10 +1607,16 @@ export const githubPrReviewRouter = createTRPCRouter({
           page,
           per_page: FILES_PAGE_SIZE,
         });
+        const link = response.headers?.link;
         return buildFilesPage({
           page,
           perPage: FILES_PAGE_SIZE,
           rawFiles: response.data as never,
+          // GitHub answers with `Link: rel="next"` exactly while more pages
+          // exist, so the header — not the page length — decides whether the
+          // client keeps paging. A response with no Link header (an older
+          // proxy, a test double) falls back to the page-length heuristic.
+          linkHasNext: typeof link === 'string' ? link.includes('rel="next"') : undefined,
         });
       },
     });

@@ -345,6 +345,9 @@ const config: ExpoConfig = {
         ],
       },
     ],
+    // The iOS File Provider extension that shows the artifact mirror in the
+    // Files app: its Xcode target, Pods integration and EAS app-extension entry.
+    './plugins/withArtifactFileProvider',
     // Local Expo module for Android Live Updates (no-op until slice `and`).
     './plugins/withActiveAgentsLiveUpdate',
     // Translates the Android widget-picker entry, which the widget library

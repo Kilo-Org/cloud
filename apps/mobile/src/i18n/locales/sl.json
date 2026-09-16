@@ -582,6 +582,10 @@
       "pending": "na čakanju: {{displayCount}}",
       "skipped": "preskočeno: {{displayCount}}",
       "checksCount": "preverjanja: {{displayCount}}",
+      "checksCount_one": "preverjanje: {{displayCount}}",
+      "checksCount_two": "preverjanji: {{displayCount}}",
+      "checksCount_few": "preverjanja: {{displayCount}}",
+      "checksCount_other": "preverjanja: {{displayCount}}",
       "checkDetails": "podrobnosti preverjanja"
     },
     "inbox": {

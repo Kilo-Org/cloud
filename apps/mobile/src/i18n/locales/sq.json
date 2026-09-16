@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} në pritje",
       "skipped": "të anashkaluara: {{displayCount}}",
       "checksCount": "{{displayCount}} kontrolle",
+      "checksCount_one": "{{displayCount}} kontroll",
+      "checksCount_other": "{{displayCount}} kontrolle",
       "checkDetails": "detajet e kontrollit"
     },
     "inbox": {

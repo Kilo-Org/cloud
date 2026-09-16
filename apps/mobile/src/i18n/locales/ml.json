@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} പൂർത്തിയായിട്ടില്ല",
       "skipped": "{{displayCount}} ഒഴിവാക്കി",
       "checksCount": "{{displayCount}} പരിശോധനകൾ",
+      "checksCount_one": "{{displayCount}} പരിശോധന",
+      "checksCount_other": "{{displayCount}} പരിശോധനകൾ",
       "checkDetails": "പരിശോധനയുടെ വിശദാംശങ്ങൾ"
     },
     "inbox": {

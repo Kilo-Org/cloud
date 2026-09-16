@@ -4,6 +4,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import { glanceableLayoutCopy, withGlanceableCopy } from './layout-copy';
 
 const PLACEHOLDER = '__KILO_GLANCEABLE_COPY__';
@@ -63,14 +65,16 @@ describe('withGlanceableCopy', () => {
     expect(glanceableLayoutCopy().locale).not.toContain('-');
   });
 
-  it('covers every status the layouts render, plus the language tag', () => {
+  it('covers every slot the layouts read, plus the language tag', () => {
     expect(Object.keys(glanceableLayoutCopy()).toSorted()).toEqual([
+      'approve',
       'digits',
       'empty',
       'expired',
       'idle',
       'locale',
       'needsInput',
+      'open',
       'openAgents',
       'privacy',
       'running',
@@ -78,5 +82,15 @@ describe('withGlanceableCopy', () => {
       'stale',
       'waiting',
     ]);
+  });
+
+  it('bakes both Live Activity action labels from the reviewed keys', () => {
+    // A missing key would come back as the key itself, so the copy is asserted
+    // against the catalog and not only against the slot.
+    const copy = glanceableLayoutCopy();
+    expect(copy.approve).toBe(i18n.t('common.approve'));
+    expect(copy.approve).not.toBe('common.approve');
+    expect(copy.open).toBe(i18n.t('glanceable.openSession'));
+    expect(copy.open).not.toBe('glanceable.openSession');
   });
 });

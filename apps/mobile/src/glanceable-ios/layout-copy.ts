@@ -57,6 +57,11 @@ export function glanceableLayoutCopy() {
     running: i18n.t('common.working'),
     idle: i18n.t('common.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
+    // The two Live Activity buttons. They answer, and navigate to, the recorded
+    // waiting ask, so they carry the same copy the Android notification's
+    // actions do — one key each, so the two surfaces cannot drift.
+    approve: i18n.t('common.approve'),
+    open: i18n.t('glanceable.openSession'),
     locale: resolveGlanceableLocale(i18n.language),
     digits: glanceableDigits(),
   };

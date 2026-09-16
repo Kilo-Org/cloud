@@ -1,4 +1,4 @@
-import { HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
+import { Button, HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   accessibilityElement,
   accessibilityLabel,
@@ -14,6 +14,7 @@ import {
   monospacedDigit,
   padding,
   resizable,
+  tint,
 } from '@expo/ui/swift-ui/modifiers';
 import { createLiveActivity, type LiveActivityComponent } from 'expo-widgets';
 import { PlatformColor } from 'react-native';
@@ -27,8 +28,9 @@ import { withWidgetLogo } from './widget-logo';
 
 // The layout function below is marked with the `'widget'` directive, so Babel
 // stringifies it and the watcher extension re-evaluates the source. Everything
-// it references must be a watcher global (`Text`, `VStack`, the modifiers,
-// `PlatformColor`) or a built-in. Do not call `@/` helpers or i18n from here.
+// it references must be a watcher global (`Text`, `VStack`, `Button`, the
+// modifiers, `PlatformColor`) or a built-in. Do not call `@/` helpers or i18n
+// from here.
 //
 // Two values are resolved after stringification, both from literals below:
 // `withWidgetLogo` swaps `__KILO_WIDGET_LOGO_URI__` for the app-group path of
@@ -112,6 +114,10 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // blocked agent is the one interval the user can act on. Working and idle
   // durations tell the user nothing they can use.
   const needsInputSince = (props.needsInput ?? 0) > 0 ? (props.needsInputSince ?? null) : null;
+  // Approval is offered only while an ask actually waits: an Approve that
+  // cannot answer anything is a dead control, and a card whose ask was just
+  // answered elsewhere would keep offering the tap that answered it.
+  const canApprove = (props.needsInput ?? 0) > 0;
 
   // Spoken label: status word, numeric counts, then Open agents. The whole
   // surface deep-links to the agents list, so "Open agents" stays in the
@@ -204,10 +210,51 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // user at the state with nothing in it.
   const countRows = countLines.map(line => countRow(line, line === primary));
 
+  // The two action buttons, on the surfaces with room: the Lock Screen banner
+  // and the expanded Dynamic Island. The compact presentations keep the count
+  // alone — two tappable controls in the leading/trailing slots would crowd
+  // the one number a glance reads — so the buttons sit exactly where the counts
+  // are drawn in full.
+  //
+  // `target` is the stable id the press reports back; the app's listener routes
+  // it. The literals must stay equal to the targets in `interaction.ts`, which
+  // `active-agents-live-activity.test.ts` holds them to.
+  //
+  // A `Button` with `label` + `systemImage`, not an icon child: this process
+  // has no React context and no SVG renderer, so the theme tokens reach it as
+  // `PlatformColor` — the same values the count rows use — and the glyphs are
+  // SF Symbols, the set the count rows already draw. Approve carries the
+  // needs-input orange of the row it answers; Open takes the label color.
+  const actions = (
+    <HStack alignment="center" spacing={10}>
+      {canApprove ? (
+        <Button
+          target="approve"
+          label={COPY.approve}
+          systemImage="checkmark.circle"
+          modifiers={[tint(PlatformColor('systemOrange'))]}
+        />
+      ) : null}
+      <Button
+        target="open"
+        label={COPY.open}
+        systemImage="arrow.up.forward.app"
+        modifiers={[tint(PlatformColor('label'))]}
+      />
+    </HStack>
+  );
+
   // The mark, then the rows. The Lock Screen banner and the expanded Dynamic
-  // Island draw the same block, so one glance teaches both surfaces.
+  // Island draw the same block, so one glance teaches both surfaces. The spoken
+  // label is combined onto this block rather than the whole surface, because
+  // the buttons beside it are their own elements: a combined container would
+  // swallow the two taps into the count label.
   const markAndRows = (markSize: number) => (
-    <HStack alignment="center" spacing={12}>
+    <HStack
+      alignment="center"
+      spacing={12}
+      modifiers={[accessibilityElement('combine'), accessibilityLabel(accessibility)]}
+    >
       {logo(markSize)}
       {hasCounts ? (
         <VStack alignment="leading" spacing={5}>
@@ -231,11 +278,10 @@ const layout: LiveActivityComponent<ContentState> = props => {
           // without this the relative wait would be formatted in a different
           // language than the baked labels.
           environment({ key: 'locale', value: locale }),
-          accessibilityElement('combine'),
-          accessibilityLabel(accessibility),
         ]}
       >
         {markAndRows(26)}
+        {actions}
       </HStack>
     ),
     // The Dynamic Island's leading slot is the app-identity slot, so it holds
@@ -275,19 +321,26 @@ const layout: LiveActivityComponent<ContentState> = props => {
       <HStack
         modifiers={[
           // The island's rounded corner cuts into the leading edge, so the
-          // mark needs an inset the banner gets from its own padding.
-          padding({ vertical: 2, leading: 14 }),
+          // mark needs an inset the banner gets from its own padding. The
+          // trailing edge needs the same inset now that the buttons end there.
+          padding({ vertical: 2, leading: 14, trailing: 14 }),
           environment({ key: 'locale', value: locale }),
-          accessibilityLabel(accessibility),
         ]}
       >
         {markAndRows(24)}
+        {actions}
       </HStack>
     ),
   };
 };
 
-const LIVE_ACTIVITY_NAME = 'ActiveAgentsLiveActivity';
+/**
+ * The Live Activity's registered name: the native activity type, the key the
+ * layout is stored under, and the name a widget-style press would report as its
+ * source. Exported because the app's interaction listener has to recognise a
+ * press from this surface without repeating the literal.
+ */
+export const LIVE_ACTIVITY_NAME = 'ActiveAgentsLiveActivity';
 
 /**
  * The whole surface deep-links here, and registration persists it. A

@@ -1,0 +1,172 @@
+import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
+import { type UserInteractionEvent } from 'expo-widgets';
+import { toast } from 'sonner-native';
+
+import { i18n } from '@/i18n';
+import {
+  type GlanceableApproveResult,
+  refreshGlanceableSnapshot,
+  runGlanceableApprove,
+} from '@/lib/glanceable/approve-ask';
+import { readWaitingAsk, recordWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
+import { setPendingDeepLink } from '@/lib/deep-link-launch';
+
+import { ActiveAgentsLiveActivity, LIVE_ACTIVITY_NAME } from './active-agents-live-activity';
+
+/**
+ * What a button press on the Live Activity does.
+ *
+ * The press arrives as an in-process event: expo-widgets' `LiveActivityIntent`
+ * performs in the app's process and posts to `NotificationCenter`
+ * (`ios/Widgets/WidgetsEvents.swift`), and the app's subscription forwards it to
+ * `handleGlanceableInteraction`. The answer and the navigation are the same
+ * bodies the in-app control uses — `runGlanceableApprove` for Approve,
+ * `resolveIncomingUrl` + the pending-deep-link slot for Open — so the surface
+ * and the app cannot disagree about either.
+ */
+
+/** The Approve target the layout's button carries. */
+export const GLANCEABLE_APPROVE_TARGET = 'approve';
+/** The Open target the layout's button carries. */
+export const GLANCEABLE_OPEN_TARGET = 'open';
+
+/** The session route the Open target adds the recorded id to. */
+const SESSION_URL_PREFIX = 'kiloapp:///cloud/sessions/';
+
+/** The one failure line the toast carries; the card keeps its Approve tap. */
+const APPROVE_FAILED_KEY = 'glanceable.approveFailed';
+
+/** What the caller — and the test — gets back from one press. */
+export type GlanceableInteractionOutcome =
+  /** A press from another surface: never answered here. */
+  | { kind: 'ignored' }
+  /** A press from this surface carrying a target no button declares. */
+  | { kind: 'unhandled' }
+  /** Open landed on the recorded session. */
+  | { kind: 'opened'; href: string }
+  /** Open with nothing recorded; the card's own URL already lands on agents. */
+  | { kind: 'no_session' }
+  | GlanceableApproveResult;
+
+/**
+ * Whether the press came from this app's Active Agents Live Activity.
+ *
+ * A Live Activity's dynamic content is rendered with the ActivityKit activity
+ * id as its node name (`ios/Widgets/WidgetLiveActivity.swift` passes
+ * `context.activityID`), so a press from this card reports that id as its
+ * source, while a home-screen widget reports its widget name. A press belongs
+ * to this surface when it names one of this activity's running instances; the
+ * registered name is accepted as well so a widget-style source cannot be
+ * mistaken for a foreign one. Any other source is another layout's press.
+ */
+function isActiveAgentsLiveActivity(source: string): boolean {
+  if (source === LIVE_ACTIVITY_NAME) {
+    return true;
+  }
+  try {
+    return ActiveAgentsLiveActivity.getInstances().some(instance => instance.getId() === source);
+  } catch {
+    // An unreadable or unsupported surface is not an identity: dropping the
+    // press beats answering a target that may belong to another layout.
+    return false;
+  }
+}
+
+/**
+ * Republish through the publisher the app mounts, so every registered sink
+ * (the Live Activity itself, the widget, persistence) reads the new state. Best
+ * effort: the record the flow left behind is still the truth the next press or
+ * publish acts on. Mirrors the Android headless task's republish.
+ */
+async function republish(ask: WaitingAsk): Promise<void> {
+  try {
+    await refreshGlanceableSnapshot({
+      userId: ask.userId,
+      organizationId: ask.organizationId,
+      answeredKiloSessionId: ask.kiloSessionId,
+    });
+  } catch {
+    // The next publish corrects the surface; the card keeps its actions.
+  }
+}
+
+/**
+ * Answer through the shared flow. `runGlanceableApprove` classifies its own
+ * failures; anything that still escapes is a failure the user can retry, never
+ * a missing answer.
+ */
+async function approveResult(): Promise<GlanceableApproveResult> {
+  try {
+    return await runGlanceableApprove({ now: () => Date.now() });
+  } catch {
+    return { kind: 'retryable' };
+  }
+}
+
+/**
+ * Answer the recorded ask through the shared flow and drop the action once it
+ * is answered. The record is captured before the flow runs, because a
+ * successful answer clears it and its ids are what the republish below needs.
+ */
+async function approveFromCard(): Promise<GlanceableInteractionOutcome> {
+  const ask = await readWaitingAsk();
+  const result = await approveResult();
+  if (result.kind === 'retryable') {
+    // The record stays, so the card keeps Approve for another tap.
+    toast.error(i18n.t(APPROVE_FAILED_KEY));
+    return result;
+  }
+  if (result.kind === 'gone') {
+    // Answered elsewhere or no longer pending: dropping the record drops the
+    // tap, the same way the Android headless task drops it.
+    recordWaitingAsk(null);
+  }
+  if (ask !== null) {
+    await republish(ask);
+  }
+  return result;
+}
+
+/**
+ * Land on the recorded waiting session through the app's own deep-link path.
+ * The id is the only thing kept beside the privacy-minimal snapshot, and it
+ * goes into the URL and nowhere else. The hydrated read is the same one the
+ * headless paths use: a press that launched the process in the background has
+ * no in-memory record yet, only the mirrored one. With nothing recorded there
+ * is nothing to open — the card's own URL already lands on the agents tab — so
+ * guessing a session is the one thing this must not do.
+ */
+async function openRecordedSession(): Promise<GlanceableInteractionOutcome> {
+  const ask = await readWaitingAsk();
+  if (ask === null) {
+    return { kind: 'no_session' };
+  }
+  const href = resolveIncomingUrl(`${SESSION_URL_PREFIX}${ask.kiloSessionId}`);
+  if (href === null) {
+    return { kind: 'no_session' };
+  }
+  setPendingDeepLink(href, 'universal-link');
+  return { kind: 'opened', href };
+}
+
+/** Route one button press from the Live Activity. */
+export async function handleGlanceableInteraction(
+  event: UserInteractionEvent
+): Promise<GlanceableInteractionOutcome> {
+  if (!isActiveAgentsLiveActivity(event.source)) {
+    return { kind: 'ignored' };
+  }
+  try {
+    if (event.target === GLANCEABLE_APPROVE_TARGET) {
+      return await approveFromCard();
+    }
+    if (event.target === GLANCEABLE_OPEN_TARGET) {
+      return await openRecordedSession();
+    }
+  } catch {
+    // An escaping throw is a failed press, not a crash: the card keeps both
+    // buttons, and the tap that failed is the tap the user can repeat.
+    return { kind: 'retryable' };
+  }
+  return { kind: 'unhandled' };
+}

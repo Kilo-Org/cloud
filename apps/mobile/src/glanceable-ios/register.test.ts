@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   platform: { OS: 'ios' as string },
@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
     endImmediate: vi.fn(),
     startOrUpdate: vi.fn(),
   },
+  addUserInteractionListener: vi.fn((_listener: (event: unknown) => void) => ({
+    remove: vi.fn(),
+  })),
+  handleGlanceableInteraction: vi.fn((_event: unknown) => undefined),
 }));
 
 vi.mock('react-native', () => ({
@@ -15,6 +19,12 @@ vi.mock('react-native', () => ({
   PlatformColor: (name: string) => name,
 }));
 
+vi.mock('expo-widgets', () => ({
+  addUserInteractionListener: mocks.addUserInteractionListener,
+}));
+vi.mock('./interaction', () => ({
+  handleGlanceableInteraction: mocks.handleGlanceableInteraction,
+}));
 vi.mock('./ios-sink', () => ({ iosSink: mocks.iosSink }));
 vi.mock('./adopt-activity', () => ({ adoptPushStartedActivity: vi.fn() }));
 vi.mock('./active-agents-live-activity', () => ({
@@ -31,6 +41,10 @@ vi.mock('@/lib/glanceable/live-activity-switch', () => ({
 }));
 
 describe('glanceable-ios register', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   afterEach(() => {
     vi.resetModules();
   });
@@ -49,5 +63,25 @@ describe('glanceable-ios register', () => {
     const { getGlanceableSinks } = await import('@/lib/glanceable/sink-registry');
     await import('./register');
     expect(getGlanceableSinks()).toContain(mocks.iosSink);
+  });
+
+  it('subscribes to Live Activity presses once on iOS and forwards them', async () => {
+    mocks.platform.OS = 'ios';
+    vi.resetModules();
+    await import('./register');
+
+    expect(mocks.addUserInteractionListener).toHaveBeenCalledTimes(1);
+    const press = { source: 'activity-1', target: 'open', timestamp: 0 };
+    mocks.addUserInteractionListener.mock.calls.at(0)?.[0]?.(press);
+    expect(mocks.handleGlanceableInteraction).toHaveBeenCalledWith(press);
+  });
+
+  it('does not subscribe to Live Activity presses on Android', async () => {
+    mocks.platform.OS = 'android';
+    vi.resetModules();
+    await import('./register');
+
+    expect(mocks.addUserInteractionListener).not.toHaveBeenCalled();
+    expect(mocks.handleGlanceableInteraction).not.toHaveBeenCalled();
   });
 });

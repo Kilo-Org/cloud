@@ -1,5 +1,7 @@
 import { Platform } from 'react-native';
 
+import { addUserInteractionListener } from 'expo-widgets';
+
 import { i18n } from '@/i18n';
 import { getGlanceableDelivery, registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import {
@@ -10,10 +12,40 @@ import {
 import { adoptPushStartedActivity } from './adopt-activity';
 import { refreshActiveAgentsLiveActivityCopy } from './active-agents-live-activity';
 import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
+import { handleGlanceableInteraction } from './interaction';
 import { iosSink } from './ios-sink';
 import { ensureWidgetLogo } from './widget-logo';
 
+type InteractionSubscription = ReturnType<typeof addUserInteractionListener>;
+
+/**
+ * The one press subscription for this process lifetime.
+ *
+ * expo-widgets attaches its native `NotificationCenter` observer when the first
+ * JS listener subscribes and detaches it when the last one leaves
+ * (`WidgetsModule.OnStartObserving`), so the handle is held in module scope
+ * rather than dropped at the call site.
+ */
+let interactionSubscription: InteractionSubscription | null = null;
+
+/** Subscribe once; a second call is a no-op. */
+function subscribeToInteractions(): void {
+  if (interactionSubscription !== null) {
+    return;
+  }
+  interactionSubscription = addUserInteractionListener(event => {
+    // The press is answered in the background too, where a rejected promise has
+    // nowhere to surface; the handler classifies its own failures.
+    void handleGlanceableInteraction(event);
+  });
+}
+
 if (Platform.OS === 'ios') {
+  // Subscribe before anything slower below: a press only reaches JavaScript
+  // while the native observer is attached, and the observer is attached from
+  // this subscription.
+  subscribeToInteractions();
+
   // Registers the iOS Live Activity and widget sink at import time. The root
   // layout imports this file on both platforms; Android owns
   // glanceable-android/register. Never create a React dependency here: the

@@ -800,6 +800,7 @@ export function NewSessionScreenBody() {
         organizationId={organizationId}
         sandbox={{
           status: sandboxSelection.status,
+          isSlowLoading: sandboxSelection.isSlowLoading,
           capabilities: sandboxSelection.capabilities,
           value: sandboxSelection.allocation,
           error: sandboxError,

@@ -241,6 +241,7 @@ const SANDBOX_CAPABILITIES: SandboxSelectionCapabilities = {
 function sandboxState(overrides: Partial<NewSessionSandboxState> = {}): NewSessionSandboxState {
   return {
     status: 'ready',
+    isSlowLoading: false,
     capabilities: SANDBOX_CAPABILITIES,
     value: undefined,
     error: undefined,
@@ -877,16 +878,27 @@ describe('NewSessionConfigureForm sandbox section', () => {
     expect(findElementByType(element, 'SandboxSelector')?.disabled).toBe(true);
   });
 
-  it('renders nothing while capabilities load so placeholder space never collapses', async () => {
+  it('renders nothing while the capabilities load fast so a collapsing slot never paints', async () => {
     const element = await renderForm({
       sandbox: sandboxState({ status: 'loading', capabilities: undefined }),
     });
-    // Most owners get a settled disabled verdict, so a loading skeleton would
-    // paint reserved space that then collapses and moves the sections below.
-    // Until the verdict is known the section renders nothing (as
-    // renderProfileRow does); the retryable failure still renders once settled.
+    // Most owners get a fast settled disabled verdict; a slot painted for
+    // them would collapse when the verdict lands, so the section renders
+    // nothing until the load outlasts the reserve grace.
     expect(findTextContent(element, text => text === 'Sandbox')).toBe(false);
     expect(findElementByType(element, 'Skeleton')).toBeNull();
+    expect(findElementByType(element, 'SandboxSelector')).toBeNull();
+    expect(findTextContent(element, text => text === 'Retry')).toBe(false);
+  });
+
+  it('renders the label and a field-sized skeleton once the load outlasts the grace', async () => {
+    const element = await renderForm({
+      sandbox: sandboxState({ status: 'loading', isSlowLoading: true, capabilities: undefined }),
+    });
+    // The skeleton holds the field's slot so the sections below keep their
+    // place when the query resolves; no selector or recovery exists yet.
+    expect(findTextContent(element, text => text === 'Sandbox')).toBe(true);
+    expect(findElementByType(element, 'Skeleton')).not.toBeNull();
     expect(findElementByType(element, 'SandboxSelector')).toBeNull();
     expect(findTextContent(element, text => text === 'Retry')).toBe(false);
   });

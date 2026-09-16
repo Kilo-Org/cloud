@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- one suite covering every builder and the locked-copy matrix */
 import {
   buildGlanceableSnapshot,
+  GLANCEABLE_STALE_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -11,6 +12,7 @@ import {
   buildCurrentWidgetProps,
   buildOngoingNotificationText,
 } from './widget-props';
+import widgetConfig from './widget-config.json';
 
 const NOW = 1_750_000_000_000;
 
@@ -273,6 +275,98 @@ describe('current widget deadline rendering', () => {
     expect(props.newestResultLabel).toBeNull();
     expect(props.newestResultAgo).toBeNull();
     expect(props.countLines).toEqual([]);
+  });
+});
+
+describe('current widget lapsed frame', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // The Android twin of the iOS stale timeline frame: a redraw a whole stale
+  // window after the snapshot was taken stops asserting the counts are current.
+  it.each([
+    ['exactly at the window', GLANCEABLE_STALE_MS],
+    ['past the window', 31 * 60_000],
+  ])('swaps the age for the delayed copy %s', (_label, elapsed) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW + elapsed);
+    const props = buildCurrentWidgetProps(
+      { ...MIXED, newestResultKind: 'running', newestResultAt: NEWEST_AT },
+      translate,
+      String,
+      formatAgo
+    );
+
+    expect(props.statusLine).toBe('Updates delayed');
+    // The counts stay: they are still the last thing the device knew, and the
+    // expiry frame is not yet due at 31 minutes.
+    expect(props.countLines).toEqual([
+      { label: 'Needs input', kind: 'needsInput', count: '2' },
+      { label: 'Working', kind: 'running', count: '4' },
+      { label: 'Idle', kind: 'idle', count: '3' },
+    ]);
+    expect(props.primaryLabel).toBe('Needs input');
+    expect(props.newestResultTitle).toBe('Newest result');
+  });
+
+  it('keeps the happy frame inside the stale window', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW + 29 * 60_000);
+    const props = buildCurrentWidgetProps(
+      { ...MIXED, newestResultKind: 'running', newestResultAt: NEWEST_AT },
+      translate,
+      String,
+      formatAgo
+    );
+
+    expect(props.statusLine).toBeNull();
+    expect(props.newestResultAgo).toBe(AGO);
+    expect(props.countLines).toHaveLength(3);
+  });
+
+  // The deadline keeps its precedence: a lapsed snapshot past `expiresAt` still
+  // draws the expired frame, never the delayed one behind it.
+  it('prefers the expired frame past the data deadline', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW + 28_800_000);
+    const props = buildCurrentWidgetProps(
+      { ...MIXED, newestResultKind: 'running', newestResultAt: NEWEST_AT },
+      translate,
+      String,
+      formatAgo
+    );
+
+    expect(props.statusLine).toBe('Status expired');
+    expect(props.countLines).toEqual([]);
+    expect(props.newestResultTitle).toBeNull();
+  });
+
+  // A locked frame asserts nothing that can lapse, so the lapsed branch skips it.
+  it.each(['waiting', 'empty', 'signed_out', 'privacy'] as const)(
+    'leaves %s copy alone past the stale window',
+    status => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW + 31 * 60_000);
+      const props = buildCurrentWidgetProps({ ...MIXED, status }, translate, String, formatAgo);
+      expect(props.statusLine).not.toBe('Updates delayed');
+      expect(props.countLines).toEqual([]);
+    }
+  );
+});
+
+describe('widget config', () => {
+  /**
+   * The age and the delayed frame are time facts: a surface that redraws only
+   * when an update is delivered keeps asserting both forever. The platform's
+   * own periodic redraw is what recomputes them, so the declared period must
+   * not be longer than the stale window it exists to catch. 30 minutes is
+   * Android's floor and exactly `GLANCEABLE_STALE_MS`.
+   */
+  it('declares a periodic redraw no longer than the stale window', () => {
+    const widget = widgetConfig.widgets.find(entry => entry.name === 'ActiveAgentsWidget');
+
+    expect(widget?.updatePeriodMillis).toBeGreaterThanOrEqual(GLANCEABLE_STALE_MS);
   });
 });
 

@@ -1,4 +1,7 @@
-import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  GLANCEABLE_STALE_MS,
+  type GlanceableAgentsSnapshot,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import {
   type GlanceableCountKind,
@@ -120,6 +123,22 @@ export function buildCurrentWidgetProps(
     (!Number.isFinite(expiresAt) || expiresAt <= Date.now())
   ) {
     return buildExpiredWidgetProps(snapshot, translate, formatCount, formatAgo);
+  }
+  // The Android twin of the iOS stale timeline frame: a redraw past
+  // `updatedAt + GLANCEABLE_STALE_MS` stops asserting the counts are current.
+  // The counts stay — they are still the last thing the device knew — and only
+  // the age goes. The platform's own redraw is what runs this check, so the
+  // claim stays honest without the app running. The deadline above wins, so a
+  // lapsed snapshot past `expiresAt` still draws the expired frame.
+  const staleAt = Date.parse(snapshot.updatedAt) + GLANCEABLE_STALE_MS;
+  if (snapshot.status === 'happy' && staleAt <= Date.now()) {
+    return buildAndroidWidgetProps(
+      { ...snapshot, status: 'stale' },
+      {},
+      translate,
+      formatCount,
+      formatAgo
+    );
   }
   return buildAndroidWidgetProps(snapshot, {}, translate, formatCount, formatAgo);
 }

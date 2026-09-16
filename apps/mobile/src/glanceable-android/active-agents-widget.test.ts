@@ -3,12 +3,12 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 
 import { renderActiveAgentsWidget } from './active-agents-widget';
-import { buildAndroidWidgetProps } from './widget-props';
+import { buildAndroidWidgetProps, buildCurrentWidgetProps } from './widget-props';
 
 // Stub the widget primitives so the layout functions return inspectable trees
 // without loading react-native. The real components are exercised by prebuild.
@@ -28,7 +28,7 @@ type MockElement = {
     clickAction?: string;
     clickActionData?: { uri?: string };
     accessibilityLabel?: string;
-    style?: { backgroundColor?: string };
+    style?: { backgroundColor?: string; justifyContent?: string };
     children?: unknown;
   };
 };
@@ -308,6 +308,10 @@ describe('renderActiveAgentsWidget', () => {
 // newest result on the bottom edge. Four cells tall, which reports roughly
 // 240–300 dp on Android's launcher grid.
 describe('the large widget cell', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('composes the counts and the newest-result footer from real props', () => {
     const rep = render(propsWithNewest(), { width: 250, height: 260 });
 
@@ -349,6 +353,50 @@ describe('the large widget cell', () => {
       'Newest result',
       'Updates delayed',
     ]);
+  });
+
+  // The lapsed frame is the happy frame with its age retracted: a redraw past
+  // the stale window draws the delayed copy in the footer the happy frame
+  // reserved, so the mark and the counts do not move and nothing blanks.
+  it('draws the delayed copy in the happy frame footer once the data lapses', () => {
+    const happy = render(propsWithNewest(), { width: 250, height: 260 });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW + 31 * 60_000);
+    const props = buildCurrentWidgetProps(
+      {
+        ...snapshotFor(
+          [{ status: 'busy', statusUpdatedAt: new Date(NOW - 180_000).toISOString() }],
+          0
+        ),
+        needsInput: 2,
+        idle: 3,
+        running: 4,
+      },
+      translate,
+      String,
+      formatAgo
+    );
+    vi.useRealTimers();
+    const lapsed = render(props, { width: 250, height: 260 });
+
+    expect(collectText(lapsed.light)).toEqual([
+      '2',
+      'Needs input',
+      '4',
+      'Working',
+      '3',
+      'Idle',
+      'Newest result',
+      'Updates delayed',
+    ]);
+    expect(lapsed.light.props.accessibilityLabel).toBe(
+      'Updates delayed, 2 Needs input, 4 Working, 3 Idle, Open agents'
+    );
+    // The footer box is the one the happy frame reserved, so the column keeps
+    // its space-between composition and the counts stay put.
+    expect(lapsed.light.props.style?.justifyContent).toBe('space-between');
+    expect(happy.light.props.style?.justifyContent).toBe(lapsed.light.props.style?.justifyContent);
   });
 
   // No counts means one fact only: the status text is the body and there is no

@@ -6,11 +6,13 @@ import {
   sessionIdSchema,
   WORKTREE_RUNTIME_HISTORY_UNAVAILABLE,
   type CanDestroyCloudAgentWorktreeSandboxParams,
+  type CloudAgentWorktreeLocation,
   type UnresolvedCloudAgentSandboxOwner,
 } from '@kilocode/session-ingest-contracts';
 import { DEFAULT_DO_RETRY_CONFIG } from '@kilocode/worker-utils';
 import { getSandboxProvider, type SessionMetadata } from '../persistence/session-metadata';
 import { getSandboxSessionStub, resolveSessionStub } from '../sandbox-session/session-stub';
+import { sessionPlaneFromId } from '../session-plane';
 import { withDORetry } from '../utils/do-retry';
 import type { Env } from '../types';
 import { logControlDiagnostic } from './diagnostics';
@@ -95,13 +97,24 @@ function lookupSessionRuntimeLocator(
 ): Promise<SessionRuntimeLocator | null> {
   return withDORetry(
     () =>
-      session.cloudAgentSessionId.startsWith('workspace_')
+      sessionPlaneFromId(session.cloudAgentSessionId) === 'control'
         ? getSandboxSessionStub(env, params.kiloUserId, session.cloudAgentSessionId)
         : resolveSessionStub(env, params.kiloUserId, session.cloudAgentSessionId),
     stub => stub.getRuntimeLocation(),
     'getRuntimeLocation',
     { ...DEFAULT_DO_RETRY_CONFIG, scope: { deadlineAt } }
   ).then(value => sessionRuntimeLocatorSchema.nullable().parse(value));
+}
+
+function matchesTarget(candidate: CloudAgentWorktreeLocation, target: CloudAgentWorktreeLocation) {
+  return candidate.sandboxId === target.sandboxId && candidate.provider === target.provider;
+}
+
+function ownerNeedsRuntimeLookup(owner: UnresolvedCloudAgentSandboxOwner): boolean {
+  if (owner.worktreeId !== null) return true;
+  return owner.sessions.some(
+    session => sessionPlaneFromId(session.cloudAgentSessionId) === 'control'
+  );
 }
 
 type OwnerOutcome =
@@ -154,6 +167,11 @@ export async function reconcileSandboxReferences(
 
     const locateOwner = async (ownerIndex: number): Promise<OwnerOutcome> => {
       const owner = owners[ownerIndex];
+      if (!ownerNeedsRuntimeLookup(owner)) {
+        return owner.allocationLocation && matchesTarget(owner.allocationLocation, params.location)
+          ? { kind: 'foreign' }
+          : { kind: 'located' };
+      }
       let located = false;
       for (const session of owner.sessions) {
         let locator: SessionRuntimeLocator | null;
@@ -185,19 +203,13 @@ export async function reconcileSandboxReferences(
           };
         }
         located = true;
-        if (
-          locator.location.sandboxId === params.location.sandboxId &&
-          locator.location.provider === params.location.provider
-        ) {
+        if (matchesTarget(locator.location, params.location)) {
           return { kind: 'foreign' };
         }
       }
       if (!located) {
         if (!owner.allocationLocation) return { kind: 'no-locator' };
-        if (
-          owner.allocationLocation.sandboxId === params.location.sandboxId &&
-          owner.allocationLocation.provider === params.location.provider
-        ) {
+        if (matchesTarget(owner.allocationLocation, params.location)) {
           return { kind: 'foreign' };
         }
       }

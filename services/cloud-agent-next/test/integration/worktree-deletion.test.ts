@@ -1,7 +1,7 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { getWorktreeWorkspacePath } from '../../src/workspace';
 import { CALLBACK_OUTBOX_PREFIX } from '../../src/sandbox-session/message-callbacks';
 import {
@@ -299,6 +299,37 @@ function installLegacyLocator(
   return () => Object.assign(instance['env'], { CLOUD_AGENT_SESSION: original });
 }
 
+function installControlLocator(
+  instance: SandboxControl,
+  locations: (
+    cloudAgentSessionId: string
+  ) => { sandboxId: string; provider: 'cloudflare' | 'vercel' } | null
+) {
+  const original = instance['env'].SANDBOX_SESSION;
+  Object.assign(instance['env'], {
+    SANDBOX_SESSION: {
+      idFromName: (name: string) => name,
+      get: (name: string) => ({
+        getRuntimeLocation: async () => {
+          const prefix = `${userId}:`;
+          const cloudAgentSessionId = name.startsWith(prefix) ? name.slice(prefix.length) : name;
+          const location = locations(cloudAgentSessionId);
+          if (!location) return null;
+          return {
+            cloudAgentSessionId,
+            kiloUserId: userId,
+            organizationId: null,
+            sessionId: null,
+            worktreeId: null,
+            location,
+          };
+        },
+      }),
+    },
+  });
+  return () => Object.assign(instance['env'], { SANDBOX_SESSION: original });
+}
+
 function registration(
   sessionId: `workspace_${string}`,
   sandboxId: `usr-${string}` | `ses-${string}`
@@ -367,40 +398,6 @@ function reply(socket: WebSocket, frame: RequestFrame, result: unknown, ok = tru
     })
   );
 }
-
-// Registered sessions leave dispatch, alarm, and fire-and-forget publication
-// work in the session DO. Interrupt every session a test touched, clear its
-// alarm, and drain its publication tail, or that work wakes after this file
-// closes and its logs race the vitest worker shutdown as pending
-// onUserConsoleLog rejections (EnvironmentTeardownError).
-const touchedSessions = new Set<string>();
-
-function sessionStub(userId: string, sessionId: string) {
-  const sessionName = `${userId}:${sessionId}`;
-  touchedSessions.add(sessionName);
-  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
-}
-
-afterEach(async () => {
-  for (const sessionName of touchedSessions) {
-    await runInDurableObject(
-      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
-      async (instance, state) => {
-        try {
-          await instance.interruptExecution();
-        } catch {
-          // A session that never registered has no work to interrupt.
-        }
-        await state.storage.deleteAlarm();
-        const publicationTail = (instance as any).publicExtensionPublicationTail as
-          | Promise<unknown>
-          | undefined;
-        await publicationTail?.catch(() => undefined);
-      }
-    ).catch(() => undefined);
-  }
-  touchedSessions.clear();
-});
 
 describe('worktree deletion in Durable Objects', () => {
   it('retains never-run child lineage for cold deletion when scoped publication fails', async () => {
@@ -481,65 +478,129 @@ describe('worktree deletion in Durable Objects', () => {
     await stub.finishWorktreeDeletion(worktreeId);
   });
 
-  it.each([true, false])(
-    'uses persisted legacy routing while public metadata is hidden by deletion (shared: %s)',
-    async shared => {
-      const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`;
-      const otherSandboxId = `usr-${'d'.repeat(48)}`;
-      const legacyId = `agent_${crypto.randomUUID()}`;
-      const legacy = sessionStub(userId, legacyId);
-      await runInDurableObject(legacy, async (instance, state) => {
-        await state.storage.put({
-          metadata: {
-            metadataSchemaVersion: 2,
-            identity: { sessionId: legacyId, userId },
-            auth: { kiloSessionId: kiloId(1) },
-            workspace: { sandboxId: shared ? sandboxId : otherSandboxId },
-            lifecycle: { timestamp: 1, version: 1 },
-          },
-          session_deletion_intent: { reason: 'explicit', startedAt: Date.now() },
-        });
-        await expect(instance.getMetadata()).resolves.toBeNull();
+  it('a matching recorded allocation blocks reconciliation on its own', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`;
+    const legacyId = `agent_${crypto.randomUUID()}`;
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(control, async instance => {
+      const original = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: {
+          canDestroyCloudAgentWorktreeSandbox: async () => ({
+            kind: 'unresolved',
+            owners: [
+              {
+                worktreeId: null,
+                organizationId: null,
+                allocationLocation: { sandboxId, provider: 'cloudflare' },
+                sessions: [{ sessionId: kiloId(1), cloudAgentSessionId: legacyId }],
+              },
+            ],
+          }),
+        },
       });
-      const control = env.SANDBOX_CONTROL.getByName(sandboxId);
-      await runInDurableObject(control, async instance => {
-        const original = instance['env'].SESSION_INGEST;
-        Object.assign(instance['env'], {
-          SESSION_INGEST: {
-            canDestroyCloudAgentWorktreeSandbox: async () => ({
-              kind: 'unresolved',
-              owners: [
-                {
-                  worktreeId: null,
-                  organizationId: null,
-                  allocationLocation: {
-                    sandboxId: shared ? otherSandboxId : sandboxId,
-                    provider: 'cloudflare',
-                  },
-                  sessions: [{ sessionId: kiloId(1), cloudAgentSessionId: legacyId }],
-                },
-              ],
-            }),
-          },
+      try {
+        await expect(
+          reconcileSandboxReferences(instance['env'], {
+            worktreeId,
+            kiloUserId: userId,
+            location: { sandboxId, provider: 'cloudflare' },
+          })
+        ).resolves.toEqual({
+          complete: false,
+          foreign: true,
+          unavailable: false,
         });
-        try {
-          await expect(
-            reconcileSandboxReferences(instance['env'], {
-              worktreeId,
-              kiloUserId: userId,
-              location: { sandboxId, provider: 'cloudflare' },
-            })
-          ).resolves.toEqual({
-            complete: !shared,
-            foreign: shared,
-            unavailable: false,
-          });
-        } finally {
-          Object.assign(instance['env'], { SESSION_INGEST: original });
-        }
+      } finally {
+        Object.assign(instance['env'], { SESSION_INGEST: original });
+      }
+    });
+  });
+
+  it('does not consult a legacy locator when a matching recorded allocation names the target', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`;
+    const legacyId = `agent_${crypto.randomUUID()}`;
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(control, async instance => {
+      const locator = vi.fn(() => ({ sandboxId, provider: 'cloudflare' as const }));
+      const restoreLegacy = installLegacyLocator(instance, locator);
+      const original = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: {
+          canDestroyCloudAgentWorktreeSandbox: async () => ({
+            kind: 'unresolved',
+            owners: [
+              {
+                worktreeId: null,
+                organizationId: null,
+                allocationLocation: { sandboxId, provider: 'cloudflare' },
+                sessions: [{ sessionId: kiloId(1), cloudAgentSessionId: legacyId }],
+              },
+            ],
+          }),
+        },
       });
-    }
-  );
+      try {
+        await expect(
+          reconcileSandboxReferences(instance['env'], {
+            worktreeId,
+            kiloUserId: userId,
+            location: { sandboxId, provider: 'cloudflare' },
+          })
+        ).resolves.toEqual({
+          complete: false,
+          foreign: true,
+          unavailable: false,
+        });
+        expect(locator).not.toHaveBeenCalled();
+      } finally {
+        restoreLegacy();
+        Object.assign(instance['env'], { SESSION_INGEST: original });
+      }
+    });
+  });
+
+  it('ignores a legacy no-worktree root whose persisted locator names the target', async () => {
+    const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`;
+    const legacyId = `agent_${crypto.randomUUID()}`;
+    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+    await runInDurableObject(control, async instance => {
+      const locator = vi.fn(() => ({ sandboxId, provider: 'cloudflare' as const }));
+      const restoreLegacy = installLegacyLocator(instance, locator);
+      const original = instance['env'].SESSION_INGEST;
+      Object.assign(instance['env'], {
+        SESSION_INGEST: {
+          canDestroyCloudAgentWorktreeSandbox: async () => ({
+            kind: 'unresolved',
+            owners: [
+              {
+                worktreeId: null,
+                organizationId: null,
+                sessions: [{ sessionId: kiloId(1), cloudAgentSessionId: legacyId }],
+              },
+            ],
+          }),
+        },
+      });
+      try {
+        await expect(
+          reconcileSandboxReferences(instance['env'], {
+            worktreeId,
+            kiloUserId: userId,
+            location: { sandboxId, provider: 'cloudflare' },
+          })
+        ).resolves.toEqual({
+          complete: true,
+          foreign: false,
+          unavailable: false,
+        });
+        expect(locator).not.toHaveBeenCalled();
+      } finally {
+        restoreLegacy();
+        Object.assign(instance['env'], { SESSION_INGEST: original });
+      }
+    });
+  });
 
   it.each(['cloudflare', 'vercel'] as const)(
     'completes an ownership-only %s allocation from fenced empty creation history without provider access',
@@ -604,7 +665,7 @@ describe('worktree deletion in Durable Objects', () => {
     }
   );
 
-  it('does not block a never-started allocation on unrelated unavailable legacy history or touch its provider', async () => {
+  it('does not block a never-started allocation or touch its provider', async () => {
     const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`;
     const legacyId = `agent_${crypto.randomUUID()}`;
     const control = env.SANDBOX_CONTROL.getByName(sandboxId);
@@ -779,10 +840,10 @@ describe('worktree deletion in Durable Objects', () => {
     });
   });
 
-  it('resolves an unrelated legacy runtime from original metadata before destroying the exclusive target', async () => {
+  it('resolves an unrelated control runtime from the locator before destroying the exclusive target', async () => {
     const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`;
     const otherSandboxId = `usr-${'c'.repeat(48)}`;
-    const legacyId = 'agent_44444444-4444-4444-8444-444444444444';
+    const otherSessionId = cloudId();
     const control = env.SANDBOX_CONTROL.getByName(sandboxId);
     await runInDurableObject(control, async (instance, state) => {
       const providerRef = encodeCloudflareProviderRef({
@@ -805,8 +866,9 @@ describe('worktree deletion in Durable Objects', () => {
         logs: async () => '',
       };
       const originalIngest = instance['env'].SESSION_INGEST;
-      const originalLegacy = instance['env'].CLOUD_AGENT_SESSION;
       Object.assign(instance, { provider, createProviderAdapter: () => provider });
+      const locator = vi.fn(() => ({ sandboxId: otherSandboxId, provider: 'cloudflare' as const }));
+      const restoreLocator = installControlLocator(instance, locator);
       Object.assign(instance['env'], {
         SESSION_INGEST: {
           canDestroyCloudAgentWorktreeSandbox: async () => ({
@@ -815,22 +877,9 @@ describe('worktree deletion in Durable Objects', () => {
               {
                 worktreeId: null,
                 organizationId: null,
-                sessions: [{ sessionId: kiloId(1), cloudAgentSessionId: legacyId }],
+                sessions: [{ sessionId: kiloId(1), cloudAgentSessionId: otherSessionId }],
               },
             ],
-          }),
-        },
-        CLOUD_AGENT_SESSION: {
-          idFromName: (name: string) => name,
-          get: () => ({
-            getRuntimeLocation: async () => ({
-              cloudAgentSessionId: legacyId,
-              kiloUserId: userId,
-              organizationId: null,
-              sessionId: kiloId(1),
-              worktreeId: null,
-              location: { sandboxId: otherSandboxId, provider: 'cloudflare' },
-            }),
           }),
         },
       });
@@ -845,19 +894,17 @@ describe('worktree deletion in Durable Objects', () => {
         });
         expect([...running]).toEqual([otherSandboxId]);
         expect(await state.storage.get('physical_record')).toBeUndefined();
+        expect(locator).toHaveBeenCalledTimes(1);
       } finally {
         await state.storage.deleteAlarm();
-        Object.assign(instance['env'], {
-          SESSION_INGEST: originalIngest,
-          CLOUD_AGENT_SESSION: originalLegacy,
-        });
+        restoreLocator();
+        Object.assign(instance['env'], { SESSION_INGEST: originalIngest });
       }
     });
   });
 
-  it('decides a many-unrelated-roots deletion inside the reconciliation budget', async () => {
+  it('no owner is walked and the sandbox is destroyed for many unrelated legacy roots', async () => {
     const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '')}`;
-    const otherSandboxId = `usr-${'c'.repeat(48)}`;
     const control = env.SANDBOX_CONTROL.getByName(sandboxId);
     await runInDurableObject(control, async (instance, state) => {
       const memory = createDeletionProvider(sandboxId);
@@ -874,10 +921,7 @@ describe('worktree deletion in Durable Objects', () => {
           { sessionId: null, cloudAgentSessionId: `agent_${crypto.randomUUID()}${index}` },
         ],
       }));
-      const locator = vi.fn((_cloudAgentSessionId: string) => ({
-        sandboxId: otherSandboxId,
-        provider: 'cloudflare' as const,
-      }));
+      const locator = vi.fn(() => null);
       const restoreLegacy = installLegacyLocator(instance, locator);
       const ownership = vi.fn(async () => ({ kind: 'unresolved' as const, owners }));
       const originalIngest = instance['env'].SESSION_INGEST;
@@ -899,10 +943,7 @@ describe('worktree deletion in Durable Objects', () => {
         expect(ownership).toHaveBeenCalledWith(
           expect.objectContaining({ releasedWorktreeIds: [] })
         );
-        expect(locator).toHaveBeenCalledTimes(owners.length);
-        expect(
-          new Set(locator.mock.calls.map(([cloudAgentSessionId]) => cloudAgentSessionId)).size
-        ).toBe(owners.length);
+        expect(locator).not.toHaveBeenCalled();
         expect(await memory.observe(created.providerRef)).toMatchObject({ status: 'terminal' });
         expect(await state.storage.get('physical_record')).toBeUndefined();
       } finally {
@@ -957,9 +998,9 @@ describe('worktree deletion in Durable Objects', () => {
     });
   });
 
-  it('does not terminalize a missing history that is repaired later', async () => {
+  it('does not terminalize a missing control history that is repaired later', async () => {
     const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '')}`;
-    const legacyId = `agent_${crypto.randomUUID()}`;
+    const controlSessionId = cloudId();
     const otherSandboxId = `usr-${'e'.repeat(48)}`;
     const control = env.SANDBOX_CONTROL.getByName(sandboxId);
     await runInDurableObject(control, async (instance, state) => {
@@ -972,14 +1013,14 @@ describe('worktree deletion in Durable Objects', () => {
       await installDeletionProvider(instance, memory);
       installScopedCleanupSocket(instance);
       let locator: { sandboxId: string; provider: 'cloudflare' } | null = null;
-      const restoreLegacy = installLegacyLocator(instance, () => locator);
+      const restoreLocator = installControlLocator(instance, () => locator);
       const ownership = vi.fn(async () => ({
         kind: 'unresolved' as const,
         owners: [
           {
             worktreeId: null,
             organizationId: null,
-            sessions: [{ sessionId: null, cloudAgentSessionId: legacyId }],
+            sessions: [{ sessionId: null, cloudAgentSessionId: controlSessionId }],
           },
         ],
       }));
@@ -1013,7 +1054,7 @@ describe('worktree deletion in Durable Objects', () => {
         expect(await state.storage.get('physical_record')).toBeUndefined();
       } finally {
         await state.storage.deleteAlarm();
-        restoreLegacy();
+        restoreLocator();
         Object.assign(instance['env'], { SESSION_INGEST: originalIngest });
       }
     });
@@ -1212,9 +1253,9 @@ describe('worktree deletion in Durable Objects', () => {
     });
   });
 
-  it('does not lose a pre-deploy detached foreign reference on a shared sandbox', async () => {
+  it('does not lose a control reference on a shared sandbox', async () => {
     const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '')}`;
-    const legacyId = `agent_${crypto.randomUUID()}`;
+    const controlSessionId = cloudId();
     const control = env.SANDBOX_CONTROL.getByName(sandboxId);
     await runInDurableObject(control, async (instance, state) => {
       const memory = createDeletionProvider(sandboxId);
@@ -1226,7 +1267,7 @@ describe('worktree deletion in Durable Objects', () => {
       const stop = vi.fn(memory.stop.bind(memory));
       await installDeletionProvider(instance, { ...memory, stop });
       installScopedCleanupSocket(instance);
-      const restoreLegacy = installLegacyLocator(instance, () => ({
+      const restoreLocator = installControlLocator(instance, () => ({
         sandboxId,
         provider: 'vercel',
       }));
@@ -1236,7 +1277,7 @@ describe('worktree deletion in Durable Objects', () => {
           {
             worktreeId: null,
             organizationId: null,
-            sessions: [{ sessionId: null, cloudAgentSessionId: legacyId }],
+            sessions: [{ sessionId: null, cloudAgentSessionId: controlSessionId }],
           },
         ],
       }));
@@ -1261,7 +1302,7 @@ describe('worktree deletion in Durable Objects', () => {
         expect(await loadSessionReferences(state.storage)).toMatchObject({ reconciled: false });
       } finally {
         await state.storage.deleteAlarm();
-        restoreLegacy();
+        restoreLocator();
         Object.assign(instance['env'], { SESSION_INGEST: originalIngest });
       }
     });

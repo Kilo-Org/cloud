@@ -723,6 +723,11 @@ export const baseGetSessionNextOutputSchema = z.object({
   orgId: z.string().optional(),
   sandboxId: z.string().optional(),
 
+  // Worktree ownership (present only for worktree sessions)
+  worktreeId: z.string().nullable().optional(),
+  parentSessionId: z.string().nullable().optional(),
+  cloudAgentSessionScopeId: z.string().nullable().optional(),
+
   // Repository info (no tokens)
   githubRepo: z.string().optional(),
   gitUrl: z.string().optional(),

@@ -349,6 +349,11 @@ export type GetSessionOutput = {
   /** Sandbox ID (hashed format like usr-abc123...) for correlating with Cloudflare logs */
   sandboxId?: string;
 
+  // Worktree ownership (present only for worktree sessions)
+  worktreeId?: string | null;
+  parentSessionId?: string | null;
+  cloudAgentSessionScopeId?: string | null;
+
   // Repository info (no tokens)
   githubRepo?: string;
   gitUrl?: string;

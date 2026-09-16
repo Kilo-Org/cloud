@@ -2121,6 +2121,7 @@
     "couldNotLoadActiveSessions": "Etkin oturumlar yüklenemedi.",
     "agentSessions": "Şu anda etkin",
     "newCodingTask": "Yeni kodlama görevi",
+    "newTaskFromPicture": "Resimden yeni görev",
     "explore": "Keşfet",
     "seeAll": "Tümünü gör",
     "noLiveSessions": "Şu anda çalışan oturum yok"

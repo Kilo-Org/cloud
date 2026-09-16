@@ -39,6 +39,16 @@ export const MAX_THRESHOLD_USD = 1_000_000;
 export const MIN_MULTIPLIER_BASIS_POINTS = 100;
 export const MAX_MULTIPLIER_BASIS_POINTS = 5_000;
 
+/**
+ * Stand-ins submitted for a rule kind the owner has switched off. The router
+ * requires a value for every kind whatever its `enabled` flag, so a switched-off
+ * kind that is blank or out of range submits the smallest value its schema
+ * accepts instead of making the owner repair a field for an alert that never
+ * fires. A switched-off rule whose draft still holds a valid value keeps it.
+ */
+export const DISABLED_THRESHOLD_USD = 1;
+export const DISABLED_MULTIPLIER_BASIS_POINTS = MIN_MULTIPLIER_BASIS_POINTS;
+
 export const SPEND_ALERTS_LOAD_ERROR = "Couldn't load spend alerts.";
 export const SPEND_ALERTS_SAVE_ERROR = "Couldn't save spend alerts.";
 export const SPEND_ALERTS_FORBIDDEN = "You don't have permission to manage spend alerts.";
@@ -215,9 +225,12 @@ export type SpendAlertValidation =
   | { ok: false; input: null; errors: SpendAlertFieldErrors };
 
 /**
- * Draft → the payload `spendAlerts.save` accepts. Fails (and reports which
- * field is wrong) exactly when the router's zod schema would reject the same
- * values, so a disabled Save always means the server would refuse.
+ * Draft → the payload `spendAlerts.save` accepts. A rule kind the owner has
+ * switched off is not being edited, so its fields are not validated and never
+ * report an error; the router still needs one value per kind, so such a rule
+ * submits the smallest value its schema accepts unless the draft already holds
+ * a valid one. An enabled rule is validated exactly as the router's zod schema
+ * would, so a disabled Save always means the server would refuse.
  */
 export function toSaveInput(draft: SpendAlertsDraft): SpendAlertValidation {
   const errors: SpendAlertFieldErrors = {};
@@ -227,11 +240,13 @@ export function toSaveInput(draft: SpendAlertsDraft): SpendAlertValidation {
     if (rule.kind === 'threshold') {
       const threshold = parseUsdInput(rule.thresholdUsd);
       const valid = threshold !== null && threshold > 0 && threshold <= MAX_THRESHOLD_USD;
-      if (!valid) errors.threshold = THRESHOLD_FIELD_ERROR;
+      if (!valid && rule.enabled) errors.threshold = THRESHOLD_FIELD_ERROR;
       rules.push({
         kind: 'threshold',
         enabled: rule.enabled,
-        threshold: valid ? threshold : null,
+        // Only an enabled rule can block Save on a bad limit; a switched-off one
+        // falls back to a schema-valid stand-in.
+        threshold: valid ? threshold : DISABLED_THRESHOLD_USD,
         windowHours: rule.windowHours,
         multiplierBasisPoints: null,
         emailEnabled: rule.emailEnabled,
@@ -246,13 +261,13 @@ export function toSaveInput(draft: SpendAlertsDraft): SpendAlertValidation {
       basisPoints !== null &&
       basisPoints >= MIN_MULTIPLIER_BASIS_POINTS &&
       basisPoints <= MAX_MULTIPLIER_BASIS_POINTS;
-    if (!valid) errors.multiplier = MULTIPLIER_FIELD_ERROR;
+    if (!valid && rule.enabled) errors.multiplier = MULTIPLIER_FIELD_ERROR;
     rules.push({
       kind: 'anomaly',
       enabled: rule.enabled,
       threshold: null,
       windowHours: null,
-      multiplierBasisPoints: valid ? basisPoints : null,
+      multiplierBasisPoints: valid ? basisPoints : DISABLED_MULTIPLIER_BASIS_POINTS,
       emailEnabled: rule.emailEnabled,
       pushEnabled: rule.pushEnabled,
     });

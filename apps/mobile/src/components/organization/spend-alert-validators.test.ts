@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_MULTIPLIER,
   DEFAULT_WINDOW_HOURS,
+  DISABLED_MULTIPLIER,
+  DISABLED_THRESHOLD_USD,
   multiplierBasisPoints,
   multiplierError,
   parseMultiplier,
@@ -58,6 +60,16 @@ describe('parseMultiplier', () => {
     expect(multiplierError('2')).toBeNull();
     expect(multiplierError('0.5')).not.toBeNull();
     expect(multiplierError('51')).not.toBeNull();
+  });
+});
+
+describe('disabled-kind stand-ins', () => {
+  it('are the smallest values the wire accepts', () => {
+    // A switched-off kind submits these instead of gating Save on a field the
+    // owner deliberately left empty.
+    expect(parseThreshold(String(DISABLED_THRESHOLD_USD))).toBe(DISABLED_THRESHOLD_USD);
+    expect(parseMultiplier(String(DISABLED_MULTIPLIER))).toBe(DISABLED_MULTIPLIER);
+    expect(multiplierBasisPoints(DISABLED_MULTIPLIER)).toBe(100);
   });
 });
 

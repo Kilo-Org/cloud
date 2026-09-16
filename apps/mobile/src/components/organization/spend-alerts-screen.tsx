@@ -14,6 +14,8 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import {
   DEFAULT_MULTIPLIER,
+  DISABLED_MULTIPLIER,
+  DISABLED_THRESHOLD_USD,
   multiplierBasisPoints,
   multiplierError,
   parseMultiplier,
@@ -225,9 +227,13 @@ function SpendAlertsForm({
   const [anomalyPush, setAnomalyPush] = useState(anomaly?.pushEnabled ?? false);
 
   // The wire requires a limit and a multiplier for both kinds whether or not the
-  // kind is enabled, so Save stays disabled until both parse.
-  const canSubmit = () =>
-    parseThreshold(thresholdRef.current) != null && parseMultiplier(multiplierRef.current) != null;
+  // kind is enabled, but a kind the owner switched off is not being edited: it
+  // does not gate Save, and its payload falls back to a schema-valid stand-in
+  // (buildInput below).
+  const canSubmitWith = (thresholdOn: boolean, anomalyOn: boolean) =>
+    (!thresholdOn || parseThreshold(thresholdRef.current) != null) &&
+    (!anomalyOn || parseMultiplier(multiplierRef.current) != null);
+  const canSubmit = () => canSubmitWith(thresholdEnabled, anomalyEnabled);
   const [canSave, setCanSave] = useState(canSubmit);
   const revalidate = () => {
     setCanSave(canSubmit());
@@ -262,7 +268,11 @@ function SpendAlertsForm({
   const buildInput = (pushOverride?: PushOverride): SpendAlertSaveInput | null => {
     const limit = parseThreshold(thresholdRef.current);
     const multiplier = parseMultiplier(multiplierRef.current);
-    if (limit == null || multiplier == null) {
+    // A kind the owner switched off need not hold a value; the wire still wants
+    // one per kind, so it falls back to the smallest value the schema accepts.
+    const thresholdUsd = limit ?? (thresholdEnabled ? null : DISABLED_THRESHOLD_USD);
+    const multiplierTimes = multiplier ?? (anomalyEnabled ? null : DISABLED_MULTIPLIER);
+    if (thresholdUsd == null || multiplierTimes == null) {
       return null;
     }
     return {
@@ -272,7 +282,7 @@ function SpendAlertsForm({
         {
           kind: 'threshold',
           enabled: thresholdEnabled,
-          threshold: limit,
+          threshold: thresholdUsd,
           windowHours: toWindowHours(Number(windowOption)),
           emailEnabled: thresholdEmail,
           pushEnabled: pushOverride?.target === 'threshold' ? pushOverride.value : thresholdPush,
@@ -280,7 +290,7 @@ function SpendAlertsForm({
         {
           kind: 'anomaly',
           enabled: anomalyEnabled,
-          multiplierBasisPoints: multiplierBasisPoints(multiplier),
+          multiplierBasisPoints: multiplierBasisPoints(multiplierTimes),
           emailEnabled: anomalyEmail,
           pushEnabled: pushOverride?.target === 'anomaly' ? pushOverride.value : anomalyPush,
         },
@@ -376,6 +386,8 @@ function SpendAlertsForm({
             onEnabledChange={value => {
               void Haptics.selectionAsync();
               setThresholdEnabled(value);
+              // Switching the kind off drops its field from the Save gate.
+              setCanSave(canSubmitWith(value, anomalyEnabled));
             }}
             emailEnabled={thresholdEmail}
             onEmailChange={setThresholdEmail}
@@ -390,11 +402,11 @@ function SpendAlertsForm({
           >
             <FormField
               label={t('spendAlerts.limitLabel')}
-              required
+              required={thresholdEnabled}
               placeholder="25.00"
               keyboardType="decimal-pad"
               defaultValue={thresholdRef.current || undefined}
-              validate={thresholdError}
+              validate={thresholdEnabled ? thresholdError : undefined}
               onChangeText={value => {
                 thresholdRef.current = value;
                 revalidate();
@@ -420,6 +432,8 @@ function SpendAlertsForm({
             onEnabledChange={value => {
               void Haptics.selectionAsync();
               setAnomalyEnabled(value);
+              // Switching the kind off drops its field from the Save gate.
+              setCanSave(canSubmitWith(thresholdEnabled, value));
             }}
             emailEnabled={anomalyEmail}
             onEmailChange={setAnomalyEmail}
@@ -434,11 +448,11 @@ function SpendAlertsForm({
           >
             <FormField
               label={t('spendAlerts.multiplierLabel')}
-              required
+              required={anomalyEnabled}
               placeholder={String(DEFAULT_MULTIPLIER)}
               keyboardType="decimal-pad"
               defaultValue={multiplierRef.current || undefined}
-              validate={multiplierError}
+              validate={anomalyEnabled ? multiplierError : undefined}
               onChangeText={value => {
                 multiplierRef.current = value;
                 revalidate();

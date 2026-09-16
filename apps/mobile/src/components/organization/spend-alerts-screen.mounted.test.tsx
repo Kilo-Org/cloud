@@ -393,6 +393,66 @@ describe('SpendAlertsScreen non-retryable states', () => {
   });
 });
 
+describe('SpendAlertsScreen with an alert kind switched off', () => {
+  it('lets Save pass with a blank limit once the threshold kind is off', async () => {
+    const { renderer } = await mountLoaded();
+
+    type(renderer, LIMIT, '');
+    expect(buttonByVariant(renderer).props.disabled).toBe(true);
+
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.thresholdTitle')), false);
+
+    // A switched-off kind stops validating its field and stops gating Save.
+    expect(fieldByLabel(renderer, LIMIT).props.validate).toBeUndefined();
+    expect(buttonByVariant(renderer).props.disabled).toBe(false);
+
+    press(buttonByVariant(renderer));
+
+    await waitFor(() => saveMutationFn.mock.calls.length === 1);
+    const input = saveMutationFn.mock.calls[0]?.[0] as {
+      rules: { kind: string; enabled: boolean; threshold: number }[];
+    };
+    const savedThreshold = input.rules.find(rule => rule.kind === 'threshold');
+    expect(savedThreshold?.enabled).toBe(false);
+    // The wire still needs a positive limit for the kind: the stand-in fills in.
+    expect(savedThreshold?.threshold).toBeGreaterThan(0);
+  });
+
+  it('lets Save pass with a blank multiplier once the anomaly kind is off', async () => {
+    const { renderer } = await mountLoaded();
+
+    type(renderer, MULTIPLIER, '');
+    expect(buttonByVariant(renderer).props.disabled).toBe(true);
+
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.anomalyTitle')), false);
+
+    expect(fieldByLabel(renderer, MULTIPLIER).props.validate).toBeUndefined();
+    expect(buttonByVariant(renderer).props.disabled).toBe(false);
+
+    press(buttonByVariant(renderer));
+
+    await waitFor(() => saveMutationFn.mock.calls.length === 1);
+    const input = saveMutationFn.mock.calls[0]?.[0] as {
+      rules: { kind: string; enabled: boolean; multiplierBasisPoints: number }[];
+    };
+    const anomaly = input.rules.find(rule => rule.kind === 'anomaly');
+    expect(anomaly?.enabled).toBe(false);
+    expect(anomaly?.multiplierBasisPoints).toBeGreaterThanOrEqual(100);
+  });
+
+  it('keeps a valid typed limit when the threshold kind is switched off', async () => {
+    const { renderer } = await mountLoaded();
+
+    type(renderer, LIMIT, '30');
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.thresholdTitle')), false);
+    press(buttonByVariant(renderer));
+
+    await waitFor(() => saveMutationFn.mock.calls.length === 1);
+    const input = saveMutationFn.mock.calls[0]?.[0] as { rules: { threshold: number }[] };
+    expect(input.rules[0]?.threshold).toBe(30);
+  });
+});
+
 describe('SpendAlertsScreen empty state', () => {
   it('shows the off copy with the master switch as the only call to action', async () => {
     const { renderer } = await mountLoaded({ enabled: false });

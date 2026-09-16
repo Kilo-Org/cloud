@@ -19,6 +19,15 @@ export const DEFAULT_WINDOW_HOURS: SpendAlertWindowHours = 24;
 export const DEFAULT_MULTIPLIER = 2;
 
 /**
+ * The value the save payload carries for an alert kind the owner has switched
+ * off. The wire requires a limit and a multiplier whichever kinds are enabled,
+ * so a switched-off kind submits the smallest value its schema accepts rather
+ * than making the owner fill in a field for an alert that will not fire.
+ */
+export const DISABLED_THRESHOLD_USD = 1;
+export const DISABLED_MULTIPLIER = 1;
+
+/**
  * Parse a USD limit: an empty, unparsable, zero, negative, or above-cap value is
  * `null` (no limit), never a clamped number.
  */

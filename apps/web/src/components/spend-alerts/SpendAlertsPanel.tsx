@@ -276,8 +276,11 @@ function RuleEditor({
     ? null
     : pushChannelNote(pushCategoryEnabled, pushChannelBlocked, rule);
   // A disabled rule is not being edited, so its bounds are not the caller's
-  // problem yet: only an editable field reports what is wrong with it.
-  const fieldError = disabled ? undefined : isThreshold ? errors.threshold : errors.multiplier;
+  // problem yet: only an editable, switched-on field reports what is wrong with
+  // it. Switching a kind off also drops its error from `toSaveInput`, so the
+  // hidden message and the enabled Save cannot disagree.
+  const fieldError =
+    disabled || !rule.enabled ? undefined : isThreshold ? errors.threshold : errors.multiplier;
 
   return (
     <div className={cn('rounded-lg border p-4', disabled && 'opacity-50')}>

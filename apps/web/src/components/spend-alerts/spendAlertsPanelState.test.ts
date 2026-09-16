@@ -1,5 +1,7 @@
 import {
+  MAX_MULTIPLIER_BASIS_POINTS,
   MAX_THRESHOLD_USD,
+  MIN_MULTIPLIER_BASIS_POINTS,
   MOBILE_APP_SETUP_HREF,
   MULTIPLIER_FIELD_ERROR,
   SPEND_ALERTS_FORBIDDEN,
@@ -362,6 +364,83 @@ describe('toSaveInput bounds', () => {
     );
     expect(result.ok).toBe(true);
     expect(result.input?.rules[1].multiplierBasisPoints).toBe(255);
+  });
+});
+
+describe('toSaveInput with a rule kind switched off', () => {
+  const disabledThreshold = draftRule({ kind: 'threshold', enabled: false, thresholdUsd: '' });
+  const disabledAnomaly = draftRule({ kind: 'anomaly', enabled: false, multiplier: '' });
+
+  it('lets Save pass when a switched-off limit is blank, and submits a schema-valid stand-in', () => {
+    const result = toSaveInput(
+      draft({
+        rules: [disabledThreshold, draftRule({ kind: 'anomaly', multiplier: '3' })],
+      })
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual({});
+    const rule = result.input?.rules.find(candidate => candidate.kind === 'threshold');
+    expect(rule?.enabled).toBe(false);
+    expect(rule?.threshold).toBeGreaterThan(0);
+    expect(rule?.threshold).toBeLessThanOrEqual(MAX_THRESHOLD_USD);
+    expect(rule?.windowHours).toBe(24);
+  });
+
+  it('lets Save pass when a switched-off multiplier is blank, and submits a schema-valid stand-in', () => {
+    const result = toSaveInput(
+      draft({
+        rules: [draftRule({ kind: 'threshold', thresholdUsd: '10' }), disabledAnomaly],
+      })
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual({});
+    const rule = result.input?.rules.find(candidate => candidate.kind === 'anomaly');
+    expect(rule?.enabled).toBe(false);
+    expect(rule?.multiplierBasisPoints).toBeGreaterThanOrEqual(MIN_MULTIPLIER_BASIS_POINTS);
+    expect(rule?.multiplierBasisPoints).toBeLessThanOrEqual(MAX_MULTIPLIER_BASIS_POINTS);
+  });
+
+  it('does not block Save on out-of-range text in a switched-off field', () => {
+    const result = toSaveInput(
+      draft({
+        rules: [
+          draftRule({ kind: 'threshold', enabled: false, thresholdUsd: '0' }),
+          draftRule({ kind: 'anomaly', enabled: false, multiplier: 'not a number' }),
+        ],
+      })
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual({});
+  });
+
+  it('keeps a valid typed value on a switched-off rule', () => {
+    const result = toSaveInput(
+      draft({
+        rules: [
+          draftRule({ kind: 'threshold', enabled: false, thresholdUsd: '75' }),
+          draftRule({ kind: 'anomaly', enabled: false, multiplier: '4' }),
+        ],
+      })
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.input?.rules[0]).toMatchObject({ enabled: false, threshold: 75 });
+    expect(result.input?.rules[1]).toMatchObject({ enabled: false, multiplierBasisPoints: 400 });
+  });
+
+  it('still reports the error of the rule kind that is switched on', () => {
+    const result = toSaveInput(
+      draft({
+        rules: [disabledThreshold, draftRule({ kind: 'anomaly', multiplier: '' })],
+      })
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.threshold).toBeUndefined();
+    expect(result.errors.multiplier).toBe(MULTIPLIER_FIELD_ERROR);
   });
 });
 

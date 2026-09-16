@@ -1713,6 +1713,7 @@ describe('cold iOS background delivery', () => {
       status: 'empty',
       running: 0,
       needsInput: 0,
+      needsApproval: 0,
       idle: 0,
       needsInputSince: null,
       // No ask is recorded for this cold push, so the app-built state says so

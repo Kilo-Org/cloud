@@ -19,8 +19,9 @@ import expo.modules.kotlin.modules.ModuleDefinition
  * The JS side owns the translated copy, the deep link, and the revision guard;
  * this module owns the fixed notification id, the dedicated `active-agents`
  * channel (default importance, silent, no heads-up), the API 36.1+ promotion
- * gate, the content intent plus Open action that deep-link into the Agents
- * route, and the Approve action whose broadcast the headless worker answers.
+ * gate, the content intent plus Open action that deep-link into the recorded
+ * session's route (the Agents tab when nothing waits), and the Approve action
+ * whose broadcast runs the headless approval when a permission waits.
  */
 class ActiveAgentsLiveUpdateModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -111,7 +112,11 @@ class ActiveAgentsLiveUpdateModule : Module() {
     )
   }
 
-  /** The Approve action: one broadcast the receiver turns into a unique answer. */
+  /**
+   * The Approve action: one broadcast the receiver turns into a unique answer,
+   * with no Activity. The phone can be locked when the surface answers, and the
+   * approval needs no screen.
+   */
   private fun approvePendingIntent(): PendingIntent {
     val intent = Intent(context, ActiveAgentsActionReceiver::class.java)
       .setAction(ActiveAgentsActionReceiver.ACTION_APPROVE)
@@ -142,7 +147,8 @@ class ActiveAgentsLiveUpdateModule : Module() {
         ).build()
       )
 
-    // No recorded approvable ask: the action is omitted, not disabled.
+    // No recorded approvable ask: the action is omitted, not disabled. The JS
+    // side drops the label once the wait is answered elsewhere.
     if (approveLabel != null) {
       builder.addAction(
         Notification.Action.Builder(

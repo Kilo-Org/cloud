@@ -1,3 +1,5 @@
+import { AppRegistry } from 'react-native';
+
 import { i18n } from '@/i18n';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { refreshGlanceableSnapshot, runGlanceableApprove } from '@/lib/glanceable/approve-ask';
@@ -11,17 +13,30 @@ import {
 } from './android-sink';
 
 /**
- * The JS body the notification's Approve tap runs.
+ * The JS bodies the ongoing notification's Approve action runs headless.
  *
- * `ActiveAgentsApproveWorker` boots headless JS with no Activity and starts this
- * task, so the entry registers it by this key. The worker's `TASK_NAME` and the
- * entry's registration carry the same string; all three are asserted equal in
- * `approve-task.test.ts`, because only the string crosses the native boundary.
+ * Two registrations share this module. `handleApproveTask` answers the ask the
+ * app recorded, and the entry registers it under `APPROVE_HEADLESS_TASK_KEY`
+ * via the Kotlin worker; `runApproveTask` runs the front-approval service and
+ * is registered under `APPROVE_AGENT_TASK_KEY` by `registerApproveTask`, the
+ * key the `ActiveAgentsApproveTaskService` chain starts. Only the strings cross
+ * the native boundary, so they are asserted equal in `approve-task.test.ts`.
  *
- * The recorded waiting ask is the only thing there is to answer — never the
- * snapshot's counts — and it also names the ids the republish below needs.
+ * The recorded waiting ask is the only thing `handleApproveTask` answers —
+ * never the snapshot's counts — and it also names the ids the republish below
+ * needs.
  */
 export const APPROVE_HEADLESS_TASK_KEY = 'KiloActiveAgentsApprove';
+
+/**
+ * The key the `ActiveAgentsApproveTaskService` chain starts. One literal,
+ * shared by the Kotlin service and this registration: a mismatch would leave
+ * that notification action with no task.
+ */
+export const APPROVE_AGENT_TASK_KEY = 'ActiveAgentsApprove';
+
+/** The approval the task runs. Injected so the flow is unit-testable. */
+export type ApproveRunner = () => Promise<void>;
 
 // A headless approve run has no Activity and no app root, so nothing else has
 // loaded the Android sink by the time the republish below runs; without the
@@ -115,4 +130,71 @@ export async function handleApproveTask(): Promise<void> {
   if (failed) {
     showApproveFailed(ask);
   }
+}
+
+/**
+ * Run one approval headless, from the ongoing notification's Approve action.
+ *
+ * The stored language goes first, for the same reason a widget redraw applies
+ * it: the process has no Activity, so nothing else has switched i18n and the
+ * surface the approval republishes would render English. Then the same service
+ * the phone's permission card backs runs, and it republishes the surfaces
+ * before it resolves.
+ *
+ * A rejection never reaches Android — `AppRegistry.startHeadlessTask` only
+ * finishes the native task for a resolved promise, so a rejection would hold
+ * the service's wake lock until its timeout. Every failure is swallowed here,
+ * and the surface republish inside the service is what shows the user whether
+ * the approval landed.
+ */
+export async function runApproveTask(
+  approve: ApproveRunner = loadApproveFrontAgent
+): Promise<void> {
+  await applyLanguageBestEffort();
+  try {
+    await approve();
+  } catch {
+    // Swallowed by design; see the doc comment above.
+  }
+}
+
+/**
+ * The language is copy only: a failure there must not swallow the tap the user
+ * made, so it is best-effort and the approval runs in whatever language the
+ * process already has.
+ */
+async function applyLanguageBestEffort(): Promise<void> {
+  try {
+    // The import does double duty: it registers the Android sink the refreshed
+    // surfaces have to reach, and it hands over the one language step a
+    // headless process has nothing else to run.
+    //
+    // Loaded on task fire, not at app entry: the widget register module pulls in
+    // the widget sink and an `AppState` listener, which this chain's own task
+    // never needs.
+    const { applyWidgetLanguage } = await import('./register');
+    await applyWidgetLanguage();
+  } catch {
+    // Swallowed by design; see the doc comment above.
+  }
+}
+
+/** The wired default: the one s2 approval service both wrists share. */
+async function loadApproveFrontAgent(): Promise<void> {
+  const { approveFrontAgent } = await import('@/lib/glanceable/approve-front-agent');
+  await approveFrontAgent();
+}
+
+/** The registered task. Android passes an empty data map, which is ignored. */
+async function approveTask(): Promise<void> {
+  await runApproveTask();
+}
+
+/**
+ * Register the headless task for the notification action. Called from the app
+ * entry, before `expo-router/entry`: Android can deliver the action to a cold
+ * process that never had a widget redraw.
+ */
+export function registerApproveTask(): void {
+  AppRegistry.registerHeadlessTask(APPROVE_AGENT_TASK_KEY, () => approveTask);
 }

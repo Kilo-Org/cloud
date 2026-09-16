@@ -32,7 +32,11 @@ describe('Active Agents Live Activity actions', () => {
   const source = read(LAYOUT_FILE);
 
   it('declares the two stable targets', () => {
-    expect(targetsIn(source)).toEqual(['approve', 'open']);
+    // Two surfaces draw Approve — the phone block's `actions` and the
+    // watch/CarPlay `bannerSmall` control beside it — so the literal repeats.
+    // The contract is the set of targets the handler routes, and no surface
+    // declares one outside it.
+    expect([...new Set(targetsIn(source))]).toEqual(['approve', 'open']);
   });
 
   it('reads both labels from the baked copy, never through an import', () => {
@@ -102,7 +106,7 @@ describe('Active Agents Live Activity actions', () => {
       .map(match => match[1] ?? '')
       .toSorted();
     expect(interactionTargets).toEqual(['approve', 'open']);
-    expect(targetsIn(source)).toEqual(interactionTargets);
+    expect([...new Set(targetsIn(source))]).toEqual(interactionTargets);
   });
 
   it('foregrounds the app for Open, and only for Open', () => {

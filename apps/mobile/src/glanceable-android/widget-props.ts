@@ -152,6 +152,22 @@ export function buildOngoingNotificationText(
   return notice === null ? text : `${notice} ${text}`;
 }
 
+/**
+ * The ongoing notification's Approve action label, or null when no action must
+ * be offered.
+ *
+ * Only a session waiting on a permission prompt can be approved without
+ * choosing an option, and `needsApproval` counts exactly those rows — an older
+ * producer omits the field, so absent reads as zero. A `question` or `retry`
+ * wait therefore gets no action, and neither does an empty surface.
+ */
+export function buildApproveLabel(
+  snapshot: GlanceableAgentsSnapshot,
+  translate: (key: string) => string
+): string | null {
+  return (snapshot.needsApproval ?? 0) > 0 ? translate('common.approve') : null;
+}
+
 /** The promoted chip shows only the primary number; the full text keeps all labels. */
 export function buildCompactNotificationText(
   snapshot: GlanceableAgentsSnapshot,

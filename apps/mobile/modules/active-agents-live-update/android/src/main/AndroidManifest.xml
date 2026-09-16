@@ -14,5 +14,12 @@
     <receiver
       android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsActionReceiver"
       android:exported="false" />
+    <!-- The headless-task-service chain the same Approve action can take. -->
+    <receiver
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsApproveReceiver"
+      android:exported="false" />
+    <service
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsApproveTaskService"
+      android:exported="false" />
   </application>
 </manifest>

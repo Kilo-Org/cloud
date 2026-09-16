@@ -1,7 +1,6 @@
 /* eslint-disable max-lines -- notification wiring: foreground/background handlers, channels, and push-token plumbing are kept together. */
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import * as SecureStore from 'expo-secure-store';
 import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 import { z } from 'zod';
@@ -34,6 +33,7 @@ import {
   persistGlanceableSink,
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
+import { getActiveUserId, getSelectedOrganizationId } from '@/lib/glanceable/scope';
 import {
   getGlanceableSinks,
   type GlanceableSink,
@@ -41,7 +41,6 @@ import {
 } from '@/lib/glanceable/sink-registry';
 import { readWaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { chainSave } from '@/lib/hooks/save-chain';
-import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
 import { notificationPathForData } from './notification-path';
@@ -248,31 +247,6 @@ export async function applyGlanceablePushData(
     );
   }
   return true;
-}
-
-/**
- * Read the selected organization id for scope validation and token registration.
- * A missing hint only matches a personal scope; it cannot revive an org scope.
- */
-async function getSelectedOrganizationId(): Promise<string | null> {
-  try {
-    return await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Read the active-user id for scope validation and logout reconciliation.
- * An unavailable hint drops the push rather than reviving a persisted scope.
- * The raw id never enters the snapshot.
- */
-async function getActiveUserId(): Promise<string | null> {
-  try {
-    return await SecureStore.getItemAsync(ACTIVE_USER_ID_KEY);
-  } catch {
-    return null;
-  }
 }
 
 const shown = {

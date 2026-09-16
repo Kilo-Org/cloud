@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { openExternalUrl } from '@/lib/external-link';
-import { parseGitHubPrUrl } from '@/lib/github-pr-url';
+import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
+import { parseProviderPrUrl } from '@/lib/pr-review/provider-pr-url';
 
 import {
   buildChatLinkActionSheet,
@@ -31,18 +32,8 @@ function sheetMessage(href: string): string {
 }
 
 function buildPrReviewHref(href: string): Href | null {
-  const parsed = parseGitHubPrUrl(href);
-  if (!parsed) {
-    return null;
-  }
-  return {
-    pathname: '/(app)/pr-review/[owner]/[repo]/[number]',
-    params: {
-      owner: parsed.owner,
-      repo: parsed.repo,
-      number: String(parsed.number),
-    },
-  };
+  const ref = parseProviderPrUrl(href);
+  return ref ? providerPrRoutePath(ref) : null;
 }
 
 export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
@@ -56,7 +47,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
     (href: string) => {
       // When PR Review is off, PR links behave like any other link (default
       // open-in-browser) instead of showing the Review-PR tap sheet.
-      if (!prReviewEnabled || !parseGitHubPrUrl(href)) {
+      if (!prReviewEnabled || !parseProviderPrUrl(href)) {
         return false;
       }
       // Tap on a PR link shows exactly four options: Review PR / Open in
@@ -96,7 +87,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
   const handleLongPressLink = useCallback(
     (href: string, event?: GestureResponderEvent) => {
       event?.stopPropagation();
-      const isPrLink = prReviewEnabled && parseGitHubPrUrl(href) !== null;
+      const isPrLink = prReviewEnabled && parseProviderPrUrl(href) !== null;
       const sheet = buildChatLinkActionSheet({ isPrLink });
       showActionSheetWithOptions(
         {

@@ -410,6 +410,112 @@ describe('androidSink start and update', () => {
   });
 });
 
+/**
+ * The Approve control while a permission waits, and its removal. The merged
+ * sink takes the action from the recorded waiting ask — the same record the
+ * headless answer reads — so these cases record one, and the Open deep link
+ * rides beside the label.
+ */
+describe('androidSink approve action', () => {
+  const PERMISSION = snapshotFor([{ status: 'permission' }], 0);
+
+  it('passes the Approve label while a permission waits and drops it once answered', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_approve' }));
+    androidSink.startOrUpdate(PERMISSION, CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.approveLabel).toBe(i18n.t('common.approve'));
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      '1 Needs input',
+      i18n.t('glanceable.openSession'),
+      'kiloapp:///cloud/sessions/ses_approve',
+      i18n.t('common.approve'),
+      '1',
+      true
+    );
+
+    // Answered elsewhere: the record is gone, so the next publish drops Approve.
+    recordWaitingAsk(null);
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 1), CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.approveLabel).toBeNull();
+    expect(mocks.native.update).toHaveBeenLastCalledWith(
+      'Active agents',
+      '1 Working',
+      i18n.t('glanceable.openSession'),
+      'kiloapp:///cloud/sessions',
+      null,
+      '1',
+      true,
+      0
+    );
+  });
+
+  it('passes the Approve label when the pending start is retried at foreground', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_retry' }));
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('denied'));
+    androidSink.startOrUpdate(PERMISSION, CTX);
+    await flushAsync();
+    expect(mocks.native.start).not.toHaveBeenCalled();
+
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('granted'));
+    await handleAppStateActive();
+
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      '1 Needs input',
+      i18n.t('glanceable.openSession'),
+      'kiloapp:///cloud/sessions/ses_retry',
+      i18n.t('common.approve'),
+      '1',
+      true
+    );
+  });
+
+  it('passes no Approve label for a question-only wait or no wait', async () => {
+    recordWaitingAsk(waitingAsk({ status: 'question', kiloSessionId: 'ses_question' }));
+    androidSink.startOrUpdate(snapshotFor([{ status: 'question' }], 0), CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.approveLabel).toBeNull();
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      '1 Needs input',
+      i18n.t('glanceable.openSession'),
+      'kiloapp:///cloud/sessions/ses_question',
+      null,
+      '1',
+      true
+    );
+
+    recordWaitingAsk(null);
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 1), CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.approveLabel).toBeNull();
+  });
+
+  it('adds the label through the publish path once the notification is up', async () => {
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.approveLabel).toBeNull();
+
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_late' }));
+    androidSink.publish(snapshotFor([{ status: 'permission' }], 1));
+    expect(mocks.getNotification()?.approveLabel).toBe(i18n.t('common.approve'));
+    expect(mocks.native.update).toHaveBeenLastCalledWith(
+      'Active agents',
+      '1 Needs input',
+      i18n.t('glanceable.openSession'),
+      'kiloapp:///cloud/sessions/ses_late',
+      i18n.t('common.approve'),
+      '1',
+      true,
+      0
+    );
+  });
+});
+
 describe('androidSink app-state retry', () => {
   it('restarts pending work and registers tokens once permission is granted', async () => {
     // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules

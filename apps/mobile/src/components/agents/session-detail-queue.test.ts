@@ -369,7 +369,7 @@ vi.mock('@/components/agents/use-message-copy', () => ({
 vi.mock('@/components/agents/session-detail-content-helpers', () => ({
   countInFlightMessages: () => 0,
   resolveRetryPrompt: () => null,
-  retryMessageAndClear: vi.fn(),
+  retryFailedMessage: vi.fn(),
 }));
 vi.mock('@/components/agents/create-and-navigate-agent-session', () => ({
   createAndNavigateAgentSession: vi.fn(),

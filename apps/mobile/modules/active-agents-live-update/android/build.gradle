@@ -28,8 +28,12 @@ dependencies {
   // the widget library already puts on the runtime classpath.
   implementation 'androidx.work:work-runtime:2.8.1'
   implementation 'androidx.concurrent:concurrent-futures:1.1.0'
-  // The headless worker names com.facebook.react.** classes. The app's React
-  // Gradle plugin puts react-android on the runtime classpath; compileOnly is
-  // how expo-task-manager gets the same compile classpath without repackaging.
+  // The headless worker and the headless task service beside it name
+  // com.facebook.react.** classes. The app's React Gradle plugin puts
+  // react-android on the runtime classpath, so the library only needs it on its
+  // own Kotlin compile classpath — the declaration expo-asset's build.gradle
+  // carries. Both declarations name the one coordinate, which Gradle resolves to
+  // that single copy rather than repackaging it.
   compileOnly 'com.facebook.react:react-android'
+  implementation 'com.facebook.react:react-android'
 }

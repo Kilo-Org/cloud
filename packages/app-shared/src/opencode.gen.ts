@@ -49,6 +49,8 @@ export type UserMessage = {
     [key: string]: boolean;
   };
   variant?: string;
+  /** Kilo extension: marks a client-materialised row not yet confirmed by the server. */
+  synthetic?: boolean;
   editorContext?: {
     visibleFiles?: Array<string>;
     openTabs?: Array<string>;

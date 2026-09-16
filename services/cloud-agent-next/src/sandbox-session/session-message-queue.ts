@@ -411,6 +411,34 @@ export function releaseCompletedRetryableAttach(
   });
 }
 
+/**
+ * Retire a dispatched attach with no result so this delivery can record a
+ * fresh attach against the same runtime, attempt, and deadline. Late results
+ * for the reused authorization apply to the live proof; retiredAttach is
+ * consulted only when the live slot no longer matches.
+ */
+export function releaseUnconfirmedAttach(
+  messages: readonly SessionMessageRecord[],
+  authorization: SessionOperationAuthorization
+): SessionMessageRecord[] | undefined {
+  const message = messages.find(item => item.messageId === authorization.messageId);
+  const attach = message?.operations?.attach;
+  if (
+    !message ||
+    !attach?.dispatched ||
+    attach.result !== undefined ||
+    !sameSessionOperation(attach.authorization, authorization)
+  )
+    return undefined;
+  const operations = { ...message.operations, retiredAttach: attach };
+  delete operations.attach;
+  return messages.map(item =>
+    item.messageId !== message.messageId
+      ? item
+      : { ...item, unresolvedDispatch: undefined, operations }
+  );
+}
+
 export function rotateLostPreparationAttempt(
   messages: readonly SessionMessageRecord[],
   messageId: string,

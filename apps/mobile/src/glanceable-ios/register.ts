@@ -19,12 +19,19 @@ import { ensureWidgetLogo } from './widget-logo';
 type InteractionSubscription = ReturnType<typeof addUserInteractionListener>;
 
 /**
- * The one press subscription for this process lifetime.
+ * The one press subscription for this process lifetime, and the one owner of
+ * the Live Activity's `approve` and `open` targets.
  *
  * expo-widgets attaches its native `NotificationCenter` observer when the first
  * JS listener subscribes and detaches it when the last one leaves
  * (`WidgetsModule.OnStartObserving`), so the handle is held in module scope
  * rather than dropped at the call site.
+ *
+ * The Lock Screen card and its Apple Watch mirror report the same `approve`
+ * target, so a second listener for that target would run two answer flows for
+ * one press; `handleGlanceableInteraction` owns both targets alone. It answers
+ * through the recorded ask (`runGlanceableApprove`), which is also what gates
+ * the control (`canApprove`), so the press and the button can never disagree.
  */
 let interactionSubscription: InteractionSubscription | null = null;
 

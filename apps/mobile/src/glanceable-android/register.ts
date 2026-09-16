@@ -46,6 +46,20 @@ function translate(key: string): string {
 }
 
 /**
+ * Switch i18n to the user's language before a headless render or press.
+ *
+ * A widget redraw and the notification's Approve both run as headless JS tasks
+ * with no Activity, so the app's root never mounts and nothing else applies the
+ * language — without this the placed widget renders English whatever the user
+ * chose. Exported because the headless approve task runs the same way and must
+ * speak one language with it; the language step itself is `applyStoredLanguage`,
+ * the same one `handleWidgetTask` takes.
+ */
+export async function applyWidgetLanguage(): Promise<void> {
+  await applyStoredLanguage();
+}
+
+/**
  * Redraw a placed widget. Registered from the app entry, which loads this
  * module only when a task fires: a widget redraw runs headless, so nothing
  * else has loaded the Android sink by then.

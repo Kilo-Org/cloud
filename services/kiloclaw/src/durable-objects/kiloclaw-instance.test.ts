@@ -3528,6 +3528,37 @@ describe('start: metadata recovery re-arms alarm', () => {
   });
 });
 
+describe('start: metadata recovery cooldown', () => {
+  it('escapes an active metadata-recovery cooldown when the caller passes skipCooldown', async () => {
+    const { instance, storage } = createInstance();
+    // The reconcile alarm stamps lastMetadataRecoveryAt every idle cycle, so a
+    // user-initiated start on a machine-less instance always lands inside the
+    // cooldown. Without skipCooldown that turns every Start into a hard 500.
+    await seedProvisioned(storage, {
+      flyMachineId: null,
+      status: 'stopped',
+      lastMetadataRecoveryAt: Date.now(),
+    });
+
+    (flyClient.listMachines as Mock).mockResolvedValue([]);
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+
+    await expect(instance.start('user-1')).rejects.toThrow(
+      'Metadata recovery failed; aborting start to avoid creating a duplicate machine'
+    );
+    expect(flyClient.listMachines).not.toHaveBeenCalled();
+
+    // skipCooldown runs recovery, confirms no machine exists, then provisions.
+    await instance.start('user-1', { skipCooldown: true });
+
+    expect(flyClient.listMachines).toHaveBeenCalled();
+    expect(flyClient.createMachine).toHaveBeenCalled();
+    expect(storage._store.get('flyMachineId')).toBe('machine-new');
+  });
+});
+
 // ============================================================================
 // updateChannels
 // ============================================================================

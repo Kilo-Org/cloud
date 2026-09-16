@@ -46,6 +46,7 @@ describe('glanceable-ios register', () => {
   });
 
   afterEach(() => {
+    vi.clearAllMocks();
     vi.resetModules();
   });
 
@@ -83,5 +84,19 @@ describe('glanceable-ios register', () => {
 
     expect(mocks.addUserInteractionListener).not.toHaveBeenCalled();
     expect(mocks.handleGlanceableInteraction).not.toHaveBeenCalled();
+  });
+
+  it('routes an approve press through the one subscription, never a second flow', async () => {
+    mocks.platform.OS = 'ios';
+    vi.resetModules();
+    await import('./register');
+
+    // The card's Approve and the Apple Watch mirror report the same target, so
+    // one listener must own it: a second registration would answer twice.
+    expect(mocks.addUserInteractionListener).toHaveBeenCalledTimes(1);
+    const press = { source: 'activity-1', target: 'approve', timestamp: 0 };
+    mocks.addUserInteractionListener.mock.calls.at(0)?.[0]?.(press);
+    expect(mocks.handleGlanceableInteraction).toHaveBeenCalledTimes(1);
+    expect(mocks.handleGlanceableInteraction).toHaveBeenCalledWith(press);
   });
 });

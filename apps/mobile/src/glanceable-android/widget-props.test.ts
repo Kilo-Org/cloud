@@ -60,6 +60,9 @@ function snapshotFor(
   });
 }
 
+// A snapshot from an older producer: it carries the counts but omits
+// `needsApproval`, which is what the Approve gate reads. Action cases that need
+// an approvable tray add the field explicitly.
 const MIXED = {
   ...snapshotFor([], 0, 'happy'),
   needsInput: 2,
@@ -269,14 +272,35 @@ describe('status precedence and count hiding', () => {
 });
 
 describe('widget actions and the newest line', () => {
-  it('offers Approve while a session waits, and New agent only then', () => {
-    const props = buildAndroidWidgetProps(MIXED, {}, translate);
+  it('offers Approve while a permission waits, and New agent only then', () => {
+    const props = buildAndroidWidgetProps({ ...MIXED, needsApproval: 2 }, {}, translate);
     expect(props.actions).toEqual({
       approve: true,
       newAgent: false,
       approveLabel: 'Approve',
       newAgentLabel: 'New agent',
     });
+  });
+
+  it.each(['question', 'retry'])(
+    'offers no Approve for a %s wait the action cannot answer',
+    status => {
+      // `needsInput` folds in questions and retries: a question needs an answer
+      // and a retry needs the provider back, so neither may draw a button whose
+      // press only finds nothing to approve and opens the app instead.
+      const props = buildAndroidWidgetProps(snapshotFor([{ status }]), {}, translate);
+      expect(props.actions.approve).toBe(false);
+      expect(props.actions.newAgent).toBe(false);
+    }
+  );
+
+  it('offers Approve for a permission wait even beside a question', () => {
+    const props = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'question' }, { status: 'permission' }]),
+      {},
+      translate
+    );
+    expect(props.actions.approve).toBe(true);
   });
 
   it('offers New agent when every connected agent is idle and nothing waits', () => {
@@ -401,7 +425,11 @@ describe('widget actions and the newest line', () => {
 
   it('keeps the failure line and the offered action on a retryable surface', () => {
     setSurfaceExtras({ newestSessionTitle: null, actionFeedback: 'couldNotApprove' });
-    const props = buildAndroidWidgetProps({ ...MIXED, status: 'stale' }, {}, translate);
+    const props = buildAndroidWidgetProps(
+      { ...MIXED, needsApproval: 1, status: 'stale' },
+      {},
+      translate
+    );
     expect(props.newestLine).toBe('Could not approve');
     expect(props.actions.approve).toBe(true);
     expect(props.countLines).toHaveLength(3);

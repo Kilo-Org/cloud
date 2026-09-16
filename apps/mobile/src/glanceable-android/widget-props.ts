@@ -150,7 +150,12 @@ export function buildAndroidWidgetProps(
     primaryLabel: primary === null ? null : translate(primary.key),
     newestLine: newestLineFor(extras, status, translate),
     actions: {
-      approve: showCounts && snapshot.needsInput > 0,
+      // Only a permission wait can be answered from the widget, so the button
+      // gates on `needsApproval` — the same count as the ongoing notification's
+      // Approve action. A `question` needs an answer and a `retry` needs the
+      // provider back: neither is approvable, so neither may offer a button the
+      // action can only answer by opening the app.
+      approve: showCounts && (snapshot.needsApproval ?? 0) > 0,
       newAgent: status === 'empty' || (showCounts && isIdleOnlyGlanceableWork(snapshot)),
       approveLabel: translate('common.approve'),
       newAgentLabel: translate('glanceable.newAgent'),

@@ -144,7 +144,12 @@ export function buildGlanceableViewProps(
     primaryCount: primary === null ? 0 : primary.count,
     newestTitle: newestTitleFor(getSurfaceExtras(), status, translate),
     actions: {
-      approve: showCounts && snapshot.needsInput > 0,
+      // Only a permission wait can be answered from the widget, so the button
+      // gates on `needsApproval` (the count the Live Activity's own Approve
+      // control uses). A `question` needs an answer and a `retry` needs the
+      // provider back: neither is approvable, so neither may offer a button the
+      // action can only answer by opening the app.
+      approve: showCounts && (snapshot.needsApproval ?? 0) > 0,
       // Nothing waiting to act on: the empty state, or an idle-only tray that
       // keeps a card alive. A locked or expired surface offers neither.
       newAgent: status === 'empty' || (showCounts && isIdleOnlyGlanceableWork(snapshot)),
@@ -216,16 +221,51 @@ export function buildExpiredWidgetProps(
 }
 
 /**
+ * The widget timeline for one snapshot running from `now`: the current frame,
+ * then the delayed frame that stops asserting the counts as current and the
+ * expiry frame that zeroes them.
+ *
+ * WidgetKit is the only clock the widget has while the app is not running, so
+ * every writer that replaces the timeline must hand it the whole set — the
+ * publisher's sink (`ios-sink.publish`) and the failure republish after a press
+ * (`glanceable-ios/widget-actions`). A single-frame write drops the two
+ * fallbacks and the widget keeps claiming the line it was last given.
+ *
+ * `null` for a terminal blank: `updateSnapshot` already wrote its single
+ * current frame, and the delayed copy must never replace signed-out or privacy
+ * copy.
+ */
+export function widgetTimelineFrames(
+  snapshot: GlanceableAgentsSnapshot,
+  props: Partial<GlanceableViewProps>,
+  translate: (key: string) => string
+): { date: Date; props: Partial<GlanceableViewProps> }[] | null {
+  if (snapshot.status === 'signed_out' || snapshot.status === 'privacy') {
+    return null;
+  }
+  const now = Date.now();
+  // WidgetKit renders the newest entry at or before `now` and never rewinds, so
+  // a frame whose date has already passed sits behind the current one and only
+  // leaves the timeline unsorted. A press on a widget whose last snapshot
+  // lapsed while the app was away therefore keeps the single current frame.
+  const later = [
+    ...staleTimelineFrame(snapshot, translate),
+    { date: new Date(snapshot.expiresAt), props: buildExpiredWidgetProps(snapshot, translate) },
+  ].filter(frame => frame.date.getTime() > now);
+  return [{ date: new Date(now), props }, ...later];
+}
+
+/**
  * Build the Live Activity content-state from a snapshot. The server pushes the
  * same raw shape, so the widget extension's `active-agents-live-activity.tsx`
  * renders it directly with inlined English copy (the server cannot translate).
  *
  * The approvable count rides only here, never in `GlanceableViewProps`: the
- * widget families and the complication stay read-only counts, and the Lock
- * Screen / Watch Smart Stack layout is the one surface that draws an Approve
- * control. A snapshot from an older producer omits the field, so it resolves
- * to 0 and the control is hidden rather than offering an Approve the service
- * could not complete.
+ * widget's own in-place buttons read it from the snapshot while `actions` is
+ * built, and the Lock Screen / Watch Smart Stack layout draws its Approve
+ * control from this content state. A snapshot from an older producer omits the
+ * field, so it resolves to 0 and both controls are hidden rather than offering
+ * an Approve the service could not complete.
  */
 export function buildGlanceableLiveActivityContentState(
   snapshot: GlanceableAgentsSnapshot

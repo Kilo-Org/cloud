@@ -181,7 +181,7 @@ describe('renderActiveAgentsWidget', () => {
   // row reverses its own children and every column flips its alignment.
   it('mirrors every row for a right-to-left language', () => {
     const props = buildAndroidWidgetProps(
-      snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
+      snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
       {},
       translate
     );
@@ -201,7 +201,7 @@ describe('renderActiveAgentsWidget', () => {
   // stack beside the mark and each one keeps its word.
   it('stacks every state beside the mark in a short narrow cell', () => {
     const props = buildAndroidWidgetProps(
-      snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
+      snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
       {},
       translate
     );
@@ -219,7 +219,7 @@ describe('renderActiveAgentsWidget', () => {
 
   it('draws every state at a small width too, zeros included', () => {
     const props = buildAndroidWidgetProps(
-      snapshotFor([{ status: 'question' }, { status: 'busy' }, { status: 'busy' }], 0),
+      snapshotFor([{ status: 'permission' }, { status: 'busy' }, { status: 'busy' }], 0),
       {},
       translate
     );
@@ -231,7 +231,7 @@ describe('renderActiveAgentsWidget', () => {
 
   it('shows every count, zeros included, at a wide width', () => {
     const props = buildAndroidWidgetProps(
-      snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
+      snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
       {},
       translate
     );
@@ -251,7 +251,7 @@ describe('renderActiveAgentsWidget', () => {
     'runs the counts in a row at width $width and one cell of height',
     ({ width, visibleText }) => {
       const props = buildAndroidWidgetProps(
-        snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
+        snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
         {},
         translate
       );
@@ -273,6 +273,9 @@ describe('renderActiveAgentsWidget', () => {
         {
           ...snapshotFor([], 0, 'stale'),
           needsInput: 2,
+          // The two waiting agents are permission waits: `needsApproval` is the
+          // count that draws the chip.
+          needsApproval: 2,
           idle: 3,
           running: 4,
         },
@@ -346,7 +349,7 @@ describe('renderActiveAgentsWidget', () => {
 
   it('draws the Approve row with its own headless click action', () => {
     const props = buildAndroidWidgetProps(
-      snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
+      snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
       {},
       translate
     );
@@ -360,11 +363,22 @@ describe('renderActiveAgentsWidget', () => {
     expect(collectText(approve)).toEqual(['Approve']);
   });
 
+  // The chip follows the props gate, which only a permission wait raises: a
+  // retry (or a question) needs the app, so the tray must not draw an Approve
+  // whose press would only open it.
+  it('draws no Approve row for a wait the action cannot answer', () => {
+    const props = buildAndroidWidgetProps(snapshotFor([{ status: 'retry' }]), {}, translate);
+    const light = render(props, { width: 250 }).light;
+
+    expect(collectText(light)).toEqual(['1', 'Needs input', '0', 'Working', '0', 'Idle']);
+    expect(findElement(light, element => element.props.clickAction === 'approve')).toBeUndefined();
+  });
+
   // The chip is the widget's only in-place action, and its whole box is the tap
   // target, so it holds Android's 48 dp minimum instead of sizing to the label.
   it('gives both action chips a full-height tap target', () => {
     const approveProps = buildAndroidWidgetProps(
-      snapshotFor([{ status: 'question' }], 0),
+      snapshotFor([{ status: 'permission' }], 0),
       {},
       translate
     );

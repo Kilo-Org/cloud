@@ -111,19 +111,29 @@ describe('actions', () => {
     expect(props.actions).toEqual({ approve: false, newAgent: true });
   });
 
-  it('keeps New agent disabled while a session waits', () => {
-    const props = buildGlanceableViewProps(snapshotFor([{ status: 'question' }]), {}, translate);
+  it('keeps New agent disabled while a permission waits', () => {
+    const props = buildGlanceableViewProps(snapshotFor([PERMISSION_ROW]), {}, translate);
     expect(props.actions).toEqual({ approve: true, newAgent: false });
   });
+
+  it.each(['question', 'retry'] as const)(
+    'offers no button for a %s wait the action cannot answer',
+    status => {
+      // `needsInput` folds in questions and retries: a question needs an answer
+      // and a retry needs the provider back, so neither may draw a button whose
+      // press only finds nothing to approve and opens the app instead.
+      const props = buildGlanceableViewProps(snapshotFor([{ status }]), {}, translate);
+      expect(props.actions).toEqual({ approve: false, newAgent: false });
+    }
+  );
 });
 
 /**
- * The approvable count is the gate for the Live Activity's Approve control. It
- * is narrower than `needsInput` on purpose: only a permission prompt can be
+ * The approvable count gates every Approve control: the Live Activity's wrist
+ * control and the Home Screen widget's in-place button both read it. It is
+ * narrower than `needsInput` on purpose: only a permission prompt can be
  * answered without choosing an option, so a question or a retry must never
- * raise the wrist control. The Home Screen widget's in-place buttons gate on
- * `needsInput` instead (they hand a question to the app), which is why this
- * count must stay off `GlanceableViewProps`: the widget never reads it.
+ * raise a control whose answer is "open the app".
  */
 describe('buildGlanceableLiveActivityContentState needsApproval', () => {
   it('forwards one permission wait as 1', () => {

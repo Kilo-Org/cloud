@@ -20,9 +20,14 @@ export const secureStore = {
   getItemAsync: vi.fn<(key: string) => Promise<string | null>>(),
 };
 
+/**
+ * The default tray: one permission wait — the only kind the widget can answer
+ * in place — one retry wait it cannot, and two working agents. Two agents wait,
+ * so the counts read 2 and the Approve chip is offered for the permission.
+ */
 export function snapshotFor(
   sessions: { status: string }[] = [
-    { status: 'question' },
+    { status: 'permission' },
     { status: 'retry' },
     { status: 'busy' },
     { status: 'busy' },

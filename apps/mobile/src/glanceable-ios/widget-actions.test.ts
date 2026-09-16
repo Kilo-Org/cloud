@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
+  GLANCEABLE_SNAPSHOT_EXPIRY_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
@@ -128,12 +129,12 @@ vi.mock('@/i18n', () => ({ i18n: { on: vi.fn(), t: (key: string) => key } }));
 
 const NOW = 1_750_000_000_000;
 
-function snapshotFor(sessions: { status: string }[]): GlanceableAgentsSnapshot {
+function snapshotFor(sessions: { status: string }[], now = NOW): GlanceableAgentsSnapshot {
   return buildGlanceableSnapshot({
     sessions,
     userId: 'u1',
     organizationId: null,
-    now: NOW,
+    now,
   });
 }
 
@@ -404,7 +405,7 @@ describe('runPendingWidgetActions', () => {
       { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
     ];
     mocks.runWidgetAction.mockResolvedValue({ kind: 'failed' });
-    _setLastGlanceableSnapshotForTests(snapshotFor([{ status: 'question' }]));
+    _setLastGlanceableSnapshotForTests(snapshotFor([{ status: 'permission' }]));
 
     await runPendingWidgetActions();
 
@@ -415,6 +416,46 @@ describe('runPendingWidgetActions', () => {
       // Approve is still available: the call failed, not the work.
       actions: { approve: true, newAgent: false },
     });
+  });
+
+  it('keeps the delayed and expiry frames on the failure republish', async () => {
+    widgetState.timeline = [
+      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
+    ];
+    mocks.runWidgetAction.mockResolvedValue({ kind: 'failed' });
+    // Built against the wall clock, unlike this suite's fixed `NOW` snapshots:
+    // the two trailing frames have to still be ahead of `now` to be written.
+    const snapshot = snapshotFor([{ status: 'permission' }], Date.now());
+    _setLastGlanceableSnapshotForTests(snapshot);
+
+    await runPendingWidgetActions();
+
+    // The failure republish replaces the timeline, so it owes WidgetKit the
+    // same three frames the sink writes: a single frame would leave a widget
+    // nothing refreshes claiming the failure line as current past `expiresAt`.
+    expect(widgetState.timeline).toHaveLength(3);
+    expect(widgetState.timeline[0]?.props.newestTitle).toBe('glanceable.couldNotApprove');
+    expect(widgetState.timeline[1]?.props.statusLine).toBe('glanceable.stale');
+    expect(widgetState.timeline[2]?.date.getTime()).toBe(Date.parse(snapshot.expiresAt));
+    expect(widgetState.timeline[2]?.props).toMatchObject({ statusLine: 'glanceable.expired' });
+  });
+
+  it('writes one frame when the last snapshot already lapsed', async () => {
+    widgetState.timeline = [
+      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
+    ];
+    mocks.runWidgetAction.mockResolvedValue({ kind: 'failed' });
+    // A snapshot that lapsed while the app was away: both trailing frames would
+    // land behind the current one, and WidgetKit never rewinds to an entry it
+    // has already passed, so the failure line keeps the timeline to itself.
+    _setLastGlanceableSnapshotForTests(
+      snapshotFor([{ status: 'permission' }], Date.now() - GLANCEABLE_SNAPSHOT_EXPIRY_MS - 60_000)
+    );
+
+    await runPendingWidgetActions();
+
+    expect(widgetState.timeline).toHaveLength(1);
+    expect(widgetState.timeline[0]?.props.newestTitle).toBe('glanceable.couldNotApprove');
   });
 
   it('clears the previous failure line before a retried approve runs', async () => {

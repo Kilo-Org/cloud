@@ -1149,15 +1149,23 @@ describe('buildGlanceableViewProps', () => {
     );
   });
 
-  it('offers Approve for a waiting agent and nothing else', () => {
+  it('offers Approve for a permission wait and nothing else', () => {
     const props = buildGlanceableViewProps(
-      snapshotFor([{ status: 'question' }], 0),
+      snapshotFor([{ status: 'permission' }], 0),
       {},
       key => key
     );
     expect(props.actions).toEqual({ approve: true, newAgent: false });
     expect(props.statusLine).toBeNull();
   });
+
+  it.each(['question', 'retry'] as const)(
+    'offers no Approve for a %s wait the action cannot answer',
+    status => {
+      const props = buildGlanceableViewProps(snapshotFor([{ status }], 0), {}, key => key);
+      expect(props.actions).toEqual({ approve: false, newAgent: false });
+    }
+  );
 
   it('offers no action for a tray that is working and needs nothing', () => {
     const props = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
@@ -1186,7 +1194,7 @@ describe('buildGlanceableViewProps', () => {
       actionFeedback: 'couldNotApprove',
     });
     const props = buildGlanceableViewProps(
-      snapshotFor([{ status: 'question' }], 0),
+      snapshotFor([{ status: 'permission' }], 0),
       {},
       key => key
     );

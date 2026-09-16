@@ -20,6 +20,8 @@ import {
 import { trpcClient } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
+import { getTerminalBlankEpoch, isGlanceableOrgLost } from './cleanup';
+import { pickFrontApprovableSession } from './front-approval';
 import { newestSessionTitle } from './newest-session';
 import { getLastGlanceableSnapshot } from './persist';
 import { forEachSink } from './sink-registry';
@@ -104,11 +106,13 @@ function waitingSince(row: WaitingSessionRow): number | null {
 }
 
 /**
- * The session to approve: the oldest row waiting on a permission or a
- * question (the attention statuses in `lib/active-sessions-live.ts`), ranked
- * by `statusUpdatedAt` then `createdAt`. An untimed row ranks after every
- * timed one, and a tie keeps the earlier row. Pure, so the widget's decision
- * is unit-tested without tRPC.
+ * The oldest row the user has to act on: the attention statuses in
+ * `lib/active-sessions-live.ts` (`question`/`permission`), ranked by
+ * `statusUpdatedAt` then `createdAt`. An untimed row ranks after every timed
+ * one, and a tie keeps the earlier row. Used to tell a tray with a wait the
+ * widget cannot answer from one with nothing waiting; the row the widget
+ * approves is `pickFrontApprovableSession`'s oldest `permission`. Pure, so the
+ * decision is unit-tested without tRPC.
  */
 export function resolveWaitingSession(
   rows: readonly WaitingSessionRow[]
@@ -170,9 +174,10 @@ async function readStoredScope(): Promise<WidgetScope> {
 }
 
 /**
- * Answer the oldest waiting permission with `'once'`. Nothing waiting is
- * `none`; a wait with no permission pending is `no-permission` (the caller
- * opens the app for the free-form question); a rejected call is `failed`.
+ * Answer the longest-waiting permission with `'once'`. A rejected call is
+ * `failed`; a tray with no permission waiting is `no-permission` when a
+ * free-form question waits, and `none` otherwise — the caller opens the app for
+ * either.
  */
 async function approveWaitingSession(
   organizationId: string | null
@@ -180,9 +185,18 @@ async function approveWaitingSession(
   const { sessions } = await trpcClient.activeSessions.list.query(
     buildActiveSessionsTrayInput(organizationId)
   );
-  const waiting = resolveWaitingSession(sessions);
+  // The Approve chip is offered on `needsApproval`, which counts exactly the
+  // `permission` rows, so the press must answer one of the rows that count
+  // describes: the longest-waiting permission, the same pick the wrist and
+  // notification controls make (`pickFrontApprovableSession`). Ranking every
+  // attention row instead would let an older `question` or `retry` shadow a
+  // newer permission — the chip would draw, and the press would only open the
+  // app instead of approving the permission the chip was offered for.
+  const waiting = pickFrontApprovableSession(sessions);
   if (waiting === null) {
-    return 'none';
+    // Nothing approvable: a free-form question opens the app for an answer,
+    // while a tray with nothing to act on needs only the agents list.
+    return resolveWaitingSession(sessions) === null ? 'none' : 'no-permission';
   }
   // Only a cloud-agent session carries pending interactions the control plane
   // can answer; a remote CLI session has none, so the app owns it.
@@ -330,22 +344,50 @@ async function createAgentFromDraft(scope: WidgetScope): Promise<WidgetActionRes
       })
     : trpcClient.cloudAgentNext.prepareSession.mutate(input));
   // The draft became a session, so the next new-session visit starts empty.
-  await clearDraft(userId, NEW_SESSION_DRAFT_KEY);
+  await clearConsumedDraft(userId);
   return 'created';
+}
+
+/**
+ * Clear the new-session draft a create just consumed. `clearDraft` reports its
+ * own failure to Sentry and returns false, and a draft that survives would make
+ * the next New agent press start the same prompt a second time, so retry once.
+ * The create itself already succeeded either way, so this reports nothing: the
+ * caller must not answer a created session with the failed-action copy.
+ */
+async function clearConsumedDraft(userId: string): Promise<void> {
+  if (await clearDraft(userId, NEW_SESSION_DRAFT_KEY)) {
+    return;
+  }
+  // Last attempt: its result cannot change what the caller reports, and a
+  // second failure is reported to Sentry by `clearDraft` itself.
+  await clearDraft(userId, NEW_SESSION_DRAFT_KEY);
 }
 
 /**
  * Re-derive the glanceable snapshot from the tray after a successful action
  * and hand it to every registered sink, so the placed widget shows the new
  * counts at once instead of waiting for the next tray event.
+ *
+ * Gated exactly like `GlanceablePublisher.isGated`: a terminal blank that lands
+ * while the action runs — sign-out, an account or org switch, or a confirmed
+ * lost org — owns the surface, and publishing here would put the counts it
+ * blanked back on screen. `blankEpochAtStart` is the epoch the action saw when
+ * it started, so an epoch that advanced before this press (an earlier
+ * sign-out, long since republished) never silences it.
  */
-async function republishTray(scope: WidgetScope): Promise<void> {
+async function republishTray(scope: WidgetScope, blankEpochAtStart: number): Promise<void> {
   if (scope.userId === null) {
     return;
   }
   const { sessions } = await trpcClient.activeSessions.list.query(
     buildActiveSessionsTrayInput(scope.organizationId)
   );
+  // Checked after the read, not before: the tray fetch is another window in
+  // which a blank can land, and it owns the surface over this republish.
+  if (isGlanceableOrgLost() || getTerminalBlankEpoch() !== blankEpochAtStart) {
+    return;
+  }
   const snapshot: GlanceableAgentsSnapshot = buildGlanceableSnapshot({
     sessions,
     userId: scope.userId,
@@ -367,14 +409,27 @@ async function republishTray(scope: WidgetScope): Promise<void> {
  * call reports `failed` so the widget can say so and keep the action offered.
  */
 export async function runWidgetAction(action: WidgetAction): Promise<WidgetActionResult> {
-  const scope = await readStoredScope();
+  // Read the publication gate as the action starts; `republishTray` compares it
+  // after the action, so a blank that lands while it runs wins the surface.
+  const blankEpochAtStart = getTerminalBlankEpoch();
   try {
+    // The scope read is a storage call, so it belongs inside the container: a
+    // rejection must settle the widget on its failure line instead of leaving
+    // the progress line up with nothing driving it.
+    const scope = await readStoredScope();
     const kind =
       action === 'approve'
         ? await approveWaitingSession(scope.organizationId)
         : await createAgentFromDraft(scope);
     if (kind === 'approved' || kind === 'created') {
-      await republishTray(scope);
+      // A republish that fails must not turn a completed action into `failed`:
+      // the approve or create landed, the failure is reported by the sink
+      // guard, and the next tray event redraws the counts.
+      try {
+        await republishTray(scope, blankEpochAtStart);
+      } catch {
+        // Contained: the action's own result stands.
+      }
     }
     return { kind };
   } catch {

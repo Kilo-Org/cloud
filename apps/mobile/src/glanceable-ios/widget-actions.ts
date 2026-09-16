@@ -11,7 +11,12 @@ import {
 } from '@/lib/glanceable/widget-actions';
 
 import { ActiveAgentsWidget, WIDGET_NAME, type WidgetProps } from './active-agents-widget';
-import { buildGlanceableViewProps, type GlanceableWidgetAction, toWidgetProps } from './view-props';
+import {
+  buildGlanceableViewProps,
+  type GlanceableWidgetAction,
+  toWidgetProps,
+  widgetTimelineFrames,
+} from './view-props';
 
 /**
  * Handling for the widget's in-place App Intent buttons.
@@ -70,15 +75,28 @@ export function pendingActionForEvent(
   return null;
 }
 
-/** Rebuild the widget props from the last snapshot and replace the timeline. */
+/**
+ * Rebuild the widget props from the last snapshot and replace the timeline.
+ *
+ * The props carry the surface extras (the press's failure line), so this runs
+ * only for a press that did not republish the tray. `updateSnapshot` leaves a
+ * single frame behind, which would drop the delayed and expiry frames the sink
+ * wrote: a widget nothing refreshes after this press would then keep claiming
+ * the line as current past `expiresAt`. Hand WidgetKit the same frames the sink
+ * does; `null` means a terminal blank, whose single frame stands.
+ */
 function republishWidgetProps(): void {
   const snapshot = getLastGlanceableSnapshot();
   if (snapshot === null) {
     return;
   }
-  ActiveAgentsWidget.updateSnapshot(
-    toWidgetProps(buildGlanceableViewProps(snapshot, {}, key => i18n.t(key)))
-  );
+  const translate = (key: string): string => i18n.t(key);
+  const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate));
+  ActiveAgentsWidget.updateSnapshot(props);
+  const frames = widgetTimelineFrames(snapshot, props, translate);
+  if (frames !== null) {
+    ActiveAgentsWidget.updateTimeline(frames);
+  }
 }
 
 /** Where an unfinished action lands: the same agents list the body tap opens. */

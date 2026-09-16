@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- one cohesive headless-action suite sharing the trpcClient harness */
+import * as SecureStore from 'expo-secure-store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
@@ -30,8 +31,17 @@ const mocks = vi.hoisted(() => {
     trpc,
     loadDraft: vi.fn(),
     clearDraft: vi.fn(),
+    // The publication gate `lib/glanceable/cleanup` owns: a terminal blank bump
+    // and the lost-org latch, driven per case.
+    blankEpoch: 0,
+    orgLost: false,
   };
 });
+
+vi.mock('./cleanup', () => ({
+  getTerminalBlankEpoch: () => mocks.blankEpoch,
+  isGlanceableOrgLost: () => mocks.orgLost,
+}));
 
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(async (key: string) => {
@@ -235,6 +245,10 @@ describe('runWidgetAction', () => {
     mocks.secure.set(USER_KEY, 'user-1');
     mocks.loadDraft.mockReset();
     mocks.clearDraft.mockReset();
+    // A clear that succeeds: the failure cases override it per test.
+    mocks.clearDraft.mockResolvedValue(true);
+    mocks.blankEpoch = 0;
+    mocks.orgLost = false;
     setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
   });
 
@@ -246,6 +260,64 @@ describe('runWidgetAction', () => {
     wireTrpc({ sessions: [{ id: 'busy', status: 'busy' }] });
 
     await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'none' });
+  });
+
+  it('reports failed, not a rejection, when the stored scope cannot be read', async () => {
+    wireTrpc({ sessions: [{ id: 'waiting', status: 'permission' }] });
+    vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain locked'));
+
+    // A rejected read used to escape the container and leave the widget on its
+    // progress line, because nothing settled the action's own line.
+    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'failed' });
+  });
+
+  it('does not republish when a terminal blank lands while the action runs', async () => {
+    const rpc = wireTrpc({
+      sessions: [{ id: 'waiting', status: 'permission' }],
+      cloudAgentSessionId: 'workspace_agent_1',
+      permissions: [{ id: 'perm-1' }],
+    });
+    rpc.answerPermission.mutate.mockImplementation(async () => {
+      // The user signs out (or the org list drops the selection) while the
+      // answer is in flight: the blank owns the surface from here on, exactly
+      // as it owns the publisher.
+      await Promise.resolve();
+      mocks.blankEpoch += 1;
+      return { success: true };
+    });
+    const { snapshots, release } = collectSink();
+
+    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'approved' });
+    expect(snapshots).toEqual([]);
+    release();
+  });
+
+  it('does not republish while a confirmed lost org blocks publication', async () => {
+    wireTrpc({
+      sessions: [{ id: 'waiting', status: 'permission' }],
+      cloudAgentSessionId: 'workspace_agent_1',
+      permissions: [{ id: 'perm-1' }],
+    });
+    mocks.orgLost = true;
+    const { snapshots, release } = collectSink();
+
+    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'approved' });
+    expect(snapshots).toEqual([]);
+    release();
+  });
+
+  it("reports the action's own result when the republish fails", async () => {
+    const rpc = wireTrpc({
+      sessions: [{ id: 'waiting', status: 'permission' }],
+      cloudAgentSessionId: 'workspace_agent_1',
+      permissions: [{ id: 'perm-1' }],
+    });
+    // The approve landed; the tray read its redraw needs is what fails.
+    rpc.activeSessions.list.query
+      .mockResolvedValueOnce({ sessions: [{ id: 'waiting', status: 'permission' }] })
+      .mockRejectedValueOnce(new Error('tray down'));
+
+    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'approved' });
   });
 
   it('reports none when the waiting session is not a cloud-agent session', async () => {
@@ -295,6 +367,33 @@ describe('runWidgetAction', () => {
 
     await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'no-permission' });
   });
+
+  // The chip is offered on `needsApproval`, which counts `permission` rows, so
+  // the press must answer one of them: an older `question` must not shadow the
+  // permission and turn the press into an open-the-app, and an older `retry`
+  // must not displace it either.
+  it.each(['question', 'retry'] as const)(
+    'approves the waiting permission when an older %s waits beside it',
+    async status => {
+      const rpc = wireTrpc({
+        sessions: [
+          { id: 'older', status, statusUpdatedAt: '2026-01-01T00:00:00.000Z' },
+          { id: 'waiting', status: 'permission', statusUpdatedAt: '2026-01-02T00:00:00.000Z' },
+        ],
+        cloudAgentSessionId: 'workspace_agent_1',
+        permissions: [{ id: 'perm-1' }],
+      });
+
+      await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'approved' });
+
+      expect(rpc.cliSessionsV2.get.query).toHaveBeenCalledWith({ session_id: 'waiting' });
+      expect(rpc.answerPermission.mutate).toHaveBeenCalledWith({
+        sessionId: 'workspace_agent_1',
+        permissionId: 'perm-1',
+        response: 'once',
+      });
+    }
+  );
 
   it('reports failed when the answer is rejected, and publishes nothing', async () => {
     const rpc = wireTrpc({
@@ -392,6 +491,32 @@ describe('runWidgetAction', () => {
       githubRepo: 'acme/widgets',
     });
     expect(mocks.clearDraft).toHaveBeenCalledWith('user-1', DRAFT_KEY);
+  });
+
+  it('clears the draft again when the first clear fails', async () => {
+    wireTrpc({});
+    mocks.secure.set(USER_KEY, 'user-1');
+    mocks.secure.set(MODEL_KEY, JSON.stringify({ personal: { model: 'claude', variant: 'high' } }));
+    mocks.loadDraft.mockResolvedValue('Ship the widget');
+    mocks.clearDraft.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+    // A surviving draft would let the next New agent press start the same
+    // prompt a second time, so the false result must not be dropped.
+    await expect(runWidgetAction('new-agent')).resolves.toEqual({ kind: 'created' });
+    expect(mocks.clearDraft).toHaveBeenCalledTimes(2);
+  });
+
+  it('still reports created when the draft cannot be cleared', async () => {
+    wireTrpc({});
+    mocks.secure.set(USER_KEY, 'user-1');
+    mocks.secure.set(MODEL_KEY, JSON.stringify({ personal: { model: 'claude', variant: 'high' } }));
+    mocks.loadDraft.mockResolvedValue('Ship the widget');
+    mocks.clearDraft.mockResolvedValue(false);
+
+    // The session exists: the widget must not answer it with the failed-action
+    // copy just because the draft's removal failed.
+    await expect(runWidgetAction('new-agent')).resolves.toEqual({ kind: 'created' });
+    expect(mocks.clearDraft).toHaveBeenCalledTimes(2);
   });
 
   it('reports none when the only recent repository is not on a known provider', async () => {

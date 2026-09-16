@@ -118,6 +118,17 @@ describe('the exported entry point', () => {
     expect(activityTag).toContain('android:launchMode="singleTop"');
   });
 
+  it('keeps its own task, so a repeat action still reaches it', () => {
+    // The entry point launches the app (the cold path). With the package
+    // affinity the app joins the action's task and that task keeps the action
+    // intent as its base intent, so the next intent for the same action is
+    // delivered to the app's top activity instead of this one: the action is
+    // dropped with no result for the caller. The empty affinity is what keeps
+    // the entry point out of the app's task.
+    const activityTag = /<activity\b[^>]*KiloActionActivity[^>]*>/.exec(MANIFEST)?.[0] ?? '';
+    expect(activityTag).toContain('android:taskAffinity=""');
+  });
+
   it('gives every intent-filter its own action', () => {
     const filters = intentFilters(MANIFEST);
     const actionsPerFilter = filters.map(filter =>

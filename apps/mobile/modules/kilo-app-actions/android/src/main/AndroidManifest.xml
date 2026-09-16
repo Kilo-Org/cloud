@@ -15,11 +15,23 @@
     `adb shell am start`, the launcher, another app, or the Assistant can reach.
   -->
   <application>
+    <!--
+      `android:taskAffinity=""` keeps the entry point out of the app's own task.
+      Without it the activity picks up the package affinity, so the app it
+      launches (the cold path below) joins the action's task and that task keeps
+      the action intent as its base intent; Android then treats the next intent
+      for the same action as a repeat for the task already on top, hands it to
+      the app's top activity, and the action never reaches this activity or the
+      dispatcher — silently, with no result for the caller. An empty affinity
+      gives the entry point a task of its own, which it finishes every time, so
+      every later action intent starts a fresh instance.
+    -->
     <activity
       android:name="expo.modules.kiloappactions.KiloActionActivity"
       android:excludeFromRecents="true"
       android:exported="true"
-      android:launchMode="singleTop">
+      android:launchMode="singleTop"
+      android:taskAffinity="">
 
       <!-- StartAgent: start a new agent, from a prompt and optionally a repository or a session. -->
       <intent-filter>

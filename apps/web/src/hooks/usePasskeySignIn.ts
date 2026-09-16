@@ -147,8 +147,14 @@ export type UsePasskeySignInOptions = {
 };
 
 export type UsePasskeySignInResult = {
-  /** `window.PublicKeyCredential` is absent: no control may be offered. */
-  isSupported: boolean;
+  /**
+   * Whether the browser exposes the credential API. `null` before the client
+   * has read the global — the server render and the first client render cannot
+   * know it — `false` when `window.PublicKeyCredential` is absent, `true` when
+   * it is present. A consumer must reserve the same space in all three states
+   * so resolving support never moves the content around it.
+   */
+  isSupported: boolean | null;
   isPending: boolean;
   failure: PasskeySignInFailure | null;
   signInWithPasskey: () => Promise<void>;
@@ -157,10 +163,12 @@ export type UsePasskeySignInResult = {
 export function usePasskeySignIn({
   callbackUrl,
 }: UsePasskeySignInOptions = {}): UsePasskeySignInResult {
-  // The credential API is a browser global, so this starts false and is only
-  // ever true after the client has read the global: server-rendered HTML never
-  // contains a dead passkey control.
-  const [isSupported, setIsSupported] = useState(false);
+  // The credential API is a browser global, so this starts unknown (`null`) and
+  // is only ever `true`/`false` after the client has read the global. The
+  // consumer shows a same-height placeholder while it is unknown, so
+  // server-rendered HTML never contains a dead passkey control and resolving
+  // support never shifts the providers below it.
+  const [isSupported, setIsSupported] = useState<boolean | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [failure, setFailure] = useState<PasskeySignInFailure | null>(null);
   const isMountedRef = useRef(true);

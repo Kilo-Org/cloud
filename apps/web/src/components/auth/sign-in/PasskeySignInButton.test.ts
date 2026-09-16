@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 const mockHookResult: {
-  isSupported: boolean;
+  isSupported: boolean | null;
   isPending: boolean;
   failure: 'cancelled' | 'expired' | 'no_passkey' | 'failed' | null;
   signInWithPasskey: () => Promise<void>;
@@ -38,6 +38,27 @@ describe('PasskeySignInButton', () => {
     mockHookResult.isSupported = false;
 
     expect(render()).toBe('');
+  });
+
+  // The server render and the first client render both run before the
+  // credential-API global can be read. The control's slot is reserved on both,
+  // so resolving support later cannot push the providers below it down.
+  it('reserves the control height until the browser support check resolves', () => {
+    mockHookResult.isSupported = null;
+    const html = render();
+
+    expect(html).toContain('h-10 w-full');
+    expect(html).not.toContain('Sign in with a passkey');
+  });
+
+  it('reserves the same height as the button that replaces it', () => {
+    mockHookResult.isSupported = null;
+    const reserved = render();
+    mockHookResult.isSupported = true;
+    const offered = render();
+
+    expect(reserved).toContain('h-10 w-full');
+    expect(offered).toContain('h-10 w-full');
   });
 
   it('offers the button when a passkey can be used', () => {

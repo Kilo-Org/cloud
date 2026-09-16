@@ -49,6 +49,7 @@ import {
   type VercelUserByokInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
 import { cn } from '@/lib/utils';
 import * as z from 'zod';
@@ -395,6 +396,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     );
   }
 
+  // The "Sign in with ChatGPT" connection is stored in this table under its own
+  // provider id, but it is not a pasted key: the card above the list owns it, so
+  // it never appears here with edit, toggle, test or delete controls.
+  const listedKeys = keys?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID);
+
   // Map provider IDs to display names
   const getProviderDisplayName = (providerId: string) => {
     const provider = BYOK_PROVIDERS.find(p => p.id === providerId);
@@ -422,7 +428,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
           </Button>
         </CardHeader>
         <CardContent>
-          {keys && keys.length > 0 ? (
+          {listedKeys && listedKeys.length > 0 ? (
             <div className="rounded-md border">
               <table className="w-full">
                 <thead>
@@ -434,7 +440,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {keys.map(
+                  {listedKeys.map(
                     (key: {
                       id: string;
                       provider_id: string;

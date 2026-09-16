@@ -32,12 +32,7 @@ export const OPENAI_REDIRECT_PATH = '/testing/oai-redirect';
  */
 export const OPENAI_REDIRECT_URI = `${APP_URL}${OPENAI_REDIRECT_PATH}`;
 
-/** Identity-only scopes: stable subject, profile, and email claims. */
-export const OPENAI_IDENTITY_SCOPE = 'openid profile email';
+// The scope sets and the API resource live in a client-safe module so the BYOK
+// card can add the token-sharing scope without importing this server-only file.
+export { OPENAI_IDENTITY_SCOPE, OPENAI_RESOURCE, OPENAI_TOKEN_SHARING_SCOPE } from './scopes';
 
-/** Token-sharing scopes, used once a client is approved for delegated access. */
-export const OPENAI_TOKEN_SHARING_SCOPE =
-  'openid profile email offline_access resource.invoke chatpass.enable.request';
-
-/** The API resource that token sharing targets. */
-export const OPENAI_RESOURCE = 'https://api.openai.com/v1';

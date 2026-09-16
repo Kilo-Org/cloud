@@ -166,20 +166,30 @@ describe('openai-chatgpt connection store', () => {
     await expect(getOpenAiChatGptConnection(TEST_USER_ID)).resolves.toBeNull();
   });
 
-  it('markOpenAiChatGptError keeps the tokens and disables the connection', async () => {
+  it('markOpenAiChatGptError clears the token set and disables the connection', async () => {
     await saveOpenAiChatGptConnection(TEST_USER_ID, buildConnection());
 
     await markOpenAiChatGptError(TEST_USER_ID, 'Your ChatGPT connection has expired.');
 
     const stored = await getOpenAiChatGptConnection(TEST_USER_ID);
     expect(stored).toMatchObject({
-      access_token: 'access-token-1',
-      refresh_token: 'refresh-token-1',
+      access_token: '',
+      expires_at: 0,
       status: 'error',
       error_message: 'Your ChatGPT connection has expired.',
     });
+    expect(stored?.refresh_token).toBeUndefined();
+    // The identity the card renders survives the cleared credential.
+    expect(stored?.email).toBe('user@example.com');
     expect(stored?.error_at).toBeTruthy();
     expect(rows[0].is_enabled).toBe(false);
+  });
+
+  it('markOpenAiChatGptError is a no-op when no row exists', async () => {
+    await markOpenAiChatGptError(TEST_USER_ID, 'Your ChatGPT connection has expired.');
+
+    expect(rows).toHaveLength(0);
+    expect(mockDb.update).not.toHaveBeenCalled();
   });
 
   it('clears a previous error state when the connection is saved again', async () => {

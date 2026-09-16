@@ -120,16 +120,21 @@ export async function clearOpenAiChatGptConnection(userId: string): Promise<void
 }
 
 /**
- * Records a terminal connection failure while keeping the tokens: the row is
- * disabled so no request retries it, and the status tells the UI to show the
- * reconnect message. A missing row is a no-op.
+ * Records a terminal connection failure and clears the stored token set: the
+ * access and refresh tokens are dropped because OpenAI has already rejected
+ * them, the row is disabled so no request retries the dead credential, and the
+ * status fields tell the UI to show the reconnect message. A missing row is a
+ * no-op.
  */
 export async function markOpenAiChatGptError(userId: string, message: string): Promise<void> {
   const connection = await getOpenAiChatGptConnection(userId);
   if (!connection) return;
 
+  const { refresh_token: _refreshToken, ...withoutTokens } = connection;
   const errored: OpenAiChatGptConnection = {
-    ...connection,
+    ...withoutTokens,
+    access_token: '',
+    expires_at: 0,
     status: 'error',
     error_message: message,
     error_at: new Date().toISOString(),

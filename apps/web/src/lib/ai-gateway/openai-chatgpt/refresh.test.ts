@@ -246,8 +246,25 @@ describe('ensureFreshOpenAiChatGptAccessToken', () => {
     const persisted = decodeStored(markUpdateSetCalls[0]);
     expect(persisted.status).toBe('error');
     expect(persisted.error_message).toBe(OPENAI_CHATGPT_RECONNECT_MESSAGE);
-    expect(persisted.access_token).toBe('stored-access-token');
-    expect(persisted.refresh_token).toBe('stored-refresh-token');
+    // The dead credential is cleared, never kept at rest.
+    expect(persisted.access_token).toBe('');
+    expect(persisted.refresh_token).toBeUndefined();
+    expect(persisted.expires_at).toBe(0);
+  });
+
+  it('does not call OpenAI when the stored connection has no refresh token', async () => {
+    storedRow = encryptedRow(
+      buildConnection({
+        access_token: '',
+        refresh_token: undefined,
+        expires_at: 0,
+        status: 'error',
+      })
+    );
+
+    await expect(ensureFreshOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toBeNull();
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('issues exactly one fetch for two concurrent calls', async () => {

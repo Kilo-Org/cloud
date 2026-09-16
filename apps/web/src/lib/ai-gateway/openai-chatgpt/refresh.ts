@@ -41,8 +41,8 @@ export const OPENAI_CHATGPT_RECONNECT_MESSAGE =
 
 /**
  * OAuth error codes that mean the stored refresh token can never work again.
- * The tokens are kept (so the UI can show what happened) but the connection is
- * disabled and the user is told to reconnect.
+ * The credential is dead: `markOpenAiChatGptError` clears the stored OpenAI
+ * token set, disables the connection, and the user is told to reconnect.
  */
 const TERMINAL_REFRESH_ERROR_CODES = new Set([
   'invalid_grant',

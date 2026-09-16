@@ -783,6 +783,7 @@
       "chat": "Chat messages",
       "kiloclaw": "KiloClaw activity",
       "balance": "Balance alerts",
+      "spend": "Spend alerts",
       "security": "Security findings"
     },
     "category": {
@@ -795,6 +796,8 @@
       "sessionStatusSubtitle": "finished / failed / ready to control",
       "kiloclawActivitySubtitle": "instance ready/failed, scheduled actions",
       "balanceAlertsSubtitle": "low organization balance warnings",
+      "spendAlertsSubtitle": "spending threshold and anomaly warnings",
+      "spendAlertsToggle": "Toggle spend alerts",
       "securityFindingsSubtitle": "new findings and SLA reminders"
     }
   },

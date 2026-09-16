@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { useWorktreeFile } from './useWorktreeFile';
 import type { WorktreeFileViewMode } from './workspace-tabs';
+import type { WorktreeReviewCapture } from './worktree-review';
+import type { WorktreeFileReviewBindings } from './worktree-review-bindings';
 
 const WorktreeFileRenderer = lazy(() => import('./WorktreeFileRenderer'));
 
@@ -91,12 +93,16 @@ export function WorktreeFilePane({
   path,
   mode,
   onModeChange,
+  review,
+  reviewScope,
 }: {
   cloudAgentSessionId: string;
   organizationId?: string;
   path: string;
   mode?: WorktreeFileViewMode;
   onModeChange: (mode: WorktreeFileViewMode) => void;
+  review?: WorktreeFileReviewBindings;
+  reviewScope?: { userId: string; organizationId?: string; workspaceScope: string };
 }) {
   const { state, isFetching, reload } = useWorktreeFile({
     cloudAgentSessionId,
@@ -111,6 +117,22 @@ export function WorktreeFilePane({
   const statusProps = { path, isFetching, onReload };
   const showReload =
     !('file' in state) && (state.status === 'error' || (state.status === 'stale' && !isFetching));
+  const reviewCapture: WorktreeReviewCapture | undefined =
+    review &&
+    reviewScope &&
+    reviewScope.organizationId === organizationId &&
+    cloudAgentSessionId.startsWith('workspace_') &&
+    'file' in state
+      ? {
+          userId: reviewScope.userId,
+          organizationId: reviewScope.organizationId,
+          workspaceScope: reviewScope.workspaceScope,
+          sourceCloudAgentSessionId: cloudAgentSessionId,
+          revision: state.file.revision,
+          capturedAt: state.capturedAt,
+          comparison: state.comparison,
+        }
+      : undefined;
 
   return (
     <div
@@ -142,6 +164,8 @@ export function WorktreeFilePane({
               file={state.file}
               mode={mode ?? 'diff'}
               onModeChange={onModeChange}
+              review={reviewCapture ? review : undefined}
+              reviewCapture={reviewCapture}
             />
           </Suspense>
         </RendererBoundary>

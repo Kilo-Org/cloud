@@ -64,6 +64,8 @@ vi.mock('@/lib/trpc', () => {
 });
 vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
   useUserWebConnectionState: () => false,
+  // These cases blip the CLI socket, not the phone's own transport.
+  useUserWebConnectionHealth: () => ({ isConnected: true, reconnectExhausted: false }),
 }));
 vi.mock('react-native', () => ({
   InteractionManager: {

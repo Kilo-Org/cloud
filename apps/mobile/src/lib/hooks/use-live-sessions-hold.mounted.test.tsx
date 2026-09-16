@@ -7,12 +7,12 @@ import { LIVE_SESSIONS_EMPTY_HOLD_MS } from '@/lib/live-sessions-render-hold';
 import { useLiveSessionsHold } from '@/lib/hooks/use-live-sessions-hold';
 
 type Row = { id: string };
-type ProbeInput = { current: Row[]; scopeKey: string; canHold: boolean };
+type ProbeInput = { current: Row[]; scopeKey: string; canHold: boolean; reconnecting?: boolean };
 
 const row = (id: string): Row => ({ id });
 
-function Probe(input: ProbeInput) {
-  const rows = useLiveSessionsHold(input);
+function Probe({ reconnecting = false, ...input }: ProbeInput) {
+  const rows = useLiveSessionsHold({ ...input, reconnecting });
   return createElement('HeldRows', { ids: rows.map(entry => entry.id).join(',') });
 }
 
@@ -118,6 +118,29 @@ describe('useLiveSessionsHold', () => {
   it('does not delay an empty live set that was never populated', async () => {
     await render({ current: [], scopeKey: 'k1', canHold: true });
     expect(heldIds()).toBe('');
+
+    await advanceBy(LIVE_SESSIONS_EMPTY_HOLD_MS);
+    expect(heldIds()).toBe('');
+  });
+
+  it('holds through the transport reconnect and releases one window after it settles', async () => {
+    await render({ current: [row('a1')], scopeKey: 'k1', canHold: true });
+
+    // The phone's socket drops: the live set empties, but no answer read while
+    // the transport is down can confirm it.
+    await render({ current: [], scopeKey: 'k1', canHold: true, reconnecting: true });
+    expect(heldIds()).toBe('a1');
+
+    // The retry schedule outlasts the short window many times over, and the
+    // rows stay: the reported blank flash is exactly this gap.
+    await advanceBy(LIVE_SESSIONS_EMPTY_HOLD_MS * 4);
+    await render({ current: [], scopeKey: 'k1', canHold: true, reconnecting: true });
+    expect(heldIds()).toBe('a1');
+
+    // The transport settles and answers the same empty set: the surface gets
+    // the full grace window from here, then reports the emptiness.
+    await render({ current: [], scopeKey: 'k1', canHold: true, reconnecting: false });
+    expect(heldIds()).toBe('a1');
 
     await advanceBy(LIVE_SESSIONS_EMPTY_HOLD_MS);
     expect(heldIds()).toBe('');

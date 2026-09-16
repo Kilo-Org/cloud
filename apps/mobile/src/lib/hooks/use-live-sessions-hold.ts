@@ -13,6 +13,11 @@ import { type LiveSessionsHold, resolveLiveSessionsHold } from '@/lib/live-sessi
  * `resolveLiveSessionsHold`), and releases the surface to the empty state once
  * the window expires so a finished session is still reported as empty.
  *
+ * The phone's own transport reconnect is longer than that window, and the
+ * hook holds through it in full: while `reconnecting` no server answer can
+ * confirm an empty live set, so the rows stay and the window starts only once
+ * the transport settles.
+ *
  * The release is a timer because nothing else re-renders at the window's end:
  * without it a held emptiness would pin stale rows forever.
  */
@@ -23,8 +28,10 @@ export function useLiveSessionsHold<T>(input: {
   scopeKey: string;
   /** False when the caller may not read (signed out, not ready): never hold. */
   canHold: boolean;
+  /** True while the live transport is reconnecting and has not given up. */
+  reconnecting: boolean;
 }): T[] {
-  const { current, scopeKey, canHold } = input;
+  const { current, scopeKey, canHold, reconnecting } = input;
   const holdRef = useRef<LiveSessionsHold<T> | null>(null);
   // Bumped when the window expires so the hold decision runs again.
   const [, setRelease] = useState(0);
@@ -33,6 +40,7 @@ export function useLiveSessionsHold<T>(input: {
     current,
     scopeKey,
     canHold,
+    reconnecting,
     // Monotonic, so a device clock correction cannot step the reading back and
     // stretch the window: `Date.now()` would hold the stale rows longer.
     now: performance.now(),

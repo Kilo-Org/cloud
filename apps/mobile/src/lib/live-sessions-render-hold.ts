@@ -21,6 +21,15 @@
  * monotonic reading, so a device clock correction cannot stretch it; a reading
  * behind the recorded start restarts the window instead.
  *
+ * A reconnect of the phone's own transport is a longer, different gap: the
+ * socket stays down for the whole retry schedule, and every answer read in
+ * that window reports the same empty live set. The device cannot learn the
+ * truth until the transport answers again, so the hold stays open while
+ * `reconnecting` — the last rows keep rendering, spending no window — and the
+ * window starts when the transport recovers or gives up. Only a settled
+ * transport may let the empty state speak for a session that is really gone;
+ * an exhausted reconnect draws its own `Connection lost` + Retry instead.
+ *
  * The hold is scoped to the query key: a context (personal/organization)
  * change builds a new key and must keep its designed loading state instead of
  * showing the previous context's rows.
@@ -36,7 +45,8 @@ export type LiveSessionsHold<T> = {
   sessions: T[];
   /**
    * Monotonic clock reading when the live set first went empty inside this
-   * hold, or null while rows are being delivered.
+   * hold, or null while rows are being delivered or while the transport cannot
+   * answer.
    */
   emptySince: number | null;
 };
@@ -57,12 +67,17 @@ export function resolveLiveSessionsHold<T>(input: {
   scopeKey: string;
   /** False when the caller may not read (signed out, not ready): never hold. */
   canHold: boolean;
+  /**
+   * True while the live transport is reconnecting, i.e. its socket is down and
+   * it has not given up: no answer read now can confirm an empty live set.
+   */
+  reconnecting: boolean;
   /** Monotonic clock reading for this render. */
   now: number;
   /** Hold carried from the previous render, or null. */
   previousHold: LiveSessionsHold<T> | null;
 }): ResolvedLiveSessionsHold<T> {
-  const { current, scopeKey, canHold, now, previousHold } = input;
+  const { current, scopeKey, canHold, reconnecting, now, previousHold } = input;
   if (current.length > 0) {
     return {
       sessions: current,
@@ -72,6 +87,18 @@ export function resolveLiveSessionsHold<T>(input: {
   }
   if (!canHold || previousHold?.key !== scopeKey || previousHold.sessions.length === 0) {
     return { sessions: current, hold: null, releaseDelayMs: null };
+  }
+  if (reconnecting) {
+    // The emptiness is the reconnect itself, not a server answer: keep the
+    // rows and start no window, because the transport may stay down for the
+    // whole retry schedule and the empty set read meanwhile says nothing.
+    // `emptySince` resets so the recovery below gets its own full window
+    // instead of releasing the instant the transport comes back.
+    return {
+      sessions: previousHold.sessions,
+      hold: { key: scopeKey, sessions: previousHold.sessions, emptySince: null },
+      releaseDelayMs: null,
+    };
   }
   // A reading behind the recorded one means the caller's clock stepped
   // backwards (an NTP correction, a manual clock change): start the window

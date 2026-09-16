@@ -39,6 +39,7 @@ const state = vi.hoisted(() => ({
     authEpoch: 0,
   },
   organization: { organizationId: null as string | null, isLoaded: true },
+  connection: { isConnected: false as boolean, reconnectExhausted: false as boolean },
   request: vi.fn<() => Promise<CachedActiveSessionsData>>(),
 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => state.auth }));
@@ -62,7 +63,8 @@ vi.mock('@/lib/trpc', () => {
   return { useTRPC: () => trpc };
 });
 vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
-  useUserWebConnectionState: () => false,
+  useUserWebConnectionState: () => state.connection.isConnected,
+  useUserWebConnectionHealth: () => state.connection,
 }));
 vi.mock('@/components/agents/user-web-connection-provider', () => ({
   useUserWebConnection: () => connection,
@@ -105,6 +107,7 @@ beforeEach(() => {
     authEpoch: currentAuthEpoch(),
   });
   Object.assign(state.organization, { organizationId: null, isLoaded: true });
+  Object.assign(state.connection, { isConnected: false, reconnectExhausted: false });
   state.request.mockReset().mockResolvedValue({ sessions: [] });
   connection = makeConnection();
   client = makeTestQueryClient();
@@ -166,5 +169,25 @@ describe('live Agents list across a transient socket empty', () => {
     expect(ids()).toEqual([]);
     expect(live().hasAcceptedSuccess).toBe(true);
     expect(liveSessionContent(readyContext, live())).toBe('empty');
+  });
+
+  it("keeps the rows while the phone's own transport is reconnecting", async () => {
+    state.request
+      .mockResolvedValueOnce({ sessions: [liveRow] })
+      .mockResolvedValue({ sessions: [] });
+    await render();
+    expect(ids()).toEqual(['a1']);
+
+    // The phone's socket drops: every answer read until it comes back reports
+    // the empty live set, and none of them can be confirmed. The rows must
+    // survive that whole retry schedule, not one short window.
+    await act(async () => {
+      state.connection.isConnected = false;
+      connection.__fireSystem({ event: 'sessions.list', data: { sessions: [] } });
+      await flush();
+    });
+    expect(client.getQueryData(QUERY_KEY)).toEqual({ sessions: [] });
+    expect(ids()).toEqual(['a1']);
+    expect(liveSessionContent(readyContext, live())).toBe('rows');
   });
 });

@@ -37,6 +37,7 @@ import {
   parseAgentSessionSortBy,
 } from '@/lib/agent-session-sort';
 import { useLiveSessionsHold } from '@/lib/hooks/use-live-sessions-hold';
+import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { useTRPC } from '@/lib/trpc';
@@ -415,6 +416,7 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
  */
 export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
   const active = useActiveSessions(options);
+  const { isConnected, reconnectExhausted } = useUserWebConnectionHealth();
   const queryClient = useQueryClient();
   const query = active.canRead
     ? queryClient.getQueryCache().find({ queryKey: active.queryKey, exact: true })
@@ -441,10 +443,17 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
   // the reconnect restores the rows a moment later. Hold the last rows through
   // that window so the surface does not flash the empty state on a reconnect;
   // the hold is scoped to the query key so a context change still loads.
+  //
+  // While the phone's own transport is reconnecting, no answer read can
+  // confirm an empty live set, so the hold stays open for the whole retry
+  // schedule instead of the short window: the empty state must not speak for
+  // rows the device cannot see. Exhaustion ends that window (the surface then
+  // shows `Connection lost` + Retry), so stale rows are still not pinned.
   const renderedActiveSessions = useLiveSessionsHold({
     current: activeSessions,
     scopeKey: JSON.stringify(active.queryKey),
     canHold: active.canRead,
+    reconnecting: !isConnected && !reconnectExhausted,
   });
 
   return {

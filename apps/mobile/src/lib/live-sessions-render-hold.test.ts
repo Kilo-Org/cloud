@@ -21,12 +21,14 @@ function resolve(over: {
   current: Session[];
   scopeKey?: string;
   canHold?: boolean;
+  reconnecting?: boolean;
   now?: number;
   previousHold?: LiveSessionsHold<Session> | null;
 }) {
   return resolveLiveSessionsHold({
     scopeKey: 'key-1',
     canHold: true,
+    reconnecting: false,
     now: 1000,
     previousHold: null,
     ...over,
@@ -143,5 +145,66 @@ describe('resolveLiveSessionsHold', () => {
 
     expect(first.sessions).toBe(rows);
     expect(second.sessions).toBe(rows);
+  });
+
+  it('holds the rows past the window while the transport is reconnecting', () => {
+    const rows = [session('a')];
+
+    const start = resolve({ current: [], previousHold: held(rows), reconnecting: true, now: 1000 });
+    expect(start.sessions).toBe(rows);
+    // No window runs while no answer can confirm the emptiness.
+    expect(start.hold).toEqual({ key: 'key-1', sessions: rows, emptySince: null });
+    expect(start.releaseDelayMs).toBeNull();
+
+    const muchLater = resolve({
+      current: [],
+      previousHold: start.hold,
+      reconnecting: true,
+      now: 1000 + LIVE_SESSIONS_EMPTY_HOLD_MS * 20,
+    });
+    expect(muchLater.sessions).toBe(rows);
+    expect(muchLater.releaseDelayMs).toBeNull();
+  });
+
+  it('starts the window at the transport recovery, not at the disconnect', () => {
+    const rows = [session('a')];
+    const duringReconnect = resolve({
+      current: [],
+      previousHold: held(rows),
+      reconnecting: true,
+      now: 1000,
+    });
+
+    // The transport answers again after a long retry schedule: the client gets
+    // the full window from here, so a reconnect that reads one empty snapshot
+    // before the CLI re-registers still does not flash.
+    const recovered = resolve({
+      current: [],
+      previousHold: duringReconnect.hold,
+      now: 90_000,
+    });
+    expect(recovered.sessions).toBe(rows);
+    expect(recovered.hold?.emptySince).toBe(90_000);
+    expect(recovered.releaseDelayMs).toBe(LIVE_SESSIONS_EMPTY_HOLD_MS);
+
+    const released = resolve({
+      current: [],
+      previousHold: recovered.hold,
+      now: 90_000 + LIVE_SESSIONS_EMPTY_HOLD_MS,
+    });
+    expect(released.sessions).toEqual([]);
+    expect(released.hold).toBeNull();
+  });
+
+  it('releases a settled emptiness after the window once the reconnect is exhausted', () => {
+    const rows = [session('a')];
+    const previousHold = held(rows, { emptySince: 1000 });
+
+    // `reconnecting` is false once the client has given up: the surface shows
+    // `Connection lost` + Retry, so the rows must not be pinned.
+    const result = resolve({ current: [], previousHold, reconnecting: false, now: 61_000 });
+
+    expect(result.sessions).toEqual([]);
+    expect(result.hold).toBeNull();
   });
 });

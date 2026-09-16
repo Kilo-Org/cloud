@@ -23,10 +23,10 @@ export async function isFreeModel(model: string): Promise<boolean> {
       isLocalFakeLlmEnabled()) ||
     isKiloExclusiveFreeModel(model) ||
     model === KILO_AUTO_FREE_MODEL.id ||
-    (model ?? '').endsWith(':free') ||
+    model.endsWith(':free') ||
     model === 'openrouter/free' ||
-    model === 'stealth/ox-alpha' ||
-    (await isPublicIdExperimented(model ?? ''))
+    model.startsWith('stealth/') && model.endsWith('-alpha') ||
+    (await isPublicIdExperimented(model))
   );
 }
 

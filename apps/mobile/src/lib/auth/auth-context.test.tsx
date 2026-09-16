@@ -209,6 +209,14 @@ vi.mock('@/lib/query-client', () => ({
 
 vi.mock('@/lib/persist/read-cache', () => readCacheMock);
 
+// The sign-out teardown reaches the OS search bridge through
+// `session-scoped-state`. That bridge imports the root `expo` entry, which
+// reads `__DEV__` at import time and does not parse under the node test
+// environment; the clear is a no-op here.
+vi.mock('@/lib/native-system-search', () => ({
+  clearSystemSearchIndex: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/auth/logout-cleanup', () => logoutCleanupMock);
 
 vi.mock('@/lib/consent', () => ({

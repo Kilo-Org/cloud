@@ -216,7 +216,7 @@ describe('worktree state capture and restore', () => {
     fs.writeFileSync(path.join(source, 'tracked.txt'), Buffer.alloc(80 * 1024 * 1024, 0x61));
     expect(await captureWorktreeState({ directory: source, endpoint, env: gitEnv })).toEqual({
       status: 'skipped',
-      reason: 'diff_failed',
+      reason: 'too_large',
     });
     expect(net.stored.bundle).toBeUndefined();
   });

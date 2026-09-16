@@ -43,6 +43,8 @@ import {
  * Android, so neither platform lacks the capability and no per-platform storage
  * branch is kept: every read goes through `readStoredValue`, the app's one
  * cross-platform entry point, the same one `lib/glanceable/scope` reads.
+ * `expo-crypto`'s `randomUUID` is also the same call on iOS and Android, so the
+ * create's operation key needs no per-platform branch either.
  * `trpcClient` reads the stored token headlessly through
  * `getAuthTokenForRequest`, so a task with no Activity can authenticate.
  */

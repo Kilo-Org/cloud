@@ -211,6 +211,13 @@ export async function runPendingWidgetActions(
  * sweep stay guarded to the platform that has the capability; Android runs the
  * same action from the widget host's headless task
  * (`glanceable-android/register.ts`).
+ *
+ * The one user-visible difference is when the action runs: Android's task
+ * answers the press in the background the moment it is tapped, while an iOS
+ * press is answered at this process's next launch or foreground, because an
+ * App Intent cannot run this JS in a cold process. Both draw the press's
+ * progress line immediately, and both run the same shared action
+ * (`lib/glanceable/widget-actions`).
  */
 export function registerWidgetActionHandling(): void {
   if (Platform.OS !== 'ios') {

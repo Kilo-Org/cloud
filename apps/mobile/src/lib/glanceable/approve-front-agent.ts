@@ -115,14 +115,22 @@ async function runApproval(deps: FrontApprovalDeps): Promise<FrontApprovalOutcom
   let handle = deps.getLiveSessionManager(front.id);
   let created = false;
   if (handle === null) {
-    handle = await deps.createLiveSessionManager(scope);
+    try {
+      handle = await deps.createLiveSessionManager(scope);
+    } catch (error) {
+      // The factory can reject after it has already retained a connection; it
+      // owns that teardown. The failure must still map to an outcome and refresh
+      // the surfaces instead of escaping this function.
+      await refreshSurfaces(deps, scope);
+      return { kind: 'failed', retryable: deps.classifyFailure(error) === 'retryable' };
+    }
     created = true;
     try {
       // The active-sessions row id is the kilo session id the manager switches
       // on (the route brands the same value the same way).
       await handle.manager.switchSession(front.id as KiloSessionId);
     } catch (error) {
-      deps.destroyLiveSessionManager(handle);
+      destroyHeadless(deps, handle);
       await refreshSurfaces(deps, scope);
       return { kind: 'failed', retryable: deps.classifyFailure(error) === 'retryable' };
     }
@@ -134,11 +142,27 @@ async function runApproval(deps: FrontApprovalDeps): Promise<FrontApprovalOutcom
   } finally {
     // Only a manager this call created: a registered one belongs to the screen.
     if (created) {
-      deps.destroyLiveSessionManager(handle);
+      destroyHeadless(deps, handle);
     }
   }
   await refreshSurfaces(deps, scope);
   return outcome;
+}
+
+/**
+ * Tear down a manager this call created.
+ *
+ * Teardown runs from the approval's `finally`, so a rejection here would skip
+ * the surface refresh and replace the outcome with a failure the wrist cannot
+ * show. The handle is dropped either way, so a failed teardown has nothing left
+ * to act on.
+ */
+function destroyHeadless(deps: FrontApprovalDeps, handle: LiveSessionManagerHandle): void {
+  try {
+    deps.destroyLiveSessionManager(handle);
+  } catch {
+    // Deliberate: see above.
+  }
 }
 
 async function answerFrontAsk(
@@ -288,21 +312,36 @@ async function defaultFrontApprovalDeps(): Promise<FrontApprovalDeps> {
       // Without a retain the connection never opens: `hasLifetime()` is false.
       // The release handle is not kept: teardown destroys the connection.
       connection.retain();
-      const manager = createMobileAgentSessionManager({
-        store,
-        userWebConnection: connection,
-        organizationId: approvalScope.organizationId ?? undefined,
-        userId: approvalScope.userId ?? '',
-      });
-      headlessConnections.set(manager, connection);
-      return { manager, store };
+      try {
+        const manager = createMobileAgentSessionManager({
+          store,
+          userWebConnection: connection,
+          organizationId: approvalScope.organizationId ?? undefined,
+          userId: approvalScope.userId ?? '',
+        });
+        headlessConnections.set(manager, connection);
+        return { manager, store };
+      } catch (error) {
+        // A manager that never comes back would strand the retained socket: the
+        // map entry is the only handle a later teardown has.
+        connection.destroy();
+        throw error;
+      }
     },
     destroyLiveSessionManager: handle => {
-      handle.manager.destroy();
+      // Drop the map entry before the manager's own teardown runs: it is the
+      // only handle to the retained socket, so a throwing teardown would
+      // otherwise leak the connection.
       const connection = headlessConnections.get(handle.manager);
       if (connection !== undefined) {
         headlessConnections.delete(handle.manager);
         connection.destroy();
+      }
+      try {
+        handle.manager.destroy();
+      } catch {
+        // Teardown is best-effort: nothing downstream can act on a failure, and
+        // the approval's own refresh must still run.
       }
     },
     ackSessionAttention,

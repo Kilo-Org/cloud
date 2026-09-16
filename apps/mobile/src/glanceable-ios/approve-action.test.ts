@@ -131,4 +131,38 @@ describe('registerGlanceableApproveAction', () => {
     unsubscribe();
     expect(mocks.remove).toHaveBeenCalledTimes(1);
   });
+
+  it('leaves a later registration alone when an earlier unsubscribe runs', async () => {
+    const mod: ApproveActionModule = await loadApproveAction();
+    const first = approveThatResolves();
+    const second = approveThatResolves();
+    const unsubscribeFirst = mod.registerGlanceableApproveAction(first);
+    mod.registerGlanceableApproveAction(second);
+
+    // The second registration replaced the callback and owns the listener. The
+    // first unsubscribe must not remove it or clear what it no longer owns, or
+    // Approve would be dead until the next app launch.
+    unsubscribeFirst();
+
+    expect(mocks.remove).not.toHaveBeenCalled();
+    firstListener()(nativeEvent());
+    await vi.waitFor(() => {
+      expect(second).toHaveBeenCalledTimes(1);
+    });
+    expect(first).not.toHaveBeenCalled();
+  });
+
+  it('does not clear a registration that replaced it when unsubscribing twice', async () => {
+    const mod: ApproveActionModule = await loadApproveAction();
+    const first = approveThatResolves();
+    const second = approveThatResolves();
+    const unsubscribeFirst = mod.registerGlanceableApproveAction(first);
+    mod.registerGlanceableApproveAction(second);
+
+    unsubscribeFirst();
+    unsubscribeFirst();
+
+    expect(mocks.remove).not.toHaveBeenCalled();
+    expect(mocks.listeners).toHaveLength(1);
+  });
 });

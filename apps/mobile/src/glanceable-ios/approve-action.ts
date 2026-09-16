@@ -51,6 +51,12 @@ export type GlanceableUserInteraction = { source: string; target: string };
  */
 let approveAction: (() => Promise<void>) | null = null;
 let subscription: ReturnType<typeof addUserInteractionListener> | null = null;
+/**
+ * Which registration owns the callback and the listener. A later registration
+ * replaces the callback, and only the registration still holding this id may
+ * clear them.
+ */
+let registrationId = 0;
 
 /**
  * Route one interaction event to `approve` when it is this Live Activity's
@@ -84,6 +90,7 @@ export async function handleApproveInteraction(
  * approval twice for one press.
  */
 export function registerGlanceableApproveAction(approve: () => Promise<void>): () => void {
+  const id = (registrationId += 1);
   approveAction = approve;
   subscription ??= addUserInteractionListener(event => {
     const current = approveAction;
@@ -92,6 +99,12 @@ export function registerGlanceableApproveAction(approve: () => Promise<void>): (
     }
   });
   return () => {
+    // A later registration replaced the callback and owns the listener now, so
+    // clearing them here would disable an approval this call no longer owns.
+    if (id !== registrationId) {
+      return;
+    }
+    registrationId += 1;
     subscription?.remove();
     subscription = null;
     approveAction = null;

@@ -74,6 +74,10 @@ type HarnessInput = {
   listRejection?: Error;
   /** Rejection of the scope read that precedes the list read. */
   scopeRejection?: Error;
+  /** Rejection of the headless manager factory, after it may have retained a connection. */
+  createRejection?: Error;
+  /** A failing teardown: the approval must still refresh and keep its outcome. */
+  destroyRejection?: Error;
   askSettleMs?: number;
   headless?: { respondRejection?: unknown; switchRejection?: unknown };
 };
@@ -81,7 +85,11 @@ type HarnessInput = {
 function createHarness(input: HarnessInput) {
   const clock = { now: 1_000_000 };
   const headless = makeFakeHandle(input.headless ?? {});
-  const destroyLiveSessionManager = vi.fn<(handle: LiveSessionManagerHandle) => void>();
+  const destroyLiveSessionManager = vi.fn<(handle: LiveSessionManagerHandle) => void>(() => {
+    if (input.destroyRejection !== undefined) {
+      throw input.destroyRejection;
+    }
+  });
   const ackSessionAttention = vi.fn<(kiloSessionId: string) => void>();
   let listCall = 0;
   const listSessions = vi.fn(async (_organizationId: string | null) => {
@@ -111,7 +119,12 @@ function createHarness(input: HarnessInput) {
     },
     listSessions,
     getLiveSessionManager: () => input.registered?.handle ?? null,
-    createLiveSessionManager: async () => headless.handle,
+    createLiveSessionManager: async () => {
+      if (input.createRejection !== undefined) {
+        throw input.createRejection;
+      }
+      return headless.handle;
+    },
     destroyLiveSessionManager,
     ackSessionAttention,
     refreshGlanceableSurfaces,
@@ -337,6 +350,38 @@ describe('approveFrontAgent', () => {
 
     expect(outcome).toEqual({ kind: 'approved' });
     expect(harness.ackSessionAttention).toHaveBeenCalledWith('session-1');
+  });
+
+  it('fails without rejecting when the headless manager factory rejects', async () => {
+    const harness = createHarness({
+      rows: [PERMISSION_ROW],
+      createRejection: new Error('connection refused'),
+    });
+
+    const outcome = await approveFrontAgent(harness.deps);
+
+    expect(outcome).toEqual({ kind: 'failed', retryable: true });
+    expect(harness.destroyLiveSessionManager).not.toHaveBeenCalled();
+    // The factory rejects after it may have retained a connection. That
+    // rejection must not escape and skip the republish, or a control that
+    // outlived its ask would stay on the surface.
+    expect(harness.refreshGlanceableSurfaces).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the outcome and the refresh when the headless teardown rejects', async () => {
+    const harness = createHarness({
+      rows: [PERMISSION_ROW],
+      pendingAsks: [{ requestId: 'perm-6' }],
+      destroyRejection: new Error('destroy failed'),
+    });
+
+    const outcome = await approveFrontAgent(harness.deps);
+
+    // Teardown runs from the approval's `finally`: a rejection there must not
+    // replace the outcome or skip the surface refresh.
+    expect(outcome).toEqual({ kind: 'approved' });
+    expect(harness.destroyLiveSessionManager).toHaveBeenCalledTimes(1);
+    expect(harness.refreshGlanceableSurfaces).toHaveBeenCalledTimes(1);
   });
 });
 

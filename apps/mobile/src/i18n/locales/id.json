@@ -1638,7 +1638,20 @@
       "continueFrom": "Melanjutkan sesi {{title}}.",
       "importingSession": "Mengimpor sesi",
       "cliCannotContinue": "CLI ini tidak dapat melanjutkan sesi. Pilih Cloud Agent atau CLI lain.",
-      "importFailed": "Tidak dapat mengimpor sesi ini."
+      "importFailed": "Tidak dapat mengimpor sesi ini.",
+      "sandbox": "Lingkungan terisolasi",
+      "sandboxAccessibility": "Lingkungan terisolasi: {{label}}",
+      "sandboxDefaultWithDestination": "Bawaan · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Kecil",
+      "sandboxInstanceShared": "Berbagi",
+      "sandboxInstanceLarge": "Besar",
+      "sandboxInstanceDevcontainer": "Kontainer dev",
+      "sandboxInstanceProviderDefault": "Bawaan penyedia",
+      "sandboxCouldNotLoad": "Tidak dapat memuat opsi sandbox",
+      "sandboxUnavailable": "Lingkungan terisolasi ini tidak tersedia. Pilih lingkungan terisolasi lain atau Bawaan.",
+      "sandboxUseDefault": "Gunakan Bawaan"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} berkas telah diperbarui.",

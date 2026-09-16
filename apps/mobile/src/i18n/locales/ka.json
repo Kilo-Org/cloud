@@ -2124,7 +2124,20 @@
       "continueFrom": "გრძელდება სესია: {{title}}.",
       "importingSession": "სესიის იმპორტი მიმდინარეობს…",
       "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
-      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა."
+      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა.",
+      "sandbox": "სენდბოქსი",
+      "sandboxAccessibility": "სენდბოქსი: {{label}}",
+      "sandboxDefaultWithDestination": "ნაგულისხმევი · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "პატარა",
+      "sandboxInstanceShared": "საერთო",
+      "sandboxInstanceLarge": "დიდი",
+      "sandboxInstanceDevcontainer": "დევ კონტეინერი",
+      "sandboxInstanceProviderDefault": "მომწოდებლის ნაგულისხმევი",
+      "sandboxCouldNotLoad": "სენდბოქსის ვარიანტების ჩატვირთვა ვერ მოხერხდა",
+      "sandboxUnavailable": "ეს სენდბოქსი მიუწვდომელია. აირჩიეთ სხვა სენდბოქსი ან ნაგულისხმევი.",
+      "sandboxUseDefault": "ნაგულისხმევის გამოყენება"
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი.",

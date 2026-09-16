@@ -14,6 +14,7 @@ import {
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
+import { type SandboxAllocation } from '@/lib/sandbox-allocation-label';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
@@ -55,6 +56,12 @@ type UseNewSessionCreatorInput = {
   autoCommit: boolean;
   /** Effective environment profile id; omitted from the create body when unset. */
   profileId?: string | null;
+  /**
+   * The sandbox allocation picked on the new-session form (the s1 picker row's
+   * shape); omitted from the create body when unset, so the backend's own
+   * default applies.
+   */
+  sandboxAllocation?: SandboxAllocation;
 };
 
 type PrepareSessionInput = {
@@ -74,6 +81,8 @@ type PrepareSessionInput = {
   operationKey: string;
   profileId?: string;
   attachments?: AgentAttachmentWire;
+  /** The picked sandbox allocation; omitted, the backend's default applies. */
+  sandboxAllocation?: SandboxAllocation;
 };
 
 type UseNewSessionCreatorResult = {
@@ -100,6 +109,7 @@ export function useNewSessionCreator({
   variant,
   autoCommit,
   profileId,
+  sandboxAllocation,
 }: UseNewSessionCreatorInput): UseNewSessionCreatorResult {
   const router = useStackSafeReplace();
   const queryClient = useQueryClient();
@@ -158,6 +168,10 @@ export function useNewSessionCreator({
       organizationId: organizationId ?? null,
       profileId: profileId ?? null,
       attachments: attachmentWire ?? null,
+      // Changing the sandbox pick is a fresh intent: a same-key retry would
+      // replay the previous pick's ledger result instead of creating with the
+      // newly picked allocation.
+      sandboxAllocation: sandboxAllocation ?? null,
     });
     // Pre-fix safe-retry rows persisted the bare `fullName` as `repo`. A GitHub
     // `owner/repo` is inherently a single-provider identity, so only GitHub
@@ -217,6 +231,9 @@ export function useNewSessionCreator({
       setRepositoryField(baseInput, selectedRepository);
       if (profileId) {
         baseInput.profileId = profileId;
+      }
+      if (sandboxAllocation) {
+        baseInput.sandboxAllocation = sandboxAllocation;
       }
       if (attachmentWire) {
         baseInput.attachments = attachmentWire;
@@ -312,6 +329,7 @@ export function useNewSessionCreator({
     autoCommit,
     organizationId,
     profileId,
+    sandboxAllocation,
     queryClient,
     trpc,
     router,

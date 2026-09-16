@@ -1818,6 +1818,7 @@ export function SessionDetailContent({
             visible={detailsMessageId !== null}
             message={detailsMessage ?? null}
             modelOptions={modelOptions}
+            deliveryState={detailsDelivery}
             onClose={handleCloseDetails}
             canCancelQueued={canCancelSelected}
             isCancelingQueued={isCancelingSelected}

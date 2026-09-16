@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('./active-agents-live-activity', () => ({
   LIVE_ACTIVITY_NAME: 'ActiveAgentsLiveActivity',
+  OPEN_AGENTS_URL: 'kiloapp:///cloud/sessions',
   ActiveAgentsLiveActivity: { getInstances: mocks.getInstances },
 }));
 vi.mock('./ios-sink', () => ({
@@ -269,14 +270,23 @@ describe('handleGlanceableInteraction', () => {
     expect(mocks.runGlanceableApprove).not.toHaveBeenCalled();
   });
 
-  it('does nothing on Open without a record', async () => {
+  it('lands on the Agents tab when Open has no recorded session', async () => {
     mocks.readWaitingAsk.mockResolvedValue(null);
 
     await expect(handleGlanceableInteraction(fromCard(GLANCEABLE_OPEN_TARGET))).resolves.toEqual({
-      kind: 'no_session',
+      kind: 'opened',
+      href: '/(app)/(tabs)/(2_agents)',
     });
 
-    expect(mocks.setPendingDeepLink).not.toHaveBeenCalled();
+    // The button carries no URL of its own: with nothing recorded there is no
+    // session to open, and a press that stashes nothing is a dead control. The
+    // Agents tab is the destination the card's body deep-links to and the one
+    // Android's notification already falls back to.
+    expect(mocks.setPendingDeepLink).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(2_agents)',
+      'universal-link'
+    );
+    expect(mocks.runGlanceableApprove).not.toHaveBeenCalled();
   });
 
   it('turns an escaping failure into a retryable press', async () => {

@@ -12,7 +12,11 @@ import {
 import { readWaitingAsk, recordWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { setPendingDeepLink } from '@/lib/deep-link-launch';
 
-import { ActiveAgentsLiveActivity, LIVE_ACTIVITY_NAME } from './active-agents-live-activity';
+import {
+  ActiveAgentsLiveActivity,
+  LIVE_ACTIVITY_NAME,
+  OPEN_AGENTS_URL,
+} from './active-agents-live-activity';
 import { renderStoredSnapshotWithNotice, setGlanceableActionNotice } from './ios-sink';
 
 /**
@@ -48,9 +52,9 @@ export type GlanceableInteractionOutcome =
   | { kind: 'ignored' }
   /** A press from this surface carrying a target no button declares. */
   | { kind: 'unhandled' }
-  /** Open landed on the recorded session. */
+  /** Open landed on the recorded session, or on the Agents tab when none was recorded. */
   | { kind: 'opened'; href: string }
-  /** Open with nothing recorded; the card's own URL already lands on agents. */
+  /** Open whose target the app's router could not resolve; nothing was stashed. */
   | { kind: 'no_session' }
   | GlanceableApproveResult;
 
@@ -164,16 +168,19 @@ async function approveFromCard(): Promise<GlanceableInteractionOutcome> {
  * The id is the only thing kept beside the privacy-minimal snapshot, and it
  * goes into the URL and nowhere else. The hydrated read is the same one the
  * headless paths use: a press that launched the process in the background has
- * no in-memory record yet, only the mirrored one. With nothing recorded there
- * is nothing to open — the card's own URL already lands on the agents tab — so
- * guessing a session is the one thing this must not do.
+ * no in-memory record yet, only the mirrored one.
+ *
+ * With nothing recorded there is no session to open, and the button itself
+ * carries no URL — so Open falls back to the Agents tab, the destination the
+ * card's body deep-links to and the one Android's notification already uses.
+ * A press that stashes nothing would be the dead control this button must not
+ * be; guessing a session stays the one thing it must not do.
  */
 async function openRecordedSession(): Promise<GlanceableInteractionOutcome> {
   const ask = await readWaitingAsk();
-  if (ask === null) {
-    return { kind: 'no_session' };
-  }
-  const href = resolveIncomingUrl(`${SESSION_URL_PREFIX}${ask.kiloSessionId}`);
+  const href = resolveIncomingUrl(
+    ask === null ? OPEN_AGENTS_URL : `${SESSION_URL_PREFIX}${ask.kiloSessionId}`
+  );
   if (href === null) {
     return { kind: 'no_session' };
   }

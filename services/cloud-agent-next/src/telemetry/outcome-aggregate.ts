@@ -90,7 +90,7 @@ type DatabaseTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0]
 
 const unknownResponsibilityCondition: SQL = sql`(${cloud_agent_session_runs.failure_responsibility} is null or ${cloud_agent_session_runs.failure_responsibility} not in ('platform', 'user'))`;
 
-function generationExpression(sessionId: AnyColumn): SQL<OutcomeGeneration> {
+export function generationExpression(sessionId: AnyColumn): SQL<OutcomeGeneration> {
   return sql<OutcomeGeneration>`case when left(${sessionId}, ${CONTROL_PLANE_SESSION_PREFIX.length}) = ${CONTROL_PLANE_SESSION_PREFIX} then 'control' else 'legacy' end`;
 }
 

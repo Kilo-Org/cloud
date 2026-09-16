@@ -50,11 +50,40 @@ const mocks = vi.hoisted(() => {
     notificationDeadline = timeoutMs > 0 ? Date.now() + timeoutMs : null;
   }
 
+  const isPromotionCapable = vi.fn(() => true);
+
+  // The native `update` spends its eighth bridge slot on the terminal timeout,
+  // so it applies the promotion gate from the capability check it re-runs
+  // instead of a JS flag.
+  // eslint-disable-next-line max-params -- the fake models the native update bridge arguments
+  function postUpdate(
+    title: string,
+    text: string,
+    openAgentsLabel: string,
+    approveLabel: string | null,
+    compactText: string | null,
+    channelId: string,
+    alerting: boolean,
+    timeoutMs = 0
+  ): void {
+    post(
+      title,
+      text,
+      openAgentsLabel,
+      approveLabel,
+      compactText,
+      channelId,
+      alerting,
+      isPromotionCapable(),
+      timeoutMs
+    );
+  }
+
   return {
     native: {
-      isPromotionCapable: vi.fn(() => true),
+      isPromotionCapable,
       start: vi.fn(post),
-      update: vi.fn(post),
+      update: vi.fn(postUpdate),
       end: vi.fn(() => {
         notification = null;
         notificationDeadline = null;
@@ -276,7 +305,6 @@ describe('androidSink start and update', () => {
       '4',
       'agent-progress',
       false,
-      true,
       0
     );
   });
@@ -297,7 +325,6 @@ describe('androidSink start and update', () => {
       expect.any(String),
       'needs-input',
       false,
-      true,
       0
     );
   });
@@ -332,7 +359,6 @@ describe('androidSink start and update', () => {
       null,
       expect.any(String),
       'needs-input',
-      true,
       true,
       0
     );
@@ -545,7 +571,6 @@ describe('androidSink approve action', () => {
       '1',
       'agent-progress',
       false,
-      true,
       0
     );
   });
@@ -607,7 +632,6 @@ describe('androidSink approve action', () => {
       'Approve',
       '1',
       'needs-input',
-      true,
       true,
       0
     );

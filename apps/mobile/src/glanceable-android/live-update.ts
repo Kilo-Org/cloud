@@ -35,7 +35,6 @@ type LiveUpdateNativeModule = {
     compactText: string | null,
     channelId: AndroidNotificationChannelId,
     alerting: boolean,
-    promotion: boolean,
     timeoutMs: number
   ): void;
   end(): void;
@@ -86,6 +85,9 @@ export function update(
   alerting: boolean,
   timeoutMs = 0
 ): void {
+  // The native `update` spends its eighth bridge slot on the terminal timeout,
+  // which is Expo's argument limit for a native `Function`, so it reads the
+  // promotion gate from its own `isPromotionCapable()` instead of a JS flag.
   nativeModule?.update(
     title,
     text,
@@ -94,7 +96,6 @@ export function update(
     compactText,
     channelId,
     alerting,
-    isPromotionCapable(),
     timeoutMs
   );
 }

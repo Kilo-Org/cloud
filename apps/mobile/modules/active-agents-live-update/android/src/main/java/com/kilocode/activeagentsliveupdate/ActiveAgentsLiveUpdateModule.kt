@@ -33,8 +33,13 @@ class ActiveAgentsLiveUpdateModule : Module() {
       post(title, text, openAgentsLabel, approveLabel, compactText, channelId, alerting, promotion, 0)
     }
 
-    Function("update") { title: String, text: String, openAgentsLabel: String, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean, timeoutMs: Double ->
-      post(title, text, openAgentsLabel, approveLabel, compactText, channelId, alerting, promotion, timeoutMs.toLong())
+    // Expo's `Function` builder has one overload per arity and stops at eight
+    // arguments (expo-modules-core `ObjectDefinitionBuilder`), so `update`
+    // cannot carry `start`'s `promotion` flag on top of the terminal
+    // `timeoutMs`. The flag is redundant on this path: `post` gates promotion
+    // on `isPromotionCapable()` itself, which is the value the JS side passed.
+    Function("update") { title: String, text: String, openAgentsLabel: String, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, timeoutMs: Double ->
+      post(title, text, openAgentsLabel, approveLabel, compactText, channelId, alerting, isPromotionCapable(), timeoutMs.toLong())
     }
 
     Function("end") {

@@ -52,9 +52,15 @@ export default function WaitingAgentScreen() {
       enabled: orgLoaded,
     });
   // Re-render when an ack lands or expires, so a raise the user just answered
-  // is not reopened.
-  useSessionAttentionRevision();
-  const waiting = useMemo(() => pickWaitingAgent(activeSessions), [activeSessions]);
+  // is not reopened. The revision is also a memo dependency: `pickWaitingAgent`
+  // reads the ack store directly, so the selection must be recomputed whenever
+  // the store changes — not only when the sessions query hands back a new array.
+  const attentionRevision = useSessionAttentionRevision();
+  const waiting = useMemo(
+    () => pickWaitingAgent(activeSessions),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `attentionRevision` is the ack store's change signal; `pickWaitingAgent` reads the store itself, so the dependency is required even though the callback does not take it as an argument.
+    [activeSessions, attentionRevision]
+  );
   // Provenance, not `isLoading`: a render that has not been accepted yet is not
   // an accepted empty success (see `useLiveAgentSessions`'s empty-data note).
   const error = isError && !hasAcceptedSuccess;

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
+import { __resetSessionAttentionForTests, ackSessionAttention } from '@/lib/session-attention';
 import WaitingAgentScreen from './waiting';
 
 const replace = vi.hoisted(() => vi.fn());
@@ -135,6 +136,7 @@ let mounted: TestRenderer.ReactTestRenderer | null = null;
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  __resetSessionAttentionForTests();
   replace.mockClear();
   organization.organizationId = null;
   organization.isLoaded = true;
@@ -172,6 +174,51 @@ describe('WaitingAgentScreen', () => {
 
     expect(byType(renderer, 'CenteredState')).toHaveLength(1);
     expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('re-reads the ack store when the ack hydrates before the organization resolves', async () => {
+    // The persisted ack store hydrates asynchronously at module init, so the
+    // first render can resolve a raise the user already answered. The selection
+    // must be recomputed on the ack-store revision, or the redirect happens
+    // once the organization resolves and reopens the answered raise.
+    organization.isLoaded = false;
+    live.activeSessions = [session({ id: 'acked-1' })];
+    const renderer = await mount();
+    mounted = renderer;
+    expect(replace).not.toHaveBeenCalled();
+
+    act(() => {
+      ackSessionAttention('acked-1');
+    });
+    organization.isLoaded = true;
+    await update(renderer);
+
+    expect(replace).not.toHaveBeenCalled();
+    expect(texts(renderer)).toContain(i18n.t('home.noLiveSessions'));
+  });
+
+  it('re-reads the ack store when an ack lands while the route is mounted on an error', async () => {
+    // Same window with the error gate: the effect is held back while the query
+    // is failing, an ack lands, then the retry settles and the stale selection
+    // must not reopen the answered raise.
+    live.hasAcceptedSuccess = false;
+    live.isError = true;
+    live.terminalError = { kind: 'retryable', error: new Error('boom') };
+    live.activeSessions = [session({ id: 'acked-2' })];
+    const renderer = await mount();
+    mounted = renderer;
+    expect(replace).not.toHaveBeenCalled();
+
+    act(() => {
+      ackSessionAttention('acked-2');
+    });
+    live.isError = false;
+    live.hasAcceptedSuccess = true;
+    live.terminalError = null;
+    await update(renderer);
+
+    expect(replace).not.toHaveBeenCalled();
+    expect(texts(renderer)).toContain(i18n.t('home.noLiveSessions'));
   });
 
   it('replaces the route with the waiting agent session on the happy path', async () => {

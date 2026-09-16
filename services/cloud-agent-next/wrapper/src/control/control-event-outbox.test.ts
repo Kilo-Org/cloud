@@ -1,7 +1,9 @@
-import { describe, expect, it, mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
 import { ControlDeliveryError } from './sandbox-control-client';
 import {
+  CONTROL_EVENT_BATCH_WINDOW_MS,
   createControlEventOutbox,
+  type ControlEventOutboxFailure,
   type ControlEventPublication,
   type PreparedControlEventPublication,
 } from './control-event-outbox';
@@ -46,6 +48,72 @@ async function waitFor(condition: () => boolean, attempts = 100): Promise<void> 
 }
 
 describe('control event outbox', () => {
+  it('releases a root lane after local handoff without waiting for a receipt', async () => {
+    const delivered: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        delivered.push(publication);
+      },
+      onFailure: mock(),
+    });
+    try {
+      for (let sequence = 0; sequence < 3; sequence += 1)
+        expect(
+          outbox.enqueue(
+            outbox.prepare({
+              event: 'session.event',
+              session,
+              payload: { type: 'session.idle', properties: { sequence } },
+            })
+          )
+        ).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(delivered.map(publication => publication.sequence)).toEqual([1, 2, 3]);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('applies count pressure across roots and drops the incoming publication', () => {
+    const failure = mock();
+    const outbox = createControlEventOutbox({
+      publish: async () => {},
+      onFailure: failure,
+    });
+    try {
+      for (let index = 0; index < 256; index += 1)
+        expect(
+          outbox.enqueue(
+            outbox.prepare({
+              event: 'session.event',
+              session: {
+                ...session,
+                kiloSessionId: `ses_${index}`,
+                rootKiloSessionId: `ses_${index}`,
+              },
+              payload: { type: 'session.idle', properties: { index } },
+            })
+          )
+        ).toBe(true);
+      expect(
+        outbox.enqueue(
+          outbox.prepare({
+            event: 'session.event',
+            session: {
+              ...session,
+              kiloSessionId: 'ses_overflow',
+              rootKiloSessionId: 'ses_overflow',
+            },
+            payload: { type: 'session.idle', properties: { index: 256 } },
+          })
+        )
+      ).toBe(false);
+      expect(failure).toHaveBeenCalledWith(expect.objectContaining({ reason: 'queue_overflow' }));
+    } finally {
+      outbox.close();
+    }
+  });
+
   it('squashes adjacent same-part updates while retaining the original receipt metadata', async () => {
     const delivered: Array<{ publication: ControlEventPublication; deadlineAt: number }> = [];
     const outbox = createControlEventOutbox({
@@ -142,7 +210,7 @@ describe('control event outbox', () => {
         Buffer.byteLength(
           JSON.stringify({
             type: 'request',
-            requestId: '00000000-0000-4000-8000-000000000000',
+            requestId: 'event_00000000-0000-4000-8000-000000000000',
             operation: 'sandbox.event.publish',
             payload: wire,
           })
@@ -405,7 +473,7 @@ describe('control event outbox', () => {
     }
   });
 
-  it.each(['entity', 'root', 'native'] as const)(
+  it.each(['entity', 'root', 'native', 'session', 'directory'] as const)(
     'does not squash when the %s is different',
     async fence => {
       const published: ControlEventPublication[] = [];
@@ -420,13 +488,21 @@ describe('control event outbox', () => {
       const firstSession =
         fence === 'root'
           ? { ...session, kiloSessionId: 'root_a', rootKiloSessionId: 'root_a' }
-          : { ...session, nativeRuntimeId: firstNativeRuntimeId };
+          : fence === 'session'
+            ? { ...session, kiloSessionId: 'child_a', rootKiloSessionId: 'root_shared' }
+            : fence === 'directory'
+              ? { ...session, directory: '/workspace/a' }
+              : { ...session, nativeRuntimeId: firstNativeRuntimeId };
       const secondSession =
         fence === 'root'
           ? { ...session, kiloSessionId: 'root_b', rootKiloSessionId: 'root_b' }
-          : fence === 'native'
-            ? { ...session, nativeRuntimeId: secondNativeRuntimeId }
-            : firstSession;
+          : fence === 'session'
+            ? { ...session, kiloSessionId: 'child_b', rootKiloSessionId: 'root_shared' }
+            : fence === 'directory'
+              ? { ...session, directory: '/workspace/b' }
+              : fence === 'native'
+                ? { ...session, nativeRuntimeId: secondNativeRuntimeId }
+                : firstSession;
       const first = outbox.prepare({
         event: 'session.event',
         session: firstSession,
@@ -519,16 +595,15 @@ describe('control event outbox', () => {
     }
   });
 
-  it('keeps a retry-held head unchanged and queues a newer same-message update behind it', async () => {
+  it('reports a failed local handoff once and delivers a newer same-message update behind it', async () => {
     const delivered: Array<{ publication: ControlEventPublication; deadlineAt: number }> = [];
-    const retried = Promise.withResolvers<void>();
+    const failure = mock();
     const outbox = createControlEventOutbox({
       publish: async (publication, deadlineAt) => {
         delivered.push({ publication, deadlineAt });
         if (delivered.length === 1) throw new ControlDeliveryError('not attached', true);
-        if (delivered.length === 2) retried.resolve();
       },
-      onFailure: mock(),
+      onFailure: failure,
     });
     try {
       const first = outbox.prepare({
@@ -542,18 +617,19 @@ describe('control event outbox', () => {
         payload: messageUpdatedPayload('msg_1', 'latest'),
       });
       expect(outbox.enqueue(first)).toBe(true);
-      expect(await outbox.resume()).toBe(false);
+      expect(await outbox.resume()).toBe(true);
       expect(outbox.enqueue(second)).toBe(true);
-      await retried.promise;
-      await waitFor(() => delivered.length === 3, 500);
-      expect(delivered[0]?.publication).toEqual(delivered[1]?.publication);
-      expect(delivered[0]?.deadlineAt).toBe(first.deadlineAt);
-      expect(delivered[2]?.publication).toMatchObject({
+      expect(await outbox.resume()).toBe(true);
+      expect(failure).toHaveBeenCalledTimes(1);
+      expect(failure).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'rejected', publication: first })
+      );
+      expect(delivered).toHaveLength(2);
+      expect(delivered[1]?.publication).toMatchObject({
         receiptId: second.receiptId,
         sequence: second.sequence,
         payload: second.payload,
       });
-      expect(await outbox.resume()).toBe(true);
     } finally {
       outbox.close();
     }
@@ -695,9 +771,10 @@ describe('control event outbox', () => {
     }
   });
 
-  it('does not let a retryable root A head delay root B', async () => {
+  it('reports a root A handoff failure without delaying root B', async () => {
     const published: ControlEventPublication[] = [];
     let attemptsA = 0;
+    const failure = mock();
     const outbox = createControlEventOutbox({
       publish: async publication => {
         published.push(publication);
@@ -705,7 +782,7 @@ describe('control event outbox', () => {
         if (root === 'root_a' && attemptsA++ === 0)
           throw new ControlDeliveryError('root A is not attached', true);
       },
-      onFailure: mock(),
+      onFailure: failure,
     });
     try {
       outbox.enqueue(
@@ -723,10 +800,16 @@ describe('control event outbox', () => {
         })
       );
 
-      expect(await outbox.resume()).toBe(false);
+      expect(await outbox.resume()).toBe(true);
       expect(
         published.map(item => item.session.rootKiloSessionId ?? item.session.kiloSessionId)
       ).toEqual(['root_a', 'root_b']);
+      expect(failure).toHaveBeenCalledTimes(1);
+      const reported = failure.mock.calls[0]?.[0] as
+        | { reason?: string; publication?: ControlEventPublication }
+        | undefined;
+      expect(reported?.reason).toBe('rejected');
+      expect(reported?.publication?.receiptId).toBe(published[0]?.receiptId);
     } finally {
       outbox.close();
     }
@@ -781,143 +864,32 @@ describe('control event outbox', () => {
     }
   });
 
-  it('wakes a retry-ready root while another root receipt remains pending', async () => {
-    const releaseB = Promise.withResolvers<void>();
-    const rootA = { ...session, kiloSessionId: 'root_a', rootKiloSessionId: 'root_a' };
-    const rootB = { ...session, kiloSessionId: 'root_b', rootKiloSessionId: 'root_b' };
-    let attemptsA = 0;
-    let startedB = false;
-    let retriedA = false;
-    const outbox = createControlEventOutbox({
-      publish: async publication => {
-        const root = publication.session.rootKiloSessionId ?? publication.session.kiloSessionId;
-        if (root === 'root_a') {
-          attemptsA += 1;
-          if (attemptsA === 1) throw new ControlDeliveryError('root A is not attached', true);
-          retriedA = true;
-          return;
-        }
-        startedB = true;
-        await releaseB.promise;
-      },
-      onFailure: mock(),
-    });
+  it('applies byte pressure across roots and drops the incoming publication', () => {
+    const failure = mock();
+    const outbox = createControlEventOutbox({ publish: async () => {}, onFailure: failure });
+    const medium = {
+      type: 'message.updated',
+      properties: { text: 'm'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.45)) },
+    };
     try {
-      outbox.enqueue(
-        outbox.prepare({
+      let admitted = 0;
+      for (;;) {
+        const publication = outbox.prepare({
           event: 'session.event',
-          session: rootA,
-          payload: { type: 'session.idle' },
-        })
-      );
-      outbox.enqueue(
-        outbox.prepare({
-          event: 'session.event',
-          session: rootB,
-          payload: { type: 'session.idle' },
-        })
-      );
-      const draining = outbox.resume();
-      await waitFor(() => startedB);
-      await waitFor(() => retriedA, 500);
-      releaseB.resolve();
-      expect(await draining).toBe(true);
-    } finally {
-      releaseB.resolve();
-      outbox.close();
-    }
-  });
-
-  it('keeps entry, byte, and waiter limits independent per root', async () => {
-    const outbox = createControlEventOutbox({ publish: async () => {}, onFailure: mock() });
-    const rootA = { ...session, kiloSessionId: 'root_a', rootKiloSessionId: 'root_a' };
-    const rootB = { ...session, kiloSessionId: 'root_b', rootKiloSessionId: 'root_b' };
-    const small = { type: 'session.idle', properties: {} };
-    try {
-      for (let index = 0; index < 256; index += 1)
-        expect(
-          outbox.enqueue(outbox.prepare({ event: 'session.event', session: rootA, payload: small }))
-        ).toBe(true);
-      expect(
-        outbox.enqueue(outbox.prepare({ event: 'session.event', session: rootA, payload: small }))
-      ).toBe(false);
-      expect(
-        outbox.enqueue(outbox.prepare({ event: 'session.event', session: rootB, payload: small }))
-      ).toBe(true);
-
-      outbox.pause();
-      outbox.close();
-      const bytesOutbox = createControlEventOutbox({ publish: async () => {}, onFailure: mock() });
-      try {
-        const medium = {
-          type: 'message.updated',
-          properties: { text: 'm'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.45)) },
-        };
-        for (let index = 0; index < 256; index += 1) {
-          if (
-            !bytesOutbox.enqueue(
-              bytesOutbox.prepare({ event: 'session.event', session: rootA, payload: medium })
-            )
-          )
-            break;
-        }
-        expect(
-          bytesOutbox.enqueue(
-            bytesOutbox.prepare({ event: 'session.event', session: rootA, payload: medium })
-          )
-        ).toBe(false);
-        expect(
-          bytesOutbox.enqueue(
-            bytesOutbox.prepare({ event: 'session.event', session: rootB, payload: medium })
-          )
-        ).toBe(true);
-      } finally {
-        bytesOutbox.close();
-      }
-
-      const waiterOutbox = createControlEventOutbox({ publish: async () => {}, onFailure: mock() });
-      try {
-        for (let index = 0; index < 256; index += 1)
-          expect(
-            waiterOutbox.enqueue(
-              waiterOutbox.prepare({ event: 'session.event', session: rootA, payload: small })
-            )
-          ).toBe(true);
-        const rootWaiters: Array<Promise<boolean>> = [];
-        for (let index = 0; index < 256; index += 1) {
-          const publication = waiterOutbox.prepare({
-            event: 'session.event',
-            session: rootA,
-            payload: small,
-          });
-          expect(waiterOutbox.enqueue(publication)).toBe(false);
-          rootWaiters.push(waiterOutbox.waitForSpace(publication));
-        }
-        for (let index = 0; index < 256; index += 1)
-          expect(
-            waiterOutbox.enqueue(
-              waiterOutbox.prepare({ event: 'session.event', session: rootB, payload: small })
-            )
-          ).toBe(true);
-        const rootBPublication = waiterOutbox.prepare({
-          event: 'session.event',
-          session: rootB,
-          payload: small,
+          session: {
+            ...session,
+            kiloSessionId: `ses_${admitted}`,
+            rootKiloSessionId: `ses_${admitted}`,
+          },
+          payload: medium,
         });
-        expect(waiterOutbox.enqueue(rootBPublication)).toBe(false);
-        const rootBWaiter = waiterOutbox.waitForSpace(rootBPublication);
-        let settled = false;
-        void rootBWaiter.then(() => {
-          settled = true;
-        });
-        await Promise.resolve();
-        expect(settled).toBe(false);
-        waiterOutbox.close();
-        expect(await rootBWaiter).toBe(false);
-        expect(await Promise.all(rootWaiters)).toEqual(Array.from({ length: 256 }, () => false));
-      } finally {
-        waiterOutbox.close();
+        if (!outbox.enqueue(publication)) break;
+        admitted += 1;
+        if (admitted > 256) throw new Error('byte budget did not apply');
       }
+      expect(admitted).toBeGreaterThan(1);
+      expect(admitted).toBeLessThan(256);
+      expect(failure).toHaveBeenCalledWith(expect.objectContaining({ reason: 'queue_overflow' }));
     } finally {
       outbox.close();
     }
@@ -1095,75 +1067,6 @@ describe('control event outbox', () => {
     expect(wire).not.toHaveProperty('receiptHash');
   });
 
-  it('autonomously retries one stable receipt without future events or resume calls', async () => {
-    const published: Array<{ publication: ControlEventPublication; deadlineAt: number }> = [];
-    const retried = Promise.withResolvers<void>();
-    const failure = mock();
-    const outbox = createControlEventOutbox({
-      publish: async (publication, deadlineAt) => {
-        published.push({ publication, deadlineAt });
-        if (published.length === 1) throw new ControlDeliveryError('offline', true);
-        retried.resolve();
-      },
-      onFailure: failure,
-    });
-    try {
-      const publication = outbox.prepare({
-        event: 'session.event',
-        session,
-        payload: { type: 'message.updated', properties: { id: 'msg_1' } },
-      });
-      expect(outbox.enqueue(publication)).toBe(true);
-      expect(await outbox.resume()).toBe(false);
-      await retried.promise;
-      expect(await outbox.resume()).toBe(true);
-      expect(published).toHaveLength(2);
-      expect(published[1]).toEqual(published[0]);
-      expect(published[1]?.deadlineAt).toBe(publication.deadlineAt);
-      expect(failure).not.toHaveBeenCalled();
-    } finally {
-      outbox.close();
-    }
-  });
-
-  it('coalesces retry triggers and never overlaps publication attempts', async () => {
-    const retried = Promise.withResolvers<void>();
-    const release = Promise.withResolvers<void>();
-    const published: number[] = [];
-    const outbox = createControlEventOutbox({
-      publish: async publication => {
-        published.push(publication.sequence);
-        if (published.length === 1) throw new ControlDeliveryError('not attached', true);
-        if (published.length === 2) {
-          retried.resolve();
-          await release.promise;
-        }
-      },
-      onFailure: mock(),
-    });
-    const publication = () =>
-      outbox.prepare({ event: 'session.event', session, payload: { type: 'session.idle' } });
-    try {
-      outbox.enqueue(publication());
-      expect(await outbox.resume()).toBe(false);
-      for (let index = 0; index < 20; index += 1) {
-        outbox.enqueue(publication());
-        expect(await outbox.resume()).toBe(false);
-      }
-      expect(published).toEqual([1]);
-      await retried.promise;
-      const draining = outbox.resume();
-      for (let index = 0; index < 20; index += 1) expect(outbox.resume()).toBe(draining);
-      expect(published).toEqual([1, 1]);
-      release.resolve();
-      expect(await draining).toBe(true);
-      expect(published).toEqual([1, ...Array.from({ length: 21 }, (_, index) => index + 1)]);
-    } finally {
-      release.resolve();
-      outbox.close();
-    }
-  });
-
   it('coalesces publication callbacks that synchronously enqueue and resume', async () => {
     const published: number[] = [];
     const outbox = createControlEventOutbox({
@@ -1264,7 +1167,7 @@ describe('control event outbox', () => {
     }
   });
 
-  it('settles an in-flight pump on close without reporting expiry or publishing queued events', async () => {
+  it('settles an in-flight pump on close without publishing queued events', async () => {
     const started = Promise.withResolvers<void>();
     const held = Promise.withResolvers<void>();
     const failure = mock();
@@ -1288,11 +1191,11 @@ describe('control event outbox', () => {
     held.reject(new ControlDeliveryError('late connection close', true));
     await Promise.resolve();
     expect(published).toHaveBeenCalledTimes(1);
-    expect(failure).not.toHaveBeenCalled();
+    expect(failure).toHaveBeenCalledWith(expect.objectContaining({ reason: 'disconnected' }));
     expect(await outbox.resume()).toBe(false);
   });
 
-  it.each(['retry', 'paused', 'pending'] as const)(
+  it.each(['paused', 'pending'] as const)(
     'expires an old native publication at its original deadline while %s and admits its replacement',
     async phase => {
       const clock = spyOn(Date, 'now').mockReturnValue(1_000);
@@ -1328,8 +1231,7 @@ describe('control event outbox', () => {
           })
         );
         const pumping = phase === 'paused' ? undefined : outbox.resume();
-        if (phase === 'retry') expect(await pumping).toBe(false);
-        else await Promise.resolve();
+        await Promise.resolve();
         expect(timers.mock.calls.at(-1)?.[1]).toBe(100);
         const expire = timers.mock.calls.at(-1)?.[0];
         if (typeof expire !== 'function') throw new Error('Missing publication deadline');
@@ -1341,7 +1243,11 @@ describe('control event outbox', () => {
         await pumping;
         expect(await outbox.resume()).toBe(true);
         expect(failure).toHaveBeenCalledTimes(1);
-        expect(failure).toHaveBeenCalledWith({ reason: 'expired', publication: original });
+        const reported = failure.mock.calls[0]?.[0] as
+          | { reason?: string; publication?: ControlEventPublication }
+          | undefined;
+        expect(reported?.reason).toBe('expired');
+        expect(reported?.publication?.receiptId).toBe(original.receiptId);
         expect(published.at(-1)?.publication.session.nativeRuntimeId).toBe(replacementId);
         expect(
           published.filter(item => item.publication.session.nativeRuntimeId === nativeRuntimeId)
@@ -1371,94 +1277,6 @@ describe('control event outbox', () => {
     }
   );
 
-  it.each(['pause', 'close', 'permanent'] as const)(
-    'does not retry after %s and reports permanent failure only once',
-    async stop => {
-      const published = mock(async () => {
-        throw new ControlDeliveryError('unavailable', stop !== 'permanent');
-      });
-      const failure = mock();
-      const outbox = createControlEventOutbox({ publish: published, onFailure: failure });
-      try {
-        outbox.enqueue(
-          outbox.prepare({ event: 'session.event', session, payload: { type: 'session.idle' } })
-        );
-        expect(await outbox.resume()).toBe(stop === 'permanent');
-        if (stop === 'pause') outbox.pause();
-        else if (stop === 'close') outbox.close();
-        else {
-          expect(await outbox.resume()).toBe(true);
-          expect(await outbox.resume()).toBe(true);
-        }
-        await new Promise(resolve => setTimeout(resolve, 300));
-        expect(published).toHaveBeenCalledTimes(1);
-        expect(failure).toHaveBeenCalledTimes(stop === 'permanent' ? 1 : 0);
-      } finally {
-        outbox.close();
-      }
-    }
-  );
-
-  it('settles an expired backpressured publication without failing the replacement outbox', async () => {
-    const clock = spyOn(Date, 'now').mockReturnValue(1_000);
-    const timers = spyOn(globalThis, 'setTimeout');
-    const failure = mock();
-    const published = mock(async () => {});
-    const outbox = createControlEventOutbox({ publish: published, onFailure: failure });
-    const prepare = () =>
-      outbox.prepare({ event: 'session.event', session, payload: { type: 'session.idle' } });
-    try {
-      const expired = prepare();
-      clock.mockReturnValue(2_000);
-      for (let index = 0; index < 256; index += 1) expect(outbox.enqueue(prepare())).toBe(true);
-      expect(outbox.enqueue(expired)).toBe(false);
-      const waiting = outbox.waitForSpace(expired);
-      const expire = timers.mock.calls.at(-1)?.[0];
-      if (typeof expire !== 'function') throw new Error('Missing backpressure deadline');
-      clock.mockReturnValue(expired.deadlineAt);
-      clearTimeout(timers.mock.results.at(-1)?.value as ReturnType<typeof setTimeout> | undefined);
-      expire();
-      expect(await waiting).toBe(true);
-      expect(outbox.enqueue(expired)).toBe(true);
-      expect(failure).toHaveBeenCalledWith({ reason: 'expired', publication: expired });
-      expect(await outbox.resume()).toBe(true);
-      expect(published).toHaveBeenCalledTimes(256);
-    } finally {
-      outbox.close();
-      timers.mockRestore();
-      clock.mockRestore();
-    }
-  });
-
-  it('applies producer backpressure only after the bounded offline burst', () => {
-    const published = mock(async () => {});
-    const failed = mock();
-    const outbox = createControlEventOutbox({ publish: published, onFailure: failed });
-
-    for (let index = 0; index < 256; index += 1)
-      expect(
-        outbox.enqueue(
-          outbox.prepare({
-            event: 'session.event',
-            session,
-            payload: { type: 'message.updated', properties: { id: `msg_${index}` } },
-          })
-        )
-      ).toBe(true);
-    expect(
-      outbox.enqueue(
-        outbox.prepare({
-          event: 'session.event',
-          session,
-          payload: { type: 'message.updated', properties: { id: 'overflow' } },
-        })
-      )
-    ).toBe(false);
-    expect(failed).not.toHaveBeenCalled();
-    expect(published).not.toHaveBeenCalled();
-    outbox.close();
-  });
-
   it('retains an immutable event snapshot across a sustained offline burst', async () => {
     const published: Array<{ payload: { properties: { nested: { state: string } } } }> = [];
     const outbox = createControlEventOutbox({
@@ -1485,67 +1303,767 @@ describe('control event outbox', () => {
     expect(published).toHaveLength(97);
     expect(published[0]?.payload.properties.nested.state).toBe('queued');
   });
+});
 
-  it('waits for the exact byte footprint of one prepared publication', async () => {
-    const firstPublication = Promise.withResolvers<void>();
-    let calls = 0;
+describe('control event outbox batching', () => {
+  function progressPublication(index: number, nativeRuntimeId?: string) {
+    return {
+      event: 'session.event' as const,
+      session: {
+        ...session,
+        ...(nativeRuntimeId === undefined ? {} : { nativeRuntimeId }),
+      },
+      payload: { type: 'session.updated', properties: { marker: `progress_${index}` } },
+    };
+  }
+
+  it('collects queued events into one ordered batch within the fixed window', async () => {
+    const batches: ControlEventPublication[][] = [];
     const outbox = createControlEventOutbox({
       publish: async () => {
-        calls += 1;
-        if (calls === 1) await firstPublication.promise;
+        throw new Error('single publication must not be used in batch mode');
       },
+      publishBatch: async publications => {
+        batches.push(publications);
+      },
+      supportsBatches: () => true,
       onFailure: mock(),
     });
-    const medium = () =>
+    try {
+      for (let index = 0; index < 3; index += 1)
+        expect(outbox.enqueue(outbox.prepare(progressPublication(index)))).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(batches).toHaveLength(1);
+      expect(batches[0]?.map(publication => publication.sequence)).toEqual([1, 2, 3]);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('flushes an urgent boundary after older queued events without overtaking them', async () => {
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {},
+      publishBatch: async publications => {
+        batches.push(publications);
+      },
+      supportsBatches: () => true,
+      onFailure: mock(),
+    });
+    try {
+      expect(outbox.enqueue(outbox.prepare(progressPublication(0)))).toBe(true);
+      expect(
+        outbox.enqueue(
+          outbox.prepare({
+            event: 'session.event',
+            session,
+            payload: { type: 'question.asked', properties: { id: 'question_1' } },
+          })
+        )
+      ).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(batches).toHaveLength(1);
+      expect(
+        batches[0]?.map(publication => (publication.payload as { type: string }).type)
+      ).toEqual(['session.updated', 'question.asked']);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('splits batches at a native runtime identity boundary', async () => {
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {},
+      publishBatch: async publications => {
+        batches.push(publications);
+      },
+      supportsBatches: () => true,
+      onFailure: mock(),
+    });
+    const replacement = '11111111-1111-4111-8111-111111111111';
+    try {
+      expect(outbox.enqueue(outbox.prepare(progressPublication(0, replacement)))).toBe(true);
+      expect(outbox.enqueue(outbox.prepare(progressPublication(1)))).toBe(true);
+      expect(outbox.enqueue(outbox.prepare(progressPublication(2)))).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(batches.map(batch => batch.length)).toEqual([1, 2]);
+      expect(batches[0]?.[0]?.session.nativeRuntimeId).toBe(replacement);
+      expect(batches[1]?.every(item => item.session.nativeRuntimeId === undefined)).toBe(true);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('bounds a batch at the item cap and continues with later collection', async () => {
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {},
+      publishBatch: async publications => {
+        batches.push(publications);
+      },
+      supportsBatches: () => true,
+      onFailure: mock(),
+    });
+    try {
+      for (let index = 0; index < 70; index += 1)
+        expect(outbox.enqueue(outbox.prepare(progressPublication(index)))).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(batches.map(batch => batch.length)).toEqual([64, 6]);
+      expect(batches[0]?.[0]?.sequence).toBe(1);
+      expect(batches[0]?.at(-1)?.sequence).toBe(64);
+      expect(batches[1]?.[0]?.sequence).toBe(65);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('keeps the unchanged single-publication protocol when batching is unsupported', async () => {
+    const singles: ControlEventPublication[] = [];
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        singles.push(publication);
+      },
+      publishBatch: async publications => {
+        batches.push(publications);
+      },
+      supportsBatches: () => false,
+      onFailure: mock(),
+    });
+    try {
+      for (let index = 0; index < 3; index += 1)
+        expect(outbox.enqueue(outbox.prepare(progressPublication(index)))).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(singles.map(publication => publication.sequence)).toEqual([1, 2, 3]);
+      expect(batches).toEqual([]);
+    } finally {
+      outbox.close();
+    }
+  });
+});
+
+describe('control event outbox batch scheduling', () => {
+  function progressPublication(index: number) {
+    return {
+      event: 'session.event' as const,
+      session,
+      payload: { type: 'session.updated', properties: { marker: `progress_${index}` } },
+    };
+  }
+
+  async function flushMicrotasks(): Promise<void> {
+    for (let attempt = 0; attempt < 20; attempt += 1) await Promise.resolve();
+  }
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('holds an ordinary batch for the fixed collection window and then hands it off', async () => {
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {},
+      publishBatch: async publications => {
+        batches.push(publications);
+      },
+      supportsBatches: () => true,
+      onFailure: mock(),
+    });
+    try {
+      expect(outbox.enqueue(outbox.prepare(progressPublication(0)))).toBe(true);
+      const draining = outbox.resume();
+      await flushMicrotasks();
+      expect(batches).toHaveLength(0);
+      jest.advanceTimersByTime(CONTROL_EVENT_BATCH_WINDOW_MS - 1);
+      await flushMicrotasks();
+      expect(batches).toHaveLength(0);
+      jest.advanceTimersByTime(1);
+      expect(await draining).toBe(true);
+      expect(batches.map(batch => batch.length)).toEqual([1]);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('flushes the head on its own window under continuous streaming', async () => {
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {},
+      publishBatch: async publications => {
+        batches.push(publications);
+      },
+      supportsBatches: () => true,
+      onFailure: mock(),
+    });
+    try {
+      expect(outbox.enqueue(outbox.prepare(progressPublication(0)))).toBe(true);
+      const draining = outbox.resume();
+      await flushMicrotasks();
+      for (let index = 1; index <= 4; index += 1) {
+        jest.advanceTimersByTime(5);
+        await flushMicrotasks();
+        expect(outbox.enqueue(outbox.prepare(progressPublication(index)))).toBe(true);
+      }
+      expect(batches).toHaveLength(0);
+      jest.advanceTimersByTime(5);
+      expect(await draining).toBe(true);
+      expect(batches.map(batch => batch.length)).toEqual([5]);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('flushes an urgent boundary without waiting for the collection window', async () => {
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {},
+      publishBatch: async publications => {
+        batches.push(publications);
+      },
+      supportsBatches: () => true,
+      onFailure: mock(),
+    });
+    try {
+      expect(outbox.enqueue(outbox.prepare(progressPublication(0)))).toBe(true);
+      expect(
+        outbox.enqueue(
+          outbox.prepare({
+            event: 'session.event',
+            session,
+            payload: { type: 'question.asked', properties: { id: 'question_1' } },
+          })
+        )
+      ).toBe(true);
+      const draining = outbox.resume();
+      await flushMicrotasks();
+      expect(batches.map(batch => batch.length)).toEqual([2]);
+      expect(await draining).toBe(true);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('flushes when the next batch prefix reaches the frame byte limit', async () => {
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {},
+      publishBatch: async publications => {
+        batches.push(publications);
+      },
+      supportsBatches: () => true,
+      onFailure: mock(),
+    });
+    const large = 'x'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.55));
+    try {
+      for (const id of ['msg_a', 'msg_b'])
+        expect(
+          outbox.enqueue(
+            outbox.prepare({
+              event: 'session.event',
+              session,
+              payload: { type: 'message.updated', properties: { info: { id, marker: large } } },
+            })
+          )
+        ).toBe(true);
+      const draining = outbox.resume();
+      await flushMicrotasks();
+      expect(batches.map(batch => batch.length)).toEqual([1]);
+      jest.advanceTimersByTime(CONTROL_EVENT_BATCH_WINDOW_MS);
+      expect(await draining).toBe(true);
+      expect(batches.map(batch => batch.length)).toEqual([1, 1]);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('hands off an item that only fits the single-publication frame', async () => {
+    const singles: ControlEventPublication[] = [];
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        singles.push(publication);
+      },
+      publishBatch: async publications => {
+        batches.push(publications);
+      },
+      supportsBatches: () => true,
+      onFailure: mock(),
+    });
+    const measure = (marker: string) =>
       outbox.prepare({
         event: 'session.event',
         session,
-        payload: {
-          type: 'message.updated',
-          properties: { text: 'm'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.45)) },
-        },
+        payload: { type: 'message.updated', properties: { info: { id: 'single', marker } } },
+      }).bytes;
+    try {
+      const text = 'x'.repeat(MAX_SANDBOX_CONTROL_FRAME_BYTES - measure('') - 1);
+      const nearLimit = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: { type: 'message.updated', properties: { info: { id: 'single', marker: text } } },
       });
-    for (let index = 0; index < 8; index += 1) expect(outbox.enqueue(medium())).toBe(true);
-    const blocked = outbox.prepare({
-      event: 'session.event',
-      session,
-      payload: {
-        type: 'message.updated',
-        properties: { text: 'l'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.7)) },
-      },
-    });
-    expect(outbox.enqueue(blocked)).toBe(false);
-    const waiting = outbox.waitForSpace(blocked);
-    let settled = false;
-    void waiting.then(() => {
-      settled = true;
-    });
-    await Promise.resolve();
-    expect(settled).toBe(false);
-    const pumping = outbox.resume();
-    firstPublication.resolve();
-    expect(await waiting).toBe(true);
-    expect(outbox.enqueue(blocked)).toBe(true);
-    await pumping;
+      expect(nearLimit.bytes).toBe(MAX_SANDBOX_CONTROL_FRAME_BYTES - 1);
+      expect(outbox.enqueue(nearLimit)).toBe(true);
+      const draining = outbox.resume();
+      await flushMicrotasks();
+      expect(singles.map(publication => publication.sequence)).toEqual([nearLimit.sequence]);
+      expect(batches).toEqual([]);
+      expect(await draining).toBe(true);
+    } finally {
+      outbox.close();
+    }
   });
 
-  it('wakes a blocked producer when the outbox closes', async () => {
-    const outbox = createControlEventOutbox({ publish: async () => {}, onFailure: mock() });
-    for (let index = 0; index < 256; index += 1)
-      outbox.enqueue(
-        outbox.prepare({
-          event: 'session.event',
-          session,
-          payload: { type: 'message.updated', properties: { id: `msg_${index}` } },
-        })
-      );
-    const blocked = outbox.prepare({
-      event: 'session.event',
-      session,
-      payload: { type: 'message.updated', properties: { id: 'blocked' } },
+  it('protects the selected batch tail from a synchronous enqueue before handoff', async () => {
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {
+        throw new Error('single publication must not be used in batch mode');
+      },
+      publishBatch: async publications => {
+        batches.push(publications);
+      },
+      supportsBatches: () => true,
+      onFailure: mock(),
     });
-    const waiting = outbox.waitForSpace(blocked);
-    outbox.close();
-    expect(await waiting).toBe(false);
+    try {
+      for (let index = 0; index < 64; index += 1)
+        expect(
+          outbox.enqueue(
+            outbox.prepare({
+              event: 'session.event',
+              session,
+              payload: messageUpdatedPayload(`msg_${index}`, `old_${index}`),
+            })
+          )
+        ).toBe(true);
+      const newer = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_63', 'new_63'),
+      });
+      const draining = outbox.resume();
+      expect(outbox.enqueue(newer)).toBe(true);
+      await flushMicrotasks();
+      jest.advanceTimersByTime(CONTROL_EVENT_BATCH_WINDOW_MS);
+      expect(await draining).toBe(true);
+      const published = batches.flat();
+      expect(published).toHaveLength(65);
+      expect(published.map(item => item.sequence)).toEqual(
+        Array.from({ length: 65 }, (_value, index) => index + 1)
+      );
+      expect(new Set(published.map(item => item.receiptId)).size).toBe(65);
+      const tail = published[64];
+      if (!tail) throw new Error('Missing tail publication');
+      expect(tail.receiptId).not.toBe(published[63]?.receiptId);
+      expect(
+        (tail.payload as { properties: { info: { id: string; marker: string } } }).properties.info
+      ).toMatchObject({ id: 'msg_63', marker: 'new_63' });
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('hands off an identity-closed prefix when its successor is urgent', async () => {
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {},
+      publishBatch: async publications => {
+        batches.push(publications);
+      },
+      supportsBatches: () => true,
+      onFailure: mock(),
+    });
+    const childA = { ...session, kiloSessionId: 'child_a' };
+    const childB = { ...session, kiloSessionId: 'child_b' };
+    try {
+      expect(
+        outbox.enqueue(
+          outbox.prepare({
+            event: 'session.event',
+            session: childA,
+            payload: { type: 'session.updated', properties: { marker: 'ordinary' } },
+          })
+        )
+      ).toBe(true);
+      expect(
+        outbox.enqueue(
+          outbox.prepare({
+            event: 'session.event',
+            session: childB,
+            payload: { type: 'question.asked', properties: { id: 'question_1' } },
+          })
+        )
+      ).toBe(true);
+      const draining = outbox.resume();
+      await flushMicrotasks();
+      expect(batches.map(batch => batch.map(item => item.session.kiloSessionId))).toEqual([
+        ['child_a'],
+        ['child_b'],
+      ]);
+      expect(
+        batches.map(batch => batch.map(item => (item.payload as { type: string }).type))
+      ).toEqual([['session.updated'], ['question.asked']]);
+      expect(await draining).toBe(true);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('cancels the losing collection-window timer once a wake hands off early', async () => {
+    const batches: ControlEventPublication[][] = [];
+    const setTimer = spyOn(globalThis, 'setTimeout');
+    const clearTimer = spyOn(globalThis, 'clearTimeout');
+    const outbox = createControlEventOutbox({
+      publish: async () => {},
+      publishBatch: async publications => {
+        batches.push(publications);
+      },
+      supportsBatches: () => true,
+      onFailure: mock(),
+    });
+    try {
+      expect(outbox.enqueue(outbox.prepare(progressPublication(0)))).toBe(true);
+      const draining = outbox.resume();
+      await flushMicrotasks();
+      expect(batches).toHaveLength(0);
+      const windowIndex = setTimer.mock.calls.findIndex(
+        call => call[1] === CONTROL_EVENT_BATCH_WINDOW_MS
+      );
+      const windowTimer = setTimer.mock.results[windowIndex]?.value;
+      expect(windowTimer).toBeDefined();
+      expect(
+        outbox.enqueue(
+          outbox.prepare({
+            event: 'session.event',
+            session,
+            payload: { type: 'question.asked', properties: { id: 'question_1' } },
+          })
+        )
+      ).toBe(true);
+      await flushMicrotasks();
+      expect(batches.map(batch => batch.length)).toEqual([2]);
+      expect(clearTimer.mock.calls.some(call => call[0] === windowTimer)).toBe(true);
+      expect(await draining).toBe(true);
+    } finally {
+      outbox.close();
+      setTimer.mockRestore();
+      clearTimer.mockRestore();
+    }
+  });
+});
+
+describe('control event outbox disconnected hold', () => {
+  function progressPublication(index: number) {
+    return {
+      event: 'session.event' as const,
+      session,
+      payload: { type: 'session.updated', properties: { marker: `progress_${index}` } },
+    };
+  }
+
+  function questionAsked(id: string) {
+    return {
+      event: 'session.event' as const,
+      session,
+      payload: { type: 'question.asked', properties: { id } },
+    };
+  }
+
+  async function flushMicrotasks(): Promise<void> {
+    for (let attempt = 0; attempt < 20; attempt += 1) await Promise.resolve();
+  }
+
+  it('retains a disconnected head and republishes the same identity on resume', async () => {
+    const failures: ControlEventOutboxFailure[] = [];
+    const delivered: Array<{ publication: ControlEventPublication; deadlineAt: number }> = [];
+    let attempts = 0;
+    const outbox = createControlEventOutbox({
+      publish: async (publication, deadlineAt) => {
+        delivered.push({ publication, deadlineAt });
+        if (attempts++ === 0) throw new ControlDeliveryError('disconnected', true, 'disconnected');
+      },
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const head = outbox.prepare(progressPublication(0));
+      expect(outbox.enqueue(head)).toBe(true);
+      expect(await outbox.resume()).toBe(false);
+      expect(failures).toHaveLength(0);
+      expect(await outbox.resume()).toBe(true);
+      expect(failures).toHaveLength(0);
+      expect(delivered).toHaveLength(2);
+      expect(delivered[1]).toMatchObject({
+        publication: {
+          receiptId: head.receiptId,
+          sequence: head.sequence,
+          payload: head.payload,
+        },
+        deadlineAt: head.deadlineAt,
+      });
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('drops a socket_overflow head and keeps publishing without a hold', async () => {
+    const failures: ControlEventOutboxFailure[] = [];
+    const delivered: ControlEventPublication[] = [];
+    let attempts = 0;
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        delivered.push(publication);
+        if (attempts++ === 0) throw new ControlDeliveryError('overflow', true, 'socket_overflow');
+      },
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const head = outbox.prepare(progressPublication(0));
+      expect(outbox.enqueue(head)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({ reason: 'socket_overflow' });
+
+      const later = outbox.prepare(progressPublication(1));
+      expect(outbox.enqueue(later)).toBe(true);
+      await flushMicrotasks();
+      expect(delivered).toHaveLength(2);
+      expect(delivered[1]?.receiptId).toBe(later.receiptId);
+      expect(failures).toHaveLength(1);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('does not spin retrying a disconnected head without a resume', async () => {
+    const publish = mock(async () => {
+      throw new ControlDeliveryError('disconnected', true, 'disconnected');
+    });
+    const outbox = createControlEventOutbox({ publish, onFailure: mock() });
+    try {
+      outbox.enqueue(outbox.prepare(progressPublication(0)));
+      expect(await outbox.resume()).toBe(false);
+      expect(publish).toHaveBeenCalledTimes(1);
+      await flushMicrotasks();
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(await outbox.resume()).toBe(false);
+      expect(publish).toHaveBeenCalledTimes(2);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('expires a retained disconnected head at its original deadline', async () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(1_000);
+    const timers = spyOn(globalThis, 'setTimeout');
+    const failures: ControlEventOutboxFailure[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {
+        throw new ControlDeliveryError('disconnected', true, 'disconnected');
+      },
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const head = outbox.prepare(progressPublication(0));
+      expect(head.deadlineAt).toBe(31_000);
+      expect(outbox.enqueue(head)).toBe(true);
+      expect(await outbox.resume()).toBe(false);
+      expect(failures).toHaveLength(0);
+      await flushMicrotasks();
+
+      const wakeup = timers.mock.calls.at(-1);
+      const handle = timers.mock.results.at(-1)?.value as ReturnType<typeof setTimeout> | undefined;
+      expect(wakeup?.[1]).toBe(30_000);
+      clock.mockReturnValue(head.deadlineAt);
+      clearTimeout(handle);
+      const callback = wakeup?.[0];
+      if (typeof callback !== 'function') throw new Error('Missing publication deadline');
+      callback();
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({
+        reason: 'expired',
+        publication: { receiptId: head.receiptId },
+      });
+
+      await flushMicrotasks();
+      expect(failures).toHaveLength(1);
+    } finally {
+      outbox.close();
+      timers.mockRestore();
+      clock.mockRestore();
+    }
+  });
+
+  it('expires a disconnected rejection at the deadline without holding', async () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(1_000);
+    const failures: ControlEventOutboxFailure[] = [];
+    const delivered: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async (publication, deadlineAt) => {
+        delivered.push(publication);
+        if (delivered.length === 1) {
+          clock.mockReturnValue(deadlineAt);
+          throw new ControlDeliveryError('disconnected', true, 'disconnected');
+        }
+      },
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const head = outbox.prepare(progressPublication(0));
+      expect(outbox.enqueue(head)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({
+        reason: 'expired',
+        publication: { receiptId: head.receiptId },
+      });
+
+      const later = outbox.prepare(progressPublication(1));
+      expect(later.deadlineAt).toBeGreaterThan(head.deadlineAt);
+      expect(outbox.enqueue(later)).toBe(true);
+      await flushMicrotasks();
+      expect(delivered).toHaveLength(2);
+      expect(delivered[1]?.receiptId).toBe(later.receiptId);
+      expect(failures).toHaveLength(1);
+    } finally {
+      outbox.close();
+      clock.mockRestore();
+    }
+  });
+
+  it('expires a retained head at its deadline so a later urgent event is not blocked', async () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(1_000);
+    const timers = spyOn(globalThis, 'setTimeout');
+    const failures: ControlEventOutboxFailure[] = [];
+    const delivered: ControlEventPublication[] = [];
+    let attempts = 0;
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        delivered.push(publication);
+        if (attempts++ === 0) throw new ControlDeliveryError('disconnected', true, 'disconnected');
+      },
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const head = outbox.prepare(progressPublication(0));
+      expect(outbox.enqueue(head)).toBe(true);
+      clock.mockReturnValue(1_001);
+      expect(await outbox.resume()).toBe(false);
+      expect(failures).toHaveLength(0);
+      await flushMicrotasks();
+
+      const urgent = outbox.prepare(questionAsked('question_1'));
+      expect(urgent.preparedAt).toBe(1_001);
+      expect(urgent.deadlineAt).toBeGreaterThan(head.deadlineAt);
+      expect(outbox.enqueue(urgent)).toBe(true);
+
+      const wakeup = timers.mock.calls.at(-1);
+      const handle = timers.mock.results.at(-1)?.value as ReturnType<typeof setTimeout> | undefined;
+      expect(wakeup?.[1]).toBe(head.deadlineAt - 1_001);
+
+      clock.mockReturnValue(head.deadlineAt);
+      clearTimeout(handle);
+      const callback = wakeup?.[0];
+      if (typeof callback !== 'function') throw new Error('Missing publication deadline');
+      callback();
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({
+        reason: 'expired',
+        publication: { receiptId: head.receiptId },
+      });
+
+      expect(await outbox.resume()).toBe(true);
+      expect(delivered).toHaveLength(2);
+      expect(delivered[1]?.receiptId).toBe(urgent.receiptId);
+      expect(failures).toHaveLength(1);
+    } finally {
+      outbox.close();
+      timers.mockRestore();
+      clock.mockRestore();
+    }
+  });
+
+  it('retains a disconnected batch and republishes the same identities on resume', async () => {
+    const failures: ControlEventOutboxFailure[] = [];
+    const batches: Array<{ publications: ControlEventPublication[]; deadlineAt: number }> = [];
+    let attempts = 0;
+    const outbox = createControlEventOutbox({
+      publish: async () => {
+        throw new Error('single publication must not be used in batch mode');
+      },
+      publishBatch: async (publications, deadlineAt) => {
+        batches.push({ publications, deadlineAt });
+        if (attempts++ === 0) throw new ControlDeliveryError('disconnected', true, 'disconnected');
+      },
+      supportsBatches: () => true,
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const first = outbox.prepare(progressPublication(0));
+      const second = outbox.prepare(questionAsked('question_1'));
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(outbox.enqueue(second)).toBe(true);
+
+      expect(await outbox.resume()).toBe(false);
+      expect(failures).toHaveLength(0);
+      expect(await outbox.resume()).toBe(true);
+      expect(failures).toHaveLength(0);
+      expect(batches).toHaveLength(2);
+      const expectedReceiptIds = [first.receiptId, second.receiptId];
+      const expectedSequences = [first.sequence, second.sequence];
+      for (const batch of batches) {
+        expect(batch.publications.map(entry => entry.receiptId)).toEqual(expectedReceiptIds);
+        expect(batch.publications.map(entry => entry.sequence)).toEqual(expectedSequences);
+        expect(batch.deadlineAt).toBe(first.deadlineAt);
+      }
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('expires only the batch head at its deadline and keeps later entries queued', async () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(1_000);
+    const failures: ControlEventOutboxFailure[] = [];
+    const batches: ControlEventPublication[][] = [];
+    const outbox = createControlEventOutbox({
+      publish: async () => {
+        throw new Error('single publication must not be used in batch mode');
+      },
+      publishBatch: async (publications, deadlineAt) => {
+        batches.push(publications);
+        if (batches.length === 1) {
+          clock.mockReturnValue(deadlineAt);
+          throw new ControlDeliveryError('disconnected', true, 'disconnected');
+        }
+      },
+      supportsBatches: () => true,
+      onFailure: failure => failures.push(failure),
+    });
+    try {
+      const head = outbox.prepare(progressPublication(0));
+      expect(outbox.enqueue(head)).toBe(true);
+      clock.mockReturnValue(1_001);
+      const later = outbox.prepare(questionAsked('question_1'));
+      expect(later.deadlineAt).toBeGreaterThan(head.deadlineAt);
+      expect(outbox.enqueue(later)).toBe(true);
+
+      expect(await outbox.resume()).toBe(true);
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({
+        reason: 'expired',
+        publication: { receiptId: head.receiptId },
+      });
+      expect(batches).toHaveLength(2);
+      expect(batches[0]?.map(entry => entry.receiptId)).toEqual([head.receiptId, later.receiptId]);
+      expect(batches[1]?.map(entry => entry.receiptId)).toEqual([later.receiptId]);
+    } finally {
+      outbox.close();
+      clock.mockRestore();
+    }
   });
 });

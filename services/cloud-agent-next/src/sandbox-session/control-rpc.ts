@@ -1,3 +1,4 @@
+import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { CredentialContainmentRequirements } from '../sandbox-control/physical-lifecycle.js';
 import {
@@ -24,6 +25,7 @@ import type {
 import type { SandboxBillingInput } from '../container-usage-context.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { withDORetry } from '../utils/do-retry.js';
+import { reconstructControlRequestError } from './control-dispatch.js';
 
 type SandboxControlRpc = {
   prepareSessionCredentials(input: {
@@ -34,6 +36,7 @@ type SandboxControlRpc = {
     ownerId: string;
     sessionId: string;
     provider?: 'cloudflare' | 'vercel';
+    resources?: VercelSandboxResources;
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;
     billing?: SandboxBillingInput;
@@ -154,12 +157,15 @@ export function sandboxControlRpc(
         (abort?.success === true &&
           abort.data.operationId !== undefined &&
           abort.data.messageId !== undefined);
-      return withDORetry(
+      const pending = withDORetry(
         stub,
         control => control.request(input),
         'controlRequest',
         config(deadlineAt, retrySafe)
-      );
+      ) as Promise<ResponseFrame>;
+      return pending.catch((error: unknown): never => {
+        throw reconstructControlRequestError(error);
+      });
     },
   };
 }

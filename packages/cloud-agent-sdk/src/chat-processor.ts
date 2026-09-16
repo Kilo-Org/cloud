@@ -146,6 +146,11 @@ function createChatProcessor(
       if (!content) return;
       if (sessionStorage.getMessageInfo(messageId)) return;
 
+      // Same unconfirmed marker as the optimistic send-time row: the
+      // authoritative `message.updated` for this id replaces the info (role and
+      // synthetic flag) and its non-synthetic parts drop this placeholder part
+      // (`upsertPartDroppingStaleSyntheticParts`), so a confirmed record wins
+      // the role and the parts.
       const syntheticMessage: UserMessage = {
         id: messageId,
         sessionID: sessionId,
@@ -153,6 +158,7 @@ function createChatProcessor(
         time: { created: Date.now() },
         agent: '',
         model: { providerID: '', modelID: '' },
+        synthetic: true,
       };
       sessionStorage.upsertMessage(syntheticMessage);
 

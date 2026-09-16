@@ -1,7 +1,10 @@
 import * as SecureStore from 'expo-secure-store';
 import { z } from 'zod';
 
+import { type ProviderPrRef, providerPrRefKey } from '@kilocode/app-shared/provider-review';
+
 import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
+import { providerPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import { PR_REVIEW_VIEWED_KEY } from '@/lib/storage-keys';
 
 type ViewedFileEntry = {
@@ -37,7 +40,25 @@ type ViewedFilePrRef = {
   number: number;
 };
 
-function viewedFilesKey(ref: ViewedFilePrRef): string {
+/**
+ * A viewed-files identity: the legacy GitHub triple or any provider ref
+ * (s6). The GitHub bytes never change — a set stored before the provider
+ * surface keeps loading — and a provider ref folds the s1 collision-free
+ * `providerPrRefKey` into the key, so one GitLab project on two instances,
+ * or a GitLab MR and a same-numbered GitHub PR, can never share a set
+ * (identity rule 17).
+ */
+export type ViewedFilesRef = ProviderPrRef | ViewedFilePrRef;
+
+function viewedFilesKey(ref: ViewedFilesRef): string {
+  if ('platform' in ref) {
+    const triple = providerPrTriple(ref);
+    const legacy = `${triple.owner.toLowerCase()}/${triple.repo.toLowerCase()}#${triple.number}`;
+    if (ref.platform === 'github') {
+      return legacy;
+    }
+    return `${legacy}@${providerPrRefKey(ref)}`;
+  }
   return `${ref.owner.toLowerCase()}/${ref.repo.toLowerCase()}#${ref.number}`;
 }
 
@@ -102,7 +123,7 @@ async function readMap(): Promise<ViewedFileMap> {
   return parsed;
 }
 
-export async function getViewedFiles(ref: ViewedFilePrRef, headSha: string): Promise<string[]> {
+export async function getViewedFiles(ref: ViewedFilesRef, headSha: string): Promise<string[]> {
   const map = await readMap();
   const entry = map[viewedFilesKey(ref)];
   if (!entry || entry.headSha !== headSha) {
@@ -118,7 +139,7 @@ export async function getViewedFiles(ref: ViewedFilePrRef, headSha: string): Pro
  * almost certainly stale and shouldn't be re-marked). The map itself is
  * LRU-trimmed to VIEWED_FILES_PR_LIMIT PRs by most-recently-touched.
  */
-type ToggleViewedFileInput = ViewedFilePrRef & {
+type ToggleViewedFileInput = ViewedFilesRef & {
   headSha: string;
   path: string;
 };

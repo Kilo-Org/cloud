@@ -1,9 +1,8 @@
 /* eslint-disable max-lines -- renderer host-key, image, link interaction, and empty-fence mount suites stay in one cohesive unit test file */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount RN trees under vitest (same pattern as code-block.test.ts) */
 // eslint-disable-next-line import/no-nodejs-modules -- patching the CJS loader is the only way to stub react-native for the externalized react-native-marked; the library under test stays real
 import Module from 'node:module';
 import { createElement, type ReactElement, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
@@ -140,7 +139,7 @@ function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: strin
   if (!instance) {
     return undefined;
   }
-  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
   return instance.props[key];
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
 }
@@ -565,6 +564,48 @@ describe('MarkdownRenderer code override', () => {
       Record<string, unknown>
     >;
     expect((inner(element).props as { maxLength?: unknown }).maxLength).toBe(cap);
+  });
+
+  it('passes an onCopyCode handler through to CodeBlock and omits it otherwise', async () => {
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const copyable = new RendererClass(palette, true, { onCopyCode });
+    const element = copyable.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect((inner(element).props as { onCopyCode?: unknown }).onCopyCode).toBe(onCopyCode);
+
+    const plain = new RendererClass(palette, true, {});
+    const plainElement = plain.code(
+      'const x = 1;',
+      'ts',
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+    expect((inner(plainElement).props as { onCopyCode?: unknown }).onCopyCode).toBeUndefined();
+  });
+
+  it('passes an onLongPressCode handler through to CodeBlock and omits it otherwise', async () => {
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const onLongPressCode = vi.fn<() => void>();
+    const copyable = new RendererClass(palette, true, { onLongPressCode });
+    const element = copyable.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect((inner(element).props as { onLongPressCode?: unknown }).onLongPressCode).toBe(
+      onLongPressCode
+    );
+
+    const plain = new RendererClass(palette, true, {});
+    const plainElement = plain.code(
+      'const x = 1;',
+      'ts',
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+    expect(
+      (inner(plainElement).props as { onLongPressCode?: unknown }).onLongPressCode
+    ).toBeUndefined();
   });
 });
 

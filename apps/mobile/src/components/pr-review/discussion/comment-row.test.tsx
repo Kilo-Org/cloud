@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to test React/RN structure under vitest */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CommentRow, moderationFailure } from './comment-row';
@@ -298,6 +297,60 @@ describe('CommentRow overflow actions', () => {
     openOverflow(renderer);
 
     expect(disabledButtonIndices()).toEqual([1, 2, 3]);
+
+    renderer.unmount();
+  });
+});
+
+describe('CommentRow reactions capability gate (s6)', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  async function renderWithCapabilities(
+    reactionsSupported: boolean
+  ): Promise<TestRenderer.ReactTestRenderer> {
+    let renderer: TestRenderer.ReactTestRenderer | null = null;
+    await act(async () => {
+      await Promise.resolve();
+      renderer = TestRenderer.create(
+        createElement(CommentRow, {
+          comment: makeComment(),
+          onToggleReaction: vi.fn<() => void>(),
+          readOnly: true,
+          reactionsSupported,
+        })
+      );
+    });
+    // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
+    if (!renderer) {
+      throw new Error('Failed to create test renderer');
+    }
+    return renderer;
+  }
+
+  it('supported (default): renders the reactions row', async () => {
+    const renderer = await renderWithCapabilities(true);
+    expect(renderer.root.findAll(node => (node.type as string) === 'ReactionsRow')).toHaveLength(1);
+    renderer.unmount();
+  });
+
+  it('unsupported: renders no reactions row at all — never an empty or failing one', async () => {
+    const renderer = await renderWithCapabilities(false);
+    expect(renderer.root.findAll(node => (node.type as string) === 'ReactionsRow')).toHaveLength(0);
+    renderer.unmount();
+  });
+});
+
+describe('CommentRow avatar recycling', () => {
+  it('sets recyclingKey to the author avatar URL so a recycled row clears the previous image', async () => {
+    const avatarUrl = 'https://example.com/alice.png';
+    const renderer = await render(makeComment({ author: { login: 'alice', avatarUrl } }));
+
+    const image = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'Image'
+    );
+    expect((image.props as Record<string, unknown>).recyclingKey).toBe(avatarUrl);
 
     renderer.unmount();
   });

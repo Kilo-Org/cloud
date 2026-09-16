@@ -37,6 +37,7 @@ const snapshot: ActiveAgentsGlanceable = {
   status: 'happy',
   running: 2,
   needsInput: 1,
+  needsApproval: 1,
   idle: 0,
   updatedAt: '2026-08-27T10:00:00.000Z',
   expiresAt: '2026-08-27T18:00:00.000Z',
@@ -299,6 +300,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     return {
       ...snapshot,
       needsInput: 0,
+      needsApproval: 0,
       updatedAt: new Date(Date.now()).toISOString(),
       expiresAt: new Date(Date.now() + 28_800_000).toISOString(),
       needsInputSince: new Date(Date.now()).toISOString(),
@@ -584,6 +586,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       status: 'empty',
       running: 0,
       needsInput: 0,
+      needsApproval: 0,
       idle: 0,
       needsInputSince: null,
     });
@@ -898,6 +901,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           status: 'happy',
           running: 0,
           needsInput: 1,
+          needsApproval: 0,
           idle: 0,
           needsInputSince: '2026-08-27T10:00:01.000Z',
         },
@@ -1442,6 +1446,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
                 status: 'empty',
                 running: 0,
                 needsInput: 0,
+                needsApproval: 0,
                 idle: 0,
                 needsInputSince: null,
               },
@@ -1749,9 +1754,23 @@ describe('toGlanceableContentState', () => {
       status: 'happy',
       running: 2,
       needsInput: 1,
+      needsApproval: 1,
       idle: 0,
       needsInputSince: '2026-08-27T09:00:00.000Z',
     });
+  });
+
+  it('forwards the approvable count and treats an absent field as zero', () => {
+    expect(
+      (JSON.parse(toGlanceableContentState(snapshot).props) as Record<string, unknown>)
+        .needsApproval
+    ).toBe(1);
+    // A snapshot from a server older than this release omits the field; the
+    // Live Activity content state still carries an explicit 0.
+    const { needsApproval: _absent, ...legacy } = snapshot;
+    expect(
+      (JSON.parse(toGlanceableContentState(legacy).props) as Record<string, unknown>).needsApproval
+    ).toBe(0);
   });
 
   it('never leaks snapshot bookkeeping, ids, or titles into the pushed content-state', () => {
@@ -1776,7 +1795,8 @@ describe('buildGlanceableExpoMessages', () => {
         { token: 'ExponentPushToken[aaa]', locale: null },
         { token: 'ExponentPushToken[bbb]', locale: 'es' },
       ],
-      snapshot
+      snapshot,
+      'default'
     );
 
     expect(messages).toHaveLength(2);
@@ -1791,6 +1811,28 @@ describe('buildGlanceableExpoMessages', () => {
       expect(message.tag).toBe('deadbeef');
     }
     expect(messages.map(m => m.to)).toEqual(['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]']);
+  });
+
+  it('builds the iOS wake at default priority and the Android wake at high priority', () => {
+    const iosMessages = buildGlanceableExpoMessages(
+      [{ token: 'ExponentPushToken[ios]', locale: null }],
+      snapshot,
+      'default'
+    );
+    const androidMessages = buildGlanceableExpoMessages(
+      [{ token: 'ExponentPushToken[android]', locale: null }],
+      snapshot,
+      'high'
+    );
+
+    expect(iosMessages[0].priority).toBe('default');
+    expect(androidMessages[0].priority).toBe('high');
+    // Only the transport priority and destination token differ between platforms.
+    expect(androidMessages[0]).toEqual({
+      ...iosMessages[0],
+      to: 'ExponentPushToken[android]',
+      priority: 'high',
+    });
   });
 });
 
@@ -1890,6 +1932,7 @@ describe('deliverGlanceableSnapshot', () => {
     expect(calls.expoSends[0][0].to).toBe('ExponentPushToken[aaa]');
     expect(calls.expoSends[0][0].tag).toBe('deadbeef');
     expect(calls.expoSends[0][0]._contentAvailable).toBe(true);
+    expect(calls.expoSends[0][0].priority).toBe('high');
   });
 
   it('sends nothing on Android when the user has no Expo tokens even with an ongoing token', async () => {
@@ -1962,6 +2005,7 @@ describe('deliverGlanceableSnapshot', () => {
     expect(calls.expoSends[0]).toHaveLength(1);
     expect(calls.expoSends[0][0].to).toBe('ExponentPushToken[ios]');
     expect(calls.expoSends[0][0]._contentAvailable).toBe(true);
+    expect(calls.expoSends[0][0].priority).toBe('default');
     expect(calls.expoSends[0][0].title).toBeUndefined();
     expect(calls.expoSends[0][0].body).toBeUndefined();
   });

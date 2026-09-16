@@ -10,6 +10,7 @@ import {
   type NewSessionRepository,
   type RepositoryGroup,
   type RepositoryGroups,
+  repositoryIdentityKey,
   type RepositoryPlatform,
   resolveBitbucketStatus,
   resolveProviderStatus,
@@ -22,8 +23,9 @@ import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
 import { useExternalAuthReturn } from '@/lib/external-auth/use-external-auth-return';
+import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
-import { useTRPC } from '@/lib/trpc';
+import { trpcClient, useTRPC } from '@/lib/trpc';
 
 type UseNewSessionReposArgs = {
   organizationId: string | undefined;
@@ -372,4 +374,98 @@ export function useNewSessionRepos({
 
 function repoKey(repository: NewSessionRepository): string {
   return `${repository.platform}/${repository.fullName.toLowerCase()}`;
+}
+
+// ── Branches of the selected repository ──────────────────────────────
+
+export type RepositoryBranchesState = {
+  /** The provider's default branch, or null when it reports none. */
+  defaultBranch: string | null;
+  branches: string[];
+  /** The query runs only for a selected repository in a scope that can serve it. */
+  isEnabled: boolean;
+  isLoading: boolean;
+  /** A transient failure: the caller offers a retry. */
+  isRetryableError: boolean;
+  /** FORBIDDEN/UNAUTHORIZED/NOT_FOUND — a retry cannot fix it, so no retry CTA. */
+  isPermanentError: boolean;
+  isRetrying: boolean;
+  retry: () => void;
+};
+
+/**
+ * Branches of the selected repository, from the provider, through the s4
+ * `listRepositoryBranches` procedures (organization variant when the
+ * new-session route carries an organization).
+ *
+ * The query runs only when a repository is selected. Bitbucket is
+ * organization-only, so a personal Bitbucket row never issues a request — the
+ * server would refuse it with the org-only message, and the section explains
+ * the restriction instead.
+ *
+ * The organization scope is the caller's `organizationId` PROP, not a value
+ * read back from a store: the screen owns the route's scope, so passing it in
+ * means a scope change reaches the query key on the same render that changed
+ * it — a store published by a passive effect would leave the previous
+ * organization installed for one render and query it.
+ *
+ * The cache key carries the full repository identity: the procedure input
+ * only accepts `platform` + `fullName`, so the Bitbucket workspace/repository
+ * uuids are appended to the key here. Two same-named rows — across providers,
+ * or across renamed Bitbucket workspaces — can never read each other's
+ * branches out of the cache.
+ */
+export function useRepositoryBranches(
+  repository: NewSessionRepository | null,
+  organizationId: string | undefined
+): RepositoryBranchesState {
+  const trpc = useTRPC();
+
+  const platform: RepositoryPlatform = repository?.platform ?? 'github';
+  const fullName = repository?.fullName ?? '';
+  const isEnabled =
+    repository !== null && fullName !== '' && !(platform === 'bitbucket' && !organizationId);
+
+  const personalInput = { platform, repository: { fullName } };
+  const organizationInput = { organizationId: organizationId ?? '', ...personalInput };
+  const identity = repository ? repositoryIdentityKey(repository) : 'none';
+
+  const branchQuery = useQuery({
+    queryKey: [
+      ...(organizationId
+        ? trpc.organizations.cloudAgentNext.listRepositoryBranches.queryKey(organizationInput)
+        : trpc.cloudAgentNext.listRepositoryBranches.queryKey(personalInput)),
+      identity,
+    ],
+    queryFn: async () => {
+      const listing = organizationId
+        ? await trpcClient.organizations.cloudAgentNext.listRepositoryBranches.query(
+            organizationInput
+          )
+        : await trpcClient.cloudAgentNext.listRepositoryBranches.query(personalInput);
+      return listing;
+    },
+    enabled: isEnabled,
+  });
+
+  const errorCode = branchQuery.isError
+    ? // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- the query fn calls tRPC directly, so the error is a TRPCClientError carrying `data.code`
+      (branchQuery.error as { data?: { code?: string } } | null)?.data?.code
+    : undefined;
+  const { permanent } = classifyProviderErrorCode(errorCode);
+
+  const retry = useCallback(() => {
+    void branchQuery.refetch();
+  }, [branchQuery]);
+
+  return {
+    defaultBranch: branchQuery.data?.defaultBranch ?? null,
+    branches: branchQuery.data?.branches ?? [],
+    isEnabled,
+    isLoading: isEnabled && branchQuery.isPending,
+    isRetryableError: branchQuery.isError && !permanent,
+    isPermanentError: branchQuery.isError && permanent,
+    isRetrying: branchQuery.isFetching && branchQuery.isError,
+    retry,
+  };
 }

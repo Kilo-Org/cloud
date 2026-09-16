@@ -46,6 +46,11 @@ const runtimeProxyGrantBaseSchema = z
   })
   .strict();
 
+const legacyRuntimeProxyGrantV3Schema = runtimeProxyGrantBaseSchema.extend({
+  version: z.literal(3),
+  plane: z.literal('legacy'),
+  instanceGeneration: z.number().int().nonnegative(),
+});
 const legacyRuntimeProxyGrantV2Schema = runtimeProxyGrantBaseSchema.extend({
   version: z.literal(2),
   plane: z.literal('legacy'),
@@ -71,6 +76,7 @@ const legacyRuntimeProxyGrantV1Schema = runtimeProxyGrantBaseSchema
 
 /** v1 persisted grants are accepted temporarily as legacy only; never control. */
 export const runtimeProxyGrantSchema = z.union([
+  legacyRuntimeProxyGrantV3Schema,
   legacyRuntimeProxyGrantV2Schema,
   controlRuntimeProxyGrantV2Schema,
   legacyRuntimeProxyGrantV1Schema,
@@ -79,10 +85,8 @@ export type RuntimeProxyGrant = z.infer<typeof runtimeProxyGrantSchema>;
 export type RuntimeProxyFence =
   | {
       plane: 'legacy';
-      generation: number;
       allocationId: string;
-      wrapperRunId: string;
-      wrapperConnectionId: string;
+      instanceGeneration: number;
     }
   | {
       plane: 'control';
@@ -92,16 +96,42 @@ export type RuntimeProxyFence =
       wrapperInstanceId: string;
     };
 type RuntimeProxyGrantInput =
-  | Omit<z.infer<typeof legacyRuntimeProxyGrantV2Schema>, 'version' | 'grantId' | 'nonce'>
+  | Omit<z.infer<typeof legacyRuntimeProxyGrantV3Schema>, 'version' | 'grantId' | 'nonce'>
   | Omit<z.infer<typeof controlRuntimeProxyGrantV2Schema>, 'version' | 'grantId' | 'nonce'>;
 
 export function createRuntimeProxyGrant(input: RuntimeProxyGrantInput): RuntimeProxyGrant {
   return runtimeProxyGrantSchema.parse({
-    version: 2,
+    version: input.plane === 'legacy' ? 3 : 2,
     grantId: crypto.randomUUID(),
     nonce: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url'),
     ...input,
   });
+}
+
+export function sameRuntimeProxyPhysicalBinding(
+  left: RuntimeProxyGrant | RuntimeProxyFence,
+  right: RuntimeProxyGrant | RuntimeProxyFence
+): boolean {
+  if (left.plane !== 'legacy' || right.plane !== 'legacy') return false;
+  if (left.allocationId !== right.allocationId) return false;
+  const leftGeneration = 'instanceGeneration' in left ? left.instanceGeneration : undefined;
+  const rightGeneration = 'instanceGeneration' in right ? right.instanceGeneration : undefined;
+  return (
+    leftGeneration === undefined ||
+    rightGeneration === undefined ||
+    leftGeneration === rightGeneration
+  );
+}
+
+export function sameRuntimeProxyControlBinding(
+  left: { allocationId: string; providerInstanceId: string; wrapperInstanceId: string },
+  right: { allocationId: string; providerInstanceId: string; wrapperInstanceId: string }
+): boolean {
+  return (
+    left.allocationId === right.allocationId &&
+    left.providerInstanceId === right.providerInstanceId &&
+    left.wrapperInstanceId === right.wrapperInstanceId
+  );
 }
 
 export async function issueRuntimeCredentialProxyHandle(
@@ -179,16 +209,11 @@ export function matchesRuntimeProxyGrant(
     current.userId === context.userId &&
     current.orgId === context.orgId &&
     current.plane === context.fence.plane &&
-    current.allocationId === context.fence.allocationId &&
     (current.plane === 'legacy' && context.fence.plane === 'legacy'
-      ? current.generation === context.fence.generation &&
-        current.wrapperRunId === context.fence.wrapperRunId &&
-        current.wrapperConnectionId === context.fence.wrapperConnectionId
+      ? sameRuntimeProxyPhysicalBinding(current, context.fence)
       : current.plane === 'control' &&
         context.fence.plane === 'control' &&
-        current.providerInstanceId === context.fence.providerInstanceId &&
-        current.connectionId === context.fence.connectionId &&
-        current.wrapperInstanceId === context.fence.wrapperInstanceId)
+        sameRuntimeProxyControlBinding(current, context.fence))
   );
 }
 

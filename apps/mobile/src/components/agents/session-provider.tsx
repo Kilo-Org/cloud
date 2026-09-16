@@ -1,7 +1,12 @@
 import { createContext, type ReactNode, useContext, useEffect, useRef } from 'react';
 import { createStore, Provider as JotaiProvider } from 'jotai';
 import { type SessionManager } from '@kilocode/cloud-agent-sdk';
+import { useLocalSearchParams } from 'expo-router';
 import { createMobileAgentSessionManager } from '@/components/agents/mobile-session-manager';
+import {
+  registerLiveSessionManager,
+  unregisterLiveSessionManager,
+} from '@/components/agents/live-session-manager-registry';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 import {
   getAuthenticatedOwner,
@@ -23,13 +28,44 @@ export function AgentSessionProvider({
   const userWebConnection = useUserWebConnection();
   const storeRef = useRef(createStore());
   const managerRef = useRef<SessionManager | null>(null);
+  // Capture the owner before the manager is created so its transcript cache is
+  // scoped to this account. The route keys the provider on the owner, so a new
+  // account gets a new manager; the provider only renders for a confirmed
+  // owner, and `?? ''` makes the manager skip the cache if it ever is not.
+  const owner = useRef(getAuthenticatedOwner()).current;
   managerRef.current ??= createMobileAgentSessionManager({
     store: storeRef.current,
     userWebConnection,
     organizationId,
+    userId: owner.userId ?? '',
   });
 
-  const owner = useRef(getAuthenticatedOwner()).current;
+  // The provider only mounts on the agent-chat route, so the route's session id
+  // is the session this manager owns. Publishing it lets the front-approval
+  // orchestrator answer through this live connection instead of attaching a
+  // second one to a relay that allows a single owner per session.
+  const params = useLocalSearchParams<{ 'session-id'?: string | string[] }>();
+  const rawSessionId = params['session-id'];
+  const sessionId =
+    Array.isArray(rawSessionId) || rawSessionId === undefined || rawSessionId.length === 0
+      ? null
+      : rawSessionId;
+
+  useEffect(() => {
+    if (sessionId === null) {
+      return undefined;
+    }
+    const manager = managerRef.current;
+    if (manager === null) {
+      return undefined;
+    }
+    const handle = { manager, store: storeRef.current };
+    registerLiveSessionManager(sessionId, handle);
+    return () => {
+      unregisterLiveSessionManager(sessionId, handle);
+    };
+  }, [sessionId]);
+
   useEffect(() => {
     const manager = managerRef.current;
     const retire = () => {

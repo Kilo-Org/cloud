@@ -1,10 +1,18 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  getSandboxAllocationRequest,
+  SELECTABLE_SANDBOX_ALLOCATIONS,
+  type SelectableSandboxAllocationRequest,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import {
   baseCreateWorktreeChatNextOutputSchema,
   baseCreateWorktreeChatNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseGetSandboxStatusNextSchema,
+  baseGetSessionNextOutputSchema,
   basePrepareSessionNextSchema,
+  organizationPrepareSessionNextSchema,
+  personalPrepareSessionNextSchema,
   baseCancelQueuedMessageNextSchema,
   SANDBOX_STATUS_DETAIL_MESSAGES,
   type SandboxStatusSnapshot,
@@ -213,6 +221,50 @@ describe('baseGetSandboxStatusNextSchema', () => {
     expect(baseGetSandboxStatusNextSchema.safeParse({ cloudAgentSessionId: '' }).success).toBe(
       false
     );
+  });
+});
+
+describe('baseGetSessionNextOutputSchema', () => {
+  const workspaceSessionId = `workspace_${MESSAGE_UUID}`;
+  const worktreeId = `worktree_${MESSAGE_UUID}`;
+  const baseSession = {
+    sessionId: workspaceSessionId,
+    userId: 'user_123',
+    execution: null,
+    timestamp: 1,
+    version: 1,
+  };
+
+  it('preserves worktree ownership for a grouped worktree session', () => {
+    const response = {
+      ...baseSession,
+      worktreeId,
+      parentSessionId: KILO_SESSION_ID,
+      cloudAgentSessionScopeId: workspaceSessionId,
+    };
+
+    expect(baseGetSessionNextOutputSchema.parse(response)).toEqual(response);
+  });
+
+  it('preserves explicit null ownership fields when no ownership row exists', () => {
+    const response = baseGetSessionNextOutputSchema.parse({
+      ...baseSession,
+      worktreeId,
+      parentSessionId: null,
+      cloudAgentSessionScopeId: null,
+    });
+
+    expect(response.worktreeId).toBe(worktreeId);
+    expect(response.parentSessionId).toBeNull();
+    expect(response.cloudAgentSessionScopeId).toBeNull();
+  });
+
+  it('omits ownership fields for an ordinary session', () => {
+    const response = baseGetSessionNextOutputSchema.parse(baseSession);
+
+    expect(response).not.toHaveProperty('worktreeId');
+    expect(response).not.toHaveProperty('parentSessionId');
+    expect(response).not.toHaveProperty('cloudAgentSessionScopeId');
   });
 });
 
@@ -571,6 +623,21 @@ describe('createWorktreeChat schemas', () => {
     }
   });
 
+  it.each([
+    ...SELECTABLE_SANDBOX_ALLOCATIONS,
+    ...SELECTABLE_SANDBOX_ALLOCATIONS.map(allocation => getSandboxAllocationRequest(allocation)),
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'large' },
+  ])('rejects attempts to change an existing worktree to %j', sandboxAllocation => {
+    expect(
+      baseCreateWorktreeChatNextSchema.safeParse({
+        sourceKiloSessionId: KILO_SESSION_ID,
+        operationKey,
+        sandboxAllocation,
+      }).success
+    ).toBe(false);
+  });
+
   it('requires canonical workspace/worktree output and rejects private runtime paths', () => {
     const output = {
       kiloSessionId: KILO_SESSION_ID,
@@ -588,6 +655,158 @@ describe('createWorktreeChat schemas', () => {
     ]) {
       expect(baseCreateWorktreeChatNextOutputSchema.safeParse(invalidOutput).success).toBe(false);
     }
+  });
+});
+
+describe('prepare session sandbox selection', () => {
+  const baseInput = {
+    githubRepo: 'acme/repo',
+    prompt: 'Test prompt',
+    mode: 'code',
+    model: 'kilo/test-model',
+  };
+  const organizationInput = { ...baseInput, organizationId: MESSAGE_UUID };
+  const allocations = SELECTABLE_SANDBOX_ALLOCATIONS;
+  const requests: SelectableSandboxAllocationRequest[] = [
+    ...allocations.map(allocation => getSandboxAllocationRequest(allocation)),
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'large' },
+  ];
+
+  it.each(['isolated-standard', getSandboxAllocationRequest('isolated-standard')])(
+    'rejects isolated-standard on the organization schema: %j',
+    sandboxAllocation => {
+      expect(
+        organizationPrepareSessionNextSchema.safeParse({ ...organizationInput, sandboxAllocation })
+          .success
+      ).toBe(false);
+    }
+  );
+
+  it.each(allocations)('normalizes the legacy organization allocation %s', sandboxAllocation => {
+    expect(
+      organizationPrepareSessionNextSchema.parse({ ...organizationInput, sandboxAllocation })
+        .sandboxAllocation
+    ).toEqual(getSandboxAllocationRequest(sandboxAllocation));
+  });
+
+  it.each(allocations)('normalizes the legacy personal allocation %s', sandboxAllocation => {
+    expect(
+      personalPrepareSessionNextSchema.parse({ ...baseInput, sandboxAllocation }).sandboxAllocation
+    ).toEqual(getSandboxAllocationRequest(sandboxAllocation));
+  });
+
+  it.each(requests)('preserves the structured organization allocation %j', sandboxAllocation => {
+    expect(
+      organizationPrepareSessionNextSchema.parse({ ...organizationInput, sandboxAllocation })
+        .sandboxAllocation
+    ).toEqual(sandboxAllocation);
+  });
+
+  it.each(requests)('preserves the structured personal allocation %j', sandboxAllocation => {
+    expect(
+      personalPrepareSessionNextSchema.parse({ ...baseInput, sandboxAllocation }).sandboxAllocation
+    ).toEqual(sandboxAllocation);
+  });
+
+  it.each([
+    'default',
+    'vercel-medium',
+    '',
+    null,
+    2,
+    { vcpus: 4 },
+    { provider: { id: 'cloudflare', account: 'byoc' }, instanceType: 'single' },
+    { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'small' },
+    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'single' },
+    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+    { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
+  ])('rejects an invalid sandbox allocation: %j', sandboxAllocation => {
+    expect(
+      organizationPrepareSessionNextSchema.safeParse({ ...organizationInput, sandboxAllocation })
+        .success
+    ).toBe(false);
+    expect(
+      personalPrepareSessionNextSchema.safeParse({ ...baseInput, sandboxAllocation }).success
+    ).toBe(false);
+  });
+
+  it('keeps Default omitted in personal and organization requests', () => {
+    expect(personalPrepareSessionNextSchema.parse(baseInput)).not.toHaveProperty(
+      'sandboxAllocation'
+    );
+    expect(organizationPrepareSessionNextSchema.parse(organizationInput)).not.toHaveProperty(
+      'sandboxAllocation'
+    );
+  });
+
+  it.each([...allocations, ...requests])(
+    'rejects dev containers combined with %j',
+    sandboxAllocation => {
+      for (const result of [
+        organizationPrepareSessionNextSchema.safeParse({
+          ...organizationInput,
+          devcontainer: true,
+          sandboxAllocation,
+        }),
+        personalPrepareSessionNextSchema.safeParse({
+          ...baseInput,
+          devcontainer: true,
+          sandboxAllocation,
+        }),
+      ]) {
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.issues).toEqual(
+            expect.arrayContaining([expect.objectContaining({ path: ['sandboxAllocation'] })])
+          );
+        }
+      }
+    }
+  );
+
+  it('accepts dev containers with Default', () => {
+    expect(
+      organizationPrepareSessionNextSchema.safeParse({ ...organizationInput, devcontainer: true })
+        .success
+    ).toBe(true);
+    expect(
+      personalPrepareSessionNextSchema.safeParse({ ...baseInput, devcontainer: true }).success
+    ).toBe(true);
+  });
+
+  it('preserves clone-only validation while accepting a preset', () => {
+    const personalClone = {
+      ...baseInput,
+      prompt: undefined,
+      cloneFromKiloSessionId: KILO_SESSION_ID,
+      autoInitiate: true,
+      operationKey: MESSAGE_UUID,
+      sandboxAllocation: 'cloudflare-single',
+    };
+    expect(personalPrepareSessionNextSchema.parse(personalClone).sandboxAllocation).toEqual(
+      getSandboxAllocationRequest('cloudflare-single')
+    );
+    expect(
+      personalPrepareSessionNextSchema.safeParse({ ...personalClone, prompt: 'Not allowed' })
+        .success
+    ).toBe(false);
+
+    const cloneInput = {
+      ...organizationInput,
+      prompt: undefined,
+      cloneFromKiloSessionId: KILO_SESSION_ID,
+      autoInitiate: true,
+      operationKey: MESSAGE_UUID,
+      sandboxAllocation: 'cloudflare-single',
+    };
+    expect(organizationPrepareSessionNextSchema.parse(cloneInput).sandboxAllocation).toEqual(
+      getSandboxAllocationRequest('cloudflare-single')
+    );
+    expect(
+      organizationPrepareSessionNextSchema.safeParse({ ...cloneInput, prompt: 'Not allowed' })
+        .success
+    ).toBe(false);
   });
 });
 

@@ -41,6 +41,18 @@ describe('glanceable layout copy placeholder', () => {
 describe('glanceable approve target', () => {
   const source = read('active-agents-live-activity.tsx');
 
+  /**
+   * Extract one section of the returned layout object, from its key to the next
+   * key at the same indentation. The `'widget'` layout never runs under vitest,
+   * so the source text is the only place its sections are observable.
+   */
+  const section = (key: string): string => {
+    const pattern = new RegExp(`\\n {4}${key}: ([\\s\\S]*?)(?=\\n {4}[A-Za-z]+: |\\n {2}\\};\\n)`);
+    const match = source.match(pattern);
+    expect(match).not.toBeNull();
+    return match?.[1] ?? '';
+  };
+
   it('is a literal in the layout, equal to APPROVE_TARGET', () => {
     // The handler matches the event's `target` against APPROVE_TARGET, and the
     // widget process reads the target off the layout source. A `target` written
@@ -60,6 +72,32 @@ describe('glanceable approve target', () => {
     // still offers Approve. `view-props.test.ts` pins that expired shape.
     expect(source).toMatch(/const needsApproval\s*=\s*hasCounts\s*&&/);
     expect(source).not.toMatch(/const needsApproval\s*=\s*\(props\.needsApproval/);
+  });
+
+  it('declares the bannerSmall section the Apple Watch and CarPlay draw', () => {
+    // expo-widgets' banner view renders `nodes["bannerSmall"]` when the activity
+    // family is `.small`, falling back to the phone `banner` when the key is
+    // absent. The key itself, not a mention in a comment, is what reaches the
+    // widget process.
+    expect(source).toContain('bannerSmall:');
+    expect(section('bannerSmall')).not.toBe('');
+  });
+
+  it('carries the control in the bannerSmall block under the wait gate', () => {
+    // The watch draws one row and the Approve control after it. The press has to
+    // answer on the wrist, so the block itself must hold the literal target and
+    // the same wait gate the phone banner uses.
+    const block = section('bannerSmall');
+    expect(block).toContain('target="approve"');
+    expect(block).toMatch(/needsApproval/);
+  });
+
+  it('keeps the phone banner drawing its own control', () => {
+    // The Lock Screen banner and the expanded island share `markAndRows`, which
+    // holds the Button; the whole-source literal-target and gate assertions
+    // above pin that control. The phone `banner` block must still draw the
+    // shared block, so the small section is an addition, not a move.
+    expect(section('banner')).toContain('markAndRows');
   });
 
   it('registers under the Live Activity name, not the source the native event reports', () => {

@@ -158,7 +158,9 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // without color), a fixed-width count, then the label. Every row shares one
   // type size so the counts line up on a grid; only the label dims to rank
   // them, because a second font size in a two-line banner reads as a mistake.
-  const countRow = (line: (typeof countLines)[number], isPrimary: boolean) => (
+  // `showWait` is false for the small family, which draws one line and keeps
+  // the relative wait off it; the phone banner and the expanded island keep it.
+  const countRow = (line: (typeof countLines)[number], isPrimary: boolean, showWait = true) => (
     <HStack key={line.label} alignment="center" spacing={7}>
       <Image systemName={line.icon} color={line.color} size={13} />
       <Text
@@ -190,7 +192,7 @@ const layout: LiveActivityComponent<ContentState> = props => {
       >
         {line.label}
       </Text>
-      {line.kind === 'needsInput' && needsInputSince !== null ? (
+      {showWait && line.kind === 'needsInput' && needsInputSince !== null ? (
         <Text
           date={new Date(needsInputSince)}
           dateStyle="relative"
@@ -217,9 +219,9 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // The mark, then the rows, then the Approve control while the card still
   // draws a wait and an approvable one exists. The Lock Screen banner and the
   // expanded Dynamic Island draw the same block, so one glance teaches both
-  // surfaces — and the Live Activity is what the Apple Watch mirrors into its
-  // Smart Stack, which is where the control has to live: an accessory
-  // complication is read-only in this layout and keeps the count alone.
+  // surfaces. The Apple Watch and CarPlay draw the `bannerSmall` section
+  // instead: their activity family is `.small`, so they get one compact row
+  // plus the same control rather than this stacked block.
   const markAndRows = (markSize: number) => (
     <HStack alignment="center" spacing={12}>
       {logo(markSize)}
@@ -258,6 +260,49 @@ const layout: LiveActivityComponent<ContentState> = props => {
         ]}
       >
         {markAndRows(26)}
+      </HStack>
+    ),
+    // The Apple Watch and CarPlay small family draws this section, not the
+    // phone `banner`: expo-widgets' banner view prefers the `bannerSmall` node
+    // whenever the activity family is `.small`, falling back to `banner`
+    // otherwise, so the phone Lock Screen and Dynamic Island never read it. One
+    // compact row plus the Approve control, so the wait count and the wrist
+    // control fit the small region instead of the phone's stacked block. The
+    // ranked primary row only — the small family draws one line — and no
+    // relative wait: the medium banner and the accessory rectangle carry it. The
+    // trailing Spacer pins the row to the leading edge, so the count keeps its
+    // place when the control appears and disappears, the way the phone block is
+    // spaced; the row draws unconditionally, and only the control is gated.
+    bannerSmall: (
+      <HStack alignment="center" spacing={10}>
+        <HStack
+          alignment="center"
+          spacing={7}
+          modifiers={[
+            // The combined label sits on the count row alone, so VoiceOver on
+            // the watch can still focus and activate the Approve button
+            // separately.
+            accessibilityElement('combine'),
+            accessibilityLabel(accessibility),
+          ]}
+        >
+          {hasCounts ? (
+            countRow(primary, true, false)
+          ) : (
+            <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>
+              {statusLine}
+            </Text>
+          )}
+        </HStack>
+        {needsApproval ? (
+          // The target is the literal, not the imported `APPROVE_TARGET`: this
+          // function's source is stringified and re-evaluated in the widget
+          // process, where an imported binding is an undefined global.
+          // `layout-copy.test.ts` keeps it equal to the constant the interaction
+          // handler matches.
+          <Button label={COPY.approve} target="approve" />
+        ) : null}
+        <Spacer />
       </HStack>
     ),
     // The Dynamic Island's leading slot is the app-identity slot, so it holds

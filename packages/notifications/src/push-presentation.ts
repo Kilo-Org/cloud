@@ -19,6 +19,64 @@ export const ANDROID_NOTIFICATION_CHANNELS = [
 export type AndroidNotificationChannelId = (typeof ANDROID_NOTIFICATION_CHANNELS)[number]['id'];
 
 /**
+ * The first app version that creates the named agent channels. `needs-input`
+ * and `agent-progress` are new here, and the build that creates them also
+ * deletes the legacy `agent` / `chat` / `active-agents` channels, so a token
+ * registered by an older build knows neither: Android 8+ drops a post
+ * addressed to a channel the app never created. The push route therefore omits
+ * `channelId` for those tokens and the post falls back to the app's default
+ * channel. Keep this at the mobile release that first ships the split
+ * (`apps/mobile/app.config.ts` `version` at that release).
+ */
+export const ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION = '1.0.11';
+
+/** The agent channels that only a build at or above the split's release creates. */
+const AGENT_KIND_ANDROID_CHANNELS: readonly AndroidNotificationChannelId[] = [
+  'needs-input',
+  'agent-progress',
+];
+
+/**
+ * Compare dotted-numeric versions (`1.10.0` > `1.9.9`, missing segments count
+ * as zero). A version the server cannot parse sorts below every release, so a
+ * client that cannot prove its age never receives a channel id it may not have
+ * created.
+ */
+function compareAppVersions(a: string, b: string): number {
+  const left = a.split('.').map(segment => Number.parseInt(segment, 10) || 0);
+  const right = b.split('.').map(segment => Number.parseInt(segment, 10) || 0);
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const delta = (left[index] ?? 0) - (right[index] ?? 0);
+    if (delta !== 0) {
+      return delta < 0 ? -1 : 1;
+    }
+  }
+  return 0;
+}
+
+/**
+ * The Android channel a token's client can actually receive, or `undefined`
+ * when the client predates channel creation or predates the named agent
+ * channels. The caller omits `channelId` in that case; Android then posts to
+ * the app's default channel instead of dropping the notification.
+ */
+export function androidChannelIdForRegisteredClient(
+  channelId: AndroidNotificationChannelId,
+  appVersion: string | null | undefined
+): AndroidNotificationChannelId | undefined {
+  if (appVersion == null) {
+    return undefined;
+  }
+  if (!AGENT_KIND_ANDROID_CHANNELS.includes(channelId)) {
+    return channelId;
+  }
+  return compareAppVersions(appVersion, ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION) >= 0
+    ? channelId
+    : undefined;
+}
+
+/**
  * The named kinds every agent notification is split into. The user can keep
  * needs-input (breaks through Do Not Disturb) and silence progress (does not).
  * Every presentation decision — Android channel, iOS interruption level —

@@ -250,7 +250,16 @@ describe('ensureAndroidNotificationChannels', () => {
 
     expect(mocks.setNotificationChannelAsync.mock.calls).toEqual([
       ['needs-input', { name: 'Needs input', importance: 4, bypassDnd: true }],
-      ['agent-progress', { name: 'Agent progress', importance: 3, bypassDnd: false, sound: null }],
+      [
+        'agent-progress',
+        {
+          name: 'Agent progress',
+          importance: 3,
+          bypassDnd: false,
+          sound: null,
+          enableVibrate: false,
+        },
+      ],
       ['kiloclaw', { name: 'KiloClaw activity', importance: 3, bypassDnd: false }],
       ['balance', { name: 'Balance alerts', importance: 3, bypassDnd: false }],
       ['security', { name: 'Security findings', importance: 4, bypassDnd: false }],
@@ -266,8 +275,11 @@ describe('ensureAndroidNotificationChannels', () => {
       mocks.setNotificationChannelAsync.mock.calls.find(call => call[0] === id)?.[1];
     // Android takes a channel-based post's sound from the channel, so the
     // progress kind must be silent here; an absent key is the default sound.
-    expect(optionsFor('agent-progress')).toMatchObject({ sound: null });
+    // Vibration is a separate channel setting that defaults to enabled, so a
+    // silent channel disables it explicitly.
+    expect(optionsFor('agent-progress')).toMatchObject({ sound: null, enableVibrate: false });
     expect(optionsFor('needs-input')).not.toHaveProperty('sound');
+    expect(optionsFor('needs-input')).not.toHaveProperty('enableVibrate');
   });
 
   it('deletes the three legacy channels on first creation', async () => {
@@ -291,7 +303,13 @@ describe('ensureAndroidNotificationChannels', () => {
       ['needs-input', { name: expect.any(String), importance: 4, bypassDnd: true }],
       [
         'agent-progress',
-        { name: expect.any(String), importance: 3, bypassDnd: false, sound: null },
+        {
+          name: expect.any(String),
+          importance: 3,
+          bypassDnd: false,
+          sound: null,
+          enableVibrate: false,
+        },
       ],
       ['kiloclaw', { name: expect.any(String), importance: 3, bypassDnd: false }],
       ['balance', { name: expect.any(String), importance: 3, bypassDnd: false }],

@@ -17,12 +17,13 @@ import {
   type GlanceableSink,
   type GlanceableSinkContext,
 } from '@/lib/glanceable/sink-registry';
-import { ensureAndroidNotificationChannels } from '@/lib/notifications';
+import type * as NotificationsModule from '@/lib/notifications';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
 import { formatGlanceableCount, isWidgetRtl } from './count-format';
 import {
   end as endLiveUpdate,
+  getStoredWidgetSnapshot,
   setWidgetSnapshot,
   start as startLiveUpdate,
   update as updateLiveUpdate,
@@ -48,14 +49,39 @@ function translate(key: string): string {
   return i18n.t(key);
 }
 
+/**
+ * Create the Android channels before the first post, lazily. `@/lib/notifications`
+ * pulls the native notifications graph (expo-notifications → expo-constants),
+ * and the importers of this module — the widget / Live-Update headless entry and
+ * the pure widget suite — must not load it. The reverse direction already
+ * lazy-requires the platform sink registrations (see
+ * `ensureGlanceableSinksLoaded`), so this keeps one rule.
+ *
+ * The dynamic import is memoized so concurrent starts share one load, matching
+ * the drafts / encrypted-kv pattern.
+ */
+let notificationsModule: Promise<typeof NotificationsModule> | null = null;
+
+async function ensureAndroidNotificationChannels(): Promise<void> {
+  notificationsModule ??= import('@/lib/notifications');
+  const { ensureAndroidNotificationChannels: ensureChannels } = await notificationsModule;
+  await ensureChannels();
+}
+
 let lastWidgetSnapshot: GlanceableAgentsSnapshot | null = null;
 let notificationActive = false;
 let revision = 0;
 /**
  * The kind the posted card carries, so entering needs-input is detectable: only
  * the first entry alerts, and repeated updates of an unchanged kind stay quiet.
+ * A JS restart empties this memory while the native card stays in the shade, so
+ * the first publication of a fresh process adopts the kind the durable native
+ * mirror recorded (see `publish`).
  */
 let notificationKind: AgentNotificationKind | null = null;
+// One adoption per JS process: the native mirror is overwritten by the first
+// publication, so later publications cannot read the previous process's kind.
+let storedKindAdopted = false;
 let pending: {
   snapshot: GlanceableAgentsSnapshot;
   ctx: GlanceableSinkContext;
@@ -236,6 +262,18 @@ export async function handleAppStateActive(): Promise<void> {
 export const androidSink: GlanceableSink = {
   publish(snapshot) {
     lastWidgetSnapshot = snapshot;
+    // The native card survives a JS restart. Read the durable mirror before it
+    // is overwritten and adopt the kind it recorded, so a needs-input card that
+    // is already in the shade does not alert again on the fresh process.
+    if (!storedKindAdopted) {
+      storedKindAdopted = true;
+      if (!notificationActive) {
+        const stored = getStoredWidgetSnapshot();
+        if (stored !== null) {
+          notificationKind = agentNotificationKindForGlanceableSnapshot(stored);
+        }
+      }
+    }
     setWidgetSnapshot(snapshot);
     const props = buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount);
     renderWidgetNow(props);
@@ -293,6 +331,7 @@ export function _resetAndroidSinkForTests(): void {
   lastWidgetSnapshot = null;
   notificationActive = false;
   notificationKind = null;
+  storedKindAdopted = false;
   revision = 0;
   pending = null;
   startEpoch += 1;

@@ -78,6 +78,9 @@ vi.mock('expo', () => ({
   requireOptionalNativeModule: () => mocks.native,
 }));
 
+// The sink resolves `@/lib/notifications` lazily so the widget headless entry
+// and the pure suites never load the native notifications graph; this mock is
+// what the sink's dynamic import resolves to here.
 vi.mock('@/lib/notifications', () => ({
   ensureAndroidNotificationChannels: mocks.ensureAndroidNotificationChannels,
 }));
@@ -140,6 +143,10 @@ const MIXED = {
 };
 
 async function flushAsync(): Promise<void> {
+  // The channel ensurer resolves `@/lib/notifications` through a dynamic
+  // import, so a start settles over more turns than a direct call: advance the
+  // timer queue the import promise rides on, then drain the microtasks.
+  await vi.advanceTimersByTimeAsync(0);
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
@@ -318,6 +325,50 @@ describe('androidSink start and update', () => {
       true,
       true,
       0
+    );
+  });
+
+  it('does not re-alert a needs-input card a previous process left in the shade', async () => {
+    const needsInput = { ...MIXED, needsInput: 1 };
+    // The previous JS process posted this card; the native mirror survives the
+    // restart and still holds that snapshot.
+    mocks.native.setWidgetSnapshot(JSON.stringify(needsInput), Date.parse(needsInput.expiresAt));
+    _resetAndroidSinkForTests();
+    const next = { ...needsInput, revision: needsInput.revision + 1 };
+
+    androidSink.publish(next);
+    androidSink.startOrUpdate(next, CTX);
+    await flushAsync();
+
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      expect.any(String),
+      'Open agents',
+      expect.any(String),
+      'needs-input',
+      false,
+      true
+    );
+  });
+
+  it('alerts a needs-input entry after a restart that left a progress card', async () => {
+    const progress = { ...MIXED, needsInput: 0 };
+    mocks.native.setWidgetSnapshot(JSON.stringify(progress), 0);
+    _resetAndroidSinkForTests();
+    const next = { ...MIXED, needsInput: 1, revision: progress.revision + 1 };
+
+    androidSink.publish(next);
+    androidSink.startOrUpdate(next, CTX);
+    await flushAsync();
+
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      expect.any(String),
+      'Open agents',
+      expect.any(String),
+      'needs-input',
+      true,
+      true
     );
   });
 

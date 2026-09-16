@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { pushDataSchema } from './push-data';
 import {
   AGENT_NOTIFICATION_KINDS,
+  ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
   ANDROID_NOTIFICATION_CHANNELS,
   agentNotificationKindForGlanceableSnapshot,
   agentNotificationKindForPushData,
   androidChannelIdForAgentKind,
   androidChannelIdForPushData,
+  androidChannelIdForRegisteredClient,
   genericPushContentForPushData,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
@@ -366,5 +368,32 @@ describe('genericPushContentForPushData', () => {
       title: 'Kilo',
       body: 'Your balance needs attention',
     });
+  });
+});
+
+describe('androidChannelIdForRegisteredClient', () => {
+  const splitVersion = ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION;
+
+  it('hands a named agent channel to a client that creates it', () => {
+    expect(androidChannelIdForRegisteredClient('needs-input', splitVersion)).toBe('needs-input');
+    expect(androidChannelIdForRegisteredClient('agent-progress', '1.0.12')).toBe('agent-progress');
+    expect(androidChannelIdForRegisteredClient('agent-progress', '1.10.0')).toBe('agent-progress');
+  });
+
+  it('withholds a named agent channel from a pre-split or unknown client', () => {
+    // Both older clients know only the legacy channels, and this build deletes
+    // those, so naming a channel would make Android drop the post.
+    expect(androidChannelIdForRegisteredClient('needs-input', '1.0.10')).toBeUndefined();
+    expect(androidChannelIdForRegisteredClient('needs-input', null)).toBeUndefined();
+    expect(androidChannelIdForRegisteredClient('needs-input', undefined)).toBeUndefined();
+    expect(androidChannelIdForRegisteredClient('agent-progress', 'not-a-version')).toBeUndefined();
+  });
+
+  it('keeps the pre-split channels for every client that created them', () => {
+    for (const channelId of ['kiloclaw', 'balance', 'security'] as const) {
+      expect(androidChannelIdForRegisteredClient(channelId, '1.0.4')).toBe(channelId);
+      expect(androidChannelIdForRegisteredClient(channelId, splitVersion)).toBe(channelId);
+      expect(androidChannelIdForRegisteredClient(channelId, null)).toBeUndefined();
+    }
   });
 });

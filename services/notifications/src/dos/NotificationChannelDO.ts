@@ -3,6 +3,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { user_notification_preferences, user_push_tokens } from '@kilocode/db/schema';
 import {
   androidChannelIdForPushData,
+  androidChannelIdForRegisteredClient,
   genericPushContentForPushData,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
@@ -285,16 +286,18 @@ export class NotificationChannelDO extends DurableObject<Env> {
         body = input.push.body;
       }
 
+      const clientChannelId = androidChannelIdForRegisteredClient(channelId, app_version);
       return {
         to: token,
         title,
         body,
         data: input.push.data,
         // Android 8+ drops a notification addressed to a channel that does
-        // not exist. Only clients that create channels (a non-null app
-        // version at registration) get a channelId; older clients fall back
-        // to the default channel. iOS ignores channelId either way.
-        ...(app_version != null && { channelId }),
+        // not exist, and the channel list is created client-side. A token
+        // registered before channel creation, or before the named agent
+        // channels existed, gets no channelId and the post falls back to the
+        // app's default channel. iOS ignores channelId either way.
+        ...(clientChannelId !== undefined && { channelId: clientChannelId }),
         // iOS has no per-kind channel; the interruption level is its
         // equivalent and it is what lets a needs-input push break through a
         // Focus / Do Not Disturb. Applied to every message — unlike

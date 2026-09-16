@@ -502,6 +502,8 @@ const LEGACY_ANDROID_NOTIFICATION_CHANNELS = ['agent', 'chat', 'active-agents'] 
 // `setSound(null)` is a no-op for a channel post on API 26+), and the framework
 // keeps the sound a channel was created with — so the progress kind is silent
 // here at creation, while needs-input keeps the default sound for its alert.
+// A channel's vibration is independent of its sound: Android defaults it to
+// enabled, so silence also has to disable it explicitly.
 const SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS = new Set<AndroidNotificationChannelId>([
   'agent-progress',
 ]);
@@ -521,8 +523,11 @@ function androidChannelConfiguration(
     // so requesting it on every write is what makes the user's own "Override
     // Do Not Disturb" grant effective.
     bypassDnd: channel.bypassDnd,
-    // An absent sound is the system default; an explicit null is silence.
-    ...(SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.has(channel.id) ? { sound: null } : {}),
+    // An absent sound is the system default; an explicit null is silence, and a
+    // silent channel must not vibrate either (the default is enabled).
+    ...(SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.has(channel.id)
+      ? { sound: null, enableVibrate: false }
+      : {}),
   };
 }
 

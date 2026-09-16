@@ -1254,8 +1254,8 @@ describe('NotificationChannelDO preview mode and channel', () => {
   it('adds channelId and time-sensitive level to every message for an attention push', async () => {
     installDbMock({
       tokens: [
-        { user_id: 'user-chan', token: 'tok1', app_version: '1.0.4' },
-        { user_id: 'user-chan', token: 'tok2', app_version: '1.0.4' },
+        { user_id: 'user-chan', token: 'tok1', app_version: '1.0.11' },
+        { user_id: 'user-chan', token: 'tok2', app_version: '1.0.11' },
       ],
     });
     const stub = getDO('user-chan');
@@ -1278,7 +1278,7 @@ describe('NotificationChannelDO preview mode and channel', () => {
 
   it('routes a status push to the agent-progress channel with an active level', async () => {
     installDbMock({
-      tokens: [{ user_id: 'user-status', token: 'tok-status', app_version: '1.0.4' }],
+      tokens: [{ user_id: 'user-status', token: 'tok-status', app_version: '1.0.11' }],
     });
     const stub = getDO('user-status');
     const result = await stub.dispatchPush(
@@ -1306,7 +1306,7 @@ describe('NotificationChannelDO preview mode and channel', () => {
 
   it('leaves a non-agent push active while keeping its own channel', async () => {
     installDbMock({
-      tokens: [{ user_id: 'user-nonagent', token: 'tok-nonagent', app_version: '1.0.4' }],
+      tokens: [{ user_id: 'user-nonagent', token: 'tok-nonagent', app_version: '1.0.11' }],
     });
     const stub = getDO('user-nonagent');
     const result = await stub.dispatchPush(
@@ -1332,11 +1332,12 @@ describe('NotificationChannelDO preview mode and channel', () => {
     expect(messages[0]?.mutableContent).toBeUndefined();
   });
 
-  it('omits channelId for a token without an app version (old client)', async () => {
+  it('omits channelId for a client that cannot have created the channel', async () => {
     installDbMock({
       tokens: [
         { user_id: 'user-chan-old', token: 'tok-old', app_version: null },
-        { user_id: 'user-chan-old', token: 'tok-new', app_version: '1.0.4' },
+        { user_id: 'user-chan-old', token: 'tok-split', app_version: '1.0.10' },
+        { user_id: 'user-chan-old', token: 'tok-new', app_version: '1.0.11' },
       ],
     });
     const stub = getDO('user-chan-old');
@@ -1345,15 +1346,46 @@ describe('NotificationChannelDO preview mode and channel', () => {
     );
     expect(result.kind).toBe('delivered');
     const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
-    expect(messages).toHaveLength(2);
+    expect(messages).toHaveLength(3);
     const oldMessage = messages.find(m => m.to === 'tok-old');
+    const splitMessage = messages.find(m => m.to === 'tok-split');
     const newMessage = messages.find(m => m.to === 'tok-new');
+    // The named agent channels are new in 1.0.11 and that build deletes the
+    // legacy ids, so both older clients get no channelId (Android falls back
+    // to the default channel instead of dropping the post).
     expect(oldMessage?.channelId).toBeUndefined();
+    expect(splitMessage?.channelId).toBeUndefined();
     expect(newMessage?.channelId).toBe('needs-input');
     // The interruption level has no older-client failure mode (unlike the
     // Android channel), so it is attached to every message.
     expect(oldMessage?.interruptionLevel).toBe('time-sensitive');
+    expect(splitMessage?.interruptionLevel).toBe('time-sensitive');
     expect(newMessage?.interruptionLevel).toBe('time-sensitive');
+  });
+
+  it('keeps the pre-split channel for a non-agent push on an older client', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-old-balance', token: 'tok-old-balance', app_version: '1.0.4' }],
+    });
+    const stub = getDO('user-old-balance');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-old-balance',
+        idempotencyKey: 'k-old-balance',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: { type: 'low_balance', organizationId: 'org1' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    // `balance` predates the split: an older client created it, so the post
+    // still carries the channel id.
+    expect(messages[0]?.channelId).toBe('balance');
   });
 
   it('substitutes generic content when previews is generic', async () => {

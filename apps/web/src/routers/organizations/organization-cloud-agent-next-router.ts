@@ -1,5 +1,6 @@
 import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { sandboxSelectionCapabilitiesSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   createCloudAgentNextClient,
   createCloudAgentNextClientForModel,
@@ -28,7 +29,12 @@ import {
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
 import {
-  basePrepareSessionNextSchema,
+  listProviderRepositoryBranches,
+  ProviderBranchListingSchema,
+  repositoryFullNameSchema,
+} from '@/lib/cloud-agent/provider-branch-listing';
+import {
+  organizationPrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
   baseCreateWorktreeChatNextSchema,
   baseCreateWorktreeChatNextOutputSchema,
@@ -153,12 +159,6 @@ async function assertOrganizationOwnsSession(params: {
 }
 
 // Extend base schemas with organizationId for organization context
-const PrepareSessionInput = basePrepareSessionNextSchema.and(
-  z.object({
-    organizationId: z.uuid(),
-  })
-);
-
 const CreateWorktreeChatInput = baseCreateWorktreeChatNextSchema.extend({
   organizationId: z.uuid(),
 });
@@ -266,6 +266,21 @@ const ListBitbucketRepositoriesInput = z.object({
  * separately via WebSocket connection.
  */
 export const organizationCloudAgentNextRouter = createTRPCRouter({
+  getSandboxSelectionOptions: organizationMemberProcedure
+    .input(z.object({ devcontainer: z.boolean().optional() }))
+    .output(sandboxSelectionCapabilitiesSchema)
+    .query(async ({ ctx, input }) => {
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({
+        kilocodeOrganizationId: input.organizationId,
+        ...(input.devcontainer !== undefined ? { devcontainer: input.devcontainer } : {}),
+      });
+    }),
+
   /**
    * Prepare a new cloud agent session (organization context).
    *
@@ -274,7 +289,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
    * initiateFromPreparedSession.
    */
   prepareSession: organizationMemberMutationProcedure
-    .input(PrepareSessionInput)
+    .input(organizationPrepareSessionNextSchema)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
       if (
@@ -1016,4 +1031,31 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         }),
       };
     }),
+
+  /**
+   * List the branches of one repository for the new-session flow
+   * (organization context). All three providers run against the
+   * organization's own connection; the integration and credentials are
+   * resolved server-side, never supplied here. `organizationMemberProcedure`
+   * runs `ensureOrganizationAccess` before the resolver sees the input.
+   */
+  listRepositoryBranches: organizationMemberProcedure
+    .input(
+      z
+        .object({
+          organizationId: z.uuid(),
+          platform: z.enum(['github', 'gitlab', 'bitbucket']),
+          repository: z.object({ fullName: repositoryFullNameSchema }).strict(),
+        })
+        .strict()
+    )
+    .output(ProviderBranchListingSchema)
+    .query(async ({ ctx, input }) =>
+      listProviderRepositoryBranches({
+        platform: input.platform,
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        repositoryFullName: input.repository.fullName,
+      })
+    ),
 });

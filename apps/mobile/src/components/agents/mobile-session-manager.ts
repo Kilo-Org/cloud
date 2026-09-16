@@ -6,6 +6,7 @@ import {
   type FetchedSessionData,
   type JotaiStore,
   type KiloSessionId,
+  projectSessionGoal,
   type ResolvedSession,
   type SessionManager,
   type SessionSnapshot,
@@ -16,19 +17,29 @@ import {
   formatSafeCloudAgentFailureDiagnostic,
   withCloudAgentDiagnostics,
 } from '@/components/agents/mobile-session-diagnostics';
+import { RequestDeadlineError } from '@kilocode/event-service';
 import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
 import { type AgentMode } from '@/components/agents/mode-normalize';
-import { API_BASE_URL, CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
+import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
+import {
+  fetchCloudAgentStreamTicket,
+  StreamTicketResponseSchema,
+} from '@/lib/cloud-agent-stream-ticket';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import { trpcClient } from '@/lib/trpc';
-import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
 import { cacheFilePart } from '@/components/agents/file-part-cache';
+import {
+  readSessionTranscriptPage,
+  writeSessionTranscriptPage,
+} from '@/lib/persist/session-transcript-cache';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
-import * as z from 'zod';
 import { i18n } from '@/i18n';
+
+export { StreamTicketResponseSchema };
 
 type SessionWithRuntimeState =
   inferRouterOutputs<MobileRouter>['cliSessionsV2']['getWithRuntimeState'];
@@ -42,6 +53,23 @@ const FETCH_SESSION_NOT_FOUND_RETRY_DELAY_MS = 1000;
  */
 export function readFetchSessionErrorCode(error: unknown): string | undefined {
   return readTrpcErrorField(error, 'code');
+}
+
+/**
+ * True when the failure is the client control-plane deadline firing — the
+ * request never got an answer, so the open is stalled rather than failed.
+ * tRPC wraps the thrown reason in a `TRPCClientError` whose `cause` chain
+ * carries it, so the walk is bounded against malformed chains.
+ */
+export function isStalledTransportError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
+    if (current instanceof RequestDeadlineError) {
+      return true;
+    }
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 /**
@@ -59,18 +87,6 @@ const CLOUD_PREPARE_TRANSIENT_CODES = new Set([
 
 /** Stable message the ledger returns on a same-key in-flight duplicate (plan P1-A-08b). */
 const CLOUD_PREPARE_IN_PROGRESS_MESSAGE = 'creation_in_progress';
-
-/**
- * Wire contract for the cloud-agent stream-ticket endpoint. `expiresAt` is the
- * Unix-epoch number `signStreamTicket` returns. All fields are optional here;
- * the required-field check below rejects an otherwise-valid object missing
- * `ticket` or `expiresAt`.
- */
-export const StreamTicketResponseSchema = z.object({
-  ticket: z.string().optional(),
-  expiresAt: z.number().optional(),
-  error: z.string().optional(),
-});
 
 /**
  * True when a `prepareSession` failure may be retried with the SAME
@@ -155,6 +171,12 @@ type CreateMobileAgentSessionManagerOptions = {
   store: JotaiStore;
   userWebConnection: UserWebConnection;
   organizationId?: string;
+  /**
+   * The authenticated owner the cached transcript is scoped to. Empty means
+   * the owner is not confirmed yet, in which case the cache is skipped
+   * entirely rather than writing to a shared anonymous scope.
+   */
+  userId: string;
 };
 
 const skipBatchOptions = { context: { skipBatch: true } };
@@ -163,13 +185,36 @@ export function createMobileAgentSessionManager({
   store,
   userWebConnection,
   organizationId,
+  userId,
 }: Readonly<CreateMobileAgentSessionManagerOptions>): SessionManager {
+  // Last successful `fetchSession` metadata, memoized so `resolveSession` can
+  // read `cloud_agent_session_id` without a duplicate serial
+  // `cliSessionsV2.get`. It is only consulted when the id matches; any other
+  // resolve keeps the defensive query.
+  let fetchedMetadata: {
+    sessionId: KiloSessionId;
+    cloudAgentSessionId: CloudAgentSessionId | null;
+  } | null = null;
+  // The auth epoch this manager was created under. A transcript-cache write
+  // captured before a sign-out/sign-in must not land in the previous account's
+  // scope, so the write path re-checks this epoch (same fence as the read
+  // cache's persister).
+  const transcriptOwner = { userId, authEpoch: currentAuthEpoch() };
   return createSessionManager({
     store,
     websocketBaseUrl: CLOUD_AGENT_WS_URL,
     websocketHeaders: { Origin: WEB_BASE_URL },
     lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
     userWebConnection,
+    // Thin cache passthrough: `readSessionTranscriptPage` already returns the
+    // promise and no-ops on an empty owner.
+    // eslint-disable-next-line @typescript-eslint/promise-function-async -- passthrough returns the promise directly
+    readCachedSnapshotPage: (id: KiloSessionId) => readSessionTranscriptPage(userId, id),
+    // A tRPC call whose client control-plane deadline expired never got an
+    // answer: the open is stalled, not failed. The manager keeps the skeleton
+    // (then the slow-load state with Retry) instead of a premature error
+    // screen. Unwrapped from the TRPCClientError tRPC layers over it.
+    isStalledTransportError,
     onToolAttachment: (partId, attachment) => {
       cacheToolAttachment(partId, attachment);
     },
@@ -177,16 +222,26 @@ export function createMobileAgentSessionManager({
       cacheFilePart(partId, file);
     },
     resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
-      // Read-only is only ever returned once we have successful evidence the
-      // session isn't cloud-agent or remote. A failed query here must
-      // propagate so it lands in the retryable error state instead of being
-      // silently misclassified as read-only.
-      const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
-      if (session.cloud_agent_session_id) {
+      // `fetchSession` already read this row through `getWithRuntimeState`, so
+      // reuse its cloud-agent id instead of a duplicate serial
+      // `cliSessionsV2.get`. Any other resolve (no matching memo) keeps the
+      // query: read-only is only ever returned once we have successful
+      // evidence the session isn't cloud-agent or remote, and a failed query
+      // here must propagate so it lands in the retryable error state instead
+      // of being silently misclassified as read-only.
+      const memo = fetchedMetadata;
+      let cloudAgentSessionId: CloudAgentSessionId | null = null;
+      if (memo?.sessionId === kiloSessionId) {
+        cloudAgentSessionId = memo.cloudAgentSessionId;
+      } else {
+        const session = await trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
+        cloudAgentSessionId = session.cloud_agent_session_id as CloudAgentSessionId | null;
+      }
+      if (cloudAgentSessionId) {
         return {
           type: 'cloud-agent',
           kiloSessionId,
-          cloudAgentSessionId: session.cloud_agent_session_id as CloudAgentSessionId,
+          cloudAgentSessionId,
         };
       }
       const active = await trpcClient.activeSessions.list.query();
@@ -210,33 +265,8 @@ export function createMobileAgentSessionManager({
       sessionId: CloudAgentSessionId
     ): Promise<{ ticket: string; expiresAt: number }> => {
       const result = await withCloudAgentDiagnostics('getTicket', organizationId, async () => {
-        const token = await getAuthTokenForRequest();
-        const body = {
-          cloudAgentSessionId: sessionId,
-          ...(organizationId ? { organizationId } : {}),
-        };
-        const response = await fetch(
-          `${API_BASE_URL}/api/cloud-agent-next/sessions/stream-ticket`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify(body),
-          }
-        );
-        const data = StreamTicketResponseSchema.parse(await response.json());
-        if (!response.ok) {
-          throw new Error(data.error ?? 'Failed to get stream ticket');
-        }
-        if (!data.ticket) {
-          throw new Error('Missing ticket in stream-ticket response');
-        }
-        if (data.expiresAt === undefined) {
-          throw new Error('Missing expiresAt in stream-ticket response');
-        }
-        return { ticket: data.ticket, expiresAt: data.expiresAt };
+        const ticket = await fetchCloudAgentStreamTicket(sessionId, organizationId);
+        return ticket;
       });
       return result;
     },
@@ -245,17 +275,33 @@ export function createMobileAgentSessionManager({
         trpcClient.cliSessionsV2.get.query({ session_id: id }),
         trpcClient.cliSessionsV2.getSessionMessages.query({ session_id: id }),
       ]);
-      const snapshotInfo = messagesResult.info as Partial<SessionSnapshot['info']>;
+      const snapshotInfo = messagesResult.info as Partial<SessionSnapshot['info']> & {
+        metadata?: unknown;
+      };
+      // The goal lives in the session metadata; project it into `info` so the
+      // fixed goal section survives a snapshot replay (which would otherwise
+      // clobber the goal carried by the live session state).
+      const goal = projectSessionGoal(snapshotInfo.metadata);
       return {
         info: {
           id: snapshotInfo.id ?? sessionData.session_id,
           parentID: snapshotInfo.parentID ?? sessionData.parent_session_id ?? undefined,
           ...(snapshotInfo.model ? { model: snapshotInfo.model } : {}),
+          ...(goal === undefined ? {} : { goal }),
         },
         messages: messagesResult.messages as SessionSnapshot['messages'],
       };
     },
-    fetchSnapshotPage: fetchMobileSessionSnapshotPage,
+    fetchSnapshotPage: async (id: KiloSessionId, options: { cursor?: string }) => {
+      const outcome = await fetchMobileSessionSnapshotPage(id, options);
+      // Only the first page (no cursor) is cached: it holds the newest
+      // messages, which is what a warm open paints before the live refresh.
+      // Best effort — the write never affects the returned page.
+      if (outcome.kind === 'success' && options.cursor === undefined) {
+        void writeSessionTranscriptPage(transcriptOwner, id, outcome);
+      }
+      return outcome;
+    },
     api: {
       send: async input => {
         await withCloudAgentDiagnostics('send', organizationId, async () => {
@@ -402,10 +448,14 @@ export function createMobileAgentSessionManager({
     },
     fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {
       const sessionResult = await fetchSessionWithNotFoundRetry(kiloSessionId);
+      const cloudAgentSessionId =
+        sessionResult.cloud_agent_session_id as CloudAgentSessionId | null;
+      // Memoize the metadata `resolveSession` needs so it never re-reads the row.
+      fetchedMetadata = { sessionId: kiloSessionId, cloudAgentSessionId };
       const rs = sessionResult.runtimeState;
       return {
         kiloSessionId,
-        cloudAgentSessionId: sessionResult.cloud_agent_session_id as CloudAgentSessionId | null,
+        cloudAgentSessionId,
         title: sessionResult.title,
         organizationId: sessionResult.organization_id,
         gitUrl: sessionResult.git_url,

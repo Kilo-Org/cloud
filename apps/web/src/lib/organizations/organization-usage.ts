@@ -67,7 +67,6 @@ export async function getBalanceForOrganizationUser(
     `[getBalanceForOrganizationUser] Starting balance check for user ${userId} in org ${organizationId}`
   );
 
-  // Single query to get user limits, usage, organization balance, require_seats, and verify membership
   const result = await fromDb
     .select({
       microdollar_limit: organization_user_limits.microdollar_limit,
@@ -111,7 +110,6 @@ export async function getBalanceForOrganizationUser(
     )
     .limit(1);
 
-  // If no result, user is not a member of the organization
   if (result.length === 0) {
     const endTime = performance.now();
     const duration = endTime - startTime;
@@ -179,7 +177,6 @@ export async function getBalanceForOrganizationUser(
     return { balance: fromMicrodollars(organization_balance), settings, plan };
   }
 
-  // If user has no limits set, return organization's total balance
   if (microdollar_limit == null) {
     const endTime = performance.now();
     const duration = endTime - startTime;
@@ -190,7 +187,6 @@ export async function getBalanceForOrganizationUser(
     return { balance: fromMicrodollars(organization_balance), settings, plan };
   }
 
-  // User has limits - calculate remaining allowance
   const usageAmount = microdollar_usage || 0;
   const remainingAllowance = microdollar_limit - usageAmount;
 
@@ -397,7 +393,6 @@ export async function updateOrganizationUserLimit(
         )
       );
   } else {
-    // Validate the limit is within acceptable range
     if (dailyUsageLimitUsd < 0 || dailyUsageLimitUsd > MAX_DAILY_LIMIT_USD) {
       throw new Error(`Daily usage limit must be between $0 and $${MAX_DAILY_LIMIT_USD}`);
     }
@@ -451,9 +446,6 @@ export async function getAgentInteractionsPerDay(
     .groupBy(microdollar_usage.kilo_user_id, sql`DATE(${microdollar_usage.created_at})`);
 }
 
-/**
- * Fetch cloud agent sessions per day for given users
- */
 export async function getCloudAgentSessionsPerDay(
   userIds: string[],
   startDate: string,
@@ -476,9 +468,6 @@ export async function getCloudAgentSessionsPerDay(
     .groupBy(sharedCliSessions.kilo_user_id, sql`DATE(${sharedCliSessions.created_at})`);
 }
 
-/**
- * Fetch code review runs per day for given users
- */
 export async function getCodeReviewsPerDay(
   organizationId: Organization['id'],
   userIds: string[],

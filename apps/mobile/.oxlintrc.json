@@ -232,8 +232,13 @@
     {
       "files": ["src/lib/expo-router-linking.mounted.test.tsx"],
       "rules": {
-        "import/no-nodejs-modules": "off",
-        "@typescript-eslint/no-deprecated": "off"
+        "import/no-nodejs-modules": "off"
+      }
+    },
+    {
+      "files": ["src/test/renderer.mounted.test.tsx"],
+      "rules": {
+        "import/no-nodejs-modules": "off"
       }
     },
     {
@@ -272,7 +277,8 @@
         "**/*.test.tsx",
         "**/__tests__/**",
         "**/*test-utils*",
-        "**/*test-helpers*"
+        "**/*test-helpers*",
+        "src/test/**"
       ],
       "rules": {
         "anti-slop/no-chained-type-assertions": "off",

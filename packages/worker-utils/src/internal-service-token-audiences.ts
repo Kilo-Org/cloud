@@ -12,6 +12,8 @@ export const AI_ATTRIBUTION_AUDIENCE = 'ai-attribution';
 export const HTML_DEPLOY_AUDIENCE = 'deploy-builder:html-deploy';
 
 export const BITBUCKET_REPOSITORY_LIST_AUDIENCE = 'git-token-service:bitbucket-repositories';
+export const BITBUCKET_WORKSPACE_ACCESS_TOKEN_AUDIENCE =
+  'git-token-service:bitbucket-workspace-access-token';
 export const BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE =
   'git-token-service:bitbucket-code-review:pull-request';
 export const BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE =

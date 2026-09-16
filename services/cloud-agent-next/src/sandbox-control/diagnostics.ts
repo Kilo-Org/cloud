@@ -5,6 +5,13 @@ export type ControlDiagnosticFields = Record<string, string | number | boolean |
 type ControlDiagnosticOptions = { coalesceIdentity?: string };
 
 export const CONTROL_DIAGNOSTIC_COALESCE_LIMIT = 128;
+
+// Single owner for the diagnostic string shape. `logControlDiagnostic` keeps a
+// string only when it is at most this many allowed charset characters; callers
+// that pre-format a bounded field (for example `packSessionReport`) must use the
+// same two exports so the join cannot be silently redacted.
+export const CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH = 128;
+export const CONTROL_DIAGNOSTIC_STRING_CHARSET = /^[a-zA-Z0-9_.:-]+$/;
 const coalescedDiagnostics = new Map<
   string,
   { fields: ControlDiagnosticFields; stableFields: string; occurrences: number }
@@ -71,7 +78,7 @@ export function diagnosticEventType(value: string): string {
 export function diagnosticCause(value: string): string {
   return CAUSES.has(value)
     ? value.replaceAll(' ', '_')
-    : value.replace(/[^a-zA-Z0-9_.:-]/g, '_').slice(0, 128);
+    : value.replace(/[^a-zA-Z0-9_.:-]/g, '_').slice(0, CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH);
 }
 
 const DELTA_PROGRESS_EVENTS = new Set([
@@ -101,7 +108,11 @@ export function logControlDiagnostic(
     for (const [key, value] of Object.entries(fields).slice(0, 48)) {
       if (!/^[a-zA-Z][a-zA-Z0-9]{0,63}$/.test(key)) continue;
       if (typeof value === 'string') {
-        bounded[key] = /^[a-zA-Z0-9_.:-]{1,128}$/.test(value) ? value : 'redacted';
+        bounded[key] =
+          value.length <= CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH &&
+          CONTROL_DIAGNOSTIC_STRING_CHARSET.test(value)
+            ? value
+            : 'redacted';
       } else if (typeof value === 'number') {
         bounded[key] = Number.isFinite(value)
           ? Math.max(-Number.MAX_SAFE_INTEGER, Math.min(Number.MAX_SAFE_INTEGER, value))

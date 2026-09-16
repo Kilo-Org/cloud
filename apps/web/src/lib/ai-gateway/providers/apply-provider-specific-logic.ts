@@ -238,11 +238,12 @@ export function removeUnsupportedRequestServiceTier(
   kiloExclusiveModel: KiloExclusiveModel | null
 ) {
   const customPricing = getCustomPricing(requestedModel);
-  const reason = customPricing
-    ? 'custom pricing'
-    : kiloExclusiveModel && !kiloExclusiveModel.flags.includes('flex')
-      ? 'non-Flex Kilo-exclusive model'
-      : null;
+  const reason =
+    customPricing && !customPricing.fallbackOnly
+      ? 'non-fallback custom pricing'
+      : kiloExclusiveModel && !kiloExclusiveModel.flags.includes('flex')
+        ? 'non-Flex Kilo-exclusive model'
+        : null;
   const serviceTier = requestToMutate.body.service_tier;
   if (!reason || serviceTier === undefined) {
     return;

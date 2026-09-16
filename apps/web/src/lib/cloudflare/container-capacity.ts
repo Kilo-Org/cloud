@@ -34,6 +34,10 @@ export function containerCapacityForService(service: string): ContainerCapacity 
   }
 }
 
+export function formatContainerCapacity(capacity: ContainerCapacity): string {
+  return `${capacity.vcpu} vCPU / ${capacity.memoryBytes / 1024 ** 3} GiB`;
+}
+
 export function sharedContainerCapacity(services: Set<string>): ContainerCapacity | null {
   let shared: ContainerCapacity | null = null;
   for (const service of services) {

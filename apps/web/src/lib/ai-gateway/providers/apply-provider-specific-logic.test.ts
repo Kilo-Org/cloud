@@ -9,12 +9,12 @@ import {
   removeUnsupportedRequestServiceTier,
 } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
 import {
   ReasoningDetailsTransform,
   type Provider,
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
-import { QWEN37_MAX_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import {
   gpt_5_6_sol_discounted_model,
@@ -112,9 +112,9 @@ describe('applyAnthropicThinkingDefault', () => {
 describe('removeUnsupportedRequestServiceTier', () => {
   it.each([
     {
-      model: QWEN37_MAX_MODEL_ID,
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
       kiloExclusiveModel: null,
-      reason: 'custom pricing',
+      reason: 'non-fallback custom pricing',
     },
     {
       model: gpt_5_6_sol_discounted_model.public_id,

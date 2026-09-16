@@ -934,7 +934,8 @@ export async function rewriteModelResponse({
   const customPricing = getCustomPricing(model);
   const requiresCostRemoval =
     (providerId === 'openrouter' || providerId === 'vercel') &&
-    (isKiloExclusiveFreeModel(model) || customPricing !== undefined);
+    (isKiloExclusiveFreeModel(model) ||
+      (customPricing !== undefined && !customPricing.fallbackOnly));
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   const { vercel_request_id: vercelRequestId } = logging;

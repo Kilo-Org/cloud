@@ -11,7 +11,15 @@ packages:
 
 catalog:
   '@cloudflare/vitest-pool-workers': 0.16.13
+  # The OAuth 2.1 provider the kilo-mcp worker delegates its hand-rolled
+  # authorization/token server to. Pinned exactly; adopted with the KV binding
+  # and zod schemas in the same change.
+  '@cloudflare/workers-oauth-provider': 0.10.3
   '@cloudflare/workers-types': 4.20260605.1
+  # Workers-compatible JSON Schema validator for the kilo-mcp call tool.
+  # AJV cannot run on Workerd: it compiles schemas with `new Function`, which
+  # the Workers runtime forbids. Pinned exactly.
+  '@cfworker/json-schema': 4.1.1
   '@octokit/auth-app': 8.2.0
   # Only for packages that shell out to the `sentry-cli` binary directly (Workers,
   # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume
@@ -195,6 +203,17 @@ patchedDependencies:
   expo-task-manager@57.0.16: patches/expo-task-manager@57.0.16.patch
   expo-widgets@57.0.18: patches/expo-widgets@57.0.18.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
+  # Fabric mounting race: RCTComponentViewFactory registers component views from
+  # the JS thread without the class-map mutex, so a mounting transaction can
+  # dereference an unregistered handle and crash (EXC_BAD_ACCESS 0x18,
+  # KILO-APP-6H; react/react-native#58299). Also synchronizes the
+  # LegacyViewManagerInterop cache. iOS needs buildReactNativeFromSource to
+  # compile this in — see apps/mobile/app.config.ts.
+  # Bounds-guard the unmountChildComponentView assert message. Without it a
+  # stale Fabric child index throws NSRangeException while the assert is being
+  # formatted, which SIGABRTs release builds that link the assert-enabled
+  # prebuilt React core (Kilo-Org/kilocode#14065; react/react-native#57865).
+  react-native@0.86.3: patches/react-native@0.86.3.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

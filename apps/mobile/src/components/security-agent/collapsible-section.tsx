@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui/text';
+import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -33,11 +34,15 @@ export function CollapsibleSection({
 }: Readonly<CollapsibleSectionProps>) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const colors = useThemeColors();
+  const { reducedMotion } = useMotionPolicy();
   const rotation = useSharedValue(defaultExpanded ? 180 : 0);
 
   useEffect(() => {
-    rotation.value = withTiming(expanded ? 180 : 0, { duration: 200 });
-  }, [expanded, rotation]);
+    // Reduced motion jumps the chevron straight to its target angle instead of
+    // a 200ms timing; the layout transition and content fade are dropped below.
+    const target = expanded ? 180 : 0;
+    rotation.value = reducedMotion ? target : withTiming(target, { duration: 200 });
+  }, [expanded, reducedMotion, rotation]);
 
   const chevronStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],
@@ -45,7 +50,7 @@ export function CollapsibleSection({
 
   return (
     <Animated.View
-      layout={LinearTransition.duration(200)}
+      layout={reducedMotion ? undefined : LinearTransition.duration(200)}
       className={cn('gap-2 rounded-lg bg-secondary p-3', className)}
     >
       <Pressable
@@ -64,7 +69,10 @@ export function CollapsibleSection({
         </Animated.View>
       </Pressable>
       {expanded && (
-        <Animated.View entering={FadeIn.duration(150)} className="gap-2">
+        <Animated.View
+          entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
+          className="gap-2"
+        >
           {children}
         </Animated.View>
       )}

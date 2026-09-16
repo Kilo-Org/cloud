@@ -36,6 +36,7 @@
     "cost": "Кошт",
     "discard": "Адкінуць",
     "findings": "Выяўленыя праблемы",
+    "mergeRequest": "merge-запыт",
     "notConnected": "Не падключана",
     "notifications": "Апавяшчэнні",
     "pullRequest": "запыт на зліццё",
@@ -231,6 +232,8 @@
     "voiceInput": "Галасавы ўвод",
     "autoExpandThinking": "Аўтаматычна разгортваць развагі",
     "autoExpandThinkingSubtitle": "Паказваць развагі агента разгорнутымі пасля іх завяршэння.",
+    "hideThinking": "Хаваць падрабязнасці разваг",
+    "hideThinkingSubtitle": "Не паказваць развагі агента на старонцы сеанса.",
     "keepScreenOn": "Не выключаць экран на старонцы сеанса",
     "keepScreenOnSubtitle": "Не выключаць экран, пакуль сеанс актыўны.",
     "appearance": "Знешні выгляд",
@@ -253,7 +256,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Распазнаванне маўлення праз Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Пераўтварайце галасавы ўвод у тэкст з дапамогай мадэлі Kilo Gateway замест распазнавання маўлення на самой прыладзе. Ваш запіс адпраўляецца ў Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Сціскаць выклікі інструментаў",
+    "condenseToolCallsSubtitle": "Збірайце паслядоўныя выклікі інструментаў у адзін радок, які можна адкрыць.",
+    "toolSummaryTranslation": "Перакласці зводкі інструментаў",
+    "toolSummaryTranslationSubtitle": "Адпраўляйце кожную зводку інструмента мадэлі, каб перакласці яе на мову вашай праграмы. Калі пераклад не ўдасца, паказваецца арыгінал.",
+    "toolSummaryTranslationModelUnavailableNotice": "Гэта мадэль больш не прапануецца. Націсніце $t(common.model), каб выбраць іншую."
   },
   "prReview": {
     "pullRequestUnavailable": "Запыт на зліццё недаступны",
@@ -354,6 +362,7 @@
       "merge": "Зліццё",
       "mergeNow": "Зліць зараз",
       "mergePullRequest": "Зліццё запыту",
+      "mergeTermTitle": "Зліць {{term}}",
       "enableAutoMerge": "Уключыць аўтазліццё",
       "disableAutoMerge": "Адключыць аўтазліццё",
       "autoMergeOn": "Аўтазліццё ўключана",
@@ -372,9 +381,12 @@
       "deleteBranchAfterMerge": "Выдаліць галіну пасля зліцця",
       "noEnabledMethods": "У гэтым рэпазіторыі не дазволены ніводны метад зліцця. Папрасі адміністратара дазволіць зліццё з асобным камітам, з аб'яднаннем камітаў або з перабазаваннем.",
       "confirmTitle": "Зліць запыт?",
+      "confirmTitleTerm": "Зліць {{term}}?",
       "confirmMessage": "Твае змены будуць уключаны ў базавую галіну.",
       "enableAutoMergeConfirmTitle": "Уключыць аўтазліццё?",
       "enableAutoMergeConfirmMessage": "GitHub аўтаматычна зліе гэты запыт, калі ўсе абавязковыя праверкі завершацца паспяхова.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} будзе аўтаматычна зліты пасля паспяховага выканання канвеера.",
+      "enableAutoMergeDescriptionTerm": "GitLab аўтаматычна злівае гэты {{term}} пасля паспяховага выканання канвеера.",
       "forbidden": "У цябе няма дазволу зліваць гэты запыт.",
       "cannotMerge": "Гэты запыт на зліццё немагчыма зліць у яго бягучым стане.",
       "couldNotMerge": "Не атрымалася зліць запыт.",
@@ -385,7 +397,8 @@
       },
       "terminal": {
         "alreadyMerged": "Ужо зліта",
-        "closed": "Гэты запыт на зліццё закрыты"
+        "closed": "Гэты запыт на зліццё закрыты",
+        "closedMergeRequest": "Гэты merge-запыт закрыты"
       },
       "partialSuccessBanner": {
         "body": "Не атрымалася выдаліць галіну: {{reason}}.",
@@ -410,6 +423,20 @@
         "behindDetail": "Зыходная галіна адстае ад базавай. Перад зліццём выканай перабазаванне або абнаві галіну.",
         "notMergeableTitle": "Гэты запыт пакуль немагчыма зліць",
         "notMergeableDetail": "GitHub паведаміў пра наступны стан магчымасці зліцця: {{state}}."
+      },
+      "restrictions": {
+        "title": "Абмежаванні на зліццё",
+        "approvalsRequired_one": "Патрабуецца {{displayCount}} зацвярджэнне",
+        "approvalsRequired_other": "Патрабуецца {{displayCount}} зацвярджэнняў",
+        "pipelineMustSucceed": "Перад зліццём канвеер павінен завяршыцца паспяхова.",
+        "approvalsRequired_many": "Патрабуецца {{displayCount}} зацвярджэнняў",
+        "approvalsRequired_few": "Патрабуецца {{displayCount}} зацвярджэння"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Канвеер завяршаецца памылкай на апошнім каміце.",
+        "pendingPipeline": "Канвеер яшчэ выконваецца на апошнім каміце.",
+        "permission": "У вас няма правоў на зліццё {{term}}.",
+        "draft": "Перад зліццём перавядзіце {{term}} у стан гатоўнасці да агляду."
       },
       "methodLabels": {
         "merge": "Стварыць каміт зліцця",
@@ -513,7 +540,8 @@
         "outdatedOnLines": "Састарэлы каментар: {{lines}}",
         "outdatedOnPath": "Састарэлы каментар: {{path}}"
       },
-      "deletedUser": "выдалены карыстальнік"
+      "deletedUser": "выдалены карыстальнік",
+      "replyForbiddenTerm": "У вас няма правоў адказваць у {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Не атрымалася адкрыць налады праграмы GitHub.",
     "installKiloGitHubApp": "Усталяваць праграму Kilo для GitHub",
@@ -525,17 +553,19 @@
     "reviewPullRequest": "Праверыць запыт на зліццё",
     "headLine": "{{counts}} · апошні каміт {{sha}}",
     "entry": {
-      "eyebrow": "Адкрый запыт на зліццё па URL.",
-      "pastePrLink": "Уставіць спасылку на PR",
-      "noRecentPrs": "Няма нядаўніх PR",
-      "noRecentPrsDescription": "Устаў вышэй спасылку на PR, каб пачаць праверку кода. У наступны раз гэты PR з'явіцца тут.",
+      "eyebrow": "Адкрыйце запыт на зліццё або merge-запыт па URL",
+      "pastePrLink": "Устаўце спасылку на запыт на зліццё або merge-запыт",
+      "noRecentPrs": "Няма нядаўніх аглядаў",
+      "noRecentPrsDescription": "Каб пачаць агляд, устаўце спасылку вышэй — наступным разам ён з'явіцца тут.",
       "couldNotLoad": "Не атрымалася загрузіць.",
       "removeFromRecentsTitle": "Выдаліць са спіса нядаўніх?",
-      "removeFromRecentsMessage": "Гэты запыт на зліццё знікне з твайго спіса нядаўніх.",
+      "removeFromRecentsMessage": "Гэты агляд будзе выдалены са спісу нядаўніх.",
       "removeRecentAccessibility": "Выдаліць {{repo}} са спіса нядаўніх",
-      "urlAccessibility": "URL запыту на зліццё на GitHub",
-      "clearLink": "Ачысціць спасылку на запыт на зліццё",
-      "pasteLink": "Уставіць спасылку на запыт на зліццё",
+      "urlAccessibility": "Увядзіце URL запыту на зліццё або merge-запыту",
+      "urlPlaceholder": "URL запыту на зліццё або merge-запыту",
+      "openAccessibility": "Адкрыць запыт на зліццё або merge-запыт",
+      "clearLink": "Ачысціць спасылку",
+      "pasteLink": "Уставіць спасылку на запыт на зліццё або merge-запыт",
       "open": "Адкрыць"
     },
     "checks": {
@@ -584,9 +614,15 @@
     "connect": {
       "checkFailedTitle": "Не атрымалася праверыць падключэнне да GitHub.",
       "checkFailedMessage": "Стан уваходу недаступны, пакуль даныя не загрузяцца.",
+      "checkFailedTitleGitLab": "Не ўдалося праверыць падключэнне да GitLab",
+      "checkFailedTitleBitbucket": "Не ўдалося праверыць падключэнне да Bitbucket",
+      "providerCheckFailedMessage": "Стан падключэння недаступны, пакуль гэта не загрузіцца.",
       "reconnectTitle": "Падключыць GitHub зноў",
       "reconnectDescription": "Тваё падключэнне да GitHub адклікана. Падключыся зноў, каб працягнуць правяраць запыты на зліццё з мабільнай прылады.",
-      "description": "Падключы свой уліковы запіс GitHub, каб правяраць запыты на зліццё з мабільнай прылады."
+      "description": "Падключы свой уліковы запіс GitHub, каб правяраць запыты на зліццё з мабільнай прылады.",
+      "gitlabDescription": "Падключыце ўліковы запіс GitLab, каб разглядаць merge-запыты з мабільнай прылады.",
+      "bitbucketDescription": "Падключыце Bitbucket да гэтай арганізацыі, каб разглядаць запыты на зліццё з мабільнай прылады.",
+      "bitbucketOrgOnlyDescription": "Выберыце арганізацыю ў профілі, каб разглядаць яе запыты на зліццё Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -610,7 +646,10 @@
     },
     "reconnectNotice": {
       "title": "Тэрмін дзеяння падключэння да GitHub скончыўся.",
-      "message": "Тваё падключэнне да GitHub больш не дзейнічае. Правер яго яшчэ раз — пры патрэбе табе прапануюць падключыцца зноў."
+      "message": "Тваё падключэнне да GitHub больш не дзейнічае. Правер яго яшчэ раз — пры патрэбе табе прапануюць падключыцца зноў.",
+      "gitlabTitle": "Тэрмін дзеяння падключэння да GitLab скончыўся",
+      "bitbucketTitle": "Тэрмін дзеяння падключэння да Bitbucket скончыўся",
+      "providerMessage": "Вашае падключэнне да {{provider}} больш не сапраўднае. Праверце падключэнне яшчэ раз — пры неабходнасці вам прапануюць падключыцца зноў."
     },
     "eventChips": {
       "comment": "Каментаваць",
@@ -682,7 +721,7 @@
       "emptyLine": "(пуста)"
     },
     "linkPasteClipboardEmpty": "Буфер абмену пусты.",
-    "linkPasteNotAPullRequest": "Гэта не спасылка на запыт на зліццё на GitHub.",
+    "linkPasteNotAPullRequest": "Гэта не спасылка на запыт на зліццё або merge-запыт",
     "announce": {
       "commentPosted": "Каментар апублікаваны",
       "reviewSubmitted": "Праверка кода адпраўлена",
@@ -691,6 +730,7 @@
     "mutationError": {
       "commentNotPosted": "Немагчыма апублікаваць гэты каментар. Магчыма, вылучаны радок змяніўся або PR абнавілі.",
       "reviewNotSubmitted": "Немагчыма адправіць гэтую праверку кода ў яе бягучым выглядзе. Магчыма, PR змяніўся або ты спрабуеш праверыць уласны запыт на зліццё.",
+      "reviewNotSubmittedTerm": "Гэты агляд немагчыма адправіць як ёсць. {{term}} магчыма змяніўся, або вы не можаце разглядаць уласны {{term}}.",
       "couldNotPostComment": "Не атрымалася апублікаваць каментар.",
       "couldNotSubmitReview": "Не атрымалася адправіць праверку кода. Правер падключэнне да інтэрнэту і паспрабуй яшчэ раз."
     },
@@ -698,9 +738,31 @@
       "couldNotReply": "Не атрымалася адказаць.",
       "couldNotCompleteAction": "Не атрымалася выканаць гэтае дзеянне.",
       "mergeResultDefaultError": "GitHub не завяршыў зліццё.",
+      "mergeResultNotCompleted": "{{term}} не быў зліты. Праверце яго стан і паўтарыце спробу.",
       "ambiguous": "Не атрымалася пацвердзіць вынік — правер PR перад паўторнай спробай.",
       "persistenceFailed": "Не атрымалася запісаць гэтае дзеянне. Паспрабуй яшчэ раз пазней.",
       "forbidden": "Доступ забаронены."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Недаступна ў гэтага правайдара",
+        "accessibility": "Недаступна ў гэтага правайдара: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Запыт на зліццё",
+      "mergeRequest": "Merge-запыт",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Падзяліцца merge-запытам",
+      "viewOnProvider": "Адкрыць у {{provider}}",
+      "mergeRequestUnavailable": "Merge-запыт недаступны",
+      "unavailableDescription": "Магчыма, ён быў выдалены або ў вас няма да яго доступу.",
+      "accessDeniedMergeRequest": "У вас няма правоў на прагляд гэтага merge-запыту.",
+      "couldNotLoadMergeRequest": "Не ўдалося загрузіць merge-запыт",
+      "discussionAccessDenied": "У вас няма правоў на прагляд абмеркавання гэтага merge-запыту.",
+      "discussionUnavailableMessage": "Гэты merge-запыт магчыма, быў выдалены.",
+      "noDiscussionDescription": "У гэтым merge-запыце няма галін агляду ці каментароў размовы.",
+      "noFilesChangedDescription": "У гэтым merge-запыце няма змен файлаў."
     }
   },
   "notifications": {
@@ -2028,12 +2090,48 @@
       "connectionLost": "Сувязь страчана",
       "retryConnection": "Паўтарыць падключэнне"
     },
+    "goal": {
+      "title": "Мэта",
+      "statusActive": "Актыўная мэта",
+      "statusPaused": "Прыпыненая мэта",
+      "statusComplete": "Мэта выканана",
+      "statusBlocked": "Мэта заблакавана",
+      "edit": "Рэдагаваць мэту",
+      "remove": "Выдаліць мэту",
+      "pause": "Прыпыніць мэту",
+      "resume": "Працягнуць мэту",
+      "editPlaceholder": "Апішыце мэту",
+      "removeConfirmTitle": "Выдаліць мэту?",
+      "removeConfirmMessage": "CLI ачышчае мэту гэтага сеансу.",
+      "updateFailed": "Не ўдалося абнавіць мэту.",
+      "sectionAccessibility": "{{status}}. Мэта: {{text}}"
+    },
     "newSession": {
+      "recentlyUsed": "Нядаўна выкарыстаныя",
+      "couldNotLoadGithubRepositories": "Не ўдалося загрузіць рэпазіторыі GitHub.",
+      "couldNotLoadGitlabRepositories": "Не ўдалося загрузіць рэпазіторыі GitLab.",
+      "couldNotLoadBitbucketRepositories": "Не ўдалося загрузіць рэпазіторыі Bitbucket.",
       "connectGithubDescription": "Падключыце GitHub у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
+      "connectGitlabDescription": "Падключыце GitLab у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
+      "connectBitbucketDescription": "Падключыце Bitbucket у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
       "openGithub": "Адкрыць GitHub",
+      "openGitlab": "Адкрыць GitLab",
+      "openBitbucket": "Адкрыць Bitbucket",
       "refreshRepositories": "Абнавіць рэпазіторыі",
       "githubConnected": "GitHub падключаны",
+      "gitlabConnected": "GitLab падключаны",
       "noRepositoriesVisible": "Рэпазіторыі не адлюстроўваюцца. Праверце, ці мае праграма Kilo для GitHub доступ да іх, і абнавіце спіс.",
+      "noRepositoriesVisibleGitlab": "Рэпазіторыі не адлюстроўваюцца. Праверце доступ да рэпазіторыяў GitLab і абнавіце спіс.",
+      "noRepositoriesVisibleBitbucket": "Рэпазіторыі не адлюстроўваюцца. Праверце доступ да рэпазіторыяў Bitbucket і абнавіце спіс.",
+      "bitbucketOrganizationsOnly": "Bitbucket даступны толькі для арганізацый.",
+      "branchPickerTitle": "Выбраць галіну",
+      "branchDefault": "Прадвызначаная",
+      "branchAccessibility": "Галіна: {{label}}",
+      "branchLoading": "Загрузка галін",
+      "branchLoadError": "Не ўдалося загрузіць галіны",
+      "branchUnavailable": "Галіны недаступныя для гэтага рэпазіторыя. Праверце доступ у правайдара, затым выберыце іншы рэпазіторый.",
+      "branchEmpty": "Няма даступных галін",
+      "branchPlaceholder": "Выберыце галіну",
       "runOnWithTarget": "Асяроддзе запуску: {{target}}",
       "environment": "Асяроддзе",
       "couldNotLoadEnvironment": "Не ўдалося загрузіць ваша асяроддзе.",
@@ -2054,24 +2152,13 @@
       "couldNotRefreshRepositories": "Не ўдалося абнавіць рэпазіторыі. Паспрабуйце яшчэ раз.",
       "discardDraftTitle": "Выдаліць чарнавік?",
       "discardDraftMessage": "Ваш запыт будзе страчаны.",
+      "discardWithUploadsMessage": "Ваш запыт і загружаныя файлы, не прымацаваныя да адпраўленых паведамленняў, будуць выдаленыя.",
       "discardFailed": "Не ўдалося выдаліць чарнавік. Паспрабуйце яшчэ раз.",
       "remoteHint": "Выканайце `kilo remote` на сваім камп'ютары або `/remote` у актыўным сеансе CLI, каб кіраваць лакальным працэсам kilo.",
-      "connectBitbucketDescription": "Падключыце Bitbucket у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
-      "connectGitlabDescription": "Падключыце GitLab у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
-      "couldNotLoadBitbucketRepositories": "Не ўдалося загрузіць рэпазіторыі Bitbucket.",
-      "couldNotLoadGithubRepositories": "Не ўдалося загрузіць рэпазіторыі GitHub.",
-      "couldNotLoadGitlabRepositories": "Не ўдалося загрузіць рэпазіторыі GitLab.",
-      "gitlabConnected": "GitLab падключаны",
-      "noRepositoriesVisibleBitbucket": "Рэпазіторыі не адлюстроўваюцца. Праверце доступ да рэпазіторыяў Bitbucket і абнавіце спіс.",
-      "noRepositoriesVisibleGitlab": "Рэпазіторыі не адлюстроўваюцца. Праверце доступ да рэпазіторыяў GitLab і абнавіце спіс.",
-      "openBitbucket": "Адкрыць Bitbucket",
-      "openGitlab": "Адкрыць GitLab",
-      "recentlyUsed": "Нядаўна выкарыстаныя",
       "continueFrom": "Працягваецца сеанс «{{title}}».",
       "importingSession": "Імпартаванне сеанса",
       "cliCannotContinue": "Гэты CLI не падтрымлівае працяг сеанса. Выберыце Cloud Agent або іншы CLI.",
-      "importFailed": "Не ўдалося імпартаваць гэты сеанс.",
-      "discardWithUploadsMessage": "Ваш запыт і загружаныя файлы, не прымацаваныя да адпраўленых паведамленняў, будуць выдаленыя."
+      "importFailed": "Не ўдалося імпартаваць гэты сеанс."
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл.",
@@ -2481,6 +2568,11 @@
       "stepsCount_few": "{{steps}} крокі",
       "stepsCount_many": "{{steps}} крокаў"
     },
+    "autoApprove": {
+      "title": "Аўтаматычнае адабрэнне",
+      "description": "Аўтаматычна ўхваляць запыты на дазвол для гэтага сеансу. Пасля гэтага інструменты запускаюцца без запыту.",
+      "unavailable": "Гэты сеанс не можа атрымліваць запыты на дазвол."
+    },
     "prBadge": {
       "open": "адкрыты запыт на зліццё",
       "closed": "закрыты запыт на зліццё",
@@ -2511,6 +2603,10 @@
       "tapToListHint": "Націсніце на папку, каб убачыць яе змесціва.",
       "unsupportedDescription": "Гэты CLI не падтрымлівае прагляд папак. Кнопка «Гатова» пакідае папку запуску, а «Пачаць сеанс» запускае ў ёй сеанс.",
       "unsupportedTitle": "Спіс папак недаступны"
+    },
+    "toolRun": {
+      "sheetTitle": "Выклікі інструментаў",
+      "condensedLabel": "{{itemCount}} элементаў; {{last}}"
     }
   },
   "bootstrap": {
@@ -2623,7 +2719,10 @@
     "gatewayModelUnavailable": "Гэта мадэль распазнавання маўлення недаступная. Абярыце іншую ў наладах.",
     "gatewayModelUnavailableNotice": "Гэта мадэль больш не прапануецца. Націсніце $t(transcriptionModel.title), каб выбраць іншую.",
     "gatewaySignInRequired": "Увайдзіце, каб карыстацца распазнаваннем маўлення праз Kilo Gateway.",
-    "gatewayNoModel": "Спачатку абярыце мадэль распазнавання маўлення ў наладах."
+    "gatewayNoModel": "Спачатку абярыце мадэль распазнавання маўлення ў наладах.",
+    "testTitle": "Праверыць галасавы ўвод",
+    "testPlaceholder": "Дакраніцеся да мікрафона і пачніце гаварыць.",
+    "testClear": "Ачысціць тэкст"
   },
   "share": {
     "title": "Адпраўка ў Kilo",
@@ -3014,5 +3113,31 @@
     "emptyTitle": "Няма мадэляў распазнавання маўлення",
     "emptyDescription": "Зараз Kilo Gateway не прапануе мадэляў распазнавання маўлення.",
     "loadFailed": "Не атрымалася загрузіць мадэлі распазнавання маўлення."
+  },
+  "voiceLanguage": {
+    "title": "Мова галасавога ўводу",
+    "automatic": "Аўтаматычна",
+    "loadFailed": "Не ўдалося загрузіць мовы, якія падтрымлівае гэта прылада.",
+    "emptyTitle": "Няма падтрымліваемых моў",
+    "emptyDescription": "Распазнаванне маўлення гэтай прылады не паведамляе ніводнай падтрымліваемай мовы."
+  },
+  "tour": {
+    "eyebrow": "Хуткі агляд",
+    "forkTitle": "Дзе вы хацелі б запускаць Kilo?",
+    "forkSubtitle": "Выберыце, дзе Kilo будзе працаваць у вашым першым сеансе.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Запускайце Kilo ў асобленым воблачным асяроддзі, не ўсталёўваючы нічога.",
+    "remoteOptionTitle": "Ваш камп'ютар",
+    "remoteOptionBody": "Запускайце Kilo на ўласнай машыне праз CLI `kilo remote`.",
+    "skip": "Прапусціць агляд",
+    "tutorialLabel": "Навучанне",
+    "remoteTitle": "Пачніце свой першы аддалены сеанс",
+    "remoteBody": "Падключыце свой камп'ютар, а затым пачніце сеанс адсюль.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Яшчэ няма падключанага камп'ютара",
+    "remoteEmptyBody": "Каб падключыць яго, выканайце `kilo remote` на сваім камп'ютары.",
+    "remoteFound": "Камп'ютар падключаны",
+    "checkAgain": "Праверыць яшчэ раз",
+    "networkError": "$t(authErrors.networkError)"
   }
 }

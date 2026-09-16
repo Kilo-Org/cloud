@@ -264,11 +264,6 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     url: 'https://llm.chutes.ai/v1/models',
   }),
   openAICompatibleFetcher({
-    providerId: 'crofai',
-    label: 'CrofAI',
-    url: 'https://crof.ai/v1/models',
-  }),
-  openAICompatibleFetcher({
     providerId: 'orcarouter',
     label: 'OrcaRouter',
     url: 'https://api.orcarouter.ai/v1/models',

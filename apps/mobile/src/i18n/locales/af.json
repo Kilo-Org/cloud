@@ -3063,6 +3063,7 @@
     "newAgent": "Nuwe agent",
     "approving": "Besig om goed te keur...",
     "couldNotApprove": "Kon nie goedkeur nie",
+    "couldNotStart": "Kon nie begin nie",
     "channelName": "Aktiewe agente",
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien."
   },

@@ -3063,6 +3063,7 @@
     "newAgent": "Wakala mpya",
     "approving": "Inaidhinisha...",
     "couldNotApprove": "Imeshindwa kuidhinisha",
+    "couldNotStart": "Imeshindwa kuanza",
     "channelName": "Mawakala wanaofanya kazi",
     "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa."
   },

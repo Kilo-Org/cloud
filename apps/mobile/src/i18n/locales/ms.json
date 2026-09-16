@@ -3063,6 +3063,7 @@
     "newAgent": "Ejen baharu",
     "approving": "Meluluskan...",
     "couldNotApprove": "Gagal meluluskan",
+    "couldNotStart": "Gagal memulakan",
     "channelName": "Ejen aktif",
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci."
   },

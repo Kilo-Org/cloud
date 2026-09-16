@@ -3132,6 +3132,7 @@
     "newAgent": "Gníomhaire nua",
     "approving": "Á cheadú...",
     "couldNotApprove": "Níorbh fhéidir ceadú",
+    "couldNotStart": "Níorbh fhéidir tosú",
     "channelName": "Gníomhairí gníomhacha",
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála."
   },

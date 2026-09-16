@@ -3063,6 +3063,7 @@
     "newAgent": "Ny agent",
     "approving": "Godkjenner...",
     "couldNotApprove": "Kunne ikke godkjenne",
+    "couldNotStart": "Kunne ikke starte",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
   },

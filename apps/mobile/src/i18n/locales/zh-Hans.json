@@ -3063,6 +3063,7 @@
     "newAgent": "新建智能体",
     "approving": "正在批准...",
     "couldNotApprove": "无法批准",
+    "couldNotStart": "无法启动",
     "channelName": "运行中的智能体",
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。"
   },

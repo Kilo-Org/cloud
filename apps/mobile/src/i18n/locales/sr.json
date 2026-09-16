@@ -3086,6 +3086,7 @@
     "newAgent": "Novi agent",
     "approving": "Odobrava se...",
     "couldNotApprove": "Odobravanje nije uspelo",
+    "couldNotStart": "Pokretanje nije uspelo",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu."
   },

@@ -3155,6 +3155,7 @@
     "newAgent": "Asiant newydd",
     "approving": "Yn cymeradwyo...",
     "couldNotApprove": "Methwyd cymeradwyo",
+    "couldNotStart": "Methwyd dechrau",
     "channelName": "Asiantau gweithredol",
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo."
   },

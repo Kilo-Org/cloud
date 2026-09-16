@@ -3109,6 +3109,7 @@
     "newAgent": "Naujas agentas",
     "approving": "Tvirtinama...",
     "couldNotApprove": "Nepavyko patvirtinti",
+    "couldNotStart": "Nepavyko paleisti",
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus."
   },

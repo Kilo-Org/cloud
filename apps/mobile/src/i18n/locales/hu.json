@@ -3063,6 +3063,7 @@
     "newAgent": "Új ügynök",
     "approving": "Jóváhagyás folyamatban...",
     "couldNotApprove": "Nem sikerült jóváhagyni",
+    "couldNotStart": "Nem sikerült elindítani",
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
   },

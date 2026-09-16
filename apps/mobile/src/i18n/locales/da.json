@@ -3063,6 +3063,7 @@
     "newAgent": "Ny agent",
     "approving": "Godkender...",
     "couldNotApprove": "Kunne ikke godkende",
+    "couldNotStart": "Kunne ikke starte",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen."
   },

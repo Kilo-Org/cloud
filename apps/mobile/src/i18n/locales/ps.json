@@ -3063,6 +3063,7 @@
     "newAgent": "نوی اجنټ",
     "approving": "منظور کېږي...",
     "couldNotApprove": "منظور نه شو",
+    "couldNotStart": "پیل نه شو",
     "channelName": "فعال اجنټان",
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ."
   },

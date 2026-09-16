@@ -3063,6 +3063,7 @@
     "newAgent": "I-ejenti entsha",
     "approving": "Kuyagunyaza...",
     "couldNotApprove": "Akukwazi ukugunyaza",
+    "couldNotStart": "Akukwazi ukuqala",
     "channelName": "Ama-ejenti asebenzayo",
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe."
   },

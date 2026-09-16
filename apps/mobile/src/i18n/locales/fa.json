@@ -3063,6 +3063,7 @@
     "newAgent": "عامل جدید",
     "approving": "در حال تأیید...",
     "couldNotApprove": "تأیید نشد",
+    "couldNotStart": "شروع نشد",
     "channelName": "عامل‌های فعال",
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید."
   },

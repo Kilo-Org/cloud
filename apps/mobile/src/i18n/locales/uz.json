@@ -3063,6 +3063,7 @@
     "newAgent": "Yangi agent",
     "approving": "Tasdiqlanmoqda...",
     "couldNotApprove": "Tasdiqlab bo'lmadi",
+    "couldNotStart": "Boshlab bo'lmadi",
     "channelName": "Faol agentlar",
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing."
   },

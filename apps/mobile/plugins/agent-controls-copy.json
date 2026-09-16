@@ -1,0 +1,524 @@
+{
+  "af": {
+    "newAgent": "Nuwe agent",
+    "newAgentDescription": "Begin 'n nuwe agent",
+    "openWaitingAgent": "Wagtende agent",
+    "openWaitingAgentDescription": "Maak die agent oop wat op inset wag"
+  },
+  "am": {
+    "newAgent": "አዲስ ወኪል",
+    "newAgentDescription": "አዲስ ወኪል ይጀምራል",
+    "openWaitingAgent": "የሚጠብቅ ወኪል",
+    "openWaitingAgentDescription": "ግብዓት የሚጠብቀውን ወኪል ይከፍታል"
+  },
+  "ar": {
+    "newAgent": "وكيل جديد",
+    "newAgentDescription": "يبدأ وكيلًا جديدًا",
+    "openWaitingAgent": "وكيل في الانتظار",
+    "openWaitingAgentDescription": "يفتح الوكيل الذي ينتظر الإدخال"
+  },
+  "az": {
+    "newAgent": "Yeni agent",
+    "newAgentDescription": "Yeni agent başladır",
+    "openWaitingAgent": "Gözləyən agent",
+    "openWaitingAgentDescription": "Giriş gözləyən agenti açır"
+  },
+  "be": {
+    "newAgent": "Новы агент",
+    "newAgentDescription": "Пачынае новага агента",
+    "openWaitingAgent": "Агент у чаканні",
+    "openWaitingAgentDescription": "Адкрывае агента, які чакае ўводу"
+  },
+  "bg": {
+    "newAgent": "Нов агент",
+    "newAgentDescription": "Стартира нов агент",
+    "openWaitingAgent": "Чакащ агент",
+    "openWaitingAgentDescription": "Отваря агента, който чака въвеждане"
+  },
+  "bn": {
+    "newAgent": "নতুন এজেন্ট",
+    "newAgentDescription": "নতুন এজেন্ট শুরু করে",
+    "openWaitingAgent": "অপেক্ষারত এজেন্ট",
+    "openWaitingAgentDescription": "ইনপুটের জন্য অপেক্ষারত এজেন্ট খোলে"
+  },
+  "bs": {
+    "newAgent": "Novi agent",
+    "newAgentDescription": "Pokreće novog agenta",
+    "openWaitingAgent": "Agent na čekanju",
+    "openWaitingAgentDescription": "Otvara agenta koji čeka unos"
+  },
+  "ca": {
+    "newAgent": "Agent nou",
+    "newAgentDescription": "Inicia un agent nou",
+    "openWaitingAgent": "Agent en espera",
+    "openWaitingAgentDescription": "Obre l'agent que espera dades"
+  },
+  "ckb": {
+    "newAgent": "ئەجێنتی نوێ",
+    "newAgentDescription": "ئەجێنتێکی نوێ دەستپێدەکات",
+    "openWaitingAgent": "ئەجێنتی چاوەڕوان",
+    "openWaitingAgentDescription": "ئەجێنتە چاوەڕوانەکە دەکاتەوە کە چاوەڕوانی داخڵکردنە"
+  },
+  "cs": {
+    "newAgent": "Nový agent",
+    "newAgentDescription": "Spustí nového agenta",
+    "openWaitingAgent": "Čekající agent",
+    "openWaitingAgentDescription": "Otevře agenta čekajícího na vstup"
+  },
+  "cy": {
+    "newAgent": "Asiant newydd",
+    "newAgentDescription": "Yn dechrau asiant newydd",
+    "openWaitingAgent": "Asiant yn aros",
+    "openWaitingAgentDescription": "Yn agor yr asiant sy'n aros am fewnbwn"
+  },
+  "da": {
+    "newAgent": "Ny agent",
+    "newAgentDescription": "Starter en ny agent",
+    "openWaitingAgent": "Ventende agent",
+    "openWaitingAgentDescription": "Åbner agenten, der venter på input"
+  },
+  "de": {
+    "newAgent": "Neuer Agent",
+    "newAgentDescription": "Startet einen neuen Agenten",
+    "openWaitingAgent": "Wartender Agent",
+    "openWaitingAgentDescription": "Öffnet den Agenten, der auf Eingaben wartet"
+  },
+  "el": {
+    "newAgent": "Νέος πράκτορας",
+    "newAgentDescription": "Ξεκινά έναν νέο πράκτορα",
+    "openWaitingAgent": "Πράκτορας σε αναμονή",
+    "openWaitingAgentDescription": "Ανοίγει τον πράκτορα που περιμένει δεδομένα"
+  },
+  "en": {
+    "newAgent": "New Agent",
+    "newAgentDescription": "Starts a new agent",
+    "openWaitingAgent": "Waiting Agent",
+    "openWaitingAgentDescription": "Opens the agent waiting for input"
+  },
+  "es": {
+    "newAgent": "Nuevo agente",
+    "newAgentDescription": "Inicia un agente nuevo",
+    "openWaitingAgent": "Agente en espera",
+    "openWaitingAgentDescription": "Abre el agente que espera datos"
+  },
+  "et": {
+    "newAgent": "Uus agent",
+    "newAgentDescription": "Alustab uut agenti",
+    "openWaitingAgent": "Ootav agent",
+    "openWaitingAgentDescription": "Avab agenti, mis ootab sisendit"
+  },
+  "eu": {
+    "newAgent": "Agente berria",
+    "newAgentDescription": "Agente berri bat hasten du",
+    "openWaitingAgent": "Zain dagoen agentea",
+    "openWaitingAgentDescription": "Sarrera zain dagoen agentea irekitzen du"
+  },
+  "fa": {
+    "newAgent": "عامل جدید",
+    "newAgentDescription": "یک عامل جدید را شروع می‌کند",
+    "openWaitingAgent": "عامل در انتظار",
+    "openWaitingAgentDescription": "عاملی را که منتظر ورودی است باز می‌کند"
+  },
+  "fi": {
+    "newAgent": "Uusi agentti",
+    "newAgentDescription": "Aloittaa uuden agentin",
+    "openWaitingAgent": "Odottava agentti",
+    "openWaitingAgentDescription": "Avaa agentin, joka odottaa syötettä"
+  },
+  "fil": {
+    "newAgent": "Bagong agent",
+    "newAgentDescription": "Nagsisimula ng bagong agent",
+    "openWaitingAgent": "Naghihintay na agent",
+    "openWaitingAgentDescription": "Binubuksan ang agent na naghihintay ng input"
+  },
+  "fr": {
+    "newAgent": "Nouvel agent",
+    "newAgentDescription": "Démarre un nouvel agent",
+    "openWaitingAgent": "Agent en attente",
+    "openWaitingAgentDescription": "Ouvre l'agent en attente de saisie"
+  },
+  "ga": {
+    "newAgent": "Gníomhaire nua",
+    "newAgentDescription": "Tosaíonn gníomhaire nua",
+    "openWaitingAgent": "Gníomhaire ag fanacht",
+    "openWaitingAgentDescription": "Osclaíonn an gníomhaire atá ag fanacht le hionchur"
+  },
+  "gl": {
+    "newAgent": "Axente novo",
+    "newAgentDescription": "Inicia un axente novo",
+    "openWaitingAgent": "Axente en espera",
+    "openWaitingAgentDescription": "Abre o axente que espera datos"
+  },
+  "gu": {
+    "newAgent": "નવો એજન્ટ",
+    "newAgentDescription": "નવો એજન્ટ શરૂ કરે છે",
+    "openWaitingAgent": "પ્રતીક્ષારત એજન્ટ",
+    "openWaitingAgentDescription": "ઇનપુટની પ્રતીક્ષા કરતો એજન્ટ ખોલે છે"
+  },
+  "ha": {
+    "newAgent": "Sabon wakili",
+    "newAgentDescription": "Yana fara sabon wakili",
+    "openWaitingAgent": "Wakili mai jira",
+    "openWaitingAgentDescription": "Yana buɗe wakilin da ke jiran bayani"
+  },
+  "he": {
+    "newAgent": "סוכן חדש",
+    "newAgentDescription": "מתחיל סוכן חדש",
+    "openWaitingAgent": "סוכן בהמתנה",
+    "openWaitingAgentDescription": "פותח את הסוכן שממתין לקלט"
+  },
+  "hi": {
+    "newAgent": "नया एजेंट",
+    "newAgentDescription": "नया एजेंट शुरू करता है",
+    "openWaitingAgent": "प्रतीक्षारत एजेंट",
+    "openWaitingAgentDescription": "इनपुट की प्रतीक्षा कर रहे एजेंट को खोलता है"
+  },
+  "hr": {
+    "newAgent": "Novi agent",
+    "newAgentDescription": "Pokreće novog agenta",
+    "openWaitingAgent": "Agent na čekanju",
+    "openWaitingAgentDescription": "Otvara agenta koji čeka unos"
+  },
+  "ht": {
+    "newAgent": "Nouvo ajans",
+    "newAgentDescription": "Kòmanse yon nouvo ajans",
+    "openWaitingAgent": "Ajans k ap tann",
+    "openWaitingAgentDescription": "Louvri ajans k ap tann antre"
+  },
+  "hu": {
+    "newAgent": "Új ügynök",
+    "newAgentDescription": "Új ügynököt indít",
+    "openWaitingAgent": "Várakozó ügynök",
+    "openWaitingAgentDescription": "Megnyitja a bevitelre váró ügynököt"
+  },
+  "hy": {
+    "newAgent": "Նոր գործակալ",
+    "newAgentDescription": "Սկսում է նոր գործակալ",
+    "openWaitingAgent": "Սպասող գործակալ",
+    "openWaitingAgentDescription": "Բացում է մուտքագրման սպասող գործակալին"
+  },
+  "id": {
+    "newAgent": "Agen baru",
+    "newAgentDescription": "Memulai agen baru",
+    "openWaitingAgent": "Agen menunggu",
+    "openWaitingAgentDescription": "Membuka agen yang menunggu masukan"
+  },
+  "ig": {
+    "newAgent": "Onye ọrụ ọhụrụ",
+    "newAgentDescription": "Na-amalite onye ọrụ ọhụrụ",
+    "openWaitingAgent": "Onye ọrụ na-eche",
+    "openWaitingAgentDescription": "Na-emepe onye ọrụ na-eche ntinye"
+  },
+  "is": {
+    "newAgent": "Nýtt umboð",
+    "newAgentDescription": "Byrjar nýtt umboð",
+    "openWaitingAgent": "Umboð í bið",
+    "openWaitingAgentDescription": "Opnar umboðið sem bíður inntaks"
+  },
+  "it": {
+    "newAgent": "Nuovo agente",
+    "newAgentDescription": "Avvia un nuovo agente",
+    "openWaitingAgent": "Agente in attesa",
+    "openWaitingAgentDescription": "Apre l'agente in attesa di input"
+  },
+  "ja": {
+    "newAgent": "新しいエージェント",
+    "newAgentDescription": "新しいエージェントを開始します",
+    "openWaitingAgent": "待機中のエージェント",
+    "openWaitingAgentDescription": "入力を待っているエージェントを開きます"
+  },
+  "ka": {
+    "newAgent": "ახალი აგენტი",
+    "newAgentDescription": "იწყებს ახალ აგენტს",
+    "openWaitingAgent": "მოლოდინში მყოფი აგენტი",
+    "openWaitingAgentDescription": "ხსნის მონაცემების მოლოდინში მყოფ აგენტს"
+  },
+  "kk": {
+    "newAgent": "Жаңа агент",
+    "newAgentDescription": "Жаңа агентті бастайды",
+    "openWaitingAgent": "Күтіп тұрған агент",
+    "openWaitingAgentDescription": "Енгізуді күтіп тұрған агентті ашады"
+  },
+  "km": {
+    "newAgent": "ភ្នាក់ងារថ្មី",
+    "newAgentDescription": "ចាប់ផ្ដើមភ្នាក់ងារថ្មី",
+    "openWaitingAgent": "ភ្នាក់ងារកំពុងរង់ចាំ",
+    "openWaitingAgentDescription": "បើកភ្នាក់ងារដែលកំពុងរង់ចាំការបញ្ចូល"
+  },
+  "kn": {
+    "newAgent": "ಹೊಸ ಏಜೆಂಟ್",
+    "newAgentDescription": "ಹೊಸ ಏಜೆಂಟ್ ಪ್ರಾರಂಭಿಸುತ್ತದೆ",
+    "openWaitingAgent": "ಕಾಯುತ್ತಿರುವ ಏಜೆಂಟ್",
+    "openWaitingAgentDescription": "ಇನ್‌ಪುಟ್‌ಗಾಗಿ ಕಾಯುತ್ತಿರುವ ಏಜೆಂಟ್ ಅನ್ನು ತೆರೆಯುತ್ತದೆ"
+  },
+  "ko": {
+    "newAgent": "새 에이전트",
+    "newAgentDescription": "새 에이전트를 시작합니다",
+    "openWaitingAgent": "대기 중인 에이전트",
+    "openWaitingAgentDescription": "입력을 기다리는 에이전트를 엽니다"
+  },
+  "lo": {
+    "newAgent": "ຕົວແທນໃໝ່",
+    "newAgentDescription": "ເລີ່ມຕົວແທນໃໝ່",
+    "openWaitingAgent": "ຕົວແທນທີ່ລໍຖ້າ",
+    "openWaitingAgentDescription": "ເປີດຕົວແທນທີ່ລໍຖ້າການປ້ອນຂໍ້ມູນ"
+  },
+  "lt": {
+    "newAgent": "Naujas agentas",
+    "newAgentDescription": "Pradeda naują agentą",
+    "openWaitingAgent": "Laukiantis agentas",
+    "openWaitingAgentDescription": "Atidaro agentą, laukiantį įvesties"
+  },
+  "lv": {
+    "newAgent": "Jauns aģents",
+    "newAgentDescription": "Sāk jaunu aģentu",
+    "openWaitingAgent": "Gaidošs aģents",
+    "openWaitingAgentDescription": "Atver aģentu, kas gaida ievadi"
+  },
+  "mg": {
+    "newAgent": "Agent vaovao",
+    "newAgentDescription": "Manomboka agent vaovao",
+    "openWaitingAgent": "Agent miandry",
+    "openWaitingAgentDescription": "Manokatra ny agent miandry fampidirana"
+  },
+  "mi": {
+    "newAgent": "Māngai hou",
+    "newAgentDescription": "Ka tīmata he māngai hou",
+    "openWaitingAgent": "Māngai e tatari ana",
+    "openWaitingAgentDescription": "Ka whakatuwhera i te māngai e tatari ana mō te whakaurunga"
+  },
+  "mk": {
+    "newAgent": "Нов агент",
+    "newAgentDescription": "Започнува нов агент",
+    "openWaitingAgent": "Агент во чекање",
+    "openWaitingAgentDescription": "Го отвора агентот што чека внес"
+  },
+  "ml": {
+    "newAgent": "പുതിയ ഏജന്റ്",
+    "newAgentDescription": "പുതിയ ഏജന്റ് ആരംഭിക്കുന്നു",
+    "openWaitingAgent": "കാത്തിരിക്കുന്ന ഏജന്റ്",
+    "openWaitingAgentDescription": "ഇൻപുട്ടിനായി കാത്തിരിക്കുന്ന ഏജന്റ് തുറക്കുന്നു"
+  },
+  "mn": {
+    "newAgent": "Шинэ агент",
+    "newAgentDescription": "Шинэ агент эхлүүлнэ",
+    "openWaitingAgent": "Хүлээж буй агент",
+    "openWaitingAgentDescription": "Оролт хүлээж буй агентыг нээнэ"
+  },
+  "mr": {
+    "newAgent": "नवीन एजंट",
+    "newAgentDescription": "नवीन एजंट सुरू करतो",
+    "openWaitingAgent": "प्रतीक्षा करणारा एजंट",
+    "openWaitingAgentDescription": "इनपुटची प्रतीक्षा करणारा एजंट उघडतो"
+  },
+  "ms": {
+    "newAgent": "Ejen baharu",
+    "newAgentDescription": "Memulakan ejen baharu",
+    "openWaitingAgent": "Ejen menunggu",
+    "openWaitingAgentDescription": "Membuka ejen yang menunggu input"
+  },
+  "mt": {
+    "newAgent": "Aġent ġdid",
+    "newAgentDescription": "Jibda aġent ġdid",
+    "openWaitingAgent": "Aġent li qed jistenna",
+    "openWaitingAgentDescription": "Jiftaħ l-aġent li qed jistenna input"
+  },
+  "my": {
+    "newAgent": "agent အသစ်",
+    "newAgentDescription": "agent အသစ် စတင်သည်",
+    "openWaitingAgent": "စောင့်နေသော agent",
+    "openWaitingAgentDescription": "ထည့်သွင်းမှု စောင့်နေသော agent ကို ဖွင့်သည်"
+  },
+  "nb": {
+    "newAgent": "Ny agent",
+    "newAgentDescription": "Starter en ny agent",
+    "openWaitingAgent": "Ventende agent",
+    "openWaitingAgentDescription": "Åpner agenten som venter på inndata"
+  },
+  "ne": {
+    "newAgent": "नयाँ एजेन्ट",
+    "newAgentDescription": "नयाँ एजेन्ट सुरु गर्छ",
+    "openWaitingAgent": "प्रतीक्षारत एजेन्ट",
+    "openWaitingAgentDescription": "इनपुटको प्रतीक्षा गरिरहेको एजेन्ट खोल्छ"
+  },
+  "nl": {
+    "newAgent": "Nieuwe agent",
+    "newAgentDescription": "Start een nieuwe agent",
+    "openWaitingAgent": "Wachtende agent",
+    "openWaitingAgentDescription": "Opent de agent die op invoer wacht"
+  },
+  "om": {
+    "newAgent": "Eejentii haaraa",
+    "newAgentDescription": "Eejentii haaraa jalqaba",
+    "openWaitingAgent": "Eejentii eegu",
+    "openWaitingAgentDescription": "Eejentii galtee eegu bana"
+  },
+  "or": {
+    "newAgent": "ନୂଆ ଏଜେଣ୍ଟ",
+    "newAgentDescription": "ନୂଆ ଏଜେଣ୍ଟ ଆରମ୍ଭ କରେ",
+    "openWaitingAgent": "ଅପେକ୍ଷାରତ ଏଜେଣ୍ଟ",
+    "openWaitingAgentDescription": "ଇନପୁଟ୍ ଅପେକ୍ଷା କରୁଥିବା ଏଜେଣ୍ଟ ଖୋଲେ"
+  },
+  "pa": {
+    "newAgent": "ਨਵਾਂ ਏਜੰਟ",
+    "newAgentDescription": "ਨਵਾਂ ਏਜੰਟ ਸ਼ੁਰੂ ਕਰਦਾ ਹੈ",
+    "openWaitingAgent": "ਉਡੀਕ ਰਿਹਾ ਏਜੰਟ",
+    "openWaitingAgentDescription": "ਇਨਪੁਟ ਦੀ ਉਡੀਕ ਕਰ ਰਹੇ ਏਜੰਟ ਨੂੰ ਖੋਲ੍ਹਦਾ ਹੈ"
+  },
+  "pl": {
+    "newAgent": "Nowy agent",
+    "newAgentDescription": "Uruchamia nowego agenta",
+    "openWaitingAgent": "Agent oczekujący",
+    "openWaitingAgentDescription": "Otwiera agenta oczekującego na dane"
+  },
+  "ps": {
+    "newAgent": "نوی اجنټ",
+    "newAgentDescription": "نوی اجنټ پیل کوي",
+    "openWaitingAgent": "په تمه اجنټ",
+    "openWaitingAgentDescription": "هغه اجنټ پرانیزي چې د ورودي په تمه دی"
+  },
+  "pt": {
+    "newAgent": "Novo agente",
+    "newAgentDescription": "Inicia um novo agente",
+    "openWaitingAgent": "Agente em espera",
+    "openWaitingAgentDescription": "Abre o agente à espera de dados"
+  },
+  "pt-BR": {
+    "newAgent": "Novo agente",
+    "newAgentDescription": "Inicia um novo agente",
+    "openWaitingAgent": "Agente aguardando",
+    "openWaitingAgentDescription": "Abre o agente que aguarda entrada"
+  },
+  "ro": {
+    "newAgent": "Agent nou",
+    "newAgentDescription": "Pornește un agent nou",
+    "openWaitingAgent": "Agent în așteptare",
+    "openWaitingAgentDescription": "Deschide agentul care așteaptă date"
+  },
+  "ru": {
+    "newAgent": "Новый агент",
+    "newAgentDescription": "Запускает нового агента",
+    "openWaitingAgent": "Агент ожидает",
+    "openWaitingAgentDescription": "Открывает агента, ожидающего ввода"
+  },
+  "si": {
+    "newAgent": "නව නියෝජිතයා",
+    "newAgentDescription": "නව නියෝජිතයෙකු අරඹයි",
+    "openWaitingAgent": "රැඳී සිටින නියෝජිතයා",
+    "openWaitingAgentDescription": "ආදානය එනතුරු රැඳී සිටින නියෝජිතයා විවෘත කරයි"
+  },
+  "sk": {
+    "newAgent": "Nový agent",
+    "newAgentDescription": "Spustí nového agenta",
+    "openWaitingAgent": "Čakajúci agent",
+    "openWaitingAgentDescription": "Otvorí agenta čakajúceho na vstup"
+  },
+  "sl": {
+    "newAgent": "Nov agent",
+    "newAgentDescription": "Zažene novega agenta",
+    "openWaitingAgent": "Agent v čakanju",
+    "openWaitingAgentDescription": "Odpre agenta, ki čaka na vnos"
+  },
+  "so": {
+    "newAgent": "Wakiil cusub",
+    "newAgentDescription": "Bilow wakiil cusub",
+    "openWaitingAgent": "Wakiil sugaya",
+    "openWaitingAgentDescription": "Furaya wakiilka sugaya wax-soo-gal"
+  },
+  "sq": {
+    "newAgent": "Agjent i ri",
+    "newAgentDescription": "Nis një agjent të ri",
+    "openWaitingAgent": "Agjent në pritje",
+    "openWaitingAgentDescription": "Hap agjentin që pret të dhëna"
+  },
+  "sr": {
+    "newAgent": "Нови агент",
+    "newAgentDescription": "Покреће новог агента",
+    "openWaitingAgent": "Агент на чекању",
+    "openWaitingAgentDescription": "Отвара агента који чека унос"
+  },
+  "sv": {
+    "newAgent": "Ny agent",
+    "newAgentDescription": "Startar en ny agent",
+    "openWaitingAgent": "Väntande agent",
+    "openWaitingAgentDescription": "Öppnar agenten som väntar på indata"
+  },
+  "sw": {
+    "newAgent": "Wakala mpya",
+    "newAgentDescription": "Huanzisha wakala mpya",
+    "openWaitingAgent": "Wakala anasubiri",
+    "openWaitingAgentDescription": "Hufungua wakala anayesubiri maelezo"
+  },
+  "ta": {
+    "newAgent": "புதிய முகவர்",
+    "newAgentDescription": "புதிய முகவரைத் தொடங்குகிறது",
+    "openWaitingAgent": "காத்திருக்கும் முகவர்",
+    "openWaitingAgentDescription": "உள்ளீட்டுக்காகக் காத்திருக்கும் முகவரைத் திறக்கிறது"
+  },
+  "te": {
+    "newAgent": "కొత్త ఏజెంట్",
+    "newAgentDescription": "కొత్త ఏజెంట్ను ప్రారంభిస్తుంది",
+    "openWaitingAgent": "నిరీక్షిస్తున్న ఏజెంట్",
+    "openWaitingAgentDescription": "ఇన్‌పుట్ కోసం నిరీక్షిస్తున్న ఏజెంట్ను తెరుస్తుంది"
+  },
+  "th": {
+    "newAgent": "เอเจนต์ใหม่",
+    "newAgentDescription": "เริ่มเอเจนต์ใหม่",
+    "openWaitingAgent": "เอเจนต์ที่รออยู่",
+    "openWaitingAgentDescription": "เปิดเอเจนต์ที่รอข้อมูล"
+  },
+  "tr": {
+    "newAgent": "Yeni ajan",
+    "newAgentDescription": "Yeni bir ajan başlatır",
+    "openWaitingAgent": "Bekleyen ajan",
+    "openWaitingAgentDescription": "Giriş bekleyen ajanı açar"
+  },
+  "uk": {
+    "newAgent": "Новий агент",
+    "newAgentDescription": "Запускає нового агента",
+    "openWaitingAgent": "Агент очікує",
+    "openWaitingAgentDescription": "Відкриває агента, який очікує введення"
+  },
+  "ur": {
+    "newAgent": "نیا ایجنٹ",
+    "newAgentDescription": "نیا ایجنٹ شروع کرتا ہے",
+    "openWaitingAgent": "انتظار کرنے والا ایجنٹ",
+    "openWaitingAgentDescription": "ان پٹ کے منتظر ایجنٹ کو کھولتا ہے"
+  },
+  "uz": {
+    "newAgent": "Yangi agent",
+    "newAgentDescription": "Yangi agent ishga tushiradi",
+    "openWaitingAgent": "Kutayotgan agent",
+    "openWaitingAgentDescription": "Kiritishni kutayotgan agentni ochadi"
+  },
+  "vi": {
+    "newAgent": "Tác nhân mới",
+    "newAgentDescription": "Bắt đầu một tác nhân mới",
+    "openWaitingAgent": "Tác nhân đang chờ",
+    "openWaitingAgentDescription": "Mở tác nhân đang chờ dữ liệu"
+  },
+  "yo": {
+    "newAgent": "Aṣoju tuntun",
+    "newAgentDescription": "Bẹrẹ aṣoju tuntun",
+    "openWaitingAgent": "Aṣoju to ń dúró",
+    "openWaitingAgentDescription": "Ṣii aṣoju to ń dúró fún igbewọle"
+  },
+  "zh-Hans": {
+    "newAgent": "新建代理",
+    "newAgentDescription": "启动新的代理",
+    "openWaitingAgent": "等待中的代理",
+    "openWaitingAgentDescription": "打开正在等待输入的代理"
+  },
+  "zh-Hant": {
+    "newAgent": "新增代理",
+    "newAgentDescription": "啟動新的代理",
+    "openWaitingAgent": "等待中的代理",
+    "openWaitingAgentDescription": "開啟正在等待輸入的代理"
+  },
+  "zu": {
+    "newAgent": "I-agent entsha",
+    "newAgentDescription": "Qala i-agent entsha",
+    "openWaitingAgent": "I-agent elindile",
+    "openWaitingAgentDescription": "Vula i-agent elinde okokufaka"
+  }
+}

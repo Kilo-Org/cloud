@@ -307,6 +307,14 @@ const config: ExpoConfig = {
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
     './plugins/withAndroidExpoModuleRepos',
+    // The agent controls' one-tap system surfaces: two ControlWidgets (Control
+    // Center, the Lock Screen control slots, the Action button) that open the
+    // app's existing agent deep links. Registered BEFORE
+    // './plugins/withWidgetLocalizations': mods run in reverse registration
+    // order, so this one runs after expo-widgets has written the extension and
+    // after that plugin has written the per-language Localizable.strings files
+    // whose entries the controls' copy is appended to.
+    './plugins/withAgentControls',
     // Declares the app's languages on the widget extension, which expo-widgets
     // leaves English-only. This must be registered BEFORE 'expo-widgets':
     // dangerous mods run in reverse registration order, so the earlier entry

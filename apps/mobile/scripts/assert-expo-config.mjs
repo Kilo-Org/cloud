@@ -24,6 +24,7 @@ const BLOCKED_PERMISSIONS = [
 ];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+const AGENT_CONTROLS_PLUGIN = './plugins/withAgentControls';
 const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSMicrophoneUsageDescription',
   'NSSpeechRecognitionUsageDescription',
@@ -138,6 +139,13 @@ check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGI
 check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
+);
+// The agent-controls plugin writes the extension's ControlWidgets and their
+// localized copy. Without it the app ships no Control Center, Lock Screen, or
+// Action button control at all.
+check(
+  pluginNames.includes(AGENT_CONTROLS_PLUGIN),
+  `plugins must include "${AGENT_CONTROLS_PLUGIN}"`
 );
 
 const extra = config.extra ?? {};

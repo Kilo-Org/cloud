@@ -64,6 +64,7 @@ import {
   recordSessionOperationDispatch,
   releaseCompletedRetryableAttach,
   releaseUnadmittedWaitingMessages,
+  releaseUnconfirmedAttach,
   rotateLostPreparationAttempt,
   resolveSessionMessageIntent,
   streamCloudStatus,
@@ -672,6 +673,89 @@ describe('releaseCompletedRetryableAttach', () => {
     expect(applied).toMatchObject({ disposition: 'identical' });
     expect(applied?.messages[0]?.operations?.attach).toBeUndefined();
     expect(applied?.messages[0]?.operations?.retiredAttach).toMatchObject({ authorization });
+  });
+});
+
+describe('releaseUnconfirmedAttach', () => {
+  const authorization: SessionOperationAuthorization = {
+    operation: 'session.attach',
+    operationId: 'attempt-missing',
+    messageId: 'a',
+    session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_root', directory: DIRECTORY },
+    wrapperInstanceId: RUNTIME_ID,
+    dispatchDeadlineAt: 100,
+  };
+
+  function queuedMessage(attach: SessionOperationProof): SessionMessageRecord {
+    return {
+      ...createSessionMessageRecord({ turn: promptTurn, agent: defaultAgent }),
+      unresolvedDispatch: true,
+      wrapperInstanceId: RUNTIME_ID,
+      operations: { attach },
+    };
+  }
+
+  it('retires a dispatched attach the runtime has no record of', () => {
+    const attach = { authorization, dispatched: true };
+    const released = releaseUnconfirmedAttach(
+      [
+        {
+          ...queuedMessage(attach),
+          preparationAttemptId: 'attempt-missing',
+          deliveryDeadlineAt: 500,
+        },
+      ],
+      authorization
+    );
+
+    expect(released?.[0]).toMatchObject({
+      unresolvedDispatch: undefined,
+      wrapperInstanceId: RUNTIME_ID,
+      preparationAttemptId: 'attempt-missing',
+      deliveryDeadlineAt: 500,
+      operations: { retiredAttach: attach },
+    });
+    expect(released?.[0]?.operations?.attach).toBeUndefined();
+  });
+
+  it('refuses a message id that is not in the messages array', () => {
+    expect(releaseUnconfirmedAttach([], authorization)).toBeUndefined();
+  });
+
+  it('refuses a present message with no attach proof', () => {
+    const message: SessionMessageRecord = {
+      ...queuedMessage({ authorization, dispatched: true }),
+      operations: undefined,
+    };
+
+    expect(releaseUnconfirmedAttach([message], authorization)).toBeUndefined();
+  });
+
+  it.each([
+    {
+      name: 'a completed attach result',
+      attach: {
+        authorization,
+        dispatched: true,
+        result: { ok: false as const, error: { code: 'not_ready', message: 'x', retryable: true } },
+      },
+    },
+    {
+      name: 'an undispatched attach proof',
+      attach: { authorization, dispatched: false },
+    },
+    {
+      name: 'an attach proof for another wrapper',
+      attach: {
+        authorization: {
+          ...authorization,
+          wrapperInstanceId: '44444444-4444-4444-8444-444444444444',
+        },
+        dispatched: true,
+      },
+    },
+  ])('refuses to release $name', ({ attach }) => {
+    expect(releaseUnconfirmedAttach([queuedMessage(attach)], authorization)).toBeUndefined();
   });
 });
 

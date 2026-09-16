@@ -3093,5 +3093,12 @@
     "remoteFound": "Ejikọrọ kọmputa",
     "checkAgain": "Lelee ọzọ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Malite onye enyemaka chọrọ ntụziaka. Tinye ntụziaka wee mee ya ọzọ.",
+      "repositoryUnknown": "Kilo anaghị amata {{repository}} dị ka ebe nchekwa koodu GitHub ma ọ bụ GitLab. Họrọ ebe nchekwa koodu ọzọ na Kilo.",
+      "repositoryUnsupported": "{{repository}} bụ ebe nchekwa koodu Bitbucket — Malite onye enyemaka enweghị ike iji ya ugbu a. Họrọ ebe nchekwa koodu ọzọ na Kilo."
+    }
   }
 }

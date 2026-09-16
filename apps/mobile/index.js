@@ -19,3 +19,12 @@ if (Platform.OS === 'android') {
 }
 
 require('expo-router/entry');
+
+// Register the OS-action dispatcher after the router entry, for the reason the
+// widget block above states — `require`, not `import`, so this module is
+// evaluated after `expo-router/entry` sets the app up. The native side can hold
+// a payload that arrived before any screen mounted (StartAgent with the app
+// closed) and replays it into the registered handler.
+const { registerAppActionDispatcher } = require('./src/lib/app-actions/app-action-dispatch');
+
+void registerAppActionDispatcher();

@@ -3093,5 +3093,12 @@
     "remoteFound": "电脑已连接",
     "checkAgain": "重新检查",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "启动智能体需要提示词。请添加提示词后重新运行。",
+      "repositoryUnknown": "Kilo 无法将 {{repository}} 识别为 GitHub 或 GitLab 仓库。请在 Kilo 中选择其他仓库。",
+      "repositoryUnsupported": "{{repository}} 是 Bitbucket 仓库——启动智能体暂时无法使用它。请在 Kilo 中选择其他仓库。"
+    }
   }
 }

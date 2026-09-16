@@ -3093,5 +3093,12 @@
     "remoteFound": "Tietokone yhdistetty",
     "checkAgain": "Tarkista uudelleen",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Agentin käynnistys vaatii kehotteen. Lisää kehote ja suorita se uudelleen.",
+      "repositoryUnknown": "Kilo ei tunnista {{repository}}-kohdetta GitHub- tai GitLab-koodivarastoksi. Valitse toinen koodivarasto Kilossa.",
+      "repositoryUnsupported": "{{repository}} on Bitbucket-koodivarasto — Käynnistä agentti ei voi vielä käyttää sitä. Valitse toinen koodivarasto Kilossa."
+    }
   }
 }

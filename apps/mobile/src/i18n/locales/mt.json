@@ -3162,5 +3162,12 @@
     "remoteFound": "Kompjuter konness",
     "checkAgain": "Iċċekkja mill-ġdid",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Ibda aġent jeħtieġ istruzzjoni. Żid istruzzjoni u erġa' ħaddmu.",
+      "repositoryUnknown": "Kilo ma jagħrafx lil {{repository}} bħala repożitorju GitHub jew GitLab. Agħżel repożitorju ieħor fil-Kilo.",
+      "repositoryUnsupported": "{{repository}} huwa repożitorju Bitbucket — Ibda aġent għadu ma jistax jużah. Agħżel repożitorju ieħor fil-Kilo."
+    }
   }
 }

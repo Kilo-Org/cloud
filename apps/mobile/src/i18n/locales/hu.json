@@ -3093,5 +3093,12 @@
     "remoteFound": "Számítógép csatlakoztatva",
     "checkAgain": "Ellenőrzés újra",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Az ügynök indításához utasítás szükséges. Adj hozzá utasítást, és futtasd újra.",
+      "repositoryUnknown": "A Kilo nem ismeri fel a {{repository}} nevet GitHub- vagy GitLab-adattárként. Válassz másik adattárat a Kilóban.",
+      "repositoryUnsupported": "A {{repository}} egy Bitbucket-adattár — Az Ügynök indítása még nem tudja használni. Válassz másik adattárat a Kilóban."
+    }
   }
 }

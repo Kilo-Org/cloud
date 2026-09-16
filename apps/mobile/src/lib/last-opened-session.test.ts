@@ -51,6 +51,16 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
   };
 }
 
+/**
+ * Let the serialized SecureStore mirror drain: the mock operations settle in
+ * microtasks, so one macrotask boundary runs the whole chain.
+ */
+async function flushMirror(): Promise<void> {
+  await new Promise(resolve => {
+    setTimeout(resolve, 0);
+  });
+}
+
 beforeEach(() => {
   _resetLastOpenedSessionForTests();
   _setSecureStoreForTests(secureStoreMock);
@@ -64,11 +74,13 @@ afterEach(() => {
 });
 
 describe('last opened session', () => {
-  it('records the session for its account and mirrors the exact record shape', () => {
+  it('records the session for its account and mirrors the exact record shape', async () => {
     recordLastOpenedSession('s1', 'u1');
 
     expect(getLastOpenedSession('u1')).toBe('s1');
     expect(getLastOpenedSessionSnapshot()).toBe('s1');
+
+    await flushMirror();
     expect(secureStoreMock.setItemAsync).toHaveBeenCalledOnce();
     expect(secureStoreMock.setItemAsync.mock.calls[0]?.[0]).toBe(KEY);
     expect(JSON.parse(secureStoreMock.setItemAsync.mock.calls[0]?.[1] ?? '')).toEqual({
@@ -143,15 +155,52 @@ describe('last opened session', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('clears both memory and the SecureStore mirror', () => {
+  it('clears both memory and the SecureStore mirror', async () => {
     recordLastOpenedSession('s1', 'u1');
 
     clearLastOpenedSession();
 
     expect(getLastOpenedSessionSnapshot()).toBeNull();
     expect(getLastOpenedSession('u1')).toBeNull();
+
+    await flushMirror();
     expect(secureStoreMock.deleteItemAsync).toHaveBeenCalledExactlyOnceWith(KEY);
     expect(store.has(KEY)).toBe(false);
+  });
+
+  it('does not let a sign-out delete be overtaken by an in-flight write', async () => {
+    // Hold the first mirror write open across the sign-out clear.
+    const gate = deferred();
+    secureStoreMock.setItemAsync.mockImplementationOnce(async (key: string, value: string) => {
+      await gate.promise;
+      store.set(key, value);
+    });
+
+    recordLastOpenedSession('s1', 'u1');
+    clearLastOpenedSession();
+
+    gate.resolve();
+    await flushMirror();
+
+    expect(secureStoreMock.deleteItemAsync).toHaveBeenCalledExactlyOnceWith(KEY);
+    expect(store.has(KEY)).toBe(false);
+  });
+
+  it('settles rapid mirror writes in order, so the last record wins', async () => {
+    // The first write settles only after the second one is queued.
+    const gate = deferred();
+    secureStoreMock.setItemAsync.mockImplementationOnce(async (key: string, value: string) => {
+      await gate.promise;
+      store.set(key, value);
+    });
+
+    recordLastOpenedSession('s1', 'u1');
+    recordLastOpenedSession('s2', 'u1');
+
+    gate.resolve();
+    await flushMirror();
+
+    expect(JSON.parse(store.get(KEY) ?? '')).toMatchObject({ sessionId: 's2', userId: 'u1' });
   });
 
   it('does not overwrite a record held in memory before the restart read', async () => {

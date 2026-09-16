@@ -10,6 +10,8 @@
  * adds no routing of its own, only entry points.
  */
 
+import { parseTimestamp } from '@kilocode/app-shared/utils';
+
 /**
  * Prefix for a single session's deep link: alone it resolves to the Agents
  * tab, with an id to `/(app)/agent-chat/<id>`.
@@ -40,8 +42,24 @@ export type LauncherSurfaceTargets = {
 type WaitingSession = { id: string; waitedSince: number };
 
 /**
- * Longest wait first: the smallest `waitedSince` (an epoch-ms timestamp) is
- * the session that has waited the longest. Ties keep input order.
+ * The sort key for one waiting session. `statusUpdatedAt` is the server's raise
+ * timestamp, so an earlier stamp means a longer wait. A row without a usable
+ * stamp reports `Number.POSITIVE_INFINITY`: `longestWaiting` picks the smallest
+ * `waitedSince`, so "unknown" must be the largest value, never 0 (the minimum),
+ * or a timestamp-less row would always outrank a row with a real wait.
+ */
+export function waitedSinceFor(statusUpdatedAt: string | null | undefined): number {
+  if (!statusUpdatedAt) {
+    return Number.POSITIVE_INFINITY;
+  }
+  const parsed = parseTimestamp(statusUpdatedAt).getTime();
+  return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
+}
+
+/**
+ * Longest wait first: the smallest `waitedSince` (an epoch-ms timestamp, or
+ * `POSITIVE_INFINITY` for a session with no usable raise timestamp) is the
+ * session that has waited the longest. Ties keep input order.
  */
 function longestWaiting(waiting: readonly WaitingSession[]): WaitingSession | null {
   let oldest: WaitingSession | null = null;

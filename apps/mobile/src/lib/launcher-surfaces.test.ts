@@ -8,6 +8,7 @@ import {
   LAUNCHER_NEW_AGENT_URL,
   LAUNCHER_SESSION_URL_PREFIX,
   launcherSessionUrl,
+  waitedSinceFor,
 } from '@/lib/launcher-surfaces';
 
 function waiting(id: string, waitedSince: number) {
@@ -109,5 +110,40 @@ describe('deriveLauncherTargets', () => {
     expect(input).toEqual(snapshot);
     expect(input[0]).toBe(snapshot[0]);
     expect(input[1]).toBe(snapshot[1]);
+  });
+});
+
+describe('waitedSinceFor', () => {
+  it('keeps a real raise timestamp as the sort key', () => {
+    expect(waitedSinceFor('2026-08-24T10:00:00Z')).toBe(Date.parse('2026-08-24T10:00:00Z'));
+  });
+
+  it('reports an unknown wait as the largest key, never the smallest', () => {
+    expect(waitedSinceFor(undefined)).toBe(Number.POSITIVE_INFINITY);
+    expect(waitedSinceFor(null)).toBe(Number.POSITIVE_INFINITY);
+    expect(waitedSinceFor('not a timestamp')).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it('does not let a timestamp-less row outrank a real wait', () => {
+    // The regression: with a 0 fallback the timestamp-less row held the smallest
+    // key, so `longestWaiting` picked it over a session with a real wait.
+    const targets = deriveLauncherTargets({
+      waiting: [waiting('ses_unknown', waitedSinceFor(null)), waiting('ses_oldest', 1000)],
+      lastOpenedSessionId: null,
+    });
+
+    expect(targets.needsInputUrl).toBe(launcherSessionUrl('ses_oldest'));
+  });
+
+  it('keeps input order when no row has a raise timestamp', () => {
+    const targets = deriveLauncherTargets({
+      waiting: [
+        waiting('ses_first', waitedSinceFor(undefined)),
+        waiting('ses_second', waitedSinceFor(undefined)),
+      ],
+      lastOpenedSessionId: null,
+    });
+
+    expect(targets.needsInputUrl).toBe(launcherSessionUrl('ses_first'));
   });
 });

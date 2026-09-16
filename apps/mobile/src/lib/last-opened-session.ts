@@ -85,6 +85,28 @@ async function dropMirroredRecord(): Promise<void> {
   }
 }
 
+// The SecureStore mirror is serialized through this chain: each operation runs
+// only after the one before it settled, so a sign-out delete cannot be overtaken
+// by a write still in flight and two rapid writes cannot settle out of order.
+// The operations swallow their own failures, so the chain never rejects; the
+// in-memory record stays the source of truth. An idle chain still starts its
+// operation synchronously, so a lone write mirrors immediately.
+let mirrorTail: Promise<void> | null = null;
+
+function chainMirror(operation: () => Promise<void>): void {
+  mirrorTail = runAfterMirror(mirrorTail, operation);
+}
+
+async function runAfterMirror(
+  previous: Promise<void> | null,
+  operation: () => Promise<void>
+): Promise<void> {
+  if (previous !== null) {
+    await previous;
+  }
+  await operation();
+}
+
 /**
  * Restore the in-memory record after a JS restart. Best effort: a failed or
  * malformed read leaves the in-memory record null. A write that lands during
@@ -120,8 +142,13 @@ export function recordLastOpenedSession(sessionId: string, userId: string | null
   epoch += 1;
   record = { sessionId, userId, storedAt: Date.now() };
   notify();
-  // Fire-and-forget: the in-memory record is the source of truth.
-  void mirrorRecord(JSON.stringify(record));
+  // The payload is captured now, at record time; only the write is serialized
+  // behind any earlier mirror operation, so a later record always lands after
+  // an earlier one and no write can jump a sign-out delete.
+  const serialized = JSON.stringify(record);
+  chainMirror(async () => {
+    await mirrorRecord(serialized);
+  });
 }
 
 /**
@@ -168,8 +195,11 @@ export function clearLastOpenedSession(): void {
   if (hadRecord) {
     notify();
   }
-  // Fire-and-forget: the in-memory clear is already visible to readers.
-  void dropMirroredRecord();
+  // Serialized behind any earlier mirror operation, so an in-flight write can
+  // never land after this delete. The in-memory clear is already visible.
+  chainMirror(async () => {
+    await dropMirroredRecord();
+  });
 }
 
 // ── Injection seams used by the pure suites ────────────────────────────────
@@ -193,6 +223,7 @@ export function _resetLastOpenedSessionForTests(): void {
   record = null;
   epoch = 0;
   hydration = null;
+  mirrorTail = null;
   listeners.clear();
   secureStoreForTests = null;
 }

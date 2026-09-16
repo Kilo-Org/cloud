@@ -528,17 +528,25 @@ export function SessionDetailContent({
   );
 
   const viewTrackedRef = useRef<string | null>(null);
+  const recordedLastOpenedRef = useRef<{ sessionId: string; userId: string } | null>(null);
   useEffect(() => {
-    if (fetchedData?.kiloSessionId !== sessionId || viewTrackedRef.current === sessionId) {
+    if (fetchedData?.kiloSessionId !== sessionId) {
       return;
     }
-    viewTrackedRef.current = sessionId;
-    captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
+    if (viewTrackedRef.current !== sessionId) {
+      viewTrackedRef.current = sessionId;
+      captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
+    }
     // Record the session the person actually viewed (not one merely fetched) so
-    // the launcher's 'Open last session' reopens it. Lockstep with the analytics
-    // event above: the same once-per-session ref guards both, so adding `userId`
-    // to the deps cannot re-capture or re-record.
-    recordLastOpenedSession(sessionId, userId ?? null);
+    // the launcher's 'Open last session' reopens it. Its latch is separate from
+    // the analytics one above: `userId` resolves after the first render, so the
+    // analytics event still fires once per session while the record waits for
+    // the identity and lands on the render that has it.
+    const recorded = recordedLastOpenedRef.current;
+    if (userId !== undefined && (recorded?.sessionId !== sessionId || recorded.userId !== userId)) {
+      recordedLastOpenedRef.current = { sessionId, userId };
+      recordLastOpenedSession(sessionId, userId);
+    }
   }, [fetchedData, sessionId, analyticsSurface, openedVia, userId]);
 
   useEffect(

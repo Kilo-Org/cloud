@@ -6,7 +6,7 @@ import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 import { setPendingDeepLink } from '@/lib/deep-link-launch';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { deriveLauncherTargets } from '@/lib/launcher-surfaces';
+import { deriveLauncherTargets, waitedSinceFor } from '@/lib/launcher-surfaces';
 import {
   createLauncherSurfacesPublisher,
   type LauncherSurfacesPublisher,
@@ -24,12 +24,12 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { parseTimestamp } from '@/lib/utils';
 
 /**
  * The waiting sessions, in the tab layout's exact filter, paired with how long
- * each has waited. `statusUpdatedAt` is the server's raise timestamp; a row
- * without one reports 0 so it can never outrank a row that has a real wait.
+ * each has waited. `waitedSinceFor` maps the server's `statusUpdatedAt` raise
+ * timestamp to the sort key and reports `POSITIVE_INFINITY` for a row without
+ * one, so a timestamp-less row can never outrank a row that has a real wait.
  */
 function selectWaitingSessions(sessions: readonly ActiveSession[]) {
   return sessions
@@ -42,7 +42,7 @@ function selectWaitingSessions(sessions: readonly ActiveSession[]) {
     )
     .map(session => ({
       id: session.id,
-      waitedSince: session.statusUpdatedAt ? parseTimestamp(session.statusUpdatedAt).getTime() : 0,
+      waitedSince: waitedSinceFor(session.statusUpdatedAt),
     }));
 }
 

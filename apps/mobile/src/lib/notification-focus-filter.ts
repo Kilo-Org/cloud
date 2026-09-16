@@ -1,5 +1,4 @@
-import { requireNativeModule } from 'expo';
-import { Platform } from 'react-native';
+import { requireOptionalNativeModule } from 'expo';
 
 /**
  * The native surface `modules/notification-focus-filter` exposes. The Swift
@@ -11,23 +10,24 @@ type NotificationFocusFilterNativeModule = {
 };
 
 /**
- * Whether the active iOS Focus allows agent-progress notifications.
+ * Whether the active Focus allows agent-progress notifications.
  *
- * Android has no Focus filters — its per-kind choice is the notification
- * channel, which the system settings own — so this is always `true` there and
- * the native module is never required. On iOS a missing module (an old build
- * without the rebuilt native code) or a throwing read also falls back to
- * `true`: an absent answer must never suppress a notification the user did not
- * exclude. The read is never cached, so switching Focus takes effect on the
- * next push.
+ * Registering `NotificationFocusFilter` is an iOS-only capability: Android has
+ * no Focus filter — its per-kind choice is the notification channel, which the
+ * system settings own — so the module is absent there. The read is therefore the
+ * same code on both platforms: the optional module lookup returns `null` on
+ * Android and on an old iOS build without the rebuilt native code, and a
+ * throwing read is caught below. Both fall back to `true`, because an absent
+ * answer must never suppress a notification the user did not exclude. The read
+ * is never cached, so switching Focus takes effect on the next push.
  */
 export function isAgentProgressAllowedInActiveFocus(): boolean {
-  if (Platform.OS !== 'ios') {
-    return true;
-  }
   try {
     const native =
-      requireNativeModule<NotificationFocusFilterNativeModule>('NotificationFocusFilter');
+      requireOptionalNativeModule<NotificationFocusFilterNativeModule>('NotificationFocusFilter');
+    if (!native) {
+      return true;
+    }
     return native.isAgentProgressAllowed();
   } catch {
     // A missing module or a failed native read must never suppress a notification.

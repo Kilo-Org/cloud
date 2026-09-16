@@ -57,7 +57,7 @@ const mocks = vi.hoisted(() => ({
   defineTask: vi.fn(),
   registerTaskAsync: vi.fn(),
   captureEvent: vi.fn(),
-  requireNativeModule: vi.fn(),
+  requireOptionalNativeModule: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -70,9 +70,10 @@ vi.mock('react-native', () => ({
   },
 }));
 
-// The Focus filter reads through `requireNativeModule`; the per-test return
-// value stands in for what the active iOS Focus stored.
-vi.mock('expo', () => ({ requireNativeModule: mocks.requireNativeModule }));
+// The Focus filter reads through `requireOptionalNativeModule`; the per-test
+// return value stands in for what the active iOS Focus stored, and `null`
+// stands in for Android, where the module is not registered.
+vi.mock('expo', () => ({ requireOptionalNativeModule: mocks.requireOptionalNativeModule }));
 
 vi.mock('expo-notifications', () => ({
   setBadgeCountAsync: mocks.setBadgeCountAsync,
@@ -224,7 +225,7 @@ beforeEach(() => {
   mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
   mocks.requestPermissionsAsync.mockResolvedValue({ status: 'denied' });
   mocks.getExpoPushTokenAsync.mockResolvedValue({ data: 'expo-token' });
-  mocks.requireNativeModule.mockReturnValue({ isAgentProgressAllowed: () => true });
+  mocks.requireOptionalNativeModule.mockReturnValue({ isAgentProgressAllowed: () => true });
   mocks.lastResponse = null;
   mocks.listeners.clear();
   mocks.clearLastNotificationResponse.mockImplementation(() => {
@@ -895,7 +896,7 @@ const needsInputPush = {
 describe('per-Focus agent-progress suppression', () => {
   it('suppresses an agent-progress push on iOS when the active Focus excludes it', async () => {
     mocks.platform.OS = 'ios';
-    mocks.requireNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
+    mocks.requireOptionalNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
     const handleNotification = await loadForegroundHandler();
 
     await expect(
@@ -905,7 +906,7 @@ describe('per-Focus agent-progress suppression', () => {
 
   it('shows an agent-progress push on iOS when the active Focus allows it', async () => {
     mocks.platform.OS = 'ios';
-    mocks.requireNativeModule.mockReturnValue({ isAgentProgressAllowed: () => true });
+    mocks.requireOptionalNativeModule.mockReturnValue({ isAgentProgressAllowed: () => true });
     const handleNotification = await loadForegroundHandler();
 
     await expect(
@@ -915,7 +916,7 @@ describe('per-Focus agent-progress suppression', () => {
 
   it('never suppresses a needs-input push, even when the Focus excludes progress', async () => {
     mocks.platform.OS = 'ios';
-    mocks.requireNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
+    mocks.requireOptionalNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
     const handleNotification = await loadForegroundHandler();
 
     await expect(
@@ -923,20 +924,19 @@ describe('per-Focus agent-progress suppression', () => {
     ).resolves.toEqual(SHOWN_BEHAVIOR);
   });
 
-  it('does not consult the native Focus module on Android', async () => {
+  it('shows an agent-progress push on Android, where the Focus module is absent', async () => {
     mocks.platform.OS = 'android';
-    mocks.requireNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
+    mocks.requireOptionalNativeModule.mockReturnValue(null);
     const handleNotification = await loadForegroundHandler();
 
     await expect(
       handleNotification({ request: { content: { data: progressPush } } })
     ).resolves.toEqual(SHOWN_BEHAVIOR);
-    expect(mocks.requireNativeModule).not.toHaveBeenCalled();
   });
 
   it('never suppresses the glanceable carrier under an excluding Focus', async () => {
     mocks.platform.OS = 'ios';
-    mocks.requireNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
+    mocks.requireOptionalNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
     const loaded = await loadNotifications();
     loaded.persist._setLastGlanceableSnapshotForTests(glanceableSnapshot({ needsInput: 2 }));
     mockSecureStoreKeys();

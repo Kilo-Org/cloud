@@ -11,7 +11,10 @@ export function rememberWorktreeStateEndpoint(
   directory: string,
   endpoint: WorktreeStateEndpoint | undefined
 ): void {
-  if (!endpoint) return;
+  if (!endpoint) {
+    endpoints.delete(directory);
+    return;
+  }
   endpoints.set(directory, endpoint);
 }
 

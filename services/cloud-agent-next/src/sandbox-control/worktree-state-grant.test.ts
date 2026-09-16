@@ -51,8 +51,17 @@ describe('worktree state grant', () => {
     expect(validateWorktreeStateGrant(`Bearer ${forged}`, secret)).toBeUndefined();
   });
 
+  it('round-trips federated oauth user ids', () => {
+    const federated = { userId: 'oauth/google:1234', scopeId: 'worktree_abc-123' };
+    const grant = mintWorktreeStateGrant(federated, secret);
+    expect(validateWorktreeStateGrant(`Bearer ${grant}`, secret)).toEqual(federated);
+  });
+
   it('refuses identities the object key schema would not accept', () => {
     expect(() => mintWorktreeStateGrant({ userId: '../etc', scopeId: 'ok' }, secret)).toThrow();
     expect(() => mintWorktreeStateGrant({ userId: 'usr', scopeId: 'a/b' }, secret)).toThrow();
+    expect(() =>
+      mintWorktreeStateGrant({ userId: 'oauth/../etc', scopeId: 'ok' }, secret)
+    ).toThrow();
   });
 });

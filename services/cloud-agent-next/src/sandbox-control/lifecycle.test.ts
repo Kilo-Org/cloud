@@ -523,6 +523,7 @@ async function harness(
     closeProvisionalSockets: vi.fn(),
     supportsOperationResults: () => true,
     supportsNativeRuntimeIdCapture: () => false,
+    supportsWorktreeState: () => true,
     pendingControlRequests: () => 0,
     sendRequest,
   } as unknown as SandboxControlSocketHandler;

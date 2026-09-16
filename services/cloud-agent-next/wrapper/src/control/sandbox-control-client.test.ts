@@ -408,6 +408,7 @@ describe('createSandboxControlClient', () => {
           workingBranches?: boolean;
           gitAuthor?: boolean;
           nativeRuntimeIdCapture?: boolean;
+          worktreeState?: boolean;
         };
       };
     };
@@ -429,6 +430,7 @@ describe('createSandboxControlClient', () => {
         workingBranches: true,
         gitAuthor: true,
         nativeRuntimeIdCapture: true,
+        worktreeState: true,
       },
     });
     fake.respond(

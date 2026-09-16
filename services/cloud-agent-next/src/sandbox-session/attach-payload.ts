@@ -85,7 +85,8 @@ export function buildSessionAttachPayload(
 export function adaptSessionAttachPayloadForWrapper(
   payload: SessionAttachPayload,
   supportsWorkingBranches: boolean,
-  supportsGitAuthor = false
+  supportsGitAuthor = false,
+  supportsWorktreeState = false
 ): SessionAttachPayload {
   let adapted = payload;
   if (!supportsWorkingBranches && adapted.branchMode === 'working') {
@@ -95,6 +96,10 @@ export function adaptSessionAttachPayloadForWrapper(
   if (!supportsGitAuthor && adapted.git?.author) {
     const { author: _author, ...git } = adapted.git;
     adapted = { ...adapted, git };
+  }
+  if (!supportsWorktreeState && adapted.worktreeState !== undefined) {
+    const { worktreeState: _worktreeState, ...legacyPayload } = adapted;
+    adapted = legacyPayload;
   }
   return adapted;
 }

@@ -3061,6 +3061,10 @@
     "channelName": "Active agents",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."
   },
+  "launcher": {
+    "newAgent": "New agent",
+    "openLastSession": "Open last session"
+  },
   "transcriptionModel": {
     "title": "Transcription model",
     "noneChosen": "None chosen",

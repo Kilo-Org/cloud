@@ -582,6 +582,10 @@
       "pending": "čekající: {{displayCount}}",
       "skipped": "přeskočené: {{displayCount}}",
       "checksCount": "kontroly: {{displayCount}}",
+      "checksCount_one": "kontrola: {{displayCount}}",
+      "checksCount_few": "kontroly: {{displayCount}}",
+      "checksCount_many": "kontroly: {{displayCount}}",
+      "checksCount_other": "kontroly: {{displayCount}}",
       "checkDetails": "podrobnosti kontroly"
     },
     "inbox": {

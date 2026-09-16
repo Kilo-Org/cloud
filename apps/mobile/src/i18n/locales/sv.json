@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} väntande",
       "skipped": "{{displayCount}} överhoppade",
       "checksCount": "{{displayCount}} kontroller",
+      "checksCount_one": "{{displayCount}} kontroll",
+      "checksCount_other": "{{displayCount}} kontroller",
       "checkDetails": "information om kontrollen"
     },
     "inbox": {

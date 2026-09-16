@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} afventer",
       "skipped": "{{displayCount}} sprunget over",
       "checksCount": "{{displayCount}} kontroller",
+      "checksCount_one": "{{displayCount}} kontrol",
+      "checksCount_other": "{{displayCount}} kontroller",
       "checkDetails": "detaljer om kontrollen"
     },
     "inbox": {

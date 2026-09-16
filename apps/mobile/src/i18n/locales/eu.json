@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} zain",
       "skipped": "{{displayCount}} alde batera utzita",
       "checksCount": "{{displayCount}} egiaztapen",
+      "checksCount_one": "{{displayCount}} egiaztapen",
+      "checksCount_other": "{{displayCount}} egiaztapen",
       "checkDetails": "egiaztapenaren xehetasunak"
     },
     "inbox": {

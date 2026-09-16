@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
 import type { User } from '@kilocode/db/schema';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
@@ -15,6 +16,7 @@ jest.mock('next/server', () => {
 
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
+jest.mock('@/lib/autoTopUpInFlight');
 jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
 }));
@@ -32,6 +34,7 @@ jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedIsFreeModel = jest.mocked(isFreeModel);
+const mockedIsAutoTopUpInFlight = jest.mocked(isAutoTopUpInFlight);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
@@ -92,6 +95,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     globalThis.fetch = mockedFetch;
+    mockedIsAutoTopUpInFlight.mockResolvedValue(false);
   });
 
   afterAll(() => {
@@ -252,6 +256,36 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
 
     expect(response.status).toBe(402);
     expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('returns a retryable response when a zero balance is blocked during an in-flight auto top-up', async () => {
+    setUserAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 0,
+      settings: undefined,
+      plan: undefined,
+    });
+    mockedIsFreeModel.mockResolvedValue(false);
+    mockedIsAutoTopUpInFlight.mockResolvedValue(true);
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest({
+        model: 'openai/gpt-4o-mini-transcribe',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+      }) as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('5');
+    const body = (await response.json()) as { error_type?: string; message?: string };
+    expect(body.error_type).toBe('top_up_in_progress');
+    expect(body.message).not.toMatch(/credit|payment|balance|quota/i);
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(mockedIsAutoTopUpInFlight).toHaveBeenCalledWith({
+      userId: 'user-123',
+      organizationId: undefined,
+    });
   });
 
   it('proxies multipart transcription requests with the model and file fields', async () => {

@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} belum selesai",
       "skipped": "{{displayCount}} dilangkau",
       "checksCount": "{{displayCount}} pemeriksaan",
+      "checksCount_one": "{{displayCount}} pemeriksaan",
+      "checksCount_other": "{{displayCount}} pemeriksaan",
       "checkDetails": "butiran pemeriksaan"
     },
     "inbox": {

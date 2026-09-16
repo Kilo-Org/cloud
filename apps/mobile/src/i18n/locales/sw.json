@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} vinasubiri",
       "skipped": "{{displayCount}} vimerukwa",
       "checksCount": "vipimo {{displayCount}}",
+      "checksCount_one": "kipimo {{displayCount}}",
+      "checksCount_other": "vipimo {{displayCount}}",
       "checkDetails": "maelezo ya kipimo"
     },
     "inbox": {

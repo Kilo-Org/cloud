@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} gözləmədə",
       "skipped": "{{displayCount}} buraxılıb",
       "checksCount": "{{displayCount}} yoxlama",
+      "checksCount_one": "{{displayCount}} yoxlama",
+      "checksCount_other": "{{displayCount}} yoxlama",
       "checkDetails": "yoxlama təfərrüatları"
     },
     "inbox": {

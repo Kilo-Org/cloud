@@ -577,6 +577,9 @@
       "pending": "gaida: {{displayCount}}",
       "skipped": "izlaistas: {{displayCount}}",
       "checksCount": "pārbaudes: {{displayCount}}",
+      "checksCount_zero": "pārbaužu: {{displayCount}}",
+      "checksCount_one": "pārbaude: {{displayCount}}",
+      "checksCount_other": "pārbaudes: {{displayCount}}",
       "checkDetails": "informācija par pārbaudi"
     },
     "inbox": {

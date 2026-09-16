@@ -31,6 +31,11 @@ import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { logger } from '../logger.js';
 import { SESSION_DELIVERY_TIMEOUT_MS } from './control-dispatch.js';
 import { RUNTIME_AUTHORIZATION_KEY } from '../session/runtime-authorization-persistence.js';
+import {
+  RUNTIME_PROXY_GRANT_KEY,
+  runtimeProxyGrantSchema,
+  type RuntimeProxyFence,
+} from '../runtime-credential-proxy.js';
 import { PENDING_SESSION_MESSAGE_LIMIT } from '../session/pending-messages.js';
 import { createControlStopRequest } from '../shared/control-plane-session.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
@@ -59,6 +64,7 @@ import {
   recordSessionOperationDispatch,
   releaseCompletedRetryableAttach,
   releaseUnadmittedWaitingMessages,
+  releaseUnconfirmedAttach,
   rotateLostPreparationAttempt,
   resolveSessionMessageIntent,
   streamCloudStatus,
@@ -670,6 +676,89 @@ describe('releaseCompletedRetryableAttach', () => {
   });
 });
 
+describe('releaseUnconfirmedAttach', () => {
+  const authorization: SessionOperationAuthorization = {
+    operation: 'session.attach',
+    operationId: 'attempt-missing',
+    messageId: 'a',
+    session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_root', directory: DIRECTORY },
+    wrapperInstanceId: RUNTIME_ID,
+    dispatchDeadlineAt: 100,
+  };
+
+  function queuedMessage(attach: SessionOperationProof): SessionMessageRecord {
+    return {
+      ...createSessionMessageRecord({ turn: promptTurn, agent: defaultAgent }),
+      unresolvedDispatch: true,
+      wrapperInstanceId: RUNTIME_ID,
+      operations: { attach },
+    };
+  }
+
+  it('retires a dispatched attach the runtime has no record of', () => {
+    const attach = { authorization, dispatched: true };
+    const released = releaseUnconfirmedAttach(
+      [
+        {
+          ...queuedMessage(attach),
+          preparationAttemptId: 'attempt-missing',
+          deliveryDeadlineAt: 500,
+        },
+      ],
+      authorization
+    );
+
+    expect(released?.[0]).toMatchObject({
+      unresolvedDispatch: undefined,
+      wrapperInstanceId: RUNTIME_ID,
+      preparationAttemptId: 'attempt-missing',
+      deliveryDeadlineAt: 500,
+      operations: { retiredAttach: attach },
+    });
+    expect(released?.[0]?.operations?.attach).toBeUndefined();
+  });
+
+  it('refuses a message id that is not in the messages array', () => {
+    expect(releaseUnconfirmedAttach([], authorization)).toBeUndefined();
+  });
+
+  it('refuses a present message with no attach proof', () => {
+    const message: SessionMessageRecord = {
+      ...queuedMessage({ authorization, dispatched: true }),
+      operations: undefined,
+    };
+
+    expect(releaseUnconfirmedAttach([message], authorization)).toBeUndefined();
+  });
+
+  it.each([
+    {
+      name: 'a completed attach result',
+      attach: {
+        authorization,
+        dispatched: true,
+        result: { ok: false as const, error: { code: 'not_ready', message: 'x', retryable: true } },
+      },
+    },
+    {
+      name: 'an undispatched attach proof',
+      attach: { authorization, dispatched: false },
+    },
+    {
+      name: 'an attach proof for another wrapper',
+      attach: {
+        authorization: {
+          ...authorization,
+          wrapperInstanceId: '44444444-4444-4444-8444-444444444444',
+        },
+        dispatched: true,
+      },
+    },
+  ])('refuses to release $name', ({ attach }) => {
+    expect(releaseUnconfirmedAttach([queuedMessage(attach)], authorization)).toBeUndefined();
+  });
+});
+
 describe('rotateLostPreparationAttempt', () => {
   const attachAuthorization: SessionOperationAuthorization = {
     operation: 'session.attach',
@@ -1181,6 +1270,16 @@ function installModernRuntimeAuthorization(fixture: ReturnType<typeof sessionFix
     source: { admissionSource: 'user' },
   });
   return token;
+}
+
+function connectionFence(connectionId: string): Extract<RuntimeProxyFence, { plane: 'control' }> {
+  return {
+    plane: 'control',
+    allocationId: 'allocation_1',
+    providerInstanceId: 'provider_1',
+    connectionId,
+    wrapperInstanceId: RUNTIME_ID,
+  };
 }
 
 describe('SandboxSession orchestration', () => {
@@ -5406,6 +5505,68 @@ describe('SandboxSession orchestration', () => {
       });
     }
   );
+
+  it('resolves and reuses a runtime proxy handle when only the control connection changes', async () => {
+    const fixture = sessionFixture();
+    const backingToken = installModernRuntimeAuthorization(fixture);
+    const fenceMock = fixture.control.getRuntimeCredentialProxyFence;
+    const f1 = connectionFence('connection_1');
+    const f2 = connectionFence('connection_2');
+    fenceMock.mockResolvedValueOnce(f1).mockResolvedValueOnce(f1).mockResolvedValue(f2);
+
+    const handle = await fixture.session.issueRuntimeCredentialProxyGrant({
+      wrapperRunId: 'ignored',
+      wrapperGeneration: 0,
+      wrapperConnectionId: 'ignored',
+    });
+    expect(handle).toEqual(expect.any(String));
+    expect(fixture.values.get(RUNTIME_PROXY_GRANT_KEY)).toMatchObject({
+      plane: 'control',
+      connectionId: 'connection_1',
+    });
+
+    await expect(
+      fixture.session.resolveRuntimeCredentialProxyGrant(handle!)
+    ).resolves.toMatchObject({ token: backingToken });
+
+    const reused = await fixture.session.issueRuntimeCredentialProxyGrant({
+      wrapperRunId: 'ignored',
+      wrapperGeneration: 0,
+      wrapperConnectionId: 'ignored',
+    });
+    expect(reused).toBe(handle);
+    expect(
+      runtimeProxyGrantSchema.parse(fixture.values.get(RUNTIME_PROXY_GRANT_KEY))
+    ).toMatchObject({ plane: 'control', connectionId: 'connection_2' });
+  });
+
+  it('reuses a runtime proxy handle when the control connection changes between the two reads', async () => {
+    const fixture = sessionFixture();
+    installModernRuntimeAuthorization(fixture);
+    const fenceMock = fixture.control.getRuntimeCredentialProxyFence;
+    const f1 = connectionFence('connection_1');
+    const f2 = connectionFence('connection_2');
+
+    fenceMock.mockResolvedValue(f1);
+    const handle = await fixture.session.issueRuntimeCredentialProxyGrant({
+      wrapperRunId: 'ignored',
+      wrapperGeneration: 0,
+      wrapperConnectionId: 'ignored',
+    });
+    expect(handle).toEqual(expect.any(String));
+
+    fenceMock.mockReset();
+    fenceMock.mockResolvedValueOnce(f1).mockResolvedValue(f2);
+    const reused = await fixture.session.issueRuntimeCredentialProxyGrant({
+      wrapperRunId: 'ignored',
+      wrapperGeneration: 0,
+      wrapperConnectionId: 'ignored',
+    });
+    expect(reused).toBe(handle);
+    expect(
+      runtimeProxyGrantSchema.parse(fixture.values.get(RUNTIME_PROXY_GRANT_KEY))
+    ).toMatchObject({ plane: 'control', connectionId: 'connection_2' });
+  });
 
   it.each(['revoked', 'deleted'] as const)(
     'immediately denies runtime proxy issue and resolution after terminal lifecycle is %s despite pending or failed detach',

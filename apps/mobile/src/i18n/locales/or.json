@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} ବାକି",
       "skipped": "{{displayCount}} ଛାଡ଼ିଦିଆଗଲା",
       "checksCount": "{{displayCount}} ଯାଞ୍ଚ",
+      "checksCount_one": "{{displayCount}} ଯାଞ୍ଚ",
+      "checksCount_other": "{{displayCount}} ଯାଞ୍ଚ",
       "checkDetails": "ଯାଞ୍ଚ ବିବରଣୀ"
     },
     "inbox": {

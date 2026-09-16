@@ -99,9 +99,9 @@ const roleExpression: SQL<OutcomeRole> = sql<OutcomeRole>`case when ${cloud_agen
 const responsibilityBucketExpression: SQL<string> = sql<string>`case when ${unknownResponsibilityCondition} then 'unknown' else ${cloud_agent_session_runs.failure_responsibility} end`;
 
 const runFailureStageExpression: SQL<string> = sql<string>`coalesce(${cloud_agent_session_runs.failure_stage}, 'unknown')`;
-const runFailureCodeExpression: SQL<string> = sql<string>`coalesce(${cloud_agent_session_runs.failure_code}, 'unknown')`;
+const runFailureCodeExpression: SQL<string> = sql<string>`coalesce(${cloud_agent_session_runs.failure_code}, 'unclassified')`;
 const sessionFailureStageExpression: SQL<string> = sql<string>`coalesce(${cloud_agent_sessions.failure_stage}, 'unknown')`;
-const sessionFailureCodeExpression: SQL<string> = sql<string>`coalesce(${cloud_agent_sessions.failure_code}, 'unknown')`;
+const sessionFailureCodeExpression: SQL<string> = sql<string>`coalesce(${cloud_agent_sessions.failure_code}, 'unclassified')`;
 
 function retainedWindow(
   timeColumn: AnyColumn,

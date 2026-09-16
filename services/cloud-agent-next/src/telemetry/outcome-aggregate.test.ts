@@ -88,7 +88,7 @@ function runRow(input: {
     status: input.status,
     responsibility: input.responsibility ?? 'unknown',
     failureStage: input.failureStage ?? 'unknown',
-    failureCode: input.failureCode ?? 'unknown',
+    failureCode: input.failureCode ?? 'unclassified',
     runCount: input.runCount,
   };
 }

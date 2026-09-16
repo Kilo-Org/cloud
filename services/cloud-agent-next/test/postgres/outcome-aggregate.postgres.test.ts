@@ -367,6 +367,23 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     expect(legacy(result).distinctUnknownAffectedSessions).toBe(1);
   });
 
+  it('emits the unclassified failure-code sentinel for a failed run with no classification', async () => {
+    const window = nextWindow();
+    const sessionId = uniqueSessionId('agent');
+    const initial = await createSession(sessionId, window.start);
+    await saveReport(
+      sessionId,
+      { messageId: initial, status: 'failed', queuedAt: window.start, terminalAt: window.start },
+      window.end
+    );
+
+    const result = await aggregate(window);
+    expect(legacy(result).totals.failureStages).toEqual([{ stage: 'unknown', count: 1 }]);
+    expect(legacy(result).totals.failureStageCodes).toEqual([
+      { stage: 'unknown', code: 'unclassified', count: 1 },
+    ]);
+  });
+
   it('counts one distinct platform-affected session across many failing turns', async () => {
     const window = nextWindow();
     const sessionId = uniqueSessionId('agent');

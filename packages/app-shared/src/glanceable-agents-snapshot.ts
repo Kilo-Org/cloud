@@ -89,13 +89,19 @@ export const glanceableAgentsSnapshotSchema = z.object({
    * completed or unknown status folds into `running`, the same fold the counts
    * use, so the newest-result line can never disagree with the row above it —
    * see `newestGlanceableResult`.
+   *
+   * Optional on input with a null default: a version-1 snapshot persisted by
+   * the release before this fact carried no such key, and every reader treats
+   * absent as null. Remove the optional and the default when every producer
+   * sends it.
    */
-  newestResultKind: z.enum(['needsInput', 'running', 'idle']).nullable(),
+  newestResultKind: z.enum(['needsInput', 'running', 'idle']).nullable().default(null),
   /**
    * ISO 8601 timestamp or null: when that newest change happened. Null exactly
-   * when `newestResultKind` is null.
+   * when `newestResultKind` is null. Optional on input with a null default for
+   * the same reason as the kind.
    */
-  newestResultAt: z.string().nullable(),
+  newestResultAt: z.string().nullable().default(null),
 });
 
 export type GlanceableAgentsSnapshot = z.infer<typeof glanceableAgentsSnapshotSchema>;

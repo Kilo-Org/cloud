@@ -256,6 +256,28 @@ describe('buildGlanceableSnapshot', () => {
     expect(glanceableAgentsSnapshotSchema.safeParse(withoutCount).success).toBe(true);
   });
 
+  // The release before the newest-result fact wrote schema version 1 records
+  // without these two keys. A parse that rejects them would drop the last
+  // counts from a widget that survived the app upgrade, so the fact must parse
+  // as absent and default to null.
+  it('parses a version-1 record written before the newest-result fields existed', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'question', statusUpdatedAt: new Date(NOW - 60_000).toISOString() }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    const { newestResultKind: _kind, newestResultAt: _at, ...previousRelease } = snapshot;
+
+    const result = glanceableAgentsSnapshotSchema.safeParse(previousRelease);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.newestResultKind).toBeNull();
+      expect(result.data.newestResultAt).toBeNull();
+    }
+  });
+
   it('sets organizationBound only when organizationId is a string', () => {
     const personal = buildGlanceableSnapshot({
       sessions: [],

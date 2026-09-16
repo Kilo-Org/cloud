@@ -368,7 +368,7 @@ describe('widget config', () => {
   it('declares a periodic redraw no longer than the stale window', () => {
     const widget = widgetConfig.widgets.find(entry => entry.name === 'ActiveAgentsWidget');
 
-    expect(widget?.updatePeriodMillis).toBeGreaterThanOrEqual(GLANCEABLE_STALE_MS);
+    expect(widget?.updatePeriodMillis).toBeLessThanOrEqual(GLANCEABLE_STALE_MS);
   });
 });
 

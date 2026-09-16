@@ -20,6 +20,7 @@ import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { tryGetProviderById } from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
 import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
+import { checkOpenAiChatGptByok } from '@/lib/ai-gateway/openai-chatgpt/routing';
 import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
@@ -238,6 +239,18 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {
     return directByokByok;
+  }
+
+  // An enabled "Sign in with ChatGPT" connection wins for an eligible OpenAI
+  // responses request, before the Vercel BYOK lookup. Every other resolution
+  // (including an ineligible request for the same model) stays as it is today.
+  const openAiChatGptByok = await checkOpenAiChatGptByok({
+    request,
+    requestedModel,
+    userId: isAnonymousContext(user) ? null : user.id,
+  });
+  if (openAiChatGptByok) {
+    return openAiChatGptByok;
   }
 
   const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);

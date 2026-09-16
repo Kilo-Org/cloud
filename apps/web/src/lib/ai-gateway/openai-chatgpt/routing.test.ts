@@ -1,0 +1,291 @@
+jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
+  getOpenAiChatGptConnection: jest.fn(),
+}));
+jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
+  ensureFreshOpenAiChatGptAccessToken: jest.fn(),
+}));
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}));
+// `upstreamRequest` schedules its timeout-listener cleanup through `next/server`'s
+// `after()` post-response hook, which only works in a request context.
+jest.mock('next/server', () => ({
+  ...(jest.requireActual('next/server') as Record<string, unknown>),
+  after: jest.fn((work: Promise<unknown> | (() => Promise<unknown>)) => {
+    void (typeof work === 'function' ? work() : work);
+  }),
+}));
+
+import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
+import { ensureFreshOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
+import { getOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
+import type {
+  GatewayRequest,
+  GatewayResponsesRequest,
+} from '@/lib/ai-gateway/providers/openrouter/types';
+import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
+import { EmptyFraudDetectionHeaders } from '@/lib/utils';
+import {
+  checkOpenAiChatGptByok,
+  isOpenAiChatGptEligible,
+  OPENAI_CHATGPT_API_URL,
+  OPENAI_ON_BEHALF_OF_TOKEN_HEADER,
+  type OpenAiChatGptRoutingInput,
+} from './routing';
+import type { OpenAiChatGptConnection } from './types';
+
+const PARTNER_KEY = 'partner-project-key';
+const DELEGATED_TOKEN = 'delegated-access-token';
+const REQUESTED_MODEL = 'openai/gpt-5-nano';
+const USER_ID = 'user-1';
+
+const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
+const originalFetch = global.fetch;
+
+function connectedConnection(): OpenAiChatGptConnection {
+  return {
+    access_token: 'stored-access-token',
+    refresh_token: 'stored-refresh-token',
+    expires_at: 1_800_000_000,
+    scope: 'openid profile email offline_access',
+    token_type: 'Bearer',
+    issuer: 'https://auth.openai.com',
+    client_id: 'client-id',
+    subject: 'subject-1',
+    email: 'user@example.com',
+    connected_at: '2026-09-16T00:00:00.000Z',
+    status: 'connected',
+  };
+}
+
+function responsesRequest(model: string): GatewayRequest {
+  return {
+    kind: 'responses',
+    body: { model, input: 'hello', store: true, conversation: 'conv-1', background: true },
+  };
+}
+
+function chatCompletionsRequest(model: string): GatewayRequest {
+  return {
+    kind: 'chat_completions',
+    body: { model, messages: [{ role: 'user', content: 'hello' }] },
+  };
+}
+
+function routingInput(
+  overrides: Partial<OpenAiChatGptRoutingInput> = {}
+): OpenAiChatGptRoutingInput {
+  return {
+    request: responsesRequest(REQUESTED_MODEL),
+    requestedModel: REQUESTED_MODEL,
+    userId: USER_ID,
+    ...overrides,
+  };
+}
+
+async function buildProviderForTest() {
+  const result = await checkOpenAiChatGptByok(routingInput());
+  if (!result) {
+    throw new Error('expected an openai-chatgpt provider');
+  }
+  return result.provider;
+}
+
+async function transformResponsesRequest(
+  provider: Awaited<ReturnType<typeof buildProviderForTest>>,
+  body: GatewayResponsesRequest
+): Promise<Record<string, string>> {
+  const extraHeaders: Record<string, string> = {};
+  await provider.transformRequest({
+    provider,
+    model: REQUESTED_MODEL,
+    request: { kind: 'responses', body },
+    originalHeaders: EmptyFraudDetectionHeaders,
+    extraHeaders,
+    userByok: null,
+    kilo_user_id: USER_ID,
+    organization_id: null,
+    session_id: null,
+  });
+  return extraHeaders;
+}
+
+beforeEach(() => {
+  process.env.OPENAI_API_KEY = PARTNER_KEY;
+  jest
+    .mocked(getOpenAiChatGptConnection)
+    .mockReset()
+    .mockResolvedValue(connectedConnection());
+  jest.mocked(ensureFreshOpenAiChatGptAccessToken).mockReset().mockResolvedValue(DELEGATED_TOKEN);
+});
+
+afterAll(() => {
+  if (originalOpenAiApiKey === undefined) {
+    delete process.env.OPENAI_API_KEY;
+  } else {
+    process.env.OPENAI_API_KEY = originalOpenAiApiKey;
+  }
+  global.fetch = originalFetch;
+});
+
+describe('isOpenAiChatGptEligible', () => {
+  it('is eligible for a responses request for a prefixed OpenAI model', async () => {
+    await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(true);
+    expect(getOpenAiChatGptConnection).toHaveBeenCalledWith(USER_ID);
+  });
+
+  it('matches and strips the model id case-insensitively, ignoring surrounding whitespace', async () => {
+    await expect(
+      isOpenAiChatGptEligible(routingInput({ requestedModel: '  OpenAI/gpt-5-nano  ' }))
+    ).resolves.toBe(true);
+  });
+
+  it.each([
+    {
+      label: 'a chat_completions request for the same model',
+      overrides: { request: chatCompletionsRequest('openai/gpt-5-nano') },
+    },
+    {
+      label: 'a gpt-oss open-weight model',
+      overrides: {
+        request: responsesRequest('openai/gpt-oss-20b'),
+        requestedModel: 'openai/gpt-oss-20b',
+      },
+    },
+    {
+      label: 'a non-OpenAI model',
+      overrides: {
+        request: responsesRequest('anthropic/claude-sonnet-5'),
+        requestedModel: 'anthropic/claude-sonnet-5',
+      },
+    },
+    {
+      label: 'a Kilo-exclusive OpenAI model',
+      overrides: {
+        request: responsesRequest('openai/gpt-5.6-sol-discounted'),
+        requestedModel: 'openai/gpt-5.6-sol-discounted',
+      },
+    },
+    { label: 'an anonymous caller', overrides: { userId: null } },
+  ] satisfies Array<{ label: string; overrides: Partial<OpenAiChatGptRoutingInput> }>)(
+    'is not eligible for $label',
+    async ({ overrides }) => {
+      await expect(isOpenAiChatGptEligible(routingInput(overrides))).resolves.toBe(false);
+    }
+  );
+
+  it.each(['', '   '])('is not eligible with an empty partner key %p', async apiKey => {
+    process.env.OPENAI_API_KEY = apiKey;
+
+    await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(false);
+  });
+
+  it('is not eligible when no connection is stored', async () => {
+    jest.mocked(getOpenAiChatGptConnection).mockResolvedValue(null);
+
+    await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(false);
+  });
+
+  it('is not eligible when the connection is disabled after a failed refresh', async () => {
+    jest
+      .mocked(getOpenAiChatGptConnection)
+      .mockResolvedValue({ ...connectedConnection(), status: 'error', error_message: 'expired' });
+
+    await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(false);
+  });
+});
+
+describe('checkOpenAiChatGptByok', () => {
+  it('builds a stateless responses provider carrying the delegated token', async () => {
+    const result = await checkOpenAiChatGptByok(routingInput());
+
+    expect(result).toMatchObject({
+      kind: 'provider',
+      userByok: null,
+      bypassAccessCheck: false,
+      provider: {
+        id: 'openai-chatgpt',
+        apiUrl: OPENAI_CHATGPT_API_URL,
+        apiKey: PARTNER_KEY,
+        // A null apiKeyHeader makes `upstream-request.ts` send the partner key
+        // as `Authorization: Bearer <key>`.
+        apiKeyHeader: null,
+        supportedChatApis: ['responses'],
+      },
+    });
+
+    const provider = await buildProviderForTest();
+    const body: GatewayResponsesRequest = {
+      model: 'OpenAI/gpt-5-nano',
+      input: 'hello',
+      store: true,
+      conversation: 'conv-1',
+      background: true,
+      // The gateway-only routing object must not reach api.openai.com.
+      provider: { only: ['openai'] },
+    };
+
+    const extraHeaders = await transformResponsesRequest(provider, body);
+
+    expect(extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER]).toBe(DELEGATED_TOKEN);
+    expect(body.model).toBe('gpt-5-nano');
+    expect(body.store).toBe(false);
+    expect('conversation' in body).toBe(false);
+    expect('background' in body).toBe(false);
+    expect('provider' in body).toBe(false);
+  });
+
+  it('sends the partner key as Authorization and the delegated token upstream', async () => {
+    const provider = await buildProviderForTest();
+    const body: GatewayResponsesRequest = {
+      model: 'openai/gpt-5-nano',
+      input: 'hello',
+      provider: { only: ['openai'] },
+    };
+    const extraHeaders = await transformResponsesRequest(provider, body);
+
+    const mockFetch = jest.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+    global.fetch = mockFetch;
+
+    const outcome = await upstreamRequest({
+      chatApi: 'responses',
+      search: '',
+      method: 'POST',
+      body,
+      extraHeaders,
+      provider,
+      reasoningEffort: null,
+    });
+
+    expect(outcome.type).toBe('success');
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${OPENAI_CHATGPT_API_URL}/responses`);
+    const headers = init.headers as Headers;
+    expect(headers.get('Authorization')).toBe(`Bearer ${PARTNER_KEY}`);
+    expect(headers.get(OPENAI_ON_BEHALF_OF_TOKEN_HEADER)).toBe(DELEGATED_TOKEN);
+    // api.openai.com rejects the gateway-only routing object.
+    expect(JSON.parse(init.body as string)).not.toHaveProperty('provider');
+  });
+
+  it('returns no provider when the connection cannot refresh', async () => {
+    jest.mocked(ensureFreshOpenAiChatGptAccessToken).mockResolvedValue(null);
+
+    await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
+  });
+
+  it('returns no provider for an ineligible request without reading the connection', async () => {
+    await expect(
+      checkOpenAiChatGptByok(
+        routingInput({ request: chatCompletionsRequest('openai/gpt-5-nano') })
+      )
+    ).resolves.toBeNull();
+    expect(getOpenAiChatGptConnection).not.toHaveBeenCalled();
+    expect(ensureFreshOpenAiChatGptAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('returns no provider for an anonymous caller', async () => {
+    await expect(checkOpenAiChatGptByok(routingInput({ userId: null }))).resolves.toBeNull();
+    expect(ensureFreshOpenAiChatGptAccessToken).not.toHaveBeenCalled();
+  });
+});

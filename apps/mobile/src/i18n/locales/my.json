@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} ခု စောင့်ဆိုင်းဆဲ",
       "skipped": "{{displayCount}} ခု ကျော်ထား",
       "checksCount": "စစ်ဆေးမှု {{displayCount}} ခု",
+      "checksCount_one": "စစ်ဆေးမှု {{displayCount}} ခု",
+      "checksCount_other": "စစ်ဆေးမှု {{displayCount}} ခု",
       "checkDetails": "စစ်ဆေးမှုအသေးစိတ်များ"
     },
     "inbox": {

@@ -587,6 +587,11 @@
       "pending": "{{displayCount}} pendenti",
       "skipped": "{{displayCount}} maqbuża",
       "checksCount": "{{displayCount}} kontrolli",
+      "checksCount_one": "{{displayCount}} kontroll",
+      "checksCount_two": "{{displayCount}} kontrolli",
+      "checksCount_few": "{{displayCount}} kontrolli",
+      "checksCount_many": "{{displayCount}}-il kontroll",
+      "checksCount_other": "{{displayCount}} kontrolli",
       "checkDetails": "dettalji tal-kontroll"
     },
     "inbox": {

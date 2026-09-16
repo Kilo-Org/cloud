@@ -2374,6 +2374,8 @@
     "checkConnection": "Kiểm tra kết nối",
     "checks": {
       "checksCount": "{{displayCount}} bước kiểm tra",
+      "checksCount_one": "{{displayCount}} bước kiểm tra",
+      "checksCount_other": "{{displayCount}} bước kiểm tra",
       "couldNotLoad": "Không thể tải các bước kiểm tra.",
       "failed": "{{displayCount}} không đạt",
       "noAccess": "Bạn không có quyền xem các bước kiểm tra của kho lưu trữ này.",

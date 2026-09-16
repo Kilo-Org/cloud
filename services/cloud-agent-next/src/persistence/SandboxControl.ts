@@ -793,7 +793,7 @@ export class SandboxControl extends DurableObject<Env> {
     ) {
       return null;
     }
-    const runtime = this.readyWrapperRuntime();
+    const runtime = this.establishedWrapperForAllocation(physical);
     if (
       !runtime ||
       !runtime.wrapperInstanceId ||

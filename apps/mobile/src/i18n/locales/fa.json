@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} در انتظار",
       "skipped": "{{displayCount}} اجرا‌نشده",
       "checksCount": "{{displayCount}} بررسی",
+      "checksCount_one": "{{displayCount}} بررسی",
+      "checksCount_other": "{{displayCount}} بررسی",
       "checkDetails": "جزئیات بررسی"
     },
     "inbox": {

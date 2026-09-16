@@ -577,6 +577,9 @@
       "pending": "{{displayCount}} por concluir",
       "skipped": "{{displayCount}} ignoradas",
       "checksCount": "{{displayCount}} verificações",
+      "checksCount_one": "{{displayCount}} verificação",
+      "checksCount_many": "{{displayCount}} verificações",
+      "checksCount_other": "{{displayCount}} verificações",
       "checkDetails": "detalhes da verificação"
     },
     "inbox": {

@@ -24,6 +24,7 @@ const BLOCKED_PERMISSIONS = [
 ];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+const ARTIFACT_FILE_PROVIDER_PLUGIN = './plugins/withArtifactFileProvider';
 const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSMicrophoneUsageDescription',
   'NSSpeechRecognitionUsageDescription',
@@ -138,6 +139,21 @@ check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGI
 check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
+);
+// The iOS File Provider extension target and the Pods integration behind it are
+// created by this plugin alone; without it the Files-app location has no
+// extension to serve it.
+check(
+  pluginNames.includes(ARTIFACT_FILE_PROVIDER_PLUGIN),
+  `plugins must include "${ARTIFACT_FILE_PROVIDER_PLUGIN}"`
+);
+// Same reason one layer down: EAS only builds and signs the extension from its
+// `appExtensions` entry, and the evaluated config is the only place that shows
+// the entry the plugin composed.
+const appExtensions = config.extra?.eas?.build?.experimental?.ios?.appExtensions ?? [];
+check(
+  appExtensions.some(extension => extension.targetName === 'ArtifactsFileProvider'),
+  'extra.eas.build.experimental.ios.appExtensions must carry the ArtifactsFileProvider target'
 );
 
 const extra = config.extra ?? {};

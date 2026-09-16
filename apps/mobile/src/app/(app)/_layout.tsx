@@ -9,6 +9,7 @@ import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { TourAutoOpen } from '@/components/tour/tour-auto-open';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
+import { ArtifactMirrorSyncMount } from '@/lib/artifacts/artifact-mirror-sync-mount';
 import { attemptLogoutReconciliation } from '@/lib/auth/logout-reconciliation';
 import { GlanceablePublisherMount } from '@/lib/glanceable/mount';
 import { useGlanceableOrgFence } from '@/lib/glanceable/org-fence';
@@ -116,6 +117,7 @@ export default function AppLayout() {
   return (
     <UserWebConnectionProvider>
       <ActiveSessionsLiveSyncMount />
+      <ArtifactMirrorSyncMount />
       <GlanceablePublisherMount />
       <CachePersistenceMount />
       <LogoutReconciliationMount />

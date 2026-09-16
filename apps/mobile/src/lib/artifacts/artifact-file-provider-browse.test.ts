@@ -93,12 +93,11 @@ function swiftNumberConstant(name: string): number {
 }
 
 /**
- * The `struct <name>: Decodable { ... }` body, matched by brace depth so a
- * struct nested inside another (`File` inside `Session` inside
- * `ArtifactManifest`) ends at its own closing brace.
+ * The body one Swift `... {` header opens, matched by brace depth so a struct
+ * nested inside another (`File` inside `Session` inside `ArtifactManifest`) or
+ * a closure inside a function ends at its own closing brace.
  */
-function swiftStructBody(name: string): string {
-  const header = `struct ${name}: Decodable {`;
+function swiftBlockBody(header: string): string {
   const start = extensionSource.indexOf(header);
   if (start === -1) {
     throw new Error(`${TARGET_NAME}Extension.swift declares no "${header}"`);
@@ -115,7 +114,12 @@ function swiftStructBody(name: string): string {
       }
     }
   }
-  throw new Error(`unterminated struct ${name}`);
+  throw new Error(`unterminated ${header}`);
+}
+
+/** The `struct <name>: Decodable { ... }` body. */
+function swiftStructBody(name: string): string {
+  return swiftBlockBody(`struct ${name}: Decodable {`);
 }
 
 /** Drop every nested `struct ...: Decodable { ... }` from a struct body. */
@@ -175,6 +179,59 @@ const swiftContract = {
   sessionsDirectoryName: swiftStringConstant('sessionsDirectoryName'),
   supportedManifestVersion: swiftNumberConstant('supportedManifestVersion'),
 };
+
+/**
+ * `ArtifactPath.isSafeComponent` and `ArtifactPath.isSafePath`, read clause by
+ * clause out of the extension source.
+ *
+ * The guard is what lets a manifest id become a path at all: a session id has to
+ * be one plain path component and a file id a run of them, so no id can address
+ * a path above its own session folder. The clauses are read from the Swift
+ * bodies rather than copied, so a guard that is deleted — or that loses a
+ * clause — fails the traversal assertions below instead of leaving them unable
+ * to fail.
+ */
+const safeComponentBody = swiftBlockBody(
+  'static func isSafeComponent(_ segment: String) -> Bool {'
+);
+const safePathBody = swiftBlockBody(
+  'static func isSafePath(sessionId: String, fileId: String) -> Bool {'
+);
+
+/** The `segment != "<value>"` clauses: the components the guard refuses. */
+const refusedComponents = new Set(
+  [...safeComponentBody.matchAll(/segment != "([^"]*)"/gu)].map(match =>
+    swiftLiteral(match[1] ?? '')
+  )
+);
+
+/** The `segment.contains("<value>")` clauses: the text it refuses anywhere. */
+const refusedCharacters = [...safeComponentBody.matchAll(/segment\.contains\("([^"]*)"\)/gu)].map(
+  match => swiftLiteral(match[1] ?? '')
+);
+
+/** A Swift literal's text: the guard's `\0` escape stands for the NUL byte. */
+function swiftLiteral(text: string): string {
+  return text.replaceAll(String.raw`\0`, String.fromCodePoint(0));
+}
+
+/** `ArtifactPath.isSafeComponent`: one non-empty, plain path component. */
+function isSafeComponent(segment: string): boolean {
+  return (
+    segment !== '' &&
+    !refusedComponents.has(segment) &&
+    !refusedCharacters.some(character => segment.includes(character))
+  );
+}
+
+/** `ArtifactPath.isSafePath`: one plain session id, one or more file segments. */
+function isSafePath(sessionId: string, fileId: string): boolean {
+  if (!isSafeComponent(sessionId)) {
+    return false;
+  }
+  const segments = fileId.split('/');
+  return segments.length > 0 && segments.every(segment => isSafeComponent(segment));
+}
 
 type Decoded = { ok: true; value: unknown } | { ok: false; reason: string };
 
@@ -304,8 +361,26 @@ function enumerateSession(manifest: ExtensionManifest, sessionId: string): Files
 /**
  * `ArtifactMirror.fileURL(sessionId:fileId:)`: `<app group>/<mirror>/
  * sessions/<sessionId>/<fileId>`, with a file id spanning several segments.
+ *
+ * The guard is part of the call: an id that is not a plain path component
+ * resolves to no URL, so the extension never builds a path above the session
+ * folder an item belongs to.
  */
-function extensionFileURL(appGroupContainer: string, sessionId: string, fileId: string): string {
+function extensionFileURL(
+  appGroupContainer: string,
+  sessionId: string,
+  fileId: string
+): string | null {
+  return isSafePath(sessionId, fileId)
+    ? unguardedFileURL(appGroupContainer, sessionId, fileId)
+    : null;
+}
+
+/**
+ * The same layout without the guard, to show what it is defending against: the
+ * escapes the assertions below reject only exist once `isSafePath` is gone.
+ */
+function unguardedFileURL(appGroupContainer: string, sessionId: string, fileId: string): string {
   return join(
     appGroupContainer,
     swiftContract.directoryName,
@@ -514,6 +589,9 @@ describe('artifacts File Provider browse (iOS)', () => {
 
         // The open: the path the extension resolves holds the artifact's bytes.
         const resolved = extensionFileURL(containerRoot, session.id, fileIdOf(item, session.id));
+        if (resolved === null) {
+          throw new Error(`the extension refused to resolve ${item.identifier}`);
+        }
         expect(resolved.startsWith(`${sessionDirectory}${sep}`)).toBe(true);
         expect(readFileSync(resolved, 'utf8')).toBe(artifact?.bytes);
       }
@@ -546,13 +624,16 @@ describe('artifacts File Provider browse (iOS)', () => {
   it('keeps a mirrored artifact inside its own session folder', () => {
     const { manifest } = mirroredAsExtension();
     // Ids come from stored session history, so the extension validates them
-    // before they become a path. Every id the app actually writes resolves to a
-    // path below the session folder it belongs to, which is what keeps an
-    // agent-supplied id from walking out of the location.
+    // before they become a path (see `refuses an id that would walk out of its
+    // session folder`). Every id the app actually writes passes that guard and
+    // resolves to a path below the session folder it belongs to.
     for (const session of manifest.sessions) {
       const sessionDirectory = join(mirrorRoot, swiftContract.sessionsDirectoryName, session.id);
       for (const file of session.files) {
         const resolved = extensionFileURL(containerRoot, session.id, file.id);
+        if (resolved === null) {
+          throw new Error(`the extension refused ${session.id}/${file.id}`);
+        }
         expect(resolved.startsWith(`${sessionDirectory}${sep}`)).toBe(true);
       }
       expect(
@@ -561,5 +642,55 @@ describe('artifacts File Provider browse (iOS)', () => {
         )
       ).toBe(true);
     }
+  });
+
+  it('refuses an id that would walk out of its session folder', () => {
+    // The guard's clauses, as the extension declares them. This is what makes
+    // the assertions below fail when the guard is deleted, loses a clause, or
+    // stops being used where an id becomes a path.
+    expect(safeComponentBody).toContain('!segment.isEmpty');
+    expect(safePathBody).toContain('guard isSafeComponent(sessionId) else');
+    expect(safePathBody).toContain('segments.allSatisfy { isSafeComponent(String($0)) }');
+    // Both call sites: the resolver above, and the parser that turns an item
+    // identifier back into a session and file id.
+    expect(extensionSource).toContain(
+      'guard ArtifactPath.isSafePath(sessionId: sessionId, fileId: fileId),'
+    );
+    expect(extensionSource).toContain(
+      'if ArtifactPath.isSafePath(sessionId: sessionId, fileId: fileId) {'
+    );
+
+    // Ids an index could carry. The ids the app writes are opaque and never
+    // look like this, so the guard is the only thing between a tampered index
+    // and a path: each of these resolves to no URL at all.
+    const hostileIds: [sessionId: string, fileId: string][] = [
+      ['../../etc', 'passwd'],
+      ['sess_01HZ', '../../../etc/passwd'],
+      ['sess_01HZ', '../../etc/passwd'],
+      ['sess_01HZ', 'part/..'],
+      ['sess_01HZ', '..'],
+      ['sess_01HZ', ''],
+      ['', 'part_a1'],
+    ];
+    for (const [sessionId, fileId] of hostileIds) {
+      expect(extensionFileURL(containerRoot, sessionId, fileId)).toBeNull();
+    }
+
+    // Teeth: without the guard the same components resolve above the session
+    // folder — the escape `keeps a mirrored artifact inside its own session
+    // folder` rejects — or out of the mirror entirely.
+    const sessionDirectory = join(sessionsRoot, 'sess_01HZ');
+    for (const escaped of [
+      unguardedFileURL(containerRoot, 'sess_01HZ', '..'),
+      unguardedFileURL(containerRoot, 'sess_01HZ', '../../etc/passwd'),
+      unguardedFileURL(containerRoot, '../../etc', 'passwd'),
+    ]) {
+      expect(escaped.startsWith(`${sessionDirectory}${sep}`)).toBe(false);
+    }
+    expect(
+      unguardedFileURL(containerRoot, 'sess_01HZ', '../../../etc/passwd').startsWith(
+        `${mirrorRoot}${sep}`
+      )
+    ).toBe(false);
   });
 });

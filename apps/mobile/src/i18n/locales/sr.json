@@ -2629,6 +2629,7 @@
     "couldNotLoadActiveSessions": "Nije moguće učitati aktivne sesije.",
     "agentSessions": "Trenutno aktivno",
     "newCodingTask": "Novi zadatak za programiranje",
+    "newTaskFromPicture": "Novi zadatak sa slike",
     "explore": "Istraži",
     "seeAll": "Prikaži sve",
     "noLiveSessions": "Trenutno ništa nije pokrenuto"

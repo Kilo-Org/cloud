@@ -2651,6 +2651,7 @@
     "couldNotLoadActiveSessions": "Aktivní relace se nepodařilo načíst.",
     "agentSessions": "Právě běží",
     "newCodingTask": "Nový programovací úkol",
+    "newTaskFromPicture": "Nový úkol z obrázku",
     "explore": "Prozkoumat",
     "seeAll": "Zobrazit vše",
     "noLiveSessions": "Právě nic neběží"

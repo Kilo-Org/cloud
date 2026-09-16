@@ -2607,6 +2607,7 @@
     "couldNotLoadActiveSessions": "လက်ရှိလုပ်ဆောင်နေသော ဆက်ရှင်များကို ရယူ၍ မရပါ။",
     "agentSessions": "ယခု လုပ်ဆောင်နေ",
     "newCodingTask": "ကုဒ်ရေးသည့် အလုပ်အသစ်",
+    "newTaskFromPicture": "ပုံမှ အလုပ်အသစ်",
     "explore": "လေ့လာစရာများ",
     "seeAll": "အားလုံး ကြည့်ရန်",
     "noLiveSessions": "ယခု ဘာမှ လုပ်ဆောင်နေခြင်း မရှိပါ"

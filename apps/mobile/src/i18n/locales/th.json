@@ -2607,6 +2607,7 @@
     "couldNotLoadActiveSessions": "โหลดเซสชันที่ใช้งานอยู่ไม่สำเร็จ",
     "agentSessions": "กำลังทำงานอยู่",
     "newCodingTask": "งานเขียนโค้ดใหม่",
+    "newTaskFromPicture": "งานใหม่จากรูปภาพ",
     "explore": "สำรวจ",
     "seeAll": "ดูทั้งหมด",
     "noLiveSessions": "ขณะนี้ไม่มีงานที่กำลังทำงานอยู่"

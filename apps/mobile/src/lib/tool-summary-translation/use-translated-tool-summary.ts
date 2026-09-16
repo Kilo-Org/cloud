@@ -15,6 +15,20 @@ export type ToolSummaryTranslation = {
 };
 
 /**
+ * How long an unresolved row waits before it asks the gateway again. Every
+ * client failure (no token, non-2xx, timeout, malformed body) resolves to
+ * `null` and caches nothing, so a request that settled without a translation
+ * would otherwise leave `pending` true for the rest of the mount: a condensed
+ * label would keep its count alone and never show the last summary again, and a
+ * plain row would keep the original text. The retry belongs to the mounted row,
+ * so it stops when the translation lands (`translated` clears the timer) or the
+ * row unmounts, and `ensureTranslation` drops each tick while a request is in
+ * flight or the translation is already cached, so rows sharing a summary ask
+ * the gateway once per cadence.
+ */
+export const TOOL_SUMMARY_TRANSLATION_RETRY_MS = 10_000;
+
+/**
  * The translation for a tool summary and whether it is still on its way. The
  * subscription also carries the preference that decides whether to translate at
  * all.
@@ -29,9 +43,12 @@ export type ToolSummaryTranslation = {
  * single-line, so the swap cannot shift layout.
  *
  * `pending` is true only while translation is on for this text and the runtime
- * holds no translation for it: a row that embeds the summary in a sentence of
- * its own (`CondensedToolRunRow`) has nowhere to put the original English while
- * it waits, so it reads this flag instead of the fallback text.
+ * holds no translation for it, but the row keeps asking while it stays mounted:
+ * a request that failed (or timed out) leaves the runtime uncached, so the row
+ * retries it rather than reporting the missing summary as final. A row that
+ * embeds the summary in a sentence of its own (`CondensedToolRunRow`) has
+ * nowhere to put the original English while it waits, so it reads this flag
+ * instead of the fallback text.
  */
 export function useToolSummaryTranslation(text: string, enabled = true): ToolSummaryTranslation {
   const { i18n } = useTranslation();
@@ -43,10 +60,23 @@ export function useToolSummaryTranslation(text: string, enabled = true): ToolSum
   const translated = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   useEffect(() => {
-    if (active) {
-      ensureTranslation({ text, language, model: config.model });
+    if (!active) {
+      return undefined;
     }
-  }, [active, text, language, config.model]);
+    ensureTranslation({ text, language, model: config.model });
+    if (translated !== undefined) {
+      return undefined;
+    }
+    // A request that settled without a translation is not final: while the row
+    // stays mounted it asks again, so a transient gateway failure resolves once
+    // the gateway recovers instead of stranding the label for the session.
+    const retry = setInterval(() => {
+      ensureTranslation({ text, language, model: config.model });
+    }, TOOL_SUMMARY_TRANSLATION_RETRY_MS);
+    return () => {
+      clearInterval(retry);
+    };
+  }, [active, text, language, config.model, translated]);
 
   return { text: translated ?? text, pending: active && translated === undefined };
 }

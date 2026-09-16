@@ -60,7 +60,9 @@ export function ToolOneLineRow({
  * count keeps the localized `condensedLabel` copy. While that translation is on
  * its way the label carries the count alone: the raw English summary inside an
  * otherwise translated sentence reads as a glitch, so the row waits for the
- * summary the app would show.
+ * summary the app would show. A failed request does not end that wait:
+ * `useToolSummaryTranslation` re-asks while the row stays mounted, so the label
+ * resolves once the gateway answers again.
  */
 export function CondensedToolRunRow({ parts }: Readonly<{ parts: readonly ToolPart[] }>) {
   const { t } = useTranslation();
@@ -80,6 +82,8 @@ export function CondensedToolRunRow({ parts }: Readonly<{ parts: readonly ToolPa
     return only ? <ToolOneLineRow part={only} /> : null;
   }
 
+  // `pending` is not final: the hook keeps re-asking while this row is mounted,
+  // so the count-only label resolves as soon as the translation lands.
   const label = translation.pending
     ? buildToolRunCountLabel(rows, t)
     : buildToolRunLabel(rows, t, translation.text);

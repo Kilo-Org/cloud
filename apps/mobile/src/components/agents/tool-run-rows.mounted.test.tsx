@@ -3,7 +3,7 @@ import '@/i18n';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 
@@ -115,6 +115,21 @@ beforeEach(() => {
   setConfig({ enabled: false, model: MODEL });
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/** Long past any retry cadence the row uses for an unresolved summary. */
+const RETRY_WINDOW_MS = 60_000;
+
+/** Advance the fake clock and let the pending import/request microtasks settle. */
+async function advance(ms: number): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+    await vi.dynamicImportSettled();
+  });
+}
+
 describe('CondensedToolRunRow label', () => {
   it('reads "n items; last summary" with the last tool call summary when translation is off', () => {
     const renderer = renderCondensed(runOf('resolved.ts'));
@@ -152,6 +167,28 @@ describe('CondensedToolRunRow label', () => {
 
     expect(textWithContent(renderer.root, '3 items')).toHaveLength(1);
     expect(texts(renderer).some(text => text.includes('untranslated.ts'))).toBe(false);
+    renderer.unmount();
+  });
+
+  it('recovers the last summary after a failed request instead of staying count-only', async () => {
+    requestMock.mockResolvedValueOnce(null).mockResolvedValue('Nouveau fichier');
+    setConfig({ enabled: true, model: MODEL });
+    vi.useFakeTimers();
+    // A summary no sibling test cached, so the first request really is made.
+    const renderer = renderCondensed(runOf('retry-target.ts'));
+
+    // The first request settles without a translation, so the label holds the
+    // count alone: the untranslated summary must not appear.
+    await advance(0);
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(textWithContent(renderer.root, '3 items')).toHaveLength(1);
+    expect(texts(renderer).some(text => text.includes('retry-target.ts'))).toBe(false);
+
+    // The row re-asks and the label resolves: a single gateway failure must not
+    // strand the summary for the rest of the mount.
+    await advance(RETRY_WINDOW_MS);
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(textWithContent(renderer.root, '3 items; Nouveau fichier')).toHaveLength(1);
     renderer.unmount();
   });
 

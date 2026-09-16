@@ -99,6 +99,40 @@ describe('deep-link-launch', () => {
     });
   });
 
+  describe('system-search source precedence', () => {
+    it('beats a pending notification', () => {
+      setPendingDeepLink('/from-notification', 'notification');
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
+    });
+
+    it('loses to a universal link', () => {
+      setPendingDeepLink('/from-link', 'universal-link');
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      expect(getPendingDeepLink()).toBe('/from-link');
+    });
+
+    it('is not overwritten by a later notification', () => {
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      setPendingDeepLink('/from-notification', 'notification');
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
+    });
+
+    it('round-trips through the persisted record', async () => {
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
+      });
+      const record = JSON.parse(store.get(PENDING_DEEP_LINK_KEY) ?? '') as { source: string };
+      expect(record.source).toBe('system-search');
+
+      _resetDeepLinkLaunchForTests();
+
+      await restorePersistedPendingDeepLink();
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
+    });
+  });
+
   describe('consume exactly once', () => {
     it('lets exactly one of two consumers read a single href', () => {
       setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');

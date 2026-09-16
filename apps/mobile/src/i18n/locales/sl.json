@@ -3105,7 +3105,8 @@
     "openAgents": "Odpri agente",
     "needsInput": "Čaka na vnos",
     "channelName": "Aktivni agenti",
-    "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu."
+    "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu.",
+    "newestResult": "Najnovejši rezultat"
   },
   "transcriptionModel": {
     "title": "Model za prepisovanje",

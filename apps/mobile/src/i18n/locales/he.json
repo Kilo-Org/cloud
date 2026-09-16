@@ -3082,7 +3082,8 @@
     "openAgents": "הצגת הסוכנים",
     "needsInput": "נדרש קלט",
     "channelName": "סוכנים פעילים",
-    "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
+    "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה.",
+    "newestResult": "התוצאה החדשה ביותר"
   },
   "transcriptionModel": {
     "title": "מודל תמלול",

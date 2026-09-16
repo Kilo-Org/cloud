@@ -4540,7 +4540,8 @@
       "getservicefeeexemption",
       "organizationid"
     ],
-    "searchBlob": "organizations.admin.getServiceFeeExemption View an organization's current service-fee exemption and its audit history. organizations admin getservicefeeexemption organizationid organizationId"
+    "searchBlob": "organizations.admin.getServiceFeeExemption View an organization's current service-fee exemption and its audit history. organizations admin getservicefeeexemption organizationid organizationId",
+    "admin": true
   },
   "organizations.admin.list": {
     "path": "organizations.admin.list",

@@ -639,10 +639,6 @@ function normalizePersistedSnapshotFileDiffs(value: unknown): unknown {
   return parsed.success ? parsed.data : value;
 }
 
-function isKnownKiloSdkPartType(type: string): boolean {
-  return kiloSdkPartSchema.options.some(option => option.shape.type.safeParse(type).success);
-}
-
 type NormalizedPersistedStoredMessage = {
   message: unknown;
   omittedItemCount: number;
@@ -678,20 +674,25 @@ function normalizePersistedKiloSdkParts(value: unknown): {
   }
   const parts: unknown[] = [];
   let omittedItemCount = 0;
-  for (const part of value) {
-    if (isRecord(part)) {
-      const textNormalized = normalizePersistedMissingPartText(part);
-      if (textNormalized) {
-        parts.push(textNormalized);
-        continue;
-      }
+  for (const part of value as unknown[]) {
+    // Normalize the known wire omissions first so a part that only needs the
+    // text fix (KILO-APP-99) still renders.
+    const textNormalized = isRecord(part) ? normalizePersistedMissingPartText(part) : null;
+    const candidate = textNormalized ?? part;
+    if (kiloSdkPartSchema.safeParse(candidate).success) {
+      parts.push(candidate);
+      continue;
     }
-    if (
-      isRecord(part) &&
-      typeof part['type'] === 'string' &&
-      !isKnownKiloSdkPartType(part['type']) &&
-      sdkPartBaseSchema.safeParse(part).success
-    ) {
+    // A part whose persisted identity is well-formed but whose body this client
+    // cannot parse (an unknown `type`, or a field shape this contract does not
+    // understand yet) must not degrade the whole page to `invalid_data`. The
+    // session keeps receiving parts from whichever client drives it, so one
+    // such part would freeze the transcript on an older message while the
+    // separately projected session cost kept updating. Drop and count it
+    // instead, so the rest of the transcript still renders. A part with a
+    // malformed identity stays untouched: that is corrupt data the caller must
+    // not silently paper over.
+    if (isRecord(candidate) && sdkPartBaseSchema.safeParse(candidate).success) {
       omittedItemCount += 1;
       continue;
     }

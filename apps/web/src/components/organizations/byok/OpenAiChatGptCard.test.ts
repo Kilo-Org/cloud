@@ -28,7 +28,7 @@ function renderStatus(status: OpenAiChatGptStatus): string {
 
 /** The class attribute of the reserved-height body wrapper. */
 function bodyClass(html: string): string | undefined {
-  return html.match(/class="([^"]*min-h-\[5\.5rem\][^"]*)"/)?.[1];
+  return html.match(/class="([^"]*min-h-\[6\.75rem\][^"]*)"/)?.[1];
 }
 
 /** The class attribute of the card container itself. */
@@ -235,10 +235,27 @@ describe('OpenAiChatGptCard returned authorization errors', () => {
     expect(html.match(/>Disconnect</g)).toHaveLength(1);
   });
 
-  it('uses the stored body CTA as the retry when the linking session fails', () => {
+  it('offers the promised Try again retry when the linking session fails', () => {
     const html = render({ status: { state: 'disconnected' }, authErrorCode: 'connect_failed' });
 
     expect(html.replace(/&#x27;/g, "'")).toContain("We couldn't connect ChatGPT. Try again.");
+    // One retry control only, labelled with the action the message promises.
+    expect(html.match(/>Try again</g)).toHaveLength(1);
+    expect(html).not.toContain('>Sign in with ChatGPT<');
+  });
+
+  it('offers Try again for a declined authorization with no stored connection', () => {
+    const html = render({ status: { state: 'disconnected' }, authErrorCode: 'access_denied' });
+
+    expect(html.replace(/&#x27;/g, "'")).toContain('ChatGPT was not connected. Try again.');
+    expect(html).toContain('No API key needed.');
+    expect(html.match(/>Try again</g)).toHaveLength(1);
+    expect(html).not.toContain('>Sign in with ChatGPT<');
+  });
+
+  it('keeps the plain connect label when the disconnected card has no error', () => {
+    const html = renderStatus({ state: 'disconnected' });
+
     expect(html.match(/Sign in with ChatGPT/g)).toHaveLength(1);
     expect(html).not.toContain('>Try again<');
   });
@@ -358,7 +375,7 @@ describe('OpenAiChatGptCard layout', () => {
     expect(cardClasses.size).toBe(1);
     expect(bodyClasses.size).toBe(1);
     expect([...cardClasses][0]).toBeDefined();
-    expect([...bodyClasses][0]).toContain('min-h-[5.5rem]');
+    expect([...bodyClasses][0]).toContain('min-h-[6.75rem]');
   });
 
   it('keeps the same content padding in every state', () => {

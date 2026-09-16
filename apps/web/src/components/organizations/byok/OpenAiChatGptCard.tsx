@@ -67,9 +67,13 @@ const CONNECT_FAILED_CODE = 'connect_failed';
 /**
  * Shared by every state so the card keeps one padding and one reserved height:
  * switching between loading, disconnected, connected and error never moves the
- * key list below it.
+ * key list below it. The minimum fits the tallest resolved body at the
+ * narrowest supported width (375px), where the connect explanation wraps to
+ * three lines; a shorter reservation lets the resolved card outgrow the
+ * loading skeleton and pushes the page below it while the status query
+ * resolves.
  */
-const CARD_BODY_CLASS = 'flex min-h-[5.5rem] flex-col justify-center gap-3';
+const CARD_BODY_CLASS = 'flex min-h-[6.75rem] flex-col justify-center gap-3';
 const CARD_ACTION_CLASS = 'w-fit';
 
 /** The declined/failed authorization copy, keyed by the returned error code. */
@@ -146,6 +150,7 @@ function AuthErrorAlert({ code }: { code: string }) {
 
 function CardBody({
   status,
+  authErrorCode,
   hasLoadError,
   hasDisconnectError,
   onConnect,
@@ -198,11 +203,14 @@ function CardBody({
   }
 
   if (status.state === 'disconnected') {
+    // A returned or local connect failure is reported by the alert above this
+    // body, so the same one-click connect action is relabelled as the retry the
+    // message promises. Without an error it stays the plain connect CTA.
     return (
       <>
         <p className="type-body text-muted-foreground">{CONNECT_DESCRIPTION}</p>
         <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect} disabled={isConnecting}>
-          {isConnecting ? CONNECTING_LABEL : CONNECT_LABEL}
+          {isConnecting ? CONNECTING_LABEL : authErrorCode ? TRY_AGAIN_LABEL : CONNECT_LABEL}
         </Button>
       </>
     );

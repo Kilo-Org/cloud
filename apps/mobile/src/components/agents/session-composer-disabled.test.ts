@@ -28,8 +28,14 @@ describe('resolveSessionComposerDisabled', () => {
     // Pylon 28248: the send capability is a separate gate (`sendDisabled` on
     // ChatComposer). A session that cannot accept a message right now must
     // still leave the reader able to type beside the error's Retry, so this
-    // resolver never reads the send capability.
-    expect(Object.keys(idleInput)).not.toContain('canSend');
+    // resolver never reads the send capability. Assert on the resolver's
+    // source: an input-shaped assertion here would be tautological, because
+    // the test owns the input object it inspects.
+    const resolverSource = readFileSync(
+      fileURLToPath(new URL('session-composer-disabled.ts', import.meta.url)),
+      'utf8'
+    );
+    expect(resolverSource).not.toMatch(/canSend/);
     expect(resolveSessionComposerDisabled(idleInput)).toBe(false);
   });
 

@@ -10,6 +10,7 @@ const mockVerifyGitHubWebhookSignature = jest.fn(
   (_payload: string, _signature: string, _appType: string) => true
 );
 const mockFindIntegrationByInstallationId = jest.fn();
+const mockFindConnectedIntegrationByInstallationId = jest.fn();
 const mockGetIntegrationForOrganization = jest.fn();
 const mockLogWebhookEvent = jest.fn();
 const mockUpdateWebhookEvent = jest.fn();
@@ -40,6 +41,11 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     installationId: string | undefined,
     githubAppType?: string
   ) => mockFindIntegrationByInstallationId(platform, installationId, githubAppType),
+  findConnectedIntegrationByInstallationId: (
+    platform: string,
+    installationId: string | undefined,
+    githubAppType?: string
+  ) => mockFindConnectedIntegrationByInstallationId(platform, installationId, githubAppType),
   getIntegrationForOrganization: (organizationId: string, platform: string) =>
     mockGetIntegrationForOrganization(organizationId, platform),
 }));
@@ -61,8 +67,12 @@ jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
       super(message);
     }
   },
-  assertGitHubInstallationRuntimeAuthorized: (installationId: string, appType: string) =>
-    mockAssertGitHubInstallationRuntimeAuthorized(installationId, appType),
+  assertGitHubInstallationRuntimeAuthorized: (
+    installationId: string,
+    appType: string,
+    expectedIntegrationId?: string
+  ) =>
+    mockAssertGitHubInstallationRuntimeAuthorized(installationId, appType, expectedIntegrationId),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
@@ -120,7 +130,11 @@ const integration = {
   owned_by_organization_id: 'org_1',
   owned_by_user_id: null,
   platform_installation_id: '98765',
+  github_app_type: 'standard',
+  integration_status: 'active',
   suspended_at: null,
+  auth_invalid_at: null,
+  github_disconnected_at: null,
 };
 
 function signedGitHubRequest(eventType: string, payload: unknown): NextRequest {
@@ -230,6 +244,7 @@ describe('handleGitHubWebhook', () => {
     mockGetIntegrationForOrganization.mockResolvedValue(integration);
     mockVerifyGitHubWebhookSignature.mockReturnValue(true);
     mockFindIntegrationByInstallationId.mockResolvedValue(integration);
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(integration);
     mockIsSharedGitHubInstallation.mockResolvedValue(false);
     mockClaimSharedGitHubInstallationDelivery.mockResolvedValue({
       status: 'claimed',
@@ -276,6 +291,48 @@ describe('handleGitHubWebhook', () => {
     expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
     expect(mockLogWebhookEvent).not.toHaveBeenCalled();
     expect(mockHandlePullRequest).not.toHaveBeenCalled();
+  });
+
+  it('must not route an active sibling installation webhook to a disconnected tenant', async () => {
+    const disconnected = {
+      ...integration,
+      integration_status: 'suspended',
+      github_disconnected_at: '2026-09-14T00:00:00.000Z',
+      suspended_by: 'local_disconnect',
+    };
+    mockFindIntegrationByInstallationId.mockResolvedValue(disconnected);
+    mockGetIntegrationForOrganization.mockResolvedValue(disconnected);
+    // The real unscoped runtime resolver succeeds on the remaining active sibling.
+    mockAssertGitHubInstallationRuntimeAuthorized.mockResolvedValue(undefined);
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect({
+      logged: mockLogWebhookEvent.mock.calls.length,
+      dispatched: mockHandlePullRequest.mock.calls.length,
+    }).toEqual({ logged: 0, dispatched: 0 });
+    expect(mockAssertGitHubInstallationRuntimeAuthorized).not.toHaveBeenCalled();
+  });
+
+  it('validates deferred dispatch against the exact routed association', async () => {
+    mockAssertGitHubInstallationRuntimeAuthorized.mockResolvedValue(undefined);
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await waitForAfterTask();
+    expect(mockAssertGitHubInstallationRuntimeAuthorized).toHaveBeenCalledWith(
+      '98765',
+      'standard',
+      'pi_github'
+    );
   });
 
   it('routes installation_target renamed events through authoritative login synchronization', async () => {
@@ -726,7 +783,54 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
+    expect(mockFindConnectedIntegrationByInstallationId).toHaveBeenCalledWith(
+      'github',
+      '98765',
+      'standard'
+    );
+    expect(mockHandleInstallationSuspend).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      'standard'
+    );
+  });
+
+  it('dispatches installation.suspend for the connected tenant when a disconnected former tenant exists', async () => {
+    // The unfiltered lookup would return the retained disconnected row; the
+    // route must not use it (and must not drop the delivery), so the handler
+    // still runs and canonical state is reconciled.
+    mockFindIntegrationByInstallationId.mockResolvedValue({
+      ...integration,
+      github_disconnected_at: '2026-09-15T00:00:00.000Z',
+    });
+
+    const payload = { action: 'suspend', installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+    expect(mockLogWebhookEvent).toHaveBeenCalledTimes(1);
+    expect(mockHandleInstallationSuspend).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      'standard'
+    );
+  });
+
+  it('still dispatches installation.suspend when only a disconnected former tenant remains', async () => {
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(null);
+
+    const payload = { action: 'suspend', installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    // Canonical state is still reconciled by the handler; nothing is logged
+    // against the disconnected tenant.
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
     expect(mockHandleInstallationSuspend).toHaveBeenCalledWith(
       expect.objectContaining(payload),
       'standard'
@@ -742,11 +846,53 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
+    expect(mockFindConnectedIntegrationByInstallationId).toHaveBeenCalledWith(
+      'github',
+      '98765',
+      'lite'
+    );
     expect(mockHandleInstallationUnsuspend).toHaveBeenCalledWith(
       expect.objectContaining(payload),
       'lite'
     );
+  });
+
+  it('processes installation.unsuspend for a suspended association instead of dropping it', async () => {
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue({
+      ...integration,
+      integration_status: 'suspended',
+      suspended_at: '2026-09-15T00:00:00.000Z',
+      suspended_by: 'github_suspend',
+    });
+
+    const payload = { action: 'unsuspend', installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ message: 'Installation unsuspended' });
+    expect(mockHandleInstallationUnsuspend).toHaveBeenCalledWith(
+      expect.objectContaining(payload),
+      'standard'
+    );
+  });
+
+  it('does not log installation.unsuspend when only a disconnected former tenant remains', async () => {
+    // The connected-tenant lookup ignores retained disconnected rows, so the
+    // delivery is not recorded against a tenant that no longer owns the
+    // installation. Canonical state is still reconciled by the handler.
+    mockFindConnectedIntegrationByInstallationId.mockResolvedValue(null);
+
+    const payload = { action: 'unsuspend', installation: { id: 98765 } };
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
   });
 
   it('routes installation_repositories to the handler with the webhook app type', async () => {

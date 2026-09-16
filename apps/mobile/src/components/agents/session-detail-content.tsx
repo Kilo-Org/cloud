@@ -202,6 +202,8 @@ type SessionDetailContentProps = {
   cachedTitle?: string;
   /** Epoch ms the route mounted this open; anchors the slow-load threshold. */
   openStartedAt?: number;
+  /** Message id the opening `?at=` deep link named; the list scrolls to it. */
+  resumeAt?: string | null;
 };
 
 type CancelQueuedStatus = {
@@ -221,6 +223,7 @@ export function SessionDetailContent({
   spawnedMode,
   cachedTitle,
   openStartedAt,
+  resumeAt,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const { t } = useTranslation();
@@ -2208,6 +2211,7 @@ export function SessionDetailContent({
             manager.trimRetainedHistory();
           }}
           renderItem={renderItem}
+          resumeAt={resumeAt}
         />
       </Animated.View>
     );

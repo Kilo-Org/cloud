@@ -646,6 +646,21 @@ describe('SessionDetailScreen valid session-id', () => {
     expect(queryEnabled()).toBe(true);
     expect(queryInput()).toEqual({ session_id: 'sess-1' });
   });
+
+  it('forwards the parsed `at` anchor to the session content', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', at: 'msg_42' });
+    const renderer = await mountRoute();
+
+    const content = findByType(renderer.root, 'SessionDetailContent');
+    expect(content).toHaveLength(1);
+    expect(propOf(content[0], 'resumeAt')).toBe('msg_42');
+  });
+
+  it('opens at the bottom with no anchor when `at` is missing or unusable', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    const renderer = await mountRoute();
+    expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'resumeAt')).toBeNull();
+  });
 });
 
 function transcriptPage(sessionId: KiloSessionId, messageId: string, text: string) {

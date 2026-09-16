@@ -29,6 +29,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
+import { parseResumeAnchor } from '@/lib/session-resume';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { shouldRetryNotFoundOnSpawnedRoute } from '@/lib/spawned-not-found-retry';
 import { useTRPC } from '@/lib/trpc';
@@ -46,6 +47,7 @@ export default function SessionDetailScreen() {
     shareId: shareIdParam,
     autoSend: autoSendRaw,
     mode: modeParam,
+    at: resumeAtRaw,
   } = useLocalSearchParams<{
     'session-id': string;
     organizationId?: string;
@@ -65,6 +67,12 @@ export default function SessionDetailScreen() {
     autoSend?: string;
     /** Agent mode the spawn was started with; seeds the composer before the CLI reports one. */
     mode?: string;
+    /**
+     * Resume anchor: the message id a `?at=` deep link recorded on the other
+     * device. Missing or unknown is not an error — the session opens at the
+     * bottom exactly as it does without the param.
+     */
+    at?: string;
     /** Legacy title hints remain accepted but carry no account ownership, so ignore them. */
     title?: string;
   }>();
@@ -76,6 +84,7 @@ export default function SessionDetailScreen() {
   const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;
   const spawnedMode = Array.isArray(modeParam) ? modeParam[0] : modeParam;
+  const resumeAt = parseResumeAnchor(resumeAtRaw);
   const trpc = useTRPC();
   const router = useRouter();
   const { t } = useTranslation();
@@ -270,6 +279,7 @@ export default function SessionDetailScreen() {
         autoSend={autoSendParam === '1'}
         spawnedMode={spawnedMode}
         openStartedAt={openStart.current.startedAt}
+        resumeAt={resumeAt}
       />
     </AgentSessionProvider>
   );

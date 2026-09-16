@@ -15,6 +15,14 @@ import { useMotionPolicy } from '@/lib/a11y/motion';
 type UseSessionListAutoScrollParams = {
   itemCount: number;
   resetKey: string;
+  /**
+   * Whether the session opens following the newest message. Default true keeps
+   * every existing caller byte-identical. A `?at=` resume passes false: the
+   * list opens on an older row and the mount-time scroll-to-end (and its 80ms
+   * safety-net retry) would otherwise scroll the viewport back to the bottom,
+   * discarding the resume position.
+   */
+  initialAutoScroll?: boolean;
 };
 
 /**
@@ -27,6 +35,7 @@ type UseSessionListAutoScrollParams = {
 export function useSessionListAutoScroll<ItemT>({
   itemCount,
   resetKey,
+  initialAutoScroll = true,
 }: UseSessionListAutoScrollParams) {
   const listRef = useRef<FlashListRef<ItemT>>(null);
   const { scrollAnimated } = useMotionPolicy();
@@ -127,11 +136,11 @@ export function useSessionListAutoScroll<ItemT>({
   }, [clearAutoScrollRetryTimeout, scrollToLatestMessage]);
 
   useEffect(() => {
-    const initial = getInitialSessionListAutoScrollVisibility();
+    const initial = getInitialSessionListAutoScrollVisibility({ followTail: initialAutoScroll });
     shouldAutoScrollRef.current = initial.shouldAutoScroll;
     lastContentHeightRef.current = 0;
     setIsAtBottom(prev => (prev === initial.isAtBottom ? prev : initial.isAtBottom));
-  }, [resetKey]);
+  }, [resetKey, initialAutoScroll]);
 
   useEffect(() => {
     if (itemCount > 0 && shouldAutoScrollRef.current && !isUserScrollingRef.current) {

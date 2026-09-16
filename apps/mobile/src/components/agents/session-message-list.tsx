@@ -17,6 +17,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
+import {
+  getSessionTranscriptItemMessageId,
+  type SessionTranscriptItem,
+} from '@/components/agents/session-transcript';
+import { planResumeScroll } from '@/lib/session-resume';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getOlderMessagesArrivedAnnouncement,
@@ -46,6 +51,14 @@ type SessionMessageListProps<T> = {
   onLoadOlderMessages: () => void;
   renderItem: ListRenderItem<T>;
   ListFooterComponent?: React.ComponentType | React.ReactElement | null;
+  /**
+   * Message id a `?at=` deep link wants the transcript to open on. When it is
+   * a rendered row the list scrolls to it once; when it lives in an older page
+   * the list loads pages up to a bound and re-plans. Absent/null keeps every
+   * existing caller byte-identical, and an anchor the session no longer has
+   * scrolls nothing and blanks nothing.
+   */
+  resumeAt?: string | null;
   /**
    * Extra bottom padding (in dp) applied to the list's content container.
    * The default (undefined) keeps the legacy `paddingVertical: 8` behavior
@@ -78,7 +91,27 @@ export function SessionMessageList<T>({
   ListFooterComponent,
   contentBottomInset,
   onReachedBottom,
+  resumeAt,
 }: Readonly<SessionMessageListProps<T>>) {
+  // Rows are already present when the list mounts (the resume never mounts a
+  // blank list), so the resume decision is derivable at render: every row's
+  // anchor id via `getSessionTranscriptItemMessageId`, and whether the anchor
+  // is one of them.
+  const anchorIds = useMemo(
+    () => items.map(item => getSessionTranscriptItemMessageId(item as SessionTranscriptItem)),
+    [items]
+  );
+  const resumeAnchor =
+    resumeAt !== undefined && resumeAt !== null && resumeAt.trim().length > 0
+      ? resumeAt.trim()
+      : null;
+  // Follow the newest message at mount exactly as before UNLESS the resume has
+  // work to do: an anchor that is already a row (scroll), or one that may still
+  // arrive with an older page (load-older). An anchor the session no longer has
+  // and no older history to search keeps the list byte-identical to an
+  // anchor-less open — at the bottom, following the tail.
+  const anchorIsRow = resumeAnchor !== null && anchorIds.includes(resumeAnchor);
+  const followTailAtMount = !(anchorIsRow || (resumeAnchor !== null && hasOlderMessages));
   // FlashList v2 renders the list in chronological order (oldest → newest).
   // `startRenderingFromBottom` keeps the viewport anchored at the newest
   // message on first render and after prepended older pages, which is the
@@ -98,6 +131,7 @@ export function SessionMessageList<T>({
   } = useSessionListAutoScroll<T>({
     itemCount: items.length,
     resetKey: sessionId,
+    initialAutoScroll: followTailAtMount,
   });
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -136,6 +170,74 @@ export function SessionMessageList<T>({
   useEffect(() => {
     inFlightRef.current = false;
   }, [sessionId]);
+
+  // Resume-position scroll for a `?at=` deep link. Runs once per
+  // (sessionId, resumeAt) pair: an anchor among the rendered rows scrolls to
+  // its index; an anchor still in an older page requests one page (bounded by
+  // `planResumeScroll`) and re-plans on the next render. An anchor the session
+  // no longer has plans 'none' — nothing scrolls and nothing blanks, so the
+  // session opens exactly as it does without an anchor.
+  //
+  // The budget counts page REQUESTS, not effect re-runs: streaming updates
+  // change `items` (and with it `anchorIds`) many times while one page is in
+  // flight, and counting those re-runs would spend the whole budget in a burst,
+  // mark the resume done, and drop the anchor's page when it arrives. The same
+  // guard `onStartReached` uses makes a re-run while a load is in flight a
+  // no-op; the plan runs again when the page lands.
+  const resumeStateRef = useRef<{ key: string; attempts: number; done: boolean } | null>(null);
+  useEffect(() => {
+    if (resumeAnchor === null) {
+      return;
+    }
+    const key = `${sessionId}\u0000${resumeAnchor}`;
+    if (resumeStateRef.current?.key !== key) {
+      resumeStateRef.current = { key, attempts: 0, done: false };
+    }
+    const resume = resumeStateRef.current;
+    if (resume.done) {
+      return;
+    }
+    // `anchorIds` is built at render (see `getSessionTranscriptItemMessageId`):
+    // this list is generic for its other callers (quick chat, review spectator),
+    // and only the session screen passes `resumeAt`, always with transcript
+    // items. The assertion is confined to that path.
+    const plan = planResumeScroll({
+      anchorIds,
+      anchorMessageId: resumeAnchor,
+      hasOlderMessages,
+      olderLoadAttempts: resume.attempts,
+    });
+    if (plan.kind === 'scroll') {
+      resume.done = true;
+      void listRef.current?.scrollToIndex({ index: plan.index, viewPosition: 0, animated: false });
+      return;
+    }
+    if (plan.kind === 'load-older') {
+      if (
+        !shouldTriggerOlderMessagesLoad({
+          hasOlderMessages,
+          isLoadingOlderMessages,
+          isInFlight: inFlightRef.current,
+          olderMessagesError,
+        })
+      ) {
+        return;
+      }
+      resume.attempts += 1;
+      onLoadOlderMessages();
+      return;
+    }
+    resume.done = true;
+  }, [
+    sessionId,
+    resumeAnchor,
+    anchorIds,
+    hasOlderMessages,
+    isLoadingOlderMessages,
+    olderMessagesError,
+    onLoadOlderMessages,
+    listRef,
+  ]);
 
   // Keep the newest message visible when the keyboard opens, but only while
   // the follow guard is true (the user is still at the bottom). On iOS,

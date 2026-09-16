@@ -51,7 +51,7 @@ async function resolveSnapshotVolumeSizeGb(
       } catch (err) {
         // A volume can disappear between listing and snapshot lookup. Fly reports a
         // vanished volume as 400, 404, or 422 depending on the endpoint.
-        if (fly.isFlyMissingVolume(err)) return null;
+        if (fly.isFlyNotFound(err) || fly.isFlyMissingVolume(err)) return null;
         throw err;
       }
     })

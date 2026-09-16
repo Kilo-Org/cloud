@@ -34,7 +34,7 @@
   },
   "logpush": true,
   "triggers": {
-    "crons": ["17 2 * * *"],
+    "crons": ["17 2 * * *", "*/3 * * * *"],
   },
   "routes": [
     {
@@ -421,7 +421,7 @@
     "dev": {
       "name": "cloud-agent-next-dev",
       "triggers": {
-        "crons": ["17 2 * * *"],
+        "crons": ["17 2 * * *", "*/3 * * * *"],
       },
       "hyperdrive": [
         {

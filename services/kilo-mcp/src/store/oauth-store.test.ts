@@ -158,6 +158,57 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       expect(db.prepare('SELECT count(*) AS n FROM oauth_refresh_token_history').get()?.n).toBe(0);
     });
 
+    it('keeps the newest hashes when every write shares one expires_at', async () => {
+      // `expiresAt` is a millisecond clock, so two rotations of one grant can
+      // rank equal by `expires_at` alone. The prune must still keep the newest
+      // eight by insertion order: the row just inserted and the provider's
+      // other accepted token, the previous one, are both in that set, and a
+      // LIMIT over an unordered tie may drop either.
+      const grant = { userId: 'u', grantId: 'tied' };
+      const hashes = Array.from({ length: 10 }, (_value, index) => `tied-${index}`);
+      for (const hash of hashes) await store.rememberRefreshToken(hash, grant, LATER);
+
+      const rows = db
+        .prepare(
+          'SELECT token_hash FROM oauth_refresh_token_history WHERE user_id = ? AND grant_id = ?'
+        )
+        .all('u', 'tied') as Array<{ token_hash: string }>;
+      expect(rows.map(row => row.token_hash).sort()).toEqual([...hashes.slice(2)].sort());
+
+      expect(await store.getRefreshToken('tied-9', NOW)).toEqual({
+        userId: 'u',
+        grantId: 'tied',
+        current: true,
+      });
+      expect(await store.getRefreshToken('tied-8', NOW)).toEqual({
+        userId: 'u',
+        grantId: 'tied',
+        current: false,
+      });
+      // The two oldest are the ones the bound is supposed to shed.
+      expect(await store.getRefreshToken('tied-1', NOW)).toBeNull();
+      expect(await store.getRefreshToken('tied-0', NOW)).toBeNull();
+    });
+
+    it('forgets one grant’s hashes without touching another grant', async () => {
+      const revoked = await hashRefreshToken('u:revoked:first');
+      const revokedNext = await hashRefreshToken('u:revoked:second');
+      const live = await hashRefreshToken('u:live:only');
+      await store.rememberRefreshToken(revoked, { userId: 'u', grantId: 'revoked' }, LATER);
+      await store.rememberRefreshToken(revokedNext, { userId: 'u', grantId: 'revoked' }, LATER);
+      await store.rememberRefreshToken(live, { userId: 'u', grantId: 'live' }, LATER);
+
+      await store.forgetRefreshTokens({ userId: 'u', grantId: 'revoked' });
+
+      expect(await store.getRefreshToken(revoked, NOW)).toBeNull();
+      expect(await store.getRefreshToken(revokedNext, NOW)).toBeNull();
+      expect(await store.getRefreshToken(live, NOW)).toEqual({
+        userId: 'u',
+        grantId: 'live',
+        current: true,
+      });
+    });
+
     it('rolls back supersession if recording the newly issued hash fails', async () => {
       await store.rememberRefreshToken('original', { userId: 'atomic', grantId: 'g' }, LATER);
       db.exec(
@@ -651,6 +702,34 @@ describe('production token routing (real provider + DO SQLite)', () => {
       expect((await h.refresh(h.initial.refresh_token)).status).toBe(400);
       expect((await h.refresh(third.refresh_token)).status).toBe(400);
       expect((await h.mcp(third.access_token)).status).toBe(401);
+    } finally {
+      h.db.close();
+    }
+  });
+
+  it('forgets a revoked grant’s history instead of keeping it for the history TTL', async () => {
+    const h = await harness();
+    try {
+      const [, grantId] = h.initial.refresh_token.split(':');
+      const historyRows = () =>
+        h.db
+          .prepare(
+            'SELECT token_hash FROM oauth_refresh_token_history WHERE user_id = ? AND grant_id = ?'
+          )
+          .all('user', grantId ?? '') as Array<{ token_hash: string }>;
+      expect((await h.refresh(h.initial.refresh_token)).status).toBe(200);
+      expect(historyRows()).toHaveLength(2);
+
+      // A superseded hash replay is the guard's revoke path: the grant dies, so
+      // its hashes can never authenticate another replay and must not sit in
+      // the single global DO until the TTL would remove them.
+      const replay = await h.refresh(h.initial.refresh_token);
+      expect(replay.status).toBe(400);
+      expect(await replay.json()).toMatchObject({
+        error: 'invalid_grant',
+        error_description: 'Refresh token reuse detected; the grant has been revoked.',
+      });
+      expect(historyRows()).toHaveLength(0);
     } finally {
       h.db.close();
     }

@@ -92,6 +92,18 @@ describe('glanceable approve target', () => {
     expect(block).toMatch(/needsApproval/);
   });
 
+  it('draws the watch card count row outside the Approve gate', () => {
+    // The wrist card must show a waiting agent's count even when nothing is
+    // approvable: only the control is conditional. The ranked primary row draws
+    // from the count payload, and the gate that hides the control must sit after
+    // it, so a permission-less wait still reads on the watch.
+    const block = section('bannerSmall');
+    const gate = block.indexOf('{needsApproval ? (');
+    expect(gate).toBeGreaterThanOrEqual(0);
+    expect(block.slice(0, gate)).toContain('countRow(primary, true, false)');
+    expect(block.slice(gate)).toContain('target="approve"');
+  });
+
   it('keeps the phone banner drawing its own control', () => {
     // The Lock Screen banner and the expanded island share `markAndRows`, which
     // holds the Button; the whole-source literal-target and gate assertions

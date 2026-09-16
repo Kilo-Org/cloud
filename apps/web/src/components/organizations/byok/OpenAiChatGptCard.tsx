@@ -38,6 +38,14 @@ const RECONNECT_BADGE_LABEL = 'Needs reconnect';
 const FALLBACK_ERROR_MESSAGE = 'Your ChatGPT connection is not available. Reconnect to continue.';
 const FALLBACK_IDENTITY_LABEL = 'your ChatGPT account';
 const LOAD_ERROR_MESSAGE = "We couldn't load your ChatGPT connection. Try again.";
+const DISCONNECT_ERROR_MESSAGE = "We couldn't disconnect ChatGPT. Try again.";
+
+/**
+ * Client-side code for a linking session that never started the OAuth
+ * round-trip. It is fed through `authErrorCode`, so the card renders the same
+ * generic connect-failure copy and try-again action as a returned OAuth error.
+ */
+const CONNECT_FAILED_CODE = 'connect_failed';
 
 /**
  * Shared by every state so the card keeps one padding and one reserved height:
@@ -54,8 +62,18 @@ function openAiChatGptAuthErrorMessage(code: string): string {
     : "We couldn't connect ChatGPT. Try again.";
 }
 
-function connectWithChatGpt(): Promise<unknown> {
-  return signIn('openai', { callbackUrl: BYOK_PATH }, { scope: OPENAI_TOKEN_SHARING_SCOPE });
+/**
+ * Starts the connect round-trip: first an account-linking session for the
+ * signed-in person, then the OpenAI authorization with the token-sharing
+ * scope. The linking session is what lets the callback attach this identity to
+ * the current account (and skip the sign-in Turnstile gate); it must succeed
+ * before the browser leaves for OpenAI.
+ */
+export async function startOpenAiChatGptConnect(
+  createLinkingSession: () => Promise<unknown>
+): Promise<void> {
+  await createLinkingSession();
+  await signIn('openai', { callbackUrl: BYOK_PATH }, { scope: OPENAI_TOKEN_SHARING_SCOPE });
 }
 
 /** The email claim, or the issuer-scoped subject when the token has no email. */
@@ -70,9 +88,12 @@ export type OpenAiChatGptCardViewProps = {
   authErrorCode?: string | null;
   /** The status query failed: show a message and a retry instead of a skeleton. */
   hasLoadError?: boolean;
+  /** The last disconnect attempt failed: keep the retry action on the card. */
+  hasDisconnectError?: boolean;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onRetry?: () => void;
+  isConnecting?: boolean;
   isDisconnecting?: boolean;
 };
 
@@ -96,9 +117,11 @@ function CardBody({
   status,
   authErrorCode,
   hasLoadError,
+  hasDisconnectError,
   onConnect,
   onDisconnect,
   onRetry,
+  isConnecting,
   isDisconnecting,
 }: OpenAiChatGptCardViewProps) {
   if (authErrorCode) {
@@ -107,7 +130,7 @@ function CardBody({
         <p className="type-body text-muted-foreground">
           {openAiChatGptAuthErrorMessage(authErrorCode)}
         </p>
-        <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect}>
+        <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect} disabled={isConnecting}>
           {TRY_AGAIN_LABEL}
         </Button>
       </>
@@ -138,11 +161,30 @@ function CardBody({
     );
   }
 
+  if (hasDisconnectError) {
+    // A failed disconnect keeps the disconnect action so one more click
+    // retries; the message replaces the identity line in the same body.
+    return (
+      <>
+        <p className="type-body text-muted-foreground">{DISCONNECT_ERROR_MESSAGE}</p>
+        <Button
+          variant="outline"
+          size="sm"
+          className={CARD_ACTION_CLASS}
+          onClick={onDisconnect}
+          disabled={isDisconnecting}
+        >
+          {DISCONNECT_LABEL}
+        </Button>
+      </>
+    );
+  }
+
   if (status.state === 'disconnected') {
     return (
       <>
         <p className="type-body text-muted-foreground">{CONNECT_DESCRIPTION}</p>
-        <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect}>
+        <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect} disabled={isConnecting}>
           {CONNECT_LABEL}
         </Button>
       </>
@@ -174,15 +216,27 @@ function CardBody({
   }
 
   // Expired or otherwise failed connection: the stored message says what
-  // happened, and reconnecting is the way out.
+  // happened, reconnecting is the way out, and disconnect stays available so a
+  // stored connection can always be removed in one click.
   return (
     <>
       <p className="type-body text-muted-foreground">
         {status.errorMessage ?? FALLBACK_ERROR_MESSAGE}
       </p>
-      <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect}>
-        {RECONNECT_LABEL}
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect} disabled={isConnecting}>
+          {RECONNECT_LABEL}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className={CARD_ACTION_CLASS}
+          onClick={onDisconnect}
+          disabled={isDisconnecting}
+        >
+          {DISCONNECT_LABEL}
+        </Button>
+      </div>
     </>
   );
 }
@@ -213,6 +267,7 @@ function OpenAiChatGptCardConnected() {
   const searchParams = useSearchParams();
   const openaiError = searchParams.get(AUTH_ERROR_PARAM);
   const [authErrorCode, setAuthErrorCode] = useState<string | null>(null);
+  const [hasDisconnectError, setHasDisconnectError] = useState(false);
 
   // Show the returned error once, then strip it from the URL so a refresh does
   // not repeat the message.
@@ -226,18 +281,32 @@ function OpenAiChatGptCardConnected() {
   const disconnectMutation = useMutation(
     trpc.openAiChatGpt.disconnect.mutationOptions({
       onSuccess: () => {
+        setHasDisconnectError(false);
         void queryClient.invalidateQueries({
           queryKey: trpc.openAiChatGpt.status.queryKey(),
         });
       },
+      onError: () => {
+        setHasDisconnectError(true);
+      },
     })
   );
 
+  const linkMutation = useMutation(trpc.user.linkAuthProvider.mutationOptions());
+
   const handleConnect = () => {
-    void connectWithChatGpt();
+    // A retry starts from a clean state so the failure copy never overlaps the
+    // new attempt.
+    setAuthErrorCode(null);
+    void startOpenAiChatGptConnect(() => linkMutation.mutateAsync({ provider: 'openai' })).catch(
+      () => {
+        setAuthErrorCode(CONNECT_FAILED_CODE);
+      }
+    );
   };
 
   const handleDisconnect = () => {
+    setHasDisconnectError(false);
     disconnectMutation.mutate();
   };
 
@@ -250,9 +319,11 @@ function OpenAiChatGptCardConnected() {
       status={statusQuery.data}
       authErrorCode={authErrorCode}
       hasLoadError={statusQuery.isError}
+      hasDisconnectError={hasDisconnectError}
       onConnect={handleConnect}
       onDisconnect={handleDisconnect}
       onRetry={handleRetryLoad}
+      isConnecting={linkMutation.isPending}
       isDisconnecting={disconnectMutation.isPending}
     />
   );

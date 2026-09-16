@@ -2207,9 +2207,18 @@ export async function linkAuthProviderToUser(
 
   // Check if user already has this provider linked
   const userProviders = await getUserAuthProviders(kiloUserId);
-  const hasProvider = userProviders.some(p => p.provider === authProviderData.provider);
+  const existingProvider = userProviders.find(p => p.provider === authProviderData.provider);
 
-  if (hasProvider) {
+  if (existingProvider) {
+    // An identical account id is the same verified external person, so linking
+    // again is a no-op success instead of an error. The ChatGPT issuer scopes
+    // its subject as `<issuer>#<sub>`, which is the stable external identity:
+    // reconnecting after an expiry - or after linking for sign-in only - must
+    // not fail on an already-present row. A different account id for the same
+    // provider stays PROVIDER-ALREADY-LINKED.
+    if (existingProvider.provider_account_id === authProviderData.provider_account_id) {
+      return successResult();
+    }
     return failureResult('PROVIDER-ALREADY-LINKED');
   }
 

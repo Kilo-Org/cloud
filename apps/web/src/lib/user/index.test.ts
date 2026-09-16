@@ -148,6 +148,8 @@ import {
   createOrUpdateUser,
   getAllUserProviders,
   getCrossAccountEmailConflicts,
+  getUserAuthProviders,
+  linkAuthProviderToUser,
   unlinkAuthProviderFromUser,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
@@ -6363,6 +6365,71 @@ describe('User', () => {
           )
         );
       expect(rows).toHaveLength(1);
+    });
+  });
+
+  describe('linkAuthProviderToUser identical re-link', () => {
+    // The issuer-qualified subject the OpenAI flow stores (`<issuer>#<sub>`).
+    const OPENAI_ACCOUNT_ID = 'https://auth.openai.com#cb-openai-sub';
+
+    async function seedUserWithOpenAiProvider() {
+      const user = await insertTestUser();
+      await db.insert(user_auth_provider).values([
+        {
+          kilo_user_id: user.id,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+        {
+          kilo_user_id: user.id,
+          provider: 'openai',
+          provider_account_id: OPENAI_ACCOUNT_ID,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+      ]);
+      return user;
+    }
+
+    test('re-linking the identical account id succeeds and keeps one row', async () => {
+      const user = await seedUserWithOpenAiProvider();
+
+      const result = await linkAuthProviderToUser({
+        kilo_user_id: user.id,
+        provider: 'openai',
+        provider_account_id: OPENAI_ACCOUNT_ID,
+        email: user.google_user_email,
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: null,
+      });
+
+      expect(result.success).toBe(true);
+      const providers = await getUserAuthProviders(user.id);
+      expect(providers.filter(p => p.provider === 'openai')).toHaveLength(1);
+    });
+
+    test('re-linking a different account id for the same provider still fails', async () => {
+      const user = await seedUserWithOpenAiProvider();
+
+      const result = await linkAuthProviderToUser({
+        kilo_user_id: user.id,
+        provider: 'openai',
+        provider_account_id: 'https://auth.openai.com#other-sub',
+        email: user.google_user_email,
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: null,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('PROVIDER-ALREADY-LINKED');
+      }
     });
   });
 });

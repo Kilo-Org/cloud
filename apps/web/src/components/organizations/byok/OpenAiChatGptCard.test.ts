@@ -9,11 +9,9 @@ jest.mock('next-auth/react', () => ({ signIn: jest.fn() }));
 
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from '@jest/globals';
-import {
-  OpenAiChatGptCardView,
-  type OpenAiChatGptCardViewProps,
-} from './OpenAiChatGptCard';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { OpenAiChatGptCardView, type OpenAiChatGptCardViewProps } from './OpenAiChatGptCard';
+import { OPENAI_TOKEN_SHARING_SCOPE } from '@/lib/auth/openai/scopes';
 import type { OpenAiChatGptStatus } from '@/lib/ai-gateway/openai-chatgpt/status';
 
 const CONNECTED_AT = '2026-09-16T12:00:00.000Z';
@@ -68,6 +66,22 @@ const STATES: Array<{ label: string; html: string }> = [
     }),
   },
   {
+    label: 'connect failed',
+    html: render({ status: { state: 'disconnected' }, authErrorCode: 'connect_failed' }),
+  },
+  {
+    label: 'disconnect failed',
+    html: render({
+      status: {
+        state: 'connected',
+        email: 'user@example.com',
+        subject: 'subject-1',
+        connectedAt: CONNECTED_AT,
+      },
+      hasDisconnectError: true,
+    }),
+  },
+  {
     label: 'status query failed',
     html: render({ status: undefined, hasLoadError: true }),
   },
@@ -113,7 +127,7 @@ describe('OpenAiChatGptCard connected state', () => {
 });
 
 describe('OpenAiChatGptCard expired state', () => {
-  it('shows the stored message with one reconnect action', () => {
+  it('shows the stored message with a reconnect and a disconnect action', () => {
     const html = renderStatus({
       state: 'error',
       email: 'user@example.com',
@@ -123,6 +137,24 @@ describe('OpenAiChatGptCard expired state', () => {
 
     expect(html).toContain(RECONNECT_MESSAGE);
     expect(html.match(/Reconnect with ChatGPT/g)).toHaveLength(1);
+    expect(html.match(/>Disconnect</g)).toHaveLength(1);
+  });
+});
+
+describe('OpenAiChatGptCard disconnect failure', () => {
+  it('keeps one disconnect action so the click can be retried', () => {
+    const html = render({
+      status: {
+        state: 'connected',
+        email: 'user@example.com',
+        subject: 'subject-1',
+        connectedAt: CONNECTED_AT,
+      },
+      hasDisconnectError: true,
+    });
+
+    expect(html.replace(/&#x27;/g, "'")).toContain("We couldn't disconnect ChatGPT. Try again.");
+    expect(html.match(/Disconnect/g)).toHaveLength(1);
   });
 });
 
@@ -137,9 +169,14 @@ describe('OpenAiChatGptCard returned authorization errors', () => {
   it('shows the generic copy with the same action for any other code', () => {
     const html = render({ status: undefined, authErrorCode: 'server_error' });
 
-    expect(html.replace(/&#x27;/g, "'")).toContain(
-      "We couldn't connect ChatGPT. Try again."
-    );
+    expect(html.replace(/&#x27;/g, "'")).toContain("We couldn't connect ChatGPT. Try again.");
+    expect(html.match(/>Try again</g)).toHaveLength(1);
+  });
+
+  it('shows the generic copy with one try-again action when the linking session fails', () => {
+    const html = render({ status: undefined, authErrorCode: 'connect_failed' });
+
+    expect(html.replace(/&#x27;/g, "'")).toContain("We couldn't connect ChatGPT. Try again.");
     expect(html.match(/>Try again</g)).toHaveLength(1);
   });
 });
@@ -170,7 +207,7 @@ describe('OpenAiChatGptCard layout', () => {
     const cardClasses = new Set(STATES.map(state => cardClass(state.html)));
     const bodyClasses = new Set(STATES.map(state => bodyClass(state.html)));
 
-    expect(STATES).toHaveLength(6);
+    expect(STATES).toHaveLength(8);
     expect(cardClasses.size).toBe(1);
     expect(bodyClasses.size).toBe(1);
     expect([...cardClasses][0]).toBeDefined();
@@ -181,5 +218,53 @@ describe('OpenAiChatGptCard layout', () => {
     for (const state of STATES) {
       expect(state.html).toContain('class="p-6 pt-0"');
     }
+  });
+});
+
+describe('startOpenAiChatGptConnect', () => {
+  beforeEach(() => {
+    // @swc/jest does not hoist `jest.mock` above the static imports, so the card
+    // has to be loaded after the mock is registered: drop the module registry
+    // and import both the card and the mocked `signIn` freshly per test.
+    jest.resetModules();
+    jest.clearAllMocks();
+  });
+
+  async function loadConnect() {
+    const card = await import('./OpenAiChatGptCard');
+    const nextAuth = await import('next-auth/react');
+    return {
+      startOpenAiChatGptConnect: card.startOpenAiChatGptConnect,
+      signIn: jest.mocked(nextAuth.signIn),
+    };
+  }
+
+  it('creates the account-linking session before starting the OpenAI authorization', async () => {
+    const { startOpenAiChatGptConnect, signIn } = await loadConnect();
+    const createLinkingSession = jest.fn(async () => ({}));
+
+    await startOpenAiChatGptConnect(createLinkingSession);
+
+    expect(createLinkingSession).toHaveBeenCalledTimes(1);
+    expect(signIn).toHaveBeenCalledWith(
+      'openai',
+      { callbackUrl: '/byok' },
+      { scope: OPENAI_TOKEN_SHARING_SCOPE }
+    );
+    expect(createLinkingSession.mock.invocationCallOrder[0]).toBeLessThan(
+      signIn.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('does not start the OpenAI authorization when the linking session fails', async () => {
+    const { startOpenAiChatGptConnect, signIn } = await loadConnect();
+    const createLinkingSession = jest.fn(async () => {
+      throw new Error('linking session failed');
+    });
+
+    await expect(startOpenAiChatGptConnect(createLinkingSession)).rejects.toThrow(
+      'linking session failed'
+    );
+    expect(signIn).not.toHaveBeenCalled();
   });
 });

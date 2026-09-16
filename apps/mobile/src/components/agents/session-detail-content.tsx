@@ -245,6 +245,9 @@ export function SessionDetailContent({
 
   const messages = useAtomValue(manager.atoms.messagesList);
   const isLoading = useAtomValue(manager.atoms.isLoading);
+  // Cached rows are on screen and the session's current transcript is still
+  // being fetched: the open is a refresh over readable content, not a load.
+  const isRefreshingCachedTranscript = useAtomValue(manager.atoms.isRefreshingCachedTranscript);
   const error = useAtomValue(manager.atoms.error);
   const fetchedData = useAtomValue(manager.atoms.fetchedSessionData);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
@@ -1744,6 +1747,10 @@ export function SessionDetailContent({
               : {})}
           />
           <SessionConnectionIndicator
+            // The cached transcript is readable while its replacement is
+            // fetched: the refresh indicator owns the row for that window, in
+            // the same fixed slot so nothing below it shifts.
+            isRefreshingTranscript={isRefreshingCachedTranscript && messages.length > 0}
             sessionRefresh={
               cachedMetadataRefresh
                 ? {

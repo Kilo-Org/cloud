@@ -938,6 +938,30 @@ describe('session detail cached metadata refresh', () => {
   });
 });
 
+describe('session detail cached transcript refresh', () => {
+  function refreshFlag(renderer: ReactTestRenderer): unknown {
+    return renderer.root.findAllByType(SessionConnectionIndicator)[0]?.props.isRefreshingTranscript;
+  }
+
+  it('shows a loading indicator while the cached transcript is refreshed', async () => {
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    // The live page never resolves: the cached rows stay on screen, so the
+    // refresh indicator has to stay with them.
+    const view = await mountDetails(null, { cachedRows });
+
+    expect(renderedText(view.renderer.root)).toContain('cached root row');
+    expect(refreshFlag(view.renderer)).toBe(true);
+  });
+
+  it('clears the loading indicator once the live transcript lands', async () => {
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails([childMessage(ROOT_ID, 'live root row')], { cachedRows });
+
+    expect(renderedText(view.renderer.root)).toContain('live root row');
+    expect(refreshFlag(view.renderer)).toBe(false);
+  });
+});
+
 describe('session detail bottom strip', () => {
   it('keeps the home-indicator strip full-bleed (pure background, no side padding)', async () => {
     const { renderer } = await mountDetails([]);

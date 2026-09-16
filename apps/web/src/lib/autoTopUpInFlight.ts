@@ -1,7 +1,7 @@
 import { db } from '@/lib/drizzle';
 import { auto_top_up_configs } from '@kilocode/db/schema';
 import { and, eq, gt, isNotNull, sql } from 'drizzle-orm';
-import { AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS } from '@/lib/autoTopUpConstants';
+import { AUTO_TOP_UP_IN_FLIGHT_WINDOW_SECONDS } from '@/lib/autoTopUpConstants';
 
 /**
  * Reports whether an auto-top-up is currently in flight for the billing entity.
@@ -11,8 +11,9 @@ import { AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS } from '@/lib/autoTopUpConstan
  * releases it). While it is held the balance can cross zero before credits
  * land, so callers must not treat that window as a terminal no-credits state.
  *
- * The read uses the primary database because a stale lock (older than the
- * reclaim window) is not a reliable in-flight signal.
+ * The read uses the primary database because a replica-stale lock is not a
+ * reliable in-flight signal. Locks older than the in-flight window are ignored:
+ * a lost webhook must not suppress the terminal no-credits response for long.
  */
 export async function isAutoTopUpInFlight(params: {
   userId?: string;
@@ -34,7 +35,7 @@ export async function isAutoTopUpInFlight(params: {
         isNotNull(auto_top_up_configs.attempt_started_at),
         gt(
           auto_top_up_configs.attempt_started_at,
-          sql`NOW() - INTERVAL '${sql.raw(String(AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS))} second'`
+          sql`NOW() - INTERVAL '${sql.raw(String(AUTO_TOP_UP_IN_FLIGHT_WINDOW_SECONDS))} second'`
         )
       )
     )

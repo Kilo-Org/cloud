@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
-import { AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS } from '@/lib/autoTopUpConstants';
+import { AUTO_TOP_UP_IN_FLIGHT_WINDOW_SECONDS } from '@/lib/autoTopUpConstants';
 
 describe('isAutoTopUpInFlight', () => {
   let userId: string;
@@ -63,9 +63,9 @@ describe('isAutoTopUpInFlight', () => {
     await expect(isAutoTopUpInFlight({ userId })).resolves.toBe(true);
   });
 
-  it('returns false when the attempt lock is stale', async () => {
+  it('returns false when the attempt lock is older than the in-flight window', async () => {
     const staleAt = new Date(
-      Date.now() - (AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS + 60) * 1000
+      Date.now() - (AUTO_TOP_UP_IN_FLIGHT_WINDOW_SECONDS + 60) * 1000
     ).toISOString();
     await db.insert(auto_top_up_configs).values({
       owned_by_user_id: userId,
@@ -74,6 +74,19 @@ describe('isAutoTopUpInFlight', () => {
     });
 
     await expect(isAutoTopUpInFlight({ userId })).resolves.toBe(false);
+  });
+
+  it('returns true when the attempt lock is inside the in-flight window', async () => {
+    const withinWindow = new Date(
+      Date.now() - (AUTO_TOP_UP_IN_FLIGHT_WINDOW_SECONDS - 60) * 1000
+    ).toISOString();
+    await db.insert(auto_top_up_configs).values({
+      owned_by_user_id: userId,
+      stripe_payment_method_id: 'pm_test_inflight',
+      attempt_started_at: withinWindow,
+    });
+
+    await expect(isAutoTopUpInFlight({ userId })).resolves.toBe(true);
   });
 
   it('returns true for an in-flight organization attempt', async () => {

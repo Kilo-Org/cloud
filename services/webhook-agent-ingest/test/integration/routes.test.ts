@@ -1,6 +1,6 @@
 import { SELF, env, runInDurableObject } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
-import { encodeUserIdForPath } from '../../src/util/user-id-encoding';
+import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
 
 describe('Hono Routes', () => {
   describe('Webhook Ingestion - Personal Triggers', () => {

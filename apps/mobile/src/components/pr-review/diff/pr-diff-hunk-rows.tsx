@@ -222,6 +222,10 @@ export function PaginationRow({
       <View className="flex-row items-center justify-center gap-3 py-4">
         <Text variant="muted" className="text-xs">
           {t('prReview.hunkRows.loadedOfTotalFiles', {
+            // The loaded count drives the plural category: a catalog inflects
+            // the participle on the number of files actually loaded
+            // ("1 fichier chargé sur 5"). English carries the plural noun
+            // because the page set, not the loaded page, names the files.
             count: loadedFiles,
             loaded: formatNumber(loadedFiles, i18n.language),
             total: totalFiles == null ? '?' : formatNumber(totalFiles, i18n.language),

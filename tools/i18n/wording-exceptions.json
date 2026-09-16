@@ -165,7 +165,8 @@
     "open pull request",
     "plan",
     "recent",
-    "recommended"
+    "recommended",
+    "{{loaded}} of {{total}} files loaded"
   ],
   "ga": ["block", "commit", "open", "open pull request", "reply"],
   "gl": ["enabled", "none", "open", "open pull request", "review"],
@@ -340,5 +341,5 @@
   "yo": ["commit", "draft", "open"],
   "zh-Hans": ["commit", "file", "files", "open", "open pull request", "reactions"],
   "zh-Hant": ["commit", "created", "file", "files", "open", "open pull request", "reactions"],
-  "zu": ["commit", "open"]
+  "zu": ["commit", "open", "{{loaded}} of {{total}} files loaded"]
 }

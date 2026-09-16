@@ -340,7 +340,7 @@
       "failedToLoadMoreFiles": "Failed to load more files — tap to retry",
       "loadingAllFiles": "Loading all files — {{loaded}}…",
       "loadingAllFilesOf": "Loading all files — {{loaded}} of {{total}}…",
-      "loadedOfTotalFiles_one": "{{loaded}} of {{total}} file loaded",
+      "loadedOfTotalFiles_one": "{{loaded}} of {{total}} files loaded",
       "loadedOfTotalFiles": "{{loaded}} of {{total}} files loaded",
       "loadedOfTotalFiles_other": "{{loaded}} of {{total}} files loaded",
       "loadAllFiles": "Load all files",

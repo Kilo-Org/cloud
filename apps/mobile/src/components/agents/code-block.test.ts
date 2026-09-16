@@ -59,25 +59,46 @@ function isMockedStringElement(node: TestRenderer.ReactTestInstance, name: strin
   return typeof node.type === 'string' && node.type === name;
 }
 
-/** Nested RNText token runs: the ones that carry a style.color. */
-function colorRuns(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
-  return root.findAll(node => {
-    const style = propOf(node, 'style') as { color?: string } | undefined;
-    return typeof style?.color === 'string';
-  });
-}
-
-/** The single parent code RNText (carries the mono sizing className). */
-function codeParent(
-  root: TestRenderer.ReactTestInstance
-): TestRenderer.ReactTestInstance | undefined {
+/** Code Texts carrying the mono sizing: one selectable fence, or one per line. */
+function codeLines(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => {
     if (!isMockedStringElement(node, 'RNText')) {
       return false;
     }
     const className = propOf(node, 'className');
     return typeof className === 'string' && className.includes('font-mono text-xs');
+  });
+}
+
+/** The first code Text (the fence, or the first line of a per-line fence). */
+function codeParent(
+  root: TestRenderer.ReactTestInstance
+): TestRenderer.ReactTestInstance | undefined {
+  return codeLines(root)[0];
+}
+
+/** The intrinsic-width content wrapper of the sheet scroll mode. */
+function codeScrollContent(
+  root: TestRenderer.ReactTestInstance
+): TestRenderer.ReactTestInstance | undefined {
+  return root.findAll(node => {
+    if (!isMockedStringElement(node, 'View')) {
+      return false;
+    }
+    const className = propOf(node, 'className');
+    return typeof className === 'string' && className.includes('shrink-0 self-start');
   })[0];
+}
+
+/** Nested RNText token runs: the colored runs, never the per-line code Texts. */
+function colorRuns(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => {
+    if (propOf(node, 'className') !== undefined) {
+      return false;
+    }
+    const style = propOf(node, 'style') as { color?: string } | undefined;
+    return typeof style?.color === 'string';
+  });
 }
 
 function truncatedMarkers(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
@@ -175,10 +196,13 @@ function withSheet(
 }
 
 describe('CodeBlock', () => {
-  it('renders one nested RNText per token run', async () => {
-    const renderer = await mount(blockElement());
-    const expectedRuns = tokenizeCodeLines('const x = 1;', 'typescript').reduce(
-      (total, line) => total + line.length,
+  it('renders one code line Text per source line when the fence is not selectable', async () => {
+    const renderer = await mount(blockElement({ selectable: false }));
+    const lines = tokenizeCodeLines('const x = 1;', 'typescript');
+    expect(codeLines(renderer.root)).toHaveLength(lines.length);
+
+    const expectedRuns = lines.reduce(
+      (total, line) => total + line.filter(token => token.className !== null).length,
       0
     );
     expect(expectedRuns).toBeGreaterThan(0);
@@ -186,7 +210,99 @@ describe('CodeBlock', () => {
     await unmount(renderer);
   });
 
-  it('applies tokenColorFor to tagged runs and baseColor to plain runs', async () => {
+  it('keeps a selectable fence in one Text, so selection spans the whole fence', async () => {
+    // Regression: Android selects inside one `ReactTextView` only, so the
+    // per-line split (the non-selectable path) would let the user select a
+    // single line per gesture. A selectable fence must therefore stay one Text.
+    const code = Array.from({ length: 40 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const renderer = await mount(blockElement({ code, language: 'typescript' }));
+
+    const fences = codeLines(renderer.root);
+    expect(fences).toHaveLength(1);
+    expect(propOf(fences[0], 'selectable')).toBe(true);
+
+    // Nothing is dropped by the single-Text render: the tagged runs of every
+    // line still total what the highlighter produced.
+    const expectedRuns = tokenizeCodeLines(code, 'typescript').reduce(
+      (total, line) => total + line.filter(token => token.className !== null).length,
+      0
+    );
+    expect(expectedRuns).toBeGreaterThan(0);
+    expect(colorRuns(renderer.root)).toHaveLength(expectedRuns);
+    await unmount(renderer);
+  });
+
+  it('costs no token span for an untagged run in a selectable fence', async () => {
+    const code = Array.from({ length: 20 }, (_, index) => `plain output line ${index}`).join('\n');
+    const renderer = await mount(blockElement({ code, language: null }));
+    expect(codeLines(renderer.root)).toHaveLength(1);
+    expect(colorRuns(renderer.root)).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('keeps a blank source line as its own node in a selectable fence', async () => {
+    const renderer = await mount(blockElement({ code: 'a\n\nb', language: null }));
+    const [fence] = codeLines(renderer.root);
+    expect(fence).toBeDefined();
+    expect(propOf(fence, 'children')).toHaveLength(3);
+    await unmount(renderer);
+  });
+
+  it('keeps every non-selectable Text to a single line, so no Text holds the whole fence', async () => {
+    // Regression: the fence used to render all lines into one RNText, so a
+    // long file produced one SpannableStringBuilder whose span count scaled
+    // with the whole file (the Android `SetSpanOperation.execute` ANR).
+    const code = Array.from({ length: 200 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const renderer = await mount(blockElement({ code, language: 'typescript', selectable: false }));
+
+    const lines = codeLines(renderer.root);
+    expect(lines).toHaveLength(200);
+
+    // Every line Text carries only its own line's runs.
+    const runsPerLine = lines.map(line => {
+      const children = propOf(line, 'children');
+      if (typeof children === 'string') {
+        return 1;
+      }
+      return Array.isArray(children) ? children.length : 0;
+    });
+    expect(Math.max(...runsPerLine)).toBeLessThan(50);
+
+    // The tagged runs of the whole fence still total what the highlighter
+    // produced — nothing is dropped by the split.
+    const expectedRuns = tokenizeCodeLines(code, 'typescript').reduce(
+      (total, line) => total + line.filter(token => token.className !== null).length,
+      0
+    );
+    expect(colorRuns(renderer.root)).toHaveLength(expectedRuns);
+    await unmount(renderer);
+  });
+
+  it('costs no token span for an untagged run', async () => {
+    // A fence with no language highlights to plain text; every line is one
+    // raw string, so no line carries a nested token Text at all.
+    const code = Array.from({ length: 100 }, (_, index) => `plain output line ${index}`).join('\n');
+    const renderer = await mount(blockElement({ code, language: null, selectable: false }));
+    expect(codeLines(renderer.root)).toHaveLength(100);
+    expect(colorRuns(renderer.root)).toHaveLength(0);
+    await unmount(renderer);
+  });
+
+  it('keeps a blank source line as a line box', async () => {
+    const renderer = await mount(
+      blockElement({ code: 'a\n\nb', language: null, selectable: false })
+    );
+    const lines = codeLines(renderer.root);
+    expect(lines).toHaveLength(3);
+    expect(propOf(lines[1], 'children')).toBe(' ');
+    await unmount(renderer);
+  });
+
+  it('applies tokenColorFor to tagged runs and baseColor to the line text', async () => {
     const baseColor = '#112233';
     const renderer = await mount(blockElement({ baseColor }));
 
@@ -195,7 +311,9 @@ describe('CodeBlock', () => {
     );
     expect(runColors).toContain(tokenColorFor('keyword', false));
     expect(runColors).toContain(tokenColorFor('number', false));
-    expect(runColors).toContain(baseColor);
+    // Untagged runs are plain strings inside the line Text, so the base ink
+    // moves from a per-token run onto the line itself.
+    expect((propOf(codeParent(renderer.root), 'style') as { color: string }).color).toBe(baseColor);
 
     const keywordRun = colorRuns(renderer.root).find(
       run => (propOf(run, 'style') as { color: string }).color === tokenColorFor('keyword', false)
@@ -207,12 +325,9 @@ describe('CodeBlock', () => {
     await unmount(renderer);
   });
 
-  it('uses the theme foreground for plain runs by default', async () => {
+  it('uses the theme foreground for the line text by default', async () => {
     const renderer = await mount(blockElement());
-    const runColors = colorRuns(renderer.root).map(
-      run => (propOf(run, 'style') as { color: string }).color
-    );
-    expect(runColors).toContain('#14130F');
+    expect((propOf(codeParent(renderer.root), 'style') as { color: string }).color).toBe('#14130F');
     await unmount(renderer);
   });
 
@@ -242,9 +357,12 @@ describe('CodeBlock', () => {
     const renderer = await mount(withSheet('scroll', track, blockElement()));
     const scrollViews = renderer.root.findAll(node => isMockedStringElement(node, 'ScrollView'));
     expect(scrollViews).toHaveLength(1);
-    const parent = codeParent(renderer.root);
-    expect(parent).toBeDefined();
-    expect((propOf(parent, 'className') as string).includes('shrink-0 self-start')).toBe(true);
+    const content = codeScrollContent(renderer.root);
+    expect(content).toBeDefined();
+    expect(codeLines(renderer.root).length).toBeGreaterThan(0);
+    // Each code line keeps the mono sizing inside the intrinsic-width wrapper.
+    const [firstLine] = codeLines(renderer.root);
+    expect((propOf(firstLine, 'className') as string).includes('font-mono text-xs')).toBe(true);
     await unmount(renderer);
   });
 
@@ -422,6 +540,20 @@ describe('CodeBlock copy action', () => {
       });
     });
     expect(onCopyCode).toHaveBeenCalledWith('const x = 1;');
+    await unmount(renderer);
+  });
+
+  it('carries the copy action on every line Text of a non-selectable fence', async () => {
+    // Each line is its own Android `ReactTextView`, so the transcript's
+    // non-selectable fence needs the action on each of them.
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const code = 'const a = 1;\nconst b = 2;\nconst c = 3;';
+    const renderer = await mount(blockElement({ code, selectable: false, onCopyCode }));
+    const lines = codeLines(renderer.root);
+    expect(lines).toHaveLength(3);
+    for (const line of lines) {
+      expect(typeof propOf(line, 'onAccessibilityAction')).toBe('function');
+    }
     await unmount(renderer);
   });
 

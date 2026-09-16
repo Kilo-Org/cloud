@@ -19,11 +19,13 @@ const mockQueryResult: {
   data: { passkeys: unknown[] } | undefined;
   isLoading: boolean;
   isError: boolean;
+  isFetching: boolean;
   refetch: () => Promise<unknown>;
 } = {
   data: undefined,
   isLoading: false,
   isError: false,
+  isFetching: false,
   refetch: mockRefetch,
 };
 
@@ -214,6 +216,13 @@ function hasButton(container: ParentNode, text: string): boolean {
   );
 }
 
+/** The inline failure notices currently rendered, by their text. */
+function alerts(container: ParentNode): string[] {
+  return Array.from(container.querySelectorAll('[role="alert"]')).map(
+    node => node.textContent?.trim() ?? ''
+  );
+}
+
 async function flush() {
   await act(async () => {
     await Promise.resolve();
@@ -241,6 +250,7 @@ beforeEach(() => {
   mockQueryResult.data = undefined;
   mockQueryResult.isLoading = false;
   mockQueryResult.isError = false;
+  mockQueryResult.isFetching = false;
   mockBrowserSupportsWebAuthn.mockReturnValue(true);
   mockStartRegistration.mockResolvedValue({ id: 'new-credential' });
   mockFetch.mockReset();
@@ -377,5 +387,85 @@ describe('PasskeysCard', () => {
     );
     expect(mounted.container.querySelectorAll('[role="listitem"]')).toHaveLength(1);
     expect(mockRefetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps the rendered list, its controls and the add control when a background refresh fails', () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockQueryResult.isError = true;
+    mounted = mountCard();
+
+    expect(mounted.container.querySelectorAll('[role="listitem"]')).toHaveLength(1);
+    expect(mounted.container.textContent).toContain('Work laptop');
+    expect(hasButton(mounted.container, 'Rename')).toBe(true);
+    expect(hasButton(mounted.container, 'Remove')).toBe(true);
+    expect(hasButton(mounted.container, 'Add a passkey')).toBe(true);
+    expect(alerts(mounted.container)).toContain('Could not load your passkeys. Try again.');
+    expect(hasButton(mounted.container, 'Try again')).toBe(true);
+  });
+
+  it('keeps the empty state and the add control when a background refresh fails', () => {
+    mockQueryResult.data = { passkeys: [] };
+    mockQueryResult.isError = true;
+    mounted = mountCard();
+
+    expect(mounted.container.textContent).toContain('No passkeys yet');
+    expect(hasButton(mounted.container, 'Add a passkey')).toBe(true);
+    expect(alerts(mounted.container)).toContain('Could not load your passkeys. Try again.');
+    expect(hasButton(mounted.container, 'Try again')).toBe(true);
+    expect(mounted.container.querySelectorAll('[role="listitem"]')).toHaveLength(0);
+  });
+
+  it('retries the list request once without unmounting the rendered rows', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockQueryResult.isError = true;
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Try again').click());
+    await flush();
+
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+    expect(mounted.container.querySelectorAll('[role="listitem"]')).toHaveLength(1);
+    expect(mounted.container.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it('locks the retry control and shows one inline spinner while the retry runs', () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockQueryResult.isError = true;
+    mockQueryResult.isFetching = true;
+    mounted = mountCard();
+
+    expect(button(mounted.container, 'Try again').disabled).toBe(true);
+    expect(mounted.container.querySelectorAll('.animate-spin')).toHaveLength(1);
+    expect(mounted.container.querySelector('[role="status"]')).toBeNull();
+    expect(mounted.container.querySelectorAll('[role="listitem"]')).toHaveLength(1);
+  });
+
+  it('keeps the rows, the add control and the notice when the retry fails again', async () => {
+    mockQueryResult.data = { passkeys: [ROW] };
+    mockQueryResult.isError = true;
+    mounted = mountCard();
+
+    act(() => button(mounted!.container, 'Try again').click());
+    await flush();
+
+    // The retry finished and failed again: the query is still in error and the
+    // list it already had is still on screen.
+    mockQueryResult.isFetching = false;
+    act(() => mounted!.root.render(createElement(PasskeysCard)));
+    await flush();
+
+    expect(mounted.container.querySelectorAll('[role="listitem"]')).toHaveLength(1);
+    expect(hasButton(mounted.container, 'Add a passkey')).toBe(true);
+    expect(alerts(mounted.container)).toContain('Could not load your passkeys. Try again.');
+  });
+
+  it('shows only the error and its retry when the first load fails with no data', () => {
+    mockQueryResult.isError = true;
+    mounted = mountCard();
+
+    expect(mounted.container.querySelectorAll('[role="listitem"]')).toHaveLength(0);
+    expect(hasButton(mounted.container, 'Add a passkey')).toBe(false);
+    expect(alerts(mounted.container)).toContain('Could not load your passkeys. Try again.');
+    expect(hasButton(mounted.container, 'Try again')).toBe(true);
   });
 });

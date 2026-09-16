@@ -1,6 +1,6 @@
 'use client';
 
-import { KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
+import { KeyRound, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/browser';
@@ -225,7 +225,8 @@ export function PasskeysCard() {
               <Skeleton className="h-[62px] w-full rounded-lg" />
               <Skeleton className="h-10 w-full" />
             </div>
-          ) : passkeysQuery.isError ? (
+          ) : passkeysQuery.isError && passkeysQuery.data === undefined ? (
+            // The first load failed with nothing to keep on screen.
             <div className="space-y-3">
               <p role="alert" className="text-muted-foreground text-sm leading-relaxed">
                 Could not load your passkeys. Try again.
@@ -234,56 +235,78 @@ export function PasskeysCard() {
                 Try again
               </Button>
             </div>
-          ) : passkeys.length === 0 ? (
-            <div className="space-y-3">
-              <p className="text-muted-foreground text-sm">No passkeys yet</p>
-              {addControl}
-            </div>
           ) : (
-            <div className="space-y-2" role="list" aria-label="Your passkeys">
-              {passkeys.map(passkey => (
-                <div
-                  key={passkey.id}
-                  role="listitem"
-                  className="flex items-center justify-between gap-3 rounded-lg border p-3"
-                >
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">{passkeyLabel(passkey)}</div>
-                    <div className="text-muted-foreground text-sm">
-                      Added {formatPasskeyDate(passkey.created_at)}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={removeMutation.isPending}
-                      onClick={() => {
-                        setRenameTarget(passkey);
-                        setRenameName(passkey.name ?? '');
-                        setRenameFailure(null);
-                      }}
-                    >
-                      <Pencil className="mr-1 h-4 w-4" />
-                      Rename
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={removeMutation.isPending}
-                      onClick={() => {
-                        setRemoveTarget(passkey);
-                        setRemoveFailure(null);
-                      }}
-                    >
-                      <Trash2 className="mr-1 h-4 w-4" />
-                      Remove
-                    </Button>
-                  </div>
+            <>
+              {passkeysQuery.isError && (
+                // A background refresh failed with a list already on screen.
+                // Whatever was rendered stays, and the retry re-runs the same
+                // request while the rows remain visible.
+                <div className="space-y-3">
+                  <p role="alert" className="text-muted-foreground text-sm leading-relaxed">
+                    Could not load your passkeys. Try again.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => void passkeysQuery.refetch()}
+                    disabled={passkeysQuery.isFetching}
+                  >
+                    {passkeysQuery.isFetching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Try again
+                  </Button>
                 </div>
-              ))}
-              {addControl}
-            </div>
+              )}
+              {passkeys.length === 0 ? (
+                <div className="space-y-3">
+                  <p className="text-muted-foreground text-sm">No passkeys yet</p>
+                  {addControl}
+                </div>
+              ) : (
+                <div className="space-y-2" role="list" aria-label="Your passkeys">
+                  {passkeys.map(passkey => (
+                    <div
+                      key={passkey.id}
+                      role="listitem"
+                      className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">{passkeyLabel(passkey)}</div>
+                        <div className="text-muted-foreground text-sm">
+                          Added {formatPasskeyDate(passkey.created_at)}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={removeMutation.isPending}
+                          onClick={() => {
+                            setRenameTarget(passkey);
+                            setRenameName(passkey.name ?? '');
+                            setRenameFailure(null);
+                          }}
+                        >
+                          <Pencil className="mr-1 h-4 w-4" />
+                          Rename
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={removeMutation.isPending}
+                          onClick={() => {
+                            setRemoveTarget(passkey);
+                            setRemoveFailure(null);
+                          }}
+                        >
+                          <Trash2 className="mr-1 h-4 w-4" />
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {addControl}
+                </div>
+              )}
+            </>
           )}
 
           {!canCreatePasskeys && !passkeysQuery.isLoading && (

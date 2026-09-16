@@ -14,11 +14,14 @@ function stripNulBytes(value: unknown): unknown {
   if (typeof value === 'string') return value.replaceAll('\u0000', '');
   if (Array.isArray(value)) return value.map(stripNulBytes);
   if (value !== null && typeof value === 'object') {
-    const result: Record<string, unknown> = {};
-    for (const [key, entry] of Object.entries(value)) {
-      result[key.replaceAll('\u0000', '')] = stripNulBytes(entry);
-    }
-    return result;
+    // Object.fromEntries defines own properties, so a '__proto__' key survives
+    // instead of being routed through the inherited setter and dropped.
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key.replaceAll('\u0000', ''),
+        stripNulBytes(entry),
+      ])
+    );
   }
   return value;
 }

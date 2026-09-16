@@ -69,6 +69,26 @@ describe('logWebhookEvent NUL sanitization', () => {
     });
   });
 
+  test('preserves a __proto__ payload key through sanitization and the jsonb insert', async () => {
+    const eventSignature = `proto-${crypto.randomUUID()}`;
+    const payload = JSON.parse('{"__proto__":{"polluted":true},"action":"created"}');
+
+    await logWebhookEvent({
+      owner: { type: 'user', id: user.id },
+      platform: 'github',
+      event_type: 'pull_request_review_comment',
+      event_action: 'created',
+      payload,
+      headers: { 'x-github-event': 'pull_request_review_comment' },
+      event_signature: eventSignature,
+    });
+
+    const stored = await findEventBySignature(eventSignature);
+    expect(stored.payload).toEqual(
+      JSON.parse('{"__proto__":{"polluted":true},"action":"created"}')
+    );
+  });
+
   test('leaves a clean payload and headers unchanged', async () => {
     const eventSignature = `clean-${crypto.randomUUID()}`;
     const payload = {

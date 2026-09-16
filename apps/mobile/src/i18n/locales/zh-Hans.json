@@ -2374,6 +2374,8 @@
     "checkConnection": "检查连接",
     "checks": {
       "checksCount": "{{displayCount}} 项检查",
+      "checksCount_one": "{{displayCount}} 项检查",
+      "checksCount_other": "{{displayCount}} 项检查",
       "couldNotLoad": "无法加载检查结果。",
       "failed": "{{displayCount}} 项失败",
       "noAccess": "你无权查看此仓库的检查结果。",

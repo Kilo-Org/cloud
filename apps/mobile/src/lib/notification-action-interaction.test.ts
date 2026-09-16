@@ -414,6 +414,44 @@ describe('runNeedsInputInteraction', () => {
 
       expect(outcome).toBe('retryable');
     });
+
+    it('returns retryable when no raise of either kind appears in the budget, so the actions are kept', async () => {
+      const fake = createFakeManager();
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      // An expired wait budget is not proof the raise is gone: a cold headless
+      // start can exceed the budget while the raise is still live, so the
+      // notification must keep its actions instead of turning terminal.
+      expect(outcome).toBe('retryable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(fake.answerQuestion).not.toHaveBeenCalled();
+      expect(ack).not.toHaveBeenCalled();
+      expect(fake.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns retryable for a reply when neither kind is pending at the deadline', async () => {
+      const fake = createFakeManager();
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'reply',
+        text: 'answer',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('retryable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(fake.answerQuestion).not.toHaveBeenCalled();
+      expect(ack).not.toHaveBeenCalled();
+      expect(fake.destroy).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('non-retryable and empty paths', () => {
@@ -448,23 +486,6 @@ describe('runNeedsInputInteraction', () => {
 
       expect(outcome).toBe('unavailable');
       expect(createManager).not.toHaveBeenCalled();
-    });
-
-    it('returns unavailable when no raise of either kind appears in the budget and sends nothing', async () => {
-      const fake = createFakeManager();
-      const ack = vi.fn<(kiloSessionId: string) => void>();
-
-      const outcome = await runNeedsInputInteraction({
-        kiloSessionId: SESSION_ID,
-        action: 'approve',
-        deps: fakeManagerDeps(fake, { ack }),
-      });
-
-      expect(outcome).toBe('unavailable');
-      expect(fake.respondToPermission).not.toHaveBeenCalled();
-      expect(fake.answerQuestion).not.toHaveBeenCalled();
-      expect(ack).not.toHaveBeenCalled();
-      expect(fake.destroy).toHaveBeenCalledTimes(1);
     });
 
     it('returns retryable when the raise does not match the action, so the raise keeps its actions', async () => {
@@ -546,24 +567,6 @@ describe('runNeedsInputInteraction', () => {
 
       expect(outcome).toBe('retryable');
       expect(createManager).not.toHaveBeenCalled();
-    });
-
-    it('returns unavailable for a reply when neither kind is pending at the deadline', async () => {
-      const fake = createFakeManager();
-      const ack = vi.fn<(kiloSessionId: string) => void>();
-
-      const outcome = await runNeedsInputInteraction({
-        kiloSessionId: SESSION_ID,
-        action: 'reply',
-        text: 'answer',
-        deps: fakeManagerDeps(fake, { ack }),
-      });
-
-      expect(outcome).toBe('unavailable');
-      expect(fake.respondToPermission).not.toHaveBeenCalled();
-      expect(fake.answerQuestion).not.toHaveBeenCalled();
-      expect(ack).not.toHaveBeenCalled();
-      expect(fake.destroy).toHaveBeenCalledTimes(1);
     });
   });
 });

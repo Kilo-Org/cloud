@@ -13,11 +13,15 @@
  *
  * Outcomes:
  * - `ok` — the matching raise was answered and acked.
- * - `retryable` — a transport / tRPC failure, or the tap carried no answer
- *   while the raise is still live (blank reply text, or a pending raise of the
- *   other kind): nothing was sent, so the caller may offer a retry.
- * - `unavailable` — the session is gone (`NOT_FOUND`), or no raise of either
- *   kind appeared within the budget.
+ * - `retryable` — a transport / tRPC failure, or nothing was sent because the
+ *   raise had not reached the atoms yet (blank reply text, a pending raise of
+ *   the other kind, or the wait budget expired): the raise may still be live,
+ *   so the caller keeps the actions and the user can tap again.
+ * - `unavailable` — the session read returned `NOT_FOUND`: the raise is
+ *   authoritatively gone. A wait-budget expiry proves nothing about the raise
+ *   — with the app closed, a cold headless start (ticket mint, connect,
+ *   snapshot replay) can exceed the budget while the raise is still live —
+ *   so it is retryable, never terminal.
  */
 
 import { type Atom, createStore } from 'jotai';
@@ -155,14 +159,14 @@ export async function runNeedsInputInteraction({
         pollIntervalMs,
       });
       if (requestId === null) {
-        // No raise of this kind inside the budget: nothing was sent. When the
-        // session instead holds a raise of the other kind, that raise is still
-        // live and untouched — the user tapped the wrong control — so the
-        // notification must keep its actions for a tap on the right one.
-        const oppositeRequest = store.get(
-          action === 'approve' ? manager.atoms.activeQuestion : manager.atoms.activePermission
-        );
-        return oppositeRequest === null ? 'unavailable' : 'retryable';
+        // No raise of this kind reached the atoms inside the budget and
+        // nothing was sent. An expired budget is not proof the raise is gone:
+        // with the app closed, a cold headless start (ticket mint, connect,
+        // snapshot replay) can exceed the budget while the raise is still
+        // live. The raise — of either kind — is untouched, so the outcome is
+        // retryable and the notification keeps its actions for another tap.
+        // Only the session read's NOT_FOUND above is terminal.
+        return 'retryable';
       }
       await (action === 'approve'
         ? manager.respondToPermission(requestId, 'once')

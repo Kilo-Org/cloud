@@ -167,6 +167,7 @@ function buildRollupLine(rollup: {
   if (rollup.skipped > 0) {
     parts.push(i18n.t('prReview.checks.skipped', rollupCountOptions(rollup.skipped)));
   }
+  // i18n-dup-ok: 'prReview.checks.checksCount_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
   return parts.length > 0
     ? formatList(parts, i18n.language)
     : i18n.t('prReview.checks.checksCount', rollupCountOptions(rollup.total));

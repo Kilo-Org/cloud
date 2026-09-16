@@ -343,7 +343,17 @@
       "fileLoadedOfTotalCount_other": "ಒಟ್ಟು {{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{displayCount}} ಲೋಡ್ ಆಗಿವೆ",
       "filesStillLoading": "ಫೈಲ್‌ಗಳು ಇನ್ನೂ ಲೋಡ್ ಆಗುತ್ತಿವೆ. ರಿಫ್ರೆಶ್ ಮಾಡಲು ಕೆಳಗೆ ಎಳೆಯಿರಿ.",
       "goToOverview": "ಅವಲೋಕನಕ್ಕೆ ಹೋಗಿ",
-      "goToOverviewTab": "ಅವಲೋಕನ ಟ್ಯಾಬ್‌ಗೆ ಹೋಗಿ"
+      "goToOverviewTab": "ಅವಲೋಕನ ಟ್ಯಾಬ್‌ಗೆ ಹೋಗಿ",
+      "expandAllLines_one": "ಎಲ್ಲಾ {{displayCount}} ಸಾಲು ತೋರಿಸಿ",
+      "expandAllLines_other": "ಎಲ್ಲಾ {{displayCount}} ಸಾಲುಗಳನ್ನು ತೋರಿಸಿ",
+      "expandLines_one": "{{displayCount}} ಸಾಲು ತೋರಿಸಿ ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} ಸಾಲುಗಳನ್ನು ತೋರಿಸಿ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "ಸುತ್ತಲಿನ {{displayCount}} ಸಾಲು ತೋರಿಸಿ",
+      "expandLinesOfContext_other": "ಸುತ್ತಲಿನ {{displayCount}} ಸಾಲುಗಳನ್ನು ತೋರಿಸಿ",
+      "expandMoreLines_one": "ಇನ್ನೂ {{displayCount}} ಸಾಲು ತೋರಿಸಿ ({{start}}–{{end}})",
+      "expandMoreLines_other": "ಇನ್ನೂ {{displayCount}} ಸಾಲುಗಳನ್ನು ತೋರಿಸಿ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{loaded}} ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
+      "loadedOfTotalFiles_other": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{loaded}} ಲೋಡ್ ಮಾಡಲಾಗಿದೆ"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ಫೈಲ್‌ನ ಕೊನೆಯಲ್ಲಿ ಹೊಸ ಸಾಲು ಇಲ್ಲ",
@@ -531,7 +541,9 @@
         "outdatedOnPath": "{{path}} — ಹಳೆಯ ಆವೃತ್ತಿಯ ಕಾಮೆಂಟ್"
       },
       "deletedUser": "ಅಳಿಸಲಾದ ಬಳಕೆದಾರ",
-      "replyForbiddenTerm": "ಈ {{term}}‌ಗೆ ಉತ್ತರಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ."
+      "replyForbiddenTerm": "ಈ {{term}}‌ಗೆ ಉತ್ತರಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
+      "moreLinesAbove_one": "… ಮೇಲೆ ಇನ್ನೂ {{displayCount}} ಸಾಲು.",
+      "moreLinesAbove_other": "… ಮೇಲೆ ಇನ್ನೂ {{displayCount}} ಸಾಲುಗಳಿವೆ."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ಆ್ಯಪ್‌ನ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "installKiloGitHubApp": "Kilo GitHub ಆ್ಯಪ್ ಸ್ಥಾಪಿಸಿ",
@@ -572,7 +584,9 @@
       "pending": "{{displayCount}} ಬಾಕಿ",
       "skipped": "{{displayCount}} ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ",
       "checksCount": "{{displayCount}} ತಪಾಸಣೆಗಳು",
-      "checkDetails": "ತಪಾಸಣೆಯ ವಿವರಗಳು"
+      "checkDetails": "ತಪಾಸಣೆಯ ವಿವರಗಳು",
+      "checksCount_one": "{{displayCount}} ತಪಾಸಣೆ",
+      "checksCount_other": "{{displayCount}} ತಪಾಸಣೆಗಳು"
     },
     "inbox": {
       "title": "ಇನ್‌ಬಾಕ್ಸ್",
@@ -702,7 +716,9 @@
       "statusContext": "ಸುತ್ತಲಿನ ಸಾಲುಗಳು",
       "lineLabel": "{{status}} ಸಾಲು {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} ಸಾಲು: {{text}}",
-      "emptyLine": "(ಖಾಲಿ)"
+      "emptyLine": "(ಖಾಲಿ)",
+      "truncationBanner_one": "ಬದಲಾದ {{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ ಮೊದಲ {{limit}} ಫೈಲ್‌ಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ — ಇದು GitHub API ಮಿತಿ.",
+      "truncationBanner_other": "ಬದಲಾದ {{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ ಮೊದಲ {{limit}} ಫೈಲ್‌ಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ — ಇದು GitHub API ಮಿತಿ."
     },
     "linkPasteClipboardEmpty": "ಕ್ಲಿಪ್‌ಬೋರ್ಡ್ ಖಾಲಿಯಾಗಿದೆ.",
     "linkPasteNotAPullRequest": "ಇದು ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಲ್ಲ",
@@ -876,7 +892,9 @@
       "uploadFailed": "ಅಪ್‌ಲೋಡ್ ವಿಫಲವಾಗಿದೆ.",
       "failedToUploadFile": "ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ: {{reason}}.",
       "nothingToPaste": "ಅಂಟಿಸಲು ಏನೂ ಇಲ್ಲ.",
-      "metadataStripFailed": "ಫೋಟೋದ ಮೆಟಾಡೇಟಾವನ್ನು ತೆಗೆದುಹಾಕಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
+      "metadataStripFailed": "ಫೋಟೋದ ಮೆಟಾಡೇಟಾವನ್ನು ತೆಗೆದುಹಾಕಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "limit_one": "ನೀವು ಗರಿಷ್ಠ {{displayCount}} ಫೈಲ್ ಲಗತ್ತಿಸಬಹುದು.",
+      "limit_other": "ನೀವು ಗರಿಷ್ಠ {{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಲಗತ್ತಿಸಬಹುದು."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1620,7 +1638,11 @@
       "syncFindings": "ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಗಳನ್ನು ಸಿಂಕ್ ಮಾಡಿ",
       "syncNow": "ಈಗ ಸಿಂಕ್ ಮಾಡಿ",
       "syncQueued": "ಸಿಂಕ್ ಅನ್ನು ಸರದಿಗೆ ಸೇರಿಸಲಾಗಿದೆ",
-      "syncStatusUnavailable": "ಸಿಂಕ್ ಸ್ಥಿತಿ ಲಭ್ಯವಿಲ್ಲ."
+      "syncStatusUnavailable": "ಸಿಂಕ್ ಸ್ಥಿತಿ ಲಭ್ಯವಿಲ್ಲ.",
+      "daysOverdue_one": "ಗಡುವು ಮೀರಿ {{displayCount}} ದಿನ",
+      "daysOverdue_other": "ಗಡುವು ಮೀರಿ {{displayCount}} ದಿನಗಳಾಗಿವೆ",
+      "findingsCount_one": "ಪತ್ತೆಯಾದ {{displayCount}} ಸಮಸ್ಯೆ",
+      "findingsCount_other": "ಪತ್ತೆಯಾದ {{displayCount}} ಸಮಸ್ಯೆಗಳು"
     },
     "dashboardMetrics": {
       "openFindings": "ಪತ್ತೆಯಾದ ಬಾಕಿ ಸಮಸ್ಯೆಗಳು",
@@ -2148,7 +2170,13 @@
       "updateTodos": "ಕಾರ್ಯಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ",
       "linesBadge": "{{displayCount}} ಸಾಲುಗಳು",
       "filesBadge": "{{displayCount}} ಫೈಲ್‌ಗಳು",
-      "matchesBadge": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು"
+      "matchesBadge": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು",
+      "filesBadge_one": "{{displayCount}} ಫೈಲ್",
+      "filesBadge_other": "{{displayCount}} ಫೈಲ್‌ಗಳು",
+      "linesBadge_one": "{{displayCount}} ಸಾಲು",
+      "linesBadge_other": "{{displayCount}} ಸಾಲುಗಳು",
+      "matchesBadge_one": "{{displayCount}} ಹೊಂದಾಣಿಕೆ",
+      "matchesBadge_other": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} ಸಾಲುಗಳು (ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ)",
@@ -2438,7 +2466,11 @@
       "files": "ಫೈಲ್‌ಗಳು",
       "couldNotOpenPhotoPicker": "ಫೋಟೋ ಆಯ್ಕೆ ಪರದೆಯನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. Kilo ಅನ್ನು ಮರುಪ್ರಾರಂಭಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "maxFilesAllowed": "ಗರಿಷ್ಠ {{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಸೇರಿಸಬಹುದು.",
-      "onlyAddingFiles": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{accepted}} ಮಾತ್ರ ಸೇರಿಸಲಾಗುತ್ತಿದೆ (ಗರಿಷ್ಠ {{max}})"
+      "onlyAddingFiles": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{accepted}} ಮಾತ್ರ ಸೇರಿಸಲಾಗುತ್ತಿದೆ (ಗರಿಷ್ಠ {{max}})",
+      "maxFilesAllowed_one": "ಗರಿಷ್ಠ {{displayCount}} ಫೈಲ್ ಸೇರಿಸಬಹುದು.",
+      "maxFilesAllowed_other": "ಗರಿಷ್ಠ {{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಸೇರಿಸಬಹುದು.",
+      "onlyAddingFiles_one": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{accepted}} ಮಾತ್ರ ಸೇರಿಸಲಾಗುತ್ತಿದೆ (ಗರಿಷ್ಠ {{max}})",
+      "onlyAddingFiles_other": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{accepted}} ಮಾತ್ರ ಸೇರಿಸಲಾಗುತ್ತಿದೆ (ಗರಿಷ್ಠ {{max}})"
     },
     "composer": {
       "addAttachment": "ಲಗತ್ತು ಸೇರಿಸಿ",
@@ -2456,7 +2488,9 @@
       "discardAttachmentsMessage": "ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳಿಗೆ ಲಗತ್ತಿಸದ ಅಪ್‌ಲೋಡ್‌ಗಳನ್ನು ಅಳಿಸಲಾಗುತ್ತದೆ.",
       "discardAttachmentsTitle": "ಲಗತ್ತುಗಳನ್ನು ತೆಗೆದುಹಾಕಬೇಕೆ?",
       "charactersRemaining": "{{count}} ಅಕ್ಷರಗಳು ಉಳಿದಿವೆ",
-      "insertNewline": "ಹೊಸ ಸಾಲನ್ನು ಸೇರಿಸಿ"
+      "insertNewline": "ಹೊಸ ಸಾಲನ್ನು ಸೇರಿಸಿ",
+      "charactersRemaining_one": "{{count}} ಅಕ್ಷರ ಉಳಿದಿದೆ",
+      "charactersRemaining_other": "{{count}} ಅಕ್ಷರಗಳು ಉಳಿದಿವೆ"
     },
     "chatLink": {
       "linkCopied": "ಲಿಂಕ್ ನಕಲಿಸಲಾಗಿದೆ",
@@ -2522,7 +2556,9 @@
       "stepsCount_one": "{{steps}} ಹಂತ",
       "stepsCount": "{{steps}} ಹಂತಗಳು",
       "stepsCount_other": "{{steps}} ಹಂತಗಳು",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "ಮಾದರಿ ({{displayCount}})",
+      "modelsCount_other": "ಮಾದರಿಗಳು ({{displayCount}})"
     },
     "autoApprove": {
       "title": "ಸ್ವಯಂ ಅನುಮೋದನೆ",
@@ -2562,7 +2598,9 @@
     },
     "toolRun": {
       "sheetTitle": "ಸಾಧನ ಕರೆಗಳು",
-      "condensedLabel": "{{itemCount}} ಅಂಶಗಳು; {{last}}"
+      "condensedLabel": "{{itemCount}} ಅಂಶಗಳು; {{last}}",
+      "condensedLabel_one": "{{itemCount}} ಅಂಶ; {{last}}",
+      "condensedLabel_other": "{{itemCount}} ಅಂಶಗಳು; {{last}}"
     }
   },
   "bootstrap": {
@@ -2696,7 +2734,9 @@
     "cliCantReceiveFilesTitle": "ಈ ಸೆಶನ್‌ಗೆ ಫೈಲ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ",
     "cliCantReceiveFilesMessage": "ಈ ಸೆಶನ್ ಚಲಾಯಿಸುತ್ತಿರುವ Kilo CLIಗೆ ಫೈಲ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಆ ಯಂತ್ರದಲ್ಲಿ CLI ನವೀಕರಿಸಿ ಅಥವಾ ಹೊಸ ಸೆಶನ್‌ಗೆ ಹಂಚಿ.",
     "contentlessMessage": "ಹಂಚಲು ಏನೂ ಇಲ್ಲ — ಯಾವುದೇ ಪಠ್ಯ ಅಥವಾ ಫೈಲ್‌ಗಳನ್ನು ಸೇರಿಸಿಲ್ಲ.",
-    "couldNotReadContent": "ಹಂಚಿದ ವಿಷಯವನ್ನು ಓದಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
+    "couldNotReadContent": "ಹಂಚಿದ ವಿಷಯವನ್ನು ಓದಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "onlyFirstFilesAttached_one": "ಮೊದಲ {{displayCount}} ಫೈಲ್ ಮಾತ್ರ ಲಗತ್ತಿಸಲಾಗುತ್ತದೆ.",
+    "onlyFirstFilesAttached_other": "ಮೊದಲ {{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಮಾತ್ರ ಲಗತ್ತಿಸಲಾಗುತ್ತದೆ."
   },
   "kiloPass": {
     "title": "Kilo Pass",

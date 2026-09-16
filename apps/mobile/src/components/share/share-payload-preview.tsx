@@ -126,6 +126,7 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
       ) : null}
       {validation.truncated ? (
         <Text className="text-xs text-muted-foreground">
+          {/* i18n-dup-ok: 'share.onlyFirstFilesAttached_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
           {t('share.onlyFirstFilesAttached', {
             count: AGENT_ATTACHMENT_MAX_FILES,
             displayCount: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),

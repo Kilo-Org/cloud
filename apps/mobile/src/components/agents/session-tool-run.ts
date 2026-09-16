@@ -109,6 +109,7 @@ export function buildToolRunRows(parts: readonly ToolPart[]): ToolRunRow[] {
 
 /** The condensed row label: item count plus the last tool call's own label. */
 export function buildToolRunLabel(rows: readonly ToolRunRow[], t: TFunction): string {
+  // i18n-dup-ok: 'agentChat.toolRun.condensedLabel_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
   return t('agentChat.toolRun.condensedLabel', {
     count: rows.length,
     itemCount: formatNumber(rows.length, i18n.language),

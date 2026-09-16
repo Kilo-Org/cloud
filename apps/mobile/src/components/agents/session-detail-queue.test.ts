@@ -489,6 +489,7 @@ function makeManager() {
     atoms: {
       messagesList: { value: [] as StoredMessage[] },
       isLoading: { value: false },
+      isRefreshingCachedTranscript: { value: false },
       error: { value: null },
       fetchedSessionData: {
         value: {

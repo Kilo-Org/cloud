@@ -379,6 +379,12 @@ type W<T> = WritableAtom<T, [T], void>;
 type SessionManagerAtoms = {
   isStreaming: W<boolean>;
   isLoading: W<boolean>;
+  /**
+   * True while cached transcript rows are on screen and the session's current
+   * transcript has not landed yet. False for callers without a cached-page
+   * reader.
+   */
+  isRefreshingCachedTranscript: W<boolean>;
   /** Session structurally cannot accept input (no transport send). */
   isReadOnly: W<boolean>;
   /** Active resolved transport can deliver canonical Cloud Agent attachments. */
@@ -770,6 +776,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // Public writable atoms
   const isStreamingAtom = atom(false);
   const isLoadingAtom = atom(false);
+  /**
+   * True while the transcript on screen is a cached page (`readCachedSnapshotPage`
+   * or a preserved transcript across a metadata-retry) that the live transport
+   * has not caught up with yet: the rows are readable, but the session's current
+   * transcript is still being fetched. Drives the inline refresh indicator.
+   * Callers without a cached-page reader (web, extension) never set it, so their
+   * behavior is unchanged.
+   */
+  const isRefreshingCachedTranscriptAtom = atom(false);
   const isReadOnlyAtom = atom(false);
   const supportsAttachmentsAtom = atom(false);
   const activeSessionTypeAtom = atom<ActiveSessionType | null>(null);
@@ -1003,6 +1018,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
+    store.set(isRefreshingCachedTranscriptAtom, false);
     store.set(isReadOnlyAtom, false);
     store.set(supportsAttachmentsAtom, false);
     store.set(activeSessionTypeAtom, null);
@@ -1761,6 +1777,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     remoteOptimisticIds.clear();
     store.set(rootSessionIdAtom, kiloSessionId);
     store.set(isLoadingAtom, true);
+    // A retry that keeps the transcript mounted must also keep advertising that
+    // the visible rows are being refetched: the rows stay, the refresh is the
+    // wait the user is in.
+    store.set(isRefreshingCachedTranscriptAtom, preserveTranscript);
 
     const jotaiStorage = store.get(sessionStorageAtom) ?? createJotaiStorage(store);
     store.set(sessionStorageAtom, jotaiStorage);
@@ -1783,6 +1803,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           if (cachedPage && cachedPage.messages.length > 0) {
             if (applyPage({ ...cachedPage, kind: 'success' }, initialPageGeneration, true)) {
               store.set(isLoadingAtom, false);
+              // Rows are on screen but they are the cached page: the live
+              // transcript is still being fetched, so the open is refreshing,
+              // not done.
+              store.set(isRefreshingCachedTranscriptAtom, true);
             }
           }
         })
@@ -1838,6 +1862,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           return;
         }
         store.set(isLoadingAtom, false);
+        store.set(isRefreshingCachedTranscriptAtom, false);
         setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
       };
       if (!cacheReadPending) {
@@ -1878,7 +1903,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // pass the generation check and clobber the active session's cursor
     // and omitted-item count.
     const recordInitialPage = (page: SessionSnapshotPage): void => {
-      applyPage({ ...page, kind: 'success' }, initialPageGeneration, true);
+      if (applyPage({ ...page, kind: 'success' }, initialPageGeneration, true)) {
+        // The live bounded page landed: what is on screen is no longer the
+        // cached page, so the refresh indicator is done. Guarded by the
+        // applied flag so a superseded page cannot clear a newer open's state.
+        store.set(isRefreshingCachedTranscriptAtom, false);
+      }
     };
 
     // Once live replay can start, a slower cache must not overwrite it. Do not
@@ -2009,6 +2039,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (expectedGeneration !== switchGeneration) return;
         remoteHistoryReplaying = false;
         store.set(isLoadingAtom, false);
+        store.set(isRefreshingCachedTranscriptAtom, false);
         // `/clear` with no successful post-clear send: drop the replayed
         // snapshot down to live post-clear ids only. No id/timestamp
         // comparison across hosts — survivors were local when replay started.
@@ -2044,6 +2075,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           return;
         }
         store.set(errorAtom, message);
+        // The live transcript will not replace the cached rows now: the error
+        // indicator owns the stale-rows state, so the refresh indicator stops.
+        store.set(isRefreshingCachedTranscriptAtom, false);
       },
       onChildSessionError: (childSessionId, message) => {
         const next = new Map(store.get(childSessionErrorsAtom));
@@ -2459,6 +2493,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     olderMessagesInFlight = null;
     loadOlderGeneration += 1;
     store.set(transcriptClearedAtom, true);
+    // Nothing stale is on screen any more: the user asked for an empty view.
+    store.set(isRefreshingCachedTranscriptAtom, false);
     store.set(chatUIAtom, { shouldAutoScroll: true });
     setIndicator({
       type: 'info',
@@ -2617,6 +2653,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     atoms: {
       isStreaming: isStreamingAtom,
       isLoading: isLoadingAtom,
+      isRefreshingCachedTranscript: isRefreshingCachedTranscriptAtom,
       isReadOnly: isReadOnlyAtom,
       supportsAttachments: supportsAttachmentsAtom,
       activeSessionType: activeSessionTypeAtom,

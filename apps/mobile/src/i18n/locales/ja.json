@@ -3058,6 +3058,11 @@
     "privacy": "Kiloを開いてエージェントを確認",
     "openAgents": "エージェントを開く",
     "needsInput": "入力が必要",
+    "newestSession": "最新: {{title}}",
+    "noneWaiting": "待機中のエージェントはありません",
+    "newAgent": "新しいエージェント",
+    "approving": "承認中...",
+    "couldNotApprove": "承認できませんでした",
     "channelName": "アクティブなエージェント",
     "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。"
   },

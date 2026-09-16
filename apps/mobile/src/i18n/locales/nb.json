@@ -3058,6 +3058,11 @@
     "privacy": "Åpne Kilo for å se agenter",
     "openAgents": "Åpne agenter",
     "needsInput": "Venter på svar",
+    "newestSession": "Nyeste: {{title}}",
+    "noneWaiting": "Ingen agenter venter",
+    "newAgent": "Ny agent",
+    "approving": "Godkjenner...",
+    "couldNotApprove": "Kunne ikke godkjenne",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
   },

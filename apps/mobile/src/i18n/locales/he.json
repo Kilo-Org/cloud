@@ -3081,6 +3081,11 @@
     "privacy": "פתיחת Kilo להצגת הסוכנים",
     "openAgents": "הצגת הסוכנים",
     "needsInput": "נדרש קלט",
+    "newestSession": "החדש ביותר: {{title}}",
+    "noneWaiting": "אין סוכנים בהמתנה",
+    "newAgent": "סוכן חדש",
+    "approving": "מאשר...",
+    "couldNotApprove": "לא ניתן לאשר",
     "channelName": "סוכנים פעילים",
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
   },

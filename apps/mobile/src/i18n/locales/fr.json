@@ -3081,6 +3081,11 @@
     "privacy": "Ouvrez Kilo pour voir les agents",
     "openAgents": "Ouvrir les agents",
     "needsInput": "Intervention requise",
+    "newestSession": "La plus récente: {{title}}",
+    "noneWaiting": "Aucun agent en attente",
+    "newAgent": "Nouvel agent",
+    "approving": "Approbation en cours...",
+    "couldNotApprove": "Échec de l'approbation",
     "channelName": "Agents actifs",
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé."
   },

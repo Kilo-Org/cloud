@@ -3058,6 +3058,11 @@
     "privacy": "Agentlarni ko'rish uchun Kiloni oching",
     "openAgents": "Agentlarni ochish",
     "needsInput": "Javob kutilmoqda",
+    "newestSession": "Eng yangi: {{title}}",
+    "noneWaiting": "Kutayotgan agent yo'q",
+    "newAgent": "Yangi agent",
+    "approving": "Tasdiqlanmoqda...",
+    "couldNotApprove": "Tasdiqlab bo'lmadi",
     "channelName": "Faol agentlar",
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing."
   },

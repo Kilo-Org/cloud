@@ -3058,6 +3058,11 @@
     "privacy": "Vula i-Kilo ukuze ubone ama-ejenti",
     "openAgents": "Vula ama-ejenti",
     "needsInput": "Kudinga impendulo",
+    "newestSession": "Okusha kakhulu: {{title}}",
+    "noneWaiting": "Awekho ama-ejenti alindile",
+    "newAgent": "I-ejenti entsha",
+    "approving": "Kuyagunyaza...",
+    "couldNotApprove": "Akukwazi ukugunyaza",
     "channelName": "Ama-ejenti asebenzayo",
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe."
   },

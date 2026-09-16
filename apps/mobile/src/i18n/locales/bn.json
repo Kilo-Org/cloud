@@ -3058,6 +3058,11 @@
     "privacy": "এজেন্ট দেখতে Kilo খুলুন",
     "openAgents": "এজেন্ট খুলুন",
     "needsInput": "ইনপুট প্রয়োজন",
+    "newestSession": "সর্বশেষ: {{title}}",
+    "noneWaiting": "কোনো এজেন্ট অপেক্ষা করছে না",
+    "newAgent": "নতুন এজেন্ট",
+    "approving": "অনুমোদন করা হচ্ছে...",
+    "couldNotApprove": "অনুমোদন করা যায়নি",
     "channelName": "সক্রিয় এজেন্ট",
     "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।"
   },

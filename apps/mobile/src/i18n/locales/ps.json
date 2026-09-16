@@ -3058,6 +3058,11 @@
     "privacy": "د اجنټانو د لیدلو لپاره Kilo پرانیزئ",
     "openAgents": "اجنټان پرانیزئ",
     "needsInput": "ځواب ته اړتیا لري",
+    "newestSession": "تر ټولو نوې: {{title}}",
+    "noneWaiting": "هیڅ اجنټ انتظار نه کوي",
+    "newAgent": "نوی اجنټ",
+    "approving": "منظور کېږي...",
+    "couldNotApprove": "منظور نه شو",
     "channelName": "فعال اجنټان",
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ."
   },

@@ -3104,6 +3104,11 @@
     "privacy": "Odpri Kilo za ogled agentov",
     "openAgents": "Odpri agente",
     "needsInput": "Čaka na vnos",
+    "newestSession": "Najnovejša: {{title}}",
+    "noneWaiting": "Noben agent ne čaka",
+    "newAgent": "Nov agent",
+    "approving": "Odobritev poteka...",
+    "couldNotApprove": "Odobritev ni uspela",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu."
   },

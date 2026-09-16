@@ -3150,6 +3150,11 @@
     "privacy": "افتح Kilo لعرض الوكلاء",
     "openAgents": "فتح الوكلاء",
     "needsInput": "بانتظار تدخلك",
+    "newestSession": "الأحدث: {{title}}",
+    "noneWaiting": "لا يوجد وكلاء في الانتظار",
+    "newAgent": "وكيل جديد",
+    "approving": "جارٍ الموافقة...",
+    "couldNotApprove": "تعذّرت الموافقة",
     "channelName": "الوكلاء النشطون",
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل."
   },

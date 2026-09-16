@@ -3058,6 +3058,11 @@
     "privacy": "Buɗe Kilo don ganin wakilai",
     "openAgents": "Buɗe wakilai",
     "needsInput": "Ana buƙatar bayani",
+    "newestSession": "Mafi sabo: {{title}}",
+    "noneWaiting": "Babu wakilin da ke jira",
+    "newAgent": "Sabon wakili",
+    "approving": "Ana amincewa...",
+    "couldNotApprove": "Ba a iya amincewa ba",
     "channelName": "Wakilai da ke aiki",
     "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle."
   },

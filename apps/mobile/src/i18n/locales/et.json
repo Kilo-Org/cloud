@@ -3058,6 +3058,11 @@
     "privacy": "Agentide nägemiseks ava Kilo",
     "openAgents": "Ava agendid",
     "needsInput": "Vajab sisendit",
+    "newestSession": "Uusim: {{title}}",
+    "noneWaiting": "Ükski agent ei oota",
+    "newAgent": "Uus agent",
+    "approving": "Kinnitamisel...",
+    "couldNotApprove": "Kinnitamine ebaõnnestus",
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente."
   },

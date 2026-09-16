@@ -3058,6 +3058,11 @@
     "privacy": "एजेंट देखने के लिए Kilo खोलें",
     "openAgents": "एजेंट खोलें",
     "needsInput": "इनपुट चाहिए",
+    "newestSession": "सबसे नया: {{title}}",
+    "noneWaiting": "कोई एजेंट प्रतीक्षा में नहीं",
+    "newAgent": "नया एजेंट",
+    "approving": "स्वीकृत किया जा रहा है...",
+    "couldNotApprove": "स्वीकृत नहीं किया जा सका",
     "channelName": "सक्रिय एजेंट",
     "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।"
   },

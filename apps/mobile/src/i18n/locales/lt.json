@@ -3104,6 +3104,11 @@
     "privacy": "Atidaryk Kilo, kad matytum agentus",
     "openAgents": "Atidaryti agentus",
     "needsInput": "Laukia atsakymo",
+    "newestSession": "Naujausia: {{title}}",
+    "noneWaiting": "Nė vienas agentas nelaukia",
+    "newAgent": "Naujas agentas",
+    "approving": "Tvirtinama...",
+    "couldNotApprove": "Nepavyko patvirtinti",
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus."
   },

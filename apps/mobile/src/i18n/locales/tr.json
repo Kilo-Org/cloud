@@ -3058,6 +3058,11 @@
     "privacy": "Ajanları görmek için Kilo'yu aç",
     "openAgents": "Ajanları aç",
     "needsInput": "Yanıt bekliyor",
+    "newestSession": "En yeni: {{title}}",
+    "noneWaiting": "Bekleyen ajan yok",
+    "newAgent": "Yeni ajan",
+    "approving": "Onaylanıyor...",
+    "couldNotApprove": "Onaylanamadı",
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç."
   },

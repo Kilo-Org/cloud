@@ -3058,6 +3058,11 @@
     "privacy": "Open Kilo om agents te zien",
     "openAgents": "Agents openen",
     "needsInput": "Invoer nodig",
+    "newestSession": "Nieuwste: {{title}}",
+    "noneWaiting": "Geen agents in afwachting",
+    "newAgent": "Nieuwe agent",
+    "approving": "Bezig met goedkeuren...",
+    "couldNotApprove": "Goedkeuren mislukt",
     "channelName": "Actieve agents",
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien."
   },

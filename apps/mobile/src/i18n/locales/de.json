@@ -3058,6 +3058,11 @@
     "privacy": "Kilo öffnen, um Agenten anzuzeigen",
     "openAgents": "Agenten öffnen",
     "needsInput": "Eingabe erforderlich",
+    "newestSession": "Neueste: {{title}}",
+    "noneWaiting": "Keine Agenten warten",
+    "newAgent": "Neuer Agent",
+    "approving": "Genehmigung läuft...",
+    "couldNotApprove": "Genehmigung fehlgeschlagen",
     "channelName": "Aktive Agenten",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
   },

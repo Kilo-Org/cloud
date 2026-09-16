@@ -3104,6 +3104,11 @@
     "privacy": "Otevři Kilo a zobraz agenty",
     "openAgents": "Otevřít agenty",
     "needsInput": "Čeká na reakci",
+    "newestSession": "Nejnovější: {{title}}",
+    "noneWaiting": "Žádný agent nečeká",
+    "newAgent": "Nový agent",
+    "approving": "Schvaluje se...",
+    "couldNotApprove": "Schválení se nezdařilo",
     "channelName": "Aktivní agenti",
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce."
   },

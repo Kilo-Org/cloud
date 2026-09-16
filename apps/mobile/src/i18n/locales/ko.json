@@ -3058,6 +3058,11 @@
     "privacy": "에이전트를 보려면 Kilo를 여세요",
     "openAgents": "에이전트 열기",
     "needsInput": "입력 필요",
+    "newestSession": "최신: {{title}}",
+    "noneWaiting": "대기 중인 에이전트 없음",
+    "newAgent": "새 에이전트",
+    "approving": "승인 중...",
+    "couldNotApprove": "승인할 수 없음",
     "channelName": "활성 에이전트",
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요."
   },

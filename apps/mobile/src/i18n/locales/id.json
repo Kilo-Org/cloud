@@ -3058,6 +3058,11 @@
     "privacy": "Buka Kilo untuk melihat agen",
     "openAgents": "Buka agen",
     "needsInput": "Perlu masukan",
+    "newestSession": "Terbaru: {{title}}",
+    "noneWaiting": "Tidak ada agen yang menunggu",
+    "newAgent": "Agen baru",
+    "approving": "Menyetujui...",
+    "couldNotApprove": "Tidak dapat menyetujui",
     "channelName": "Agen aktif",
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci."
   },

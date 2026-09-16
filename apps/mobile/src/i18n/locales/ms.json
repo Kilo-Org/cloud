@@ -3058,6 +3058,11 @@
     "privacy": "Buka Kilo untuk melihat ejen",
     "openAgents": "Buka ejen",
     "needsInput": "Perlu input",
+    "newestSession": "Terkini: {{title}}",
+    "noneWaiting": "Tiada ejen menunggu",
+    "newAgent": "Ejen baharu",
+    "approving": "Meluluskan...",
+    "couldNotApprove": "Gagal meluluskan",
     "channelName": "Ejen aktif",
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci."
   },

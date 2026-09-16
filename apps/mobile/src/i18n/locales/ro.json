@@ -3081,6 +3081,11 @@
     "privacy": "Deschide Kilo pentru a vedea agenții",
     "openAgents": "Deschide agenții",
     "needsInput": "Așteaptă un răspuns",
+    "newestSession": "Cea mai recentă: {{title}}",
+    "noneWaiting": "Niciun agent în așteptare",
+    "newAgent": "Agent nou",
+    "approving": "Se aprobă...",
+    "couldNotApprove": "Aprobarea nu a reușit",
     "channelName": "Agenți activi",
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare."
   },

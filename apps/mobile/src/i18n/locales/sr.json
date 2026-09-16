@@ -3081,6 +3081,11 @@
     "privacy": "Otvori Kilo da vidiš agente",
     "openAgents": "Otvori agente",
     "needsInput": "Čeka unos",
+    "newestSession": "Najnovija: {{title}}",
+    "noneWaiting": "Nema agenata koji čekaju",
+    "newAgent": "Novi agent",
+    "approving": "Odobrava se...",
+    "couldNotApprove": "Odobravanje nije uspelo",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu."
   },

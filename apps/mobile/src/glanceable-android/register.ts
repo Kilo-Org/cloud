@@ -8,12 +8,9 @@ import {
 } from '@/lib/glanceable/live-activity-switch';
 import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
-import {
-  getResolvedLanguage,
-  whenLanguagePreferenceLoaded,
-} from '@/lib/hooks/use-language-preference';
 
 import { renderActiveAgentsWidget } from './active-agents-widget';
+import { applyStoredLanguage } from './apply-stored-language';
 import { androidSink, getCurrentWidgetProps, handleAppStateActive } from './android-sink';
 import { formatGlanceableCount, isWidgetRtl } from './count-format';
 import { getStoredWidgetSnapshot, setWidgetSnapshot } from './live-update';
@@ -49,21 +46,6 @@ function translate(key: string): string {
 }
 
 /**
- * Switch i18n to the user's language before a widget render.
- *
- * A widget redraw runs as a headless JS task with no Activity, so the app's
- * root never mounts and nothing else applies the language — without this the
- * placed widget renders English whatever the user chose.
- */
-async function applyWidgetLanguage(): Promise<void> {
-  await whenLanguagePreferenceLoaded();
-  const language = getResolvedLanguage();
-  if (i18n.language !== language) {
-    await i18n.changeLanguage(language);
-  }
-}
-
-/**
  * Redraw a placed widget. Registered from the app entry, which loads this
  * module only when a task fires: a widget redraw runs headless, so nothing
  * else has loaded the Android sink by then.
@@ -71,7 +53,7 @@ async function applyWidgetLanguage(): Promise<void> {
 export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<void> {
   const { widgetInfo, renderWidget } = task;
 
-  await applyWidgetLanguage();
+  await applyStoredLanguage();
 
   // Re-read native storage even in a live process. An old alarm can already have
   // queued this task when newer work or a privacy blank replaces its deadline.

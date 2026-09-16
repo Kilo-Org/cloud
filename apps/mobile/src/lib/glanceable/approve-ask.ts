@@ -27,7 +27,7 @@ import { readWaitingAsk, recordWaitingAsk } from './waiting-ask';
  */
 
 /** The three answers the in-app permission card sends. */
-export type PermissionResponse = 'once' | 'always' | 'reject';
+type PermissionResponse = 'once' | 'always' | 'reject';
 
 /** What an activity surface does with the outcome of an approve attempt. */
 export type GlanceableApproveResult =
@@ -143,7 +143,7 @@ export type ResolvePendingPermissionIdInput = {
 };
 
 /** Flat budget for one control-plane stream open. */
-export const PENDING_PERMISSION_TIMEOUT_MS = 15_000;
+const PENDING_PERMISSION_TIMEOUT_MS = 15_000;
 
 /**
  * Read the pending permission's id from the cloud-agent control plane. The id
@@ -273,9 +273,9 @@ export async function runGlanceableApprove(
 }
 
 /** One poll cadence tick while the answered session still shows as waiting. */
-export const GLANCEABLE_REFRESH_POLL_MS = 1000;
+const GLANCEABLE_REFRESH_POLL_MS = 1000;
 /** The poll budget: `cli_sessions_v2.status` syncs asynchronously. */
-export const GLANCEABLE_REFRESH_DEADLINE_MS = 10_000;
+const GLANCEABLE_REFRESH_DEADLINE_MS = 10_000;
 
 /** Statuses that still mean the answered ask has not cleared server-side. */
 const ANSWERED_BUT_WAITING_STATUSES: ReadonlySet<string> = new Set(['permission', 'question']);

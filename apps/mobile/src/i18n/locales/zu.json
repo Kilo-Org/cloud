@@ -3059,7 +3059,8 @@
     "openAgents": "Vula ama-ejenti",
     "needsInput": "Kudinga impendulo",
     "channelName": "Ama-ejenti asebenzayo",
-    "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe."
+    "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe.",
+    "newestResult": "Umphumela wakamuva"
   },
   "transcriptionModel": {
     "title": "Imodeli yokuguqula inkulumo",

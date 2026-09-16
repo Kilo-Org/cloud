@@ -3059,7 +3059,8 @@
     "openAgents": "Eejentoota bani",
     "needsInput": "Deebii barbaada",
     "channelName": "Eejentoota hojii irra jiran",
-    "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi."
+    "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi.",
+    "newestResult": "Bu'aa haaraa"
   },
   "transcriptionModel": {
     "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",

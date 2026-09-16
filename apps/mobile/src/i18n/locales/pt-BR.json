@@ -3082,7 +3082,8 @@
     "openAgents": "Abrir agentes",
     "needsInput": "Aguardando resposta",
     "channelName": "Agentes ativos",
-    "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada."
+    "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada.",
+    "newestResult": "Resultado mais recente"
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",

@@ -3059,7 +3059,8 @@
     "openAgents": "Fur wakiillada",
     "needsInput": "Jawaab sugaya",
     "channelName": "Wakiillada firfircoon",
-    "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka."
+    "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka.",
+    "newestResult": "Natiijada ugu cusub"
   },
   "transcriptionModel": {
     "title": "Moodeelka qoraal u beddelidda",

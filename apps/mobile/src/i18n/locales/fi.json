@@ -3059,7 +3059,8 @@
     "openAgents": "Avaa agentit",
     "needsInput": "Odottaa vastausta",
     "channelName": "Aktiiviset agentit",
-    "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä."
+    "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
+    "newestResult": "Uusin tulos"
   },
   "transcriptionModel": {
     "title": "Puheentunnistusmalli",

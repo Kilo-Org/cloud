@@ -3059,7 +3059,8 @@
     "openAgents": "Fungua mawakala",
     "needsInput": "Inasubiri jibu",
     "channelName": "Mawakala wanaofanya kazi",
-    "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa."
+    "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa.",
+    "newestResult": "Matokeo mapya zaidi"
   },
   "transcriptionModel": {
     "title": "Modeli ya unukuzi",

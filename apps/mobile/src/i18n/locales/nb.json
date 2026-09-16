@@ -3059,7 +3059,8 @@
     "openAgents": "Åpne agenter",
     "needsInput": "Venter på svar",
     "channelName": "Aktive agenter",
-    "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
+    "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen.",
+    "newestResult": "Nyeste resultat"
   },
   "transcriptionModel": {
     "title": "Transkripsjonsmodell",

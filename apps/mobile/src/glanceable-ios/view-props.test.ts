@@ -85,12 +85,16 @@ describe('buildGlanceableLiveActivityContentState needsApproval', () => {
     // The Home Screen widget and the complication render `GlanceableViewProps`
     // and must never grow an approve affordance. Assert the whole key set so a
     // new field on the widget shape fails here rather than shipping on the
-    // read-only surfaces.
+    // read-only surfaces; the newest-result trio is the deliberate read-only
+    // data the large card draws in its footer.
     const props = buildGlanceableViewProps(snapshot([PERMISSION_ROW]), {}, translate);
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
       'countLines',
       'needsInputSince',
+      'newestResultAt',
+      'newestResultKind',
+      'newestResultLabel',
       'primaryCount',
       'primaryKind',
       'primaryLabel',

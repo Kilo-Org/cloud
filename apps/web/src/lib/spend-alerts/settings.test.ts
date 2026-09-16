@@ -15,6 +15,7 @@ import {
   organizationScopeKey,
   parseSpendAlertScopeKey,
   personalScopeKey,
+  pushCategoryChanges,
   readSpendAlertSettings,
   saveSpendAlertSettings,
   type SpendAlertRuleConfig,
@@ -91,6 +92,23 @@ describe('spend alert push derivation', () => {
     expect(effectivePushFor(true, ruleConfig({ kind: 'threshold', pushEnabled: false }))).toBe(
       false
     );
+  });
+});
+
+describe('spend alert push category agreement', () => {
+  const pushOn = ruleConfig({ kind: 'threshold', pushEnabled: true });
+  const pushOff = ruleConfig({ kind: 'threshold', pushEnabled: false });
+  const other = ruleConfig({ kind: 'anomaly' });
+
+  it('reports a change only for the save that moves the channel choice', () => {
+    // Turning a push channel on, or the last one off, moves the agreement.
+    expect(pushCategoryChanges([], [pushOn, other])).toBe(true);
+    expect(pushCategoryChanges([pushOn, other], [pushOff, other])).toBe(true);
+    // Re-sending the stored channel choices does not.
+    expect(pushCategoryChanges([pushOn, other], [pushOn, other])).toBe(false);
+    expect(pushCategoryChanges([pushOff, other], [pushOff, other])).toBe(false);
+    // A push rule that is switched off was not a push channel either way.
+    expect(pushCategoryChanges([{ ...pushOn, enabled: false }, other], [pushOn, other])).toBe(true);
   });
 });
 
@@ -215,6 +233,88 @@ describe('saveSpendAlertSettings', () => {
       .from(user_notification_preferences)
       .where(eq(user_notification_preferences.user_id, user.id));
     expect(afterPushOff?.enabled).toBe(false);
+  });
+
+  it('leaves the caller’s own category alone when a save does not change the push choice', async () => {
+    const user = await insertTestUser();
+    const scope = { type: 'personal', userId: user.id } as const;
+    const pushRules = [
+      ruleConfig({
+        kind: 'threshold',
+        thresholdMicrodollars: 5_000_000,
+        windowHours: 24,
+        pushEnabled: true,
+      }),
+      ruleConfig({ kind: 'anomaly', multiplierBasisPoints: 300 }),
+    ];
+
+    await saveSpendAlertSettings(db, scope, {
+      enabled: true,
+      rules: pushRules,
+      viewerUserId: user.id,
+    });
+
+    // The exact control the owner request adds: the mobile Notifications screen
+    // turns this viewer's spend-alert category off.
+    await db
+      .update(user_notification_preferences)
+      .set({ spend_alerts_enabled: false })
+      .where(eq(user_notification_preferences.user_id, user.id));
+
+    // An unrelated spend-view save — editing the threshold — re-sends the
+    // stored rule, push included, without changing any channel choice.
+    await saveSpendAlertSettings(db, scope, {
+      enabled: true,
+      rules: [
+        ruleConfig({
+          kind: 'threshold',
+          thresholdMicrodollars: 9_000_000,
+          windowHours: 24,
+          pushEnabled: true,
+        }),
+        ruleConfig({ kind: 'anomaly', multiplierBasisPoints: 300 }),
+      ],
+      viewerUserId: user.id,
+    });
+
+    const [preference] = await db
+      .select({ enabled: user_notification_preferences.spend_alerts_enabled })
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, user.id));
+    expect(preference?.enabled).toBe(false);
+  });
+
+  it('enables the caller’s category when the save turns a push channel on', async () => {
+    const user = await insertTestUser();
+    const scope = { type: 'personal', userId: user.id } as const;
+
+    await db
+      .insert(user_notification_preferences)
+      .values({ user_id: user.id, spend_alerts_enabled: false })
+      .onConflictDoUpdate({
+        target: user_notification_preferences.user_id,
+        set: { spend_alerts_enabled: false },
+      });
+
+    await saveSpendAlertSettings(db, scope, {
+      enabled: true,
+      rules: [
+        ruleConfig({
+          kind: 'threshold',
+          thresholdMicrodollars: 5_000_000,
+          windowHours: 24,
+          pushEnabled: true,
+        }),
+        ruleConfig({ kind: 'anomaly', multiplierBasisPoints: 300 }),
+      ],
+      viewerUserId: user.id,
+    });
+
+    const [preference] = await db
+      .select({ enabled: user_notification_preferences.spend_alerts_enabled })
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, user.id));
+    expect(preference?.enabled).toBe(true);
   });
 
   it('is idempotent when replayed', async () => {

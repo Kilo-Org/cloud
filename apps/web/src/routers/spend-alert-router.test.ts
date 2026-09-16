@@ -125,6 +125,32 @@ describe('spendAlertRouter', () => {
     expect(preference?.enabled).toBe(true);
   });
 
+  it('does not reverse a viewer’s notification opt-out on an unrelated spend-view save', async () => {
+    const caller = await createCallerForUser(billingManager.id);
+    const save = (threshold: number) =>
+      caller.spendAlerts.save({
+        organizationId: organization.id,
+        enabled: true,
+        rules: [{ ...VALID_RULES[0], threshold }, VALID_RULES[1]],
+      });
+
+    await save(250);
+    // The Notifications screen owns the per-viewer category; turning Spend
+    // alerts off there writes the same column the spend view used to re-derive.
+    await caller.user.setNotificationPreferences({ spendAlerts: false });
+
+    // An unrelated save (an edited limit, the same channel choices) must leave
+    // the caller's own category where the Notifications screen put it.
+    const saved = await save(300);
+    expect(saved.pushCategoryEnabled).toBe(false);
+
+    const [preference] = await db
+      .select({ enabled: user_notification_preferences.spend_alerts_enabled })
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, billingManager.id));
+    expect(preference?.enabled).toBe(false);
+  });
+
   it('gives a member who may see the scope no settings payload and canManage false', async () => {
     const caller = await createCallerForUser(member.id);
 

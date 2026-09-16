@@ -184,6 +184,24 @@ export function derivePushCategoryEnabled(
 }
 
 /**
+ * Whether a save changes the push agreement between a scope's rules and the
+ * caller's own mobile notification category.
+ *
+ * {@link derivePushCategoryEnabled} answers what the agreement *should* be;
+ * this answers whether *this* save is the one that moves it. The category is a
+ * per-viewer setting the Notifications screen owns, so a save that re-sends a
+ * stored push rule (editing a threshold, toggling email) must leave the column
+ * where the caller put it — only a save that turns a push channel on, or the
+ * last one off, agrees the category again.
+ */
+export function pushCategoryChanges(
+  storedRules: Pick<SpendAlertRuleConfig, 'enabled' | 'pushEnabled'>[],
+  nextRules: Pick<SpendAlertRuleConfig, 'enabled' | 'pushEnabled'>[]
+): boolean {
+  return derivePushCategoryEnabled(storedRules) !== derivePushCategoryEnabled(nextRules);
+}
+
+/**
  * Whether a rule's push would actually be delivered to a viewer. Push is only
  * effective when the rule asks for push AND the viewer's own category is on —
  * the rule cannot override an individual's notification settings. Pure, so both
@@ -362,9 +380,36 @@ async function readSpend(tx: DrizzleTransaction, scopeKey: string): Promise<Spen
 }
 
 /**
- * Writes the settings row, both rules, and — in the same transaction — the
- * caller's `spend_alerts_enabled` agreement column. Upserts are keyed on the
- * unique indexes the schema declares, so a replayed save is idempotent.
+ * The channel choices a scope's stored rules carry, read inside the save
+ * transaction before this save overwrites them. Empty for a scope with no
+ * settings row, which is the same as no rule asking for push.
+ */
+async function readStoredRuleChannels(
+  tx: DrizzleTransaction,
+  scopeKey: string
+): Promise<Pick<SpendAlertRuleConfig, 'enabled' | 'pushEnabled'>[]> {
+  const [settingsRow] = await tx
+    .select({ id: spend_alert_settings.id })
+    .from(spend_alert_settings)
+    .where(eq(spend_alert_settings.scope_key, scopeKey))
+    .limit(1);
+  if (!settingsRow) {
+    return [];
+  }
+  return tx
+    .select({
+      enabled: spend_alert_rules.enabled,
+      pushEnabled: spend_alert_rules.push_enabled,
+    })
+    .from(spend_alert_rules)
+    .where(eq(spend_alert_rules.settings_id, settingsRow.id));
+}
+
+/**
+ * Writes the settings row and both rules, and — in the same transaction — the
+ * caller's `spend_alerts_enabled` agreement column when this save changes the
+ * push channel choice. Upserts are keyed on the unique indexes the schema
+ * declares, so a replayed save is idempotent.
  */
 export async function saveSpendAlertSettings(
   database: DbOrTx,
@@ -375,6 +420,9 @@ export async function saveSpendAlertSettings(
   const categoryEnabled = derivePushCategoryEnabled(input.rules);
 
   await inTransaction(database, async tx => {
+    // Read the channel choice this save replaces before any upsert touches it.
+    const storedChannels = await readStoredRuleChannels(tx, scopeKey);
+
     const [settingsRow] = await tx
       .insert(spend_alert_settings)
       .values({
@@ -417,15 +465,20 @@ export async function saveSpendAlertSettings(
     }
 
     // The mobile category and the spend view's push channel must not disagree:
-    // any enabled push rule turns the caller's own category on, and dropping
-    // push from every rule turns it back off.
-    await tx
-      .insert(user_notification_preferences)
-      .values({ user_id: input.viewerUserId, spend_alerts_enabled: categoryEnabled })
-      .onConflictDoUpdate({
-        target: user_notification_preferences.user_id,
-        set: { spend_alerts_enabled: categoryEnabled, updated_at: sql`now()` },
-      });
+    // a save that turns a push channel on enables the caller's own category,
+    // and one that drops the last push turns it back off. A save that leaves
+    // the channel choices where they were writes nothing: the Notifications
+    // screen owns the column, and re-deriving it from every rule on every save
+    // silently re-enabled a category the caller had turned off there.
+    if (pushCategoryChanges(storedChannels, input.rules)) {
+      await tx
+        .insert(user_notification_preferences)
+        .values({ user_id: input.viewerUserId, spend_alerts_enabled: categoryEnabled })
+        .onConflictDoUpdate({
+          target: user_notification_preferences.user_id,
+          set: { spend_alerts_enabled: categoryEnabled, updated_at: sql`now()` },
+        });
+    }
   });
 
   return readSpendAlertSettings(database, scope);

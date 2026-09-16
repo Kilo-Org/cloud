@@ -85,6 +85,16 @@ export function notificationIdentifierForSession(kiloSessionId: string): string 
 
 const IDENTIFIER_PREFIX = 'needs-input:';
 
+/**
+ * True when a notification request identifier belongs to the app's own
+ * needs-input post. The foreground handler reads it so it can suppress the
+ * server's attention push without suppressing the app's own notification,
+ * which carries the same parsed payload (both must dispatch the same actions).
+ */
+export function isAppOwnedNeedsInputNotification(identifier: string | null | undefined): boolean {
+  return (identifier ?? '').startsWith(IDENTIFIER_PREFIX);
+}
+
 // The sessions whose app-owned needs-input notification is currently posted.
 // In-memory like the mount's notified set: a fresh process posts nothing until
 // the cached rows raise again, so a restart can only under-report (a duplicate

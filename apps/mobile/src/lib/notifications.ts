@@ -49,7 +49,10 @@ import {
   isNeedsInputActionIdentifier,
 } from './notification-actions';
 import { notificationPathForData } from './notification-path';
-import { isNeedsInputNotificationPosted } from './needs-input-notification';
+import {
+  isAppOwnedNeedsInputNotification,
+  isNeedsInputNotificationPosted,
+} from './needs-input-notification';
 
 const easConfigSchema = z.object({ projectId: z.string().min(1) });
 
@@ -328,11 +331,16 @@ export function setupNotificationHandler() {
       }
       // The app's own needs-input notification is already the presentation for
       // this raise: suppressing the server's attention push keeps one OS
-      // notification per raise instead of a duplicate banner.
+      // notification per raise instead of a duplicate banner. The app's own
+      // post carries the same parsed payload, so it is exempted by its
+      // reserved identifier — suppressing it would drop the only notification
+      // the foregrounded app ever presents for the raise (the schedule
+      // resolves before the handler consults the posted marker).
       if (
         data?.type === 'cloud_agent_session' &&
         data.category === 'attention' &&
-        isNeedsInputNotificationPosted(data.cliSessionId)
+        isNeedsInputNotificationPosted(data.cliSessionId) &&
+        !isAppOwnedNeedsInputNotification(notification.request.identifier)
       ) {
         return suppressed;
       }

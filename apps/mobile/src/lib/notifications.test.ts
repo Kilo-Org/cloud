@@ -1421,7 +1421,7 @@ describe('foreground attention-push suppression', () => {
     loaded.setupNotificationHandler();
     const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
       handleNotification: (notification: {
-        request: { content: { data: unknown } };
+        request: { identifier?: string; content: { data: unknown } };
       }) => Promise<{ shouldShowBanner: boolean; shouldSetBadge: boolean }>;
     };
     return { loaded, needsInput, registration };
@@ -1448,10 +1448,41 @@ describe('foreground attention-push suppression', () => {
     await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
 
     const behavior = await registration.handleNotification({
-      request: { content: { data: attentionPush } },
+      request: { identifier: 'expo-push-remote-1', content: { data: attentionPush } },
     });
     expect(behavior.shouldShowBanner).toBe(false);
     expect(behavior.shouldSetBadge).toBe(false);
+  });
+
+  it('shows the app-owned needs-input notification even while its session is posted', async () => {
+    const { needsInput, registration } = await loadHandler();
+
+    await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
+
+    // The app's own post carries the same parsed payload as the server push;
+    // suppressing it would drop the only notification the app presents.
+    const behavior = await registration.handleNotification({
+      request: {
+        identifier: needsInput.notificationIdentifierForSession('ses_1'),
+        content: { data: attentionPush },
+      },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
+    expect(behavior.shouldSetBadge).toBe(true);
+  });
+
+  it('shows the app-owned notification while the posted marker is not yet set', async () => {
+    // The schedule resolves before the handler consults the posted marker, so
+    // the app's own post must not depend on it.
+    const { registration } = await loadHandler();
+
+    const behavior = await registration.handleNotification({
+      request: {
+        identifier: 'needs-input:ses_1',
+        content: { data: attentionPush },
+      },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
   });
 
   it('shows the server attention push when the app notification is not posted', async () => {

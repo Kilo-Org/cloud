@@ -20,17 +20,17 @@ export function countInFlightMessages(
 }
 
 /**
- * Re-sends a failed message and clears its failed row only on success. On
- * failure the row stays so the user can retry again; the manager has already
- * surfaced the failure toast, so the rejection is swallowed here.
+ * Re-sends a failed submission as a new one. The failed row keeps its typed
+ * footer and its Retry action: it is the record of a submission that did fail,
+ * and the re-send materialises its own row with its own delivery state. Clearing
+ * the original footer on an accepted re-send left the transcript with fewer
+ * failure footers than failed submissions (the re-send can fail too), so the
+ * failed row's state is left alone. The manager has already surfaced any failure
+ * through its own toast, so the rejection is swallowed here.
  */
-export async function retryMessageAndClear(
-  send: () => Promise<void>,
-  clearFailed: () => void
-): Promise<void> {
+export async function retryFailedMessage(send: () => Promise<void>): Promise<void> {
   try {
     await send();
-    clearFailed();
   } catch {
     // Swallow: the manager already surfaced the failure toast and the failed
     // row stays so the user can retry again.

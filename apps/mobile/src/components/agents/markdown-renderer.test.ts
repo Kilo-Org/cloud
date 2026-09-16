@@ -658,17 +658,20 @@ describe('MarkdownRenderer empty fence mounting', () => {
     vi.resetModules();
   });
 
-  it('renders a transcript (non-selectable) fence as one Text per source line', async () => {
+  it('renders a transcript (non-selectable) fence as a chunk of lines per Text', async () => {
     // TextPartRenderer renders the chat transcript with selectable={false}.
     // Android builds one SpannableStringBuilder per ReactTextView on the UI
-    // thread, so the transcript fence must split per line instead of putting
-    // the whole fence into one Text (the SetSpanOperation.execute ANR).
+    // thread, so the transcript fence must split into chunks instead of putting
+    // the whole fence into one Text (the SetSpanOperation.execute ANR) — and
+    // not one Text per source line either, which would scale the native view
+    // count with the file.
     vi.doUnmock('./code-block');
     vi.resetModules();
     const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
     const renderer = new RendererClass(palette, false, {});
+    const sourceLines = Array.from({ length: 80 }, (_, index) => `const value${index} = ${index};`);
     const element = renderer.code(
-      'const a = 1;\nconst b = 2;\nconst c = 3;',
+      sourceLines.join('\n'),
       'ts',
       containerStyle,
       undefined
@@ -697,7 +700,8 @@ describe('MarkdownRenderer empty fence mounting', () => {
       },
       { deep: true }
     );
-    expect(codeTexts).toHaveLength(3);
+    expect(codeTexts.length).toBeGreaterThan(1);
+    expect(codeTexts.length).toBeLessThan(sourceLines.length);
     for (const codeText of codeTexts) {
       expect(propOf(codeText, 'selectable')).toBe(false);
     }

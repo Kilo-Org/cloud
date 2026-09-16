@@ -11,11 +11,11 @@
 // untagged tokens stay raw strings, which React Native's text shadow node
 // coalesces into the parent `Text`'s own fragment, and only tagged tokens
 // become nested `Text`s. All highlighted surfaces (the chat/tool code block
-// and both diff renderers) share it. Each diff row and each line of a
+// and both diff renderers) share it. Each diff row and each chunk of a
 // non-selectable fence is its own `Text`, so the span ceiling there is one
-// line; a selectable fence must stay one `Text` (Android selects inside a
-// single `ReactTextView` only) and still pays a span only for its tagged
-// tokens, never for its untagged runs.
+// chunk of lines; a selectable fence must stay one `Text` (Android selects
+// inside a single `ReactTextView` only) and still pays a span only for its
+// tagged tokens, never for its untagged runs.
 //
 // The caller must give the parent `Text` the base ink (`tokenColorFor(null,
 // isDark)` — the theme foreground, or the bubble's text color), which is what

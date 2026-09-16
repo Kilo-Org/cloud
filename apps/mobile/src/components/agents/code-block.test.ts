@@ -59,7 +59,7 @@ function isMockedStringElement(node: TestRenderer.ReactTestInstance, name: strin
   return typeof node.type === 'string' && node.type === name;
 }
 
-/** Code Texts carrying the mono sizing: one selectable fence, or one per line. */
+/** Code Texts carrying the mono sizing: the selectable fence, or one per chunk. */
 function codeLines(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => {
     if (!isMockedStringElement(node, 'RNText')) {
@@ -70,11 +70,17 @@ function codeLines(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTest
   });
 }
 
-/** The first code Text (the fence, or the first line of a per-line fence). */
+/** The first code Text (the fence, or the first chunk of a chunked fence). */
 function codeParent(
   root: TestRenderer.ReactTestInstance
 ): TestRenderer.ReactTestInstance | undefined {
   return codeLines(root)[0];
+}
+
+/** Source lines held by one non-selectable code Text: one `Fragment` per line. */
+function chunkLineCount(chunk: TestRenderer.ReactTestInstance): number {
+  const children = propOf(chunk, 'children');
+  return Array.isArray(children) ? children.length : 0;
 }
 
 /** The intrinsic-width content wrapper of the sheet scroll mode. */
@@ -90,7 +96,7 @@ function codeScrollContent(
   })[0];
 }
 
-/** Nested RNText token runs: the colored runs, never the per-line code Texts. */
+/** Nested RNText token runs: the colored runs, never the code chunk Texts. */
 function colorRuns(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => {
     if (propOf(node, 'className') !== undefined) {
@@ -99,6 +105,17 @@ function colorRuns(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTest
     const style = propOf(node, 'style') as { color?: string } | undefined;
     return typeof style?.color === 'string';
   });
+}
+
+/**
+ * The fence's accessibility host: the single element that carries the code and
+ * the `copyCode` action. `Text` is one element per chunk on iOS, so the
+ * non-selectable path wraps its chunks in one accessible `View`.
+ */
+function accessibilityHosts(
+  root: TestRenderer.ReactTestInstance
+): TestRenderer.ReactTestInstance[] {
+  return root.findAll(node => propOf(node, 'accessible') === true);
 }
 
 function truncatedMarkers(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
@@ -196,12 +213,11 @@ function withSheet(
 }
 
 describe('CodeBlock', () => {
-  it('renders one code line Text per source line when the fence is not selectable', async () => {
+  it('renders a short non-selectable fence as one code Text', async () => {
     const renderer = await mount(blockElement({ selectable: false }));
-    const lines = tokenizeCodeLines('const x = 1;', 'typescript');
-    expect(codeLines(renderer.root)).toHaveLength(lines.length);
+    expect(codeLines(renderer.root)).toHaveLength(1);
 
-    const expectedRuns = lines.reduce(
+    const expectedRuns = tokenizeCodeLines('const x = 1;', 'typescript').reduce(
       (total, line) => total + line.filter(token => token.className !== null).length,
       0
     );
@@ -211,10 +227,13 @@ describe('CodeBlock', () => {
   });
 
   it('keeps a selectable fence in one Text, so selection spans the whole fence', async () => {
-    // Regression: Android selects inside one `ReactTextView` only, so the
-    // per-line split (the non-selectable path) would let the user select a
-    // single line per gesture. A selectable fence must therefore stay one Text.
-    const code = Array.from({ length: 40 }, (_, index) => `const value${index} = ${index};`).join(
+    // Regression: Android selects inside one `ReactTextView` only, so a chunked
+    // selectable fence would let the user select a single chunk per gesture. A
+    // selectable fence must therefore stay one Text even at the size the tool
+    // detail sheet renders (read-tool-card.tsx caps the file at 50,000
+    // characters), where a chunk split is the only way to bound this Text's
+    // spans: the tag runs stay the lever instead (see `highlightRunChildren`).
+    const code = Array.from({ length: 200 }, (_, index) => `const value${index} = ${index};`).join(
       '\n'
     );
     const renderer = await mount(blockElement({ code, language: 'typescript' }));
@@ -250,27 +269,29 @@ describe('CodeBlock', () => {
     await unmount(renderer);
   });
 
-  it('keeps every non-selectable Text to a single line, so no Text holds the whole fence', async () => {
+  it('bounds a non-selectable fence to a run of lines per Text, not a Text per line', async () => {
     // Regression: the fence used to render all lines into one RNText, so a
     // long file produced one SpannableStringBuilder whose span count scaled
-    // with the whole file (the Android `SetSpanOperation.execute` ANR).
+    // with the whole file (the Android `SetSpanOperation.execute` ANR). One
+    // Text per line moved the same scale onto the native view count, so the
+    // fence renders a chunk of lines per Text instead: no Text holds the whole
+    // fence, and the views a fence needs stay far below its line count.
     const code = Array.from({ length: 200 }, (_, index) => `const value${index} = ${index};`).join(
       '\n'
     );
     const renderer = await mount(blockElement({ code, language: 'typescript', selectable: false }));
 
-    const lines = codeLines(renderer.root);
-    expect(lines).toHaveLength(200);
+    const chunks = codeLines(renderer.root);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.length).toBeLessThan(200);
 
-    // Every line Text carries only its own line's runs.
-    const runsPerLine = lines.map(line => {
-      const children = propOf(line, 'children');
-      if (typeof children === 'string') {
-        return 1;
-      }
-      return Array.isArray(children) ? children.length : 0;
-    });
-    expect(Math.max(...runsPerLine)).toBeLessThan(50);
+    // Every chunk but the last holds the same number of lines; the last holds
+    // the remainder. That is what bounds both the views and a Text's spans.
+    const linesPerChunk = chunks.map(chunk => chunkLineCount(chunk));
+    expect(linesPerChunk.reduce((total, lines) => total + lines, 0)).toBe(200);
+    expect(Math.max(...linesPerChunk)).toBeLessThan(200);
+    expect(linesPerChunk.slice(0, -1).every(lines => lines === linesPerChunk[0])).toBe(true);
+    expect(linesPerChunk.at(-1)).toBeLessThanOrEqual(linesPerChunk[0] ?? 0);
 
     // The tagged runs of the whole fence still total what the highlighter
     // produced — nothing is dropped by the split.
@@ -284,21 +305,28 @@ describe('CodeBlock', () => {
 
   it('costs no token span for an untagged run', async () => {
     // A fence with no language highlights to plain text; every line is one
-    // raw string, so no line carries a nested token Text at all.
+    // raw string, so no code Text carries a nested token Text at all.
     const code = Array.from({ length: 100 }, (_, index) => `plain output line ${index}`).join('\n');
     const renderer = await mount(blockElement({ code, language: null, selectable: false }));
-    expect(codeLines(renderer.root)).toHaveLength(100);
+    const chunks = codeLines(renderer.root);
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks.length).toBeLessThan(100);
     expect(colorRuns(renderer.root)).toHaveLength(0);
     await unmount(renderer);
   });
 
-  it('keeps a blank source line as a line box', async () => {
+  it('keeps a blank source line as a line box in a chunk', async () => {
     const renderer = await mount(
       blockElement({ code: 'a\n\nb', language: null, selectable: false })
     );
-    const lines = codeLines(renderer.root);
-    expect(lines).toHaveLength(3);
-    expect(propOf(lines[1], 'children')).toBe(' ');
+    const [chunk] = codeLines(renderer.root);
+    expect(chunk).toBeDefined();
+    // One Fragment per source line: a break before every line but the chunk's
+    // first, and a space (never an empty child) for the blank line, so its box
+    // survives wherever it falls in the chunk.
+    const lineChildren = propOf(chunk, 'children') as { props: { children: unknown[] } }[];
+    expect(lineChildren).toHaveLength(3);
+    expect(lineChildren[1]?.props.children).toEqual(['\n', ' ']);
     await unmount(renderer);
   });
 
@@ -543,17 +571,41 @@ describe('CodeBlock copy action', () => {
     await unmount(renderer);
   });
 
-  it('carries the copy action on every line Text of a non-selectable fence', async () => {
-    // Each line is its own Android `ReactTextView`, so the transcript's
-    // non-selectable fence needs the action on each of them.
+  it('carries the copy action on one accessible host, not on every chunk Text', async () => {
+    // Regression: a `Text` per line was one accessibility element per line on
+    // iOS, so screen-reader navigation went from one element per fence to N.
+    // The chunks stay non-accessible and the fence exposes a single host that
+    // reads the code and offers the action once.
     const onCopyCode = vi.fn<(code: string) => void>();
-    const code = 'const a = 1;\nconst b = 2;\nconst c = 3;';
+    const code = Array.from({ length: 40 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
     const renderer = await mount(blockElement({ code, selectable: false, onCopyCode }));
-    const lines = codeLines(renderer.root);
-    expect(lines).toHaveLength(3);
-    for (const line of lines) {
-      expect(typeof propOf(line, 'onAccessibilityAction')).toBe('function');
+    const chunks = codeLines(renderer.root);
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks) {
+      expect(propOf(chunk, 'accessible')).toBe(false);
+      expect(propOf(chunk, 'onAccessibilityAction')).toBeUndefined();
     }
+
+    const hosts = accessibilityHosts(renderer.root);
+    expect(hosts).toHaveLength(1);
+    const onAccessibilityAction = propOf(hosts[0], 'onAccessibilityAction');
+    expect(typeof onAccessibilityAction).toBe('function');
+    act(() => {
+      (onAccessibilityAction as (event: { nativeEvent: { actionName: string } }) => void)({
+        nativeEvent: { actionName: 'copyCode' },
+      });
+    });
+    expect(onCopyCode).toHaveBeenCalledWith(code);
+    await unmount(renderer);
+  });
+
+  it('keeps a non-selectable fence one accessibility element without a copy handler', async () => {
+    const renderer = await mount(blockElement({ selectable: false }));
+    const hosts = accessibilityHosts(renderer.root);
+    expect(hosts).toHaveLength(1);
+    expect(propOf(hosts[0], 'accessibilityActions')).toBeUndefined();
     await unmount(renderer);
   });
 

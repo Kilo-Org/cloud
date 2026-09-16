@@ -51,6 +51,7 @@ import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
 import { quickChatRouter } from '@/routers/quick-chat-router';
+import { spendAlertRouter } from '@/routers/spend-alert-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -103,6 +104,7 @@ export const rootRouter = createTRPCRouter({
   moderation: moderationRouter,
   userExports: userExportsRouter,
   quickChat: quickChatRouter,
+  spendAlerts: spendAlertRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

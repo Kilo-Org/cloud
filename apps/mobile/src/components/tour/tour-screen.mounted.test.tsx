@@ -224,15 +224,17 @@ describe('TourScreen', () => {
     unmount();
   });
 
-  it('starts the fork body under the header in one top-aligned scroll container', async () => {
+  it('centres the fork body in the band between the header and the Skip bar', async () => {
     const { renderer, unmount } = await mountTour();
 
-    // The body begins directly under the header — it is not vertically centred
-    // in the band between the header and the Skip bar (the empty band the owner
-    // reported). One ScrollView owns it, top-aligned with the app's own
-    // first-run rhythm.
+    // One ScrollView owns the fork body. Its content container grows to the
+    // viewport (`grow`) and distributes the header and the two path cards in
+    // the middle (`justify-center`), so the block fills the band between the
+    // header and the Skip bar instead of leaving the empty lower half the owner
+    // reported. `grow` is a minimum, so taller content still scrolls rather
+    // than being clipped.
     const scroller = renderer.root.findByType('ScrollView' as ElementType);
-    expect(scroller.props.contentContainerClassName).toBe('gap-8 px-6 pt-4 pb-6');
+    expect(scroller.props.contentContainerClassName).toBe('grow justify-center gap-8 px-6 py-6');
     expect(renderer.root.findAllByType('CenteredState' as ElementType)).toHaveLength(0);
 
     unmount();

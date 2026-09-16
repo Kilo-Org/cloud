@@ -78,14 +78,16 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
   return (
     <ScrollView
       className="flex-1"
-      contentContainerClassName="gap-8 px-6 pt-4 pb-6"
+      contentContainerClassName="grow justify-center gap-8 px-6 py-6"
       keyboardShouldPersistTaps="handled"
     >
-      {/* Top-aligned, matching the app's own modal first-run flow: the body
-          starts directly under the header instead of being centred in the band
-          between the header and the Skip bar. It still scrolls, so a large
-          system font or a short screen cannot push the path cards over the
-          header or the action bar. */}
+      {/* Centred in the band between the header and the Skip bar: the content
+          container grows to the viewport (`grow`) and distributes its children
+          in the middle (`justify-center`), so the block sits where the eye
+          expects it instead of against the header. `grow` is a minimum, not a
+          fixed height, so the block still scrolls: a large system font or a
+          short screen starts at the top padding rather than being pushed over
+          the header or the action bar. */}
       <View className="items-center gap-4">
         <TourStepHeader
           icon={<Sparkles size={36} color={colors.foreground} />}

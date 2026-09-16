@@ -93,4 +93,29 @@ describe('Active Agents Live Activity actions', () => {
     expect(interactionTargets).toEqual(['approve', 'open']);
     expect(targetsIn(source)).toEqual(interactionTargets);
   });
+
+  it('foregrounds the app for Open, and only for Open', () => {
+    // A Live Activity button performs in the app's process without bringing it
+    // forward, so Open asks for the foreground: the destination the press
+    // records is consumed by the app's own listener, which the user has to be
+    // looking at. Approve must not ask for it — an Approve that needed the app
+    // up would not answer the Lock Screen with the app closed.
+    expect(source).toContain('const openButtonProps = { openAppWhenRun: true };');
+    expect(source.match(/\.\.\.openButtonProps/g)).toHaveLength(1);
+    // The one spread is the Open button's: the prop travels beside its target.
+    expect(region(source, '{...openButtonProps}', 'modifiers=')).toContain('target="open"');
+  });
+
+  it('names the foregrounding prop the patched expo-widgets button view reads', () => {
+    // The prop name is the JS-to-native contract: the layout writes
+    // `openAppWhenRun` on the Open button, and expo-widgets' patched ButtonProps
+    // reads that name and presses through the intent that asks the system for
+    // the foreground. The two sides are literals in different languages, so the
+    // patch is read here to hold them equal — a rename on one side alone would
+    // put Open back in the background with no other test to catch it.
+    const patch = read('../../../../patches/expo-widgets@57.0.18.patch');
+    expect(patch).toContain('@Field var openAppWhenRun: Bool?');
+    expect(patch).toContain('static var openAppWhenRun: Bool = true');
+    expect(patch).toContain('intent: LiveActivityOpenInteraction(');
+  });
 });

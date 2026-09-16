@@ -19,10 +19,14 @@ import { ActiveAgentsLiveActivity, LIVE_ACTIVITY_NAME } from './active-agents-li
  * The press arrives as an in-process event: expo-widgets' `LiveActivityIntent`
  * performs in the app's process and posts to `NotificationCenter`
  * (`ios/Widgets/WidgetsEvents.swift`), and the app's subscription forwards it to
- * `handleGlanceableInteraction`. The answer and the navigation are the same
- * bodies the in-app control uses — `runGlanceableApprove` for Approve,
- * `resolveIncomingUrl` + the pending-deep-link slot for Open — so the surface
- * and the app cannot disagree about either.
+ * `handleGlanceableInteraction`. Approve keeps that background path — it answers
+ * the ask without the app. Open would perform there unseen, so its button asks
+ * for the foreground instead (`openAppWhenRun`, read by the patched expo-widgets
+ * button view) and the destination it stashes is consumed with the app up. The
+ * answer and the navigation are the same bodies the in-app control uses —
+ * `runGlanceableApprove` for Approve, `resolveIncomingUrl` + the
+ * pending-deep-link slot for Open — so the surface and the app cannot disagree
+ * about either.
  */
 
 /** The Approve target the layout's button carries. */

@@ -234,6 +234,15 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // `PlatformColor` — the same values the count rows use — and the glyphs are
   // SF Symbols, the set the count rows already draw. Approve carries the
   // needs-input orange of the row it answers; Open takes the label color.
+  //
+  // The Open tap has to show the user the session, and a Live Activity button's
+  // intent performs in the app's process without foregrounding it: unattended,
+  // the tap records a destination on a surface nobody is looking at.
+  // `openAppWhenRun` selects the foregrounding intent in the patched
+  // expo-widgets button view, so the app is up to consume that destination. It
+  // is a prop of that view, not of `@expo/ui`'s `Button`, so it travels as the
+  // plain extra prop the widget process serialises with the rest.
+  const openButtonProps = { openAppWhenRun: true };
   const actions = (
     <HStack alignment="center" spacing={10}>
       {canApprove ? (
@@ -245,6 +254,7 @@ const layout: LiveActivityComponent<ContentState> = props => {
         />
       ) : null}
       <Button
+        {...openButtonProps}
         target="open"
         label={COPY.open}
         systemImage="arrow.up.forward.app"

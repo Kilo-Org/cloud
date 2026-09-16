@@ -79,6 +79,7 @@ type SandboxControlRpc = {
     handle: string;
   }): Promise<{ bound: true }>;
   detachSession(sessionId: string): Promise<{ existed: boolean }>;
+  forgetSessionReference(sessionId: string): Promise<void>;
   validateTerminalAccess(input: SandboxTerminalAccessInput): Promise<SandboxTerminalAccessResult>;
   recordTerminalActivity(input: SandboxTerminalAccessInput): Promise<SandboxTerminalAccessResult>;
   updateNetworkPolicy(input: {
@@ -131,6 +132,13 @@ export function sandboxControlRpc(
       ),
     detachSession: sessionId =>
       withDORetry(stub, control => control.detachSession(sessionId), 'detachSession'),
+    forgetSessionReference: sessionId =>
+      withDORetry(
+        stub,
+        control => control.forgetSessionReference(sessionId),
+        'forgetSessionReference',
+        config()
+      ),
     validateTerminalAccess: input =>
       withDORetry(stub, control => control.validateTerminalAccess(input), 'validateTerminalAccess'),
     recordTerminalActivity: input =>

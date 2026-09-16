@@ -148,6 +148,22 @@ describe('worktree state routes', () => {
     expect(f.objects.has(key)).toBe(false);
   });
 
+  it('round-trips a federated user id as a single encoded path segment', async () => {
+    const federated = { userId: 'oauth/google:1234', scopeId: 'worktree_abc' };
+    const path = `/worktree-state/${encodeURIComponent(federated.userId)}/${federated.scopeId}`;
+    const objectKey = `worktree-state/v1/${encodeURIComponent(federated.userId)}/${federated.scopeId}/state.tar.gz`;
+    const f = fixture();
+    const token = mintWorktreeStateGrant(federated, secret);
+    expect((await f.upload(bundle as BodyInit, path, token)).status).toBe(204);
+    expect(f.objects.get(objectKey)?.body).toEqual(bundle);
+
+    const response = await f.request(path, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(response.status).toBe(200);
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(bundle);
+  });
+
   it('rejects identities that cannot appear in an object key', async () => {
     const f = fixture();
     const response = await f.request('/worktree-state/..%2Fetc/worktree_abc', {

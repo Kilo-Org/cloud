@@ -18,6 +18,7 @@ import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
 import { formatGlanceableCount, isWidgetRtl } from './count-format';
 import {
   end as endLiveUpdate,
+  getStoredWidgetSnapshot,
   setWidgetSnapshot,
   start as startLiveUpdate,
   update as updateLiveUpdate,
@@ -173,7 +174,10 @@ async function tryStartOrUpdate(
     pending = null;
     return;
   }
-  if (notificationActive && snapshot.revision <= revision) {
+  // A pending notice must reach the surface even when the counts did not
+  // change: it is the only carrier of the retryable failure, and the republish
+  // that carries it can arrive with the same counts (or not arrive at all).
+  if (notificationActive && snapshot.revision <= revision && actionNotice === null) {
     return;
   }
   const title = translate(NOTIFICATION_TITLE_KEY);
@@ -233,6 +237,22 @@ async function tryStartOrUpdate(
     return;
   }
   pending = { snapshot, ctx };
+}
+
+/**
+ * Re-render the surface the app last published, read back from Android's own
+ * storage, so a headless tap that cannot reach the backend still shows its
+ * pending notice. Reusing `tryStartOrUpdate` keeps the one render path: the
+ * in-app switch, the permission gate, the revision bookkeeping, and the
+ * notification actions; its start branch re-posts the fixed native id, so the
+ * counts stay and only the text gains the notice.
+ */
+export function renderStoredSnapshotWithNotice(ctx: GlanceableSinkContext): void {
+  const snapshot = getStoredWidgetSnapshot();
+  if (snapshot === null) {
+    return;
+  }
+  void tryStartOrUpdate(snapshot, ctx);
 }
 
 /** Retry a pending start after permission turns granted. Caller owns the check. */

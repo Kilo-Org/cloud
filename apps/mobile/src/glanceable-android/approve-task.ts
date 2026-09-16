@@ -3,7 +3,11 @@ import { refreshGlanceableSnapshot, runGlanceableApprove } from '@/lib/glanceabl
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { readWaitingAsk, recordWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 
-import { androidSink, setGlanceableActionNotice } from './android-sink';
+import {
+  androidSink,
+  renderStoredSnapshotWithNotice,
+  setGlanceableActionNotice,
+} from './android-sink';
 import { applyStoredLanguage } from './apply-stored-language';
 
 /**
@@ -52,6 +56,20 @@ async function republish(ask: WaitingAsk): Promise<void> {
 }
 
 /**
+ * Show the retryable failure line. The backend that answers the ask is the one
+ * the republish below fetches from, so a failed refresh would leave the notice
+ * unrendered; the sink renders the last stored snapshot instead, which already
+ * carries the counts the notification shows, and the notice reaches the text.
+ */
+function showApproveFailed(ask: WaitingAsk): void {
+  setGlanceableActionNotice(translate(APPROVE_FAILED_KEY));
+  renderStoredSnapshotWithNotice({
+    userId: ask.userId,
+    organizationId: ask.organizationId,
+  });
+}
+
+/**
  * Answer the recorded ask and update the notification in place. Never throws:
  * the worker completes from the headless task's finish, so a rejection would
  * only lose the failure state the user needs to see. A thrown error is a
@@ -75,10 +93,13 @@ export async function handleApproveTask(): Promise<void> {
       recordWaitingAsk(null);
     } else if (result.kind === 'retryable') {
       // Keep the record: the notification keeps Approve for another tap.
-      setGlanceableActionNotice(translate(APPROVE_FAILED_KEY));
+      showApproveFailed(ask);
     }
   } catch {
-    setGlanceableActionNotice(translate(APPROVE_FAILED_KEY));
+    if (ask !== null) {
+      // Keep the recorded ask and its Approve; only the failure line is needed.
+      showApproveFailed(ask);
+    }
   }
   if (ask !== null) {
     await republish(ask);

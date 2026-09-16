@@ -19,6 +19,7 @@ import {
   androidSink,
   getCurrentWidgetProps,
   handleAppStateActive,
+  renderStoredSnapshotWithNotice,
   setGlanceableActionNotice,
 } from './android-sink';
 import { _setPermissionReaderForTests, type NotificationPermissionStatus } from './permission';
@@ -68,7 +69,7 @@ const mocks = vi.hoisted(() => {
         widgetSnapshot = snapshot;
         widgetDeadline = deadline;
       }),
-      getWidgetSnapshot: () => widgetSnapshot,
+      getWidgetSnapshot: vi.fn(() => widgetSnapshot),
     },
     getNotification: () => notification,
     getRequestedNotificationDeadline: () => notificationDeadline,
@@ -551,6 +552,63 @@ describe('androidSink action notice', () => {
     await flushAsync();
 
     expect(mocks.getNotification()?.text).toBe('2 Needs input, 4 Working, 3 Idle');
+  });
+});
+
+describe('renderStoredSnapshotWithNotice', () => {
+  it('renders the stored snapshot with the failure line and Approve, with no fresh publish', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_retry' }));
+    // The app persisted this on its last publish; a headless process reads the
+    // counts back from Android's own storage instead of fetching them again.
+    mocks.native.setWidgetSnapshot(JSON.stringify(MIXED), 0);
+    setGlanceableActionNotice('Approval failed');
+
+    renderStoredSnapshotWithNotice(CTX);
+    await flushAsync();
+
+    expect(mocks.native.getWidgetSnapshot).toHaveBeenCalled();
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      'Approval failed 2 Needs input, 4 Working, 3 Idle',
+      i18n.t('glanceable.openSession'),
+      'kiloapp:///cloud/sessions/ses_retry',
+      i18n.t('common.approve'),
+      '2',
+      true
+    );
+    expect(mocks.native.update).not.toHaveBeenCalled();
+  });
+
+  it('updates an active notification when the revision did not change', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_live' }));
+    androidSink.publish(MIXED);
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    mocks.native.start.mockClear();
+
+    setGlanceableActionNotice('Approval failed');
+    renderStoredSnapshotWithNotice(CTX);
+    await flushAsync();
+
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(mocks.native.update).toHaveBeenCalledTimes(1);
+    expect(mocks.getNotification()).toMatchObject({
+      text: 'Approval failed 2 Needs input, 4 Working, 3 Idle',
+      approveLabel: i18n.t('common.approve'),
+    });
+  });
+
+  it('makes no native call when nothing is stored', async () => {
+    setGlanceableActionNotice('Approval failed');
+
+    renderStoredSnapshotWithNotice(CTX);
+    await flushAsync();
+
+    expect(mocks.native.getWidgetSnapshot).toHaveBeenCalled();
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(mocks.native.update).not.toHaveBeenCalled();
   });
 });
 

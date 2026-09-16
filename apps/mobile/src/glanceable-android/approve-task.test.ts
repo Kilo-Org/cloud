@@ -27,6 +27,8 @@ const mocks = vi.hoisted(() => ({
   runGlanceableApprove: vi.fn<() => Promise<GlanceableApproveResult>>(),
   refreshGlanceableSnapshot: vi.fn<() => Promise<void>>(),
   setGlanceableActionNotice: vi.fn<(notice: string | null) => void>(),
+  renderStoredSnapshotWithNotice:
+    vi.fn<(ctx: { userId: string; organizationId: string | null }) => void>(),
   language: {
     whenLanguagePreferenceLoaded: vi.fn<() => Promise<void>>(),
     getResolvedLanguage: vi.fn<() => SupportedLanguage>(),
@@ -58,6 +60,7 @@ vi.mock('@/lib/hooks/use-language-preference', () => ({
 vi.mock('./android-sink', () => ({
   androidSink: mocks.sink,
   setGlanceableActionNotice: mocks.setGlanceableActionNotice,
+  renderStoredSnapshotWithNotice: mocks.renderStoredSnapshotWithNotice,
 }));
 
 const { APPROVE_HEADLESS_TASK_KEY, handleApproveTask } = await import('./approve-task');
@@ -107,6 +110,7 @@ describe('handleApproveTask', () => {
     // clear it again, and an approval is not a failure to report.
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
     expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
+    expect(mocks.renderStoredSnapshotWithNotice).not.toHaveBeenCalled();
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
       userId: 'u1',
@@ -127,12 +131,36 @@ describe('handleApproveTask', () => {
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
     expect(mocks.setGlanceableActionNotice).toHaveBeenCalledTimes(1);
     expect(mocks.setGlanceableActionNotice).toHaveBeenCalledWith(APPROVE_FAILED);
-    // The notice must be set before the republish, or the line never reaches
-    // the notification.
+    // The notice goes into the text before the sink renders the stored
+    // snapshot, so the failure line reaches the surface even when the
+    // republish below cannot reach the backend.
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(1);
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledWith({
+      userId: 'u1',
+      organizationId: 'org_1',
+    });
     const noticeOrder = mocks.setGlanceableActionNotice.mock.invocationCallOrder[0];
+    const renderOrder = mocks.renderStoredSnapshotWithNotice.mock.invocationCallOrder[0];
     const refreshOrder = mocks.refreshGlanceableSnapshot.mock.invocationCallOrder[0];
-    expect(noticeOrder).toBeLessThan(refreshOrder ?? Number.POSITIVE_INFINITY);
+    expect(noticeOrder).toBeLessThan(renderOrder ?? Number.POSITIVE_INFINITY);
+    expect(renderOrder).toBeLessThan(refreshOrder ?? Number.POSITIVE_INFINITY);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the failure line from the stored snapshot when the republish rejects', async () => {
+    // The retryable failure's trigger is a backend that is not answering, so
+    // the republish that would render the line can fail as well: the sink had
+    // to render it before that, from the snapshot the app stored.
+    mocks.runGlanceableApprove.mockResolvedValue({ kind: 'retryable' });
+    mocks.refreshGlanceableSnapshot.mockRejectedValue(new Error('offline'));
+
+    await expect(handleApproveTask()).resolves.toBeUndefined();
+
+    expect(mocks.setGlanceableActionNotice).toHaveBeenCalledWith(APPROVE_FAILED);
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledWith({
+      userId: 'u1',
+      organizationId: 'org_1',
+    });
   });
 
   // The worker boots headless with no Activity, so the app root never applies
@@ -168,6 +196,7 @@ describe('handleApproveTask', () => {
     expect(mocks.recordWaitingAsk).toHaveBeenCalledTimes(1);
     expect(mocks.recordWaitingAsk).toHaveBeenCalledWith(null);
     expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
+    expect(mocks.renderStoredSnapshotWithNotice).not.toHaveBeenCalled();
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
   });
 
@@ -178,6 +207,7 @@ describe('handleApproveTask', () => {
 
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
     expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
+    expect(mocks.renderStoredSnapshotWithNotice).not.toHaveBeenCalled();
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
   });
 
@@ -197,6 +227,10 @@ describe('handleApproveTask', () => {
 
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
     expect(mocks.setGlanceableActionNotice).toHaveBeenCalledWith(APPROVE_FAILED);
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledWith({
+      userId: 'u1',
+      organizationId: 'org_1',
+    });
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
   });
 
@@ -205,6 +239,8 @@ describe('handleApproveTask', () => {
 
     await expect(handleApproveTask()).resolves.toBeUndefined();
 
+    // No ask means no ids to render with and no Approve left to keep.
+    expect(mocks.renderStoredSnapshotWithNotice).not.toHaveBeenCalled();
     expect(mocks.refreshGlanceableSnapshot).not.toHaveBeenCalled();
   });
 

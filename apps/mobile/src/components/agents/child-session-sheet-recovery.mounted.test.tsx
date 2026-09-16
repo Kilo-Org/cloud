@@ -228,7 +228,10 @@ describe('ChildSessionSheet recovery', () => {
     const list = host(renderer.root, 'FlashList');
     await sheet.sync({ sessionError: 'Runtime failure' });
     expect(textValues(renderer.root)).toEqual(
-      expect.arrayContaining(['Connection failed. Please retry in a moment.', 'Runtime failure'])
+      expect.arrayContaining([
+        'Connection failed. Please retry in a moment.',
+        i18n.t('agentChat.messageFailure.assistantFailed'),
+      ])
     );
     sheet.fetchPage.mockResolvedValueOnce(historyPage([], 'older-cursor'));
     await sheet.retry();
@@ -240,13 +243,13 @@ describe('ChildSessionSheet recovery', () => {
     const older = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
     sheet.fetchPage.mockReturnValueOnce(older.promise);
     await sheet.retry();
-    expect(textValues(renderer.root)).toContain('Runtime failure');
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
     expect(textValues(renderer.root)).toContain(i18n.t('agentChat.olderMessages.couldNotLoad'));
     expect(renderer.root.findAllByType(QueryError)).toHaveLength(0);
     older.resolve(historyPage([makeAssistantMessage('m0', 'Older recovered row')]));
     await sheet.settle();
     expect(textValues(list)).toEqual(['Older recovered row', 'child text']);
-    expect(textValues(renderer.root)).toContain('Runtime failure');
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
     expect(textValues(renderer.root)).not.toContain('Retry');
     expect(host(renderer.root, 'FlashList')).toBe(list);
   });
@@ -299,6 +302,8 @@ describe('ChildSessionSheet recovery', () => {
       ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
       sessionError: 'Runtime failure',
     });
+    // The sheet's own failure screen (child-session-sheet.tsx:219-223) is not
+    // the transcript status slot, so it still names the child's runtime error.
     expect(textValues(renderer.root)).toContain('Runtime failure');
     expect(textValues(renderer.root)).not.toContain('Retry');
   });

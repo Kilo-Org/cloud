@@ -367,6 +367,13 @@ const kiloSdkUserMessageBaseShape = {
   sessionID: sessionIdSchema,
   role: z.literal('user'),
   time: z.object({ created: z.number() }),
+  /**
+   * Kilo extension: marks a client-materialised row not yet confirmed by the
+   * server (the optimistic send-time insert and the `cloud.message.queued`
+   * synthesize). Declared so a round-trip through this contract preserves the
+   * flag instead of stripping it.
+   */
+  synthetic: z.boolean().optional(),
   format: z
     .discriminatedUnion('type', [
       z.object({ type: z.literal('text') }),

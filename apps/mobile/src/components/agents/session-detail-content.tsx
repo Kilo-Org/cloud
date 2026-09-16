@@ -90,7 +90,7 @@ import {
 import {
   countInFlightMessages,
   resolveRetryPrompt,
-  retryMessageAndClear,
+  retryFailedMessage,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
 import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
@@ -1014,16 +1014,11 @@ export function SessionDetailContent({
         void handleSend(prompt);
         return;
       }
-      void retryMessageAndClear(
-        async () => {
-          await handleSend(prompt);
-        },
-        () => {
-          manager.clearFailedMessage(message.info.id);
-        }
-      );
+      void retryFailedMessage(async () => {
+        await handleSend(prompt);
+      });
     },
-    [messages, requiresModel, pinned.model, currentModel, handleSend, manager]
+    [messages, requiresModel, pinned.model, currentModel, handleSend]
   );
 
   const handleCancelQueued = useCallback(
@@ -1818,6 +1813,7 @@ export function SessionDetailContent({
             visible={detailsMessageId !== null}
             message={detailsMessage ?? null}
             modelOptions={modelOptions}
+            deliveryState={detailsDelivery}
             onClose={handleCloseDetails}
             canCancelQueued={canCancelSelected}
             isCancelingQueued={isCancelingSelected}

@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
+import { TRPCClientError } from '@trpc/client';
 import { toast } from 'sonner';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import {
@@ -13,10 +14,25 @@ import {
 import { invalidateSessionQueries } from './session-deletion';
 
 /**
+ * tRPC error code from a thrown client error, following the established
+ * `error.data?.code ?? error.shape?.data?.code` pattern.
+ */
+function readForkErrorCode(error: unknown): string | undefined {
+  if (error instanceof TRPCClientError) {
+    return error.data?.code ?? error.shape?.data?.code;
+  }
+  return undefined;
+}
+
+/**
  * Fork a source session into a brand-new Cloud Agent session and navigate to
  * it. `organizationId` is the context the caller renders in (personal when
  * omitted, an organization otherwise) and decides both which `prepareSession`
  * endpoint runs and where the new session opens.
+ *
+ * Idempotency is best-effort: the key is held in memory so an in-page retry
+ * after an ambiguous failure replays the same create, but a page reload mints
+ * a fresh key and may duplicate the session.
  */
 export function useCloudSessionFork(organizationId?: string) {
   const router = useRouter();
@@ -27,7 +43,8 @@ export function useCloudSessionFork(organizationId?: string) {
   // Reuse one `operationKey` per (context, session) while an attempt may have
   // committed server-side: after an ambiguous failure a retry with the same
   // key replays the settled create instead of minting a second session. The
-  // key rotates once the fork settles (success or a definite rejection).
+  // key rotates once the fork reports a settled outcome. Typed rejections
+  // return `false` from the flow without a create call, so they settle too.
   const pendingOperationRef = useRef<{ fingerprint: string; operationKey: string } | null>(null);
 
   const forkSessionToNewCloudSession = useCallback(
@@ -87,10 +104,20 @@ export function useCloudSessionFork(organizationId?: string) {
       } catch (error) {
         // The error is ambiguous: the server may have committed the create but
         // the response was lost. Keep the operation key so a user retry replays
-        // the same intent instead of duplicating the session. Show a generic
-        // message rather than leaking internal zod/worker error text.
+        // the same intent instead of duplicating the session. A missing or
+        // unreadable source session cannot have committed anything, but
+        // reusing the key there is harmless.
         console.error('Failed to fork session into a new Cloud Agent session:', error);
-        toast.error('Failed to fork the session into a new Cloud Agent session. Please try again.');
+        const code = readForkErrorCode(error);
+        if (code === 'NOT_FOUND') {
+          toast.error('This session no longer exists, so it cannot be forked.');
+        } else if (code === 'FORBIDDEN') {
+          toast.error('You do not have access to fork this session.');
+        } else {
+          toast.error(
+            'Failed to fork the session into a new Cloud Agent session. Please try again.'
+          );
+        }
         return false;
       } finally {
         setForkingSessionId(null);

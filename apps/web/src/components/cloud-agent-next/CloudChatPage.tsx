@@ -1160,6 +1160,7 @@ export default function CloudChatPage({
       changesOpen={changesDrawerOpen}
       onToggleChanges={canOpenChanges ? handleToggleChanges : undefined}
       sessionActive={isStreaming || activity.type === 'busy' || activity.type === 'retrying'}
+      canForkToCloud={!isReadOnly && Boolean(fetchedSessionData?.cloudAgentSessionId)}
       sandboxStatusEligible={isSandboxStatusEligible({
         currentUserId,
         sessionId,
@@ -1380,7 +1381,10 @@ export default function CloudChatPage({
                             <SessionContinuationPanel
                               sessionId={sessionIdFromParams}
                               organizationId={organizationId}
-                              canForkToCloud={fetchedSessionData.cloudAgentSessionId !== null}
+                              canForkToCloud={Boolean(
+                                activeSessionType === 'cloud-agent' &&
+                                fetchedSessionData.cloudAgentSessionId
+                              )}
                             />
                           ) : null
                         ) : (

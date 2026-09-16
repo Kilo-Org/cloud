@@ -207,6 +207,15 @@ describe('deriveCloudSessionForkFields', () => {
     expect(result).toEqual({ ok: false, reason: 'invalid-mode' });
   });
 
+  it('rejects when the runtime mode exceeds the prepare schema length cap', () => {
+    const result = deriveCloudSessionForkFields({
+      session: CLOUD_SESSION,
+      runtime: runtime({ mode: `a${'b'.repeat(50)}` }),
+    });
+
+    expect(result).toEqual({ ok: false, reason: 'invalid-mode' });
+  });
+
   it('rejects a GitHub session whose runtime has no repository', () => {
     const result = deriveCloudSessionForkFields({
       session: CLOUD_SESSION,

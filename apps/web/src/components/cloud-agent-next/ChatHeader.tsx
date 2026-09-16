@@ -50,6 +50,8 @@ type ChatHeaderProps = {
   sessionTitle?: string;
   sessionActive: boolean;
   sandboxStatusEligible?: boolean;
+  /** Whether the source session is a Cloud Agent session that can be forked. */
+  canForkToCloud?: boolean;
 };
 
 export function ChatHeader({
@@ -72,6 +74,7 @@ export function ChatHeader({
   sessionTitle,
   sessionActive,
   sandboxStatusEligible = false,
+  canForkToCloud = false,
 }: ChatHeaderProps) {
   const [showActionsDialog, setShowActionsDialog] = useState(false);
   const moreOptionsTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -131,6 +134,7 @@ export function ChatHeader({
         sessionTitle={sessionTitle}
         repository={repository}
         organizationId={organizationId}
+        canForkToCloud={canForkToCloud}
       />
       <div className="flex min-w-0 items-center gap-1">
         {sandboxStatusEligible && (

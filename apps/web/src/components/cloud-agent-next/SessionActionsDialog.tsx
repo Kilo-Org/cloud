@@ -25,6 +25,8 @@ type SessionActionsDialogProps = {
   repository?: string;
   /** Organization context the dialog renders in; omitted for personal sessions. */
   organizationId?: string;
+  /** Whether the source session is a Cloud Agent session that can be forked. */
+  canForkToCloud?: boolean;
 };
 
 export function SessionActionsDialog({
@@ -34,6 +36,7 @@ export function SessionActionsDialog({
   sessionTitle,
   repository,
   organizationId,
+  canForkToCloud = false,
 }: SessionActionsDialogProps) {
   const [isSharing, setIsSharing] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
@@ -197,28 +200,31 @@ export function SessionActionsDialog({
               <h3 className="text-sm font-medium">Fork Session</h3>
             </div>
             <p className="text-muted-foreground text-xs">
-              Fork this session to continue working on it in your editor, CLI, or a new Cloud Agent
-              session
+              {canForkToCloud
+                ? 'Fork this session to continue working on it in your editor, CLI, or a new Cloud Agent session'
+                : 'Fork this session to continue working on it in your editor or CLI'}
             </p>
 
             {kiloSessionId ? (
               <div className="space-y-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full gap-2"
-                  disabled={isForkingToCloud}
-                  onClick={() => void handleForkToCloud()}
-                >
-                  {isForkingToCloud ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Cloud className="h-4 w-4" />
-                  )}
-                  {isForkingToCloud
-                    ? 'Forking to a new Cloud Agent session...'
-                    : 'Fork to a new Cloud Agent session'}
-                </Button>
+                {canForkToCloud && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2"
+                    disabled={isForkingToCloud}
+                    onClick={() => void handleForkToCloud()}
+                  >
+                    {isForkingToCloud ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Cloud className="h-4 w-4" />
+                    )}
+                    {isForkingToCloud
+                      ? 'Forking to a new Cloud Agent session...'
+                      : 'Fork to a new Cloud Agent session'}
+                  </Button>
+                )}
 
                 <div className="flex justify-center">
                   <OpenInEditorButton

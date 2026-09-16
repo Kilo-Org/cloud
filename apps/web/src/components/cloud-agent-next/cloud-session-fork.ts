@@ -57,6 +57,7 @@ export type DeriveCloudSessionForkResult =
   | { ok: false; reason: CloudForkRejectionReason };
 
 const MODE_SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
+const MAX_MODE_SLUG_LENGTH = 50;
 const VARIANT_PATTERN = /^[a-zA-Z]+$/;
 const GITHUB_REPO_PATTERN = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
 const GITLAB_PROJECT_PATTERN = /^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)+$/;
@@ -83,7 +84,7 @@ export function deriveCloudSessionForkFields(input: {
   if (!mode) {
     return { ok: false, reason: 'missing-mode' };
   }
-  if (!MODE_SLUG_PATTERN.test(mode)) {
+  if (!MODE_SLUG_PATTERN.test(mode) || mode.length > MAX_MODE_SLUG_LENGTH) {
     return { ok: false, reason: 'invalid-mode' };
   }
 
@@ -371,6 +372,9 @@ export async function runCloudForkFlow(params: {
  * Fork a source session into a brand-new Cloud Agent session and return the
  * new session id. The destination is cloned from the source transcript and
  * inherits the source runtime's repository, model, mode, and custom agents.
+ * The source session's profile (env vars, secrets, setup commands, MCP
+ * servers, skills) and branch are not inherited; the fork starts from the
+ * caller's default profile instead.
  *
  * `organizationId` describes the context the user is acting from: a personal
  * listing passes nothing, an organization listing passes the organization id.

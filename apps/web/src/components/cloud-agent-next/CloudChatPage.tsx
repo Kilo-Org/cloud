@@ -1378,14 +1378,7 @@ export default function CloudChatPage({
                       <div hidden={!chatTabActive} className={chatTabActive ? '' : 'hidden'}>
                         {isReadOnly ? (
                           !isLoading && sessionIdFromParams && fetchedSessionData ? (
-                            <SessionContinuationPanel
-                              sessionId={sessionIdFromParams}
-                              organizationId={organizationId}
-                              canForkToCloud={Boolean(
-                                activeSessionType === 'cloud-agent' &&
-                                fetchedSessionData.cloudAgentSessionId
-                              )}
-                            />
+                            <SessionContinuationPanel sessionId={sessionIdFromParams} />
                           ) : null
                         ) : (
                           <>

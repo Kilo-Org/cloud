@@ -128,7 +128,9 @@ function renderChunkChildren(
  *
  * Each line is highlighted independently by `highlightLine` (the per-line
  * ceiling documented in `highlight.ts`). A fence renders one `RNText` per chunk
- * of source lines, mirroring the shipped `DiffLine` pattern.
+ * of source lines, mirroring the shipped `DiffLine` pattern, and a single line
+ * denser than the chunk's run budget is split across chunks so no `Text` holds
+ * an unbounded run set (see `chunkTokenLines`).
  * Android builds one `SpannableStringBuilder` per `ReactTextView` and runs
  * `SetSpanOperation.execute` once per span on the UI thread, so a fence
  * rendered as one `RNText` made the span count scale with the whole fence — a
@@ -227,9 +229,17 @@ function CodeBlockImpl({
   });
   // A streamed fence only appends to the text it already had, so its mounts
   // carry over and the batches continue; a replaced fence (a different part, an
-  // edited message) restarts from the bounded first paint. Computing the reset
-  // during render, not in an effect, keeps the reset frame itself bounded.
+  // edited message) restarts from the bounded first paint. The reset is applied
+  // during render, not left to the batch effect: a replaced fence shorter than
+  // the first paint never runs that effect, so its text would stay in the state
+  // and a later fence that extends the replaced-away text would match it and
+  // resume its count, mounting more than one batch in a single commit. Setting
+  // the state during render re-renders this component alone before its children
+  // render, so the reset frame itself stays bounded.
   const sameFence = displayText.startsWith(mountProgress.text);
+  if (!sameFence) {
+    setMountProgress({ text: displayText, chunks: CODE_FIRST_PAINT_CHUNKS });
+  }
   const mountedChunkCount = sameFence ? mountProgress.chunks : CODE_FIRST_PAINT_CHUNKS;
   // Add one batch per commit until the fence is fully mounted. Each batch is
   // CODE_CHUNK_MOUNT_BATCH chunks, so the spans applied in one frame stay

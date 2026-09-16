@@ -8,6 +8,7 @@ import { CodeBlock } from './code-block';
 import {
   chunkTokenLines,
   CODE_CHUNK_MOUNT_BATCH,
+  CODE_CHUNK_TOKENS,
   CODE_FIRST_PAINT_CHUNKS,
   tokenizeCodeLines,
 } from './code-block-model';
@@ -261,6 +262,22 @@ function mountFirstCommit(element: React.ReactElement): TestRenderer.ReactTestRe
   return renderer;
 }
 
+/**
+ * Update without letting the batch timers run: the synchronous act flushes the
+ * update's effects but leaves a `setTimeout(0)` batch pending, so the caller
+ * sees the fence's first commit after the update (see `mountFirstCommit`).
+ * Asserting the first commit through an async act is a race — the batch can
+ * land inside that act, and the fence legitimately mounts more than one batch.
+ */
+function updateFirstCommit(
+  renderer: TestRenderer.ReactTestRenderer,
+  element: React.ReactElement
+): void {
+  act(() => {
+    renderer.update(element);
+  });
+}
+
 async function unmount(renderer: TestRenderer.ReactTestRenderer): Promise<void> {
   await act(async () => {
     await Promise.resolve();
@@ -369,11 +386,64 @@ describe('CodeBlock', () => {
       { length: 400 },
       (_, index) => `let other${index} = ${index};`
     ).join('\n');
-    await act(async () => {
-      await Promise.resolve();
-      renderer.update(blockElement({ code: otherCode, language: 'typescript' }));
-    });
+    updateFirstCommit(renderer, blockElement({ code: otherCode, language: 'typescript' }));
     expect(codeLines(renderer.root)).toHaveLength(CODE_FIRST_PAINT_CHUNKS);
+    await unmount(renderer);
+  });
+
+  it('does not resume a replaced fence’s mount count in a later fence that extends it', async () => {
+    // Regression: a replaced fence shorter than the first paint never ran the
+    // batch effect, so the mount state kept the replaced-away text and count.
+    // A later fence that extends that text matched it and mounted more than one
+    // bounded batch in its first commit.
+    const longCode = Array.from(
+      { length: 400 },
+      (_, index) => `const value${index} = ${index};`
+    ).join('\n');
+    const renderer = await mount(blockElement({ code: longCode, language: 'typescript' }));
+    await settleChunkMounts(renderer);
+    expect(codeLines(renderer.root).length).toBeGreaterThan(CODE_FIRST_PAINT_CHUNKS);
+
+    updateFirstCommit(renderer, blockElement({ code: 'short', language: 'typescript' }));
+    expect(codeLines(renderer.root)).toHaveLength(1);
+
+    updateFirstCommit(
+      renderer,
+      blockElement({ code: `${longCode}\nconst appended = true;`, language: 'typescript' })
+    );
+    expect(codeLines(renderer.root)).toHaveLength(CODE_FIRST_PAINT_CHUNKS);
+    await unmount(renderer);
+  });
+
+  it('splits one run-dense source line across chunk Texts', async () => {
+    // Regression: chunking by lines alone left a single long source line in one
+    // `Text` with its whole token run set applied in one frame. The tool sheet
+    // routes a read body of up to 50,000 characters through this block, and a
+    // minified file is exactly one such line.
+    const code = JSON.stringify({
+      items: Array.from({ length: 100 }, (_, index) => ({ id: index, name: `name-${index}` })),
+    });
+    expect(code.split('\n')).toHaveLength(1);
+    const totalRuns = tokenizeCodeLines(code, 'json')[0]?.filter(
+      token => token.className !== null
+    ).length;
+    expect(totalRuns).toBeGreaterThan(CODE_CHUNK_TOKENS);
+
+    const renderer = await mount(blockElement({ code, language: 'json', selectable: false }));
+    await settleChunkMounts(renderer);
+    const chunks = codeLines(renderer.root);
+    expect(chunks).toHaveLength(expectedChunkCount(code, 'json'));
+    expect(chunks.length).toBeGreaterThan(1);
+
+    // No chunk Text holds more than the run budget, and the split drops none of
+    // the line's tagged runs.
+    let renderedRuns = 0;
+    for (const chunk of chunks) {
+      const runs = colorRuns(chunk).length;
+      expect(runs).toBeLessThanOrEqual(CODE_CHUNK_TOKENS);
+      renderedRuns += runs;
+    }
+    expect(renderedRuns).toBe(totalRuns);
     await unmount(renderer);
   });
 

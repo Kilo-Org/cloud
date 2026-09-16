@@ -27,7 +27,8 @@ export function normalizeFenceLanguage(raw: string | undefined): string | null {
  * fence gives all of its spans to a single view; one `Text` per source line
  * gives the fence one native view per line (a 1,300-line read tool card became
  * 1,300 views). A chunk bounds both: every `Text` holds at most this many
- * lines of spans, and a fence needs one view per chunk.
+ * lines and `CODE_CHUNK_TOKENS` tagged runs, and a fence needs one view per
+ * chunk.
  *
  * A selectable fence uses the same cap. Android only selects inside one
  * `ReactTextView`, so a selection spans the chunk the gesture starts in rather
@@ -37,6 +38,22 @@ export function normalizeFenceLanguage(raw: string | undefined): string | null {
  * `code-block.tsx`).
  */
 const CODE_CHUNK_LINES = 32;
+
+/**
+ * Tagged runs one chunk `Text` may hold.
+ *
+ * The line cap does not bound a `Text`'s spans on its own: `tokenizeCodeLines`
+ * highlights a line at a time, so a single source line can carry thousands of
+ * tagged runs — a minified bundle or lockfile pasted as one line — and that
+ * whole run set still landed on one `Text` in one frame, the
+ * `SetSpanOperation.execute` cost the line cap exists to bound. A line denser
+ * than this budget is split at token boundaries into as many segments
+ * (see `chunkTokenLines`), so no `Text` ever holds more tags than this.
+ * Ordinary code stays far under the budget — a TypeScript `const x = 1;` line
+ * carries four tagged runs — so a chunk still holds `CODE_CHUNK_LINES` lines
+ * for everything but a run-dense line.
+ */
+export const CODE_CHUNK_TOKENS = 512;
 
 /**
  * Chunks a fence mounts in its first render.
@@ -64,14 +81,74 @@ export function nextChunkMountCount(mounted: number, totalChunks: number): numbe
   return Math.min(mounted + CODE_CHUNK_MOUNT_BATCH, totalChunks);
 }
 
+/** Tagged runs in one line or segment: the runs that cost an Android span. */
+function taggedRunCount(tokens: readonly HighlightToken[]): number {
+  let tagged = 0;
+  for (const token of tokens) {
+    if (token.className !== null) {
+      tagged += 1;
+    }
+  }
+  return tagged;
+}
+
+/**
+ * Split one highlighted line into segments of at most `CODE_CHUNK_TOKENS`
+ * tagged runs. A line at or under the budget — every ordinary line — comes
+ * back whole, so only a run-dense line is ever broken, and its break falls at
+ * a token boundary. The renderer treats each segment as a line of its chunk,
+ * so a broken line continues below the segment before it. An empty line keeps
+ * one empty segment so its line box survives.
+ */
+function splitLineTokens(line: readonly HighlightToken[]): HighlightToken[][] {
+  if (line.length === 0) {
+    return [[]];
+  }
+  const segments: HighlightToken[][] = [];
+  let segment: HighlightToken[] = [];
+  let tagged = 0;
+  for (const token of line) {
+    const cost = token.className === null ? 0 : 1;
+    if (segment.length > 0 && tagged + cost > CODE_CHUNK_TOKENS) {
+      segments.push(segment);
+      segment = [];
+      tagged = 0;
+    }
+    segment.push(token);
+    tagged += cost;
+  }
+  segments.push(segment);
+  return segments;
+}
+
 /**
  * Group highlighted lines into render chunks of at most `CODE_CHUNK_LINES`
- * lines. The last chunk holds the remainder.
+ * lines and `CODE_CHUNK_TOKENS` tagged runs. A line denser than the run budget
+ * is split at token boundaries first, and each segment then counts as a line
+ * of the chunk it lands in, so one `Text` never holds the whole run set of a
+ * single-line fence. The last chunk holds the remainder.
  */
 export function chunkTokenLines(lines: readonly HighlightToken[][]): HighlightToken[][][] {
   const chunks: HighlightToken[][][] = [];
-  for (let start = 0; start < lines.length; start += CODE_CHUNK_LINES) {
-    chunks.push(lines.slice(start, start + CODE_CHUNK_LINES));
+  let chunk: HighlightToken[][] = [];
+  let tagged = 0;
+  for (const line of lines) {
+    for (const segment of splitLineTokens(line)) {
+      const runs = taggedRunCount(segment);
+      if (
+        chunk.length > 0 &&
+        (chunk.length >= CODE_CHUNK_LINES || tagged + runs > CODE_CHUNK_TOKENS)
+      ) {
+        chunks.push(chunk);
+        chunk = [];
+        tagged = 0;
+      }
+      chunk.push(segment);
+      tagged += runs;
+    }
+  }
+  if (chunk.length > 0) {
+    chunks.push(chunk);
   }
   return chunks;
 }

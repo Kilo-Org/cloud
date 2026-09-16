@@ -1,16 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
+
+import { getNowTicker } from '@/lib/hooks/now-ticker-store';
 
 export function useNowTicker(intervalMs: number): number {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, intervalMs);
-    return () => {
-      clearInterval(timer);
-    };
-  }, [intervalMs]);
-
-  return now;
+  const ticker = getNowTicker(intervalMs);
+  return useSyncExternalStore(ticker.subscribe, ticker.getSnapshot);
 }

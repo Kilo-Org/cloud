@@ -5,7 +5,12 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { CodeBlock } from './code-block';
-import { tokenizeCodeLines } from './code-block-model';
+import {
+  chunkTokenLines,
+  CODE_CHUNK_MOUNT_BATCH,
+  CODE_FIRST_PAINT_CHUNKS,
+  tokenizeCodeLines,
+} from './code-block-model';
 import { type MonoScrollTextMode } from './mono-scroll-block-model';
 import { tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
 import '@/i18n';
@@ -179,10 +184,74 @@ function pressables(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTes
   return root.findAll(node => isMockedStringElement(node, 'Pressable'));
 }
 
+/** The source lines a fence of `code` needs at one chunk per `Text`. */
+function expectedChunkCount(code: string, language: string | null): number {
+  return chunkTokenLines(tokenizeCodeLines(code, language)).length;
+}
+
+/**
+ * Let the fence's bounded mount batches land. The block mounts
+ * `CODE_FIRST_PAINT_CHUNKS` chunks in its first render and adds one batch per
+ * `setTimeout(0)` tick, so a test that needs the whole fence waits for the
+ * chunk count to stop growing.
+ */
+async function settleChunkMounts(renderer: TestRenderer.ReactTestRenderer): Promise<void> {
+  let mounted = 0;
+  for (let tick = 0; tick < 500; tick += 1) {
+    const current = codeLines(renderer.root).length;
+    if (current === mounted) {
+      return;
+    }
+    mounted = current;
+    // eslint-disable-next-line no-await-in-loop -- one tick per bounded mount batch, in order
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+  }
+  throw new Error('the fence never finished mounting its chunks');
+}
+
+/** The fence's chunk mount counts after each batch, starting with the first paint. */
+async function chunkMountHistory(
+  renderer: TestRenderer.ReactTestRenderer,
+  totalChunks: number
+): Promise<number[]> {
+  const history = [codeLines(renderer.root).length];
+  while ((history.at(-1) ?? 0) < totalChunks) {
+    // eslint-disable-next-line no-await-in-loop -- one tick per bounded mount batch, in order
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+    history.push(codeLines(renderer.root).length);
+  }
+  return history;
+}
+
 async function mount(element: React.ReactElement): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
+    ref.current = TestRenderer.create(element);
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+/**
+ * Mount without letting the batch timers run: the synchronous act flushes the
+ * mount effects but leaves a `setTimeout(0)` batch pending, so the caller sees
+ * the fence's first commit.
+ */
+function mountFirstCommit(element: React.ReactElement): TestRenderer.ReactTestRenderer {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  act(() => {
     ref.current = TestRenderer.create(element);
   });
   const renderer = ref.current;
@@ -226,30 +295,107 @@ describe('CodeBlock', () => {
     await unmount(renderer);
   });
 
-  it('keeps a selectable fence in one Text, so selection spans the whole fence', async () => {
-    // Regression: Android selects inside one `ReactTextView` only, so a chunked
-    // selectable fence would let the user select a single chunk per gesture. A
-    // selectable fence must therefore stay one Text even at the size the tool
-    // detail sheet renders (read-tool-card.tsx caps the file at 50,000
-    // characters), where a chunk split is the only way to bound this Text's
-    // spans: the tag runs stay the lever instead (see `highlightRunChildren`).
+  it('chunks a selectable fence, so no Text holds the whole file', async () => {
+    // Regression: Android selects inside one `ReactTextView` only, but a
+    // whole-fence Text made a selectable fence ONE `SpannableStringBuilder` for
+    // the file the tool detail sheet routes through it (read-tool-card.tsx caps
+    // that at 50,000 characters). Its spans — thousands of
+    // `SetSpanOperation.execute` calls — landed in the frame that opened the
+    // sheet, which stayed on its bare backdrop until they finished. A selectable
+    // fence chunks like every other fence; a press-hold-drag still selects
+    // across lines in one gesture because it selects inside the chunk it starts
+    // in (32 lines).
     const code = Array.from({ length: 200 }, (_, index) => `const value${index} = ${index};`).join(
       '\n'
     );
     const renderer = await mount(blockElement({ code, language: 'typescript' }));
 
-    const fences = codeLines(renderer.root);
-    expect(fences).toHaveLength(1);
-    expect(propOf(fences[0], 'selectable')).toBe(true);
+    const chunks = codeLines(renderer.root);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.length).toBeLessThan(200);
+    for (const chunk of chunks) {
+      expect(propOf(chunk, 'selectable')).toBe(true);
+    }
+    await settleChunkMounts(renderer);
+    expect(codeLines(renderer.root)).toHaveLength(expectedChunkCount(code, 'typescript'));
 
-    // Nothing is dropped by the single-Text render: the tagged runs of every
-    // line still total what the highlighter produced.
+    // Nothing is dropped by the split: the tagged runs of every line still
+    // total what the highlighter produced.
     const expectedRuns = tokenizeCodeLines(code, 'typescript').reduce(
       (total, line) => total + line.filter(token => token.className !== null).length,
       0
     );
     expect(expectedRuns).toBeGreaterThan(0);
     expect(colorRuns(renderer.root)).toHaveLength(expectedRuns);
+    await unmount(renderer);
+  });
+
+  it('mounts a bounded first paint, then the rest of the fence in batches', async () => {
+    // Regression: the chunk cap bounds the spans one Text holds, but RN applies
+    // every mounted Text's spans in the frame that mounts it, so mounting a
+    // 1,500-line read body at once still held the sheet on its backdrop. The
+    // first render mounts a bounded front of the fence; later commits add
+    // bounded batches, so no single frame carries the whole file.
+    const code = Array.from({ length: 400 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const total = expectedChunkCount(code, 'typescript');
+    expect(total).toBeGreaterThan(CODE_FIRST_PAINT_CHUNKS + CODE_CHUNK_MOUNT_BATCH);
+    const renderer = mountFirstCommit(blockElement({ code, language: 'typescript' }));
+
+    // The first commit paints the front of the fence and no more.
+    expect(codeLines(renderer.root)).toHaveLength(CODE_FIRST_PAINT_CHUNKS);
+
+    const history = await chunkMountHistory(renderer, total);
+    expect(history.at(-1)).toBe(total);
+    // Every commit after the first adds at most one bounded batch.
+    for (const [index, mounted] of history.entries()) {
+      const previous = index === 0 ? 0 : (history[index - 1] ?? 0);
+      expect(mounted - previous).toBeLessThanOrEqual(CODE_CHUNK_MOUNT_BATCH);
+    }
+    await unmount(renderer);
+  });
+
+  it('starts a changed fence at the bounded first paint, not the last mount count', async () => {
+    const longCode = Array.from(
+      { length: 400 },
+      (_, index) => `const value${index} = ${index};`
+    ).join('\n');
+    const renderer = await mount(blockElement({ code: longCode, language: 'typescript' }));
+    await settleChunkMounts(renderer);
+    expect(codeLines(renderer.root).length).toBeGreaterThan(CODE_FIRST_PAINT_CHUNKS);
+
+    const otherCode = Array.from(
+      { length: 400 },
+      (_, index) => `let other${index} = ${index};`
+    ).join('\n');
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(blockElement({ code: otherCode, language: 'typescript' }));
+    });
+    expect(codeLines(renderer.root)).toHaveLength(CODE_FIRST_PAINT_CHUNKS);
+    await unmount(renderer);
+  });
+
+  it('keeps a streamed fence mounted when its code only grows', async () => {
+    // Regression: resetting the mount count on every text change dropped and
+    // re-applied the whole fence's spans on each streamed token, which is the
+    // per-frame work the bounded first paint exists to avoid. A fence that only
+    // appends (the transcript streaming a code block) keeps its mounts.
+    const code = Array.from({ length: 400 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const renderer = await mount(blockElement({ code, language: 'typescript' }));
+    await settleChunkMounts(renderer);
+    const mounted = codeLines(renderer.root).length;
+    expect(mounted).toBeGreaterThan(CODE_FIRST_PAINT_CHUNKS);
+
+    const grown = `${code}\nconst appended = true;`;
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(blockElement({ code: grown, language: 'typescript' }));
+    });
+    expect(codeLines(renderer.root).length).toBeGreaterThanOrEqual(mounted);
     await unmount(renderer);
   });
 
@@ -280,6 +426,7 @@ describe('CodeBlock', () => {
       '\n'
     );
     const renderer = await mount(blockElement({ code, language: 'typescript', selectable: false }));
+    await settleChunkMounts(renderer);
 
     const chunks = codeLines(renderer.root);
     expect(chunks.length).toBeGreaterThan(1);
@@ -554,12 +701,12 @@ describe('CodeBlock copy action', () => {
     await unmount(renderer);
   });
 
-  it('exposes a copy accessibility action on the code text', async () => {
+  it('exposes a copy accessibility action on the fence host, selectable or not', async () => {
     const onCopyCode = vi.fn<(code: string) => void>();
     const renderer = await mount(blockElement({ onCopyCode }));
-    const parent = codeParent(renderer.root);
-    expect(parent).toBeDefined();
-    const onAccessibilityAction = propOf(parent, 'onAccessibilityAction');
+    const hosts = accessibilityHosts(renderer.root);
+    expect(hosts).toHaveLength(1);
+    const onAccessibilityAction = propOf(hosts[0], 'onAccessibilityAction');
     expect(typeof onAccessibilityAction).toBe('function');
 
     act(() => {

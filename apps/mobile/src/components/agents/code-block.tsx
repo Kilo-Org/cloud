@@ -16,7 +16,12 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type HighlightToken } from '@/lib/pr-review/diff/highlight';
 
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
-import { chunkTokenLines, tokenizeCodeLines } from './code-block-model';
+import {
+  chunkTokenLines,
+  CODE_FIRST_PAINT_CHUNKS,
+  nextChunkMountCount,
+  tokenizeCodeLines,
+} from './code-block-model';
 import { useMonoScrollSheet } from './mono-scroll-block';
 import {
   MONO_SCROLL_VIEW_PROPS,
@@ -70,8 +75,7 @@ type CodeBlockProps = {
 const COPY_ACTION_GAP = 8;
 
 /**
- * Mono sizing on every rendered code text: the single selectable fence, or
- * each chunk `RNText` of a non-selectable fence.
+ * Mono sizing on every rendered code text: one per chunk of a fence.
  */
 const CODE_LINE_CLASSNAME = 'font-mono text-xs leading-4';
 
@@ -88,7 +92,7 @@ const BLANK_CODE_LINE = ' ';
 const CODE_LINE_BREAK = '\n';
 
 /**
- * Children for one non-selectable code line. Untagged runs are raw strings and
+ * Children for one code line. Untagged runs are raw strings and
  * tagged runs are nested `RNText`s — see `highlightRunChildren`, which both
  * diff renderers share too. A line whose runs are all empty keeps its blank
  * line box.
@@ -101,11 +105,11 @@ function renderLineRuns(tokens: readonly HighlightToken[], isDark: boolean): Rea
 }
 
 /**
- * Children for one chunk of non-selectable code lines: each line's runs, with
- * a line break before every line but the chunk's first, so the chunk lays out
- * exactly as the lines did when each had its own `Text`. A line whose runs are
- * all empty renders `BLANK_CODE_LINE`, which keeps the line box of a blank
- * line at a chunk's first or last position from collapsing the `Text`.
+ * Children for one chunk of code lines: each line's runs, with a line break
+ * before every line but the chunk's first, so the chunk lays out exactly as the
+ * lines did when each had its own `Text`. A line whose runs are all empty
+ * renders `BLANK_CODE_LINE`, which keeps the line box of a blank line at a
+ * chunk's first or last position from collapsing the `Text`.
  */
 function renderChunkChildren(
   chunkLines: readonly (readonly HighlightToken[])[],
@@ -120,29 +124,11 @@ function renderChunkChildren(
 }
 
 /**
- * Children for the single selectable fence: the runs of each source line, with
- * a line break between lines. A blank line needs no space here — the break
- * itself keeps the line box. Each line's runs sit in their own keyed
- * `Fragment` so two lines may both hold a `tok-0` run.
- */
-function renderFenceChildren(
-  tokenLines: readonly (readonly HighlightToken[])[],
-  isDark: boolean
-): ReactNode[] {
-  return tokenLines.map((tokens, lineIndex) => (
-    <Fragment key={`line-${lineIndex}`}>
-      {lineIndex > 0 ? CODE_LINE_BREAK : null}
-      {highlightRunChildren(tokens, isDark)}
-    </Fragment>
-  ));
-}
-
-/**
  * Shared highlighted code block for tool detail sheets and markdown fences.
  *
  * Each line is highlighted independently by `highlightLine` (the per-line
- * ceiling documented in `highlight.ts`). A NON-selectable fence renders one
- * `RNText` per chunk of source lines, mirroring the shipped `DiffLine` pattern.
+ * ceiling documented in `highlight.ts`). A fence renders one `RNText` per chunk
+ * of source lines, mirroring the shipped `DiffLine` pattern.
  * Android builds one `SpannableStringBuilder` per `ReactTextView` and runs
  * `SetSpanOperation.execute` once per span on the UI thread, so a fence
  * rendered as one `RNText` made the span count scale with the whole fence — a
@@ -151,24 +137,36 @@ function renderFenceChildren(
  * (see `chunkTokenLines`); the chunk's lines lay out together in one
  * `StaticLayout` instead of the whole fence doing so.
  *
- * A SELECTABLE fence stays one `RNText`: Android can only select across
- * characters inside a single `ReactTextView`, so a chunked selectable fence
- * would let the user select one chunk at a time instead of the whole fence,
- * and the tool detail sheet routes a 50k-character file through it. The single
- * fence still renders its runs through `highlightRunChildren`, so untagged
- * runs coalesce into the fence's own fragment instead of each costing a
- * nested-run span. `SelectableText` cannot carry colored runs, so highlighted
- * code accepts the documented iOS select-callout trade-off (see
- * `selectable-text.tsx`) — plain text surfaces (list rows, todo rows) keep
- * true `SelectableText`.
+ * A SELECTABLE fence renders those same chunks. Android can only select across
+ * characters inside a single `ReactTextView`, so a selection spans the chunk a
+ * gesture starts in rather than the whole fence; 32 lines is far more than a
+ * press-hold-drag selects, so the one-gesture cross-line drag is unchanged.
+ * Bounding the selectable path matters because the tool detail sheet routes a
+ * read-tool-card body of up to 50,000 characters through it: one whole-fence
+ * `SpannableStringBuilder` for a file of ~1,500 lines is what left the sheet on
+ * its bare backdrop while the fence built. Whole-fence selection stays
+ * available on the message-details "Select text" view. `SelectableText` cannot
+ * carry colored runs, so highlighted code accepts the documented iOS
+ * select-callout trade-off (see `selectable-text.tsx`) — plain text surfaces
+ * (list rows, todo rows) keep true `SelectableText`.
  *
- * Accessibility: the fence is ONE element in both paths. The selectable fence
- * is the single `RNText` itself. The NON-selectable fence wraps its chunk
- * `RNText`s in one accessible `View`: `Text` defaults to an accessibility
- * element on iOS, so chunk Texts would otherwise regress screen-reader
- * navigation from one element per fence to one per chunk, and the shared
- * `copyCode` action needs one focusable host rather than one per chunk. Each
- * chunk is explicit `accessible={false}` so the host stays the only target.
+ * First paint: a fence mounts `CODE_FIRST_PAINT_CHUNKS` chunks in the render
+ * that mounts it and adds the rest in bounded batches, one per commit (see
+ * `code-block-model.ts`). The chunk cap bounds the spans one `Text` holds, but
+ * RN applies every mounted `Text`'s spans in the frame that mounts it, so
+ * mounting a whole 50,000-character file at once held the UI thread for seconds
+ * with nothing on screen. The first paint is about a screen of code, and the
+ * batches land below it, so the fence's own height is the only thing that grows
+ * while the rest arrives. A streamed fence keeps the mounts it already has and
+ * batches only its new lines; only a replaced fence restarts from the first
+ * paint, so a growing transcript fence never drops and re-applies its spans.
+ *
+ * Accessibility: the fence is ONE element whether or not it is selectable. The
+ * chunk `RNText`s sit in one accessible `View`: `Text` defaults to an
+ * accessibility element on iOS, so chunk Texts would otherwise regress
+ * screen-reader navigation from one element per fence to one per chunk, and the
+ * shared `copyCode` action needs one focusable host rather than one per chunk.
+ * Each chunk is explicit `accessible={false}` so the host stays the only target.
  *
  * Sheet contract: inside the tool detail sheet the block reads the mono
  * sheet context, registers presence through `track()`, and honors the sheet's
@@ -217,6 +215,43 @@ function CodeBlockImpl({
   // Memoized so the chunk array keeps its identity and the code content below
   // is not rebuilt (and its spans re-applied) on an unrelated re-render.
   const tokenChunks = useMemo(() => chunkTokenLines(tokenLines), [tokenLines]);
+  // How much of the fence is mounted right now, remembered with the text it was
+  // mounted for. The first paint mounts CODE_FIRST_PAINT_CHUNKS chunks — 128
+  // lines, about a screen at this leading — so the sheet shows its header and
+  // the front of the code in the frame that opens it; the rest follows in
+  // bounded batches so no single commit carries the whole fence's spans (see
+  // `code-block-model.ts`).
+  const [mountProgress, setMountProgress] = useState({
+    text: displayText,
+    chunks: CODE_FIRST_PAINT_CHUNKS,
+  });
+  // A streamed fence only appends to the text it already had, so its mounts
+  // carry over and the batches continue; a replaced fence (a different part, an
+  // edited message) restarts from the bounded first paint. Computing the reset
+  // during render, not in an effect, keeps the reset frame itself bounded.
+  const sameFence = displayText.startsWith(mountProgress.text);
+  const mountedChunkCount = sameFence ? mountProgress.chunks : CODE_FIRST_PAINT_CHUNKS;
+  // Add one batch per commit until the fence is fully mounted. Each batch is
+  // CODE_CHUNK_MOUNT_BATCH chunks, so the spans applied in one frame stay
+  // bounded however long the file is.
+  useEffect(() => {
+    if (mountedChunkCount >= tokenChunks.length) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setMountProgress({
+        text: displayText,
+        chunks: nextChunkMountCount(mountedChunkCount, tokenChunks.length),
+      });
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [displayText, mountedChunkCount, tokenChunks.length]);
+  const mountedChunks = useMemo(
+    () => tokenChunks.slice(0, Math.min(mountedChunkCount, tokenChunks.length)),
+    [tokenChunks, mountedChunkCount]
+  );
   const [heightPin, setHeightPin] = useState<MonoScrollHeightPin | undefined>(undefined);
   // Content-space Y of the revealed copy action; null means hidden. The action
   // is anchored to the tap, not the block top: a long fence is many screens
@@ -327,51 +362,37 @@ function CodeBlockImpl({
     [canCopyCode, copyLabel]
   );
 
-  // A selectable fence is ONE `RNText`, so native selection spans the whole
-  // fence. A non-selectable fence is one `RNText` per chunk of source lines, so
-  // each Text's Android span count is bounded to its chunk — the previous
-  // single parent `RNText` gave Android one `SpannableStringBuilder` per fence
-  // (see the component doc), turning a long file into thousands of
-  // `SetSpanOperation.execute` calls in a single frame.
+  // Every fence is one `RNText` per chunk of source lines, selectable or not,
+  // so each Text's Android span count is bounded to its chunk — the previous
+  // selectable path gave Android one `SpannableStringBuilder` for the whole
+  // fence (see the component doc), turning a long file into thousands of
+  // `SetSpanOperation.execute` calls in a single frame. `mountedChunks` is the
+  // bounded first paint plus whatever batches have landed since.
   //
   // The chunk split must not turn one fence into N accessibility elements:
   // `Text` is one element per chunk on iOS (`accessible` defaults on) and the
-  // fence was one element before the split. The chunked path therefore wraps
-  // its chunks in ONE accessible host that carries the `copyCode` action, and
-  // each chunk `RNText` is explicit `accessible={false}`. The host reads the
-  // whole fence in one swipe and offers the action once, exactly like the
-  // single selectable `RNText` above.
-  const codeContent = useMemo(() => {
-    if (effectiveSelectable) {
-      return (
-        <RNText
-          selectable
-          className={CODE_LINE_CLASSNAME}
-          // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
-          style={{ color: textBase }}
-          accessibilityActions={copyAccessibilityActions}
-          onAccessibilityAction={canCopyCode ? handleCopyAccessibilityAction : undefined}
-        >
-          {renderFenceChildren(tokenLines, isDark)}
-        </RNText>
-      );
-    }
-    return (
+  // fence was one element before the split. The chunks therefore sit in ONE
+  // accessible host that carries the `copyCode` action, and each chunk `RNText`
+  // is explicit `accessible={false}`. The host reads the whole fence in one
+  // swipe and offers the action once.
+  const codeContent = useMemo(
+    () => (
       <View
         // Always accessible: the fence is one element whether or not it
-        // offers copy, matching the selectable fence and the pre-split
-        // single-Text fence. The host, not the chunks, is the a11y target.
+        // offers copy. The host, not the chunks, is the a11y target.
         accessible
         accessibilityActions={copyAccessibilityActions}
         onAccessibilityAction={canCopyCode ? handleCopyAccessibilityAction : undefined}
       >
-        {tokenChunks.map((chunk, chunkIndex) => (
+        {mountedChunks.map((chunk, chunkIndex) => (
           <RNText
             // Chunks are positional: the index is their identity.
             // eslint-disable-next-line react/no-array-index-key -- code chunks are positional, not reorderable
             key={`chunk-${chunkIndex}`}
             accessible={false}
-            selectable={false}
+            // Native selection is offered per chunk; the sheet's wrap/scroll
+            // mode and this flag are independent.
+            selectable={effectiveSelectable}
             className={CODE_LINE_CLASSNAME}
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
             style={{ color: textBase }}
@@ -380,17 +401,17 @@ function CodeBlockImpl({
           </RNText>
         ))}
       </View>
-    );
-  }, [
-    tokenLines,
-    tokenChunks,
-    effectiveSelectable,
-    textBase,
-    copyAccessibilityActions,
-    canCopyCode,
-    handleCopyAccessibilityAction,
-    isDark,
-  ]);
+    ),
+    [
+      mountedChunks,
+      effectiveSelectable,
+      textBase,
+      copyAccessibilityActions,
+      canCopyCode,
+      handleCopyAccessibilityAction,
+      isDark,
+    ]
+  );
 
   const truncatedMarker = isTruncated ? (
     <Text
@@ -450,9 +471,8 @@ function CodeBlockImpl({
     return (
       <View>
         {copyTriggerProps ? (
-          // Leave the code text its own accessible element: the selectable
-          // fence's single Text, or the accessible host wrapping a
-          // non-selectable fence's chunks, reads the code and carries the
+          // Leave the code text its own accessible element: the accessible
+          // host wrapping the fence's chunks reads the code and carries the
           // copyCode action, instead of collapsing the whole block into one
           // synthesized button label. The right gutter is reserved on the
           // trigger, not the text, so the pill anchored to this view's

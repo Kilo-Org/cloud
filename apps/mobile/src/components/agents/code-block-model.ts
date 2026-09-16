@@ -16,7 +16,7 @@ export function normalizeFenceLanguage(raw: string | undefined): string | null {
 }
 
 /**
- * Source lines per non-selectable `RNText`.
+ * Source lines per code `RNText`.
  *
  * A code fence's Android cost has two shapes, and they pull in opposite
  * directions: a `Text` is one native `ReactTextView` (a view, a yoga node, and
@@ -29,11 +29,40 @@ export function normalizeFenceLanguage(raw: string | undefined): string | null {
  * 1,300 views). A chunk bounds both: every `Text` holds at most this many
  * lines of spans, and a fence needs one view per chunk.
  *
- * A selectable fence cannot be chunked at all: Android selects inside one
- * `ReactTextView`, so splitting it would let the user select one chunk per
- * gesture (see `code-block.tsx`).
+ * A selectable fence uses the same cap. Android only selects inside one
+ * `ReactTextView`, so a selection spans the chunk the gesture starts in rather
+ * than the whole fence — 32 lines, far more than a press-hold-drag selects —
+ * and the tool detail sheet's 50,000-character selectable body is bounded to
+ * this many lines of spans per `Text` like every other fence (see
+ * `code-block.tsx`).
  */
 const CODE_CHUNK_LINES = 32;
+
+/**
+ * Chunks a fence mounts in its first render.
+ *
+ * The chunk cap bounds the spans one `Text` holds, but RN still applies every
+ * mounted `Text`'s spans in the frame that mounts them: the tool detail sheet's
+ * 50,000-character read body is ~1,500 lines, and mounting all of its chunks in
+ * one commit held the UI thread for seconds while the sheet showed nothing but
+ * its backdrop. The first render mounts this many chunks — 128 lines, about a
+ * screen at the mono leading — so the sheet paints its header and the front of
+ * the code at once, and `nextChunkMountCount` adds the rest in bounded batches
+ * (see `code-block.tsx`). A fence whose text only grows keeps its mounts;
+ * only a replaced fence starts over from this first paint.
+ */
+export const CODE_FIRST_PAINT_CHUNKS = 4;
+
+/** Chunks added per bounded batch after the first paint. */
+export const CODE_CHUNK_MOUNT_BATCH = 4;
+
+/**
+ * The mount count after one more bounded batch: `mounted + CODE_CHUNK_MOUNT_BATCH`,
+ * never past the fence's own chunk count.
+ */
+export function nextChunkMountCount(mounted: number, totalChunks: number): number {
+  return Math.min(mounted + CODE_CHUNK_MOUNT_BATCH, totalChunks);
+}
 
 /**
  * Group highlighted lines into render chunks of at most `CODE_CHUNK_LINES`

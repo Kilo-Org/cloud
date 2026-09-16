@@ -29,6 +29,7 @@ permissions:
 
 jobs:
   check-changes:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
@@ -86,11 +87,12 @@ jobs:
           fi
 
   validate:
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/kilo-app-ci.yml
 
   preflight:
     needs: [check-changes]
-    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     permissions:
@@ -155,7 +157,7 @@ jobs:
 
   build-and-submit:
     needs: [check-changes, validate, preflight]
-    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
     steps:
@@ -241,7 +243,7 @@ jobs:
   # The build number is not bumped here; EAS auto-increments it remotely.
   bump-version:
     needs: [check-changes]
-    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:

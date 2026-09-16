@@ -9,6 +9,7 @@ on:
 jobs:
   check:
     name: Check markdown table padding
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

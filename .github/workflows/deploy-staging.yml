@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   check-staging-db-startup:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: staging
@@ -44,6 +45,7 @@ jobs:
         run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
 
   run-migrations:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: staging
@@ -74,6 +76,7 @@ jobs:
         run: NODE_ENV=production pnpm run drizzle migrate
 
   deploy-app:
+    if: github.repository == 'Kilo-Org/cloud'
     needs: [check-staging-db-startup, run-migrations]
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
@@ -83,6 +86,7 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   deploy-global-app:
+    if: github.repository == 'Kilo-Org/cloud'
     needs: [check-staging-db-startup, run-migrations]
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
@@ -92,6 +96,7 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
 
   deploy-workers:
+    if: github.repository == 'Kilo-Org/cloud'
     needs: [check-staging-db-startup, run-migrations, deploy-app, deploy-global-app]
     uses: ./.github/workflows/deploy-workers.yml
     with:

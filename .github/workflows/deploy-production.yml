@@ -18,6 +18,7 @@ env:
 
 jobs:
   check-production-db-startup:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
@@ -48,6 +49,7 @@ jobs:
         run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
 
   run-migrations:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
@@ -78,6 +80,7 @@ jobs:
         run: NODE_ENV=production pnpm run drizzle migrate
 
   stage-app:
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -86,6 +89,7 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   stage-global-app:
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -94,6 +98,7 @@ jobs:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
 
   promote-app:
+    if: github.repository == 'Kilo-Org/cloud'
     needs: [stage-app, check-production-db-startup, run-migrations]
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
@@ -104,6 +109,7 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   promote-global-app:
+    if: github.repository == 'Kilo-Org/cloud'
     needs: [stage-global-app, check-production-db-startup, run-migrations]
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
@@ -112,6 +118,7 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   resolve-worker-base:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -151,6 +158,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-production-db-startup.result == 'success' &&
         needs.run-migrations.result == 'success' &&
@@ -166,6 +174,7 @@ jobs:
     secrets: inherit
 
   detect-gastown-wasteland-changes:
+    if: github.repository == 'Kilo-Org/cloud'
     needs: resolve-worker-base
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
@@ -242,6 +251,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-production-db-startup.result == 'success' &&
         needs.run-migrations.result == 'success' &&
@@ -298,6 +308,7 @@ jobs:
         run: pnpm --filter cloudflare-gastown sentry:sourcemaps
 
   deploy-kiloclaw:
+    if: github.repository == 'Kilo-Org/cloud'
     needs: [check-production-db-startup, run-migrations]
     # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
     # exceed the caller). The reusable workflow restricts further per job — only

@@ -8,6 +8,7 @@ import {
   buildPrMergeStateQueryOptions,
   buildPrOverviewQueryOptions,
   buildPrThreadsQueryOptions,
+  classifyCheckRollupStatus,
   normalizeProviderChecks,
   normalizeProviderOverview,
   normalizeProviderThreadsPage,
@@ -223,7 +224,10 @@ describe('normalizeProviderChecks', () => {
       ['in_progress', null],
       ['completed', 'cancelled'],
     ]);
-    expect(result.rollup).toEqual({ total: 4, success: 1, failure: 1, pending: 1, skipped: 1 });
+    // Bitbucket's `canceled` normalizes to GitHub's `cancelled`, which the
+    // server rollup counts as a failure (`rollupState`), so the bucket here and
+    // the row the checks section renders for it agree.
+    expect(result.rollup).toEqual({ total: 4, success: 1, failure: 2, pending: 1, skipped: 0 });
     // Empty: a provider with no pipeline at all reports a zeroed rollup.
     const empty = { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 };
     expect(normalizeProviderChecks({ checks: [] })).toEqual({ checkRuns: [], rollup: empty });
@@ -291,6 +295,38 @@ describe('normalizeProviderChecks', () => {
     };
     const { total, success, failure, pending, skipped } = model.rollup;
     expect(success + failure + pending + skipped).toBe(total);
+  });
+});
+
+describe('classifyCheckRollupStatus', () => {
+  it('buckets a run exactly the way the server rollup does', () => {
+    // The server's own table (`rollupState` in
+    // apps/web/src/lib/github-pr-review/mappers.ts): a cancelled/stale run is a
+    // failure, a completed run whose verdict no bucket names is pending, and
+    // only skipped/neutral are skipped. The checks section groups its rows with
+    // this classifier, so a failed run can never render a "skipped" row.
+    const table: [status: string, conclusion: string | null, bucket: string][] = [
+      ['in_progress', null, 'pending'],
+      ['queued', null, 'pending'],
+      ['completed', 'success', 'success'],
+      ['completed', 'failure', 'failure'],
+      ['completed', 'startup_failure', 'failure'],
+      ['completed', 'error', 'failure'],
+      ['completed', 'cancelled', 'failure'],
+      ['completed', 'stale', 'failure'],
+      ['completed', 'timed_out', 'failure'],
+      ['completed', 'action_required', 'failure'],
+      ['completed', 'skipped', 'skipped'],
+      ['completed', 'neutral', 'skipped'],
+      ['completed', null, 'pending'],
+      ['completed', 'manual', 'pending'],
+    ];
+    const bucketOf = ([status, conclusion]: (typeof table)[number]) =>
+      classifyCheckRollupStatus(status, conclusion);
+    const buckets = table.map(row => bucketOf(row));
+    const expected = table.map(row => row[2]);
+
+    expect(buckets).toEqual(expected);
   });
 });
 

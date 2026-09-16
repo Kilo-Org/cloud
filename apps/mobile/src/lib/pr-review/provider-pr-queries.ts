@@ -92,20 +92,39 @@ function normalizeConclusion(conclusion: string | null): string | null {
   return conclusion === 'canceled' ? 'cancelled' : conclusion;
 }
 
-// Which rollup counter a completed run lands in. A verdict no bucket names —
-// GitLab's finished `manual` pipeline, or any provider-specific one — counts
-// as pending, which is the bucket GitHub's own rollup puts a completed run
-// with an unmapped conclusion in (`rollupState` in
-// apps/web/src/lib/github-pr-review/mappers.ts). Every run that reaches
-// `total` is therefore also in a bucket, so the rollup line can never print
-// fewer checks than the rows the section renders below it.
-const ROLLUP_BUCKETS = new Map<string, 'success' | 'failure' | 'skipped'>([
-  ['success', 'success'],
-  ['failure', 'failure'],
-  ['error', 'failure'],
-  ['cancelled', 'skipped'],
-  ['skipped', 'skipped'],
-]);
+/**
+ * Which rollup bucket one run lands in. This mirrors the server's classifier
+ * exactly (`rollupState` in apps/web/src/lib/github-pr-review/mappers.ts), so
+ * the rows the checks section groups by bucket and the rollup the server
+ * returns for the same run cannot disagree: a `cancelled`/`stale` run is a
+ * failure on both, and a completed run whose verdict no bucket names (GitLab's
+ * finished `manual` pipeline, a provider-specific state, or a null conclusion)
+ * counts as pending on both, never as skipped.
+ *
+ * A verdict no bucket names is pending rather than nothing, so every run that
+ * reaches `total` is also in a bucket and no run is dropped. The return type
+ * is the section's `PrReviewChecksStatus` spelled out, because a lib module
+ * cannot import from a component module.
+ */
+export function classifyCheckRollupStatus(
+  status: string,
+  conclusion: string | null
+): 'success' | 'failure' | 'pending' | 'skipped' {
+  if (status !== 'completed') {
+    return 'pending';
+  }
+  const value = conclusion ?? '';
+  if (/^success$/i.test(value)) {
+    return 'success';
+  }
+  if (/failure|error|cancelled|timed_out|action_required|stale/i.test(value)) {
+    return 'failure';
+  }
+  if (/skipped|neutral/i.test(value)) {
+    return 'skipped';
+  }
+  return 'pending';
+}
 
 // A provider's terminal run states. `conclusion` is only set for the verdicts
 // the read layer maps, so GitLab's finished `skipped` and `manual` pipelines
@@ -141,14 +160,9 @@ export function normalizeProviderChecks(result: ProviderPrChecksResult): PrCheck
   });
   const rollup = { total: checkRuns.length, success: 0, failure: 0, pending: 0, skipped: 0 };
   for (const run of checkRuns) {
-    if (run.status !== 'completed') {
-      rollup.pending += 1;
-    } else {
-      // An unmapped verdict counts as pending, never as nothing: the fallback
-      // is what keeps `total` equal to the sum of the buckets.
-      const bucket = run.conclusion === null ? undefined : ROLLUP_BUCKETS.get(run.conclusion);
-      rollup[bucket ?? 'pending'] += 1;
-    }
+    // The same classifier the checks section groups its rows with, so the
+    // model's rollup and the rendered rows can never disagree about a run.
+    rollup[classifyCheckRollupStatus(run.status, run.conclusion)] += 1;
   }
   return { checkRuns, rollup };
 }

@@ -177,6 +177,34 @@ describe('PrReviewChecksSection status groups', () => {
     expect(rows.map(row => (row.props.children as unknown[]).length)).toEqual([1, 2, 2, 1]);
   });
 
+  it('groups a run by the server rollup bucket, not by the icon tone it draws', () => {
+    // `rollupState` (apps/web/src/lib/github-pr-review/mappers.ts) counts a
+    // cancelled/stale/timed-out/action-required run as failed, `neutral` as
+    // skipped, and a completed run whose verdict no bucket names as pending.
+    // Grouping by icon tone files the first four under skipped and the last
+    // two under skipped too, printing row counts the server rollup contradicts.
+    setRuns([
+      run('cancelled', 'completed', 'cancelled'),
+      run('stale', 'completed', 'stale'),
+      run('timed-out', 'completed', 'timed_out'),
+      run('action-required', 'completed', 'action_required'),
+      run('manual', 'completed', 'manual'),
+      run('unmapped', 'completed', null),
+      run('neutral', 'completed', 'neutral'),
+    ]);
+    const renderer = mount();
+
+    const rows = statusRows(renderer);
+    expect(rows.map(row => [row.props.status, row.props.count])).toEqual([
+      ['failure', 4],
+      ['pending', 2],
+      ['skipped', 1],
+    ]);
+    // Every run is in exactly one row, so the row counts sum to the header.
+    const counts = rows.map(row => row.props.count as number);
+    expect(counts.reduce((sum, count) => sum + count, 0)).toBe(7);
+  });
+
   it('renders exactly one row when only one status is present', () => {
     setRuns([run('passed', 'completed', 'success')]);
     const renderer = mount();

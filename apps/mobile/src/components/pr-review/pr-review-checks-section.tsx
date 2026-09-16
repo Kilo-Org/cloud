@@ -27,7 +27,10 @@ import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
-import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
+import {
+  classifyCheckRollupStatus,
+  useProviderPrQueries,
+} from '@/lib/pr-review/provider-pr-queries';
 import { providerPrTermKey, providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
 import { cn } from '@/lib/utils';
 import { openExternalUrl } from '@/lib/external-link';
@@ -147,30 +150,24 @@ function CheckRow({ run }: Readonly<{ run: CheckRun }>) {
 // The row order the rollup line has always summarised, kept for the groups.
 const STATUS_ORDER = ['success', 'failure', 'pending', 'skipped'] as const;
 
-// Every tone maps to exactly one status, so the row counts always sum to the
-// card total and no run is dropped (the promise provider-pr-queries keeps).
-const TONE_STATUS = {
-  success: 'success',
-  failure: 'failure',
-  warning: 'failure',
-  pending: 'pending',
-  skipped: 'skipped',
-  neutral: 'skipped',
-} satisfies Record<CheckTone, PrReviewChecksStatus>;
-
 type CheckRunGroup = {
   status: PrReviewChecksStatus;
   runs: CheckRun[];
 };
 
 /**
- * Group the run list by rollup status, dropping statuses with no runs: a
- * status the head commit has no checks for renders no row.
+ * Group the run list by the bucket the server rollup puts each run in, dropping
+ * statuses with no runs: a status the head commit has no checks for renders no
+ * row. The bucket comes from `classifyCheckRollupStatus`, which mirrors the
+ * server's `rollupState`, NOT from the run's icon tone — a `cancelled`/`stale`
+ * run draws the skipped icon but is a failure to the server, and a completed
+ * run with a verdict no bucket names is pending to the server, so grouping by
+ * tone would print row counts the rollup contradicts.
  */
 function groupRunsByStatus(runList: readonly CheckRun[]): CheckRunGroup[] {
   const byStatus = new Map<PrReviewChecksStatus, CheckRun[]>();
   for (const run of runList) {
-    const status = TONE_STATUS[classifyCheckTone(run.status, run.conclusion)];
+    const status = classifyCheckRollupStatus(run.status, run.conclusion);
     const bucket = byStatus.get(status);
     if (bucket) {
       bucket.push(run);

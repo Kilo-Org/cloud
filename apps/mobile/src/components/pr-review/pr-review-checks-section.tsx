@@ -176,6 +176,18 @@ function CheckRow({ run }: Readonly<{ run: CheckRun }>) {
 // The row order the rollup line has always summarised, kept for the groups.
 const STATUS_ORDER = ['success', 'failure', 'pending', 'skipped'] as const;
 
+// React Native on Android keeps a View's contentDescription when a later
+// render drops its `accessibilityLabel` (the loaded card inherited the loading
+// card's "Loading…" and a screen reader announced it over the loaded rows,
+// e2-scene.xml: the loaded `ViewGroup` kept `content-desc="Loading…"`). A
+// state switch must therefore mount a fresh native card: the loading card and
+// every content card carry different keys, so React unmounts one and mounts
+// the other instead of updating a reused view. The key stays stable within a
+// state, because re-mounting the same card on a re-render would drop the
+// expanded rows' state.
+const LOADING_CARD_KEY = 'checks-card-loading';
+const CONTENT_CARD_KEY = 'checks-card';
+
 type CheckRunGroup = {
   status: PrReviewChecksStatus;
   runs: CheckRun[];
@@ -240,6 +252,7 @@ export function PrReviewChecksSection({
           {t('prReview.checks.title')}
         </Text>
         <View
+          key={LOADING_CARD_KEY}
           className="overflow-hidden rounded-lg bg-secondary"
           accessibilityRole="progressbar"
           accessibilityLabel={t('common.loading')}
@@ -277,7 +290,7 @@ export function PrReviewChecksSection({
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('prReview.checks.title')}
           </Text>
-          <View className="gap-2 rounded-lg bg-secondary p-4">
+          <View key={CONTENT_CARD_KEY} className="gap-2 rounded-lg bg-secondary p-4">
             <Text className="text-sm text-muted-foreground">
               {t('prReview.checks.notAvailable')}
             </Text>
@@ -291,7 +304,7 @@ export function PrReviewChecksSection({
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             {t('prReview.checks.title')}
           </Text>
-          <View className="gap-2 rounded-lg bg-secondary p-4">
+          <View key={CONTENT_CARD_KEY} className="gap-2 rounded-lg bg-secondary p-4">
             <Text className="text-sm text-muted-foreground">{t('prReview.checks.noAccess')}</Text>
           </View>
         </View>
@@ -314,7 +327,7 @@ export function PrReviewChecksSection({
         <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
           {t('prReview.checks.title')}
         </Text>
-        <View className="gap-3 rounded-lg bg-secondary p-4">
+        <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
           <Text className="text-sm text-muted-foreground">{t('prReview.checks.couldNotLoad')}</Text>
           <Button
             variant="outline"
@@ -346,7 +359,7 @@ export function PrReviewChecksSection({
         <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
           {t('prReview.checks.title')}
         </Text>
-        <View className="gap-3 rounded-lg bg-secondary p-4">
+        <View key={CONTENT_CARD_KEY} className="gap-3 rounded-lg bg-secondary p-4">
           <Text className="text-sm text-muted-foreground">
             {t('prReview.checks.noChecksReported')}
           </Text>
@@ -378,7 +391,7 @@ export function PrReviewChecksSection({
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
         {t('prReview.checks.title')}
       </Text>
-      <View className="overflow-hidden rounded-lg bg-secondary">
+      <View key={CONTENT_CARD_KEY} className="overflow-hidden rounded-lg bg-secondary">
         <View className="border-b-[0.5px] border-hair-soft px-4 py-2">
           <Text variant="muted" className="text-xs">
             {t('prReview.checks.checksCount', {

@@ -508,6 +508,36 @@ describe('PrReviewChecksSection loading state reserves the loaded card', () => {
     });
   });
 
+  it('mounts a fresh card when the loading card is replaced by content', () => {
+    // The reported regression (e2): React Native on Android keeps a View's
+    // contentDescription when a later render drops its `accessibilityLabel`,
+    // so the loaded card kept the loading card's content-desc and a screen
+    // reader announced "Loading…" over the loaded rows. The reused native view
+    // is the defect, so a state switch must mount a new card; the distinct
+    // keys on the two cards are what makes React unmount one and mount the
+    // other, and an update that reuses the instance fails here.
+    const renderer = mountSection();
+    const loadingCard = findCard(renderer);
+    expect(loadingCard.props.accessibilityRole).toBe('progressbar');
+    expect(loadingCard.props.accessibilityLabel).toBe('common.loading');
+
+    query.isLoading = false;
+    act(() => {
+      renderer.update(
+        createElement(PrReviewChecksSection, {
+          owner: 'org',
+          repo: 'repo',
+          number: 1,
+          headSha: 'head',
+        })
+      );
+    });
+
+    const loadedCard = findCard(renderer);
+    expect(loadedCard.props.accessibilityLabel).toBeUndefined();
+    expect(loadedCard).not.toBe(loadingCard);
+  });
+
   it('guards the theme tokens: bg-muted collides with the card, bg-muted-soft does not', () => {
     const css = readFileSync(new URL('../../global.css', import.meta.url), 'utf8');
     const values = (name: string) =>

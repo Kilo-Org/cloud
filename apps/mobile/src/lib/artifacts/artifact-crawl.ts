@@ -63,6 +63,14 @@ export type MirrorMessagePage = {
   messages: unknown[];
   /** The next page's cursor, or the unchanged input cursor after a failure. */
   nextCursor: string | null;
+  /**
+   * Set when the worker returned a typed failure instead of a page: `retryable`
+   * for a transient read issue, `terminal` for a stored history the worker
+   * cannot page at all (`invalid_data`, `too_large`). It has to be read before
+   * `nextCursor`: a failure carries no messages and no cursor of its own, so an
+   * empty `messages` array from one is not the end of a session.
+   */
+  failure: 'retryable' | 'terminal' | null;
 };
 
 type SessionListQueryResult = Awaited<ReturnType<typeof trpcClient.cliSessionsV2.list.query>>;
@@ -80,8 +88,9 @@ type ArtifactSessionListPage = {
 
 /**
  * The page variant of a session's stored history, plus the typed failure
- * variants (`retryable_failure` | `too_large` | `invalid_data`) the crawl treats
- * as a no-op. Declared here as the crawl's read model; the tRPC call in
+ * variants (`retryable_failure` | `too_large` | `invalid_data`) the crawl
+ * surfaces on {@link MirrorMessagePage.failure} instead of paging past.
+ * Declared here as the crawl's read model; the tRPC call in
  * {@link DEFAULT_DEPS} is what supplies the real one.
  */
 type ArtifactMessageHistoryPage = {
@@ -223,9 +232,10 @@ export async function listSessionPage(
 }
 
 /**
- * One page of a session's stored messages. A typed failure variant is a no-op:
- * it yields no messages and returns the cursor it was given, so the caller can
- * tell an empty page from a failed one and retry from the same point.
+ * One page of a session's stored messages. A typed failure variant yields no
+ * messages and returns the cursor it was given, and says so on `failure`: the
+ * caller can then tell a failed page from a session that truly ended, and retry
+ * the same page instead of recording the session as crawled.
  */
 export async function fetchSessionMessagesPage(
   input: { cursor?: string | null; sessionId: string },
@@ -239,9 +249,18 @@ export async function fetchSessionMessagesPage(
 
   const history = result.history;
   if (history !== null && 'messages' in history) {
-    return { messages: history.messages, nextCursor: history.nextCursor };
+    return { failure: null, messages: history.messages, nextCursor: history.nextCursor };
   }
-  return { messages: [], nextCursor: cursor ?? null };
+  if (history === null) {
+    // A session with no stored history at all is a real empty page, not a
+    // failure: the run may record it as crawled.
+    return { failure: null, messages: [], nextCursor: null };
+  }
+  return {
+    failure: history.kind === 'retryable_failure' ? 'retryable' : 'terminal',
+    messages: [],
+    nextCursor: cursor ?? null,
+  };
 }
 
 /**

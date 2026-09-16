@@ -300,7 +300,7 @@ describe('listSessionPage', () => {
 });
 
 describe('fetchSessionMessagesPage', () => {
-  it('reads the page variant and treats a failure as a no-op that keeps the cursor', async () => {
+  it('surfaces a typed failure instead of reading it as the end of a session', async () => {
     const messages = [message([filePart('file-1', 'https://x/a.txt')])];
     const getSessionMessagesPage = vi
       .fn<ArtifactCrawlDeps['getSessionMessagesPage']>()
@@ -310,16 +310,16 @@ describe('fetchSessionMessagesPage', () => {
 
     await expect(
       fetchSessionMessagesPage({ sessionId: 's1' }, { getSessionMessagesPage })
-    ).resolves.toEqual({ messages, nextCursor: 'cursor-2' });
+    ).resolves.toEqual({ failure: null, messages, nextCursor: 'cursor-2' });
     expect(getSessionMessagesPage).toHaveBeenCalledWith({ session_id: 's1' });
 
     await expect(
       fetchSessionMessagesPage({ sessionId: 's1', cursor: 'cursor-1' }, { getSessionMessagesPage })
-    ).resolves.toEqual({ messages: [], nextCursor: 'cursor-1' });
+    ).resolves.toEqual({ failure: 'retryable', messages: [], nextCursor: 'cursor-1' });
 
     await expect(
       fetchSessionMessagesPage({ sessionId: 's1' }, { getSessionMessagesPage })
-    ).resolves.toEqual({ messages: [], nextCursor: null });
+    ).resolves.toEqual({ failure: null, messages: [], nextCursor: null });
   });
 });
 

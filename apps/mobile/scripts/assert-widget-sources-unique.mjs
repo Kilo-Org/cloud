@@ -146,9 +146,11 @@ function phaseResourceEntries(phaseId) {
 // there, and every `.lproj` file this phase copies is called `Localizable.strings`.
 // Resolve the path through the `PBXBuildFile` and the `PBXFileReference` it names.
 const fileReferencePaths = new Map(
-  [...project.matchAll(/^\t\t([0-9A-F]{24}) \/\* [^*]+ \*\/ = \{isa = PBXFileReference;([^\n]*)\};$/gm)].map(
-    match => [match[1], /path = "?([^";]+)"?;/.exec(match[2])?.[1]]
-  )
+  [
+    ...project.matchAll(
+      /^\t\t([0-9A-F]{24}) \/\* [^*]+ \*\/ = \{isa = PBXFileReference;([^\n]*)\};$/gm
+    ),
+  ].map(match => [match[1], /path = "?([^";]+)"?;/.exec(match[2])?.[1]])
 );
 const buildFileRefs = new Map(
   [

@@ -60,6 +60,28 @@ describe('SessionStatusIndicator mounted', () => {
     ).resolves.toEqual(['The response failed.']);
   });
 
+  // The DO's safe projection writes the same credits failure lowercase.
+  it('renders the credits copy for the DO projection', async () => {
+    await expect(
+      textNodes({
+        type: 'error',
+        message: 'Assistant request failed: insufficient credits',
+        timestamp: 0,
+      })
+    ).resolves.toEqual(['Not enough credits to run Cloud Agent. Add credits and try again.']);
+  });
+
+  // The DO's safe projection is already the reader's copy and has no translated
+  // counterpart, so the status line shows it unchanged.
+  it.each([
+    ['Workspace setup failed'],
+    ['Repository authentication failed'],
+    ['Agent wrapper disconnected'],
+    ['Commit failed'],
+  ] as const)('shows the safe projection copy for %s', async message => {
+    await expect(textNodes({ type: 'error', message, timestamp: 0 })).resolves.toEqual([message]);
+  });
+
   it('renders the classified copy for a recognized session error', async () => {
     await expect(
       textNodes({

@@ -175,6 +175,13 @@ describe('agent-controls-copy.json', () => {
     expect(Object.keys(copy).toSorted()).toEqual(SUPPORTED_LANGUAGES.toSorted());
   });
 
+  it('pins the English labels the device scenes tap', () => {
+    // The Control Center / Lock Screen / launcher scenes step on these strings; a
+    // mismatch makes the waiting control unfindable and the proof unexecutable.
+    expect(copyValue('en', 'newAgent')).toBe('New Agent');
+    expect(copyValue('en', 'openWaitingAgent')).toBe('Open Waiting Agent');
+  });
+
   it('covers every copy key the Swift binds, in every language', () => {
     for (const tag of SUPPORTED_LANGUAGES) {
       for (const key of boundCopyKeys) {

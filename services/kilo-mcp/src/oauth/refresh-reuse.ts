@@ -18,6 +18,11 @@ export type IssuedRefreshToken = RefreshTokenParts & { current: boolean };
 export type RefreshReuseStore = {
   getRefreshToken(hash: string, nowIso: string): Promise<IssuedRefreshToken | null>;
   rememberRefreshToken(hash: string, parts: RefreshTokenParts, expiresAt: string): Promise<void>;
+  /**
+   * Drop every hash recorded for a grant. The revoke path owns this cleanup, so
+   * a revoked grant does not hold DO rows until the history TTL expires.
+   */
+  forgetRefreshTokens(parts: RefreshTokenParts): Promise<void>;
 };
 
 export type RefreshReuseDeps = {
@@ -99,6 +104,9 @@ export async function detectRefreshTokenReuse(
   // of a previously issued token authenticates the stored grant identity.
   if (!issued || issued.current) return null;
   await deps.revokeGrant(issued.grantId, issued.userId);
+  // The grant is revoked now, so no hash of it can authenticate another replay:
+  // forget the history rather than leaving it for the one-year TTL.
+  await deps.store.forgetRefreshTokens({ userId: issued.userId, grantId: issued.grantId });
   return reuseDetectedResponse(request);
 }
 

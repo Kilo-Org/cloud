@@ -19,6 +19,11 @@ function makeDeps() {
       }
       tokens.set(hash, { ...parts, current: true });
     },
+    forgetRefreshTokens: async parts => {
+      for (const [hash, token] of tokens) {
+        if (token.userId === parts.userId && token.grantId === parts.grantId) tokens.delete(hash);
+      }
+    },
   };
   return { tokens, store, revokeGrant: vi.fn(async (_grantId: string, _userId: string) => {}) };
 }
@@ -42,6 +47,11 @@ function makeTtlDeps() {
         if (row.userId === parts.userId && row.grantId === parts.grantId) row.current = false;
       }
       rows.set(hash, { ...parts, current: true, expiresAt });
+    },
+    forgetRefreshTokens: async parts => {
+      for (const [hash, row] of rows) {
+        if (row.userId === parts.userId && row.grantId === parts.grantId) rows.delete(hash);
+      }
     },
   };
   return {
@@ -113,6 +123,21 @@ describe('detectRefreshTokenReuse', () => {
       error_description: 'Refresh token reuse detected; the grant has been revoked.',
     });
     expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('g', 'u');
+  });
+
+  it('forgets the revoked grant’s hashes and leaves a live grant’s alone', async () => {
+    const deps = makeDeps();
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:other:live' }), deps);
+
+    expect(await detectRefreshTokenReuse(refreshRequest('u:g:first'), deps)).not.toBeNull();
+
+    // A revoked grant's hashes can never authenticate another replay, so they
+    // are dropped with the revocation instead of waiting for the history TTL.
+    expect(deps.tokens.has(await hashRefreshToken('u:g:first'))).toBe(false);
+    expect(deps.tokens.has(await hashRefreshToken('u:g:second'))).toBe(false);
+    expect([...deps.tokens.values()].map(token => token.grantId)).toEqual(['other']);
   });
 
   it('uses the stored identity rather than parsing the presented token for revocation', async () => {

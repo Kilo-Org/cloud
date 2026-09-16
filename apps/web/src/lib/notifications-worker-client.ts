@@ -5,13 +5,15 @@ import type {
   InternalDispatchLowBalanceRequest,
   InternalDispatchSecurityFindingRequest,
   InternalDispatchSecurityLifecycleRequest,
+  InternalDispatchSpendAlertRequest,
 } from '@kilocode/notifications';
 import { INTERNAL_API_SECRET, NOTIFICATIONS_WORKER_URL } from '@/lib/config.server';
 
 type DispatchBody =
   | InternalDispatchLowBalanceRequest
   | InternalDispatchSecurityFindingRequest
-  | InternalDispatchSecurityLifecycleRequest;
+  | InternalDispatchSecurityLifecycleRequest
+  | InternalDispatchSpendAlertRequest;
 
 /**
  * Best-effort POST to the notifications worker internal dispatch endpoint.
@@ -67,6 +69,12 @@ export async function dispatchLowBalancePush(
   input: Omit<InternalDispatchLowBalanceRequest, 'kind'>
 ): Promise<void> {
   await dispatchInternal({ kind: 'low_balance', ...input });
+}
+
+export async function dispatchSpendAlertPush(
+  input: Omit<InternalDispatchSpendAlertRequest, 'kind'>
+): Promise<void> {
+  await dispatchInternal({ kind: 'spend_alert', ...input });
 }
 
 export async function dispatchSecurityFindingPush(

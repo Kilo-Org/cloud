@@ -47,8 +47,10 @@ public final class KiloSystemSearchModule: Module {
     }
 
     // The record id last opened from a Spotlight result, or nil when there is
-    // none. The JS side maps it to a route, so no id lookup lives here.
-    Function("consumePendingRoute") { () -> String? in
+    // none. The JS side maps it to a route, so no id lookup lives here. Async so
+    // both platforms hand JavaScript the same promise shape: the Android module
+    // resolves the id against its index before answering.
+    AsyncFunction("consumePendingRoute") { () -> String? in
       let defaults = UserDefaults.standard
       guard let identifier = defaults.string(forKey: KiloSystemSearchStore.pendingRouteKey) else {
         return nil

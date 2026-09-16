@@ -27,7 +27,7 @@ type SystemSearchNativeModule = InstanceType<typeof NativeModule<SystemSearchEve
   applyUpdate: (add: SystemSearchDocument[], removeIds: string[]) => Promise<void>;
   indexedFingerprints: () => Promise<Record<string, string>>;
   clear: () => Promise<void>;
-  consumePendingRoute: () => string | null;
+  consumePendingRoute: () => Promise<string | null>;
 };
 
 // Absent in a development client built before this module shipped: every export
@@ -57,9 +57,13 @@ export async function clearSystemSearchIndex(): Promise<void> {
  * The identifier of the last search result the user opened, read and cleared in
  * one step. `null` when there is none. The caller resolves the identifier to a
  * screen, so no id lookup lives here.
+ *
+ * Asynchronous because the native side answers on its module queue: resolving
+ * an Android identifier that is not already a route reads the app-search index,
+ * and that read must not run on the JavaScript thread.
  */
-export function consumePendingSystemSearchRoute(): string | null {
-  return nativeModule?.consumePendingRoute() ?? null;
+export async function consumePendingSystemSearchRoute(): Promise<string | null> {
+  return (await nativeModule?.consumePendingRoute()) ?? null;
 }
 
 export function addSystemSearchOpenListener(listener: () => void): { remove: () => void } | null {

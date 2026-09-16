@@ -99,16 +99,25 @@ private interface SearchBackend {
 
   /** Every stored document: the ledger the JS side diffs against. */
   fun stored(): List<StoredDocument>
+
+  /** Releases the AppSearch session and any thread this backend owns. */
   fun close()
 }
 
 class KiloSystemSearchModule : Module() {
   // Created on the first call so the database only opens when the app indexes
-  // something. `appContext.reactContext` is the long-lived application context.
-  private val backend: SearchBackend by lazy {
+  // something, and kept in a field so `OnDestroy` can close a backend that was
+  // opened without opening one that was never needed. `appContext.reactContext`
+  // is the long-lived application context.
+  private var openedBackend: SearchBackend? = null
+
+  private val backend: SearchBackend
+    get() = openedBackend ?: openBackend().also { openedBackend = it }
+
+  private fun openBackend(): SearchBackend {
     val context = appContext.reactContext?.applicationContext
       ?: throw CodedException("A React context is required to use the system search index.")
-    createSearchBackend(context)
+    return createSearchBackend(context)
   }
 
   // The launching Intent is the tap on a cold start, and it is delivered once:
@@ -141,35 +150,60 @@ class KiloSystemSearchModule : Module() {
       Unit
     }
 
-    Function("consumePendingRoute") { -> consumePendingRoute() }
+    // An `AsyncFunction` on purpose: resolving the identifier reads the index,
+    // and that read must not run on the JavaScript thread that consumes the
+    // slot. The module queue performs it instead (see `consumePendingRoute`).
+    AsyncFunction("consumePendingRoute") { -> consumePendingRoute() }
+
+    OnDestroy {
+      // Each backend owns an AppSearch session, and the platform one owns its
+      // executor thread as well, so a module instance must not outlive them: a
+      // reload would otherwise leak one thread and one session per instance.
+      // A module that never opened the index has nothing to close.
+      openedBackend?.close()
+      openedBackend = null
+    }
   }
 
   /**
-   * The identifier of the last search result the user opened, read and cleared
-   * in one step, or null when there is none.
+   * The route of the last search result the user opened, read and cleared in
+   * one step, or null when there is none.
+   *
+   * Resolving the identifier reads the index, so it runs here — on the module
+   * queue, because this is an `AsyncFunction` — rather than on the main thread
+   * that delivers `OnNewIntent` or the JavaScript thread that consumes the
+   * slot.
    *
    * A tap that launched this process has no event to announce — JavaScript is
    * still booting — so the launch Intent is read here, on the first consume and
-   * only once, and written to the same slot before it is read back.
+   * only once.
    */
   private fun consumePendingRoute(): String? {
-    readAndClearPendingRoute()?.let { return it }
-    if (!launchIntentRead) {
-      launchIntentRead = true
-      deliverPickedResult(appContext.currentActivity?.intent)
+    val identifier = readAndClearPendingRoute() ?: takeLaunchIdentifier() ?: return null
+    return resolveRoute(identifier)
+  }
+
+  /** The identifier of the launch Intent, taken once, or null when it is not ours. */
+  private fun takeLaunchIdentifier(): String? {
+    if (launchIntentRead) {
+      return null
     }
-    return readAndClearPendingRoute()
+    launchIntentRead = true
+    return pickedIdentifier(appContext.currentActivity?.intent)
   }
 
   /**
-   * Delivers one Intent the system raised for a picked result: the entry's
-   * stored route goes into the single-shot slot and only then is the open event
-   * announced, so the slot — not the event — carries the route. Any other
-   * Intent (the launcher Intent, an ordinary deep link, a share) is ignored.
+   * Records one Intent the system raised for a picked result: the entry's
+   * identifier goes into the single-shot slot and only then is the open event
+   * announced, so the slot — not the event — carries the identifier. The
+   * identifier is stored as the platform handed it back and resolved when the
+   * slot is consumed, so this runs no index read on the main thread that
+   * delivered the Intent. Any other Intent (the launcher Intent, an ordinary
+   * deep link, a share) is ignored.
    */
   private fun deliverPickedResult(intent: Intent?) {
     val identifier = pickedIdentifier(intent) ?: return
-    if (!writePendingRoute(resolveRoute(identifier))) {
+    if (!writePendingRoute(identifier)) {
       return
     }
     sendEvent("onSystemSearchOpen")
@@ -196,8 +230,17 @@ class KiloSystemSearchModule : Module() {
    * stored route whichever identifier form the platform handed back. Falls back
    * to the identifier itself: a stale or unreadable index must never lose the
    * tap, and the JS side refuses anything it did not issue.
+   *
+   * An identifier that is already one of our `kiloapp://` links is answered
+   * without reading the index: that form is the link itself, so a lookup could
+   * only ever return the same string, and it costs a full index scan. The
+   * qualified-id form still needs the scan, which is why this is only ever
+   * called from an `AsyncFunction`.
    */
   private fun resolveRoute(identifier: String): String {
+    if (identifier.startsWith(APP_SCHEME_PREFIX)) {
+      return identifier
+    }
     val stored = try {
       backend.stored()
     } catch (error: Exception) {
@@ -222,12 +265,15 @@ class KiloSystemSearchModule : Module() {
     return DocumentIdUtil.createQualifiedId(packageName, DATABASE_NAME, NAMESPACE, documentId)
   }
 
-  /** Writes the slot; false when there is no context to write it in. */
-  private fun writePendingRoute(route: String): Boolean {
+  /**
+   * Writes the single-shot slot; false when there is no context to write it in.
+   * The slot carries the identifier exactly as the platform handed it back.
+   */
+  private fun writePendingRoute(identifier: String): Boolean {
     val context = appContext.reactContext ?: return false
     context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
       .edit()
-      .putString(PENDING_ROUTE_KEY, route)
+      .putString(PENDING_ROUTE_KEY, identifier)
       .apply()
     return true
   }
@@ -235,9 +281,9 @@ class KiloSystemSearchModule : Module() {
   private fun readAndClearPendingRoute(): String? {
     val context = appContext.reactContext ?: return null
     val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
-    val route = preferences.getString(PENDING_ROUTE_KEY, null) ?: return null
+    val identifier = preferences.getString(PENDING_ROUTE_KEY, null) ?: return null
     preferences.edit().remove(PENDING_ROUTE_KEY).apply()
-    return route
+    return identifier
   }
 }
 
@@ -347,7 +393,10 @@ private class JetpackSearchBackend(context: Context) : SearchBackend {
   }
 
   override fun clear() {
-    session.removeAsync("", jetpackNamespaceSpec()).awaitFuture()
+    // A remove-by-query answers with a batch result: a wipe the store could not
+    // finish for every document is a failure, not a success, so the sign-out
+    // clear reports it instead of resolving without an error.
+    checkBatch(session.removeAsync("", jetpackNamespaceSpec()).awaitFuture())
   }
 
   override fun stored(): List<StoredDocument> {

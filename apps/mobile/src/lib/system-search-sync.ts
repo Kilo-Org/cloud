@@ -13,6 +13,7 @@
  */
 import { type QueryClient } from '@tanstack/react-query';
 
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { isSystemSearchAvailable } from '@/lib/native-system-search';
 import { planSystemSearchUpdate, type SystemSearchDocument } from '@/lib/system-search-entries';
@@ -97,9 +98,10 @@ export class SystemSearchIndexSync {
    * One sync: gate, collect, diff against the indexed ledger, apply.
    *
    * `applied` only when the native call accepted the delta; `skipped` when the
-   * sync is disabled or the plan is empty, and then the native call is never
-   * made; `failed` after a single report, with the ledger left untouched so the
-   * next trigger re-plans the same delta. Never rejects.
+   * sync is disabled, the plan is empty, or the run's account transitioned
+   * while it was collecting, and then the native call is never made; `failed`
+   * after a single report, with the ledger left untouched so the next trigger
+   * re-plans the same delta. Never rejects.
    */
   async syncNow(): Promise<SystemSearchSyncResult> {
     const previous = this.runQueue;
@@ -145,9 +147,13 @@ export class SystemSearchIndexSync {
 
   private async performSync(): Promise<SystemSearchSyncResult> {
     try {
-      // The gate is inside the try so a dependency that throws resolves to
-      // `failed` instead of rejecting `syncNow` at its fire-and-forget call
-      // sites (the coalescing timer and the mount).
+      // The run's own fence, captured before its first await: a sign-out or a
+      // newer sign-in moves the auth epoch, and the re-read before the write
+      // then refuses this run's documents. The gate is inside the try so a
+      // dependency that throws resolves to `failed` instead of rejecting
+      // `syncNow` at its fire-and-forget call sites (the coalescing timer and
+      // the mount).
+      const epoch = currentAuthEpoch();
       if (!this.deps.isEnabled()) {
         return 'skipped';
       }
@@ -157,6 +163,17 @@ export class SystemSearchIndexSync {
         documents,
       });
       if (plan.add.length === 0 && plan.remove.length === 0) {
+        return 'skipped';
+      }
+      // Both fences are read again after the awaits and immediately before the
+      // write, with no await in between. The collects above can outlive a
+      // sign-out, whose teardown fires the native clear: writing this run's
+      // documents then would put the outgoing account's entries back into the
+      // index after it was wiped. The flag covers the teardown window (where
+      // the epoch has not moved yet); the epoch covers a sign-out that finished
+      // or an account switch that landed during the collects, whose own clear
+      // must not be undone by this run's now-stale plan either.
+      if (!isCurrentAuthEpoch(epoch) || !this.deps.isEnabled()) {
         return 'skipped';
       }
       await this.deps.apply({ add: plan.add, remove: plan.remove });

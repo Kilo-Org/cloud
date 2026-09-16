@@ -20,12 +20,17 @@ const secureStoreMock = {
   }),
 };
 
-const mocks = vi.hoisted(() => ({
-  consumePendingRoute: vi.fn<() => string | null>(() => null),
-  addListener: vi.fn<(listener: () => void) => { remove: () => void } | null>(() => ({
-    remove: vi.fn<() => void>(),
-  })),
-}));
+const mocks = vi.hoisted(() => {
+  const consumePendingRoute = vi.fn<() => Promise<string | null>>();
+  // The mocked slot read answers `null` — an empty slot — unless a case arms it.
+  consumePendingRoute.mockResolvedValue(null);
+  return {
+    consumePendingRoute,
+    addListener: vi.fn<(listener: () => void) => { remove: () => void } | null>(() => ({
+      remove: vi.fn<() => void>(),
+    })),
+  };
+});
 
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
@@ -130,19 +135,21 @@ describe('system-search-route', () => {
 
   describe('captureSystemSearchLaunch', () => {
     it('routes the native slot once', async () => {
-      mocks.consumePendingRoute.mockReturnValueOnce(SESSION_ID);
+      mocks.consumePendingRoute.mockResolvedValueOnce(SESSION_ID);
 
       captureSystemSearchLaunch();
 
       expect(mocks.consumePendingRoute).toHaveBeenCalledOnce();
-      expect(getPendingDeepLinkSnapshot()).toBe(SESSION_ID);
+      await vi.waitFor(() => {
+        expect(getPendingDeepLinkSnapshot()).toBe(SESSION_ID);
+      });
       await vi.waitFor(() => {
         expect(persistedSource()).toBe('system-search');
       });
     });
 
-    it('cannot re-route a slot the native read already cleared', () => {
-      mocks.consumePendingRoute.mockReturnValueOnce(SESSION_ID);
+    it('cannot re-route a slot the native read already cleared', async () => {
+      mocks.consumePendingRoute.mockResolvedValueOnce(SESSION_ID);
       captureSystemSearchLaunch();
 
       // A second read — a warm listener racing the launch capture — gets the
@@ -150,40 +157,50 @@ describe('system-search-route', () => {
       captureSystemSearchLaunch();
 
       expect(mocks.consumePendingRoute).toHaveBeenCalledTimes(2);
-      expect(getPendingDeepLinkSnapshot()).toBe(SESSION_ID);
+      await vi.waitFor(() => {
+        expect(getPendingDeepLinkSnapshot()).toBe(SESSION_ID);
+      });
     });
 
-    it('is silent when the native slot is empty', () => {
+    it('is silent when the native slot is empty', async () => {
       captureSystemSearchLaunch();
 
+      await vi.waitFor(() => {
+        expect(mocks.consumePendingRoute).toHaveBeenCalledOnce();
+      });
       expect(getPendingDeepLinkSnapshot()).toBeNull();
     });
   });
 
   describe('registerSystemSearchOpenListener', () => {
-    it('routes what the native slot then holds when the wake-up fires', () => {
+    it('routes what the native slot then holds when the wake-up fires', async () => {
       const subscription = registerSystemSearchOpenListener();
       expect(mocks.addListener).toHaveBeenCalledOnce();
       const listener = mocks.addListener.mock.calls[0]?.[0];
       expect(listener).toBeTypeOf('function');
 
-      mocks.consumePendingRoute.mockReturnValueOnce(PR_ID);
+      mocks.consumePendingRoute.mockResolvedValueOnce(PR_ID);
       listener?.();
 
-      expect(getPendingDeepLinkSnapshot()).toBe(PR_ID);
+      await vi.waitFor(() => {
+        expect(getPendingDeepLinkSnapshot()).toBe(PR_ID);
+      });
       subscription.remove();
     });
 
-    it('is silent when the wake-up finds nothing in the native slot', () => {
+    it('is silent when the wake-up finds nothing in the native slot', async () => {
       const subscription = registerSystemSearchOpenListener();
       const listener = mocks.addListener.mock.calls[0]?.[0];
 
       // The launch capture already consumed the payload: the event is only a
       // signal and must not clear or re-route the pending href.
-      mocks.consumePendingRoute.mockReturnValueOnce(SESSION_ID);
+      mocks.consumePendingRoute.mockResolvedValueOnce(SESSION_ID);
       captureSystemSearchLaunch();
       listener?.();
 
+      await vi.waitFor(() => {
+        expect(mocks.consumePendingRoute).toHaveBeenCalledTimes(2);
+      });
       expect(getPendingDeepLinkSnapshot()).toBe(SESSION_ID);
       subscription.remove();
     });

@@ -21,11 +21,12 @@ function createNativeModule() {
     applyUpdate: vi.fn<(add: SystemSearchDocument[], removeIds: string[]) => Promise<void>>(),
     indexedFingerprints: vi.fn<() => Promise<Record<string, string>>>(),
     clear: vi.fn<() => Promise<void>>(),
-    consumePendingRoute: vi.fn(() => '/agent-chat/session-1'),
+    consumePendingRoute: vi.fn<() => Promise<string | null>>(),
   };
   native.applyUpdate.mockResolvedValue(undefined);
   native.indexedFingerprints.mockResolvedValue({ 'session-1': 'fp-1' });
   native.clear.mockResolvedValue(undefined);
+  native.consumePendingRoute.mockResolvedValue('/agent-chat/session-1');
   return native;
 }
 
@@ -39,7 +40,7 @@ describe('native system search', () => {
     const search = await import('./native-system-search');
 
     expect(search.isSystemSearchAvailable).toBe(false);
-    expect(search.consumePendingSystemSearchRoute()).toBeNull();
+    await expect(search.consumePendingSystemSearchRoute()).resolves.toBeNull();
     expect(search.addSystemSearchOpenListener(vi.fn<() => void>())).toBeNull();
     await expect(search.indexedSystemSearchFingerprints()).resolves.toEqual({});
     await expect(
@@ -73,7 +74,7 @@ describe('native system search', () => {
     const search = await import('./native-system-search');
     const listener = vi.fn<() => void>();
 
-    expect(search.consumePendingSystemSearchRoute()).toBe('/agent-chat/session-1');
+    await expect(search.consumePendingSystemSearchRoute()).resolves.toBe('/agent-chat/session-1');
     expect(native.consumePendingRoute).toHaveBeenCalledOnce();
 
     const subscription = search.addSystemSearchOpenListener(listener);

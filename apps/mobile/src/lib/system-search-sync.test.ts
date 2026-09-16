@@ -224,6 +224,66 @@ describe('SystemSearchIndexSync', () => {
     }
   });
 
+  it('skips a write whose collect spanned a sign-out', async () => {
+    const bridge = createBridge();
+    const harness = await loadHarness(bridge);
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(SESSION_LIST_KEY, storedSessions('Fix login bug'));
+    const signOut = await import('@/lib/auth/sign-out-state');
+    const report = vi.fn<(error: unknown) => void>();
+    // The gate is read once before the collect and again before the write; the
+    // sign-out begins while the collect is in flight, and the teardown fires
+    // its own native clear, which this run's plan must not undo.
+    const sync = new harness.SystemSearchIndexSync({
+      queryClient,
+      collect: async () => {
+        signOut.setSignOutActive(true);
+        return harness.collectSystemSearchDocuments(queryClient);
+      },
+      fingerprints: bridge.indexedSystemSearchFingerprints,
+      apply: async update => {
+        await bridge.applySystemSearchUpdate({ add: update.add, removeIds: update.remove });
+      },
+      report,
+      isEnabled: harness.isSystemSearchSyncEnabled,
+    });
+
+    try {
+      await expect(sync.syncNow()).resolves.toBe('skipped');
+      expect(bridge.applyUpdate).not.toHaveBeenCalled();
+      expect(report).not.toHaveBeenCalled();
+    } finally {
+      signOut.setSignOutActive(false);
+    }
+  });
+
+  it('skips a write whose collect spanned an account switch', async () => {
+    const bridge = createBridge();
+    const harness = await loadHarness(bridge);
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(SESSION_LIST_KEY, storedSessions('Fix login bug'));
+    const authEpoch = await import('@/lib/auth/auth-epoch');
+    // A sign-out that finished (or a newer sign-in) moves the auth epoch while
+    // the collect is in flight: the gate is open again by then, so only the
+    // epoch fence can refuse this run's now-stale documents.
+    const sync = new harness.SystemSearchIndexSync({
+      queryClient,
+      collect: async () => {
+        authEpoch.bumpAuthEpoch();
+        return harness.collectSystemSearchDocuments(queryClient);
+      },
+      fingerprints: bridge.indexedSystemSearchFingerprints,
+      apply: async update => {
+        await bridge.applySystemSearchUpdate({ add: update.add, removeIds: update.remove });
+      },
+      report: vi.fn<(error: unknown) => void>(),
+      isEnabled: harness.isSystemSearchSyncEnabled,
+    });
+
+    await expect(sync.syncNow()).resolves.toBe('skipped');
+    expect(bridge.applyUpdate).not.toHaveBeenCalled();
+  });
+
   it('coalesces a burst of cache events into one apply', async () => {
     vi.useFakeTimers();
     const bridge = createBridge();

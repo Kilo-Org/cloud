@@ -5,9 +5,9 @@
  * The native module keeps the tapped result's identifier in a single-shot
  * slot; this file resolves that identifier to an in-app route and stashes it
  * for the root layout's existing consumer (`_layout.tsx` → `pending-navigation`).
- * A warm tap wakes the app through `onSystemSearchOpen`; a cold tap populates
- * the slot before JS boots, which is why the launch capture runs at
- * `_layout.tsx` module scope.
+ * A warm tap wakes the app through `onSystemSearchOpen`; a cold tap has its
+ * launch Intent read by that same native consume before JS boots, which is why
+ * the launch capture runs at `_layout.tsx` module scope.
  */
 
 import { setPendingDeepLink } from './deep-link-launch';
@@ -40,12 +40,26 @@ export function routeSystemSearchOpen(routeId: string | null): void {
 }
 
 /**
- * SYNCHRONOUS single-shot capture of a search tap that launched this process.
- * Called at `_layout.tsx` module scope: the native subscriber has already run
- * by the time JS boots, so the slot's identifier is waiting to be read.
+ * Reads the single-shot slot and stashes the route it resolves to.
+ *
+ * The native read is asynchronous — the module resolves the identifier on its
+ * own queue, so a blocking index scan never runs on the JavaScript thread — so
+ * the route lands a turn later. The root layout consumes the pending slot
+ * reactively, so a later fill still navigates.
+ */
+function consumeAndRoute(): void {
+  void (async () => {
+    routeSystemSearchOpen(await consumePendingSystemSearchRoute());
+  })();
+}
+
+/**
+ * SINGLE-SHOT capture of a search tap that launched this process. Called at
+ * `_layout.tsx` module scope: the native subscriber has already run by the time
+ * JS boots, so the slot's identifier is waiting to be read.
  */
 export function captureSystemSearchLaunch(): void {
-  routeSystemSearchOpen(consumePendingSystemSearchRoute());
+  consumeAndRoute();
 }
 
 /**
@@ -57,8 +71,6 @@ export function captureSystemSearchLaunch(): void {
  * Returns a no-op subscription when the native module is absent.
  */
 export function registerSystemSearchOpenListener(): { remove(): void } {
-  const subscription = addSystemSearchOpenListener(() => {
-    routeSystemSearchOpen(consumePendingSystemSearchRoute());
-  });
+  const subscription = addSystemSearchOpenListener(consumeAndRoute);
   return subscription ?? { remove: () => undefined };
 }

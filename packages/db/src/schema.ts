@@ -5264,6 +5264,29 @@ export const passkey_challenges = pgTable(
 
 export type PasskeyChallenge = typeof passkey_challenges.$inferSelect;
 export type NewPasskeyChallenge = typeof passkey_challenges.$inferInsert;
+
+/**
+ * One-time sign-in tickets minted by a verified passkey assertion and redeemed
+ * by the sign-in provider to establish a session. Only the SHA-256 hash of the
+ * ticket is stored, and a redemption consumes the row atomically, so a stolen
+ * `ticket_hash` alone cannot be replayed.
+ */
+export const passkey_sign_in_tickets = pgTable(
+  'passkey_sign_in_tickets',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    ticket_hash: text().notNull(),
+    kilo_user_id: text().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [uniqueIndex('UQ_passkey_sign_in_tickets_ticket_hash').on(table.ticket_hash)]
+);
+
+export type PasskeySignInTicket = typeof passkey_sign_in_tickets.$inferSelect;
+export type NewPasskeySignInTicket = typeof passkey_sign_in_tickets.$inferInsert;
+
 export type WebhookEvent = typeof webhook_events.$inferSelect;
 
 // ============ MODEL STATS ============

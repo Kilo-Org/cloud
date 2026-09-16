@@ -103,7 +103,10 @@ const config: ExpoConfig = {
     requireFullScreen: true,
     supportsTablet: true,
     usesAppleSignIn: true,
-    associatedDomains: ['applinks:app.kilo.ai'],
+    // `webcredentials` is the passkey half of the claim: it lets the iOS
+    // platform authenticator offer the passkey created at app.kilo.ai (the
+    // relying-party id) inside the app. `applinks` keeps universal links.
+    associatedDomains: ['applinks:app.kilo.ai', 'webcredentials:app.kilo.ai'],
     entitlements: {
       // App Attest, used by @expo/app-integrity for native admission. `production`
       // is required for App Store builds; a development build against the

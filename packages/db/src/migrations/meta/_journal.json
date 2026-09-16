@@ -1709,6 +1709,13 @@
       "when": 1789520033554,
       "tag": "0243_parched_komodo",
       "breakpoints": true
+    },
+    {
+      "idx": 244,
+      "version": "7",
+      "when": 1789521271370,
+      "tag": "0244_friendly_bromley",
+      "breakpoints": true
     }
   ]
 }

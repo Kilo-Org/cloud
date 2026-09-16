@@ -44,6 +44,7 @@ import {
   magic_link_tokens,
   passkey_credentials,
   passkey_challenges,
+  passkey_sign_in_tickets,
   device_auth_requests,
   device_sessions,
   native_attested_keys,
@@ -1249,6 +1250,11 @@ export async function anonymizeCloudUserData(
     .where(
       and(eq(passkey_challenges.kilo_user_id, userId), isNull(passkey_challenges.consumed_at))
     );
+  // A sign-in ticket is a live proof that a passkey assertion verified, so it
+  // is deleted with the credentials it was minted for rather than left to
+  // expire. Consumed tickets are removed too: their `kilo_user_id` still names
+  // the deleted account.
+  await tx.delete(passkey_sign_in_tickets).where(eq(passkey_sign_in_tickets.kilo_user_id, userId));
 
   // Remove from organizations
   await tx

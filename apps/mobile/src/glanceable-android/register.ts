@@ -15,7 +15,7 @@ import {
 
 import { renderActiveAgentsWidget } from './active-agents-widget';
 import { androidSink, getCurrentWidgetProps, handleAppStateActive } from './android-sink';
-import { formatGlanceableCount, isWidgetRtl } from './count-format';
+import { formatGlanceableAgo, formatGlanceableCount, isWidgetRtl } from './count-format';
 import { getStoredWidgetSnapshot, setWidgetSnapshot } from './live-update';
 import { buildCurrentWidgetProps, buildGenericWidgetProps } from './widget-props';
 
@@ -79,7 +79,7 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
   let props =
     stored === null
       ? getCurrentWidgetProps()
-      : buildCurrentWidgetProps(stored, translate, formatGlanceableCount);
+      : buildCurrentWidgetProps(stored, translate, formatGlanceableCount, formatGlanceableAgo);
   if (props === null) {
     // Migrate the existing mirror when this installation has no native snapshot yet.
     await restorePersistedGlanceable();
@@ -90,7 +90,7 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
     props =
       snapshot === null
         ? buildGenericWidgetProps(translate)
-        : buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount);
+        : buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount, formatGlanceableAgo);
     // A live publish during restoration owns the widget.
     props = getCurrentWidgetProps() ?? props;
   }

@@ -2509,6 +2509,16 @@ export class SandboxSession extends DurableObject<Env> {
     const callbacksPending = this.messageCallbacks.pendingCallbackCount() > 0;
     const reportsPending = this.reportOutbox.pendingCount() > 0;
     if (!callbacksPending && !reportsPending) await this.ctx.storage.deleteAlarm();
+    const sandboxId = metadata?.workspace?.sandboxId;
+    if (sandboxId && metadata) {
+      try {
+        await sandboxControlRpc(this.env, sandboxId).forgetSessionReference(
+          metadata.identity.sessionId
+        );
+      } catch {
+        // Tombstone remains; over-blocking is safe.
+      }
+    }
     this.ctx.storage.transactionSync(() => {
       if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const pendingCleanup = this.pendingRuntimeCleanup();

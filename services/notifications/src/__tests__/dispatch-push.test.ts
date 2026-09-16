@@ -1076,7 +1076,7 @@ describe('NotificationChannelDO.dispatchPush — local push sink', () => {
       dataType: 'cloud_agent_session',
       sound: 'default',
       priority: 'high',
-      channelId: 'agent',
+      channelId: 'agent-progress',
       previews: 'generic',
     });
     expect(payload.to).toBe('<redacted>');
@@ -1262,7 +1262,7 @@ describe('NotificationChannelDO preview mode and channel', () => {
     const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
     expect(messages).toHaveLength(2);
     for (const message of messages) {
-      expect(message.channelId).toBe('chat');
+      expect(message.channelId).toBe('needs-input');
     }
   });
 
@@ -1283,7 +1283,7 @@ describe('NotificationChannelDO preview mode and channel', () => {
     const oldMessage = messages.find(m => m.to === 'tok-old');
     const newMessage = messages.find(m => m.to === 'tok-new');
     expect(oldMessage?.channelId).toBeUndefined();
-    expect(newMessage?.channelId).toBe('chat');
+    expect(newMessage?.channelId).toBe('needs-input');
   });
 
   it('substitutes generic content when previews is generic', async () => {

@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => ({
   appState: { currentState: 'active' as string },
   setBadgeCountAsync: vi.fn(),
   setNotificationChannelAsync: vi.fn(),
+  deleteNotificationChannelAsync: vi.fn(),
   setNotificationHandler: vi.fn(),
   getPermissionsAsync: vi.fn(),
   requestPermissionsAsync: vi.fn(),
@@ -71,6 +72,7 @@ vi.mock('react-native', () => ({
 vi.mock('expo-notifications', () => ({
   setBadgeCountAsync: mocks.setBadgeCountAsync,
   setNotificationChannelAsync: mocks.setNotificationChannelAsync,
+  deleteNotificationChannelAsync: mocks.deleteNotificationChannelAsync,
   getPermissionsAsync: mocks.getPermissionsAsync,
   requestPermissionsAsync: mocks.requestPermissionsAsync,
   getExpoPushTokenAsync: mocks.getExpoPushTokenAsync,
@@ -158,12 +160,11 @@ vi.mock('@/lib/persist/read-cache', () => ({ readCachedUserId: () => null }));
 vi.mock('@kilocode/notifications', async importOriginal => ({
   ...(await importOriginal<typeof Notifications>()),
   ANDROID_NOTIFICATION_CHANNELS: [
-    { id: 'agent', name: 'Agent sessions', importance: 'high' },
-    { id: 'chat', name: 'Chat messages', importance: 'high' },
-    { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default' },
-    { id: 'balance', name: 'Balance alerts', importance: 'default' },
-    { id: 'security', name: 'Security findings', importance: 'high' },
-    { id: 'active-agents', name: 'Active agents', importance: 'default' },
+    { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
+    { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
+    { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
+    { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
+    { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
   ],
 }));
 
@@ -214,6 +215,7 @@ beforeEach(() => {
   mocks.appState.currentState = 'active';
   mocks.setBadgeCountAsync.mockResolvedValue(true);
   mocks.setNotificationChannelAsync.mockResolvedValue(undefined);
+  mocks.deleteNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
   mocks.requestPermissionsAsync.mockResolvedValue({ status: 'denied' });
   mocks.getExpoPushTokenAsync.mockResolvedValue({ data: 'expo-token' });
@@ -232,42 +234,49 @@ describe('ensureAndroidNotificationChannels', () => {
     await ensureAndroidNotificationChannels();
 
     expect(mocks.setNotificationChannelAsync).not.toHaveBeenCalled();
+    expect(mocks.deleteNotificationChannelAsync).not.toHaveBeenCalled();
   });
 
-  it('silences the aggregate channel on first creation without changing other channels', async () => {
+  it('creates the named channels with their names, importance, and bypassDnd', async () => {
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
     await ensureAndroidNotificationChannels();
 
     expect(mocks.setNotificationChannelAsync.mock.calls).toEqual([
-      ['agent', { name: 'Agent sessions', importance: 4 }],
-      ['chat', { name: 'Chat messages', importance: 4 }],
-      ['kiloclaw', { name: 'KiloClaw activity', importance: 3 }],
-      ['balance', { name: 'Balance alerts', importance: 3 }],
-      ['security', { name: 'Security findings', importance: 4 }],
-      [
-        'active-agents',
-        { name: 'Active agents', importance: 3, sound: null, enableVibrate: false },
-      ],
+      ['needs-input', { name: 'Needs input', importance: 4, bypassDnd: true }],
+      ['agent-progress', { name: 'Agent progress', importance: 3, bypassDnd: false }],
+      ['kiloclaw', { name: 'KiloClaw activity', importance: 3, bypassDnd: false }],
+      ['balance', { name: 'Balance alerts', importance: 3, bypassDnd: false }],
+      ['security', { name: 'Security findings', importance: 4, bypassDnd: false }],
     ]);
   });
 
-  it('also silences first creation through channel renaming without changing other options', async () => {
+  it('deletes the three legacy channels on first creation', async () => {
+    const { ensureAndroidNotificationChannels } = await loadNotifications();
+
+    await ensureAndroidNotificationChannels();
+
+    expect(mocks.deleteNotificationChannelAsync.mock.calls).toEqual([
+      ['agent'],
+      ['chat'],
+      ['active-agents'],
+    ]);
+  });
+
+  it('renames every channel with its translated name and bypassDnd', async () => {
     const { renameAndroidNotificationChannels } = await loadNotifications();
 
     await renameAndroidNotificationChannels();
 
     expect(mocks.setNotificationChannelAsync.mock.calls).toEqual([
-      ['agent', { name: expect.any(String), importance: 4 }],
-      ['chat', { name: expect.any(String), importance: 4 }],
-      ['kiloclaw', { name: expect.any(String), importance: 3 }],
-      ['balance', { name: expect.any(String), importance: 3 }],
-      ['security', { name: expect.any(String), importance: 4 }],
-      [
-        'active-agents',
-        { name: expect.any(String), importance: 3, sound: null, enableVibrate: false },
-      ],
+      ['needs-input', { name: expect.any(String), importance: 4, bypassDnd: true }],
+      ['agent-progress', { name: expect.any(String), importance: 3, bypassDnd: false }],
+      ['kiloclaw', { name: expect.any(String), importance: 3, bypassDnd: false }],
+      ['balance', { name: expect.any(String), importance: 3, bypassDnd: false }],
+      ['security', { name: expect.any(String), importance: 4, bypassDnd: false }],
     ]);
+    // Legacy deletion is part of the single-flight creation pass, not a rename.
+    expect(mocks.deleteNotificationChannelAsync).not.toHaveBeenCalled();
   });
 
   it('single-flights concurrent callers to one creation pass', async () => {
@@ -278,7 +287,8 @@ describe('ensureAndroidNotificationChannels', () => {
 
     expect(first).toBe(second);
     await Promise.all([first, second]);
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(5);
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(3);
   });
 
   it('swallows a per-channel failure and still creates the remaining channels', async () => {
@@ -287,11 +297,28 @@ describe('ensureAndroidNotificationChannels', () => {
 
     await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
 
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(5);
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(3);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
         'error.subsystem': 'notifications',
         'error.operation': 'create_android_channel',
+        'notification.channel': 'needs-input',
+      },
+    });
+  });
+
+  it('reports a legacy deletion failure without rejecting or skipping the remaining deletes', async () => {
+    mocks.deleteNotificationChannelAsync.mockRejectedValueOnce(new Error('delete failed'));
+    const { ensureAndroidNotificationChannels } = await loadNotifications();
+
+    await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
+
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(3);
+    expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'notifications',
+        'error.operation': 'delete_android_channel',
         'notification.channel': 'agent',
       },
     });

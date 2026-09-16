@@ -476,6 +476,11 @@ export function checkInitialNotification(): void {
 // the remaining channels still get created.
 let androidChannelsPromise: Promise<void> | null = null;
 
+// The channels the two named kinds replaced. Android keeps an app-created
+// channel until the app deletes it, so a stale one would still appear in the
+// system settings list after the upgrade.
+const LEGACY_ANDROID_NOTIFICATION_CHANNELS = ['agent', 'chat', 'active-agents'] as const;
+
 async function createAndroidNotificationChannels(): Promise<void> {
   for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
     try {
@@ -486,7 +491,10 @@ async function createAndroidNotificationChannels(): Promise<void> {
           channel.importance === 'high'
             ? Notifications.AndroidImportance.HIGH
             : Notifications.AndroidImportance.DEFAULT,
-        ...(channel.id === 'active-agents' ? { sound: null, enableVibrate: false } : {}),
+        // The OS resets an app-set bypassDnd only when the app lacks DND
+        // access, so requesting it here is what makes the user's own
+        // "Override Do Not Disturb" grant effective.
+        bypassDnd: channel.bypassDnd,
       });
     } catch (error) {
       Sentry.captureException(error, {
@@ -494,6 +502,20 @@ async function createAndroidNotificationChannels(): Promise<void> {
           'error.subsystem': 'notifications',
           'error.operation': 'create_android_channel',
           'notification.channel': channel.id,
+        },
+      });
+    }
+  }
+  for (const legacy of LEGACY_ANDROID_NOTIFICATION_CHANNELS) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- channels are deleted sequentially so a per-channel failure is isolated
+      await Notifications.deleteNotificationChannelAsync(legacy);
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: {
+          'error.subsystem': 'notifications',
+          'error.operation': 'delete_android_channel',
+          'notification.channel': legacy,
         },
       });
     }
@@ -515,12 +537,11 @@ export function ensureAndroidNotificationChannels(): Promise<void> {
 }
 
 const CHANNEL_NAME_KEYS = {
-  agent: 'notifications.channel.agent',
-  chat: 'notifications.channel.chat',
+  'needs-input': 'glanceable.needsInput',
+  'agent-progress': 'notifications.channel.agentProgress',
   kiloclaw: 'notifications.channel.kiloclaw',
   balance: 'notifications.channel.balance',
   security: 'notifications.channel.security',
-  'active-agents': 'glanceable.channelName',
 } as const satisfies Record<AndroidNotificationChannelId, string>;
 
 /**
@@ -542,7 +563,7 @@ export async function renameAndroidNotificationChannels(): Promise<void> {
           channel.importance === 'high'
             ? Notifications.AndroidImportance.HIGH
             : Notifications.AndroidImportance.DEFAULT,
-        ...(channel.id === 'active-agents' ? { sound: null, enableVibrate: false } : {}),
+        bypassDnd: channel.bypassDnd,
       });
     } catch (error) {
       Sentry.captureException(error, {

@@ -568,7 +568,7 @@ export const sessionAttachPayloadSchema = z
       .strict()
       .optional(),
   })
-  .strict();
+  .catchall(z.unknown());
 
 export const sessionAttachResultSchema = z
   .object({

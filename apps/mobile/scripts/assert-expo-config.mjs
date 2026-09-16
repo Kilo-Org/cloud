@@ -13,6 +13,13 @@ const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
 const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
 const SCHEME = 'kiloapp';
 const ASSOCIATED_DOMAIN = 'applinks:app.kilo.ai';
+// The passkey relying-party claim on iOS. The claim is split by platform: iOS
+// carries its half here (the Associated Domains entitlement the platform
+// authenticator reads), Android carries its half in the served Digital Asset
+// Links file, whose `delegate_permission/common.get_login_creds` relation
+// apps/web/src/lib/app-site-association.test.ts pins. Both halves name the one
+// relying-party host, app.kilo.ai.
+const PASSKEY_ASSOCIATED_DOMAIN = 'webcredentials:app.kilo.ai';
 // The app name (app.config.ts `name`). `$(PRODUCT_NAME)` resolves to this in
 // the base Info.plist, but `.lproj/InfoPlist.strings` is compiled verbatim, so
 // the localized copy has to spell it out.
@@ -82,6 +89,10 @@ const associatedDomains = config.ios?.associatedDomains ?? [];
 check(
   associatedDomains.includes(ASSOCIATED_DOMAIN),
   `ios.associatedDomains must contain "${ASSOCIATED_DOMAIN}"`
+);
+check(
+  associatedDomains.includes(PASSKEY_ASSOCIATED_DOMAIN),
+  `ios.associatedDomains must contain "${PASSKEY_ASSOCIATED_DOMAIN}"`
 );
 
 const blockedPermissions = config.android?.blockedPermissions ?? [];

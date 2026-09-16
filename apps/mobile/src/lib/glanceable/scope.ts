@@ -1,11 +1,15 @@
-import * as SecureStore from 'expo-secure-store';
-
+import { readStoredValue } from '@/lib/auth/secure-store-value';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 /**
  * Scope reads shared by the push handler (`@/lib/notifications`) and the
  * glanceable front-approval orchestrator: the selected organization id and the
  * active-user id, both from SecureStore.
+ *
+ * They read through `readStoredValue` in `lib/auth/secure-store-value`, the one
+ * SecureStore entry point: `expo-secure-store` is available on iOS and Android
+ * alike, so neither platform lacks the capability and no per-platform storage
+ * branch is kept — a single implementation serves both.
  *
  * They live here rather than beside either call site so both paths resolve the
  * same scope the glanceable snapshot is fenced on; a copy per caller would let
@@ -18,7 +22,7 @@ import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys
  */
 export async function getSelectedOrganizationId(): Promise<string | null> {
   try {
-    return await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
+    return await readStoredValue(ORGANIZATION_STORAGE_KEY);
   } catch {
     return null;
   }
@@ -31,7 +35,7 @@ export async function getSelectedOrganizationId(): Promise<string | null> {
  */
 export async function getActiveUserId(): Promise<string | null> {
   try {
-    return await SecureStore.getItemAsync(ACTIVE_USER_ID_KEY);
+    return await readStoredValue(ACTIVE_USER_ID_KEY);
   } catch {
     return null;
   }

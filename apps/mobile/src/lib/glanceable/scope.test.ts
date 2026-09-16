@@ -21,14 +21,15 @@ describe('glanceable scope reads', () => {
     mocks.getItemAsync.mockResolvedValue('org-9');
 
     await expect(getSelectedOrganizationId()).resolves.toBe('org-9');
-    expect(mocks.getItemAsync).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY);
+    // The shared helper forwards its options slot, hence the explicit undefined.
+    expect(mocks.getItemAsync).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY, undefined);
   });
 
   it('reads the active user from its storage key', async () => {
     mocks.getItemAsync.mockResolvedValue('u1');
 
     await expect(getActiveUserId()).resolves.toBe('u1');
-    expect(mocks.getItemAsync).toHaveBeenCalledWith(ACTIVE_USER_ID_KEY);
+    expect(mocks.getItemAsync).toHaveBeenCalledWith(ACTIVE_USER_ID_KEY, undefined);
   });
 
   it.each([
@@ -38,7 +39,7 @@ describe('glanceable scope reads', () => {
     mocks.getItemAsync.mockResolvedValue(null);
 
     await expect(read()).resolves.toBeNull();
-    expect(mocks.getItemAsync).toHaveBeenCalledWith(key);
+    expect(mocks.getItemAsync).toHaveBeenCalledWith(key, undefined);
   });
 
   it.each([

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
     endImmediate: vi.fn(),
     startOrUpdate: vi.fn(),
   },
+  registerWidgetActionHandling: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -23,6 +24,9 @@ vi.mock('./active-agents-live-activity', () => ({
 vi.mock('./active-agents-widget', () => ({
   refreshActiveAgentsWidgetCopy: vi.fn(),
 }));
+vi.mock('./widget-actions', () => ({
+  registerWidgetActionHandling: mocks.registerWidgetActionHandling,
+}));
 vi.mock('./widget-logo', () => ({ ensureWidgetLogo: vi.fn() }));
 vi.mock('@/i18n', () => ({ i18n: { on: vi.fn(), t: (key: string) => key } }));
 vi.mock('@/lib/glanceable/live-activity-switch', () => ({
@@ -33,6 +37,7 @@ vi.mock('@/lib/glanceable/live-activity-switch', () => ({
 describe('glanceable-ios register', () => {
   afterEach(() => {
     vi.resetModules();
+    mocks.registerWidgetActionHandling.mockClear();
   });
 
   it('does not register the iOS sink on Android', async () => {
@@ -49,5 +54,19 @@ describe('glanceable-ios register', () => {
     const { getGlanceableSinks } = await import('@/lib/glanceable/sink-registry');
     await import('./register');
     expect(getGlanceableSinks()).toContain(mocks.iosSink);
+  });
+
+  it('subscribes the widget press handling on iOS', async () => {
+    mocks.platform.OS = 'ios';
+    vi.resetModules();
+    await import('./register');
+    expect(mocks.registerWidgetActionHandling).toHaveBeenCalledTimes(1);
+  });
+
+  it('subscribes no widget press handling on Android', async () => {
+    mocks.platform.OS = 'android';
+    vi.resetModules();
+    await import('./register');
+    expect(mocks.registerWidgetActionHandling).not.toHaveBeenCalled();
   });
 });

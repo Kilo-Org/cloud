@@ -11,6 +11,7 @@ import { adoptPushStartedActivity } from './adopt-activity';
 import { refreshActiveAgentsLiveActivityCopy } from './active-agents-live-activity';
 import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
 import { iosSink } from './ios-sink';
+import { registerWidgetActionHandling } from './widget-actions';
 import { ensureWidgetLogo } from './widget-logo';
 
 if (Platform.OS === 'ios') {
@@ -20,6 +21,11 @@ if (Platform.OS === 'ios') {
   // publisher is plain state, and widgets get translated copy through the sink,
   // not through a mounted component tree.
   registerGlanceableSink(iosSink);
+
+  // Widget App Intent buttons: the live subscription answers a press while this
+  // process is up, and the launch sweep picks up a press that patched the
+  // timeline before JS subscribed.
+  registerWidgetActionHandling();
 
   // Copy the Kilo mark into the shared app group so the widget extension can read
   // it. Fire and forget: it lands long before the first snapshot arrives, and a

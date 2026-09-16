@@ -12,6 +12,7 @@ import {
   _resetLiveActivitySwitchForTests,
   setLiveActivityEnabledValue,
 } from '@/lib/glanceable/live-activity-switch';
+import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
 import {
@@ -28,9 +29,11 @@ import {
   iosSink,
 } from './ios-sink';
 import {
+  buildExpiredWidgetProps,
   buildGlanceableLiveActivityContentState,
   buildGlanceableViewProps,
   type GlanceableViewProps,
+  staleTimelineFrame,
   toWidgetProps,
 } from './view-props';
 
@@ -226,7 +229,7 @@ describe('iosSink start and update', () => {
     publisher.handleSessions([], CTX);
 
     expect(mockState.started).toEqual([]);
-    expect(mockState.snapshots.at(-1)).toMatchObject({ statusLine: 'No work in progress' });
+    expect(mockState.snapshots.at(-1)).toMatchObject({ statusLine: 'No agents waiting' });
     expect(subscriptions).toEqual(new Set(['scope']));
 
     publisher.applySnapshot(snapshotFor([{ status: 'busy' }], 1), CTX);
@@ -835,7 +838,7 @@ describe('iosSink widget publish', () => {
     iosSink.publish(snapshotFor([]));
 
     expect(mockState.timeline).toHaveLength(2);
-    expect(mockState.timeline[0]?.props).toMatchObject({ statusLine: 'No work in progress' });
+    expect(mockState.timeline[0]?.props).toMatchObject({ statusLine: 'No agents waiting' });
   });
 
   it.each([
@@ -885,7 +888,9 @@ describe('iosSink widget publish', () => {
       number,
       boolean,
     ][] = [
-      ['empty', [], 'No work in progress', 0, false],
+      // The empty surface is the one that offers `New agent`, so its copy says
+      // that instead of the generic no-work copy.
+      ['empty', [], 'No agents waiting', 0, false],
       // Stale draws rows, and all three draw whenever rows draw, so the
       // surface never reflows as work moves between states.
       ['stale', [{ status: 'busy' }], "Can't update now", 3, true],
@@ -1041,6 +1046,10 @@ describe('clearActivityKitDeniedIfAvailable', () => {
 });
 
 describe('buildGlanceableViewProps', () => {
+  afterEach(() => {
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
+  });
+
   it('ranks the compact primary count as needs-input, then running, then idle', () => {
     const props = buildGlanceableViewProps(
       snapshotFor(
@@ -1059,7 +1068,7 @@ describe('buildGlanceableViewProps', () => {
     ]);
   });
 
-  it('carries no title, organization name, or raw id into the widget JSON', () => {
+  it('carries no organization name or raw id into the widget JSON', () => {
     // A waiting row with its own status timestamp, so the assertion below
     // covers the one field that carries a time into the widget payload.
     const snapshot = buildGlanceableSnapshot({
@@ -1074,8 +1083,10 @@ describe('buildGlanceableViewProps', () => {
 
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
+      'actions',
       'countLines',
       'needsInputSince',
+      'newestTitle',
       'primaryCount',
       'primaryKind',
       'primaryLabel',
@@ -1086,7 +1097,10 @@ describe('buildGlanceableViewProps', () => {
     expect(json).not.toContain(snapshot.scopeKey);
     expect(json).not.toContain(snapshot.updatedAt);
     expect(json).not.toContain('revision');
-    expect(json).not.toContain('title');
+    // The newest session's title is the one exception the owner granted, and
+    // it never rides in the snapshot: without the surface extra there is no
+    // title payload at all.
+    expect(props.newestTitle).toBeNull();
   });
 
   it('carries the oldest wait through the stale status', () => {
@@ -1123,10 +1137,115 @@ describe('buildGlanceableViewProps', () => {
     const happy = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
     expect(happy.accessibilityLabel).toBe('1 common.working, glanceable.openAgents');
 
-    const empty = buildGlanceableViewProps(snapshotFor([], 1, 'empty'), {}, key => key);
-    expect(empty.accessibilityLabel).toBe('glanceable.empty, glanceable.openAgents');
+    const empty = buildGlanceableSnapshot({
+      ...CTX,
+      sessions: [],
+      now: NOW,
+      previousRevision: 1,
+      status: 'empty',
+    });
+    expect(buildGlanceableViewProps(empty, {}, key => key).accessibilityLabel).toBe(
+      'glanceable.noneWaiting, glanceable.openAgents'
+    );
+  });
+
+  it('offers Approve for a waiting agent and nothing else', () => {
+    const props = buildGlanceableViewProps(
+      snapshotFor([{ status: 'question' }], 0),
+      {},
+      key => key
+    );
+    expect(props.actions).toEqual({ approve: true, newAgent: false });
+    expect(props.statusLine).toBeNull();
+  });
+
+  it('offers no action for a tray that is working and needs nothing', () => {
+    const props = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
+    expect(props.actions).toEqual({ approve: false, newAgent: false });
+  });
+
+  it('offers New agent and none of the others for the empty state', () => {
+    const props = buildGlanceableViewProps(snapshotFor([], 1, 'empty'), {}, key => key);
+    expect(props.actions).toEqual({ approve: false, newAgent: true });
+    expect(props.statusLine).toBe('glanceable.noneWaiting');
+  });
+
+  it.each(['waiting', 'expired', 'signed_out', 'privacy'] as const)(
+    'offers no action and no title for a locked %s surface',
+    status => {
+      const props = buildGlanceableViewProps(snapshotFor([], 1, status), {}, key => key);
+      expect(props.actions).toEqual({ approve: false, newAgent: false });
+      expect(props.newestTitle).toBeNull();
+      expect(toWidgetProps(props).actions).toEqual({ approve: false, newAgent: false });
+    }
+  );
+
+  it('keeps Approve available and names the failure in the reserved slot', () => {
+    setSurfaceExtras({
+      newestSessionTitle: 'Fix the flaky test',
+      actionFeedback: 'couldNotApprove',
+    });
+    const props = buildGlanceableViewProps(
+      snapshotFor([{ status: 'question' }], 0),
+      {},
+      key => key
+    );
+    expect(props.newestTitle).toBe('glanceable.couldNotApprove');
+    expect(props.actions).toEqual({ approve: true, newAgent: false });
+  });
+
+  it('holds the in-flight action in the reserved slot', () => {
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: 'approving' });
+    const props = buildGlanceableViewProps(
+      snapshotFor([{ status: 'question' }], 0),
+      {},
+      key => key
+    );
+    expect(props.newestTitle).toBe('glanceable.approving');
+  });
+
+  it('composes the newest-session line and drops a null one on the widget write', () => {
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
+    const props = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, translateCopy);
+    expect(props.newestTitle).toBe('Newest: Fix the flaky test');
+    expect(toWidgetProps(props)).toMatchObject({ newestTitle: 'Newest: Fix the flaky test' });
+
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
+    const untitled = buildGlanceableViewProps(
+      snapshotFor([{ status: 'busy' }], 0),
+      {},
+      translateCopy
+    );
+    expect(untitled.newestTitle).toBeNull();
+    expect('newestTitle' in toWidgetProps(untitled)).toBe(false);
+  });
+
+  it('inserts a title containing replacement patterns literally', () => {
+    setSurfaceExtras({ newestSessionTitle: 'A $& and $` title', actionFeedback: null });
+    const props = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, translateCopy);
+
+    expect(props.newestTitle).toBe('Newest: A $& and $` title');
+  });
+
+  it('keeps the title on the stale frame and off the expired and terminal frames', () => {
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
+    const happy = snapshotFor([{ status: 'busy' }], 0);
+    // Stale still draws rows, so the reserved slot keeps its line; the expired
+    // and terminal frames assert no work at all, title included.
+    expect(staleTimelineFrame(happy, translateCopy)[0]?.props.newestTitle).toBe(
+      'Newest: Fix the flaky test'
+    );
+    expect(buildExpiredWidgetProps(happy, key => key).newestTitle).toBeUndefined();
   });
 });
+
+const COPY: Record<string, string> = {
+  'glanceable.newestSession': 'Newest: {{title}}',
+};
+
+function translateCopy(key: string): string {
+  return COPY[key] ?? key;
+}
 
 describe('toWidgetProps', () => {
   it('omits every null field so the UserDefaults write cannot throw', () => {
@@ -1138,7 +1257,8 @@ describe('toWidgetProps', () => {
     expect('primaryLabel' in props).toBe(false);
     expect('primaryKind' in props).toBe(false);
     expect('needsInputSince' in props).toBe(false);
-    expect(props.statusLine).toBe('glanceable.empty');
+    expect('newestTitle' in props).toBe(false);
+    expect(props.statusLine).toBe('glanceable.noneWaiting');
   });
 
   it('keeps every non-null field', () => {

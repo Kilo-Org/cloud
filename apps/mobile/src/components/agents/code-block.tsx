@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, memo, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   type AccessibilityActionEvent,
@@ -10,9 +10,10 @@ import {
 } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 
+import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
+import { type HighlightToken } from '@/lib/pr-review/diff/highlight';
 
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
 import { tokenizeCodeLines } from './code-block-model';
@@ -69,15 +70,75 @@ type CodeBlockProps = {
 const COPY_ACTION_GAP = 8;
 
 /**
+ * Mono sizing on every rendered code text: the single selectable fence, or
+ * each line `RNText` of a non-selectable fence.
+ */
+const CODE_LINE_CLASSNAME = 'font-mono text-xs leading-4';
+
+/**
+ * A blank source line still occupies its line box; an `RNText` whose only
+ * child is the empty string collapses to zero height, so a per-line Text
+ * renders a space instead.
+ */
+const BLANK_CODE_LINE = ' ';
+
+/**
+ * Separator between the lines of the single selectable fence.
+ */
+const CODE_LINE_BREAK = '\n';
+
+/**
+ * Children for one non-selectable code line. Untagged runs are raw strings and
+ * tagged runs are nested `RNText`s — see `highlightRunChildren`, which both
+ * diff renderers share too. A line whose runs are all empty keeps its blank
+ * line box.
+ */
+function renderLineRuns(tokens: readonly HighlightToken[], isDark: boolean): ReactNode {
+  if (tokens.every(token => token.text.length === 0)) {
+    return BLANK_CODE_LINE;
+  }
+  return highlightRunChildren(tokens, isDark);
+}
+
+/**
+ * Children for the single selectable fence: the runs of each source line, with
+ * a line break between lines. A blank line needs no space here — the break
+ * itself keeps the line box. Each line's runs sit in their own keyed
+ * `Fragment` so two lines may both hold a `tok-0` run.
+ */
+function renderFenceChildren(
+  tokenLines: readonly (readonly HighlightToken[])[],
+  isDark: boolean
+): ReactNode[] {
+  return tokenLines.map((tokens, lineIndex) => (
+    <Fragment key={`line-${lineIndex}`}>
+      {lineIndex > 0 ? CODE_LINE_BREAK : null}
+      {highlightRunChildren(tokens, isDark)}
+    </Fragment>
+  ));
+}
+
+/**
  * Shared highlighted code block for tool detail sheets and markdown fences.
  *
  * Each line is highlighted independently by `highlightLine` (the per-line
- * ceiling documented in `highlight.ts`); the tokens render as nested RNText
- * runs inside one selectable parent RNText, mirroring the shipped `DiffLine`
- * pattern. `SelectableText` cannot carry colored runs, so highlighted code
- * accepts the documented iOS select-callout trade-off (see
- * `selectable-text.tsx`) — plain text surfaces (list rows, todo rows) keep
- * true `SelectableText`.
+ * ceiling documented in `highlight.ts`). A NON-selectable fence renders one
+ * `RNText` per source line, mirroring the shipped `DiffLine` pattern. Android
+ * builds one `SpannableStringBuilder` per `ReactTextView` and runs
+ * `SetSpanOperation.execute` once per span on the UI thread, so a fence
+ * rendered as one `RNText` made the span count scale with the whole fence — a
+ * long file blocked input dispatch. One `RNText` per line bounds a Text's
+ * spans to its own line, and each line lays out as a single-line
+ * `BoringLayout` instead of one giant `StaticLayout`.
+ *
+ * A SELECTABLE fence stays one `RNText`: Android can only select across
+ * characters inside a single `ReactTextView`, so the per-line split would let
+ * the user select one line at a time. The single fence still renders its runs
+ * through `highlightRunChildren`, so untagged runs coalesce into the fence's
+ * own fragment instead of each costing a nested-run span. `SelectableText`
+ * cannot carry colored runs, so highlighted code accepts the documented iOS
+ * select-callout trade-off (see `selectable-text.tsx`) — plain text surfaces
+ * (list rows, todo rows) keep true `SelectableText`.
  *
  * Sheet contract: inside the tool detail sheet the block reads the mono
  * sheet context, registers presence through `track()`, and honors the sheet's
@@ -228,24 +289,60 @@ function CodeBlockImpl({
     [handleCopyCode]
   );
 
-  const copyAccessibilityActions = canCopyCode
-    ? [{ name: 'copyCode', label: copyLabel }]
-    : undefined;
+  const copyAccessibilityActions = useMemo(
+    () => (canCopyCode ? [{ name: 'copyCode', label: copyLabel }] : undefined),
+    [canCopyCode, copyLabel]
+  );
 
-  const content = tokenLines.map((tokens, lineIndex) => (
-    <Fragment key={`line-${lineIndex}`}>
-      {lineIndex > 0 ? '\n' : null}
-      {tokens.map((token, tokenIndex) => {
-        const color = token.className === null ? textBase : tokenColorFor(token.className, isDark);
-        return (
-          // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- per-token syntax color
-          <RNText key={`tok-${tokenIndex}`} style={{ color }}>
-            {token.text}
+  // A selectable fence is ONE `RNText`, so native selection spans the whole
+  // fence. A non-selectable fence is one `RNText` per source line, so each
+  // Text's Android span count is bounded to its own line — the previous single
+  // parent `RNText` gave Android one `SpannableStringBuilder` per fence (see
+  // the component doc), turning a long file into thousands of
+  // `SetSpanOperation.execute` calls in a single frame.
+  const codeContent = useMemo(() => {
+    if (effectiveSelectable) {
+      return (
+        <RNText
+          selectable
+          className={CODE_LINE_CLASSNAME}
+          // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
+          style={{ color: textBase }}
+          accessibilityActions={copyAccessibilityActions}
+          onAccessibilityAction={canCopyCode ? handleCopyAccessibilityAction : undefined}
+        >
+          {renderFenceChildren(tokenLines, isDark)}
+        </RNText>
+      );
+    }
+    return (
+      <>
+        {tokenLines.map((tokens, lineIndex) => (
+          <RNText
+            // Code lines are positional: the index is their identity.
+            // eslint-disable-next-line react/no-array-index-key -- code lines are positional, not reorderable
+            key={`line-${lineIndex}`}
+            selectable={false}
+            className={CODE_LINE_CLASSNAME}
+            // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
+            style={{ color: textBase }}
+            accessibilityActions={copyAccessibilityActions}
+            onAccessibilityAction={canCopyCode ? handleCopyAccessibilityAction : undefined}
+          >
+            {renderLineRuns(tokens, isDark)}
           </RNText>
-        );
-      })}
-    </Fragment>
-  ));
+        ))}
+      </>
+    );
+  }, [
+    tokenLines,
+    effectiveSelectable,
+    textBase,
+    copyAccessibilityActions,
+    canCopyCode,
+    handleCopyAccessibilityAction,
+    isDark,
+  ]);
 
   const truncatedMarker = isTruncated ? (
     <Text
@@ -301,24 +398,16 @@ function CodeBlockImpl({
     : null;
 
   if (textMode === 'wrap') {
-    const codeText = (
-      <RNText
-        selectable={effectiveSelectable}
-        className="font-mono text-xs leading-4"
-        accessibilityActions={copyAccessibilityActions}
-        onAccessibilityAction={canCopyCode ? handleCopyAccessibilityAction : undefined}
-      >
-        {content}
-      </RNText>
-    );
+    const codeText = <View>{codeContent}</View>;
     return (
       <View>
         {copyTriggerProps ? (
-          // Leave the selectable code text its own accessible element: it reads
-          // the code and carries the copyCode action, instead of collapsing the
-          // whole block into one synthesized button label. The right gutter is
-          // reserved on the trigger, not the text, so the pill anchored to this
-          // view's (unpadded) right edge lands in the padding, clear of glyphs.
+          // Leave the code text its own accessible element: the selectable
+          // fence, or each line of a non-selectable fence, reads the code and
+          // carries the copyCode action, instead of collapsing the whole block
+          // into one synthesized button label. The right gutter is reserved on
+          // the trigger, not the text, so the pill anchored to this view's
+          // (unpadded) right edge lands in the padding, clear of glyphs.
           <Pressable
             {...copyTriggerProps}
             testID="code-block-copy-trigger"
@@ -342,15 +431,9 @@ function CodeBlockImpl({
       // eslint-disable-next-line react-native/no-inline-styles -- measured height cannot be a Tailwind class
       style={contentHeight === undefined ? undefined : { height: contentHeight }}
     >
-      <RNText
-        selectable={effectiveSelectable}
-        onLayout={handleContentLayout}
-        className="shrink-0 self-start font-mono text-xs leading-4"
-        accessibilityActions={copyAccessibilityActions}
-        onAccessibilityAction={canCopyCode ? handleCopyAccessibilityAction : undefined}
-      >
-        {content}
-      </RNText>
+      <View onLayout={handleContentLayout} className="shrink-0 self-start">
+        {codeContent}
+      </View>
     </ScrollView>
   );
 

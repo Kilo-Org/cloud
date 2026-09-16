@@ -657,6 +657,58 @@ describe('MarkdownRenderer empty fence mounting', () => {
     // Restore the stubbed module graph for any dynamic import that follows.
     vi.resetModules();
   });
+
+  it('renders a transcript (non-selectable) fence as one Text per source line', async () => {
+    // TextPartRenderer renders the chat transcript with selectable={false}.
+    // Android builds one SpannableStringBuilder per ReactTextView on the UI
+    // thread, so the transcript fence must split per line instead of putting
+    // the whole fence into one Text (the SetSpanOperation.execute ANR).
+    vi.doUnmock('./code-block');
+    vi.resetModules();
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const renderer = new RendererClass(palette, false, {});
+    const element = renderer.code(
+      'const a = 1;\nconst b = 2;\nconst c = 3;',
+      'ts',
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(element);
+    });
+    const mounted = rendererRef.current;
+    if (!mounted) {
+      throw new Error('renderer was not created');
+    }
+
+    const codeTexts = mounted.root.findAll(
+      node => {
+        const className = propOf(node, 'className');
+        return (
+          typeof node.type === 'string' &&
+          typeof className === 'string' &&
+          className.includes('font-mono text-xs')
+        );
+      },
+      { deep: true }
+    );
+    expect(codeTexts).toHaveLength(3);
+    for (const codeText of codeTexts) {
+      expect(propOf(codeText, 'selectable')).toBe(false);
+    }
+
+    await act(async () => {
+      await Promise.resolve();
+      mounted.unmount();
+    });
+    // Restore the stubbed module graph for any dynamic import that follows.
+    vi.resetModules();
+  });
 });
 
 describe('MarkdownRenderer list marker alignment', () => {

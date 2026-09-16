@@ -36,6 +36,7 @@ import {
   DEFAULT_AGENT_SESSION_SORT,
   parseAgentSessionSortBy,
 } from '@/lib/agent-session-sort';
+import { useLiveSessionsHold } from '@/lib/hooks/use-live-sessions-hold';
 import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { useTRPC } from '@/lib/trpc';
@@ -435,8 +436,19 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
     [active.canRead, active.data, options?.organizationId]
   );
 
+  // The socket writers (`sessions.list`, `sessions.heartbeat`,
+  // `cli.disconnected`) empty the live set the moment a CLI socket blips, and
+  // the reconnect restores the rows a moment later. Hold the last rows through
+  // that window so the surface does not flash the empty state on a reconnect;
+  // the hold is scoped to the query key so a context change still loads.
+  const renderedActiveSessions = useLiveSessionsHold({
+    current: activeSessions,
+    scopeKey: JSON.stringify(active.queryKey),
+    canHold: active.canRead,
+  });
+
   return {
-    activeSessions,
+    activeSessions: renderedActiveSessions,
     // Preserve the old flags; presentation must use provenance, not isLoading,
     // to distinguish unconfirmed empty data from accepted empty success.
     isLoading: active.isLoading,

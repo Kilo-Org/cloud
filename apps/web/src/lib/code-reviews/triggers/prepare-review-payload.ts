@@ -406,7 +406,11 @@ export async function prepareReviewPayload(
         // blocking, suspended/uninstalled app) are hard failures: without a token
         // we cannot clone private repos or post review comments. Let the error
         // propagate so the user sees a meaningful failure on the review.
-        const tokenData = await generateGitHubInstallationToken(installationId, appType);
+        const tokenData = await generateGitHubInstallationToken(
+          installationId,
+          appType,
+          integration.id
+        );
         const installationToken = tokenData.token;
         githubToken = installationToken;
         const [repoOwner, repoName] = review.repo_full_name.split('/');

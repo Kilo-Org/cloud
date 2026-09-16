@@ -1063,6 +1063,7 @@ describe('NotificationChannelDO.dispatchPush — local push sink', () => {
         sound: string | null;
         priority: string;
         channelId: string;
+        interruptionLevel: string;
         previews: string;
       };
       to: string;
@@ -1077,6 +1078,7 @@ describe('NotificationChannelDO.dispatchPush — local push sink', () => {
       sound: 'default',
       priority: 'high',
       channelId: 'agent-progress',
+      interruptionLevel: 'active',
       previews: 'generic',
     });
     expect(payload.to).toBe('<redacted>');
@@ -1247,7 +1249,7 @@ describe('NotificationChannelDO preview mode and channel', () => {
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
   });
 
-  it('adds channelId to every message when the token has an app version', async () => {
+  it('adds channelId and time-sensitive level to every message for an attention push', async () => {
     installDbMock({
       tokens: [
         { user_id: 'user-chan', token: 'tok1', app_version: '1.0.4' },
@@ -1262,8 +1264,61 @@ describe('NotificationChannelDO preview mode and channel', () => {
     const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
     expect(messages).toHaveLength(2);
     for (const message of messages) {
+      // iOS has no per-kind channel: the interruption level is the iOS
+      // equivalent of the Android channel and breaks through Focus / DND.
       expect(message.channelId).toBe('needs-input');
+      expect(message.interruptionLevel).toBe('time-sensitive');
     }
+  });
+
+  it('routes a status push to the agent-progress channel with an active level', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-status', token: 'tok-status', app_version: '1.0.4' }],
+    });
+    const stub = getDO('user-status');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-status',
+        idempotencyKey: 'k-status',
+        push: {
+          title: 'T',
+          body: 'B',
+          // No `category` is a status update, not a question for the user.
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_status' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0]?.channelId).toBe('agent-progress');
+    expect(messages[0]?.interruptionLevel).toBe('active');
+  });
+
+  it('leaves a non-agent push active while keeping its own channel', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-nonagent', token: 'tok-nonagent', app_version: '1.0.4' }],
+    });
+    const stub = getDO('user-nonagent');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-nonagent',
+        idempotencyKey: 'k-nonagent',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: { type: 'low_balance', organizationId: 'org1' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0]?.channelId).toBe('balance');
+    // Only needs-input is time-sensitive; every other kind stays active.
+    expect(messages[0]?.interruptionLevel).toBe('active');
   });
 
   it('omits channelId for a token without an app version (old client)', async () => {
@@ -1284,6 +1339,10 @@ describe('NotificationChannelDO preview mode and channel', () => {
     const newMessage = messages.find(m => m.to === 'tok-new');
     expect(oldMessage?.channelId).toBeUndefined();
     expect(newMessage?.channelId).toBe('needs-input');
+    // The interruption level has no older-client failure mode (unlike the
+    // Android channel), so it is attached to every message.
+    expect(oldMessage?.interruptionLevel).toBe('time-sensitive');
+    expect(newMessage?.interruptionLevel).toBe('time-sensitive');
   });
 
   it('substitutes generic content when previews is generic', async () => {

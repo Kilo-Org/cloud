@@ -158,7 +158,8 @@ vi.mock('@/lib/persist/read-cache', () => ({ readCachedUserId: () => null }));
 vi.mock('@kilocode/notifications', async importOriginal => ({
   ...(await importOriginal<typeof Notifications>()),
   ANDROID_NOTIFICATION_CHANNELS: [
-    { id: 'agent', name: 'Agent sessions', importance: 'high' },
+    { id: 'agent-attention', name: 'Agent needs input', importance: 'high' },
+    { id: 'agent', name: 'Agent sessions', importance: 'default' },
     { id: 'chat', name: 'Chat messages', importance: 'high' },
     { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default' },
     { id: 'balance', name: 'Balance alerts', importance: 'default' },
@@ -240,7 +241,8 @@ describe('ensureAndroidNotificationChannels', () => {
     await ensureAndroidNotificationChannels();
 
     expect(mocks.setNotificationChannelAsync.mock.calls).toEqual([
-      ['agent', { name: 'Agent sessions', importance: 4 }],
+      ['agent-attention', { name: 'Agent needs input', importance: 4 }],
+      ['agent', { name: 'Agent sessions', importance: 3 }],
       ['chat', { name: 'Chat messages', importance: 4 }],
       ['kiloclaw', { name: 'KiloClaw activity', importance: 3 }],
       ['balance', { name: 'Balance alerts', importance: 3 }],
@@ -258,7 +260,8 @@ describe('ensureAndroidNotificationChannels', () => {
     await renameAndroidNotificationChannels();
 
     expect(mocks.setNotificationChannelAsync.mock.calls).toEqual([
-      ['agent', { name: expect.any(String), importance: 4 }],
+      ['agent-attention', { name: expect.any(String), importance: 4 }],
+      ['agent', { name: expect.any(String), importance: 3 }],
       ['chat', { name: expect.any(String), importance: 4 }],
       ['kiloclaw', { name: expect.any(String), importance: 3 }],
       ['balance', { name: expect.any(String), importance: 3 }],
@@ -278,7 +281,7 @@ describe('ensureAndroidNotificationChannels', () => {
 
     expect(first).toBe(second);
     await Promise.all([first, second]);
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(7);
   });
 
   it('swallows a per-channel failure and still creates the remaining channels', async () => {
@@ -287,12 +290,12 @@ describe('ensureAndroidNotificationChannels', () => {
 
     await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
 
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(7);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
         'error.subsystem': 'notifications',
         'error.operation': 'create_android_channel',
-        'notification.channel': 'agent',
+        'notification.channel': 'agent-attention',
       },
     });
   });

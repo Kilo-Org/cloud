@@ -515,6 +515,10 @@ export function ensureAndroidNotificationChannels(): Promise<void> {
 }
 
 const CHANNEL_NAME_KEYS = {
+  // The needs-input channel groups the same raises the app's own "Agent needs
+  // you" preference names, so both read one reviewed key instead of a second
+  // copy that a translator would have to keep in step.
+  'agent-attention': 'notifications.category.agentAttentionTitle',
   agent: 'notifications.channel.agent',
   chat: 'notifications.channel.chat',
   kiloclaw: 'notifications.channel.kiloclaw',

@@ -9,7 +9,6 @@ import { resolveSessionComposerDisabled } from './session-composer-disabled';
 
 const idleInput = {
   isReadOnly: false,
-  canSend: true,
   shouldShowLoading: false,
   hasBlockingInteraction: false,
   requiresModel: false,
@@ -25,8 +24,13 @@ describe('resolveSessionComposerDisabled', () => {
     expect(resolveSessionComposerDisabled({ ...idleInput, isReadOnly: true })).toBe(true);
   });
 
-  it('returns true when cannot send', () => {
-    expect(resolveSessionComposerDisabled({ ...idleInput, canSend: false })).toBe(true);
+  it('stays unlocked for a writable session that cannot send (failed turn)', () => {
+    // Pylon 28248: the send capability is a separate gate (`sendDisabled` on
+    // ChatComposer). A session that cannot accept a message right now must
+    // still leave the reader able to type beside the error's Retry, so this
+    // resolver never reads the send capability.
+    expect(Object.keys(idleInput)).not.toContain('canSend');
+    expect(resolveSessionComposerDisabled(idleInput)).toBe(false);
   });
 
   it('returns true while loading', () => {
@@ -57,5 +61,11 @@ describe('composer unlock source check', () => {
     const sourcePath = fileURLToPath(new URL('session-detail-content.tsx', import.meta.url));
     const source = readFileSync(sourcePath, 'utf8');
     expect(source).not.toMatch(/Boolean\(error\)/);
+  });
+
+  it('gates sending without locking the input', () => {
+    const sourcePath = fileURLToPath(new URL('session-detail-content.tsx', import.meta.url));
+    const source = readFileSync(sourcePath, 'utf8');
+    expect(source).toMatch(/sendDisabled=\{!canSend\}/);
   });
 });

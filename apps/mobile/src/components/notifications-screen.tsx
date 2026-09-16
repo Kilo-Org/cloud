@@ -374,7 +374,14 @@ export function NotificationsScreen() {
         if (deviceToken) {
           queryClient.setQueryData(pushTokensQueryKey, (old: typeof pushTokens) => [
             ...(old ?? []),
-            { token: deviceToken, platform: getPlatform(), locale: getResolvedLanguage() },
+            {
+              token: deviceToken,
+              platform: getPlatform(),
+              locale: getResolvedLanguage(),
+              // Mirrors the mutate below: the row's version decides whether the
+              // server may address the named Android channels.
+              appVersion: Application.nativeApplicationVersion ?? null,
+            },
           ]);
         }
         return { previous, generation };

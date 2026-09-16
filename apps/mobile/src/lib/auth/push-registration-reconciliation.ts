@@ -141,8 +141,17 @@ async function runReconciliation(locale: string): Promise<PushRegistrationOutcom
   // user's row may hold a different locale than the one last sent.
   // `locale` is null on a row written before the column existed; that is
   // English, so it only matches when English is the active language.
+  const appVersion = Application.nativeApplicationVersion ?? null;
   const registered = tokens.find(t => t.token === token);
-  if (registered && (registered.locale ?? 'en') === locale) {
+  // The row is current only when it proves both values the server reads for
+  // this token: the locale that picks the push copy, and the app version that
+  // gates the named Android channels (`needs-input` / `agent-progress`). An
+  // upgraded client still holds a row at the previous release's version, so a
+  // locale-only comparison would leave its Android pushes on the app's default
+  // channel and never let needs-input break through Do Not Disturb. A build
+  // that cannot report its own version never overwrites the stored one.
+  const versionIsCurrent = appVersion === null || registered?.appVersion === appVersion;
+  if (registered && (registered.locale ?? 'en') === locale && versionIsCurrent) {
     lastAttemptLocale = locale;
     return { kind: 'already-registered' };
   }
@@ -157,7 +166,7 @@ async function runReconciliation(locale: string): Promise<PushRegistrationOutcom
     await trpcClient.user.registerPushToken.mutate({
       token,
       platform: getPlatform(),
-      appVersion: Application.nativeApplicationVersion ?? undefined,
+      appVersion: appVersion ?? undefined,
       locale,
     });
   } catch {

@@ -1254,6 +1254,11 @@ export const userRouter = createTRPCRouter({
         // server row, not a client-side cache, decides whether a re-register
         // is needed. Null means English.
         locale: user_push_tokens.locale,
+        // The client compares this against the running build's version, so an
+        // upgrade re-registers even when the locale is unchanged. The push DO
+        // gates the named Android channel ids on this column, and a row left
+        // at the previous release's version would never receive them.
+        appVersion: user_push_tokens.app_version,
       })
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, ctx.user.id));

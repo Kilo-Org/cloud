@@ -1,13 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 
-const { withDangerousMod, withXcodeProject } = require('expo/config-plugins');
+const { withDangerousMod, withXcodeProject, IOSConfig } = require('expo/config-plugins');
 
 const {
   AGENT_CONTROLS,
   agentControlsSwift,
   agentShortcutStrings,
   injectAgentControlBundle,
+  targetSourcesBuildPhases,
 } = require('../src/lib/agent-controls.js');
 
 // iOS agent controls: the Control Center control, the Lock Screen control
@@ -18,8 +19,10 @@ const {
 // registration order) and:
 //   1. writes AgentControls.swift beside the generated widget sources;
 //   2. splices `AgentControlsBundle().body` into the generated @main bundle;
-//   3. attaches AgentControls.swift to the extension's Sources build phase — a
-//      Swift file that is not in that phase is never compiled;
+//   3. attaches AgentControls.swift to the Sources build phase expo-widgets
+//      created for the extension — a Swift file that is not in that phase is
+//      never compiled, and a second `Sources` phase is not an option: XCBuild
+//      fails the target with "Unexpected duplicate tasks";
 //   4. appends the control copy to the `<tag>.lproj/Localizable.strings` that
 //      plugins/withWidgetLocalizations.js has already written, which is why this
 //      plugin is registered BEFORE that one in app.config.ts.
@@ -89,8 +92,8 @@ module.exports = function withAgentControls(config) {
   ]);
 
   // The uuid, not `pbxTargetByName`: that returns the target body, which carries
-  // no uuid, and `addBuildPhase` silently falls back to the first target — the
-  // app — when the uuid is undefined.
+  // no uuid, and the xcode phase helpers fall back to the first target — the app
+  // — when the uuid is undefined.
   return withXcodeProject(withControlBundle, projectConfig => {
     const project = projectConfig.modResults;
     const targets = project.pbxNativeTargetSection();
@@ -102,16 +105,39 @@ module.exports = function withAgentControls(config) {
         `withAgentControls: the ${TARGET_NAME} target is missing — this plugin ran before expo-widgets`
       );
     }
-    const phase = project.addBuildPhase(
-      [`${TARGET_NAME}/${SWIFT_FILE}`],
-      'PBXSourcesBuildPhase',
-      'Sources',
+
+    // Attach the file to the Sources phase expo-widgets built for the
+    // extension, never to a phase of this plugin's own. XCBuild names each
+    // build phase's tasks after the phase, so a second `Sources` phase on one
+    // target fails the whole build with "Unexpected duplicate tasks" before a
+    // single file compiles; `addBuildPhase` appends exactly that second phase.
+    // The file joins the PBXGroup expo-widgets created beside the widget
+    // sources, so its reference is written the way index.swift's is (path
+    // relative to the group, `sourceTree = "<group>"`).
+    const before = targetSourcesBuildPhases(project, targetUuid);
+    if (before.length !== 1) {
+      throw new Error(
+        `withAgentControls: ${TARGET_NAME} carries ${before.length} Sources build phases, expected exactly one — this plugin ran before expo-widgets, or a duplicate phase was added`
+      );
+    }
+    IOSConfig.XcodeUtils.addBuildSourceFileToGroup({
+      filepath: SWIFT_FILE,
+      groupName: TARGET_NAME,
+      project,
       targetUuid,
-      'app_extension',
-      '""'
-    );
-    if (!targets[targetUuid].buildPhases.some(entry => entry.value === phase.uuid)) {
-      throw new Error(`withAgentControls: the Sources phase did not attach to ${TARGET_NAME}`);
+    });
+
+    // The state XCBuild accepts: one Sources phase, carrying the file.
+    const after = targetSourcesBuildPhases(project, targetUuid);
+    if (after.length !== 1) {
+      throw new Error(
+        `withAgentControls: ${TARGET_NAME} ended with ${after.length} Sources build phases — XCBuild fails a target with duplicate phases ("Unexpected duplicate tasks")`
+      );
+    }
+    if (!after[0]?.files.some(entry => entry.comment === `${SWIFT_FILE} in Sources`)) {
+      throw new Error(
+        `withAgentControls: ${SWIFT_FILE} is not in the ${TARGET_NAME} Sources build phase`
+      );
     }
     return projectConfig;
   });

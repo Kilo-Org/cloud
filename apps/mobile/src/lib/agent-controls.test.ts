@@ -12,6 +12,7 @@ import {
   agentShortcutStrings,
   agentShortcutsXml,
   injectAgentControlBundle,
+  targetSourcesBuildPhases,
 } from './agent-controls';
 
 // The extension's bundle copy, one object per language tag. The English values
@@ -167,6 +168,53 @@ describe('injectAgentControlBundle', () => {
   it('throws a named error when the anchor is missing', () => {
     expect(() => injectAgentControlBundle('struct X {}\n')).toThrow(/injectAgentControlBundle/);
     expect(() => injectAgentControlBundle('')).toThrow(/injectAgentControlBundle/);
+  });
+});
+
+describe('targetSourcesBuildPhases', () => {
+  // The defect this guards: the controls plugin appended a second `Sources`
+  // build phase to the widget extension, and XCBuild rejects a target with two
+  // phases of the same name — "Unexpected duplicate tasks" — before it compiles
+  // anything. The selector must therefore see every phase the target carries,
+  // so a duplicate cannot hide behind the first match.
+  it('reads every Sources phase the target carries and skips other phases', () => {
+    const indexPhase = { files: [{ value: 'bf-index', comment: 'index.swift in Sources' }] };
+    const controlsPhase = {
+      files: [{ value: 'bf-controls', comment: 'AgentControls.swift in Sources' }],
+    };
+    const project = {
+      hash: {
+        project: {
+          objects: {
+            PBXSourcesBuildPhase: {
+              'phase-index': indexPhase,
+              'phase-controls': controlsPhase,
+            },
+          },
+        },
+      },
+      pbxNativeTargetSection: () => ({
+        target: {
+          name: 'ExpoWidgetsTarget',
+          buildPhases: [
+            { value: 'phase-index', comment: 'Sources' },
+            { value: 'phase-frameworks', comment: 'Frameworks' },
+            { value: 'phase-controls', comment: 'Sources' },
+          ],
+        },
+      }),
+    };
+    expect(targetSourcesBuildPhases(project, 'target')).toEqual([indexPhase, controlsPhase]);
+  });
+
+  it('returns nothing for a target with no Sources phase', () => {
+    const project = {
+      hash: { project: { objects: { PBXSourcesBuildPhase: {} } } },
+      pbxNativeTargetSection: () => ({
+        target: { name: 'ExpoWidgetsTarget', buildPhases: [{ value: 'phase-frameworks' }] },
+      }),
+    };
+    expect(targetSourcesBuildPhases(project, 'target')).toEqual([]);
   });
 });
 

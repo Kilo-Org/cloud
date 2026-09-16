@@ -134,6 +134,40 @@ import SwiftUI
 import WidgetKit`;
 
 /**
+ * One `Sources` build phase of a target, as the generated project stores it.
+ * @typedef {{ files: { value?: string, comment?: string }[] }} SourcesBuildPhase
+ */
+
+/**
+ * The `Sources` build phases the target carries, in target order, ignoring
+ * buildPhases references that name no `PBXSourcesBuildPhase` entry.
+ *
+ * A build phase task is named after its phase, so two `Sources` phases on one
+ * target collide: XCBuild stops the build with "Unexpected duplicate tasks"
+ * before it compiles anything. A plugin that adds a source file to an existing
+ * target therefore joins the phase the target already has — the `xcode`
+ * library's `addBuildPhase` always appends a new phase, so it is only safe
+ * against a target that has none. Reads a live `xcode.project` object; a plain
+ * object of the same shape is enough to test the selector.
+ * @param {{ hash: { project: { objects: { PBXSourcesBuildPhase?: Record<string, SourcesBuildPhase | undefined> } } }, pbxNativeTargetSection: () => Record<string, { name?: string, buildPhases?: { value: string, comment?: string }[] } | undefined> }} project
+ * @param {string} targetUuid
+ * @returns {SourcesBuildPhase[]}
+ */
+export function targetSourcesBuildPhases(project, targetUuid) {
+  const section = project.hash.project.objects.PBXSourcesBuildPhase ?? {};
+  const target = project.pbxNativeTargetSection()[targetUuid];
+  /** @type {SourcesBuildPhase[]} */
+  const phases = [];
+  for (const reference of target?.buildPhases ?? []) {
+    const phase = section[reference.value];
+    if (phase !== undefined) {
+      phases.push(phase);
+    }
+  }
+  return phases;
+}
+
+/**
  * The extension's AgentControls.swift: one AppIntent and one ControlWidget per
  * contract entry, plus the bundle index.swift splices in. Every url comes from
  * `urls` — this generator never spells one of its own.

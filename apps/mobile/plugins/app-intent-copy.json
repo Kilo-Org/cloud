@@ -1,0 +1,13 @@
+{
+  "en": {
+    "startAgent": "Start agent",
+    "openNeedsInput": "Open agent needing input",
+    "openSession": "Open session",
+    "openPullRequest": "Open pull request",
+    "promptParam": "Prompt",
+    "repositoryParam": "Repository",
+    "sessionParam": "Session",
+    "pullRequestParam": "Pull request",
+    "startFailedFallback": "Couldn't start the agent. Open Kilo and try again."
+  }
+}

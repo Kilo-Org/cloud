@@ -56,11 +56,27 @@ const controlTypeName = id =>
  *  @returns {string} */
 const descriptionCopyKey = copyKey => `${copyKey}Description`;
 
-/** Android static-shortcut resource name: `new-agent` → `agent_control_new_agent_short`.
- *  @param {string} id
+/** The Android resource file the static shortcuts live in: `@xml/kilo_agent_shortcuts`.
+ *  The shortcut ids derive from it too, so one name covers both. */
+export const AGENT_SHORTCUTS_RESOURCE = 'kilo_agent_shortcuts';
+
+/** Snake-cases a copy key for a resource name: `openWaitingAgent` → `open_waiting_agent`.
+ *  @param {string} value
+ *  @returns {string} */
+const snakeCase = value => value.replaceAll(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+
+/** Android static-shortcut label resource: `newAgent` → `kilo_shortcut_new_agent_short`.
+ *  Android resolves `@string/…` through the resource system, so the same name in a
+ *  `values-b+<tag>` folder is all the localization needs.
+ *  @param {string} copyKey
  *  @param {string} suffix
  *  @returns {string} */
-const shortcutResourceName = (id, suffix) => `agent_control_${id.replaceAll('-', '_')}_${suffix}`;
+const shortcutResourceName = (copyKey, suffix) => `kilo_shortcut_${snakeCase(copyKey)}_${suffix}`;
+
+/** Static-shortcut id: `new-agent` → `kilo_agent_shortcuts_new_agent`. Unique per app.
+ *  @param {string} id
+ *  @returns {string} */
+const shortcutId = id => `${AGENT_SHORTCUTS_RESOURCE}_${id.replaceAll('-', '_')}`;
 
 /**
  * Everything a platform plugin needs about a shortcut besides its copy: the
@@ -70,8 +86,8 @@ export const AGENT_SHORTCUTS_META_DATA = AGENT_CONTROLS.map(control => ({
   id: control.id,
   copyKey: control.copyKey,
   descriptionCopyKey: descriptionCopyKey(control.copyKey),
-  shortLabelResource: shortcutResourceName(control.id, 'short'),
-  longLabelResource: shortcutResourceName(control.id, 'long'),
+  shortLabelResource: shortcutResourceName(control.copyKey, 'short'),
+  longLabelResource: shortcutResourceName(control.copyKey, 'long'),
 }));
 
 /**
@@ -200,25 +216,31 @@ export function injectAgentControlBundle(indexSwift) {
 }
 
 /**
- * Android's static-shortcut file: one shortcut per contract entry, each opening
- * the contract url through the app's existing VIEW intent filter. The Android
- * slice writes it; the urls are this contract's.
- * @param {{ urls: AgentControl[] }} params
+ * Android's static-shortcut file: one shortcut per contract entry, each carrying
+ * exactly one VIEW intent at the contract url. The intent names the app's own
+ * launcher activity (`targetPackage` / `targetClass`) instead of relying on the
+ * system to resolve the url through the app's implicit intent filters — the app
+ * already declares `android:scheme="kiloapp"`, so the explicit target is only a
+ * more direct route to the one deep-link implementation. The Android slice
+ * writes the file; the urls and the labels are this contract's.
+ * @param {{ urls: AgentControl[], targetPackage: string, targetClass: string }} params
  * @returns {string}
  */
-export function agentShortcutsXml({ urls }) {
+export function agentShortcutsXml({ urls, targetPackage, targetClass }) {
   const shortcuts = urls.map(control => {
     const metadata = AGENT_SHORTCUTS_META_DATA.find(entry => entry.id === control.id);
     if (metadata === undefined) {
       throw new Error(`agentShortcutsXml: no shortcut metadata for control \`${control.id}\``);
     }
     return `  <shortcut
-    android:shortcutId="${escapeXml(control.id)}"
+    android:shortcutId="${shortcutId(control.id)}"
     android:enabled="true"
     android:shortcutShortLabel="@string/${metadata.shortLabelResource}"
     android:shortcutLongLabel="@string/${metadata.longLabelResource}">
     <intent
       android:action="android.intent.action.VIEW"
+      android:targetPackage="${escapeXml(targetPackage)}"
+      android:targetClass="${escapeXml(targetClass)}"
       android:data="${escapeXml(control.url)}" />
   </shortcut>`;
   });

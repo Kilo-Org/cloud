@@ -307,6 +307,13 @@ const config: ExpoConfig = {
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
     './plugins/withAndroidExpoModuleRepos',
+    // The agent controls' Android twin: two static app shortcuts on the launcher
+    // icon (long-press) carrying the same two contract urls as the
+    // './plugins/withAgentControls' iOS ControlWidgets below. No quick-settings
+    // tile, and no Action-button twin — that surface is iOS hardware only. It
+    // shares no resources with the widget plugins, so its order among the other
+    // Android plugins does not matter.
+    './plugins/withAgentShortcuts',
     // The agent controls' one-tap system surfaces: two ControlWidgets (Control
     // Center, the Lock Screen control slots, the Action button) that open the
     // app's existing agent deep links. Registered BEFORE

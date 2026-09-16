@@ -7,6 +7,7 @@ import {
   AGENT_CONTROLS,
   AGENT_CONTROLS_BUNDLE_CALL,
   AGENT_SHORTCUTS_META_DATA,
+  AGENT_SHORTCUTS_RESOURCE,
   agentControlsSwift,
   agentShortcutStrings,
   agentShortcutsXml,
@@ -75,6 +76,13 @@ describe('AGENT_CONTROLS', () => {
 describe('the generated control surfaces', () => {
   const contractUrls = AGENT_CONTROLS.map(control => control.url);
 
+  // Mirrors app.config.ts's `android.package`; the launcher activity is its
+  // `.MainActivity`. A change there must update this and the plugin together.
+  const androidTarget = {
+    targetPackage: 'com.kilocode.kiloapp',
+    targetClass: 'com.kilocode.kiloapp.MainActivity',
+  };
+
   // One definition, two surfaces: each generator renders every contract url
   // exactly once and may not spell a url of its own.
   function expectOnlyContractUrls(source: string): void {
@@ -86,7 +94,32 @@ describe('the generated control surfaces', () => {
   });
 
   it('the Android static-shortcut XML carries every contract url exactly once, and no other', () => {
-    expectOnlyContractUrls(agentShortcutsXml({ urls: AGENT_CONTROLS }));
+    expectOnlyContractUrls(agentShortcutsXml({ urls: AGENT_CONTROLS, ...androidTarget }));
+  });
+
+  it('the Android static-shortcut XML names the resource file, the app target, and the labels', () => {
+    const xml = agentShortcutsXml({ urls: AGENT_CONTROLS, ...androidTarget });
+    for (const url of contractUrls) {
+      expect(xml).toContain(`android:data="${url}"`);
+    }
+    // The labels the plugin must define as string resources, short and long.
+    expect(AGENT_SHORTCUTS_META_DATA.map(metadata => metadata.shortLabelResource)).toEqual([
+      'kilo_shortcut_new_agent_short',
+      'kilo_shortcut_open_waiting_agent_short',
+    ]);
+    for (const metadata of AGENT_SHORTCUTS_META_DATA) {
+      expect(xml).toContain(`@string/${metadata.shortLabelResource}`);
+      expect(xml).toContain(`@string/${metadata.longLabelResource}`);
+    }
+    // One VIEW intent per shortcut, aimed at the app's own launcher activity.
+    expect(xml.match(/<intent\b/g)).toHaveLength(AGENT_CONTROLS.length);
+    expect(xml.match(/android.intent.action.VIEW/g)).toHaveLength(AGENT_CONTROLS.length);
+    expect(xml).toContain(`android:targetPackage="${androidTarget.targetPackage}"`);
+    expect(xml).toContain(`android:targetClass="${androidTarget.targetClass}"`);
+    // The resource file the manifest's `android.app.shortcuts` meta-data points at.
+    expect(xml).toContain(AGENT_SHORTCUTS_RESOURCE);
+    // The launcher falls back to the app icon: no drawable asset is added.
+    expect(xml).not.toContain('android:icon');
   });
 
   it('the Swift declares an intent and a control per entry, plus the bundle', () => {

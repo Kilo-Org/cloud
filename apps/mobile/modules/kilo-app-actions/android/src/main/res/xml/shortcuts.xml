@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The shortcuts capability declaration the `android.app.shortcuts` meta-data on
+  KiloActionActivity points at. One capability per action, each targeting the
+  exported entry point, so the launcher and the Assistant surface the same four
+  actions the shared contract defines.
+
+  The entry point owns the translation into the contract payload; a capability
+  only names it.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+  <capability android:name="com.kilocode.kiloapp.action.START_AGENT">
+    <intent
+      android:action="com.kilocode.kiloapp.action.START_AGENT"
+      android:targetPackage="com.kilocode.kiloapp"
+      android:targetClass="expo.modules.kiloappactions.KiloActionActivity" />
+  </capability>
+
+  <capability android:name="com.kilocode.kiloapp.action.OPEN_NEEDS_INPUT">
+    <intent
+      android:action="com.kilocode.kiloapp.action.OPEN_NEEDS_INPUT"
+      android:targetPackage="com.kilocode.kiloapp"
+      android:targetClass="expo.modules.kiloappactions.KiloActionActivity" />
+  </capability>
+
+  <capability android:name="com.kilocode.kiloapp.action.OPEN_SESSION">
+    <intent
+      android:action="com.kilocode.kiloapp.action.OPEN_SESSION"
+      android:targetPackage="com.kilocode.kiloapp"
+      android:targetClass="expo.modules.kiloappactions.KiloActionActivity" />
+  </capability>
+
+  <capability android:name="com.kilocode.kiloapp.action.OPEN_PULL_REQUEST">
+    <intent
+      android:action="com.kilocode.kiloapp.action.OPEN_PULL_REQUEST"
+      android:targetPackage="com.kilocode.kiloapp"
+      android:targetClass="expo.modules.kiloappactions.KiloActionActivity" />
+  </capability>
+</shortcuts>

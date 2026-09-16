@@ -3093,5 +3093,12 @@
     "remoteFound": "Համակարգիչը միացված է",
     "checkAgain": "Կրկին ստուգիր",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Գործակալը մեկնարկելու համար հուշում է պետք։ Ավելացրու հուշում և նորից գործարկիր այն։",
+      "repositoryUnknown": "Kilo-ն {{repository}}-ը չի ճանաչում որպես GitHub կամ GitLab պահոց։ Ընտրիր մեկ այլ պահոց Kilo-ում։",
+      "repositoryUnsupported": "{{repository}}-ը Bitbucket պահոց է — Մեկնարկիր գործակալը դեռ չի կարող օգտագործել այն։ Ընտրիր մեկ այլ պահոց Kilo-ում։"
+    }
   }
 }

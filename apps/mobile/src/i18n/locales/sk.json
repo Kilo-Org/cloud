@@ -3139,5 +3139,12 @@
     "remoteFound": "Počítač pripojený",
     "checkAgain": "Skontrolovať znova",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Na spustenie agenta je potrebné zadanie. Pridaj zadanie a spusť ho znova.",
+      "repositoryUnknown": "Kilo nerozpoznáva {{repository}} ako repozitár na GitHube alebo GitLabe. Vyber iný repozitár v Kile.",
+      "repositoryUnsupported": "{{repository}} je repozitár na Bitbuckete — Spustiť agenta ho zatiaľ nemôže použiť. Vyber iný repozitár v Kile."
+    }
   }
 }

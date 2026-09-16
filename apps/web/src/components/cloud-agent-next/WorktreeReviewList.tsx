@@ -120,46 +120,48 @@ export function WorktreeReviewList({
               const editing = editor?.commentId === comment.id;
               const openComment = onOpenComment ? () => onOpenComment(comment) : undefined;
               return (
-                <li key={comment.id}>
+                <li key={comment.id} className="space-y-1">
                   {editing ? (
                     renderEditor
                   ) : (
-                    <article
-                      className={[
-                        'bg-muted/40 space-y-2 rounded-md border px-3 py-2',
-                        onOpenComment
-                          ? 'cursor-pointer focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none'
-                          : undefined,
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                      aria-label={`${formatWorktreeReviewRange(comment.anchor.range)} on ${comment.anchor.path}`}
-                      role={onOpenComment ? 'button' : undefined}
-                      tabIndex={onOpenComment ? 0 : undefined}
-                      onClick={openComment}
-                      onKeyDown={
-                        onOpenComment
-                          ? event => {
-                              if (event.key !== 'Enter' && event.key !== ' ') return;
-                              event.preventDefault();
-                              onOpenComment(comment);
-                            }
-                          : undefined
-                      }
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-muted-foreground text-xs">
-                          {formatWorktreeReviewRange(comment.anchor.range)}
-                        </p>
-                        {showFreshness && (
-                          <span className="text-muted-foreground shrink-0 text-xs">
-                            {freshnessLabel(status)}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm whitespace-pre-wrap break-words">{comment.text}</p>
-                      {!onOpenComment && renderActions?.(comment)}
-                    </article>
+                    <>
+                      <article
+                        className={[
+                          'bg-muted/40 space-y-2 rounded-md border px-3 py-2',
+                          onOpenComment
+                            ? 'cursor-pointer focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none'
+                            : undefined,
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        aria-label={`${formatWorktreeReviewRange(comment.anchor.range)} on ${comment.anchor.path}`}
+                        role={onOpenComment ? 'button' : undefined}
+                        tabIndex={onOpenComment ? 0 : undefined}
+                        onClick={openComment}
+                        onKeyDown={
+                          onOpenComment
+                            ? event => {
+                                if (event.key !== 'Enter' && event.key !== ' ') return;
+                                event.preventDefault();
+                                onOpenComment(comment);
+                              }
+                            : undefined
+                        }
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <p className="text-muted-foreground text-xs">
+                            {formatWorktreeReviewRange(comment.anchor.range)}
+                          </p>
+                          {showFreshness && (
+                            <span className="text-muted-foreground shrink-0 text-xs">
+                              {freshnessLabel(status)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap break-words">{comment.text}</p>
+                      </article>
+                      {renderActions?.(comment)}
+                    </>
                   )}
                 </li>
               );

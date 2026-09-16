@@ -85,6 +85,23 @@ export function WorktreeReviewDialog({
           <WorktreeReviewList
             comments={draft.comments}
             compact
+            freshness={review.freshness}
+            showFreshness
+            renderActions={comment =>
+              review.freshness.get(comment.id) === 'current' ? null : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                  disabled={review.locked}
+                  aria-label={`Discard comment on ${comment.anchor.path}`}
+                  onClick={() => review.removeComment(comment.id)}
+                >
+                  Discard
+                </Button>
+              )
+            }
             editor={draft.editor}
             editorError={draft.error}
             editorDisabled={Boolean(review.disabledReason)}

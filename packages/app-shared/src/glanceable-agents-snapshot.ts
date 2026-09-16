@@ -68,6 +68,12 @@ export const glanceableAgentsSnapshotSchema = z.object({
   running: z.number().int().min(0),
   /** Sessions waiting on the user, including one whose CLI dropped mid-question. */
   needsInput: z.number().int().min(0),
+  /**
+   * Sessions waiting on a permission prompt: the needs-input rows that can be
+   * approved without choosing an option. Optional on the wire — an older
+   * producer omits it — and every reader treats absent as 0.
+   */
+  needsApproval: z.number().int().min(0).optional(),
   /** Sessions connected but doing nothing. */
   idle: z.number().int().min(0),
   /**
@@ -149,6 +155,25 @@ export function countGlanceableSessions(
     counts[glanceableStatusKind(session.status)] += 1;
   }
   return counts;
+}
+
+/**
+ * The number of session rows whose status is exactly `permission`. A
+ * permission wait is the one needs-input kind the user can clear without
+ * choosing an option, so the wrist control offers Approve only against this
+ * count.
+ *
+ * Deliberately narrower than `needsInput`: a `question` needs an answer, and a
+ * `retry` needs the provider to come back, so neither is approvable.
+ */
+export function countGlanceableApprovals(sessions: readonly GlanceableSessionRow[]): number {
+  let approvals = 0;
+  for (const session of sessions) {
+    if (session.status === 'permission') {
+      approvals += 1;
+    }
+  }
+  return approvals;
 }
 
 /**
@@ -277,6 +302,7 @@ export function buildGlanceableSnapshot(
     status: input.status ?? (eligible ? 'happy' : 'empty'),
     running: counts.running,
     needsInput: counts.needsInput,
+    needsApproval: countGlanceableApprovals(input.sessions),
     idle: counts.idle,
     needsInputSince: oldestNeedsInputSince(input.sessions),
     newestResultKind: newest?.kind ?? null,

@@ -36,6 +36,10 @@ vi.mock('./session-access.js', () => ({
   requireCurrentSessionAccess: requireCurrentSessionAccessMock,
 }));
 
+const { getPgDbMock } = vi.hoisted(() => ({ getPgDbMock: vi.fn() }));
+
+vi.mock('./db/pg.js', () => ({ getPgDb: getPgDbMock }));
+
 vi.mock('./session/model-preflight.js', () => ({
   preflightExistingPromptModel: preflightExistingPromptModelMock,
   preflightPreparedInitialPromptModel: preflightPreparedInitialPromptModelMock,
@@ -119,6 +123,15 @@ type MockCAS = {
 
 function legacySessionMetadata(input: Record<string, unknown>): CloudAgentSessionState {
   return parseSessionMetadata(input);
+}
+
+function mockWorktreeOwnershipRow(
+  row: { parentSessionId: string | null; cloudAgentSessionScopeId: string | null } | null
+): void {
+  const limit = vi.fn().mockResolvedValue(row ? [row] : []);
+  const where = vi.fn(() => ({ limit }));
+  const from = vi.fn(() => ({ where }));
+  getPgDbMock.mockReturnValue({ select: vi.fn(() => ({ from })) });
 }
 
 // Note: Balance validation is now handled in the worker entry point (index.ts)
@@ -1183,6 +1196,64 @@ describe('router sessionId validation', () => {
           expect(result.autoCommit).toBeUndefined();
           expect(result.preparedAt).toBeUndefined();
           expect(result.initiatedAt).toBeUndefined();
+        });
+      });
+
+      describe('worktree ownership', () => {
+        const WORKTREE_ID = 'worktree_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        const SCOPE_ID = 'workspace_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+        const PARENT_KILO_SESSION_ID = 'ses_abcdefghijklmnopqrstuvwxyz';
+
+        function worktreeSessionMetadata(sessionId: SessionId): CloudAgentSessionState {
+          return parseSessionMetadata({
+            metadataSchemaVersion: 2,
+            identity: { sessionId, userId: 'test-user-123' },
+            auth: { kiloSessionId: PARENT_KILO_SESSION_ID },
+            workspace: { worktreeId: WORKTREE_ID },
+            lifecycle: { version: 1, timestamp: 123456789 },
+          });
+        }
+
+        it('exposes worktree ownership from the PostgreSQL row for a worktree session', async () => {
+          const sessionId: SessionId = 'agent_77777777-7777-4777-8777-777777777771';
+          mockGetMetadata.mockResolvedValue(worktreeSessionMetadata(sessionId));
+          mockWorktreeOwnershipRow({
+            parentSessionId: PARENT_KILO_SESSION_ID,
+            cloudAgentSessionScopeId: SCOPE_ID,
+          });
+
+          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+          expect(result.worktreeId).toBe(WORKTREE_ID);
+          expect(result.parentSessionId).toBe(PARENT_KILO_SESSION_ID);
+          expect(result.cloudAgentSessionScopeId).toBe(SCOPE_ID);
+          expect(getPgDbMock).toHaveBeenCalledTimes(1);
+        });
+
+        it('returns null ownership fields when a worktree session has no ownership row', async () => {
+          const sessionId: SessionId = 'agent_77777777-7777-4777-8777-777777777772';
+          mockGetMetadata.mockResolvedValue(worktreeSessionMetadata(sessionId));
+          mockWorktreeOwnershipRow(null);
+
+          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+          expect(result.worktreeId).toBe(WORKTREE_ID);
+          expect(result.parentSessionId).toBeNull();
+          expect(result.cloudAgentSessionScopeId).toBeNull();
+        });
+
+        it('omits ownership fields and skips PostgreSQL for an ordinary session', async () => {
+          const sessionId: SessionId = 'agent_77777777-7777-4777-8777-777777777773';
+          mockGetMetadata.mockResolvedValue(
+            legacySessionMetadata({ version: 1, sessionId, userId: 'test-user-123', timestamp: 1 })
+          );
+
+          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+          expect(result).not.toHaveProperty('worktreeId');
+          expect(result).not.toHaveProperty('parentSessionId');
+          expect(result).not.toHaveProperty('cloudAgentSessionScopeId');
+          expect(getPgDbMock).not.toHaveBeenCalled();
         });
       });
 

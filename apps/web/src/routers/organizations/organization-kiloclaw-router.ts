@@ -623,6 +623,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const client = new KiloClawInternalClient();
     const result = await client.start(ctx.user.id, workerInstanceId(instance), {
+      skipCooldown: true,
       reason: 'manual_user_request',
     });
     PostHogClient().capture({

@@ -37,6 +37,7 @@ const snapshot: ActiveAgentsGlanceable = {
   status: 'happy',
   running: 2,
   needsInput: 1,
+  needsApproval: 1,
   idle: 0,
   updatedAt: '2026-08-27T10:00:00.000Z',
   expiresAt: '2026-08-27T18:00:00.000Z',
@@ -301,6 +302,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     return {
       ...snapshot,
       needsInput: 0,
+      needsApproval: 0,
       updatedAt: new Date(Date.now()).toISOString(),
       expiresAt: new Date(Date.now() + 28_800_000).toISOString(),
       needsInputSince: new Date(Date.now()).toISOString(),
@@ -586,6 +588,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       status: 'empty',
       running: 0,
       needsInput: 0,
+      needsApproval: 0,
       idle: 0,
       needsInputSince: null,
     });
@@ -900,6 +903,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           status: 'happy',
           running: 0,
           needsInput: 1,
+          needsApproval: 0,
           idle: 0,
           needsInputSince: '2026-08-27T10:00:01.000Z',
         },
@@ -1444,6 +1448,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
                 status: 'empty',
                 running: 0,
                 needsInput: 0,
+                needsApproval: 0,
                 idle: 0,
                 needsInputSince: null,
               },
@@ -1751,9 +1756,23 @@ describe('toGlanceableContentState', () => {
       status: 'happy',
       running: 2,
       needsInput: 1,
+      needsApproval: 1,
       idle: 0,
       needsInputSince: '2026-08-27T09:00:00.000Z',
     });
+  });
+
+  it('forwards the approvable count and treats an absent field as zero', () => {
+    expect(
+      (JSON.parse(toGlanceableContentState(snapshot).props) as Record<string, unknown>)
+        .needsApproval
+    ).toBe(1);
+    // A snapshot from a server older than this release omits the field; the
+    // Live Activity content state still carries an explicit 0.
+    const { needsApproval: _absent, ...legacy } = snapshot;
+    expect(
+      (JSON.parse(toGlanceableContentState(legacy).props) as Record<string, unknown>).needsApproval
+    ).toBe(0);
   });
 
   it('never leaks snapshot bookkeeping, ids, or titles into the pushed content-state', () => {

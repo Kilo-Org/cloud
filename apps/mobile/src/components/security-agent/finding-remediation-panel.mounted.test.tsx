@@ -274,16 +274,26 @@ describe('FindingRemediationPanel pull request navigation', () => {
   });
 
   it.each([
-    ['https://github.com/kilo/kilo/pull/123', true, true],
-    ['https://github.com/kilo/kilo/pull/123', false, false],
-    ['https://gitlab.com/kilo/kilo/-/merge_requests/123', true, false],
-  ] as const)('opens %s with PR review=%s in-app=%s', (prUrl, enabled, inApp) => {
+    ['https://github.com/kilo/kilo/pull/123', true, '/(app)/pr-review/kilo/kilo/123'],
+    ['https://github.com/kilo/kilo/pull/123', false, null],
+    [
+      'https://gitlab.com/kilo/kilo/-/merge_requests/123',
+      true,
+      '/(app)/pr-review/gitlab/kilo/kilo/123?instance=https%3A%2F%2Fgitlab.com',
+    ],
+    [
+      'https://bitbucket.org/kilo/kilo/pull-requests/123',
+      true,
+      '/(app)/pr-review/bitbucket/kilo/kilo/123',
+    ],
+    ['https://github.example.com/kilo/kilo/pull/123', true, null],
+  ] as const)('opens %s with PR review=%s', (prUrl, enabled, expectedHref) => {
     mocks.prReviewEnabled = enabled;
     pressButtons(
       renderPanel(analysisFixture({ remediationSummary: { status: 'pr_opened', prUrl } }))
     );
-    if (inApp) {
-      expect(mocks.routerPush).toHaveBeenCalledWith('/(app)/pr-review/kilo/kilo/123');
+    if (expectedHref) {
+      expect(mocks.routerPush).toHaveBeenCalledWith(expectedHref);
       expect(mocks.openExternalUrl).not.toHaveBeenCalled();
     } else {
       expect(mocks.routerPush).not.toHaveBeenCalled();

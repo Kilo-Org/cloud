@@ -58,6 +58,10 @@ export function glanceableLayoutCopy() {
     idle: i18n.t('common.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
     newestResult: i18n.t('glanceable.newestResult'),
+    // The Live Activity's Approve control. `common.approve` is the existing
+    // label the permission card uses, so the wrist control and the phone name
+    // the same action; `check:i18n` forbids a second key with the same copy.
+    approve: i18n.t('common.approve'),
     locale: resolveGlanceableLocale(i18n.language),
     digits: glanceableDigits(),
   };

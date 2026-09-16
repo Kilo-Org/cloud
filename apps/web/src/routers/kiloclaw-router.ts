@@ -3362,6 +3362,7 @@ export const kiloclawRouter = createTRPCRouter({
     const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
     const result = await client.start(ctx.user.id, workerInstanceId(instance), {
+      skipCooldown: true,
       reason: 'manual_user_request',
     });
     if (instance && result.currentStatus === 'running') {

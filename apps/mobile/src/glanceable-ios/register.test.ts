@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
     endImmediate: vi.fn(),
     startOrUpdate: vi.fn(),
   },
+  registerApprove: vi.fn((_approve: () => Promise<void>) => vi.fn()),
+  approveFrontAgent: vi.fn().mockResolvedValue({ kind: 'approved' }),
 }));
 
 vi.mock('react-native', () => ({
@@ -23,6 +25,12 @@ vi.mock('./active-agents-live-activity', () => ({
 vi.mock('./active-agents-widget', () => ({
   refreshActiveAgentsWidgetCopy: vi.fn(),
 }));
+vi.mock('./approve-action', () => ({
+  registerGlanceableApproveAction: mocks.registerApprove,
+}));
+vi.mock('@/lib/glanceable/approve-front-agent', () => ({
+  approveFrontAgent: mocks.approveFrontAgent,
+}));
 vi.mock('./widget-logo', () => ({ ensureWidgetLogo: vi.fn() }));
 vi.mock('@/i18n', () => ({ i18n: { on: vi.fn(), t: (key: string) => key } }));
 vi.mock('@/lib/glanceable/live-activity-switch', () => ({
@@ -32,6 +40,7 @@ vi.mock('@/lib/glanceable/live-activity-switch', () => ({
 
 describe('glanceable-ios register', () => {
   afterEach(() => {
+    vi.clearAllMocks();
     vi.resetModules();
   });
 
@@ -41,6 +50,7 @@ describe('glanceable-ios register', () => {
     const { getGlanceableSinks } = await import('@/lib/glanceable/sink-registry');
     await import('./register');
     expect(getGlanceableSinks()).not.toContain(mocks.iosSink);
+    expect(mocks.registerApprove).not.toHaveBeenCalled();
   });
 
   it('registers the iOS sink on iOS', async () => {
@@ -49,5 +59,15 @@ describe('glanceable-ios register', () => {
     const { getGlanceableSinks } = await import('@/lib/glanceable/sink-registry');
     await import('./register');
     expect(getGlanceableSinks()).toContain(mocks.iosSink);
+  });
+
+  it('wires the Live Activity approve press to the front-approval service', async () => {
+    mocks.platform.OS = 'ios';
+    vi.resetModules();
+    await import('./register');
+    const [approve] = mocks.registerApprove.mock.calls[0] ?? [];
+    expect(approve).toBeTypeOf('function');
+    await approve?.();
+    expect(mocks.approveFrontAgent).toHaveBeenCalledTimes(1);
   });
 });

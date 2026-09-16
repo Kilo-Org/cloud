@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 
 import { i18n } from '@/i18n';
+import { approveFrontAgent } from '@/lib/glanceable/approve-front-agent';
 import { getGlanceableDelivery, registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import {
   getLiveActivityEnabled,
@@ -10,6 +11,7 @@ import {
 import { adoptPushStartedActivity } from './adopt-activity';
 import { refreshActiveAgentsLiveActivityCopy } from './active-agents-live-activity';
 import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
+import { registerGlanceableApproveAction } from './approve-action';
 import { iosSink } from './ios-sink';
 import { ensureWidgetLogo } from './widget-logo';
 
@@ -20,6 +22,14 @@ if (Platform.OS === 'ios') {
   // publisher is plain state, and widgets get translated copy through the sink,
   // not through a mounted component tree.
   registerGlanceableSink(iosSink);
+
+  // The Live Activity's Approve control mirrors to the Apple Watch, so a wrist
+  // press arrives as a widget interaction in this process. It runs the same
+  // front-approval service the phone's permission card uses; the caller is a
+  // thunk because the service reads its scope and attaches lazily.
+  registerGlanceableApproveAction(async () => {
+    await approveFrontAgent();
+  });
 
   // Copy the Kilo mark into the shared app group so the widget extension can read
   // it. Fire and forget: it lands long before the first snapshot arrives, and a

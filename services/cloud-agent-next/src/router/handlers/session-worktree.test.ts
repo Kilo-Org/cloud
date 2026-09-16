@@ -303,9 +303,10 @@ function fixture(options?: {
   };
   const legacySessionNamespace = { idFromName: vi.fn(), get: vi.fn() };
   const sandboxControlNamespace = { idFromName: vi.fn(), get: vi.fn() };
-  const headers = new Headers({
-    'x-internal-api-key': options?.internalSecret ?? INTERNAL_SECRET,
-  });
+  const headers = new Headers();
+  if (options?.internalSecret) {
+    headers.set('x-internal-api-key', options.internalSecret);
+  }
   const context = {
     userId,
     authToken: options?.authToken ?? CURRENT_AUTH_TOKEN,
@@ -445,12 +446,25 @@ describe('createWorktreeChat request validation and authorization', () => {
     expect(CreateWorktreeChatInput.safeParse({ ...input, unexpected: true }).success).toBe(false);
   });
 
-  it('requires internal authentication before loading source ownership', async () => {
-    const { caller, input } = fixture({ internalSecret: 'wrong-secret' });
+  it('requires a user token before loading source ownership', async () => {
+    const { caller, input } = fixture({ authToken: '' });
 
     await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     expect(getPgDbMock).not.toHaveBeenCalled();
     expect(admitOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('creates a worktree chat for an owned source without an internal API key', async () => {
+    const { caller, context, input, destinationStub } = fixture();
+
+    expect(context.request.headers.get('x-internal-api-key')).toBeNull();
+    await expect(caller.createWorktreeChat(input)).resolves.toEqual({
+      cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
+      kiloSessionId: DESTINATION_KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
+    });
+    expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
+    expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
   });
 
   it('rejects another owner or a same-organization member without source ownership', async () => {

@@ -366,9 +366,6 @@ export async function createWorktreeChat(
   },
   signal?: AbortSignal
 ): Promise<WorktreeSessionResult> {
-  if (!config.internalApiSecret) {
-    throw new Error('createWorktreeChat requires INTERNAL_API_SECRET');
-  }
   return trpcCall<WorktreeSessionResult>(
     config,
     'createWorktreeChat',

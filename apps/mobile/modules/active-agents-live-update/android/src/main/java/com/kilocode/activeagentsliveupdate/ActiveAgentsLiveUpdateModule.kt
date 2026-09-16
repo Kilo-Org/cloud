@@ -18,7 +18,8 @@ import expo.modules.kotlin.modules.ModuleDefinition
  * The JS side owns the translated copy, the notification kind's channel (and
  * its creation), the alert decision, and the revision guard; this module owns
  * the fixed notification id, the API 36.1+ promotion gate, and the content
- * intent plus named action that open the Agents tab via a deep link.
+ * intent plus named actions: one that opens the Agents tab via a deep link, and
+ * one that runs the headless approval when a permission waits.
  */
 class ActiveAgentsLiveUpdateModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -28,12 +29,12 @@ class ActiveAgentsLiveUpdateModule : Module() {
       isPromotionCapable()
     }
 
-    Function("start") { title: String, text: String, openAgentsLabel: String, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean ->
-      post(title, text, openAgentsLabel, compactText, channelId, alerting, promotion, 0)
+    Function("start") { title: String, text: String, openAgentsLabel: String, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean ->
+      post(title, text, openAgentsLabel, approveLabel, compactText, channelId, alerting, promotion, 0)
     }
 
-    Function("update") { title: String, text: String, openAgentsLabel: String, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean, timeoutMs: Double ->
-      post(title, text, openAgentsLabel, compactText, channelId, alerting, promotion, timeoutMs.toLong())
+    Function("update") { title: String, text: String, openAgentsLabel: String, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean, timeoutMs: Double ->
+      post(title, text, openAgentsLabel, approveLabel, compactText, channelId, alerting, promotion, timeoutMs.toLong())
     }
 
     Function("end") {
@@ -92,7 +93,33 @@ class ActiveAgentsLiveUpdateModule : Module() {
     )
   }
 
-  private fun post(title: String, text: String, openAgentsLabel: String, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean, timeoutMs: Long) {
+  /**
+   * A PendingIntent that hands the tap to the headless approve task. A
+   * broadcast, not an Activity: the phone can be locked when the Wear OS
+   * surface answers, and the approval needs no screen.
+   */
+  private fun approvePendingIntent(): PendingIntent {
+    val intent = Intent(context, ActiveAgentsApproveReceiver::class.java)
+      .setAction(ACTION_APPROVE)
+    return PendingIntent.getBroadcast(
+      context,
+      APPROVE_REQUEST_CODE,
+      intent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+  }
+
+  private fun post(
+    title: String,
+    text: String,
+    openAgentsLabel: String,
+    approveLabel: String?,
+    compactText: String?,
+    channelId: String,
+    alerting: Boolean,
+    promotion: Boolean,
+    timeoutMs: Long
+  ) {
     val contentIntent = openAgentsPendingIntent()
     // The two OS paths a notification can interrupt Do Not Disturb with are the
     // channel's DND override (user-granted, requested by the app) and the
@@ -114,6 +141,19 @@ class ActiveAgentsLiveUpdateModule : Module() {
           contentIntent
         ).build()
       )
+
+    // The second action is the wrist control: it appears exactly while a
+    // session waits on a permission, and the JS side drops the label when the
+    // wait is answered.
+    if (approveLabel != null) {
+      builder.addAction(
+        Notification.Action.Builder(
+          Icon.createWithResource(context, smallIconId()),
+          approveLabel,
+          approvePendingIntent()
+        ).build()
+      )
+    }
 
     if (needsInput) {
       // Only the first entry into the kind alerts; a later update in the same
@@ -169,5 +209,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
     const val NEEDS_INPUT_CHANNEL_ID = "needs-input"
     const val OPEN_AGENTS_DEEP_LINK = "kiloapp:///cloud/sessions"
     const val OPEN_AGENTS_REQUEST_CODE = 1002
+    const val ACTION_APPROVE = "com.kilocode.activeagentsliveupdate.action.APPROVE"
+    const val APPROVE_REQUEST_CODE = 1003
   }
 }

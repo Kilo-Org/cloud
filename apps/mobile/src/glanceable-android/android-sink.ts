@@ -32,6 +32,7 @@ import { isNotificationPermissionGranted } from './permission';
 import { showAndroidPermissionAlertOnce } from './permission-alert';
 import {
   type AndroidWidgetProps,
+  buildApproveLabel,
   buildCompactNotificationText,
   buildCurrentWidgetProps,
   buildOngoingNotificationText,
@@ -121,6 +122,11 @@ function hasCurrentWork(snapshot: GlanceableAgentsSnapshot): boolean {
   );
 }
 
+/** The Approve action label for this snapshot, or null when there is none. */
+function approveLabelFor(snapshot: GlanceableAgentsSnapshot): string | null {
+  return buildApproveLabel(snapshot, translate);
+}
+
 function endNotification(): void {
   endLiveUpdate();
   notificationActive = false;
@@ -152,6 +158,7 @@ async function tryStartOrUpdate(
   const title = translate(NOTIFICATION_TITLE_KEY);
   const text = buildOngoingNotificationText(snapshot, {}, translate, formatGlanceableCount);
   const openAgentsLabel = translate(OPEN_AGENTS_LABEL_KEY);
+  const approveLabel = approveLabelFor(snapshot);
   const compactText = buildCompactNotificationText(snapshot, {}, formatGlanceableCount);
   // The card's kind decides the channel the user can silence and whether this
   // entry alerts; progress stays on the silent status channel.
@@ -159,7 +166,15 @@ async function tryStartOrUpdate(
   const channelId = androidChannelIdForAgentKind(kind);
 
   if (notificationActive) {
-    updateLiveUpdate(title, text, openAgentsLabel, compactText, channelId, shouldAlert(kind));
+    updateLiveUpdate(
+      title,
+      text,
+      openAgentsLabel,
+      approveLabel,
+      compactText,
+      channelId,
+      shouldAlert(kind)
+    );
     notificationKind = kind;
     terminalExpiresAt = null;
     revision = snapshot.revision;
@@ -181,14 +196,30 @@ async function tryStartOrUpdate(
     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/retry can set notificationActive while awaiting permission
     if (notificationActive) {
       if (snapshot.revision > revision) {
-        updateLiveUpdate(title, text, openAgentsLabel, compactText, channelId, shouldAlert(kind));
+        updateLiveUpdate(
+          title,
+          text,
+          openAgentsLabel,
+          approveLabel,
+          compactText,
+          channelId,
+          shouldAlert(kind)
+        );
         notificationKind = kind;
         terminalExpiresAt = null;
         revision = snapshot.revision;
       }
       return;
     }
-    startLiveUpdate(title, text, openAgentsLabel, compactText, channelId, shouldAlert(kind));
+    startLiveUpdate(
+      title,
+      text,
+      openAgentsLabel,
+      approveLabel,
+      compactText,
+      channelId,
+      shouldAlert(kind)
+    );
     notificationKind = kind;
     notificationActive = true;
     terminalExpiresAt = null;
@@ -231,6 +262,7 @@ async function retryPendingStart(): Promise<void> {
     translate(NOTIFICATION_TITLE_KEY),
     buildOngoingNotificationText(p.snapshot, {}, translate, formatGlanceableCount),
     translate(OPEN_AGENTS_LABEL_KEY),
+    approveLabelFor(p.snapshot),
     buildCompactNotificationText(p.snapshot, {}, formatGlanceableCount),
     androidChannelIdForAgentKind(kind),
     shouldAlert(kind)
@@ -306,6 +338,7 @@ export const androidSink: GlanceableSink = {
           ? buildOngoingNotificationText(snapshot, {}, translate, formatGlanceableCount)
           : (props.statusLine ?? translate('glanceable.empty')),
         translate(OPEN_AGENTS_LABEL_KEY),
+        eligible ? approveLabelFor(snapshot) : null,
         eligible ? buildCompactNotificationText(snapshot, {}, formatGlanceableCount) : null,
         androidChannelIdForAgentKind(kind),
         shouldAlert(kind),

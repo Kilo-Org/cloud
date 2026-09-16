@@ -174,14 +174,17 @@ export function TourRemoteStep({ onChooseComputer }: Readonly<TourRemoteStepProp
   return (
     <ScrollView
       className="flex-1"
-      contentContainerClassName="items-center gap-6 px-6 pt-4 pb-6"
+      contentContainerClassName="grow items-center justify-center gap-6 px-6 py-6"
       keyboardShouldPersistTaps="handled"
     >
-      {/* Top-aligned, matching the app's own modal first-run flow: the body
-          starts directly under the header instead of being centred in the band
-          between the header and the action bar. It still scrolls, so the
-          discovered-computer list growing with every connected machine (or a
-          short screen or a large system font) cannot cover the Skip bar. */}
+      {/* Centred in the band between the header and the Skip bar: the content
+          container grows to the viewport (`grow`) and distributes its children
+          in the middle (`justify-center`). `grow` is a minimum, not a fixed
+          height, so the step still scrolls: the discovered-computer list
+          growing with every connected machine (or a short screen or a large
+          system font) starts at the top padding rather than covering the Skip
+          bar. */}
+
       <TourStepHeader
         icon={<Server size={36} color={colors.foreground} />}
         title={t('tour.remoteTitle')}

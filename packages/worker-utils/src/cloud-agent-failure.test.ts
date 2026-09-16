@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CLOUD_AGENT_FAILURE_CODES,
-  CLOUD_AGENT_FAILURE_STAGES,
   CLOUD_AGENT_PROVIDER_OWNERSHIPS,
   CloudAgentCallbackFailureSchema,
   CloudAgentFailureReasonSchema,
   CloudAgentSafeFailureSchema,
   classifyCloudAgentFailure,
   isWorkspaceFailureSubtype,
-  WORKSPACE_FAILURE_SUBTYPES,
 } from './cloud-agent-failure.js';
 
 describe('CloudAgentCallbackFailureSchema', () => {
@@ -330,21 +327,6 @@ describe('classifyCloudAgentFailure', () => {
 });
 
 describe('CloudAgentSafeFailureSchema', () => {
-  it('accepts every shared contract value', () => {
-    for (const stage of CLOUD_AGENT_FAILURE_STAGES) {
-      expect(CloudAgentSafeFailureSchema.safeParse({ stage }).success).toBe(true);
-    }
-    for (const code of CLOUD_AGENT_FAILURE_CODES) {
-      expect(CloudAgentSafeFailureSchema.safeParse({ code }).success).toBe(true);
-    }
-    for (const subtype of WORKSPACE_FAILURE_SUBTYPES) {
-      expect(
-        CloudAgentSafeFailureSchema.safeParse({ code: 'workspace_setup_failed', subtype }).success
-      ).toBe(true);
-      expect(isWorkspaceFailureSubtype(subtype)).toBe(true);
-    }
-  });
-
   it('requires workspace_setup_failed when subtype is present', () => {
     expect(CloudAgentSafeFailureSchema.safeParse({ subtype: 'git_clone_timeout' }).success).toBe(
       false

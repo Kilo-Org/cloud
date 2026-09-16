@@ -45,7 +45,12 @@ export async function evaluateGitHubSharingCompatibility(
     .where(
       and(
         eq(platform_integrations.platform, PLATFORM.GITHUB),
-        eq(platform_integrations.github_installation_id, canonicalInstallationId)
+        eq(platform_integrations.github_installation_id, canonicalInstallationId),
+        // A locally disconnected association has relinquished this
+        // installation: it must not count as still-incumbent work (active
+        // reviews, automation, bot requests, deployments, etc.) blocking a
+        // different tenant's connect-existing attempt.
+        isNull(platform_integrations.github_disconnected_at)
       )
     )
     .for('update');
@@ -117,11 +122,7 @@ export async function evaluateGitHubSharingCompatibility(
     .where(
       and(
         or(...slackOwnerConditions),
-        inArray(platform_integrations.platform, [
-          PLATFORM.SLACK,
-          PLATFORM.DISCORD,
-          PLATFORM.LINEAR,
-        ]),
+        inArray(platform_integrations.platform, [PLATFORM.DISCORD, PLATFORM.LINEAR]),
         eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE),
         isNull(platform_integrations.suspended_at),
         isNull(platform_integrations.auth_invalid_at)

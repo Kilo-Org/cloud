@@ -134,7 +134,14 @@ const glanceablePayload = {
 describe('pushDataSchema active_agents_glanceable', () => {
   it('parses a payload whose server omits needsApproval without inventing a value', () => {
     const parsed = pushDataSchema.parse(glanceablePayload);
-    expect(parsed).toEqual(glanceablePayload);
+    // The newest-result pair is the one defaulted field group: a server that
+    // predates the fact omits it, and the parsed shape fills null so mobile can
+    // spread it straight into a snapshot. Every other key round-trips exactly.
+    expect(parsed).toEqual({
+      ...glanceablePayload,
+      newestResultKind: null,
+      newestResultAt: null,
+    });
     // Optional on the wire so a push from an older server still parses; the
     // mobile readers treat absent as zero.
     expect('needsApproval' in parsed).toBe(false);
@@ -142,7 +149,11 @@ describe('pushDataSchema active_agents_glanceable', () => {
 
   it('parses a payload carrying needsApproval', () => {
     const payload = { ...glanceablePayload, needsApproval: 2 };
-    expect(pushDataSchema.parse(payload)).toEqual(payload);
+    expect(pushDataSchema.parse(payload)).toEqual({
+      ...payload,
+      newestResultKind: null,
+      newestResultAt: null,
+    });
   });
 
   it('rejects a negative or fractional needsApproval', () => {

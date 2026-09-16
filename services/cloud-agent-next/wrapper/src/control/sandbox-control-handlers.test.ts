@@ -727,14 +727,31 @@ describe('handleControlRequest', () => {
     const runtimes = handlerDeps.kiloRuntimes;
     if (!runtimes) throw new Error('Expected Kilo runtimes');
     runtimes.prepareForNewWork = () => false;
+    runtimes.feedRecovering = () => true;
 
     expect(
       await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
     ).toEqual({
       ok: false,
       error: {
-        code: 'not_ready',
+        code: 'session_busy',
         message: 'Native feed recovery is in progress',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+    expect(
+      await handleControlRequest(
+        'session.terminal.create',
+        session,
+        { operationId: '11111111-1111-4111-8111-111111111111' },
+        handlerDeps
+      )
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        message: 'Kilo worktree is not available',
         retryable: true,
         admission: 'not-admitted',
       },
@@ -755,6 +772,147 @@ describe('handleControlRequest', () => {
       ok: true,
       result: { status: 'already_idle' },
     });
+  });
+
+  it('defers a prompt while the native feed is recovering', async () => {
+    const handlerDeps = deps();
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Expected Kilo runtimes');
+    runtimes.prepareForNewWork = () => false;
+    runtimes.feedRecovering = () => true;
+
+    expect(
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'session_busy',
+        message: 'Native feed recovery is in progress',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+  });
+
+  it('reports an unavailable worktree as not_ready rather than feed recovery', async () => {
+    const handlerDeps = deps();
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Expected Kilo runtimes');
+    runtimes.prepareForNewWork = () => false;
+    runtimes.feedRecovering = () => false;
+
+    expect(
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        message: 'Kilo worktree is not available',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+    expect(
+      await handleControlRequest(
+        'session.terminal.create',
+        session,
+        { operationId: '11111111-1111-4111-8111-111111111111' },
+        handlerDeps
+      )
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        message: 'Kilo worktree is not available',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+  });
+
+  it('defers an authorized prompt before admission during feed recovery without retaining a receipt', async () => {
+    const started = Promise.withResolvers<void>();
+    const finished = Promise.withResolvers<Completion>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return finished.promise;
+        },
+      }),
+    });
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Expected Kilo runtimes');
+    runtimes.prepareForNewWork = () => false;
+    runtimes.feedRecovering = () => true;
+    const authorization = {
+      operation: 'session.prompt' as const,
+      operationId: promptPayload.messageId,
+      messageId: promptPayload.messageId,
+      session: { ...session },
+      wrapperInstanceId: crypto.randomUUID(),
+      dispatchDeadlineAt: Date.now() + 60_000,
+    };
+
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        promptPayload,
+        handlerDeps,
+        authorization
+      )
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'session_busy',
+        message: 'Native feed recovery is in progress',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+    expect(handlerDeps.operations.counts()).toEqual({ active: 0, retained: 0, archived: 0 });
+    expect(handlerDeps.operations.active(session.kiloSessionId)).toBeUndefined();
+    expect(handlerDeps.operations.retained()).toEqual([]);
+
+    runtimes.prepareForNewWork = () => true;
+    runtimes.feedRecovering = () => false;
+    try {
+      expect(
+        await handleControlRequest(
+          'session.prompt',
+          session,
+          promptPayload,
+          handlerDeps,
+          authorization
+        )
+      ).toEqual({
+        ok: true,
+        result: {
+          messageId: promptPayload.messageId,
+          status: 'accepted',
+          executionDeadlineAt: expect.any(Number),
+        },
+      });
+      await started.promise;
+      expect(handlerDeps.operations.retained()).toHaveLength(1);
+      expect(
+        await handleControlRequest(
+          'session.prompt',
+          session,
+          promptPayload,
+          handlerDeps,
+          authorization
+        )
+      ).toMatchObject({
+        ok: true,
+        result: { messageId: promptPayload.messageId, status: 'existing' },
+      });
+      expect(handlerDeps.operations.retained()).toHaveLength(1);
+    } finally {
+      finished.resolve(completion());
+      await waitForTasks(handlerDeps);
+    }
   });
 
   it('does not send an unfenced abort when the wrapper owns no work', async () => {
@@ -1005,7 +1163,8 @@ describe('handleControlRequest', () => {
         detach: () => true,
         retireForRecovery: async () => 'retired',
         deleteDirectory: async () => {},
-        getRetained: directory => runtimes.get(directory),
+        getRetained: identity =>
+          runtimes.get(typeof identity === 'string' ? identity : identity.directory),
         retireRuntime: async (directory, _deadlineAt, target) => {
           const runtime = runtimes.get(directory);
           return runtime &&
@@ -3178,6 +3337,97 @@ describe('owned control execution', () => {
     });
   });
 
+  it('does not shut down the wrapper when an operation abort finds directory-local native uncertainty', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return running.promise;
+        },
+        abortSession: async () => false,
+      })
+    );
+    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory').mockResolvedValue(
+      'unconfirmed'
+    );
+    try {
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+      await started.promise;
+      const task = handlerDeps.operations.active(session.kiloSessionId);
+      if (!task) throw new Error('Missing operation record');
+      const stopped = await handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: promptPayload.messageId,
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        handlerDeps
+      );
+      expect(directoryRetirement).toHaveBeenCalled();
+      expect(stopped).toMatchObject({
+        ok: true,
+        result: { status: 'unconfirmed', quiescent: false },
+      });
+      expect(stopped).not.toHaveProperty('result.runtimeRetired');
+      expect(retired).toEqual([]);
+      expect(handlerDeps.signal?.aborted).toBe(false);
+      expect(task.cleanup).toBe('unconfirmed');
+    } finally {
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await waitForTasks(handlerDeps);
+      directoryRetirement.mockRestore();
+    }
+  });
+
+  it('shuts down the wrapper when an operation abort cannot stop operation-owned processes', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return running.promise;
+        },
+        abortSession: async () => false,
+      })
+    );
+    const directoryRetirement = spyOn(handlerDeps.operations, 'retireDirectory').mockResolvedValue(
+      'operation_process_stop_unconfirmed'
+    );
+    try {
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+      await started.promise;
+      const task = handlerDeps.operations.active(session.kiloSessionId);
+      if (!task) throw new Error('Missing operation record');
+      const stopped = await handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: promptPayload.messageId,
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        handlerDeps
+      );
+      expect(directoryRetirement).toHaveBeenCalled();
+      expect(stopped).toMatchObject({
+        ok: true,
+        result: { status: 'unconfirmed', quiescent: false },
+      });
+      expect(retired).toEqual(['Native cancellation did not settle']);
+      expect(handlerDeps.signal?.aborted).toBe(true);
+      expect(task.cleanup).toBe('unconfirmed');
+    } finally {
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await waitForTasks(handlerDeps);
+      directoryRetirement.mockRestore();
+    }
+  });
+
   it.each(['false', 'malformed', 'HTTP failure'] as const)(
     'retires and rejects replacement work after an abort returns %s',
     async response => {
@@ -3204,10 +3454,11 @@ describe('owned control execution', () => {
         expect(
           await handleControlRequest('session.abort', session, { messageId: 'msg_1' }, handlerDeps)
         ).toMatchObject({ ok: false, error: { code: 'not_ready' } });
-        expect(retired).toEqual(['Kilo cancellation was not confirmed']);
-        expect(handlerDeps.signal?.aborted).toBe(true);
-        expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(false);
+        expect(retired).toEqual([]);
+        expect(handlerDeps.signal?.aborted).toBe(false);
+        expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(true);
         expect(handlerDeps.operations.counts().active).toBe(0);
+        handlerDeps.kiloRuntimes!.get = () => undefined;
         expect(
           await handleControlRequest(
             'session.prompt',
@@ -3261,9 +3512,10 @@ describe('owned control execution', () => {
       expect(
         await handleControlRequest('session.abort', session, { messageId: 'msg_1' }, handlerDeps)
       ).toMatchObject({ ok: false, error: { code: 'not_ready' } });
-      expect(retired).toEqual(['Kilo cancellation was not confirmed']);
-      expect(handlerDeps.signal?.aborted).toBe(true);
+      expect(retired).toEqual([]);
+      expect(handlerDeps.signal?.aborted).toBe(false);
       expect(handlerDeps.operations.counts().active).toBe(0);
+      handlerDeps.kiloRuntimes!.get = () => undefined;
       expect(
         await handleControlRequest(
           'session.prompt',
@@ -3330,14 +3582,15 @@ describe('owned control execution', () => {
       for (const deadline of deadlines) deadline();
       expect(await aborting).toMatchObject({ ok: false, error: { code: 'not_ready' } });
       expect(abortSignal.aborted).toBe(true);
-      expect(retired).toEqual(['Kilo cancellation was not confirmed']);
-      expect(handlerDeps.signal?.aborted).toBe(true);
+      expect(retired).toEqual([]);
+      expect(handlerDeps.signal?.aborted).toBe(false);
       remoteStopped.resolve(true);
       running.resolve(completion());
       await new Promise<void>(resolve => setImmediate(resolve));
       expect(handlerDeps.operations.counts().active).toBe(0);
       expect(events).toHaveLength(1);
-      expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(false);
+      expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(true);
+      handlerDeps.kiloRuntimes!.get = () => undefined;
       expect(
         await handleControlRequest(
           'session.prompt',
@@ -3505,7 +3758,11 @@ describe('control finalization and compact', () => {
           expect(committed).toMatchObject({
             success: true,
             messageId: 'assistant_1',
-            commitMessage: 'Apply normal control turn',
+            userMessageId: 'msg_1',
+            commitHash: (await git(['rev-parse', 'HEAD'], workspace)).trim(),
+            pushStatus: 'unknown',
+            message: 'Changes committed; push command completed',
+            commitMessage: 'Apply normal control turn\n',
           });
         } else {
           expect(committed).toMatchObject({ success: true, skipped: true });
@@ -3536,6 +3793,8 @@ describe('control finalization and compact', () => {
     const handlerDeps = deps({
       runAutoCommit: async options => {
         expect(options.workspacePath).toBe(session.directory);
+        expect(options.messageId).toBe('assistant_1');
+        expect(options.userMessageId).toBe('msg_1');
         expect(options.signal?.aborted).toBe(false);
         options.onEvent({
           streamEventType: 'autocommit_started',
@@ -3777,6 +4036,46 @@ describe('control finalization and compact', () => {
     finished.resolve(true);
     await waitForTasks(handlerDeps);
     expect(commands).toBe(0);
+    expect(events.at(-1)?.properties).toEqual({ messageId: 'msg_1', status: 'completed' });
+  });
+
+  it('anchors compact auto-commit metadata to its originating user when no assistant is known', async () => {
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      runAutoCommit: async options => {
+        options.onEvent({
+          streamEventType: 'autocommit_completed',
+          timestamp: '2026-09-01T00:00:00.000Z',
+          data: {
+            success: true,
+            message: 'Changes committed (push not attempted)',
+            commitHash: 'a'.repeat(40),
+            commitMessage: 'Apply changes\n',
+            committedAt: '2026-09-01T00:00:00.000Z',
+            pushStatus: 'not_attempted',
+            messageId: options.messageId,
+            userMessageId: options.userMessageId,
+          },
+        });
+        return { success: true };
+      },
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        {
+          ...promptPayload,
+          turn: { type: 'command', command: 'compact', arguments: '' },
+          finalization: { autoCommit: true },
+        },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: true, result: { status: 'accepted' } });
+    await waitForTasks(handlerDeps);
+    const committed = events.find(event => event.type === 'autocommit_completed')?.properties;
+    expect(committed).toMatchObject({ messageId: 'msg_1', userMessageId: 'msg_1' });
     expect(events.at(-1)?.properties).toEqual({ messageId: 'msg_1', status: 'completed' });
   });
 
@@ -5040,9 +5339,7 @@ describe('control wrapper heartbeat source policy', () => {
       "diagnosticReason: NonNullable<SandboxHeartbeatPayload['kilo']['reason']> = 'shutdown'"
     );
     expect(source).toMatch(/void control \.reportNativeRuntimeRetirement\(\{/);
-    expect(source).toContain(
-      "if (failure.cleanup === 'unconfirmed' || !control?.reportNativeRuntimeRetirement)"
-    );
+    expect(source).toContain('if (!control?.reportNativeRuntimeRetirement)');
     expect(source).toContain('nativeRuntimeId: failure.runtimeId,');
     expect(source).toContain(
       "onDisconnected: () => shutdown(1, 'Sandbox control connection lost', 'control_disconnected')"

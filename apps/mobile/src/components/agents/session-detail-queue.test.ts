@@ -46,6 +46,12 @@ vi.mock('@expo/react-native-action-sheet', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
+// The header's offline-banner reservation reads the committed connectivity
+// hook; these states are online, and the hook module pulls NetInfo (unmocked
+// in the pure project).
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useOfflineBannerState: () => false,
+}));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),
 }));
@@ -70,6 +76,11 @@ vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
 }));
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
   fetchMobileSessionSnapshotPage: vi.fn(),
+}));
+// Keep the real queue-error classifier without loading the native encrypted KV.
+vi.mock('@/lib/persist/session-transcript-cache', () => ({
+  readSessionTranscriptPage: vi.fn(async () => null),
+  writeSessionTranscriptPage: vi.fn(async () => undefined),
 }));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
@@ -354,7 +365,7 @@ vi.mock('@/components/agents/use-message-copy', () => ({
 vi.mock('@/components/agents/session-detail-content-helpers', () => ({
   countInFlightMessages: () => 0,
   resolveRetryPrompt: () => null,
-  retryMessageAndClear: vi.fn(),
+  retryFailedMessage: vi.fn(),
 }));
 vi.mock('@/components/agents/create-and-navigate-agent-session', () => ({
   createAndNavigateAgentSession: vi.fn(),

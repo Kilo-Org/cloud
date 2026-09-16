@@ -5,13 +5,8 @@ import * as z from 'zod';
 import { posthogQuery } from '@/lib/posthog-query';
 import type { Organization } from '@kilocode/db/schema';
 
-// UUID validation regex
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/**
- * Fetch autocomplete accepted suggestions count from PostHog per day for given users
- * Returns the count of accepted suggestions for each user per day
- */
 export async function getAutocompleteAcceptedSuggestionsPerDay(params: {
   organizationId: Organization['id'];
   userEmails: string[];
@@ -20,7 +15,6 @@ export async function getAutocompleteAcceptedSuggestionsPerDay(params: {
 }): Promise<Array<{ userId: string; date: string; acceptedCount: number }>> {
   const { organizationId, userEmails, startDate, endDate } = params;
 
-  // Guard against empty userEmails array
   if (userEmails.length === 0) {
     return [];
   }
@@ -34,14 +28,9 @@ export async function getAutocompleteAcceptedSuggestionsPerDay(params: {
     return [];
   }
 
-  // Parse dates for validation and SQL injection prevention
   const start = new Date(startDate);
   const end = new Date(endDate);
 
-  // Build the PostHog query - simply count accepted suggestions
-  // Always group by day (not hour)
-  // Use parseDateTimeBestEffort to handle ISO 8601 datetime strings
-  // Use the parsed Date objects to prevent SQL injection
   const query = `
     SELECT
       toStartOfDay(timestamp) AS time_bucket,
@@ -68,7 +57,6 @@ export async function getAutocompleteAcceptedSuggestionsPerDay(params: {
     return [];
   }
 
-  // Define schema for PostHog query results
   const PostHogResultSchema = z.tuple([
     z.string(), // time_bucket
     z.string(), // distinct_id (email)
@@ -77,7 +65,6 @@ export async function getAutocompleteAcceptedSuggestionsPerDay(params: {
 
   const PostHogResultsSchema = z.array(PostHogResultSchema);
 
-  // Validate and parse the results
   const parseResult = PostHogResultsSchema.safeParse(response.body.results ?? []);
   if (!parseResult.success) {
     console.error(
@@ -89,7 +76,6 @@ export async function getAutocompleteAcceptedSuggestionsPerDay(params: {
 
   const results = parseResult.data;
 
-  // Map email addresses to user IDs
   const emailToUserId = new Map<string, string>();
   const users = await db
     .select({ id: kilocode_users.id, email: kilocode_users.google_user_email })
@@ -102,7 +88,6 @@ export async function getAutocompleteAcceptedSuggestionsPerDay(params: {
     }
   });
 
-  // Transform results to match expected format
   return results
     .map(([timeBucket, email, acceptCount]) => {
       const userId = emailToUserId.get(email);

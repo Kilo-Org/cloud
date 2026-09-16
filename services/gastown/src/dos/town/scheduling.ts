@@ -20,12 +20,8 @@ import type { GastownEventData } from '../../util/analytics.util';
 
 const LOG = '[scheduling]';
 
-// ── Constants ──────────────────────────────────────────────────────────
-
-export const DISPATCH_COOLDOWN_MS = 30_000; // 30 sec
+export const DISPATCH_COOLDOWN_MS = 30_000;
 export const MAX_DISPATCH_ATTEMPTS = 5;
-
-// ── Context passed by the Town DO ──────────────────────────────────────
 
 type SchedulingContext = {
   sql: SqlStorage;
@@ -53,8 +49,6 @@ type RigConfig = {
 function now(): string {
   return new Date().toISOString();
 }
-
-// ── dispatchAgent ──────────────────────────────────────────────────────
 
 /**
  * Dispatch a single agent to the container. Transitions the bead to
@@ -228,8 +222,6 @@ export async function dispatchAgent(
   }
 }
 
-// ── dispatchUnblockedBeads ─────────────────────────────────────────────
-
 /**
  * When a bead closes, find beads that were blocked by it and are now
  * fully unblocked. Dispatch their assigned agents (fire-and-forget).
@@ -258,8 +250,6 @@ export function dispatchUnblockedBeads(ctx: SchedulingContext, closedBeadId: str
     );
   }
 }
-
-// ── hasActiveWork ──────────────────────────────────────────────────────
 
 /**
  * Returns true if the town has work that requires the fast (5s) alarm

@@ -34,7 +34,6 @@ import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
-import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const FINDINGS_PAGE_SIZE = 20;
@@ -268,9 +267,7 @@ export function ReviewDetailScreen({
                 prReviewEnabled
               );
               if (destination.kind === 'in-app') {
-                router.push(
-                  getPrReviewPath(destination.owner, destination.repo, destination.number)
-                );
+                router.push(destination.href);
                 return;
               }
               void openExternalUrl(review.pr_url, {

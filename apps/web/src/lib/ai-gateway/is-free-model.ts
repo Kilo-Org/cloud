@@ -18,15 +18,16 @@ import {
  * don't transitively pull in the Redis client.
  */
 export async function isFreeModel(model: string): Promise<boolean> {
+  const modelId = model ?? '';
   return (
-    ((isLocalFakeDeterministicModel(model) || isLocalFakeTranscriptionModel(model)) &&
+    ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
       isLocalFakeLlmEnabled()) ||
-    isKiloExclusiveFreeModel(model) ||
-    model === KILO_AUTO_FREE_MODEL.id ||
-    (model ?? '').endsWith(':free') ||
-    model === 'openrouter/free' ||
-    model === 'stealth/ox-alpha' ||
-    (await isPublicIdExperimented(model ?? ''))
+    isKiloExclusiveFreeModel(modelId) ||
+    modelId === KILO_AUTO_FREE_MODEL.id ||
+    modelId.endsWith(':free') ||
+    modelId === 'openrouter/free' ||
+    (modelId.startsWith('stealth/') && modelId.endsWith('-alpha')) ||
+    (await isPublicIdExperimented(modelId))
   );
 }
 

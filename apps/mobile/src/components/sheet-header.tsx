@@ -10,16 +10,22 @@ import { cn } from '@/lib/utils';
 /**
  * How much top clearance the header reserves:
  *
- * - 'always': the surface owns the top of the window (full-screen modals,
- *   pageSheets), so the status-bar inset applies whenever it is non-zero.
+ * - 'always': the surface owns the top of the window (full-screen modals), so
+ *   the status-bar inset applies whenever it is non-zero.
  * - 'bottom-form-sheet': a bottom-anchored formSheet never draws under the
  *   status bar, so it reserves no top clearance on either platform — the
  *   window inset would only be a dead band above the header (p7). Android
  *   caps the detents just below the inset (useFormSheetDetents) and the iOS
  *   sheet clears the top edge with its grabber, so the same rule holds
  *   everywhere.
+ * - 'ios-page-sheet': the SessionPageSheet surface owns the top of the window
+ *   on both platforms, so the header reserves no top clearance — the native
+ *   iOS pageSheet presents below the status bar, and the Android full-window
+ *   Modal pads its own top inset (session-page-sheet). `useSafeAreaInsets`
+ *   still reports the window's inset inside either Modal, so reading it in the
+ *   header would leave a dead band above the title.
  */
-export type SheetHeaderTopInset = 'always' | 'bottom-form-sheet';
+export type SheetHeaderTopInset = 'always' | 'bottom-form-sheet' | 'ios-page-sheet';
 
 export function SheetHeader({
   title,
@@ -67,10 +73,13 @@ export function SheetHeader({
   // without branching on Platform.OS.
   const statusBarHeight = StatusBar.currentHeight ?? 0;
   const resolvedTopInset = insets.top > 0 ? insets.top : statusBarHeight;
-  // A bottom formSheet is anchored below the status bar on both platforms, so
-  // it reserves no top clearance; any resolved window inset would be a dead
-  // band above the header.
-  const topInsetHeight = topInset === 'bottom-form-sheet' ? 0 : resolvedTopInset;
+  // Both sheet surfaces own the top of the window, so the header reserves no
+  // top clearance: a bottom formSheet is anchored below the status bar and a
+  // SessionPageSheet presents below it too (the native pageSheet on iOS, a
+  // full-window Modal that pads its own top inset on Android). Any resolved
+  // window inset here would only be a dead band above the header.
+  const dropsTopInset = topInset === 'bottom-form-sheet' || topInset === 'ios-page-sheet';
+  const topInsetHeight = dropsTopInset ? 0 : resolvedTopInset;
   const safeAreaStyle =
     topInsetHeight > 0 || insets.left > 0 || insets.right > 0
       ? {

@@ -13,7 +13,9 @@ import { QueryError } from '@/components/query-error';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { PrOverviewMeta } from '@/components/pr-review/pr-review-meta-parts';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
+import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { PrMergeSection } from '@/components/pr-review/merge/pr-merge-section';
+import { PrMergeSectionProvider } from '@/components/pr-review/merge/pr-merge-section-provider';
 import {
   describePrState,
   formatPrCounts,
@@ -28,8 +30,9 @@ import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
+import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { useCheckGitHubConnection } from '@/lib/pr-review/use-check-github-connection';
-import { trpcClient, useTRPC } from '@/lib/trpc';
+import { trpcClient } from '@/lib/trpc';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 
@@ -76,13 +79,19 @@ export function PrReviewOverview({
   isActive: _isActive,
   refreshControl,
 }: PrReviewOverviewProps) {
-  const trpc = useTRPC();
+  const queries = useProviderPrQueries({ owner, repo, number });
   const connection = useCheckGitHubConnection();
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
 
-  const pr = useQuery(trpc.githubPrReview.getPullRequest.queryOptions({ owner, repo, number }));
+  // GitHub-only affordances: the install/reconnect CTAs and the review-submit
+  // sheet are GitHub App flows and GitHub-route siblings. On GitLab and
+  // Bitbucket the same states render without a CTA that cannot work.
+  const isGitHub = queries.platform === 'github';
+  const isMergeRequest = queries.platform === 'gitlab';
+
+  const pr = useQuery(queries.overviewOptions());
 
   const handleOpenReviewSubmit = useCallback(() => {
     const href: Href = {
@@ -112,12 +121,22 @@ export function PrReviewOverview({
         <EmptyState
           refreshControl={refreshControl}
           icon={GitPullRequest}
-          title={t('prReview.pullRequestUnavailable')}
-          description={t('prReview.pullRequestUnavailableDescription')}
+          title={
+            isMergeRequest
+              ? t('prReview.terms.mergeRequestUnavailable')
+              : t('prReview.pullRequestUnavailable')
+          }
+          description={
+            isGitHub
+              ? t('prReview.pullRequestUnavailableDescription')
+              : t('prReview.terms.unavailableDescription')
+          }
           action={
-            <Button className="mt-3 w-full" onPress={handleInstallApp}>
-              <Text>{t('prReview.installKiloGitHubApp')}</Text>
-            </Button>
+            isGitHub ? (
+              <Button className="mt-3 w-full" onPress={handleInstallApp}>
+                <Text>{t('prReview.installKiloGitHubApp')}</Text>
+              </Button>
+            ) : null
           }
         />
       );
@@ -129,11 +148,31 @@ export function PrReviewOverview({
           refreshControl={refreshControl}
           icon={GitPullRequest}
           title={t('common.accessDenied')}
-          description={t('prReview.accessDeniedDescription')}
+          description={
+            isMergeRequest
+              ? t('prReview.terms.accessDeniedMergeRequest')
+              : t('prReview.accessDeniedDescription')
+          }
         />
       );
     }
     if (state.kind === 'reconnect') {
+      // GitHub keeps the centered empty state with its connection CTA. A
+      // provider surface reuses the shared reconnect notice instead: it carries
+      // the provider's own title/message and re-checks that provider's
+      // connection, because the GitHub copy and CTA cannot recover a GitLab or
+      // Bitbucket session.
+      if (!isGitHub) {
+        return (
+          <DetailScreenScrollView
+            className="flex-1"
+            contentContainerClassName="p-4"
+            refreshControl={refreshControl}
+          >
+            <PrReviewReconnectNotice />
+          </DetailScreenScrollView>
+        );
+      }
       return (
         <EmptyState
           refreshControl={refreshControl}
@@ -159,7 +198,11 @@ export function PrReviewOverview({
       <QueryError
         refreshControl={refreshControl}
         variant="server"
-        title={t('prReview.couldNotLoadPullRequest')}
+        title={
+          isMergeRequest
+            ? t('prReview.terms.couldNotLoadMergeRequest')
+            : t('prReview.couldNotLoadPullRequest')
+        }
         onRetry={() => {
           void pr.refetch();
         }}
@@ -232,30 +275,38 @@ export function PrReviewOverview({
 
       <PrReviewChecksSection owner={owner} repo={repo} number={number} headSha={data.headSha} />
 
-      <View className="gap-2">
-        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-          {t('prReview.review')}
-        </Text>
-        <Button
-          onPress={handleOpenReviewSubmit}
-          accessibilityLabel={t('prReview.reviewPullRequest')}
-        >
-          <View className="flex-row items-center gap-2">
-            <CheckCheck size={14} color={colors.primaryForeground} />
-            <Text>{t('prReview.review')}</Text>
-          </View>
-        </Button>
-      </View>
+      {isGitHub ? (
+        <View className="gap-2">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('prReview.review')}
+          </Text>
+          <Button
+            onPress={handleOpenReviewSubmit}
+            accessibilityLabel={t('prReview.reviewPullRequest')}
+          >
+            <View className="flex-row items-center gap-2">
+              <CheckCheck size={14} color={colors.primaryForeground} />
+              <Text>{t('prReview.review')}</Text>
+            </View>
+          </Button>
+        </View>
+      ) : null}
 
-      <PrMergeSection
-        owner={owner}
-        repo={repo}
-        overview={data}
-        onRefetch={async () => {
-          await pr.refetch();
-        }}
-        isRefetching={pr.isFetching}
-      />
+      {isGitHub ? (
+        <PrMergeSection
+          owner={owner}
+          repo={repo}
+          overview={data}
+          onRefetch={async () => {
+            await pr.refetch();
+          }}
+          isRefetching={pr.isFetching}
+        />
+      ) : (
+        // The provider merge arm (s6): the merge affordance and the
+        // capability-gated auto-merge row, pushing the ref's own sheet route.
+        <PrMergeSectionProvider prRef={queries.ref} state={data.state} />
+      )}
 
       <Text variant="muted" className="text-xs">
         {t('prReview.headLine', {

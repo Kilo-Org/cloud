@@ -140,7 +140,15 @@ const config: ExpoConfig = {
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-foreground.png',
     },
-    predictiveBackGestureEnabled: true,
+    // Keep the platform's classic back delivery. React Native 0.86 only
+    // installs its OnBackPressedCallback workaround when the device runs
+    // API 36+ (`AndroidVersion.isAtLeastTargetSdk36`), so opting into
+    // predictive back (`android:enableOnBackInvokedCallback="true"`) on an
+    // API 33-35 device routes Back straight to finish() and the JS
+    // `hardwareBackPress` event never fires. API 36 devices enforce
+    // predictive back regardless, where React Native does install the
+    // callback, so `false` is correct on every API level.
+    predictiveBackGestureEnabled: false,
     blockedPermissions: [
       'android.permission.READ_MEDIA_IMAGES',
       'android.permission.READ_MEDIA_VIDEO',
@@ -174,6 +182,17 @@ const config: ExpoConfig = {
         },
         ios: {
           ccacheEnabled: true,
+          // iOS consumes React Native Core prebuilt by default, so the pnpm patch
+          // over RCTComponentViewFactory.mm would never compile into the app.
+          // The Expo Podfile maps this to ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
+          // (KILO-APP-6H; react/react-native#58299).
+          // Compile React Native from the patched source instead of linking the
+          // prebuilt core. The App Store core ships with assertions enabled
+          // (react/react-native#57454), so the Fabric unmount assert must carry
+          // the bounds guard from react/react-native#57865 or a stale child
+          // index SIGABRTs release builds (Kilo-Org/kilocode#14065; see
+          // patches/react-native@0.86.3.patch).
+          buildReactNativeFromSource: true,
           // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop
           // (pulled transitively alongside expo-iap's AppCheckCore); those pods don't define
           // modules, so pod install fails unless we force module maps on them. Unconditional

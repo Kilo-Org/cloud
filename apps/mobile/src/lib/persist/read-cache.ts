@@ -229,31 +229,28 @@ export function createReadCachePersister(options: ReadCachePersisterOptions): Pe
       if (!isPublicationAllowed()) {
         return;
       }
+      // The budget is enforced here, on the string the library already
+      // serialized for this throttled save, so the un-throttled per-change
+      // path never serializes the blob or scans it for its byte length.
+      if (utf8ByteLength(v) > READ_CACHE_MAX_BYTES) {
+        // Oversized blobs are never written partially: the previous blob for
+        // this scope is removed so a stale snapshot cannot survive the write
+        // that replaced it.
+        await encryptedKv.removeItem(scope, k);
+        return;
+      }
       await encryptedKv.setItem(scope, k, v);
     },
     removeItem: async k => {
       await encryptedKv.removeItem(scope, k);
     },
   };
-  const base = createAsyncStoragePersister({ storage, key: READ_CACHE_KEY });
 
-  return {
-    ...base,
-    persistClient: async client => {
-      if (!isPublicationAllowed()) {
-        return;
-      }
-      const serialized = JSON.stringify(client);
-      if (utf8ByteLength(serialized) > READ_CACHE_MAX_BYTES) {
-        // Oversized blobs are never written partially: the previous blob for
-        // this scope is removed so a stale snapshot cannot survive the write
-        // that replaced it.
-        await base.removeClient();
-        return;
-      }
-      await base.persistClient(client);
-    },
-  };
+  // The library's `persistClient` is the throttle itself and is the only
+  // serializer: it serializes once per save and hands that string to `setItem`,
+  // which holds the publication fence and the 2 MB budget. No wrapper may
+  // serialize on the un-throttled per-change path.
+  return createAsyncStoragePersister({ storage, key: READ_CACHE_KEY });
 }
 
 // ── Cold-start restore ─────────────────────────────────────────────────────

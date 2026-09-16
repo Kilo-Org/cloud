@@ -65,6 +65,7 @@ import { SessionContextMetrics } from '@/components/agents/session-context-metri
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import {
   canAutoApprovePermissions,
+  canAutoApproveReply,
   resolveSessionAutoApproveState,
   setSessionAutoApproveEnabled,
   useSessionAutoApproveEnabled,
@@ -90,7 +91,7 @@ import {
 import {
   countInFlightMessages,
   resolveRetryPrompt,
-  retryMessageAndClear,
+  retryFailedMessage,
 } from '@/components/agents/session-detail-content-helpers';
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
 import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
@@ -106,6 +107,10 @@ import { useInteractionHandlers } from '@/components/agents/use-interaction-hand
 import { useSessionAutoApprove } from '@/components/agents/use-session-auto-approve';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import {
+  SESSION_SLOW_LOAD_MS,
+  useSessionSlowLoadPhase,
+} from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
   condenseTranscriptToolRuns,
@@ -114,6 +119,7 @@ import {
   mergeSessionTranscript,
   type SessionTranscriptItem,
 } from '@/components/agents/session-transcript';
+import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
@@ -195,6 +201,8 @@ type SessionDetailContentProps = {
   spawnedMode?: string;
   /** Title the route read from the session-list cache, so the header never blinks to a generic label. */
   cachedTitle?: string;
+  /** Epoch ms the route mounted this open; anchors the slow-load threshold. */
+  openStartedAt?: number;
 };
 
 type CancelQueuedStatus = {
@@ -213,6 +221,7 @@ export function SessionDetailContent({
   autoSend,
   spawnedMode,
   cachedTitle,
+  openStartedAt,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const { t } = useTranslation();
@@ -263,10 +272,13 @@ export function SessionDetailContent({
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
   const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
   // Per-session auto-approve lives in an in-memory store keyed by session id.
-  // Availability follows the transport (and the read-only flag); an unresolved
-  // transport is unavailable, so the row shows disabled without a fetch.
+  // The setting stays reachable while the transport is unresolved (metadata and
+  // the transcript resolve after it), so only a session known to be read-only
+  // shows it unavailable. Auto-reply eligibility is separate: an unresolved
+  // transport cannot deliver a permission ask.
   const autoApproveEnabled = useSessionAutoApproveEnabled(sessionId);
   const autoApproveAvailable = canAutoApprovePermissions({ activeSessionType, isReadOnly });
+  const autoApproveReplyAvailable = canAutoApproveReply({ activeSessionType, isReadOnly });
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
@@ -350,7 +362,7 @@ export function SessionDetailContent({
   // reach the hook, so a clarification question is never auto-answered.
   const { suppressedRequestId } = useSessionAutoApprove({
     enabled: autoApproveState === 'on',
-    available: autoApproveAvailable,
+    available: autoApproveReplyAvailable,
     requestId: activePermission?.requestId ?? null,
     respond: async () => {
       const outcome = await handleRespondToPermission('once');
@@ -792,7 +804,8 @@ export function SessionDetailContent({
     if (kept.length === 0) {
       return base;
     }
-    return [...base, ...kept].toSorted((a, b) => {
+    // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; the spread already copies so nothing shared is mutated
+    return [...base, ...kept].sort((a, b) => {
       if (a.info.id < b.info.id) {
         return -1;
       }
@@ -847,6 +860,26 @@ export function SessionDetailContent({
     () => (condenseToolCalls ? condenseTranscriptToolRuns(baseTranscript) : baseTranscript),
     [condenseToolCalls, baseTranscript]
   );
+
+  // The list branch must never mount with zero items: a zero-item FlashList
+  // paints blank dead space with no loading and no empty state (mobile-app
+  // spot check, e2-open). `mergeSessionTranscript` drops messages whose parts
+  // render no content, so the branch reads the merged item count.
+  const transcriptView = resolveSessionTranscriptView({
+    transcriptItemCount: transcript.length,
+    hasStatusIndicator: statusIndicator !== null,
+    hasOlderMessages,
+    olderMessagesError,
+  });
+
+  // A zero-item transcript with a live older-page cursor is transient: page
+  // until renderable content arrives or the cursor ends. The manager dedupes
+  // in-flight loads and stops on terminal errors, so this cannot loop.
+  useEffect(() => {
+    if (transcriptView === 'older-loading' && !isLoadingOlderMessages) {
+      void manager.loadOlderMessages();
+    }
+  }, [transcriptView, isLoadingOlderMessages, manager]);
 
   // Render-phase state adjustment: hold queued ids across queue → dequeue
   // transitions while streaming so the badge row never unmounts and bubble
@@ -985,16 +1018,11 @@ export function SessionDetailContent({
         void handleSend(prompt);
         return;
       }
-      void retryMessageAndClear(
-        async () => {
-          await handleSend(prompt);
-        },
-        () => {
-          manager.clearFailedMessage(message.info.id);
-        }
-      );
+      void retryFailedMessage(async () => {
+        await handleSend(prompt);
+      });
     },
-    [messages, requiresModel, pinned.model, currentModel, handleSend, manager]
+    [messages, requiresModel, pinned.model, currentModel, handleSend]
   );
 
   const handleCancelQueued = useCallback(
@@ -1246,10 +1274,47 @@ export function SessionDetailContent({
   );
 
   const shouldShowLoading =
-    isLoading ||
-    (fetchedData === null && !statusIndicator && !error) ||
-    (fetchedData !== null && fetchedData.kiloSessionId !== sessionId);
+    messages.length === 0 &&
+    (isLoading ||
+      (fetchedData === null && !statusIndicator && !error) ||
+      (fetchedData !== null && fetchedData.kiloSessionId !== sessionId));
+  const cachedMetadataRefresh = messages.length > 0 && fetchedData === null;
   const shouldBlockMessages = shouldShowLoading;
+  // A stalled open (the skeleton still up, nothing to show, no error and no
+  // progress indicator to watch) must stop looking like progress after the
+  // threshold: the slow phase swaps the skeleton for a message plus Retry.
+  // The threshold is anchored to the route's open, so a slow metadata round
+  // trip before this screen mounts does not restart the clock.
+  const sessionLoadPhase = useSessionSlowLoadPhase({
+    isLoading: shouldShowLoading,
+    hasContent: messages.length > 0,
+    hasError: error !== null,
+    hasStatusIndicator: statusIndicator !== null,
+    openStartedAt,
+  });
+  // Acknowledge a Retry tap from the slow card immediately: while the retry
+  // is in flight the button shows its spinner and is disabled, so the tap
+  // reads as accepted before any content or error arrives. Leaving the slow
+  // state (content, error, or a settled empty) ends the acknowledgment.
+  //
+  // The acknowledgment is also bounded by the slow-load threshold. Once the
+  // initial threshold has passed the phase stays `slow` on its own, so a
+  // retried open that stalls again would otherwise leave the button disabled
+  // with a spinner forever; after one threshold the user gets the Retry
+  // action back.
+  const [slowRetryPending, setSlowRetryPending] = useState(false);
+  useEffect(() => {
+    if (sessionLoadPhase !== 'slow' || !slowRetryPending) {
+      setSlowRetryPending(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setSlowRetryPending(false);
+    }, SESSION_SLOW_LOAD_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [sessionLoadPhase, slowRetryPending]);
   // Failed delivery entries must not count as in-flight: after a terminal
   // delivery failure the working spinner and wake lock would otherwise stay on.
   const inFlightMessageCount = useMemo(
@@ -1261,7 +1326,8 @@ export function SessionDetailContent({
     pendingMessageCount: inFlightMessageCount,
   });
   const hasFooterStatusIndicator =
-    statusIndicator !== null || (cloudStatus !== null && cloudStatus.type !== 'ready');
+    (!cachedMetadataRefresh && statusIndicator !== null) ||
+    (cloudStatus !== null && cloudStatus.type !== 'ready');
   const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
     isAgentWorking: shouldShowWorkingIndicator,
     hasStatusIndicator: hasFooterStatusIndicator,
@@ -1277,7 +1343,7 @@ export function SessionDetailContent({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
-    hasStatusIndicator: statusIndicator !== null,
+    hasStatusIndicator: !cachedMetadataRefresh && statusIndicator !== null,
     messageCount: messages.length,
   });
 
@@ -1302,17 +1368,17 @@ export function SessionDetailContent({
         hasMessages={messages.length > 0}
         autoApproveAvailable={autoApproveAvailable}
         loading={shouldShowLoading}
-        onPress={
-          contextInfo || autoApproveAvailable
-            ? () => {
-                setOpenContextSheetIdentity({
-                  sessionId,
-                  providerID: contextInfo?.providerID,
-                  modelID: contextInfo?.modelID,
-                });
-              }
-            : undefined
-        }
+        // The sheet is the session's own context/permission surface, so the
+        // control opens it in every state of this screen — including while the
+        // transcript is still loading and after a failed open. A state that
+        // hides the control locks the user out of the settings behind it.
+        onPress={() => {
+          setOpenContextSheetIdentity({
+            sessionId,
+            providerID: contextInfo?.providerID,
+            modelID: contextInfo?.modelID,
+          });
+        }}
       />
     </View>
   );
@@ -1678,6 +1744,16 @@ export function SessionDetailContent({
               : {})}
           />
           <SessionConnectionIndicator
+            sessionRefresh={
+              cachedMetadataRefresh
+                ? {
+                    isLoading: statusIndicator === null,
+                    onRetry: () => {
+                      void manager.switchSession(sessionId);
+                    },
+                  }
+                : undefined
+            }
             activeSessionType={activeSessionType}
             agentStatusType={agentStatus.type}
           />
@@ -1741,6 +1817,7 @@ export function SessionDetailContent({
             visible={detailsMessageId !== null}
             message={detailsMessage ?? null}
             modelOptions={modelOptions}
+            deliveryState={detailsDelivery}
             onClose={handleCloseDetails}
             canCancelQueued={canCancelSelected}
             isCancelingQueued={isCancelingSelected}
@@ -2032,17 +2109,75 @@ export function SessionDetailContent({
         </CenteredState>
       );
     }
-    if (shouldBlockMessages) {
+    if (sessionLoadPhase === 'slow') {
+      // The skeleton has outlived the threshold with nothing to show. Occupy
+      // the same flex-1 region (CenteredState) so the header and composer do
+      // not move, and give the user the only useful action: retry.
+      return (
+        <CenteredState>
+          <View className="items-center gap-3 px-6">
+            <Text className="text-center text-sm text-muted-foreground">
+              {t('common.takingLonger')}
+            </Text>
+            <Button
+              variant="outline"
+              accessibilityLabel={t('common.retry')}
+              loading={slowRetryPending}
+              onPress={() => {
+                setSlowRetryPending(true);
+                void manager.switchSession(sessionId);
+              }}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        </CenteredState>
+      );
+    }
+    if (shouldBlockMessages || transcriptView === 'older-loading') {
       return <SessionSkeletonMessages sessionId={sessionId} />;
     }
-    if (visibleMessages.length === 0) {
-      if (statusIndicator) {
+    if (transcriptView !== 'list') {
+      if (transcriptView === 'status' && statusIndicator !== null) {
         return (
           <CenteredState>
             <View className="items-center px-6">
               <SessionStatusIndicator indicator={statusIndicator} />
             </View>
           </CenteredState>
+        );
+      }
+      if (transcriptView === 'older-error') {
+        // A retryable older-page failure is a retryable state, not the empty
+        // state: the history load can be reattempted, so the body mounts the
+        // same pagination Retry the list header carries (mobile-app gate r3,
+        // session-transcript-view finding). Terminal older-page errors keep
+        // the action-less empty state below.
+        return (
+          <EmptyState
+            icon={MessageSquare}
+            title={t('agentChat.session.emptyTitle')}
+            description={
+              <AccessibleStatus
+                message={t('agentChat.olderMessages.couldNotLoad')}
+                tone="status"
+                className="text-center text-sm"
+              />
+            }
+            action={
+              <Button
+                variant="outline"
+                onPress={() => {
+                  void manager.loadOlderMessages();
+                }}
+                loading={isLoadingOlderMessages}
+                accessibilityLabel={t('common.retry')}
+                accessibilityHint={t('agentChat.olderMessages.retryHint')}
+              >
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            }
+          />
         );
       }
       return (

@@ -1,0 +1,6 @@
+export const SERVICE_FEE_RATE_BASIS_POINTS = 500;
+export const SERVICE_FEE_RATE_DENOMINATOR = 10_000;
+export const SERVICE_FEE_ACTIVATION_UNIX_SECONDS = 1_793_491_200; // 2026-11-01T00:00:00Z
+export const SERVICE_FEE_DESCRIPTION = 'Service fee (5%)';
+export const SERVICE_FEE_METADATA_TYPE = 'kilo-service-fee';
+export const SERVICE_FEE_VERSION = '2026-11-01-v1';

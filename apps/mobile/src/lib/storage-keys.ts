@@ -43,6 +43,10 @@ export const RETURN_SENDS_MESSAGE_KEY = 'return-sends-message';
 export const GATEWAY_TRANSCRIPTION_ENABLED_KEY = 'gateway-transcription-enabled';
 /** Persisted `{ id, name }` of the chosen gateway transcription model (null = none chosen). */
 export const GATEWAY_TRANSCRIPTION_MODEL_KEY = 'gateway-transcription-model';
+/** Master switch for translating tool summaries into the app language (off = raw summaries). */
+export const TOOL_SUMMARY_TRANSLATION_ENABLED_KEY = 'tool-summary-translation-enabled';
+/** Persisted `{ id, name }` of the chosen tool-summary translation model (defaults to Auto Small). */
+export const TOOL_SUMMARY_TRANSLATION_MODEL_KEY = 'tool-summary-translation-model';
 /** Persisted BCP-47 tag of the chosen voice-input language (empty = auto from the app/device language). */
 export const VOICE_INPUT_LANGUAGE_KEY = 'voice-input-language';
 /** Revocable per-host list of markdown link hosts that open without an Alert. */
@@ -50,6 +54,8 @@ export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';
 /** Group consecutive tool calls on the session page into one condensed row. */
 export const CONDENSE_TOOL_CALLS_KEY = 'condense-tool-calls';
+/** Provider platforms whose new-session "Connect <provider>" CTA the user collapsed. */
+export const COLLAPSED_CONNECT_CTAS_KEY = 'collapsed-connect-ctas';
 /** Master switch for the glanceable Active Agents surfaces (widgets, Live Activity,
  * Android ongoing). Off blanks every surface and unregisters its push tokens. */
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
@@ -92,6 +98,12 @@ export const PICKER_LAUNCH_CONTEXT_KEY = 'picker-launch-context';
  */
 export const VOICE_NETWORK_CONSENT_KEY_PREFIX = 'voice-network-consent-';
 /**
+ * Per-user first-sign-in tour decision (finished or skipped). Not deleted on
+ * sign-out — a per-account decision must survive sign-out and sign-in of the
+ * same account, exactly like `VOICE_NETWORK_CONSENT_KEY_PREFIX`.
+ */
+export const TOUR_COMPLETED_KEY_PREFIX = 'tour-completed-';
+/**
  * Encrypted-KV scope for the durable session-attention ack store (P1-F-48a).
  * Holds one serialized blob of `{ sessionId, raiseId, status, ackedAt,
  * expiresAt }` entries; ids and timestamps only, no secrets.
@@ -100,7 +112,8 @@ export const SESSION_ATTENTION_KEY = 'session-attention';
 
 /**
  * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,
- * no collisions. Shared by the analytics and voice-network consent records.
+ * no collisions. Shared by the analytics, voice-network consent, and
+ * tour-completion records.
  */
 export function encodeStorageKey(prefix: string, userId: string): string {
   return `${prefix}${[...new TextEncoder().encode(userId)]

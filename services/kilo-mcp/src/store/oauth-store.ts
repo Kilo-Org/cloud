@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { AuthRequest } from '@cloudflare/workers-oauth-provider';
-import { and, eq, gt, isNull, lt } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, notInArray } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
@@ -31,6 +31,15 @@ const STORE_INSTANCE_NAME = 'kilo-mcp-oauth';
 
 /** Interval between expired-row purges (DO alarm). */
 const PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Newest refresh-token hashes kept per grant. The provider accepts the current
+ * and the immediately previous refresh token, so eight rotations is the margin
+ * that keeps both of them — and only a bounded number of older hashes — for
+ * the whole session. Without the bound a year of rotations per client would
+ * grow this single global DO forever.
+ */
+const REFRESH_HISTORY_KEEP_PER_GRANT = 8;
 
 export type PendingAuthorizationStatus =
   | 'pending'
@@ -341,6 +350,34 @@ export class KiloMcpOAuthStore
           target: oauthRefreshTokenHistory.token_hash,
           set: { current: true, expires_at: expiresAt },
         })
+        .run();
+      // Every write uses `now + REFRESH_HISTORY_TTL_MS` and the DO's token
+      // queue serializes rotations, so ordering by `expires_at` puts the row
+      // just inserted — and with it the provider's only other accepted token,
+      // the previous one — inside the kept set. `notInArray` is never empty:
+      // the kept set always contains the row inserted a moment earlier.
+      const kept = this.db
+        .select({ token_hash: oauthRefreshTokenHistory.token_hash })
+        .from(oauthRefreshTokenHistory)
+        .where(
+          and(
+            eq(oauthRefreshTokenHistory.user_id, parts.userId),
+            eq(oauthRefreshTokenHistory.grant_id, parts.grantId)
+          )
+        )
+        .orderBy(desc(oauthRefreshTokenHistory.expires_at))
+        .limit(REFRESH_HISTORY_KEEP_PER_GRANT)
+        .all()
+        .map(row => row.token_hash);
+      this.db
+        .delete(oauthRefreshTokenHistory)
+        .where(
+          and(
+            eq(oauthRefreshTokenHistory.user_id, parts.userId),
+            eq(oauthRefreshTokenHistory.grant_id, parts.grantId),
+            notInArray(oauthRefreshTokenHistory.token_hash, kept)
+          )
+        )
         .run();
     });
   }

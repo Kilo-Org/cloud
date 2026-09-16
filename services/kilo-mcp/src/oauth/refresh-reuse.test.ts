@@ -23,6 +23,34 @@ function makeDeps() {
   return { tokens, store, revokeGrant: vi.fn(async (_grantId: string, _userId: string) => {}) };
 }
 
+/**
+ * The same store as `makeDeps`, but it honours the `expiresAt` the guard
+ * passes and the `nowIso` it reads with: a row is returned only while the
+ * clock has not passed it. `makeDeps` ignores both forever, so it cannot show
+ * whether the history outlives the grant.
+ */
+function makeTtlDeps() {
+  const rows = new Map<string, IssuedRefreshToken & { expiresAt: string }>();
+  const store: RefreshReuseStore = {
+    getRefreshToken: async (hash, nowIso) => {
+      const row = rows.get(hash);
+      if (!row || row.expiresAt <= nowIso) return null;
+      return { userId: row.userId, grantId: row.grantId, current: row.current };
+    },
+    rememberRefreshToken: async (hash, parts, expiresAt) => {
+      for (const row of rows.values()) {
+        if (row.userId === parts.userId && row.grantId === parts.grantId) row.current = false;
+      }
+      rows.set(hash, { ...parts, current: true, expiresAt });
+    },
+  };
+  return {
+    rows,
+    store,
+    revokeGrant: vi.fn(async (_grantId: string, _userId: string) => {}),
+  };
+}
+
 function refreshRequest(refreshToken: string, origin?: string): Request {
   return new Request('https://kilo-mcp.test/token', {
     method: 'POST',
@@ -96,6 +124,31 @@ describe('detectRefreshTokenReuse', () => {
     });
     await detectRefreshTokenReuse(refreshRequest('not:trusted:parts'), deps);
     expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('stored-grant', 'stored-user');
+  });
+
+  it('still detects a superseded token 41 days into the session', async () => {
+    vi.useFakeTimers();
+    try {
+      // Day 0: the code exchange issues the first token, then one rotation.
+      vi.setSystemTime(Date.UTC(2026, 0, 1, 12));
+      const deps = makeTtlDeps();
+      await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
+      await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
+
+      // Day 41: with a history that only lived 30 days this superseded row is
+      // gone, the guard forwards the replay to the provider, and the provider
+      // answers it. The history must outlive the grant the provider serves.
+      vi.setSystemTime(Date.UTC(2026, 1, 11, 12));
+      const response = await detectRefreshTokenReuse(refreshRequest('u:g:first'), deps);
+      expect(response?.status).toBe(400);
+      expect(await response?.json()).toEqual({
+        error: 'invalid_grant',
+        error_description: 'Refresh token reuse detected; the grant has been revoked.',
+      });
+      expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('g', 'u');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('leaves wrong media types, ambiguous parameters and non-refresh requests to the library', async () => {

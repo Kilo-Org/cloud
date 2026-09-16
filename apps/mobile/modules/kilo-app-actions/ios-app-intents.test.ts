@@ -12,6 +12,7 @@ import {
   missingIntentCopyKeys,
   renderLocalizableStrings,
 } from '../../plugins/app-intent-copy.js';
+import { mergeIntoResourcesPhase } from '../../plugins/app-intent-resources.js';
 import {
   APP_ACTION_IDS,
   APP_ACTION_SLUGS,
@@ -39,6 +40,10 @@ const actionsModule = readSource('KiloAppActionsModule.swift');
 const podspec = readSource('KiloAppActions.podspec');
 const configSource = readFileSync(
   fileURLToPath(new URL('../../app.config.ts', import.meta.url)),
+  'utf8'
+);
+const pluginSource = readFileSync(
+  fileURLToPath(new URL('../../plugins/withAppIntentLocalizations.js', import.meta.url)),
   'utf8'
 );
 
@@ -78,6 +83,57 @@ function swiftStruct(name: string): string {
 /** The value the struct declares for `openAppWhenRun`, or null when it does not. */
 function openAppWhenRun(body: string): string | null {
   return /openAppWhenRun[^=]*=\s*(true|false)/.exec(body)?.[1] ?? null;
+}
+
+/**
+ * The project the plugin's `addBuildPhase` call returns into: the app target's
+ * own Resources phase, carrying Expo's members, with the phase this plugin
+ * created beside it.
+ */
+function projectAfterAddBuildPhase() {
+  const existing = {
+    isa: 'PBXResourcesBuildPhase',
+    buildActionMask: 2_147_483_647,
+    files: [{ value: 'info-plist', comment: 'InfoPlist.strings in Resources' }],
+    runOnlyForDeploymentPostprocessing: 0,
+  };
+  const created = {
+    isa: 'PBXResourcesBuildPhase',
+    buildActionMask: 2_147_483_647,
+    files: [{ value: 'localizable', comment: 'Localizable.strings in Resources' }],
+    runOnlyForDeploymentPostprocessing: 0,
+  };
+  const resourcesPhases: Record<string, unknown> = {
+    'existing-phase': existing,
+    'existing-phase_comment': 'Resources',
+    'created-phase': created,
+    'created-phase_comment': 'Resources',
+  };
+  const target = {
+    productType: '"com.apple.product-type.application"',
+    buildPhases: [
+      { value: 'sources-phase', comment: 'Sources' },
+      { value: 'existing-phase', comment: 'Resources' },
+      { value: 'created-phase', comment: 'Resources' },
+    ],
+  };
+  return {
+    created: { uuid: 'created-phase', buildPhase: created },
+    existing,
+    project: {
+      // The properties the helper reads off the project expo's
+      // `withXcodeProject` hands a mod: `pbxNativeTargetSection()` and the
+      // PBX sections in the project hash. There is no
+      // `pbxResourcesBuildPhaseSection()` on it.
+      hash: { project: { objects: { PBXResourcesBuildPhase: resourcesPhases } } },
+      pbxNativeTargetSection: () => ({
+        'app-target': target,
+        'app-target_comment': 'Kilo',
+      }),
+    },
+    resourcesPhases,
+    target,
+  };
 }
 
 describe('the four App Intents', () => {
@@ -178,6 +234,21 @@ describe('the native handshake', () => {
     expect(bridge).toContain('func perform(payload: [String: String]) async throws -> String');
   });
 
+  it('marks the throwing runtime lookup with try', () => {
+    // `AppContext.runtime` is a throwing property: it raises `RuntimeLost` until
+    // the runtime exists, so an unmarked read stops the pod compiling. The ios
+    // job failed on exactly that — `KiloAppActionsModule.swift:19:27: error:
+    // property access can throw but is not marked with 'try'` — and this guard
+    // is where the module reads it.
+    const reads = actionsModule
+      .split('\n')
+      .filter(line => /appContext\?\.runtime|appContext\.runtime/.test(line));
+    expect(reads.length, 'the module no longer reads the runtime').toBeGreaterThan(0);
+    for (const line of reads) {
+      expect(line, `${line.trim()} reads a throwing property`).toMatch(/\btry\b/);
+    }
+  });
+
   it('drops the registered dispatcher when the runtime goes away, like Android', () => {
     // The singleton outlives the module, so nothing else can release the
     // dispatcher and runtime it holds: the module's `OnDestroy` is the teardown,
@@ -264,5 +335,39 @@ describe('app.config.ts', () => {
     expect(() => {
       assertIntentCopy({ en: ENGLISH_COPY }, 'de');
     }).toThrow(/de/);
+  });
+});
+
+describe('the app-target Resources phase', () => {
+  it('leaves the app target one Resources phase', () => {
+    // Xcode keeps one per target: with a second it warns "target has multiple
+    // Copy Bundle Resources build phases, which may cause it to build
+    // incorrectly" and reports the app's generated asset symbols as
+    // unprocessable. Both appeared only once this plugin ran.
+    const { created, project, resourcesPhases, target } = projectAfterAddBuildPhase();
+    mergeIntoResourcesPhase(project, 'app-target', created);
+
+    const phases = target.buildPhases.filter(entry => entry.value in resourcesPhases);
+    expect(phases.map(entry => entry.value)).toEqual(['existing-phase']);
+    expect(Object.keys(resourcesPhases)).toEqual(['existing-phase', 'existing-phase_comment']);
+  });
+
+  it('moves the created members into the phase Expo already has', () => {
+    const { created, existing, project } = projectAfterAddBuildPhase();
+    mergeIntoResourcesPhase(project, 'app-target', created);
+
+    expect(existing.files.map(file => file.value)).toEqual(['info-plist', 'localizable']);
+  });
+
+  it('runs that merge in the prebuild mod, after the phase is attached', () => {
+    expect(pluginSource).toContain('mergeIntoResourcesPhase(project, targetUuid, phase);');
+  });
+
+  it('fails the prebuild when the app target has no Resources phase', () => {
+    const { created, project, target } = projectAfterAddBuildPhase();
+    target.buildPhases = [{ value: 'sources-phase', comment: 'Sources' }];
+    expect(() => {
+      mergeIntoResourcesPhase(project, 'app-target', created);
+    }).toThrow(/no Resources phase to extend/);
   });
 });

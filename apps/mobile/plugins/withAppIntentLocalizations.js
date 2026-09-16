@@ -4,6 +4,7 @@ const path = require('path');
 const { withDangerousMod, withInfoPlist, withXcodeProject } = require('expo/config-plugins');
 
 const { assertIntentCopy, renderLocalizableStrings } = require('./app-intent-copy.js');
+const { mergeIntoResourcesPhase } = require('./app-intent-resources.js');
 
 // Localizes the App Intents on the main app target.
 //
@@ -93,6 +94,10 @@ module.exports = function withAppIntentLocalizations(config, { languages, copy }
           `withAppIntentLocalizations: the Resources phase did not attach to the ${appFolder} target`
         );
       }
+      // `addBuildPhase` always creates a phase, and the app target already has
+      // its own: fold this one into that one so the target keeps a single
+      // Copy Bundle Resources phase.
+      mergeIntoResourcesPhase(project, targetUuid, phase);
       return projectConfig;
     });
 

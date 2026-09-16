@@ -16,7 +16,10 @@ public final class KiloAppActionsModule: Module {
     /// before this call, so the pipeline can run them; on iOS it is always
     /// empty, because a native run waits for registration instead of parking.
     AsyncFunction("registerAppActionDispatcher") { (dispatcher: JavaScriptValue) throws -> [[String: String]] in
-      guard let runtime = self.appContext?.runtime else {
+      // `AppContext.runtime` is a throwing property: it raises `RuntimeLost`
+      // until the runtime exists, which is the same condition as the module
+      // having no app context at all.
+      guard let appContext = self.appContext, let runtime = try? appContext.runtime else {
         throw ActionDispatcherNotReadyException()
       }
       KiloAppActionBridge.shared.register(dispatcher: dispatcher, runtime: runtime)

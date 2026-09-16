@@ -8,13 +8,14 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { i18n } from '@/i18n';
+import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import {
   getGlanceableDelivery,
   type GlanceableSink,
   type GlanceableSinkContext,
 } from '@/lib/glanceable/sink-registry';
 import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
-import { getWaitingAsk } from '@/lib/glanceable/waiting-ask';
+import { getWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 
 import { ActiveAgentsLiveActivity, OPEN_AGENTS_URL } from './active-agents-live-activity';
 import {
@@ -61,6 +62,51 @@ function translate(key: string): string {
 function isApprovableAskRecorded(): boolean {
   const ask = getWaitingAsk();
   return ask?.status === 'permission' && ask.isCloudAgent;
+}
+
+/**
+ * The one-line notice the next Live Activity update carries: the in-app press
+ * sets it when Approve fails retryably. It never outlives its ask — a changed
+ * ask or a zero needs-input count clears it — so a failure message cannot
+ * describe a new session. Mirrors the Android sink's action notice.
+ */
+let actionNotice: string | null = null;
+let noticeAskKey: string | null = null;
+
+/** The recorded ask identity the notice describes; '' means "no ask". */
+function askKey(ask: WaitingAsk | null): string {
+  return ask === null ? '' : `${ask.kiloSessionId}|${ask.status}`;
+}
+
+/** Set (or clear) the notice for the next Live Activity update. */
+export function setGlanceableActionNotice(notice: string | null): void {
+  actionNotice = notice;
+  noticeAskKey = notice === null ? null : askKey(getWaitingAsk());
+}
+
+/** Drop the notice once nothing needs input or the recorded ask has changed. */
+function pruneActionNotice(snapshot: GlanceableAgentsSnapshot): void {
+  if (
+    actionNotice !== null &&
+    (snapshot.needsInput === 0 || askKey(getWaitingAsk()) !== noticeAskKey)
+  ) {
+    actionNotice = null;
+    noticeAskKey = null;
+  }
+}
+
+/**
+ * The content-state one update carries: the counts, the Approve gate, and the
+ * pending notice when there is one. Every Live Activity update goes through
+ * this, so the notice cannot be dropped by one path and kept by another.
+ */
+function liveActivityContentState(snapshot: GlanceableAgentsSnapshot): GlanceableLiveActivityProps {
+  pruneActionNotice(snapshot);
+  return buildGlanceableLiveActivityContentState(
+    snapshot,
+    isApprovableAskRecorded(),
+    actionNotice ?? undefined
+  );
 }
 
 /**
@@ -299,6 +345,8 @@ export function _resetIosSinkForTests(): void {
   pendingStart = null;
   pendingStartInput = null;
   pendingStartAt = 0;
+  actionNotice = null;
+  noticeAskKey = null;
 }
 
 export const iosSink: GlanceableSink = {
@@ -326,10 +374,7 @@ export const iosSink: GlanceableSink = {
         { date: new Date(snapshot.expiresAt), props: buildExpiredWidgetProps(snapshot, translate) },
       ]);
     }
-    const contentState = buildGlanceableLiveActivityContentState(
-      snapshot,
-      isApprovableAskRecorded()
-    );
+    const contentState = liveActivityContentState(snapshot);
     if (!isEligibleGlanceableWork(snapshot)) {
       // ActivityKit owns removal after this call, even if JavaScript stops.
       // The after-date retains Lock Screen content, not the Dynamic Island.
@@ -359,10 +404,7 @@ export const iosSink: GlanceableSink = {
       return;
     }
 
-    const contentState = buildGlanceableLiveActivityContentState(
-      snapshot,
-      isApprovableAskRecorded()
-    );
+    const contentState = liveActivityContentState(snapshot);
 
     if (pendingStart !== null) {
       // A start is already waiting on a dismissal. There is no card to update
@@ -429,3 +471,21 @@ export const iosSink: GlanceableSink = {
     void endNow();
   },
 };
+
+/**
+ * Re-render the surface the app last published, so a press that cannot reach
+ * the backend still shows its pending notice. The snapshot comes from the
+ * persisted mirror — a background press may have launched this process with no
+ * in-memory state — and it already carries the counts the card shows, so the
+ * update adds only the failure line. Reusing `publish` keeps the one render
+ * path: the adoption of a card this process did not start, the notice prune,
+ * and the content-state build.
+ */
+export async function renderStoredSnapshotWithNotice(): Promise<void> {
+  await restorePersistedGlanceable();
+  const snapshot = getLastGlanceableSnapshot();
+  if (snapshot === null) {
+    return;
+  }
+  iosSink.publish(snapshot);
+}

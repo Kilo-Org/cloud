@@ -39,12 +39,16 @@ import { withWidgetLogo } from './widget-logo';
 // state because the notifications Worker pushes the same raw shape and knows
 // no locale.
 
-// The pushed content state plus the one fact the widget extension cannot
-// derive: whether the recorded ask is one Approve can answer. It stays a local
-// type rather than an import from `./view-props`, because Babel stringifies
-// this function's source and every imported binding would be an undefined
-// global in the widget process.
-type ContentState = Partial<GlanceableLiveActivityContentState> & { canApprove?: boolean };
+// The pushed content state plus the two facts the widget extension cannot
+// derive: whether the recorded ask is one Approve can answer, and the failure
+// line a retryable Approve left on the card. They stay local fields rather than
+// imports from `./view-props`, because Babel stringifies this function's source
+// and every imported binding would be an undefined global in the widget
+// process.
+type ContentState = Partial<GlanceableLiveActivityContentState> & {
+  canApprove?: boolean;
+  notice?: string;
+};
 
 // Babel replaces the annotated arrow with its source string, so `layout` is a
 // string at runtime while TypeScript still checks it as a component — the same
@@ -128,6 +132,12 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // know better and the count gate stands.
   const canApprove = (props.needsInput ?? 0) > 0 && props.canApprove !== false;
 
+  // The failure line a retryable Approve left on the card. The app sets it in
+  // the content state, because this process cannot translate; a server-written
+  // state and a card whose ask changed carry none, and the line then draws
+  // nothing at all.
+  const notice = props.notice ?? null;
+
   // Spoken label: status word, numeric counts, then Open agents. The whole
   // surface deep-links to the agents list, so "Open agents" stays in the
   // spoken label even though no line draws it.
@@ -142,6 +152,28 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // `secondaryLabel` in both appearances: `tertiaryLabel` on the light widget
   // background left the ranked-down rows too faint to read.
   const mutedForeground = foregroundStyle(PlatformColor('secondaryLabel'));
+
+  // The failure line, drawn on its own full-width row under the counts so the
+  // whole banner width carries it: inside the count block it would have to fit
+  // between the mark and the buttons, which shrinks a reviewed sentence past
+  // reading. Orange, the color of the Approve button the notice asks the user
+  // to tap again. Nothing to draw when no press failed.
+  const noticeLine =
+    notice === null ? null : (
+      <Text
+        modifiers={[
+          font({ textStyle: 'footnote', weight: 'semibold' }),
+          // The line stays one row: the banner grows once for the notice and
+          // never reflows again as the copy changes language.
+          lineLimit(1),
+          minimumScaleFactor(0.6),
+          allowsTightening(true),
+          foregroundStyle(PlatformColor('systemOrange')),
+        ]}
+      >
+        {notice}
+      </Text>
+    );
 
   // The literal, not the imported constant: the widget transform stringifies
   // this function's source, so an imported binding would be an undefined global
@@ -288,7 +320,8 @@ const layout: LiveActivityComponent<ContentState> = props => {
 
   return {
     banner: (
-      <HStack
+      <VStack
+        spacing={6}
         modifiers={[
           // The banner draws to its own rounded edge, so without an inset the
           // top-left corner clips the leading content.
@@ -299,9 +332,12 @@ const layout: LiveActivityComponent<ContentState> = props => {
           environment({ key: 'locale', value: locale }),
         ]}
       >
-        {markAndRows(26)}
-        {actions}
-      </HStack>
+        <HStack>
+          {markAndRows(26)}
+          {actions}
+        </HStack>
+        {noticeLine}
+      </VStack>
     ),
     // The Dynamic Island's leading slot is the app-identity slot, so it holds
     // the Kilo mark; the trailing slot carries the ranked count.
@@ -337,7 +373,8 @@ const layout: LiveActivityComponent<ContentState> = props => {
     // the flanking regions. The leading and trailing regions stay empty and
     // take no height.
     expandedBottom: (
-      <HStack
+      <VStack
+        spacing={6}
         modifiers={[
           // The island's rounded corner cuts into the leading edge, so the
           // mark needs an inset the banner gets from its own padding. The
@@ -346,9 +383,12 @@ const layout: LiveActivityComponent<ContentState> = props => {
           environment({ key: 'locale', value: locale }),
         ]}
       >
-        {markAndRows(24)}
-        {actions}
-      </HStack>
+        <HStack>
+          {markAndRows(24)}
+          {actions}
+        </HStack>
+        {noticeLine}
+      </VStack>
     ),
   };
 };

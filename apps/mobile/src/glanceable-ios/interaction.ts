@@ -3,6 +3,7 @@ import { type UserInteractionEvent } from 'expo-widgets';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
+import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import {
   type GlanceableApproveResult,
   refreshGlanceableSnapshot,
@@ -12,6 +13,7 @@ import { readWaitingAsk, recordWaitingAsk, type WaitingAsk } from '@/lib/glancea
 import { setPendingDeepLink } from '@/lib/deep-link-launch';
 
 import { ActiveAgentsLiveActivity, LIVE_ACTIVITY_NAME } from './active-agents-live-activity';
+import { renderStoredSnapshotWithNotice, setGlanceableActionNotice } from './ios-sink';
 
 /**
  * What a button press on the Live Activity does.
@@ -108,16 +110,42 @@ async function approveResult(): Promise<GlanceableApproveResult> {
 }
 
 /**
+ * Put the retryable failure line on the card, the surface the press came from.
+ * A background press has no app on screen, so the toast below cannot be the
+ * only feedback: the notice rides the next Live Activity update, exactly as the
+ * Android notification carries it. Best effort — the toast and the recorded ask
+ * still stand when the card cannot be updated.
+ */
+async function showApproveFailed(): Promise<void> {
+  setGlanceableActionNotice(i18n.t(APPROVE_FAILED_KEY));
+  try {
+    await renderStoredSnapshotWithNotice();
+  } catch {
+    // The next publish corrects the surface; the card keeps its actions.
+  }
+}
+
+/**
  * Answer the recorded ask through the shared flow and drop the action once it
  * is answered. The record is captured before the flow runs, because a
  * successful answer clears it and its ids are what the republish below needs.
  */
 async function approveFromCard(): Promise<GlanceableInteractionOutcome> {
+  // A press can launch this process in the background with no mounted app root,
+  // so nothing else has applied the stored language yet — the same wait the
+  // Android headless task performs before it translates. Every line this press
+  // produces is translated below: the toast, the card's failure notice, and the
+  // widget props the republish renders. Switching i18n first is what keeps them
+  // in the user's language instead of English.
+  await applyStoredLanguage();
   const ask = await readWaitingAsk();
   const result = await approveResult();
   if (result.kind === 'retryable') {
-    // The record stays, so the card keeps Approve for another tap.
+    // The record stays, so the card keeps Approve for another tap. The toast
+    // only reaches the user with the app up, so the card itself carries the
+    // failure line as well.
     toast.error(i18n.t(APPROVE_FAILED_KEY));
+    await showApproveFailed();
     return result;
   }
   if (result.kind === 'gone') {

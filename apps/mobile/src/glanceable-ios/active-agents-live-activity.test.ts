@@ -70,6 +70,17 @@ describe('Active Agents Live Activity actions', () => {
     expect(region(source, 'expandedBottom: (', '\n  };\n};')).toContain('{actions}');
   });
 
+  it('draws a failed Approve on the surfaces the button lives on', () => {
+    // The press can arrive with the app closed, so the failure line the app
+    // puts in the content state has to be drawn on the card itself.
+    expect(source).toContain('const notice = props.notice ?? null;');
+    expect(region(source, 'banner: (', 'compactLeading:')).toContain('{noticeLine}');
+    expect(region(source, 'expandedBottom: (', '\n  };\n};')).toContain('{noticeLine}');
+    // The compact presentations carry the count alone: the notice goes where
+    // the buttons and the labelled counts are.
+    expect(region(source, 'compactLeading:', 'expandedBottom:')).not.toContain('{noticeLine}');
+  });
+
   it('keeps every compact presentation free of buttons', () => {
     const compact = region(source, 'compactLeading:', 'expandedBottom:');
     expect(compact).not.toContain('<Button');

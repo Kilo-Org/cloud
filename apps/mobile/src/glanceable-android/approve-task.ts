@@ -1,4 +1,5 @@
 import { i18n } from '@/i18n';
+import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { refreshGlanceableSnapshot, runGlanceableApprove } from '@/lib/glanceable/approve-ask';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { readWaitingAsk, recordWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
@@ -8,7 +9,6 @@ import {
   renderStoredSnapshotWithNotice,
   setGlanceableActionNotice,
 } from './android-sink';
-import { applyStoredLanguage } from './apply-stored-language';
 
 /**
  * The JS body the notification's Approve tap runs.

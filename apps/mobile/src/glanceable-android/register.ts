@@ -2,6 +2,7 @@ import { AppState } from 'react-native';
 import { type WidgetTaskHandlerProps } from 'react-native-android-widget';
 
 import { i18n } from '@/i18n';
+import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import {
   getLiveActivityEnabled,
   subscribeLiveActivityEnabled,
@@ -10,7 +11,6 @@ import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/gla
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 
 import { renderActiveAgentsWidget } from './active-agents-widget';
-import { applyStoredLanguage } from './apply-stored-language';
 import { androidSink, getCurrentWidgetProps, handleAppStateActive } from './android-sink';
 import { formatGlanceableCount, isWidgetRtl } from './count-format';
 import { getStoredWidgetSnapshot, setWidgetSnapshot } from './live-update';

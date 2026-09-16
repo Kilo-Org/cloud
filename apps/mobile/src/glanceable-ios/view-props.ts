@@ -134,25 +134,29 @@ export function buildExpiredWidgetProps(
 }
 
 /**
- * The Live Activity content-state plus the one fact the widget extension cannot
- * derive: whether the recorded ask is one Approve can answer. The field is
- * additive — a server-written state omits it and the layout reads that as
- * "keep the count gate".
+ * The Live Activity content-state plus the two facts the widget extension
+ * cannot derive: whether the recorded ask is one Approve can answer, and the
+ * one-line notice a retryable Approve leaves on the card. Both fields are
+ * additive — a server-written state omits them, and the layout reads an absent
+ * notice as "nothing to say".
  */
 export type GlanceableLiveActivityProps = GlanceableLiveActivityContentState & {
   canApprove?: boolean;
+  /** Translated failure line for the next update; omitted when there is none. */
+  notice?: string;
 };
 
 /**
  * Build the Live Activity content-state from a snapshot. The server pushes the
  * same raw shape, so the widget extension's `active-agents-live-activity.tsx`
  * renders it directly with inlined English copy (the server cannot translate).
- * `canApprove` is included only when the caller can decide it; a server-written
- * state omits it.
+ * `canApprove` and `notice` are included only when the caller can decide them;
+ * a server-written state omits both.
  */
 export function buildGlanceableLiveActivityContentState(
   snapshot: GlanceableAgentsSnapshot,
-  canApprove?: boolean
+  canApprove?: boolean,
+  notice?: string
 ): GlanceableLiveActivityProps {
   return {
     status: snapshot.status,
@@ -161,5 +165,6 @@ export function buildGlanceableLiveActivityContentState(
     idle: snapshot.idle,
     needsInputSince: snapshot.needsInputSince,
     ...(canApprove === undefined ? {} : { canApprove }),
+    ...(notice === undefined ? {} : { notice }),
   };
 }

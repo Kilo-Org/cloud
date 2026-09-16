@@ -17,14 +17,33 @@ const mocks = vi.hoisted(() => ({
   readWaitingAsk: vi.fn(),
   recordWaitingAsk: vi.fn(),
   setPendingDeepLink: vi.fn(),
+  setGlanceableActionNotice: vi.fn(),
+  renderStoredSnapshotWithNotice: vi.fn(),
+  changeLanguage: vi.fn(),
+  language: {
+    whenLanguagePreferenceLoaded: vi.fn<() => Promise<void>>(),
+    getResolvedLanguage: vi.fn(() => 'de'),
+  },
 }));
 
 vi.mock('./active-agents-live-activity', () => ({
   LIVE_ACTIVITY_NAME: 'ActiveAgentsLiveActivity',
   ActiveAgentsLiveActivity: { getInstances: mocks.getInstances },
 }));
+vi.mock('./ios-sink', () => ({
+  setGlanceableActionNotice: mocks.setGlanceableActionNotice,
+  renderStoredSnapshotWithNotice: mocks.renderStoredSnapshotWithNotice,
+}));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
-vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
+vi.mock('@/i18n', () => ({
+  i18n: { t: (key: string) => key, language: 'en', changeLanguage: mocks.changeLanguage },
+}));
+// The press resolves the stored language itself; the real store needs the
+// native SecureStore module, which this test does not load.
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  whenLanguagePreferenceLoaded: mocks.language.whenLanguagePreferenceLoaded,
+  getResolvedLanguage: mocks.language.getResolvedLanguage,
+}));
 vi.mock('@/lib/glanceable/approve-ask', () => ({
   runGlanceableApprove: mocks.runGlanceableApprove,
   refreshGlanceableSnapshot: mocks.refreshGlanceableSnapshot,
@@ -57,6 +76,15 @@ function event(source: string, target: string): UserInteractionEvent {
 
 const fromCard = (target: string) => event(ACTIVITY_ID, target);
 
+/** When a mock was called, relative to every other mock; fails when never called. */
+function callOrder(mock: { mock: { invocationCallOrder: number[] } }): number {
+  const order = mock.mock.invocationCallOrder[0];
+  if (order === undefined) {
+    throw new Error('expected the mock to have been called');
+  }
+  return order;
+}
+
 describe('handleGlanceableInteraction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -64,6 +92,9 @@ describe('handleGlanceableInteraction', () => {
     mocks.readWaitingAsk.mockResolvedValue(ASK);
     mocks.runGlanceableApprove.mockResolvedValue({ kind: 'approved' });
     mocks.refreshGlanceableSnapshot.mockResolvedValue(undefined);
+    mocks.renderStoredSnapshotWithNotice.mockResolvedValue(undefined);
+    mocks.changeLanguage.mockResolvedValue(undefined);
+    mocks.language.whenLanguagePreferenceLoaded.mockResolvedValue(undefined);
   });
 
   it('ignores a press from another layout', async () => {
@@ -142,9 +173,46 @@ describe('handleGlanceableInteraction', () => {
     );
 
     expect(mocks.toastError).toHaveBeenCalledWith('glanceable.approveFailed');
+    // The card itself carries the failure line: the toast is only on screen
+    // with the app up, and this press can arrive with it closed.
+    expect(mocks.setGlanceableActionNotice).toHaveBeenCalledWith('glanceable.approveFailed');
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(1);
     // The record stays, and the card is not republished as if it had changed.
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
     expect(mocks.refreshGlanceableSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('applies the stored language before the press translates anything', async () => {
+    mocks.runGlanceableApprove.mockResolvedValue({ kind: 'retryable' });
+
+    await handleGlanceableInteraction(fromCard(GLANCEABLE_APPROVE_TARGET));
+
+    // A press can launch this process in the background, where nothing has
+    // applied the stored language yet: the same wait the Android headless task
+    // performs. Both the toast and the card's notice are translated after it,
+    // so a non-English user never reads the English copy.
+    expect(mocks.language.whenLanguagePreferenceLoaded).toHaveBeenCalledTimes(1);
+    expect(mocks.changeLanguage).toHaveBeenCalledWith('de');
+    expect(callOrder(mocks.changeLanguage)).toBeLessThan(callOrder(mocks.toastError));
+    expect(callOrder(mocks.changeLanguage)).toBeLessThan(
+      callOrder(mocks.setGlanceableActionNotice)
+    );
+  });
+
+  it('keeps the retryable press when the card cannot be re-rendered', async () => {
+    mocks.runGlanceableApprove.mockResolvedValue({ kind: 'retryable' });
+    mocks.renderStoredSnapshotWithNotice.mockRejectedValue(new Error('surface unavailable'));
+
+    await expect(handleGlanceableInteraction(fromCard(GLANCEABLE_APPROVE_TARGET))).resolves.toEqual(
+      {
+        kind: 'retryable',
+      }
+    );
+
+    // The notice was still offered to the sink, and the record still stands for
+    // another tap: a failed re-render is not a second failure the user sees.
+    expect(mocks.setGlanceableActionNotice).toHaveBeenCalledWith('glanceable.approveFailed');
+    expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
   });
 
   it('drops an answered-elsewhere ask and still refreshes', async () => {
@@ -220,6 +288,10 @@ describe('handleGlanceableInteraction', () => {
       }
     );
 
+    // With no readable ask there is nothing to name and no approvable action to
+    // promise, so the card carries no notice either.
     expect(mocks.toastError).not.toHaveBeenCalled();
+    expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
+    expect(mocks.renderStoredSnapshotWithNotice).not.toHaveBeenCalled();
   });
 });

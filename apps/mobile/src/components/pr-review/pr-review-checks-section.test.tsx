@@ -177,6 +177,40 @@ describe('PrReviewChecksSection status groups', () => {
     expect(rows.map(row => (row.props.children as unknown[]).length)).toEqual([1, 2, 2, 1]);
   });
 
+  it('buckets every run where the server rollup counts it, so no row contradicts the rollup', () => {
+    // The reference is `rollupState` (apps/web/src/lib/github-pr-review/
+    // mappers.ts): `cancelled` and `stale` are failures, `skipped` and
+    // `neutral` are skipped, and a completed run with a null or unmapped
+    // conclusion is pending — never skipped.
+    setRuns([
+      run('passed', 'completed', 'success'),
+      run('failed', 'completed', 'failure'),
+      run('errored', 'completed', 'error'),
+      run('timed-out', 'completed', 'timed_out'),
+      run('action-required', 'completed', 'action_required'),
+      run('cancelled', 'completed', 'cancelled'),
+      run('stale', 'completed', 'stale'),
+      run('skipped', 'completed', 'skipped'),
+      run('neutral', 'completed', 'neutral'),
+      run('unmapped', 'completed', 'something-else'),
+      run('no-conclusion', 'completed', null),
+      run('running', 'in_progress', null),
+      run('queued', 'queued', null),
+    ]);
+    const renderer = mount();
+
+    const rows = statusRows(renderer);
+    expect(rows.map(row => [row.props.status, row.props.count])).toEqual([
+      ['success', 1],
+      ['failure', 6],
+      ['pending', 4],
+      ['skipped', 2],
+    ]);
+    // Every run is in exactly one row: the counts sum to the card total.
+    const counted = rows.reduce((sum, row) => sum + Number(row.props.count), 0);
+    expect(counted).toBe(13);
+  });
+
   it('renders exactly one row when only one status is present', () => {
     setRuns([run('passed', 'completed', 'success')]);
     const renderer = mount();

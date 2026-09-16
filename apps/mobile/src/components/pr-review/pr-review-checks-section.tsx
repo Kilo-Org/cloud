@@ -81,6 +81,35 @@ function classifyCheckTone(status: string, conclusion: string | null): CheckTone
   }
 }
 
+/**
+ * Which collapsed row counts a run. The tone above picks the detail row's
+ * icon; this picks the bucket, and the two answer different questions — a
+ * cancelled run keeps its muted circle while it counts as a failure.
+ *
+ * It mirrors the server's `rollupState` (apps/web/src/lib/github-pr-review/
+ * mappers.ts), which is the count the rows replaced: `cancelled`/`stale` are
+ * failures there, and a completed run with a null or unmapped conclusion is
+ * pending, never skipped. The provider read layer agrees (`canceled` blocks a
+ * GitLab merge as a failed pipeline), so the rows cannot contradict the
+ * rollup on either arm.
+ */
+function classifyCheckStatus(status: string, conclusion: string | null): PrReviewChecksStatus {
+  if (status !== 'completed') {
+    return 'pending';
+  }
+  const value = conclusion ?? '';
+  if (/^success$/i.test(value)) {
+    return 'success';
+  }
+  if (/failure|error|cancelled|timed_out|action_required|stale/i.test(value)) {
+    return 'failure';
+  }
+  if (/skipped|neutral/i.test(value)) {
+    return 'skipped';
+  }
+  return 'pending';
+}
+
 const TONE_COLOR = {
   success: 'good',
   failure: 'destructive',
@@ -147,30 +176,21 @@ function CheckRow({ run }: Readonly<{ run: CheckRun }>) {
 // The row order the rollup line has always summarised, kept for the groups.
 const STATUS_ORDER = ['success', 'failure', 'pending', 'skipped'] as const;
 
-// Every tone maps to exactly one status, so the row counts always sum to the
-// card total and no run is dropped (the promise provider-pr-queries keeps).
-const TONE_STATUS = {
-  success: 'success',
-  failure: 'failure',
-  warning: 'failure',
-  pending: 'pending',
-  skipped: 'skipped',
-  neutral: 'skipped',
-} satisfies Record<CheckTone, PrReviewChecksStatus>;
-
 type CheckRunGroup = {
   status: PrReviewChecksStatus;
   runs: CheckRun[];
 };
 
 /**
- * Group the run list by rollup status, dropping statuses with no runs: a
- * status the head commit has no checks for renders no row.
+ * Group the run list by the rollup status the server counts the run in,
+ * dropping statuses with no runs: a status the head commit has no checks for
+ * renders no row. Every run lands in exactly one bucket, so the row counts
+ * always sum to the card total and no run is dropped.
  */
 function groupRunsByStatus(runList: readonly CheckRun[]): CheckRunGroup[] {
   const byStatus = new Map<PrReviewChecksStatus, CheckRun[]>();
   for (const run of runList) {
-    const status = TONE_STATUS[classifyCheckTone(run.status, run.conclusion)];
+    const status = classifyCheckStatus(run.status, run.conclusion);
     const bucket = byStatus.get(status);
     if (bucket) {
       bucket.push(run);

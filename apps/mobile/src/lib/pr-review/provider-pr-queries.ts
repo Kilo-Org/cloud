@@ -92,18 +92,20 @@ function normalizeConclusion(conclusion: string | null): string | null {
   return conclusion === 'canceled' ? 'cancelled' : conclusion;
 }
 
-// Which rollup counter a completed run lands in. A verdict no bucket names —
-// GitLab's finished `manual` pipeline, or any provider-specific one — counts
-// as pending, which is the bucket GitHub's own rollup puts a completed run
-// with an unmapped conclusion in (`rollupState` in
-// apps/web/src/lib/github-pr-review/mappers.ts). Every run that reaches
-// `total` is therefore also in a bucket, so the rollup line can never print
-// fewer checks than the rows the section renders below it.
+// Which rollup counter a completed run lands in. `rollupState` in
+// apps/web/src/lib/github-pr-review/mappers.ts is the reference, because the
+// sections that render checks bucket by it: `cancelled` (a provider
+// `canceled`) is a failure there, exactly as the provider read layer blocks a
+// GitLab merge on a canceled pipeline. A verdict no bucket names — GitLab's
+// finished `manual` pipeline, or any provider-specific one — counts as
+// pending. Every run that reaches `total` is therefore also in a bucket, so
+// the rollup can never print fewer checks than the rows the section renders
+// below it.
 const ROLLUP_BUCKETS = new Map<string, 'success' | 'failure' | 'skipped'>([
   ['success', 'success'],
   ['failure', 'failure'],
   ['error', 'failure'],
-  ['cancelled', 'skipped'],
+  ['cancelled', 'failure'],
   ['skipped', 'skipped'],
 ]);
 

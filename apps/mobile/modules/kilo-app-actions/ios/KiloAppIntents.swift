@@ -1,26 +1,18 @@
 import AppIntents
 import UIKit
 
-/// The English copy the four App Intents carry.
-///
-/// An App Intent's `title`, its parameter names and a shortcut's title are
-/// `LocalizedStringResource`s that iOS resolves against `Localizable.strings`
-/// in the app bundle. The literal is therefore both the key and the fallback,
-/// and `plugins/app-intent-copy.json` holds one translation per language under
-/// exactly these strings — the contract test compares the two files, so they
-/// cannot drift.
-enum KiloIntentCopy {
-  static let startAgent: LocalizedStringResource = "Start agent"
-  static let openNeedsInput: LocalizedStringResource = "Open agent needing input"
-  static let openSession: LocalizedStringResource = "Open session"
-  static let openPullRequest: LocalizedStringResource = "Open pull request"
-  static let promptParam: LocalizedStringResource = "Prompt"
-  static let repositoryParam: LocalizedStringResource = "Repository"
-  static let sessionParam: LocalizedStringResource = "Session"
-  static let pullRequestParam: LocalizedStringResource = "Pull request"
-  static let startFailedFallback: LocalizedStringResource =
-    "Couldn't start the agent. Open Kilo and try again."
-}
+// The English copy the four App Intents carry.
+//
+// An App Intent's `title`, its parameter names and a shortcut's title are
+// `LocalizedStringResource`s that iOS resolves against `Localizable.strings`
+// in the app bundle, so the literal is both the key and the fallback. It has
+// to be written at the use site: `appintentsmetadataprocessor`, which runs on
+// this target at build time, reads these sources and halts the target with
+// "'LocalizedStringResource' must be initialized with a call to its
+// initializer or a string literal" for anything else, so a shared `static let`
+// copy table fails the build. `plugins/app-intent-copy.json` holds one
+// translation per language under exactly these English strings, and the
+// contract test compares each literal with that file.
 
 /// The `kiloapp:///actions/<slug>` targets the app's own pipeline resolves.
 ///
@@ -67,16 +59,16 @@ enum KiloAppActionTarget {
 /// Starts a new agent. The app may be closed: the bridge hands the payload to
 /// the JS pipeline, which owns the whole start path, and reports its answer.
 struct StartAgentIntent: AppIntent {
-  static var title: LocalizedStringResource = KiloIntentCopy.startAgent
+  static var title: LocalizedStringResource = "Start agent"
   static var openAppWhenRun: Bool = false
 
-  @Parameter(title: KiloIntentCopy.promptParam)
+  @Parameter(title: "Prompt")
   var prompt: String
 
-  @Parameter(title: KiloIntentCopy.repositoryParam)
+  @Parameter(title: "Repository")
   var repository: String?
 
-  @Parameter(title: KiloIntentCopy.sessionParam)
+  @Parameter(title: "Session")
   var session: String?
 
   func perform() async throws -> some IntentResult & ReturnsValue<String> {
@@ -108,7 +100,7 @@ struct StartAgentIntent: AppIntent {
   private static func reported(_ error: KiloAppActionError) -> KiloAppActionError {
     if case .refused(let message, let retryable) = error, (message ?? "").isEmpty {
       return .refused(
-        message: String(localized: KiloIntentCopy.startFailedFallback),
+        message: String(localized: "Couldn't start the agent. Open Kilo and try again."),
         retryable: retryable
       )
     }
@@ -119,7 +111,7 @@ struct StartAgentIntent: AppIntent {
 /// Opens the agent that is waiting for an answer, or the list when none or
 /// several are waiting. The app resolves both cases from live data.
 struct OpenNeedsInputIntent: AppIntent {
-  static var title: LocalizedStringResource = KiloIntentCopy.openNeedsInput
+  static var title: LocalizedStringResource = "Open agent needing input"
   static var openAppWhenRun: Bool = true
 
   func perform() async throws -> some IntentResult {
@@ -130,10 +122,10 @@ struct OpenNeedsInputIntent: AppIntent {
 
 /// Opens one session by its id.
 struct OpenSessionIntent: AppIntent {
-  static var title: LocalizedStringResource = KiloIntentCopy.openSession
+  static var title: LocalizedStringResource = "Open session"
   static var openAppWhenRun: Bool = true
 
-  @Parameter(title: KiloIntentCopy.sessionParam)
+  @Parameter(title: "Session")
   var session: String
 
   func perform() async throws -> some IntentResult {
@@ -147,10 +139,10 @@ struct OpenSessionIntent: AppIntent {
 
 /// Opens one pull request by its link or id.
 struct OpenPullRequestIntent: AppIntent {
-  static var title: LocalizedStringResource = KiloIntentCopy.openPullRequest
+  static var title: LocalizedStringResource = "Open pull request"
   static var openAppWhenRun: Bool = true
 
-  @Parameter(title: KiloIntentCopy.pullRequestParam)
+  @Parameter(title: "Pull request")
   var pullRequest: String
 
   func perform() async throws -> some IntentResult {
@@ -170,25 +162,25 @@ struct KiloAppShortcuts: AppShortcutsProvider {
     AppShortcut(
       intent: StartAgentIntent(),
       phrases: ["Start an agent with \(.applicationName)"],
-      shortTitle: KiloIntentCopy.startAgent,
+      shortTitle: "Start agent",
       systemImageName: "plus.circle"
     )
     AppShortcut(
       intent: OpenNeedsInputIntent(),
       phrases: ["Show the agent that needs input in \(.applicationName)"],
-      shortTitle: KiloIntentCopy.openNeedsInput,
+      shortTitle: "Open agent needing input",
       systemImageName: "hand.raised"
     )
     AppShortcut(
       intent: OpenSessionIntent(),
       phrases: ["Open a session in \(.applicationName)"],
-      shortTitle: KiloIntentCopy.openSession,
+      shortTitle: "Open session",
       systemImageName: "bubble.left"
     )
     AppShortcut(
       intent: OpenPullRequestIntent(),
       phrases: ["Open a pull request in \(.applicationName)"],
-      shortTitle: KiloIntentCopy.openPullRequest,
+      shortTitle: "Open pull request",
       systemImageName: "arrow.triangle.pull"
     )
   }

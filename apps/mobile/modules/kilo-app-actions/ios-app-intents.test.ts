@@ -61,6 +61,10 @@ const INTENT_TYPES = {
 /** The actions that open the app themselves; `StartAgent` runs in the background. */
 const OPEN_ACTIONS = ['OpenNeedsInput', 'OpenSession', 'OpenPullRequest'] as const;
 
+/** The lines that hand a label to the App Intents metadata extractor. */
+const LABEL_LINE =
+  /static var title: LocalizedStringResource|@Parameter\(title:|shortTitle:|String\(localized:/;
+
 /** The body of `struct <name>: … { … }`, braces balanced. */
 function swiftStruct(name: string): string {
   const declaration = intents.indexOf(`struct ${name}:`);
@@ -141,10 +145,22 @@ describe('the four App Intents', () => {
     expect(intents).toContain(`struct ${INTENT_TYPES[action]}: AppIntent {`);
   });
 
-  it('declares every copy string the plugin translates', () => {
-    for (const [key, value] of Object.entries(ENGLISH_COPY)) {
-      expect(intents, `${key} is missing from the Swift copy`).toContain(`static let ${key}:`);
-      expect(intents, `${key}'s copy is missing`).toContain(value);
+  it('spells every label the plugin translates as a literal', () => {
+    // App Intents metadata is extracted from these sources at build time, and
+    // `appintentsmetadataprocessor` halts the target for anything but a literal
+    // — the ios job failed with "'LocalizedStringResource' must be initialized
+    // with a call to its initializer or a string literal" — so the copy cannot
+    // live behind a shared table. Every literal here is a key the plugin's
+    // `Localizable.strings` carries.
+    const labels = intents.split('\n').filter(line => LABEL_LINE.test(line));
+    // Four titles, four shortcut titles, the failure copy, and five parameters:
+    // one per action plus the session `StartAgent` takes as well.
+    expect(labels).toHaveLength(APP_ACTION_IDS.length * 3 + 2);
+    const copy = new Set(Object.values(ENGLISH_COPY));
+    for (const line of labels) {
+      const literal = /"([^"]+)"/.exec(line)?.[1];
+      expect(literal, `${line.trim()} is not a literal label`).toBeDefined();
+      expect(copy.has(literal ?? ''), `${literal} is not copy the plugin renders`).toBe(true);
     }
   });
 

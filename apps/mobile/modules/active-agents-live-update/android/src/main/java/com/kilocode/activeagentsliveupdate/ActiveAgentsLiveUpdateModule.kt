@@ -15,6 +15,11 @@ import expo.modules.kotlin.modules.ModuleDefinition
 /**
  * Local Expo module for the Android aggregate ongoing notification.
  *
+ * Android-only capability: the aggregate card is a system notification, which
+ * only Android has, and API 36.1+ Live Update promotion is what keeps it on
+ * screen. iOS renders the same aggregate card as a Live Activity through
+ * `expo-widgets` (see `src/glanceable-ios`), so this module has no iOS side.
+ *
  * The JS side owns the translated copy, the notification kind's channel (and
  * its creation), the alert decision, and the revision guard; this module owns
  * the fixed notification id, the API 36.1+ promotion gate, and the content

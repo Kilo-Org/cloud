@@ -870,7 +870,9 @@ describe('worktree deletion in Durable Objects', () => {
       const owners = Array.from({ length: 40 }, (_, index) => ({
         worktreeId: null,
         organizationId: null,
-        sessions: [{ sessionId: null, cloudAgentSessionId: `agent_${crypto.randomUUID()}${index}` }],
+        sessions: [
+          { sessionId: null, cloudAgentSessionId: `agent_${crypto.randomUUID()}${index}` },
+        ],
       }));
       const locator = vi.fn((_cloudAgentSessionId: string) => ({
         sandboxId: otherSandboxId,
@@ -894,11 +896,13 @@ describe('worktree deletion in Durable Objects', () => {
           })
         ).resolves.toEqual({ deleted: true, sessionIds: [kiloId(0)] });
         expect(ownership).toHaveBeenCalledTimes(1);
-        expect(ownership).toHaveBeenCalledWith(expect.objectContaining({ releasedWorktreeIds: [] }));
-        expect(locator).toHaveBeenCalledTimes(owners.length);
-        expect(new Set(locator.mock.calls.map(([cloudAgentSessionId]) => cloudAgentSessionId)).size).toBe(
-          owners.length
+        expect(ownership).toHaveBeenCalledWith(
+          expect.objectContaining({ releasedWorktreeIds: [] })
         );
+        expect(locator).toHaveBeenCalledTimes(owners.length);
+        expect(
+          new Set(locator.mock.calls.map(([cloudAgentSessionId]) => cloudAgentSessionId)).size
+        ).toBe(owners.length);
         expect(await memory.observe(created.providerRef)).toMatchObject({ status: 'terminal' });
         expect(await state.storage.get('physical_record')).toBeUndefined();
       } finally {

@@ -3058,6 +3058,12 @@
     "privacy": "ወኪሎችን ለማየት Kiloን ክፈት",
     "openAgents": "ወኪሎችን ክፈት",
     "needsInput": "ምላሽ ይፈልጋል",
+    "newestSession": "አዲሱ: {{title}}",
+    "noneWaiting": "የሚጠብቅ ወኪል የለም",
+    "newAgent": "አዲስ ወኪል",
+    "approving": "በማጽደቅ ላይ...",
+    "couldNotApprove": "ማጽደቅ አልተቻለም",
+    "couldNotStart": "መጀመር አልተቻለም",
     "channelName": "ንቁ ወኪሎች",
     "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።"
   },

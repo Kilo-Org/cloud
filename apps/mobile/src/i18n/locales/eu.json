@@ -3058,6 +3058,12 @@
     "privacy": "Ireki Kilo agenteak ikusteko",
     "openAgents": "Ireki agenteak",
     "needsInput": "Zure erantzunaren zain",
+    "newestSession": "Berriena: {{title}}",
+    "noneWaiting": "Ez dago agente zainik",
+    "newAgent": "Agente berria",
+    "approving": "Onartzen ari da...",
+    "couldNotApprove": "Ezin izan da onartu",
+    "couldNotStart": "Ezin izan da hasi",
     "channelName": "Agente aktiboak",
     "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko."
   },

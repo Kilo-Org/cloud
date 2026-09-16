@@ -3058,6 +3058,12 @@
     "privacy": "ເປີດ Kilo ເພື່ອເບິ່ງເອເຈນ",
     "openAgents": "ເປີດເອເຈນ",
     "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ",
+    "newestSession": "ໃໝ່ສຸດ: {{title}}",
+    "noneWaiting": "ບໍ່ມີເອເຈນລໍຖ້າ",
+    "newAgent": "ເອເຈນໃໝ່",
+    "approving": "ກຳລັງອະນຸມັດ...",
+    "couldNotApprove": "ອະນຸມັດບໍ່ໄດ້",
+    "couldNotStart": "ເລີ່ມບໍ່ໄດ້",
     "channelName": "ເອເຈນທີ່ກຳລັງເຮັດວຽກ",
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ."
   },

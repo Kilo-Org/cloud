@@ -3058,6 +3058,12 @@
     "privacy": "Öppna Kilo för att se agenter",
     "openAgents": "Öppna agenter",
     "needsInput": "Väntar på svar",
+    "newestSession": "Nyaste: {{title}}",
+    "noneWaiting": "Inga agenter väntar",
+    "newAgent": "Ny agent",
+    "approving": "Godkänner...",
+    "couldNotApprove": "Kunde inte godkänna",
+    "couldNotStart": "Kunde inte starta",
     "channelName": "Aktiva agenter",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen."
   },

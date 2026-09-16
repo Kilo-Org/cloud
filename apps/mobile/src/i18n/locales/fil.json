@@ -3058,6 +3058,12 @@
     "privacy": "Buksan ang Kilo para makita ang mga agent",
     "openAgents": "Buksan ang mga agent",
     "needsInput": "Naghihintay ng sagot",
+    "newestSession": "Pinakabago: {{title}}",
+    "noneWaiting": "Walang naghihintay na agent",
+    "newAgent": "Bagong agent",
+    "approving": "Inaaprubahan...",
+    "couldNotApprove": "Hindi maaprubahan",
+    "couldNotStart": "Hindi masimulan",
     "channelName": "Mga aktibong agent",
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen."
   },

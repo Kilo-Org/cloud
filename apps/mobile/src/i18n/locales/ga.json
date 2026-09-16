@@ -3127,6 +3127,12 @@
     "privacy": "Oscail Kilo chun gníomhairí a fheiceáil",
     "openAgents": "Oscail gníomhairí",
     "needsInput": "Ionchur de dhíth",
+    "newestSession": "An ceann is nuaí: {{title}}",
+    "noneWaiting": "Níl aon ghníomhaire ag fanacht",
+    "newAgent": "Gníomhaire nua",
+    "approving": "Á cheadú...",
+    "couldNotApprove": "Níorbh fhéidir ceadú",
+    "couldNotStart": "Níorbh fhéidir tosú",
     "channelName": "Gníomhairí gníomhacha",
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála."
   },

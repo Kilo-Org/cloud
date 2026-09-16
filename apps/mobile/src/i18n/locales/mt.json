@@ -3127,6 +3127,12 @@
     "privacy": "Iftaħ Kilo biex tara l-aġenti",
     "openAgents": "Iftaħ l-aġenti",
     "needsInput": "Jistenna tweġiba",
+    "newestSession": "L-aktar reċenti: {{title}}",
+    "noneWaiting": "L-ebda aġent qed jistenna",
+    "newAgent": "Aġent ġdid",
+    "approving": "Qed japprova...",
+    "couldNotApprove": "Ma setax japprova",
+    "couldNotStart": "Ma setax jibda",
     "channelName": "Aġenti attivi",
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar."
   },

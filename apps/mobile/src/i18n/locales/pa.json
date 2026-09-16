@@ -3058,6 +3058,12 @@
     "privacy": "ਏਜੰਟ ਵੇਖਣ ਲਈ Kilo ਖੋਲ੍ਹੋ",
     "openAgents": "ਏਜੰਟ ਖੋਲ੍ਹੋ",
     "needsInput": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
+    "newestSession": "ਸਭ ਤੋਂ ਨਵਾਂ: {{title}}",
+    "noneWaiting": "ਕੋਈ ਏਜੰਟ ਉਡੀਕ ਨਹੀਂ ਰਿਹਾ",
+    "newAgent": "ਨਵਾਂ ਏਜੰਟ",
+    "approving": "ਮਨਜ਼ੂਰ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
+    "couldNotApprove": "ਮਨਜ਼ੂਰ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "couldNotStart": "ਸ਼ੁਰੂ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "channelName": "ਸਰਗਰਮ ਏਜੰਟ",
     "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।"
   },

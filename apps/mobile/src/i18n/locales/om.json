@@ -3058,6 +3058,12 @@
     "privacy": "Eejentoota ilaaluuf Kilo bani",
     "openAgents": "Eejentoota bani",
     "needsInput": "Deebii barbaada",
+    "newestSession": "Haaraa ta'e: {{title}}",
+    "noneWaiting": "Eejentiin eegu hin jiru",
+    "newAgent": "Eejentii haaraa",
+    "approving": "Raggaasisaa jira...",
+    "couldNotApprove": "Raggaasisuu hin dandeenye",
+    "couldNotStart": "Kaasuu hin dandeenye",
     "channelName": "Eejentoota hojii irra jiran",
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi."
   },

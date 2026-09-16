@@ -3104,6 +3104,12 @@
     "privacy": "Otwórz Kilo, aby zobaczyć agentów",
     "openAgents": "Otwórz listę agentów",
     "needsInput": "Czeka na odpowiedź",
+    "newestSession": "Najnowsza: {{title}}",
+    "noneWaiting": "Żaden agent nie czeka",
+    "newAgent": "Nowy agent",
+    "approving": "Zatwierdzanie...",
+    "couldNotApprove": "Nie udało się zatwierdzić",
+    "couldNotStart": "Nie udało się uruchomić",
     "channelName": "Aktywni agenci",
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
   },

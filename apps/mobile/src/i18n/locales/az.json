@@ -3058,6 +3058,12 @@
     "privacy": "Agentləri görmək üçün Kilo-nu aç",
     "openAgents": "Agentləri aç",
     "needsInput": "Cavab gözləyir",
+    "newestSession": "Ən yenisi: {{title}}",
+    "noneWaiting": "Gözləyən agent yoxdur",
+    "newAgent": "Yeni agent",
+    "approving": "Təsdiqlənir...",
+    "couldNotApprove": "Təsdiqlənmədi",
+    "couldNotStart": "Başladılmadı",
     "channelName": "Aktiv agentlər",
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir."
   },

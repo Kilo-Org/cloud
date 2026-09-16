@@ -72,6 +72,9 @@ vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
 vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
   clearCondenseToolCallsPreference: vi.fn(),
 }));
+vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
+  clearCollapsedConnectCtasPreference: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference: vi.fn() }));
 vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
   clearHideThinkingPreference: vi.fn(),
@@ -89,6 +92,12 @@ vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
 vi.mock('@/lib/persist/read-cache', () => ({
   clearCacheScopeForSignOut: vi.fn().mockResolvedValue(undefined),
   readCachedUserId: vi.fn().mockReturnValue(null),
+}));
+// The offline tool-summary translation scope: `clearToolSummaryTranslationsForSignOut`
+// imports the encrypted KV store, whose expo-crypto binding crashes the node
+// environment, so the sign-out graph must not load the real module here.
+vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
+  clearToolSummaryTranslationsForSignOut: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@/lib/pr-review/recent-prs', () => ({
   clearRecentPrs: vi.fn().mockResolvedValue(undefined),

@@ -572,6 +572,8 @@
       "pending": "நிலுவையில்: {{displayCount}}",
       "skipped": "தவிர்க்கப்பட்டவை: {{displayCount}}",
       "checksCount": "{{displayCount}} சோதனைகள்",
+      "checksCount_one": "{{displayCount}} சோதனை",
+      "checksCount_other": "{{displayCount}} சோதனைகள்",
       "checkDetails": "சோதனை விவரங்கள்"
     },
     "inbox": {

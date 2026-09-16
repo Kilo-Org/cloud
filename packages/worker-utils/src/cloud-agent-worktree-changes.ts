@@ -19,13 +19,25 @@ function hasAtMostLines(text: string, limit: number): boolean {
   return lines <= limit;
 }
 
-const revisionSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+export const worktreeChangesRevisionSchema = z
+  .number()
+  .int()
+  .positive()
+  .max(Number.MAX_SAFE_INTEGER);
+export const worktreeChangesCapturedAtSchema = z.string().datetime({ offset: true });
 const commitSchema = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/);
 const baseRefSchema = z
   .string()
   .min(1)
   .max(1024)
   .refine(ref => !ref.startsWith('-') && !ref.includes('\0'), 'Invalid comparison ref');
+export const worktreeChangesComparisonSchema = z
+  .object({
+    baseRef: baseRefSchema,
+    mergeBase: commitSchema,
+    head: commitSchema,
+  })
+  .strict();
 
 export const worktreeChangesFileSchema = z
   .object({
@@ -50,20 +62,14 @@ export const worktreeChangesFileSchema = z
 
 export const worktreeChangesCaptureRequestSchema = z
   .object({
-    revision: revisionSchema,
+    revision: worktreeChangesRevisionSchema,
     baseRef: baseRefSchema.optional(),
   })
   .strict();
 
 const captureFields = {
-  revision: revisionSchema,
-  comparison: z
-    .object({
-      baseRef: baseRefSchema,
-      mergeBase: commitSchema,
-      head: commitSchema,
-    })
-    .strict(),
+  revision: worktreeChangesRevisionSchema,
+  comparison: worktreeChangesComparisonSchema,
   files: z.array(worktreeChangesFileSchema).max(MAX_WORKTREE_CHANGES_FILES),
   truncated: z.boolean(),
 };
@@ -78,13 +84,13 @@ export const worktreeChangesCaptureSchema = z
   );
 
 const savedWorktreeChangesFileSchema = worktreeChangesFileSchema
-  .extend({ revision: revisionSchema })
+  .extend({ revision: worktreeChangesRevisionSchema })
   .strict();
 
 const legacyWorktreeChangesSnapshotSchema = z
   .object({
     schemaVersion: z.literal(1),
-    capturedAt: z.string().datetime({ offset: true }),
+    capturedAt: worktreeChangesCapturedAtSchema,
     ...captureFields,
   })
   .strict()
@@ -97,9 +103,9 @@ const legacyWorktreeChangesSnapshotSchema = z
 const savedWorktreeChangesSnapshotSchema = z
   .object({
     schemaVersion: z.literal(WORKTREE_CHANGES_SCHEMA_VERSION),
-    capturedAt: z.string().datetime({ offset: true }),
-    revision: revisionSchema,
-    comparison: captureFields.comparison,
+    capturedAt: worktreeChangesCapturedAtSchema,
+    revision: worktreeChangesRevisionSchema,
+    comparison: worktreeChangesComparisonSchema,
     files: z.array(savedWorktreeChangesFileSchema).max(MAX_WORKTREE_CHANGES_FILES),
     truncated: z.boolean(),
   })
@@ -176,7 +182,7 @@ export const worktreeFileOmissionReasonSchema = z.enum([
 export const worktreeFileRecordSchema = z
   .object({
     schemaVersion: z.literal(WORKTREE_FILE_SCHEMA_VERSION),
-    revision: revisionSchema,
+    revision: worktreeChangesRevisionSchema,
     path: worktreeChangesFileSchema.shape.path,
     diff: z.discriminatedUnion('status', [
       z
@@ -251,7 +257,7 @@ export const worktreeSnapshotCaptureSchema = z
 export const worktreeFileQuerySchema = z
   .object({
     path: worktreeChangesFileSchema.shape.path,
-    expectedRevision: revisionSchema,
+    expectedRevision: worktreeChangesRevisionSchema,
   })
   .strict();
 
@@ -269,8 +275,13 @@ export const getWorktreeFileOutputSchema = z.discriminatedUnion('status', [
       'Worktree file result status does not match the diff'
     ),
   z.object({ status: z.literal('not_captured') }).strict(),
-  z.object({ status: z.literal('no_longer_listed'), currentRevision: revisionSchema }).strict(),
-  z.object({ status: z.literal('stale'), currentRevision: revisionSchema }).strict(),
+  z
+    .object({
+      status: z.literal('no_longer_listed'),
+      currentRevision: worktreeChangesRevisionSchema,
+    })
+    .strict(),
+  z.object({ status: z.literal('stale'), currentRevision: worktreeChangesRevisionSchema }).strict(),
 ]);
 
 export type WorktreeChangesFile = z.infer<typeof worktreeChangesFileSchema>;

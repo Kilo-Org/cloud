@@ -572,6 +572,8 @@
       "pending": "ລໍຖ້າ {{displayCount}}",
       "skipped": "ຂ້າມແລ້ວ {{displayCount}}",
       "checksCount": "ການກວດສອບ {{displayCount}} ລາຍການ",
+      "checksCount_one": "ການກວດສອບ {{displayCount}} ລາຍການ",
+      "checksCount_other": "ການກວດສອບ {{displayCount}} ລາຍການ",
       "checkDetails": "ລາຍລະອຽດການກວດສອບ"
     },
     "inbox": {

@@ -54,6 +54,8 @@ export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';
 /** Group consecutive tool calls on the session page into one condensed row. */
 export const CONDENSE_TOOL_CALLS_KEY = 'condense-tool-calls';
+/** Provider platforms whose new-session "Connect <provider>" CTA the user collapsed. */
+export const COLLAPSED_CONNECT_CTAS_KEY = 'collapsed-connect-ctas';
 /** Master switch for the glanceable Active Agents surfaces (widgets, Live Activity,
  * Android ongoing). Off blanks every surface and unregisters its push tokens. */
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */

@@ -63,6 +63,7 @@ describe('GET /api/integrations/bitbucket/connect', () => {
       owner: `org_${ORGANIZATION_ID}`,
       userId: USER_ID,
       returnTo: `/organizations/${ORGANIZATION_ID}/integrations/bitbucket`,
+      issuedAt: expect.any(Number),
     });
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
       { user: expect.objectContaining({ id: USER_ID }) },

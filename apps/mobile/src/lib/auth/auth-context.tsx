@@ -45,6 +45,7 @@ import {
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
+import { clearCollapsedConnectCtasPreference } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
 import { clearCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
 import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
@@ -494,6 +495,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearSessionScopedState();
           clearPrReviewFooterPreference();
           clearCondenseToolCallsPreference();
+          clearCollapsedConnectCtasPreference();
           // The runtime's in-memory retry memory and cache hold the signed-out
           // account's tool text: without this, the next account's retry
           // (`retryUnresolvedTranslations`) re-sends it to the gateway.

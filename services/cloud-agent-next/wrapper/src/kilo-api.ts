@@ -231,7 +231,6 @@ type PromptOptions = {
   model?: { providerID?: string; modelID: string };
   system?: string;
   tools?: Record<string, boolean>;
-  snapshotInitialization?: 'wait';
   directory?: string;
   signal?: AbortSignal;
 };
@@ -271,7 +270,6 @@ export type WrapperKiloClient = {
     agent?: string;
     model?: { providerID?: string; modelID: string };
     variant?: string;
-    snapshotInitialization?: 'wait';
     directory?: string;
     signal?: AbortSignal;
   }) => Promise<SessionCommandResponse>;
@@ -364,9 +362,6 @@ export function createWrapperKiloClient(
       ...(opts.system ? { system: opts.system } : {}),
       ...(opts.tools ? { tools: opts.tools } : {}),
       ...(opts.agent ? { agent: opts.agent } : {}),
-      ...(opts.snapshotInitialization
-        ? { snapshotInitialization: opts.snapshotInitialization }
-        : {}),
     };
   }
 
@@ -513,9 +508,6 @@ export function createWrapperKiloClient(
             ? { model: `${opts.model.providerID ?? 'kilo'}/${opts.model.modelID}` }
             : {}),
           ...(opts.variant ? { variant: opts.variant } : {}),
-          ...(opts.snapshotInitialization
-            ? { snapshotInitialization: opts.snapshotInitialization }
-            : {}),
         },
         { signal: opts.signal }
       );

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { readStoredValue } from '@/lib/auth/secure-store-read';
+import { readStoredValue } from '@/lib/auth/secure-store-value';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 

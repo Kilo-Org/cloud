@@ -2374,6 +2374,8 @@
     "checkConnection": "Periksa koneksi",
     "checks": {
       "checksCount": "{{displayCount}} pemeriksaan",
+      "checksCount_one": "{{displayCount}} pemeriksaan",
+      "checksCount_other": "{{displayCount}} pemeriksaan",
       "couldNotLoad": "Tidak dapat memuat pemeriksaan.",
       "failed": "{{displayCount}} gagal",
       "noAccess": "Kamu tidak memiliki akses ke pemeriksaan repositori ini.",

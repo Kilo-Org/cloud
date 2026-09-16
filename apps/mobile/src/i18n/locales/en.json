@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} pending",
       "skipped": "{{displayCount}} skipped",
       "checksCount": "{{displayCount}} checks",
+      "checksCount_one": "{{displayCount}} check",
+      "checksCount_other": "{{displayCount}} checks",
       "checkDetails": "check details"
     },
     "inbox": {

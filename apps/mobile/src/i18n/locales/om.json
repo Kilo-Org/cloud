@@ -572,6 +572,8 @@
       "pending": "{{displayCount}} eegamaa jiru",
       "skipped": "{{displayCount}} irra darbaman",
       "checksCount": "Qorannoo {{displayCount}}",
+      "checksCount_one": "Qorannoo {{displayCount}}",
+      "checksCount_other": "Qorannoo {{displayCount}}",
       "checkDetails": "bal'ina qorannoo"
     },
     "inbox": {

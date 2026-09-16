@@ -4971,6 +4971,61 @@ describe('User', () => {
       ).resolves.toHaveLength(0);
     });
 
+    it('deletes a personal association but preserves a canonical shared with an organization', async () => {
+      const user = await insertTestUser();
+      const organizationOwner = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Shared personal deletion organization',
+        organizationOwner.id,
+        0
+      );
+      const [canonical] = await db
+        .insert(github_app_installations)
+        .values({
+          github_app_type: 'standard',
+          installation_id: '9876510',
+          account_id: '110',
+          lifecycle_state: 'active',
+          sharing_mode: 'web_cloud_agent',
+        })
+        .returning();
+      await db.insert(platform_integrations).values([
+        {
+          owned_by_user_id: user.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: '9876510',
+          github_app_type: 'standard',
+          github_installation_id: canonical.id,
+          integration_status: 'active',
+        },
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: '9876510',
+          github_app_type: 'standard',
+          github_installation_id: canonical.id,
+          integration_status: 'active',
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      await expect(
+        db
+          .select()
+          .from(github_app_installations)
+          .where(eq(github_app_installations.id, canonical.id))
+      ).resolves.toHaveLength(1);
+      const retainedAssociations = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.github_installation_id, canonical.id));
+      expect(retainedAssociations).toHaveLength(1);
+      expect(retainedAssociations[0]?.owned_by_organization_id).toBe(organization.id);
+    });
+
     it('deletes migration-created personal canonical PII but preserves organizations', async () => {
       const user = await insertTestUser();
       await db.insert(user_github_app_tokens).values({

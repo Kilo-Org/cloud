@@ -9,6 +9,11 @@ import { Text } from '@/components/ui/text';
 import { QueryError } from '@/components/query-error';
 import { RepoSelector } from '@/components/agents/repo-selector';
 import { RepositoryBranchSelector } from '@/components/agents/repository-branch-selector';
+import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
+import {
+  setConnectCtaCollapsed,
+  useCollapsedConnectCtas,
+} from '@/lib/hooks/use-collapsed-connect-ctas-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   type NewSessionRepository,
@@ -108,6 +113,7 @@ export function NewSessionRepositorySection({
 }: Readonly<NewSessionRepositorySectionProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { collapsedCtas, hasLoaded: collapseStateLoaded } = useCollapsedConnectCtas();
 
   const hasRepos = repositories.length > 0;
   const anyLoading = groups.some(group => group.status === 'loading');
@@ -192,10 +198,25 @@ export function NewSessionRepositorySection({
   function renderConnectCard(platform: RepositoryPlatform): ReactElement | null {
     const copy = PROVIDER_COPY[platform];
     const noteKey = connectNoteKey(platform);
+    // The persisted flag decides the card's height, so the card must not paint
+    // expanded and then snap shut when the disk read lands (every row below it
+    // would move). The read is already in flight from module import, so this
+    // gate lasts a frame, not a spinner.
+    if (!collapseStateLoaded) {
+      return null;
+    }
     return (
-      <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
+      <CollapsibleSection
+        className="mt-3 gap-3 rounded-lg border border-border bg-card p-4"
+        contentClassName="gap-3"
+        titleClassName="font-semibold"
+        title={t(copy.connectTitle)}
+        expanded={!collapsedCtas.includes(platform)}
+        onToggle={() => {
+          setConnectCtaCollapsed(platform, !collapsedCtas.includes(platform));
+        }}
+      >
         <View className="gap-1">
-          <Text className="text-sm font-semibold text-foreground">{t(copy.connectTitle)}</Text>
           <Text variant="muted">{t(copy.connectDescription)}</Text>
           {noteKey ? <Text variant="muted">{t(noteKey)}</Text> : null}
         </View>
@@ -224,7 +245,7 @@ export function NewSessionRepositorySection({
             )}
           </Button>
         </View>
-      </View>
+      </CollapsibleSection>
     );
   }
 

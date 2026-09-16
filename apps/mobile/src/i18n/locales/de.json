@@ -293,7 +293,7 @@
     "previewFullDescription": "Benachrichtigungen zeigen den Nachrichtentext auf deinem Sperrbildschirm.",
     "previewGenericDescription": "Benachrichtigungen weisen nur auf neue Aktivitäten hin. Öffne Kilo, um die Nachrichten zu lesen.",
     "channel": {
-      "agent": "Agentensitzungen",
+      "agentProgress": "Agentenfortschritt",
       "chat": "Chat-Nachrichten",
       "kiloclaw": "KiloClaw-Aktivitäten",
       "balance": "Guthaben-Warnungen",

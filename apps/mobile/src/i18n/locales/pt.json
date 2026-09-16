@@ -787,7 +787,7 @@
     "previewFullDescription": "As notificações mostram o texto da mensagem no ecrã bloqueado.",
     "previewGenericDescription": "As notificações indicam que há novidades. Abra o Kilo para ler a mensagem.",
     "channel": {
-      "agent": "Sessões de agente",
+      "agentProgress": "Progresso do agente",
       "chat": "Mensagens da conversa",
       "kiloclaw": "Atividade do KiloClaw",
       "balance": "Alertas de saldo",

@@ -787,7 +787,7 @@
     "previewFullDescription": "Obavijesti prikazuju tekst poruke na tvom zaključanom ekranu.",
     "previewGenericDescription": "Obavijesti pokazuju samo da se nešto dogodilo. Otvori Kilo da pročitaš poruku.",
     "channel": {
-      "agent": "Sesije agenta",
+      "agentProgress": "Napredak agenta",
       "chat": "Poruke u razgovoru",
       "kiloclaw": "Aktivnost u KiloClawu",
       "balance": "Upozorenja o stanju",

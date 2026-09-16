@@ -779,7 +779,7 @@
     "previewFullDescription": "Jakinarazpenek mezuen testua erakusten dute blokeo-pantailan.",
     "previewGenericDescription": "Jakinarazpenek zerbait gertatu dela adierazten dute. Ireki Kilo irakurtzeko.",
     "channel": {
-      "agent": "Agente-saioak",
+      "agentProgress": "Agentearen aurrerapena",
       "chat": "Txat-mezuak",
       "kiloclaw": "KiloClaw-en jarduera",
       "balance": "Saldoari buruzko alertak",

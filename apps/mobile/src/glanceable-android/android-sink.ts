@@ -3,6 +3,11 @@ import {
   type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  type AgentNotificationKind,
+  agentNotificationKindForGlanceableSnapshot,
+  androidChannelIdForAgentKind,
+} from '@kilocode/notifications';
 import { requestWidgetUpdate } from 'react-native-android-widget';
 
 import { i18n } from '@/i18n';
@@ -12,6 +17,7 @@ import {
   type GlanceableSink,
   type GlanceableSinkContext,
 } from '@/lib/glanceable/sink-registry';
+import { ensureAndroidNotificationChannels } from '@/lib/notifications';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
 import { formatGlanceableCount, isWidgetRtl } from './count-format';
@@ -45,12 +51,26 @@ function translate(key: string): string {
 let lastWidgetSnapshot: GlanceableAgentsSnapshot | null = null;
 let notificationActive = false;
 let revision = 0;
+/**
+ * The kind the posted card carries, so entering needs-input is detectable: only
+ * the first entry alerts, and repeated updates of an unchanged kind stay quiet.
+ */
+let notificationKind: AgentNotificationKind | null = null;
 let pending: {
   snapshot: GlanceableAgentsSnapshot;
   ctx: GlanceableSinkContext;
 } | null = null;
 let startEpoch = 0;
 let terminalExpiresAt: number | null = null;
+
+/**
+ * A needs-input card is the kind that asks the user a question, so its first
+ * entry alerts; a progress card is a silent status update, and a later update
+ * inside the same kind must not re-alert.
+ */
+function shouldAlert(kind: AgentNotificationKind): boolean {
+  return kind === 'needs-input' && notificationKind !== 'needs-input';
+}
 
 /** A delayed render must check the current snapshot and its deadline, not cached props. */
 export function getCurrentWidgetProps(): AndroidWidgetProps | null {
@@ -78,6 +98,7 @@ function hasCurrentWork(snapshot: GlanceableAgentsSnapshot): boolean {
 function endNotification(): void {
   endLiveUpdate();
   notificationActive = false;
+  notificationKind = null;
   revision = 0;
   pending = null;
   startEpoch += 1;
@@ -106,9 +127,14 @@ async function tryStartOrUpdate(
   const text = buildOngoingNotificationText(snapshot, {}, translate, formatGlanceableCount);
   const openAgentsLabel = translate(OPEN_AGENTS_LABEL_KEY);
   const compactText = buildCompactNotificationText(snapshot, {}, formatGlanceableCount);
+  // The card's kind decides the channel the user can silence and whether this
+  // entry alerts; progress stays on the silent status channel.
+  const kind = agentNotificationKindForGlanceableSnapshot(snapshot);
+  const channelId = androidChannelIdForAgentKind(kind);
 
   if (notificationActive) {
-    updateLiveUpdate(title, text, openAgentsLabel, compactText);
+    updateLiveUpdate(title, text, openAgentsLabel, compactText, channelId, shouldAlert(kind));
+    notificationKind = kind;
     terminalExpiresAt = null;
     revision = snapshot.revision;
     return;
@@ -120,16 +146,24 @@ async function tryStartOrUpdate(
     return;
   }
   if (granted) {
+    // Android 8+ drops a post whose channel does not exist yet, and the JS side
+    // owns channel creation, so the channel is ensured before the first start.
+    await ensureAndroidNotificationChannels();
+    if (epoch !== startEpoch || !hasCurrentWork(snapshot)) {
+      return;
+    }
     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/retry can set notificationActive while awaiting permission
     if (notificationActive) {
       if (snapshot.revision > revision) {
-        updateLiveUpdate(title, text, openAgentsLabel, compactText);
+        updateLiveUpdate(title, text, openAgentsLabel, compactText, channelId, shouldAlert(kind));
+        notificationKind = kind;
         terminalExpiresAt = null;
         revision = snapshot.revision;
       }
       return;
     }
-    startLiveUpdate(title, text, openAgentsLabel, compactText);
+    startLiveUpdate(title, text, openAgentsLabel, compactText, channelId, shouldAlert(kind));
+    notificationKind = kind;
     notificationActive = true;
     terminalExpiresAt = null;
     revision = snapshot.revision;
@@ -141,7 +175,7 @@ async function tryStartOrUpdate(
 }
 
 /** Retry a pending start after permission turns granted. Caller owns the check. */
-function retryPendingStart(): void {
+async function retryPendingStart(): Promise<void> {
   const p = pending;
   if (
     p === null ||
@@ -151,13 +185,31 @@ function retryPendingStart(): void {
   ) {
     return;
   }
-  const title = translate(NOTIFICATION_TITLE_KEY);
+  const kind = agentNotificationKindForGlanceableSnapshot(p.snapshot);
+  // Same fence as the first start: the channel must exist before the post.
+  const epoch = startEpoch;
+  await ensureAndroidNotificationChannels();
+  if (
+    epoch !== startEpoch ||
+    pending !== p ||
+    !getLiveActivityEnabled() ||
+    !hasCurrentWork(p.snapshot)
+  ) {
+    return;
+  }
+  // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/update can post while awaiting the channel
+  if (notificationActive) {
+    return;
+  }
   startLiveUpdate(
-    title,
+    translate(NOTIFICATION_TITLE_KEY),
     buildOngoingNotificationText(p.snapshot, {}, translate, formatGlanceableCount),
     translate(OPEN_AGENTS_LABEL_KEY),
-    buildCompactNotificationText(p.snapshot, {}, formatGlanceableCount)
+    buildCompactNotificationText(p.snapshot, {}, formatGlanceableCount),
+    androidChannelIdForAgentKind(kind),
+    shouldAlert(kind)
   );
+  notificationKind = kind;
   notificationActive = true;
   terminalExpiresAt = null;
   revision = p.snapshot.revision;
@@ -175,7 +227,7 @@ export async function handleAppStateActive(): Promise<void> {
     return;
   }
   if (await isNotificationPermissionGranted()) {
-    retryPendingStart();
+    await retryPendingStart();
     return;
   }
   showAndroidPermissionAlertOnce();
@@ -209,6 +261,7 @@ export const androidSink: GlanceableSink = {
       }
     }
     if (notificationActive && snapshot.revision > revision) {
+      const kind = agentNotificationKindForGlanceableSnapshot(snapshot);
       updateLiveUpdate(
         translate(NOTIFICATION_TITLE_KEY),
         eligible
@@ -216,8 +269,11 @@ export const androidSink: GlanceableSink = {
           : (props.statusLine ?? translate('glanceable.empty')),
         translate(OPEN_AGENTS_LABEL_KEY),
         eligible ? buildCompactNotificationText(snapshot, {}, formatGlanceableCount) : null,
+        androidChannelIdForAgentKind(kind),
+        shouldAlert(kind),
         terminalExpiresAt === null ? 0 : Math.max(1, terminalExpiresAt - Date.now())
       );
+      notificationKind = kind;
       revision = snapshot.revision;
     }
   },
@@ -236,6 +292,7 @@ export const androidSink: GlanceableSink = {
 export function _resetAndroidSinkForTests(): void {
   lastWidgetSnapshot = null;
   notificationActive = false;
+  notificationKind = null;
   revision = 0;
   pending = null;
   startEpoch += 1;

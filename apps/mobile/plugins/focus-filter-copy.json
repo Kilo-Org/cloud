@@ -1,0 +1,437 @@
+{
+  "af": {
+    "title": "Agentkennisgewings",
+    "description": "Behou kennisgewings wat jou insette nodig het en demper agentvordering vir hierdie Fokus.",
+    "agentProgress": "Agentvordering"
+  },
+  "sq": {
+    "title": "Njoftimet e agjentit",
+    "description": "Mba njoftimet që kërkojnë përgjigjen tënde dhe hesht ecurinë e agjentit për këtë fokus.",
+    "agentProgress": "Ecuria e agjentit"
+  },
+  "am": {
+    "title": "የወኪል ማሳወቂያዎች",
+    "description": "የእርስዎን ግብዓት የሚፈልጉ ማሳወቂያዎችን ይያዙ እና ለዚህ ትኩረት የወኪል እድገትን ያቁሙ።",
+    "agentProgress": "የወኪል እድገት"
+  },
+  "ar": {
+    "title": "إشعارات الوكيل",
+    "description": "احتفظ بالإشعارات التي تحتاج إلى ردّك واكتم تقدم الوكيل لهذا التركيز.",
+    "agentProgress": "تقدم الوكيل"
+  },
+  "hy": {
+    "title": "Գործակալի ծանուցումներ",
+    "description": "Պահպանեք ձեր պատասխանի կարիք ունեցող ծանուցումները և լռեցրեք գործակալի ընթացքը այս կենտրոնացման համար։",
+    "agentProgress": "Գործակալի ընթացքը"
+  },
+  "az": {
+    "title": "Agent bildirişləri",
+    "description": "Cavabınıza ehtiyacı olan bildirişləri saxlayın və bu Fokus üçün agent gedişatını səssiz saxlayın.",
+    "agentProgress": "Agent gedişatı"
+  },
+  "eu": {
+    "title": "Agentearen jakinarazpenak",
+    "description": "Mantendu zure erantzuna behar duten jakinarazpenak eta isildu agentearen aurrerapena Foku honetarako.",
+    "agentProgress": "Agentearen aurrerapena"
+  },
+  "be": {
+    "title": "Апавяшчэнні агента",
+    "description": "Пакідайце апавяшчэнні, якім патрэбны ваш адказ, і адключыце ход выканання агента для гэтай увагі.",
+    "agentProgress": "Ход выканання агента"
+  },
+  "bn": {
+    "title": "এজেন্টের বিজ্ঞপ্তি",
+    "description": "যে বিজ্ঞপ্তিগুলোতে আপনার উত্তর প্রয়োজন সেগুলো রাখুন এবং এই ফোকাসের জন্য এজেন্টের অগ্রগতি নীরব করুন।",
+    "agentProgress": "এজেন্টের অগ্রগতি"
+  },
+  "bs": {
+    "title": "Obavijesti agenta",
+    "description": "Zadržite obavijesti koje traže vaš unos i utišajte napredak agenta za ovaj fokus.",
+    "agentProgress": "Napredak agenta"
+  },
+  "bg": {
+    "title": "Известия от агента",
+    "description": "Запазете известията, които се нуждаят от вашия отговор, и заглушете напредъка на агентите за този фокус.",
+    "agentProgress": "Напредък на агентите"
+  },
+  "my": {
+    "title": "အေးဂျင့် အသိပေးချက်များ",
+    "description": "သင့်အဖြေ လိုအပ်သော အသိပေးချက်များကို ထားရှိပြီး ဤအာရုံစိုက်မှုအတွက် အေးဂျင့် လုပ်ဆောင်ပြီးစီးမှုကို ပိတ်ထားပါ။",
+    "agentProgress": "အေးဂျင့် လုပ်ဆောင်ပြီးစီးမှု"
+  },
+  "ca": {
+    "title": "Notificacions de l'agent",
+    "description": "Conserva les notificacions que necessiten la teva resposta i silencia el progrés de l'agent per a aquesta concentració.",
+    "agentProgress": "Progrés de l'agent"
+  },
+  "zh-Hans": {
+    "title": "智能体通知",
+    "description": "保留需要你回复的通知，并在此专注模式下静音智能体进度。",
+    "agentProgress": "智能体进度"
+  },
+  "zh-Hant": {
+    "title": "智慧代理通知",
+    "description": "保留需要你回覆的通知，並在此專注模式下靜音智慧代理進度。",
+    "agentProgress": "智慧代理進度"
+  },
+  "hr": {
+    "title": "Obavijesti agenata",
+    "description": "Zadrži obavijesti kojima je potreban tvoj unos i utišaj napredak agenata za ovaj fokus.",
+    "agentProgress": "Napredak agenata"
+  },
+  "cs": {
+    "title": "Oznámení agenta",
+    "description": "Ponech oznámení, která potřebují tvoji odpověď, a ztiš průběh agenta pro toto soustředění.",
+    "agentProgress": "Průběh agenta"
+  },
+  "da": {
+    "title": "Agentnotifikationer",
+    "description": "Behold notifikationer, der har brug for dit svar, og slå agentforløb fra for dette Fokus.",
+    "agentProgress": "Agentforløb"
+  },
+  "nl": {
+    "title": "Agentmeldingen",
+    "description": "Houd meldingen die jouw invoer nodig hebben en demp agentvoortgang voor deze Focus.",
+    "agentProgress": "Agentvoortgang"
+  },
+  "en": {
+    "title": "Agent notifications",
+    "description": "Keep notifications that need your input and silence agent progress for this Focus.",
+    "agentProgress": "Agent progress"
+  },
+  "et": {
+    "title": "Agendi teavitused",
+    "description": "Hoia alles teavitused, mis vajavad sinu vastust, ja vaigista agendi edenemine selle fookuse jaoks.",
+    "agentProgress": "Agendi edenemine"
+  },
+  "fil": {
+    "title": "Mga abiso ng ahente",
+    "description": "Panatilihin ang mga abisong nangangailangan ng iyong sagot at i-silensyo ang pag-usad ng ahente para sa Focus na ito.",
+    "agentProgress": "Pag-usad ng ahente"
+  },
+  "fi": {
+    "title": "Agentin ilmoitukset",
+    "description": "Säilytä ilmoitukset, jotka tarvitsevat vastauksesi, ja mykistä agentin eteneminen tässä keskittymässä.",
+    "agentProgress": "Agentin eteneminen"
+  },
+  "fr": {
+    "title": "Notifications d'agent",
+    "description": "Conservez les notifications qui attendent votre réponse et coupez la progression des agents pour cette concentration.",
+    "agentProgress": "Progression des agents"
+  },
+  "gl": {
+    "title": "Notificacións do axente",
+    "description": "Conserva as notificacións que precisan a túa resposta e silencia o progreso do axente para esta concentración.",
+    "agentProgress": "Progreso do axente"
+  },
+  "ka": {
+    "title": "აგენტის შეტყობინებები",
+    "description": "შეინახე შეტყობინებები, რომლებსაც შენი პასუხი სჭირდებათ, და გააჩუმე აგენტის პროგრესი ამ ფოკუსისთვის.",
+    "agentProgress": "აგენტის პროგრესი"
+  },
+  "de": {
+    "title": "Agent-Benachrichtigungen",
+    "description": "Behalte Benachrichtigungen, die deine Antwort brauchen, und stelle den Agentenfortschritt für diesen Fokus stumm.",
+    "agentProgress": "Agentenfortschritt"
+  },
+  "el": {
+    "title": "Ειδοποιήσεις πράκτορα",
+    "description": "Κράτησε τις ειδοποιήσεις που χρειάζονται την απάντησή σου και σίγασε την πρόοδο πράκτορα για αυτή την εστίαση.",
+    "agentProgress": "Πρόοδος πράκτορα"
+  },
+  "gu": {
+    "title": "એજન્ટ સૂચનાઓ",
+    "description": "તમારા જવાબની જરૂર હોય તેવી સૂચનાઓ રાખો અને આ ફોકસ માટે એજન્ટની પ્રગતિ શાંત કરો.",
+    "agentProgress": "એજન્ટની પ્રગતિ"
+  },
+  "ht": {
+    "title": "Notifikasyon ajan",
+    "description": "Kenbe notifikasyon ki bezwen repons ou epi silans pwogrè ajan pou Fokis sa a.",
+    "agentProgress": "Pwogrè ajan"
+  },
+  "ha": {
+    "title": "Sanarwar wakili",
+    "description": "Riƙe sanarwar da ke buƙatar amsarka ka kuma dakatar da ci gaban wakilai don wannan Mayar da hankali.",
+    "agentProgress": "Ci gaban wakilai"
+  },
+  "he": {
+    "title": "התראות סוכנים",
+    "description": "שמור התראות שדורשות את תשובתך והשתק את התקדמות הסוכנים עבור מיקוד זה.",
+    "agentProgress": "התקדמות הסוכנים"
+  },
+  "hi": {
+    "title": "एजेंट सूचनाएँ",
+    "description": "जिन सूचनाओं को आपका जवाब चाहिए उन्हें रखें और इस फ़ोकस के लिए एजेंट की प्रगति को शांत करें।",
+    "agentProgress": "एजेंट की प्रगति"
+  },
+  "hu": {
+    "title": "Ügynök-értesítések",
+    "description": "Tartsd meg a válaszodat igénylő értesítéseket, és némítsd el az ügynök előrehaladását ehhez a fókuszhoz.",
+    "agentProgress": "Ügynök előrehaladása"
+  },
+  "is": {
+    "title": "Tilkynningar frá fulltrúa",
+    "description": "Haltu tilkynningum sem þurfa svar frá þér og slökktu á framvindu fulltrúa fyrir þetta fókus.",
+    "agentProgress": "Framvinda fulltrúa"
+  },
+  "ig": {
+    "title": "Ọkwa ndị nnọchi anya",
+    "description": "Debe ọkwa ndị chọrọ nzaghachi gị ma gbanyụọ ọganihu ndị nnọchi anya maka Nlekwasị a.",
+    "agentProgress": "Ọganihu ndị nnọchi anya"
+  },
+  "id": {
+    "title": "Notifikasi agen",
+    "description": "Pertahankan notifikasi yang membutuhkan masukan Anda dan bisukan kemajuan agen untuk Focus ini.",
+    "agentProgress": "Kemajuan agen"
+  },
+  "ga": {
+    "title": "Fógraí gníomhairí",
+    "description": "Coinnigh fógraí a dteastaíonn d'ionchur uathu agus ciúnaigh dul chun cinn na ngníomhairí don Fhócas seo.",
+    "agentProgress": "Dul chun cinn na ngníomhairí"
+  },
+  "it": {
+    "title": "Notifiche degli agenti",
+    "description": "Mantieni le notifiche che richiedono la tua risposta e silenzia l'avanzamento degli agenti per questa concentrazione.",
+    "agentProgress": "Avanzamento degli agenti"
+  },
+  "ja": {
+    "title": "エージェントの通知",
+    "description": "返信が必要な通知を残し、この集中モードではエージェントの進捗をミュートします。",
+    "agentProgress": "エージェントの進捗"
+  },
+  "kn": {
+    "title": "ಏಜೆಂಟ್ ಅಧಿಸೂಚನೆಗಳು",
+    "description": "ನಿಮ್ಮ ಉತ್ತರ ಬೇಕಿರುವ ಅಧಿಸೂಚನೆಗಳನ್ನು ಇರಿಸಿ ಮತ್ತು ಈ ಫೋಕಸ್‌ಗಾಗಿ ಏಜೆಂಟ್ ಪ್ರಗತಿಯನ್ನು ಸದ್ದಿಲ್ಲದೆ ಮಾಡಿ.",
+    "agentProgress": "ಏಜೆಂಟ್ ಪ್ರಗತಿ"
+  },
+  "kk": {
+    "title": "Агент хабарландырулары",
+    "description": "Жауабыңыз қажет хабарландыруларды қалдырып, осы Фокуста агент барысын өшіріңіз.",
+    "agentProgress": "Агент барысы"
+  },
+  "km": {
+    "title": "ការជូនដំណឹងពីភ្នាក់ងារ",
+    "description": "រក្សាការជូនដំណឹងដែលត្រូវការចម្លើយរបស់អ្នក ហើយបិទសំឡេងវឌ្ឍនភាពភ្នាក់ងារសម្រាប់ការផ្តោតនេះ។",
+    "agentProgress": "វឌ្ឍនភាពភ្នាក់ងារ"
+  },
+  "ko": {
+    "title": "에이전트 알림",
+    "description": "답변이 필요한 알림은 유지하고 이 집중 모드에서는 에이전트 진행 상황을 음소거합니다.",
+    "agentProgress": "에이전트 진행 상황"
+  },
+  "ckb": {
+    "title": "ئاگادارکردنەوەکانی ئەجێنت",
+    "description": "ئەو ئاگادارکردنەوانە ڕابگرە کە پێویستیان بە وەڵامتە و پێشکەوتنی ئەجێنت بۆ ئەم سەرنجدانە بێدەنگ بکە.",
+    "agentProgress": "پێشکەوتنی ئەجێنت"
+  },
+  "lo": {
+    "title": "ການແຈ້ງເຕືອນຈາກຕົວແທນ",
+    "description": "ເກັບການແຈ້ງເຕືອນທີ່ຕ້ອງການຄຳຕອບຂອງທ່ານ ແລະ ປິດສຽງຄວາມຄືບໜ້າຂອງຕົວແທນສຳລັບການໂຟກັສນີ້.",
+    "agentProgress": "ຄວາມຄືບໜ້າຂອງຕົວແທນ"
+  },
+  "lv": {
+    "title": "Aģenta paziņojumi",
+    "description": "Saglabā paziņojumus, kuriem nepieciešama tava atbilde, un izslēdz aģenta norisi šim fokusam.",
+    "agentProgress": "Aģenta norise"
+  },
+  "lt": {
+    "title": "Agentų pranešimai",
+    "description": "Išlaikyk pranešimus, kuriems reikia tavo atsakymo, ir nutildyk agentų eigą šiam fokusui.",
+    "agentProgress": "Agentų eiga"
+  },
+  "mk": {
+    "title": "Известувања од агентот",
+    "description": "Задржи ги известувањата на кои им е потребен твојот одговор и замолчи го напредокот на агентите за овој фокус.",
+    "agentProgress": "Напредок на агентите"
+  },
+  "mg": {
+    "title": "Fampandrenesana avy amin'ny mpanampy",
+    "description": "Tehirizo ny fampandrenesana mila valiny ary vonoy ny fandrosoan'ny mpanampy ho an'ity fifantohana ity.",
+    "agentProgress": "Fandrosoan'ny mpanampy"
+  },
+  "ms": {
+    "title": "Pemberitahuan ejen",
+    "description": "Simpan pemberitahuan yang memerlukan maklum balas anda dan senyapkan kemajuan ejen untuk Fokus ini.",
+    "agentProgress": "Kemajuan ejen"
+  },
+  "ml": {
+    "title": "ഏജന്റ് അറിയിപ്പുകൾ",
+    "description": "നിങ്ങളുടെ മറുപടി ആവശ്യമുള്ള അറിയിപ്പുകൾ നിലനിർത്തി ഈ ഫോക്കസിനായി ഏജന്റിന്റെ പുരോഗതി നിശബ്ദമാക്കുക.",
+    "agentProgress": "ഏജന്റിന്റെ പുരോഗതി"
+  },
+  "mt": {
+    "title": "Notifiki tal-aġent",
+    "description": "Żomm in-notifiki li jeħtieġu t-tweġiba tiegħek u ssikket l-avvanz tal-aġent għal dan il-Fokus.",
+    "agentProgress": "Avvanz tal-aġent"
+  },
+  "mi": {
+    "title": "Ngā whakamōhiotanga māngai",
+    "description": "Puritia ngā whakamōhiotanga me whai urupare, ā, whakangūngia te ahunga whakamua o te māngai mō tēnei Arotahi.",
+    "agentProgress": "Te ahunga whakamua o te māngai"
+  },
+  "mr": {
+    "title": "एजंट सूचना",
+    "description": "तुमचे उत्तर आवश्यक असलेल्या सूचना ठेवा आणि या फोकससाठी एजंटची प्रगती शांत करा.",
+    "agentProgress": "एजंटची प्रगती"
+  },
+  "mn": {
+    "title": "Агентын мэдэгдэл",
+    "description": "Хариулт шаардсан мэдэгдлүүдийг үлдээж, энэ Фокусын хувьд агентын явцыг хаа.",
+    "agentProgress": "Агентын явц"
+  },
+  "ne": {
+    "title": "एजेन्ट सूचनाहरू",
+    "description": "तपाईंको जवाफ चाहिने सूचनाहरू राख्नुहोस् र यो फोकसका लागि एजेन्टको प्रगति मौन गर्नुहोस्।",
+    "agentProgress": "एजेन्टको प्रगति"
+  },
+  "nb": {
+    "title": "Agentvarsler",
+    "description": "Behold varsler som trenger svaret ditt, og demp agentfremdrift for dette fokuset.",
+    "agentProgress": "Agentfremdrift"
+  },
+  "or": {
+    "title": "ଏଜେଣ୍ଟ ବିଜ୍ଞପ୍ତି",
+    "description": "ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ କରୁଥିବା ବିଜ୍ଞପ୍ତିଗୁଡ଼ିକ ରଖନ୍ତୁ ଏବଂ ଏହି ଫୋକସ ପାଇଁ ଏଜେଣ୍ଟ ଅଗ୍ରଗତିକୁ ନୀରବ କରନ୍ତୁ।",
+    "agentProgress": "ଏଜେଣ୍ଟ ଅଗ୍ରଗତି"
+  },
+  "om": {
+    "title": "Beeksisota ergamaa",
+    "description": "Beeksisota deebii kee barbaadani qabiitii, adeemsa ergamaa Focus kanaaf calcisi.",
+    "agentProgress": "Haala adeemsaa ergamaa"
+  },
+  "ps": {
+    "title": "د ایجنټ خبرتیاوې",
+    "description": "هغه خبرتیاوې وساتئ چې ستاسو ځواب ته اړتیا لري او د دې تمرکز لپاره د ایجنټ پرمختګ غلي کړئ.",
+    "agentProgress": "د ایجنټ پرمختګ"
+  },
+  "fa": {
+    "title": "اعلان‌های عامل",
+    "description": "اعلان‌هایی را که به پاسخ شما نیاز دارند نگه دارید و پیشرفت عامل را برای این تمرکز بی‌صدا کنید.",
+    "agentProgress": "پیشرفت عامل"
+  },
+  "pl": {
+    "title": "Powiadomienia agenta",
+    "description": "Zachowaj powiadomienia wymagające twojej odpowiedzi i wycisz postęp agenta dla tego skupienia.",
+    "agentProgress": "Postęp agenta"
+  },
+  "pt": {
+    "title": "Notificações do agente",
+    "description": "Mantém as notificações que precisam da tua resposta e silencia o progresso do agente para esta concentração.",
+    "agentProgress": "Progresso do agente"
+  },
+  "pt-BR": {
+    "title": "Notificações do agente",
+    "description": "Mantenha as notificações que precisam da sua resposta e silencie o progresso dos agentes para este Foco.",
+    "agentProgress": "Progresso dos agentes"
+  },
+  "pa": {
+    "title": "ਏਜੰਟ ਸੂਚਨਾਵਾਂ",
+    "description": "ਉਹ ਸੂਚਨਾਵਾਂ ਰੱਖੋ ਜਿਨ੍ਹਾਂ ਨੂੰ ਤੁਹਾਡੇ ਜਵਾਬ ਦੀ ਲੋੜ ਹੈ ਅਤੇ ਇਸ ਫੋਕਸ ਲਈ ਏਜੰਟ ਦੀ ਪ੍ਰਗਤੀ ਚੁੱਪ ਕਰੋ।",
+    "agentProgress": "ਏਜੰਟ ਦੀ ਪ੍ਰਗਤੀ"
+  },
+  "ro": {
+    "title": "Notificări de la agenți",
+    "description": "Păstrează notificările care au nevoie de răspunsul tău și dezactivează progresul agenților pentru acest Focus.",
+    "agentProgress": "Progresul agenților"
+  },
+  "ru": {
+    "title": "Уведомления агента",
+    "description": "Оставьте уведомления, которым нужен ваш ответ, и отключите ход выполнения агента для этого фокуса.",
+    "agentProgress": "Ход выполнения агента"
+  },
+  "sr": {
+    "title": "Obaveštenja agenta",
+    "description": "Zadrži obaveštenja koja traže tvoj odgovor i utišaj napredak agenata za ovaj fokus.",
+    "agentProgress": "Napredak agenata"
+  },
+  "si": {
+    "title": "නියෝජිත දැනුම්දීම්",
+    "description": "ඔබේ පිළිතුර අවශ්‍ය දැනුම්දීම් තබාගෙන මෙම අවධානය සඳහා නියෝජිත ප්‍රගතිය නිශ්ශබ්ද කරන්න.",
+    "agentProgress": "නියෝජිත ප්‍රගතිය"
+  },
+  "sk": {
+    "title": "Oznámenia agenta",
+    "description": "Ponechaj oznámenia, ktoré potrebujú tvoju odpoveď, a stíš priebeh agenta pre toto sústredenie.",
+    "agentProgress": "Priebeh agenta"
+  },
+  "sl": {
+    "title": "Obvestila agenta",
+    "description": "Ohrani obvestila, ki potrebujejo tvoj odgovor, in utišaj napredek agenta za to osredotočenost.",
+    "agentProgress": "Napredek agenta"
+  },
+  "so": {
+    "title": "Ogeysiisyada wakiilka",
+    "description": "Hayso ogeysiisyada u baahan jawaabtaada oo aamus halka ay wakiilku marayso ee Focus-kan.",
+    "agentProgress": "Halka ay wakiilku marayso"
+  },
+  "es": {
+    "title": "Notificaciones del agente",
+    "description": "Conserva las notificaciones que necesitan tu respuesta y silencia el progreso de los agentes para esta concentración.",
+    "agentProgress": "Progreso de los agentes"
+  },
+  "sw": {
+    "title": "Arifa za wakala",
+    "description": "Weka arifa zinazohitaji jibu lako na nyamazisha maendeleo ya wakala kwa Focus hii.",
+    "agentProgress": "Maendeleo ya wakala"
+  },
+  "sv": {
+    "title": "Agentaviseringar",
+    "description": "Behåll aviseringar som behöver ditt svar och tysta agentförlopp för detta fokus.",
+    "agentProgress": "Agentförlopp"
+  },
+  "ta": {
+    "title": "ஏஜென்ட் அறிவிப்புகள்",
+    "description": "உங்கள் பதில் தேவைப்படும் அறிவிப்புகளை வைத்துக்கொண்டு இந்த ஃபோகஸுக்கு ஏஜென்ட் முன்னேற்றத்தை முடக்கவும்.",
+    "agentProgress": "ஏஜென்ட் முன்னேற்றம்"
+  },
+  "te": {
+    "title": "ఏజెంట్ నోటిఫికేషన్లు",
+    "description": "మీ సమాధానం అవసరమయ్యే నోటిఫికేషన్లను ఉంచి ఈ ఫోకస్ కోసం ఏజెంట్ పురోగతిని నిశ్శబ్దం చేయండి.",
+    "agentProgress": "ఏజెంట్ పురోగతి"
+  },
+  "th": {
+    "title": "การแจ้งเตือนจากเอเจนต์",
+    "description": "เก็บการแจ้งเตือนที่ต้องการคำตอบของคุณไว้ และปิดเสียงความคืบหน้าของเอเจนต์สำหรับโฟกัสนี้",
+    "agentProgress": "ความคืบหน้าของเอเจนต์"
+  },
+  "tr": {
+    "title": "Ajan bildirimleri",
+    "description": "Yanıtını gerektiren bildirimleri koru ve bu Odak için ajan ilerlemesini sessize al.",
+    "agentProgress": "Ajan ilerlemesi"
+  },
+  "uk": {
+    "title": "Сповіщення агента",
+    "description": "Залиште сповіщення, які потребують вашої відповіді, і вимкніть перебіг виконання агента для цього фокусу.",
+    "agentProgress": "Перебіг виконання агента"
+  },
+  "ur": {
+    "title": "ایجنٹ کی اطلاعات",
+    "description": "وہ اطلاعات رکھیں جنہیں آپ کے جواب کی ضرورت ہے اور اس فوکس کے لیے ایجنٹ کی پیش رفت خاموش کریں۔",
+    "agentProgress": "ایجنٹ کی پیش رفت"
+  },
+  "uz": {
+    "title": "Agent bildirishnomalari",
+    "description": "Javobingiz kerak bo'lgan bildirishnomalarni saqlab qoling va bu Fokus uchun agent jarayonini o'chiring.",
+    "agentProgress": "Agent jarayoni"
+  },
+  "vi": {
+    "title": "Thông báo tác nhân",
+    "description": "Giữ lại các thông báo cần bạn phản hồi và tắt tiếng tiến độ tác nhân cho Tiêu điểm này.",
+    "agentProgress": "Tiến độ tác nhân"
+  },
+  "cy": {
+    "title": "Hysbysiadau asiant",
+    "description": "Cadw hysbysiadau sy'n gofyn am dy fewnbwn a thawelu cynnydd asiant ar gyfer y Ffocws hwn.",
+    "agentProgress": "Cynnydd asiant"
+  },
+  "yo": {
+    "title": "Àwọn ìfitónilétí aṣojú",
+    "description": "Pa àwọn ìfitónilétí tí ó nílò èsì rẹ mọ́ kí o sì pa ìlọsíwájú aṣojú kù fún Ìfọkàsí yìí.",
+    "agentProgress": "Ìlọsíwájú aṣojú"
+  },
+  "zu": {
+    "title": "Izaziso zabenzeli",
+    "description": "Gcina izaziso ezidinga impendulo yakho futhi thulisa inqubekelaphambili yabenzeli kule Focus.",
+    "agentProgress": "Inqubekelaphambili yabenzeli"
+  }
+}

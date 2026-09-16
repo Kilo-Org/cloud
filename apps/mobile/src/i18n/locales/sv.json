@@ -779,7 +779,7 @@
     "previewFullDescription": "Aviseringarna visar meddelandetexten på din låsskärm.",
     "previewGenericDescription": "Aviseringarna visar att något har hänt. Öppna Kilo för att läsa meddelandet.",
     "channel": {
-      "agent": "Agentsessioner",
+      "agentProgress": "Agentförlopp",
       "chat": "Chattmeddelanden",
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarningar",

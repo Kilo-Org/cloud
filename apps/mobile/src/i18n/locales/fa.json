@@ -779,7 +779,7 @@
     "previewFullDescription": "اعلان‌ها متن پیام را روی صفحهٔ قفل شما نشان می‌دهند.",
     "previewGenericDescription": "اعلان‌ها فقط وقوع یک رویداد را نشان می‌دهند. برای خواندن پیام، Kilo را باز کنید.",
     "channel": {
-      "agent": "نشست‌های عامل",
+      "agentProgress": "پیشرفت عامل",
       "chat": "پیام‌های گفت‌وگو",
       "kiloclaw": "فعالیت KiloClaw",
       "balance": "هشدارهای موجودی",

@@ -1,7 +1,6 @@
 package com.kilocode.activeagentsliveupdate
 
 import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -16,10 +15,10 @@ import expo.modules.kotlin.modules.ModuleDefinition
 /**
  * Local Expo module for the Android aggregate ongoing notification.
  *
- * The JS side owns the translated copy and the revision guard; this module owns
- * the fixed notification id, the dedicated `active-agents` channel (default
- * importance, silent, no heads-up), the API 36.1+ promotion gate, and the
- * content intent plus named action that open the Agents tab via a deep link.
+ * The JS side owns the translated copy, the notification kind's channel (and
+ * its creation), the alert decision, and the revision guard; this module owns
+ * the fixed notification id, the API 36.1+ promotion gate, and the content
+ * intent plus named action that open the Agents tab via a deep link.
  */
 class ActiveAgentsLiveUpdateModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -29,12 +28,12 @@ class ActiveAgentsLiveUpdateModule : Module() {
       isPromotionCapable()
     }
 
-    Function("start") { title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean ->
-      post(title, text, openAgentsLabel, compactText, promotion, 0)
+    Function("start") { title: String, text: String, openAgentsLabel: String, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean ->
+      post(title, text, openAgentsLabel, compactText, channelId, alerting, promotion, 0)
     }
 
-    Function("update") { title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean, timeoutMs: Double ->
-      post(title, text, openAgentsLabel, compactText, promotion, timeoutMs.toLong())
+    Function("update") { title: String, text: String, openAgentsLabel: String, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean, timeoutMs: Double ->
+      post(title, text, openAgentsLabel, compactText, channelId, alerting, promotion, timeoutMs.toLong())
     }
 
     Function("end") {
@@ -69,24 +68,10 @@ class ActiveAgentsLiveUpdateModule : Module() {
       Build.VERSION.SDK_INT_FULL >= 36_001_000 &&
       notificationManager.canPostPromotedNotifications()
 
-  private fun ensureChannel(title: String) {
-    if (Build.VERSION.SDK_INT < 26) {
-      return
-    }
-    if (notificationManager.getNotificationChannel(CHANNEL_ID) != null) {
-      return
-    }
-    val channel = NotificationChannel(CHANNEL_ID, title, NotificationManager.IMPORTANCE_DEFAULT)
-    channel.setSound(null, null)
-    channel.enableVibration(false)
-    channel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-    notificationManager.createNotificationChannel(channel)
-  }
-
-  private fun newBuilder(title: String): Notification.Builder {
+  private fun newBuilder(channelId: String): Notification.Builder {
     if (Build.VERSION.SDK_INT >= 26) {
-      ensureChannel(title)
-      return Notification.Builder(context, CHANNEL_ID)
+      // The JS side creates and names every channel before the first post.
+      return Notification.Builder(context, channelId)
     }
     return legacyBuilder()
   }
@@ -107,17 +92,21 @@ class ActiveAgentsLiveUpdateModule : Module() {
     )
   }
 
-  private fun post(title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean, timeoutMs: Long) {
+  private fun post(title: String, text: String, openAgentsLabel: String, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean, timeoutMs: Long) {
     val contentIntent = openAgentsPendingIntent()
-    val builder = newBuilder(title)
+    // The two OS paths a notification can interrupt Do Not Disturb with are the
+    // channel's DND override (user-granted, requested by the app) and the
+    // message category, which is what a notification that expects an answer
+    // uses. A needs-input card takes both; a progress card keeps the status
+    // category and the silent behaviour it had.
+    val needsInput = channelId == NEEDS_INPUT_CHANNEL_ID
+    val builder = newBuilder(channelId)
       .setSmallIcon(smallIconId())
       .setContentTitle(title)
       .setContentText(text)
       .setContentIntent(contentIntent)
       .setOngoing(true)
-      .setOnlyAlertOnce(true)
-      .setSound(null)
-      .setCategory(Notification.CATEGORY_STATUS)
+      .setCategory(if (needsInput) Notification.CATEGORY_MESSAGE else Notification.CATEGORY_STATUS)
       .addAction(
         Notification.Action.Builder(
           Icon.createWithResource(context, smallIconId()),
@@ -125,6 +114,15 @@ class ActiveAgentsLiveUpdateModule : Module() {
           contentIntent
         ).build()
       )
+
+    if (needsInput) {
+      // Only the first entry into the kind alerts; a later update in the same
+      // kind must not re-alert.
+      builder.setOnlyAlertOnce(!alerting)
+    } else {
+      builder.setSound(null)
+      builder.setOnlyAlertOnce(true)
+    }
 
     // API 36.1+ Live Update: promote only when the device reports the capability.
     // setRequestPromotedOngoing does not exist; use the documented flag setter.
@@ -166,7 +164,9 @@ class ActiveAgentsLiveUpdateModule : Module() {
 
   private companion object {
     const val HAS_TIMEOUT = "has_timeout"
-    const val CHANNEL_ID = "active-agents"
+
+    /** The kind marker in the channel id the JS side creates for needs-input. */
+    const val NEEDS_INPUT_CHANNEL_ID = "needs-input"
     const val OPEN_AGENTS_DEEP_LINK = "kiloapp:///cloud/sessions"
     const val OPEN_AGENTS_REQUEST_CODE = 1002
   }

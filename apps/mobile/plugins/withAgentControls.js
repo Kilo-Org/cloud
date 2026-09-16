@@ -8,6 +8,8 @@ const {
   agentControlsSwift,
   agentShortcutStrings,
   injectAgentControlBundle,
+  retainOneSourceFileEntry,
+  sourceFileEntryCount,
   targetSourcesBuildPhases,
 } = require('../src/lib/agent-controls.js');
 
@@ -22,7 +24,10 @@ const {
 //   3. attaches AgentControls.swift to the Sources build phase expo-widgets
 //      created for the extension — a Swift file that is not in that phase is
 //      never compiled, and a second `Sources` phase is not an option: XCBuild
-//      fails the target with "Unexpected duplicate tasks";
+//      fails the target with "Unexpected duplicate tasks". The attach is
+//      idempotent and self-healing: surplus entries are dropped and the phase
+//      is proved to carry the file exactly once, so a repeated prebuild cannot
+//      compile one source twice by the same route;
 //   4. appends the control copy to the `<tag>.lproj/Localizable.strings` that
 //      plugins/withWidgetLocalizations.js has already written, which is why this
 //      plugin is registered BEFORE that one in app.config.ts.
@@ -120,23 +125,35 @@ module.exports = function withAgentControls(config) {
         `withAgentControls: ${TARGET_NAME} carries ${before.length} Sources build phases, expected exactly one — this plugin ran before expo-widgets, or a duplicate phase was added`
       );
     }
-    IOSConfig.XcodeUtils.addBuildSourceFileToGroup({
-      filepath: SWIFT_FILE,
-      groupName: TARGET_NAME,
-      project,
-      targetUuid,
-    });
+    // Idempotent and self-healing. A prebuild that runs this mod twice — or one
+    // that meets a project a staler run doubled — arrives with the file already
+    // attached, or attached twice: keep the first entry, drop every surplus
+    // entry with its `PBXBuildFile`, and attach only when the phase carries the
+    // file not at all.
+    const phase = before[0];
+    if (retainOneSourceFileEntry(project, phase, SWIFT_FILE) === 0) {
+      IOSConfig.XcodeUtils.addBuildSourceFileToGroup({
+        filepath: SWIFT_FILE,
+        groupName: TARGET_NAME,
+        project,
+        targetUuid,
+      });
+    }
 
-    // The state XCBuild accepts: one Sources phase, carrying the file.
+    // The state XCBuild accepts: one Sources phase, carrying each source file
+    // exactly once. A doubled entry compiles one file twice — the same
+    // "Unexpected duplicate tasks" failure a second phase causes — so the
+    // count, not the file's presence, is what this assert proves.
     const after = targetSourcesBuildPhases(project, targetUuid);
     if (after.length !== 1) {
       throw new Error(
         `withAgentControls: ${TARGET_NAME} ended with ${after.length} Sources build phases — XCBuild fails a target with duplicate phases ("Unexpected duplicate tasks")`
       );
     }
-    if (!after[0]?.files.some(entry => entry.comment === `${SWIFT_FILE} in Sources`)) {
+    const entries = sourceFileEntryCount(after[0], SWIFT_FILE);
+    if (entries !== 1) {
       throw new Error(
-        `withAgentControls: ${SWIFT_FILE} is not in the ${TARGET_NAME} Sources build phase`
+        `withAgentControls: ${SWIFT_FILE} appears ${entries} times in the ${TARGET_NAME} Sources build phase, expected exactly one — XCBuild fails a target that compiles one source twice ("Unexpected duplicate tasks")`
       );
     }
     return projectConfig;

@@ -1,9 +1,8 @@
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 import { IOSConfig } from 'expo/config-plugins';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import agentControlsCopy from '../../plugins/agent-controls-copy.json';
-import withAgentControls from '../../plugins/withAgentControls';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import {
   AGENT_CONTROLS,
@@ -14,8 +13,17 @@ import {
   agentShortcutStrings,
   agentShortcutsXml,
   injectAgentControlBundle,
+  sourceFileEntryCount,
   targetSourcesBuildPhases,
 } from './agent-controls';
+import {
+  attachMock,
+  runControlsXcodeMod,
+  SWIFT_FILE,
+  TARGET_NAME,
+  TARGET_UUID,
+  widgetTargetProject,
+} from './agent-controls.test-helpers';
 
 // The extension's bundle copy, one object per language tag. The English values
 // are the keys Swift binds, so they are what the generated code must carry.
@@ -225,86 +233,80 @@ describe('targetSourcesBuildPhases', () => {
 });
 
 describe('withAgentControls — the widget target carries one Compile Sources phase', () => {
-  const TARGET_UUID = 'target-controls';
-  const TARGET_NAME = 'ExpoWidgetsTarget';
-  const SWIFT_FILE = 'AgentControls.swift';
-
-  // The project shape the xcode library hands the mod: the phase objects live
-  // in `hash.project.objects.PBXSourcesBuildPhase` and the target references
-  // them by uuid. `addBuildPhase` is the xcode library's always-appends-a-new-
-  // phase call — the one that put a second `Sources` phase on the target and
-  // failed the whole build at plan time.
-  function widgetTargetProject(phaseCount: number) {
-    const phases: Record<string, { files: { value: string; comment: string }[] }> = {};
-    const buildPhases: { value: string; comment: string }[] = [];
-    for (let index = 0; index < phaseCount; index += 1) {
-      const uuid = `phase-sources-${index}`;
-      phases[uuid] = { files: [{ value: `bf-index-${index}`, comment: 'index.swift in Sources' }] };
-      buildPhases.push({ value: uuid, comment: 'Sources' });
-    }
-    buildPhases.push({ value: 'phase-frameworks', comment: 'Frameworks' });
-    return {
-      hash: { project: { objects: { PBXSourcesBuildPhase: phases } } },
-      pbxNativeTargetSection: () => ({
-        [TARGET_UUID]: { name: TARGET_NAME, buildPhases },
-      }),
-      addBuildPhase: vi.fn(),
-    };
-  }
-
-  async function runControlsXcodeMod(
-    project: ReturnType<typeof widgetTargetProject>
-  ): Promise<void> {
-    // `withXcodeProject` files its callback under `mods.ios.xcodeproj`; the
-    // plugin's return type is `ExpoConfig`, which does not carry the mods the
-    // compiler runs later.
-    const config = withAgentControls({ name: 'Kilo' }) as unknown as {
-      mods: { ios: { xcodeproj: (modConfig: Record<string, unknown>) => Promise<unknown> } };
-    };
-    await config.mods.ios.xcodeproj({
-      modRequest: { platformProjectRoot: '/tmp/ios' },
-      modResults: project,
-    });
-  }
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it('joins the phase expo-widgets created instead of appending a second one', async () => {
     const project = widgetTargetProject(1);
-    const attach = vi
-      .spyOn(IOSConfig.XcodeUtils, 'addBuildSourceFileToGroup')
-      .mockImplementation(() => {
-        targetSourcesBuildPhases(project, TARGET_UUID)[0]?.files.push({
-          value: 'bf-controls',
-          comment: `${SWIFT_FILE} in Sources`,
-        });
-        return project as never;
-      });
+    const attach = attachMock(project, 1);
 
-    try {
-      await runControlsXcodeMod(project);
+    await runControlsXcodeMod(project);
 
-      expect(project.addBuildPhase).not.toHaveBeenCalled();
-      expect(attach).toHaveBeenCalledTimes(1);
-      expect(attach).toHaveBeenCalledWith({
-        filepath: SWIFT_FILE,
-        groupName: TARGET_NAME,
-        project,
-        targetUuid: TARGET_UUID,
-      });
-      const phases = targetSourcesBuildPhases(project, TARGET_UUID);
-      expect(phases).toHaveLength(1);
-      expect(phases[0]?.files.map(file => file.comment)).toEqual([
-        'index.swift in Sources',
-        `${SWIFT_FILE} in Sources`,
-      ]);
-    } finally {
-      attach.mockRestore();
-    }
+    expect(project.addBuildPhase).not.toHaveBeenCalled();
+    expect(attach).toHaveBeenCalledTimes(1);
+    expect(attach).toHaveBeenCalledWith({
+      filepath: SWIFT_FILE,
+      groupName: TARGET_NAME,
+      project,
+      targetUuid: TARGET_UUID,
+    });
+    const phases = targetSourcesBuildPhases(project, TARGET_UUID);
+    expect(phases).toHaveLength(1);
+    expect(phases[0]?.files.map(file => file.comment)).toEqual([
+      'index.swift in Sources',
+      `${SWIFT_FILE} in Sources`,
+    ]);
   });
 
   it('names the duplicate-phase failure instead of adding a third phase', async () => {
     const project = widgetTargetProject(2);
     await expect(runControlsXcodeMod(project)).rejects.toThrow(/2 Sources build phases/);
     expect(project.addBuildPhase).not.toHaveBeenCalled();
+  });
+
+  // Idempotency: the next prebuild must not be able to reintroduce a duplicate.
+  it('leaves one entry and attaches once when the mod runs twice', async () => {
+    const project = widgetTargetProject(1);
+    const attach = attachMock(project, 1);
+
+    await runControlsXcodeMod(project);
+    await runControlsXcodeMod(project);
+
+    expect(attach).toHaveBeenCalledTimes(1);
+    const phases = targetSourcesBuildPhases(project, TARGET_UUID);
+    expect(phases).toHaveLength(1);
+    expect(sourceFileEntryCount(phases[0], SWIFT_FILE)).toBe(1);
+  });
+
+  // Self-heal: a staler run doubled the entry; this one keeps the first and
+  // drops the surplus, `PBXBuildFile` object included, without attaching a third.
+  it('drops a doubled entry and its PBXBuildFile instead of attaching a third', async () => {
+    const project = widgetTargetProject(1);
+    project.hash.project.objects.PBXBuildFile['bf-controls-0'] = {};
+    project.hash.project.objects.PBXBuildFile['bf-controls-1'] = {};
+    targetSourcesBuildPhases(project, TARGET_UUID)[0]?.files.push(
+      { value: 'bf-controls-0', comment: `${SWIFT_FILE} in Sources` },
+      { value: 'bf-controls-1', comment: `${SWIFT_FILE} in Sources` }
+    );
+    const attach = vi.spyOn(IOSConfig.XcodeUtils, 'addBuildSourceFileToGroup');
+
+    await runControlsXcodeMod(project);
+
+    expect(attach).not.toHaveBeenCalled();
+    const phases = targetSourcesBuildPhases(project, TARGET_UUID);
+    expect(sourceFileEntryCount(phases[0], SWIFT_FILE)).toBe(1);
+    expect(project.hash.project.objects.PBXBuildFile['bf-controls-1']).toBeUndefined();
+  });
+
+  // The guard the amendment asks for: uniqueness, not presence. An attach that
+  // doubles the entry must fail the prebuild, not reach XCBuild.
+  it('rejects when the attach helper appends a second entry', async () => {
+    const project = widgetTargetProject(1);
+    const attach = attachMock(project, 2);
+
+    await expect(runControlsXcodeMod(project)).rejects.toThrow(/appears 2 times/);
+    expect(attach).toHaveBeenCalledTimes(1);
   });
 });
 

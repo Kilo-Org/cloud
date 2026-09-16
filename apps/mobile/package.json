@@ -13,6 +13,7 @@
     "release:internal:ios": "pnpx eas-cli@21.8.0 build -p ios --profile production --auto-submit",
     "release:internal:android": "pnpx eas-cli@21.8.0 build -p android --profile production --auto-submit",
     "assert:config": "node scripts/assert-expo-config.mjs",
+    "assert:widget-sources": "node scripts/assert-widget-sources-unique.mjs",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.json apps/mobile/src",
     "format": "oxfmt src",

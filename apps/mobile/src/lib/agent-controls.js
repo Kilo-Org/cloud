@@ -168,6 +168,64 @@ export function targetSourcesBuildPhases(project, targetUuid) {
 }
 
 /**
+ * How many entries of the phase compile `file`: the entries whose comment is
+ * `` `${file} in Sources` ``. XCBuild fails a target that compiles one source
+ * twice — the same "Unexpected duplicate tasks" failure a second `Sources`
+ * phase causes — so the plugin counts this after its edit and fails the
+ * prebuild unless the count is exactly one, and
+ * `scripts/assert-widget-sources-unique.mjs` counts the same thing in the
+ * generated project.
+ * @param {SourcesBuildPhase | undefined} phase
+ * @param {string} file
+ * @returns {number}
+ */
+export function sourceFileEntryCount(phase, file) {
+  const comment = `${file} in Sources`;
+  return (phase?.files ?? []).filter(entry => entry.comment === comment).length;
+}
+
+/**
+ * Keep at most one `` `${file} in Sources` `` entry on the phase and return the
+ * number kept. Every surplus entry is dropped together with the `PBXBuildFile`
+ * object it points at — the object a doubled `addBuildSourceFileToGroup` left
+ * behind. Idempotent: a phase that already carries one entry is untouched, so a
+ * prebuild that runs the mod twice, or one that meets a project a staler run
+ * doubled, still ends with exactly one entry.
+ * @param {{ hash: { project: { objects: { PBXBuildFile?: Record<string, unknown> | undefined } } } }} project
+ * @param {SourcesBuildPhase | undefined} phase
+ * @param {string} file
+ * @returns {number}
+ */
+export function retainOneSourceFileEntry(project, phase, file) {
+  if (phase === undefined) {
+    return 0;
+  }
+  const comment = `${file} in Sources`;
+  const matching = phase.files.filter(entry => entry.comment === comment);
+  const surplus = matching
+    .slice(1)
+    .map(entry => entry.value)
+    .filter(value => value !== undefined);
+  if (surplus.length > 0) {
+    // Drop the `PBXBuildFile` section entries the doubled attach left behind:
+    // the phase no longer references them. `Reflect.deleteProperty` is the
+    // computed-key delete (`delete section[uuid]` is the lint-forbidden form).
+    const buildFiles = project.hash.project.objects.PBXBuildFile ?? {};
+    for (const uuid of surplus) {
+      Reflect.deleteProperty(buildFiles, uuid);
+      Reflect.deleteProperty(buildFiles, `${uuid}_comment`);
+    }
+  }
+  if (matching.length === 0) {
+    return 0;
+  }
+  const [kept] = matching;
+  // The first match stays; every later one is dropped from the phase.
+  phase.files = phase.files.filter(entry => entry.comment !== comment || entry === kept);
+  return 1;
+}
+
+/**
  * The extension's AgentControls.swift: one AppIntent and one ControlWidget per
  * contract entry, plus the bundle index.swift splices in. Every url comes from
  * `urls` — this generator never spells one of its own.

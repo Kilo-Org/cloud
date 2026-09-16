@@ -31,6 +31,11 @@ import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { logger } from '../logger.js';
 import { SESSION_DELIVERY_TIMEOUT_MS } from './control-dispatch.js';
 import { RUNTIME_AUTHORIZATION_KEY } from '../session/runtime-authorization-persistence.js';
+import {
+  RUNTIME_PROXY_GRANT_KEY,
+  runtimeProxyGrantSchema,
+  type RuntimeProxyFence,
+} from '../runtime-credential-proxy.js';
 import { PENDING_SESSION_MESSAGE_LIMIT } from '../session/pending-messages.js';
 import { createControlStopRequest } from '../shared/control-plane-session.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
@@ -1181,6 +1186,16 @@ function installModernRuntimeAuthorization(fixture: ReturnType<typeof sessionFix
     source: { admissionSource: 'user' },
   });
   return token;
+}
+
+function connectionFence(connectionId: string): Extract<RuntimeProxyFence, { plane: 'control' }> {
+  return {
+    plane: 'control',
+    allocationId: 'allocation_1',
+    providerInstanceId: 'provider_1',
+    connectionId,
+    wrapperInstanceId: RUNTIME_ID,
+  };
 }
 
 describe('SandboxSession orchestration', () => {
@@ -5406,6 +5421,68 @@ describe('SandboxSession orchestration', () => {
       });
     }
   );
+
+  it('resolves and reuses a runtime proxy handle when only the control connection changes', async () => {
+    const fixture = sessionFixture();
+    const backingToken = installModernRuntimeAuthorization(fixture);
+    const fenceMock = fixture.control.getRuntimeCredentialProxyFence;
+    const f1 = connectionFence('connection_1');
+    const f2 = connectionFence('connection_2');
+    fenceMock.mockResolvedValueOnce(f1).mockResolvedValueOnce(f1).mockResolvedValue(f2);
+
+    const handle = await fixture.session.issueRuntimeCredentialProxyGrant({
+      wrapperRunId: 'ignored',
+      wrapperGeneration: 0,
+      wrapperConnectionId: 'ignored',
+    });
+    expect(handle).toEqual(expect.any(String));
+    expect(fixture.values.get(RUNTIME_PROXY_GRANT_KEY)).toMatchObject({
+      plane: 'control',
+      connectionId: 'connection_1',
+    });
+
+    await expect(
+      fixture.session.resolveRuntimeCredentialProxyGrant(handle!)
+    ).resolves.toMatchObject({ token: backingToken });
+
+    const reused = await fixture.session.issueRuntimeCredentialProxyGrant({
+      wrapperRunId: 'ignored',
+      wrapperGeneration: 0,
+      wrapperConnectionId: 'ignored',
+    });
+    expect(reused).toBe(handle);
+    expect(
+      runtimeProxyGrantSchema.parse(fixture.values.get(RUNTIME_PROXY_GRANT_KEY))
+    ).toMatchObject({ plane: 'control', connectionId: 'connection_2' });
+  });
+
+  it('reuses a runtime proxy handle when the control connection changes between the two reads', async () => {
+    const fixture = sessionFixture();
+    installModernRuntimeAuthorization(fixture);
+    const fenceMock = fixture.control.getRuntimeCredentialProxyFence;
+    const f1 = connectionFence('connection_1');
+    const f2 = connectionFence('connection_2');
+
+    fenceMock.mockResolvedValue(f1);
+    const handle = await fixture.session.issueRuntimeCredentialProxyGrant({
+      wrapperRunId: 'ignored',
+      wrapperGeneration: 0,
+      wrapperConnectionId: 'ignored',
+    });
+    expect(handle).toEqual(expect.any(String));
+
+    fenceMock.mockReset();
+    fenceMock.mockResolvedValueOnce(f1).mockResolvedValue(f2);
+    const reused = await fixture.session.issueRuntimeCredentialProxyGrant({
+      wrapperRunId: 'ignored',
+      wrapperGeneration: 0,
+      wrapperConnectionId: 'ignored',
+    });
+    expect(reused).toBe(handle);
+    expect(
+      runtimeProxyGrantSchema.parse(fixture.values.get(RUNTIME_PROXY_GRANT_KEY))
+    ).toMatchObject({ plane: 'control', connectionId: 'connection_2' });
+  });
 
   it.each(['revoked', 'deleted'] as const)(
     'immediately denies runtime proxy issue and resolution after terminal lifecycle is %s despite pending or failed detach',

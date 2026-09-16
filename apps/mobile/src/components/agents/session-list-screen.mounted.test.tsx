@@ -260,6 +260,23 @@ function requireNode(type: string) {
   }
   return result;
 }
+function reconnectLine() {
+  const line = nodes('Text').find(node => node.children.includes('Reconnecting…'));
+  if (!line) {
+    throw new Error('Missing Reconnecting… line');
+  }
+  return line;
+}
+function connectionRow() {
+  const reserved = nodes('View').find(
+    node =>
+      typeof node.props.className === 'string' && node.props.className.includes('min-h-5 flex-row')
+  );
+  if (!reserved) {
+    throw new Error('Missing reserved connection line');
+  }
+  return reserved;
+}
 function text() {
   return nodes('Text')
     .map(node => node.children.filter(child => typeof child === 'string').join(''))
@@ -554,6 +571,26 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(text()).not.toContain('Reconnecting…');
     (originalRow.props.onPress as () => void)();
     expect(state.sessionId).toBe('live-1');
+  });
+
+  it('paints the reconnect line and reserves its space, so the held rows cannot move', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const connectedRow = connectionRow();
+    expect(connectedRow.props.className).toContain('min-h-5');
+
+    state.connection.isConnected = false;
+    await renderScreen();
+    // The copy is painted, unlike the other statuses that are announced only
+    // because a spinner or a skeleton is already the visual.
+    expect(reconnectLine().props.className).not.toContain('absolute');
+    expect(reconnectLine().props.className).not.toContain('size-px');
+    expect(connectionRow()).toBe(connectedRow);
+
+    state.connection.isConnected = true;
+    await renderScreen();
+    expect(text()).not.toContain('Reconnecting…');
+    expect(connectionRow()).toBe(connectedRow);
   });
 
   it.each([

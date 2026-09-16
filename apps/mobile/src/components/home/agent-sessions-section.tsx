@@ -189,19 +189,17 @@ export function LiveSessionFeedback({
 
   const feedback = (
     <View className={cn('gap-2', centered && 'px-6')}>
-      <View className="flex-row items-center gap-2">
+      {/* The connection line is painted, not only announced: while the rows are
+          held through a socket break the reader has to know the list is
+          stale, and no other visual carries that state (unlike the pull, whose
+          spinner is its own visual). Its height is reserved either way, so a
+          reconnect cannot move the rows it describes. */}
+      <View className="min-h-5 flex-row items-center gap-2">
         {/* The app-wide OfflineBanner owns the offline announcement. */}
         {internet === 'offline' ? (
           <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
         ) : (
-          <AccessibleStatus
-            message={connectionLabel}
-            tone="status"
-            className={cn(
-              'flex-1 text-xs',
-              !reconnectExhausted && 'absolute size-px overflow-hidden'
-            )}
-          />
+          <AccessibleStatus message={connectionLabel} tone="status" className="flex-1 text-xs" />
         )}
         {context.isReady && !isConnected && reconnectExhausted && (
           <Button

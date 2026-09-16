@@ -152,6 +152,28 @@ describe('MessageErrorBoundary — telemetry reporting', () => {
     expect(events[1]?.fingerprint).toEqual(events[0]?.fingerprint);
   });
 
+  it('reports a non-Error throw instead of dropping it', async () => {
+    const boundary = await mountBoundaryInstance();
+
+    expect(() => {
+      boundary.componentDidCatch('render part failed', { componentStack: 'a' });
+      boundary.componentDidCatch(null, {});
+    }).not.toThrow();
+
+    // Both throws report; a non-Error throw gets a stable grouping signature
+    // instead of a dropped event or `undefined` fingerprint parts.
+    expect(events).toHaveLength(2);
+    expect(events[0]?.error).toBe('render part failed');
+    expect(events[1]?.error).toBeNull();
+    expect(events[0]?.fingerprint).toEqual([
+      'agent-message-render',
+      'render_part',
+      'unknown',
+      'unknown',
+    ]);
+    expect(events[1]?.fingerprint).toEqual(events[0]?.fingerprint);
+  });
+
   it('groups repeated crashes of the same renderer under one fingerprint', async () => {
     const boundary = await mountBoundaryInstance();
 

@@ -31,41 +31,63 @@ const LOWERCASE_WORD_CHAIN_PATTERN = /^[a-z]+(?:[-_][a-z]+)+$/;
 /** A chain of CapitalizedWords: React's `MessageErrorBoundary`. */
 const CAPITALIZED_WORD_CHAIN_PATTERN = /^[A-Z][a-z]+(?:[A-Z][a-z]+)+$/;
 
-/** True when a token-shaped run is a word chain, i.e. a name, not a secret. */
+/** True when a token-shaped run is a word chain, i.e. maybe a name. */
 function isIdentifierRun(run: string): boolean {
   return LOWERCASE_WORD_CHAIN_PATTERN.test(run) || CAPITALIZED_WORD_CHAIN_PATTERN.test(run);
 }
 
 /**
+ * Keys whose values are contractually app identifiers rather than payload
+ * data: the `error.subsystem` / `error.operation` tags the app sets itself, and
+ * the React `componentStack` the render boundary attaches. Only there may a
+ * word-chain run stay; under any other key a word chain is redacted like any
+ * other token-shaped run.
+ *
+ * The shape alone is not proof a run is safe to send: a slug or passphrase
+ * secret (`my-super-secret-prod-token`) is a chain of lowercase words too.
+ * Keeping the exception where the app writes identifiers preserves the one
+ * copy of the `agent-message-render` / `write_logout_tombstone` diagnostics
+ * without letting a word-chain secret through anywhere else.
+ */
+const IDENTIFIER_KEYS = new Set(['error.subsystem', 'error.operation', 'componentStack']);
+
+/**
  * Redact every token-shaped run inside one string, keeping the rest of the
  * string so a diagnostic that embeds a long identifier stays readable.
  *
- * A run is 20+ consecutive base64url characters. A run that is instead a chain
- * of words is a name, not a credential: the app's own `error.subsystem` /
- * `error.operation` tags (`agent-message-render`, `write_logout_tombstone`) and
- * React's component stacks (`MessageErrorBoundary`) are full of them, and
- * redacting those destroys the only copy of the diagnostic the app sends. A
- * credential is a random run — it mixes cases or carries digits — so a
- * word-chain run is left alone. Same rationale as the structured contexts
- * `scrubEvent` leaves intact. A `Bearer ` prefix names the whole value a
+ * A run is 20+ consecutive base64url characters. Inside an identifier key's
+ * value a run that is a chain of words is a name, not a credential: without
+ * that, the app's `agent-message-render` tags and React's
+ * `MessageErrorBoundary` component names are delivered as `[redacted]`, and
+ * they are the only copy of the diagnostic the app sends. Everywhere else a
+ * run is redacted on shape alone. A `Bearer ` prefix names the whole value a
  * credential, so it redacts whole.
  */
-function redactString(value: string): string {
+function redactString(value: string, keepIdentifiers: boolean): string {
   if (value.startsWith('Bearer ')) {
     return '[redacted]';
   }
-  return value.replace(TOKEN_RUN_PATTERN, run => (isIdentifierRun(run) ? run : '[redacted]'));
+  return value.replace(TOKEN_RUN_PATTERN, run =>
+    keepIdentifiers && isIdentifierRun(run) ? run : '[redacted]'
+  );
 }
 
 /**
  * Redact token-shaped runs at any depth in a value tree, returning a scrubbed
- * copy. `seen` maps each visited object to its scrubbed copy, so a repeated or
- * aliased reference resolves to that copy rather than the original (returning
- * the original would leak its unredacted values) and a cycle is bounded.
+ * copy. `keepIdentifiers` applies to the value itself; inside an object each
+ * key decides for its own value, so the exemption stays scoped to
+ * {@link IDENTIFIER_KEYS}. `seen` maps each visited object to its scrubbed
+ * copy, so a repeated or aliased reference resolves to that copy rather than
+ * the original (returning the original would leak its unredacted values) and a
+ * cycle is bounded.
  */
-function redactValue(value: unknown, seen: WeakMap<object, unknown>): unknown {
+function redactValue(
+  value: unknown,
+  seen: WeakMap<object, unknown>,
+  keepIdentifiers: boolean
+): unknown {
   if (typeof value === 'string') {
-    return redactString(value);
+    return redactString(value, keepIdentifiers);
   }
   if (value === null || typeof value !== 'object') {
     return value;
@@ -77,14 +99,14 @@ function redactValue(value: unknown, seen: WeakMap<object, unknown>): unknown {
     const result: unknown[] = [];
     seen.set(value, result);
     for (const item of value) {
-      result.push(redactValue(item, seen));
+      result.push(redactValue(item, seen, keepIdentifiers));
     }
     return result;
   }
   const result: Record<string, unknown> = {};
   seen.set(value, result);
   for (const [key, item] of Object.entries(value)) {
-    result[key] = redactValue(item, seen);
+    result[key] = redactValue(item, seen, IDENTIFIER_KEYS.has(key));
   }
   return result;
 }
@@ -96,7 +118,7 @@ function redactTokens(
   if (map == null) {
     return undefined;
   }
-  return redactValue(map, new WeakMap()) as Record<string, unknown>;
+  return redactValue(map, new WeakMap(), false) as Record<string, unknown>;
 }
 
 /**
@@ -133,9 +155,11 @@ function exceptionContextNames(event: Record<string, unknown>): string[] {
  * - Deletes `user.email`, `user.username`, and `user.ip_address`.
  * - Redacts token-shaped runs (20+ base64url chars, or any `Bearer ` value) at
  *   any depth in `event.extra`, `event.tags`, and the exception-name context
- *   `extraErrorDataIntegration` attaches; word-chain runs are identifiers and
- *   stay. Sentry's structured contexts are left intact: their identifiers trip
- *   the token heuristic without holding secrets.
+ *   `extraErrorDataIntegration` attaches. A word-chain run stays only under an
+ *   identifier key (see {@link IDENTIFIER_KEYS}); under any other key a
+ *   word-chain secret is redacted on shape alone. Sentry's structured contexts
+ *   are left intact: their identifiers trip the token heuristic without holding
+ *   secrets.
  */
 export function scrubEvent<T>(event: T): T {
   try {
@@ -164,7 +188,7 @@ export function scrubEvent<T>(event: T): T {
       }
       for (const name of exceptionContextNames(e)) {
         if (name in ctx) {
-          ctx[name] = redactValue(ctx[name], new WeakMap());
+          ctx[name] = redactValue(ctx[name], new WeakMap(), false);
         }
       }
     }

@@ -130,6 +130,38 @@ describe('scrubEvent', () => {
     expect(result.tags['error.operation']).toBe('write_logout_tombstone');
   });
 
+  it('keeps the render-crash identifiers while redacting a credential beside them', () => {
+    const event = {
+      tags: { 'error.subsystem': 'agent-message-render', 'error.operation': 'render_part' },
+      extra: {
+        componentStack: '\n    at MessageErrorBoundary',
+        token: 'my-super-secret-prod-token',
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.tags['error.subsystem']).toBe('agent-message-render');
+    expect(result.tags['error.operation']).toBe('render_part');
+    expect(result.extra.componentStack).toBe('\n    at MessageErrorBoundary');
+    expect(result.extra.token).toBe('[redacted]');
+  });
+
+  it('redacts a word-chain secret under any non-identifier key', () => {
+    const secret = 'my-super-secret-prod-token';
+    const event = {
+      exception: { values: [{ type: 'RenderCrash' }] },
+      contexts: { RenderCrash: { detail: secret } },
+      extra: { token: secret, cause: { authorization: secret } },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.token).toBe('[redacted]');
+    expect(result.extra.cause.authorization).toBe('[redacted]');
+    expect(result.contexts.RenderCrash.detail).toBe('[redacted]');
+  });
+
   it('keeps a React component stack in extra', () => {
     const componentStack =
       '\n    at TextPartRenderer\n    at MessageErrorBoundary\n    at PartRenderer';

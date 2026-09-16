@@ -44,10 +44,16 @@ public final class ArtifactsProviderModule: Module {
    sign-in and a foreground refresh all converge on the one domain instead of
    racing to add it. A domain outlives the session that registered it: sign-out
    clears the mirror instead, so the extension serves an empty location.
+
+   The enumeration is `getDomainsWithCompletionHandler(_:)`, the name the
+   FileProvider SDK declares for `+getDomainsWithCompletionHandler:`
+   (`NSFileProviderManager.h`): there is no `getDomains` member, and the
+   header's `NS_ASSUME_NONNULL_BEGIN` makes the domain list non-optional, so it
+   is handed to `isRegistered` as read.
    */
   private func registerProviderDomain() {
     let domain = Self.fileProviderDomain
-    NSFileProviderManager.getDomains { domains, error in
+    NSFileProviderManager.getDomainsWithCompletionHandler { domains, error in
       if let error {
         NSLog(
           "[ArtifactsProvider] Could not read the File Provider domains: %@",
@@ -55,7 +61,7 @@ public final class ArtifactsProviderModule: Module {
         )
         return
       }
-      guard let domains, !Self.isRegistered(domain, among: domains) else {
+      guard !Self.isRegistered(domain, among: domains) else {
         return
       }
       NSFileProviderManager.add(domain) { error in

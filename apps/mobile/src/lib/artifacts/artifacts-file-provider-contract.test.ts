@@ -272,7 +272,20 @@ describe('artifacts provider iOS module contract', () => {
     // Registration reads the registered domains first and skips the add when
     // this one is already there, so a cold start, a sign-in and a foreground
     // refresh can all call it without a duplicate-registration error.
-    expect(providerModuleSource).toContain('NSFileProviderManager.getDomains');
+    //
+    // The File Provider domain list is `getDomainsWithCompletionHandler(_:)` —
+    // the Swift name of `+getDomainsWithCompletionHandler:` in
+    // `NSFileProviderManager.h`. The SDK declares no `getDomains` member, so a
+    // bare `NSFileProviderManager.getDomains { ... }` is a compile error that
+    // only surfaces on a macOS runner; and the header sits inside
+    // `NS_ASSUME_NONNULL_BEGIN`, so the list is non-optional and a conditional
+    // binding around it would not compile either.
+    expect(providerModuleSource).toContain(
+      'NSFileProviderManager.getDomainsWithCompletionHandler { domains, error in'
+    );
+    expect(providerModuleSource).not.toContain('NSFileProviderManager.getDomains {');
+    expect(providerModuleSource).not.toContain('NSFileProviderManager.getDomains(');
+    expect(providerModuleSource).not.toContain('guard let domains');
     expect(providerModuleSource).toContain('NSFileProviderManager.add(domain)');
     expect(providerModuleSource).not.toContain('domainAlreadyExists');
     expect(providerModuleSource).toContain('signalEnumerator(for: .rootContainer)');

@@ -3061,6 +3061,10 @@
     "channelName": "সক্রিয় এজেন্ট",
     "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।"
   },
+  "launcher": {
+    "newAgent": "নতুন এজেন্ট",
+    "openLastSession": "শেষ সেশন খুলুন"
+  },
   "transcriptionModel": {
     "title": "কথা থেকে লেখার মডেল",
     "noneChosen": "কোনোটিই নির্বাচন করা হয়নি",

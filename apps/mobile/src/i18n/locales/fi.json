@@ -3061,6 +3061,10 @@
     "channelName": "Aktiiviset agentit",
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä."
   },
+  "launcher": {
+    "newAgent": "Uusi agentti",
+    "openLastSession": "Avaa viimeisin istunto"
+  },
   "transcriptionModel": {
     "title": "Puheentunnistusmalli",
     "noneChosen": "Ei valintaa",

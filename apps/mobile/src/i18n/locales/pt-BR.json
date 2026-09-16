@@ -3084,6 +3084,10 @@
     "channelName": "Agentes ativos",
     "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada."
   },
+  "launcher": {
+    "newAgent": "Novo agente",
+    "openLastSession": "Abrir última sessão"
+  },
   "transcriptionModel": {
     "title": "Modelo de transcrição",
     "noneChosen": "Nenhum selecionado",

@@ -3061,6 +3061,10 @@
     "channelName": "Eejentoota hojii irra jiran",
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi."
   },
+  "launcher": {
+    "newAgent": "Eejentii haaraa",
+    "openLastSession": "Turtii dhumaa bani"
+  },
   "transcriptionModel": {
     "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",
     "noneChosen": "Homni hin filatamne",

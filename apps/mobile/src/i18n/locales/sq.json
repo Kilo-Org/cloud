@@ -3061,6 +3061,10 @@
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
   },
+  "launcher": {
+    "newAgent": "Agjent i ri",
+    "openLastSession": "Hap sesionin e fundit"
+  },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",
     "noneChosen": "Asgjë nuk u zgjodh",

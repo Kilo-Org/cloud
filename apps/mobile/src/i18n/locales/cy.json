@@ -3153,6 +3153,10 @@
     "channelName": "Asiantau gweithredol",
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo."
   },
+  "launcher": {
+    "newAgent": "Asiant newydd",
+    "openLastSession": "Agor y sesiwn ddiwethaf"
+  },
   "transcriptionModel": {
     "title": "Model trawsgrifio",
     "noneChosen": "Dim wedi'i ddewis",

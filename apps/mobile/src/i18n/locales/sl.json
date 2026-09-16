@@ -3107,6 +3107,10 @@
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu."
   },
+  "launcher": {
+    "newAgent": "Nov agent",
+    "openLastSession": "Odpri zadnjo sejo"
+  },
   "transcriptionModel": {
     "title": "Model za prepisovanje",
     "noneChosen": "Ni izbran",

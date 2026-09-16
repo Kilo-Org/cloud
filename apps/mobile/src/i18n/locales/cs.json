@@ -3107,6 +3107,10 @@
     "channelName": "Aktivní agenti",
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce."
   },
+  "launcher": {
+    "newAgent": "Nový agent",
+    "openLastSession": "Otevřít poslední relaci"
+  },
   "transcriptionModel": {
     "title": "Model přepisu",
     "noneChosen": "Není vybrán žádný",

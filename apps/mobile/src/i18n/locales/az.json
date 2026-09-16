@@ -3061,6 +3061,10 @@
     "channelName": "Aktiv agentlər",
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir."
   },
+  "launcher": {
+    "newAgent": "Yeni agent",
+    "openLastSession": "Son sessiyanı aç"
+  },
   "transcriptionModel": {
     "title": "Səsin mətnə çevrilməsi modeli",
     "noneChosen": "Seçilməyib",

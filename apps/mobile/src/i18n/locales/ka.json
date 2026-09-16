@@ -3061,6 +3061,10 @@
     "channelName": "აქტიური აგენტები",
     "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები."
   },
+  "launcher": {
+    "newAgent": "ახალი აგენტი",
+    "openLastSession": "ბოლო სესიის გახსნა"
+  },
   "transcriptionModel": {
     "title": "ტრანსკრიფციის მოდელი",
     "noneChosen": "არჩეული არ არის",

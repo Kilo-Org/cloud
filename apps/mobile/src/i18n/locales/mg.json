@@ -3061,6 +3061,10 @@
     "channelName": "Mpanatanteraka mandeha",
     "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy."
   },
+  "launcher": {
+    "newAgent": "Mpanampy vaovao",
+    "openLastSession": "Sokafy ny fotoam-piasana farany"
+  },
   "transcriptionModel": {
     "title": "Modely fanovana feo ho soratra",
     "noneChosen": "Tsy misy safidy",

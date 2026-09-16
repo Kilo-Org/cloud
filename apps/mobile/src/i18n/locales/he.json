@@ -3084,6 +3084,10 @@
     "channelName": "סוכנים פעילים",
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
   },
+  "launcher": {
+    "newAgent": "סוכן חדש",
+    "openLastSession": "פתיחת הסשן האחרון"
+  },
   "transcriptionModel": {
     "title": "מודל תמלול",
     "noneChosen": "לא נבחר",

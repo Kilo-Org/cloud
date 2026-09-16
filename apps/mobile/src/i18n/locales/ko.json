@@ -3061,6 +3061,10 @@
     "channelName": "활성 에이전트",
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요."
   },
+  "launcher": {
+    "newAgent": "새 에이전트",
+    "openLastSession": "마지막 세션 열기"
+  },
   "transcriptionModel": {
     "title": "음성 텍스트 변환 모델",
     "noneChosen": "선택 안 됨",

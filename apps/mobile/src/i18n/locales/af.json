@@ -3061,6 +3061,10 @@
     "channelName": "Aktiewe agente",
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien."
   },
+  "launcher": {
+    "newAgent": "Nuwe agent",
+    "openLastSession": "Maak laaste sessie oop"
+  },
   "transcriptionModel": {
     "title": "Transkripsiemodel",
     "noneChosen": "Geen gekies nie",

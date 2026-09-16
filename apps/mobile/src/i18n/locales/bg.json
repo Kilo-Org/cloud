@@ -3061,6 +3061,10 @@
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран."
   },
+  "launcher": {
+    "newAgent": "Нов агент",
+    "openLastSession": "Отвори последната сесия"
+  },
   "transcriptionModel": {
     "title": "Модел за транскрипция",
     "noneChosen": "Не е избран",

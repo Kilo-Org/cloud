@@ -3061,6 +3061,10 @@
     "channelName": "Ajan aktif",
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an."
   },
+  "launcher": {
+    "newAgent": "Nouvo ajan",
+    "openLastSession": "Louvri dènye sesyon an"
+  },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",
     "noneChosen": "Okenn pa chwazi",

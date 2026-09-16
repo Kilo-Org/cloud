@@ -3130,6 +3130,10 @@
     "channelName": "Aġenti attivi",
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar."
   },
+  "launcher": {
+    "newAgent": "Aġent ġdid",
+    "openLastSession": "Iftaħ l-aħħar sessjoni"
+  },
   "transcriptionModel": {
     "title": "Mudell ta' traskrizzjoni",
     "noneChosen": "Xejn magħżul",

@@ -3061,6 +3061,10 @@
     "channelName": "Ndị nnọchi anya na-arụ ọrụ",
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi."
   },
+  "launcher": {
+    "newAgent": "Onye enyemaka ọhụrụ",
+    "openLastSession": "Mepee nnọkọ ikpeazụ"
+  },
   "transcriptionModel": {
     "title": "Ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",
     "noneChosen": "A họpụtaghị nke ọ bụla",

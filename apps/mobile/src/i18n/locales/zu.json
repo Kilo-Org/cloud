@@ -3061,6 +3061,10 @@
     "channelName": "Ama-ejenti asebenzayo",
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe."
   },
+  "launcher": {
+    "newAgent": "I-ejenti entsha",
+    "openLastSession": "Vula iseshini yokugcina"
+  },
   "transcriptionModel": {
     "title": "Imodeli yokuguqula inkulumo",
     "noneChosen": "Akukho okukhethiwe",

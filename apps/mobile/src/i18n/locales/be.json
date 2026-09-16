@@ -3107,6 +3107,10 @@
     "channelName": "Актыўныя агенты",
     "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі."
   },
+  "launcher": {
+    "newAgent": "Новы агент",
+    "openLastSession": "Адкрыць апошні сеанс"
+  },
   "transcriptionModel": {
     "title": "Мадэль распазнавання маўлення",
     "noneChosen": "Не выбрана",

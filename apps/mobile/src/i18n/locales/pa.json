@@ -3061,6 +3061,10 @@
     "channelName": "ਸਰਗਰਮ ਏਜੰਟ",
     "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।"
   },
+  "launcher": {
+    "newAgent": "ਨਵਾਂ ਏਜੰਟ",
+    "openLastSession": "ਆਖਰੀ ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ"
+  },
   "transcriptionModel": {
     "title": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਦਾ ਮਾਡਲ",
     "noneChosen": "ਕੋਈ ਨਹੀਂ ਚੁਣਿਆ",

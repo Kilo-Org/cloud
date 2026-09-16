@@ -3061,6 +3061,10 @@
     "channelName": "Aktive Agenten",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
   },
+  "launcher": {
+    "newAgent": "Neuer Agent",
+    "openLastSession": "Letzte Sitzung öffnen"
+  },
   "transcriptionModel": {
     "title": "Transkriptionsmodell",
     "noneChosen": "Keines ausgewählt",

@@ -3084,6 +3084,10 @@
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama da vidiš aktivne agente na zaključanom ekranu."
   },
+  "launcher": {
+    "newAgent": "Novi agent",
+    "openLastSession": "Otvori posljednju sesiju"
+  },
   "transcriptionModel": {
     "title": "Model za transkripciju",
     "noneChosen": "Nije odabran",

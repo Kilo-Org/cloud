@@ -3084,6 +3084,10 @@
     "channelName": "Agenți activi",
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare."
   },
+  "launcher": {
+    "newAgent": "Agent nou",
+    "openLastSession": "Deschide ultima sesiune"
+  },
   "transcriptionModel": {
     "title": "Model de transcriere",
     "noneChosen": "Niciunul selectat",

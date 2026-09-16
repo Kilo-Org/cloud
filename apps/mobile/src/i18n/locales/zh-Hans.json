@@ -3061,6 +3061,10 @@
     "channelName": "运行中的智能体",
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。"
   },
+  "launcher": {
+    "newAgent": "新建智能体",
+    "openLastSession": "打开上次会话"
+  },
   "transcriptionModel": {
     "title": "转写模型",
     "noneChosen": "未选择",

@@ -3061,6 +3061,10 @@
     "channelName": "Wakilai da ke aiki",
     "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle."
   },
+  "launcher": {
+    "newAgent": "Sabon wakili",
+    "openLastSession": "Buɗe zaman ƙarshe"
+  },
   "transcriptionModel": {
     "title": "Samfurin mayar da magana zuwa rubutu",
     "noneChosen": "Ba a zaɓi ba",

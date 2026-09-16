@@ -3061,6 +3061,10 @@
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
   },
+  "launcher": {
+    "newAgent": "Ny agent",
+    "openLastSession": "Åpne siste økt"
+  },
   "transcriptionModel": {
     "title": "Transkripsjonsmodell",
     "noneChosen": "Ingen valgt",

@@ -3061,6 +3061,10 @@
     "channelName": "Actieve agents",
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien."
   },
+  "launcher": {
+    "newAgent": "Nieuwe agent",
+    "openLastSession": "Laatste sessie openen"
+  },
   "transcriptionModel": {
     "title": "Transcriptiemodel",
     "noneChosen": "Geen gekozen",

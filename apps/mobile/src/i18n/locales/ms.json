@@ -3061,6 +3061,10 @@
     "channelName": "Ejen aktif",
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci."
   },
+  "launcher": {
+    "newAgent": "Ejen baharu",
+    "openLastSession": "Buka sesi terakhir"
+  },
   "transcriptionModel": {
     "title": "Model transkripsi",
     "noneChosen": "Tiada dipilih",

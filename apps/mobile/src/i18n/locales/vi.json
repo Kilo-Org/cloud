@@ -3061,6 +3061,10 @@
     "channelName": "Tác nhân đang hoạt động",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
   },
+  "launcher": {
+    "newAgent": "Trợ lý mới",
+    "openLastSession": "Mở phiên gần nhất"
+  },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",
     "noneChosen": "Chưa chọn",

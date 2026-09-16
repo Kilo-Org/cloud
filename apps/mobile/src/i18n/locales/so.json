@@ -3061,6 +3061,10 @@
     "channelName": "Wakiillada firfircoon",
     "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka."
   },
+  "launcher": {
+    "newAgent": "Wakiil cusub",
+    "openLastSession": "Fur kalfadhigii ugu dambeeyay"
+  },
   "transcriptionModel": {
     "title": "Moodeelka qoraal u beddelidda",
     "noneChosen": "Waxba lama dooran",

@@ -3130,6 +3130,10 @@
     "channelName": "Gníomhairí gníomhacha",
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála."
   },
+  "launcher": {
+    "newAgent": "Gníomhaire nua",
+    "openLastSession": "Oscail an seisiún deireanach"
+  },
   "transcriptionModel": {
     "title": "Samhail tras-scríobh",
     "noneChosen": "Níor roghnaíadh aon cheann",

@@ -3061,6 +3061,10 @@
     "channelName": "Agen aktif",
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci."
   },
+  "launcher": {
+    "newAgent": "Agen baru",
+    "openLastSession": "Buka sesi terakhir"
+  },
   "transcriptionModel": {
     "title": "Model transkripsi",
     "noneChosen": "Belum ada yang dipilih",

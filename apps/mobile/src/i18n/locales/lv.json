@@ -3084,6 +3084,10 @@
     "channelName": "Aktīvie aģenti",
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus."
   },
+  "launcher": {
+    "newAgent": "Jauns aģents",
+    "openLastSession": "Atvērt pēdējo sesiju"
+  },
   "transcriptionModel": {
     "title": "Transkripcijas modelis",
     "noneChosen": "Nav izvēlēts",

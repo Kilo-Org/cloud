@@ -3061,6 +3061,10 @@
     "channelName": "Agente aktiboak",
     "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko."
   },
+  "launcher": {
+    "newAgent": "Agente berria",
+    "openLastSession": "Ireki azken saioa"
+  },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",
     "noneChosen": "Ezer hautatu gabe",

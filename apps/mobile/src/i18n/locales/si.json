@@ -3061,6 +3061,10 @@
     "channelName": "සක්‍රීය නියෝජිතයන්",
     "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න."
   },
+  "launcher": {
+    "newAgent": "නව නියෝජිතයෙක්",
+    "openLastSession": "අවසන් සැසිය විවෘත කරන්න"
+  },
   "transcriptionModel": {
     "title": "හඬ පෙළට හරවන ආකෘතිය",
     "noneChosen": "කිසිවක් තෝරා නැත",

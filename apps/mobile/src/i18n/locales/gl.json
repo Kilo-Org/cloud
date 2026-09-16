@@ -3061,6 +3061,10 @@
     "channelName": "Axentes activos",
     "activityKitDisabledBody": "Activa as actividades en directo nos axustes para ver os axentes activos na pantalla de bloqueo."
   },
+  "launcher": {
+    "newAgent": "Novo axente",
+    "openLastSession": "Abrir a última sesión"
+  },
   "transcriptionModel": {
     "title": "Modelo de transcrición",
     "noneChosen": "Ningún seleccionado",

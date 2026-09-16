@@ -3107,6 +3107,10 @@
     "channelName": "Активні агенти",
     "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані."
   },
+  "launcher": {
+    "newAgent": "Новий агент",
+    "openLastSession": "Відкрити останній сеанс"
+  },
   "transcriptionModel": {
     "title": "Модель розпізнавання мовлення",
     "noneChosen": "Не вибрано",

@@ -3107,6 +3107,10 @@
     "channelName": "Aktywni agenci",
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
   },
+  "launcher": {
+    "newAgent": "Nowy agent",
+    "openLastSession": "Otwórz ostatnią sesję"
+  },
   "transcriptionModel": {
     "title": "Model transkrypcji",
     "noneChosen": "Nie wybrano",

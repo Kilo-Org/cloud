@@ -3084,6 +3084,10 @@
     "channelName": "Agents actifs",
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé."
   },
+  "launcher": {
+    "newAgent": "Nouvel agent",
+    "openLastSession": "Ouvrir la dernière session"
+  },
   "transcriptionModel": {
     "title": "Modèle de transcription",
     "noneChosen": "Aucun choisi",

@@ -3061,6 +3061,10 @@
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen."
   },
+  "launcher": {
+    "newAgent": "Ny agent",
+    "openLastSession": "Åbn seneste session"
+  },
   "transcriptionModel": {
     "title": "Transskriptionsmodel",
     "noneChosen": "Ingen valgt",

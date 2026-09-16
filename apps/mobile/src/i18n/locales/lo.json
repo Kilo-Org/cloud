@@ -3061,6 +3061,10 @@
     "channelName": "ເອເຈນທີ່ກຳລັງເຮັດວຽກ",
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ."
   },
+  "launcher": {
+    "newAgent": "ເອເຈນໃໝ່",
+    "openLastSession": "ເປີດເຊສຊັນລ່າສຸດ"
+  },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
     "noneChosen": "ຍັງບໍ່ໄດ້ເລືອກ",

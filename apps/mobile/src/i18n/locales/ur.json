@@ -3061,6 +3061,10 @@
     "channelName": "فعال ایجنٹس",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔"
   },
+  "launcher": {
+    "newAgent": "نیا ایجنٹ",
+    "openLastSession": "آخری سیشن کھولیں"
+  },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",
     "noneChosen": "کوئی نہیں چنا گیا",

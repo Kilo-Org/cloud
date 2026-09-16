@@ -3061,6 +3061,10 @@
     "channelName": "فعال اجنټان",
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ."
   },
+  "launcher": {
+    "newAgent": "نوی اجنټ",
+    "openLastSession": "وروستۍ ناسته پرانیزئ"
+  },
   "transcriptionModel": {
     "title": "د غږ د متن ته بدلولو ماډل",
     "noneChosen": "هیڅ نه دی ټاکل شوی",

@@ -3061,6 +3061,10 @@
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç."
   },
+  "launcher": {
+    "newAgent": "Yeni ajan",
+    "openLastSession": "Son oturumu aç"
+  },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",
     "noneChosen": "Hiçbiri seçilmedi",

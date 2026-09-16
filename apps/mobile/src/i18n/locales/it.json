@@ -3084,6 +3084,10 @@
     "channelName": "Agenti attivi",
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco."
   },
+  "launcher": {
+    "newAgent": "Nuovo agente",
+    "openLastSession": "Apri l'ultima sessione"
+  },
   "transcriptionModel": {
     "title": "Modello di trascrizione",
     "noneChosen": "Nessuno selezionato",

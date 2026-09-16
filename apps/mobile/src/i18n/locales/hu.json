@@ -3061,6 +3061,10 @@
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
   },
+  "launcher": {
+    "newAgent": "Új ügynök",
+    "openLastSession": "Utolsó munkamenet megnyitása"
+  },
   "transcriptionModel": {
     "title": "Átírási modell",
     "noneChosen": "Nincs kiválasztva",

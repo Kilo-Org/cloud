@@ -3061,6 +3061,10 @@
     "channelName": "सक्रिय एजेंट",
     "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।"
   },
+  "launcher": {
+    "newAgent": "नया एजेंट",
+    "openLastSession": "पिछला सत्र खोलें"
+  },
   "transcriptionModel": {
     "title": "आवाज़ को टेक्स्ट में बदलने का मॉडल",
     "noneChosen": "कोई नहीं चुना गया",

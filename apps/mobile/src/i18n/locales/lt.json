@@ -3107,6 +3107,10 @@
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus."
   },
+  "launcher": {
+    "newAgent": "Naujas agentas",
+    "openLastSession": "Atidaryti paskutinę sesiją"
+  },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",
     "noneChosen": "Neišrinkta",

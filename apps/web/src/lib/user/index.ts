@@ -312,6 +312,16 @@ export type DeferredSignInEvent = {
 
 export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
   const timer = createTimer();
+
+  // A passkey never owns a `user_auth_provider` row: the credential is bound to
+  // the Kilo user id in `passkey_credentials`, and the redeemed sign-in ticket
+  // already proved that id, so the provider account id *is* the user id.
+  // Resolve it directly and leave the account's hosted domain and display name
+  // untouched — the passkey path settles no user-account changes.
+  if (args.provider === 'passkey') {
+    return (await findUserById(args.provider_account_id)) ?? null;
+  }
+
   const existing_kilo_user_id = await findUserIdByAuthProvider(
     args.provider,
     args.provider_account_id

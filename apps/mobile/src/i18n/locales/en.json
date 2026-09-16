@@ -3058,6 +3058,11 @@
     "privacy": "Open Kilo to see agents",
     "openAgents": "Open agents",
     "needsInput": "Needs input",
+    "newestSession": "Newest: {{title}}",
+    "noneWaiting": "No agents waiting",
+    "newAgent": "New agent",
+    "approving": "Approving...",
+    "couldNotApprove": "Could not approve",
     "channelName": "Active agents",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."
   },

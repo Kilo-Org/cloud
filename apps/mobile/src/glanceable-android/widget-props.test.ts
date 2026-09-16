@@ -1,8 +1,11 @@
+/* eslint-disable max-lines -- one cohesive props-builder suite sharing the copy-map translator */
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 
 import {
   buildAndroidWidgetProps,
@@ -24,8 +27,20 @@ const COPY: Record<string, string> = {
   'glanceable.signedOut': 'Sign in to see agents',
   'glanceable.privacy': 'Open Kilo to see agents',
   'glanceable.openAgents': 'Open agents',
+  'glanceable.noneWaiting': 'No agents waiting',
+  'glanceable.newAgent': 'New agent',
+  'glanceable.approving': 'Approving...',
+  'glanceable.couldNotApprove': 'Could not approve',
+  'glanceable.newestSession': 'Newest: {{title}}',
+  'common.approve': 'Approve',
 };
 const translate = (key: string): string => COPY[key] ?? key;
+
+// The extras are module state shared by the publisher and every surface; a
+// case that sets them resets them here so it cannot colour the next one.
+afterEach(() => {
+  setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
+});
 
 function snapshotFor(
   sessions: { status: string }[],
@@ -80,7 +95,9 @@ describe('buildAndroidWidgetProps', () => {
       boolean,
     ][] = [
       ['waiting', [], 'Waiting for agents', 0, false],
-      ['empty', [], 'No work in progress', 0, false],
+      // Android's empty state is the one that offers New agent, so it says
+      // what that action is about instead of the generic no-work copy.
+      ['empty', [], 'No agents waiting', 0, false],
       // Counts show for stale, and all three rows draw whenever they show, so
       // the widget's rows never reflow as work moves between states.
       ['stale', [{ status: 'busy' }], 'Updates delayed', 3, true],
@@ -108,7 +125,9 @@ describe('buildAndroidWidgetProps', () => {
 
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
+      'actions',
       'countLines',
+      'newestLine',
       'primaryLabel',
       'statusLine',
     ]);
@@ -138,7 +157,7 @@ describe('current widget deadline rendering', () => {
   it.each([
     ['privacy', 'Open Kilo to see agents'],
     ['signed_out', 'Sign in to see agents'],
-    ['empty', 'No work in progress'],
+    ['empty', 'No agents waiting'],
     ['waiting', 'Waiting for agents'],
   ] as const)('preserves %s copy beyond an old deadline', (status, expected) => {
     vi.useFakeTimers();
@@ -199,18 +218,21 @@ describe('buildCompactNotificationText', () => {
 
 describe('status precedence and count hiding', () => {
   it.each([
-    ['waiting', 'Waiting for agents'],
-    ['empty', 'No work in progress'],
-    ['expired', 'Status expired'],
-    ['signed_out', 'Sign in to see agents'],
-    ['privacy', 'Open Kilo to see agents'],
-  ] as const)('hides counts on every Android surface for %s', (status, expected) => {
+    ['waiting', 'Waiting for agents', 'Waiting for agents'],
+    // The widget and the ongoing notification read the same status line;
+    // `buildOngoingNotificationText`'s own empty fallback only ever renders
+    // for eligible work, so it keeps the shared no-work copy.
+    ['empty', 'No agents waiting', 'No work in progress'],
+    ['expired', 'Status expired', 'Status expired'],
+    ['signed_out', 'Sign in to see agents', 'Sign in to see agents'],
+    ['privacy', 'Open Kilo to see agents', 'Open Kilo to see agents'],
+  ] as const)('hides counts on every Android surface for %s', (status, expected, notification) => {
     const snapshot = { ...MIXED, status };
     const props = buildAndroidWidgetProps(snapshot, {}, translate);
     expect(props.statusLine).toBe(expected);
     expect(props.countLines).toEqual([]);
     expect(props.primaryLabel).toBeNull();
-    expect(buildOngoingNotificationText(snapshot, {}, translate)).toBe(expected);
+    expect(buildOngoingNotificationText(snapshot, {}, translate)).toBe(notification);
     expect(buildCompactNotificationText(snapshot, {})).toBeNull();
   });
 
@@ -225,5 +247,104 @@ describe('status precedence and count hiding', () => {
     expect(props.primaryLabel).toBeNull();
     expect(buildOngoingNotificationText(snapshot, flags, translate)).toBe(expected);
     expect(buildCompactNotificationText(snapshot, flags)).toBeNull();
+  });
+});
+
+describe('widget actions and the newest line', () => {
+  it('offers Approve while a session waits, and New agent only then', () => {
+    const props = buildAndroidWidgetProps(MIXED, {}, translate);
+    expect(props.actions).toEqual({
+      approve: true,
+      newAgent: false,
+      approveLabel: 'Approve',
+      newAgentLabel: 'New agent',
+    });
+  });
+
+  it('offers New agent when nothing is eligible, instead of Approve', () => {
+    const props = buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate);
+    expect(props.actions).toEqual({
+      approve: false,
+      newAgent: true,
+      approveLabel: 'Approve',
+      newAgentLabel: 'New agent',
+    });
+    expect(props.statusLine).toBe('No agents waiting');
+  });
+
+  it('offers neither action while the first fetch is still in flight', () => {
+    const props = buildAndroidWidgetProps(snapshotFor([], 0, 'waiting'), {}, translate);
+    expect(props.actions.approve).toBe(false);
+    expect(props.actions.newAgent).toBe(false);
+  });
+
+  it.each(['expired', 'signed_out', 'privacy'] as const)(
+    'offers no action for %s, where there is nothing to trust yet',
+    status => {
+      const props = buildAndroidWidgetProps({ ...MIXED, status }, {}, translate);
+      expect(props.actions.approve).toBe(false);
+      expect(props.actions.newAgent).toBe(false);
+    }
+  );
+
+  it('offers no action to a signed-out widget even with retained counts', () => {
+    const props = buildAndroidWidgetProps(
+      { ...MIXED, status: 'stale' },
+      { signedOut: true },
+      translate
+    );
+    expect(props.actions.approve).toBe(false);
+    expect(props.actions.newAgent).toBe(false);
+    expect(props.statusLine).toBe('Sign in to see agents');
+  });
+
+  it('draws the newest session line from the surface extras', () => {
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
+    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe(
+      'Newest: Fix the flaky test'
+    );
+  });
+
+  it('inserts a title containing a replacement pattern literally', () => {
+    setSurfaceExtras({ newestSessionTitle: 'Fix $& the build', actionFeedback: null });
+    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe(
+      'Newest: Fix $& the build'
+    );
+  });
+
+  it('keeps the reserved line empty when nothing is stored', () => {
+    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBeNull();
+  });
+
+  it('shows the action state ahead of the newest session', () => {
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'approving' });
+    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Approving...');
+
+    setSurfaceExtras({
+      newestSessionTitle: 'Fix the flaky test',
+      actionFeedback: 'couldNotApprove',
+    });
+    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Could not approve');
+  });
+
+  it('keeps the failure line and the offered action on a retryable surface', () => {
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: 'couldNotApprove' });
+    const props = buildAndroidWidgetProps({ ...MIXED, status: 'stale' }, {}, translate);
+    expect(props.newestLine).toBe('Could not approve');
+    expect(props.actions.approve).toBe(true);
+    expect(props.countLines).toHaveLength(3);
+  });
+
+  it('never draws the reserved line on a surface without counts', () => {
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'approving' });
+    expect(
+      buildAndroidWidgetProps(snapshotFor([], 0, 'signed_out'), {}, translate).newestLine
+    ).toBeNull();
+    expect(
+      buildAndroidWidgetProps(snapshotFor([], 0, 'expired'), {}, translate).newestLine
+    ).toBeNull();
+    expect(
+      buildAndroidWidgetProps(snapshotFor([], 0, 'waiting'), {}, translate).newestLine
+    ).toBeNull();
   });
 });

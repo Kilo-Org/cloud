@@ -40,6 +40,20 @@ export type GlanceableViewProps = {
    * draw it.
    */
   needsInputSince: string | null;
+  /**
+   * Kind of the most recent agent state change, or null while no counts show.
+   * The locked frames (waiting/empty/expired/signed-out/privacy) report no
+   * work at all, so their card draws only the status line.
+   */
+  newestResultKind: GlanceableCountKind | null;
+  /**
+   * The translated label for that kind, taken from the matching `countLines`
+   * row, so the footer can never name the work differently from the count
+   * above it.
+   */
+  newestResultLabel: string | null;
+  /** ISO timestamp of that newest change; null on the same locked frames. */
+  newestResultAt: string | null;
   /** Spoken label: status word, numeric counts, then Open agents. Never a title or id. */
   accessibilityLabel: string;
 };
@@ -56,18 +70,29 @@ export function buildGlanceableViewProps(
   // locked frames carry no count payload at all.
   const status = resolveGlanceableStatus(snapshot, flags);
   const showCounts = status === 'happy' || status === 'stale';
+  const countLines = (showCounts ? glanceableCountLines(snapshot) : []).map(line => ({
+    label: translate(line.key),
+    kind: line.kind,
+    count: line.count,
+  }));
+  const newestResultKind = showCounts ? snapshot.newestResultKind : null;
+  // The label comes from the row above rather than a second translation of the
+  // same word, so the footer and the count can never be worded differently.
+  const newestResultLabel =
+    newestResultKind === null
+      ? null
+      : (countLines.find(line => line.kind === newestResultKind)?.label ?? null);
 
   return {
     statusLine: statusKey === null ? null : translate(statusKey),
-    countLines: (showCounts ? glanceableCountLines(snapshot) : []).map(line => ({
-      label: translate(line.key),
-      kind: line.kind,
-      count: line.count,
-    })),
+    countLines,
     primaryLabel: primary === null ? null : translate(primary.key),
     primaryKind: primary === null ? null : primary.kind,
     primaryCount: primary === null ? 0 : primary.count,
     needsInputSince: showCounts && snapshot.needsInput > 0 ? snapshot.needsInputSince : null,
+    newestResultKind,
+    newestResultLabel,
+    newestResultAt: newestResultKind === null ? null : snapshot.newestResultAt,
     accessibilityLabel: glanceableSpokenLabel(snapshot, flags, translate),
   };
 }

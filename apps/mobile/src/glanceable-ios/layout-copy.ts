@@ -57,6 +57,7 @@ export function glanceableLayoutCopy() {
     running: i18n.t('common.working'),
     idle: i18n.t('common.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
+    newestResult: i18n.t('glanceable.newestResult'),
     locale: resolveGlanceableLocale(i18n.language),
     digits: glanceableDigits(),
   };

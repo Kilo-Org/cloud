@@ -10,11 +10,11 @@
 // `session-attention.ts`).
 
 import * as Crypto from 'expo-crypto';
-import * as SecureStore from 'expo-secure-store';
 
 import { detectRepositoryPlatform } from '@/components/agents/new-session-repository-state';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { type ParsedActionRepository } from '@/lib/app-actions/app-action-contract';
+import { readStoredValue } from '@/lib/auth/secure-store-read';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
 import {
@@ -110,10 +110,16 @@ export async function currentUserId(): Promise<string | null> {
  * The raw persisted model preference, or null when nothing is stored (or the
  * read failed — a missing preference only costs the model fallback, never the
  * start).
+ *
+ * The read goes through the app's cross-platform entry point for a plain
+ * SecureStore read (`secure-store-read.ts`), which the other headless callers
+ * use too: `expo-secure-store` exists on iOS and Android alike, so one
+ * implementation serves both and this path keeps no per-platform storage
+ * branch.
  */
 export async function storedModelPreferenceRaw(): Promise<string | null> {
   try {
-    return await SecureStore.getItemAsync(AGENT_MODEL_PREFERENCE_KEY);
+    return await readStoredValue(AGENT_MODEL_PREFERENCE_KEY);
   } catch {
     return null;
   }

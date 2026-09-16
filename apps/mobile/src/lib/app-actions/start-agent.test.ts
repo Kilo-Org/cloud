@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { i18n } from '@/i18n';
 import { type OutboxRow } from '@/lib/persist/mutation-outbox';
+import { AGENT_MODEL_PREFERENCE_KEY } from '@/lib/storage-keys';
 import { startAgent } from './start-agent';
 
 const SESSION_ID = 'ses_12345678901234567890123456';
@@ -209,6 +210,10 @@ describe('startAgent happy path', () => {
     expect(prepareSessionMutate).toHaveBeenCalledWith(
       expect.objectContaining({ model: 'anthropic/claude', variant: 'high' })
     );
+    // One cross-platform read: the preference key goes through the shared
+    // SecureStore entry point, which is what `expo-secure-store` backs on both
+    // iOS and Android.
+    expect(getItemAsync.mock.calls[0]?.[0]).toBe(AGENT_MODEL_PREFERENCE_KEY);
   });
 });
 

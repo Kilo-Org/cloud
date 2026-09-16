@@ -383,6 +383,11 @@ function RootLayoutNav({
         await i18n.changeLanguage('en');
       }
       void renameAndroidNotificationChannels();
+      // The module-scope category registration ran under the English default
+      // while the stored preference was still loading; re-register the
+      // Approve / Reply / Open PR / Open session buttons in the applied
+      // language (same localization pass as the channel rename above).
+      void registerNeedsInputCategories();
       if (!cancelled) {
         if (reloadFailed) {
           setLanguageReloadFailed(true);

@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["KiloSystemSearchModule"],
+    "appDelegateSubscribers": ["KiloSystemSearchOpenSubscriber"]
+  },
+  "android": {
+    "modules": ["expo.modules.kilosystemsearch.KiloSystemSearchModule"]
+  }
+}

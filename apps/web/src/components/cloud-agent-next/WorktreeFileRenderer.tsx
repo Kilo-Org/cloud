@@ -14,9 +14,10 @@ import { File, FileDiff } from '@pierre/diffs/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { WorktreeFileRecord } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
-import { FoldVertical, LockKeyhole, RefreshCw, UnfoldVertical } from 'lucide-react';
+import { FoldVertical, UnfoldVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import type { WorktreeFileViewMode } from './workspace-tabs';
 import {
@@ -275,17 +276,11 @@ function HighlightedWorktreeDiff({
 export default function WorktreeFileRenderer({
   file,
   mode,
-  capturedAt,
   onModeChange,
-  isFetching = false,
-  onReload,
 }: {
   file: WorktreeFileRecord;
   mode: WorktreeFileViewMode;
-  capturedAt?: string;
   onModeChange?: (mode: WorktreeFileViewMode) => void;
-  isFetching?: boolean;
-  onReload?: () => void;
 }) {
   const patch = file.diff.status === 'available' ? file.diff.patch : undefined;
   const parsed = useMemo(
@@ -393,27 +388,16 @@ export default function WorktreeFileRenderer({
   return (
     <>
       <div className="flex h-12 shrink-0 items-center gap-1 border-b px-2 sm:h-10">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div
-              tabIndex={0}
-              className="focus-visible:ring-ring flex h-11 min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 focus-visible:ring-2 focus-visible:outline-none sm:h-8"
-            >
-              <span className="min-w-0 truncate font-mono text-xs">{file.path}</span>
-              <LockKeyhole aria-hidden="true" className="text-muted-foreground size-3 shrink-0" />
-              <span className="sr-only">Saved file, read-only</span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" align="start" className="max-w-sm space-y-1">
-            <p className="font-mono whitespace-pre-wrap break-all">{file.path}</p>
-            <p>Saved file · read-only, not live</p>
-            {capturedAt && (
-              <p>
-                <time dateTime={capturedAt}>Saved {new Date(capturedAt).toLocaleString()}</time>
-              </p>
-            )}
-          </TooltipContent>
-        </Tooltip>
+        <div className="flex min-w-0 flex-1 items-center">
+          <p className="min-w-0 truncate px-1 font-mono text-xs" title={file.path}>
+            {file.path}
+          </p>
+          <CopyMessageButton
+            getText={() => file.path}
+            label="Copy path"
+            className="h-11 w-11 shrink-0 sm:h-8 sm:w-8"
+          />
+        </div>
         {viewMode !== 'diff' &&
           file.content.status === 'available' &&
           file.content.source === 'deleted-original' && (
@@ -467,33 +451,8 @@ export default function WorktreeFileRenderer({
             </TooltipContent>
           </Tooltip>
         )}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground h-11 w-11 shrink-0 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 motion-reduce:transition-none sm:h-8 sm:w-8"
-              aria-label="Reload saved file"
-              aria-disabled={isFetching}
-              onClick={() => {
-                if (!isFetching) onReload?.();
-              }}
-            >
-              <RefreshCw
-                aria-hidden="true"
-                className={`size-4 ${isFetching ? 'animate-spin motion-reduce:animate-none' : ''}`}
-              />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            Reload saved file without starting the workspace
-          </TooltipContent>
-        </Tooltip>
       </div>
-      <div className="min-h-0 min-w-0 flex-1 overflow-auto" aria-busy={isFetching}>
-        {body}
-      </div>
+      <div className="min-h-0 min-w-0 flex-1 overflow-auto">{body}</div>
     </>
   );
 }

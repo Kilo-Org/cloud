@@ -45,6 +45,7 @@ import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
 import {
   assertGitHubInstallationRuntimeAuthorized,
   GitHubRuntimeAuthorizationError,
+  isUnexpectedGitHubRuntimeAuthorizationDenial,
 } from '@/lib/integrations/github/runtime-authorization';
 
 async function isAvailableForDeferredGitHubDispatch(integration: {
@@ -59,7 +60,18 @@ async function isAvailableForDeferredGitHubDispatch(integration: {
     );
     return true;
   } catch (error) {
-    if (error instanceof GitHubRuntimeAuthorizationError) return false;
+    if (error instanceof GitHubRuntimeAuthorizationError) {
+      if (isUnexpectedGitHubRuntimeAuthorizationDenial(error)) {
+        captureMessage('Unexpected GitHub runtime authorization denial', {
+          level: 'warning',
+          tags: {
+            source: 'github_deferred_dispatch',
+            github_runtime_authorization_reason: error.reason,
+          },
+        });
+      }
+      return false;
+    }
     throw error;
   }
 }

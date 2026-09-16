@@ -357,6 +357,31 @@ describe('prepareReviewPayload', () => {
     );
   });
 
+  it('still reports unexpected payload failures without an authorization reason tag', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(defineReview(testUser.id, integration.id))
+      .returning();
+    const unexpectedError = new Error('unexpected payload failure');
+    mockGenerateGitHubInstallationToken.mockRejectedValueOnce(unexpectedError);
+    const captureMock = captureException as jest.Mock;
+    captureMock.mockClear();
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
+        platform: 'github',
+      })
+    ).rejects.toBe(unexpectedError);
+
+    expect(captureMock).toHaveBeenCalledWith(
+      unexpectedError,
+      expect.objectContaining({ tags: { operation: 'prepareReviewPayload' } })
+    );
+  });
+
   it('captures the previous summary before generating the update prompt', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)

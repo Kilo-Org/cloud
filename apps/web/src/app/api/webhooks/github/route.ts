@@ -1,10 +1,11 @@
 import { NextRequest, after } from 'next/server';
-import { captureException } from '@sentry/nextjs';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import { bot } from '@/lib/bot';
 import { handleGitHubWebhook } from '@/lib/integrations/platforms/github/webhook-handler';
 import {
   assertGitHubInstallationRuntimeAuthorized,
   GitHubRuntimeAuthorizationError,
+  isUnexpectedGitHubRuntimeAuthorizationDenial,
 } from '@/lib/integrations/github/runtime-authorization';
 
 function cloneGitHubRequest(request: NextRequest, rawBody: string) {
@@ -53,7 +54,18 @@ export async function POST(request: NextRequest) {
   try {
     await assertGitHubInstallationRuntimeAuthorized(installationId, 'standard');
   } catch (error) {
-    if (error instanceof GitHubRuntimeAuthorizationError) return response;
+    if (error instanceof GitHubRuntimeAuthorizationError) {
+      if (isUnexpectedGitHubRuntimeAuthorizationDenial(error)) {
+        captureMessage('Unexpected GitHub runtime authorization denial', {
+          level: 'warning',
+          tags: {
+            endpoint: 'webhooks/github',
+            github_runtime_authorization_reason: error.reason,
+          },
+        });
+      }
+      return response;
+    }
     captureException(error, {
       tags: { endpoint: 'webhooks/github', source: 'chat_adapter_authorization' },
     });

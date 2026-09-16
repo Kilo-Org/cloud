@@ -45,10 +45,11 @@ const GIT_BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 const MAX_ATTACHMENT_DOWNLOAD_BYTES = MAX_ATTACHMENT_BYTES + 1;
 const ATTACHMENT_DOWNLOAD_TIMEOUT_MS = 120_000;
+const ATTACHMENT_DOWNLOAD_DEADLINE_MS = 130_000;
 const MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS = 3;
-// Backoff before each retry attempt, keyed by attempt number: attempt 2 waits
+// Backoff before attempt N (attempt 1 is the initial try): attempt 2 waits
 // 250ms and attempt 3 waits 750ms.
-const ATTACHMENT_RETRY_BACKOFF_MS: Record<number, number> = { 1: 250, 2: 750 };
+const ATTACHMENT_RETRY_BACKOFF_MS = [250, 750];
 
 /**
  * True for MIME classes that the prompt must surface as a `file://` part. Any
@@ -1036,13 +1037,20 @@ async function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Buffered read used when retrying a failed attachment download. The whole
- * body is pulled with `response.arrayBuffer()`, which bypasses the Web
- * Streams reader that intermittently fails inside the sandbox Bun runtime
- * (`TypeError: undefined is not a function`) when the body arrives while the
- * stream is being read. Only used when `content-length` is present and within
- * the cap so memory stays bounded; otherwise the bounded streaming read is
- * used instead.
+ * Buffered read used when retrying a failed attachment download. The retry
+ * always re-fetches over a fresh connection: the failure being worked around
+ * is Bun's Web Streams reader intermittently throwing
+ * (`TypeError: undefined is not a function`) mid-read, so reusing the failed
+ * response's stream is not an option. The whole replacement body is pulled
+ * with `response.arrayBuffer()` instead of a `getReader()` loop.
+ *
+ * Memory stays bounded by checking the `content-length` gate before buffering:
+ * only responses advertising within the cap take this path, and the materialized
+ * bytes are re-checked afterwards for a lying header. `content-length` is a
+ * server-supplied hint for our own R2 presigned URLs, not the size enforcement
+ * itself (the post-read check is). Responses with a missing, invalid, or
+ * over-cap header fall back to the bounded streaming read, which enforces the
+ * cap incrementally without trusting the header.
  */
 async function downloadBuffered(
   filePath: string,
@@ -1120,9 +1128,10 @@ async function downloadAndMaterializeAttachment(
         : await downloadBounded(attachment.localPath, response, signal);
   } catch (error) {
     void response.body?.cancel().catch(() => {});
-    const message = redactSecrets(error instanceof Error ? error.message : String(error));
-    const retryable = !(error instanceof AttachmentTooLargeError);
-    return { kind: 'failed', message, retryable };
+    if (error instanceof AttachmentTooLargeError) {
+      return { kind: 'failed', message: error.message, retryable: false };
+    }
+    throw error;
   }
 
   if (isPromptFileMime(attachment.mime)) {
@@ -1153,16 +1162,20 @@ async function downloadAndMaterializeAttachment(
 
 /**
  * Download and materialize a single attachment, retrying transient failures.
- * The first attempt uses the bounded streaming read; later attempts use the
- * buffered read, which re-fetches and bypasses the flaky Web Streams reader.
- * Returns the prompt part: a `file://` part on success, or an explanatory
- * text part when retries are exhausted or the failure is permanent.
+ * The first attempt uses the bounded streaming read; later attempts re-fetch
+ * and use the buffered read, which bypasses the flaky Web Streams reader.
+ * One overall deadline bounds the whole attachment (retries included) so a
+ * stalled body cannot multiply the per-attempt timeout. Local filesystem
+ * failures are not retried. Returns the prompt part: a `file://` part on
+ * success, or an explanatory text part when retries are exhausted or the
+ * failure is permanent.
  */
 async function materializeAttachment(
   attachment: WrapperBootstrapAttachment,
   fetchImpl: typeof fetch,
   externalSignal?: AbortSignal
 ): Promise<WrapperPromptPart> {
+  const deadline = Date.now() + ATTACHMENT_DOWNLOAD_DEADLINE_MS;
   for (let attempt = 1; attempt <= MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS; attempt++) {
     const abortController = new AbortController();
     const timeout = setTimeout(
@@ -1189,12 +1202,25 @@ async function materializeAttachment(
       logToFile(
         `attachment download attempt ${attempt}/${MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS} failed filename=${attachment.filename} reason=${result.message}`
       );
+    } catch (error) {
+      externalSignal?.throwIfAborted();
+      if (error instanceof AttachmentTooLargeError) {
+        return {
+          type: 'text',
+          text: `attachment ${attachment.filename} could not be retrieved (${error.message})`,
+        };
+      }
+      const message = redactSecrets(error instanceof Error ? error.message : String(error));
+      logToFile(
+        `attachment download attempt ${attempt}/${MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS} failed filename=${attachment.filename} reason=${message}`
+      );
     } finally {
       clearTimeout(timeout);
     }
     externalSignal?.throwIfAborted();
     if (attempt < MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS) {
-      await sleep(ATTACHMENT_RETRY_BACKOFF_MS[attempt] ?? 0);
+      if (Date.now() >= deadline) break;
+      await sleep(ATTACHMENT_RETRY_BACKOFF_MS[attempt - 1] ?? 0);
     }
   }
   return {

@@ -3427,6 +3427,73 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(await fsp.readFile(localPath, 'utf8')).toBe('png-bytes');
   });
 
+  it('retries a 500 then succeeds, and reports a 400 without retrying', async () => {
+    const retryPath = path.join(tmpDir, 'flaky.png');
+    const badPath = path.join(tmpDir, 'bad.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_status_retry',
+        prompt: 'Show both',
+        attachments: [
+          {
+            filename: 'flaky.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/flaky.png',
+            localPath: retryPath,
+          },
+          {
+            filename: 'bad.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/bad.png',
+            localPath: badPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    let flakyRequests = 0;
+    let badRequests = 0;
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async input => {
+        const url = typeof input === 'string' ? input : (input as Request).url;
+        if (url === 'https://r2.example.com/flaky.png') {
+          flakyRequests += 1;
+          if (flakyRequests === 1) {
+            return new Response('busy', { status: 500 });
+          }
+          return new Response('png-bytes', { status: 200 });
+        }
+        badRequests += 1;
+        return new Response('bad request', { status: 400 });
+      }),
+    });
+
+    expect(flakyRequests).toBe(2);
+    expect(badRequests).toBe(1);
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Show both' },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: `file://${retryPath}`,
+        filename: 'flaky.png',
+      },
+      {
+        type: 'text',
+        text: 'attachment bad.png could not be retrieved (HTTP 400)',
+      },
+    ]);
+    expect(await fsp.readFile(retryPath, 'utf8')).toBe('png-bytes');
+    expect(fs.existsSync(badPath)).toBe(false);
+  });
+
   it('propagates a caller abort instead of retrying or masking it as an exhausted attachment', async () => {
     const localPath = path.join(tmpDir, 'aborted.png');
     const prompt: WrapperPromptRequest = {

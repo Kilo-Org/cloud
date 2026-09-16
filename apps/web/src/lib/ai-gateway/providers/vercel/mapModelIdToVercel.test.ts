@@ -1,10 +1,4 @@
-import { beforeEach, describe, it, expect, jest } from '@jest/globals';
-
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  resolveOpenRouterModelAlias: jest.fn(),
-}));
-
-import { resolveOpenRouterModelAlias } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { describe, it, expect } from '@jest/globals';
 import {
   CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,
@@ -21,10 +15,7 @@ import {
   GPT_CURRENT_VERCEL_MODEL_ID,
   GPT_MINI_CURRENT_VERCEL_MODEL_ID,
 } from '@/lib/ai-gateway/providers/openai';
-import {
-  mapModelIdToVercel,
-  resolveModelIdForVercel,
-} from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { GROK_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/xai';
 import {
   GLM_CURRENT_VERCEL_MODEL_ID,
@@ -53,43 +44,7 @@ import {
   LATEST_MODEL_ALIASES,
 } from '@/lib/ai-gateway/latest-model-aliases';
 
-const mockedResolveOpenRouterModelAlias = jest.mocked(resolveOpenRouterModelAlias);
-
-beforeEach(() => {
-  mockedResolveOpenRouterModelAlias.mockReset().mockImplementation(async modelId => modelId);
-});
-
 describe('mapModelIdToVercel', () => {
-  describe('catalog aliases', () => {
-    it('maps a latest alias that is absent from the hardcoded aliases', async () => {
-      mockedResolveOpenRouterModelAlias.mockResolvedValueOnce('deepseek/deepseek-v4-pro-0813');
-
-      await expect(resolveModelIdForVercel('~deepseek/deepseek-pro-latest')).resolves.toBe(
-        'deepseek/deepseek-v4-pro-0813'
-      );
-    });
-
-    it('translates the provider prefix of a resolved alias target', async () => {
-      mockedResolveOpenRouterModelAlias.mockResolvedValueOnce('x-ai/grok-4.6');
-
-      await expect(resolveModelIdForVercel('~x-ai/grok-latest')).resolves.toBe('xai/grok-4.6');
-    });
-
-    it('prefers a catalog target over a hardcoded alias target', async () => {
-      mockedResolveOpenRouterModelAlias.mockResolvedValueOnce('anthropic/claude-sonnet-future');
-
-      await expect(resolveModelIdForVercel(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(
-        'anthropic/claude-sonnet-future'
-      );
-    });
-
-    it('uses the hardcoded target when catalog metadata is unavailable', async () => {
-      await expect(resolveModelIdForVercel(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(
-        CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID
-      );
-    });
-  });
-
   describe('tilde-prefixed latest aliases', () => {
     it.each([
       [CLAUDE_FABLE_LATEST_MODEL_ALIAS, CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID],

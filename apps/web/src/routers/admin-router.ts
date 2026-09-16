@@ -1394,6 +1394,7 @@ export const adminRouter = createTRPCRouter({
                 input.userId,
                 workerInstanceId(activeInstance),
                 {
+                  skipCooldown: true,
                   reason: 'admin_request',
                 }
               );

@@ -2132,6 +2132,8 @@ export function inferRowlessAuthProviders(
       return ['linkedin'];
     case hosted_domain_specials.discord:
       return ['discord'];
+    case hosted_domain_specials.openai:
+      return ['openai'];
     case hosted_domain_specials.email:
       return ['email'];
     default:

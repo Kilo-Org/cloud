@@ -98,6 +98,10 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 - `ANACONDA_CLIENT_ID` - Anaconda OAuth app client ID. `[PUBLIC]`
 - `ANACONDA_CLIENT_SECRET` - Anaconda OAuth app client secret. `[SECRET]`
+- `OPENAI_CLIENT_ID` - OpenAI (Sign in with ChatGPT) OAuth client ID. Read only from the environment; the literal must never appear in source. `[SECRET]`
+- `OPENAI_CLIENT_SECRET` - OpenAI (Sign in with ChatGPT) OAuth client secret; server-side only, sent only in the token endpoint's HTTP Basic authorization header. `[SECRET]`
+- `OPENAI_DISCOVERY_URL` - Optional override for the OpenAI OpenID Connect discovery document; defaults to the production issuer's document. [SERVER]
+- `OPENAI_TOKEN_ENDPOINT` - Optional override for the OpenAI token endpoint; defaults to the production issuer's endpoint. [SERVER]
 - `GITHUB_CLIENT_ID` - GitHub OAuth app client ID. `[PUBLIC]`
 - `GITHUB_CLIENT_SECRET` - GitHub OAuth app client secret. `[SECRET]`
 - `GITHUB_APP_ID` - GitHub App ID; used in integration adapter and tests. `[SECRET]`

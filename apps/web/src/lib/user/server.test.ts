@@ -27,6 +27,7 @@ import {
   isBlockedTLD,
   parseLinkedInProfileName,
   parseAnacondaProfile,
+  parseOpenAiProfile,
   profileProvesEmailOwnership,
   authOptions,
   getUserUUID,
@@ -61,7 +62,8 @@ import {
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { NEXTAUTH_SECRET, OPENAI_CLIENT_ID } from '@/lib/config.server';
+import { OPENAI_REDIRECT_URI } from '@/lib/auth/openai/config';
 
 // Same namespace UUID used in user.server.ts
 const USER_UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
@@ -316,6 +318,79 @@ describe('Anaconda OAuth provider', () => {
       checks: ['pkce', 'state', 'nonce'],
       client: { token_endpoint_auth_method: 'client_secret_post' },
     });
+  });
+});
+
+describe('OpenAI (ChatGPT) OAuth provider', () => {
+  test('maps verified claims and uses sub as the stable account id', () => {
+    expect(
+      parseOpenAiProfile({
+        sub: 'openai-user-123',
+        email: 'user@example.com',
+        name: 'ChatGPT User',
+        picture: 'https://example.com/avatar.png',
+        email_verified: true,
+      })
+    ).toEqual({
+      id: 'openai-user-123',
+      email: 'user@example.com',
+      name: 'ChatGPT User',
+      image: 'https://example.com/avatar.png',
+    });
+  });
+
+  test('uses the email local part and null image when the profile omits them', () => {
+    expect(parseOpenAiProfile({ sub: 'openai-user-123', email: 'local-part@example.com' })).toEqual(
+      {
+        id: 'openai-user-123',
+        email: 'local-part@example.com',
+        name: 'local-part',
+        image: null,
+      }
+    );
+  });
+
+  test.each([
+    [{ email: 'user@example.com' }, 'missing subject'],
+    [{ sub: '', email: 'user@example.com' }, 'empty subject'],
+    [{ sub: 'openai-user-123' }, 'missing email'],
+    [{ sub: 'openai-user-123', email: 'not-an-email' }, 'invalid email'],
+  ])('rejects a profile with %s (%s)', (profile, _reason) => {
+    expect(() => parseOpenAiProfile(profile)).toThrow();
+  });
+
+  test('registers the registered callback path, ID tokens, OIDC checks and confidential-client auth', () => {
+    const provider = authOptions.providers.find(p => p.id === 'openai') as unknown as
+      | {
+          id: string;
+          name: string;
+          type: string;
+          issuer: string;
+          idToken: boolean;
+          checks: string[];
+          client: { token_endpoint_auth_method: string; redirect_uris?: string[] };
+          clientId: string;
+          callbackUrl: string;
+          token: { request?: unknown };
+        }
+      | undefined;
+
+    expect(provider).toMatchObject({
+      id: 'openai',
+      name: 'ChatGPT',
+      type: 'oauth',
+      issuer: 'https://auth.openai.com',
+      idToken: true,
+      client: { token_endpoint_auth_method: 'client_secret_basic' },
+      clientId: OPENAI_CLIENT_ID,
+    });
+    expect(provider?.checks).toEqual(expect.arrayContaining(['pkce', 'state', 'nonce']));
+    expect(provider?.callbackUrl.endsWith('/testing/oai-redirect')).toBe(true);
+    // NextAuth rewrites `callbackUrl` to /api/auth/callback/openai, so the
+    // registered redirect URI is declared on the client metadata and repeated
+    // in the token exchange.
+    expect(provider?.client.redirect_uris).toEqual([OPENAI_REDIRECT_URI]);
+    expect(provider?.token.request).toBeInstanceOf(Function);
   });
 });
 

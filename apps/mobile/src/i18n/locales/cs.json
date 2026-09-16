@@ -3105,7 +3105,8 @@
     "openAgents": "Otevřít agenty",
     "needsInput": "Čeká na reakci",
     "channelName": "Aktivní agenti",
-    "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce."
+    "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce.",
+    "newestResult": "Nejnovější výsledek"
   },
   "transcriptionModel": {
     "title": "Model přepisu",

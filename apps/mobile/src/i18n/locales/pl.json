@@ -3105,7 +3105,8 @@
     "openAgents": "Otwórz listę agentów",
     "needsInput": "Czeka na odpowiedź",
     "channelName": "Aktywni agenci",
-    "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
+    "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady.",
+    "newestResult": "Najnowszy wynik"
   },
   "transcriptionModel": {
     "title": "Model transkrypcji",

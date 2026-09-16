@@ -3059,7 +3059,8 @@
     "openAgents": "Ajanları aç",
     "needsInput": "Yanıt bekliyor",
     "channelName": "Etkin ajanlar",
-    "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç."
+    "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
+    "newestResult": "En yeni sonuç"
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",

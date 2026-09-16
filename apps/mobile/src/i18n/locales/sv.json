@@ -3059,7 +3059,8 @@
     "openAgents": "Öppna agenter",
     "needsInput": "Väntar på svar",
     "channelName": "Aktiva agenter",
-    "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen."
+    "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen.",
+    "newestResult": "Nyaste resultatet"
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",

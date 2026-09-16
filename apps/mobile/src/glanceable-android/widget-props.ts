@@ -1,4 +1,7 @@
-import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  GLANCEABLE_STALE_MS,
+  type GlanceableAgentsSnapshot,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import {
   type GlanceableCountKind,
@@ -28,9 +31,19 @@ type AndroidWidgetCount = {
 export type GlanceableCountFormat = (value: number) => string;
 
 /**
+ * Format a timestamp as the active language's relative time.
+ *
+ * Injected the same way as `formatCount` and for the same reason: this module
+ * stays free of i18n and of `Intl`, so its tests need no language bootstrap and
+ * the app passes `formatGlanceableAgo`.
+ */
+export type GlanceableAgoFormat = (at: string) => string;
+
+/**
  * The props the Android widget renders. The builder below is the only producer,
  * so a title, organization name, account id, or raw session id can never reach
- * the widget host. Android has no elapsed timer, so there is no elapsed anchor.
+ * the widget host. The newest-result label is a translated state word, not a
+ * session title. Android has no elapsed timer, so there is no elapsed anchor.
  */
 export type AndroidWidgetProps = {
   /**
@@ -43,56 +56,100 @@ export type AndroidWidgetProps = {
   countLines: AndroidWidgetCount[];
   /** Top-ranked count label; the only row that keeps the foreground color. */
   primaryLabel: string | null;
+  /** Kind of the most recent state change; null when no row carried a timestamp. */
+  newestResultKind: GlanceableCountKind | null;
+  /**
+   * Caption of the newest-result footer. Null while no counts show: a locked
+   * frame carries one fact, and the caption is the third fact's.
+   */
+  newestResultTitle: string | null;
+  /** The kind label read from `countLines`, never a second spelling of the word. */
+  newestResultLabel: string | null;
+  /** Preformatted relative time of that change, from the injected formatter. */
+  newestResultAgo: string | null;
   /** Spoken label: status words, counts, then Open agents. Never a title or id. */
   accessibilityLabel: string;
 };
 
 /** Build the Android widget props from a snapshot, surface flags, and a translator. */
-// eslint-disable-next-line max-params -- snapshot, flags, and the two injected formatters
+// eslint-disable-next-line max-params -- snapshot, flags, the translator, and the two injected formatters
 export function buildAndroidWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
   translate: (key: string) => string,
-  formatCount: GlanceableCountFormat = String
+  formatCount: GlanceableCountFormat,
+  formatAgo: GlanceableAgoFormat
 ): AndroidWidgetProps {
   const status = resolveGlanceableStatus(snapshot, flags);
   const statusKey = glanceableStatusCopyKey(snapshot, flags);
   const showCounts = status === 'happy' || status === 'stale';
   const primary = showCounts ? primaryGlanceableCount(snapshot) : null;
+  const countLines = (showCounts ? glanceableCountLines(snapshot) : []).map(line => ({
+    label: translate(line.key),
+    kind: line.kind,
+    count: formatCount(line.count),
+  }));
+  // The three facts locked frames must not carry: with no counts there is no
+  // newest result either, so a waiting or privacy-blanked widget keeps one fact.
+  const newestKind = showCounts ? snapshot.newestResultKind : null;
+  const newestAt = showCounts ? snapshot.newestResultAt : null;
 
   return {
     statusLine: statusKey === null ? null : translate(statusKey),
-    countLines: (showCounts ? glanceableCountLines(snapshot) : []).map(line => ({
-      label: translate(line.key),
-      kind: line.kind,
-      count: formatCount(line.count),
-    })),
+    countLines,
     primaryLabel: primary === null ? null : translate(primary.key),
+    newestResultKind: newestKind,
+    newestResultTitle: showCounts ? translate('glanceable.newestResult') : null,
+    newestResultLabel:
+      newestKind === null
+        ? null
+        : (countLines.find(line => line.kind === newestKind)?.label ?? null),
+    newestResultAgo: newestKind === null || newestAt === null ? null : formatAgo(newestAt),
     accessibilityLabel: glanceableSpokenLabel(snapshot, flags, translate),
   };
 }
 
 /** Every redraw checks the data deadline, including a task queued by an older alarm. */
+// eslint-disable-next-line max-params -- snapshot, the translator, and the two injected formatters
 export function buildCurrentWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   translate: (key: string) => string,
-  formatCount: GlanceableCountFormat = String
+  formatCount: GlanceableCountFormat,
+  formatAgo: GlanceableAgoFormat
 ): AndroidWidgetProps {
   const expiresAt = Date.parse(snapshot.expiresAt);
   if (
     (snapshot.status === 'happy' || snapshot.status === 'stale') &&
     (!Number.isFinite(expiresAt) || expiresAt <= Date.now())
   ) {
-    return buildExpiredWidgetProps(snapshot, translate, formatCount);
+    return buildExpiredWidgetProps(snapshot, translate, formatCount, formatAgo);
   }
-  return buildAndroidWidgetProps(snapshot, {}, translate, formatCount);
+  // The Android twin of the iOS stale timeline frame: a redraw past
+  // `updatedAt + GLANCEABLE_STALE_MS` stops asserting the counts are current.
+  // The counts stay — they are still the last thing the device knew — and only
+  // the age goes. The platform's own redraw is what runs this check, so the
+  // claim stays honest without the app running. The deadline above wins, so a
+  // lapsed snapshot past `expiresAt` still draws the expired frame.
+  const staleAt = Date.parse(snapshot.updatedAt) + GLANCEABLE_STALE_MS;
+  if (snapshot.status === 'happy' && staleAt <= Date.now()) {
+    return buildAndroidWidgetProps(
+      { ...snapshot, status: 'stale' },
+      {},
+      translate,
+      formatCount,
+      formatAgo
+    );
+  }
+  return buildAndroidWidgetProps(snapshot, {}, translate, formatCount, formatAgo);
 }
 
 /** Zero-count expired props: the single future redraw hides counts at expiresAt. */
+// eslint-disable-next-line max-params -- snapshot, the translator, and the two injected formatters
 function buildExpiredWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   translate: (key: string) => string,
-  formatCount: GlanceableCountFormat
+  formatCount: GlanceableCountFormat,
+  formatAgo: GlanceableAgoFormat
 ): AndroidWidgetProps {
   return buildAndroidWidgetProps(
     {
@@ -105,7 +162,8 @@ function buildExpiredWidgetProps(
     },
     {},
     translate,
-    formatCount
+    formatCount,
+    formatAgo
   );
 }
 
@@ -116,6 +174,10 @@ export function buildGenericWidgetProps(translate: (key: string) => string): And
     statusLine: empty,
     countLines: [],
     primaryLabel: null,
+    newestResultKind: null,
+    newestResultTitle: null,
+    newestResultLabel: null,
+    newestResultAgo: null,
     accessibilityLabel: empty,
   };
 }

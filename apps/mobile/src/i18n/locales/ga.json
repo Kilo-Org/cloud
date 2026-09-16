@@ -3128,7 +3128,8 @@
     "openAgents": "Oscail gníomhairí",
     "needsInput": "Ionchur de dhíth",
     "channelName": "Gníomhairí gníomhacha",
-    "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála."
+    "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála.",
+    "newestResult": "An toradh is nuaí"
   },
   "transcriptionModel": {
     "title": "Samhail tras-scríobh",

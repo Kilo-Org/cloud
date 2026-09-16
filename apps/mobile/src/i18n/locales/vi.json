@@ -3059,7 +3059,8 @@
     "openAgents": "Mở danh sách tác nhân",
     "needsInput": "Cần phản hồi",
     "channelName": "Tác nhân đang hoạt động",
-    "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
+    "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
+    "newestResult": "Kết quả mới nhất"
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",

@@ -3063,6 +3063,7 @@
     "newAgent": "New agent",
     "approving": "Approving...",
     "couldNotApprove": "Could not approve",
+    "couldNotStart": "Could not start",
     "channelName": "Active agents",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."
   },

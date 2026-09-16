@@ -104,7 +104,13 @@ const mocks = vi.hoisted(() => ({
   lastSnapshot: null as GlanceableAgentsSnapshot | null,
 }));
 
-vi.mock('@/lib/glanceable/widget-actions', () => ({ runWidgetAction: mocks.runWidgetAction }));
+// `performWidgetAction` reads the shared failure mapper, so this mock names it
+// exactly as the Android suite does (`glanceable-android/register.test.ts`);
+// `lib/glanceable/widget-actions.test.ts` proves the real pair.
+vi.mock('@/lib/glanceable/widget-actions', () => ({
+  runWidgetAction: mocks.runWidgetAction,
+  failureFeedback: (action: string) => (action === 'approve' ? 'couldNotApprove' : 'couldNotStart'),
+}));
 vi.mock('@/lib/glanceable/persist', () => ({
   getLastGlanceableSnapshot: () => mocks.lastSnapshot,
   _resetGlanceablePersistForTests: () => {

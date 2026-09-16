@@ -15,11 +15,16 @@
  */
 
 /**
- * Copy key (not text) for what the widget says while an in-place action runs
- * or after it failed. Resolved by the widget props builder, which owns the
- * translated copy.
+ * Copy key (not text) for what the widget says while one of the two in-place
+ * actions (`approve`, `new-agent`) runs or after it failed. Resolved by the
+ * widget props builder, which owns the translated copy.
  */
-type GlanceableActionFeedback = 'approving' | 'couldNotApprove' | null;
+export type GlanceableActionFeedback =
+  | 'approving'
+  | 'starting'
+  | 'couldNotApprove'
+  | 'couldNotStart'
+  | null;
 
 export type GlanceableSurfaceExtras = {
   /** Newest active session's title, or null when the tray holds no session. */

@@ -23,7 +23,11 @@ import { parseTimestamp } from '@/lib/utils';
 import { newestSessionTitle } from './newest-session';
 import { getLastGlanceableSnapshot } from './persist';
 import { forEachSink } from './sink-registry';
-import { getSurfaceExtras, setSurfaceExtras } from './surface-extras';
+import {
+  getSurfaceExtras,
+  type GlanceableActionFeedback,
+  setSurfaceExtras,
+} from './surface-extras';
 
 /**
  * The two in-place widget actions and the headless tRPC work behind them. The
@@ -38,6 +42,25 @@ import { getSurfaceExtras, setSurfaceExtras } from './surface-extras';
  */
 
 export type WidgetAction = 'approve' | 'new-agent';
+
+/**
+ * The reserved line's feedback while `action` runs. The copy key, not the text:
+ * the props builder translates it, and both platforms call this so a tapped
+ * approve and a tapped create can never claim the same progress.
+ */
+export function runningFeedback(action: WidgetAction): GlanceableActionFeedback {
+  return action === 'approve' ? 'approving' : 'starting';
+}
+
+/**
+ * The reserved line's feedback after `action` failed. The failed row stays
+ * offered as the retry, so the line says what failed instead of the generic
+ * none copy — a create included, which the widget otherwise answers with the
+ * newest-session line as if nothing had happened.
+ */
+export function failureFeedback(action: WidgetAction): GlanceableActionFeedback {
+  return action === 'approve' ? 'couldNotApprove' : 'couldNotStart';
+}
 
 /**
  * `none` = nothing to act on (no waiting session, or no draft/repository to

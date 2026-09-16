@@ -9,6 +9,7 @@ import {
   type GlanceableCountKind,
   glanceableCountLines,
   glanceableSpokenLabel,
+  type GlanceableStatus,
   glanceableStatusCopyKey,
   type GlanceableSurfaceFlags,
   primaryGlanceableCount,
@@ -71,24 +72,37 @@ export type GlanceableWidgetProps = Partial<GlanceableViewProps> & {
 };
 
 /**
- * The reserved slot line: the newest session's title, or the in-flight
- * action's progress or failure while one is being answered. Null unless the
- * counts draw — the same surfaces that show the title are the ones that carry
- * a snapshot at all, and a locked surface stays titleless.
+ * The reserved slot line: the newest session's title, or the in-flight action's
+ * progress or failure while one is being answered.
+ *
+ * The slot is visible on every surface that offers an in-place action — the two
+ * count statuses and the empty one — because a create's progress and failure
+ * have nowhere else to appear, and the empty surface is the only one that offers
+ * `New agent`. The newest-session *title* still draws only where the counts do,
+ * so a locked or empty surface stays titleless.
  */
 function newestTitleFor(
   extras: GlanceableSurfaceExtras,
-  showCounts: boolean,
+  status: GlanceableStatus,
   translate: (key: string) => string
 ): string | null {
-  if (!showCounts) {
+  if (status !== 'happy' && status !== 'stale' && status !== 'empty') {
     return null;
   }
   if (extras.actionFeedback === 'approving') {
     return translate('glanceable.approving');
   }
+  if (extras.actionFeedback === 'starting') {
+    return translate('common.starting');
+  }
   if (extras.actionFeedback === 'couldNotApprove') {
     return translate('glanceable.couldNotApprove');
+  }
+  if (extras.actionFeedback === 'couldNotStart') {
+    return translate('glanceable.couldNotStart');
+  }
+  if (status !== 'happy' && status !== 'stale') {
+    return null;
   }
   const title = extras.newestSessionTitle;
   if (title === null) {
@@ -127,7 +141,7 @@ export function buildGlanceableViewProps(
     primaryLabel: primary === null ? null : translate(primary.key),
     primaryKind: primary === null ? null : primary.kind,
     primaryCount: primary === null ? 0 : primary.count,
-    newestTitle: newestTitleFor(getSurfaceExtras(), showCounts, translate),
+    newestTitle: newestTitleFor(getSurfaceExtras(), status, translate),
     actions: {
       approve: showCounts && snapshot.needsInput > 0,
       // Nothing eligible to act on: the empty state, or an idle-only tray that

@@ -30,7 +30,9 @@ const COPY: Record<string, string> = {
   'glanceable.noneWaiting': 'No agents waiting',
   'glanceable.newAgent': 'New agent',
   'glanceable.approving': 'Approving...',
+  'common.starting': 'Starting...',
   'glanceable.couldNotApprove': 'Could not approve',
+  'glanceable.couldNotStart': 'Could not start',
   'glanceable.newestSession': 'Newest: {{title}}',
   'common.approve': 'Approve',
 };
@@ -325,6 +327,45 @@ describe('widget actions and the newest line', () => {
       actionFeedback: 'couldNotApprove',
     });
     expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Could not approve');
+
+    // The create's own progress and failure lines, on a surface that shows the
+    // newest session too: the action owns the slot while it runs or failed.
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'starting' });
+    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Starting...');
+
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'couldNotStart' });
+    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Could not start');
+  });
+
+  it('draws a create’s progress and failure in the empty surface’s reserved line', () => {
+    const empty = snapshotFor([], 0, 'empty');
+
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'starting' });
+    const running = buildAndroidWidgetProps(empty, {}, translate);
+    expect(running.newestLine).toBe('Starting...');
+    // The empty surface is the one that offers New agent, so it keeps that row
+    // as the retry while no counts draw.
+    expect(running.actions).toEqual({
+      approve: false,
+      newAgent: true,
+      approveLabel: 'Approve',
+      newAgentLabel: 'New agent',
+    });
+
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'couldNotStart' });
+    const failed = buildAndroidWidgetProps(empty, {}, translate);
+    expect(failed.newestLine).toBe('Could not start');
+    expect(failed.countLines).toEqual([]);
+    expect(failed.actions.newAgent).toBe(true);
+  });
+
+  it('never shows the newest-session title on the empty surface', () => {
+    // Empty offers the create, so the slot carries the create's feedback; with
+    // none in flight the slot is blank rather than a stale title.
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
+    expect(
+      buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate).newestLine
+    ).toBeNull();
   });
 
   it('keeps the failure line and the offered action on a retryable surface', () => {
@@ -335,8 +376,8 @@ describe('widget actions and the newest line', () => {
     expect(props.countLines).toHaveLength(3);
   });
 
-  it('never draws the reserved line on a surface without counts', () => {
-    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'approving' });
+  it('draws the reserved line only where an action is offered', () => {
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'couldNotStart' });
     expect(
       buildAndroidWidgetProps(snapshotFor([], 0, 'signed_out'), {}, translate).newestLine
     ).toBeNull();
@@ -346,5 +387,10 @@ describe('widget actions and the newest line', () => {
     expect(
       buildAndroidWidgetProps(snapshotFor([], 0, 'waiting'), {}, translate).newestLine
     ).toBeNull();
+    // The empty surface is the one that offers New agent, so its reserved slot
+    // carries that action's feedback even though no counts draw.
+    expect(buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate).newestLine).toBe(
+      'Could not start'
+    );
   });
 });

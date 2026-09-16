@@ -10,8 +10,10 @@ import {
 } from './sink-registry';
 import { setSurfaceExtras } from './surface-extras';
 import {
+  failureFeedback,
   oldestPendingPermissionId,
   resolveWaitingSession,
+  runningFeedback,
   runWidgetAction,
   type WaitingSessionRow,
 } from './widget-actions';
@@ -210,6 +212,20 @@ describe('oldestPendingPermissionId', () => {
   it('returns null when nothing carries an id', () => {
     expect(oldestPendingPermissionId([])).toBeNull();
     expect(oldestPendingPermissionId([{ tool: 'bash' }])).toBeNull();
+  });
+});
+
+describe('runningFeedback', () => {
+  it('names the progress line of each in-place action', () => {
+    expect(runningFeedback('approve')).toBe('approving');
+    expect(runningFeedback('new-agent')).toBe('starting');
+  });
+});
+
+describe('failureFeedback', () => {
+  it('names the retry line of each in-place action', () => {
+    expect(failureFeedback('approve')).toBe('couldNotApprove');
+    expect(failureFeedback('new-agent')).toBe('couldNotStart');
   });
 });
 

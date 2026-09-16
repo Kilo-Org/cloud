@@ -7,6 +7,7 @@ import {
   type GlanceableCountKind,
   glanceableCountLines,
   glanceableSpokenLabel,
+  type GlanceableStatus,
   glanceableStatusCopyKey,
   type GlanceableSurfaceFlags,
   primaryGlanceableCount,
@@ -75,24 +76,38 @@ export type AndroidWidgetProps = {
 };
 
 /**
- * Resolve the reserved slot's line. The slot renders only where the counts do,
- * so a blank or loading surface never shows a stale title or a failure line; an
- * action in flight or a failed approve then owns the slot, so the widget never
- * shows the newest session as if it were the action's result.
+ * Resolve the reserved slot's line.
+ *
+ * The slot is visible on every surface that offers an in-place action — the two
+ * count statuses and the empty one — because a create's progress and failure
+ * have nowhere else to appear, and the empty surface is the only one that offers
+ * `New agent`. The newest-session *title* still draws only where the counts do,
+ * so a locked or empty surface never carries a stale title; an action in flight
+ * or a failed action owns the slot ahead of the title, so the widget never shows
+ * the newest session as if it were the action's result.
  */
 function newestLineFor(
   extras: GlanceableSurfaceExtras,
-  showCounts: boolean,
+  status: GlanceableStatus,
   translate: (key: string) => string
 ): string | null {
-  if (!showCounts) {
+  if (status !== 'happy' && status !== 'stale' && status !== 'empty') {
     return null;
   }
   if (extras.actionFeedback === 'approving') {
     return translate('glanceable.approving');
   }
+  if (extras.actionFeedback === 'starting') {
+    return translate('common.starting');
+  }
   if (extras.actionFeedback === 'couldNotApprove') {
     return translate('glanceable.couldNotApprove');
+  }
+  if (extras.actionFeedback === 'couldNotStart') {
+    return translate('glanceable.couldNotStart');
+  }
+  if (status !== 'happy' && status !== 'stale') {
+    return null;
   }
   const title = extras.newestSessionTitle;
   if (title === null) {
@@ -132,7 +147,7 @@ export function buildAndroidWidgetProps(
       count: formatCount(line.count),
     })),
     primaryLabel: primary === null ? null : translate(primary.key),
-    newestLine: newestLineFor(extras, showCounts, translate),
+    newestLine: newestLineFor(extras, status, translate),
     actions: {
       approve: showCounts && snapshot.needsInput > 0,
       newAgent: status === 'empty' || (showCounts && !isEligibleGlanceableWork(snapshot)),

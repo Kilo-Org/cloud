@@ -9,7 +9,12 @@ import {
 import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
-import { runWidgetAction, type WidgetAction } from '@/lib/glanceable/widget-actions';
+import {
+  failureFeedback,
+  runningFeedback,
+  runWidgetAction,
+  type WidgetAction,
+} from '@/lib/glanceable/widget-actions';
 import {
   getResolvedLanguage,
   whenLanguagePreferenceLoaded,
@@ -81,7 +86,7 @@ const OPEN_NEW_AGENT_URI = 'kiloapp://agent-chat/new';
 
 /**
  * Run one in-place action and redraw the widget the user is looking at. The
- * action's request goes out with the `Approving` line already drawn, and the
+ * action's request goes out with its progress line already drawn, and the
  * redraw after it re-reads native storage: a successful action republishes the
  * tray through the sink, which writes the new snapshot there (see
  * `runWidgetAction`). A custom clickAction itself never opens the app — it
@@ -97,15 +102,14 @@ async function handleWidgetAction(
   const draw = () => {
     renderWidget(renderActiveAgentsWidget(currentProps(), widgetInfo, isWidgetRtl()));
   };
-  setSurfaceExtras({ ...getSurfaceExtras(), actionFeedback: 'approving' });
+  setSurfaceExtras({ ...getSurfaceExtras(), actionFeedback: runningFeedback(action) });
   draw();
   const result = await runWidgetAction(action);
   setSurfaceExtras({
     ...getSurfaceExtras(),
-    // The failure line is the action's own retry copy; a failed create has no
-    // copy of its own, so the widget keeps the newest line and the body tap
-    // still opens Kilo.
-    actionFeedback: action === 'approve' && result.kind === 'failed' ? 'couldNotApprove' : null,
+    // The failure line is the action's own retry copy, and the row that was
+    // tapped stays offered; the body tap still opens Kilo.
+    actionFeedback: result.kind === 'failed' ? failureFeedback(action) : null,
   });
   draw();
   // Nothing to act on, or the agent asked a free-form question the widget must

@@ -4,7 +4,11 @@ import { Linking, Platform } from 'react-native';
 import { i18n } from '@/i18n';
 import { getLastGlanceableSnapshot } from '@/lib/glanceable/persist';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
-import { runWidgetAction, type WidgetAction } from '@/lib/glanceable/widget-actions';
+import {
+  failureFeedback,
+  runWidgetAction,
+  type WidgetAction,
+} from '@/lib/glanceable/widget-actions';
 
 import { ActiveAgentsWidget, WIDGET_NAME, type WidgetProps } from './active-agents-widget';
 import { buildGlanceableViewProps, type GlanceableWidgetAction, toWidgetProps } from './view-props';
@@ -85,7 +89,7 @@ const OPEN_NEW_AGENT_URI = 'kiloapp://agent-chat/new';
 /**
  * Run one press. `runWidgetAction` republishes the tray through every sink on
  * success, which writes fresh widget props and is the answer the widget shows;
- * a failed call pushes the couldn't-approve feedback here, because no
+ * a failed call pushes the action's own couldn't-do-it feedback here, because no
  * republish happens. An action that cannot complete in place (`none`:
  * nothing to act on or no draft/repository/model to start from;
  * `no-permission`: the agent asked a free-form question the widget must never
@@ -108,10 +112,9 @@ async function performWidgetAction(action: WidgetAction): Promise<void> {
   }
   setSurfaceExtras({
     ...getSurfaceExtras(),
-    // A failed approve keeps the button it failed, so the user can retry and
-    // the body tap still opens Kilo. A failed create has no copy of its own,
-    // so the widget falls back to the newest-session line.
-    actionFeedback: action === 'approve' && result.kind === 'failed' ? 'couldNotApprove' : null,
+    // The failure line is the action's own retry copy, so the button that
+    // failed stays offered and the body tap still opens Kilo.
+    actionFeedback: result.kind === 'failed' ? failureFeedback(action) : null,
   });
   republishWidgetProps();
   // Nothing to act on, or the wait is a free-form question: the action hands

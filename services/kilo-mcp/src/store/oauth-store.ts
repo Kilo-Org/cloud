@@ -36,7 +36,7 @@ const PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000;
  * Newest refresh-token hashes kept per grant. The provider accepts the current
  * and the immediately previous refresh token, so eight rotations is the margin
  * that keeps both of them — and only a bounded number of older hashes — for
- * the whole session. Without the bound a year of rotations per client would
+ * the whole session. Without the bound a month of rotations per client would
  * grow this single global DO forever.
  */
 const REFRESH_HISTORY_KEEP_PER_GRANT = 8;

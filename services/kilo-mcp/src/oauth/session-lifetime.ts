@@ -1,11 +1,11 @@
 /**
  * How long a Kilo MCP sign-in lasts. A user authorizes once and stays signed
- * in for a year; the owner's ideal of "sign in once and that's it" is one
+ * in for a month; the owner's ideal of "sign in once and that's it" is one
  * option away with the pinned provider and is deliberately declined, so this
  * module is the record of the bounded maximum, why the bound is what it is,
  * and the trade-off it buys.
  *
- * Why the session is a year and not indefinite. The sliding half is a genuine
+ * Why the session is a month and not indefinite. The sliding half is a genuine
  * impossibility: the library derives the grant's absolute deadline
  * (`expiresAt = now + refreshTokenTTL`) once, at the authorization-code
  * exchange, re-saves the grant on every refresh with that same deadline, and
@@ -27,17 +27,20 @@
  * option later cannot revoke grants already minted, so shipping it is a
  * one-way door for every session minted while it is on. Rotation with strict
  * reuse detection and revocation bounds a *used* stolen token, not a dormant
- * one. One year is 26x the two-week floor the request names, so the request's
- * own fallback is comfortably met and the ideal is declined deliberately.
+ * one. A month is more than twice the two-week floor the request names, so the
+ * request's own fallback is comfortably met and the ideal is declined
+ * deliberately.
  *
  * Why the DCR client record outlives the grant by a month: the provider looks
- * the client up before it reads the grant (`:1636,:1648`) and defaults the
- * dynamically registered record to 90 days (`:3073`). A record expiring with
- * the grant would turn a lapsed session into `401 invalid_client` instead of
- * the `invalid_grant` an MCP client re-authorizes on, and a record expiring
- * earlier would kill a live session. The 30-day margin keeps a lapsed session
- * a re-authorization, but only while the record exists for its whole lifetime
- * at `/authorize`.
+ * the client up before it reads the grant (`:1636,:1648`), and its default for
+ * the dynamically registered record is 90 days (`:3073`). We pin the record to
+ * the session plus a 30-day margin instead of leaving the library default, so
+ * the margin is the policy this module records rather than a library accident.
+ * A record expiring with the grant would turn a lapsed session into `401
+ * invalid_client` instead of the `invalid_grant` an MCP client re-authorizes
+ * on, and a record expiring earlier would kill a live session. The 30-day
+ * margin keeps a lapsed session a re-authorization, but only while the record
+ * exists for its whole lifetime at `/authorize`.
  *
  * That whole-lifetime requirement is met by renewing the record at every
  * successful authorization: the consent completion re-puts `client:<id>` with
@@ -49,7 +52,7 @@
  * record serves.
  *
  * Security trade-off, stated explicitly: a stolen refresh token now has up to a
- * year of life. That is bounded by rotation with strict reuse detection and
+ * month of life. That is bounded by rotation with strict reuse detection and
  * revocation (a replayed token revokes the whole grant), a one-hour access
  * token, client-id binding, and the fact that the grant itself still dies at
  * the bound. Public PKCE clients — the MCP norm, registered with
@@ -60,7 +63,7 @@
  */
 
 /** One signed-in session. */
-export const SESSION_LIFETIME_SECONDS = 365 * 24 * 60 * 60;
+export const SESSION_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
 
 /** The grant's absolute deadline, fixed at the authorization-code exchange. */
 export const REFRESH_TOKEN_TTL_SECONDS = SESSION_LIFETIME_SECONDS;

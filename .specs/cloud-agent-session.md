@@ -312,9 +312,11 @@ repository.
    ignored paths such as dependency and build directories are recreated by
    setup commands rather than carried. A capture that cannot be taken or
    applied — an unreadable HEAD, a worktree rebuilt onto a different commit, a
-   patch that conflicts with setup output, a bundle beyond the size ceiling —
-   MUST leave the rebuilt worktree untouched, MUST NOT fail the attach, and
-   MUST NOT leave conflict markers or unmerged index entries behind.
+   patch that conflicts with setup output, a bundle beyond the size ceiling, an
+   expired capture grant on a wrapper that has been continuously busy beyond the
+   grant lifetime — MUST leave the rebuilt worktree untouched, MUST NOT fail
+   the attach, and MUST NOT leave conflict markers or unmerged index entries
+   behind.
 
 ### Continuity
 

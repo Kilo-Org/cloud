@@ -103,7 +103,7 @@ function spawnToFile(
     };
     child.stdout.on('data', (chunk: Buffer) => {
       written += chunk.byteLength;
-      if (written > limit) fail(new Error(`${command} output exceeded ${limit} bytes`));
+      if (written > limit) fail(new Error(`${command} output exceeded the ${limit} byte ceiling`));
     });
     child.stdout.pipe(output);
     child.on('error', fail);
@@ -209,7 +209,10 @@ export async function captureWorktreeState(
         patchPath,
         options
       );
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('byte ceiling')) {
+        return { status: 'skipped', reason: 'too_large' };
+      }
       return { status: 'skipped', reason: 'diff_failed' };
     }
     const patchBytes = (await fs.stat(patchPath)).size;
@@ -271,7 +274,10 @@ export async function captureWorktreeState(
         bundlePath,
         options
       );
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('byte ceiling')) {
+        return { status: 'skipped', reason: 'too_large' };
+      }
       return { status: 'skipped', reason: 'archive_failed' };
     }
     const bundleBytes = (await fs.stat(bundlePath)).size;
@@ -375,31 +381,36 @@ export async function restoreWorktreeState(
     const worktreeRoot = await fs.realpath(options.directory);
     let restoredFiles = 0;
     for (const relative of meta.untracked) {
-      const destination = path.resolve(options.directory, relative);
-      if (!isContainedPath(options.directory, destination)) continue;
-      const source = path.join(extracted, WORKTREE_STATE_UNTRACKED_PREFIX, relative);
-      if (!isContainedPath(extracted, source)) continue;
-      // Never clobber a file the rebuild produced; the captured copy is only
-      // meant to fill in what the fresh worktree is missing.
-      if (
-        await fs.lstat(destination).then(
-          () => true,
-          () => false
+      options.signal?.throwIfAborted();
+      try {
+        const destination = path.resolve(options.directory, relative);
+        if (!isContainedPath(options.directory, destination)) continue;
+        const source = path.join(extracted, WORKTREE_STATE_UNTRACKED_PREFIX, relative);
+        if (!isContainedPath(extracted, source)) continue;
+        // Never clobber a file the rebuild produced; the captured copy is only
+        // meant to fill in what the fresh worktree is missing.
+        if (
+          await fs.lstat(destination).then(
+            () => true,
+            () => false
+          )
         )
-      )
+          continue;
+        if (
+          !(await fs.lstat(source).then(
+            stats => stats.isFile(),
+            () => false
+          ))
+        )
+          continue;
+        const parent = await writableParent(worktreeRoot, destination);
+        if (!parent) continue;
+        await fs.mkdir(parent, { recursive: true });
+        await fs.copyFile(source, destination);
+        restoredFiles += 1;
+      } catch {
         continue;
-      if (
-        !(await fs.lstat(source).then(
-          stats => stats.isFile(),
-          () => false
-        ))
-      )
-        continue;
-      const parent = await writableParent(worktreeRoot, destination);
-      if (!parent) continue;
-      await fs.mkdir(parent, { recursive: true });
-      await fs.copyFile(source, destination);
-      restoredFiles += 1;
+      }
     }
     return { status: 'restored', files: restoredFiles };
   } catch {

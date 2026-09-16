@@ -27,6 +27,13 @@ const BYOK_PATH = '/byok';
  */
 const AUTH_ERROR_PARAM = 'openai_error';
 
+/**
+ * The card title names the connection, not the provider: the BYOK key list
+ * below this card offers a pasted 'OpenAI API key' entry, so a bare 'OpenAI'
+ * here would read as the same thing twice on one page.
+ */
+const CARD_TITLE = 'OpenAI (ChatGPT subscription)';
+
 const CONNECT_DESCRIPTION =
   'Connect with your ChatGPT subscription to use OpenAI models in Kilo. No API key needed.';
 const CONNECT_LABEL = 'Sign in with ChatGPT';
@@ -256,7 +263,7 @@ export function OpenAiChatGptCardView(props: OpenAiChatGptCardViewProps) {
     <Card>
       <CardHeader className="grid grid-cols-[1fr_auto] items-start gap-4 pb-4">
         <div className="flex flex-col gap-2">
-          <CardTitle>OpenAI</CardTitle>
+          <CardTitle>{CARD_TITLE}</CardTitle>
         </div>
         <CardIndicator status={props.status} authErrorCode={props.authErrorCode} />
       </CardHeader>

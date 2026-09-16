@@ -36,6 +36,11 @@ function cardClass(html: string): string | undefined {
   return html.match(/^<div class="([^"]*)"/)?.[1];
 }
 
+/** The card header title text. `CardTitle` renders as `<div class="type-heading">`. */
+function cardTitle(html: string): string | undefined {
+  return html.match(/class="type-heading">([^<]*)</)?.[1];
+}
+
 const STATES: Array<{ label: string; html: string }> = [
   { label: 'loading', html: render({ status: undefined }) },
   { label: 'disconnected', html: renderStatus({ state: 'disconnected' }) },
@@ -102,6 +107,14 @@ const STATES: Array<{ label: string; html: string }> = [
     }),
   },
 ];
+
+describe('OpenAiChatGptCard title', () => {
+  it('names the ChatGPT connection so it never reads as the pasted OpenAI API key entry below it', () => {
+    for (const state of STATES) {
+      expect(cardTitle(state.html)).toBe('OpenAI (ChatGPT subscription)');
+    }
+  });
+});
 
 describe('OpenAiChatGptCard disconnected state', () => {
   it('explains the subscription connection and offers one connect action', () => {

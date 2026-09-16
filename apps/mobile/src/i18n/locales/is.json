@@ -3093,5 +3093,9 @@
     "remoteFound": "Tölva tengd",
     "checkAgain": "Athuga aftur",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Nýr erindreki",
+    "openLastSession": "Opna síðustu lotu"
   }
 }

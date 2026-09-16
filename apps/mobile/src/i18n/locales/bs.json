@@ -3116,5 +3116,9 @@
     "remoteFound": "Računar povezan",
     "checkAgain": "Provjeri ponovo",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Novi agent",
+    "openLastSession": "Otvori posljednju sesiju"
   }
 }

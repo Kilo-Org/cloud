@@ -3185,5 +3185,9 @@
     "remoteFound": "تم توصيل الحاسوب",
     "checkAgain": "تحقق مرة أخرى",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "وكيل جديد",
+    "openLastSession": "فتح آخر جلسة"
   }
 }

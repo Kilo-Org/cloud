@@ -3093,5 +3093,9 @@
     "remoteFound": "کۆمپیوتەر پەیوەست بوو",
     "checkAgain": "دووبارە پشکنین بکە",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "بریکاری نوێ",
+    "openLastSession": "کردنەوەی دوایین دانیشتن"
   }
 }

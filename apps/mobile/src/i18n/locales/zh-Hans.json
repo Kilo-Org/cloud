@@ -3093,5 +3093,9 @@
     "remoteFound": "电脑已连接",
     "checkAgain": "重新检查",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "新建智能体",
+    "openLastSession": "打开上次会话"
   }
 }

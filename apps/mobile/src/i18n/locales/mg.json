@@ -3093,5 +3093,9 @@
     "remoteFound": "Mifandray ny solosaina",
     "checkAgain": "Hamarino indray",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Mpanampy vaovao",
+    "openLastSession": "Sokafy ny fotoam-piasana farany"
   }
 }

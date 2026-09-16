@@ -3093,5 +3093,9 @@
     "remoteFound": "Rekenaar gekoppel",
     "checkAgain": "Kontroleer weer",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Nuwe agent",
+    "openLastSession": "Maak laaste sessie oop"
   }
 }

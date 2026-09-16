@@ -3093,5 +3093,9 @@
     "remoteFound": "Ordenagailua konektatuta",
     "checkAgain": "Egiaztatu berriro",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Agente berria",
+    "openLastSession": "Ireki azken saioa"
   }
 }

@@ -3093,5 +3093,9 @@
     "remoteFound": "Компјутерот е поврзан",
     "checkAgain": "Провери повторно",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Нов агент",
+    "openLastSession": "Отвори ја последната сесија"
   }
 }

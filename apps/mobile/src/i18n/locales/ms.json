@@ -3093,5 +3093,9 @@
     "remoteFound": "Komputer bersambung",
     "checkAgain": "Semak semula",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Ejen baharu",
+    "openLastSession": "Buka sesi terakhir"
   }
 }

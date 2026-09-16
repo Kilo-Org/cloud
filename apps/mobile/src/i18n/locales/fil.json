@@ -3093,5 +3093,9 @@
     "remoteFound": "Konektado ang computer",
     "checkAgain": "Tingnan muli",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "launcher": {
+    "newAgent": "Bagong ahente",
+    "openLastSession": "Buksan ang huling sesyon"
   }
 }

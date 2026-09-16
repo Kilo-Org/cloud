@@ -308,6 +308,7 @@ export const sandboxHelloPayloadSchema = z.object({
       workingBranches: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
+      worktreeState: z.boolean().optional(),
     })
     .optional(),
 });
@@ -520,7 +521,7 @@ export const sessionAttachPayloadSchema = z
       .strict()
       .optional(),
   })
-  .catchall(z.unknown());
+  .strict();
 
 export const sessionAttachResultSchema = z
   .object({
@@ -1141,6 +1142,7 @@ export const sandboxControlSocketAttachmentSchema = z.object({
       workingBranches: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
+      worktreeState: z.boolean().optional(),
     })
     .optional(),
   providerInstanceId: z.string().min(1).max(256).optional(),

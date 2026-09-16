@@ -47,7 +47,13 @@ export const WORKTREE_STATE_PATCH_ENTRY = 'tracked.patch';
 export const WORKTREE_STATE_META_ENTRY = 'meta.json';
 export const WORKTREE_STATE_UNTRACKED_PREFIX = 'untracked/';
 
-export const worktreeStateUserIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/);
+/**
+ * Federated identities look like `oauth/google:1234`. `/` and `:` are encoded
+ * in the object key and route, so they are safe here; `..` is not.
+ */
+export const worktreeStateUserIdSchema = z
+  .string()
+  .regex(/^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._/:-]{0,255}$/);
 export const worktreeStateScopeIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/);
 
 export const worktreeStateIdentitySchema = z

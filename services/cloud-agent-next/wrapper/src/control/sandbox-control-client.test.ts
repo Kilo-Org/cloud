@@ -407,6 +407,7 @@ describe('createSandboxControlClient', () => {
           scopedCleanupResult?: boolean;
           workingBranches?: boolean;
           nativeRuntimeIdCapture?: boolean;
+          worktreeState?: boolean;
         };
       };
     };
@@ -427,6 +428,7 @@ describe('createSandboxControlClient', () => {
         scopedCleanupResult: true,
         workingBranches: true,
         nativeRuntimeIdCapture: true,
+        worktreeState: true,
       },
     });
     fake.respond(

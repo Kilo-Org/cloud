@@ -76,6 +76,7 @@ function helloFrame(
     scopedCleanupResult?: boolean;
     workingBranches?: boolean;
     nativeRuntimeIdCapture?: boolean;
+    worktreeState?: boolean;
   }
 ): string {
   return JSON.stringify({
@@ -476,6 +477,20 @@ describe('sandbox control socket handler', () => {
     );
 
     expect(handler.supportsWorkingBranches?.()).toBe(true);
+  });
+
+  it('reads the worktree-state capability from the wrapper handshake', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_worktree_state', {
+        worktreeState: true,
+      })
+    );
+
+    expect(handler.supportsWorktreeState?.()).toBe(true);
   });
 
   it('reads the native runtime id capture capability from the wrapper handshake', async () => {

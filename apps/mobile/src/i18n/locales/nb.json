@@ -779,7 +779,7 @@
     "previewFullDescription": "Varsler viser meldingsteksten på låseskjermen din.",
     "previewGenericDescription": "Varslene viser bare at noe har skjedd. Åpne Kilo for å lese meldingen.",
     "channel": {
-      "agent": "Agentøkter",
+      "agentProgress": "Agentfremdrift",
       "chat": "Samtalemeldinger",
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarsler",

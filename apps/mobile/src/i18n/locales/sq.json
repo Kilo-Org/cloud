@@ -779,7 +779,7 @@
     "previewFullDescription": "Njoftimet shfaqin tekstin e mesazhit në ekranin e kyçjes.",
     "previewGenericDescription": "Njoftimet tregojnë se diçka ndodhi. Hap Kilo për ta lexuar.",
     "channel": {
-      "agent": "Seancat e agjentit",
+      "agentProgress": "Ecuria e agjentit",
       "chat": "Mesazhet e bisedës",
       "kiloclaw": "Aktiviteti i KiloClaw",
       "balance": "Njoftimet për gjendjen e llogarisë",

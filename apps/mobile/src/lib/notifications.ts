@@ -7,6 +7,7 @@ import { z } from 'zod';
 
 import * as Sentry from '@sentry/react-native';
 import {
+  agentNotificationKindForPushData,
   ANDROID_NOTIFICATION_CHANNELS,
   type AndroidNotificationChannelId,
   type PushData,
@@ -42,6 +43,7 @@ import {
 import { chainSave } from '@/lib/hooks/save-chain';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
+import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
 import { notificationPathForData } from './notification-path';
 
 const easConfigSchema = z.object({ projectId: z.string().min(1) });
@@ -287,6 +289,21 @@ export function setupNotificationHandler() {
         return { ...suppressed, shouldSetBadge: applied };
       }
 
+      // A per-Focus choice covers agent progress only. The glanceable carrier
+      // above already returned (it must still reach the sinks), and anything
+      // the user has not excluded stays visible. This is the foreground half of
+      // the choice: a background or killed-app delivery never reaches this
+      // handler, so the NotificationServiceExtension target in
+      // `modules/notification-focus-filter/ios` applies the same stored choice
+      // on that path.
+      if (
+        data &&
+        agentNotificationKindForPushData(data) === 'progress' &&
+        !isAgentProgressAllowedInActiveFocus()
+      ) {
+        return suppressed;
+      }
+
       if (
         data?.type === 'chat.message' &&
         activeChatLocation?.sandboxId === data.sandboxId &&
@@ -450,24 +467,72 @@ export function checkInitialNotification(): void {
 // the remaining channels still get created.
 let androidChannelsPromise: Promise<void> | null = null;
 
+// The channels the two named kinds replaced. Android keeps an app-created
+// channel until the app deletes it, so a stale one would still appear in the
+// system settings list after the upgrade.
+const LEGACY_ANDROID_NOTIFICATION_CHANNELS = ['agent', 'chat', 'active-agents'] as const;
+
+// Android plays a channel-based post's sound from the channel (the builder's
+// `setSound(null)` is a no-op for a channel post on API 26+), and the framework
+// keeps the sound a channel was created with — so the progress kind is silent
+// here at creation, while needs-input keeps the default sound for its alert.
+// A channel's vibration is independent of its sound: Android defaults it to
+// enabled, so silence also has to disable it explicitly.
+const SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS = new Set<AndroidNotificationChannelId>([
+  'agent-progress',
+]);
+
+/** Every channel re-write (create and rename) must pass the same sound policy. */
+function androidChannelConfiguration(
+  channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number],
+  name: string
+): Notifications.NotificationChannelInput {
+  return {
+    name,
+    importance:
+      channel.importance === 'high'
+        ? Notifications.AndroidImportance.HIGH
+        : Notifications.AndroidImportance.DEFAULT,
+    // The OS resets an app-set bypassDnd only when the app lacks DND access,
+    // so requesting it on every write is what makes the user's own "Override
+    // Do Not Disturb" grant effective.
+    bypassDnd: channel.bypassDnd,
+    // An absent sound is the system default; an explicit null is silence, and a
+    // silent channel must not vibrate either (the default is enabled).
+    ...(SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.has(channel.id)
+      ? { sound: null, enableVibrate: false }
+      : {}),
+  };
+}
+
 async function createAndroidNotificationChannels(): Promise<void> {
   for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
     try {
       // eslint-disable-next-line no-await-in-loop -- channels are created sequentially so a per-channel failure is isolated
-      await Notifications.setNotificationChannelAsync(channel.id, {
-        name: channel.name,
-        importance:
-          channel.importance === 'high'
-            ? Notifications.AndroidImportance.HIGH
-            : Notifications.AndroidImportance.DEFAULT,
-        ...(channel.id === 'active-agents' ? { sound: null, enableVibrate: false } : {}),
-      });
+      await Notifications.setNotificationChannelAsync(
+        channel.id,
+        androidChannelConfiguration(channel, channel.name)
+      );
     } catch (error) {
       Sentry.captureException(error, {
         tags: {
           'error.subsystem': 'notifications',
           'error.operation': 'create_android_channel',
           'notification.channel': channel.id,
+        },
+      });
+    }
+  }
+  for (const legacy of LEGACY_ANDROID_NOTIFICATION_CHANNELS) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- channels are deleted sequentially so a per-channel failure is isolated
+      await Notifications.deleteNotificationChannelAsync(legacy);
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: {
+          'error.subsystem': 'notifications',
+          'error.operation': 'delete_android_channel',
+          'notification.channel': legacy,
         },
       });
     }
@@ -489,12 +554,11 @@ export function ensureAndroidNotificationChannels(): Promise<void> {
 }
 
 const CHANNEL_NAME_KEYS = {
-  agent: 'notifications.channel.agent',
-  chat: 'notifications.channel.chat',
+  'needs-input': 'glanceable.needsInput',
+  'agent-progress': 'notifications.channel.agentProgress',
   kiloclaw: 'notifications.channel.kiloclaw',
   balance: 'notifications.channel.balance',
   security: 'notifications.channel.security',
-  'active-agents': 'glanceable.channelName',
 } as const satisfies Record<AndroidNotificationChannelId, string>;
 
 /**
@@ -510,14 +574,10 @@ export async function renameAndroidNotificationChannels(): Promise<void> {
   for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
     try {
       // eslint-disable-next-line no-await-in-loop -- channels are renamed sequentially so a per-channel failure is isolated
-      await Notifications.setNotificationChannelAsync(channel.id, {
-        name: i18n.t(CHANNEL_NAME_KEYS[channel.id]),
-        importance:
-          channel.importance === 'high'
-            ? Notifications.AndroidImportance.HIGH
-            : Notifications.AndroidImportance.DEFAULT,
-        ...(channel.id === 'active-agents' ? { sound: null, enableVibrate: false } : {}),
-      });
+      await Notifications.setNotificationChannelAsync(
+        channel.id,
+        androidChannelConfiguration(channel, i18n.t(CHANNEL_NAME_KEYS[channel.id]))
+      );
     } catch (error) {
       Sentry.captureException(error, {
         tags: {

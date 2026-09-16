@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => {
     text: string;
     approveLabel: string | null;
     compactText: string | null;
+    channelId: string;
+    alerting: boolean;
     promotion: boolean;
   } | null = null;
 
@@ -39,10 +41,12 @@ const mocks = vi.hoisted(() => {
     _openAgentsLabel: string,
     approveLabel: string | null,
     compactText: string | null,
+    channelId: string,
+    alerting: boolean,
     promotion: boolean,
     timeoutMs = 0
   ): void {
-    notification = { title, text, approveLabel, compactText, promotion };
+    notification = { title, text, approveLabel, compactText, channelId, alerting, promotion };
     notificationDeadline = timeoutMs > 0 ? Date.now() + timeoutMs : null;
   }
 
@@ -61,6 +65,9 @@ const mocks = vi.hoisted(() => {
       }),
       getWidgetSnapshot: () => widgetSnapshot,
     },
+    // The sink owns only the ensure call; channel creation lives in @/lib/notifications.
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    ensureAndroidNotificationChannels: vi.fn(() => Promise.resolve()),
     getNotification: () => notification,
     getRequestedNotificationDeadline: () => notificationDeadline,
     getWidgetDeadline: () => widgetDeadline,
@@ -71,6 +78,13 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('expo', () => ({
   requireOptionalNativeModule: () => mocks.native,
+}));
+
+// The sink resolves `@/lib/notifications` lazily so the widget headless entry
+// and the pure suites never load the native notifications graph; this mock is
+// what the sink's dynamic import resolves to here.
+vi.mock('@/lib/notifications', () => ({
+  ensureAndroidNotificationChannels: mocks.ensureAndroidNotificationChannels,
 }));
 
 // permission-alert statically imports react-native; stub it so the pure
@@ -131,6 +145,10 @@ const MIXED = {
 };
 
 async function flushAsync(): Promise<void> {
+  // The channel ensurer resolves `@/lib/notifications` through a dynamic
+  // import, so a start settles over more turns than a direct call: advance the
+  // timer queue the import promise rides on, then drain the microtasks.
+  await vi.advanceTimersByTimeAsync(0);
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
@@ -172,6 +190,7 @@ beforeEach(() => {
   mocks.native.start.mockClear();
   mocks.native.update.mockClear();
   mocks.native.end.mockClear();
+  mocks.ensureAndroidNotificationChannels.mockClear();
   mocks.requestWidgetUpdate.mockClear();
   mocks.alert.mockClear();
 });
@@ -209,6 +228,8 @@ describe('androidSink start and update', () => {
       text: '2 Needs input, 4 Working, 3 Idle',
       approveLabel: null,
       compactText: '2',
+      channelId: 'needs-input',
+      alerting: true,
       promotion: true,
     });
 
@@ -219,6 +240,8 @@ describe('androidSink start and update', () => {
       text: '4 Working, 3 Idle',
       approveLabel: null,
       compactText: '4',
+      channelId: 'agent-progress',
+      alerting: false,
       promotion: true,
     });
 
@@ -229,6 +252,8 @@ describe('androidSink start and update', () => {
       text: '4 Working',
       approveLabel: null,
       compactText: '4',
+      channelId: 'agent-progress',
+      alerting: false,
       promotion: true,
     });
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
@@ -239,6 +264,8 @@ describe('androidSink start and update', () => {
       'Open agents',
       null,
       '2',
+      'needs-input',
+      true,
       true
     );
     expect(mocks.native.update).toHaveBeenLastCalledWith(
@@ -247,8 +274,123 @@ describe('androidSink start and update', () => {
       'Open agents',
       null,
       '4',
+      'agent-progress',
+      false,
       true,
       0
+    );
+  });
+
+  it('carries needs-input on entry and does not re-alert on a later update in that kind', async () => {
+    const needsInput = { ...MIXED, needsInput: 1 };
+    androidSink.startOrUpdate(needsInput, CTX);
+    await flushAsync();
+    expect(mocks.getNotification()).toMatchObject({ channelId: 'needs-input', alerting: true });
+
+    androidSink.startOrUpdate({ ...needsInput, revision: 2 }, CTX);
+    await flushAsync();
+    expect(mocks.native.update).toHaveBeenLastCalledWith(
+      'Active agents',
+      expect.any(String),
+      'Open agents',
+      null,
+      expect.any(String),
+      'needs-input',
+      false,
+      true,
+      0
+    );
+  });
+
+  it('stays on the silent progress channel while no work needs input', async () => {
+    androidSink.startOrUpdate({ ...MIXED, needsInput: 0 }, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()).toMatchObject({ channelId: 'agent-progress', alerting: false });
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      expect.any(String),
+      'Open agents',
+      null,
+      expect.any(String),
+      'agent-progress',
+      false,
+      true
+    );
+  });
+
+  it('alerts again when a progress card re-enters the needs-input kind', async () => {
+    androidSink.startOrUpdate({ ...MIXED, needsInput: 0 }, CTX);
+    await flushAsync();
+    androidSink.startOrUpdate({ ...MIXED, revision: 2, needsInput: 1 }, CTX);
+    await flushAsync();
+
+    expect(mocks.native.update).toHaveBeenLastCalledWith(
+      'Active agents',
+      expect.any(String),
+      'Open agents',
+      null,
+      expect.any(String),
+      'needs-input',
+      true,
+      true,
+      0
+    );
+  });
+
+  it('does not re-alert a needs-input card a previous process left in the shade', async () => {
+    const needsInput = { ...MIXED, needsInput: 1 };
+    // The previous JS process posted this card; the native mirror survives the
+    // restart and still holds that snapshot.
+    mocks.native.setWidgetSnapshot(JSON.stringify(needsInput), Date.parse(needsInput.expiresAt));
+    _resetAndroidSinkForTests();
+    const next = { ...needsInput, revision: needsInput.revision + 1 };
+
+    androidSink.publish(next);
+    androidSink.startOrUpdate(next, CTX);
+    await flushAsync();
+
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      expect.any(String),
+      'Open agents',
+      null,
+      expect.any(String),
+      'needs-input',
+      false,
+      true
+    );
+  });
+
+  it('alerts a needs-input entry after a restart that left a progress card', async () => {
+    const progress = { ...MIXED, needsInput: 0 };
+    mocks.native.setWidgetSnapshot(JSON.stringify(progress), 0);
+    _resetAndroidSinkForTests();
+    const next = { ...MIXED, needsInput: 1, revision: progress.revision + 1 };
+
+    androidSink.publish(next);
+    androidSink.startOrUpdate(next, CTX);
+    await flushAsync();
+
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      expect.any(String),
+      'Open agents',
+      null,
+      expect.any(String),
+      'needs-input',
+      true,
+      true
+    );
+  });
+
+  it('ensures the Android channels before the first native start', async () => {
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    expect(mocks.ensureAndroidNotificationChannels).toHaveBeenCalledTimes(1);
+    expect(mocks.ensureAndroidNotificationChannels.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.native.start.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     );
   });
 
@@ -262,6 +404,8 @@ describe('androidSink start and update', () => {
       text: '2 Needs input, 4 Working, 3 Idle',
       approveLabel: null,
       compactText: '2',
+      channelId: 'needs-input',
+      alerting: true,
       promotion: false,
     });
   });
@@ -280,6 +424,8 @@ describe('androidSink start and update', () => {
       text: '4 Working, 3 Idle',
       approveLabel: null,
       compactText: '4',
+      channelId: 'agent-progress',
+      alerting: false,
       promotion: true,
     });
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
@@ -383,6 +529,8 @@ describe('androidSink approve action', () => {
       'Open agents',
       'Approve',
       '1',
+      'needs-input',
+      true,
       true
     );
 
@@ -395,6 +543,8 @@ describe('androidSink approve action', () => {
       'Open agents',
       null,
       '1',
+      'agent-progress',
+      false,
       true,
       0
     );
@@ -417,6 +567,8 @@ describe('androidSink approve action', () => {
       'Open agents',
       'Approve',
       '1',
+      'needs-input',
+      true,
       true
     );
   });
@@ -431,6 +583,8 @@ describe('androidSink approve action', () => {
       'Open agents',
       null,
       '1',
+      'needs-input',
+      true,
       true
     );
 
@@ -452,6 +606,8 @@ describe('androidSink approve action', () => {
       'Open agents',
       'Approve',
       '1',
+      'needs-input',
+      true,
       true,
       0
     );
@@ -752,6 +908,8 @@ describe('handleAppStateActive permission alert', () => {
       text: '2 Needs input, 4 Working, 3 Idle',
       approveLabel: null,
       compactText: '2',
+      channelId: 'needs-input',
+      alerting: true,
       promotion: true,
     });
     expect(mocks.alert).not.toHaveBeenCalled();

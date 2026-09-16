@@ -287,6 +287,7 @@ function renderScopedRowSync(props: RowProps): TestRenderer.ReactTestRenderer {
     rendererRef.current = TestRenderer.create(
       createElement(ToolSummaryTranslationScope, {
         itemId: 'part-1',
+        // eslint-disable-next-line no-children-prop -- the scope's props require children; the variadic form does not typecheck
         children: createElement(FixedPartRow, props),
       })
     );

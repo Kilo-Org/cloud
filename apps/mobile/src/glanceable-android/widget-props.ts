@@ -1,6 +1,6 @@
 import {
   type GlanceableAgentsSnapshot,
-  isEligibleGlanceableWork,
+  isIdleOnlyGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import {
@@ -40,7 +40,7 @@ export type GlanceableCountFormat = (value: number) => string;
 type AndroidWidgetActions = {
   /** A session is waiting: the widget can answer its permission in place. */
   approve: boolean;
-  /** Nothing is eligible: the widget can start a new agent in place. */
+  /** Nothing waiting: the widget can start a new agent in place. */
   newAgent: boolean;
   approveLabel: string;
   newAgentLabel: string;
@@ -79,12 +79,13 @@ export type AndroidWidgetProps = {
  * Resolve the reserved slot's line.
  *
  * The slot is visible on every surface that offers an in-place action — the two
- * count statuses and the empty one — because a create's progress and failure
- * have nowhere else to appear, and the empty surface is the only one that offers
- * `New agent`. The newest-session *title* still draws only where the counts do,
- * so a locked or empty surface never carries a stale title; an action in flight
- * or a failed action owns the slot ahead of the title, so the widget never shows
- * the newest session as if it were the action's result.
+ * count statuses, including an idle-only tray, and the empty one — because a
+ * create's progress and failure have nowhere else to appear, and the empty
+ * surface and an idle-only tray are the ones that offer `New agent`. The
+ * newest-session *title* still draws only where the counts do, so a locked or
+ * empty surface never carries a stale title; an action in flight or a failed
+ * action owns the slot ahead of the title, so the widget never shows the newest
+ * session as if it were the action's result.
  */
 function newestLineFor(
   extras: GlanceableSurfaceExtras,
@@ -150,7 +151,7 @@ export function buildAndroidWidgetProps(
     newestLine: newestLineFor(extras, status, translate),
     actions: {
       approve: showCounts && snapshot.needsInput > 0,
-      newAgent: status === 'empty' || (showCounts && !isEligibleGlanceableWork(snapshot)),
+      newAgent: status === 'empty' || (showCounts && isIdleOnlyGlanceableWork(snapshot)),
       approveLabel: translate('common.approve'),
       newAgentLabel: translate('glanceable.newAgent'),
     },

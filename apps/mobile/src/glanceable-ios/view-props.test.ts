@@ -87,3 +87,17 @@ describe('newestTitleFor', () => {
     ).toBeNull();
   });
 });
+
+describe('actions', () => {
+  it('offers New agent when every connected agent is idle and nothing waits', () => {
+    // The idle-only tray has status happy: it keeps a card alive, and nothing
+    // waiting means the only action the surface can offer is a new agent.
+    const props = buildGlanceableViewProps(snapshotFor([{ status: 'idle' }]), {}, translate);
+    expect(props.actions).toEqual({ approve: false, newAgent: true });
+  });
+
+  it('keeps New agent disabled while a session waits', () => {
+    const props = buildGlanceableViewProps(snapshotFor([{ status: 'question' }]), {}, translate);
+    expect(props.actions).toEqual({ approve: true, newAgent: false });
+  });
+});

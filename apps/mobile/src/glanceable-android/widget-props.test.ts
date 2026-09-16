@@ -263,6 +263,21 @@ describe('widget actions and the newest line', () => {
     });
   });
 
+  it('offers New agent when every connected agent is idle and nothing waits', () => {
+    // The idle-only tray has status happy: it keeps a card alive, and nothing
+    // waiting means the only action the surface can offer is a new agent. The
+    // counts stay, so the rows do not reflow as work moves between states.
+    const props = buildAndroidWidgetProps(snapshotFor([{ status: 'idle' }]), {}, translate);
+    expect(props.actions).toEqual({
+      approve: false,
+      newAgent: true,
+      approveLabel: 'Approve',
+      newAgentLabel: 'New agent',
+    });
+    expect(props.statusLine).toBeNull();
+    expect(props.countLines).toHaveLength(3);
+  });
+
   it('offers New agent when nothing is eligible, instead of Approve', () => {
     const props = buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate);
     expect(props.actions).toEqual({

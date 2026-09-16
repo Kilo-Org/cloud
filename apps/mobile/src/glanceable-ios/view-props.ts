@@ -1,7 +1,7 @@
 import {
   GLANCEABLE_STALE_MS,
   type GlanceableAgentsSnapshot,
-  isEligibleGlanceableWork,
+  isIdleOnlyGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
@@ -76,10 +76,11 @@ export type GlanceableWidgetProps = Partial<GlanceableViewProps> & {
  * progress or failure while one is being answered.
  *
  * The slot is visible on every surface that offers an in-place action — the two
- * count statuses and the empty one — because a create's progress and failure
- * have nowhere else to appear, and the empty surface is the only one that offers
- * `New agent`. The newest-session *title* still draws only where the counts do,
- * so a locked or empty surface stays titleless.
+ * count statuses, including an idle-only tray, and the empty one — because a
+ * create's progress and failure have nowhere else to appear, and the empty
+ * surface and an idle-only tray are the ones that offer `New agent`. The
+ * newest-session *title* still draws only where the counts do, so a locked or
+ * empty surface stays titleless.
  */
 function newestTitleFor(
   extras: GlanceableSurfaceExtras,
@@ -144,9 +145,9 @@ export function buildGlanceableViewProps(
     newestTitle: newestTitleFor(getSurfaceExtras(), status, translate),
     actions: {
       approve: showCounts && snapshot.needsInput > 0,
-      // Nothing eligible to act on: the empty state, or an idle-only tray that
+      // Nothing waiting to act on: the empty state, or an idle-only tray that
       // keeps a card alive. A locked or expired surface offers neither.
-      newAgent: status === 'empty' || (showCounts && !isEligibleGlanceableWork(snapshot)),
+      newAgent: status === 'empty' || (showCounts && isIdleOnlyGlanceableWork(snapshot)),
     },
     needsInputSince: showCounts && snapshot.needsInput > 0 ? snapshot.needsInputSince : null,
     accessibilityLabel: glanceableSpokenLabel(snapshot, flags, copy),

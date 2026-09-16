@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to test React Native structure */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PrReviewChecksSection } from './pr-review-checks-section';
@@ -61,6 +60,9 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The section's loading card renders the UI skeleton; the real one reaches
+// expo-linear-gradient and the reanimated worklets, which stay unmocked here.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: (key: string) => key } }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/format', () => ({

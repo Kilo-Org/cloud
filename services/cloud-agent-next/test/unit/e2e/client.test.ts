@@ -1,17 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+type MockSocket = {
+  message: (data: string) => void;
+  closeFromServer: () => void;
+  closeCalls: number;
+};
+
 const sockets = vi.hoisted(() => ({
-  instances: [] as Array<{ message: (data: string) => void }>,
+  instances: [] as MockSocket[],
 }));
 
 vi.mock('ws', () => ({
   default: class {
     private readonly handlers = new Map<string, (value: unknown) => void>();
+    private readonly observed: MockSocket;
 
     constructor() {
-      sockets.instances.push({
+      this.observed = {
         message: data => this.handlers.get('message')?.(Buffer.from(data)),
-      });
+        closeFromServer: () => this.handlers.get('close')?.(undefined),
+        closeCalls: 0,
+      };
+      sockets.instances.push(this.observed);
     }
 
     on(event: string, handler: (value: unknown) => void): this {
@@ -20,7 +30,8 @@ vi.mock('ws', () => ({
     }
 
     close(): void {
-      this.handlers.get('close')?.(undefined);
+      this.observed.closeCalls += 1;
+      queueMicrotask(() => this.handlers.get('close')?.(undefined));
     }
   },
 }));
@@ -88,6 +99,87 @@ describe('isMessageCompleted', () => {
     socket.message(JSON.stringify(event(streamEventType, data)));
     await expect(terminal).resolves.toMatchObject({ streamEventType, data });
     stream.close();
+  });
+});
+
+describe('stream cancellation', () => {
+  beforeEach(() => {
+    sockets.instances = [];
+  });
+
+  it('detaches the abort listener when the server closes the socket', () => {
+    const controller = new AbortController();
+    const addListener = vi.spyOn(controller.signal, 'addEventListener');
+    const removeListener = vi.spyOn(controller.signal, 'removeEventListener');
+    const stream = openStream(
+      {
+        workerUrl: 'http://worker.test',
+        user: { id: 'user_1', email: 'user@example.test', api_token_pepper: 'pepper' },
+        nextAuthSecret: 'test-secret',
+        gitUrl: 'https://example.test/repo.git',
+        model: 'kilo/fake-deterministic',
+        fakeLlmUrl: 'http://fake.test',
+      },
+      'workspace_11111111-1111-4111-8111-111111111111',
+      { signal: controller.signal }
+    );
+    const socket = sockets.instances[0];
+    if (!socket) throw new Error('Missing stream socket');
+    const listener = addListener.mock.calls[0]?.[1];
+    if (typeof listener !== 'function') throw new Error('Missing abort listener');
+
+    socket.closeFromServer();
+    expect(removeListener).toHaveBeenCalledWith('abort', listener);
+
+    stream.close();
+    controller.abort();
+    expect(socket.closeCalls).toBe(0);
+    expect(removeListener).toHaveBeenCalledTimes(1);
+  });
+
+  it('settles pending waits when explicit close is followed by an async socket close', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const controller = new AbortController();
+      const addListener = vi.spyOn(controller.signal, 'addEventListener');
+      const removeListener = vi.spyOn(controller.signal, 'removeEventListener');
+      const stream = openStream(
+        {
+          workerUrl: 'http://worker.test',
+          user: { id: 'user_1', email: 'user@example.test', api_token_pepper: 'pepper' },
+          nextAuthSecret: 'test-secret',
+          gitUrl: 'https://example.test/repo.git',
+          model: 'kilo/fake-deterministic',
+          fakeLlmUrl: 'http://fake.test',
+        },
+        'workspace_11111111-1111-4111-8111-111111111111',
+        { signal: controller.signal }
+      );
+      const socket = sockets.instances[0];
+      if (!socket) throw new Error('Missing stream socket');
+      const abortListener = addListener.mock.calls[0]?.[1];
+      if (typeof abortListener !== 'function') throw new Error('Missing abort listener');
+
+      let result: StreamEvent | null | undefined;
+      const pending = stream.waitFor(() => false, 30_000);
+      pending.then(value => {
+        result = value;
+      });
+
+      stream.close();
+      controller.abort();
+      stream.close();
+      await new Promise<void>(resolve => queueMicrotask(resolve));
+      await Promise.resolve();
+
+      expect(result).toBeNull();
+      expect(socket.closeCalls).toBe(1);
+      expect(removeListener).toHaveBeenCalledWith('abort', abortListener);
+      expect(removeListener).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

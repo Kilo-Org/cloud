@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import { createElement } from 'react';
-import { act, type ReactTestInstance } from 'react-test-renderer';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -124,6 +123,7 @@ vi.mock('@/lib/feedback', () => ({
 }));
 
 vi.mock('@/components/ui/icons', () => ({
+  BookOpenCheck: 'BookOpenCheck',
   Building2: 'Building2',
   GitMerge: 'GitMerge',
   GitPullRequest: 'GitPullRequest',
@@ -322,6 +322,26 @@ describe('ProfileScreen deferred queries', () => {
     expect(providersQueryFn).not.toHaveBeenCalled();
 
     second.unmount();
+  });
+
+  it('renders the permanent Tutorial row and pushes the tour route unconditionally', async () => {
+    providersQueryFn.mockResolvedValue({ providers: [] });
+    organizationsQueryFn.mockResolvedValue([]);
+
+    const { renderer, unmount } = await mountProfile();
+
+    const rows = findConfigureRows(renderer.root, 'Tutorial');
+    expect(rows.length).toBe(1);
+    const row = rows[0];
+    if (!row) {
+      throw new Error('Tutorial row was not rendered');
+    }
+    act(() => {
+      (row.props as { onPress?: () => void }).onPress?.();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/tour');
+
+    unmount();
   });
 
   it('hides the linked-accounts section when the deferred fetch settles empty', async () => {

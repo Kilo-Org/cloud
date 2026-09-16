@@ -1,4 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { logger } from '../logger.js';
+import * as runtimeAuthorization from '@kilocode/worker-utils/runtime-authorization';
+import * as sessionService from '../session-service.js';
+import type { SessionMetadata } from '../persistence/session-metadata.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRPCError } from '@trpc/server';
 
 import {
@@ -520,4 +524,56 @@ describe('preflightRuntimeAuthorizationRecovery', () => {
 
     expect(getRuntimeAuthorizationRecoveryState).toHaveBeenCalledOnce();
   });
+});
+
+describe('preflight authorization denial diagnostics', () => {
+  afterEach(() => vi.restoreAllMocks());
+  it.each(['revoked', 'expired'] as const)(
+    'distinguishes the %s branch without credentials',
+    async state => {
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      vi.spyOn(sessionService, 'fetchSessionMetadata').mockResolvedValue({
+        identity: { sessionId: 'agent_diagnostic', userId: 'user_abc' },
+      } as SessionMetadata);
+      const create = vi
+        .spyOn(runtimeAuthorization, 'createRuntimeAuthorization')
+        .mockResolvedValue({
+          token: 'private-token',
+          authorization: {} as runtimeAuthorization.RuntimeAuthorization,
+          expiresAt: '',
+        });
+      vi.spyOn(runtimeAuthorization, 'sealRuntimeAuthorization').mockResolvedValue('private-seal');
+      const recover = vi.fn().mockResolvedValue({ status: 'denied' });
+      const env = {
+        ...makeEnv({
+          getRuntimeAuthorizationRecoveryState: async () => ({
+            state,
+            id: '00000000-0000-4000-8000-000000000011',
+          }),
+          recoverExpiredRuntimeAuthorization: recover,
+        }),
+        NEXTAUTH_SECRET: 'private-secret',
+        HYPERDRIVE: { connectionString: 'private-connection' },
+      } as Env;
+      await expect(
+        preflightRuntimeAuthorizationRecovery('agent_diagnostic', {
+          env,
+          userId: 'user_abc',
+          authToken: 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJraWxvIn0.private-signature',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+      expect(fields.mock.calls).toEqual([
+        [
+          {
+            sessionId: 'agent_diagnostic',
+            stage: 'preflight',
+            reason: state === 'revoked' ? 'stored_authorization_revoked' : 'recovery_denied',
+          },
+        ],
+      ]);
+      expect(create).toHaveBeenCalledTimes(state === 'expired' ? 1 : 0);
+      expect(recover).toHaveBeenCalledTimes(state === 'expired' ? 1 : 0);
+    }
+  );
 });

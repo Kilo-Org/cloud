@@ -605,6 +605,8 @@ export type Env = {
   CONTROL_PLANE_IDS?: string;
   WORKTREE_CREATION_ENABLED_IDS?: string;
   RUNTIME_ISOLATION_ENABLED?: string;
+  /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
+  SANDBOX_SELECTION_IDS?: string;
   CREDENTIAL_CONTAINMENT_ENABLED?: string;
   /** Comma-separated org IDs that receive workspace repo snapshots, or '*' for all */
   REPO_SNAPSHOT_ORG_IDS?: string;

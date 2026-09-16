@@ -3,9 +3,8 @@
 // for every tone and asserts the icon `color` equals the matching `lightColors`
 // token, while the label `Text` keeps its tone class.
 
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to test React/RN structure under vitest */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import type * as ReactI18next from 'react-i18next';

@@ -27,6 +27,31 @@ type MutationErrorDisplay = {
 
 type Classification = ReturnType<typeof classifyPrReviewMutationError>;
 
+type MutationErrorDisplayOptions = {
+  /** The raw thrown error, used for the retryable composer copy. */
+  readonly rawError?: unknown;
+  /**
+   * The connected provider's noun, already translated (s6f): on the submit
+   * surface a bad-request then reads "The merge request may have changed, or
+   * you can't review your own merge request." instead of the hardcoded
+   * GitHub copy. Absent (GitHub), the exact pre-s6 copy stays.
+   */
+  readonly term?: string;
+};
+
+/**
+ * The bad-request inline copy per surface. The submit surface words the
+ * rejection after the connected provider when a term rides (s6f).
+ */
+function badRequestMessage(surface: MutationErrorDisplaySurface, term?: string): string {
+  if (surface === 'composer') {
+    return i18n.t('prReview.mutationError.commentNotPosted');
+  }
+  return term === undefined
+    ? i18n.t('prReview.mutationError.reviewNotSubmitted')
+    : i18n.t('prReview.mutationError.reviewNotSubmittedTerm', { term });
+}
+
 /**
  * Maps a mutation classification (and optional raw error for retryable
  * composer copy) to the inline message the sheet should show.
@@ -34,8 +59,9 @@ type Classification = ReturnType<typeof classifyPrReviewMutationError>;
 export function mutationErrorDisplay(
   surface: MutationErrorDisplaySurface,
   classification: Classification,
-  rawError?: unknown
+  options?: MutationErrorDisplayOptions
 ): MutationErrorDisplay {
+  const rawError = options?.rawError;
   // The ambiguous outcome is NOT the generic retryable copy: the effect may
   // have committed, so the user must verify the PR. Verbatim on both surfaces.
   if (isPrOperationAmbiguous(rawError)) {
@@ -51,13 +77,7 @@ export function mutationErrorDisplay(
     return { kind: 'forbidden', message: classification.message };
   }
   if (classification.kind === 'bad-request') {
-    return {
-      kind: 'bad-request',
-      message:
-        surface === 'composer'
-          ? i18n.t('prReview.mutationError.commentNotPosted')
-          : i18n.t('prReview.mutationError.reviewNotSubmitted'),
-    };
+    return { kind: 'bad-request', message: badRequestMessage(surface, options?.term) };
   }
   if (classification.kind === 'reconnect') {
     return { kind: 'reconnect', message: i18n.t('prReview.connectionExpired') };
@@ -78,7 +98,11 @@ export function mutationErrorDisplay(
  */
 export function mutationErrorDisplayFromError(
   surface: MutationErrorDisplaySurface,
-  error: unknown
+  error: unknown,
+  term?: string
 ): MutationErrorDisplay {
-  return mutationErrorDisplay(surface, classifyPrReviewMutationError(error), error);
+  return mutationErrorDisplay(surface, classifyPrReviewMutationError(error), {
+    rawError: error,
+    term,
+  });
 }

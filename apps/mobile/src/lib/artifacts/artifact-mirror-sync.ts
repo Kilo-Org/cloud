@@ -240,6 +240,12 @@ async function runSyncOnce(options: ArtifactMirrorSyncOptions): Promise<Artifact
     sessions: snapshot,
   });
   await deps.writeState(scope, key, JSON.stringify({ lastRunAt: now, sessions: run.states }));
+  // The state write is awaited as well, so the fence is read once more before
+  // the provider is signalled: a sign-out during the write has cleared the
+  // mirror, and re-announcing it would be a stale-browser signal.
+  if (!canPublish(epoch)) {
+    return { status: 'discarded' };
+  }
   deps.notify();
   return {
     status: 'synced',
@@ -362,6 +368,13 @@ async function materializeOne(
   }
 
   const result = await materializeArtifact(artifact, target, advance.deps);
+  // The download is the run's longest await, and sign-out can land inside it:
+  // teardown has already cleared the mirror by then, so the fence is read again
+  // before the bytes that just arrived join the run's state or the disk.
+  if (!canPublish(advance.epoch)) {
+    deleteQuietly(target);
+    return artifactNote({ discarded: true });
+  }
   if (result.ok) {
     advance.state.files.push({ ...artifact, size: result.size });
     advance.known.add(artifact.id);

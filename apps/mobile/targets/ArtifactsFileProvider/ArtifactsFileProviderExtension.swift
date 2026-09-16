@@ -39,8 +39,14 @@ final class ArtifactsFileProviderExtension: NSObject, NSFileProviderReplicatedEx
     super.init()
   }
 
-  /** The app owns the domain; nothing here holds a system resource. */
-  func invalidate() {}
+  /**
+   The app owns the domain; nothing here holds a system resource. The staged
+   copies `fetchContents` handed to the system are this process's only
+   temporary files, so teardown removes them instead of waiting for the reaper.
+   */
+  func invalidate() {
+    try? FileManager.default.removeItem(at: Self.stagingRoot)
+  }
 
   func item(
     for identifier: NSFileProviderItemIdentifier,
@@ -159,14 +165,63 @@ final class ArtifactsFileProviderExtension: NSObject, NSFileProviderReplicatedEx
    The system takes ownership of the URL it is handed and may move or delete
    it, so the mirrored bytes are copied out first: the mirror is read-only and
    has to survive a browse.
+
+   Each fetch stages into its own subdirectory, because two fetches can be in
+   flight at once and each hands its own URL to the system. A staged copy is
+   temporary by construction: it is reaped once the system has had ample time
+   to take it, so a browse cannot accumulate up to the per-file cap per open.
    */
   private static func stage(source: URL, filename: String) throws -> URL {
-    let directory = FileManager.default.temporaryDirectory
-      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let root = Self.stagingRoot
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    reapStagedCopies(in: root)
+    let directory = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     let destination = directory.appendingPathComponent(filename, isDirectory: false)
     try FileManager.default.copyItem(at: source, to: destination)
     return destination
+  }
+
+  /**
+   Where staged copies wait for the system to take them.
+
+   The extension keeps no app-group state, so its temporary copies live under
+   the process's own temporary directory and never touch the mirror.
+   */
+  private static var stagingRoot: URL {
+    FileManager.default.temporaryDirectory
+      .appendingPathComponent("ArtifactsFileProvider", isDirectory: true)
+  }
+
+  /**
+   How long a staged copy may wait before the reaper removes it.
+
+   The system takes a returned URL within moments of the completion handler, so
+   this only bounds a copy the system never took, measured from the moment it
+   was staged.
+   */
+  private static let stagedCopyLifetime: TimeInterval = 15 * 60
+
+  /**
+   Delete the staged copies the system has long since taken. Creation date is
+   what ages a staging directory, so moving a copy out — which the system does
+   when it takes one — cannot keep the directory alive.
+   */
+  private static func reapStagedCopies(in root: URL) {
+    let manager = FileManager.default
+    let cutoff = Date().addingTimeInterval(-Self.stagedCopyLifetime)
+    let entries =
+      (try? manager.contentsOfDirectory(
+        at: root,
+        includingPropertiesForKeys: [.creationDateKey]
+      )) ?? []
+    for entry in entries {
+      let created =
+        (try? entry.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date()
+      if created < cutoff {
+        try? manager.removeItem(at: entry)
+      }
+    }
   }
 }
 
@@ -252,11 +307,11 @@ final class ArtifactItem: NSObject, NSFileProviderItem {
 /**
  Enumerates one container from the manifest.
 
- The mirror has no change log, so a change request reports an expired page. The
- system then re-enumerates the container from scratch, which is exactly what the
- app's `signalEnumerator(for: .rootContainer)` asks for after a sync. An empty
- container is an empty enumeration, so a session with no artifacts is an empty
- folder in the Files app, never an error.
+ The mirror has no change log, so a change request reports the sync anchor as
+ expired: the system discards the anchor and re-enumerates the container from
+ scratch, which is exactly what the app's `signalEnumerator(for: .rootContainer)`
+ asks for after a sync. An empty container is an empty enumeration, so a session
+ with no artifacts is an empty folder in the Files app, never an error.
  */
 final class ArtifactsEnumerator: NSObject, NSFileProviderEnumerator {
   private let mirror = ArtifactMirror()
@@ -281,7 +336,10 @@ final class ArtifactsEnumerator: NSObject, NSFileProviderEnumerator {
     for observer: NSFileProviderChangeObserver,
     from anchor: NSFileProviderSyncAnchor
   ) {
-    observer.finishEnumeratingWithError(NSFileProviderError(.pageExpired))
+    // `syncAnchorExpired` is what tells the system to discard the anchor it
+    // holds and re-enumerate; `pageExpired` only expires an enumeration page
+    // and would leave the system asking for changes from the same anchor.
+    observer.finishEnumeratingWithError(NSFileProviderError(.syncAnchorExpired))
   }
 }
 

@@ -45,6 +45,7 @@ const mocks = vi.hoisted(() => ({
   clearSessionAutoApprove: vi.fn(),
   clearToolCardImageCache: vi.fn(),
   clearTrustedHosts: vi.fn(),
+  notifyArtifactsChanged: vi.fn(),
   reapTempFiles: vi.fn(),
   resetArtifactMirrorSyncState: vi.fn(),
 }));
@@ -79,6 +80,11 @@ vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   clearTrustedHosts: mocks.clearTrustedHosts,
 }));
 vi.mock('@/lib/temp-file-registry', () => ({ reapTempFiles: mocks.reapTempFiles }));
+// The platform provider bridge: sign-out has to tell an open Files app the tree
+// changed, or it keeps the listing it read before the wipe.
+vi.mock('@/lib/artifacts/artifact-provider-native', () => ({
+  notifyArtifactsChanged: mocks.notifyArtifactsChanged,
+}));
 // The engine's memo reset is observed through this spy; its own suite covers
 // what the reset does to a later run.
 vi.mock('@/lib/artifacts/artifact-mirror-sync', () => ({
@@ -110,6 +116,20 @@ describe('clearSessionScopedState', () => {
 
     expect(fakeFs.deleted).toEqual([MIRROR_ROOT_URI]);
     expect(fakeFs.state.rootExists).toBe(false);
+  });
+
+  it('signals the platform provider once the mirror is gone', () => {
+    // An open Files app keeps the listing it last read until the provider says
+    // the tree changed, so the signal must follow the wipe, never precede it.
+    let mirrorWasGone: boolean | null = null;
+    mocks.notifyArtifactsChanged.mockImplementationOnce(() => {
+      mirrorWasGone = !fakeFs.state.rootExists;
+    });
+
+    clearSessionScopedState();
+
+    expect(mocks.notifyArtifactsChanged).toHaveBeenCalledTimes(1);
+    expect(mirrorWasGone).toBe(true);
   });
 
   it('resets the sync engine, clears every member, and reaps all temp copies', () => {

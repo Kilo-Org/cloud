@@ -132,6 +132,31 @@ describe('artifacts File Provider extension contract', () => {
     );
   });
 
+  it('stages every fetch under one temporary root and reaps what the system leaves', () => {
+    // The system takes ownership of the URL `fetchContents` hands it — it may
+    // move or delete it — so the mirrored bytes are copied out first. A staged
+    // copy nothing reclaims would leak up to the per-file cap on every open, so
+    // each fetch reaps the copies the system has long since taken, and
+    // teardown removes the root outright.
+    expect(extensionSource).toContain(
+      'private static func stage(source: URL, filename: String) throws -> URL'
+    );
+    expect(extensionSource).toContain(
+      '.appendingPathComponent("ArtifactsFileProvider", isDirectory: true)'
+    );
+    expect(extensionSource).toContain('reapStagedCopies(in: root)');
+    expect(extensionSource).toContain('try? manager.removeItem(at: entry)');
+    expect(extensionSource).toContain('try? FileManager.default.removeItem(at: Self.stagingRoot)');
+  });
+
+  it('expires the sync anchor so the system discards it and re-enumerates', () => {
+    // `pageExpired` only expires an enumeration page; the anchor is what tells
+    // the system to throw its anchor away and enumerate the container afresh,
+    // which is what the app's `signalEnumerator(for: .rootContainer)` asks for.
+    expect(extensionSource).toContain('NSFileProviderError(.syncAnchorExpired)');
+    expect(extensionSource).not.toContain('NSFileProviderError(.pageExpired)');
+  });
+
   it('shows an empty container as an empty enumeration', () => {
     // A missing manifest reads as absent and a container with no entries
     // enumerates an empty list, so an empty session is an empty folder in the

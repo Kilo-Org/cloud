@@ -492,4 +492,40 @@ describe('syncArtifactMirror crawling', () => {
     expect(h.notify).not.toHaveBeenCalled();
     expect(h.store.size).toBe(0);
   });
+
+  it('removes the bytes a download wrote when a sign-out lands inside the download', async () => {
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+    // The sign-out lands inside the download await itself, past the fence that
+    // gated starting it, so only the post-await fence can stop the bytes that
+    // arrive after teardown already deleted the mirror.
+    const targets: { deleted: boolean }[] = [];
+    h.deps.downloadFile = vi.fn(async (_url: string, target: File) => {
+      setSignOutActive(true);
+      targets.push(target as unknown as { deleted: boolean });
+      return downloaded(10);
+    });
+
+    expect(await syncArtifactMirror({ deps: h.deps })).toEqual({ status: 'discarded' });
+    expect(targets).toHaveLength(1);
+    expect(targets[0]?.deleted).toBe(true);
+    expect(h.applied).toHaveLength(0);
+    expect(h.notify).not.toHaveBeenCalled();
+    expect(h.store.size).toBe(0);
+  });
+
+  it('does not signal the provider when a sign-out lands inside the state write', async () => {
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+    h.deps.writeState = vi.fn(async () => {
+      setSignOutActive(true);
+    });
+
+    expect(await syncArtifactMirror({ deps: h.deps })).toEqual({ status: 'discarded' });
+    // The teardown clears the mirror, so the run stops before telling an open
+    // browser to re-query a location that no longer holds anything.
+    expect(h.notify).not.toHaveBeenCalled();
+  });
 });

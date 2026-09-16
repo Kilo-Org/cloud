@@ -5,6 +5,7 @@ import { clearToolCardImageCache } from '@/components/agents/tool-card-image-cac
 import { clearClipboardImages } from '@/lib/agent-attachments/clipboard-image';
 import { clearArtifactMirror } from '@/lib/artifacts/artifact-mirror';
 import { resetArtifactMirrorSyncState } from '@/lib/artifacts/artifact-mirror-sync';
+import { notifyArtifactsChanged } from '@/lib/artifacts/artifact-provider-native';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { reapTempFiles } from '@/lib/temp-file-registry';
 
@@ -23,8 +24,13 @@ export function clearSessionScopedState(): void {
   runClear(clearClipboardImages);
   runClear(clearSessionAutoApprove);
   // Wiping the mirror is what makes "signed out shows nothing to browse" true;
-  // dropping the engine memo keeps a completed run from repopulating it.
+  // dropping the engine memo keeps a completed run from repopulating it. The
+  // wipe alone is invisible to an open Files app, which keeps the listing it
+  // last read until the platform provider says the tree changed, so the
+  // provider is signalled after the wipe — an empty location, never the
+  // previous account's folders.
   runClear(clearArtifactMirror);
+  runClear(notifyArtifactsChanged);
   runClear(resetArtifactMirrorSyncState);
   runClear(() => {
     reapTempFiles({ all: true });

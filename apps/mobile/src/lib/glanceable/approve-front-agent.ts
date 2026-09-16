@@ -16,10 +16,10 @@ import { type FrontApprovableRow, pickFrontApprovableSession } from './front-app
  * One waiting ask replayed by the wrapper. Only the id matters: the wrist
  * control always answers `once`, the same response the card's Allow Once sends.
  */
-export type FrontApprovalAsk = { requestId: string };
+type FrontApprovalAsk = { requestId: string };
 
 /** Bounded wait for the ask to replay on attach. */
-export const FRONT_APPROVAL_ASK_TIMEOUT_MS = 15_000;
+const FRONT_APPROVAL_ASK_TIMEOUT_MS = 15_000;
 
 /** Cadence of the bounded ask wait. */
 const ASK_POLL_MS = 250;
@@ -31,7 +31,7 @@ const ASK_POLL_MS = 250;
  */
 const ASK_SETTLE_MS = 3000;
 
-export type FrontApprovalScope = {
+type FrontApprovalScope = {
   organizationId: string | null;
   userId: string | null;
 };

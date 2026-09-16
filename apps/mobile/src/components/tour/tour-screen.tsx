@@ -85,9 +85,9 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
           container grows to the viewport (`grow`) and distributes its children
           in the middle (`justify-center`), so the block sits where the eye
           expects it instead of against the header. `grow` is a minimum, not a
-          fixed height, so the block still scrolls: a large system font, a short
-          screen or a growing computer list starts at the top padding rather
-          than being pushed over the header or the action bar. */}
+          fixed height, so the block still scrolls: a large system font or a
+          short screen starts at the top padding rather than being pushed over
+          the header or the action bar. */}
       <View className="items-center gap-4">
         <TourStepHeader
           icon={<Sparkles size={36} color={colors.foreground} />}

@@ -38,13 +38,13 @@ afterEach(() => {
 });
 
 describe('MiniMax managed usage transport', () => {
-  it('uses the fixed endpoint and returns normalized subscription quota windows', async () => {
+  it('uses the documented endpoint and returns normalized subscription quota windows', async () => {
     const request = jest.spyOn(global, 'fetch').mockResolvedValue(jsonResponse(payload()));
 
     const result = await getMiniMaxUsage(API_KEY);
 
     expect(request).toHaveBeenCalledWith(
-      'https://api.minimax.io/v1/token_plan/remains',
+      'https://www.minimax.io/v1/token_plan/remains',
       expect.objectContaining({
         method: 'GET',
         cache: 'no-store',
@@ -56,6 +56,7 @@ describe('MiniMax managed usage transport', () => {
         },
       })
     );
+    expect(request).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
       fetchedAt: expect.stringContaining('T'),
       windows: [
@@ -79,6 +80,81 @@ describe('MiniMax managed usage transport', () => {
     expect(JSON.stringify(result)).not.toContain('unknown_secret');
     expect(JSON.stringify(result)).not.toContain('model_name');
     expect(JSON.stringify(result)).not.toContain('status_code');
+  });
+
+  it('falls back to the gateway endpoint when the documented host is unavailable', async () => {
+    const request = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(new Response('raw upstream body', { status: 503 }))
+      .mockResolvedValueOnce(jsonResponse(payload()));
+
+    const result = await getMiniMaxUsage(API_KEY);
+
+    expect(request).toHaveBeenNthCalledWith(
+      1,
+      'https://www.minimax.io/v1/token_plan/remains',
+      expect.anything()
+    );
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      'https://api.minimax.io/v1/token_plan/remains',
+      expect.anything()
+    );
+    expect(result.windows).toHaveLength(2);
+  });
+
+  it('accepts the MiniMax-M* aggregate row returned by the gateway host', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      jsonResponse(
+        payload({
+          model_remains: [
+            {
+              model_name: 'MiniMax-M*',
+              current_interval_remaining_percent: 64,
+              current_interval_status: 1,
+              end_time: 1_781_280_000_000,
+              current_weekly_remaining_percent: 91,
+              current_weekly_status: 1,
+              weekly_end_time: 1_781_884_800_000,
+            },
+          ],
+        })
+      )
+    );
+
+    await expect(getMiniMaxUsage(API_KEY)).resolves.toMatchObject({
+      windows: [
+        { id: 'short_term', remainingPercent: 64 },
+        { id: 'weekly', remainingPercent: 91 },
+      ],
+    });
+  });
+
+  it('clamps out-of-range remaining percent values to the 0-100 range', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      jsonResponse(
+        payload({
+          model_remains: [
+            {
+              model_name: 'general',
+              current_interval_remaining_percent: 175,
+              current_interval_status: 1,
+              end_time: 1_781_280_000_000,
+              current_weekly_remaining_percent: -25,
+              current_weekly_status: 1,
+              weekly_end_time: 1_781_884_800_000,
+            },
+          ],
+        })
+      )
+    );
+
+    await expect(getMiniMaxUsage(API_KEY)).resolves.toMatchObject({
+      windows: [
+        { id: 'short_term', remainingPercent: 100 },
+        { id: 'weekly', remainingPercent: 0 },
+      ],
+    });
   });
 
   it('returns independently valid windows and applies weekly boosts above 100 percent', async () => {

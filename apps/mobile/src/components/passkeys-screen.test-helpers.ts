@@ -42,6 +42,7 @@ const list = vi.hoisted(() => ({
   deleteFn: vi.fn(),
   renameFn: vi.fn(),
   register: vi.fn(),
+  supported: vi.fn(() => true),
 }));
 const store = vi.hoisted(() => ({ rows: [] as unknown[] }));
 const toastSuccess = vi.hoisted(() => vi.fn());
@@ -68,7 +69,10 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'test-token' }) }));
-vi.mock('@/lib/auth/passkey-client', () => ({ registerPasskey: list.register }));
+vi.mock('@/lib/auth/passkey-client', () => ({
+  registerPasskey: list.register,
+  passkeysSupported: list.supported,
+}));
 vi.mock('sonner-native', () => ({ toast: { success: toastSuccess, error: toastError } }));
 vi.mock('react-native', () => ({
   Alert: { alert: alertSpy },
@@ -166,6 +170,18 @@ export function first(view: PasskeysView, type: string): ReactTestInstance {
 
 export function texts(view: PasskeysView): string[] {
   return nodes(view, 'Text').flatMap(node => flatten(node.props.children));
+}
+
+/**
+ * The EmptyState description as text. The screen passes the creation hint as a
+ * plain string and the unsupported notice as a node, so a test reads both.
+ */
+export function emptyDescription(view: PasskeysView): string {
+  const description = first(view, 'EmptyState').props.description as
+    | string
+    | { props?: { children?: unknown } };
+  const value = typeof description === 'string' ? description : description.props?.children;
+  return flatten(value).join('');
 }
 
 export function buttonByLabel(view: PasskeysView, label: string): ReactTestInstance {

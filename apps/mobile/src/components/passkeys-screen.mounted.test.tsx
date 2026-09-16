@@ -2,6 +2,7 @@ import {
   alertSpy,
   buttonByLabel,
   confirmRemoval,
+  emptyDescription,
   first,
   hasButtonLabel,
   list,
@@ -24,6 +25,7 @@ import { waitFor } from '@/test/render-with-providers';
 beforeEach(() => {
   vi.clearAllMocks();
   store.rows = [MACBOOK, UNNAMED];
+  list.supported.mockReturnValue(true);
   list.queryFn.mockImplementation(() => ({ success: true, passkeys: store.rows }));
   list.deleteFn.mockResolvedValue(undefined);
   list.renameFn.mockResolvedValue(undefined);
@@ -176,17 +178,62 @@ describe('PasskeysScreen', () => {
     view.unmount();
   });
 
-  it('keeps the Add CTA and names the reason when this device cannot create passkeys', async () => {
+  it('hides the Add control and names the reason on a device that cannot create passkeys', async () => {
+    list.supported.mockReturnValue(false);
+    const view = await mount();
+    await waitFor(() => texts(view).includes('MacBook'));
+
+    // The device can never create one, so the notice stands alone and the
+    // existing passkeys still list.
+    expect(texts(view)).toContain('This device cannot create passkeys.');
+    expect(hasButtonLabel(view, 'Add a passkey')).toBe(false);
+    expect(hasButtonLabel(view, 'Retry')).toBe(false);
+    expect(texts(view)).toContain('Passkey');
+    expect(nodes(view, 'KeyRound')).toHaveLength(2);
+    view.unmount();
+  });
+
+  it('shows the unsupported notice instead of creation when there are no passkeys and the device cannot create them', async () => {
+    store.rows = [];
+    list.supported.mockReturnValue(false);
+    const view = await mount();
+    await waitFor(() => nodes(view, 'EmptyState').length === 1);
+
+    const empty = first(view, 'EmptyState');
+    // The creation hint would name the Add control this device cannot offer, so
+    // the notice is the description and the state has no action at all.
+    expect(emptyDescription(view)).toBe('This device cannot create passkeys.');
+    expect(empty.props.action).toBeNull();
+    expect(hasButtonLabel(view, 'Add a passkey')).toBe(false);
+    view.unmount();
+  });
+
+  it('drops the Add control when the ceremony refuses as unsupported', async () => {
     store.rows = [];
     list.register.mockResolvedValue({ status: 'error', failure: 'unsupported' });
     const view = await mount();
     await waitFor(() => nodes(view, 'EmptyState').length === 1);
 
     await press(buttonByLabel(view, 'Add a passkey'));
-    await waitFor(() => texts(view).includes('This device cannot create passkeys.'));
+    await waitFor(() => !hasButtonLabel(view, 'Add a passkey'));
 
-    // Non-retryable: no retry control, and the Add CTA stays as the way out.
+    // Non-retryable: no retry control, and no Add control that could only fail
+    // the same way again. The notice replaces the hint the control annotated.
     expect(hasButtonLabel(view, 'Retry')).toBe(false);
+    expect(emptyDescription(view)).toBe('This device cannot create passkeys.');
+    view.unmount();
+  });
+
+  it('keeps the Add CTA and names the reason when creation fails retryably', async () => {
+    store.rows = [];
+    list.register.mockResolvedValue({ status: 'error', failure: 'failed' });
+    const view = await mount();
+    await waitFor(() => nodes(view, 'EmptyState').length === 1);
+
+    await press(buttonByLabel(view, 'Add a passkey'));
+    await waitFor(() => texts(view).includes('Could not add a passkey. Try again.'));
+
+    // Retryable: the same control starts a fresh ceremony.
     expect(hasButtonLabel(view, 'Add a passkey')).toBe(true);
     view.unmount();
   });

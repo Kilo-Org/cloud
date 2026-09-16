@@ -19,7 +19,7 @@ import { KeyRound, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
-import { registerPasskey } from '@/lib/auth/passkey-client';
+import { passkeysSupported, registerPasskey } from '@/lib/auth/passkey-client';
 import {
   isLatestMutationGeneration,
   nextMutationGeneration,
@@ -28,9 +28,10 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 
 /**
- * Why the Add control did not add a row. Both keep the Add CTA: creation has no
- * half-written credential to clean up, so the same control starts a fresh
- * ceremony, and it never retries by itself.
+ * Why the Add control did not add a row. A ceremony that failed has no
+ * half-written credential to clean up, so the same control is a working retry;
+ * an `unsupported` result removes the control instead, because a device that
+ * has just refused the ceremony cannot create one.
  */
 type AddFailure = 'unsupported' | 'failed';
 
@@ -71,12 +72,13 @@ function InlineFailure({
  * Four states: loading reserves the final rows' boxes, empty offers creation as
  * its only action, happy lists a row per passkey, and a failure is either
  * retryable in place (the list request or a removal, with the rows it was shown
- * with kept) or non-retryable (no native passkey module, or the platform
- * refused the creation, where the Add CTA remains the recovery). A cancelled
- * creation sheet changed nothing, so the list is left as it was and the toast
- * says so. A retry is single-flight — its control is disabled while the request
- * it starts is pending — and a removal failure is only actionable while that
- * delete runs or its row has rolled back, never after the server list drops it.
+ * with kept) or non-retryable (a device that cannot create passkeys: the Add
+ * control is not offered, and the unsupported notice takes the hint's place
+ * while the existing rows stay). A cancelled creation sheet changed nothing, so
+ * the list is left as it was and the toast says so. A retry is single-flight —
+ * its control is disabled while the request it starts is pending — and a removal
+ * failure is only actionable while that delete runs or its row has rolled back,
+ * never after the server list drops it.
  */
 export function PasskeysScreen() {
   const { t } = useTranslation();
@@ -99,6 +101,14 @@ export function PasskeysScreen() {
   const [failedRemoveId, setFailedRemoveId] = useState<string | null>(null);
   const [addFailure, setAddFailure] = useState<AddFailure | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+
+  // A build without the native passkey module, or a platform that cannot hold
+  // one, must not offer an Add control whose only possible result is the
+  // unsupported notice — the login screen reads the same synchronous gate
+  // before it renders its passkey button. A ceremony that comes back
+  // `unsupported` proves the same thing, so it drops the control too; any other
+  // failure keeps it, because the same control starts a fresh ceremony.
+  const canCreatePasskeys = passkeysSupported() && addFailure !== 'unsupported';
 
   const remove = useMutation(
     trpc.user.deletePasskey.mutationOptions({
@@ -203,7 +213,7 @@ export function PasskeysScreen() {
     setAddFailure(result.failure === 'unsupported' ? 'unsupported' : 'failed');
   };
 
-  const addButton = (
+  const addControl = canCreatePasskeys ? (
     <Button
       variant="outline"
       loading={isAdding}
@@ -214,16 +224,24 @@ export function PasskeysScreen() {
       <Plus size={16} color={colors.foreground} />
       <Text>{t('profile.addPasskey')}</Text>
     </Button>
-  );
+  ) : null;
 
-  const addFailureNotice =
-    addFailure === null ? null : (
+  // On a device that cannot create passkeys the notice is not a reaction to a
+  // press: it is the reason no Add control is offered, shown beside the rows.
+  let addFailureNotice: ReactNode = null;
+  if (!canCreatePasskeys) {
+    addFailureNotice = (
       <Text accessibilityRole="alert" className="text-sm text-muted-foreground">
-        {addFailure === 'unsupported'
-          ? t('profile.passkeyAddUnsupported')
-          : t('profile.passkeyAddFailed')}
+        {t('profile.passkeyAddUnsupported')}
       </Text>
     );
+  } else if (addFailure === 'failed') {
+    addFailureNotice = (
+      <Text accessibilityRole="alert" className="text-sm text-muted-foreground">
+        {t('profile.passkeyAddFailed')}
+      </Text>
+    );
+  }
 
   let failureNotice: ReactNode = null;
   if (removeFailureId !== null) {
@@ -275,7 +293,7 @@ export function PasskeysScreen() {
             </View>
           ))}
         </View>
-        {addButton}
+        {addControl}
       </>
     );
   } else if (isError && data === undefined) {
@@ -292,17 +310,22 @@ export function PasskeysScreen() {
       />
     );
   } else if (passkeys.length === 0) {
+    // With no passkey to list and no way to create one, the notice takes the
+    // hint's place: "Add a passkey…" would instruct the control this device has
+    // just withdrawn, and the notice is then the state's only content.
     body = (
       <EmptyState
         placement="top"
         icon={KeyRound}
         title={t('profile.passkeysEmpty')}
-        description={t('profile.passkeysEmptyHint')}
+        description={canCreatePasskeys ? t('profile.passkeysEmptyHint') : addFailureNotice}
         action={
-          <>
-            {addFailureNotice}
-            {addButton}
-          </>
+          canCreatePasskeys ? (
+            <>
+              {addFailureNotice}
+              {addControl}
+            </>
+          ) : null
         }
       />
     );
@@ -322,7 +345,7 @@ export function PasskeysScreen() {
           ))}
         </View>
         {addFailureNotice}
-        {addButton}
+        {addControl}
       </>
     );
   }

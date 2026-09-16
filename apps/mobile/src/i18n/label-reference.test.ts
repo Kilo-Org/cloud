@@ -244,4 +244,19 @@ describe('plural forms', () => {
     const form = (count: number) => render(key, count).res.replace(String(count), '');
     expect(form(1), key).not.toBe(form(5));
   });
+
+  /**
+   * The review caught the Slovenian findings count: the head "Število" (the
+   * number) governs the phrase, so the genitive plural "ugotovitev" cannot
+   * inflect with the count. A per-category form rendered "Število ugotovitve:
+   * 3" and "Število ugotovitvi: 2"; one wording must hold at every count.
+   */
+  it('holds the Slovenian findings count invariant', async () => {
+    await i18n.changeLanguage('sl');
+    const rows = [1, 2, 3, 4, 5, 21].map(count =>
+      i18n.t('securityAgent.dashboard.findingsCount', { count, displayCount: 'N' })
+    );
+    expect(new Set(rows).size).toBe(1);
+    expect(rows[0]).toBe('Število ugotovitev: N');
+  });
 });

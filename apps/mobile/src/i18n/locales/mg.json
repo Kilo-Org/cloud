@@ -343,7 +343,17 @@
       "fileLoadedOfTotalCount_other": "Rakitra {{displayCount}} amin'ny {{total}} voampiditra",
       "filesStillLoading": "Mbola ampidirina ny rakitra. Sintony hanavaozana.",
       "goToOverview": "Mankanesa amin'ny topimaso",
-      "goToOverviewTab": "Mankanesa amin'ny kiheba topimaso"
+      "goToOverviewTab": "Mankanesa amin'ny kiheba topimaso",
+      "expandAllLines_one": "Asehoy avokoa ny andalana {{displayCount}}",
+      "expandAllLines_other": "Asehoy avokoa ny andalana {{displayCount}}",
+      "expandLines_one": "Asehoy ny andalana {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_other": "Asehoy ny andalana {{displayCount}} ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Asehoy ny andalana manodidina {{displayCount}}",
+      "expandLinesOfContext_other": "Asehoy ny andalana manodidina {{displayCount}}",
+      "expandMoreLines_one": "Asehoy ny andalana fanampiny {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_other": "Asehoy ny andalana fanampiny {{displayCount}} ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "rakitra {{loaded}} amin'ny {{total}} no tafiditra",
+      "loadedOfTotalFiles_other": "rakitra {{loaded}} amin'ny {{total}} no tafiditra"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ tsy misy marika fiandohan'andalana vaovao eo amin'ny faran'ny rakitra.",
@@ -531,7 +541,9 @@
         "outdatedOnPath": "Tsy mifanaraka intsony amin'ny {{path}}"
       },
       "deletedUser": "mpampiasa voafafa",
-      "replyForbiddenTerm": "Tsy manana alalana hamaly ity {{term}} ity ianao."
+      "replyForbiddenTerm": "Tsy manana alalana hamaly ity {{term}} ity ianao.",
+      "moreLinesAbove_one": "… mbola misy andalana {{displayCount}} etsy ambony.",
+      "moreLinesAbove_other": "… mbola misy andalana {{displayCount}} etsy ambony."
     },
     "couldNotOpenGitHubAppSettings": "Tsy voasokatra ny fikirana ho an'ny rindranasa GitHub.",
     "installKiloGitHubApp": "Apetraho ny rindranasa Kilo ho an'ny GitHub",
@@ -572,7 +584,9 @@
       "pending": "{{displayCount}} miandry",
       "skipped": "{{displayCount}} nodiavina",
       "checksCount": "{{displayCount}} fanamarinana",
-      "checkDetails": "antsipirian'ny fanamarinana"
+      "checkDetails": "antsipirian'ny fanamarinana",
+      "checksCount_one": "{{displayCount}} fanamarinana",
+      "checksCount_other": "{{displayCount}} fanamarinana"
     },
     "inbox": {
       "title": "Voaray",
@@ -702,7 +716,9 @@
       "statusContext": "Andalana manodidina",
       "lineLabel": "andalana {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(foana)"
+      "emptyLine": "(foana)",
+      "truncationBanner_one": "Ny rakitra {{limit}} voalohany amin'ny {{total}} novaina no aseho — fetran'ny API GitHub.",
+      "truncationBanner_other": "Ny rakitra {{limit}} voalohany amin'ny {{total}} novaina no aseho — fetran'ny API GitHub."
     },
     "linkPasteClipboardEmpty": "Foana ny fitahirizana vonjimaika.",
     "linkPasteNotAPullRequest": "Tsy rohy fangatahana fampiraisana izany",
@@ -876,7 +892,9 @@
       "uploadFailed": "Tsy nahomby ny fampiakarana.",
       "failedToUploadFile": "Tsy nahomby ny fampiakarana ny rakitra: {{reason}}.",
       "nothingToPaste": "Tsy misy azo apetaka.",
-      "metadataStripFailed": "Tsy nety nesorina ny angona mamaritra ny sary."
+      "metadataStripFailed": "Tsy nety nesorina ny angona mamaritra ny sary.",
+      "limit_one": "Afaka mampiaraka rakitra hatramin'ny {{displayCount}} ianao.",
+      "limit_other": "Afaka mampiaraka rakitra hatramin'ny {{displayCount}} ianao."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1620,7 +1638,11 @@
       "syncFindings": "Ampifanaraho ny angon'ny olana hita",
       "syncNow": "Ampifanaraho izao",
       "syncQueued": "Voalahatra ny fampifanarahana",
-      "syncStatusUnavailable": "Tsy azo jerena ny satan'ny fampifanarahana."
+      "syncStatusUnavailable": "Tsy azo jerena ny satan'ny fampifanarahana.",
+      "daysOverdue_one": "Nihoatra {{displayCount}} andro ny fe-potoana",
+      "daysOverdue_other": "Nihoatra {{displayCount}} andro ny fe-potoana",
+      "findingsCount_one": "Olana hita {{displayCount}}",
+      "findingsCount_other": "Olana hita {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Olana hita mbola misokatra",
@@ -2148,7 +2170,13 @@
       "updateTodos": "Havaozy ny lisitry ny asa hatao",
       "linesBadge": "Andalana {{displayCount}}",
       "filesBadge": "Rakitra {{displayCount}}",
-      "matchesBadge": "Valiny mifanaraka {{displayCount}}"
+      "matchesBadge": "Valiny mifanaraka {{displayCount}}",
+      "filesBadge_one": "Rakitra {{displayCount}}",
+      "filesBadge_other": "Rakitra {{displayCount}}",
+      "linesBadge_one": "Andalana {{displayCount}}",
+      "linesBadge_other": "Andalana {{displayCount}}",
+      "matchesBadge_one": "Valiny mifanaraka {{displayCount}}",
+      "matchesBadge_other": "Valiny mifanaraka {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "andalana {{start}}–{{end}} (nohafohezina)",
@@ -2438,7 +2466,11 @@
       "files": "Rakitra",
       "couldNotOpenPhotoPicker": "Tsy voasokatra ny mpisafidy sary. Avereno alefa ny Kilo ary andramo indray.",
       "maxFilesAllowed": "Rakitra {{displayCount}} raha be indrindra no azo ampidirina.",
-      "onlyAddingFiles": "Rakitra {{accepted}} amin'ny {{total}} ihany no ampiana ({{max}} raha be indrindra)"
+      "onlyAddingFiles": "Rakitra {{accepted}} amin'ny {{total}} ihany no ampiana ({{max}} raha be indrindra)",
+      "maxFilesAllowed_one": "Rakitra {{displayCount}} raha be indrindra no azo ampidirina.",
+      "maxFilesAllowed_other": "Rakitra {{displayCount}} raha be indrindra no azo ampidirina.",
+      "onlyAddingFiles_one": "Rakitra {{accepted}} amin'ny {{total}} ihany no ampiana ({{max}} raha be indrindra)",
+      "onlyAddingFiles_other": "Rakitra {{accepted}} amin'ny {{total}} ihany no ampiana ({{max}} raha be indrindra)"
     },
     "composer": {
       "addAttachment": "Ampio tovana",
@@ -2456,7 +2488,9 @@
       "discardAttachmentsMessage": "Hofafana ny rakitra nampakarina nefa mbola tsy nampiarahina tamin'ny hafatra nalefa.",
       "discardAttachmentsTitle": "Hariana ve ny rakitra ampiarahina?",
       "charactersRemaining": "marika {{count}} sisa",
-      "insertNewline": "Ampidiro andalana vaovao"
+      "insertNewline": "Ampidiro andalana vaovao",
+      "charactersRemaining_one": "marika {{count}} sisa",
+      "charactersRemaining_other": "marika {{count}} sisa"
     },
     "chatLink": {
       "linkCopied": "Voadika ny rohy",
@@ -2522,7 +2556,9 @@
       "stepsCount_one": "dingana {{steps}}",
       "stepsCount": "dingana {{steps}}",
       "stepsCount_other": "dingana {{steps}}",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Modely ({{displayCount}})",
+      "modelsCount_other": "Modely ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Fankatoavana ho azy",
@@ -2562,7 +2598,9 @@
     },
     "toolRun": {
       "sheetTitle": "Antson'ny fitaovana",
-      "condensedLabel": "{{itemCount}} singa; {{last}}"
+      "condensedLabel": "{{itemCount}} singa; {{last}}",
+      "condensedLabel_one": "{{itemCount}} singa; {{last}}",
+      "condensedLabel_other": "{{itemCount}} singa; {{last}}"
     }
   },
   "bootstrap": {
@@ -2696,7 +2734,9 @@
     "cliCantReceiveFilesTitle": "Tsy afaka mandray rakitra ity fotoam-piasana ity",
     "cliCantReceiveFilesMessage": "Tsy afaka mandray rakitra ny Kilo CLI mampandeha ity fotoam-piasana ity. Havaozy ny CLI amin'io milina io, na zarao amin'ny fotoam-piasana vaovao.",
     "contentlessMessage": "Tsy misy hozaraina — tsy nisy lahatsoratra na rakitra nampidirina.",
-    "couldNotReadContent": "Tsy voavaky ny votoaty nozaraina."
+    "couldNotReadContent": "Tsy voavaky ny votoaty nozaraina.",
+    "onlyFirstFilesAttached_one": "Ny rakitra {{displayCount}} voalohany ihany no hatambatra amin'ny hafatra.",
+    "onlyFirstFilesAttached_other": "Ny rakitra {{displayCount}} voalohany ihany no hatambatra amin'ny hafatra."
   },
   "kiloPass": {
     "title": "Kilo Pass",

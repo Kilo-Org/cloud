@@ -246,7 +246,8 @@ function isCatalogRow(value: unknown): value is CatalogRow {
   const row = value as Record<string, unknown>;
   return (
     typeof row['path'] === 'string' &&
-    row['kind'] === 'query' &&
+    // Closed set: mutations index alongside queries, anything else is drift.
+    (row['kind'] === 'query' || row['kind'] === 'mutation') &&
     typeof row['summary'] === 'string' &&
     typeof row['searchBlob'] === 'string' &&
     Array.isArray(row['tags']) &&

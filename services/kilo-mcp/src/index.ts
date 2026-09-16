@@ -9,7 +9,7 @@ import {
 } from './analytics';
 import { forwardedAuthFromProps } from './auth';
 import { MCP_SCOPE, scopeTokens } from './auth/http';
-import { callCatalogEndpoint } from './call';
+import { callCatalogEndpoint, serializeWithCap } from './call';
 import { createDefaultHandler } from './oauth/consent';
 import { onError, tokenExchangeCallback } from './oauth/provider-hooks';
 import { createRefreshReuseHandler, isTokenRequest } from './oauth/refresh-reuse';
@@ -117,7 +117,7 @@ const TOOLS = [
   {
     name: 'search',
     description:
-      'Search the Kilo API catalog for endpoints that match a task. ALWAYS run search first: the call tool only accepts paths this catalog publishes, and search returns the path, summary, and input schema you need for the call.',
+      'Search the Kilo API catalog for endpoints that match a task. ALWAYS run search first: the call tool only accepts paths this catalog publishes, and search returns the path, summary, and input schema you need for the call. Every result carries a kind: "query" reads data, "mutation" changes it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -139,7 +139,7 @@ const TOOLS = [
   {
     name: 'call',
     description:
-      'Call a Kilo API endpoint by its catalog path. Run search first to find a valid path and its input schema — paths outside the catalog and inputs that violate the published schema are rejected before any request is made.',
+      'Call a Kilo API endpoint by its catalog path. Run search first to find a valid path and its input schema — paths outside the catalog and inputs that violate the published schema are rejected before any request is made. A call to a "mutation" path changes data, so call one only when the user asked for that change; if such a call fails with an ambiguous transport error, check the current state before retrying.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -201,8 +201,15 @@ type ToolResult = {
   truncated?: true;
 };
 
-function textResult(text: string): ToolResult {
-  return { content: [{ type: 'text', text }] };
+/**
+ * Wrap a capped serialized payload as a tool result, marking it truncated when
+ * the cap cut it so the client knows the text is incomplete.
+ */
+function toolResult(outcome: { text: string; truncated: boolean }): ToolResult {
+  return {
+    content: [{ type: 'text', text: outcome.text }],
+    ...(outcome.truncated ? { truncated: true as const } : {}),
+  };
 }
 
 /** JSON object guard used only to recover the JSON-RPC `id` from a malformed envelope. */
@@ -242,14 +249,17 @@ async function runTool(
     });
     if (results.length === 0) {
       // Empty state, not an error: tell the agent how to recover.
-      return textResult(
-        JSON.stringify({
+      return toolResult(
+        serializeWithCap({
           results: [],
           message: `No endpoints matched "${query.trim()}". Refine your query: use fewer or different keywords, or describe the task in plain language.`,
         })
       );
     }
-    return textResult(JSON.stringify({ results }));
+    // Every hit carries its published input schema, and a 50-row result can
+    // exceed the tool-result cap: cut and mark the payload like the call tool
+    // instead of handing the client an unbounded body.
+    return toolResult(serializeWithCap({ results }));
   }
   if (name === 'call') {
     const parsed = callArgsSchema.safeParse(args);
@@ -268,10 +278,7 @@ async function runTool(
       webBaseUrl: deps.webBaseUrl,
       ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
     });
-    return {
-      content: [{ type: 'text', text: outcome.text }],
-      ...(outcome.truncated ? { truncated: true as const } : {}),
-    };
+    return toolResult(outcome);
   }
   throw new JsonRpcFailure(
     INVALID_PARAMS,
@@ -317,7 +324,7 @@ async function handleRpcMessage(
           capabilities: { tools: {} },
           serverInfo: SERVER_INFO,
           instructions:
-            'This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call.',
+            'This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying.',
         });
       }
       case 'ping':

@@ -7,6 +7,7 @@ import { db } from '@/lib/drizzle';
 import { getUserFromAuth } from '@/lib/user/server';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 import { GET } from './route';
+import { getApiRequestLogPayload } from '@/lib/r2/api-request-logs';
 
 jest.mock('next/server', () => {
   const actual = jest.requireActual('next/server');
@@ -17,7 +18,12 @@ jest.mock('@/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 
+jest.mock('@/lib/r2/api-request-logs', () => ({
+  getApiRequestLogPayload: jest.fn(),
+}));
+
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
+const mockedGetApiRequestLogPayload = jest.mocked(getApiRequestLogPayload);
 const TEST_USER_ID = 'api-request-log-download-test-user';
 const TEST_MODEL = 'poolside/laguna-s-2.1:free';
 const BATCH_SIZE = 25;
@@ -40,6 +46,7 @@ function readEntry(entries: Record<string, Uint8Array>, suffix: string): string 
 
 describe('GET /admin/api/api-request-log/download', () => {
   beforeEach(() => {
+    jest.clearAllMocks();
     mockedGetUserFromAuth.mockResolvedValue({
       user: defineTestUser({ is_admin: true }),
       authFailedResponse: null,
@@ -88,5 +95,81 @@ describe('GET /admin/api/api-request-log/download', () => {
       output: BATCH_SIZE,
       payload,
     });
+  });
+
+  it('loads object-backed payloads from R2', async () => {
+    const [row] = await db
+      .insert(api_request_log)
+      .values({
+        created_at: '2026-08-01T12:00:00.000Z',
+        kilo_user_id: TEST_USER_ID,
+        provider: 'test-provider',
+        model: TEST_MODEL,
+        payload_object_key: 'api-request-logs/v1/payload.json.gz',
+      })
+      .returning({ id: api_request_log.id });
+    mockedGetApiRequestLogPayload.mockResolvedValue({
+      version: 1,
+      request: { input: 'from-r2' },
+      response: JSON.stringify({ output: 'from-r2' }),
+    });
+
+    const response = await GET(createRequest());
+    const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+
+    expect(mockedGetApiRequestLogPayload).toHaveBeenCalledWith(
+      'api-request-logs/v1/payload.json.gz'
+    );
+    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(
+      JSON.stringify({ input: 'from-r2' }, null, 2)
+    );
+    expect(JSON.parse(readEntry(entries, `_${row.id}_response.json`))).toEqual({
+      output: 'from-r2',
+    });
+  });
+
+  it('falls back to inline payloads when an R2 read fails', async () => {
+    const [row] = await db
+      .insert(api_request_log)
+      .values({
+        created_at: '2026-08-01T12:00:00.000Z',
+        kilo_user_id: TEST_USER_ID,
+        provider: 'test-provider',
+        model: TEST_MODEL,
+        payload_object_key: 'api-request-logs/v1/missing.json.gz',
+        request: { input: 'inline' },
+        response: JSON.stringify({ output: 'inline' }),
+      })
+      .returning({ id: api_request_log.id });
+    mockedGetApiRequestLogPayload.mockRejectedValue(new Error('R2 unavailable'));
+
+    const response = await GET(createRequest());
+    const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+
+    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(
+      JSON.stringify({ input: 'inline' }, null, 2)
+    );
+  });
+
+  it('returns a valid partial archive when an object-only payload is unavailable', async () => {
+    const [row] = await db
+      .insert(api_request_log)
+      .values({
+        created_at: '2026-08-01T12:00:00.000Z',
+        kilo_user_id: TEST_USER_ID,
+        provider: 'test-provider',
+        model: TEST_MODEL,
+        payload_object_key: 'api-request-logs/v1/missing.json.gz',
+      })
+      .returning({ id: api_request_log.id });
+    mockedGetApiRequestLogPayload.mockRejectedValue(new Error('R2 unavailable'));
+
+    const response = await GET(createRequest());
+    const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
+
+    expect(response.status).toBe(200);
+    expect(readEntry(entries, `_${row.id}_payload_error.txt`)).toBe(
+      'The R2 payload was unavailable while this export was generated.'
+    );
   });
 });

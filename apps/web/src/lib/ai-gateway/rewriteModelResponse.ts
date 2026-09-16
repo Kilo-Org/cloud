@@ -21,6 +21,8 @@ import { after, NextResponse } from 'next/server';
 import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
 import { applyReasoningDetailsResponseTransform } from '@/lib/ai-gateway/reasoning-details-transform';
+import { deleteApiRequestLogPayloads, putApiRequestLogPayload } from '@/lib/r2/api-request-logs';
+import { captureException } from '@sentry/nextjs';
 
 /**
  * Handle passed to the response pipeline so the upstream response body can be
@@ -72,6 +74,13 @@ export type RewriteModelResponseParams = {
 type CapturedResponseBody =
   | { text: string; readError?: never }
   | { readError: string; text?: string };
+
+type ApiRequestLogStorageMode = 'inline' | 'dual' | 'r2';
+
+function getApiRequestLogStorageMode(): ApiRequestLogStorageMode {
+  const mode = process.env.API_REQUEST_LOG_STORAGE_MODE;
+  return mode === 'dual' || mode === 'r2' ? mode : 'inline';
+}
 
 async function isLoggingEnabledForUser(
   user: User | null,
@@ -144,6 +153,8 @@ async function createRequestLogCapture(
         `[rewriteModelResponse] failed to read response body (user=${user?.id}, status=${status}, model=${model}): ${responseReadError}`
       );
     }
+    const storageMode = getApiRequestLogStorageMode();
+    let payloadObjectKey: string | null = null;
     try {
       const error =
         responseText !== undefined
@@ -154,6 +165,20 @@ async function createRequestLogCapture(
               }
             : detectToolCallArgumentErrors(responseText, request)
           : { response_body_read_error: responseReadError };
+      const sanitizedRequest = sanitizeApiRequestLogRequest(request);
+      try {
+        if (storageMode !== 'inline') {
+          payloadObjectKey = await putApiRequestLogPayload({
+            request: sanitizedRequest,
+            response: responseText ?? null,
+          });
+        }
+      } catch (storageError) {
+        captureException(storageError, {
+          tags: { source: 'api-request-log', operation: 'put-payload' },
+        });
+      }
+
       const apiRequestLogId = await db
         .insert(api_request_log)
         .values({
@@ -164,8 +189,9 @@ async function createRequestLogCapture(
           status_code: status,
           model,
           provider,
-          request: sanitizeApiRequestLogRequest(request),
-          response: responseText,
+          payload_object_key: payloadObjectKey,
+          request: payloadObjectKey && storageMode === 'r2' ? null : sanitizedRequest,
+          response: payloadObjectKey && storageMode === 'r2' ? null : responseText,
           error: sanitizeJsonbValue(error),
         })
         .returning({ id: api_request_log.id });
@@ -174,6 +200,22 @@ async function createRequestLogCapture(
         apiRequestLogId[0].id
       );
     } catch (e) {
+      if (storageMode === 'dual' && payloadObjectKey) {
+        try {
+          const deleteResult = await deleteApiRequestLogPayloads([payloadObjectKey]);
+          if (deleteResult.failedKeys.length) {
+            captureException(new Error('Failed to delete orphaned API request log payload'), {
+              tags: { source: 'api-request-log', operation: 'delete-orphaned-payload' },
+              extra: { payloadObjectKey },
+            });
+          }
+        } catch (cleanupError) {
+          captureException(cleanupError, {
+            tags: { source: 'api-request-log', operation: 'delete-orphaned-payload' },
+            extra: { payloadObjectKey },
+          });
+        }
+      }
       const cause = e instanceof Error ? e.cause : undefined;
       logExceptInTest(
         `[rewriteModelResponse] failed to insert api_request_log (user=${user?.id}, status=${status}, model=${model}) cause (truncated): ${String(cause).substring(0, 4000)} error (truncated): ${String(e).substring(0, 4000)}`

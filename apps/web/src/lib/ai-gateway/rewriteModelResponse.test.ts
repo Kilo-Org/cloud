@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { after } from 'next/server';
 import {
   rewriteModelResponse_ChatCompletions,
@@ -15,6 +15,8 @@ import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import { ReasoningDetailsTransform } from '@/lib/ai-gateway/providers/types';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { db } from '@/lib/drizzle';
+import { deleteApiRequestLogPayloads, putApiRequestLogPayload } from '@/lib/r2/api-request-logs';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -30,14 +32,48 @@ jest.mock('@/lib/utils.server', () => ({
   logExceptInTest: jest.fn(),
 }));
 
+jest.mock('@/lib/drizzle', () => ({
+  db: { insert: jest.fn() },
+}));
+
+jest.mock('@/lib/r2/api-request-logs', () => ({
+  deleteApiRequestLogPayloads: jest.fn(),
+  putApiRequestLogPayload: jest.fn(),
+}));
+
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+}));
+
 const mockedOptIn = jest.mocked(isDynamicallyOptedIntoRequestLogging);
 const mockedLog = jest.mocked(logExceptInTest);
 const mockedAfter = jest.mocked(after);
+const mockedDbInsert = jest.mocked(db.insert);
+const mockedDeleteApiRequestLogPayloads = jest.mocked(deleteApiRequestLogPayloads);
+const mockedPutApiRequestLogPayload = jest.mocked(putApiRequestLogPayload);
+let mockedValues: jest.Mock;
+const originalApiRequestLogStorageMode = process.env.API_REQUEST_LOG_STORAGE_MODE;
 
 beforeEach(() => {
   mockedOptIn.mockClear();
   mockedLog.mockClear();
   mockedAfter.mockClear();
+  mockedDbInsert.mockReset();
+  mockedDeleteApiRequestLogPayloads.mockReset();
+  mockedPutApiRequestLogPayload.mockReset();
+  process.env.API_REQUEST_LOG_STORAGE_MODE = 'r2';
+  mockedValues = jest.fn().mockReturnValue({
+    returning: jest.fn().mockResolvedValue([{ id: BigInt(1) }]),
+  });
+  mockedDbInsert.mockReturnValue({ values: mockedValues } as never);
+});
+
+afterEach(() => {
+  if (originalApiRequestLogStorageMode === undefined) {
+    delete process.env.API_REQUEST_LOG_STORAGE_MODE;
+  } else {
+    process.env.API_REQUEST_LOG_STORAGE_MODE = originalApiRequestLogStorageMode;
+  }
 });
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -1441,6 +1477,126 @@ describe('rewriteModelResponse', () => {
 
     expect(mockedAfter).toHaveBeenCalledTimes(1);
     expect(mockedOptIn).not.toHaveBeenCalled();
+  });
+
+  test('stores request and response payloads in R2 instead of Postgres', async () => {
+    mockedPutApiRequestLogPayload.mockResolvedValue('api-request-logs/v1/payload.json.gz');
+    await logUnrewrittenResponse({
+      response: jsonResponse({ output: 'stored' }),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      logging: makeLogging(),
+    });
+
+    const callback = mockedAfter.mock.calls[0]?.[0];
+    if (typeof callback !== 'function') throw new Error('Expected after callback');
+    await callback();
+
+    expect(mockedPutApiRequestLogPayload).toHaveBeenCalledWith({
+      request: {},
+      response: JSON.stringify({ output: 'stored' }),
+    });
+    expect(mockedValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload_object_key: 'api-request-logs/v1/payload.json.gz',
+        request: null,
+        response: null,
+      })
+    );
+  });
+
+  test('falls back to inline payloads when R2 storage fails', async () => {
+    mockedPutApiRequestLogPayload.mockRejectedValue(new Error('R2 unavailable'));
+    await logUnrewrittenResponse({
+      response: jsonResponse({ output: 'inline' }),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      logging: makeLogging(),
+    });
+
+    const callback = mockedAfter.mock.calls[0]?.[0];
+    if (typeof callback !== 'function') throw new Error('Expected after callback');
+    await callback();
+
+    expect(mockedValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload_object_key: null,
+        request: {},
+        response: JSON.stringify({ output: 'inline' }),
+      })
+    );
+  });
+
+  test('keeps inline payloads during dual-write rollout', async () => {
+    process.env.API_REQUEST_LOG_STORAGE_MODE = 'dual';
+    mockedPutApiRequestLogPayload.mockResolvedValue('api-request-logs/v1/payload.json.gz');
+    await logUnrewrittenResponse({
+      response: jsonResponse({ output: 'dual' }),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      logging: makeLogging(),
+    });
+
+    const callback = mockedAfter.mock.calls[0]?.[0];
+    if (typeof callback !== 'function') throw new Error('Expected after callback');
+    await callback();
+
+    expect(mockedValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload_object_key: 'api-request-logs/v1/payload.json.gz',
+        request: {},
+        response: JSON.stringify({ output: 'dual' }),
+      })
+    );
+  });
+
+  test.each(['inline', 'invalid'])('skips R2 in %s storage mode', async storageMode => {
+    process.env.API_REQUEST_LOG_STORAGE_MODE = storageMode;
+    await logUnrewrittenResponse({
+      response: jsonResponse({ output: 'inline-only' }),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      logging: makeLogging(),
+    });
+
+    const callback = mockedAfter.mock.calls[0]?.[0];
+    if (typeof callback !== 'function') throw new Error('Expected after callback');
+    await callback();
+
+    expect(mockedPutApiRequestLogPayload).not.toHaveBeenCalled();
+    expect(mockedValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload_object_key: null,
+        request: {},
+        response: JSON.stringify({ output: 'inline-only' }),
+      })
+    );
+  });
+
+  test('removes a dual-written payload when the metadata insert fails', async () => {
+    process.env.API_REQUEST_LOG_STORAGE_MODE = 'dual';
+    mockedPutApiRequestLogPayload.mockResolvedValue('api-request-logs/v1/payload.json.gz');
+    mockedDeleteApiRequestLogPayloads.mockResolvedValue({
+      deletedKeys: ['api-request-logs/v1/payload.json.gz'],
+      failedKeys: [],
+    });
+    mockedValues.mockReturnValue({
+      returning: jest.fn().mockRejectedValue(new Error('database unavailable')),
+    });
+    await logUnrewrittenResponse({
+      response: jsonResponse({ output: 'dual' }),
+      model: 'kilo-internal/my-model',
+      providerId: 'custom',
+      logging: makeLogging(),
+    });
+
+    const callback = mockedAfter.mock.calls[0]?.[0];
+    if (typeof callback !== 'function') throw new Error('Expected after callback');
+    await callback();
+
+    expect(mockedDeleteApiRequestLogPayloads).toHaveBeenCalledWith([
+      'api-request-logs/v1/payload.json.gz',
+    ]);
   });
 });
 

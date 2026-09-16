@@ -2765,11 +2765,21 @@ export const api_request_log = pgTable(
     provider: text(),
     model: text(),
     status_code: integer(),
+    payload_object_key: text(),
     request: jsonb(),
     response: text(),
     error: jsonb(),
   },
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
+);
+
+export const api_request_log_payload_deletions = pgTable(
+  'api_request_log_payload_deletions',
+  {
+    object_key: text().primaryKey(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [index('idx_api_request_log_payload_deletions_created_at').on(table.created_at)]
 );
 
 export const http_user_agent = pgTable(

@@ -338,6 +338,8 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `R2_ACCESS_KEY_ID` - R2 access key ID for CLI session storage. `[SECRET]`
 - `R2_SECRET_ACCESS_KEY` - R2 secret access key for CLI session storage. `[SECRET]`
 - `R2_CLI_SESSIONS_BUCKET_NAME` - R2 bucket name for CLI session blobs. [SERVER]
+- `R2_EXPERIMENT_PROMPTS_BUCKET_NAME` - R2 bucket for model experiment prompts and API request log payloads under separate prefixes. [SERVER]
+- `API_REQUEST_LOG_STORAGE_MODE` - API request payload storage rollout mode: `inline` (default), `dual`, or `r2`. [SERVER]
 
 ## Services
 

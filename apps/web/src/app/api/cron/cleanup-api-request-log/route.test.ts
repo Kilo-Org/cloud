@@ -14,12 +14,18 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   emitScheduledJobEvent: jest.fn(),
 }));
 
-import { api_request_log } from '@kilocode/db/schema';
+import { api_request_log, api_request_log_payload_deletions } from '@kilocode/db/schema';
 import { db, sql } from '@/lib/drizzle';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { GET } from './route';
+import { deleteApiRequestLogPayloads } from '@/lib/r2/api-request-logs';
+
+jest.mock('@/lib/r2/api-request-logs', () => ({
+  deleteApiRequestLogPayloads: jest.fn(),
+}));
 
 const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
+const mockDeleteApiRequestLogPayloads = jest.mocked(deleteApiRequestLogPayloads);
 
 const BATCH_SIZE = 10_000;
 
@@ -53,7 +59,12 @@ async function insertApiRequestLogRecords(count: number, created_at: string) {
 describe('GET /api/cron/cleanup-api-request-log', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockDeleteApiRequestLogPayloads.mockImplementation(async keys => ({
+      deletedKeys: keys,
+      failedKeys: [],
+    }));
     await db.delete(api_request_log).where(sql`true`);
+    await db.delete(api_request_log_payload_deletions).where(sql`true`);
   });
 
   it('rejects requests without authorization header', async () => {
@@ -78,6 +89,8 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
       outcome: 'succeeded',
       deleted_api_request_log_count: 0,
       deleted_count: 0,
+      queued_payload_count: 0,
+      deleted_payload_count: 0,
       batch_size: BATCH_SIZE,
       has_more: false,
     });
@@ -127,6 +140,102 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     expect(remainingIds).toEqual(
       expect.arrayContaining([recent1.id.toString(), recent2.id.toString()])
     );
+  });
+
+  it('queues and deletes R2 payloads while expiring their metadata rows', async () => {
+    const expired = await db
+      .insert(api_request_log)
+      .values({
+        created_at: daysAgo(8),
+        provider: 'object-backed',
+        payload_object_key: 'api-request-logs/v1/payload.json.gz',
+      })
+      .returning();
+
+    const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+
+    expect(response.status).toBe(200);
+    expect(mockDeleteApiRequestLogPayloads).toHaveBeenCalledWith([
+      'api-request-logs/v1/payload.json.gz',
+    ]);
+    await expect(
+      db
+        .select()
+        .from(api_request_log)
+        .where(sql`${api_request_log.id} = ${expired[0].id}`)
+    ).resolves.toHaveLength(0);
+    await expect(db.select().from(api_request_log_payload_deletions)).resolves.toHaveLength(0);
+  });
+
+  it('keeps deletion work queued when R2 deletion fails', async () => {
+    const expired = await db
+      .insert(api_request_log)
+      .values({
+        created_at: daysAgo(8),
+        provider: 'object-backed',
+        payload_object_key: 'api-request-logs/v1/payload.json.gz',
+      })
+      .returning();
+    mockDeleteApiRequestLogPayloads.mockResolvedValue({
+      deletedKeys: [],
+      failedKeys: ['api-request-logs/v1/payload.json.gz'],
+    });
+
+    await expect(GET(makeRequest({ authorization: 'Bearer cron-secret' }))).rejects.toThrow(
+      'Failed to delete 1 API request log payloads'
+    );
+    await expect(
+      db
+        .select()
+        .from(api_request_log)
+        .where(sql`${api_request_log.id} = ${expired[0].id}`)
+    ).resolves.toHaveLength(0);
+    await expect(db.select().from(api_request_log_payload_deletions)).resolves.toEqual([
+      expect.objectContaining({ object_key: 'api-request-logs/v1/payload.json.gz' }),
+    ]);
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith({
+      outcome: 'failed',
+      exception_name: 'Error',
+    });
+  });
+
+  it('acknowledges successful object deletions while retaining failed keys', async () => {
+    await db
+      .insert(api_request_log_payload_deletions)
+      .values([
+        { object_key: 'api-request-logs/v1/deleted.json.gz' },
+        { object_key: 'api-request-logs/v1/failed.json.gz' },
+      ]);
+    mockDeleteApiRequestLogPayloads.mockResolvedValue({
+      deletedKeys: ['api-request-logs/v1/deleted.json.gz'],
+      failedKeys: ['api-request-logs/v1/failed.json.gz'],
+    });
+
+    await expect(GET(makeRequest({ authorization: 'Bearer cron-secret' }))).rejects.toThrow(
+      'Failed to delete 1 API request log payloads'
+    );
+
+    await expect(db.select().from(api_request_log_payload_deletions)).resolves.toEqual([
+      expect.objectContaining({ object_key: 'api-request-logs/v1/failed.json.gz' }),
+    ]);
+  });
+
+  it('processes more than one R2 API batch from the deletion outbox', async () => {
+    const objectKeys = Array.from(
+      { length: 1_001 },
+      (_, index) => `api-request-logs/v1/${index}.json.gz`
+    );
+    await db
+      .insert(api_request_log_payload_deletions)
+      .values(objectKeys.map(object_key => ({ object_key })));
+
+    const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+
+    expect(response.status).toBe(200);
+    const deletedKeys = mockDeleteApiRequestLogPayloads.mock.calls[0]?.[0];
+    expect(deletedKeys).toHaveLength(objectKeys.length);
+    expect(deletedKeys).toEqual(expect.arrayContaining(objectKeys));
+    await expect(db.select().from(api_request_log_payload_deletions)).resolves.toHaveLength(0);
   });
 
   it('emits one failure event and preserves rejected database failure semantics', async () => {

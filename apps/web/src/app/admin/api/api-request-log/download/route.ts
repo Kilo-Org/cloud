@@ -5,6 +5,8 @@ import { api_request_log } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
+import { getApiRequestLogPayload } from '@/lib/r2/api-request-logs';
+import { captureException } from '@sentry/nextjs';
 
 // Downloading all logs for a heavy user can take a while. Without a raised
 // maxDuration the Vercel function was killed mid-stream, producing a ZIP
@@ -182,22 +184,59 @@ export async function GET(request: NextRequest) {
 
       if (rows.length === 0) break;
 
-      for (const row of rows) {
+      const rowsWithPayloads = await Promise.all(
+        rows.map(async row => {
+          if (!row.payload_object_key) {
+            return { row, request: row.request, response: row.response, payloadError: null };
+          }
+
+          try {
+            const payload = await getApiRequestLogPayload(row.payload_object_key);
+            return {
+              row,
+              request: payload.request,
+              response: payload.response,
+              payloadError: null,
+            };
+          } catch (error) {
+            captureException(error, {
+              tags: { source: 'api-request-log', operation: 'get-payload' },
+              extra: { payloadObjectKey: row.payload_object_key },
+            });
+            if (row.request !== null || row.response !== null) {
+              return { row, request: row.request, response: row.response, payloadError: null };
+            }
+            return {
+              row,
+              request: null,
+              response: null,
+              payloadError: 'The R2 payload was unavailable while this export was generated.',
+            };
+          }
+        })
+      );
+
+      for (const { row, request, response, payloadError } of rowsWithPayloads) {
         const ts = formatTimestamp(row.created_at);
         const id = String(row.id);
 
-        const requestExt = isJson(row.request) ? 'json' : 'txt';
-        const requestContent = tryFormatJson(row.request);
+        const requestExt = isJson(request) ? 'json' : 'txt';
+        const requestContent = tryFormatJson(request);
         if (requestContent) {
           totalAppendedEntries += 1;
           archive.append(requestContent, { name: `${ts}_${id}_request.${requestExt}` });
         }
 
-        const responseExt = isJson(row.response) ? 'json' : 'txt';
-        const responseContent = tryFormatJson(row.response);
+        const responseExt = isJson(response) ? 'json' : 'txt';
+        const responseContent = tryFormatJson(response);
         if (responseContent) {
           totalAppendedEntries += 1;
           archive.append(responseContent, { name: `${ts}_${id}_response.${responseExt}` });
+        }
+
+        if (payloadError) {
+          totalAppendedEntries += 1;
+          archive.append(payloadError, { name: `${ts}_${id}_payload_error.txt` });
         }
 
         if (row.error !== null && row.error !== undefined) {

@@ -27,6 +27,10 @@ export type AndroidNotificationChannelId = (typeof ANDROID_NOTIFICATION_CHANNELS
  * `channelId` for those tokens and the post falls back to the app's default
  * channel. Keep this at the mobile release that first ships the split
  * (`apps/mobile/app.config.ts` `version` at that release).
+ *
+ * The app refreshes `user_push_tokens.app_version` on the first launch under a
+ * new version, so this classification follows the installed build instead of
+ * the version the token first registered under.
  */
 export const ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION = '1.0.11';
 

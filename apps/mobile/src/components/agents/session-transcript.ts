@@ -35,6 +35,20 @@ export type SessionTranscriptItem =
  */
 export const TRANSCRIPT_TIME_MARKER_GAP_MS = 10 * 60 * 1000;
 
+/**
+ * Whether this row is client-materialised for a prompt the server has not
+ * confirmed: the send-time optimistic insert and the `cloud.message.queued`
+ * synthesize both write `info.synthetic` (the same Kilo extension their
+ * placeholder parts carry). The authoritative `message.updated` replaces the
+ * info and clears the flag; when that update never lands — production has
+ * shown the wrapper's event publications rejected wholesale
+ * (`event_batch_rejected`) — the row stays unconfirmed for a submission the
+ * server may never have accepted.
+ */
+function isUnconfirmedSubmission(message: StoredMessage): boolean {
+  return message.info.role === 'user' && message.info.synthetic === true;
+}
+
 export function getSessionTranscriptItemKey(item: SessionTranscriptItem): string {
   if (item.type === 'message') {
     // A split message emits one item per plain stretch of its visible parts, so
@@ -80,10 +94,20 @@ export function mergeSessionTranscript(
   let previousCreated: number | undefined = undefined;
   for (const message of messages) {
     messageIds.add(message.info.id);
-    if (
-      messageRendersContent(message) ||
-      deliveryStates?.get(message.info.id)?.status === 'failed'
-    ) {
+    const failed = deliveryStates?.get(message.info.id)?.status === 'failed';
+    // An unconfirmed row with nothing to render stays invisible: unlike a
+    // confirmed user row (whose parts may still stream in, so a zero-part row
+    // stays transient), a client materialised row that lost its text will not
+    // gain content on its own — it would otherwise leave the reported empty
+    // yellow stub above the submitted text. The row is keyed by the id the
+    // client sent (the server honors `messageId`), so the run that failed it
+    // attaches here and a failed submission keeps its one row with the typed
+    // footer. Two rows with the same prompt are two submissions and stay two
+    // rows. If the server later confirms the id, the authoritative record
+    // replaces the info and the row re-renders through the normal path.
+    const permanentlyInvisible =
+      isUnconfirmedSubmission(message) && !failed && !message.parts.some(partRendersContent);
+    if (!permanentlyInvisible && (messageRendersContent(message) || failed)) {
       const created = message.info.time.created;
       // One validity rule, shared with the marker component: a timestamp the label
       // cannot format must never produce a marker row.

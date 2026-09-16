@@ -4,6 +4,7 @@ import {
   buildTerminalErrorCopyText,
   classifyTerminalError,
   resolveSessionTerminalError,
+  sessionStatusErrorMessage,
 } from './session-terminal-error';
 
 describe('classifyTerminalError', () => {
@@ -177,5 +178,24 @@ describe('buildTerminalErrorCopyText', () => {
         detail: 'Same',
       })
     ).toBe('sess-1\nTitle\nSame');
+  });
+});
+
+describe('sessionStatusErrorMessage', () => {
+  it.each([
+    ['simulated error', 'The response failed.'],
+    ['Unauthorized: Unauthorized', 'The response failed.'],
+    [
+      'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      'Not enough credits to run Cloud Agent. Add credits and try again.',
+    ],
+    ['Message failed to deliver', 'Failed to deliver'],
+  ] as const)('maps %s to typed copy', (raw, expected) => {
+    expect(sessionStatusErrorMessage(raw)).toBe(expected);
+  });
+
+  it('never returns the raw text', () => {
+    const raw = 'Service Unavailable: The service is temporarily unavailable.';
+    expect(sessionStatusErrorMessage(raw)).not.toContain('Service Unavailable');
   });
 });

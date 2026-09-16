@@ -111,6 +111,31 @@ function retryableClass(cls: TerminalErrorClass): boolean {
 }
 
 /**
+ * The SDK's own fixed string for an exhausted delivery failure
+ * (session-manager.ts `onMessageFailed`). It is app copy, not provider text, and
+ * already has translated copy of its own.
+ */
+const DELIVERY_FAILED_INDICATOR = 'Message failed to deliver';
+
+/**
+ * The reader's own copy for a session error in the transcript's status slot
+ * (session-status-indicator.tsx). The message is the provider's or the
+ * transport's own English string; the reader sees the classified copy instead,
+ * never the original — the same rule `resolveSessionTerminalError` follows for
+ * the empty-transcript state. An unrecognized string is still a failed agent
+ * run, so it gets the assistant-failure line rather than a generic one.
+ */
+export function sessionStatusErrorMessage(raw: string): string {
+  if (raw === DELIVERY_FAILED_INDICATOR) {
+    return i18n.t('agentChat.messageFailure.deliveryTitle');
+  }
+  const cls = classifyTerminalError(raw);
+  return cls === 'unknown'
+    ? i18n.t('agentChat.messageFailure.assistantFailed')
+    : messageForClass(cls);
+}
+
+/**
  * The terminal error a session must surface, taking precedence over the
  * skeleton. Copy is always offered for a terminal error, regardless of class.
  */

@@ -1949,9 +1949,12 @@ describe('createServiceState', () => {
         reason: 'exhausted',
       });
 
+      // The status the transcript area renders never carries the raw transport
+      // text; the failed row's typed footer does, and its Copy action keeps the
+      // original (same split as the accepted-turn settlement below).
       expect(state.getCloudStatus()).toEqual({
         type: 'error',
-        message: 'Environment preparation failed',
+        message: 'Message delivery failed',
       });
       expect(state.getPendingMessages().get('m1')).toEqual({
         status: 'failed',

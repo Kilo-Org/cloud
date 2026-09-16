@@ -3059,7 +3059,8 @@
     "openAgents": "Agenten öffnen",
     "needsInput": "Eingabe erforderlich",
     "channelName": "Aktive Agenten",
-    "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
+    "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen.",
+    "newestResult": "Neuestes Ergebnis"
   },
   "transcriptionModel": {
     "title": "Transkriptionsmodell",

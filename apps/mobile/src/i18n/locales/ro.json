@@ -3082,7 +3082,8 @@
     "openAgents": "Deschide agenții",
     "needsInput": "Așteaptă un răspuns",
     "channelName": "Agenți activi",
-    "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare."
+    "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare.",
+    "newestResult": "Cel mai recent rezultat"
   },
   "transcriptionModel": {
     "title": "Model de transcriere",

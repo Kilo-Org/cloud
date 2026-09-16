@@ -11,10 +11,19 @@ import {
 import { validateWorktreeStateGrant } from './worktree-state-grant.js';
 import { declaredLength, readBoundedBytes } from './bounded-body.js';
 
+function decodeParam(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return undefined;
+  }
+}
+
 function routeIdentity(c: Context<HonoContext>) {
   return worktreeStateIdentitySchema.safeParse({
-    userId: c.req.param('userId'),
-    scopeId: c.req.param('scopeId'),
+    userId: decodeParam(c.req.param('userId')),
+    scopeId: decodeParam(c.req.param('scopeId')),
   });
 }
 

@@ -816,6 +816,7 @@ export function createSandboxControlClient(
               eventBatches: true,
               scopedCleanupResult: true,
               workingBranches: true,
+              worktreeState: true,
             },
             ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
             ...(options.wrapperVersion ? { wrapperVersion: options.wrapperVersion } : {}),

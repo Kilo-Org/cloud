@@ -400,6 +400,7 @@ describe('createSandboxControlClient', () => {
           eventBatches?: boolean;
           scopedCleanupResult?: boolean;
           workingBranches?: boolean;
+          worktreeState?: boolean;
         };
       };
     };
@@ -419,6 +420,7 @@ describe('createSandboxControlClient', () => {
         eventBatches: true,
         scopedCleanupResult: true,
         workingBranches: true,
+        worktreeState: true,
       },
     });
     fake.respond(

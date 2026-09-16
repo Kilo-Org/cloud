@@ -96,6 +96,35 @@ describe('worktree state capture and restore', () => {
     expect(fs.existsSync(path.join(rebuilt, 'ignored', 'artifact.bin'))).toBe(false);
   });
 
+  it('does not overwrite a restorable bundle with a conflicted worktree', async () => {
+    const source = repository(root);
+    fs.writeFileSync(path.join(source, 'tracked.txt'), 'edited\n');
+    expect(await captureWorktreeState({ directory: source, endpoint, env: gitEnv })).toMatchObject({
+      status: 'captured',
+    });
+    const restorable = net.stored.bundle;
+    expect(restorable).toBeDefined();
+
+    git(source, 'checkout', '-b', 'other');
+    fs.writeFileSync(path.join(source, 'tracked.txt'), 'other\n');
+    git(source, 'commit', '--quiet', '-am', 'other');
+    git(source, 'checkout', '--quiet', 'main');
+    fs.writeFileSync(path.join(source, 'tracked.txt'), 'main\n');
+    git(source, 'commit', '--quiet', '-am', 'main');
+    const merged = spawnSync('git', ['merge', '--no-edit', 'other'], {
+      cwd: source,
+      env: gitEnv,
+      encoding: 'utf8',
+    });
+    expect(merged.status).not.toBe(0);
+
+    expect(await captureWorktreeState({ directory: source, endpoint, env: gitEnv })).toEqual({
+      status: 'skipped',
+      reason: 'unmerged',
+    });
+    expect(net.stored.bundle).toBe(restorable);
+  });
+
   it('captures a deletion so the restored worktree loses the file again', async () => {
     const source = repository(root);
     fs.rmSync(path.join(source, 'tracked.txt'));

@@ -137,6 +137,7 @@ export type SandboxControlSocketHandler = {
   supportsScopedCleanupResult?(): boolean;
   supportsNativeRuntimeRetirement(): boolean;
   supportsWorkingBranches?(): boolean;
+  supportsWorktreeState?(): boolean;
   supportsConnectionRecovery(): boolean;
   getConnectionIdentity(): SandboxControlConnectionIdentity | null;
   getReadySocket(): WebSocket | null;
@@ -398,6 +399,13 @@ export function createSandboxControlSocketHandler(
       const current = currentHandshakenSocket(state);
       return (
         current !== null && readAttachment(current.socket)?.capabilities?.workingBranches === true
+      );
+    },
+
+    supportsWorktreeState(): boolean {
+      const current = currentHandshakenSocket(state);
+      return (
+        current !== null && readAttachment(current.socket)?.capabilities?.worktreeState === true
       );
     },
 

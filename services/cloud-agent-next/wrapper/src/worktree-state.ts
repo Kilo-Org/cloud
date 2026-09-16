@@ -201,6 +201,16 @@ export async function captureWorktreeState(
     const head = await headCommit(options);
     if (!head) return { status: 'skipped', reason: 'unreadable_head' };
 
+    const unmerged = await runGit(['ls-files', '--unmerged', '-z'], options, 1024 * 1024);
+    if (unmerged.exitCode !== 0 || unmerged.stdoutTruncated) {
+      return { status: 'skipped', reason: 'unmerged_listing_failed' };
+    }
+    // Combined diffs from an unmerged index cannot be applied, and uploading
+    // one would overwrite the last restorable bundle.
+    if (unmerged.stdout.split('\0').some(entry => entry.length > 0)) {
+      return { status: 'skipped', reason: 'unmerged' };
+    }
+
     const patchPath = path.join(stage, WORKTREE_STATE_PATCH_ENTRY);
     try {
       await spawnToFile(

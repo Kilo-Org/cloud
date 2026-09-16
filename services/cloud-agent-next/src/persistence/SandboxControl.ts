@@ -1163,7 +1163,8 @@ export class SandboxControl extends DurableObject<Env> {
             payload: {
               ...adaptSessionAttachPayloadForWrapper(
                 sessionAttachPayloadSchema.parse(input.payload),
-                this.socketHandler.supportsWorkingBranches?.() === true
+                this.socketHandler.supportsWorkingBranches?.() === true,
+                this.socketHandler.supportsWorktreeState?.() === true
               ),
               ...(this.supportsNativeRuntimeRetirement()
                 ? { captureNativeRuntimeId: true as const }

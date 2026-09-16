@@ -51,7 +51,7 @@ import {
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
   temporarilyUnavailableResponse,
-  usageLimitExceededResponse,
+  creditsBlockedResponse,
   unavailableModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
@@ -858,7 +858,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       !(await isFreeModel(effectiveModelIdLowerCased)) &&
       !effectiveProviderContext.userByok
     ) {
-      return await usageLimitExceededResponse(user, balance);
+      return await creditsBlockedResponse({ user, balance, organizationId });
     }
 
     // Organization model/provider restrictions check

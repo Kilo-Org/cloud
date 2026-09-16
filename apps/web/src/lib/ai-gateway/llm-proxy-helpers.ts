@@ -14,6 +14,7 @@ import {
   INCEPTION_PROMO_RUNNING,
 } from '@/lib/constants';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
+import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
 import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
@@ -132,6 +133,46 @@ export async function usageLimitExceededResponse(user: User, balance?: number) {
     },
     { status: 402 }
   );
+}
+
+/**
+ * Returned when a paid request is blocked at a non-positive balance while an
+ * auto-top-up is in flight. The balance is expected to recover when the
+ * `invoice.paid` webhook posts credits, so this is a transient, retryable
+ * condition rather than a terminal no-credits state.
+ *
+ * The message must not contain "credit", "payment", "balance", or "quota":
+ * agent runtimes classify those words as a terminal insufficient-credits error.
+ */
+export function topUpInProgressResponse() {
+  const message = 'Your top-up is processing. Please retry in a few seconds.';
+  return NextResponse.json(
+    {
+      error: message,
+      error_type: ProxyErrorType.top_up_in_progress,
+      message,
+    },
+    { status: 503, headers: { 'Retry-After': '5' } }
+  );
+}
+
+/**
+ * Builds the response for a request that is blocked because the billing
+ * entity has no available balance. If an auto-top-up is in flight, the block is
+ * transient and reported as retryable; otherwise it is the terminal
+ * low-credits response.
+ */
+export async function creditsBlockedResponse(params: {
+  user: User;
+  balance?: number;
+  organizationId?: string;
+}) {
+  if (
+    await isAutoTopUpInFlight({ userId: params.user.id, organizationId: params.organizationId })
+  ) {
+    return topUpInProgressResponse();
+  }
+  return await usageLimitExceededResponse(params.user, params.balance);
 }
 
 export function dataCollectionRequiredResponse() {

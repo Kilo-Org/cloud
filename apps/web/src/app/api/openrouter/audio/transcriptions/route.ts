@@ -18,7 +18,7 @@ import {
   invalidRequestResponse,
   modelNotAllowedResponse,
   temporarilyUnavailableResponse,
-  usageLimitExceededResponse,
+  creditsBlockedResponse,
   wrapInSafeNextResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -261,7 +261,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
   if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
-    return await usageLimitExceededResponse(user, balance);
+    return await creditsBlockedResponse({ user, balance, organizationId });
   }
 
   const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({

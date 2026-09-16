@@ -1862,6 +1862,139 @@ describe('api routes', () => {
     });
   });
 
+  it('drops-and-counts a part whose persisted identity is well-formed but carries no sessionID', async () => {
+    // The ingest seam (`SessionItemSchema` needs `id` + `messageID` on a part)
+    // and the Durable Object's own part reader (`readPartIdentity`) both define
+    // a persisted part's identity without `sessionID`
+    // (services/session-ingest/src/util/compaction.ts stores `messageID/id`). A
+    // stored part that omits `sessionID` is therefore well-formed persisted
+    // data; its body still fails this read contract's union (every variant
+    // declares `sessionID`). It must be dropped and counted, not pushed back
+    // through to degrade the whole page to `invalid_data`.
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: sessionId }]);
+
+    const userInfo = {
+      id: 'msg_user_01',
+      sessionID: sessionId,
+      role: 'user',
+      time: { created: 1 },
+      agent: 'build',
+      model: { providerID: 'anthropic', modelID: 'claude' },
+    };
+    const assistantInfo = {
+      id: 'msg_asst_01',
+      sessionID: sessionId,
+      role: 'assistant',
+      time: { created: 2, completed: 3 },
+      parentID: 'msg_user_01',
+      modelID: 'claude',
+      providerID: 'anthropic',
+      mode: 'code',
+      agent: 'build',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [
+        {
+          info: userInfo,
+          parts: [
+            {
+              id: 'prt_q',
+              sessionID: sessionId,
+              messageID: 'msg_user_01',
+              type: 'text',
+              text: 'Question about the queue',
+            },
+          ],
+        },
+        {
+          info: assistantInfo,
+          parts: [
+            // Persisted identity `id` + `messageID`, no `sessionID`, unknown body.
+            { id: 'prt_future_01', messageID: 'msg_asst_01', type: 'future-safe-part' },
+            {
+              id: 'prt_t_ok',
+              sessionID: sessionId,
+              messageID: 'msg_asst_01',
+              type: 'text',
+              text: 'latest answer',
+            },
+          ],
+        },
+      ],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(`http://local/session/${sessionId}/messages?limit=50`, { method: 'GET' }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      history: {
+        messages: [
+          { info: { id: 'msg_user_01' } },
+          {
+            info: { id: 'msg_asst_01' },
+            parts: [{ id: 'prt_t_ok', type: 'text', text: 'latest answer' }],
+          },
+        ],
+        omittedItemCount: 1,
+      },
+    });
+  });
+
+  it('still degrades the page to invalid_data when a part has no persisted identity', async () => {
+    // `SessionItemSchema` rejects a part without both `id` and `messageID`, so
+    // such a part is corrupt rather than merely unreadable by this build: the
+    // page keeps surfacing it as `invalid_data` instead of dropping it.
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValue([{ session_id: sessionId }]);
+
+    const userInfo = {
+      id: 'msg_user_01',
+      sessionID: sessionId,
+      role: 'user',
+      time: { created: 1 },
+      agent: 'build',
+      model: { providerID: 'anthropic', modelID: 'claude' },
+    };
+    const readKiloSdkMessages = vi.fn(async () => ({
+      messages: [
+        {
+          info: userInfo,
+          parts: [{ id: 'prt_orphan', type: 'text', text: 'orphan messageID' }],
+        },
+      ],
+      nextCursor: null,
+      omittedItemCount: 0,
+    }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ readKiloSdkMessages } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(`http://local/session/${sessionId}/messages?limit=50`, { method: 'GET' }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      history: { kind: 'invalid_data' },
+    });
+  });
+
   it('DELETE /session/:sessionId revokes cache, clears DO, and deletes descendants child-first', async () => {
     const parentSessionId = 'ses_12345678901234567890123456';
     const childSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';

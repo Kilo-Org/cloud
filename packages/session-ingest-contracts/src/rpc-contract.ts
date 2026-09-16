@@ -450,6 +450,22 @@ const sdkPartBaseShape = {
 const sdkPartBaseSchema = z.object(sdkPartBaseShape);
 export type KiloSdkPartBase = z.infer<typeof sdkPartBaseSchema>;
 
+/**
+ * The identity a part is PERSISTED under: `id` + `messageID`, with no
+ * `sessionID`. The ingest seam accepts a part on exactly those two fields
+ * (`services/session-ingest/src/types/session-sync.ts`), the storage item id is
+ * `messageID/id` (`services/session-ingest/src/util/compaction.ts`), and the
+ * Durable Object's own part reader checks the same pair
+ * (`services/session-ingest/src/dos/kilo-sdk-materialization.ts`,
+ * `readPartIdentity`). A stored part that omits `sessionID` is therefore
+ * well-formed persisted data whose body this contract's union may still not
+ * understand.
+ */
+const persistedSdkPartIdentitySchema = z.object({
+  id: sdkPartBaseShape.id,
+  messageID: sdkPartBaseShape.messageID,
+});
+
 export const sdkFilePartSchema = z.object({
   ...sdkPartBaseShape,
   type: z.literal('file'),
@@ -683,16 +699,17 @@ function normalizePersistedKiloSdkParts(value: unknown): {
       parts.push(candidate);
       continue;
     }
-    // A part whose persisted identity is well-formed but whose body this client
-    // cannot parse (an unknown `type`, or a field shape this contract does not
-    // understand yet) must not degrade the whole page to `invalid_data`. The
-    // session keeps receiving parts from whichever client drives it, so one
-    // such part would freeze the transcript on an older message while the
-    // separately projected session cost kept updating. Drop and count it
-    // instead, so the rest of the transcript still renders. A part with a
-    // malformed identity stays untouched: that is corrupt data the caller must
-    // not silently paper over.
-    if (isRecord(candidate) && sdkPartBaseSchema.safeParse(candidate).success) {
+    // A part whose PERSISTED identity is well-formed but whose body this client
+    // cannot parse (an unknown `type`, a field shape this contract does not
+    // understand yet, or the `sessionID` this union declares but persistence
+    // does not) must not degrade the whole page to `invalid_data`. The session
+    // keeps receiving parts from whichever client drives it, so one such part
+    // would freeze the transcript on an older message while the separately
+    // projected session cost kept updating. Drop and count it instead, so the
+    // rest of the transcript still renders. A part with a malformed persisted
+    // identity stays untouched: that is corrupt data the caller must not
+    // silently paper over.
+    if (isRecord(candidate) && persistedSdkPartIdentitySchema.safeParse(candidate).success) {
       omittedItemCount += 1;
       continue;
     }

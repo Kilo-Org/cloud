@@ -12,6 +12,7 @@ import {
   type GlanceableSink,
   type GlanceableSinkContext,
 } from '@/lib/glanceable/sink-registry';
+import { getWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
 import { formatGlanceableCount, isWidgetRtl } from './count-format';
@@ -36,10 +37,39 @@ import {
  * Ending the ongoing notification never cancels a still-eligible widget expiry.
  */
 const NOTIFICATION_TITLE_KEY = 'glanceable.channelName';
-const OPEN_AGENTS_LABEL_KEY = 'glanceable.openAgents';
+const OPEN_SESSION_LABEL_KEY = 'glanceable.openSession';
+const APPROVE_LABEL_KEY = 'common.approve';
+
+/** No recorded ask: Open falls back to the Agents tab, never a guessed session. */
+const OPEN_AGENTS_URL = 'kiloapp:///cloud/sessions';
+
+/** The session route the deep link adds an id to. */
+const SESSION_URL_PREFIX = 'kiloapp:///cloud/sessions/';
 
 function translate(key: string): string {
   return i18n.t(key);
+}
+
+/** The two notification actions, both named by the one recorded waiting ask. */
+type NotificationActions = {
+  openLabel: string;
+  openUrl: string;
+  approveLabel: string | null;
+};
+
+/**
+ * Only a cloud-agent permission ask can be answered headlessly, and only while
+ * it is still the recorded ask. The session id goes into the Open intent and
+ * nowhere else: never the title, the text, the compact text, or the label.
+ */
+function notificationActions(): NotificationActions {
+  const ask = getWaitingAsk();
+  const canApprove = ask?.status === 'permission' && ask.isCloudAgent;
+  return {
+    openLabel: translate(OPEN_SESSION_LABEL_KEY),
+    openUrl: ask === null ? OPEN_AGENTS_URL : `${SESSION_URL_PREFIX}${ask.kiloSessionId}`,
+    approveLabel: canApprove ? translate(APPROVE_LABEL_KEY) : null,
+  };
 }
 
 let lastWidgetSnapshot: GlanceableAgentsSnapshot | null = null;
@@ -51,6 +81,46 @@ let pending: {
 } | null = null;
 let startEpoch = 0;
 let terminalExpiresAt: number | null = null;
+
+/**
+ * A one-line notice for the next republish: the headless approve task sets it
+ * on a retryable failure, the notification text prefixes it, and nothing else
+ * reads it. It never outlives its ask — a changed ask or a zero needs-input
+ * count clears it — so a failure message cannot describe a new session.
+ */
+let actionNotice: string | null = null;
+let noticeAskKey: string | null = null;
+
+/** The recorded ask identity the notice describes; '' means "no ask". */
+function askKey(ask: WaitingAsk | null): string {
+  return ask === null ? '' : `${ask.kiloSessionId}|${ask.status}`;
+}
+
+/**
+ * Set (or clear) the notice for the next republish. Records the ask it belongs
+ * to, so the drop rules below can tell a stale notice from a current one.
+ */
+export function setGlanceableActionNotice(notice: string | null): void {
+  actionNotice = notice;
+  noticeAskKey = notice === null ? null : askKey(getWaitingAsk());
+}
+
+/** Drop the notice once nothing needs input or the recorded ask has changed. */
+function pruneActionNotice(snapshot: GlanceableAgentsSnapshot): void {
+  if (
+    actionNotice !== null &&
+    (snapshot.needsInput === 0 || askKey(getWaitingAsk()) !== noticeAskKey)
+  ) {
+    actionNotice = null;
+    noticeAskKey = null;
+  }
+}
+
+/** The ongoing notification line, carrying the pending notice when one waits. */
+function notificationText(snapshot: GlanceableAgentsSnapshot): string {
+  pruneActionNotice(snapshot);
+  return buildOngoingNotificationText(snapshot, {}, translate, formatGlanceableCount, actionNotice);
+}
 
 /** A delayed render must check the current snapshot and its deadline, not cached props. */
 export function getCurrentWidgetProps(): AndroidWidgetProps | null {
@@ -103,12 +173,19 @@ async function tryStartOrUpdate(
     return;
   }
   const title = translate(NOTIFICATION_TITLE_KEY);
-  const text = buildOngoingNotificationText(snapshot, {}, translate, formatGlanceableCount);
-  const openAgentsLabel = translate(OPEN_AGENTS_LABEL_KEY);
+  const text = notificationText(snapshot);
+  const actions = notificationActions();
   const compactText = buildCompactNotificationText(snapshot, {}, formatGlanceableCount);
 
   if (notificationActive) {
-    updateLiveUpdate(title, text, openAgentsLabel, compactText);
+    updateLiveUpdate(
+      title,
+      text,
+      actions.openLabel,
+      actions.openUrl,
+      actions.approveLabel,
+      compactText
+    );
     terminalExpiresAt = null;
     revision = snapshot.revision;
     return;
@@ -123,13 +200,27 @@ async function tryStartOrUpdate(
     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/retry can set notificationActive while awaiting permission
     if (notificationActive) {
       if (snapshot.revision > revision) {
-        updateLiveUpdate(title, text, openAgentsLabel, compactText);
+        updateLiveUpdate(
+          title,
+          text,
+          actions.openLabel,
+          actions.openUrl,
+          actions.approveLabel,
+          compactText
+        );
         terminalExpiresAt = null;
         revision = snapshot.revision;
       }
       return;
     }
-    startLiveUpdate(title, text, openAgentsLabel, compactText);
+    startLiveUpdate(
+      title,
+      text,
+      actions.openLabel,
+      actions.openUrl,
+      actions.approveLabel,
+      compactText
+    );
     notificationActive = true;
     terminalExpiresAt = null;
     revision = snapshot.revision;
@@ -152,10 +243,13 @@ function retryPendingStart(): void {
     return;
   }
   const title = translate(NOTIFICATION_TITLE_KEY);
+  const actions = notificationActions();
   startLiveUpdate(
     title,
-    buildOngoingNotificationText(p.snapshot, {}, translate, formatGlanceableCount),
-    translate(OPEN_AGENTS_LABEL_KEY),
+    notificationText(p.snapshot),
+    actions.openLabel,
+    actions.openUrl,
+    actions.approveLabel,
     buildCompactNotificationText(p.snapshot, {}, formatGlanceableCount)
   );
   notificationActive = true;
@@ -183,6 +277,8 @@ export async function handleAppStateActive(): Promise<void> {
 
 export const androidSink: GlanceableSink = {
   publish(snapshot) {
+    // A zero needs-input snapshot ends the ask the notice belongs to.
+    pruneActionNotice(snapshot);
     lastWidgetSnapshot = snapshot;
     setWidgetSnapshot(snapshot);
     const props = buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount);
@@ -209,12 +305,13 @@ export const androidSink: GlanceableSink = {
       }
     }
     if (notificationActive && snapshot.revision > revision) {
+      const actions = notificationActions();
       updateLiveUpdate(
         translate(NOTIFICATION_TITLE_KEY),
-        eligible
-          ? buildOngoingNotificationText(snapshot, {}, translate, formatGlanceableCount)
-          : (props.statusLine ?? translate('glanceable.empty')),
-        translate(OPEN_AGENTS_LABEL_KEY),
+        eligible ? notificationText(snapshot) : (props.statusLine ?? translate('glanceable.empty')),
+        actions.openLabel,
+        actions.openUrl,
+        actions.approveLabel,
         eligible ? buildCompactNotificationText(snapshot, {}, formatGlanceableCount) : null,
         terminalExpiresAt === null ? 0 : Math.max(1, terminalExpiresAt - Date.now())
       );
@@ -240,4 +337,6 @@ export function _resetAndroidSinkForTests(): void {
   pending = null;
   startEpoch += 1;
   terminalExpiresAt = null;
+  actionNotice = null;
+  noticeAskKey = null;
 }

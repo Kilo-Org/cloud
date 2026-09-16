@@ -7,6 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
 import { setGlanceableDelivery } from '@/lib/glanceable/sink-registry';
+import {
+  _resetWaitingAskForTests,
+  recordWaitingAsk,
+  type WaitingAsk,
+} from '@/lib/glanceable/waiting-ask';
 import { i18n } from '@/i18n';
 
 import {
@@ -14,6 +19,7 @@ import {
   androidSink,
   getCurrentWidgetProps,
   handleAppStateActive,
+  setGlanceableActionNotice,
 } from './android-sink';
 import { _setPermissionReaderForTests, type NotificationPermissionStatus } from './permission';
 import { _resetAndroidPermissionAlertForTests } from './permission-alert';
@@ -22,6 +28,9 @@ const mocks = vi.hoisted(() => {
   let notification: {
     title: string;
     text: string;
+    openLabel: string;
+    openUrl: string;
+    approveLabel: string | null;
     compactText: string | null;
     promotion: boolean;
   } | null = null;
@@ -35,12 +44,14 @@ const mocks = vi.hoisted(() => {
   function post(
     title: string,
     text: string,
-    _openAgentsLabel: string,
+    openLabel: string,
+    openUrl: string,
+    approveLabel: string | null,
     compactText: string | null,
     promotion: boolean,
     timeoutMs = 0
   ): void {
-    notification = { title, text, compactText, promotion };
+    notification = { title, text, openLabel, openUrl, approveLabel, compactText, promotion };
     notificationDeadline = timeoutMs > 0 ? Date.now() + timeoutMs : null;
   }
 
@@ -128,6 +139,33 @@ const MIXED = {
   running: 4,
 };
 
+/** The two notification actions when no ask is recorded. */
+function noAskActions(): {
+  openLabel: string;
+  openUrl: string;
+  approveLabel: string | null;
+} {
+  return {
+    openLabel: i18n.t('glanceable.openSession'),
+    openUrl: 'kiloapp:///cloud/sessions',
+    approveLabel: null,
+  };
+}
+
+/** A recorded waiting ask; overrides carry the case under test. */
+function waitingAsk(overrides: Partial<WaitingAsk> = {}): WaitingAsk {
+  return {
+    kiloSessionId: 'ses_waiting',
+    status: 'permission',
+    isCloudAgent: true,
+    scopeKey: 'scope-u1',
+    organizationId: null,
+    userId: 'u1',
+    recordedAt: NOW,
+    ...overrides,
+  };
+}
+
 async function flushAsync(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
@@ -156,6 +194,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   mocks.native.setWidgetSnapshot('', 0);
   _resetAndroidSinkForTests();
+  _resetWaitingAskForTests();
   _resetAndroidPermissionAlertForTests();
   // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
   _setPermissionReaderForTests(() => Promise.resolve('granted'));
@@ -205,6 +244,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '2 Needs input, 4 Working, 3 Idle',
+      ...noAskActions(),
       compactText: '2',
       promotion: true,
     });
@@ -214,6 +254,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '4 Working, 3 Idle',
+      ...noAskActions(),
       compactText: '4',
       promotion: true,
     });
@@ -223,6 +264,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '4 Working',
+      ...noAskActions(),
       compactText: '4',
       promotion: true,
     });
@@ -231,14 +273,18 @@ describe('androidSink start and update', () => {
     expect(mocks.native.start).toHaveBeenCalledWith(
       'Active agents',
       '2 Needs input, 4 Working, 3 Idle',
-      'Open agents',
+      i18n.t('glanceable.openSession'),
+      'kiloapp:///cloud/sessions',
+      null,
       '2',
       true
     );
     expect(mocks.native.update).toHaveBeenLastCalledWith(
       'Active agents',
       '4 Working',
-      'Open agents',
+      i18n.t('glanceable.openSession'),
+      'kiloapp:///cloud/sessions',
+      null,
       '4',
       true,
       0
@@ -253,6 +299,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '2 Needs input, 4 Working, 3 Idle',
+      ...noAskActions(),
       compactText: '2',
       promotion: false,
     });
@@ -270,6 +317,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '4 Working, 3 Idle',
+      ...noAskActions(),
       compactText: '4',
       promotion: true,
     });
@@ -395,6 +443,116 @@ describe('androidSink app-state retry', () => {
 function runningCount(): string | undefined {
   return getCurrentWidgetProps()?.countLines.find(line => line.kind === 'running')?.count;
 }
+
+describe('androidSink notification actions', () => {
+  it('passes Approve and Open with the recorded session deep link for a cloud-agent permission', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_approve' }));
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()).toMatchObject({
+      openLabel: i18n.t('glanceable.openSession'),
+      openUrl: 'kiloapp:///cloud/sessions/ses_approve',
+      approveLabel: i18n.t('common.approve'),
+    });
+  });
+
+  it('passes Open only for a question', async () => {
+    recordWaitingAsk(waitingAsk({ status: 'question', kiloSessionId: 'ses_question' }));
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()).toMatchObject({
+      openUrl: 'kiloapp:///cloud/sessions/ses_question',
+      approveLabel: null,
+    });
+  });
+
+  it('passes Open only when the recorded permission is not a cloud-agent row', async () => {
+    recordWaitingAsk(waitingAsk({ isCloudAgent: false, kiloSessionId: 'ses_local' }));
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()).toMatchObject({
+      openUrl: 'kiloapp:///cloud/sessions/ses_local',
+      approveLabel: null,
+    });
+  });
+
+  it('passes Open only when no ask is recorded', async () => {
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()).toMatchObject(noAskActions());
+  });
+
+  it('carries the recorded session id only in the Open intent', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_secret' }));
+    androidSink.publish(MIXED);
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    const notification = mocks.getNotification();
+    expect(notification?.openUrl).toBe('kiloapp:///cloud/sessions/ses_secret');
+    expect(
+      JSON.stringify({
+        title: notification?.title,
+        text: notification?.text,
+        openLabel: notification?.openLabel,
+        approveLabel: notification?.approveLabel,
+        compactText: notification?.compactText,
+      })
+    ).not.toContain('ses_secret');
+    expect(getCurrentWidgetProps()?.accessibilityLabel).not.toContain('ses_secret');
+  });
+});
+
+describe('androidSink action notice', () => {
+  it('prefixes the notice to the next notification republish', async () => {
+    recordWaitingAsk(waitingAsk());
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    setGlanceableActionNotice('Approval failed');
+    androidSink.startOrUpdate({ ...MIXED, revision: 2, running: 5 }, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()?.text).toBe('Approval failed 2 Needs input, 5 Working, 3 Idle');
+  });
+
+  it('drops the notice once the counts reach zero', async () => {
+    recordWaitingAsk(waitingAsk());
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    setGlanceableActionNotice('Approval failed');
+
+    androidSink.publish({ ...MIXED, revision: 2, needsInput: 0 });
+    expect(mocks.getNotification()?.text).toBe('4 Working, 3 Idle');
+
+    androidSink.publish({ ...MIXED, revision: 3, needsInput: 3 });
+    expect(mocks.getNotification()?.text).toBe('3 Needs input, 4 Working, 3 Idle');
+  });
+
+  it('drops the notice when the recorded ask changes', async () => {
+    recordWaitingAsk(waitingAsk());
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    setGlanceableActionNotice('Approval failed');
+
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_other' }));
+    androidSink.startOrUpdate({ ...MIXED, revision: 2, running: 5 }, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()?.text).toBe('2 Needs input, 5 Working, 3 Idle');
+  });
+
+  it('prefixes the notice only after it is set', async () => {
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()?.text).toBe('2 Needs input, 4 Working, 3 Idle');
+  });
+});
 
 describe('androidSink widget publish and end', () => {
   it('publishes the widget snapshot on every publish', () => {
@@ -653,6 +811,7 @@ describe('handleAppStateActive permission alert', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '2 Needs input, 4 Working, 3 Idle',
+      ...noAskActions(),
       compactText: '2',
       promotion: true,
     });

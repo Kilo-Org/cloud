@@ -9,5 +9,10 @@
         <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
       </intent-filter>
     </receiver>
+    <!-- Explicit broadcast from the ongoing notification's Approve action, so
+         the receiver is not exported and needs no intent filter. -->
+    <receiver
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsActionReceiver"
+      android:exported="false" />
   </application>
 </manifest>

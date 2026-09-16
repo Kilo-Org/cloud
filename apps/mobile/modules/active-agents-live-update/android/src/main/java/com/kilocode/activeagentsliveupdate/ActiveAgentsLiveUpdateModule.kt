@@ -16,10 +16,11 @@ import expo.modules.kotlin.modules.ModuleDefinition
 /**
  * Local Expo module for the Android aggregate ongoing notification.
  *
- * The JS side owns the translated copy and the revision guard; this module owns
- * the fixed notification id, the dedicated `active-agents` channel (default
- * importance, silent, no heads-up), the API 36.1+ promotion gate, and the
- * content intent plus named action that open the Agents tab via a deep link.
+ * The JS side owns the translated copy, the deep link, and the revision guard;
+ * this module owns the fixed notification id, the dedicated `active-agents`
+ * channel (default importance, silent, no heads-up), the API 36.1+ promotion
+ * gate, the content intent plus Open action that deep-link into the Agents
+ * route, and the Approve action whose broadcast the headless worker answers.
  */
 class ActiveAgentsLiveUpdateModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -29,12 +30,12 @@ class ActiveAgentsLiveUpdateModule : Module() {
       isPromotionCapable()
     }
 
-    Function("start") { title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean ->
-      post(title, text, openAgentsLabel, compactText, promotion, 0)
+    Function("start") { title: String, text: String, openLabel: String, openUrl: String, approveLabel: String?, compactText: String?, promotion: Boolean ->
+      post(title, text, openLabel, openUrl, approveLabel, compactText, promotion, 0)
     }
 
-    Function("update") { title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean, timeoutMs: Double ->
-      post(title, text, openAgentsLabel, compactText, promotion, timeoutMs.toLong())
+    Function("update") { title: String, text: String, openLabel: String, openUrl: String, approveLabel: String?, compactText: String?, promotion: Boolean, timeoutMs: Double ->
+      post(title, text, openLabel, openUrl, approveLabel, compactText, promotion, timeoutMs.toLong())
     }
 
     Function("end") {
@@ -94,21 +95,36 @@ class ActiveAgentsLiveUpdateModule : Module() {
   @Suppress("DEPRECATION")
   private fun legacyBuilder(): Notification.Builder = Notification.Builder(context)
 
-  /** A PendingIntent that deep-links the app to the Open agents route. */
-  private fun openAgentsPendingIntent(): PendingIntent {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(OPEN_AGENTS_DEEP_LINK)).apply {
+  /**
+   * A PendingIntent that deep-links the app to the URL the JS side named: the
+   * waiting session's route when one is recorded, the Agents tab otherwise.
+   */
+  private fun openPendingIntent(openUrl: String): PendingIntent {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).apply {
       setPackage(context.packageName)
     }
     return PendingIntent.getActivity(
       context,
-      OPEN_AGENTS_REQUEST_CODE,
+      OPEN_REQUEST_CODE,
       intent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
   }
 
-  private fun post(title: String, text: String, openAgentsLabel: String, compactText: String?, promotion: Boolean, timeoutMs: Long) {
-    val contentIntent = openAgentsPendingIntent()
+  /** The Approve action: one broadcast the receiver turns into a unique answer. */
+  private fun approvePendingIntent(): PendingIntent {
+    val intent = Intent(context, ActiveAgentsActionReceiver::class.java)
+      .setAction(ActiveAgentsActionReceiver.ACTION_APPROVE)
+    return PendingIntent.getBroadcast(
+      context,
+      APPROVE_REQUEST_CODE,
+      intent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+  }
+
+  private fun post(title: String, text: String, openLabel: String, openUrl: String, approveLabel: String?, compactText: String?, promotion: Boolean, timeoutMs: Long) {
+    val contentIntent = openPendingIntent(openUrl)
     val builder = newBuilder(title)
       .setSmallIcon(smallIconId())
       .setContentTitle(title)
@@ -121,10 +137,21 @@ class ActiveAgentsLiveUpdateModule : Module() {
       .addAction(
         Notification.Action.Builder(
           Icon.createWithResource(context, smallIconId()),
-          openAgentsLabel,
+          openLabel,
           contentIntent
         ).build()
       )
+
+    // No recorded approvable ask: the action is omitted, not disabled.
+    if (approveLabel != null) {
+      builder.addAction(
+        Notification.Action.Builder(
+          Icon.createWithResource(context, smallIconId()),
+          approveLabel,
+          approvePendingIntent()
+        ).build()
+      )
+    }
 
     // API 36.1+ Live Update: promote only when the device reports the capability.
     // setRequestPromotedOngoing does not exist; use the documented flag setter.
@@ -167,7 +194,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
   private companion object {
     const val HAS_TIMEOUT = "has_timeout"
     const val CHANNEL_ID = "active-agents"
-    const val OPEN_AGENTS_DEEP_LINK = "kiloapp:///cloud/sessions"
-    const val OPEN_AGENTS_REQUEST_CODE = 1002
+    const val OPEN_REQUEST_CODE = 1002
+    const val APPROVE_REQUEST_CODE = 1003
   }
 }

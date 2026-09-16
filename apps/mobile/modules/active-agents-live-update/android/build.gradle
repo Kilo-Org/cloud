@@ -20,3 +20,16 @@ android {
     abortOnError false
   }
 }
+
+dependencies {
+  // The Approve action answers in headless JS, which Android 8+ only allows
+  // through WorkManager. concurrent-futures supplies the ListenableFuture
+  // adapter the worker completes from the task listener; it is the same 1.1.0
+  // the widget library already puts on the runtime classpath.
+  implementation 'androidx.work:work-runtime:2.8.1'
+  implementation 'androidx.concurrent:concurrent-futures:1.1.0'
+  // The headless worker names com.facebook.react.** classes. The app's React
+  // Gradle plugin puts react-android on the runtime classpath; compileOnly is
+  // how expo-task-manager gets the same compile classpath without repackaging.
+  compileOnly 'com.facebook.react:react-android'
+}

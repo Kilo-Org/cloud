@@ -122,14 +122,18 @@ export function buildGenericWidgetProps(translate: (key: string) => string): And
 
 /**
  * Ongoing notification: every ranked count, with a warning when stale, otherwise
- * the locked status copy. Never a title, organization name, or id.
+ * the locked status copy. A pending action notice (an approve attempt that has
+ * to be retried) prefixes the line, separated by a space because the notice is
+ * a full sentence; the compact and promoted surfaces never carry it. Never a
+ * title, organization name, or id.
  */
-// eslint-disable-next-line max-params -- snapshot, flags, and the two injected formatters
+// eslint-disable-next-line max-params -- snapshot, flags, the two injected formatters, and the notice
 export function buildOngoingNotificationText(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
   translate: (key: string) => string,
-  formatCount: GlanceableCountFormat = String
+  formatCount: GlanceableCountFormat = String,
+  notice: string | null = null
 ): string {
   const status = resolveGlanceableStatus(snapshot, flags);
   if (status === 'happy' || status === 'stale') {
@@ -140,10 +144,12 @@ export function buildOngoingNotificationText(
       const counts = lines
         .map(line => `${formatCount(line.count)} ${translate(line.key)}`)
         .join(', ');
-      return status === 'stale' ? `${translate('glanceable.stale')}, ${counts}` : counts;
+      const text = status === 'stale' ? `${translate('glanceable.stale')}, ${counts}` : counts;
+      return notice === null ? text : `${notice} ${text}`;
     }
   }
-  return translate(glanceableStatusCopyKey(snapshot, flags) ?? 'glanceable.empty');
+  const text = translate(glanceableStatusCopyKey(snapshot, flags) ?? 'glanceable.empty');
+  return notice === null ? text : `${notice} ${text}`;
 }
 
 /** The promoted chip shows only the primary number; the full text keeps all labels. */

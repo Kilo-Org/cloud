@@ -16,14 +16,18 @@ type LiveUpdateNativeModule = {
   start(
     title: string,
     text: string,
-    openAgentsLabel: string,
+    openLabel: string,
+    openUrl: string,
+    approveLabel: string | null,
     compactText: string | null,
     promotion: boolean
   ): void;
   update(
     title: string,
     text: string,
-    openAgentsLabel: string,
+    openLabel: string,
+    openUrl: string,
+    approveLabel: string | null,
     compactText: string | null,
     promotion: boolean,
     timeoutMs: number
@@ -43,25 +47,52 @@ function isPromotionCapable(): boolean {
   return nativeModule?.isPromotionCapable() ?? false;
 }
 
+/**
+ * Open action and content intent. `openUrl` is the recorded waiting session's
+ * deep link, or the Agents tab when nothing waits; `approveLabel` is non-null
+ * only while a cloud-agent permission ask can be answered, and adds the
+ * Approve action the receiver answers headlessly.
+ */
 // eslint-disable-next-line max-params -- mirrors the native presentation fields
 export function start(
   title: string,
   text: string,
-  openAgentsLabel: string,
+  openLabel: string,
+  openUrl: string,
+  approveLabel: string | null,
   compactText: string | null
 ): void {
-  nativeModule?.start(title, text, openAgentsLabel, compactText, isPromotionCapable());
+  nativeModule?.start(
+    title,
+    text,
+    openLabel,
+    openUrl,
+    approveLabel,
+    compactText,
+    isPromotionCapable()
+  );
 }
 
 // eslint-disable-next-line max-params -- translated bridge fields plus the native terminal timeout
 export function update(
   title: string,
   text: string,
-  openAgentsLabel: string,
+  openLabel: string,
+  openUrl: string,
+  approveLabel: string | null,
   compactText: string | null,
   timeoutMs = 0
 ): void {
-  nativeModule?.update(title, text, openAgentsLabel, compactText, isPromotionCapable(), timeoutMs);
+  nativeModule?.update(
+    title,
+    text,
+    openLabel,
+    openUrl,
+    approveLabel,
+    compactText,
+    isPromotionCapable(),
+    timeoutMs
+  );
 }
 
 export function end(): void {

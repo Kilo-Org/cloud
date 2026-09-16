@@ -10,18 +10,6 @@
       "kind": "intentional",
       "maxMatches": 1,
       "maxTokens": 101
-    },
-    {
-      "files": [
-        "wrapper/src/control/sandbox-control-client.ts",
-        "wrapper/src/control/sandbox-control-client.ts"
-      ],
-      "fingerprint": "cddc940139a221f0",
-      "owner": "sandbox control transport",
-      "reason": "Event publication and native-runtime retirement intentionally use the same request-receipt timeout protocol while retaining operation-specific payloads and errors.",
-      "kind": "intentional",
-      "maxMatches": 1,
-      "maxTokens": 109
     }
   ]
 }

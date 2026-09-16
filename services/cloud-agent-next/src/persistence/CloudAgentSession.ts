@@ -4,18 +4,21 @@
  * Uses RPC methods for type-safe communication.
  */
 
+import { logRuntimeAuthorizationDiagnostic } from '../session/runtime-authorization-diagnostics.js';
 import {
-  logRuntimeAuthorizationDiagnostic,
-  runtimeAuthorizationRecoveryDenied,
-} from '../session/runtime-authorization-diagnostics.js';
+  loadRecoverableRuntimeAuthorization,
+  RUNTIME_AUTHORIZATION_RESTORE_ERRORS,
+  replaceStoredRuntimeAuthorization,
+  unsealActiveRuntimeAuthorization,
+  type ReauthorizeRequest,
+  type RecoveryOutcome,
+  type RecoveryRequest,
+} from '../session/runtime-authorization-seal.js';
 import { DurableObject } from 'cloudflare:workers';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
 import type { OperationResult } from './types.js';
-import {
-  renewRuntimeAuthorization,
-  unsealRuntimeAuthorization,
-} from '@kilocode/worker-utils/runtime-authorization';
+import { renewRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
@@ -1755,36 +1758,19 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY) !== undefined;
   }
 
-  async recoverExpiredRuntimeAuthorization(input: {
-    ownerId: string;
-    expectedOldId: string;
-    recoveryId: string;
-    runtimeAuthorizationSeal: string;
-    runtimeToken: string;
-  }): Promise<{ status: 'recovered' | 'not-needed' | 'denied' | 'busy' | 'retry' }> {
-    const metadata = await this.getMetadata();
-    const denied = (reason: Parameters<typeof runtimeAuthorizationRecoveryDenied>[1]) =>
-      runtimeAuthorizationRecoveryDenied(metadata?.identity.sessionId ?? this.sessionId, reason);
-    if (!metadata) return denied('metadata_unavailable');
-    if (metadata.identity.userId !== input.ownerId) return denied('owner_mismatch');
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) return denied('missing_secret');
-    let fresh: RuntimeAuthorization;
-    try {
-      fresh = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
-        resourceKind: 'cloud-agent-next',
-        resourceId: metadata.identity.sessionId,
-        userId: metadata.identity.userId,
-        organizationId: metadata.identity.orgId,
-      });
-    } catch {
-      return denied('invalid_seal');
-    }
-    if (fresh.state !== 'active') return denied('fresh_authorization_inactive');
+  async recoverExpiredRuntimeAuthorization(input: RecoveryRequest): Promise<RecoveryOutcome> {
+    const prelude = await loadRecoverableRuntimeAuthorization(
+      input,
+      await this.getMetadata(),
+      this.sessionId,
+      this.env.NEXTAUTH_SECRET
+    );
+    if (prelude.status === 'denied') return prelude;
+    const { metadata, authorization: fresh, deny } = prelude;
     const state = await this.getRuntimeAuthorizationRecoveryState();
     if (state.state === 'legacy' || state.state === 'active') return { status: 'not-needed' };
     if (state.state !== 'expired' || state.id !== input.expectedOldId)
-      return denied('authorization_state_changed');
+      return deny('authorization_state_changed');
     const [active, pending] = await Promise.all([
       hasNonTerminalSessionMessage(this.ctx.storage),
       countPendingSessionMessages(this.ctx.storage),
@@ -1894,7 +1880,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         diagnostic('authorization_state_changed');
         return latest.state === 'active' || latest.state === 'legacy'
           ? { status: 'not-needed' }
-          : denied('authorization_state_changed');
+          : deny('authorization_state_changed');
       }
       failureReason = 'authorization_commit_failed';
       await this.ctx.storage.transaction(async transaction => {
@@ -2035,33 +2021,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     });
   }
 
-  async reauthorizeRuntimeAuthorization(input: {
-    ownerId: string;
-    expectedOldId: string;
-    runtimeAuthorizationSeal: string;
-  }): Promise<boolean> {
-    const metadata = await this.getMetadata();
-    if (!metadata || metadata.identity.userId !== input.ownerId) return false;
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) return false;
-    let authorization: RuntimeAuthorization;
-    try {
-      authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
-        resourceKind: 'cloud-agent-next',
-        resourceId: metadata.identity.sessionId,
-        userId: metadata.identity.userId,
-        organizationId: metadata.identity.orgId,
-      });
-    } catch {
-      return false;
-    }
-    if (authorization.state !== 'active') return false;
-    const current = RuntimeAuthorizationSchema.safeParse(
-      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+  async reauthorizeRuntimeAuthorization(input: ReauthorizeRequest): Promise<boolean> {
+    return replaceStoredRuntimeAuthorization(
+      input,
+      await this.getMetadata(),
+      this.env.NEXTAUTH_SECRET,
+      () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      authorization => this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, authorization)
     );
-    if (!current.success || current.data.id !== input.expectedOldId) return false;
-    await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, authorization);
-    return true;
   }
 
   async getRuntimeLocation(): Promise<SessionRuntimeLocator | null> {
@@ -2902,21 +2869,15 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     }
     let runtimeAuthorization: RuntimeAuthorization | undefined;
     if (input.runtimeAuthorizationSeal) {
-      const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-      if (!secret) return { success: false, error: 'Authentication unavailable' };
-      let authorization: RuntimeAuthorization;
-      try {
-        authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
-          resourceKind: 'cloud-agent-next',
-          resourceId: input.identity.sessionId,
-          userId: input.identity.userId,
-          organizationId: input.identity.orgId,
-        });
-      } catch {
-        return { success: false, error: 'Invalid runtime authorization' };
+      const unsealed = await unsealActiveRuntimeAuthorization({
+        secretBinding: this.env.NEXTAUTH_SECRET,
+        seal: input.runtimeAuthorizationSeal,
+        identity: input.identity,
+      });
+      if (unsealed.status !== 'active') {
+        return { success: false, error: RUNTIME_AUTHORIZATION_RESTORE_ERRORS[unsealed.status] };
       }
-      if (authorization.state !== 'active')
-        return { success: false, error: 'Runtime authorization revoked' };
+      const authorization = unsealed.authorization;
       if (await this.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY)) {
         return { success: false, error: 'Runtime authorization already installed' };
       }

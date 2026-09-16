@@ -110,24 +110,12 @@ export type RootRuntimeDisappearance = {
 };
 export type RootRetirementScope = 'shared' | 'sole' | 'stale';
 
-export type WorktreeKiloRuntimes = {
-  readonly kiloCliVersion?: string | null;
-  attach(
-    identity: SessionRequestIdentity,
-    kilo: WorktreeKiloAuth,
-    env?: Record<string, string>,
-    canRefreshCredentials?: () => boolean,
-    runtimeIsolation?: RuntimeIsolation,
-    beforeMutation?: () => void,
-    onCleanupTarget?: (cleanup: (deadlineAt: number) => Promise<NativeRetirement>) => void
-  ): WorktreeKiloAttachment;
-  detach(identity: SessionRequestIdentity): boolean;
-  retireForRecovery(
-    identity: SessionRequestIdentity,
-    recoveryId: string,
-    assertIdle: () => void
-  ): Promise<RecoveryRetirement>;
-  deleteDirectory(directory: string): Promise<void>;
+/**
+ * Native-runtime retirement surface shared by the runtime registry and the
+ * operation-registry dependency boundary. Optional members are capability
+ * probes; callers must treat an absent member as unsupported.
+ */
+export type NativeRuntimeControl = {
   retireRuntime?(
     directory: string,
     deadlineAt: number,
@@ -157,6 +145,26 @@ export type WorktreeKiloRuntimes = {
     target: NativeOperationTarget,
     deadlineAt: number
   ): Promise<boolean>;
+};
+
+export type WorktreeKiloRuntimes = NativeRuntimeControl & {
+  readonly kiloCliVersion?: string | null;
+  attach(
+    identity: SessionRequestIdentity,
+    kilo: WorktreeKiloAuth,
+    env?: Record<string, string>,
+    canRefreshCredentials?: () => boolean,
+    runtimeIsolation?: RuntimeIsolation,
+    beforeMutation?: () => void,
+    onCleanupTarget?: (cleanup: (deadlineAt: number) => Promise<NativeRetirement>) => void
+  ): WorktreeKiloAttachment;
+  detach(identity: SessionRequestIdentity): boolean;
+  retireForRecovery(
+    identity: SessionRequestIdentity,
+    recoveryId: string,
+    assertIdle: () => void
+  ): Promise<RecoveryRetirement>;
+  deleteDirectory(directory: string): Promise<void>;
   getRetained?(
     identity: SessionRequestIdentity | string,
     runtimeId?: string

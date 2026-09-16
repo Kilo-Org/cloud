@@ -1,4 +1,4 @@
-import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -6,6 +6,7 @@ import { dateTimeFormat } from '@/lib/intl-cache';
 
 import { collectCopyableText } from './collect-copyable-text';
 import { formatCost } from './context-usage-display';
+import { selectMessageFailure } from './message-failure-state';
 import { resolveMessageDisplayModel } from './message-model-label';
 import { isPartStreaming } from './part-types';
 import { friendlyModelName } from './session-model-display';
@@ -22,6 +23,12 @@ type MessageDetailsContent = {
   costLabel: string | null;
   tokenRows: MessageDetailsTokenRow[] | null;
   copyableText: string | null;
+  /**
+   * What the sheet's Copy action copies: the same text plus, on a failed
+   * delivery, the untranslated transport text. The select-text view renders
+   * `copyableText`, so the raw string stays behind the copy action only.
+   */
+  copyText: string | null;
   canSelectText: boolean;
 };
 
@@ -29,10 +36,15 @@ type MessageDetailsContent = {
  * Pure projection of a StoredMessage into the details-sheet fields.
  * Unit-tested for happy / empty visibility rules; the sheet component
  * only renders this shape.
+ *
+ * When the message's delivery failed, the raw transport text joins the Copy
+ * payload (the failure footer never renders it): the sheet's Copy action is
+ * where the untranslated original stays reachable, as with a terminal error.
  */
 export function getMessageDetailsContent(
   message: StoredMessage,
-  modelOptions: SessionModelOption[]
+  modelOptions: SessionModelOption[],
+  deliveryState?: MessageDeliveryState
 ): MessageDetailsContent {
   const roleLabel =
     message.info.role === 'user'
@@ -40,7 +52,11 @@ export function getMessageDetailsContent(
       : i18n.t('agentChat.messageDetails.roleAssistant');
   const sentTimeLabel = formatMessageSentTime(message.info.time.created);
   const copyable = collectCopyableText(message);
+  const failureCopyDetail =
+    selectMessageFailure({ deliveryState, info: message.info })?.copyDetail ?? '';
   const copyableText = copyable.length > 0 ? copyable : null;
+  const fullCopy = [copyable, failureCopyDetail].filter(text => text.length > 0).join('\n\n');
+  const copyText = fullCopy.length > 0 ? fullCopy : null;
   const canSelectText =
     copyableText !== null &&
     !message.parts.some(part => isPartInFlightForSelect(part, message.info.role));
@@ -53,6 +69,7 @@ export function getMessageDetailsContent(
       costLabel: null,
       tokenRows: null,
       copyableText,
+      copyText,
       canSelectText,
     };
   }
@@ -81,6 +98,7 @@ export function getMessageDetailsContent(
         ]
       : null,
     copyableText,
+    copyText,
     canSelectText,
   };
 }

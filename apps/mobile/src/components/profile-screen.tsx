@@ -4,6 +4,7 @@ import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import {
+  BookOpenCheck,
   Building2,
   GitMerge,
   GitPullRequest,
@@ -251,9 +252,20 @@ export function ProfileScreen() {
             title={t('common.preferences')}
             subtitle={t('profile.preferencesSubtitle')}
             className="rounded-lg bg-secondary px-3"
-            last
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+            }}
+          />
+          {/* Permanent replay entry: opens the tour at any time, including
+              after the account finished or skipped it. Opening it is an
+              explicit user action, never a re-arm of the auto-open. */}
+          <ConfigureRow
+            icon={BookOpenCheck}
+            title={t('tour.tutorialLabel')}
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/tour' as Href);
             }}
           />
         </View>
@@ -308,6 +320,7 @@ export function ProfileScreen() {
                   icon={KeyRound}
                   title={providerLabel(p.provider)}
                   subtitle={p.email}
+                  subtitleNumberOfLines={1}
                   className="rounded-lg bg-secondary px-3"
                   last={index === data.providers.length - 1}
                 />

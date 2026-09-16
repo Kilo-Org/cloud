@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 import { i18n } from '@/i18n';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import {
+  getSelectedBranchOverride,
   type NewSessionRepository,
   type RepositoryPlatform,
 } from '@/components/agents/new-session-repository-state';
@@ -24,6 +25,16 @@ import {
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
+/**
+ * A cloud `prepareSession` rejection, classified for the form's inline error.
+ * `retryable` keeps the same `operationKey` and offers a retry control;
+ * `message` is the server's reason, or the generic copy when it carries none.
+ */
+export type CloudCreateFailure = {
+  retryable: boolean;
+  message: string;
+};
+
 type UseNewSessionCreatorInput = {
   attachments: ReturnType<typeof useAgentAttachmentUpload>;
   mode: AgentMode;
@@ -31,6 +42,12 @@ type UseNewSessionCreatorInput = {
   organizationId?: string;
   /** Invoked on the success path before navigation; failures never fire it. */
   onCreated?: () => void;
+  /**
+   * Invoked with a classified cloud-create rejection. When supplied, the form
+   * owns the failure feedback (a persistent inline error) and the hook does not
+   * also toast, so the person never gets two copies of the same failure.
+   */
+  onCreateError?: (failure: CloudCreateFailure) => void;
   selectedRepository: NewSessionRepository | null;
   setIsCreating: (value: boolean) => void;
   variant: string;
@@ -50,6 +67,8 @@ type PrepareSessionInput = {
   githubRepo?: string;
   gitlabProject?: string;
   bitbucketRepo?: { fullName: string; workspaceUuid: string; repositoryUuid: string };
+  /** The chosen non-default branch; omitted, the provider's default is checked out. */
+  upstreamBranch?: string;
   autoCommit: boolean;
   autoInitiate: boolean;
   operationKey: string;
@@ -75,6 +94,7 @@ export function useNewSessionCreator({
   model,
   organizationId,
   onCreated,
+  onCreateError,
   selectedRepository,
   setIsCreating,
   variant,
@@ -264,11 +284,20 @@ export function useNewSessionCreator({
       }
     } catch (error) {
       // Only `prepareSession` errors reach here; UI failures are swallowed.
+      const retryable = isCloudPrepareRetryableError(error);
       const message =
-        error instanceof Error ? error.message : i18n.t('agentChat.newSession.failedToCreate');
-      toast.error(message);
+        error instanceof Error && error.message
+          ? error.message
+          : i18n.t('agentChat.newSession.failedToCreate');
+      // One feedback channel: the form's inline error when it accepts the
+      // callback, the toast otherwise. Never both for the same rejection.
+      if (onCreateError) {
+        onCreateError({ retryable, message });
+      } else {
+        toast.error(message);
+      }
       // A typed terminal rejection ends the intent; a retryable one keeps the key.
-      if (!isCloudPrepareRetryableError(error)) {
+      if (!retryable) {
         rotateKey();
         await removeOutboxRow(intentFingerprint);
       }
@@ -295,6 +324,7 @@ export function useNewSessionCreator({
     removeOutboxRow,
     whenLoaded,
     onCreated,
+    onCreateError,
   ]);
 
   return { createSessionFromDraft, promptRef };
@@ -327,9 +357,16 @@ function resolveRepoFingerprint(repository: NewSessionRepository | null): {
 
 /**
  * Write exactly one repository field into the create body, matching the
- * selected row's platform. Bitbucket requires workspace + run ids, so it
- * contributes nothing when those are missing (which cannot happen for a row
- * that came from `listBitbucketRepositories`).
+ * selected row's platform, plus the branch the user picked for that exact
+ * repository. Bitbucket requires workspace + run ids, so it contributes
+ * nothing when those are missing (which cannot happen for a row that came
+ * from `listBitbucketRepositories`).
+ *
+ * The branch is read by repository identity, so a branch chosen for another
+ * repository can never ride along; only a non-default choice is stored, so an
+ * unset `upstreamBranch` means "check out the provider's own default". It is
+ * deliberately absent from the retry fingerprint: the retry key stays
+ * repository-scoped, and changing the branch must not fork it.
  */
 function setRepositoryField(
   input: PrepareSessionInput,
@@ -340,10 +377,12 @@ function setRepositoryField(
   }
   if (repository.platform === 'github') {
     input.githubRepo = repository.fullName;
+    setUpstreamBranch(input, repository);
     return;
   }
   if (repository.platform === 'gitlab') {
     input.gitlabProject = repository.fullName;
+    setUpstreamBranch(input, repository);
     return;
   }
   if (repository.workspaceUuid && repository.repositoryUuid) {
@@ -352,5 +391,14 @@ function setRepositoryField(
       workspaceUuid: repository.workspaceUuid,
       repositoryUuid: repository.repositoryUuid,
     };
+    setUpstreamBranch(input, repository);
+  }
+}
+
+/** Carry the branch only when a repository field was written for it. */
+function setUpstreamBranch(input: PrepareSessionInput, repository: NewSessionRepository): void {
+  const branch = getSelectedBranchOverride(repository);
+  if (branch !== null) {
+    input.upstreamBranch = branch;
   }
 }

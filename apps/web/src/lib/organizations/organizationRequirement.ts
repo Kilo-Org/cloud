@@ -11,7 +11,6 @@ import { eq, and, count } from 'drizzle-orm';
 export type OrganizationRequirement = (orgInfo: Organization) => Awaitable<OptionalError<string>>;
 
 export const team_topup_bonus_requirement: OrganizationRequirement = async orgInfo => {
-  // Check based on actual organization member count (active memberships only)
   const [{ memberCount }] = await db
     .select({ memberCount: count() })
     .from(organization_memberships)

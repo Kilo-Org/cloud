@@ -1,20 +1,17 @@
-import { setTimeout as delay } from 'node:timers/promises';
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import {
-  diagnosticDetail,
   emitControlDiagnostic,
   type ControlDiagnosticReporter,
 } from '../../../src/shared/control-diagnostics.js';
-import { SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS } from '../../../src/shared/sandbox-control-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
-import { withTimeoutAndAbort } from '../utils.js';
+import { logToFile } from '../utils.js';
 import { unfilteredKiloEvents } from './feed.js';
 import {
-  KILO_CONTROL_REQUEST_TIMEOUT_MS,
-  KILO_FEED_FRESHNESS_TIMEOUT_MS,
+  feedDirectoryName,
   KiloEventFeedError,
   observeKiloFeedResponse,
   startSandboxControlEventFeed,
+  type KiloFeedConnection,
 } from './sandbox-control-runtime.js';
 
 export type KiloFeedEvent = {
@@ -35,21 +32,9 @@ export type WorktreeFeedSource = Readonly<{
 export type WorktreeFeed = {
   open(): Promise<void>;
   isFresh(): boolean;
+  isRecovering(): boolean;
   prepareForNewWork(): boolean;
   close(): void;
-};
-
-type FeedAttempt = {
-  controller: AbortController;
-  failure: PromiseWithResolvers<unknown>;
-  failed: boolean;
-  feed?: Awaited<ReturnType<typeof startSandboxControlEventFeed>>;
-};
-
-type Recovery = {
-  controller: AbortController;
-  deadlineAt: number;
-  reason: KiloEventFeedError['reason'];
 };
 
 export function createWorktreeFeed(options: {
@@ -59,190 +44,91 @@ export function createWorktreeFeed(options: {
   onFailure: (reason: KiloEventFeedError['reason']) => void;
   onStateChange?: () => void;
   onDiagnostic?: ControlDiagnosticReporter;
+  log?: (message: string) => void;
+  now?: () => number;
+  /** Test seam; production defaults to an abortable real-timer sleep. */
+  sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
 }): WorktreeFeed {
   const { scopeId, runtimeId, directory, kiloClient, signal: processSignal } = options.source;
   const lifetime = new AbortController();
   const signal = AbortSignal.any([lifetime.signal, processSignal]);
-  let active: FeedAttempt | undefined;
-  let recovery: Recovery | undefined;
-  let state: 'opening' | 'ready' | 'recovering' | 'unavailable' = 'opening';
-
-  function isCurrent(): boolean {
-    return !signal.aborted && options.isCurrent(runtimeId, kiloClient);
-  }
-
-  function isCurrentAttempt(attempt: FeedAttempt): boolean {
-    return isCurrent() && active === attempt && !attempt.controller.signal.aborted;
-  }
-
-  function closeActive(): void {
-    const attempt = active;
-    active = undefined;
-    attempt?.controller.abort();
-    const close = attempt?.feed?.close;
-    if (typeof close === 'function') close();
-  }
-
-  function failAttempt(attempt: FeedAttempt, error: unknown): void {
-    if (attempt.failed) return;
-    attempt.failed = true;
-    attempt.failure.resolve(error);
-    attempt.controller.abort();
-    const close = attempt.feed?.close;
-    if (typeof close === 'function') close();
-  }
-
-  async function connect(deadlineAt?: number, cancellation?: AbortSignal): Promise<void> {
-    if (!isCurrent()) throw new Error('Native feed source was superseded');
-    const attempt: FeedAttempt = {
-      controller: new AbortController(),
-      failure: Promise.withResolvers<unknown>(),
-      failed: false,
-    };
-    active = attempt;
-    const attemptSignal = cancellation
-      ? AbortSignal.any([signal, attempt.controller.signal, cancellation])
-      : AbortSignal.any([signal, attempt.controller.signal]);
-    const feed = await startSandboxControlEventFeed({
-      signal: attemptSignal,
-      deadlineAt,
-      open: (feedSignal, onActivity, onFrame) => {
-        const feedFetch: typeof fetch = Object.assign(async (...args: Parameters<typeof fetch>) => {
-          feedSignal.throwIfAborted();
-          const init: RequestInit & { duplex: 'half'; timeout: false } = {
-            ...args[1],
-            duplex: 'half',
-            timeout: false,
-          };
-          const response = await fetch(args[0], init);
-          feedSignal.throwIfAborted();
-          return observeKiloFeedResponse(response, feedSignal, onActivity, onFrame);
-        }, fetch);
-        const eventClient = createKiloEventClient({
-          baseUrl: kiloClient.serverUrl,
-          directory,
-          fetch: feedFetch,
-        });
-        return eventClient.global.event({
-          signal: feedSignal,
-          sseMaxRetryAttempts: 1,
-          onSseError: () => {
-            if (!feedSignal.aborted)
-              throw new KiloEventFeedError('feed_failed', 'Kilo global event feed failed');
-          },
-        });
-      },
-      consume: async stream => {
-        for await (const event of unfilteredKiloEvents(stream)) {
-          if (!isCurrentAttempt(attempt)) return;
-          void options.onEvent?.({ ...event, nativeRuntimeId: runtimeId });
+  const log = options.log ?? logToFile;
+  const sleep =
+    options.sleep ??
+    ((ms: number, abortSignal: AbortSignal) =>
+      new Promise<void>(resolve => {
+        if (abortSignal.aborted) {
+          resolve();
+          return;
         }
-      },
-      onUnexpectedClose: error => {
-        if (!isCurrentAttempt(attempt)) return;
-        failAttempt(attempt, error);
-        if (state === 'ready')
-          recover(error instanceof KiloEventFeedError ? error.reason : 'feed_failed');
-      },
-      onDiagnostic: options.onDiagnostic
-        ? (event, fields) =>
-            emitControlDiagnostic(options.onDiagnostic, event, { ...fields, scopeId })
-        : undefined,
-    });
-    if (!isCurrentAttempt(attempt) || attempt.failed) {
-      feed.close();
-      throw new Error('Native feed attempt was superseded');
-    }
-    attempt.feed = feed;
-    if (deadlineAt !== undefined) {
-      try {
-        const usable = await withTimeoutAndAbort(
-          Promise.race([feed.usable, attempt.failure.promise.then(() => false)]),
-          {
-            signal: attemptSignal,
-            timeoutMs: Math.max(1, deadlineAt - Date.now()),
-            timeoutMessage: 'Kilo global event feed recovery timed out',
-            abortMessage: 'Kilo global event feed recovery cancelled',
-          }
-        );
-        if (!usable || !isCurrentAttempt(attempt) || attempt.failed)
-          throw new Error('Native feed attempt closed before becoming usable');
-      } catch (error) {
-        failAttempt(attempt, error);
-        throw error;
-      }
-    }
+        const done = (): void => {
+          clearTimeout(timer);
+          abortSignal.removeEventListener('abort', done);
+          resolve();
+        };
+        const timer = setTimeout(done, ms);
+        abortSignal.addEventListener('abort', done, { once: true });
+      }));
+  let feed: Awaited<ReturnType<typeof startSandboxControlEventFeed>> | undefined;
+  let failureReported = false;
+
+  function logFeed(fields: string): void {
+    log(
+      `control feed scopeId=${scopeId} runtimeId=${runtimeId} directory=${feedDirectoryName(directory)} ${fields}`
+    );
   }
 
-  function feedDiagnostic(
-    phase: 'retry_scheduled' | 'failed',
-    reason: KiloEventFeedError['reason']
-  ): void {
-    const detail = diagnosticDetail(reason);
-    emitControlDiagnostic(options.onDiagnostic, 'control.feed', {
-      phase,
-      scopeId,
-      ...(detail ? { detail } : {}),
-    });
-  }
-
-  function unavailable(current: Recovery): void {
-    if (!isCurrent() || recovery !== current) return;
-    recovery = undefined;
-    state = 'unavailable';
-    options.onStateChange?.();
-    feedDiagnostic('failed', current.reason);
-    options.onFailure(current.reason);
-  }
-
-  async function retry(current: Recovery): Promise<void> {
-    for (let attempt = 1; attempt <= SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS; attempt++) {
-      if (!isCurrent() || recovery !== current || current.controller.signal.aborted) return;
-      const deadlineAt = Math.min(current.deadlineAt, Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS);
-      if (Date.now() >= deadlineAt) break;
-      try {
-        await connect(deadlineAt, current.controller.signal);
-        if (!isCurrent() || recovery !== current || current.controller.signal.aborted) return;
-        recovery = undefined;
-        state = 'ready';
-        options.onStateChange?.();
-        return;
-      } catch {
-        if (!isCurrent() || recovery !== current || current.controller.signal.aborted) return;
-        closeActive();
-        if (attempt === SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS || Date.now() >= current.deadlineAt)
-          break;
-        await delay(
-          Math.min(1_000 * 2 ** (attempt - 1), Math.max(0, current.deadlineAt - Date.now())),
-          undefined,
-          { signal: current.controller.signal }
-        ).catch(() => undefined);
-      }
-    }
-    unavailable(current);
-  }
-
-  function recover(reason: KiloEventFeedError['reason']): void {
-    if (!isCurrent() || state === 'unavailable') return;
-    if (recovery) return;
-    const current: Recovery = {
-      controller: new AbortController(),
-      deadlineAt: Date.now() + KILO_FEED_FRESHNESS_TIMEOUT_MS,
-      reason,
+  function openSdk(
+    feedSignal: AbortSignal,
+    onActivity: () => void,
+    onFrame: (frame: string) => void,
+    connection: KiloFeedConnection
+  ): Promise<{ stream?: AsyncIterable<unknown> }> {
+    const abortableSleep = async (ms: number): Promise<void> => {
+      logFeed(`phase=retry_delay delayMs=${ms}`);
+      await sleep(ms, feedSignal);
+      connection.hooks.onSleepWake();
     };
-    recovery = current;
-    state = 'recovering';
-    closeActive();
-    options.onStateChange?.();
-    feedDiagnostic('retry_scheduled', reason);
-    void retry(current);
+    const feedFetch: typeof fetch = Object.assign(async (...args: Parameters<typeof fetch>) => {
+      const composite = connection.hooks.beginAttempt();
+      composite.throwIfAborted();
+      connection.hooks.onGetStart();
+      const init: RequestInit & { duplex: 'half'; timeout: false } = {
+        ...args[1],
+        duplex: 'half',
+        timeout: false,
+        signal: composite,
+      };
+      const response = await fetch(args[0], init);
+      composite.throwIfAborted();
+      return observeKiloFeedResponse(response, composite, onActivity, onFrame);
+    }, fetch);
+    const eventClient = createKiloEventClient({
+      baseUrl: kiloClient.serverUrl,
+      directory,
+      fetch: feedFetch,
+    });
+    const sseOptions: Parameters<typeof eventClient.global.event>[0] & {
+      sseSleepFn: (ms: number) => Promise<void>;
+    } = {
+      signal: feedSignal,
+      sseMaxRetryAttempts: connection.sseMaxRetryAttempts,
+      sseSleepFn: abortableSleep,
+      onSseError: (error: unknown) => connection.hooks.onSseError(error),
+    };
+    return eventClient.global.event(sseOptions);
   }
 
   function close(): void {
     lifetime.abort();
-    recovery?.controller.abort();
-    recovery = undefined;
-    closeActive();
+    feed?.close();
+  }
+
+  // Producer-lifetime guard: the caller's registry can replace or retire this
+  // runtime while the feed is still running. Do not serve stale events or
+  // report failures for an incarnation that no longer owns the directory.
+  function producerCurrent(): boolean {
+    return !signal.aborted && options.isCurrent(runtimeId, kiloClient);
   }
 
   processSignal.addEventListener('abort', close, { once: true });
@@ -250,23 +136,45 @@ export function createWorktreeFeed(options: {
 
   return {
     async open() {
-      if (!isCurrent()) throw new Error('Native feed source was superseded');
-      if (state === 'unavailable') throw new Error('Native feed recovery is unavailable');
-      closeActive();
-      state = 'opening';
-      await connect();
-      if (!isCurrent()) throw new Error('Native feed source was superseded');
-      state = 'ready';
-      options.onStateChange?.();
+      if (!producerCurrent()) throw new Error('Native feed source was superseded');
+      feed?.close();
+      failureReported = false;
+      feed = await startSandboxControlEventFeed({
+        signal,
+        open: openSdk,
+        consume: async stream => {
+          for await (const event of unfilteredKiloEvents(stream)) {
+            if (!producerCurrent()) {
+              close();
+              return;
+            }
+            void options.onEvent?.({ ...event, nativeRuntimeId: runtimeId });
+          }
+        },
+        onUnexpectedClose: error => {
+          if (failureReported || !producerCurrent()) return;
+          failureReported = true;
+          options.onStateChange?.();
+          options.onFailure(error instanceof KiloEventFeedError ? error.reason : 'feed_failed');
+        },
+        onDiagnostic: options.onDiagnostic
+          ? (event, fields) =>
+              emitControlDiagnostic(options.onDiagnostic, event, { ...fields, scopeId })
+          : undefined,
+        log,
+        identity: { scopeId, runtimeId, directory },
+        ...(options.now ? { now: options.now } : {}),
+      });
     },
     isFresh() {
-      return state === 'ready' && active?.feed?.isFresh() === true;
+      return producerCurrent() && feed?.isFresh() === true;
+    },
+    isRecovering() {
+      return producerCurrent() && feed?.isRecovering() === true;
     },
     prepareForNewWork() {
-      if (!isCurrent() || state === 'unavailable') return false;
-      if (state === 'ready' && active?.feed?.isFresh() === true) return true;
-      if (state === 'ready') recover('feed_stale');
-      return false;
+      if (!producerCurrent() || !feed) return false;
+      return feed.isFresh() && !feed.isRecovering();
     },
     close,
   };

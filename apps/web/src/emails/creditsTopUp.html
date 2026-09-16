@@ -77,21 +77,10 @@
                             sans-serif;
                         "
                       >
-                        <strong style="color: #1a1a1a">Amount:</strong> ${{ amount_usd }} USD
+                        <strong style="color: #1a1a1a">{{ amount_label }}:</strong>
+                        ${{ amount_usd }} USD
                       </p>
-                      <p
-                        style="
-                          margin: 0 0 8px;
-                          font-size: 13px;
-                          line-height: 20px;
-                          color: #555;
-                          font-family:
-                            -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-                            sans-serif;
-                        "
-                      >
-                        <strong style="color: #1a1a1a">Credits:</strong> ${{ credits_usd }} USD
-                      </p>
+                      {{ service_fee_section }} {{ credits_row_section }}
                       <p
                         style="
                           margin: 0;

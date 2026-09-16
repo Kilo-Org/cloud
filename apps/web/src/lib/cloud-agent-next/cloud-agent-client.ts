@@ -26,6 +26,7 @@ import {
   type WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
+import { baseGetMessageResultNextOutputSchema } from '@/routers/cloud-agent-next-schemas';
 import {
   SandboxStatusSnapshotSchema,
   type SandboxStatusSnapshot,
@@ -350,6 +351,11 @@ export type GetSessionOutput = {
   /** Sandbox ID (hashed format like usr-abc123...) for correlating with Cloudflare logs */
   sandboxId?: string;
 
+  // Worktree ownership (present only for worktree sessions)
+  worktreeId?: string | null;
+  parentSessionId?: string | null;
+  cloudAgentSessionScopeId?: string | null;
+
   // Repository info (no tokens)
   githubRepo?: string;
   gitUrl?: string;
@@ -639,6 +645,9 @@ type CloudAgentNextTRPCClient = {
   };
   sendMessageV2: {
     mutate: (input: SendMessageInput) => Promise<InitiateSessionOutput>;
+  };
+  getMessageResult: {
+    query: (input: { cloudAgentSessionId: string; messageId: string }) => Promise<unknown>;
   };
   createTerminal: {
     mutate: (input: CreateTerminalInput) => Promise<CreateTerminalOutput>;
@@ -1072,6 +1081,34 @@ export class CloudAgentNextClient {
         },
       });
       throw normalizedError;
+    }
+  }
+
+  async getMessageResult(input: { cloudAgentSessionId: string; messageId: string }) {
+    try {
+      return baseGetMessageResultNextOutputSchema.parse(
+        await this.client.getMessageResult.query(input)
+      );
+    } catch (error) {
+      if (
+        error instanceof TRPCClientError &&
+        (error.data?.code === 'NOT_FOUND' || error.shape?.data?.code === 'NOT_FOUND') &&
+        error.message === 'Message not found'
+      ) {
+        return null;
+      }
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'getMessageResult' },
+        extra: {
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          messageId: input.messageId,
+        },
+      });
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Message result unavailable',
+        cause: error,
+      });
     }
   }
 

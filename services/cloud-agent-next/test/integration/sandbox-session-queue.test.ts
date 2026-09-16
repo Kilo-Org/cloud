@@ -338,11 +338,9 @@ describe('public control queue capacity and cancellation', () => {
   it.each([
     { state: 'accepted' as const, acceptedAt: 1 },
     { unresolvedDispatch: true as const },
-    { preparationAttemptId: 'attempt-original', deliveryDeadlineAt: Date.now() + 60_000 },
-    { wrapperInstanceId: 'wrapper-original' },
     { state: 'failed' as const, terminalAt: 1 },
     { state: 'cancelled' as const, terminalAt: 1 },
-  ])('refuses accepted, ambiguous, preparing and stale targets: %j', async patch => {
+  ])('refuses accepted, ambiguous and stale targets: %j', async patch => {
     const { session, sessionId } = await fixture();
     await send(sessionId, 1);
     await runInDurableObject(session, (_instance, state) => {
@@ -362,11 +360,37 @@ describe('public control queue capacity and cancellation', () => {
     expect(await snapshot(session)).toEqual(before);
   });
 
-  it('counts the preparing head and releases capacity on terminal settlement', async () => {
+  it.each([
+    { preparationAttemptId: 'attempt-original', deliveryDeadlineAt: Date.now() + 60_000 },
+    { wrapperInstanceId: 'wrapper-original' },
+  ])('drops a queued preparing or wrapper-bound target: %j', async patch => {
+    const { session, sessionId } = await fixture();
+    await send(sessionId, 1);
+    await runInDurableObject(session, (_instance, state) => {
+      const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+      state.storage.kv.put(
+        'session_messages',
+        messages.map(message => (message.messageId === id(1) ? { ...message, ...patch } : message))
+      );
+    });
+    const before = await snapshot(session);
+    expect(await (await cancel(sessionId, 1)).json()).toMatchObject({
+      result: { data: { dropped: true } },
+    });
+    const after = await snapshot(session);
+    expect(after).not.toEqual(before);
+    expect(after.messages.find(message => message.messageId === id(1))).toMatchObject({
+      ...patch,
+      state: 'cancelled',
+      failedReason: 'queued_message_cancelled',
+      terminalAt: expect.any(Number),
+    });
+  });
+
+  it('counts the preparing head and frees a slot when that head is cancelled', async () => {
     const { session, sessionId } = await fixture();
     for (let index = 1; index <= PENDING_SESSION_MESSAGE_LIMIT; index++)
       await send(sessionId, index);
-    const acceptedHead = (await snapshot(session)).messages[0];
     await runInDurableObject(session, (_instance, state) => {
       const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
       state.storage.kv.put(
@@ -384,27 +408,17 @@ describe('public control queue capacity and cancellation', () => {
           )
       );
     });
-    const preparing = await snapshot(session);
     expect((await send(sessionId, 11)).status).toBe(429);
     expect(await (await cancel(sessionId, 1)).json()).toMatchObject({
-      result: { data: { dropped: false } },
+      result: { data: { dropped: true } },
     });
-    expect(await snapshot(session)).toEqual(preparing);
-    await runInDurableObject(session, (instance, state) => {
-      const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
-      instance['saveMessages']([
-        acceptedHead,
-        ...messages.map(message =>
-          message.messageId === id(2) ? { ...message, state: 'failed' as const } : message
-        ),
-      ]);
-    });
-    expect((await send(sessionId, 12)).status).toBe(200);
-    const state = await snapshot(session);
-    expect(state.messages.find(message => message.messageId === id(1))).toMatchObject({
+    expect(
+      (await snapshot(session)).messages.find(message => message.messageId === id(1))
+    ).toMatchObject({
+      state: 'cancelled',
+      failedReason: 'queued_message_cancelled',
       preparationAttemptId: 'original',
-      state: 'queued',
     });
-    expect((await send(sessionId, 2)).status).toBe(400);
+    expect((await send(sessionId, 11)).status).toBe(200);
   });
 });

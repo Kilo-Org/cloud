@@ -40,7 +40,12 @@ export type SessionForwarding = {
 };
 
 export function createSessionForwarding(): SessionForwarding {
-  const chains = new Map<string, Promise<void>>();
+  type Chain = {
+    tail: Promise<void>;
+    active: number;
+    detached: boolean;
+  };
+  const chains = new Map<string, Chain>();
   const stats: SessionForwardingStats = {
     waiting: 0,
     inFlight: 0,
@@ -48,15 +53,31 @@ export function createSessionForwarding(): SessionForwarding {
     highWater: 0,
   };
 
+  const cleanup = (sessionId: string, chain: Chain): void => {
+    if (chain.active === 0 && chain.detached && chains.get(sessionId) === chain)
+      chains.delete(sessionId);
+  };
+
   const enqueue = <T>(sessionId: string, forward: () => Promise<T>): Promise<T> => {
-    const previous = chains.get(sessionId) ?? Promise.resolve();
+    const chain =
+      chains.get(sessionId) ??
+      (() => {
+        const created: Chain = { tail: Promise.resolve(), active: 0, detached: false };
+        chains.set(sessionId, created);
+        return created;
+      })();
+    chain.active++;
+    const previous = chain.tail;
     const next = previous.catch(() => undefined).then(forward);
-    chains.set(
-      sessionId,
-      next.then(
-        () => undefined,
-        () => undefined
-      )
+    chain.tail = next.then(
+      () => {
+        chain.active--;
+        cleanup(sessionId, chain);
+      },
+      () => {
+        chain.active--;
+        cleanup(sessionId, chain);
+      }
     );
     return next;
   };
@@ -101,8 +122,15 @@ export function createSessionForwarding(): SessionForwarding {
       });
     },
     stats: () => ({ ...stats }),
-    get: sessionId => chains.get(sessionId),
-    values: () => chains.values(),
-    delete: sessionId => chains.delete(sessionId),
+    get: sessionId => chains.get(sessionId)?.tail,
+    values: function* () {
+      for (const chain of chains.values()) yield chain.tail;
+    },
+    delete: sessionId => {
+      const chain = chains.get(sessionId);
+      if (!chain) return;
+      chain.detached = true;
+      cleanup(sessionId, chain);
+    },
   };
 }

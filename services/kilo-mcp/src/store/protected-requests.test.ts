@@ -2,6 +2,8 @@
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { totpCode } from '../otp/totp';
+import { createMcpHandler } from '../index';
+import type { ForwardedAuth } from '../types';
 import { KiloMcpOAuthStore, MAX_OTP_ATTEMPTS, PROTECTED_REQUEST_TTL_SECONDS } from './oauth-store';
 
 // Same in-memory/DO pattern as oauth-store.test.ts: a
@@ -98,9 +100,20 @@ describe('protected requests and OTP claims (real drizzle durable-sqlite over no
     db.close();
   });
 
-  /** Enrol `kiloUserId` and return the one secret the store keeps for them. */
+  /**
+   * Enrol `kiloUserId` and return the one secret the store keeps for them. The
+   * enrollment is completed the way the picker completes it — the code that
+   * answers `ensureAuthenticator` is confirmed with `confirmAuthenticator` —
+   * because the store treats a row that never proved possession as unusable.
+   */
   async function enroll(kiloUserId = 'admin-1'): Promise<string> {
     const { secret } = await store.ensureAuthenticator(kiloUserId, NOW);
+    const confirmed = await store.confirmAuthenticator(
+      kiloUserId,
+      await totpCode(secret, NOW_MS),
+      NOW
+    );
+    if (!confirmed) throw new Error('enrollment code did not verify');
     return secret;
   }
 
@@ -209,9 +222,18 @@ describe('protected requests and OTP claims (real drizzle durable-sqlite over no
     const request = await createRequest();
     const code = await totpCode(secret, Date.parse(AFTER_REQUEST_TTL));
 
+    // The owning connection is told why, so the handler can serve the expired
+    // refusal without reading a clock of its own.
     expect(await store.peekProtectedRequest(request.id, 'session-1', AFTER_REQUEST_TTL)).toEqual({
+      status: 'expired',
+    });
+    // Another session — and an id that was never issued — stays uniform.
+    expect(await store.peekProtectedRequest(request.id, 'session-2', AFTER_REQUEST_TTL)).toEqual({
       status: 'gone',
     });
+    expect(
+      await store.peekProtectedRequest('never-issued', 'session-1', AFTER_REQUEST_TTL)
+    ).toEqual({ status: 'gone' });
     expect(await claim(request.id, code, { nowIso: AFTER_REQUEST_TTL })).toEqual({
       status: 'expired',
     });
@@ -263,8 +285,14 @@ describe('protected requests and OTP claims (real drizzle durable-sqlite over no
     expect(await claim(request.id, correctCode, { sessionId: 'session-2' })).toEqual({
       status: 'not_pending',
     });
+    expect(await store.peekProtectedRequest(request.id, 'session-2', NOW)).toEqual({
+      status: 'gone',
+    });
     // The owner is told the request is gone and must start a new call.
     expect(await claim(request.id, correctCode)).toEqual({ status: 'invalidated' });
+    expect(await store.peekProtectedRequest(request.id, 'session-1', NOW)).toEqual({
+      status: 'invalidated',
+    });
   });
 
   it('answers not_pending for a used request', async () => {
@@ -280,6 +308,24 @@ describe('protected requests and OTP claims (real drizzle durable-sqlite over no
     const request = await createRequest();
     expect(await claim(request.id, '123456')).toEqual({ status: 'no_authenticator' });
     // A failed claim without an authenticator consumes no attempt.
+    expect(rowFor(db, 'mcp_protected_requests', 'id', request.id)).toMatchObject({
+      status: 'pending',
+      attempts: 0,
+    });
+  });
+
+  it('treats a row that never proved possession as no authenticator at all', async () => {
+    // `ensureAuthenticator` creates the row on the picker's first render, so an
+    // admin can hold an unverified authenticator. The schema's invariant is
+    // that `verified_at` null means unusable, and a correct code must not change
+    // that: the enrollment code the picker submits is what verifies the row.
+    const { secret } = await store.ensureAuthenticator('admin-1', NOW);
+    const request = await createRequest();
+
+    expect(await claim(request.id, await totpCode(secret, NOW_MS))).toEqual({
+      status: 'no_authenticator',
+    });
+    // Refused as if no authenticator existed: no attempt is consumed.
     expect(rowFor(db, 'mcp_protected_requests', 'id', request.id)).toMatchObject({
       status: 'pending',
       attempts: 0,
@@ -328,5 +374,74 @@ describe('protected requests and OTP claims (real drizzle durable-sqlite over no
     expect(await store.peekProtectedRequest(request.id, 'session-1', AFTER_REQUEST_TTL)).toEqual({
       status: 'gone',
     });
+  });
+
+  it('serves the stored expired and cancelled refusals through the real submit_otp handler', async () => {
+    // The handler reads `nowIso` from the wall clock, so the rows are made stale
+    // relative to it: the expired one was created in 2020, and the cancelled one
+    // is invalidated before the submit. This is the production path — the store
+    // is the real Durable Object implementation, not a scripted fake.
+    const handler = createMcpHandler({
+      catalog: {},
+      webBaseUrl: 'https://app.kilo.ai',
+      protectedRequests: store,
+    });
+    const auth: ForwardedAuth = {
+      authorization: 'Bearer kilo-token',
+      kiloUserId: 'admin-1',
+      clientId: 'client-1',
+      adminEnabled: true,
+      adminEligible: true,
+      sessionId: 'session-1',
+    };
+    const submit = async (requestId: string): Promise<string> => {
+      const response = await handler(
+        new Request('https://kilo-mcp.test/mcp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/call',
+            params: { name: 'submit_otp', arguments: { request_id: requestId, otp: '000000' } },
+          }),
+        }),
+        auth
+      );
+      const json = (await response.json()) as { error: { code: number; message: string } };
+      return json.error.message;
+    };
+    const fresh = new Date().toISOString();
+
+    const expired = await store.createProtectedRequest({
+      sessionId: 'session-1',
+      kiloUserId: 'admin-1',
+      clientId: 'client-1',
+      path: 'organizations.admin.list',
+      kind: 'admin',
+      inputJson: null,
+      nowIso: '2020-01-01T00:00:00.000Z',
+    });
+    const secret = await enroll();
+    const cancelled = await store.createProtectedRequest({
+      sessionId: 'session-1',
+      kiloUserId: 'admin-1',
+      clientId: 'client-1',
+      path: 'organizations.admin.list',
+      kind: 'admin',
+      inputJson: null,
+      nowIso: fresh,
+    });
+    const wrong = wrongCodeFor(await totpCode(secret, Date.now()));
+    for (let attempt = 0; attempt < MAX_OTP_ATTEMPTS; attempt++) {
+      expect((await claim(cancelled.id, wrong, { nowIso: fresh })).status).toBe('bad_code');
+    }
+
+    expect(await submit(expired.id)).toBe(
+      'This request expired. Start a new admin or debug call with call_protected.'
+    );
+    expect(await submit(cancelled.id)).toBe(
+      'This request was cancelled after too many incorrect codes. Start a new admin or debug call with call_protected.'
+    );
   });
 });

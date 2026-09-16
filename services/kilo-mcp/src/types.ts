@@ -151,16 +151,19 @@ export type ProtectedRequestsApi = {
     nowIso: string;
   }): Promise<{ id: string; expiresAt: string }>;
   /**
-   * Whether `sessionId` still holds an unexpired pending request `id`, without
-   * consuming anything. Anything else — an unknown id, another session's id, a
-   * used row, an expired row — answers `gone`, so the caller's reply is
-   * uniform.
+   * Whether `sessionId` can still submit `id`, and if not, why — without
+   * consuming anything. An unknown id, another session's id and a used row
+   * answer `gone`, so the caller's reply for those is uniform; the owning
+   * connection, which already holds the id, gets the specific `expired` or
+   * `invalidated` state so its refusal can name the reason.
    */
   peekProtectedRequest(
     id: string,
     sessionId: string,
     nowIso: string
-  ): Promise<{ status: 'pending' } | { status: 'gone' }>;
+  ): Promise<
+    { status: 'pending' } | { status: 'expired' } | { status: 'invalidated' } | { status: 'gone' }
+  >;
   /**
    * Verify the submitted code against the owner's authenticator and, on
    * success, claim the request exactly once — all in one storage transaction.

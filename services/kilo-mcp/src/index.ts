@@ -303,6 +303,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * The refusal a `submit_otp` caller sees for a request it can no longer submit.
+ * `gone` is the single uniform answer for an unknown id, another session's id
+ * and a used request — it names no path, kind, client or owner, so enumerating
+ * ids learns nothing. The owning connection, which already holds the id, gets
+ * the specific `expired` or `invalidated` reason instead.
+ */
+function staleProtectedRequest(status: 'gone' | 'expired' | 'invalidated'): JsonRpcFailure {
+  switch (status) {
+    case 'expired':
+      return new JsonRpcFailure(
+        INVALID_PARAMS,
+        'This request expired. Start a new admin or debug call with call_protected.'
+      );
+    case 'invalidated':
+      return new JsonRpcFailure(
+        INVALID_PARAMS,
+        'This request was cancelled after too many incorrect codes. Start a new admin or debug call with call_protected.'
+      );
+    case 'gone':
+      return new JsonRpcFailure(
+        INVALID_PARAMS,
+        'This request is no longer pending. Start a new admin or debug call with call_protected.'
+      );
+  }
+}
+
 async function runTool(
   name: string,
   args: Record<string, unknown>,
@@ -433,14 +460,13 @@ async function runTool(
     const nowIso = new Date().toISOString();
     let outcome: OtpSubmitOutcome;
     try {
-      // `gone` covers an unknown id, another session's id, an expired row and a
-      // used row with one uniform answer that names no path, kind or owner.
+      // `gone` covers an unknown id, another session's id and a used row with
+      // one uniform answer that names no path, kind or owner; the owning
+      // connection's expired/cancelled request gets its own refusal here,
+      // before the live admin re-check below (a stale request never reaches it).
       const peek = await requests.peekProtectedRequest(request_id, sessionId, nowIso);
-      if (peek.status === 'gone') {
-        throw new JsonRpcFailure(
-          INVALID_PARAMS,
-          'This request is no longer pending. Start a new admin or debug call with call_protected.'
-        );
+      if (peek.status !== 'pending') {
+        throw staleProtectedRequest(peek.status);
       }
       // Re-derive admin from the live user.getMe with the grant's Kilo bearer:
       // an admin who lost the role cannot execute an already-pending request.
@@ -486,20 +512,11 @@ async function runTool(
 
     switch (outcome.status) {
       case 'not_pending':
-        throw new JsonRpcFailure(
-          INVALID_PARAMS,
-          'This request is no longer pending. Start a new admin or debug call with call_protected.'
-        );
+        throw staleProtectedRequest('gone');
       case 'expired':
-        throw new JsonRpcFailure(
-          INVALID_PARAMS,
-          'This request expired. Start a new admin or debug call with call_protected.'
-        );
+        throw staleProtectedRequest('expired');
       case 'invalidated':
-        throw new JsonRpcFailure(
-          INVALID_PARAMS,
-          'This request was cancelled after too many incorrect codes. Start a new admin or debug call with call_protected.'
-        );
+        throw staleProtectedRequest('invalidated');
       case 'bad_code':
         throw new JsonRpcFailure(
           INVALID_PARAMS,

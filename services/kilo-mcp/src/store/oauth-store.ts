@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { AuthRequest } from '@cloudflare/workers-oauth-provider';
-import { and, eq, gt, isNull, lt } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, isNull, lt } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
@@ -416,20 +416,29 @@ export class KiloMcpOAuthStore
     id: string,
     sessionId: string,
     nowIso: string
-  ): Promise<{ status: 'pending' } | { status: 'gone' }> {
+  ): Promise<
+    { status: 'pending' } | { status: 'expired' } | { status: 'invalidated' } | { status: 'gone' }
+  > {
     const row = this.db
       .select()
       .from(mcpProtectedRequests)
-      .where(
-        and(
-          eq(mcpProtectedRequests.id, id),
-          eq(mcpProtectedRequests.session_id, sessionId),
-          eq(mcpProtectedRequests.status, 'pending'),
-          gt(mcpProtectedRequests.expires_at, nowIso)
-        )
-      )
+      .where(and(eq(mcpProtectedRequests.id, id), eq(mcpProtectedRequests.session_id, sessionId)))
       .get();
-    return row ? { status: 'pending' } : { status: 'gone' };
+    // An unknown id, another session's id and an already-used row answer the
+    // uniform `gone`. The owning connection already holds the id, so telling it
+    // why its own request is no longer submittable discloses nothing new.
+    if (!row || row.status === 'used') {
+      return { status: 'gone' };
+    }
+    // Same order as `claimProtectedRequest`, so a peek and a claim agree on a
+    // row that is both cancelled and past its TTL.
+    if (row.status === 'invalidated') {
+      return { status: 'invalidated' };
+    }
+    if (row.expires_at <= nowIso) {
+      return { status: 'expired' };
+    }
+    return { status: 'pending' };
   }
 
   async verifyOtpAndClaim(input: {
@@ -445,10 +454,18 @@ export class KiloMcpOAuthStore
     // changes it — so this is the same verification the transaction would
     // perform; every row read and every state change (including the attempt
     // count and the single-use step) still happens inside the transaction.
+    // Only a verified row is usable (`verified_at` is the schema's invariant):
+    // an authenticator that never proved possession is treated as none at all,
+    // so a half-finished enrollment can never approve an execution.
     const authenticator = this.db
       .select({ secret: mcpAdminAuthenticators.secret })
       .from(mcpAdminAuthenticators)
-      .where(eq(mcpAdminAuthenticators.kilo_user_id, input.kiloUserId))
+      .where(
+        and(
+          eq(mcpAdminAuthenticators.kilo_user_id, input.kiloUserId),
+          isNotNull(mcpAdminAuthenticators.verified_at)
+        )
+      )
       .get();
     const verification = authenticator
       ? await verifyTotp(authenticator.secret, input.code, Date.parse(input.nowIso))

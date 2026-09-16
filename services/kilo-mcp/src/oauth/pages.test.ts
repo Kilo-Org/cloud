@@ -30,6 +30,8 @@ describe('consentPage', () => {
     const response = render();
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toContain('text/html');
+    // No cache — browser or intermediary — may retain an OAuth flow page.
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     const html = await response.text();
     expect(html).not.toContain('<script>alert(1)</script>');
     expect(html).toContain('&lt;script&gt;');
@@ -151,14 +153,18 @@ describe('orgPickerPage', () => {
   });
 
   it('shows the secret, the otpauth URI and the code field for an unenrolled admin', async () => {
-    const html = await orgPickerPage({
+    const response = orgPickerPage({
       clientName: 'c',
       actionUrl: '/authorize/org?id=pa-1',
       options: [{ id: PERSONAL_ORG_ID, name: 'Personal account' }],
       error: null,
       showAdminOption: true,
       authenticator: { secret: SECRET, verified: false },
-    }).text();
+    });
+    const html = await response.text();
+    // The one-time TOTP secret is long-lived, so this response must not be
+    // stored by any cache.
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(html).toContain('Add an authenticator');
     expect(html).toContain(
       'Add this secret to your authenticator app, or enter the otpauth URI below:'

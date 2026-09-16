@@ -32,10 +32,12 @@
   },
   "devDependencies": {
     "@jest/globals": "30.3.0",
+    "@swc/jest": "0.2.39",
     "@types/pg": "8.18.0",
     "@typescript/native-preview": "catalog:",
     "dotenv": "17.3.1",
     "drizzle-kit": "catalog:",
+    "jest": "30.3.0",
     "typescript": "catalog:"
   }
 }

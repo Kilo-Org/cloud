@@ -3059,7 +3059,9 @@
     "openAgents": "Vula ama-ejenti",
     "needsInput": "Kudinga impendulo",
     "channelName": "Ama-ejenti asebenzayo",
-    "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe."
+    "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe.",
+    "openSession": "Vula",
+    "approveFailed": "Asikwazanga ukugunyaza. Thepha $t(common.approve) ukuze uzame futhi."
   },
   "transcriptionModel": {
     "title": "Imodeli yokuguqula inkulumo",

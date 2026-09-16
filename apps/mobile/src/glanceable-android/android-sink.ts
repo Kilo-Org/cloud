@@ -37,6 +37,10 @@ import {
  * Ending the ongoing notification never cancels a still-eligible widget expiry.
  */
 const NOTIFICATION_TITLE_KEY = 'glanceable.channelName';
+// i18n-dup-ok: 'glanceable.openSession' repeats the English word of the open-state keys of a pull
+// request, a finding and an invoice — a status adjective cs, pl, be and ru decline apart from the
+// imperative — and of two feature CTAs the catalogs render as a noun (fr "Ouverture", de "Offen",
+// es "Apertura"), so this notification and Live Activity button keeps its own key.
 const OPEN_SESSION_LABEL_KEY = 'glanceable.openSession';
 const APPROVE_LABEL_KEY = 'common.approve';
 

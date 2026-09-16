@@ -3082,7 +3082,9 @@
     "openAgents": "Abrir agentes",
     "needsInput": "Aguardando resposta",
     "channelName": "Agentes ativos",
-    "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada."
+    "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada.",
+    "openSession": "Abrir",
+    "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente."
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",

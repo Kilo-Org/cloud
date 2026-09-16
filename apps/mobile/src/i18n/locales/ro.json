@@ -3082,7 +3082,9 @@
     "openAgents": "Deschide agenții",
     "needsInput": "Așteaptă un răspuns",
     "channelName": "Agenți activi",
-    "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare."
+    "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare.",
+    "openSession": "Deschide",
+    "approveFailed": "Aprobarea nu a reușit. Atinge $t(common.approve) pentru a încerca din nou."
   },
   "transcriptionModel": {
     "title": "Model de transcriere",

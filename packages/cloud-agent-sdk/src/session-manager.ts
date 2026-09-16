@@ -782,7 +782,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * has not caught up with yet: the rows are readable, but the session's current
    * transcript is still being fetched. Drives the inline refresh indicator.
    * Callers without a cached-page reader (web, extension) never set it, so their
-   * behavior is unchanged.
+   * behavior is unchanged. It clears when the live transcript lands — the page
+   * callback when one is configured, otherwise the replayed `session.created`
+   * — and on an error, a transcript clear, or a session reset.
    */
   const isRefreshingCachedTranscriptAtom = atom(false);
   const isReadOnlyAtom = atom(false);
@@ -1939,6 +1941,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           // cast cloudAgentSessionId (the createAndStart path).
           store.set(rootSessionIdAtom, info.id);
           store.set(isLoadingAtom, false);
+          // The snapshot replay is the landing signal for a cached open that
+          // has no page-aware read: without `fetchSnapshotPage` the transport
+          // never calls `onInitialPageLoaded`, and the legacy `fetchSnapshot`
+          // fallback of the cloud-agent and read-only transports never emits
+          // `onReplayComplete` either, so a cached-page refresh that waited for
+          // those would stay advertised forever. With `fetchSnapshotPage` the
+          // live page already cleared it (and arrives before this replay), so
+          // the refresh keeps its page-scoped clear there.
+          if (!config.fetchSnapshotPage) {
+            store.set(isRefreshingCachedTranscriptAtom, false);
+          }
           // A fresh replay is starting (initial connect or a reconnect);
           // onReplayComplete flips this back off once it's done.
           remoteHistoryReplaying = true;

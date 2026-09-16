@@ -774,6 +774,29 @@ describe('createSessionManager', () => {
         );
       });
 
+      it('clears the cached transcript refresh when a legacy transport replays its snapshot', async () => {
+        // Without `fetchSnapshotPage` the transport has no `onInitialPageLoaded`
+        // to report the live read, and the legacy `fetchSnapshot` fallback of
+        // the cloud-agent and read-only transports never emits
+        // `onReplayComplete` either. The root `session.created` it replays with
+        // the live snapshot is the only landing signal, so the refresh must not
+        // outlive it.
+        const config = createMockConfig({
+          readCachedSnapshotPage: jest.fn().mockResolvedValue(cachedPage('ses-1', ['msg-cache-1'])),
+        });
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(atomValue<boolean>(config.store, mgr.atoms.isRefreshingCachedTranscript)).toBe(true);
+
+        mockSessionCallbacks.onSessionCreated?.({ id: kiloId('ses-1') });
+        expect(atomValue<boolean>(config.store, mgr.atoms.isRefreshingCachedTranscript)).toBe(
+          false
+        );
+      });
+
       it('stops advertising the refresh when the open fails over cached rows', async () => {
         const config = createMockConfig({
           fetchSession: jest.fn().mockRejectedValue(new Error('offline')),

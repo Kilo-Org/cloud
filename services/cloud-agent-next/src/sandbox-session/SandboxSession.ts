@@ -31,6 +31,7 @@ import {
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyGrantSchema,
   RUNTIME_PROXY_GRANT_KEY,
+  sameRuntimeProxyControlBinding,
   verifyRuntimeCredentialProxyHandle,
 } from '../runtime-credential-proxy.js';
 import { z } from 'zod';
@@ -1467,13 +1468,7 @@ export class SandboxSession extends DurableObject<Env> {
       readFence(),
     ]);
     const authorization = RuntimeAuthorizationSchema.safeParse(storedAuthorization);
-    if (
-      !latestFence ||
-      latestFence.allocationId !== fence.allocationId ||
-      latestFence.providerInstanceId !== fence.providerInstanceId ||
-      latestFence.connectionId !== fence.connectionId ||
-      latestFence.wrapperInstanceId !== fence.wrapperInstanceId
-    ) {
+    if (!latestFence || !sameRuntimeProxyControlBinding(fence, latestFence)) {
       return null;
     }
     return issuePersistedRuntimeProxyGrant({
@@ -2181,18 +2176,21 @@ export class SandboxSession extends DurableObject<Env> {
     this.ctx.storage.transactionSync(() => {
       this.ctx.storage.kv.put(DELETED_WORKTREE_KEY, worktreeId);
       this.terminalLifecycle.beginDeletion(metadata);
-      this.worktreeChanges.purge();
       this.snapshotDeletedMessages(metadata);
     });
     if (this.messageCallbacks.pendingCallbackCount() > 0) this.scheduleCallbackRepair();
     if (this.reportOutbox.pendingCount() > 0) this.scheduleReportRepair();
     this.deletedWorktreeId = worktreeId;
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
-    if (
-      this.messageCallbacks.pendingCallbackCount() === 0 &&
-      this.reportOutbox.pendingCount() === 0
-    )
-      await this.ctx.storage.deleteAlarm();
+    try {
+      this.ctx.storage.transactionSync(() => this.worktreeChanges.purge());
+    } finally {
+      if (
+        this.messageCallbacks.pendingCallbackCount() === 0 &&
+        this.reportOutbox.pendingCount() === 0
+      )
+        await this.ctx.storage.deleteAlarm();
+    }
     if (!metadata) return null;
     return cloudAgentWorktreeLocationSchema.parse({
       sandboxId: metadata.workspace?.sandboxId,
@@ -2484,7 +2482,6 @@ export class SandboxSession extends DurableObject<Env> {
     const records = this.ctx.storage.transactionSync(() => {
       if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const records = this.terminalLifecycle.beginDeletion(metadata);
-      this.worktreeChanges.purge();
       if (preparing?.wrapperInstanceId && preparing.deliveryRetryScope !== 'message' && metadata) {
         this.retainRuntimeCleanup(metadata, preparing.wrapperInstanceId, 'preparation_interrupted');
       }
@@ -2496,9 +2493,21 @@ export class SandboxSession extends DurableObject<Env> {
     for (const ws of this.ctx.getWebSockets('stream')) {
       ws.close(1000, 'session access revoked');
     }
-    if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
-    else await this.interruptDeletedMessage(metadata, accepted);
-    await this.terminalLifecycle.cleanupSession(metadata, records);
+    const errors: unknown[] = [];
+    try {
+      this.ctx.storage.transactionSync(() => this.worktreeChanges.purge());
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
+      else await this.interruptDeletedMessage(metadata, accepted);
+      await this.terminalLifecycle.cleanupSession(metadata, records);
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, 'Session cleanup failed');
     await this.ingestPublicationChain.catch(() => undefined);
     if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     const callbacksPending = this.messageCallbacks.pendingCallbackCount() > 0;

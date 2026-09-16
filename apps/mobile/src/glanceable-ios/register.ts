@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 
 import { i18n } from '@/i18n';
+import { approveFrontAgent } from '@/lib/glanceable/approve-front-agent';
 import { getGlanceableDelivery, registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import {
   getLiveActivityEnabled,
@@ -10,6 +11,7 @@ import {
 import { adoptPushStartedActivity } from './adopt-activity';
 import { refreshActiveAgentsLiveActivityCopy } from './active-agents-live-activity';
 import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
+import { registerGlanceableApproveAction } from './approve-action';
 import { iosSink } from './ios-sink';
 import { registerWidgetActionHandling } from './widget-actions';
 import { ensureWidgetLogo } from './widget-logo';
@@ -26,6 +28,18 @@ if (Platform.OS === 'ios') {
   // process is up, and the launch sweep picks up a press that patched the
   // timeline before JS subscribed.
   registerWidgetActionHandling();
+
+  // The Live Activity's Approve control mirrors to the Apple Watch, so a wrist
+  // press arrives as a widget interaction in this process. It runs the same
+  // front-approval service the phone's permission card uses; the caller is a
+  // thunk because the service reads its scope and attaches lazily. This is a
+  // second interaction listener beside `registerWidgetActionHandling`: each
+  // handler filters on its own surface (this one on the `approve` target, the
+  // widget sweep on the Home Screen widget's press marker), so a press is
+  // answered by exactly one of them.
+  registerGlanceableApproveAction(async () => {
+    await approveFrontAgent();
+  });
 
   // Copy the Kilo mark into the shared app group so the widget extension can read
   // it. Fire and forget: it lands long before the first snapshot arrives, and a

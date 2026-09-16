@@ -17,7 +17,14 @@ import { cn } from '@/lib/utils';
 type CollapsibleSectionProps = {
   title: string;
   defaultExpanded?: boolean;
+  /** Controlled expanded state. When set, the parent owns it and `onToggle` is
+   *  the only way it changes; omit it to keep the internal (uncontrolled) state. */
+  expanded?: boolean;
+  /** Called on every header press, before the uncontrolled fallback toggles. */
+  onToggle?: () => void;
   className?: string;
+  titleClassName?: string;
+  contentClassName?: string;
   children: ReactNode;
 };
 
@@ -29,20 +36,27 @@ type CollapsibleSectionProps = {
 export function CollapsibleSection({
   title,
   defaultExpanded = false,
+  expanded,
+  onToggle,
   className,
+  titleClassName,
+  contentClassName,
   children,
 }: Readonly<CollapsibleSectionProps>) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
+  // A controlled parent wins over the internal state so the persisted value
+  // (s3's connect card) is what the chevron, the body, and a11y report.
+  const resolvedExpanded = expanded ?? internalExpanded;
   const colors = useThemeColors();
   const { reducedMotion } = useMotionPolicy();
-  const rotation = useSharedValue(defaultExpanded ? 180 : 0);
+  const rotation = useSharedValue((expanded ?? defaultExpanded) ? 180 : 0);
 
   useEffect(() => {
     // Reduced motion jumps the chevron straight to its target angle instead of
     // a 200ms timing; the layout transition and content fade are dropped below.
-    const target = expanded ? 180 : 0;
+    const target = resolvedExpanded ? 180 : 0;
     rotation.value = reducedMotion ? target : withTiming(target, { duration: 200 });
-  }, [expanded, reducedMotion, rotation]);
+  }, [resolvedExpanded, reducedMotion, rotation]);
 
   const chevronStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],
@@ -57,21 +71,24 @@ export function CollapsibleSection({
         className="flex-row items-center justify-between gap-2"
         hitSlop={12}
         onPress={() => {
-          setExpanded(current => !current);
+          onToggle?.();
+          if (expanded === undefined) {
+            setInternalExpanded(current => !current);
+          }
         }}
         accessibilityRole="button"
-        accessibilityState={{ expanded }}
+        accessibilityState={{ expanded: resolvedExpanded }}
         accessibilityLabel={title}
       >
-        <Text className="flex-1 text-sm font-medium">{title}</Text>
+        <Text className={cn('flex-1 text-sm font-medium', titleClassName)}>{title}</Text>
         <Animated.View style={chevronStyle}>
           <ChevronDown size={16} color={colors.mutedForeground} />
         </Animated.View>
       </Pressable>
-      {expanded && (
+      {resolvedExpanded && (
         <Animated.View
           entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-          className="gap-2"
+          className={cn('gap-2', contentClassName)}
         >
           {children}
         </Animated.View>

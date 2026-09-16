@@ -219,6 +219,13 @@ export function buildExpiredWidgetProps(
  * Build the Live Activity content-state from a snapshot. The server pushes the
  * same raw shape, so the widget extension's `active-agents-live-activity.tsx`
  * renders it directly with inlined English copy (the server cannot translate).
+ *
+ * The approvable count rides only here, never in `GlanceableViewProps`: the
+ * widget families and the complication stay read-only counts, and the Lock
+ * Screen / Watch Smart Stack layout is the one surface that draws an Approve
+ * control. A snapshot from an older producer omits the field, so it resolves
+ * to 0 and the control is hidden rather than offering an Approve the service
+ * could not complete.
  */
 export function buildGlanceableLiveActivityContentState(
   snapshot: GlanceableAgentsSnapshot
@@ -227,6 +234,7 @@ export function buildGlanceableLiveActivityContentState(
     status: snapshot.status,
     running: snapshot.running,
     needsInput: snapshot.needsInput,
+    needsApproval: snapshot.needsApproval ?? 0,
     idle: snapshot.idle,
     needsInputSince: snapshot.needsInputSince,
   };

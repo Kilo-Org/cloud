@@ -1,14 +1,20 @@
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
+  type GlanceableSessionRow,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { withStatus } from '@/lib/glanceable/publisher';
 import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 
-import { buildGlanceableViewProps } from './view-props';
+import {
+  buildGlanceableLiveActivityContentState,
+  buildGlanceableViewProps,
+  toWidgetProps,
+} from './view-props';
 
-const NOW = 1_750_000_000_000;
+const NOW = Date.parse('2026-01-02T00:00:00Z');
 
 const COPY: Record<string, string> = {
   'glanceable.approving': 'Approving...',
@@ -26,7 +32,7 @@ afterEach(() => {
 });
 
 function snapshotFor(
-  sessions: { status: string }[] = [],
+  sessions: readonly GlanceableSessionRow[] = [],
   status?: GlanceableAgentsSnapshot['status']
 ): GlanceableAgentsSnapshot {
   return buildGlanceableSnapshot({
@@ -37,6 +43,15 @@ function snapshotFor(
     ...(status === undefined ? {} : { status }),
   });
 }
+
+const PERMISSION_ROW: GlanceableSessionRow = {
+  status: 'permission',
+  statusUpdatedAt: '2026-01-01T00:00:00.000Z',
+};
+const QUESTION_ROW: GlanceableSessionRow = {
+  status: 'question',
+  statusUpdatedAt: '2026-01-01T00:00:00.000Z',
+};
 
 describe('newestTitleFor', () => {
   it.each([
@@ -99,5 +114,79 @@ describe('actions', () => {
   it('keeps New agent disabled while a session waits', () => {
     const props = buildGlanceableViewProps(snapshotFor([{ status: 'question' }]), {}, translate);
     expect(props.actions).toEqual({ approve: true, newAgent: false });
+  });
+});
+
+/**
+ * The approvable count is the gate for the Live Activity's Approve control. It
+ * is narrower than `needsInput` on purpose: only a permission prompt can be
+ * answered without choosing an option, so a question or a retry must never
+ * raise the wrist control. The Home Screen widget's in-place buttons gate on
+ * `needsInput` instead (they hand a question to the app), which is why this
+ * count must stay off `GlanceableViewProps`: the widget never reads it.
+ */
+describe('buildGlanceableLiveActivityContentState needsApproval', () => {
+  it('forwards one permission wait as 1', () => {
+    const built = snapshotFor([PERMISSION_ROW]);
+    expect(built.needsApproval).toBe(1);
+    expect(buildGlanceableLiveActivityContentState(built).needsApproval).toBe(1);
+  });
+
+  it('forwards a question-only wait as 0, though it is still needs-input', () => {
+    const built = snapshotFor([QUESTION_ROW]);
+    expect(built.needsInput).toBe(1);
+    expect(buildGlanceableLiveActivityContentState(built).needsApproval).toBe(0);
+  });
+
+  it('reads an absent field on an old snapshot as 0, never undefined', () => {
+    // An older producer omits `needsApproval` from the pushed shape. The
+    // content state must still carry a number: the layout compares it with
+    // `> 0` and must not draw the control for a value it cannot read.
+    const { needsApproval: _omitted, ...oldSnapshot } = snapshotFor([PERMISSION_ROW]);
+    const contentState = buildGlanceableLiveActivityContentState(
+      oldSnapshot as GlanceableAgentsSnapshot
+    );
+    expect(contentState.needsApproval).toBe(0);
+  });
+
+  it('expires to a frame with no counts while keeping the approvable count', () => {
+    // The fetch-error path (`handleFetchError`) advances the retained card with
+    // `withStatus(..., 'stale', now)`: past `expiresAt` it zeroes every count
+    // but leaves `needsApproval` standing. The layout gates the Approve control
+    // on the counts too (`hasCounts && needsApproval`), so this frame draws no
+    // control; this test pins the exact shape that gate defends against.
+    const current = snapshotFor([PERMISSION_ROW]);
+    expect(current.needsApproval).toBe(1);
+    const expired = withStatus(current, 'stale', Date.parse(current.expiresAt));
+
+    expect(expired.status).toBe('expired');
+    const contentState = buildGlanceableLiveActivityContentState(expired);
+    expect(contentState.needsInput).toBe(0);
+    expect(contentState.running).toBe(0);
+    expect(contentState.idle).toBe(0);
+    // Survives expiry — which is exactly why the layout cannot gate on it alone.
+    expect(contentState.needsApproval).toBe(1);
+  });
+
+  it('keeps the approvable count off the widget props', () => {
+    // The Live Activity is the surface that reads `needsApproval`; the Home
+    // Screen widget and the complication render `GlanceableViewProps`, whose
+    // Approve button is driven by the retained wait itself. Assert the whole
+    // key set so the approvable count (or any other field) cannot silently
+    // ship onto a widget shape that has no use for it.
+    const props = buildGlanceableViewProps(snapshotFor([PERMISSION_ROW]), {}, translate);
+    expect(Object.keys(props).toSorted()).toEqual([
+      'accessibilityLabel',
+      'actions',
+      'countLines',
+      'needsInputSince',
+      'newestTitle',
+      'primaryCount',
+      'primaryKind',
+      'primaryLabel',
+      'statusLine',
+    ]);
+    expect('needsApproval' in props).toBe(false);
+    expect(toWidgetProps(props)).not.toHaveProperty('needsApproval');
   });
 });

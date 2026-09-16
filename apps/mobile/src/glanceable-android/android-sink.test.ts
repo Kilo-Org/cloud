@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => {
   let notification: {
     title: string;
     text: string;
+    approveLabel: string | null;
     compactText: string | null;
     promotion: boolean;
   } | null = null;
@@ -36,11 +37,12 @@ const mocks = vi.hoisted(() => {
     title: string,
     text: string,
     _openAgentsLabel: string,
+    approveLabel: string | null,
     compactText: string | null,
     promotion: boolean,
     timeoutMs = 0
   ): void {
-    notification = { title, text, compactText, promotion };
+    notification = { title, text, approveLabel, compactText, promotion };
     notificationDeadline = timeoutMs > 0 ? Date.now() + timeoutMs : null;
   }
 
@@ -205,6 +207,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '2 Needs input, 4 Working, 3 Idle',
+      approveLabel: null,
       compactText: '2',
       promotion: true,
     });
@@ -214,6 +217,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '4 Working, 3 Idle',
+      approveLabel: null,
       compactText: '4',
       promotion: true,
     });
@@ -223,6 +227,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '4 Working',
+      approveLabel: null,
       compactText: '4',
       promotion: true,
     });
@@ -232,6 +237,7 @@ describe('androidSink start and update', () => {
       'Active agents',
       '2 Needs input, 4 Working, 3 Idle',
       'Open agents',
+      null,
       '2',
       true
     );
@@ -239,6 +245,7 @@ describe('androidSink start and update', () => {
       'Active agents',
       '4 Working',
       'Open agents',
+      null,
       '4',
       true,
       0
@@ -253,6 +260,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '2 Needs input, 4 Working, 3 Idle',
+      approveLabel: null,
       compactText: '2',
       promotion: false,
     });
@@ -270,6 +278,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '4 Working, 3 Idle',
+      approveLabel: null,
       compactText: '4',
       promotion: true,
     });
@@ -358,6 +367,94 @@ describe('androidSink start and update', () => {
     await flushAsync();
 
     expect(delivery.registerTokens).not.toHaveBeenCalled();
+  });
+});
+
+describe('androidSink approve action', () => {
+  const PERMISSION = snapshotFor([{ status: 'permission' }], 0);
+
+  it('passes the Approve label while a permission waits and drops it once answered', async () => {
+    androidSink.startOrUpdate(PERMISSION, CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.approveLabel).toBe('Approve');
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      '1 Needs input',
+      'Open agents',
+      'Approve',
+      '1',
+      true
+    );
+
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 1), CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.approveLabel).toBeNull();
+    expect(mocks.native.update).toHaveBeenLastCalledWith(
+      'Active agents',
+      '1 Working',
+      'Open agents',
+      null,
+      '1',
+      true,
+      0
+    );
+  });
+
+  it('passes the Approve label when the pending start is retried at foreground', async () => {
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('denied'));
+    androidSink.startOrUpdate(PERMISSION, CTX);
+    await flushAsync();
+    expect(mocks.native.start).not.toHaveBeenCalled();
+
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('granted'));
+    await handleAppStateActive();
+
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      '1 Needs input',
+      'Open agents',
+      'Approve',
+      '1',
+      true
+    );
+  });
+
+  it('passes no Approve label for a question-only wait or no wait', async () => {
+    androidSink.startOrUpdate(snapshotFor([{ status: 'question' }], 0), CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.approveLabel).toBeNull();
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      '1 Needs input',
+      'Open agents',
+      null,
+      '1',
+      true
+    );
+
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 1), CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.approveLabel).toBeNull();
+  });
+
+  it('adds the label through the publish path once the notification is up', async () => {
+    androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.approveLabel).toBeNull();
+
+    androidSink.publish(snapshotFor([{ status: 'permission' }], 1));
+    expect(mocks.getNotification()?.approveLabel).toBe('Approve');
+    expect(mocks.native.update).toHaveBeenLastCalledWith(
+      'Active agents',
+      '1 Needs input',
+      'Open agents',
+      'Approve',
+      '1',
+      true,
+      0
+    );
   });
 });
 
@@ -653,6 +750,7 @@ describe('handleAppStateActive permission alert', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '2 Needs input, 4 Working, 3 Idle',
+      approveLabel: null,
       compactText: '2',
       promotion: true,
     });

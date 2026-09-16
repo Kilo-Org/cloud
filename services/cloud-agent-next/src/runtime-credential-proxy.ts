@@ -123,6 +123,17 @@ export function sameRuntimeProxyPhysicalBinding(
   );
 }
 
+export function sameRuntimeProxyControlBinding(
+  left: { allocationId: string; providerInstanceId: string; wrapperInstanceId: string },
+  right: { allocationId: string; providerInstanceId: string; wrapperInstanceId: string }
+): boolean {
+  return (
+    left.allocationId === right.allocationId &&
+    left.providerInstanceId === right.providerInstanceId &&
+    left.wrapperInstanceId === right.wrapperInstanceId
+  );
+}
+
 export async function issueRuntimeCredentialProxyHandle(
   env: Pick<Env, 'NEXTAUTH_SECRET'>,
   input: RuntimeProxyGrant,
@@ -202,10 +213,7 @@ export function matchesRuntimeProxyGrant(
       ? sameRuntimeProxyPhysicalBinding(current, context.fence)
       : current.plane === 'control' &&
         context.fence.plane === 'control' &&
-        current.allocationId === context.fence.allocationId &&
-        current.providerInstanceId === context.fence.providerInstanceId &&
-        current.connectionId === context.fence.connectionId &&
-        current.wrapperInstanceId === context.fence.wrapperInstanceId)
+        sameRuntimeProxyControlBinding(current, context.fence))
   );
 }
 

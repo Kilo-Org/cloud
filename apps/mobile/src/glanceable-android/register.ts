@@ -64,9 +64,10 @@ function translate(key: string): string {
  *
  * A widget redraw runs as a headless JS task with no Activity, so the app's
  * root never mounts and nothing else applies the language — without this the
- * placed widget renders English whatever the user chose.
+ * placed widget renders English whatever the user chose. Exported because the
+ * headless approve task runs the same way and must speak one language with it.
  */
-async function applyWidgetLanguage(): Promise<void> {
+export async function applyWidgetLanguage(): Promise<void> {
   await whenLanguagePreferenceLoaded();
   const language = getResolvedLanguage();
   if (i18n.language !== language) {

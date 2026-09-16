@@ -57,11 +57,14 @@ export function glanceableLayoutCopy() {
     running: i18n.t('common.working'),
     idle: i18n.t('common.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
-    // The in-place widget actions. Their copy is baked, not pushed through
-    // props: the press-patch display has to show before any app push can
-    // answer it, and the gallery placeholder has no props at all. The two
-    // press lines are picked by the patch's action marker, so a New agent tap
-    // reads "Starting…" rather than the approving line the approve tap shows.
+    // The in-place widget actions and the Live Activity's Approve control all
+    // read `common.approve`: the permission card, the wrist control, and the
+    // widget button name the same action, and `check:i18n` forbids a second key
+    // with the same copy. The action copy is baked, not pushed through props:
+    // the press-patch display has to show before any app push can answer it,
+    // and the gallery placeholder has no props at all. The two press lines are
+    // picked by the patch's action marker, so a New agent tap reads "Starting…"
+    // rather than the approving line the approve tap shows.
     approve: i18n.t('common.approve'),
     newAgent: i18n.t('glanceable.newAgent'),
     approving: i18n.t('glanceable.approving'),

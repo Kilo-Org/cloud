@@ -9,6 +9,7 @@ import {
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
+import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import type { User } from '@kilocode/db/schema';
 import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
@@ -32,6 +33,8 @@ import {
   baseInitiateFromPreparedSessionNextSchema,
   baseInitiateSessionNextOutputSchema,
   baseSendMessageNextSchema,
+  baseGetMessageResultNextSchema,
+  baseGetMessageResultNextOutputSchema,
   baseInterruptSessionNextSchema,
   baseCancelQueuedMessageNextSchema,
   baseGetSessionNextSchema,
@@ -117,7 +120,11 @@ function createTerminalTicket(params: {
   };
 }
 
-async function assertUserOwnsSession(userId: string, cloudAgentSessionId: string): Promise<void> {
+async function assertUserOwnsSession(
+  userId: string,
+  cloudAgentSessionId: string,
+  expectedWorktreeId?: string
+): Promise<void> {
   const sessionOwnership = await verifyUserOwnsSessionV2ByCloudAgentId(
     db,
     userId,
@@ -128,6 +135,13 @@ async function assertUserOwnsSession(userId: string, cloudAgentSessionId: string
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Session not found or access denied',
+    });
+  }
+  if (expectedWorktreeId !== undefined) {
+    await assertSessionWorktree(db, {
+      kiloSessionId: sessionOwnership.kiloSessionId,
+      cloudAgentSessionId,
+      expectedWorktreeId,
     });
   }
 }
@@ -291,7 +305,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseSendMessageNextSchema)
     .output(baseInitiateSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId, input.expectedWorktreeId);
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       // Prompt turns carry their own model; command turns run the session's
       // stored model, so resolve it to apply the same free/BYOK eligibility
@@ -325,9 +339,11 @@ export const cloudAgentNextRouter = createTRPCRouter({
       // Tokens are refreshed inside cloud-agent-next (GitHub App installation
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab).
       try {
-        const { attachments, images, ...restInput } = input;
+        const { attachments, images } = input;
         const result = await client.sendMessage({
-          ...restInput,
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          payload: input.payload,
+          autoCommit: input.autoCommit,
           attachments: attachments ?? images,
           messageId: input.messageId ?? generateMessageId(),
         });
@@ -351,6 +367,20 @@ export const cloudAgentNextRouter = createTRPCRouter({
         rethrowAsPaymentRequired(error);
         throw error;
       }
+    }),
+
+  getMessageResult: baseProcedure
+    .input(baseGetMessageResultNextSchema)
+    .output(baseGetMessageResultNextOutputSchema.nullable())
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId, input.expectedWorktreeId);
+      const client = createCloudAgentNextClient(
+        await createCloudAgentControlToken(ctx.user, ctx.headersList)
+      );
+      return await client.getMessageResult({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        messageId: input.messageId,
+      });
     }),
 
   getWorktreeChanges: baseProcedure

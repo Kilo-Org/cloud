@@ -9,6 +9,7 @@ import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 
 import {
   buildAndroidWidgetProps,
+  buildApproveLabel,
   buildCompactNotificationText,
   buildCurrentWidgetProps,
   buildOngoingNotificationText,
@@ -200,6 +201,21 @@ describe('buildOngoingNotificationText', () => {
     expect(buildOngoingNotificationText(snapshotFor([]), {}, translate)).toBe(
       'No work in progress'
     );
+  });
+});
+
+describe('buildApproveLabel', () => {
+  it('offers the Approve action only while a permission waits', () => {
+    expect(buildApproveLabel({ ...MIXED, needsApproval: 1 }, translate)).toBe('Approve');
+    expect(buildApproveLabel({ ...MIXED, needsApproval: 3 }, translate)).toBe('Approve');
+  });
+
+  it.each([
+    ['a question-only wait', { ...MIXED, needsInput: 2, needsApproval: 0 }],
+    ['an older producer that omits the count', { ...MIXED, needsInput: 2 }],
+    ['no work', snapshotFor([])],
+  ] as const)('offers no Approve action for %s', (_reason, snapshot) => {
+    expect(buildApproveLabel(snapshot, translate)).toBeNull();
   });
 });
 

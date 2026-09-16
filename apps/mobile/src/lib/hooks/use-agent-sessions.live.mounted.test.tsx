@@ -31,6 +31,9 @@ const state = vi.hoisted(() => ({
   organization: { organizationId: null as string | null, isLoaded: true },
   request: vi.fn<() => Promise<CachedActiveSessionsData>>(),
   mountSync: false,
+  pathname: '/(app)/(tabs)/(2_agents)',
+  scheduleNotificationAsync: vi.fn<(request: { identifier: string }) => Promise<void>>(),
+  dismissNotificationAsync: vi.fn<(identifier: string) => Promise<void>>(),
 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => state.auth }));
 vi.mock('@/lib/organization-context', () => ({ useOrganization: () => state.organization }));
@@ -62,7 +65,15 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 // the same subscribe/remove contract as React Native.
 vi.mock('react-native', () => ({
   InteractionManager: { runAfterInteractions: vi.fn() },
-  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  AppState: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+}));
+// The mount also derives the app-owned needs-input plan from the route and
+// posts through expo-notifications; both are native-backed, so the mount test
+// stubs them (their behavior is covered by needs-input-notification.test.ts).
+vi.mock('expo-router', () => ({ usePathname: () => state.pathname }));
+vi.mock('expo-notifications', () => ({
+  scheduleNotificationAsync: state.scheduleNotificationAsync,
+  dismissNotificationAsync: state.dismissNotificationAsync,
 }));
 
 let client = makeTestQueryClient();
@@ -117,6 +128,8 @@ beforeEach(() => {
   });
   Object.assign(state.organization, { organizationId: null, isLoaded: true });
   state.request.mockReset().mockResolvedValue({ sessions: [] });
+  state.scheduleNotificationAsync.mockClear();
+  state.dismissNotificationAsync.mockClear();
   state.mountSync = false;
   leases = 0;
   connection = makeConnection({
@@ -279,6 +292,47 @@ describe('live query presentation and refresh contracts', () => {
       expect(await pending).toBe(false);
     }
   );
+
+  it('posts an app-owned needs-input notification from a cached raise and dismisses it when answered', async () => {
+    state.mountSync = true;
+    client.setQueryData(QUERY_KEY, {
+      sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+    });
+    await render();
+    expect(state.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: 'needs-input:ses_1',
+        content: expect.objectContaining({ categoryIdentifier: 'kilo-needs-input:question' }),
+      })
+    );
+    expect(state.dismissNotificationAsync).not.toHaveBeenCalled();
+    expect(state.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+
+    // A refetch or heartbeat that leaves the raise waiting must not re-post:
+    // the mount remembers the whole notified set, not the last plan's delta,
+    // so a plan that publishes nothing cannot erase it.
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, {
+        sessions: [
+          makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' }),
+          makeCached({ id: 'ses_2', status: 'running' }),
+        ],
+      });
+      await flush();
+    });
+    expect(state.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+    expect(state.scheduleNotificationAsync.mock.calls.map(c => c[0].identifier)).toEqual([
+      'needs-input:ses_1',
+    ]);
+
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, {
+        sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'running' })],
+      });
+      await flush();
+    });
+    expect(state.dismissNotificationAsync).toHaveBeenCalledWith('needs-input:ses_1');
+  });
 
   it.each(['token', 'bootstrap', 'sign-out', 'organization'] as const)(
     'gates cached reads and socket ownership on %s readiness',

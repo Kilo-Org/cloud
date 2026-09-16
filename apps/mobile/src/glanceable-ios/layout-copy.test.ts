@@ -2,9 +2,14 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import { ACTIVE_AGENTS_LIVE_ACTIVITY_NAME, APPROVE_TARGET } from './approve-action';
 import { glanceableLayoutCopy, withGlanceableCopy } from './layout-copy';
+
+// `approve-action` imports expo-widgets, whose native module is unreachable
+// under vitest. This suite only reads the identifier it exports.
+vi.mock('expo-widgets', () => ({ addUserInteractionListener: vi.fn() }));
 
 const PLACEHOLDER = '__KILO_GLANCEABLE_COPY__';
 const LAYOUT_FILES = ['active-agents-live-activity.tsx', 'active-agents-widget.tsx'];
@@ -31,6 +36,42 @@ describe('glanceable layout copy placeholder', () => {
       expect(read(file)).toContain(`= '${PLACEHOLDER}'`);
     });
   }
+});
+
+describe('glanceable approve target', () => {
+  const source = read('active-agents-live-activity.tsx');
+
+  it('is a literal in the layout, equal to APPROVE_TARGET', () => {
+    // The handler matches the event's `target` against APPROVE_TARGET, and the
+    // widget process reads the target off the layout source. A `target` written
+    // as the imported identifier would be an undefined global there, so the
+    // literal is the contract: this reads the source because no widget
+    // transform runs under vitest.
+    const targets = [...source.matchAll(/target=(['"])([^'"]*)\1/g)].map(match => match[2]);
+    expect(targets).toContain(APPROVE_TARGET);
+    expect(source).not.toContain('target={APPROVE_TARGET}');
+  });
+
+  it('is gated on the card still drawing a wait, not the approvable count alone', () => {
+    // `withStatus` (lib/glanceable/publisher) zeroes every count on expiry but
+    // keeps `needsApproval`, so the retained expired frame carries an approvable
+    // count with nothing to approve. `hasCounts` is false exactly when every
+    // count is zero, and the gate must include it or the card reads Expired and
+    // still offers Approve. `view-props.test.ts` pins that expired shape.
+    expect(source).toMatch(/const needsApproval\s*=\s*hasCounts\s*&&/);
+    expect(source).not.toMatch(/const needsApproval\s*=\s*\(props\.needsApproval/);
+  });
+
+  it('registers under the Live Activity name, not the source the native event reports', () => {
+    // The native intent reports `context.activityID` as the event's `source`
+    // (`WidgetLiveActivity.swift` renders the layout with
+    // `name: context.activityID`, and `DynamicView.swift` copies that name onto
+    // the button's `source`), so the handler matches the unique `approve` target
+    // instead of a source name. The registration name still has to be this
+    // value: the activity's content state carries it, and it is what makes the
+    // card mirror into the Apple Watch Smart Stack.
+    expect(source).toContain(`'${ACTIVE_AGENTS_LIVE_ACTIVITY_NAME}'`);
+  });
 });
 
 describe('withGlanceableCopy', () => {
@@ -63,8 +104,9 @@ describe('withGlanceableCopy', () => {
     expect(glanceableLayoutCopy().locale).not.toContain('-');
   });
 
-  it('covers every status the layouts render, plus the language tag', () => {
+  it('covers every status the layouts render, plus the language tag and Approve', () => {
     expect(Object.keys(glanceableLayoutCopy()).toSorted()).toEqual([
+      'approve',
       'digits',
       'empty',
       'expired',

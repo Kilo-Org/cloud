@@ -1,4 +1,4 @@
-import { HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
+import { Button, HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   accessibilityElement,
   accessibilityLabel,
@@ -112,6 +112,16 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // blocked agent is the one interval the user can act on. Working and idle
   // durations tell the user nothing they can use.
   const needsInputSince = (props.needsInput ?? 0) > 0 ? (props.needsInputSince ?? null) : null;
+  // The Approve control rides the count block only while the card still draws a
+  // wait AND that wait is approvable. The wait gate is what keeps the control
+  // off the retained expired frame: `withStatus` zeroes every count on expiry
+  // but keeps `needsApproval`, so a gate on that count alone drew an Approve
+  // button on a card that reads Expired and shows no waiting agent. A question
+  // or a retry counts as needs-input but has no approve-without-choosing
+  // answer, so `needsApproval` is narrower than the needs-input row above it; a
+  // content state from an older producer omits the field and the control stays
+  // hidden.
+  const needsApproval = hasCounts && (props.needsApproval ?? 0) > 0;
 
   // Spoken label: status word, numeric counts, then Open agents. The whole
   // surface deep-links to the agents list, so "Open agents" stays in the
@@ -204,8 +214,12 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // user at the state with nothing in it.
   const countRows = countLines.map(line => countRow(line, line === primary));
 
-  // The mark, then the rows. The Lock Screen banner and the expanded Dynamic
-  // Island draw the same block, so one glance teaches both surfaces.
+  // The mark, then the rows, then the Approve control while the card still
+  // draws a wait and an approvable one exists. The Lock Screen banner and the
+  // expanded Dynamic Island draw the same block, so one glance teaches both
+  // surfaces — and the Live Activity is what the Apple Watch mirrors into its
+  // Smart Stack, which is where the control has to live: an accessory
+  // complication is read-only in this layout and keeps the count alone.
   const markAndRows = (markSize: number) => (
     <HStack alignment="center" spacing={12}>
       {logo(markSize)}
@@ -216,6 +230,14 @@ const layout: LiveActivityComponent<ContentState> = props => {
       ) : (
         <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>{statusLine}</Text>
       )}
+      {needsApproval ? (
+        // The target is the literal, not the imported `APPROVE_TARGET`: this
+        // function's source is stringified and re-evaluated in the widget
+        // process, where an imported binding is an undefined global.
+        // `layout-copy.test.ts` keeps it equal to the constant the interaction
+        // handler matches.
+        <Button label={COPY.approve} target="approve" />
+      ) : null}
       <Spacer />
     </HStack>
   );

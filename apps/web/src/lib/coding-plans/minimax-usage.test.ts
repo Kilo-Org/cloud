@@ -135,7 +135,7 @@ describe('MiniMax managed usage transport', () => {
     ['null', null],
     ['empty', []],
   ])(
-    'reports an inactive subscription when MiniMax returns %s quota rows',
+    'reports an inactive provider plan when MiniMax returns %s quota rows',
     async (_label, rows) => {
       jest.spyOn(global, 'fetch').mockResolvedValue(
         jsonResponse({
@@ -145,11 +145,24 @@ describe('MiniMax managed usage transport', () => {
       );
 
       await expect(getMiniMaxUsage(API_KEY)).rejects.toMatchObject({
-        code: 'subscription_inactive',
+        code: 'provider_plan_inactive',
         message: 'Coding Plan usage is temporarily unavailable.',
       });
     }
   );
+
+  it('rejects a zero-status response that omits the quota rows as invalid', async () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(
+        jsonResponse({ base_resp: { status_code: 0, status_msg: 'provider message' } })
+      );
+
+    await expect(getMiniMaxUsage(API_KEY)).rejects.toMatchObject({
+      code: 'invalid_response',
+      message: 'Coding Plan usage is temporarily unavailable.',
+    });
+  });
 
   it.each([
     [

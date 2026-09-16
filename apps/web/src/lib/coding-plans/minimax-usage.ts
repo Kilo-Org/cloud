@@ -29,7 +29,9 @@ const MiniMaxModelRemainsSchema = z.object({
 });
 
 // MiniMax returns `model_remains: null` with a zero status code when it holds
-// no quota rows for the key, so the field must accept null as well as absence.
+// no quota rows for the managed key. The field stays optional so a non-zero
+// application status without rows still maps to `application`; a zero status
+// with the field absent is a response-shape problem and is rejected below.
 const MiniMaxUsageResponseSchema = z.object({
   base_resp: z.object({
     status_code: NativeIntegerSchema,
@@ -132,9 +134,12 @@ export async function getMiniMaxUsage(apiKey: string) {
   if (result.data.base_resp.status_code !== 0) {
     throw new CodingPlanUsageError('application');
   }
-  const rows = result.data.model_remains ?? [];
-  if (rows.length === 0) {
-    throw new CodingPlanUsageError('subscription_inactive');
+  const rows = result.data.model_remains;
+  if (rows === undefined) {
+    throw new CodingPlanUsageError('invalid_response');
+  }
+  if (rows === null || rows.length === 0) {
+    throw new CodingPlanUsageError('provider_plan_inactive');
   }
   return {
     fetchedAt: new Date().toISOString(),

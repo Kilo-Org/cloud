@@ -8,11 +8,7 @@ import {
 } from '@kilocode/cloud-agent-sdk/list-directories';
 
 import { act } from '@/test/renderer';
-import {
-  createTestQueryClient,
-  renderWithProviders,
-  waitFor,
-} from '@/test/render-with-providers';
+import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 import { useListDirectories, type UseListDirectoriesResult } from './use-list-directories';
 

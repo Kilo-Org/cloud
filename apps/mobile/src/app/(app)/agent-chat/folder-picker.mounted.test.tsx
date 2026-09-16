@@ -133,11 +133,7 @@ async function mount(): Promise<TestRenderer.ReactTestRenderer> {
   const queryClient = createTestQueryClient();
   await act(async () => {
     ref.current = TestRenderer.create(
-      createElement(
-        QueryClientProvider,
-        { client: queryClient },
-        createElement(FolderPickerScreen)
-      )
+      createElement(QueryClientProvider, { client: queryClient }, createElement(FolderPickerScreen))
     );
     await Promise.resolve();
   });

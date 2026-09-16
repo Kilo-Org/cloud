@@ -55,10 +55,7 @@ function storeKey(ref: ViewedFilesRef, headSha: string): string {
   return `${viewedFilesKey(ref)}|${headSha}`;
 }
 
-export function getViewedFilesSnapshot(
-  ref: ViewedFilesRef,
-  headSha: string
-): ViewedFilesSnapshot {
+export function getViewedFilesSnapshot(ref: ViewedFilesRef, headSha: string): ViewedFilesSnapshot {
   return entries.get(storeKey(ref, headSha))?.snapshot ?? PENDING;
 }
 
@@ -124,10 +121,7 @@ export function subscribeViewedFiles(
 }
 
 /** Re-read the durable set for one open key, if anything is subscribed to it. */
-export async function revalidateViewedFiles(
-  ref: ViewedFilesRef,
-  headSha: string
-): Promise<void> {
+export async function revalidateViewedFiles(ref: ViewedFilesRef, headSha: string): Promise<void> {
   const key = storeKey(ref, headSha);
   const entry = entries.get(key);
   if (!entry) {

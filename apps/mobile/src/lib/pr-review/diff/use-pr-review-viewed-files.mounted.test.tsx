@@ -142,4 +142,3 @@ describe('usePrReviewViewedFiles provider refs (s6)', () => {
     await waitFor(() => viewedOf(second).isViewed('src/b.ts'));
   });
 });
-

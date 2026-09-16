@@ -67,13 +67,25 @@ const CONNECT_FAILED_CODE = 'connect_failed';
 /**
  * Shared by every state so the card keeps one padding and one reserved height:
  * switching between loading, disconnected, connected and error never moves the
- * key list below it. The minimum fits the tallest resolved body at the
- * narrowest supported width (375px), where the connect explanation wraps to
- * three lines; a shorter reservation lets the resolved card outgrow the
- * loading skeleton and pushes the page below it while the status query
- * resolves.
+ * key list below it. The minimum fits the tallest body at the narrowest
+ * supported width (375px): the returned-authorization alert above its one
+ * action row. The alert is part of this reservation (see `CardBody`), so it
+ * never adds a row on top of the body and the error page keeps the same offset
+ * as the clean page.
  */
-const CARD_BODY_CLASS = 'flex min-h-[6.75rem] flex-col justify-center gap-3';
+const CARD_BODY_CLASS = 'flex min-h-[7rem] flex-col justify-center gap-3';
+
+/**
+ * The header's status column. It is rendered in every state, including the
+ * loading skeleton, and keeps room for the longest indicator label
+ * ('Needs reconnect'), so the title wraps to the same number of lines whether
+ * or not the card currently shows an indicator. Sizing the column to the badge
+ * alone makes the resolved expired card one title line taller than the loading
+ * skeleton at 375px, which pushes the key list 23px down when the status
+ * arrives.
+ */
+const CARD_STATUS_SLOT_CLASS = 'flex min-w-[7.625rem] justify-end';
+
 const CARD_ACTION_CLASS = 'w-fit';
 
 /** The declined/failed authorization copy, keyed by the returned error code. */
@@ -106,9 +118,9 @@ export type OpenAiChatGptCardViewProps = {
   /** `undefined` while the status query is loading. */
   status: OpenAiChatGptStatus | undefined;
   /**
-   * A returned `openai_error` code. It renders as an alert above the stored
-   * status body so the connection's indicator, identity and Disconnect action
-   * stay visible (and usable) while the failure is reported.
+   * A returned `openai_error` code. It renders as the body's own alert, in the
+   * reserved height, so the page never moves when it mounts; the stored
+   * connection's indicator and actions stay visible beside it.
    */
   authErrorCode?: string | null;
   /** The status query failed: show a message and a retry instead of a skeleton. */
@@ -122,6 +134,10 @@ export type OpenAiChatGptCardViewProps = {
   isDisconnecting?: boolean;
 };
 
+/**
+ * The connection's own indicator. It renders inside the reserved status column
+ * (`CARD_STATUS_SLOT_CLASS`) so its label never changes how the title wraps.
+ */
 function CardIndicator({ status }: Pick<OpenAiChatGptCardViewProps, 'status'>) {
   if (!status) {
     return null;
@@ -136,15 +152,49 @@ function CardIndicator({ status }: Pick<OpenAiChatGptCardViewProps, 'status'>) {
 }
 
 /**
- * The returned authorization error, shown as an alert above the stored status
- * body. The status body keeps its own actions, so the stored connection's
- * reconnect or connect CTA is the retry and Disconnect stays one click away.
+ * The returned authorization error, rendered as the body's message inside the
+ * reserved height. The body keeps the stored connection's actions, so the
+ * reconnect or connect control is the retry and Disconnect stays one click
+ * away.
  */
 function AuthErrorAlert({ code }: { code: string }) {
   return (
     <Alert variant="destructive">
       <AlertDescription>{openAiChatGptAuthErrorMessage(code)}</AlertDescription>
     </Alert>
+  );
+}
+
+/**
+ * The expired/failed connection's pair of actions: reconnect in place, or
+ * remove the stored connection. Shared with the returned-failure body so a
+ * declined reconnect keeps both controls instead of collapsing to a bare
+ * retry.
+ */
+function ReconnectDisconnectActions({
+  onConnect,
+  onDisconnect,
+  isConnecting,
+  isDisconnecting,
+}: Pick<
+  OpenAiChatGptCardViewProps,
+  'onConnect' | 'onDisconnect' | 'isConnecting' | 'isDisconnecting'
+>) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect} disabled={isConnecting}>
+        {isConnecting ? CONNECTING_LABEL : RECONNECT_LABEL}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className={CARD_ACTION_CLASS}
+        onClick={onDisconnect}
+        disabled={isDisconnecting}
+      >
+        {isDisconnecting ? DISCONNECTING_LABEL : DISCONNECT_LABEL}
+      </Button>
+    </div>
   );
 }
 
@@ -170,19 +220,6 @@ function CardBody({
     );
   }
 
-  if (!status) {
-    // Same text lines and same action size as the connected body.
-    return (
-      <>
-        <div className="space-y-1">
-          <Skeleton className="h-5 w-64" />
-          <Skeleton className="h-5 w-40" />
-        </div>
-        <Skeleton className="h-8 w-36" />
-      </>
-    );
-  }
-
   if (hasDisconnectError) {
     // A failed disconnect keeps the disconnect action so one more click
     // retries; the message replaces the identity line in the same body.
@@ -202,15 +239,62 @@ function CardBody({
     );
   }
 
+  if (authErrorCode && status?.state !== 'connected') {
+    // A returned authorization failure is the card's message for this load: it
+    // fills the body's single message slot (and carries the retry itself)
+    // instead of stacking a second row above the stored body, so the reserved
+    // height already covers it and the key list below the card stays put. The
+    // stored connection keeps its own actions, so a declined reconnect still
+    // offers its Reconnect and Disconnect controls.
+    //
+    // A live `connected` status is left out on purpose: there is nothing to
+    // recover, and a failure alert beside 'Connected as ...' would contradict
+    // the connection the card is reporting.
+    return (
+      <>
+        <AuthErrorAlert code={authErrorCode} />
+        {status?.state === 'error' ? (
+          <ReconnectDisconnectActions
+            onConnect={onConnect}
+            onDisconnect={onDisconnect}
+            isConnecting={isConnecting}
+            isDisconnecting={isDisconnecting}
+          />
+        ) : (
+          <Button
+            size="sm"
+            className={CARD_ACTION_CLASS}
+            onClick={onConnect}
+            disabled={isConnecting}
+          >
+            {isConnecting ? CONNECTING_LABEL : TRY_AGAIN_LABEL}
+          </Button>
+        )}
+      </>
+    );
+  }
+
+  if (!status) {
+    // Same text lines and same action size as the connected body.
+    return (
+      <>
+        <div className="space-y-1">
+          <Skeleton className="h-5 w-64" />
+          <Skeleton className="h-5 w-40" />
+        </div>
+        <Skeleton className="h-8 w-36" />
+      </>
+    );
+  }
+
   if (status.state === 'disconnected') {
-    // A returned or local connect failure is reported by the alert above this
-    // body, so the same one-click connect action is relabelled as the retry the
-    // message promises. Without an error it stays the plain connect CTA.
+    // The plain connect state. A returned or local connect failure takes the
+    // branch above, so this body is only reached without an error code.
     return (
       <>
         <p className="type-body text-muted-foreground">{CONNECT_DESCRIPTION}</p>
         <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect} disabled={isConnecting}>
-          {isConnecting ? CONNECTING_LABEL : authErrorCode ? TRY_AGAIN_LABEL : CONNECT_LABEL}
+          {isConnecting ? CONNECTING_LABEL : CONNECT_LABEL}
         </Button>
       </>
     );
@@ -248,20 +332,12 @@ function CardBody({
       <p className="type-body text-muted-foreground">
         {status.errorMessage ?? FALLBACK_ERROR_MESSAGE}
       </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect} disabled={isConnecting}>
-          {isConnecting ? CONNECTING_LABEL : RECONNECT_LABEL}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className={CARD_ACTION_CLASS}
-          onClick={onDisconnect}
-          disabled={isDisconnecting}
-        >
-          {isDisconnecting ? DISCONNECTING_LABEL : DISCONNECT_LABEL}
-        </Button>
-      </div>
+      <ReconnectDisconnectActions
+        onConnect={onConnect}
+        onDisconnect={onDisconnect}
+        isConnecting={isConnecting}
+        isDisconnecting={isDisconnecting}
+      />
     </>
   );
 }
@@ -274,11 +350,12 @@ export function OpenAiChatGptCardView(props: OpenAiChatGptCardViewProps) {
         <div className="flex flex-col gap-2">
           <CardTitle>{CARD_TITLE}</CardTitle>
         </div>
-        <CardIndicator status={props.status} />
+        <div className={CARD_STATUS_SLOT_CLASS}>
+          <CardIndicator status={props.status} />
+        </div>
       </CardHeader>
       <CardContent>
         <div className={CARD_BODY_CLASS}>
-          {props.authErrorCode ? <AuthErrorAlert code={props.authErrorCode} /> : null}
           <CardBody {...props} />
         </div>
       </CardContent>

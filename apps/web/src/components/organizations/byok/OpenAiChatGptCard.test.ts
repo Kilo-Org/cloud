@@ -28,7 +28,31 @@ function renderStatus(status: OpenAiChatGptStatus): string {
 
 /** The class attribute of the reserved-height body wrapper. */
 function bodyClass(html: string): string | undefined {
-  return html.match(/class="([^"]*min-h-\[6\.75rem\][^"]*)"/)?.[1];
+  return html.match(/class="([^"]*min-h-\[7rem\][^"]*)"/)?.[1];
+}
+
+/** The opening tag of the reserved-height body wrapper. */
+const BODY_WRAPPER_OPEN = '<div class="flex min-h-[7rem] flex-col justify-center gap-3">';
+
+/** True when `needle` renders inside the element opened by `openTag`. */
+function containsElement(html: string, openTag: string, needle: string): boolean {
+  const start = html.indexOf(openTag);
+  const target = html.indexOf(needle);
+  if (start < 0 || target < start) return false;
+
+  const div = /<\/?div\b/g;
+  div.lastIndex = start;
+  let depth = 0;
+  let match: RegExpExecArray | null;
+  while ((match = div.exec(html))) {
+    if (match[0] === '</div') {
+      depth -= 1;
+      if (depth === 0) return target < match.index;
+    } else {
+      depth += 1;
+    }
+  }
+  return false;
 }
 
 /** The class attribute of the card container itself. */
@@ -209,7 +233,7 @@ describe('OpenAiChatGptCard returned authorization errors', () => {
     errorMessage: RECONNECT_MESSAGE,
   };
 
-  it('shows the declined copy as an alert above the stored reconnect state', () => {
+  it('shows the declined copy in the stored reconnect body, keeping its reconnect and disconnect actions', () => {
     const html = render({
       status: STORED_RECONNECT_STATUS,
       authErrorCode: 'access_denied',
@@ -217,16 +241,17 @@ describe('OpenAiChatGptCard returned authorization errors', () => {
 
     expect(html.replace(/&#x27;/g, "'")).toContain('ChatGPT was not connected. Try again.');
     expect(html).toContain('data-slot="alert"');
-    // The stored connection keeps its badge, its message and one-click disconnect.
+    // The stored connection keeps its badge and its one-click actions.
     expect(html).toContain('Needs reconnect');
-    expect(html).toContain(RECONNECT_MESSAGE);
     expect(html.match(/Reconnect with ChatGPT/g)).toHaveLength(1);
     expect(html.match(/>Disconnect</g)).toHaveLength(1);
-    // The alert is rendered above the stored status body.
-    expect(html.indexOf('ChatGPT was not connected')).toBeLessThan(html.indexOf(RECONNECT_MESSAGE));
+    // The returned failure is the body's single message: it replaces the
+    // stored failure text instead of stacking a second row that would grow the
+    // card and move the key list below it.
+    expect(html).not.toContain(RECONNECT_MESSAGE);
   });
 
-  it('shows the generic copy above the stored status for any other code', () => {
+  it('shows the generic copy with the stored status for any other code', () => {
     const html = render({ status: STORED_RECONNECT_STATUS, authErrorCode: 'server_error' });
 
     expect(html.replace(/&#x27;/g, "'")).toContain("We couldn't connect ChatGPT. Try again.");
@@ -248,7 +273,9 @@ describe('OpenAiChatGptCard returned authorization errors', () => {
     const html = render({ status: { state: 'disconnected' }, authErrorCode: 'access_denied' });
 
     expect(html.replace(/&#x27;/g, "'")).toContain('ChatGPT was not connected. Try again.');
-    expect(html).toContain('No API key needed.');
+    // The failure copy is the body's message, so the connect pitch is not
+    // stacked under it.
+    expect(html).not.toContain('No API key needed.');
     expect(html.match(/>Try again</g)).toHaveLength(1);
     expect(html).not.toContain('>Sign in with ChatGPT<');
   });
@@ -260,7 +287,7 @@ describe('OpenAiChatGptCard returned authorization errors', () => {
     expect(html).not.toContain('>Try again<');
   });
 
-  it('keeps the stored identity and disconnect action when a reconnect is declined', () => {
+  it('reports the stored live connection when a declined attempt is reported late', () => {
     const html = render({
       status: {
         state: 'connected',
@@ -271,7 +298,9 @@ describe('OpenAiChatGptCard returned authorization errors', () => {
       authErrorCode: 'access_denied',
     });
 
-    expect(html).toContain('data-slot="alert"');
+    // A live connection has nothing to recover, and a failure alert beside
+    // 'Connected as ...' would contradict it: the card reports the connection.
+    expect(html).not.toContain('data-slot="alert"');
     expect(html).toContain('Connected as user@example.com');
     expect(html.match(/>Disconnect</g)).toHaveLength(1);
   });
@@ -375,13 +404,34 @@ describe('OpenAiChatGptCard layout', () => {
     expect(cardClasses.size).toBe(1);
     expect(bodyClasses.size).toBe(1);
     expect([...cardClasses][0]).toBeDefined();
-    expect([...bodyClasses][0]).toContain('min-h-[6.75rem]');
+    expect([...bodyClasses][0]).toContain('min-h-[7rem]');
   });
 
   it('keeps the same content padding in every state', () => {
     for (const state of STATES) {
       expect(state.html).toContain('class="p-6 pt-0"');
     }
+  });
+
+  it('reserves the status column in every state so the title wraps the same with and without a badge', () => {
+    for (const state of STATES) {
+      expect(state.html).toContain('min-w-[7.625rem]');
+    }
+  });
+
+  it('renders the returned-error alert inside the reserved body height', () => {
+    const html = render({
+      status: { state: 'disconnected' },
+      authErrorCode: 'access_denied',
+    });
+    const wrapperOpen = html.indexOf(BODY_WRAPPER_OPEN);
+    const alert = html.indexOf('data-slot="alert"');
+
+    // Inside the wrapper the alert is covered by the reservation in every
+    // state; as a sibling above it the alert would add a row and push the key
+    // list below the card down when it mounts.
+    expect(alert).toBeGreaterThan(wrapperOpen);
+    expect(containsElement(html, BODY_WRAPPER_OPEN, 'data-slot="alert"')).toBe(true);
   });
 });
 

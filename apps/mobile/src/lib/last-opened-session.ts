@@ -29,7 +29,7 @@ type SecureStoreLike = {
   deleteItemAsync: (key: string) => Promise<void>;
 };
 
-// Test-only override so pure suites do not load expo-secure-store
+// Injection seam so the pure suites do not load expo-secure-store
 // (→ expo-modules-core → RN). Mirrors the glanceable persist pattern.
 let secureStoreForTests: SecureStoreLike | null = null;
 
@@ -172,7 +172,7 @@ export function clearLastOpenedSession(): void {
   void dropMirroredRecord();
 }
 
-// ── Test-only helpers ──────────────────────────────────────────────────────
+// ── Injection seams used by the pure suites ────────────────────────────────
 
 export function _setSecureStoreForTests(store: SecureStoreLike | null): void {
   secureStoreForTests = store;

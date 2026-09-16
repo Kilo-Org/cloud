@@ -9,8 +9,9 @@ import {
 } from './analytics';
 import { forwardedAuthFromProps } from './auth';
 import { MCP_SCOPE, scopeTokens } from './auth/http';
-import { callCatalogEndpoint } from './call';
+import { callCatalogEndpoint, executeProtectedCall, requestProtectedCall } from './call';
 import { createDefaultHandler } from './oauth/consent';
+import { fetchUserIsAdmin } from './oauth/kilo-pairing';
 import { onError, tokenExchangeCallback } from './oauth/provider-hooks';
 import { createRefreshReuseHandler, isTokenRequest } from './oauth/refresh-reuse';
 import {
@@ -19,6 +20,7 @@ import {
   initializeParamsSchema,
   jsonRpcEnvelopeSchema,
   searchArgsSchema,
+  submitOtpArgsSchema,
   toolsCallParamsSchema,
   type JsonRpcEnvelope,
 } from './schemas';
@@ -26,7 +28,7 @@ import {
   DEFAULT_SEARCH_LIMIT,
   MAX_SEARCH_LIMIT,
   noSemanticCandidates,
-  searchCatalog,
+  searchCatalogDetailed,
 } from './search';
 import { createSemanticCandidates } from './search-knn';
 import { getKiloMcpOAuthStoreStub, KiloMcpOAuthStore as OAuthStore } from './store/oauth-store';
@@ -35,6 +37,8 @@ import {
   type Catalog,
   type ForwardedAuth,
   type GrantProps,
+  type OtpSubmitOutcome,
+  type ProtectedRequestsApi,
   type SemanticCandidates,
 } from './types';
 import OAuthProvider, {
@@ -53,6 +57,8 @@ const PARSE_ERROR = -32700;
 const INVALID_REQUEST = -32600;
 const METHOD_NOT_FOUND = -32601;
 const INVALID_PARAMS = -32602;
+/** A local or upstream failure that is not the caller's fault (retryable when marked so). */
+const INTERNAL_ERROR = -32000;
 /** The library already authenticated the request; this is the post-auth "no Kilo token bound" case. */
 const UNAUTHORIZED = -32001;
 
@@ -65,7 +71,7 @@ const SERVER_INFO = { name: 'kilo-mcp', version: '1.0.0' } as const;
  * these and reports everything else as `unknown`, so arbitrary caller text can
  * never reach PostHog.
  */
-const PUBLISHED_TOOL_NAMES = new Set(['search', 'call']);
+const PUBLISHED_TOOL_NAMES = new Set(['search', 'call', 'call_protected', 'submit_otp']);
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -148,10 +154,8 @@ const TOOLS = [
           description: 'A catalog endpoint path returned by search, e.g. "organizations.list".',
         },
         input: {
-          type: 'object',
           description:
-            'Arguments matching the endpoint input schema from search. Omit for endpoints that take no input.',
-          additionalProperties: true,
+            'Arguments matching the endpoint input schema from search. Usually an object, but some endpoints take a scalar or array — pass exactly the value the schema describes. Omit for endpoints that take no input.',
         },
       },
       required: ['path'],
@@ -160,10 +164,89 @@ const TOOLS = [
   },
 ] as const;
 
+/**
+ * The two tools published only to an opted-in admin connection. `call_protected`
+ * records a reviewed admin or debug call; `submit_otp` runs it once the user's
+ * authenticator code is accepted. The payload is fixed by `call_protected`, so
+ * `submit_otp` carries no path and no input.
+ */
+const PROTECTED_TOOLS = [
+  {
+    name: 'call_protected',
+    description:
+      'Call an admin or debug Kilo API endpoint with OTP approval. This does NOT run the endpoint: it validates the input, records the call exactly as submitted, and returns a request_id and an expiry. Ask the user to read the current code from their authenticator app, then call submit_otp with that request_id and that code. The endpoint and payload are fixed once this returns, and the call runs at most once, when the code is accepted.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: {
+          type: 'string',
+          description:
+            'An admin or debug catalog endpoint path returned by search, e.g. "organizations.admin.getMetrics". The call tool refuses these paths.',
+        },
+        input: {
+          description:
+            'Arguments matching the endpoint input schema from search. Usually an object, but some endpoints take a scalar or array — pass exactly the value the schema describes. Omit for endpoints that take no input.',
+        },
+      },
+      required: ['path'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'submit_otp',
+    description:
+      "Approve and run the admin or debug call that call_protected recorded. The code comes from the user's authenticator app, never from the model or the transcript. This tool takes only the request_id from call_protected and the current otp: the endpoint and payload were fixed when call_protected returned and cannot change here.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        request_id: {
+          type: 'string',
+          description: 'The request_id that call_protected returned.',
+        },
+        otp: {
+          type: 'string',
+          description:
+            'The current one-time code the user reads from their authenticator app for this Kilo account.',
+        },
+      },
+      required: ['request_id', 'otp'],
+      additionalProperties: false,
+    },
+  },
+] as const;
+
+/**
+ * Whether this grant may use the OTP-protected admin and debug tools. Fail-closed
+ * on every leg: the admin opt-in, the live admin eligibility recorded on the
+ * grant, and a non-empty per-connection id the pending request binds to. A
+ * pre-amendment grant (no `sessionId`) is never eligible.
+ */
+export function canUseProtectedActions(auth: ForwardedAuth): boolean {
+  return (
+    auth.adminEnabled === true &&
+    auth.adminEligible === true &&
+    typeof auth.sessionId === 'string' &&
+    auth.sessionId.length > 0
+  );
+}
+
+/** The ordinary unknown-tool refusal; an unpublished name is never disclosed. */
+function unknownTool(name: string): JsonRpcFailure {
+  return new JsonRpcFailure(
+    INVALID_PARAMS,
+    `Unknown tool "${name}". Available tools: search, call.`
+  );
+}
+
 type McpHandlerDeps = {
   catalog: Catalog;
   webBaseUrl: string;
   fetchImpl?: typeof fetch;
+  /**
+   * The pending protected-request store (o2). A guarded call without it is
+   * refused before anything runs: never fail open.
+   */
+  protectedRequests?: ProtectedRequestsApi;
   /** Vectorize kNN hook; token-only search when omitted. */
   semanticCandidates?: SemanticCandidates;
   /**
@@ -193,6 +276,16 @@ const noopAnalytics: McpAnalytics = {
  */
 function identity(auth: ForwardedAuth): AnalyticsIdentity {
   return { kiloUserId: auth.kiloUserId, organizationId: auth.organizationId ?? null };
+}
+
+/**
+ * The raw Kilo token inside the grant's `Authorization` header value. The
+ * admin re-check calls `fetchUserIsAdmin`, which forms its own `Bearer …`
+ * header, so the grant's already-prefixed value is unwrapped here. Never log or
+ * echo the result.
+ */
+function grantKiloToken(authorization: string): string {
+  return authorization.replace(/^Bearer\s+/i, '');
 }
 
 /** An MCP tools/call success payload. */
@@ -227,10 +320,16 @@ async function runTool(
       );
     }
     const { query, limit } = parsed.data;
-    const results = await searchCatalog(query, {
+    // One pass yields the rows and whether the guarded gate withheld a match, so
+    // the empty-state answer below needs no second search: an opted-in grant
+    // withholds nothing, and a query with no match anywhere reports `false`.
+    const { results, hiddenGuardedMatches } = await searchCatalogDetailed(query, {
       catalog: deps.catalog,
       limit,
       semanticCandidates: deps.semanticCandidates ?? noSemanticCandidates,
+      // Fail-closed: only a grant that ticked the admin opt-in sees admin or
+      // debug rows.
+      includeGuarded: auth.adminEnabled === true,
     });
     // The query's shape only — never the raw text (it can carry personal data).
     analytics.searchPerformed({
@@ -241,13 +340,18 @@ async function runTool(
       limit: Math.max(1, Math.floor(limit ?? DEFAULT_SEARCH_LIMIT)),
     });
     if (results.length === 0) {
-      // Empty state, not an error: tell the agent how to recover.
-      return textResult(
-        JSON.stringify({
-          results: [],
-          message: `No endpoints matched "${query.trim()}". Refine your query: use fewer or different keywords, or describe the task in plain language.`,
-        })
-      );
+      // Empty state, not an error: tell the agent how to recover. A query whose
+      // only matches are guarded rows is NOT a bad query: the catalog matches,
+      // the guarded gate hid the rows for this connection. That signal came from
+      // the single search pass above, so no second embedding or vector lookup
+      // runs while the user is already waiting on an empty answer. Only an admin
+      // is told the endpoints exist — a non-admin gets no admin/debug trace.
+      const message = `No endpoints matched "${query.trim()}". Refine your query: use fewer or different keywords, or describe the task in plain language.${
+        hiddenGuardedMatches && auth.adminEligible === true
+          ? ' Some endpoints matching this query are admin or debug endpoints and are hidden for this connection. If you are a Kilo admin, reconnect the Kilo MCP server and tick "Enable admin and debug actions" at sign-in to allow them; admin and debug calls then need a code from your authenticator app.'
+          : ''
+      }`;
+      return textResult(JSON.stringify({ results: [], message }));
     }
     return textResult(JSON.stringify({ results }));
   }
@@ -273,10 +377,163 @@ async function runTool(
       ...(outcome.truncated ? { truncated: true as const } : {}),
     };
   }
-  throw new JsonRpcFailure(
-    INVALID_PARAMS,
-    `Unknown tool "${name}". Available tools: search, call.`
-  );
+  if (name === 'call_protected') {
+    // A connection without the opt-in, the live admin eligibility and a
+    // sessionId never learns these tools exist: the same unknown-tool answer as
+    // any unpublished name.
+    if (!canUseProtectedActions(auth)) {
+      throw unknownTool(name);
+    }
+    const parsed = callArgsSchema.safeParse(args);
+    if (!parsed.success) {
+      throw new JsonRpcFailure(
+        INVALID_PARAMS,
+        `Invalid call_protected arguments: ${describeZodIssues(parsed.error)}`
+      );
+    }
+    const { path, input } = parsed.data;
+    const outcome = await requestProtectedCall({
+      catalog: deps.catalog,
+      path,
+      input,
+      auth,
+      ...(deps.protectedRequests ? { requests: deps.protectedRequests } : {}),
+      webBaseUrl: deps.webBaseUrl,
+      ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
+    });
+    return {
+      content: [{ type: 'text', text: outcome.text }],
+      ...(outcome.truncated ? { truncated: true as const } : {}),
+    };
+  }
+  if (name === 'submit_otp') {
+    if (!canUseProtectedActions(auth)) {
+      throw unknownTool(name);
+    }
+    const parsed = submitOtpArgsSchema.safeParse(args);
+    if (!parsed.success) {
+      throw new JsonRpcFailure(
+        INVALID_PARAMS,
+        `Invalid submit_otp arguments: ${describeZodIssues(parsed.error)}`
+      );
+    }
+    const { request_id, otp } = parsed.data;
+    const requests = deps.protectedRequests;
+    const sessionId = auth.sessionId;
+    if (!requests || typeof sessionId !== 'string' || sessionId.length === 0) {
+      // Fail-closed: without the store there is no pending request to check or
+      // claim, so an admin or debug call can never run.
+      throw new JsonRpcFailure(
+        INTERNAL_ERROR,
+        `Could not check this admin or debug request for "${request_id}". Retry; if it keeps failing, reconnect the Kilo MCP server.`,
+        { retryable: true }
+      );
+    }
+
+    const nowIso = new Date().toISOString();
+    let outcome: OtpSubmitOutcome;
+    try {
+      // `gone` covers an unknown id, another session's id, an expired row and a
+      // used row with one uniform answer that names no path, kind or owner.
+      const peek = await requests.peekProtectedRequest(request_id, sessionId, nowIso);
+      if (peek.status === 'gone') {
+        throw new JsonRpcFailure(
+          INVALID_PARAMS,
+          'This request is no longer pending. Start a new admin or debug call with call_protected.'
+        );
+      }
+      // Re-derive admin from the live user.getMe with the grant's Kilo bearer:
+      // an admin who lost the role cannot execute an already-pending request.
+      // A check that cannot be reached is retryable, never a pass.
+      let isAdmin: boolean;
+      try {
+        isAdmin = await fetchUserIsAdmin(
+          {
+            webBaseUrl: deps.webBaseUrl,
+            ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
+          },
+          grantKiloToken(auth.authorization)
+        );
+      } catch {
+        throw new JsonRpcFailure(
+          INTERNAL_ERROR,
+          'Could not check admin access for this admin or debug call. Retry; if it keeps failing, reconnect the Kilo MCP server.',
+          { retryable: true }
+        );
+      }
+      if (!isAdmin) {
+        throw new JsonRpcFailure(
+          INVALID_PARAMS,
+          'Your Kilo account does not have admin access, so this admin or debug call cannot run. Reconnect the Kilo MCP server if that is unexpected.'
+        );
+      }
+      outcome = await requests.verifyOtpAndClaim({
+        id: request_id,
+        sessionId,
+        kiloUserId: auth.kiloUserId,
+        code: otp,
+        nowIso,
+      });
+    } catch (error) {
+      if (error instanceof JsonRpcFailure) throw error;
+      // A store failure is a local refusal: the code never reaches a message.
+      throw new JsonRpcFailure(
+        INTERNAL_ERROR,
+        'Could not use this admin or debug request. Retry; if it keeps failing, reconnect the Kilo MCP server.',
+        { retryable: true }
+      );
+    }
+
+    switch (outcome.status) {
+      case 'not_pending':
+        throw new JsonRpcFailure(
+          INVALID_PARAMS,
+          'This request is no longer pending. Start a new admin or debug call with call_protected.'
+        );
+      case 'expired':
+        throw new JsonRpcFailure(
+          INVALID_PARAMS,
+          'This request expired. Start a new admin or debug call with call_protected.'
+        );
+      case 'invalidated':
+        throw new JsonRpcFailure(
+          INVALID_PARAMS,
+          'This request was cancelled after too many incorrect codes. Start a new admin or debug call with call_protected.'
+        );
+      case 'bad_code':
+        throw new JsonRpcFailure(
+          INVALID_PARAMS,
+          `That code is not valid. Check your authenticator app and try again. ${outcome.attemptsRemaining} attempts remaining.`
+        );
+      case 'reused_code':
+        throw new JsonRpcFailure(
+          INVALID_PARAMS,
+          'That code was already used. Ask the user for the next code from their authenticator app, then submit it again.'
+        );
+      case 'no_authenticator':
+        throw new JsonRpcFailure(
+          INVALID_PARAMS,
+          'No authenticator is registered for this Kilo account. Reconnect the Kilo MCP server and add your authenticator at sign-in.'
+        );
+      case 'ok': {
+        // The payload was fixed by call_protected and re-validated against the
+        // published schema; this is the single upstream request for it.
+        const result = await executeProtectedCall({
+          catalog: deps.catalog,
+          path: outcome.path,
+          inputJson: outcome.inputJson,
+          auth,
+          webBaseUrl: deps.webBaseUrl,
+          ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
+        });
+        return {
+          content: [{ type: 'text', text: result.text }],
+          ...(result.truncated ? { truncated: true as const } : {}),
+        };
+      }
+    }
+  }
+  throw unknownTool(name);
 }
 
 async function handleRpcMessage(
@@ -316,14 +573,17 @@ async function handleRpcMessage(
           protocolVersion,
           capabilities: { tools: {} },
           serverInfo: SERVER_INFO,
-          instructions:
-            'This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call.',
+          instructions: canUseProtectedActions(auth)
+            ? 'This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. This connection may also run admin and debug endpoints: use call_protected to submit one, then submit_otp with the code the user reads from their authenticator app to approve it. The endpoint and payload are fixed once call_protected returns.'
+            : 'This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call.',
         });
       }
       case 'ping':
         return jsonRpcResult(id ?? 0, {});
       case 'tools/list':
-        return jsonRpcResult(id ?? 0, { tools: TOOLS });
+        return jsonRpcResult(id ?? 0, {
+          tools: canUseProtectedActions(auth) ? [...TOOLS, ...PROTECTED_TOOLS] : TOOLS,
+        });
       case 'tools/call': {
         const parsed = toolsCallParamsSchema.safeParse(message.params);
         if (!parsed.success) {
@@ -488,11 +748,17 @@ export const apiHandler = {
       analytics.callRejected({ identity: null, reason: 'auth_failure' });
       return unauthorizedResponse(request);
     }
+    // The pending protected requests live in the worker's existing DO (o2).
+    // Resolve it only when the binding is present so a handler built without one
+    // still answers every non-guarded call; the protected tools then fail closed
+    // rather than running a guarded call unapproved.
+    const protectedRequests = env.KILO_MCP_OAUTH_STORE ? getKiloMcpOAuthStoreStub(env) : undefined;
     const handler = createMcpHandler({
       catalog,
       webBaseUrl: env.WEB_BASE_URL,
       semanticCandidates: createSemanticCandidates(env),
       analytics,
+      ...(protectedRequests ? { protectedRequests } : {}),
     });
     return handler(request, forwardedAuthFromProps(props));
   },

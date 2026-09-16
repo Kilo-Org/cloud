@@ -168,7 +168,11 @@ export function PasskeysScreen() {
     Alert.alert(t('profile.removePasskeyTitle'), t('profile.removePasskeyMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
-        text: t('common.remove'),
+        // The destructive action names itself, the same pair every other
+        // confirmation in the app uses (`profile.deleteAccountTitle` /
+        // `profile.deleteAccountConfirm`): a bare "Remove" would not say what
+        // the row is about to lose.
+        text: t('profile.removePasskey'),
         style: 'destructive',
         onPress: () => {
           remove.mutate({ id: passkey.id });

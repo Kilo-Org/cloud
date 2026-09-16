@@ -128,13 +128,17 @@ export async function retry(control: ReactTestInstance): Promise<void> {
   });
 }
 
-/** Answer the removal confirmation the screen raised, choosing the destructive action. */
+/**
+ * Answer the removal confirmation the screen raised, choosing the destructive
+ * action. The action names the passkey it removes, so it is picked by its role,
+ * not by a label a copy change would move.
+ */
 export async function confirmRemoval(spy: Mock): Promise<void> {
   const buttons = (
-    spy.mock.calls[0] as [string, string, { text: string; onPress?: () => void }[]]
+    spy.mock.calls[0] as [string, string, { text: string; style?: string; onPress?: () => void }[]]
   )[2];
   await act(() => {
-    buttons.find(button => button.text === 'Remove')?.onPress?.();
+    buttons.find(button => button.style === 'destructive')?.onPress?.();
   });
 }
 

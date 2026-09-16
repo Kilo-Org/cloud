@@ -93,7 +93,9 @@ describe('PasskeysScreen', () => {
     expect(alertSpy).toHaveBeenCalledOnce();
     expect(alertSpy.mock.calls[0]?.[0]).toBe('Remove passkey?');
     expect(alertSpy.mock.calls[0]?.[2]).toEqual(
-      expect.arrayContaining([expect.objectContaining({ style: 'destructive' })])
+      expect.arrayContaining([
+        expect.objectContaining({ style: 'destructive', text: 'Remove passkey' }),
+      ])
     );
 
     // Removed optimistically, before the server answered: with no row left, the

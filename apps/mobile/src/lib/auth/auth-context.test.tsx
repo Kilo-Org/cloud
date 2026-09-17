@@ -113,6 +113,19 @@ const readCacheMock = vi.hoisted(() => ({
   readCachedUserId: vi.fn().mockReturnValue(null),
 }));
 
+// Hoisted so the sign-out test can assert the offline translation cache is
+// cleared without loading the native-bound encrypted-KV chain.
+const toolSummaryTranslationCacheMock = vi.hoisted(() => ({
+  clearToolSummaryTranslationsForSignOut: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Hoisted so the sign-out test can assert the runtime's in-memory retry memory
+// is dropped with the disk scope, without loading the transcript graph.
+const toolSummaryTranslationRuntimeMock = vi.hoisted(() => ({
+  clearToolSummaryTranslationMemory: vi.fn(),
+  clearToolSummaryTranslationMemoryForSignOut: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Hoisted so the FIFO and failure-matrix tests can hold remote cleanup open or
 // force it to reject without loading the tRPC/notifications chain.
 const logoutCleanupMock = vi.hoisted(() => ({
@@ -208,6 +221,19 @@ vi.mock('@/lib/query-client', () => ({
 }));
 
 vi.mock('@/lib/persist/read-cache', () => readCacheMock);
+
+vi.mock('@/lib/persist/tool-summary-translation-cache', () => toolSummaryTranslationCacheMock);
+
+vi.mock(
+  '@/lib/tool-summary-translation/tool-summary-translation-runtime',
+  async importOriginal => ({
+    ...(await importOriginal()),
+    clearToolSummaryTranslationMemory:
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemory,
+    clearToolSummaryTranslationMemoryForSignOut:
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut,
+  })
+);
 
 vi.mock('@/lib/auth/logout-cleanup', () => logoutCleanupMock);
 
@@ -776,6 +802,44 @@ describe('sign-out teardown ordering', () => {
     expect(cleanupOrder).toBeLessThan(clearOrder);
     expect(clearMock).toHaveBeenCalledTimes(1);
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
+
+    unmount();
+  });
+
+  it('clears the offline translation cache exactly once, before the query client clear', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const { queryClient: queryClientMock } = await import('@/lib/query-client');
+    const clearMock = vi.mocked(queryClientMock.clear);
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    // The offline translation cache holds the signed-out account's tool text,
+    // so sign-out drops it exactly once, as part of the same local cleanup
+    // batch, before the query client is cleared.
+    expect(
+      toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut
+    ).toHaveBeenCalledTimes(1);
+    // The runtime's in-memory retry memory and cache hold the same tool text:
+    // without this reset the next account's retry re-sends it to the gateway.
+    // It resolves only once the writes already dispatched have settled, so the
+    // disk scope clear can never race one of them.
+    expect(
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut
+    ).toHaveBeenCalledTimes(1);
+    const runtimeResetOrder: number =
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut.mock
+        .invocationCallOrder[0];
+    const translationClearOrder: number =
+      toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut.mock
+        .invocationCallOrder[0];
+    // The runtime reset (generation bump + dispatched-write drain) resolves
+    // before the disk scope is cleared, so no fire-and-forget persist can land
+    // after the scope is gone.
+    expect(runtimeResetOrder).toBeLessThan(translationClearOrder);
+    const clearOrder: number = clearMock.mock.invocationCallOrder[0];
+    expect(translationClearOrder).toBeLessThan(clearOrder);
 
     unmount();
   });

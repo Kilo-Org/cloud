@@ -40,6 +40,9 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 vi.mock('@/lib/context-scope', () => ({
   getAuthenticatedOwner: () => ({ authEpoch: 0, generation: 0, userId: 'user-1' }),
   isAuthenticatedOwner: () => true,
+  // The provider's retirement fence reads the captured owner against the live
+  // one; the mock owner stands, so the registry must stay populated.
+  isCurrentOwner: () => true,
   subscribeAuthenticatedOwner: () => () => undefined,
 }));
 

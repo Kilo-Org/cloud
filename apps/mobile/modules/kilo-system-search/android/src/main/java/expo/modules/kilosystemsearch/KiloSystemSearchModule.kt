@@ -194,8 +194,13 @@ class KiloSystemSearchModule : Module() {
     if (launchIntentRead) {
       return null
     }
+    // Read it through the activity, and only mark it read once one exists: on a
+    // cold start `currentActivity` can still be null when JavaScript makes its
+    // first consume, and giving up then would forfeit the launch tap for the
+    // rest of the process's life.
+    val intent = appContext.currentActivity?.intent ?: return null
     launchIntentRead = true
-    return pickedIdentifier(appContext.currentActivity?.intent)
+    return pickedIdentifier(intent)
   }
 
   /**
@@ -204,8 +209,9 @@ class KiloSystemSearchModule : Module() {
    * announced, so the slot — not the event — carries the identifier. The
    * identifier is stored as the platform handed it back and resolved when the
    * slot is consumed, so this runs no index read on the main thread that
-   * delivered the Intent. Any other Intent (the launcher Intent, an ordinary
-   * deep link, a share) is ignored.
+   * delivered the Intent. An Intent whose identifier the index does not hold —
+   * the launcher Intent, a share, an ordinary deep link — resolves to nothing
+   * when the slot is consumed and never navigates as a search tap.
    */
   private fun deliverPickedResult(intent: Intent?) {
     val identifier = pickedIdentifier(intent) ?: return
@@ -218,8 +224,11 @@ class KiloSystemSearchModule : Module() {
   /**
    * The identifier this Intent carries for one of our entries: the entry's
    * `kiloapp://` link, or the qualified id of one of the documents the index
-   * stores. Null for every other Intent, which is why only the app's own search
-   * entries are read out of one.
+   * stores. Null for an Intent that carries neither.
+   *
+   * The link form is not proof by itself — `kiloapp://` is also the scheme the
+   * app's ordinary deep links use — so it is only honoured once the index is
+   * seen to hold it (see `resolveRoute`).
    */
   private fun pickedIdentifier(intent: Intent?): String? {
     val identifier = intent?.dataString?.takeIf { it.isNotBlank() } ?: return null
@@ -233,24 +242,30 @@ class KiloSystemSearchModule : Module() {
 
   /**
    * The route the index holds for the picked entry, so the slot carries the
-   * stored route whichever identifier form the platform handed back. Falls back
-   * to the identifier itself: a stale or unreadable index must never lose the
-   * tap, and the JS side refuses anything it did not issue.
+   * stored route whichever identifier form the platform handed back. Null when
+   * the index does not hold the identifier.
    *
-   * An identifier that is already one of our `kiloapp://` links is answered
-   * without reading the index: that form is the link itself, so a lookup could
-   * only ever return the same string, and it costs a full index scan. The
-   * qualified-id form still needs the scan, which is why this is only ever
-   * called from an `AsyncFunction`.
+   * The index is the authority on which identifiers are ours: the app writes
+   * one route per entry it indexes, so a `kiloapp://` link the index does not
+   * carry is an ordinary deep link — the app's own scheme is what its deep
+   * links use — and must not open as a search tap. The qualified-id form is
+   * matched against the same stored entries.
+   *
+   * This is only ever called from an `AsyncFunction`, so the index read runs on
+   * the module queue, never on the main thread that delivers the Intent or the
+   * JavaScript thread that consumes the slot.
    */
-  private fun resolveRoute(identifier: String): String {
-    if (identifier.startsWith(APP_SCHEME_PREFIX)) {
-      return identifier
-    }
+  private fun resolveRoute(identifier: String): String? {
     val stored = try {
       backend.stored()
     } catch (error: Exception) {
-      emptyList()
+      // An unreadable index must not lose a tap that already names its entry: a
+      // `kiloapp://` identifier is the link itself, and the JS side still
+      // refuses anything it did not issue.
+      return identifier.takeIf { it.startsWith(APP_SCHEME_PREFIX) }
+    }
+    if (identifier.startsWith(APP_SCHEME_PREFIX)) {
+      return identifier.takeIf { link -> stored.any { it.route == link } }
     }
     val matched = stored.firstOrNull { it.id == identifier || it.route == identifier }
       ?: stored.firstOrNull { qualifiedDocumentId(it.id) == identifier }

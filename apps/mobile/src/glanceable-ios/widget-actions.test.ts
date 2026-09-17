@@ -34,6 +34,11 @@ const widgetState = vi.hoisted(() => ({
   snapshots: [] as unknown[],
   listeners: [] as ((event: { source: string; target: string; timestamp: number }) => void)[],
   removals: 0,
+  /**
+   * When set, the next timeline read resolves only once it is released,
+   * modelling a native read still in flight when the running pass ends.
+   */
+  timelineReadGate: null as Promise<unknown> | null,
 }));
 
 /** A swift-ui primitive stand-in: the kind tag rides on the function itself. */
@@ -58,7 +63,17 @@ vi.mock('expo-widgets', () => ({
     updateTimeline: (entries: { date: Date; props: Record<string, unknown> }[]) => {
       widgetState.timeline = entries;
     },
-    getTimeline: () => widgetState.timeline,
+    getTimeline: async () => {
+      // The read answers with the timeline as of the read, never with the
+      // writes that land while a held read waits.
+      const timeline = widgetState.timeline;
+      const gate = widgetState.timelineReadGate;
+      if (gate !== null) {
+        widgetState.timelineReadGate = null;
+        await gate;
+      }
+      return timeline;
+    },
     reload: () => undefined,
   }),
   addUserInteractionListener: (
@@ -289,6 +304,7 @@ describe('runPendingWidgetActions', () => {
     widgetState.snapshots = [];
     widgetState.listeners = [];
     widgetState.removals = 0;
+    widgetState.timelineReadGate = null;
     mocks.runWidgetAction.mockReset();
     mocks.linkingOpenURL.mockReset();
     mocks.lastSnapshot = null;
@@ -449,6 +465,51 @@ describe('runPendingWidgetActions', () => {
 
     // The follow-up pass answers the held press. Re-reading the timeline after
     // the republish finds no marker, which is the drop this covers.
+    expect(mocks.runWidgetAction).toHaveBeenCalledTimes(2);
+    expect(mocks.runWidgetAction).toHaveBeenLastCalledWith('new-agent');
+  });
+
+  it('waits for the held press read before the sweep decides to stop', async () => {
+    widgetState.timeline = [
+      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
+    ];
+    const gate = Promise.withResolvers<{ kind: string }>();
+    let calls = 0;
+    mocks.runWidgetAction.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 1) {
+        await gate.promise;
+        // The answered action republishes the tray, which takes the mid-sweep
+        // press's marker with it.
+        widgetState.timeline = [{ date: new Date(3), props: { primaryCount: 1 } }];
+      }
+      return { kind: 'approved' };
+    });
+    const sweep = runPendingWidgetActions();
+    await vi.waitFor(() => {
+      expect(mocks.runWidgetAction).toHaveBeenCalledTimes(1);
+    });
+
+    // The second press lands mid-sweep and its delivery read is still in
+    // flight when the first action ends. A queued pass that runs before that
+    // read settles reads no marker and holds no press, so the tap would only
+    // be answered at the next launch or foreground.
+    widgetState.timeline = [
+      { date: new Date(2), props: { pendingAction: 'new-agent', pendingActionVisible: true } },
+    ];
+    const heldRead = Promise.withResolvers<null>();
+    widgetState.timelineReadGate = heldRead.promise;
+    const live = runPendingWidgetActions({ source: WIDGET_NAME });
+
+    gate.resolve({ kind: 'approved' });
+    // Let the running sweep run out its queued pass before the read lands: the
+    // drop this covers is that pass deciding to stop while the read is out.
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 0);
+    });
+    heldRead.resolve(null);
+    await Promise.all([sweep, live]);
+
     expect(mocks.runWidgetAction).toHaveBeenCalledTimes(2);
     expect(mocks.runWidgetAction).toHaveBeenLastCalledWith('new-agent');
   });
@@ -681,6 +742,7 @@ describe('registerWidgetActionHandling', () => {
     widgetState.snapshots = [];
     widgetState.listeners = [];
     widgetState.removals = 0;
+    widgetState.timelineReadGate = null;
     mocks.runWidgetAction.mockReset();
     mocks.lastSnapshot = null;
     const widgetActions = await import('./widget-actions');

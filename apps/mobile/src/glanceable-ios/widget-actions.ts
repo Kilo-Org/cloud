@@ -190,6 +190,27 @@ let resweepRequested = false;
  */
 let carriedPresses: PressedEntry[] = [];
 
+/**
+ * The delivery reads a mid-pass press started, still in flight. The sweep waits
+ * them out before it decides whether to stop: a read that settles after the
+ * pass it raced would place its press in `carriedPresses` with no pass left to
+ * answer it, so the tap would only be answered at the next launch or foreground.
+ */
+let carriesInFlight: Promise<void>[] = [];
+
+/**
+ * Wait out every delivery read started so far, plus any that start while
+ * waiting: a press that lands during the wait is still owed this sweep a pass.
+ */
+async function settleCarries(): Promise<void> {
+  while (carriesInFlight.length > 0) {
+    const inFlight = carriesInFlight;
+    carriesInFlight = [];
+    // eslint-disable-next-line no-await-in-loop -- a press that lands during the wait joins the next batch
+    await Promise.all(inFlight);
+  }
+}
+
 /** Read and clear the presses held from mid-pass. */
 function takeCarriedPresses(): PressedEntry[] {
   const carried = carriedPresses;
@@ -279,7 +300,9 @@ async function sweepPendingActions(): Promise<void> {
  * while a press asked for another pass. A press the live listener delivers
  * while a pass is in flight sets `resweepRequested` and is held from the
  * timeline read taken at delivery, so the follow-up pass answers it even though
- * the running pass's own writes have since erased its marker.
+ * the running pass's own writes have since erased its marker. The sweep waits
+ * for that read before it decides to stop, so a read that settles after the
+ * pass it raced still gets its pass.
  *
  * The press marker rides the `expo-widgets` widget timeline the App Intent
  * patches, and that timeline exists only on iOS: `expo-widgets` has no widget
@@ -298,7 +321,9 @@ export async function runPendingWidgetActions(
 ): Promise<void> {
   if (sweeping) {
     resweepRequested = true;
-    await carryPendingPress(event);
+    const carry = carryPendingPress(event);
+    carriesInFlight.push(carry);
+    await carry;
     return;
   }
   sweeping = true;
@@ -312,6 +337,11 @@ export async function runPendingWidgetActions(
     do {
       // eslint-disable-next-line no-await-in-loop -- a pass republishes the surface, so passes must not overlap
       await sweepPendingActions();
+      // The running pass may have finished while a press it has to answer was
+      // still reading the timeline. Wait that read out before deciding to stop,
+      // so the pass below answers the held press instead of the next launch.
+      // eslint-disable-next-line no-await-in-loop -- the follow-up pass owes these reads their answer
+      await settleCarries();
     } while (takeResweepRequest());
   } catch {
     // A native timeline read/write failure must not throw into the caller;

@@ -57,10 +57,10 @@ async function resolveInteractiveSession(opts: {
  * A legacy (`agent_*`) session's pending set, read from its wrapper: that plane
  * keeps none in a Durable Object, so the wrapper's live Kilo state is the only
  * read there is. Returns null when the wrapper cannot answer — it is not
- * running, or it predates the read route — which the caller reports as nothing
- * pending: the answer this query gave for a legacy session before the wrapper
- * could be read at all, so the press still hands the user to the app instead of
- * dead-ending on an error.
+ * running, it has no session bound yet, or it predates the read route — which
+ * the caller reports as nothing pending: the answer this query gave for a
+ * legacy session before the wrapper could be read at all, so the press still
+ * hands the user to the app instead of dead-ending on an error.
  */
 async function readLegacyPendingInteractions(opts: {
   sessionId: SessionId;
@@ -80,7 +80,13 @@ async function readLegacyPendingInteractions(opts: {
     ) {
       return null;
     }
-    if (error instanceof WrapperError && (error.statusCode === 404 || error.statusCode === 405)) {
+    // A wrapper that is running but has no Kilo session bound yet answers
+    // `NO_SESSION` (400). It has nothing to report for the same reason an old
+    // wrapper without the route does, so it folds into the empty set too.
+    if (
+      error instanceof WrapperError &&
+      (error.code === 'NO_SESSION' || error.statusCode === 404 || error.statusCode === 405)
+    ) {
       return null;
     }
     throw error;

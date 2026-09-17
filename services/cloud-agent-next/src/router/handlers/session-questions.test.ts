@@ -166,6 +166,21 @@ describe('getPendingInteractions', () => {
     ).resolves.toEqual({ questions: [], permissions: [] });
   });
 
+  it('returns the empty set when the running wrapper has no session bound', async () => {
+    const harness = setup();
+    setupLegacy({
+      getPendingInteractions: vi
+        .fn()
+        .mockRejectedValue(new WrapperError('No session context', 'NO_SESSION', 400)),
+    });
+
+    // A wrapper that is running but has no Kilo session bound waits on
+    // nothing, so the read reports the empty set instead of failing.
+    await expect(
+      harness.caller.getPendingInteractions({ cloudAgentSessionId: LEGACY_SESSION_ID })
+    ).resolves.toEqual({ questions: [], permissions: [] });
+  });
+
   it('fails the read when the wrapper itself errors', async () => {
     const harness = setup();
     setupLegacy({

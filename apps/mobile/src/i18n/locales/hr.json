@@ -2146,7 +2146,20 @@
       "continueFrom": "Nastavlja se sesija {{title}}.",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberi Cloud Agent ili drugi CLI.",
-      "importFailed": "Uvoz ove sesije nije uspio."
+      "importFailed": "Uvoz ove sesije nije uspio.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Zadano · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Malo",
+      "sandboxInstanceShared": "Dijeljeno",
+      "sandboxInstanceLarge": "Veliko",
+      "sandboxInstanceDevcontainer": "Dev kontejner",
+      "sandboxInstanceProviderDefault": "Zadano od pružatelja",
+      "sandboxCouldNotLoad": "Opcije sandboxa nije moguće učitati",
+      "sandboxUnavailable": "Ovaj sandbox nije dostupan. Odaberite drugi sandbox ili Zadano.",
+      "sandboxUseDefault": "Koristi Zadano"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirana je {{displayCount}} datoteka.",

@@ -2128,7 +2128,20 @@
       "continueFrom": "A na-aga n'ihu na {{title}}.",
       "importingSession": "Na-ebubata nnọkọ",
       "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",
-      "importFailed": "Enweghị ike ibubata nnọkọ a."
+      "importFailed": "Enweghị ike ibubata nnọkọ a.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Ndabere · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Nta",
+      "sandboxInstanceShared": "Kejoro",
+      "sandboxInstanceLarge": "Ukwu",
+      "sandboxInstanceDevcontainer": "Dev konteita",
+      "sandboxInstanceProviderDefault": "Ndabere onye na-enye ọrụ",
+      "sandboxCouldNotLoad": "Enweghị ike ibudata nhọrọ sandbox",
+      "sandboxUnavailable": "Sandbox a adịghị. Họrọ sandbox ọzọ ma ọ bụ Ndabere.",
+      "sandboxUseDefault": "Jiri Ndabere"
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere faịlụ {{displayCount}}.",

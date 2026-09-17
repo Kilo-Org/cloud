@@ -2128,7 +2128,20 @@
       "continueFrom": "Po vazhdon seanca {{title}}.",
       "importingSession": "Duke importuar seancën",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidh Cloud Agent ose një CLI tjetër.",
-      "importFailed": "Nuk u arrit të importohej kjo seancë."
+      "importFailed": "Nuk u arrit të importohej kjo seancë.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Parazgjedhje · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "E vogël",
+      "sandboxInstanceShared": "E përbashkët",
+      "sandboxInstanceLarge": "E madhe",
+      "sandboxInstanceDevcontainer": "Kontejner zhvillimi",
+      "sandboxInstanceProviderDefault": "Parazgjedhje e ofruesit",
+      "sandboxCouldNotLoad": "Nuk mund të ngarkoheshin opsionet e sandbox-it",
+      "sandboxUnavailable": "Ky sandbox nuk është i disponueshëm. Zgjidhni një sandbox tjetër ose Parazgjedhjen.",
+      "sandboxUseDefault": "Përdor Parazgjedhjen"
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar.",

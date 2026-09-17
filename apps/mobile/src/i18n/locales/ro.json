@@ -2146,7 +2146,20 @@
       "continueFrom": "Se continuă sesiunea {{title}}.",
       "importingSession": "Se importă sesiunea",
       "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
-      "importFailed": "Nu s-a putut importa această sesiune."
+      "importFailed": "Nu s-a putut importa această sesiune.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Implicit · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Mic",
+      "sandboxInstanceShared": "Partajat",
+      "sandboxInstanceLarge": "Mare",
+      "sandboxInstanceDevcontainer": "Container de dezvoltare",
+      "sandboxInstanceProviderDefault": "Implicit al furnizorului",
+      "sandboxCouldNotLoad": "Nu s-au putut încărca opțiunile pentru sandbox",
+      "sandboxUnavailable": "Acest sandbox nu este disponibil. Alege un alt sandbox sau Implicit.",
+      "sandboxUseDefault": "Folosește Implicit"
     },
     "partRenderer": {
       "updatedFileCount_one": "S-a actualizat {{displayCount}} fișier.",

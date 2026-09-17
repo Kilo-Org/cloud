@@ -325,13 +325,41 @@ describe('getSlashCommandDescription', () => {
     await i18n.changeLanguage('en');
   });
 
-  it('resolves a mapped command description from the catalog instead of the reported description', () => {
-    expect(getSlashCommandDescription({ name: 'goal', description: 'Goal', hints: [] })).toBe(
-      'Keep working toward a session goal. /goal <objective> or pause, resume, clear'
-    );
+  it('keeps the description a catalog entry reports when it reuses a built-in command name', () => {
+    // A repository command file or an MCP prompt can carry a built-in name,
+    // so the name alone must not pull the row into the catalogue.
+    for (const [name, description] of [
+      ['review', 'review my style guide'],
+      ['init', 'bootstrap this repository'],
+      ['compact', 'shrink my notes'],
+      ['resume-claude', 'continue my Claude transcript'],
+    ] as const) {
+      expect(getSlashCommandDescription({ name, description, hints: [] })).toBe(description);
+    }
   });
 
-  it('resolves every built-in command name from the catalog, ignoring the reported description', () => {
+  it('keeps an external entry that reuses a built-in name in a non-English locale', async () => {
+    await i18n.changeLanguage('de');
+    expect(
+      getSlashCommandDescription({
+        name: 'review',
+        description: 'review my style guide',
+        hints: [],
+      })
+    ).toBe('review my style guide');
+  });
+
+  it('resolves a built-in entry that reports the catalog source string', () => {
+    expect(
+      getSlashCommandDescription({
+        name: 'goal',
+        description: en.agentChat.slashCommands.goalDescription,
+        hints: [],
+      })
+    ).toBe('Keep working toward a session goal. /goal <objective> or pause, resume, clear');
+  });
+
+  it('resolves every built-in command name that reports the catalog source string', () => {
     const expected = {
       compact: en.agentChat.slashCommands.compactDescription,
       goal: en.agentChat.slashCommands.goalDescription,
@@ -339,24 +367,35 @@ describe('getSlashCommandDescription', () => {
       'resume-claude': en.agentChat.slashCommands.resumeClaudeDescription,
       'resume-codex': en.agentChat.slashCommands.resumeCodexDescription,
       review: en.agentChat.slashCommands.reviewDescription,
-      new: en.agentChat.slashCommands.startNewSession,
-      exit: en.agentChat.slashCommands.exitSession,
-      quit: en.agentChat.slashCommands.exitSession,
-      clear: en.agentChat.slashCommands.clearSession,
     };
     for (const [name, description] of Object.entries(expected)) {
-      expect(getSlashCommandDescription({ name, description: 'reported', hints: [] })).toBe(
-        description
-      );
+      expect(getSlashCommandDescription({ name, description, hints: [] })).toBe(description);
     }
   });
 
-  it('prefers the active language catalog over the reported English description', async () => {
+  it('localizes a command this client registered, whichever language built it', async () => {
+    const command = getLocalNewSlashCommand();
+    await i18n.changeLanguage('de');
+    i18n.addResource(
+      'de',
+      'translation',
+      'agentChat.slashCommands.startNewSession',
+      'Neue Sitzung'
+    );
+    expect(getSlashCommandDescription(command)).toBe('Neue Sitzung');
+    i18n.removeResourceBundle('de', 'translation');
+  });
+
+  it('prefers the active language catalog over the built-in English source', async () => {
     await i18n.changeLanguage('de');
     i18n.addResource('de', 'translation', 'agentChat.slashCommands.goalDescription', 'Ziel');
-    expect(getSlashCommandDescription({ name: 'goal', description: 'Goal', hints: [] })).toBe(
-      'Ziel'
-    );
+    expect(
+      getSlashCommandDescription({
+        name: 'goal',
+        description: en.agentChat.slashCommands.goalDescription,
+        hints: [],
+      })
+    ).toBe('Ziel');
     i18n.removeResourceBundle('de', 'translation');
   });
 

@@ -85,16 +85,24 @@ export function passkeysSupported(): boolean {
  *
  * - `cancelled`: the sheet was dismissed, the platform refused to show it, or a
  *   request never reached the server. The same button is a working retry.
+ * - `expired`: the server refused the challenge itself — it expired, was already
+ *   used, or did not match the one it stored — or the verify response was not
+ *   one this client recognizes. A fresh ceremony mints a new challenge, so the
+ *   same button is a working retry, exactly as in the web flow.
  * - `no-passkey`: the device holds no passkey this relying party accepts.
  *   Retrying cannot help; the other sign-in methods are the way out.
  * - `unsupported`: this build or platform cannot run the ceremony at all.
- * - `failed`: the ceremony ran and the server refused the assertion. The
- *   passkey is not usable as presented, so the other methods are the way out.
+ * - `failed`: the ceremony ran, the server knew the passkey, and the assertion
+ *   did not verify against it. The passkey is not usable as presented, so the
+ *   other methods are the way out.
  */
-export type PasskeyFailure = 'cancelled' | 'no-passkey' | 'unsupported' | 'failed';
+export type PasskeyFailure = 'cancelled' | 'expired' | 'no-passkey' | 'unsupported' | 'failed';
 
 const FAILURE_KEYS = {
   cancelled: 'login.passkeyCancelled',
+  // Reused from the login screen: an expired challenge is a sign-in that could
+  // not be completed, and the same generic retryable copy tells the user so.
+  expired: 'login.couldNotCompleteSignIn',
   'no-passkey': 'login.passkeyNotFound',
   unsupported: 'login.passkeyUnsupported',
   failed: 'login.passkeyFailed',
@@ -215,7 +223,18 @@ export async function signInWithPasskey(
     }
     // A request that never reached the server refused nothing about the
     // credential, so it stays retryable.
-    return { status: 'error', failure: verifyResult.errorCode ? 'failed' : 'cancelled' };
+    if (!verifyResult.errorCode) {
+      return { status: 'error', failure: 'cancelled' };
+    }
+    // A known passkey whose signature did not verify cannot be retried into a
+    // success on the same device.
+    if (verifyResult.errorCode === 'VERIFICATION_FAILED') {
+      return { status: 'error', failure: 'failed' };
+    }
+    // Everything else — an expired, replayed or mismatched challenge, and any
+    // refusal this client does not recognize — is resolved by a fresh ceremony,
+    // so the same button stays a working retry.
+    return { status: 'error', failure: 'expired' };
   }
   const ticket = ticketSchema.safeParse(verifyResult.data);
   if (!ticket.success) {

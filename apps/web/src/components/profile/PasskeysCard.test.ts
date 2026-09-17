@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { createRequire } from 'node:module';
 import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { renderToStaticMarkup } from 'react-dom/server';
 import type { PasskeysCard as PasskeysCardComponent } from './PasskeysCard';
 
 const mockDeletePasskey = jest.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({
@@ -300,6 +301,18 @@ describe('PasskeysCard', () => {
     mounted = mountCard();
 
     expect(mounted.container.textContent).toContain('Passkey');
+  });
+
+  it('does not report a capable browser as unsupported before the client reads the credential API', () => {
+    // The first render (here: a static render, where effects never run) has a
+    // cached list already, so the old `false` default flashed the unsupported
+    // notice for a browser that does support WebAuthn.
+    mockQueryResult.data = { passkeys: [ROW] };
+
+    const markup = renderToStaticMarkup(createElement(PasskeysCard));
+
+    expect(markup).not.toContain('This browser cannot create passkeys.');
+    expect(markup).toContain('Work laptop');
   });
 
   it('keeps the list and withholds the add control when the browser cannot create passkeys', () => {

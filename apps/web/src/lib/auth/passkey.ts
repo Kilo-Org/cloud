@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { createHash, randomBytes, randomUUID } from 'crypto';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, lt, sql } from 'drizzle-orm';
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
@@ -314,6 +314,15 @@ export async function verifyAuthentication(
   challengeId: string,
   response: AuthenticationResponseJSON
 ): Promise<{ ticket: string }> {
+  // The route hands the assertion over straight from an untrusted body, and the
+  // credential id below is used as a query parameter before the WebAuthn
+  // library ever validates the response. A non-string id is not a credential
+  // this relying party stored, and the challenge must not be burned for it.
+  const credentialId: unknown = response.id;
+  if (typeof credentialId !== 'string' || credentialId.length === 0) {
+    throw new PasskeyVerificationError('VERIFICATION_FAILED');
+  }
+
   const challenge = await consumeChallenge(challengeId, 'authentication');
 
   const presentedChallenge = readPresentedChallenge(response);
@@ -324,7 +333,7 @@ export async function verifyAuthentication(
   const [credential] = await db
     .select()
     .from(passkey_credentials)
-    .where(eq(passkey_credentials.credential_id, response.id))
+    .where(eq(passkey_credentials.credential_id, credentialId))
     .limit(1);
   if (!credential) {
     throw new PasskeyVerificationError('UNKNOWN_CREDENTIAL');
@@ -411,6 +420,22 @@ export async function consumeSignInTicket(ticket: string): Promise<PasskeySignIn
     .returning();
 
   return row ?? null;
+}
+
+/**
+ * Delete passkey challenges that can no longer authorize anything. Both
+ * ceremonies mint rows, and the usernameless ones carry no user id, so account
+ * deletion cannot reach them; this is what keeps the table bounded. Only rows
+ * past their five-minute expiry are removed, so a ceremony in flight is never
+ * cut short.
+ */
+export async function cleanupExpiredPasskeyChallenges(): Promise<number> {
+  const deleted = await db
+    .delete(passkey_challenges)
+    .where(lt(passkey_challenges.expires_at, new Date().toISOString()))
+    .returning({ id: passkey_challenges.id });
+
+  return deleted.length;
 }
 
 /** Passkeys registered by a user, newest first. */

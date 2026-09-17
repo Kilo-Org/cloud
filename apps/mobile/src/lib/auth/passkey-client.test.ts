@@ -125,6 +125,7 @@ describe('classifyPasskeyError', () => {
 describe('passkeyFailureKey', () => {
   it('names one catalog key per failure', () => {
     expect(passkeyFailureKey('cancelled')).toBe('login.passkeyCancelled');
+    expect(passkeyFailureKey('expired')).toBe('login.couldNotCompleteSignIn');
     expect(passkeyFailureKey('no-passkey')).toBe('login.passkeyNotFound');
     expect(passkeyFailureKey('unsupported')).toBe('login.passkeyUnsupported');
     expect(passkeyFailureKey('failed')).toBe('login.passkeyFailed');
@@ -261,6 +262,20 @@ describe('signInWithPasskey', () => {
 
     expect(result).toEqual({ status: 'error', failure: 'failed' });
   });
+
+  it.each(['CHALLENGE_EXPIRED', 'CHALLENGE_ALREADY_USED', 'WRONG_CHALLENGE', 'SOMETHING_NEW'])(
+    'keeps the %s challenge refusal a fresh ceremony resolves retryable',
+    async errorCode => {
+      const api = fakeApi();
+      api.get.mockResolvedValue(assertion);
+      mockPostAuth.mockReset();
+      mockPostAuth.mockResolvedValueOnce(optionsResponse).mockResolvedValueOnce(refused(errorCode));
+
+      const result = await signInWithPasskey(api);
+
+      expect(result).toEqual({ status: 'error', failure: 'expired' });
+    }
+  );
 
   it('reports a malformed options response as the generic failure', async () => {
     const api = fakeApi();

@@ -130,8 +130,11 @@ export function PasskeysCard() {
   const trpc = useTRPC();
   const passkeysQuery = useQuery(trpc.user.getPasskeys.queryOptions());
 
-  // The credential API is a browser global, so this is read after mount only.
-  const [canCreatePasskeys, setCanCreatePasskeys] = useState(false);
+  // The credential API is a browser global, so support starts unknown (`null`)
+  // and is only ever `true`/`false` after the client has read it. The unsupported
+  // notice below waits for an explicit `false`, so a capable browser is never
+  // briefly reported as unable to create passkeys.
+  const [canCreatePasskeys, setCanCreatePasskeys] = useState<boolean | null>(null);
   useEffect(() => {
     setCanCreatePasskeys(browserSupportsWebAuthn());
   }, []);
@@ -309,7 +312,7 @@ export function PasskeysCard() {
             </>
           )}
 
-          {!canCreatePasskeys && !passkeysQuery.isLoading && (
+          {canCreatePasskeys === false && !passkeysQuery.isLoading && (
             <p role="alert" className="text-muted-foreground text-sm leading-relaxed">
               This browser cannot create passkeys.
             </p>

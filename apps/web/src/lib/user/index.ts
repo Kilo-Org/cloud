@@ -1253,7 +1253,8 @@ export async function anonymizeCloudUserData(
   // label identify the user's device. Drop any challenge still open for a
   // ceremony so a deleted account cannot complete a pending registration or
   // authentication. Usernameless challenges (kilo_user_id IS NULL) are not
-  // attributable to this user and expire on their own.
+  // attributable to this user; the device-auth cleanup cron removes them once
+  // they expire.
   await tx.delete(passkey_credentials).where(eq(passkey_credentials.kilo_user_id, userId));
   await tx
     .delete(passkey_challenges)

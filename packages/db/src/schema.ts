@@ -5252,6 +5252,9 @@ export const passkey_challenges = pgTable(
   },
   table => [
     index('idx_passkey_challenges_expires_at').on(table.expires_at),
+    // Account deletion removes this user's open challenges; without the index
+    // that delete is a sequential scan of every ceremony ever minted.
+    index('idx_passkey_challenges_kilo_user_id').on(table.kilo_user_id),
     // `kind` decides which ceremony a challenge may authorize, so an unknown
     // value must never reach a consumer that matches on the known set. The
     // column is plain text, so without this constraint the union is a fiction.
@@ -5281,7 +5284,12 @@ export const passkey_sign_in_tickets = pgTable(
     consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
-  table => [uniqueIndex('UQ_passkey_sign_in_tickets_ticket_hash').on(table.ticket_hash)]
+  table => [
+    uniqueIndex('UQ_passkey_sign_in_tickets_ticket_hash').on(table.ticket_hash),
+    // Account deletion removes this user's tickets; without the index that
+    // delete is a sequential scan of every ticket ever minted.
+    index('idx_passkey_sign_in_tickets_kilo_user_id').on(table.kilo_user_id),
+  ]
 );
 
 export type PasskeySignInTicket = typeof passkey_sign_in_tickets.$inferSelect;

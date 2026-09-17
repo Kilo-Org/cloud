@@ -40,6 +40,13 @@ export type LiveSessionRefreshState = Readonly<{
   /** The last pull/retry failed or ran past the feedback budget. */
   failed: boolean;
   onRetry: () => void;
+  /**
+   * This pull's progress belongs to the surface's centered refreshable body
+   * (the no-match body), which draws it itself while reduced motion is on,
+   * so the reserved line carries the "Updating" copy without a second
+   * spinner: one indicator per pull.
+   */
+  progressInBody?: boolean;
 }>;
 
 /** Notices stay outside the rows so refresh and connection changes cannot remount them. */
@@ -228,6 +235,7 @@ export function LiveSessionFeedback({
             busy={refresh.busy}
             failed={refresh.failed}
             onRetry={handleRefreshRetry}
+            progressInBody={refresh.progressInBody}
           />
         </View>
       ) : (

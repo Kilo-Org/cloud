@@ -57,13 +57,34 @@ function toolLifecycleRank(part: Part): number | null {
 }
 
 /**
+ * Start time a running tool part carries as its ordering evidence. A running
+ * part is a live run in progress, so `state.time.start` says when that run
+ * began — the only ordering evidence an unsettled part has. A stored running
+ * part that was replayed from a snapshot carries no recorded update time, so
+ * without this a terminal replay could be ordered against nothing.
+ */
+function toolRunningStartedAt(part: Part): number | undefined {
+  if (part.type !== 'tool') return undefined;
+  const state = part.state;
+  if (state.status === 'running') return state.time.start;
+  return undefined;
+}
+
+/**
  * A tool part advances pending → running → terminal and never moves backwards.
  * A snapshot, history or DO replay can re-deliver an older part version over
  * newer live state, so a lower-ranked update is dropped, and a terminal update
  * is applied only when it carries ordering evidence that it postdates the
  * stored update (the event's own time, or the tool state's `time.end` when a
- * replay carries no event time). A terminal with no evidence at all never
- * replaces a live running task.
+ * replay carries no event time). Over a running part, that evidence must also
+ * postdate the run's `time.start`: a terminal whose settle time predates the
+ * live run is an out-of-order replay, not a completion. A terminal with no
+ * evidence at all never replaces a live running task.
+ *
+ * The same ordering evidence settles the mirror case: a run whose `time.start`
+ * postdates a stored terminal's settle time is a newer observation of that part
+ * (a reopen replay of the live run over a stale cached terminal), so it
+ * replaces it instead of being dropped as a backwards lifecycle step.
  */
 function isStaleToolLifecycleUpdate(
   stored: Part,
@@ -79,7 +100,20 @@ function isStaleToolLifecycleUpdate(
     return true;
   }
 
-  if (incomingRank < storedRank) return true;
+  if (incomingRank < storedRank) {
+    if (incomingRank === 1 && storedRank === 2) {
+      const runningStartedAt = toolRunningStartedAt(incoming);
+      const storedSettledAt = partSettledAt(stored);
+      if (
+        runningStartedAt !== undefined &&
+        storedSettledAt !== undefined &&
+        runningStartedAt > storedSettledAt
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   if (incomingRank === 2 && storedRank === 2) {
     const incomingOrder = eventTime ?? partSettledAt(incoming);
@@ -88,8 +122,10 @@ function isStaleToolLifecycleUpdate(
     return incomingOrder <= storedOrder;
   }
 
-  if (incomingRank === 2 && storedRank === 1 && eventTime === undefined) {
-    return true;
+  if (incomingRank === 2 && storedRank === 1) {
+    if (eventTime === undefined) return true;
+    const runningStartedAt = toolRunningStartedAt(stored);
+    if (runningStartedAt !== undefined && eventTime <= runningStartedAt) return true;
   }
 
   return false;

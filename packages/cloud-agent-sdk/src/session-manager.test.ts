@@ -7448,10 +7448,10 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       };
     }
 
-    function runningTaskPart(): ToolPart {
+    function runningTaskPart(start = 1): ToolPart {
       return {
         ...taskPartBase(),
-        state: { status: 'running', input: {}, time: { start: 1 } },
+        state: { status: 'running', input: {}, time: { start } },
       };
     }
 
@@ -7535,6 +7535,46 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
       livePage.resolve(
         makePage({ kiloSessionId: 'ses-1', messages: [taskMessage(completedTaskPart(150))] })
       );
+      await new Promise<void>(resolve => setImmediate(resolve));
+
+      expect(storedTaskPart(config, mgr).state.status).toBe('running');
+    });
+
+    it('keeps a snapshotted running task when the replayed terminal settled before the live run', async () => {
+      // Reopen replay: the cached transcript holds the live run's running part
+      // (start = 2026), and the freshly fetched page delivers the stale stored
+      // terminal whose settle time is 2023-11-16 — older than the live run. The
+      // page replay must not flip the snapshotted running task to completed.
+      const readCachedSnapshotPage = jest
+        .fn()
+        .mockResolvedValue(cachedTaskPage(runningTaskPart(1_789_655_865_076)));
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({ kiloSessionId: 'ses-1', messages: [taskMessage(completedTaskPart(1_700_100_006_000))] })
+      );
+      const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await new Promise<void>(resolve => setImmediate(resolve));
+
+      expect(storedTaskPart(config, mgr).state.status).toBe('running');
+    });
+
+    it('keeps a live running task when the cached terminal is stale (reverse replay order)', async () => {
+      // Reverse reopen order: the cached transcript holds a stored terminal
+      // that settled in 2023, while the freshly fetched page delivers the live
+      // run (start = 2026) of the same part. The newer run replaces the stale
+      // cached terminal instead of being dropped as a backwards step.
+      const readCachedSnapshotPage = jest
+        .fn()
+        .mockResolvedValue(cachedTaskPage(completedTaskPart(1_700_100_006_000)));
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({ kiloSessionId: 'ses-1', messages: [taskMessage(runningTaskPart(1_789_655_865_076))] })
+      );
+      const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
       await new Promise<void>(resolve => setImmediate(resolve));
 
       expect(storedTaskPart(config, mgr).state.status).toBe('running');

@@ -242,6 +242,28 @@ describe('tool part lifecycle ordering', () => {
     expect(toolStatus(result, 'p-1')).toBe('completed');
   });
 
+  test('applies a newer running update over a stored terminal that settled before the run', () => {
+    // Mirror reopen replay: the cache still holds a stale stored terminal while
+    // the live run (started later) is the current state of the same part.
+    const arr = [
+      makeToolPart('p-1', 'completed', { start: 1700100002000, end: 1700100006000 }),
+    ];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'running', { start: 1789655865076 })
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('drops a running update whose start predates the stored terminal', () => {
+    const arr = [makeToolPart('p-1', 'completed', { start: 1, end: 250 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'running', { start: 100 })
+    );
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
   test('settles terminal vs terminal by the tool state time when no event time exists', () => {
     const arr = [makeToolPart('p-1', 'completed', { start: 1, end: 5 })];
     const older = upsertPartDroppingStaleSyntheticParts(
@@ -255,6 +277,41 @@ describe('tool part lifecycle ordering', () => {
       makeToolPart('p-1', 'error', { start: 1, end: 6 })
     );
     expect(toolStatus(newer, 'p-1')).toBe('error');
+  });
+
+  test('drops a replayed terminal whose settle time predates the stored running start', () => {
+    // Reopen replay: the snapshotted running part carries the live run's start
+    // as its only ordering evidence, and the page replay delivers a terminal
+    // that settled before that run began. The stale terminal must not flip it.
+    const arr = [makeToolPart('p-1', 'running', { start: 1789655865076 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1700100002000, end: 1700100006000 }),
+      1700100006000
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+    expect(result).toBe(arr);
+  });
+
+  test('drops a replayed error whose settle time predates the stored running start', () => {
+    const arr = [makeToolPart('p-1', 'running', { start: 1789655865076 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'error', { start: 1700100002000, end: 1700100006000 }),
+      1700100006000
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+    expect(result).toBe(arr);
+  });
+
+  test('applies a replayed terminal whose settle time postdates the stored running start', () => {
+    const arr = [makeToolPart('p-1', 'running', { start: 1700100002000 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1700100002000, end: 1700100006000 }),
+      1700100006000
+    );
+    expect(toolStatus(result, 'p-1')).toBe('completed');
   });
 
   test('first settled terminal wins when no ordering evidence exists at all', () => {

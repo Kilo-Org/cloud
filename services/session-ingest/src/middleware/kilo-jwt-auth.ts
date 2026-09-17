@@ -60,7 +60,7 @@ function parseRuntimeAuthorizationClaim(token: string | null) {
  */
 function logKiloJwtAuthRejection(fields: {
   reason: KiloJwtAuthLogReason;
-  token: string | null;
+  token?: string | null;
   hasAttestationHeader: boolean;
   tokenRejectionReason?: KiloBearerRejectionReason;
   verificationFailure?: KiloBearerTokenVerificationFailure;
@@ -69,8 +69,13 @@ function logKiloJwtAuthRejection(fields: {
     console.warn('Kilo JWT auth rejected', {
       event: 'kilo_jwt_auth_rejected',
       reason: fields.reason,
-      hasBearer: Boolean(fields.token),
-      hasRuntimeAuthorizationClaim: parseRuntimeAuthorizationClaim(fields.token)?.success === true,
+      ...(fields.token !== undefined
+        ? {
+            hasBearer: Boolean(fields.token),
+            hasRuntimeAuthorizationClaim:
+              parseRuntimeAuthorizationClaim(fields.token)?.success === true,
+          }
+        : {}),
       hasAttestationHeader: fields.hasAttestationHeader,
       ...(fields.tokenRejectionReason ? { tokenRejectionReason: fields.tokenRejectionReason } : {}),
       ...(fields.verificationFailure
@@ -97,7 +102,6 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
       // mean "not evaluated", not "no bearer was presented".
       logKiloJwtAuthRejection({
         reason: 'missing_ticket',
-        token: null,
         hasAttestationHeader: c.req.header(RUNTIME_PROXY_ATTESTATION_HEADER) !== undefined,
       });
       return c.json({ success: false, error: 'Missing or invalid ticket' }, 401);
@@ -108,7 +112,6 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     if (!consumed) {
       logKiloJwtAuthRejection({
         reason: 'invalid_ticket',
-        token: null,
         hasAttestationHeader: c.req.header(RUNTIME_PROXY_ATTESTATION_HEADER) !== undefined,
       });
       return c.json({ success: false, error: 'Invalid or expired ticket' }, 401);

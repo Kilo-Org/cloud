@@ -888,6 +888,8 @@ describe('kiloJwtAuthMiddleware', () => {
       'hasAttestationHeader',
     ];
 
+    const TICKET_PATH_KEYS = ['event', 'reason', 'hasAttestationHeader'];
+
     it('logs missing_ticket without reading the bearer or ?token= on the ticket path', async () => {
       userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
       const token = await signUserToken('pepper-current');
@@ -905,16 +907,15 @@ describe('kiloJwtAuthMiddleware', () => {
       expect(onlyRejectionFields()).toStrictEqual({
         event: 'kilo_jwt_auth_rejected',
         reason: 'missing_ticket',
-        hasBearer: false,
-        hasRuntimeAuthorizationClaim: false,
         hasAttestationHeader: false,
       });
-      expect(Object.keys(onlyRejectionFields())).toStrictEqual(BASE_KEYS);
+      expect(Object.keys(onlyRejectionFields())).toStrictEqual(TICKET_PATH_KEYS);
     });
 
     it('logs invalid_ticket for an unknown ticket', async () => {
+      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
       const tickets = makeTicketStore();
-      const res = await request(null, {
+      const res = await request(await signUserToken('pepper-current'), {
         path: '/api/user/web',
         websocket: true,
         query: '?ticket=invalid',
@@ -925,11 +926,9 @@ describe('kiloJwtAuthMiddleware', () => {
       expect(onlyRejectionFields()).toStrictEqual({
         event: 'kilo_jwt_auth_rejected',
         reason: 'invalid_ticket',
-        hasBearer: false,
-        hasRuntimeAuthorizationClaim: false,
         hasAttestationHeader: false,
       });
-      expect(Object.keys(onlyRejectionFields())).toStrictEqual(BASE_KEYS);
+      expect(Object.keys(onlyRejectionFields())).toStrictEqual(TICKET_PATH_KEYS);
     });
 
     it('logs missing_bearer with hasBearer false for an empty websocket ?token=', async () => {

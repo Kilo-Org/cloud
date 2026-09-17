@@ -124,6 +124,10 @@ import {
 } from '@/lib/share-payload';
 import { persistShareNavigationNow, restoreShareNavigation } from '@/lib/share-navigation';
 import {
+  captureSystemSearchLaunch,
+  registerSystemSearchOpenListener,
+} from '@/lib/system-search-route';
+import {
   flushDraft,
   isStringDraft,
   loadDraft,
@@ -167,6 +171,11 @@ setupNotificationHandler();
 setupNotificationBackgroundHandler();
 checkInitialNotification();
 captureLaunchDeepLink();
+// A tap on a result in the phone's own search: capture the cold-launch payload
+// now, and subscribe to the warm `onSystemSearchOpen` wake-up before any screen
+// mounts. Both feed the pending deep-link slot the layout already consumes.
+captureSystemSearchLaunch();
+registerSystemSearchOpenListener();
 prefetchCurrentUser();
 preloadThemePreference();
 preloadHideBalancePreference();

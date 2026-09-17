@@ -23,13 +23,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlight';
 import { type ParsedDiffLine, type ParsedHunk } from '@/lib/pr-review/diff/parse-patch';
 import { type SideBySideRow as SideBySideRowData } from '@/lib/pr-review/diff/side-by-side';
-import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
+import { MUTED_COLOR } from '@/lib/pr-review/diff/syntax-colors';
 import { cn } from '@/lib/utils';
 import {
   type BoundedFontMetrics,
   DIFF_MAX_FONT_SCALE,
   useDiffFontMetrics,
 } from '@/components/pr-review/diff/diff-font-metrics';
+import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs';
 
 const COLUMN_GUTTER_WIDTH = 56;
 const COLUMN_INNER_PADDING = 2;
@@ -135,15 +136,9 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
           selectable
           style={{ ...codeBaseStyle, color: foreground }}
         >
-          {tokens.map((token, index) => {
-            const tokenColor = tokenColorFor(token.className, isDark);
-            return (
-              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- per-token syntax color
-              <RNText key={`tok-${index}`} style={{ color: tokenColor }}>
-                {token.text}
-              </RNText>
-            );
-          })}
+          {/* Untagged runs are raw strings inside this Text, so only the
+              highlighter's tagged runs cost an Android span. */}
+          {highlightRunChildren(tokens, isDark)}
           {noNewlineLabel ? (
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color for no-newline marker
             <RNText style={{ ...noNewlineBase, color: noNewlineColor }}>{noNewlineLabel}</RNText>

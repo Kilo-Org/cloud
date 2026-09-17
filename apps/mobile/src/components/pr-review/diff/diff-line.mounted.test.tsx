@@ -55,6 +55,18 @@ function mountLine(props: {
   return created;
 }
 
+/** The children the shared highlight-run renderer produced for the code Text. */
+function codeRunChildren(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+  const [codeText] = renderer.root.findAll(
+    node => node.type === ('RNText' as never) && node.props.selectable === true
+  );
+  if (codeText === undefined) {
+    throw new Error('expected a selectable code Text');
+  }
+  const [runs] = codeText.props.children as unknown[];
+  return Array.isArray(runs) ? runs : [runs];
+}
+
 /** The row is the only `flex-row items-stretch` View in a DiffLine. */
 function findRow(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
   const rows = renderer.root.findAll(
@@ -143,6 +155,28 @@ describe('DiffLine gutter alignment', () => {
         TestRenderer.ReactTestInstance,
       ];
       expect(gutter.props.className).toContain('justify-start');
+    }
+  });
+});
+
+describe('DiffLine highlight runs', () => {
+  // The diff line shares the code block's run renderer: untagged tokens stay
+  // raw strings (React Native coalesces them into the code Text's own
+  // fragment), so a plain line adds no Android span beyond the Text itself.
+  it('renders an untagged line as one raw string', () => {
+    const renderer = mountLine({ line: line(), language: null, keyId: 'runs-plain' });
+    expect(codeRunChildren(renderer)).toEqual(['const value = computeSomething(x);']);
+  });
+
+  it('emits a nested run for the tagged tokens only', () => {
+    const renderer = mountLine({ line: line(), language: 'typescript', keyId: 'runs-ts' });
+    const runs = codeRunChildren(renderer);
+    const tagged = runs.filter(run => typeof run === 'object' && run !== null);
+    expect(tagged.length).toBeGreaterThan(0);
+    expect(tagged.length).toBeLessThan(runs.length);
+    for (const run of tagged) {
+      const style = (run as { props: { style: { color: string } } }).props.style;
+      expect(typeof style.color).toBe('string');
     }
   });
 });

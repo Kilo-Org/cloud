@@ -48,12 +48,13 @@ import {
   diffLineMarker,
   type ParsedDiffLine,
 } from '@/lib/pr-review/diff/parse-patch';
-import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
+import { MUTED_COLOR } from '@/lib/pr-review/diff/syntax-colors';
 import { cn } from '@/lib/utils';
 import {
   DIFF_MAX_FONT_SCALE,
   useDiffFontMetrics,
 } from '@/components/pr-review/diff/diff-font-metrics';
+import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs';
 
 const GUTTER_WIDTH = 56;
 const VERTICAL_PADDING = 2;
@@ -194,15 +195,9 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
           selectable
           style={{ ...codeBaseStyle, color: colors.foreground }}
         >
-          {tokens.map((token, index) => {
-            const tokenColor = tokenColorFor(token.className, isDark);
-            return (
-              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- per-token syntax color
-              <RNText key={`tok-${index}`} style={{ color: tokenColor }}>
-                {token.text}
-              </RNText>
-            );
-          })}
+          {/* Untagged runs are raw strings inside this Text, so only the
+              highlighter's tagged runs cost an Android span. */}
+          {highlightRunChildren(tokens, isDark)}
           {line.noNewlineAtEndOfFile ? (
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color for no-newline marker
             <RNText style={{ ...noNewlineBase, color: noNewlineColor }}>{noNewlineLabel}</RNText>

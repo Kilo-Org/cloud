@@ -43,26 +43,3 @@ export function parseGitHubPrUrl(href: string): GitHubPrUrl | null {
   }
   return { owner, repo, number };
 }
-
-/**
- * Find the first GitHub PR URL in free text. Tries the whole trimmed string
- * first, then each whitespace-separated token, so a title or surrounding words
- * do not hide the URL. Returns `null` when no token parses as a PR URL.
- */
-export function findFirstGitHubPrUrl(text: string): GitHubPrUrl | null {
-  if (text.length === 0) {
-    return null;
-  }
-  const trimmed = text.trim();
-  const whole = parseGitHubPrUrl(trimmed);
-  if (whole) {
-    return whole;
-  }
-  for (const token of trimmed.split(/\s+/)) {
-    const parsed = parseGitHubPrUrl(token);
-    if (parsed) {
-      return parsed;
-    }
-  }
-  return null;
-}

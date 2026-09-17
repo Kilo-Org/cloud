@@ -490,6 +490,8 @@
       "replyBadRequest": "ይህን ምላሽ መለጠፍ አይቻልም። የውይይት ሰንሰለቱ ተለውጦ ሊሆን ይችላል።",
       "replyForbidden": "ለዚህ የማዋሃድ ጥያቄ ምላሽ ለመስጠት ፈቃድ የለህም።",
       "addCommentCta": "በዚህ የማዋሃድ ጥያቄ ላይ አስተያየት ስጥ",
+      "fixWithKilo": "በKilo አስተካክል",
+      "fixWithKiloPrompt": "እባክህ የሚከተለውን የማዋሃድ ጥያቄ አስተያየት አስተካክል፦ {{link}}",
       "commentBadRequest": "ይህ አስተያየት መለጠፍ አይቻልም። የማዋሃዱ ጥያቄ ተለውጦ ሊሆን ይችላል።",
       "commentForbidden": "በዚህ የማዋሃድ ጥያቄ ላይ አስተያየት ለመስጠት ፈቃድ የለህም።",
       "moderation": {
@@ -584,9 +586,9 @@
       "pending": "{{displayCount}} በመጠባበቅ ላይ",
       "skipped": "{{displayCount}} ተዘልለዋል",
       "checksCount": "{{displayCount}} ፍተሻዎች",
-      "checkDetails": "የፍተሻ ዝርዝሮች",
       "checksCount_one": "{{displayCount}} ፍተሻ",
-      "checksCount_other": "{{displayCount}} ፍተሻዎች"
+      "checksCount_other": "{{displayCount}} ፍተሻዎች",
+      "checkDetails": "የፍተሻ ዝርዝሮች"
     },
     "inbox": {
       "title": "ገቢ መልእክቶች",
@@ -3098,6 +3100,12 @@
     "privacy": "ወኪሎችን ለማየት Kiloን ክፈት",
     "openAgents": "ወኪሎችን ክፈት",
     "needsInput": "ምላሽ ይፈልጋል",
+    "newestSession": "አዲሱ: {{title}}",
+    "noneWaiting": "የሚጠብቅ ወኪል የለም",
+    "newAgent": "አዲስ ወኪል",
+    "approving": "በማጽደቅ ላይ...",
+    "couldNotApprove": "ማጽደቅ አልተቻለም",
+    "couldNotStart": "መጀመር አልተቻለም",
     "channelName": "ንቁ ወኪሎች",
     "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።"
   },
@@ -3133,5 +3141,12 @@
     "remoteFound": "ኮምፒውተር ተገናኝቷል",
     "checkAgain": "እንደገና ይፈትሹ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ወኪል ለመጀመር ጥያቄ ያስፈልጋል። ጥያቄ ያክሉ እና እንደገና ያሂዱ።",
+      "repositoryUnknown": "Kilo {{repository}}ን እንደ GitHub ወይም GitLab ማከማቻ አያውቅም። በKilo ውስጥ ሌላ ማከማቻ ይምረጡ።",
+      "repositoryUnsupported": "{{repository}} የBitbucket ማከማቻ ነው — ወኪል ይጀምሩ ገና ሊጠቀምበት አይችልም። በKilo ውስጥ ሌላ ማከማቻ ይምረጡ።"
+    }
   }
 }

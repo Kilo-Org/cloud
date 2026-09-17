@@ -80,3 +80,42 @@ describe('pushDataSchema unknown type', () => {
     expect(pushDataSchema.safeParse(payload).success).toBe(false);
   });
 });
+
+const glanceablePayload = {
+  type: 'active_agents_glanceable',
+  schemaVersion: 1,
+  revision: 2,
+  scopeKey: 'deadbeef',
+  organizationBound: false,
+  status: 'happy',
+  running: 1,
+  needsInput: 2,
+  idle: 0,
+  updatedAt: '2026-08-27T10:00:00.000Z',
+  expiresAt: '2026-08-27T18:00:00.000Z',
+  needsInputSince: '2026-08-27T09:00:00.000Z',
+} as const;
+
+describe('pushDataSchema active_agents_glanceable', () => {
+  it('parses a payload whose server omits needsApproval without inventing a value', () => {
+    const parsed = pushDataSchema.parse(glanceablePayload);
+    expect(parsed).toEqual(glanceablePayload);
+    // Optional on the wire so a push from an older server still parses; the
+    // mobile readers treat absent as zero.
+    expect('needsApproval' in parsed).toBe(false);
+  });
+
+  it('parses a payload carrying needsApproval', () => {
+    const payload = { ...glanceablePayload, needsApproval: 2 };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('rejects a negative or fractional needsApproval', () => {
+    expect(pushDataSchema.safeParse({ ...glanceablePayload, needsApproval: -1 }).success).toBe(
+      false
+    );
+    expect(pushDataSchema.safeParse({ ...glanceablePayload, needsApproval: 1.5 }).success).toBe(
+      false
+    );
+  });
+});

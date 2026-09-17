@@ -490,6 +490,8 @@
       "replyBadRequest": "Seda vastust ei saa postitada. Lõim võis muutuda.",
       "replyForbidden": "Sul pole õigust sellele tõmbetaotlusele vastata.",
       "addCommentCta": "Kommenteeri seda tõmbetaotlust",
+      "fixWithKilo": "Paranda Kiloga",
+      "fixWithKiloPrompt": "Palun tegele järgmise tõmbetaotluse kommentaariga: {{link}}",
       "commentBadRequest": "Seda kommentaari ei saa postitada. Tõmbetaotlus võis muutuda.",
       "commentForbidden": "Sul pole õigust seda tõmbetaotlust kommenteerida.",
       "moderation": {
@@ -584,9 +586,9 @@
       "pending": "{{displayCount}} ootel",
       "skipped": "{{displayCount}} vahele jäetud",
       "checksCount": "{{displayCount}} kontrolli",
-      "checkDetails": "kontrolli üksikasjad",
       "checksCount_one": "{{displayCount}} kontrolli",
-      "checksCount_other": "{{displayCount}} kontrolli"
+      "checksCount_other": "{{displayCount}} kontrolli",
+      "checkDetails": "kontrolli üksikasjad"
     },
     "inbox": {
       "title": "Postkast",
@@ -3098,6 +3100,12 @@
     "privacy": "Agentide nägemiseks ava Kilo",
     "openAgents": "Ava agendid",
     "needsInput": "Vajab sisendit",
+    "newestSession": "Uusim: {{title}}",
+    "noneWaiting": "Ükski agent ei oota",
+    "newAgent": "Uus agent",
+    "approving": "Kinnitamisel...",
+    "couldNotApprove": "Kinnitamine ebaõnnestus",
+    "couldNotStart": "Käivitamine ebaõnnestus",
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente."
   },
@@ -3133,5 +3141,12 @@
     "remoteFound": "Arvuti ühendatud",
     "checkAgain": "Kontrolli uuesti",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Agendi käivitamiseks on vaja viipa. Lisa viip ja käivita see uuesti.",
+      "repositoryUnknown": "Kilo ei tunne {{repository}} ära GitHubi ega GitLabi hoidlana. Vali Kilos teine hoidla.",
+      "repositoryUnsupported": "{{repository}} on Bitbucketi hoidla — Käivita agent ei saa seda veel kasutada. Vali Kilos teine hoidla."
+    }
   }
 }

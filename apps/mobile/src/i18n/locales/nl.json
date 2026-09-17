@@ -2499,6 +2499,8 @@
       "replyBody": "Antwoordtekst",
       "replyForbidden": "Je hebt geen toestemming om op deze PR te reageren.",
       "addCommentCta": "Een opmerking op deze PR plaatsen",
+      "fixWithKilo": "Oplossen met Kilo",
+      "fixWithKiloPrompt": "Los alsjeblieft de volgende opmerking op deze PR op: {{link}}",
       "commentBadRequest": "Deze opmerking kan niet worden geplaatst. De PR is mogelijk gewijzigd.",
       "commentForbidden": "Je hebt geen toestemming om een opmerking op deze PR te plaatsen.",
       "replyPlaceholder": "Je antwoord…",
@@ -3098,6 +3100,12 @@
     "privacy": "Open Kilo om agents te zien",
     "openAgents": "Agents openen",
     "needsInput": "Invoer nodig",
+    "newestSession": "Nieuwste: {{title}}",
+    "noneWaiting": "Geen agents in afwachting",
+    "newAgent": "Nieuwe agent",
+    "approving": "Bezig met goedkeuren...",
+    "couldNotApprove": "Goedkeuren mislukt",
+    "couldNotStart": "Starten mislukt",
     "channelName": "Actieve agents",
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien."
   },
@@ -3133,5 +3141,12 @@
     "remoteFound": "Computer verbonden",
     "checkAgain": "Opnieuw controleren",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Agent starten vereist een prompt. Voeg een prompt toe en voer de actie opnieuw uit.",
+      "repositoryUnknown": "Kilo herkent {{repository}} niet als GitHub- of GitLab-repository. Kies een andere repository in Kilo.",
+      "repositoryUnsupported": "{{repository}} is een Bitbucket-repository — Agent starten kan die nog niet gebruiken. Kies een andere repository in Kilo."
+    }
   }
 }

@@ -498,6 +498,8 @@
       "replyBadRequest": "Aquesta resposta no es pot publicar. Pot ser que el fil hagi canviat.",
       "replyForbidden": "No tens permís per respondre a aquesta sol·licitud d'integració.",
       "addCommentCta": "Comenta aquesta sol·licitud d'integració",
+      "fixWithKilo": "Resol-ho amb Kilo",
+      "fixWithKiloPrompt": "Si us plau, resol el següent comentari de la sol·licitud d'integració: {{link}}",
       "commentBadRequest": "Aquest comentari no es pot publicar. Pot ser que la sol·licitud d'integració hagi canviat.",
       "commentForbidden": "No tens permís per comentar aquesta sol·licitud d'integració.",
       "moderation": {
@@ -595,10 +597,10 @@
       "pending": "{{displayCount}} pendents",
       "skipped": "{{displayCount}} omeses",
       "checksCount": "{{displayCount}} comprovacions",
-      "checkDetails": "detalls de la comprovació",
       "checksCount_one": "{{displayCount}} comprovació",
+      "checksCount_many": "{{displayCount}} comprovacions",
       "checksCount_other": "{{displayCount}} comprovacions",
-      "checksCount_many": "{{displayCount}} comprovacions"
+      "checkDetails": "detalls de la comprovació"
     },
     "inbox": {
       "title": "Safata d'entrada",
@@ -3141,6 +3143,12 @@
     "privacy": "Obre Kilo per veure els agents",
     "openAgents": "Obre els agents",
     "needsInput": "Pendent de resposta",
+    "newestSession": "La més recent: {{title}}",
+    "noneWaiting": "Cap agent en espera",
+    "newAgent": "Agent nou",
+    "approving": "S'està aprovant...",
+    "couldNotApprove": "No s'ha pogut aprovar",
+    "couldNotStart": "No s'ha pogut iniciar",
     "channelName": "Agents actius",
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig."
   },
@@ -3176,5 +3184,12 @@
     "remoteFound": "Ordinador connectat",
     "checkAgain": "Torna-ho a comprovar",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Per iniciar un agent cal un missatge. Afegeix un missatge i torna-ho a executar.",
+      "repositoryUnknown": "Kilo no reconeix {{repository}} com a repositori de GitHub o GitLab. Tria un altre repositori a Kilo.",
+      "repositoryUnsupported": "{{repository}} és un repositori de Bitbucket — Inicia un agent encara no el pot utilitzar. Tria un altre repositori a Kilo."
+    }
   }
 }

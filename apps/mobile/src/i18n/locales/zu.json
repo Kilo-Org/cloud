@@ -490,6 +490,8 @@
       "replyBadRequest": "Le mpendulo ayikwazi ukuthunyelwa. Kungenzeka uchungechunge lwengxoxo lushintshile.",
       "replyForbidden": "Awunayo imvume yokuphendula kulesi sicelo sokuhlanganisa.",
       "addCommentCta": "Phawula kulesi sicelo sokuhlanganisa",
+      "fixWithKilo": "Lungisa nge-Kilo",
+      "fixWithKiloPrompt": "Sicela ubhekane nokuphawula okulandelayo kwesicelo sokuhlanganisa: {{link}}",
       "commentBadRequest": "Le phawula ayikwazi ukuthunyelwa. Kungenzeka lesi sicelo sokuhlanganisa sishintshile.",
       "commentForbidden": "Awunayo imvume yokuphawula kulesi sicelo sokuhlanganisa.",
       "moderation": {
@@ -584,9 +586,9 @@
       "pending": "{{displayCount}} zilindile",
       "skipped": "{{displayCount}} zeqiwe",
       "checksCount": "izihlolo ezingu-{{displayCount}}",
-      "checkDetails": "imininingwane yesihlolo",
       "checksCount_one": "isihlolo esingu-{{displayCount}}",
-      "checksCount_other": "izihlolo ezingu-{{displayCount}}"
+      "checksCount_other": "izihlolo ezingu-{{displayCount}}",
+      "checkDetails": "imininingwane yesihlolo"
     },
     "inbox": {
       "title": "Ibhokisi lokungenayo",
@@ -3098,6 +3100,12 @@
     "privacy": "Vula i-Kilo ukuze ubone ama-ejenti",
     "openAgents": "Vula ama-ejenti",
     "needsInput": "Kudinga impendulo",
+    "newestSession": "Okusha kakhulu: {{title}}",
+    "noneWaiting": "Awekho ama-ejenti alindile",
+    "newAgent": "I-ejenti entsha",
+    "approving": "Kuyagunyaza...",
+    "couldNotApprove": "Akukwazi ukugunyaza",
+    "couldNotStart": "Akukwazi ukuqala",
     "channelName": "Ama-ejenti asebenzayo",
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe."
   },
@@ -3133,5 +3141,12 @@
     "remoteFound": "Ikhompyutha ixhunyiwe",
     "checkAgain": "Phinda uhlole",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Qala i-ejenti kudinga isicelo. Engeza isicelo bese uyiphinda.",
+      "repositoryUnknown": "I-Kilo ayiyiboni i-{{repository}} njengenqolobane yekhodi ye-GitHub noma ye-GitLab. Khetha enye inqolobane yekhodi ku-Kilo.",
+      "repositoryUnsupported": "I-{{repository}} iyinqolobane yekhodi ye-Bitbucket — Qala i-ejenti ayikakwazi ukuyisebenzisa. Khetha enye inqolobane yekhodi ku-Kilo."
+    }
   }
 }

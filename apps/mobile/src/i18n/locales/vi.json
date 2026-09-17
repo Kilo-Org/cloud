@@ -2499,6 +2499,8 @@
       "replyBody": "Nội dung trả lời",
       "replyForbidden": "Bạn không có quyền trả lời trong PR này.",
       "addCommentCta": "Bình luận trong PR này",
+      "fixWithKilo": "Sửa bằng Kilo",
+      "fixWithKiloPrompt": "Vui lòng xử lý bình luận PR sau: {{link}}",
       "commentBadRequest": "Không thể đăng bình luận này. PR có thể đã thay đổi.",
       "commentForbidden": "Bạn không có quyền bình luận trong PR này.",
       "replyPlaceholder": "Trả lời…",
@@ -3098,6 +3100,12 @@
     "privacy": "Mở Kilo để xem tác nhân",
     "openAgents": "Mở danh sách tác nhân",
     "needsInput": "Cần phản hồi",
+    "newestSession": "Mới nhất: {{title}}",
+    "noneWaiting": "Không có tác nhân nào chờ",
+    "newAgent": "Tác nhân mới",
+    "approving": "Đang phê duyệt...",
+    "couldNotApprove": "Không thể phê duyệt",
+    "couldNotStart": "Không thể bắt đầu",
     "channelName": "Tác nhân đang hoạt động",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
   },
@@ -3133,5 +3141,12 @@
     "remoteFound": "Đã kết nối máy tính",
     "checkAgain": "Kiểm tra lại",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Bắt đầu trợ lý cần một lời nhắc. Thêm lời nhắc và chạy lại.",
+      "repositoryUnknown": "Kilo không nhận diện {{repository}} là kho mã nguồn GitHub hoặc GitLab. Chọn kho mã nguồn khác trong Kilo.",
+      "repositoryUnsupported": "{{repository}} là kho mã nguồn Bitbucket — Bắt đầu trợ lý chưa thể dùng nó. Chọn kho mã nguồn khác trong Kilo."
+    }
   }
 }

@@ -522,6 +522,8 @@
       "replyBadRequest": "Ni ellir postio'r ateb hwn. Efallai fod yr edefyn wedi newid.",
       "replyForbidden": "Nid oes gennych ganiatâd i ateb y cais tynnu hwn.",
       "addCommentCta": "Sylwadu ar y cais tynnu hwn",
+      "fixWithKilo": "Trwsio gyda Kilo",
+      "fixWithKiloPrompt": "Ymdrinwch â'r sylw canlynol ar y cais tynnu: {{link}}",
       "commentBadRequest": "Ni ellir postio'r sylw hwn. Efallai fod y cais tynnu wedi newid.",
       "commentForbidden": "Nid oes gennych ganiatâd i sylwadu ar y cais tynnu hwn.",
       "moderation": {
@@ -628,13 +630,13 @@
       "pending": "{{displayCount}} yn aros",
       "skipped": "{{displayCount}} wedi'u hepgor",
       "checksCount": "{{displayCount}} gwiriad",
-      "checkDetails": "manylion gwiriad",
-      "checksCount_one": "{{displayCount}} gwiriad",
-      "checksCount_other": "{{displayCount}} gwiriad",
       "checksCount_zero": "{{displayCount}} gwiriad",
+      "checksCount_one": "{{displayCount}} gwiriad",
       "checksCount_two": "{{displayCount}} gwiriad",
       "checksCount_few": "{{displayCount}} gwiriad",
-      "checksCount_many": "{{displayCount}} gwiriad"
+      "checksCount_many": "{{displayCount}} gwiriad",
+      "checksCount_other": "{{displayCount}} gwiriad",
+      "checkDetails": "manylion gwiriad"
     },
     "inbox": {
       "title": "Blwch derbyn",
@@ -3270,6 +3272,12 @@
     "privacy": "Agorwch Kilo i weld asiantau",
     "openAgents": "Agor asiantau",
     "needsInput": "Angen mewnbwn",
+    "newestSession": "Diweddaraf: {{title}}",
+    "noneWaiting": "Nid oes asiantau'n aros",
+    "newAgent": "Asiant newydd",
+    "approving": "Yn cymeradwyo...",
+    "couldNotApprove": "Methwyd cymeradwyo",
+    "couldNotStart": "Methwyd dechrau",
     "channelName": "Asiantau gweithredol",
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo."
   },
@@ -3305,5 +3313,12 @@
     "remoteFound": "Cyfrifiadur wedi'i gysylltu",
     "checkAgain": "Gwirio eto",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Mae angen anogiad i ddechrau asiant. Ychwanega anogiad a'i redeg eto.",
+      "repositoryUnknown": "Nid yw Kilo'n adnabod {{repository}} fel ystorfa GitHub neu GitLab. Dewiswch ystorfa arall yn Kilo.",
+      "repositoryUnsupported": "Ystorfa Bitbucket yw {{repository}} — Nid yw Dechrau asiant yn gallu ei defnyddio eto. Dewiswch ystorfa arall yn Kilo."
+    }
   }
 }

@@ -40,7 +40,7 @@ import { withDORetry } from '../../utils/do-retry.js';
 import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
 import { sha256Hex } from '../../utils/sha256.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
-import { internalApiProtectedProcedure } from '../auth.js';
+import { protectedProcedure } from '../auth.js';
 import { resolveSecret } from '../../auth.js';
 import { assertOrganizationMembership } from './organization-membership.js';
 
@@ -981,7 +981,7 @@ async function reconcileWorktreeCreate(
   return resultFromProgress(progress, true);
 }
 
-const createWorktreeChatHandler = internalApiProtectedProcedure
+const createWorktreeChatHandler = protectedProcedure
   .input(CreateWorktreeChatInput)
   .output(CreateWorktreeChatOutput)
   .mutation(async ({ input, ctx }) => {

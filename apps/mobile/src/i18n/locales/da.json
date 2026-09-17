@@ -490,6 +490,8 @@
       "replyBadRequest": "Dette svar kan ikke sendes. Tråden kan have ændret sig.",
       "replyForbidden": "Du har ikke tilladelse til at svare på denne pull request.",
       "addCommentCta": "Kommenter på denne pull request",
+      "fixWithKilo": "Ret med Kilo",
+      "fixWithKiloPrompt": "Håndter venligst følgende kommentar på pull requesten: {{link}}",
       "commentBadRequest": "Denne kommentar kan ikke sendes. Pull requesten kan have ændret sig.",
       "commentForbidden": "Du har ikke tilladelse til at kommentere på denne pull request.",
       "moderation": {
@@ -584,9 +586,9 @@
       "pending": "{{displayCount}} afventer",
       "skipped": "{{displayCount}} sprunget over",
       "checksCount": "{{displayCount}} kontroller",
-      "checkDetails": "detaljer om kontrollen",
       "checksCount_one": "{{displayCount}} kontrol",
-      "checksCount_other": "{{displayCount}} kontroller"
+      "checksCount_other": "{{displayCount}} kontroller",
+      "checkDetails": "detaljer om kontrollen"
     },
     "inbox": {
       "title": "Indbakke",
@@ -3098,6 +3100,12 @@
     "privacy": "Åbn Kilo for at se agenter",
     "openAgents": "Åbn agenter",
     "needsInput": "Afventer svar",
+    "newestSession": "Nyeste: {{title}}",
+    "noneWaiting": "Ingen agenter venter",
+    "newAgent": "Ny agent",
+    "approving": "Godkender...",
+    "couldNotApprove": "Kunne ikke godkende",
+    "couldNotStart": "Kunne ikke starte",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen."
   },
@@ -3133,5 +3141,12 @@
     "remoteFound": "Computer tilsluttet",
     "checkAgain": "Tjek igen",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Start agenten kræver en forespørgsel. Tilføj en forespørgsel, og kør den igen.",
+      "repositoryUnknown": "Kilo genkender ikke {{repository}} som et GitHub- eller GitLab-kodelager. Vælg et andet kodelager i Kilo.",
+      "repositoryUnsupported": "{{repository}} er et Bitbucket-kodelager — Start agenten kan endnu ikke bruge det. Vælg et andet kodelager i Kilo."
+    }
   }
 }

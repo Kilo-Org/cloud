@@ -498,6 +498,8 @@
       "replyBadRequest": "Šo atbildi nevar publicēt. Pavediens, iespējams, ir mainījies.",
       "replyForbidden": "Tev nav atļaujas atbildēt šajā izmaiņu pieprasījumā.",
       "addCommentCta": "Komentēt šo izmaiņu pieprasījumu",
+      "fixWithKilo": "Novērst ar Kilo",
+      "fixWithKiloPrompt": "Lūdzu, risini šo izmaiņu pieprasījuma komentāru: {{link}}",
       "commentBadRequest": "Šo komentāru nevar publicēt. Iespējams, izmaiņu pieprasījums ir mainījies.",
       "commentForbidden": "Tev nav atļaujas komentēt šajā izmaiņu pieprasījumā.",
       "moderation": {
@@ -595,10 +597,10 @@
       "pending": "gaida: {{displayCount}}",
       "skipped": "izlaistas: {{displayCount}}",
       "checksCount": "pārbaudes: {{displayCount}}",
-      "checkDetails": "informācija par pārbaudi",
+      "checksCount_zero": "pārbaužu: {{displayCount}}",
       "checksCount_one": "pārbaude: {{displayCount}}",
       "checksCount_other": "pārbaudes: {{displayCount}}",
-      "checksCount_zero": "pārbaužu: {{displayCount}}"
+      "checkDetails": "informācija par pārbaudi"
     },
     "inbox": {
       "title": "Iesūtne",
@@ -3141,6 +3143,12 @@
     "privacy": "Atver Kilo, lai redzētu aģentus",
     "openAgents": "Atvērt aģentus",
     "needsInput": "Gaida ievadi",
+    "newestSession": "Jaunākā: {{title}}",
+    "noneWaiting": "Neviens aģents negaida",
+    "newAgent": "Jauns aģents",
+    "approving": "Apstiprina...",
+    "couldNotApprove": "Neizdevās apstiprināt",
+    "couldNotStart": "Neizdevās palaist",
     "channelName": "Aktīvie aģenti",
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus."
   },
@@ -3176,5 +3184,12 @@
     "remoteFound": "Dators pievienots",
     "checkAgain": "Pārbaudīt vēlreiz",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Lai sāktu aģentu, nepieciešama uzvedne. Pievieno uzvedni un palaid to vēlreiz.",
+      "repositoryUnknown": "Kilo neatpazīst {{repository}} kā GitHub vai GitLab repozitoriju. Izvēlies citu repozitoriju Kilo.",
+      "repositoryUnsupported": "{{repository}} ir Bitbucket repozitorijs — Sākt aģentu to vēl nevar izmantot. Izvēlies citu repozitoriju Kilo."
+    }
   }
 }

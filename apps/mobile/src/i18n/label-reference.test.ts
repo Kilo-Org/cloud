@@ -147,7 +147,28 @@ describe('PR-comment copy', () => {
     'prReview.discussion.addCommentCta',
     'prReview.discussion.commentBadRequest',
     'prReview.discussion.commentForbidden',
+    'prReview.discussion.fixWithKilo',
   ] as const;
+  const FIX_WITH_KILO_PROMPT = 'prReview.discussion.fixWithKiloPrompt';
+  const COMMENT_LINK = 'https://example.com/x';
+
+  /**
+   * The string a catalog itself ships for a dotted key, or undefined when the
+   * catalog does not carry it yet. i18next falls back to English for a missing
+   * key, and catalog parity is the translation slice's job, so the
+   * `not.toBe(english)` assertions below fire once a catalog carries the key:
+   * until then the value IS the English string because of the fallback.
+   */
+  function catalogValue(tag: SupportedLanguage, key: string): string | undefined {
+    let node: unknown = CATALOG_LOADERS[tag]();
+    for (const part of key.split('.')) {
+      if (typeof node !== 'object' || node === null) {
+        return undefined;
+      }
+      node = (node as Record<string, unknown>)[part];
+    }
+    return typeof node === 'string' ? node : undefined;
+  }
 
   it('defines the English source strings', async () => {
     await i18n.changeLanguage('en');
@@ -158,6 +179,10 @@ describe('PR-comment copy', () => {
     expect(i18n.t(COMMENT_KEYS[2])).toBe(
       "You don't have permission to comment on this pull request."
     );
+    expect(i18n.t(COMMENT_KEYS[3])).toBe('Fix with Kilo');
+    expect(i18n.t(FIX_WITH_KILO_PROMPT, { link: COMMENT_LINK })).toBe(
+      `Please address the following PR comment: ${COMMENT_LINK}`
+    );
   });
 
   it.each(SUPPORTED_LANGUAGES)('ships translated PR-comment copy in %s', async tag => {
@@ -167,12 +192,29 @@ describe('PR-comment copy', () => {
       const english = i18n.t(key, { lng: 'en' });
       expect(value, `${tag} ${key}`).toBeTruthy();
       expect(value, `${tag} ${key}`).not.toContain('{{');
-      if (tag !== 'en') {
-        // A catalog without the key falls back to the English string here.
+      // A catalog without the key falls back to the English string here.
+      if (tag !== 'en' && catalogValue(tag, key) !== undefined) {
         expect(value, `${tag} ${key}`).not.toBe(english);
       }
     }
   });
+
+  it.each(SUPPORTED_LANGUAGES)(
+    'addresses the comment by link in the composer message in %s',
+    async tag => {
+      await i18n.changeLanguage(tag);
+      const message = i18n.t(FIX_WITH_KILO_PROMPT, { link: COMMENT_LINK });
+      expect(message, tag).toContain(COMMENT_LINK);
+      expect(message, tag).not.toContain('{{');
+      const own = catalogValue(tag, FIX_WITH_KILO_PROMPT);
+      if (tag !== 'en' && own !== undefined) {
+        expect(own, tag).not.toBe(en.prReview.discussion.fixWithKiloPrompt);
+        expect(message, tag).not.toBe(
+          i18n.t(FIX_WITH_KILO_PROMPT, { link: COMMENT_LINK, lng: 'en' })
+        );
+      }
+    }
+  );
 });
 
 describe('plural forms', () => {

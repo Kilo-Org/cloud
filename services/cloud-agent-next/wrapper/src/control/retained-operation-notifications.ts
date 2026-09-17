@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
   sessionPreparingPayloadSchema,
@@ -5,6 +6,7 @@ import {
   type SessionPreparingPayload,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import type { PreparingEventDataV2 } from '../../../src/shared/protocol.js';
+import { FULL_COMMIT_HASH, MAX_COMMIT_MESSAGE_BYTES } from '../commit-objects.js';
 
 const MAX_RETAINED_DELIVERY_EVENTS = 8;
 const MAX_RETAINED_PREPARING_EVENTS = 64;
@@ -13,8 +15,10 @@ const RESERVED_TERMINAL_EVENTS = 1;
 const RESERVED_TERMINAL_PREPARING_EVENTS = 8;
 const RESERVED_ATTEMPT_TERMINALS = 1;
 const MAX_EVENT_MESSAGE_LENGTH = 4_096;
-const MAX_COMMIT_HASH_LENGTH = 128;
+const MAX_MESSAGE_ID_LENGTH = 256;
 const MAX_TIMESTAMP_LENGTH = 128;
+const PUSH_STATUSES = ['pushed', 'failed', 'not_attempted', 'unknown'] as const;
+const committedAtSchema = z.string().max(MAX_TIMESTAMP_LENGTH).datetime({ offset: true });
 
 type Entry =
   | { kind: 'event'; payload: SessionEventPayload; terminal: boolean; bytes: number }
@@ -46,8 +50,33 @@ function boundedString(value: string, limit: number): string {
   return value.length <= limit ? value : value.slice(0, limit);
 }
 
+function boundedIdentity(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_MESSAGE_ID_LENGTH)
+    return undefined;
+  return value;
+}
+
 function boundedTimestamp(timestamp: string | undefined): string | undefined {
   return timestamp === undefined ? undefined : boundedString(timestamp, MAX_TIMESTAMP_LENGTH);
+}
+
+function projectPushStatus(value: unknown): (typeof PUSH_STATUSES)[number] | undefined {
+  if (typeof value !== 'string') return undefined;
+  return PUSH_STATUSES.find(status => status === value);
+}
+
+function projectCommitMessage(value: string): { value: string; truncated: boolean } {
+  if (Buffer.byteLength(value) <= MAX_COMMIT_MESSAGE_BYTES) return { value, truncated: false };
+
+  const codePoints: string[] = [];
+  let bytes = 0;
+  for (const codePoint of value) {
+    const codePointBytes = Buffer.byteLength(codePoint);
+    if (bytes + codePointBytes > MAX_COMMIT_MESSAGE_BYTES) break;
+    codePoints.push(codePoint);
+    bytes += codePointBytes;
+  }
+  return { value: codePoints.join(''), truncated: true };
 }
 
 function projectFinalizationEvent(payload: SessionEventPayload):
@@ -58,19 +87,34 @@ function projectFinalizationEvent(payload: SessionEventPayload):
   | undefined {
   if (payload.type === 'autocommit_completed') {
     const { properties } = payload;
-    if (typeof properties.success !== 'boolean' || typeof properties.messageId !== 'string')
-      return undefined;
+    const messageId = boundedIdentity(properties.messageId);
+    if (typeof properties.success !== 'boolean' || messageId === undefined) return undefined;
     const projected: Record<string, unknown> = {
       success: properties.success,
-      messageId: properties.messageId,
+      messageId,
     };
     if (typeof properties.skipped === 'boolean') projected.skipped = properties.skipped;
-    if (typeof properties.commitHash === 'string')
-      projected.commitHash = boundedString(properties.commitHash, MAX_COMMIT_HASH_LENGTH);
+    if (typeof properties.commitHash === 'string' && FULL_COMMIT_HASH.test(properties.commitHash))
+      projected.commitHash = properties.commitHash;
     if (typeof properties.message === 'string')
       projected.message = boundedString(properties.message, MAX_EVENT_MESSAGE_LENGTH);
-    if (typeof properties.commitMessage === 'string')
-      projected.commitMessage = boundedString(properties.commitMessage, MAX_EVENT_MESSAGE_LENGTH);
+    const userMessageId = boundedIdentity(properties.userMessageId);
+    if (userMessageId !== undefined) projected.userMessageId = userMessageId;
+    if (
+      typeof properties.committedAt === 'string' &&
+      committedAtSchema.safeParse(properties.committedAt).success
+    )
+      projected.committedAt = properties.committedAt;
+    const pushStatus = projectPushStatus(properties.pushStatus);
+    if (pushStatus !== undefined) projected.pushStatus = pushStatus;
+    if (typeof properties.commitMessage === 'string') {
+      const commitMessage = projectCommitMessage(properties.commitMessage);
+      projected.commitMessage = commitMessage.value;
+      if (commitMessage.truncated || properties.commitMessageTruncated === true)
+        projected.commitMessageTruncated = true;
+    } else if (properties.commitMessageTruncated === true) {
+      projected.commitMessageTruncated = true;
+    }
     return {
       payload: {
         type: payload.type,

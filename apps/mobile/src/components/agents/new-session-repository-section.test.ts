@@ -14,6 +14,7 @@ import {
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  Pressable: 'Pressable',
   View: 'View',
 }));
 vi.mock('@/components/ui/text', async () => {
@@ -21,7 +22,11 @@ vi.mock('@/components/ui/text', async () => {
   return { Text: 'Text', TextClassContext: React.createContext<string | undefined>(undefined) };
 });
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/icons', () => ({ ExternalLink: 'ExternalLink', RefreshCw: 'RefreshCw' }));
+vi.mock('@/components/ui/icons', () => ({
+  ChevronDown: 'ChevronDown',
+  ExternalLink: 'ExternalLink',
+  RefreshCw: 'RefreshCw',
+}));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/agents/repo-selector', () => ({ RepoSelector: 'RepoSelector' }));
@@ -30,6 +35,32 @@ vi.mock('@/components/agents/repository-branch-selector', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#777777' }),
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+  selectReducedMotionEntrance: <T>(reducedMotion: boolean, entrance: T) =>
+    reducedMotion ? undefined : entrance,
+}));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  useSharedValue: (value: unknown) => ({ value }),
+  useAnimatedStyle: () => ({}),
+  withTiming: (value: number, config: unknown) => ({ value, config }),
+  FadeIn: { duration: (ms: number) => ({ __fadeIn: ms }) },
+  LinearTransition: { duration: (ms: number) => ({ __linearTransition: ms }) },
+}));
+
+const collapseState = vi.hoisted(() => ({
+  collapsedCtas: [] as string[],
+  hasLoaded: true,
+  setConnectCtaCollapsed: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
+  useCollapsedConnectCtas: () => ({
+    collapsedCtas: collapseState.collapsedCtas,
+    hasLoaded: collapseState.hasLoaded,
+  }),
+  setConnectCtaCollapsed: collapseState.setConnectCtaCollapsed,
 }));
 
 const githubRow: NewSessionRepository = {
@@ -98,8 +129,31 @@ function renderedText(renderer: TestRenderer.ReactTestRenderer): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
+/** The headers of the connect cards; the section renders no other pressable. */
+function pressables(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAllByType('Pressable' as never);
+}
+
+function connectHeader(renderer: TestRenderer.ReactTestRenderer, title: string) {
+  return pressables(renderer).find(node => node.props.accessibilityLabel === title);
+}
+
+/** Press the header of the connect card with the given title. */
+function pressHeader(renderer: TestRenderer.ReactTestRenderer, title: string): void {
+  const header = connectHeader(renderer, title);
+  if (!header) {
+    throw new Error(`no connect header for ${title}`);
+  }
+  act(() => {
+    (header.props.onPress as () => void)();
+  });
+}
+
 beforeEach(() => {
   resetSelectedBranchOverrides();
+  collapseState.collapsedCtas = [];
+  collapseState.hasLoaded = true;
+  collapseState.setConnectCtaCollapsed.mockClear();
 });
 
 describe('NewSessionRepositorySection branch row', () => {
@@ -169,5 +223,98 @@ describe('NewSessionRepositorySection Bitbucket connect card', () => {
     expect(renderedText(renderer)).not.toContain(
       i18n.t('agentChat.newSession.bitbucketOrganizationsOnly')
     );
+  });
+
+  it('hides the organizations-only note when the Bitbucket card is collapsed', () => {
+    collapseState.collapsedCtas = ['bitbucket'];
+    const renderer = mountSection({
+      groups: [group('github', 'repos'), group('gitlab', 'repos'), group('bitbucket', 'connect')],
+    });
+
+    expect(renderedText(renderer)).not.toContain(
+      i18n.t('agentChat.newSession.bitbucketOrganizationsOnly')
+    );
+    expect(
+      connectHeader(renderer, i18n.t('common.connectBitbucket'))?.props.accessibilityState
+    ).toEqual({ expanded: false });
+  });
+});
+
+describe('NewSessionRepositorySection connect card collapse', () => {
+  const bothConnect = [group('github', 'connect'), group('gitlab', 'connect')];
+
+  it('paints every connect card expanded when nothing is persisted as collapsed', () => {
+    const renderer = mountSection({ groups: bothConnect });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('agentChat.newSession.connectGithubDescription'));
+    expect(text).toContain(i18n.t('agentChat.newSession.connectGitlabDescription'));
+    expect(
+      connectHeader(renderer, i18n.t('common.connectGithub'))?.props.accessibilityState
+    ).toEqual({ expanded: true });
+    expect(
+      connectHeader(renderer, i18n.t('common.connectGitlab'))?.props.accessibilityState
+    ).toEqual({ expanded: true });
+  });
+
+  it('collapses only the persisted provider and leaves the others expanded', () => {
+    collapseState.collapsedCtas = ['github'];
+    const renderer = mountSection({ groups: bothConnect });
+
+    const text = renderedText(renderer);
+    // Collapsed means reduced, not deleted: the title row stays.
+    expect(text).toContain(i18n.t('common.connectGithub'));
+    expect(text).not.toContain(i18n.t('agentChat.newSession.connectGithubDescription'));
+    expect(text).not.toContain(i18n.t('agentChat.newSession.openGithub'));
+    expect(text).toContain(i18n.t('agentChat.newSession.connectGitlabDescription'));
+
+    expect(
+      connectHeader(renderer, i18n.t('common.connectGithub'))?.props.accessibilityState
+    ).toEqual({ expanded: false });
+    expect(
+      connectHeader(renderer, i18n.t('common.connectGitlab'))?.props.accessibilityState
+    ).toEqual({ expanded: true });
+  });
+
+  it('requests a collapse when an expanded header is pressed', () => {
+    const renderer = mountSection({ groups: [group('github', 'connect')] });
+
+    pressHeader(renderer, i18n.t('common.connectGithub'));
+
+    expect(collapseState.setConnectCtaCollapsed).toHaveBeenCalledWith('github', true);
+  });
+
+  it('requests an expand when a collapsed header is pressed', () => {
+    collapseState.collapsedCtas = ['github'];
+    const renderer = mountSection({ groups: [group('github', 'connect')] });
+
+    pressHeader(renderer, i18n.t('common.connectGithub'));
+
+    expect(collapseState.setConnectCtaCollapsed).toHaveBeenCalledWith('github', false);
+  });
+
+  it('renders no connect card until the persisted state has loaded', () => {
+    collapseState.hasLoaded = false;
+    const renderer = mountSection({ groups: [group('github', 'connect')] });
+
+    const text = renderedText(renderer);
+    expect(text).not.toContain(i18n.t('common.connectGithub'));
+    expect(text).not.toContain(i18n.t('agentChat.newSession.connectGithubDescription'));
+    expect(pressables(renderer)).toHaveLength(0);
+  });
+
+  it('renders no connect card when every provider has repositories', () => {
+    const renderer = mountSection({
+      groups: [group('github', 'repos'), group('gitlab', 'repos')],
+    });
+
+    expect(pressables(renderer)).toHaveLength(0);
+  });
+
+  it('renders no connect card for a github group that only has repositories', () => {
+    const renderer = mountSection({ groups: [group('github', 'repos')] });
+
+    expect(renderedText(renderer)).not.toContain(i18n.t('common.connectGithub'));
+    expect(pressables(renderer)).toHaveLength(0);
   });
 });

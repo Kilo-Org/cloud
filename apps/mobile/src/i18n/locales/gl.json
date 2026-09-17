@@ -490,6 +490,8 @@
       "replyBadRequest": "Non se pode publicar esta resposta. Pode que o fío cambiase.",
       "replyForbidden": "Non tes permiso para responder a esta solicitude de integración.",
       "addCommentCta": "Comentar esta solicitude de integración",
+      "fixWithKilo": "Corrixir con Kilo",
+      "fixWithKiloPrompt": "Atende o seguinte comentario da solicitude de integración: {{link}}",
       "commentBadRequest": "Non se pode publicar este comentario. Pode que a solicitude de integración cambiase.",
       "commentForbidden": "Non tes permiso para comentar nesta solicitude de integración.",
       "moderation": {
@@ -584,9 +586,9 @@
       "pending": "{{displayCount}} pendentes",
       "skipped": "{{displayCount}} omitidas",
       "checksCount": "{{displayCount}} comprobacións",
-      "checkDetails": "detalles da comprobación",
       "checksCount_one": "{{displayCount}} comprobación",
-      "checksCount_other": "{{displayCount}} comprobacións"
+      "checksCount_other": "{{displayCount}} comprobacións",
+      "checkDetails": "detalles da comprobación"
     },
     "inbox": {
       "title": "Caixa de entrada",
@@ -3098,6 +3100,12 @@
     "privacy": "Abre Kilo para ver os axentes",
     "openAgents": "Abrir axentes",
     "needsInput": "Agardando resposta",
+    "newestSession": "A máis recente: {{title}}",
+    "noneWaiting": "Ningún axente en espera",
+    "newAgent": "Novo axente",
+    "approving": "Aprobando...",
+    "couldNotApprove": "Non se puido aprobar",
+    "couldNotStart": "Non se puido iniciar",
     "channelName": "Axentes activos",
     "activityKitDisabledBody": "Activa as actividades en directo nos axustes para ver os axentes activos na pantalla de bloqueo."
   },
@@ -3133,5 +3141,12 @@
     "remoteFound": "Computador conectado",
     "checkAgain": "Comprobar de novo",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Iniciar un axente necesita unha instrución. Engade unha instrución e execútao de novo.",
+      "repositoryUnknown": "Kilo non recoñece {{repository}} como un repositorio de GitHub ou GitLab. Escolle outro repositorio en Kilo.",
+      "repositoryUnsupported": "{{repository}} é un repositorio de Bitbucket — Iniciar un axente aínda non pode usalo. Escolle outro repositorio en Kilo."
+    }
   }
 }

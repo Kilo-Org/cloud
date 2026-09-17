@@ -490,6 +490,8 @@
       "replyBadRequest": "Tsy azo avoaka ity valiny ity. Mety niova ny loha-dresaka.",
       "replyForbidden": "Tsy manana alalana hamaly ity fangatahana fampiraisana ity ianao.",
       "addCommentCta": "Manao fanehoan-kevitra momba ity fangatahana fampiraisana ity",
+      "fixWithKilo": "Amboary miaraka amin'ny Kilo",
+      "fixWithKiloPrompt": "Azafady amboary ity fanehoan-kevitra momba ny fangatahana fampiraisana ity: {{link}}",
       "commentBadRequest": "Tsy azo avoaka ity fanehoan-kevitra ity. Mety niova ny fangatahana fampiraisana.",
       "commentForbidden": "Tsy manana alalana hanao fanehoan-kevitra momba ity fangatahana fampiraisana ity ianao.",
       "moderation": {
@@ -584,9 +586,9 @@
       "pending": "{{displayCount}} miandry",
       "skipped": "{{displayCount}} nodiavina",
       "checksCount": "{{displayCount}} fanamarinana",
-      "checkDetails": "antsipirian'ny fanamarinana",
       "checksCount_one": "{{displayCount}} fanamarinana",
-      "checksCount_other": "{{displayCount}} fanamarinana"
+      "checksCount_other": "{{displayCount}} fanamarinana",
+      "checkDetails": "antsipirian'ny fanamarinana"
     },
     "inbox": {
       "title": "Voaray",
@@ -3098,6 +3100,12 @@
     "privacy": "Sokafy ny Kilo hijery ny mpanatanteraka",
     "openAgents": "Sokafy ny mpanatanteraka",
     "needsInput": "Mila valiny",
+    "newestSession": "Vao farany: {{title}}",
+    "noneWaiting": "Tsy misy mpanatanteraka miandry",
+    "newAgent": "Mpanatanteraka vaovao",
+    "approving": "Eo am-panekena...",
+    "couldNotApprove": "Tsy nahomby ny fanekena",
+    "couldNotStart": "Tsy nahomby ny fanombohana",
     "channelName": "Mpanatanteraka mandeha",
     "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy."
   },
@@ -3133,5 +3141,12 @@
     "remoteFound": "Mifandray ny solosaina",
     "checkAgain": "Hamarino indray",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Ny Atombohy ny mpanampy dia mila toromarika. Manampia toromarika ary avereno indray izy.",
+      "repositoryUnknown": "Tsy fantatr'i Kilo ny {{repository}} ho tahirin-kaody GitHub na GitLab. Mifidiana tahirin-kaody hafa ao amin'ny Kilo.",
+      "repositoryUnsupported": "Tahirin-kaody Bitbucket ny {{repository}} — Tsy mbola afaka mampiasa azy ny Atombohy ny mpanampy. Mifidiana tahirin-kaody hafa ao amin'ny Kilo."
+    }
   }
 }

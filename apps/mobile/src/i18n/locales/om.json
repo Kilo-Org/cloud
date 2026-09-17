@@ -490,6 +490,8 @@
       "replyBadRequest": "Deebiin kun maxxanfamuu hin danda'u. Dameen marii jijjiirameera ta'a.",
       "replyForbidden": "Gaaffii walitti makuu kanaaf deebii kennuuf hayyama hin qabdu.",
       "addCommentCta": "Gaaffii walitti makuu kanaa irratti yaada kenni",
+      "fixWithKilo": "Kilo waliin sirreessi",
+      "fixWithKiloPrompt": "Maaloo yaada gaaffii walitti makuu armaan gadii sirreessi: {{link}}",
       "commentBadRequest": "Yaadni kun maxxanfamuu hin danda'u. Gaaffiin walitti makuu jijjiirameera ta'a.",
       "commentForbidden": "Gaaffii walitti makuu kanaa irratti yaada kennuuf hayyama hin qabdu.",
       "moderation": {
@@ -584,9 +586,9 @@
       "pending": "{{displayCount}} eegamaa jiru",
       "skipped": "{{displayCount}} irra darbaman",
       "checksCount": "Qorannoo {{displayCount}}",
-      "checkDetails": "bal'ina qorannoo",
       "checksCount_one": "Qorannoo {{displayCount}}",
-      "checksCount_other": "Qorannoo {{displayCount}}"
+      "checksCount_other": "Qorannoo {{displayCount}}",
+      "checkDetails": "bal'ina qorannoo"
     },
     "inbox": {
       "title": "Sanduuqa ergaa",
@@ -3098,6 +3100,12 @@
     "privacy": "Eejentoota ilaaluuf Kilo bani",
     "openAgents": "Eejentoota bani",
     "needsInput": "Deebii barbaada",
+    "newestSession": "Haaraa ta'e: {{title}}",
+    "noneWaiting": "Eejentiin eegu hin jiru",
+    "newAgent": "Eejentii haaraa",
+    "approving": "Raggaasisaa jira...",
+    "couldNotApprove": "Raggaasisuu hin dandeenye",
+    "couldNotStart": "Kaasuu hin dandeenye",
     "channelName": "Eejentoota hojii irra jiran",
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi."
   },
@@ -3133,5 +3141,12 @@
     "remoteFound": "Kompiitaraan walqabate",
     "checkAgain": "Irra deebi'ii ilaali",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Eejensa jalqabuuf gaaffii barbaachisa. Gaaffii itti dabaliitii irra deebi'ii hojjedhu.",
+      "repositoryUnknown": "Kilo {{repository}} kuusaa koodii GitHub yookaan GitLab jedhee hin beeku. Kilo keessatti kuusaa koodii bira filadhu.",
+      "repositoryUnsupported": "{{repository}} kuusaa koodii Bitbucket ti — Eejensa jalqabi ammallee isa fayyadamuu hin danda'u. Kilo keessatti kuusaa koodii bira filadhu."
+    }
   }
 }

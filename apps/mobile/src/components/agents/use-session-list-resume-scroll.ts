@@ -202,32 +202,47 @@ export function useSessionListResumeScroll<ItemT>({
     });
     if (plan.kind === 'scroll') {
       resume.done = true;
-      // Arm the suppression before any scroll this plan issues: FlashList's
-      // bottom-start events (cold) or this scroll's own 5-step events (warm)
-      // read "at the bottom" and would arm the tail follow, whose
-      // content-size path no retry can out-race. The mount window bridges to
-      // the first retry; the warm window covers the immediate scroll's event
-      // settle and the first retry re-arms from there.
-      suppressAutoFollow(mountedRef.current ? RESUME_RETRY_SUPPRESS_MS : RESUME_MOUNT_SUPPRESS_MS);
-      // A cold open (anchor already a row at mount) does not scroll here: the
-      // first layout has not measured its rows, so this scroll loses to
-      // FlashList's own bottom-start initial scroll and to the estimate
-      // settle. The scheduled retries land after both, under the measured
-      // conditions the warm scroll is proven exact under. A warm open — an
-      // anchor arriving on an already-mounted list — has measured rows and
-      // scrolls immediately.
-      if (mountedRef.current) {
-        void listRef.current?.scrollToIndex({
-          index: plan.index,
-          viewPosition: 0,
-          // One pixel into the anchor row: adjacent transcript rows overlap by
-          // one pixel (device: row 30's frame bottom is row 31's top + 1), so a
-          // scroll landing exactly on the row top leaves a 1px sliver of the
-          // previous row as the first visible cell. One pixel down hides it and
-          // keeps the anchor itself as the viewport's tracked first row.
-          viewOffset: 1,
-          animated: false,
-        });
+      // The user has grabbed the transcript: the position is theirs now, and
+      // this scroll plus its retry chain would yank the list back to the
+      // recorded row after they let go. End the resume, exactly as the retries
+      // do when they see the same flag.
+      if (userInteractedRef.current) {
+        return;
+      }
+      // An in-flight drag (or momentum fling) must not be yanked either: the
+      // immediate scroll honours the same guard the retries do. When it is
+      // skipped the retry chain below still lands the anchor once the drag
+      // ends, so nothing is lost.
+      if (!isUserScrollingRef.current) {
+        // Arm the suppression before any scroll this plan issues: FlashList's
+        // bottom-start events (cold) or this scroll's own 5-step events (warm)
+        // read "at the bottom" and would arm the tail follow, whose
+        // content-size path no retry can out-race. The mount window bridges to
+        // the first retry; the warm window covers the immediate scroll's event
+        // settle and the first retry re-arms from there.
+        suppressAutoFollow(
+          mountedRef.current ? RESUME_RETRY_SUPPRESS_MS : RESUME_MOUNT_SUPPRESS_MS
+        );
+        // A cold open (anchor already a row at mount) does not scroll here: the
+        // first layout has not measured its rows, so this scroll loses to
+        // FlashList's own bottom-start initial scroll and to the estimate
+        // settle. The scheduled retries land after both, under the measured
+        // conditions the warm scroll is proven exact under. A warm open — an
+        // anchor arriving on an already-mounted list — has measured rows and
+        // scrolls immediately.
+        if (mountedRef.current) {
+          void listRef.current?.scrollToIndex({
+            index: plan.index,
+            viewPosition: 0,
+            // One pixel into the anchor row: adjacent transcript rows overlap by
+            // one pixel (device: row 30's frame bottom is row 31's top + 1), so a
+            // scroll landing exactly on the row top leaves a 1px sliver of the
+            // previous row as the first visible cell. One pixel down hides it and
+            // keeps the anchor itself as the viewport's tracked first row.
+            viewOffset: 1,
+            animated: false,
+          });
+        }
       }
       scheduleResumeRetries(key);
       return;
@@ -264,6 +279,7 @@ export function useSessionListResumeScroll<ItemT>({
     isInFlightRef,
     listRef,
     isUserScrollingRef,
+    userInteractedRef,
     clearResumeRetries,
     scheduleResumeRetries,
     suppressAutoFollow,

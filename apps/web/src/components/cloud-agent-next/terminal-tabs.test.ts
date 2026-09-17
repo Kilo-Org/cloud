@@ -42,10 +42,13 @@ const mockChats = [
   },
 ] as StoredSession[];
 const mockSetAtom = jest.fn();
+const mockRequestOlderMessages = jest.fn();
+let mockChatInput: Record<string, unknown> | null = null;
 const mockManager = {
   atoms: new Proxy({}, { get: (_target, key) => key }),
   switchSession: jest.fn(),
   destroy: jest.fn(),
+  send: jest.fn(async () => true),
 };
 const mockQueryClient = { invalidateQueries: jest.fn() };
 const mockUploadEndpoint = { mutationOptions: () => ({}) };
@@ -133,7 +136,10 @@ jest.mock('./hooks/useSessionModels', () => ({
   }),
 }));
 jest.mock('./older-messages-scroll', () => ({
-  useOlderMessagesPagination: () => ({}),
+  useOlderMessagesPagination: () => ({
+    requestOlderMessages: mockRequestOlderMessages,
+    tryLoadOlderFromScroll: jest.fn(),
+  }),
   shouldAnnounceOlderMessagesArrival: () => false,
 }));
 jest.mock('./MobileSidebarToggle', () => ({ MobileSidebarToggle: () => null }));
@@ -175,7 +181,10 @@ jest.mock('./WorktreeFilePane', () => ({
     }),
 }));
 jest.mock('./ChatInput', () => ({
-  ChatInput: () => createElement('input', { 'data-composer': true }),
+  ChatInput: (props: Record<string, unknown>) => {
+    mockChatInput = props;
+    return createElement('input', { 'data-composer': true });
+  },
 }));
 jest.mock('./ConversationMessages', () => ({
   ConversationMessages: (props: ComponentProps<typeof ConversationMessages>) => {
@@ -774,6 +783,105 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     // ...and an anchor the session no longer has opens at the bottom, following
     // new output, exactly as a link without `at=` does.
     expect(chatUiWrites.at(-1)).toEqual({ shouldAutoScroll: true });
+  });
+
+  /** A transcript row the resume can group; the harness renders no DOM rows. */
+  function anchorMessage(id: string): { info: Record<string, unknown>; parts: never[] } {
+    return {
+      info: { id, role: 'user', sessionID: 'ses_recent', parentID: 'ses_recent', error: null },
+      parts: [],
+    };
+  }
+
+  /** Every `chatUI` write the render made, in order. */
+  function chatUiWrites(): { shouldAutoScroll: boolean }[] {
+    return mockSetAtom.mock.calls
+      .map(call => call[0] as { shouldAutoScroll?: boolean } | null)
+      .filter(
+        (value): value is { shouldAutoScroll: boolean } =>
+          typeof value === 'object' && value !== null && 'shouldAutoScroll' in value
+      );
+  }
+
+  it('hands a resolved but unrendered ?at= anchor back to the tail', () => {
+    mockAtParam = 'msg_1';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockSetAtom.mockClear();
+
+    render();
+
+    // The anchor is in the loaded window, but the group that holds it drew no
+    // row. No older page can change that, so the open must land at the bottom
+    // and follow new output instead of staying paused with follow off.
+    expect(chatUiWrites().at(-1)).toEqual({ shouldAutoScroll: true });
+  });
+
+  it('gives up a ?at= resume when an older page fails instead of waiting forever', () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    mockAtomValues.olderMessagesError = { kind: 'retryable' };
+    mockSetAtom.mockClear();
+
+    render();
+
+    // A failed page cannot reach the anchor, and the one-shot resume would
+    // otherwise sit paused on it: give up the way a link without `at=` opens.
+    expect(chatUiWrites().at(-1)).toEqual({ shouldAutoScroll: true });
+  });
+
+  it('ends a ?at= resume when a message is sent, so the send is not re-paused', () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    mockRequestOlderMessages.mockClear();
+    mockSetAtom.mockClear();
+
+    render();
+    // The resume is still looking: it paused follow and asked for an older page.
+    expect(mockRequestOlderMessages).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      void (mockChatInput?.onSend as ((prompt: string) => Promise<unknown>) | undefined)?.('hello');
+    });
+
+    // The sent message lands and the resume effect re-runs over the new rows.
+    mockSetAtom.mockClear();
+    mockAtomValues.staticMessages = [anchorMessage('msg_1'), anchorMessage('msg_2')];
+    render();
+
+    // The send owns the position now: the effect must not pause follow again
+    // (which also cancels the send's scheduled scroll).
+    expect(chatUiWrites()).toEqual([]);
+  });
+
+  it('ends a ?at= resume when a slash command is sent, so the command is not re-paused', () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    mockRequestOlderMessages.mockClear();
+    mockSetAtom.mockClear();
+
+    render();
+    // The resume is still looking: it paused follow and asked for an older page.
+    expect(mockRequestOlderMessages).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      void (
+        mockChatInput?.onSendCommand as
+          | ((command: string, args: string) => Promise<unknown>)
+          | undefined
+      )?.('review', '');
+    });
+
+    // The command's output lands and the resume effect re-runs over the new
+    // rows. The command send owns the position now: the effect must not pause
+    // follow again (which also cancels the command's scheduled scroll).
+    mockSetAtom.mockClear();
+    mockAtomValues.staticMessages = [anchorMessage('msg_1'), anchorMessage('msg_2')];
+    render();
+
+    expect(chatUiWrites()).toEqual([]);
   });
 });
 

@@ -127,6 +127,12 @@ function readAnchorParam(raw: string): string | null {
   }
 
   const hash = afterScheme.indexOf('#');
+  // A fragment before the query owns everything after it: a `?` inside the
+  // fragment is fragment text, not a query parameter.
+  if (hash >= 0 && hash < queryStart) {
+    return null;
+  }
+
   const queryEnd = hash > queryStart ? hash : afterScheme.length;
 
   for (const pair of afterScheme.slice(queryStart + 1, queryEnd).split('&')) {

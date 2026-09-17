@@ -39,8 +39,7 @@ import {
   isRenderableSessionCost,
 } from './session-cost-breakdown';
 import { ConversationMessages } from './ConversationMessages';
-import { groupConversationMessages } from './message-presentation';
-import { resumeAnchor } from './resume-anchor';
+import { planResumeAttempt, resumeAnchorForTranscript } from './resume-anchor';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
@@ -660,6 +659,13 @@ export default function CloudChatPage({
 
   const handleSendMessage = useCallback(
     async (prompt: string, attachments?: CloudAgentAttachments) => {
+      // Sending takes over the position: end a resume that is still looking for
+      // its anchor, or its effect re-pauses follow and cancels this scroll when
+      // the message lands.
+      const resumeState = resumeStateRef.current;
+      if (resumeState) {
+        resumeState.done = true;
+      }
       shouldAutoScrollRef.current = true;
       setChatUI({ shouldAutoScroll: true });
       const selectedRuntimeAgentForSend = sessionConfig?.runtimeAgents?.find(
@@ -698,6 +704,13 @@ export default function CloudChatPage({
 
   const handleSendSlashCommand = useCallback(
     async (command: string, args: string, attachments?: CloudAgentAttachments) => {
+      // A command send takes over the position exactly as a message send does:
+      // end a resume still looking for its anchor, or the effect re-pauses
+      // follow and cancels the scroll scheduled for this send's output.
+      const resumeState = resumeStateRef.current;
+      if (resumeState) {
+        resumeState.done = true;
+      }
       shouldAutoScrollRef.current = true;
       setChatUI({ shouldAutoScroll: true });
       const acceptedPromise = manager.send({
@@ -1202,9 +1215,10 @@ export default function CloudChatPage({
   // -- Resume position (`?at=`) ---------------------------------------------
   // One shot per (session, anchor): land the anchor message at the top of the
   // transcript, loading older pages while it still sits before the loaded
-  // window. A real user scroll, or an anchor this session no longer has (an id
-  // absent from the loaded window after 8 exhausted pages, or no older history
-  // to search), ends the attempt by opening exactly as an anchor-less link
+  // window. A real user scroll or a send ends the attempt, and so does an
+  // anchor the run cannot reach: an id absent from the loaded window after 8
+  // pages, no older history to search, a failed older page, or a group that
+  // renders no element. Each ends it by opening exactly as an anchor-less link
   // does: at the bottom, following new output. The transcript container starts
   // at `scrollTop = 0`, so leaving the paused resume behind would strand the
   // reader on the oldest loaded message with follow off.
@@ -1230,18 +1244,29 @@ export default function CloudChatPage({
     // The snapshot for this session has not painted yet; wait for its commit.
     if (staticMessages.length === 0 && dynamicMessages.length === 0 && !hasOlderMessages) return;
 
-    const groups = groupConversationMessages(
+    // Group exactly as the transcript renders (same preparation rows and commit
+    // anchors), or the anchor resolves against boundaries the renderer does not
+    // have and lands on an earlier rendered group.
+    const anchor = resumeAnchorForTranscript(
       [...staticMessages, ...dynamicMessages],
-      preparationByMessageId
-    );
-    const anchor = resumeAnchor(
-      groups.map(group => group.map(message => message.info.id)),
+      preparationByMessageId,
+      commitsAfterMessage,
       anchorMessageIdFromParams
     );
     const container = scrollContainerRef.current;
     const element = anchor && container ? findAnchorElement(container, anchor.selectorIds) : null;
 
-    if (element && container) {
+    const step = planResumeAttempt({
+      anchorRendered: element !== null && container !== null,
+      anchorResolved: anchor !== null,
+      attempts: state.attempts,
+      maxOlderPages: MAX_RESUME_OLDER_PAGES,
+      hasOlderMessages,
+      isLoadingOlderMessages,
+      hasOlderMessagesError: olderMessagesError !== null,
+    });
+
+    if (step === 'scroll' && element && container) {
       state.done = true;
       isAutoScrollingRef.current = true;
       container.scrollTop = element.offsetTop;
@@ -1256,20 +1281,13 @@ export default function CloudChatPage({
       return;
     }
 
-    // The anchor is in the loaded window, so no older page can produce a target
-    // for it: give up rather than load pages for a message that renders nothing.
-    if (anchor) {
-      state.done = true;
-      return;
-    }
-
-    if (state.attempts >= MAX_RESUME_OLDER_PAGES || !hasOlderMessages) {
-      // The anchor never resolved — a deleted or trimmed message, an id past the
-      // page bound, or an id this session never had. Give up the way an
-      // anchor-less link opens: follow the tail again, so the reader lands at
-      // the bottom instead of the oldest loaded message (the mobile `?at=`
-      // contract). Fired only here: an anchor that resolved into a group keeps
-      // the paused position above.
+    if (step === 'follow-tail') {
+      // The anchor cannot be reached — a deleted or trimmed message, an id past
+      // the page bound, an older page that failed to load, or a group that
+      // renders no element — so no later attempt can reach it. Give up the way
+      // an anchor-less link opens: follow the tail again, so the reader lands
+      // at the bottom instead of staying paused on the oldest loaded message
+      // with follow off (the mobile `?at=` contract).
       shouldAutoScrollRef.current = true;
       setChatUI({ shouldAutoScroll: true });
       scheduleScrollToBottom();
@@ -1277,7 +1295,7 @@ export default function CloudChatPage({
       return;
     }
 
-    if (!isLoadingOlderMessages && olderMessagesError === null) {
+    if (step === 'load-older') {
       state.attempts += 1;
       requestOlderMessages();
     }
@@ -1285,6 +1303,7 @@ export default function CloudChatPage({
     anchorMessageIdFromParams,
     cancelScheduledAutoScroll,
     chatTabActive,
+    commitsAfterMessage,
     dynamicMessages,
     hasOlderMessages,
     isLoading,

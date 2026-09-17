@@ -1,4 +1,7 @@
 import { anchorPosition } from '@kilocode/app-shared/universal-links';
+import type { PreparationAttempt, SessionCommit } from '@kilocode/cloud-agent-sdk';
+import type { StoredMessage } from './types';
+import { groupConversationMessages } from './message-presentation';
 
 /**
  * Where a resumed transcript should land, resolved against the rendered
@@ -56,4 +59,77 @@ export function resumeAnchor(
   }
 
   return null;
+}
+
+/**
+ * Resolve the anchor against the transcript's own grouping. This has to be the
+ * renderer's grouping — the same messages, preparation rows AND commit anchors
+ * (`commitsAfterMessage`) — or a group boundary the renderer sees does not
+ * exist here: a commit anchored between two assistant messages would leave the
+ * resume's groups merged, and the anchor would land on an earlier rendered
+ * group than the one it belongs to.
+ */
+export function resumeAnchorForTranscript(
+  messages: readonly StoredMessage[],
+  preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>,
+  commitsAfterMessage: ReadonlyMap<string, readonly SessionCommit[]>,
+  anchorMessageId: string | null | undefined
+): ResumeAnchor | null {
+  const groups = groupConversationMessages(
+    [...messages],
+    preparationByMessageId,
+    commitsAfterMessage
+  );
+  return resumeAnchor(
+    groups.map(group => group.map(message => message.info.id)),
+    anchorMessageId
+  );
+}
+
+/** What a resume attempt does next. */
+export type ResumeAttemptStep = 'scroll' | 'load-older' | 'follow-tail' | 'wait';
+
+/**
+ * Decide one resume attempt. `follow-tail` is the give-up: the transcript opens
+ * exactly as an anchor-less link does, at the bottom and following new output,
+ * instead of staying paused at its oldest loaded message with follow off.
+ *
+ * An anchor that resolved inside the loaded window but drew no element cannot
+ * be reached by an older page — an all-invisible assistant turn renders
+ * nothing by design — and a failed older page ends the attempt too: the resume
+ * is one-shot, so waiting on that failure would never complete or give up.
+ */
+export function planResumeAttempt({
+  anchorRendered,
+  anchorResolved,
+  attempts,
+  maxOlderPages,
+  hasOlderMessages,
+  isLoadingOlderMessages,
+  hasOlderMessagesError,
+}: {
+  anchorRendered: boolean;
+  anchorResolved: boolean;
+  attempts: number;
+  maxOlderPages: number;
+  hasOlderMessages: boolean;
+  isLoadingOlderMessages: boolean;
+  hasOlderMessagesError: boolean;
+}): ResumeAttemptStep {
+  if (anchorRendered) {
+    return 'scroll';
+  }
+  if (anchorResolved) {
+    return 'follow-tail';
+  }
+  if (attempts >= maxOlderPages || !hasOlderMessages) {
+    return 'follow-tail';
+  }
+  if (hasOlderMessagesError) {
+    return 'follow-tail';
+  }
+  if (isLoadingOlderMessages) {
+    return 'wait';
+  }
+  return 'load-older';
 }

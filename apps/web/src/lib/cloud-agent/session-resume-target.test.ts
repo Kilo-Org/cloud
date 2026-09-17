@@ -3,6 +3,7 @@ import { webPathToAppPath } from '@kilocode/app-shared/universal-links';
 import {
   SESSION_RESUME_REFUSAL_HREF,
   sessionResumeHref,
+  sessionResumeNeedsSignIn,
   sessionResumeRefusal,
   sessionResumeSignInPath,
 } from '@/lib/cloud-agent/session-resume-target';
@@ -41,6 +42,26 @@ describe('sessionResumeRefusal', () => {
     expect(sessionResumeRefusal('TIMEOUT')).toBeNull();
     expect(sessionResumeRefusal(undefined)).toBeNull();
     expect(sessionResumeRefusal(null)).toBeNull();
+  });
+});
+
+describe('sessionResumeNeedsSignIn', () => {
+  it('treats a context auth failure as recoverable sign-in, not a denial', () => {
+    expect(sessionResumeNeedsSignIn({ data: { authRequired: true } })).toBe(true);
+  });
+
+  it('does not treat a session-access denial as sign-in', () => {
+    // A procedure-level UNAUTHORIZED (another account's session, lost org
+    // membership) has no `authRequired`: it is the permanent denial the gate
+    // renders, and signing in again would not change it.
+    expect(sessionResumeNeedsSignIn({ data: { code: 'UNAUTHORIZED' } })).toBe(false);
+    expect(sessionResumeNeedsSignIn({ data: { authRequired: false } })).toBe(false);
+  });
+
+  it('is false for a missing error', () => {
+    expect(sessionResumeNeedsSignIn(null)).toBe(false);
+    expect(sessionResumeNeedsSignIn(undefined)).toBe(false);
+    expect(sessionResumeNeedsSignIn({})).toBe(false);
   });
 });
 

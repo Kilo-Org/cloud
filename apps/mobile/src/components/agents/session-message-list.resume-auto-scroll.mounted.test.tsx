@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted harness drives the real auto-scroll and resume hooks for every resume/takeover case */
 /**
  * Resume scroll vs. tail auto-follow, driven through the REAL auto-scroll hook
  * (unlike `session-message-list.mounted.test.tsx`, which mocks it).
@@ -122,6 +123,42 @@ function mountListKeep(overrides: Partial<ListProps>): TestRenderer.ReactTestRen
     throw new Error('renderer was not created');
   }
   return mounted;
+}
+
+function updateList(mounted: TestRenderer.ReactTestRenderer, overrides: Partial<ListProps>): void {
+  act(() => {
+    mounted.update(
+      createElement(SessionMessageList<SessionTranscriptItem>, {
+        ...baseProps,
+        ...overrides,
+        items: overrides.items ?? [],
+      })
+    );
+  });
+}
+
+/** The native drag callbacks FlashList raises, so a test can act as the user. */
+function beginUserDrag(): void {
+  (flashListProps?.onScrollBeginDrag as ((event: unknown) => void) | undefined)?.({
+    nativeEvent: {},
+  });
+}
+
+function endUserDrag(): void {
+  (flashListProps?.onScrollEndDrag as ((event: unknown) => void) | undefined)?.({
+    nativeEvent: {
+      contentOffset: { x: 0, y: 0 },
+      contentSize: { height: 900 },
+      layoutMeasurement: { height: 300 },
+    },
+  });
+}
+
+function emitContentSizeChange(height: number): void {
+  (flashListProps?.onContentSizeChange as ((width: number, height: number) => void) | undefined)?.(
+    1000,
+    height
+  );
 }
 
 describe('SessionMessageList resume anchor vs tail auto-follow', () => {
@@ -376,5 +413,101 @@ describe('SessionMessageList resume anchor vs tail auto-follow', () => {
     // The row is not loaded yet: the page has to arrive first, and the resume
     // scroll runs on the items that land.
     expect(flashListProps?.initialScrollIndex).toBeUndefined();
+  });
+
+  it('does not scroll when the anchor arrives while the user is dragging', () => {
+    vi.useFakeTimers();
+
+    const mounted = mountListKeep({ items: [resumeItem('msg-1'), resumeItem('msg-2')] });
+    expect(scrollCalls).toEqual(['end']);
+    scrollCalls.length = 0;
+
+    // The user is mid-drag when the anchor's older page lands. The immediate
+    // warm scroll must honour the same guard its retries do, or the list is
+    // yanked out of the user's hands.
+    act(() => {
+      beginUserDrag();
+    });
+    updateList(mounted, {
+      items: [resumeItem('msg-1'), resumeItem('msg-2'), resumeItem('msg-3')],
+      resumeAt: 'msg-3',
+    });
+    expect(scrollCalls).toEqual([]);
+
+    // The takeover cancels the retry chain too: nothing pulls the list back
+    // after the drag ends.
+    act(() => {
+      endUserDrag();
+      vi.advanceTimersByTime(2000);
+    });
+    expect(scrollCalls).toEqual([]);
+  });
+
+  it('does not scroll when the anchor arrives after the user has grabbed the transcript', () => {
+    vi.useFakeTimers();
+
+    const mounted = mountListKeep({ items: [resumeItem('msg-1'), resumeItem('msg-2')] });
+    expect(scrollCalls).toEqual(['end']);
+    scrollCalls.length = 0;
+
+    act(() => {
+      beginUserDrag();
+      endUserDrag();
+    });
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+
+    // The route updates `at` on the already-mounted screen: the sticky takeover
+    // outranks the resume.
+    updateList(mounted, {
+      items: [resumeItem('msg-1'), resumeItem('msg-2'), resumeItem('msg-3')],
+      resumeAt: 'msg-3',
+    });
+    expect(scrollCalls).toEqual([]);
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(scrollCalls).toEqual([]);
+  });
+
+  it('keeps the user takeover when the follow policy flips mid-session', () => {
+    vi.useFakeTimers();
+
+    const onLoad = vi.fn<() => void>();
+    const mounted = mountListKeep({
+      items: [resumeItem('msg-new')],
+      resumeAt: 'msg-older',
+      hasOlderMessages: true,
+      onLoadOlderMessages: onLoad,
+    });
+    expect(onLoad).toHaveBeenCalledTimes(1);
+    scrollCalls.length = 0;
+
+    // The user takes over while the anchor's older page is in flight.
+    act(() => {
+      beginUserDrag();
+      endUserDrag();
+    });
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+
+    // The older pages run out without the anchor, so `followTailAtMount` flips
+    // to true mid-session. That must not clear the takeover flag nor re-arm the
+    // tail follow: the user's position is theirs.
+    updateList(mounted, {
+      items: [resumeItem('msg-new')],
+      resumeAt: 'msg-older',
+      hasOlderMessages: false,
+      onLoadOlderMessages: onLoad,
+    });
+
+    // A streamed content-size growth must not pull the list back to the tail.
+    emitContentSizeChange(3100);
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(scrollCalls).toEqual([]);
   });
 });

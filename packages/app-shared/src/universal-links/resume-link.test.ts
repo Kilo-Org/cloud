@@ -130,6 +130,19 @@ describe('readSessionResume', () => {
     });
   });
 
+  it('does not read a query that sits inside a fragment', () => {
+    // The fragment starts before the `?`, so everything after it is fragment
+    // text: the session still opens, but no anchor is adopted from it.
+    expect(readSessionResume(`${WEB}/cloud/sessions/ses_1#section?at=msg_42`)).toEqual({
+      sessionId: 'ses_1',
+      anchorMessageId: null,
+    });
+    expect(readSessionResume('kiloapp:///cloud/sessions/ses_1#section?at=msg_42')).toEqual({
+      sessionId: 'ses_1',
+      anchorMessageId: null,
+    });
+  });
+
   it('never throws on garbage', () => {
     const garbage = [
       'not a url',

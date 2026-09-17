@@ -165,7 +165,18 @@ export function useSessionListAutoScroll<ItemT>({
     }, 80);
   }, [clearAutoScrollRetryTimeout, scrollToLatestMessage]);
 
+  // A new session resets the follow policy and the sticky takeover flag. A
+  // policy that flips on its own mid-session — a `?at=` resume whose anchor
+  // never arrived, or whose older pages ran out — must not undo a takeover:
+  // once the user has grabbed the transcript the follow stays off and the
+  // resume retries stay cancelled, whatever the policy now says.
+  const resetKeyRef = useRef(resetKey);
   useEffect(() => {
+    const sessionChanged = resetKeyRef.current !== resetKey;
+    resetKeyRef.current = resetKey;
+    if (!sessionChanged && userInteractedRef.current) {
+      return;
+    }
     const initial = getInitialSessionListAutoScrollVisibility({ followTail: initialAutoScroll });
     shouldAutoScrollRef.current = initial.shouldAutoScroll;
     lastContentHeightRef.current = 0;

@@ -55,6 +55,28 @@ export function sessionResumeRefusal(code: string | null | undefined): SessionRe
 }
 
 /**
+ * The `cliSessionsV2.get` error fields this decision reads. `code` is part of
+ * the shape so a caller can pass the error data as-is.
+ */
+type SessionResumeErrorLike =
+  | {
+      readonly data?: { readonly authRequired?: boolean; readonly code?: string } | null;
+    }
+  | null
+  | undefined;
+
+/**
+ * Whether the lookup failed because the signed-in session expired rather than
+ * because the account may not open this session. Both arrive as `UNAUTHORIZED`;
+ * only the context-level auth failure carries `authRequired`. That failure is
+ * recoverable — the gate sends the reader through sign-in and back to the same
+ * link — so it must not render as a permanent access denial.
+ */
+export function sessionResumeNeedsSignIn(error: SessionResumeErrorLike): boolean {
+  return error?.data?.authRequired === true;
+}
+
+/**
  * Chat URL that opens the session, preserving the recorded anchor when present.
  * Organization sessions land on their organization chat page.
  */

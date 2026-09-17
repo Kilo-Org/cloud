@@ -9,7 +9,9 @@ import { Button } from '@/components/ui/button';
 import {
   SESSION_RESUME_REFUSAL_HREF,
   sessionResumeHref,
+  sessionResumeNeedsSignIn,
   sessionResumeRefusal,
+  sessionResumeSignInPath,
   type SessionResumeRefusal,
 } from '@/lib/cloud-agent/session-resume-target';
 
@@ -32,12 +34,21 @@ export function SessionResumeGate({ sessionId, anchorMessageId }: SessionResumeG
   const targetHref = sessionQuery.data
     ? sessionResumeHref(sessionQuery.data, anchorMessageId)
     : null;
+  // An expired sign-in fails the context auth, not the session lookup. That is
+  // recoverable through sign-in, so it must not render as a permanent denial.
+  const needsSignIn = sessionResumeNeedsSignIn(sessionQuery.error);
 
   useEffect(() => {
     if (targetHref) router.replace(targetHref);
   }, [router, targetHref]);
 
-  if (targetHref || sessionQuery.isLoading) {
+  useEffect(() => {
+    if (needsSignIn) {
+      router.replace(sessionResumeSignInPath(sessionId, anchorMessageId));
+    }
+  }, [anchorMessageId, needsSignIn, router, sessionId]);
+
+  if (targetHref || needsSignIn || sessionQuery.isLoading) {
     return <ResumePlaceholder />;
   }
 

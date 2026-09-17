@@ -2,7 +2,12 @@ import type { PreparationAttempt, SessionCommit } from '@kilocode/cloud-agent-sd
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { StoredMessage } from './types';
 import { groupConversationMessages, commitsByMessageAnchor } from './message-presentation';
-import { planResumeAttempt, resumeAnchor, resumeAnchorForTranscript } from './resume-anchor';
+import {
+  planResumeAttempt,
+  resumeAnchor,
+  resumeAnchorForTranscript,
+  sendTakesOverResume,
+} from './resume-anchor';
 
 describe('resumeAnchor', () => {
   it('resolves the group that starts with the anchor', () => {
@@ -177,5 +182,41 @@ describe('planResumeAttempt', () => {
 
   it('loads one older page when the anchor may still be in it', () => {
     expect(planResumeAttempt(base)).toBe('load-older');
+  });
+});
+
+describe('sendTakesOverResume', () => {
+  const atSend = { key: 'ses-1\u0000m1', attempts: 0, done: false };
+
+  it('takes over the resume that was live when the send started', () => {
+    expect(sendTakesOverResume(atSend, atSend)).toBe(true);
+  });
+
+  it('takes over a resume that had already landed its anchor at send time', () => {
+    // The attempt is the same object the send started under, so the send owns
+    // the output it produces — a completed resume must not block a later send.
+    const landed = { key: 'ses-1\u0000m1', attempts: 1, done: true };
+    expect(sendTakesOverResume(landed, landed)).toBe(true);
+  });
+
+  it('leaves a newer ?at= anchor that became live while the send was in flight', () => {
+    // The send resolves after a different anchor landed. Re-arming tail follow
+    // would scroll to the bottom and abandon the anchor the reader just opened.
+    const newer = { key: 'ses-1\u0000m2', attempts: 0, done: false };
+    expect(sendTakesOverResume(atSend, newer)).toBe(false);
+  });
+
+  it('leaves a newer anchor that had already completed', () => {
+    const newer = { key: 'ses-1\u0000m2', attempts: 1, done: true };
+    expect(sendTakesOverResume(atSend, newer)).toBe(false);
+  });
+
+  it('leaves a newer anchor that arrived when no resume was live at send time', () => {
+    const newer = { key: 'ses-1\u0000m2', attempts: 0, done: false };
+    expect(sendTakesOverResume(null, newer)).toBe(false);
+  });
+
+  it('follows the tail for an ordinary send with no resume at all', () => {
+    expect(sendTakesOverResume(null, null)).toBe(true);
   });
 });

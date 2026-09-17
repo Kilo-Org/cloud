@@ -140,3 +140,24 @@ export function planResumeAttempt({
   }
   return 'load-older';
 }
+
+/**
+ * Whether the send that just got accepted owns the transcript position for its
+ * output. It takes the position over from the resume that was live when it was
+ * sent: that attempt ends and follow returns to the tail, so the reader lands
+ * on the new output.
+ *
+ * A `?at=` link that arrived while the send was in flight is a *different*
+ * attempt and owns the position now — re-arming follow here would scroll to the
+ * bottom and abandon the anchor the reader just opened, and its resume effect
+ * would then fight the send's scroll.
+ *
+ * Identity, not the `done` flag, is the test: a resume that had already landed
+ * its anchor when the send started is still the attempt the send takes over
+ * from, while a newer anchor is a different attempt even before it has done
+ * anything. `null` on both sides — no resume at send time and none since — is
+ * the ordinary send that follows the tail.
+ */
+export function sendTakesOverResume<T>(resumeAtSend: T | null, resumeNow: T | null): boolean {
+  return resumeNow === resumeAtSend;
+}

@@ -39,7 +39,7 @@ import {
   isRenderableSessionCost,
 } from './session-cost-breakdown';
 import { ConversationMessages } from './ConversationMessages';
-import { planResumeAttempt, resumeAnchorForTranscript } from './resume-anchor';
+import { planResumeAttempt, resumeAnchorForTranscript, sendTakesOverResume } from './resume-anchor';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
@@ -697,15 +697,17 @@ export default function CloudChatPage({
       if (!accepted) {
         return false;
       }
-      // Take the position over for the output this send produces. Mark the
-      // attempt that was live at send time — a `?at=` link that arrived while
-      // the send was in flight owns the position now.
-      if (resumeStateAtSend && resumeStateRef.current === resumeStateAtSend) {
-        resumeStateAtSend.done = true;
+      // Take the position over for the output this send produces, but only
+      // while the attempt it started under is still the live one: a `?at=` link
+      // that arrived while the send was in flight owns the position now, and
+      // re-arming follow would abandon its anchor.
+      const resumeNow = resumeStateRef.current;
+      if (sendTakesOverResume(resumeStateAtSend, resumeNow)) {
+        if (resumeNow) resumeNow.done = true;
+        shouldAutoScrollRef.current = true;
+        setChatUI({ shouldAutoScroll: true });
+        scheduleScrollToBottom();
       }
-      shouldAutoScrollRef.current = true;
-      setChatUI({ shouldAutoScroll: true });
-      scheduleScrollToBottom();
       return true;
     },
     [manager, scheduleScrollToBottom, sessionConfig, setChatUI, supportsAttachments]
@@ -728,12 +730,15 @@ export default function CloudChatPage({
       if (!accepted) {
         return false;
       }
-      if (resumeStateAtSend && resumeStateRef.current === resumeStateAtSend) {
-        resumeStateAtSend.done = true;
+      // Same take-over rule as a message send: the command owns the position
+      // only while the attempt it started under is still the live one.
+      const resumeNow = resumeStateRef.current;
+      if (sendTakesOverResume(resumeStateAtSend, resumeNow)) {
+        if (resumeNow) resumeNow.done = true;
+        shouldAutoScrollRef.current = true;
+        setChatUI({ shouldAutoScroll: true });
+        scheduleScrollToBottom();
       }
-      shouldAutoScrollRef.current = true;
-      setChatUI({ shouldAutoScroll: true });
-      scheduleScrollToBottom();
       return true;
     },
     [manager, scheduleScrollToBottom, setChatUI, supportsAttachments]

@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "રિમોટ સ્લેશ કમાન્ડ માટે Kilo CLIનું નવું સંસ્કરણ જરૂરી છે. Kilo CLI અપડેટ કરો અને ફરી કનેક્ટ કરો."
     },
     "sessionConnection": {
+      "label": "કનેક્શન",
       "connecting": "કનેક્ટ થઈ રહ્યું છે…",
       "reconnecting": "ફરી કનેક્ટ થઈ રહ્યું છે…",
       "connectionLost": "કનેક્શન તૂટી ગયું",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "ધ્યેય દૂર કરવું?",
       "removeConfirmMessage": "CLI આ સત્રનું ધ્યેય સાફ કરે છે.",
       "updateFailed": "ધ્યેય અપડેટ કરી શકાયું નહીં.",
-      "sectionAccessibility": "{{status}}. ધ્યેય: {{text}}"
+      "sectionAccessibility": "{{status}}. ધ્યેય: {{text}}",
+      "collapse": "ધ્યેય છુપાવો",
+      "expand": "ધ્યેય બતાવો"
     },
     "newSession": {
       "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું",

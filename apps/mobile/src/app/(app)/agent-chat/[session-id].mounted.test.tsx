@@ -248,10 +248,6 @@ vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionComposerSkeleton: 'SessionComposerSkeleton',
 }));
 
-vi.mock('@/components/agents/session-connection-indicator', () => ({
-  SessionConnectionIndicator: 'SessionConnectionIndicator',
-}));
-
 vi.mock('@/components/agents/session-context-metrics', () => ({
   SessionContextMetrics: 'SessionContextMetrics',
 }));

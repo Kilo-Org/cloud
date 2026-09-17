@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "दूरस्थ स्लॅश कमांडसाठी Kilo CLI ची नवीन आवृत्ती आवश्यक आहे. Kilo CLI अद्ययावत करा आणि पुन्हा कनेक्ट करा."
     },
     "sessionConnection": {
+      "label": "कनेक्शन",
       "connecting": "कनेक्ट होत आहे…",
       "reconnecting": "पुन्हा कनेक्ट होत आहे…",
       "connectionLost": "कनेक्शन तुटले",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "ध्येय काढायचे?",
       "removeConfirmMessage": "CLI या सत्राचे ध्येय साफ करते.",
       "updateFailed": "ध्येय अपडेट करता आले नाही.",
-      "sectionAccessibility": "{{status}}. ध्येय: {{text}}"
+      "sectionAccessibility": "{{status}}. ध्येय: {{text}}",
+      "collapse": "ध्येय लपवा",
+      "expand": "ध्येय दाखवा"
     },
     "newSession": {
       "recentlyUsed": "अलीकडे वापरलेले",

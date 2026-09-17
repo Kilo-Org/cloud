@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Pou itilize kòmandman ki kòmanse ak / adistans, ou bezwen yon vèsyon Kilo CLI ki pi resan. Mete Kilo CLI ajou epi rekonekte."
     },
     "sessionConnection": {
+      "label": "Koneksyon",
       "connecting": "Ap konekte…",
       "reconnecting": "Ap rekonekte…",
       "connectionLost": "Koneksyon an koupe",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Retire objektif la?",
       "removeConfirmMessage": "CLI a efase objektif sesyon sa a.",
       "updateFailed": "Pa t kapab mete objektif la ajou.",
-      "sectionAccessibility": "{{status}}. Objektif: {{text}}"
+      "sectionAccessibility": "{{status}}. Objektif: {{text}}",
+      "collapse": "Kache objektif la",
+      "expand": "Montre objektif la"
     },
     "newSession": {
       "recentlyUsed": "Itilize dènyèman",

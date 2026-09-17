@@ -174,8 +174,9 @@ function toNotificationRow(
 /**
  * Diff the rows a notification currently stands for (`previous`) against the
  * cached rows after a change (`next`): publish the raises that are not yet
- * notified, dismiss the identifiers whose raise cleared, disappeared, or moved
- * to another organization. A sign-out dismisses everything and publishes
+ * notified — or whose action-relevant shape (kind, associated PR) changed while
+ * still waiting — dismiss the identifiers whose raise cleared, disappeared, or
+ * moved to another organization. A sign-out dismisses everything and publishes
  * nothing.
  *
  * A raise that is still waiting is never dismissed merely because the app is
@@ -214,11 +215,23 @@ export function planNeedsInputNotifications({
   const publish: NeedsInputNotificationRow[] = [];
   if (!signedOut) {
     for (const [sessionId, { row, kind }] of attention) {
-      if (
-        !alreadyNotified.has(sessionId) &&
-        shouldPublishForSession({ appState, pathname, sessionId })
-      ) {
-        publish.push(toNotificationRow(row, kind));
+      if (shouldPublishForSession({ appState, pathname, sessionId })) {
+        const notifiedRow = alreadyNotified.has(sessionId)
+          ? previous.find(previousRow => previousRow.sessionId === sessionId)
+          : undefined;
+        // An already-notified raise is still waiting under its standing
+        // notification. Re-publish in place only when the action-relevant
+        // shape changed: the kind moved, or the associated PR appeared or
+        // changed. A raise posted before the PR link reached the cache would
+        // otherwise never offer Open PR, and a kind flip would keep offering
+        // the wrong controls.
+        if (
+          notifiedRow === undefined ||
+          notifiedRow.kind !== kind ||
+          (notifiedRow.prUrl ?? null) !== (row.associatedPr?.url ?? null)
+        ) {
+          publish.push(toNotificationRow(row, kind));
+        }
       }
     }
   }

@@ -3,6 +3,11 @@ import { atom, createStore, type PrimitiveAtom } from 'jotai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  type ActiveSessionType,
+  type AgentStatus,
+  type SessionActivity,
+} from '@kilocode/cloud-agent-sdk';
+import {
   type NeedsInputSessionManager,
   runNeedsInputInteraction,
 } from '@/lib/notification-action-interaction';
@@ -77,6 +82,13 @@ type RaiseSeeds = {
   store: ReturnType<typeof createStore>;
   activePermission: PrimitiveAtom<PendingRequest | null>;
   activeQuestion: PrimitiveAtom<PendingRequest | null>;
+  /** Transport activity; `connecting` until the snapshot lands. */
+  activity: PrimitiveAtom<SessionActivity>;
+  /** Resolved transport kind; `remote` stands for an opened live socket. */
+  sessionType: PrimitiveAtom<ActiveSessionType | null>;
+  isReadOnly: PrimitiveAtom<boolean>;
+  /** Agent lifecycle status; `error` stands for a failed open. */
+  agentStatus: PrimitiveAtom<AgentStatus>;
 };
 
 type FakeManager = RaiseSeeds & {
@@ -102,7 +114,23 @@ function createFakeManager(options?: {
   const store = options?.store ?? createStore();
   const activePermission = atom<PendingRequest | null>(null);
   const activeQuestion = atom<PendingRequest | null>(null);
-  const seeds: RaiseSeeds = { store, activePermission, activeQuestion };
+  // `connecting` is the app-closed cold start the module must treat as
+  // unknown; a test that has a snapshot lands it with `type: 'idle'`. The
+  // other three atoms default to the live remote session the snapshot belongs
+  // to; a test drives the read-only / failed-open cases by overriding them.
+  const activity = atom<SessionActivity>({ type: 'connecting' });
+  const sessionType = atom<ActiveSessionType | null>('remote');
+  const isReadOnly = atom(false);
+  const agentStatus = atom<AgentStatus>({ type: 'idle' });
+  const seeds: RaiseSeeds = {
+    store,
+    activePermission,
+    activeQuestion,
+    activity,
+    sessionType,
+    isReadOnly,
+    agentStatus,
+  };
   const switchSession = vi.fn(async () => {
     options?.onSwitch?.(seeds);
   });
@@ -114,7 +142,7 @@ function createFakeManager(options?: {
     respondToPermission,
     answerQuestion,
     destroy,
-    atoms: { activePermission, activeQuestion },
+    atoms: { activePermission, activeQuestion, activity, sessionType, isReadOnly, agentStatus },
   };
   return { ...seeds, manager, switchSession, respondToPermission, answerQuestion, destroy };
 }
@@ -154,6 +182,8 @@ function fakeManagerDeps(
     sleep: clock.sleep,
     waitBudgetMs: WAIT_BUDGET_MS,
     pollIntervalMs: POLL_INTERVAL_MS,
+    // One settle poll keeps the settle loop's shape on the fake clock.
+    missingRaiseSettleMs: POLL_INTERVAL_MS,
   };
 }
 
@@ -488,14 +518,265 @@ describe('runNeedsInputInteraction', () => {
       expect(createManager).not.toHaveBeenCalled();
     });
 
+    it('returns unavailable when the connected snapshot reports no raise and the status moved on', async () => {
+      // A raise answered elsewhere: the transport connected, the snapshot
+      // cleared the pending sets and replayed whatever was still pending, and
+      // the session's status has already left needs-input. An empty atom with
+      // a moved-on status is authoritative — another tap can never succeed,
+      // so the actions must go instead of looping the retry body.
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activity, { type: 'idle' });
+        },
+      });
+      getSessionQuery.mockResolvedValue({ organization_id: 'org-1', status: 'idle' });
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('unavailable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(fake.answerQuestion).not.toHaveBeenCalled();
+      // The raise is over, so the Agents row and badge stop offering it.
+      expect(ack).toHaveBeenCalledWith(SESSION_ID);
+      expect(fake.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('approves a still-raised raise the live snapshot proves has no ask, and acks attention', async () => {
+      // A status-only raise: the notification was posted from the session's
+      // needs-input status and no agent ever asked (or the ask is already
+      // gone), but nobody answered the raise either. The proven-empty atoms
+      // plus the still-raised status mean the user's approve is what ends the
+      // raise — the outcome is the approved result, not a gone body and not a
+      // retryable loop.
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activity, { type: 'idle' });
+        },
+      });
+      getSessionQuery
+        .mockResolvedValueOnce({ organization_id: 'org-1', status: 'permission' })
+        .mockResolvedValue({ organization_id: 'org-1', status: 'permission' });
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('ok');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(fake.answerQuestion).not.toHaveBeenCalled();
+      expect(ack).toHaveBeenCalledWith(SESSION_ID);
+      expect(fake.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps a reply retryable when the raise is still raised but holds no question', async () => {
+      // A reply ends nothing it did not answer: with the status still raised
+      // the raise may be a permission the Approve control can still answer, so
+      // the notification keeps its actions (wrong-kind tap contract).
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activity, { type: 'idle' });
+        },
+      });
+      getSessionQuery.mockResolvedValue({ organization_id: 'org-1', status: 'permission' });
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'reply',
+        text: 'answer',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('retryable');
+      expect(fake.answerQuestion).not.toHaveBeenCalled();
+      expect(ack).not.toHaveBeenCalled();
+      expect(fake.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns retryable when the outcome-time status read fails, so nothing terminal is announced', async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activity, { type: 'idle' });
+        },
+      });
+      getSessionQuery
+        .mockResolvedValueOnce({ organization_id: 'org-1' })
+        .mockRejectedValue(
+          Object.assign(new Error('network down'), { data: { code: 'INTERNAL_SERVER_ERROR' } })
+        );
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('retryable');
+      expect(ack).not.toHaveBeenCalled();
+      expect(fake.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns retryable when the session resolved read-only, so the empty atoms prove nothing', async () => {
+      // A historical (read-only) resolution sets activity to idle without ever
+      // opening a live socket: the absence of a raise is silence, not proof the
+      // raise is gone, so the actions must survive (review finding: a read-only
+      // resolution must never drop the Approve/Reply controls).
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activity, { type: 'idle' });
+          seeds.store.set(seeds.sessionType, 'read-only');
+          seeds.store.set(seeds.isReadOnly, true);
+        },
+      });
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('retryable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(ack).not.toHaveBeenCalled();
+    });
+
+    it('returns retryable when the live transport failed before its snapshot', async () => {
+      // A resolved live session whose transport errors lands activity idle too,
+      // so the status is what separates it from a landed snapshot.
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activity, { type: 'idle' });
+          seeds.store.set(seeds.agentStatus, { type: 'error', message: 'transport failed' });
+        },
+      });
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('retryable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(ack).not.toHaveBeenCalled();
+    });
+
+    it('returns retryable when the resolve failed and left no transport kind', async () => {
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activity, { type: 'idle' });
+          seeds.store.set(seeds.sessionType, null);
+        },
+      });
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('retryable');
+      expect(fake.respondToPermission).not.toHaveBeenCalled();
+      expect(ack).not.toHaveBeenCalled();
+    });
+
+    it('returns retryable when a live transport opens but its socket never delivers a raise', async () => {
+      // `connecting` is the never-opened socket: the budget expiring here is
+      // exactly the cold headless start the raise can still be live behind.
+      const fake = createFakeManager();
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        deps: fakeManagerDeps(fake, { ack }),
+      });
+
+      expect(outcome).toBe('retryable');
+      expect(ack).not.toHaveBeenCalled();
+    });
+
+    it('acks a session the user can no longer see', async () => {
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        deps: {
+          getSession: async () => {
+            throw trpcError('NOT_FOUND');
+          },
+          ack,
+        },
+      });
+
+      expect(outcome).toBe('unavailable');
+      expect(ack).toHaveBeenCalledWith(SESSION_ID);
+    });
+
+    it('answers a raise that lands with the snapshot replay just after the budget', async () => {
+      // The pending-ask replay follows the snapshot as its own events, so a
+      // connected snapshot with nothing pending gets one more poll interval
+      // before the absence is treated as terminal.
+      const fake = createFakeManager({
+        onSwitch: seeds => {
+          seeds.store.set(seeds.activity, { type: 'idle' });
+        },
+      });
+      const clock = createFakeClock();
+      let seeded = false;
+      const ack = vi.fn<(kiloSessionId: string) => void>();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'approve',
+        deps: {
+          createManager: () => fake.manager,
+          store: fake.store,
+          ack,
+          now: clock.now,
+          sleep: async ms => {
+            clock.advance(ms);
+            if (!seeded && clock.now() > WAIT_BUDGET_MS) {
+              seeded = true;
+              fake.store.set(fake.activePermission, { requestId: 'perm-late' });
+            }
+          },
+          waitBudgetMs: WAIT_BUDGET_MS,
+          pollIntervalMs: POLL_INTERVAL_MS,
+        },
+      });
+
+      expect(outcome).toBe('ok');
+      expect(fake.respondToPermission).toHaveBeenCalledWith('perm-late', 'once');
+      expect(ack).toHaveBeenCalledWith(SESSION_ID);
+    });
+
     it('returns retryable when the raise does not match the action, so the raise keeps its actions', async () => {
+      // The connected snapshot holds the other kind: the wrong-kind tap must
+      // not end a live raise the other action can still answer (c2), so this
+      // stays retryable even though the transport reported its snapshot.
       const approveFake = createFakeManager({
         onSwitch: seeds => {
+          seeds.store.set(seeds.activity, { type: 'idle' });
           seeds.store.set(seeds.activeQuestion, { requestId: 'question-1' });
         },
       });
       const replyFake = createFakeManager({
         onSwitch: seeds => {
+          seeds.store.set(seeds.activity, { type: 'idle' });
           seeds.store.set(seeds.activePermission, { requestId: 'perm-1' });
         },
       });

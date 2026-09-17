@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite pins the plan's publish/dismiss decisions */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeCached } from '@/lib/active-sessions-live-sync.test-helpers';
@@ -149,6 +150,76 @@ describe('planNeedsInputNotifications', () => {
       previous: [notifiedRow()],
       next: [makeCached({ id: 'ses_1', status: 'question' })],
       pathname: AWAY,
+      appState: ACTIVE,
+    });
+    expect(plan).toEqual({ publish: [], dismiss: [] });
+  });
+
+  it('re-publishes a still-waiting raise whose associated PR appeared', () => {
+    // A raise posted before the PR link reached the cache carries no Open PR
+    // control; once the enriched row lands while the raise still waits, the
+    // notification must offer the action the session now supports. The same
+    // identifier replaces the standing notification in place.
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow()],
+      next: [
+        makeCached({
+          id: 'ses_1',
+          title: 'Fix the bug',
+          status: 'question',
+          associatedPr: {
+            url: 'https://github.com/org/repo/pull/7',
+            number: 7,
+            state: 'open',
+            title: null,
+            headSha: null,
+            lastSyncedAt: '2026-01-01T00:00:00.000Z',
+            reviewDecision: null,
+            reviewDecisionPending: false,
+            platform: 'github',
+          },
+        }),
+      ],
+      pathname: AWAY,
+      appState: ACTIVE,
+    });
+    expect(plan.publish).toEqual([notifiedRow({ prUrl: 'https://github.com/org/repo/pull/7' })]);
+    expect(plan.dismiss).toEqual([]);
+  });
+
+  it('re-publishes a still-waiting raise whose kind moved', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow({ kind: 'question' })],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'permission' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+    });
+    expect(plan.publish).toEqual([notifiedRow({ kind: 'permission' })]);
+    expect(plan.dismiss).toEqual([]);
+  });
+
+  it('withholds the re-publish while that session chat is open', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow()],
+      next: [
+        makeCached({
+          id: 'ses_1',
+          title: 'Fix the bug',
+          status: 'question',
+          associatedPr: {
+            url: 'https://github.com/org/repo/pull/7',
+            number: 7,
+            state: 'open',
+            title: null,
+            headSha: null,
+            lastSyncedAt: '2026-01-01T00:00:00.000Z',
+            reviewDecision: null,
+            reviewDecisionPending: false,
+            platform: 'github',
+          },
+        }),
+      ],
+      pathname: '/agent-chat/ses_1',
       appState: ACTIVE,
     });
     expect(plan).toEqual({ publish: [], dismiss: [] });

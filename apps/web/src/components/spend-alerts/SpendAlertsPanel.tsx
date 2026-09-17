@@ -41,10 +41,17 @@ import {
 } from './spendAlertsPanelState';
 
 /**
- * Every state renders into this slot. The skeleton mirrors the ready panel's
- * rows, so the settings arriving (or failing) never moves the dashboard below.
+ * Every state renders into this slot, and every state gets at least this much
+ * room, so the settings arriving (or failing) never moves the dashboard below.
+ *
+ * 47rem is the tallest the ready form gets on a dashboard-width card: the
+ * content column narrows to ~24rem just above the `lg` breakpoint, where the
+ * rule descriptions wrap and the form reaches 740px (measured; a wide card is
+ * 719px). The old 45rem floor was 20px short there, so swapping the skeleton
+ * for the form pushed the usage summary and Trends down by exactly that. The
+ * skeleton's own blocks are 717px in every state and so stay inside the slot.
  */
-const PANEL_SLOT_CLASS = 'min-h-[45rem]';
+const PANEL_SLOT_CLASS = 'min-h-[47rem]';
 
 export type SpendAlertsPanelProps = {
   /** Organization scope when set; personal scope when omitted. */

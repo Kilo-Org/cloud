@@ -671,6 +671,11 @@ describe('artifacts File Provider browse (iOS)', () => {
       ['sess_01HZ', '..'],
       ['sess_01HZ', ''],
       ['', 'part_a1'],
+      // A whole-file id of `.` is refused by the `segment != "."` clause alone,
+      // and a NUL byte is refused by the `!segment.contains("\0")` clause
+      // alone: nothing else above exercises either one.
+      ['sess_01HZ', '.'],
+      ['sess_01HZ', 'part\u0000'],
     ];
     for (const [sessionId, fileId] of hostileIds) {
       expect(extensionFileURL(containerRoot, sessionId, fileId)).toBeNull();

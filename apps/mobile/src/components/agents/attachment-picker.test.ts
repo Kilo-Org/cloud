@@ -216,6 +216,14 @@ describe('agent attachment picker', () => {
     );
   });
 
+  it('resolves empty when the library picker invocation throws', async () => {
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockImplementationOnce(() => {
+      throw new Error('native launch threw');
+    });
+
+    expect(await pickWithSheetSelection(1)).toEqual([]);
+  });
+
   it('launches the picker when the launch context write fails', async () => {
     vi.mocked(SecureStore.setItemAsync).mockRejectedValueOnce(new Error('store write failed'));
     const result: Awaited<ReturnType<typeof ImagePicker.launchImageLibraryAsync>> = {
@@ -375,6 +383,37 @@ describe('agent picture picker', () => {
       userId: 'user-1',
       surface: 'agent-picture',
       sessionId: null,
+    });
+  });
+
+  // A rejected permission request, or a synchronous throw while building the
+  // native launch promise, must settle the public helper instead of leaving it
+  // pending forever with the person stuck on Home.
+  it('resolves empty when the camera permission request rejects', async () => {
+    vi.mocked(ImagePicker.requestCameraPermissionsAsync).mockRejectedValueOnce(
+      new Error('permission module unavailable')
+    );
+
+    expect(await pickPictureWithSheetSelection(0)).toEqual([]);
+  });
+
+  it('resolves empty and reports when the camera launch throws synchronously', async () => {
+    vi.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValueOnce(
+      grantedCameraPermission()
+    );
+    vi.mocked(ImagePicker.launchCameraAsync).mockImplementationOnce(() => {
+      throw new Error('native launch threw');
+    });
+    vi.mocked(Sentry.captureException).mockClear();
+
+    expect(await pickPictureWithSheetSelection(0)).toEqual([]);
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'agent-attachments',
+        'error.operation': 'pick-attachment-source',
+      },
+      extra: { source: 'camera', surface: 'agent-picture', hasSession: false },
     });
   });
 

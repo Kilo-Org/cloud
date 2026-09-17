@@ -222,7 +222,24 @@ function showAttachmentSourceSheet(
           });
         }
       }
-      settle(await pickFromSource(source, libraryMultipleSelection));
+      try {
+        settle(await pickFromSource(source, libraryMultipleSelection));
+      } catch (error) {
+        // A rejected `requestCameraPermissionsAsync` (or any other failure
+        // inside the source helper, e.g. a synchronous throw while building
+        // the native launch promise) must still settle the public helper.
+        // `handle` runs detached, so an uncaught rejection would hang the
+        // caller's `await` forever; no candidates means "nothing picked", so
+        // the caller stays where it is and can tap again.
+        Sentry.captureException(error, {
+          tags: {
+            'error.subsystem': 'agent-attachments',
+            'error.operation': 'pick-attachment-source',
+          },
+          extra: { source, surface: context.surface, hasSession: context.sessionId !== null },
+        });
+        settle([]);
+      }
     };
     const options = buildAttachmentSourceOptions(sources);
     showActionSheetWithOptions(

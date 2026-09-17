@@ -62,6 +62,13 @@ type UseSessionListResumeScrollParams<ItemT> = {
   isUserScrollingRef: RefObject<boolean>;
   /** Sticky per-session "the user has grabbed the list" flag from the auto-scroll hook. */
   userInteractedRef: RefObject<boolean>;
+  /**
+   * True while a send's take-over is the current claim on the position. A send
+   * ends a resume that is still paging for its anchor: the position now belongs
+   * to the send's output, so the resume must not keep pulling older pages under
+   * it.
+   */
+  sendTakeoverRef: RefObject<boolean>;
   suppressAutoFollow: (ms: number) => void;
   /**
    * Message id a `?at=` deep link wants the transcript to open on. When it is
@@ -88,6 +95,11 @@ type UseSessionListResumeScrollParams<ItemT> = {
  * mark the resume done, and drop the anchor's page when it arrives. The same
  * guard `onStartReached` uses makes a re-run while a load is in flight a
  * no-op; the plan runs again when the page lands.
+ *
+ * A send ends the plan wherever it is: the warm scroll and the retries drop on
+ * the sticky take-over flag, and the load-older branch ends the resume on the
+ * send's own flag (`sendTakeoverRef`) instead of pulling another page under the
+ * output the send owns.
  */
 export function useSessionListResumeScroll<ItemT>({
   sessionId,
@@ -100,6 +112,7 @@ export function useSessionListResumeScroll<ItemT>({
   listRef,
   isUserScrollingRef,
   userInteractedRef,
+  sendTakeoverRef,
   suppressAutoFollow,
   resumeAt,
 }: UseSessionListResumeScrollParams<ItemT>): void {
@@ -248,6 +261,14 @@ export function useSessionListResumeScroll<ItemT>({
       return;
     }
     if (plan.kind === 'load-older') {
+      // A send took the position over while the anchor's page was in flight:
+      // the resume ends here, exactly as the scroll and retry paths end it,
+      // instead of paging for a position the send's output now owns.
+      if (sendTakeoverRef.current) {
+        resume.done = true;
+        clearResumeRetries();
+        return;
+      }
       if (
         !shouldTriggerOlderMessagesLoad({
           hasOlderMessages,
@@ -280,6 +301,7 @@ export function useSessionListResumeScroll<ItemT>({
     listRef,
     isUserScrollingRef,
     userInteractedRef,
+    sendTakeoverRef,
     clearResumeRetries,
     scheduleResumeRetries,
     suppressAutoFollow,

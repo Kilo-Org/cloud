@@ -142,6 +142,7 @@ export function SessionMessageList<T>({
     suppressAutoFollow,
     isUserScrollingRef,
     userInteractedRef,
+    sendTakeoverRef,
     followTailFromSend,
     handleContentSizeChange,
     handleKeyboardShow,
@@ -155,6 +156,7 @@ export function SessionMessageList<T>({
     itemCount: items.length,
     resetKey: sessionId,
     initialAutoScroll: followTailAtMount,
+    resumeKey: resumeAnchor,
   });
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -198,6 +200,31 @@ export function SessionMessageList<T>({
   // nothing is wired: no viewability callback, no config.
   const anchorReport = useSessionListAnchorReport<T>({ sessionId, onAnchorChange });
 
+  // The host's send path takes the position over through the counter. A list
+  // that mounts following the tail adopts the mount value as already handled:
+  // an empty transcript receiving its first message follows the tail at mount,
+  // so replaying an earlier send's take-over would be redundant. A list that
+  // mounts NOT following the tail — a `?at=` resume still paging for its
+  // anchor — must honour a counter the host already bumped, or a send issued
+  // while the transcript was in the zero-item `older-loading` state (the list
+  // was not mounted for the change) is dropped and the resume parks on the
+  // recorded anchor with the sent message and its reply off-screen.
+  //
+  // Declared before the resume hook on purpose: effects run in declaration
+  // order, so the take-over is in place when the resume plans this render. A
+  // send must end the resume in the same commit it lands, not one render later.
+  const handledFollowTailNonceRef = useRef(followTailAtMount ? followTailNonce : 0);
+  useEffect(() => {
+    if (followTailNonce === undefined) {
+      return;
+    }
+    if (handledFollowTailNonceRef.current === followTailNonce) {
+      return;
+    }
+    handledFollowTailNonceRef.current = followTailNonce;
+    followTailFromSend();
+  }, [followTailNonce, followTailFromSend]);
+
   // Resume-position scroll for a `?at=` deep link — see
   // `use-session-list-resume-scroll` for the plan, the page budget, and the
   // device-proven retry schedule.
@@ -212,30 +239,10 @@ export function SessionMessageList<T>({
     listRef,
     isUserScrollingRef,
     userInteractedRef,
+    sendTakeoverRef,
     suppressAutoFollow,
     resumeAt,
   });
-
-  // The host's send path takes the position over through the counter. A list
-  // that mounts following the tail adopts the mount value as already handled:
-  // an empty transcript receiving its first message follows the tail at mount,
-  // so replaying an earlier send's take-over would be redundant. A list that
-  // mounts NOT following the tail — a `?at=` resume still paging for its
-  // anchor — must honour a counter the host already bumped, or a send issued
-  // while the transcript was in the zero-item `older-loading` state (the list
-  // was not mounted for the change) is dropped and the resume parks on the
-  // recorded anchor with the sent message and its reply off-screen.
-  const handledFollowTailNonceRef = useRef(followTailAtMount ? followTailNonce : 0);
-  useEffect(() => {
-    if (followTailNonce === undefined) {
-      return;
-    }
-    if (handledFollowTailNonceRef.current === followTailNonce) {
-      return;
-    }
-    handledFollowTailNonceRef.current = followTailNonce;
-    followTailFromSend();
-  }, [followTailNonce, followTailFromSend]);
 
   // Keep the newest message visible when the keyboard opens, but only while
   // the follow guard is true (the user is still at the bottom). On iOS,

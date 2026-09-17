@@ -97,7 +97,9 @@ export type ResumeAttemptStep = 'scroll' | 'load-older' | 'follow-tail' | 'wait'
  * An anchor that resolved inside the loaded window but drew no element cannot
  * be reached by an older page — an all-invisible assistant turn renders
  * nothing by design — and a failed older page ends the attempt too: the resume
- * is one-shot, so waiting on that failure would never complete or give up.
+ * is one-shot, so waiting on that failure would never complete or give up. A
+ * page still in flight (a retry of a failed one included) is not a failure and
+ * is waited for — see the check order below.
  */
 export function planResumeAttempt({
   anchorRendered,
@@ -125,11 +127,16 @@ export function planResumeAttempt({
   if (attempts >= maxOlderPages || !hasOlderMessages) {
     return 'follow-tail';
   }
-  if (hasOlderMessagesError) {
-    return 'follow-tail';
-  }
+  // The in-flight check wins over the error check: a retry (the header's Retry
+  // CTA) starts a page load without clearing the last error, so both are set
+  // for the whole retry. The page it is fetching may hold the anchor, and
+  // giving up here would strand the open at the bottom even though the retry
+  // lands the anchor.
   if (isLoadingOlderMessages) {
     return 'wait';
+  }
+  if (hasOlderMessagesError) {
+    return 'follow-tail';
   }
   return 'load-older';
 }

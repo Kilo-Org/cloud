@@ -806,14 +806,70 @@ describe('CloudChatPage terminal ownership across navigation', () => {
   it('hands a resolved but unrendered ?at= anchor back to the tail', () => {
     mockAtParam = 'msg_1';
     mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    // Older history exists, so the tail hand-off can only come from the anchor
+    // being resolved-but-unrendered. Without it the exhausted-history branch
+    // writes the same value and the test would not discriminate.
+    mockAtomValues.hasOlderMessages = true;
+    mockRequestOlderMessages.mockClear();
     mockSetAtom.mockClear();
 
     render();
 
     // The anchor is in the loaded window, but the group that holds it drew no
     // row. No older page can change that, so the open must land at the bottom
-    // and follow new output instead of staying paused with follow off.
+    // and follow new output instead of paging for an id it already has.
+    expect(mockRequestOlderMessages).not.toHaveBeenCalled();
     expect(chatUiWrites().at(-1)).toEqual({ shouldAutoScroll: true });
+  });
+
+  it('keeps waiting when a retried older page is in flight', () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    // A retry of a failed page leaves the error set while it loads (see the
+    // manager's `loadOlderMessages`), so both flags are true for the whole
+    // request.
+    mockAtomValues.isLoadingOlderMessages = true;
+    mockAtomValues.olderMessagesError = { kind: 'retryable' };
+    mockSetAtom.mockClear();
+
+    render();
+
+    // The page the resume is waiting for may hold the anchor: staying paused
+    // is the only answer that can still land it. Giving up here would open at
+    // the bottom even though the retry arrives with the anchor.
+    expect(chatUiWrites()).toContainEqual({ shouldAutoScroll: false });
+    expect(chatUiWrites()).not.toContainEqual({ shouldAutoScroll: true });
+  });
+
+  it('keeps a ?at= resume when the send is refused', async () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    mockRequestOlderMessages.mockClear();
+    mockManager.send.mockResolvedValueOnce(false);
+
+    render();
+    // The resume is still looking: it paused follow and asked for an older page.
+    expect(mockRequestOlderMessages).toHaveBeenCalledTimes(1);
+    mockSetAtom.mockClear();
+
+    await act(async () => {
+      await (mockChatInput?.onSend as ((prompt: string) => Promise<unknown>) | undefined)?.(
+        'hello'
+      );
+    });
+
+    // The refused send is not a position take-over: no follow write, so the
+    // reader stays where the resume left them.
+    expect(chatUiWrites()).toEqual([]);
+
+    // The transcript re-renders (the dropped optimistic row): the resume must
+    // still be pending and pause follow, exactly as it did before the send.
+    mockSetAtom.mockClear();
+    mockAtomValues.staticMessages = [anchorMessage('msg_1'), anchorMessage('msg_2')];
+    render();
+    expect(chatUiWrites()).toContainEqual({ shouldAutoScroll: false });
   });
 
   it('gives up a ?at= resume when an older page fails instead of waiting forever', () => {
@@ -830,7 +886,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     expect(chatUiWrites().at(-1)).toEqual({ shouldAutoScroll: true });
   });
 
-  it('ends a ?at= resume when a message is sent, so the send is not re-paused', () => {
+  it('ends a ?at= resume when a message is sent, so the send is not re-paused', async () => {
     mockAtParam = 'msg_older';
     mockAtomValues.staticMessages = [anchorMessage('msg_1')];
     mockAtomValues.hasOlderMessages = true;
@@ -841,8 +897,11 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     // The resume is still looking: it paused follow and asked for an older page.
     expect(mockRequestOlderMessages).toHaveBeenCalledTimes(1);
 
-    act(() => {
-      void (mockChatInput?.onSend as ((prompt: string) => Promise<unknown>) | undefined)?.('hello');
+    // The accepted send takes the position over.
+    await act(async () => {
+      await (mockChatInput?.onSend as ((prompt: string) => Promise<unknown>) | undefined)?.(
+        'hello'
+      );
     });
 
     // The sent message lands and the resume effect re-runs over the new rows.
@@ -855,7 +914,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     expect(chatUiWrites()).toEqual([]);
   });
 
-  it('ends a ?at= resume when a slash command is sent, so the command is not re-paused', () => {
+  it('ends a ?at= resume when a slash command is sent, so the command is not re-paused', async () => {
     mockAtParam = 'msg_older';
     mockAtomValues.staticMessages = [anchorMessage('msg_1')];
     mockAtomValues.hasOlderMessages = true;
@@ -866,8 +925,9 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     // The resume is still looking: it paused follow and asked for an older page.
     expect(mockRequestOlderMessages).toHaveBeenCalledTimes(1);
 
-    act(() => {
-      void (
+    // The accepted command takes the position over.
+    await act(async () => {
+      await (
         mockChatInput?.onSendCommand as
           | ((command: string, args: string) => Promise<unknown>)
           | undefined

@@ -160,6 +160,21 @@ describe('planResumeAttempt', () => {
     expect(planResumeAttempt({ ...base, isLoadingOlderMessages: true })).toBe('wait');
   });
 
+  it('keeps waiting when a retry of the failed page is in flight', () => {
+    // The header's Retry CTA starts a new page load without clearing the last
+    // error, so both flags are set for the whole retry. The in-flight check
+    // must win: the page the resume is waiting for may hold the anchor, and
+    // giving up here would strand the open at the bottom even though the retry
+    // lands the anchor.
+    expect(
+      planResumeAttempt({
+        ...base,
+        hasOlderMessagesError: true,
+        isLoadingOlderMessages: true,
+      })
+    ).toBe('wait');
+  });
+
   it('loads one older page when the anchor may still be in it', () => {
     expect(planResumeAttempt(base)).toBe('load-older');
   });

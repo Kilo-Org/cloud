@@ -578,6 +578,73 @@ describe('SessionMessageList resume anchor vs tail auto-follow', () => {
     expect(scrollCalls).toEqual(['end', 'end']);
   });
 
+  it('ends a paging resume when the host sends', () => {
+    vi.useFakeTimers();
+
+    const onLoad = vi.fn<() => void>();
+    const items = [resumeItem('msg-new')];
+    const mounted = mountListKeep({
+      items,
+      resumeAt: 'msg-older',
+      hasOlderMessages: true,
+      onLoadOlderMessages: onLoad,
+    });
+    expect(onLoad).toHaveBeenCalledTimes(1);
+    scrollCalls.length = 0;
+
+    // The user sends while the anchor's page is in flight.
+    updateList(mounted, {
+      items,
+      resumeAt: 'msg-older',
+      hasOlderMessages: true,
+      onLoadOlderMessages: onLoad,
+      followTailNonce: 1,
+    });
+    expect(scrollCalls).toEqual(['end']);
+
+    // The page lands without the anchor: the resume is over, so it must not
+    // pull another page behind the send's back.
+    updateList(mounted, {
+      items: [resumeItem('msg-still-not-there'), resumeItem('msg-new')],
+      resumeAt: 'msg-older',
+      hasOlderMessages: true,
+      onLoadOlderMessages: onLoad,
+      followTailNonce: 1,
+    });
+    expect(onLoad).toHaveBeenCalledTimes(1);
+    expect(scrollCalls).toEqual(['end']);
+  });
+
+  it('opens a later ?at= anchor after a send has taken the position over', () => {
+    vi.useFakeTimers();
+
+    const items = [resumeItem('msg-1'), resumeItem('msg-2'), resumeItem('msg-3')];
+    const mounted = mountListKeep({ items, resumeAt: 'msg-2' });
+
+    // The resume lands the anchor through its retry chain.
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(scrollCalls).toEqual(['index:1']);
+    scrollCalls.length = 0;
+
+    // The user sends: the send's output owns the position.
+    updateList(mounted, { items, resumeAt: 'msg-2', followTailNonce: 1 });
+    expect(scrollCalls).toEqual(['end']);
+    scrollCalls.length = 0;
+
+    // The route then updates `at` on the same mounted screen. A send does not
+    // claim the session's position, so the new link resumes again instead of
+    // being swallowed by the send's take-over.
+    updateList(mounted, { items, resumeAt: 'msg-1', followTailNonce: 1 });
+    expect(scrollCalls).toEqual(['index:0']);
+
+    // The tail follow is off again for the resumed position: a streamed
+    // content-size growth must not pull the list back to the bottom.
+    emitContentSizeChange(3100);
+    expect(scrollCalls).toEqual(['index:0']);
+  });
+
   it('does not replay an earlier send when the list mounts following the tail', () => {
     vi.useFakeTimers();
 

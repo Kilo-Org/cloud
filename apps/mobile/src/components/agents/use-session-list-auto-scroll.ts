@@ -23,6 +23,14 @@ type UseSessionListAutoScrollParams = {
    * discarding the resume position.
    */
   initialAutoScroll?: boolean;
+  /**
+   * The `?at=` anchor this list is resuming, or null when it is not resuming.
+   * A send's take-over ends the resume it interrupted, but — unlike a user drag
+   * — it is not a claim on the session's position: a later link's anchor starts
+   * a fresh resume on the same mounted list, and only then is the send's
+   * take-over released and the follow policy re-applied.
+   */
+  resumeKey?: string | null;
 };
 
 /**
@@ -36,6 +44,7 @@ export function useSessionListAutoScroll<ItemT>({
   itemCount,
   resetKey,
   initialAutoScroll = true,
+  resumeKey = null,
 }: UseSessionListAutoScrollParams) {
   const listRef = useRef<FlashListRef<ItemT>>(null);
   const { scrollAnimated } = useMotionPolicy();
@@ -54,12 +63,18 @@ export function useSessionListAutoScroll<ItemT>({
   // otherwise a content-size update from a streaming response yanks the
   // viewport back to the bottom and the user's drag appears to "bounce back".
   const isUserScrollingRef = useRef(false);
-  // Sticky for the whole session: set on the first user drag, cleared only
-  // when the session (or the follow policy) resets. A scheduled programmatic
-  // scroll (the `?at=` resume retries) must not fight a user who has taken
-  // over the transcript — `isUserScrollingRef` only covers the drag itself,
-  // while this covers everything after the user lets go.
+  // "The position is taken" flag for the current attempt: set on the first
+  // user drag and by a send's take-over, cleared when the session resets (or
+  // when a later link's anchor releases a send's take-over). A scheduled
+  // programmatic scroll (the `?at=` resume retries) must not fight a user who
+  // has taken over the transcript — `isUserScrollingRef` only covers the drag
+  // itself, while this covers everything after the user lets go.
   const userInteractedRef = useRef(false);
+  // True when the take-over came from a send rather than from a drag. A send
+  // ends the resume it interrupted and pins the tail, but the session's
+  // position is not the send's to keep: the next link's anchor releases this
+  // (see the reset effect) while a drag's claim outranks the link.
+  const sendTakeoverRef = useRef(false);
   const lastContentHeightRef = useRef(0);
   const autoScrollResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoScrollRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,6 +137,10 @@ export function useSessionListAutoScroll<ItemT>({
    * follow then pins the viewport to the newest row: the optimistic row, the
    * streamed reply, and every later content-size change.
    *
+   * The take-over lasts for the session's current position, not for the whole
+   * session: a later `?at=` link on the same mounted list releases it (the
+   * reset effect), so a send cannot swallow that link's anchor.
+   *
    * The scroll is issued directly instead of through
    * `scheduleScrollToLatestMessage`: the resume's suppression window can
    * still be armed when the user hits Send, and the guarded scheduler would
@@ -129,6 +148,7 @@ export function useSessionListAutoScroll<ItemT>({
    */
   const followTailFromSend = useCallback(() => {
     userInteractedRef.current = true;
+    sendTakeoverRef.current = true;
     shouldAutoScrollRef.current = true;
     setIsAtBottom(true);
     scrollToLatestMessage();
@@ -208,10 +228,23 @@ export function useSessionListAutoScroll<ItemT>({
   // never arrived, or whose older pages ran out — must not undo a takeover:
   // once the user has grabbed the transcript the follow stays off and the
   // resume retries stay cancelled, whatever the policy now says.
+  //
+  // A NEW anchor is not a policy flip: a later `?at=` link on this mounted list
+  // owns the position again. It releases a send's take-over (the send took the
+  // position for its output, it did not claim the session) and re-applies the
+  // follow policy so the new resume is not yanked to the tail. A drag's
+  // take-over is the user's own position and still outranks the link.
   const resetKeyRef = useRef(resetKey);
+  const resumeKeyRef = useRef(resumeKey);
   useEffect(() => {
     const sessionChanged = resetKeyRef.current !== resetKey;
     resetKeyRef.current = resetKey;
+    const resumeChanged = resumeKeyRef.current !== resumeKey;
+    resumeKeyRef.current = resumeKey;
+    if (resumeChanged && sendTakeoverRef.current) {
+      userInteractedRef.current = false;
+      sendTakeoverRef.current = false;
+    }
     if (!sessionChanged && userInteractedRef.current) {
       return;
     }
@@ -219,8 +252,9 @@ export function useSessionListAutoScroll<ItemT>({
     shouldAutoScrollRef.current = initial.shouldAutoScroll;
     lastContentHeightRef.current = 0;
     userInteractedRef.current = false;
+    sendTakeoverRef.current = false;
     setIsAtBottom(prev => (prev === initial.isAtBottom ? prev : initial.isAtBottom));
-  }, [resetKey, initialAutoScroll]);
+  }, [resetKey, initialAutoScroll, resumeKey]);
 
   useEffect(() => {
     if (itemCount > 0 && shouldAutoScrollRef.current && !isUserScrollingRef.current) {
@@ -268,6 +302,10 @@ export function useSessionListAutoScroll<ItemT>({
   const handleScrollBeginDrag = useCallback(() => {
     isUserScrollingRef.current = true;
     userInteractedRef.current = true;
+    // The user's own drag is the current claim on the position: it replaces a
+    // send's take-over, which a later link is allowed to release (a drag's is
+    // not).
+    sendTakeoverRef.current = false;
     isAutoScrollingRef.current = false;
     clearAutoScrollResetTimeout();
     clearAutoScrollRetryTimeout();
@@ -372,6 +410,14 @@ export function useSessionListAutoScroll<ItemT>({
      * after the first drag the position belongs to the user, not the link.
      */
     userInteractedRef,
+    /**
+     * True while a send's take-over is the current claim on the position (the
+     * send's row and its reply, not the user's own scroll). The resume reads it
+     * to end its paging: a position a send took over must not keep pulling in
+     * older pages. Cleared when the user drags or a later link's anchor
+     * arrives.
+     */
+    sendTakeoverRef,
     handleContentSizeChange,
     handleKeyboardShow,
     handleListLayout,

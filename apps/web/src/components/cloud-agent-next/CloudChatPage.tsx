@@ -659,15 +659,12 @@ export default function CloudChatPage({
 
   const handleSendMessage = useCallback(
     async (prompt: string, attachments?: CloudAgentAttachments) => {
-      // Sending takes over the position: end a resume that is still looking for
-      // its anchor, or its effect re-pauses follow and cancels this scroll when
-      // the message lands.
-      const resumeState = resumeStateRef.current;
-      if (resumeState) {
-        resumeState.done = true;
-      }
-      shouldAutoScrollRef.current = true;
-      setChatUI({ shouldAutoScroll: true });
+      // Sending takes the position over only once the send is accepted: end a
+      // resume that is still looking for its anchor, or its effect re-pauses
+      // follow and cancels this scroll when the message lands. A rejected send
+      // produces no output, so the resume keeps the position instead of being
+      // abandoned at the bottom.
+      const resumeStateAtSend = resumeStateRef.current;
       const selectedRuntimeAgentForSend = sessionConfig?.runtimeAgents?.find(
         a => a.slug === sessionConfig?.mode
       );
@@ -691,38 +688,53 @@ export default function CloudChatPage({
         },
         attachments: supportsAttachments ? attachments : undefined,
       });
+      // Pins the tail when the list already follows. While a resume has the
+      // follow off this is a no-op, so a refused send never moves the reader
+      // off the anchor.
       scheduleScrollToBottom();
 
       const accepted = await acceptedPromise;
-      if (accepted) {
-        scheduleScrollToBottom();
+      if (!accepted) {
+        return false;
       }
-      return accepted;
+      // Take the position over for the output this send produces. Mark the
+      // attempt that was live at send time — a `?at=` link that arrived while
+      // the send was in flight owns the position now.
+      if (resumeStateAtSend && resumeStateRef.current === resumeStateAtSend) {
+        resumeStateAtSend.done = true;
+      }
+      shouldAutoScrollRef.current = true;
+      setChatUI({ shouldAutoScroll: true });
+      scheduleScrollToBottom();
+      return true;
     },
     [manager, scheduleScrollToBottom, sessionConfig, setChatUI, supportsAttachments]
   );
 
   const handleSendSlashCommand = useCallback(
     async (command: string, args: string, attachments?: CloudAgentAttachments) => {
-      // A command send takes over the position exactly as a message send does:
-      // end a resume still looking for its anchor, or the effect re-pauses
-      // follow and cancels the scroll scheduled for this send's output.
-      const resumeState = resumeStateRef.current;
-      if (resumeState) {
-        resumeState.done = true;
-      }
-      shouldAutoScrollRef.current = true;
-      setChatUI({ shouldAutoScroll: true });
+      // A command send takes the position over exactly as a message send does,
+      // and only once it is accepted: end a resume still looking for its anchor,
+      // or the effect re-pauses follow and cancels the scroll for this
+      // command's output. A refused command leaves the resume in place.
+      const resumeStateAtSend = resumeStateRef.current;
       const acceptedPromise = manager.send({
         payload: { type: 'command', command, arguments: args },
         attachments: supportsAttachments ? attachments : undefined,
       });
+      // Pins the tail when the list already follows; a no-op under a resume.
       scheduleScrollToBottom();
       const accepted = await acceptedPromise;
-      if (accepted) {
-        scheduleScrollToBottom();
+      if (!accepted) {
+        return false;
       }
-      return accepted;
+      if (resumeStateAtSend && resumeStateRef.current === resumeStateAtSend) {
+        resumeStateAtSend.done = true;
+      }
+      shouldAutoScrollRef.current = true;
+      setChatUI({ shouldAutoScroll: true });
+      scheduleScrollToBottom();
+      return true;
     },
     [manager, scheduleScrollToBottom, setChatUI, supportsAttachments]
   );

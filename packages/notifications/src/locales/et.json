@@ -7,6 +7,7 @@
       "instanceLifecycle": "Sinu eksemplaril on uuendus",
       "scheduledAction": "Planeeritud toimingul on uuendus",
       "lowBalance": "Sinu saldo vajab tähelepanu",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Turbetuvastus vajab tähelepanu",
       "activeAgentsGlanceable": "Aktiivsetel agentidel on uuendus"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Madala saldo hoiatus",
       "body": "{{organizationName}} saldo langes alla ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Uus turbetuvastus ({{severity}})",

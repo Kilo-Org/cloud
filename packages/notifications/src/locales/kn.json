@@ -7,6 +7,7 @@
       "instanceLifecycle": "ನಿಮ್ಮ ಇನ್‌ಸ್ಟಾನ್ಸ್‌ಗೆ ನವೀಕರಣವಿದೆ",
       "scheduledAction": "ನಿಗದಿತ ಕ್ರಿಯೆಗೆ ನವೀಕರಣವಿದೆ",
       "lowBalance": "ನಿಮ್ಮ ಬ್ಯಾಲೆನ್ಸ್‌ಗೆ ಗಮನ ಬೇಕು",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "ಭದ್ರತಾ ಸಂಶೋಧನೆಗೆ ಗಮನ ಬೇಕು",
       "activeAgentsGlanceable": "ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳಿಗೆ ನವೀಕರಣವಿದೆ"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "ಕಡಿಮೆ ಬ್ಯಾಲೆನ್ಸ್ ಎಚ್ಚರಿಕೆ",
       "body": "{{organizationName}} ಬ್ಯಾಲೆನ್ಸ್ ${{minimumBalanceUsd}} ಕ್ಕಿಂತ ಕಡಿಮೆಯಾಗಿದೆ"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "ಹೊಸ ಭದ್ರತಾ ಸಂಶೋಧನೆ ({{severity}})",

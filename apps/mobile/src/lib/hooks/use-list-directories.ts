@@ -23,7 +23,9 @@ export type UseListDirectoriesResult = {
    * previously listed path from cache synchronously; otherwise shows skeleton
    * and fetches. A repeated call for the path already on screen is the picker's
    * Retry: it refetches that query, which drops back to the skeleton until the
-   * retry lands.
+   * retry lands. A repeat while that listing still has no data and a fetch is in
+   * flight is dropped — query-core reuses the in-flight fetch, so a second
+   * attempt cannot start and the Retry budget must stay unarmed.
    */
   list: (path: string) => void;
 };
@@ -223,8 +225,20 @@ export function useListDirectories(connectionId: string | null): UseListDirector
       // skeleton: a no-data refetch goes back to pending and clears the error
       // (`fetchState` in @tanstack/query-core), the phase the replaced
       // generation guard produced.
+      const current = queryRef.current;
+      // A repeat while the listing has not answered yet — a double-tapped Retry
+      // or folder row — starts no second attempt: query-core ends the refetch on
+      // the fetch already in flight (`continueRetry` in query.js, which returns
+      // that fetch's promise without re-running the queryFn whenever a no-data
+      // fetch is in flight), so the armed flag would never be read and the next
+      // plain open would inherit the Retry budget instead of its own single
+      // send and 12 s deadline. The attempt on screen is already the retry the
+      // user asked for.
+      if (current.fetchStatus !== 'idle' && current.data === undefined) {
+        return;
+      }
       retryBudgetRef.current = true;
-      void queryRef.current.refetch();
+      void current.refetch();
       return;
     }
     requestedPathRef.current = nextPath;

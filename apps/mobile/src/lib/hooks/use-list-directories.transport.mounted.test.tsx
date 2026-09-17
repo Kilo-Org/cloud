@@ -206,6 +206,9 @@ describe('useListDirectories transport failures, nudges and retry pacing', () =>
     });
     await waitFor(() => api().state?.phase === 'skeleton');
     await waitForRealTimers(() => listFn.mock.calls.length >= 6, 9000);
+    // The sixth send is the one that lands: wait for its result to reach the
+    // observer instead of racing the assertion against the mock's microtasks.
+    await waitFor(() => api().state?.phase === 'ready');
     expect(api().state).toEqual({ phase: 'ready', path: 'src', directories: [server] });
     expect(listFn).toHaveBeenCalledTimes(6);
     unmount();

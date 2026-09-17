@@ -2173,6 +2173,9 @@ export const kilo_pass_store_purchases = pgTable(
     environment: text().notNull(),
     purchased_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    amount_charged_minor_units: integer(),
+    currency: text(),
+    tax_minor_units: integer(),
     raw_payload_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -2213,6 +2216,22 @@ export const kilo_pass_store_purchases = pgTable(
     check(
       'kilo_pass_store_purchases_store_provider_check',
       sql`${table.payment_provider} IN ('app_store', 'google_play')`
+    ),
+    check(
+      'kilo_pass_store_purchases_amount_charged_non_negative_check',
+      sql`${table.amount_charged_minor_units} IS NULL OR ${table.amount_charged_minor_units} >= 0`
+    ),
+    check(
+      'kilo_pass_store_purchases_tax_non_negative_check',
+      sql`${table.tax_minor_units} IS NULL OR ${table.tax_minor_units} >= 0`
+    ),
+    check(
+      'kilo_pass_store_purchases_currency_check',
+      sql`${table.currency} IS NULL OR ${table.currency} ~ '^[A-Z]{3}$'`
+    ),
+    check(
+      'kilo_pass_store_purchases_currency_required_check',
+      sql`${table.currency} IS NOT NULL OR (${table.amount_charged_minor_units} IS NULL AND ${table.tax_minor_units} IS NULL)`
     ),
     enumCheck(
       'kilo_pass_store_purchases_payment_provider_check',

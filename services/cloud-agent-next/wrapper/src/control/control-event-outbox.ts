@@ -7,9 +7,9 @@ import {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import type { SessionEventIdentity } from '../../../src/shared/sandbox-control-protocol.js';
 
-const MAX_CONTROL_EVENT_OUTBOX_EVENTS = 256;
+export const MAX_CONTROL_EVENT_OUTBOX_EVENTS = 2048;
 export const MAX_CONTROL_EVENT_OUTBOX_BYTES = 4 * MAX_SANDBOX_CONTROL_FRAME_BYTES;
-const PUBLICATION_DEADLINE_MS = 30_000;
+const PUBLICATION_DEADLINE_MS = 60_000;
 export const CONTROL_EVENT_BATCH_WINDOW_MS = 25;
 
 const URGENT_EVENT_TYPES = new Set([

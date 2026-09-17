@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from '
 import { ControlDeliveryError } from './sandbox-control-client';
 import {
   CONTROL_EVENT_BATCH_WINDOW_MS,
+  MAX_CONTROL_EVENT_OUTBOX_EVENTS,
   createControlEventOutbox,
   type ControlEventOutboxFailure,
   type ControlEventPublication,
@@ -106,7 +107,7 @@ describe('control event outbox', () => {
       onFailure: failure,
     });
     try {
-      for (let index = 0; index < 256; index += 1)
+      for (let index = 0; index < MAX_CONTROL_EVENT_OUTBOX_EVENTS; index += 1)
         expect(
           outbox.enqueue(
             outbox.prepare({
@@ -129,7 +130,10 @@ describe('control event outbox', () => {
               kiloSessionId: 'ses_overflow',
               rootKiloSessionId: 'ses_overflow',
             },
-            payload: { type: 'session.idle', properties: { index: 256 } },
+            payload: {
+              type: 'session.idle',
+              properties: { index: MAX_CONTROL_EVENT_OUTBOX_EVENTS },
+            },
           })
         )
       ).toBe(false);
@@ -268,8 +272,8 @@ describe('control event outbox', () => {
         session,
         payload: messageUpdatedPayload('msg_1', 'latest'),
       });
-      expect(first.deadlineAt).toBe(31_000);
-      expect(second.deadlineAt).toBe(32_000);
+      expect(first.deadlineAt).toBe(61_000);
+      expect(second.deadlineAt).toBe(62_000);
       expect(first.deadlineAt).toBeLessThan(second.deadlineAt);
       expect(outbox.enqueue(first)).toBe(true);
       expect(outbox.enqueue(second)).toBe(true);
@@ -753,7 +757,7 @@ describe('control event outbox', () => {
     }
   });
 
-  it('admits a tail replacement at the 256-entry count boundary', async () => {
+  it(`admits a tail replacement at the ${MAX_CONTROL_EVENT_OUTBOX_EVENTS}-entry count boundary`, async () => {
     const published: ControlEventPublication[] = [];
     const outbox = createControlEventOutbox({
       publish: async publication => {
@@ -762,7 +766,7 @@ describe('control event outbox', () => {
       onFailure: mock(),
     });
     try {
-      for (let index = 0; index < 255; index += 1)
+      for (let index = 0; index < MAX_CONTROL_EVENT_OUTBOX_EVENTS - 1; index += 1)
         expect(
           outbox.enqueue(
             outbox.prepare({
@@ -785,7 +789,7 @@ describe('control event outbox', () => {
       expect(outbox.enqueue(old)).toBe(true);
       expect(outbox.enqueue(latest)).toBe(true);
       expect(await outbox.resume()).toBe(true);
-      expect(published).toHaveLength(256);
+      expect(published).toHaveLength(MAX_CONTROL_EVENT_OUTBOX_EVENTS);
       expect(published.at(-1)).toMatchObject({
         receiptId: old.receiptId,
         sequence: old.sequence,
@@ -910,10 +914,11 @@ describe('control event outbox', () => {
         });
         if (!outbox.enqueue(publication)) break;
         admitted += 1;
-        if (admitted > 256) throw new Error('byte budget did not apply');
+        if (admitted > MAX_CONTROL_EVENT_OUTBOX_EVENTS)
+          throw new Error('byte budget did not apply');
       }
       expect(admitted).toBeGreaterThan(1);
-      expect(admitted).toBeLessThan(256);
+      expect(admitted).toBeLessThan(MAX_CONTROL_EVENT_OUTBOX_EVENTS);
       expect(failure).toHaveBeenCalledWith(expect.objectContaining({ reason: 'queue_overflow' }));
     } finally {
       outbox.close();
@@ -1245,9 +1250,9 @@ describe('control event outbox', () => {
           session: { ...session, nativeRuntimeId },
           payload: { type: 'session.idle' },
         });
-        expect(original.deadlineAt).toBe(31_000);
+        expect(original.deadlineAt).toBe(61_000);
         outbox.enqueue(original);
-        clock.mockReturnValue(30_900);
+        clock.mockReturnValue(60_900);
         outbox.enqueue(
           outbox.prepare({
             event: 'session.event',
@@ -1619,9 +1624,9 @@ describe('control event outbox delta merge', () => {
         session,
         payload: deltaPayload('msg_1', 'part_1', 'first '),
       });
-      expect(first.deadlineAt).toBe(31_000);
+      expect(first.deadlineAt).toBe(61_000);
       expect(outbox.enqueue(first)).toBe(true);
-      expect(timers.mock.calls.at(-1)?.[1]).toBe(30_000);
+      expect(timers.mock.calls.at(-1)?.[1]).toBe(60_000);
 
       clock.mockReturnValue(30_000);
       const second = outbox.prepare({
@@ -1629,9 +1634,9 @@ describe('control event outbox delta merge', () => {
         session,
         payload: deltaPayload('msg_1', 'part_1', 'second'),
       });
-      expect(second.deadlineAt).toBe(60_000);
+      expect(second.deadlineAt).toBe(90_000);
       expect(outbox.enqueue(second)).toBe(true);
-      expect(timers.mock.calls.at(-1)?.[1]).toBe(30_000);
+      expect(timers.mock.calls.at(-1)?.[1]).toBe(60_000);
 
       clock.mockReturnValue(first.deadlineAt);
       clearTimeout(timers.mock.results.at(-1)?.value as ReturnType<typeof setTimeout> | undefined);
@@ -1868,7 +1873,7 @@ describe('control event outbox delta merge', () => {
     const left = 'a'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.55));
     const right = 'b'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.55));
     try {
-      for (let index = 0; index < 255; index += 1)
+      for (let index = 0; index < MAX_CONTROL_EVENT_OUTBOX_EVENTS - 1; index += 1)
         expect(
           outbox.enqueue(
             outbox.prepare({
@@ -1899,7 +1904,7 @@ describe('control event outbox delta merge', () => {
       );
 
       expect(await outbox.resume()).toBe(true);
-      expect(published).toHaveLength(256);
+      expect(published).toHaveLength(MAX_CONTROL_EVENT_OUTBOX_EVENTS);
       expect(deltaText(published.at(-1)?.payload)).toBe(left);
     } finally {
       outbox.close();
@@ -2472,7 +2477,7 @@ describe('control event outbox disconnected hold', () => {
     });
     try {
       const head = outbox.prepare(progressPublication(0));
-      expect(head.deadlineAt).toBe(31_000);
+      expect(head.deadlineAt).toBe(61_000);
       expect(outbox.enqueue(head)).toBe(true);
       expect(await outbox.resume()).toBe(false);
       expect(failures).toHaveLength(0);
@@ -2480,7 +2485,7 @@ describe('control event outbox disconnected hold', () => {
 
       const wakeup = timers.mock.calls.at(-1);
       const handle = timers.mock.results.at(-1)?.value as ReturnType<typeof setTimeout> | undefined;
-      expect(wakeup?.[1]).toBe(30_000);
+      expect(wakeup?.[1]).toBe(60_000);
       clock.mockReturnValue(head.deadlineAt);
       clearTimeout(handle);
       const callback = wakeup?.[0];

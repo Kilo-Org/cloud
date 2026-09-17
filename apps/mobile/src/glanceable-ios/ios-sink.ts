@@ -404,14 +404,16 @@ export const iosSink: GlanceableSink = {
       return;
     }
 
-    const contentState = liveActivityContentState(snapshot);
+    // The content state is built only where it is applied: building it prunes
+    // the notice, and a snapshot this call discards (an older revision, or one
+    // that cannot start) must not clear the line a live card carries.
 
     if (pendingStart !== null) {
       // A start is already waiting on a dismissal. There is no card to update
       // yet, and raising a second one is the duplicate this sink exists to stop.
       // Hand the waiting start the newer counts so it does not open stale.
       if (isStartableGlanceableWork(snapshot) && snapshot.revision >= pendingStartAt) {
-        pendingStartInput = { contentState, snapshot, ctx };
+        pendingStartInput = { contentState: liveActivityContentState(snapshot), snapshot, ctx };
         pendingStartAt = snapshot.revision;
       }
       return;
@@ -427,6 +429,7 @@ export const iosSink: GlanceableSink = {
       if (!isStartableGlanceableWork(snapshot)) {
         return;
       }
+      const contentState = liveActivityContentState(snapshot);
       // Work resumed inside an idle window, so the card it replaces is already
       // `ended` and waiting out its dismissal date. Native discovery hides an
       // ended card, and only a second, immediate end removes it: dismiss it
@@ -462,6 +465,7 @@ export const iosSink: GlanceableSink = {
     if (snapshot.revision <= revision) {
       return;
     }
+    const contentState = liveActivityContentState(snapshot);
     lastProps = contentState;
     inFlightUpdate = activity.update(contentState, STALE_AFTER_SECONDS);
     revision = snapshot.revision;

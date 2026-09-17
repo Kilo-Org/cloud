@@ -73,14 +73,21 @@ async function republish(ask: WaitingAsk): Promise<void> {
 /**
  * Show the retryable failure line: prefix it to the stored snapshot the app last
  * published, so a headless tap that cannot reach the backend still reports the
- * failure the user's tap produced.
+ * failure the user's tap produced. Awaited, because the render is the only
+ * thing that carries the line to the notification and the task may finish right
+ * after it; a failed render is dropped — the republish below draws the line
+ * again from the same stored counts.
  */
-function showApproveFailed(ask: WaitingAsk): void {
+async function showApproveFailed(ask: WaitingAsk): Promise<void> {
   setGlanceableActionNotice(translate(APPROVE_FAILED_KEY));
-  renderStoredSnapshotWithNotice({
-    userId: ask.userId,
-    organizationId: ask.organizationId,
-  });
+  try {
+    await renderStoredSnapshotWithNotice({
+      userId: ask.userId,
+      organizationId: ask.organizationId,
+    });
+  } catch {
+    // The republish corrects the surface; the notification keeps its action.
+  }
 }
 
 /**
@@ -93,7 +100,9 @@ function showApproveFailed(ask: WaitingAsk): void {
  * wait out the refresh's poll budget to learn the tap failed, and again after it,
  * because the republish writes the notification and re-selects the ask from the
  * tray — a line drawn only first can be pruned by the render that follows it,
- * and the user would then see the failure nowhere.
+ * and the user would then see the failure nowhere. Both draws are awaited: the
+ * task resolves once the last render has reached the notification, so a headless
+ * process cannot exit with the update still in flight.
  */
 export async function handleApproveTask(): Promise<void> {
   let ask: WaitingAsk | null = null;
@@ -124,11 +133,11 @@ export async function handleApproveTask(): Promise<void> {
     return;
   }
   if (failed) {
-    showApproveFailed(ask);
+    await showApproveFailed(ask);
   }
   await republish(ask);
   if (failed) {
-    showApproveFailed(ask);
+    await showApproveFailed(ask);
   }
 }
 

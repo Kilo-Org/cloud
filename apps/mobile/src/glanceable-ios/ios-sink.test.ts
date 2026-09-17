@@ -1111,6 +1111,26 @@ describe('iosSink approve-failed notice', () => {
 
     expect(mockState.started.at(-1)?.props).not.toHaveProperty('notice');
   });
+
+  it('keeps the notice when an older revision is discarded unrendered', () => {
+    recordWaitingAsk(recordedAsk());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+    setGlanceableActionNotice('failed');
+
+    // The revision guard drops this snapshot without rendering it: it must not
+    // prune the line the card on screen is still carrying (its zero needs-input
+    // count would clear the notice).
+    const stale = {
+      ...snapshotFor([{ status: 'busy' }], 0),
+      updatedAt: new Date(NOW - 60_000).toISOString(),
+    };
+    iosSink.startOrUpdate(stale, CTX);
+    expect(mockState.updated).toEqual([]);
+
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 1), CTX);
+
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: true, notice: 'failed' });
+  });
 });
 
 describe('iosSink idle updates', () => {

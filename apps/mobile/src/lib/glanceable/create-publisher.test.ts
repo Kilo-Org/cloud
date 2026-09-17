@@ -13,7 +13,12 @@ import {
   registerGlanceableSink,
   unregisterGlanceableSink,
 } from './sink-registry';
-import { _resetWaitingAskForTests, _setSecureStoreForTests, getWaitingAsk } from './waiting-ask';
+import {
+  _flushWaitingAskMirrorForTests,
+  _resetWaitingAskForTests,
+  _setSecureStoreForTests,
+  getWaitingAsk,
+} from './waiting-ask';
 
 const NOW = 1_750_000_000_000;
 const CTX = { userId: 'u1', organizationId: null };
@@ -70,7 +75,7 @@ describe('createGlanceablePublisher', () => {
     store.clear();
   });
 
-  it('records the waiting ask the activity can action', () => {
+  it('records the waiting ask the activity can action', async () => {
     const publisher = createGlanceablePublisher();
     publisher.handleSessions(
       [
@@ -84,6 +89,7 @@ describe('createGlanceablePublisher', () => {
       CTX
     );
     expect(getWaitingAsk()).toMatchObject({ kiloSessionId: 'waiting', status: 'permission' });
+    await _flushWaitingAskMirrorForTests();
     expect(store.get(ASK_KEY)).toBe(JSON.stringify(getWaitingAsk()));
 
     publisher.handleSessions([{ id: 'busy', status: 'busy' }], CTX);

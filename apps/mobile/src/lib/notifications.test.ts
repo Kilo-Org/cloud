@@ -1753,6 +1753,36 @@ describe('cold iOS background delivery', () => {
     expect(JSON.parse(native.props ?? '{}')).toMatchObject({ needsInput: 1, canApprove: true });
   });
 
+  it('does not revive a mirrored ask recorded for another scope', async () => {
+    // The mirror outlives a sign-out or an org switch, and the ask names the
+    // session and organization an action would answer: a restored record from
+    // another scope must never put Approve on the card.
+    secureStore.set(
+      'glanceable-waiting-ask',
+      JSON.stringify({
+        kiloSessionId: 'session-1',
+        status: 'permission',
+        isCloudAgent: true,
+        scopeKey: buildOpaqueScopeKey({ userId: 'u1', organizationId: 'org-other' }),
+        organizationId: 'org-other',
+        userId: 'u1',
+        recordedAt: Date.parse('2026-01-01T00:00:00.000Z'),
+      })
+    );
+    const background = await loadColdBackground();
+    expect(
+      await background.deliver({
+        status: 'happy',
+        running: 0,
+        needsInput: 1,
+        idle: 0,
+        needsInputSince: '2026-01-01T00:00:00.000Z',
+      })
+    ).toBe(0);
+
+    expect(JSON.parse(native.props ?? '{}')).toMatchObject({ needsInput: 1, canApprove: false });
+  });
+
   it('keeps the adopted card when an idle-only push arrives in the background', async () => {
     vi.setSystemTime(Date.parse('2026-01-02T00:00:00.000Z'));
     mocks.appState.currentState = 'background';

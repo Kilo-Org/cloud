@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { buildOpaqueScopeKey } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  buildGlanceableSnapshot,
+  buildOpaqueScopeKey,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 
+import { _resetGlanceablePersistForTests, _setLastGlanceableSnapshotForTests } from './persist';
 import {
+  _flushWaitingAskMirrorForTests,
   _resetWaitingAskForTests,
   _setSecureStoreForTests,
   getWaitingAsk,
@@ -171,6 +176,7 @@ describe('selectWaitingAsk', () => {
 describe('waiting ask store', () => {
   beforeEach(() => {
     _resetWaitingAskForTests();
+    _resetGlanceablePersistForTests();
     _setSecureStoreForTests(secureStoreMock);
     store.clear();
     vi.clearAllMocks();
@@ -178,27 +184,73 @@ describe('waiting ask store', () => {
 
   afterEach(() => {
     _resetWaitingAskForTests();
+    _resetGlanceablePersistForTests();
     store.clear();
   });
+
+  /** Publish the scope this process is on, as the persist sink does on a publish. */
+  function setLocalScope(ctx: { userId: string; organizationId: string | null }): void {
+    _setLastGlanceableSnapshotForTests(
+      buildGlanceableSnapshot({
+        sessions: [],
+        userId: ctx.userId,
+        organizationId: ctx.organizationId,
+        now: NOW,
+      })
+    );
+  }
 
   it('round-trips the ask and clears both the memory and the mirror', async () => {
     const ask = askFor();
     recordWaitingAsk(ask);
     expect(getWaitingAsk()).toEqual(ask);
+    await _flushWaitingAskMirrorForTests();
     expect(store.get(ASK_KEY)).toBe(JSON.stringify(ask));
 
     recordWaitingAsk(null);
     expect(getWaitingAsk()).toBeNull();
+    await _flushWaitingAskMirrorForTests();
     expect(store.has(ASK_KEY)).toBe(false);
     await expect(readWaitingAsk()).resolves.toBeNull();
   });
 
-  it('replaces the previous ask with the next one', () => {
+  it('replaces the previous ask with the next one', async () => {
     recordWaitingAsk(askFor({ kiloSessionId: 's1' }));
     const second = askFor({ kiloSessionId: 's2', status: 'question' });
     recordWaitingAsk(second);
     expect(getWaitingAsk()).toEqual(second);
+    await _flushWaitingAskMirrorForTests();
     expect(store.get(ASK_KEY)).toBe(JSON.stringify(second));
+  });
+
+  it('serializes the mirror writes so the last record wins on disk', async () => {
+    const first = deferred();
+    // The first write lands late, after the second record was made: a chained
+    // mirror still stores the newer ask, an unordered one would keep the older.
+    secureStoreMock.setItemAsync.mockImplementationOnce(async (key: string, value: string) => {
+      await first.promise;
+      store.set(key, value);
+    });
+
+    recordWaitingAsk(askFor({ kiloSessionId: 's1' }));
+    const second = askFor({ kiloSessionId: 's2' });
+    recordWaitingAsk(second);
+
+    first.resolve();
+    await _flushWaitingAskMirrorForTests();
+
+    expect(store.get(ASK_KEY)).toBe(JSON.stringify(second));
+  });
+
+  it('keeps the in-memory ask when a mirror write rejects', async () => {
+    secureStoreMock.setItemAsync.mockRejectedValueOnce(new Error('SecureStore unavailable'));
+    const ask = askFor();
+
+    recordWaitingAsk(ask);
+    await expect(_flushWaitingAskMirrorForTests()).resolves.toBeUndefined();
+
+    expect(getWaitingAsk()).toEqual(ask);
+    await expect(readWaitingAsk()).resolves.toEqual(ask);
   });
 
   it('survives a JS restart through the SecureStore mirror', async () => {
@@ -230,6 +282,28 @@ describe('waiting ask store', () => {
     gate.resolve();
 
     await expect(pending).resolves.toEqual(fresh);
+  });
+
+  it('keeps a mirrored ask recorded for the scope this process publishes', async () => {
+    setLocalScope(CTX);
+    const ask = askFor();
+    store.set(ASK_KEY, JSON.stringify(ask));
+
+    await expect(readWaitingAsk()).resolves.toEqual(ask);
+  });
+
+  it('drops a mirrored ask recorded for another scope', async () => {
+    // The mirror outlives a sign-out or an org switch: the ask names a session
+    // and an organization the action would answer, so a foreign one must never
+    // reach a surface or an approval.
+    setLocalScope(CTX);
+    const foreign = askFor({
+      scopeKey: buildOpaqueScopeKey({ userId: 'u1', organizationId: 'org-1' }),
+    });
+    store.set(ASK_KEY, JSON.stringify(foreign));
+
+    await expect(readWaitingAsk()).resolves.toBeNull();
+    expect(getWaitingAsk()).toBeNull();
   });
 
   it('treats a malformed mirror as absent', async () => {

@@ -1,23 +1,14 @@
-import {
-  type ConnectionConfig,
-  createConnection,
-  type KiloSessionId,
-} from '@kilocode/cloud-agent-sdk';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { type GlanceableSessionRow } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { z } from 'zod';
 
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import { performRefresh } from '@/lib/auth/credentials';
-import {
-  fetchCloudAgentStreamTicket,
-  StreamTicketHttpError,
-} from '@/lib/cloud-agent-stream-ticket';
-import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
+import { StreamTicketHttpError } from '@/lib/cloud-agent-stream-ticket';
 import { trpcClient } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
-import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 
 import { createGlanceablePublisher } from './create-publisher';
+import { resolvePendingPermissionId } from './pending-permission';
 import { readWaitingAsk, recordWaitingAsk } from './waiting-ask';
 
 /**
@@ -114,115 +105,6 @@ export async function answerSessionPermission(input: AnswerSessionPermissionInpu
     return;
   }
   await trpcClient.cloudAgentNext.answerPermission.mutate(payload, skipBatchOptions);
-}
-
-/** The interaction identity the control plane's projection guarantees. */
-const pendingPermissionSchema = z.object({ id: z.string().min(1) });
-
-/** The `connected` frame's interaction projection; absent means none pending. */
-const connectedInteractionsSchema = z.object({
-  pendingInteractions: z.object({ permissions: z.array(pendingPermissionSchema) }).optional(),
-});
-
-type StreamConnectionLike = { connect: () => void; destroy: () => void };
-
-export type PendingPermissionResolverDeps = {
-  getTicket?: (
-    cloudAgentSessionId: string,
-    organizationId?: string
-  ) => Promise<{ ticket: string; expiresAt: number }>;
-  createConnection?: (config: ConnectionConfig) => StreamConnectionLike;
-  now?: () => number;
-  /**
-   * Schedule the deadline and return its cancel function. Injectable so the
-   * pure suite fires the deadline by hand and no opaque timer handle leaks.
-   */
-  setTimeout?: (handler: () => void, timeoutMs: number) => () => void;
-};
-
-export type ResolvePendingPermissionIdInput = {
-  cloudAgentSessionId: string;
-  organizationId?: string | null;
-  timeoutMs?: number;
-};
-
-/** Flat budget for one control-plane stream open. */
-const PENDING_PERMISSION_TIMEOUT_MS = 15_000;
-
-/**
- * Read the pending permission's id from the cloud-agent control plane. The id
- * lives only in the control plane's pending-interaction projection and is sent
- * on stream connect, so this reuses the shipped stream transport for one frame
- * and closes it. Resolves `null` when the connect carries no pending permission
- * or the deadline fires.
- */
-export async function resolvePendingPermissionId(
-  input: ResolvePendingPermissionIdInput,
-  deps?: PendingPermissionResolverDeps
-): Promise<string | null> {
-  const getTicket = deps?.getTicket ?? fetchCloudAgentStreamTicket;
-  const openConnection = deps?.createConnection ?? createConnection;
-  const now = deps?.now ?? (() => Date.now());
-  const setTimer =
-    deps?.setTimeout ??
-    ((handler: () => void, timeoutMs: number) => {
-      const handle = setTimeout(handler, timeoutMs);
-      return () => {
-        clearTimeout(handle);
-      };
-    });
-  const organizationId =
-    input.organizationId && input.organizationId.length > 0 ? input.organizationId : undefined;
-  const timeoutMs = input.timeoutMs ?? PENDING_PERMISSION_TIMEOUT_MS;
-  const deadlineAt = now() + timeoutMs;
-
-  const ticket = await getTicket(input.cloudAgentSessionId, organizationId);
-
-  return new Promise<string | null>(resolve => {
-    let settled = false;
-    let cancelDeadline: (() => void) | null = null;
-    let connection: StreamConnectionLike | null = null;
-    const settle = (permissionId: string | null): void => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cancelDeadline?.();
-      connection?.destroy();
-      resolve(permissionId);
-    };
-    cancelDeadline = setTimer(() => {
-      settle(null);
-    }, timeoutMs);
-    const url = new URL('/stream', CLOUD_AGENT_WS_URL);
-    url.searchParams.set('cloudAgentSessionId', input.cloudAgentSessionId);
-    connection = openConnection({
-      websocketUrl: url.toString(),
-      ticket,
-      websocketHeaders: { Origin: WEB_BASE_URL },
-      lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
-      onEvent: event => {
-        if (event.streamEventType !== 'connected') {
-          return;
-        }
-        // A frame that lands after the deadline is not an answer.
-        if (now() >= deadlineAt) {
-          settle(null);
-          return;
-        }
-        const parsed = connectedInteractionsSchema.safeParse(event.data);
-        const permissionId = parsed.success
-          ? (parsed.data.pendingInteractions?.permissions[0]?.id ?? null)
-          : null;
-        settle(permissionId);
-      },
-      onConnected: () => undefined,
-      onDisconnected: () => undefined,
-      onError: () => undefined,
-    });
-    // `createConnection` builds the transport; the caller opens it.
-    connection.connect();
-  });
 }
 
 /** Terminal codes: the ask is already answered or no longer pending. */

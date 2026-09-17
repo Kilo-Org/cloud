@@ -64,9 +64,11 @@ const {
   answerSessionPermission,
   NotApprovableError,
   refreshGlanceableSnapshot,
-  resolvePendingPermissionId,
   runGlanceableApprove,
 } = await import('@/lib/glanceable/approve-ask');
+// The pending-permission read is its own module; this suite owns its cases too.
+const { PendingPermissionTimeoutError, resolvePendingPermissionId } =
+  await import('@/lib/glanceable/pending-permission');
 
 function connectedFrame(permissionIds: readonly string[]): CloudAgentEvent {
   return {
@@ -205,7 +207,7 @@ describe('resolvePendingPermissionId', () => {
     expect(stream.destroy).toHaveBeenCalledTimes(1);
   });
 
-  it('returns null when the deadline fires', async () => {
+  it('rejects with a retryable timeout and closes the stream when the deadline fires', async () => {
     const stream = fakeStream([]);
     const deadlines: (() => void)[] = [];
     const cancelled = vi.fn();
@@ -222,18 +224,44 @@ describe('resolvePendingPermissionId', () => {
         },
       }
     );
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(deadlines).toHaveLength(1);
+    const assertion = expect(pending).rejects.toBeInstanceOf(PendingPermissionTimeoutError);
+    await vi.waitFor(() => {
+      expect(stream.connect).toHaveBeenCalledTimes(1);
+    });
     deadlines[0]?.();
-    await expect(pending).resolves.toBeNull();
+    await assertion;
+    expect(cancelled).toHaveBeenCalledTimes(1);
+    expect(stream.destroy).toHaveBeenCalledTimes(1);
   });
 
-  it('returns null when the connected frame lands after the deadline', async () => {
+  it('rejects when the ticket fetch outlives the deadline', async () => {
+    const deadlines: (() => void)[] = [];
+    const openConnection = vi.fn();
+    const pending = resolvePendingPermissionId(
+      { cloudAgentSessionId: 'agent_1', timeoutMs: 50 },
+      {
+        // A route that never answers must not hold the headless approve: the
+        // deadline covers the ticket fetch, not only the stream.
+        getTicket: async () => new Promise<{ ticket: string; expiresAt: number }>(() => undefined),
+        createConnection: openConnection,
+        setTimeout: handler => {
+          deadlines.push(handler);
+          return () => undefined;
+        },
+      }
+    );
+    const assertion = expect(pending).rejects.toBeInstanceOf(PendingPermissionTimeoutError);
+    expect(deadlines).toHaveLength(1);
+    deadlines[0]?.();
+    await assertion;
+    expect(openConnection).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the connected frame lands after the deadline', async () => {
     const stream = fakeStream([connectedFrame(['perm_late'])]);
     const clock = { now: 1000 };
     const cancelled = vi.fn();
-    const permissionId = await resolvePendingPermissionId(
+    const pending = resolvePendingPermissionId(
       { cloudAgentSessionId: 'agent_1', timeoutMs: 50 },
       {
         getTicket: resolveTicket,
@@ -249,7 +277,7 @@ describe('resolvePendingPermissionId', () => {
         },
       }
     );
-    expect(permissionId).toBeNull();
+    await expect(pending).rejects.toBeInstanceOf(PendingPermissionTimeoutError);
   });
 });
 
@@ -313,6 +341,25 @@ describe('runGlanceableApprove', () => {
     createConnection.mockImplementation(fakeStream([connectedFrame([])]).open);
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone' });
     expect(answerPermissionMutate).not.toHaveBeenCalled();
+  });
+
+  it('is retryable, not gone, when the pending-permission read times out', async () => {
+    readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+    // A stalled control-plane route is transient: the ask is still pending, so
+    // the tap must keep Approve and the failure line, never drop the record.
+    fetchCloudAgentStreamTicket.mockImplementation(
+      async () => new Promise<{ ticket: string; expiresAt: number }>(() => undefined)
+    );
+    vi.useFakeTimers();
+    try {
+      const pending = runGlanceableApprove();
+      const assertion = expect(pending).resolves.toEqual({ kind: 'retryable' });
+      await vi.advanceTimersByTimeAsync(15_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(recordWaitingAsk).not.toHaveBeenCalled();
   });
 
   it('is gone when the session has no cloud-agent permission (NOT_APPROVABLE)', async () => {

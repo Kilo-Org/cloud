@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => {
     refreshGlanceableSnapshot: vi.fn<() => Promise<void>>(),
     setGlanceableActionNotice: vi.fn<(notice: string | null) => void>(),
     renderStoredSnapshotWithNotice:
-      vi.fn<(ctx: { userId: string; organizationId: string | null }) => void>(),
+      vi.fn<(ctx: { userId: string; organizationId: string | null }) => void | Promise<void>>(),
     language: {
       whenLanguagePreferenceLoaded: vi.fn<() => Promise<void>>(),
       getResolvedLanguage: vi.fn<() => SupportedLanguage>(),
@@ -141,6 +141,20 @@ beforeEach(async () => {
   await i18n.changeLanguage('en');
 });
 
+/** A promise a case releases by hand, so a task's await on it is observable. */
+function deferredRender(): { promise: Promise<void>; release: () => void } {
+  let storedResolve: (() => void) | undefined = undefined;
+  const promise = new Promise<void>(resolve => {
+    storedResolve = resolve;
+  });
+  return {
+    promise,
+    release: () => {
+      storedResolve?.();
+    },
+  };
+}
+
 describe('handleApproveTask', () => {
   it('republishes once with the answered session and leaves no notice on approval', async () => {
     mocks.runGlanceableApprove.mockResolvedValue({ kind: 'approved' });
@@ -197,6 +211,28 @@ describe('handleApproveTask', () => {
     expect(refreshOrder).toBeLessThan(lastNotice ?? Number.POSITIVE_INFINITY);
     expect(lastNotice).toBeLessThan(lastRender ?? Number.POSITIVE_INFINITY);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for the failure line before it republishes and finishes', async () => {
+    mocks.runGlanceableApprove.mockResolvedValue({ kind: 'retryable' });
+    const firstRender = deferredRender();
+    mocks.renderStoredSnapshotWithNotice.mockImplementationOnce(async () => {
+      await firstRender.promise;
+    });
+
+    const pending = handleApproveTask();
+    // The task must not republish, let alone resolve, while the first draw is
+    // still in flight: the headless process would exit with the line unshown.
+    await vi.waitFor(() => {
+      expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(1);
+    });
+    expect(mocks.refreshGlanceableSnapshot).not.toHaveBeenCalled();
+
+    firstRender.release();
+    await pending;
+
+    expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(2);
   });
 
   it('renders the failure line from the stored snapshot when the republish rejects', async () => {
@@ -438,5 +474,41 @@ describe('the headless task keys', () => {
 
     expect(ios.registrations).toEqual([]);
     expect(ios.required).not.toContain('./src/glanceable-android/approve-task');
+  });
+});
+
+/** One member's source, so a lifecycle claim is asserted where it lives. */
+function workerMember(header: string): string {
+  const escaped = header.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return new RegExp(`${escaped}[\\s\\S]*?\\n  \\}`).exec(WORKER_SOURCE)?.[0] ?? '';
+}
+
+describe('the headless worker lifecycle', () => {
+  it('resolves the worker and detaches its listener when it is stopped', () => {
+    const onStopped = workerMember('override fun onStopped()');
+
+    // WorkManager must not be left with a future that never completes: a stop
+    // can land before the ReactContext initializes, or before the task finishes.
+    expect(onStopped).toContain('completer?.set(Result.failure())');
+    // The ReactHost is shared and outlives the worker, so the stop path has to
+    // remove the pending listener it added.
+    expect(onStopped).toContain('detachReactInstanceListener()');
+    expect(WORKER_SOURCE).toContain('host.removeReactInstanceEventListener(listener)');
+  });
+
+  it('holds the listener it attaches so a stop can detach it', () => {
+    const startTask = workerMember('private fun startTask(reactHost: ReactHost)');
+
+    expect(startTask).toContain('pendingReactHost = reactHost');
+    expect(startTask).toContain('pendingListener = listener');
+    expect(startTask).toContain('reactHost.addReactInstanceEventListener(listener)');
+  });
+
+  it('matches a task finish only against an id this worker started', () => {
+    // `HeadlessJsTaskContext` numbers from 1, so 0 was never a real id and could
+    // not tell "no task started" apart from a finish event.
+    expect(WORKER_SOURCE).toContain('private const val NO_TASK_ID = -1');
+    expect(WORKER_SOURCE).toContain('private var taskId = NO_TASK_ID');
+    expect(WORKER_SOURCE).toContain('this.taskId != NO_TASK_ID && this.taskId == taskId');
   });
 });

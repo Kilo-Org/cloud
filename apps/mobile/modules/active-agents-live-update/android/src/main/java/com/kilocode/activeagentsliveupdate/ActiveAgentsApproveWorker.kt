@@ -30,8 +30,20 @@ import com.google.common.util.concurrent.ListenableFuture
 class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
   ListenableWorker(context, params), HeadlessJsTaskEventListener {
 
-  private var taskId = 0
+  /** No task started by this worker yet; `HeadlessJsTaskContext` numbers from 1. */
+  private var taskId = NO_TASK_ID
   private var completer: CallbackToFutureAdapter.Completer<Result>? = null
+
+  /** Set on stop, which can land on another thread than the task start hop. */
+  @Volatile private var stopped = false
+
+  /**
+   * The host a pending ReactContext listener is attached to, held so a stop can
+   * detach it. The ReactHost is shared and outlives this worker, so leaving the
+   * listener registered would keep a dead work order listening on it.
+   */
+  private var pendingReactHost: ReactHost? = null
+  private var pendingListener: ReactInstanceEventListener? = null
 
   override fun startWork(): ListenableFuture<Result> =
     CallbackToFutureAdapter.getFuture(
@@ -50,19 +62,37 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
   private fun startTask(reactHost: ReactHost) {
     val reactContext = reactHost.currentReactContext
     if (reactContext == null) {
-      reactHost.addReactInstanceEventListener(object : ReactInstanceEventListener {
-        override fun onReactContextInitialized(context: ReactContext) {
-          invokeStartTask(context)
-          reactHost.removeReactInstanceEventListener(this)
+      val listener =
+        object : ReactInstanceEventListener {
+          override fun onReactContextInitialized(context: ReactContext) {
+            detachReactInstanceListener()
+            invokeStartTask(context)
+          }
         }
-      })
+      pendingReactHost = reactHost
+      pendingListener = listener
+      reactHost.addReactInstanceEventListener(listener)
       reactHost.start()
     } else {
       invokeStartTask(reactContext)
     }
   }
 
+  /** Detach the listener still waiting for the ReactContext, exactly once. */
+  private fun detachReactInstanceListener() {
+    val host = pendingReactHost ?: return
+    val listener = pendingListener ?: return
+    pendingReactHost = null
+    pendingListener = null
+    host.removeReactInstanceEventListener(listener)
+  }
+
   private fun invokeStartTask(reactContext: ReactContext) {
+    // A stop can land after the listener was detached but before this call runs:
+    // starting JS for a stopped worker would answer nothing.
+    if (stopped) {
+      return
+    }
     val taskContext = HeadlessJsTaskContext.getInstance(reactContext)
     taskContext.addTaskEventListener(this)
     val data = Arguments.makeNativeMap(inputData.keyValueMap)
@@ -75,7 +105,9 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
   override fun onHeadlessJsTaskStart(taskId: Int) = Unit
 
   override fun onHeadlessJsTaskFinish(taskId: Int) {
-    if (this.taskId == taskId) {
+    // Only the id this worker started counts. Before that assignment the
+    // sentinel must not match a finish event belonging to another task.
+    if (this.taskId != NO_TASK_ID && this.taskId == taskId) {
       completer?.set(Result.success())
       completer = null
       cleanUpTask()
@@ -84,6 +116,13 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
 
   override fun onStopped() {
     super.onStopped()
+    stopped = true
+    detachReactInstanceListener()
+    // A stop can land before the ReactContext is up, or before the task
+    // finishes: the future has to resolve, or WorkManager keeps the work order
+    // pending on a worker that will never complete.
+    completer?.set(Result.failure())
+    completer = null
     cleanUpTask()
   }
 
@@ -108,6 +147,9 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
 
     /** Bounded: an answer that cannot complete must not hold the worker. */
     const val TASK_TIMEOUT_MS = 60_000L
+
+    /** No task started yet; every id `HeadlessJsTaskContext` returns is positive. */
+    private const val NO_TASK_ID = -1
 
     private const val TAG = "ActiveAgentsApproveWorker.startWork"
   }

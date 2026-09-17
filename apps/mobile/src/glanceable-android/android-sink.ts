@@ -246,13 +246,17 @@ async function tryStartOrUpdate(
  * in-app switch, the permission gate, the revision bookkeeping, and the
  * notification actions; its start branch re-posts the fixed native id, so the
  * counts stay and only the text gains the notice.
+ *
+ * Returns when the render is on the notification: the headless task finishes
+ * with this promise, so a fire-and-forget update would be lost with the process
+ * and the failure line the user's tap produced would never be shown.
  */
-export function renderStoredSnapshotWithNotice(ctx: GlanceableSinkContext): void {
+export async function renderStoredSnapshotWithNotice(ctx: GlanceableSinkContext): Promise<void> {
   const snapshot = getStoredWidgetSnapshot();
   if (snapshot === null) {
     return;
   }
-  void tryStartOrUpdate(snapshot, ctx);
+  await tryStartOrUpdate(snapshot, ctx);
 }
 
 /** Retry a pending start after permission turns granted. Caller owns the check. */

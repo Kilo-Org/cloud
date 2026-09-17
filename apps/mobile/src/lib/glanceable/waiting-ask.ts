@@ -6,6 +6,8 @@ import { z } from 'zod';
 
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 
+import { getLocalScopeKey } from './persist';
+
 /**
  * One durable record of the oldest waiting ask: the session the activity's
  * Approve and Open buttons name.
@@ -26,6 +28,10 @@ export type WaitingAsk = {
   status: string;
   /** True when the row came from the cloud-agent control plane. */
   isCloudAgent: boolean;
+  /**
+   * The snapshot scope key the ask was recorded under. Read on hydration to
+   * fence the mirror to the scope this process currently publishes.
+   */
   scopeKey: string;
   organizationId: string | null;
   userId: string;
@@ -147,6 +153,33 @@ let currentAsk: WaitingAsk | null = null;
 // the read can never be clobbered by a stale persisted record.
 let waitingAskEpoch = 0;
 
+// The mirror writes, chained one after the other. A later record's write is
+// issued only once the previous one has settled, so two rapid records can never
+// land out of order on disk, and no rejection escapes: the in-memory value is
+// authoritative and the next record repopulates a failed mirror.
+let mirrorWrite: Promise<void> | null = null;
+
+async function mirrorAskAfter(
+  previous: Promise<void> | null,
+  ask: WaitingAsk | null
+): Promise<void> {
+  if (previous !== null) {
+    await previous;
+  }
+  try {
+    const store = getSecureStore();
+    await (ask === null
+      ? store.deleteItemAsync(WAITING_ASK_KEY)
+      : store.setItemAsync(WAITING_ASK_KEY, JSON.stringify(ask)));
+  } catch {
+    // A missing mirror keeps the in-memory value authoritative.
+  }
+}
+
+function mirrorAsk(ask: WaitingAsk | null): void {
+  mirrorWrite = mirrorAskAfter(mirrorWrite, ask);
+}
+
 function parseStoredAsk(raw: string): WaitingAsk | null {
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -158,24 +191,30 @@ function parseStoredAsk(raw: string): WaitingAsk | null {
 }
 
 /**
+ * True when a mirrored ask belongs to the scope this process currently
+ * publishes. The mirror outlives a sign-out or an org switch, and the ask names
+ * both the session and the organization an action would answer, so an ask
+ * recorded for another scope must never reach a surface or an approval. An
+ * unknown local scope (nothing restored or published yet) cannot fence and
+ * accepts the ask; the push handler re-checks the live user and org against the
+ * snapshot's scope key before it renders anything.
+ */
+function isAskInCurrentScope(ask: WaitingAsk): boolean {
+  const localScopeKey = getLocalScopeKey();
+  return localScopeKey === null || ask.scopeKey === localScopeKey;
+}
+
+/**
  * Replace the one ask and mirror it to SecureStore. `null` clears both. The
- * write is fire-and-forget: the in-memory value is authoritative for the sinks
- * of this run, and a failed mirror is treated as absent after a restart. A
+ * mirror is fire-and-forget: the in-memory value is authoritative for the sinks
+ * of this run, and a failed mirror is treated as absent after a restart. The
+ * writes are serialized so a burst of records cannot land out of order, and a
  * failing native module must never break the publisher that calls this.
  */
 export function recordWaitingAsk(ask: WaitingAsk | null): void {
   waitingAskEpoch += 1;
   currentAsk = ask;
-  try {
-    const store = getSecureStore();
-    if (ask === null) {
-      void store.deleteItemAsync(WAITING_ASK_KEY);
-    } else {
-      void store.setItemAsync(WAITING_ASK_KEY, JSON.stringify(ask));
-    }
-  } catch {
-    // A missing mirror keeps the in-memory value authoritative.
-  }
+  mirrorAsk(ask);
 }
 
 /** The hydrated in-memory ask; the sinks read this synchronously. */
@@ -189,7 +228,9 @@ let hydrationPromise: Promise<void> | null = null;
  * One read of the mirror, epoch-guarded exactly like
  * `restorePersistedGlanceable`: a record that lands during the read owns the
  * state, and an already-set in-memory ask is never overwritten. Best effort —
- * a failed or malformed read leaves the in-memory state alone.
+ * a failed or malformed read leaves the in-memory state alone. A record from
+ * another scope is dropped here, at the one boundary where the mirror enters
+ * the process.
  */
 async function hydrateStoredAsk(): Promise<void> {
   const startEpoch = waitingAskEpoch;
@@ -200,7 +241,7 @@ async function hydrateStoredAsk(): Promise<void> {
     }
     if (raw !== null && currentAsk === null) {
       const parsed = parseStoredAsk(raw);
-      if (parsed !== null) {
+      if (parsed !== null && isAskInCurrentScope(parsed)) {
         currentAsk = parsed;
       }
     }
@@ -226,9 +267,15 @@ export function _setSecureStoreForTests(store: SecureStoreLike | null): void {
   secureStoreForTests = store;
 }
 
+/** Settle the mirror chain so a case can assert what landed on disk. */
+export async function _flushWaitingAskMirrorForTests(): Promise<void> {
+  await mirrorWrite;
+}
+
 export function _resetWaitingAskForTests(): void {
   currentAsk = null;
   waitingAskEpoch = 0;
   hydrationPromise = null;
+  mirrorWrite = null;
   secureStoreForTests = null;
 }

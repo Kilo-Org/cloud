@@ -669,8 +669,9 @@ describe('renderStoredSnapshotWithNotice', () => {
     mocks.native.setWidgetSnapshot(JSON.stringify(MIXED), 0);
     setGlanceableActionNotice('Approval failed');
 
-    renderStoredSnapshotWithNotice(CTX);
-    await flushAsync();
+    // The headless task finishes when this resolves, so the render must be on
+    // the notification by then: no flush, no fire-and-forget.
+    await renderStoredSnapshotWithNotice(CTX);
 
     expect(mocks.native.getWidgetSnapshot).toHaveBeenCalled();
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
@@ -695,8 +696,7 @@ describe('renderStoredSnapshotWithNotice', () => {
     mocks.native.start.mockClear();
 
     setGlanceableActionNotice('Approval failed');
-    renderStoredSnapshotWithNotice(CTX);
-    await flushAsync();
+    await renderStoredSnapshotWithNotice(CTX);
 
     expect(mocks.native.start).not.toHaveBeenCalled();
     expect(mocks.native.update).toHaveBeenCalledTimes(1);
@@ -709,8 +709,7 @@ describe('renderStoredSnapshotWithNotice', () => {
   it('makes no native call when nothing is stored', async () => {
     setGlanceableActionNotice('Approval failed');
 
-    renderStoredSnapshotWithNotice(CTX);
-    await flushAsync();
+    await renderStoredSnapshotWithNotice(CTX);
 
     expect(mocks.native.getWidgetSnapshot).toHaveBeenCalled();
     expect(mocks.native.start).not.toHaveBeenCalled();

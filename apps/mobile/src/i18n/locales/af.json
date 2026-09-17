@@ -3060,6 +3060,12 @@
     "privacy": "Maak Kilo oop om agente te sien",
     "openAgents": "Maak agente oop",
     "needsInput": "Wag op invoer",
+    "newestSession": "Nuutste: {{title}}",
+    "noneWaiting": "Geen agente wag nie",
+    "newAgent": "Nuwe agent",
+    "approving": "Besig om goed te keur...",
+    "couldNotApprove": "Kon nie goedkeur nie",
+    "couldNotStart": "Kon nie begin nie",
     "channelName": "Aktiewe agente",
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien."
   },

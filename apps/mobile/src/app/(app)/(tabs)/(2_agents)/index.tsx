@@ -5,6 +5,7 @@ import { Alert, AppState, Platform } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { AgentSessionListScreen } from '@/components/agents/session-list-screen';
+import { runPendingWidgetActions } from '@/glanceable-ios/widget-actions';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import {
@@ -142,9 +143,15 @@ export default function AgentSessionList() {
   useFocusEffect(
     useCallback(() => {
       void recoverGlanceableActivityKit();
+      // A widget press that patched its marker before JS subscribed is picked
+      // up here: the intent cannot run this JS itself, so the foreground is
+      // the first moment the press can be answered. iOS-only; the sweep is
+      // guarded to iOS internally.
+      void runPendingWidgetActions();
       const subscription = AppState.addEventListener('change', state => {
         if (state === 'active') {
           void recoverGlanceableActivityKit();
+          void runPendingWidgetActions();
         }
       });
       return () => {

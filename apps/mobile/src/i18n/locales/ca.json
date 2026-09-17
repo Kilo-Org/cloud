@@ -3084,6 +3084,12 @@
     "privacy": "Obre Kilo per veure els agents",
     "openAgents": "Obre els agents",
     "needsInput": "Pendent de resposta",
+    "newestSession": "La més recent: {{title}}",
+    "noneWaiting": "Cap agent en espera",
+    "newAgent": "Agent nou",
+    "approving": "S'està aprovant...",
+    "couldNotApprove": "No s'ha pogut aprovar",
+    "couldNotStart": "No s'ha pogut iniciar",
     "channelName": "Agents actius",
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig."
   },

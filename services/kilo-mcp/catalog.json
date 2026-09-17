@@ -1349,6 +1349,29 @@
     ],
     "searchBlob": "cloudAgentNext.getMessageResult Check the processing status and outcome of a specific message sent to a cloud agent session, such as whether it is queued, running, completed, failed, or interrupted. cloudagentnext getmessageresult cloudagentsessionid expectedworktreeid messageid cloudAgentSessionId expectedWorktreeId messageId"
   },
+  "cloudAgentNext.getPendingInteractions": {
+    "path": "cloudAgentNext.getPendingInteractions",
+    "kind": "query",
+    "summary": "Fetch the pending interactions for a cloud agent session that are still waiting on a response, such as approvals or questions requiring user input. Use this to check whether a running agent session is blocked and needs the user to act.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getpendinginteractions",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.getPendingInteractions Fetch the pending interactions for a cloud agent session that are still waiting on a response, such as approvals or questions requiring user input. Use this to check whether a running agent session is blocked and needs the user to act. cloudagentnext getpendinginteractions cloudagentsessionid cloudAgentSessionId"
+  },
   "cloudAgentNext.getSandboxSelectionOptions": {
     "path": "cloudAgentNext.getSandboxSelectionOptions",
     "kind": "query",
@@ -5229,6 +5252,32 @@
       "organizationid"
     ],
     "searchBlob": "organizations.cloudAgentNext.getMessageResult Fetch the result and status of a specific message in an organization's cloud agent session, returning null if the result is not yet available. organizations cloudagentnext getmessageresult organizationid organizationId"
+  },
+  "organizations.cloudAgentNext.getPendingInteractions": {
+    "path": "organizations.cloudAgentNext.getPendingInteractions",
+    "kind": "query",
+    "summary": "Retrieves the interactions a Cloud Agent session is currently waiting on, such as questions or approval requests that need a response before the agent can continue.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getpendinginteractions",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getPendingInteractions Retrieves the interactions a Cloud Agent session is currently waiting on, such as questions or approval requests that need a response before the agent can continue. organizations cloudagentnext getpendinginteractions organizationid organizationId"
   },
   "organizations.cloudAgentNext.getSandboxSelectionOptions": {
     "path": "organizations.cloudAgentNext.getSandboxSelectionOptions",

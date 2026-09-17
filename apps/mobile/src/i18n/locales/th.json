@@ -3060,6 +3060,12 @@
     "privacy": "เปิด Kilo เพื่อดูเอเจนต์",
     "openAgents": "เปิดเอเจนต์",
     "needsInput": "รอข้อมูลจากคุณ",
+    "newestSession": "ล่าสุด: {{title}}",
+    "noneWaiting": "ไม่มีเอเจนต์ที่รออยู่",
+    "newAgent": "เอเจนต์ใหม่",
+    "approving": "กำลังอนุมัติ...",
+    "couldNotApprove": "อนุมัติไม่สำเร็จ",
+    "couldNotStart": "เริ่มไม่สำเร็จ",
     "channelName": "เอเจนต์ที่กำลังทำงาน",
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก"
   },

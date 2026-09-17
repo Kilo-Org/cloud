@@ -3084,6 +3084,12 @@
     "privacy": "Apri Kilo per vedere gli agenti",
     "openAgents": "Apri gli agenti",
     "needsInput": "In attesa di risposta",
+    "newestSession": "La più recente: {{title}}",
+    "noneWaiting": "Nessun agente in attesa",
+    "newAgent": "Nuovo agente",
+    "approving": "Approvazione in corso...",
+    "couldNotApprove": "Approvazione non riuscita",
+    "couldNotStart": "Avvio non riuscito",
     "channelName": "Agenti attivi",
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco."
   },

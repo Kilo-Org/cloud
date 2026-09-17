@@ -9,7 +9,7 @@ import {
 } from './analytics';
 import { forwardedAuthFromProps } from './auth';
 import { MCP_SCOPE, scopeTokens } from './auth/http';
-import { callCatalogEndpoint } from './call';
+import { callCatalogEndpoint, MAX_RESULT_BYTES, serializeWithCap } from './call';
 import { createDefaultHandler } from './oauth/consent';
 import { onError, tokenExchangeCallback } from './oauth/provider-hooks';
 import { createRefreshReuseHandler, isTokenRequest } from './oauth/refresh-reuse';
@@ -35,6 +35,7 @@ import {
   type Catalog,
   type ForwardedAuth,
   type GrantProps,
+  type SearchResult,
   type SemanticCandidates,
 } from './types';
 import OAuthProvider, {
@@ -117,7 +118,7 @@ const TOOLS = [
   {
     name: 'search',
     description:
-      'Search the Kilo API catalog for endpoints that match a task. ALWAYS run search first: the call tool only accepts paths this catalog publishes, and search returns the path, summary, and input schema you need for the call.',
+      'Search the Kilo API catalog for endpoints that match a task. ALWAYS run search first: the call tool only accepts paths this catalog publishes, and search returns the path, summary, and input schema you need for the call. Every result carries a kind: "query" reads data, "mutation" changes it.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -139,7 +140,7 @@ const TOOLS = [
   {
     name: 'call',
     description:
-      'Call a Kilo API endpoint by its catalog path. Run search first to find a valid path and its input schema — paths outside the catalog and inputs that violate the published schema are rejected before any request is made.',
+      'Call a Kilo API endpoint by its catalog path. Run search first to find a valid path and its input schema — paths outside the catalog and inputs that violate the published schema are rejected before any request is made. A call to a "mutation" path changes data, so call one only when the user asked for that change; if such a call fails with an ambiguous transport error, check the current state before retrying.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -201,8 +202,47 @@ type ToolResult = {
   truncated?: true;
 };
 
-function textResult(text: string): ToolResult {
-  return { content: [{ type: 'text', text }] };
+/**
+ * Wrap a capped serialized payload as a tool result, marking it truncated when
+ * the cap cut it so the client knows the text is incomplete.
+ */
+function toolResult(outcome: { text: string; truncated: boolean }): ToolResult {
+  return {
+    content: [{ type: 'text', text: outcome.text }],
+    ...(outcome.truncated ? { truncated: true as const } : {}),
+  };
+}
+
+/** UTF-8 byte length, the unit `MAX_RESULT_BYTES` measures. */
+function utf8ByteLength(text: string): number {
+  return new TextEncoder().encode(text).byteLength;
+}
+
+/**
+ * Serialize search hits so an over-cap payload is still valid JSON.
+ *
+ * Every hit carries its published input schema, so a 50-row result can pass the
+ * tool-result cap. Cutting the serialized text at a byte boundary (what
+ * `serializeWithCap` does for the call tool's opaque upstream data) leaves the
+ * agent with unparseable JSON and no count of what was dropped. Drop hits from
+ * the end instead — the ranking already puts the best matches first — and say
+ * in the payload how many were dropped, so nothing is lost silently.
+ */
+function cappedSearchResults(results: SearchResult[]): { text: string; truncated: boolean } {
+  const full = JSON.stringify({ results });
+  if (utf8ByteLength(full) <= MAX_RESULT_BYTES) return { text: full, truncated: false };
+  for (let kept = results.length - 1; kept >= 0; kept -= 1) {
+    const dropped = results.length - kept;
+    const text = JSON.stringify({
+      results: results.slice(0, kept),
+      truncated: true,
+      message: `Dropped ${dropped} of ${results.length} results to stay within the ${MAX_RESULT_BYTES}-byte tool-result cap. Use a narrower query or a lower "limit" to see them.`,
+    });
+    if (utf8ByteLength(text) <= MAX_RESULT_BYTES) return { text, truncated: true };
+  }
+  // Unreachable in practice: an empty result list with the drop notice is far
+  // under the cap.
+  return { text: JSON.stringify({ results: [], truncated: true }), truncated: true };
 }
 
 /** JSON object guard used only to recover the JSON-RPC `id` from a malformed envelope. */
@@ -242,14 +282,17 @@ async function runTool(
     });
     if (results.length === 0) {
       // Empty state, not an error: tell the agent how to recover.
-      return textResult(
-        JSON.stringify({
+      return toolResult(
+        serializeWithCap({
           results: [],
           message: `No endpoints matched "${query.trim()}". Refine your query: use fewer or different keywords, or describe the task in plain language.`,
         })
       );
     }
-    return textResult(JSON.stringify({ results }));
+    // Every hit carries its published input schema, and a 50-row result can
+    // exceed the tool-result cap: drop the lowest-ranked hits so the payload
+    // stays parseable JSON and names how many were dropped.
+    return toolResult(cappedSearchResults(results));
   }
   if (name === 'call') {
     const parsed = callArgsSchema.safeParse(args);
@@ -268,10 +311,7 @@ async function runTool(
       webBaseUrl: deps.webBaseUrl,
       ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
     });
-    return {
-      content: [{ type: 'text', text: outcome.text }],
-      ...(outcome.truncated ? { truncated: true as const } : {}),
-    };
+    return toolResult(outcome);
   }
   throw new JsonRpcFailure(
     INVALID_PARAMS,
@@ -317,7 +357,7 @@ async function handleRpcMessage(
           capabilities: { tools: {} },
           serverInfo: SERVER_INFO,
           instructions:
-            'This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call.',
+            'This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying.',
         });
       }
       case 'ping':

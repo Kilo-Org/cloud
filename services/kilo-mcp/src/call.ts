@@ -85,17 +85,32 @@ type TrpcErrorBody = {
   };
 };
 
-/** A well-formed tRPC success body: `{ result: { data } }`. */
-type TrpcSuccessBody = { result: { data: unknown } };
+/**
+ * A tRPC success body: `{ result: { data } }`. A void procedure serializes to
+ * `{ result: {} }` — `JSON.stringify` drops the `undefined` `data` field — so a
+ * `result` object without `data` is a successful void result, not a missing
+ * body. Missing the distinction would report an error after a write landed and
+ * push an agent to re-apply it.
+ */
+type TrpcSuccessBody = { result: { data?: unknown } };
 
 function isTrpcSuccessBody(body: unknown): body is TrpcSuccessBody {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) return false;
   const result = (body as { result?: unknown }).result;
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    Object.prototype.hasOwnProperty.call(result, 'data')
-  );
+  return typeof result === 'object' && result !== null && !Array.isArray(result);
+}
+
+/**
+ * Whether the response body is an app-level tRPC error: apps/web answered and
+ * the failure's outcome is known. A tRPC error envelope always carries a
+ * non-empty message (its error formatter fills one in). A body without one — an
+ * HTML/text gateway page, or a platform JSON error like
+ * `{"error":"FUNCTION_INVOCATION_TIMEOUT"}` — is a gateway/function failure,
+ * not an app-level answer.
+ */
+function hasTrpcErrorMessage(body: TrpcErrorBody | null): boolean {
+  const message = body?.error?.message;
+  return typeof message === 'string' && message.length > 0;
 }
 
 function toTrpcFailure(status: number, body: TrpcErrorBody | null, path: string): JsonRpcFailure {
@@ -113,13 +128,71 @@ function toTrpcFailure(status: number, body: TrpcErrorBody | null, path: string)
 }
 
 /**
+ * The failure for a mutation whose outcome is unknown: the request may have
+ * reached apps/web (a rejected fetch, a gateway/function non-2xx with no tRPC
+ * error body, an unreadable or non-tRPC 2xx body), so the write may have
+ * applied. Never advertise a blind retry — a retry would duplicate the
+ * mutation (e.g. two agent profiles from one request). Safe to surface — no
+ * token in it.
+ */
+function ambiguousMutationFailure(path: string): JsonRpcFailure {
+  return new JsonRpcFailure(
+    INTERNAL_ERROR,
+    `Could not reach the Kilo API for "${path}". This mutation may or may not have been applied — check the current state before retrying.`,
+    { path, ambiguous: true }
+  );
+}
+
+/**
+ * The failure for a mutation whose app-level error cannot be pinned to a
+ * pre-write rejection. tRPC raises a 5xx-class error (INTERNAL_SERVER_ERROR,
+ * NOT_IMPLEMENTED) *after* the resolver returned — output validation, a
+ * post-resolver middleware, a serialization failure — so the write can have
+ * committed and still come back as an error envelope. The outcome is unknown:
+ * say so instead of inviting a duplicate write. A 4xx-class tRPC error is a
+ * rejection the app returns before the write (validation, authorization,
+ * not-found, precondition), so it keeps the ordinary mapping. Safe to surface —
+ * no token in it.
+ */
+function ambiguousMutationAppError(path: string, status: number): JsonRpcFailure {
+  return new JsonRpcFailure(
+    INTERNAL_ERROR,
+    `The Kilo API failed on "${path}" (HTTP ${status}). This mutation may or may not have been applied — check the current state before retrying.`,
+    { path, ambiguous: true, httpStatus: status }
+  );
+}
+
+/**
  * Validate `input` against the endpoint's published schema and forward the
- * call to apps/web over its public tRPC GET transport:
- * `{WEB_BASE_URL}/api/trpc/{path}?input=<urlencoded JSON>`. apps/web resolves
- * identity from the forwarded bearer and the organization header — both come
- * from the verified grant props (see `forwardedAuthFromProps`): the bearer is
- * the Kilo credential bound to the grant, and the organization header is the
- * grant's organization (never a caller-supplied header).
+ * call to apps/web over its public tRPC transport, chosen by the catalog row's
+ * `kind`:
+ *
+ * - `query`: `GET {WEB_BASE_URL}/api/trpc/{path}` with `?input=<JSON>` only when
+ *   input is sent. A network failure is retryable: a GET changed nothing.
+ * - `mutation`: `POST` to the same URL with no `input` query parameter,
+ *   `Content-Type: application/json`, and a JSON body (`{}` for a procedure
+ *   that takes no input). tRPC accepts a mutation only on POST and its
+ *   json content-type handler reads `req.json()`, so an empty body is a 400 —
+ *   a body is always sent. A network failure leaves the outcome unknown, so it
+ *   is reported as ambiguous, never as a blind retry. A gateway/function
+ *   failure (a non-2xx with no tRPC error message, like app.kilo.ai's
+ *   FUNCTION_INVOCATION_TIMEOUT 504) and a 2xx whose result cannot be read are
+ *   the same unknown-outcome case: the POST reached the platform, so a
+ *   mutation reports them as ambiguous too. An app-level tRPC error does not
+ *   settle it either: tRPC raises a 5xx-class error after the resolver returned
+ *   (output validation, post-resolver middleware), so a committed write can
+ *   come back as an error envelope — a mutation reports a 5xx-class tRPC error
+ *   as ambiguous as well. A 4xx-class tRPC error is raised before the write
+ *   (validation, authorization, not-found, precondition) and keeps the ordinary
+ *   mapping. A query keeps its plain upstream error: a GET changed nothing.
+ *
+ * apps/web resolves identity from the forwarded bearer and the organization
+ * header — both come from the verified grant props (see
+ * `forwardedAuthFromProps`): the bearer is the Kilo credential bound to the
+ * grant, and the organization header is the grant's organization (never a
+ * caller-supplied header). Either transport keeps the same `Accept`,
+ * `Authorization`, and organization headers and the same `fetchImpl ?? fetch`
+ * injection.
  *
  * Every rejection that can be decided locally (unknown path, schema-invalid
  * input) throws a JsonRpcFailure BEFORE any upstream request is made.
@@ -176,7 +249,7 @@ export async function callCatalogEndpoint(options: {
   }
 
   const url = new URL(`/api/trpc/${row.path}`, webBaseUrl);
-  if (sendInput) {
+  if (row.kind === 'query' && sendInput) {
     url.searchParams.set('input', JSON.stringify(input));
   }
   const headers: Record<string, string> = {
@@ -188,10 +261,29 @@ export async function callCatalogEndpoint(options: {
   }
 
   const fetchImpl = options.fetchImpl ?? fetch;
+  // A mutation carries its input in the JSON body (tRPC reads a mutation from
+  // POST only); a query sends it as the `?input=` param. Either way the body is
+  // never empty for a mutation: `{}` is the accepted shape for a procedure that
+  // takes no input, and an empty body is a 400.
+  const init: RequestInit =
+    row.kind === 'mutation'
+      ? {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify(sendInput ? input : {}),
+        }
+      : { method: 'GET', headers };
+
   let response: Response;
   try {
-    response = await fetchImpl(url.toString(), { method: 'GET', headers });
+    response = await fetchImpl(url.toString(), init);
   } catch {
+    if (row.kind === 'mutation') {
+      // The request may have reached apps/web before the connection failed, so
+      // the write's outcome is unknown: say so instead of telling the agent to
+      // retry blindly.
+      throw ambiguousMutationFailure(path);
+    }
     // Network-level failure: retryable, and safe to surface — no token in it.
     throw new JsonRpcFailure(
       INTERNAL_ERROR,
@@ -208,16 +300,46 @@ export async function callCatalogEndpoint(options: {
   }
 
   if (!response.ok) {
+    // A mutation that fails at the gateway/function layer — app.kilo.ai's
+    // FUNCTION_INVOCATION_TIMEOUT 504, a 502 edge error — comes back non-2xx
+    // with no tRPC error message. The POST reached the platform, so the write
+    // may have landed: report it as ambiguous, like a rejected fetch, instead
+    // of an ordinary upstream error that invites a blind retry.
+    //
+    // An app-level tRPC error is not proof the write did not land either: tRPC
+    // raises a 5xx-class error AFTER the resolver returned (output validation,
+    // a post-resolver middleware), so a committed mutation can still come back
+    // as an error envelope. A 4xx-class tRPC error is a rejection raised before
+    // the write, so it keeps the ordinary mapping. Queries are never ambiguous.
+    if (row.kind === 'mutation') {
+      if (hasTrpcErrorMessage(body as TrpcErrorBody | null)) {
+        // The app answered: a 5xx-class error can have landed the write, so it
+        // is ambiguous; a 4xx-class error was raised before the write and keeps
+        // the ordinary mapping below.
+        if (response.status >= 500) throw ambiguousMutationAppError(path, response.status);
+      } else {
+        throw ambiguousMutationFailure(path);
+      }
+    }
     throw toTrpcFailure(response.status, body as TrpcErrorBody, path);
   }
 
   const result = isTrpcSuccessBody(body) ? body.result : null;
   if (!result) {
+    // A 2xx whose body cannot be read, or is not a tRPC result, says the API
+    // accepted the request but not that anything failed: for a mutation the
+    // write may have landed, and reporting a failure would invite a duplicate.
+    if (row.kind === 'mutation') {
+      throw ambiguousMutationFailure(path);
+    }
     throw new JsonRpcFailure(
       INTERNAL_ERROR,
       `The Kilo API replied to "${path}" without a tRPC result body.`,
       { path }
     );
   }
-  return serializeWithCap(result.data);
+  // A void procedure has no `data` key: serialize `null` so the agent gets a
+  // success result instead of a false error for a write that landed.
+  const data = Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : null;
+  return serializeWithCap(data);
 }

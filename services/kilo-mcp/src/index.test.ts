@@ -34,6 +34,28 @@ const testCatalog: Catalog = {
     searchBlob:
       'cliSessions.search Search the user CLI sessions by keyword. clisessions search query',
   },
+  'cliSessions.revokeAll': {
+    path: 'cliSessions.revokeAll',
+    kind: 'mutation',
+    summary: 'Revoke every CLI session the user has.',
+    inputSchema: {},
+    tags: ['clisessions'],
+    searchBlob: 'cliSessions.revokeAll Revoke every CLI session the user has. clisessions revoke',
+  },
+  'teams.create': {
+    path: 'teams.create',
+    kind: 'mutation',
+    summary: 'Create a team in the organization.',
+    inputSchema: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      properties: { name: { type: 'string', minLength: 1 } },
+      required: ['name'],
+      additionalProperties: false,
+    },
+    tags: ['teams'],
+    searchBlob: 'teams.create Create a team in the organization. teams create name',
+  },
 };
 
 /** The props-derived credentials the OAuth provider hands the API handler. */
@@ -294,6 +316,54 @@ describe('tools/call search', () => {
     expect(payload.results[0]).toMatchObject({ kind: 'query', tags: ['organizations'] });
   });
 
+  it('happy: returns the published mutation with kind: "mutation" and the schema call applies', async () => {
+    const { json } = await rpcResult({
+      jsonrpc: '2.0',
+      id: 6,
+      method: 'tools/call',
+      params: { name: 'search', arguments: { query: 'create a team' } },
+    });
+    const content = (json as { result: { content: Array<{ text: string }> } }).result.content;
+    const payload = JSON.parse(content[0]!.text) as {
+      results: Array<{ path: string; kind: string; inputSchema: Record<string, unknown> }>;
+    };
+    const hit = payload.results[0]!;
+    expect(hit).toMatchObject({ path: 'teams.create', kind: 'mutation' });
+    // The tool description promises the input schema; the row must carry the
+    // exact published schema, naming the property the agent has to send.
+    expect(hit.inputSchema).toEqual(testCatalog['teams.create']!.inputSchema);
+    expect(hit.inputSchema).toMatchObject({
+      properties: { name: { type: 'string', minLength: 1 } },
+      required: ['name'],
+    });
+
+    // The schema the search returned is what `call` accepts: build the input
+    // from its required property list and confirm the call goes through.
+    const required = hit.inputSchema['required'] as string[];
+    const input = { [required[0]!]: 'core' };
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ result: { data: { id: 'team-1' } } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    const called = await rpcResult(
+      {
+        jsonrpc: '2.0',
+        id: 31,
+        method: 'tools/call',
+        params: { name: 'call', arguments: { path: hit.path, input } },
+      },
+      fetchImpl
+    );
+    expect('error' in called.json).toBe(false);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://app.kilo.ai/api/trpc/teams.create');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe('{"name":"core"}');
+  });
+
   it('empty: no matches is a zero-row result with a refine-your-query message, not an error', async () => {
     const { json } = await rpcResult({
       jsonrpc: '2.0',
@@ -331,6 +401,135 @@ describe('tools/call search', () => {
       expect('result' in (json as Record<string, unknown>)).toBe(true);
     }
   });
+
+  it('keeps an over-cap search payload parseable JSON instead of cutting it mid-token', async () => {
+    // Every hit now carries its full input schema, so a result set can exceed
+    // the cap the call tool already enforces. A lone hit whose schema alone
+    // passes the cap must still yield valid JSON: the hit is dropped and the
+    // payload says so, never left as text cut at a byte boundary.
+    const big = 'z'.repeat(20_000);
+    const blobCatalog: Catalog = {
+      'blob.get': {
+        path: 'blob.get',
+        kind: 'query',
+        summary: 'Get the stored blob.',
+        inputSchema: {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: { blob: { type: 'string', examples: [big] } },
+        },
+        tags: ['blob'],
+        searchBlob: 'blob.get Get the stored blob. blob get',
+      },
+    };
+    const response = await rpc(
+      createMcpHandler({ catalog: blobCatalog, webBaseUrl: 'https://app.kilo.ai' }),
+      {
+        jsonrpc: '2.0',
+        id: 22,
+        method: 'tools/call',
+        params: { name: 'search', arguments: { query: 'stored blob' } },
+      }
+    );
+    const result = (
+      (await response.json()) as {
+        result: { content: Array<{ text: string }>; truncated?: boolean };
+      }
+    ).result;
+    expect(result.truncated).toBe(true);
+    expect(new TextEncoder().encode(result.content[0]!.text).byteLength).toBeLessThanOrEqual(
+      16 * 1024
+    );
+    // Parseable, unlike a payload cut at a byte boundary.
+    const payload = JSON.parse(result.content[0]!.text) as {
+      results: Array<{ path: string }>;
+      truncated: boolean;
+      message: string;
+    };
+    expect(payload.truncated).toBe(true);
+    expect(payload.results).toEqual([]);
+    expect(payload.message).toContain('Dropped 1 of 1');
+  });
+
+  it('drops only the lowest-ranked hits when part of the results fit', async () => {
+    // Three equally scored hits (ties break by path ascending) of ~6 KB each:
+    // the top two fit under the cap, the third does not, so the payload must
+    // keep blob.alpha and blob.beta and report the one dropped.
+    const filler = 'z'.repeat(6_000);
+    const row = (path: string): Catalog[string] => ({
+      path,
+      kind: 'query',
+      summary: 'Get the stored blob.',
+      inputSchema: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: { blob: { type: 'string', examples: [filler] } },
+      },
+      tags: ['blob'],
+      searchBlob: `${path} Get the stored blob. stored blob`,
+    });
+    const catalog: Catalog = {
+      'blob.alpha': row('blob.alpha'),
+      'blob.beta': row('blob.beta'),
+      'blob.gamma': row('blob.gamma'),
+    };
+    const response = await rpc(createMcpHandler({ catalog, webBaseUrl: 'https://app.kilo.ai' }), {
+      jsonrpc: '2.0',
+      id: 25,
+      method: 'tools/call',
+      params: { name: 'search', arguments: { query: 'stored blob' } },
+    });
+    const result = (
+      (await response.json()) as {
+        result: { content: Array<{ text: string }>; truncated?: boolean };
+      }
+    ).result;
+    expect(result.truncated).toBe(true);
+    const text = result.content[0]!.text;
+    expect(new TextEncoder().encode(text).byteLength).toBeLessThanOrEqual(16 * 1024);
+    const payload = JSON.parse(text) as {
+      results: Array<{ path: string; inputSchema: Record<string, unknown> }>;
+      truncated: boolean;
+      message: string;
+    };
+    expect(payload.results.map(hit => hit.path)).toEqual(['blob.alpha', 'blob.beta']);
+    // Kept hits are whole rows, schema included.
+    expect(payload.results[1]!.inputSchema).toEqual(catalog['blob.beta']!.inputSchema);
+    expect(payload.message).toContain('Dropped 1 of 3');
+  });
+
+  it('caps the empty-results payload too', async () => {
+    // The empty state echoes the query back, and the query has no length bound,
+    // so that payload must be capped as well.
+    const { json } = await rpcResult({
+      jsonrpc: '2.0',
+      id: 23,
+      method: 'tools/call',
+      params: { name: 'search', arguments: { query: 'z'.repeat(20_000) } },
+    });
+    const result = (json as { result: { content: Array<{ text: string }>; truncated?: boolean } })
+      .result;
+    expect(result.truncated).toBe(true);
+    expect(result.content[0]!.text.endsWith('[truncated]')).toBe(true);
+    expect(new TextEncoder().encode(result.content[0]!.text).byteLength).toBeLessThanOrEqual(
+      16 * 1024
+    );
+  });
+
+  it('does not mark a small search payload truncated', async () => {
+    const { json } = await rpcResult({
+      jsonrpc: '2.0',
+      id: 24,
+      method: 'tools/call',
+      params: { name: 'search', arguments: { query: 'organizations list' } },
+    });
+    const result = (json as { result: { content: Array<{ text: string }>; truncated?: boolean } })
+      .result;
+    expect(result.truncated).toBeUndefined();
+    // The payload stays parseable JSON, so the agent can build the call.
+    const payload = JSON.parse(result.content[0]!.text) as { results: unknown[] };
+    expect(payload.results.length).toBeGreaterThan(0);
+  });
 });
 
 describe('tools/call call', () => {
@@ -359,6 +558,122 @@ describe('tools/call call', () => {
     const headers = init.headers as Record<string, string>;
     expect(headers['Authorization']).toBe('Bearer kilo-token');
     expect(headers[ORGANIZATION_ID_HEADER]).toBe('org-1');
+  });
+
+  it('happy: applies a mutation with one POST upstream and returns the upstream data', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ result: { data: { id: 'team-1' } } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    const { json } = await rpcResult(
+      {
+        jsonrpc: '2.0',
+        id: 30,
+        method: 'tools/call',
+        params: { name: 'call', arguments: { path: 'teams.create', input: { name: 'core' } } },
+      },
+      fetchImpl
+    );
+    const text = (json as { result: { content: Array<{ text: string }> } }).result.content[0]!.text;
+    expect(text).toBe('{"id":"team-1"}');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://app.kilo.ai/api/trpc/teams.create');
+    expect(init.method).toBe('POST');
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+    expect(init.body).toBe('{"name":"core"}');
+  });
+
+  it('happy: a void mutation ({"result":{}}) is a success, not an error', async () => {
+    // A void procedure (the real agentProfiles.bindToRepo/unbindRepo) serializes
+    // to `{"result":{}}`; reporting an error would tell the agent the write
+    // failed when it landed.
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ result: {} }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    const { json } = await rpcResult(
+      {
+        jsonrpc: '2.0',
+        id: 32,
+        method: 'tools/call',
+        params: { name: 'call', arguments: { path: 'cliSessions.revokeAll' } },
+      },
+      fetchImpl
+    );
+    expect((json as { error?: unknown }).error).toBeUndefined();
+    const text = (json as { result: { content: Array<{ text: string }> } }).result.content[0]!.text;
+    expect(text).toBe('null');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://app.kilo.ai/api/trpc/cliSessions.revokeAll');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe('{}');
+  });
+
+  it('a query path still goes out as GET with no body', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ result: { data: [] } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    await rpcResult(
+      {
+        jsonrpc: '2.0',
+        id: 31,
+        method: 'tools/call',
+        params: { name: 'call', arguments: { path: 'organizations.list' } },
+      },
+      fetchImpl
+    );
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+  });
+
+  it('non-retryable: schema-invalid mutation input lists violations with no upstream request', async () => {
+    const fetchImpl = vi.fn();
+    const { json } = await rpcResult(
+      {
+        jsonrpc: '2.0',
+        id: 32,
+        method: 'tools/call',
+        params: { name: 'call', arguments: { path: 'teams.create', input: { name: '' } } },
+      },
+      fetchImpl
+    );
+    const error = (json as { error: { code: number; message: string } }).error;
+    expect(error.code).toBe(-32602);
+    expect(error.message).toContain('name');
+    expect(error.message).toContain('minLength');
+    expect(error.message).not.toContain('may or may not');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('non-retryable: a mutation path absent from the catalog is Unknown path with no upstream request', async () => {
+    const fetchImpl = vi.fn();
+    const { json } = await rpcResult(
+      {
+        jsonrpc: '2.0',
+        id: 33,
+        method: 'tools/call',
+        params: { name: 'call', arguments: { path: 'teams.delete' } },
+      },
+      fetchImpl
+    );
+    const error = (json as { error: { code: number; message: string } }).error;
+    expect(error.code).toBe(-32602);
+    expect(error.message).toContain('Unknown path');
+    expect(error.message).not.toContain('may or may not');
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('a caller-supplied organization header never overrides the grant props', async () => {
@@ -1035,6 +1350,70 @@ describe('analytics wiring (s2)', () => {
       path: 'organizations.list',
       success: false,
       errorClass: 'upstream_unreachable',
+    });
+    expect(eventsNamed(captured, 'kilo_mcp_call_rejected')).toHaveLength(0);
+  });
+
+  it('an ambiguous mutation transport failure emits upstream_unreachable_ambiguous', async () => {
+    const upstream = vi.fn(() => Promise.reject(new Error('network down')));
+    const { captured, promises, handler } = createHarness({
+      upstreamFetchImpl: upstream as unknown as typeof fetch,
+    });
+    await post(handler, {
+      jsonrpc: '2.0',
+      id: 17,
+      method: 'tools/call',
+      params: { name: 'call', arguments: { path: 'teams.create', input: { name: 'core' } } },
+    });
+    await settle(promises);
+
+    const toolEvents = eventsNamed(captured, 'kilo_mcp_tool_called');
+    expect(toolEvents).toHaveLength(1);
+    expect(propertiesOf(toolEvents[0]!)).toMatchObject({
+      tool: 'call',
+      path: 'teams.create',
+      success: false,
+      errorClass: 'upstream_unreachable_ambiguous',
+    });
+    expect(eventsNamed(captured, 'kilo_mcp_call_rejected')).toHaveLength(0);
+  });
+
+  it('a mutation app-level 5xx error emits upstream_unreachable_ambiguous, not upstream_error', async () => {
+    // The app answered, but a 5xx-class tRPC error can follow a committed
+    // write: the class must say the outcome is unknown, not that the request
+    // failed cleanly.
+    const upstream = vi.fn(() =>
+      Promise.resolve(
+        Response.json(
+          {
+            error: {
+              message: 'Output validation failed',
+              code: -32603,
+              data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500, path: 'teams.create' },
+            },
+          },
+          { status: 500 }
+        )
+      )
+    );
+    const { captured, promises, handler } = createHarness({
+      upstreamFetchImpl: upstream as unknown as typeof fetch,
+    });
+    await post(handler, {
+      jsonrpc: '2.0',
+      id: 18,
+      method: 'tools/call',
+      params: { name: 'call', arguments: { path: 'teams.create', input: { name: 'core' } } },
+    });
+    await settle(promises);
+
+    const toolEvents = eventsNamed(captured, 'kilo_mcp_tool_called');
+    expect(toolEvents).toHaveLength(1);
+    expect(propertiesOf(toolEvents[0]!)).toMatchObject({
+      tool: 'call',
+      path: 'teams.create',
+      success: false,
+      errorClass: 'upstream_unreachable_ambiguous',
     });
     expect(eventsNamed(captured, 'kilo_mcp_call_rejected')).toHaveLength(0);
   });

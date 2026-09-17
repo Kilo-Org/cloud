@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => {
   return {
     readWaitingAsk: vi.fn<() => Promise<WaitingAsk | null>>(),
     recordWaitingAsk: vi.fn<(ask: WaitingAsk | null) => void>(),
+    restorePersistedGlanceable: vi.fn<() => Promise<void>>(),
     runGlanceableApprove: vi.fn<() => Promise<GlanceableApproveResult>>(),
     refreshGlanceableSnapshot: vi.fn<() => Promise<void>>(),
     setGlanceableActionNotice: vi.fn<(notice: string | null) => void>(),
@@ -62,6 +63,13 @@ const mocks = vi.hoisted(() => {
 vi.mock('@/lib/glanceable/waiting-ask', () => ({
   readWaitingAsk: mocks.readWaitingAsk,
   recordWaitingAsk: mocks.recordWaitingAsk,
+}));
+
+// The task restores the persisted glanceable before it reads the mirrored ask
+// (that store holds the scope key the ask is fenced against); the real module
+// needs the native SecureStore.
+vi.mock('@/lib/glanceable/persist', () => ({
+  restorePersistedGlanceable: mocks.restorePersistedGlanceable,
 }));
 
 vi.mock('@/lib/glanceable/approve-ask', () => ({
@@ -137,6 +145,7 @@ beforeEach(async () => {
   mocks.readWaitingAsk.mockResolvedValue(ASK);
   mocks.runGlanceableApprove.mockResolvedValue({ kind: 'approved' });
   mocks.refreshGlanceableSnapshot.mockResolvedValue(undefined);
+  mocks.restorePersistedGlanceable.mockResolvedValue(undefined);
   // The language case switches the shared instance; every other case is English.
   await i18n.changeLanguage('en');
 });
@@ -515,5 +524,18 @@ describe('the headless worker lifecycle', () => {
     expect(WORKER_SOURCE).toContain('private const val NO_TASK_ID = -1');
     expect(WORKER_SOURCE).toContain('private var taskId = NO_TASK_ID');
     expect(WORKER_SOURCE).toContain('this.taskId != NO_TASK_ID && this.taskId == taskId');
+  });
+
+  it('re-checks the stop on the UI thread before it starts headless JS', () => {
+    const invokeStartTask = workerMember('private fun invokeStartTask(reactContext: ReactContext)');
+    const hop = invokeStartTask.slice(invokeStartTask.indexOf('UiThreadUtil.runOnUiThread'));
+    const stopCheck = hop.indexOf('if (stopped)');
+    const start = hop.indexOf('taskContext.startTask');
+
+    // The guard before the hop runs on the worker's thread while WorkManager
+    // stops the worker on the main thread: a stop can land between the two, so
+    // the runnable has to repeat the check before it starts the task.
+    expect(stopCheck).toBeGreaterThanOrEqual(0);
+    expect(start).toBeGreaterThan(stopCheck);
   });
 });

@@ -339,7 +339,11 @@ export const androidSink: GlanceableSink = {
         eligible ? notificationText(snapshot) : (props.statusLine ?? translate('glanceable.empty')),
         actions.openLabel,
         actions.openUrl,
-        actions.approveLabel,
+        // A terminal republish (no eligible work, or an expired snapshot) must
+        // not offer Approve: the surface already reports nothing to answer, and
+        // the record can still be there — a background delivery publishes
+        // without reselecting the ask. Open stays; it is the route back.
+        eligible ? actions.approveLabel : null,
         eligible ? buildCompactNotificationText(snapshot, {}, formatGlanceableCount) : null,
         terminalExpiresAt === null ? 0 : Math.max(1, terminalExpiresAt - Date.now())
       );

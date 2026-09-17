@@ -153,6 +153,13 @@ let currentAsk: WaitingAsk | null = null;
 // the read can never be clobbered by a stale persisted record.
 let waitingAskEpoch = 0;
 
+// True once this process has recorded (or cleared) an ask. That record's mirror
+// write may still be in the chain behind a slower write, so the mirror can hold
+// a value this process has already superseded — an ask whose delete is queued.
+// Hydration fills only for a process that has not written yet: otherwise a
+// record this run made (or cleared) is authoritative, mirror or not.
+let recordedInProcess = false;
+
 // The mirror writes, chained one after the other. A later record's write is
 // issued only once the previous one has settled, so two rapid records can never
 // land out of order on disk, and no rejection escapes: the in-memory value is
@@ -214,6 +221,7 @@ function isAskInCurrentScope(ask: WaitingAsk): boolean {
 export function recordWaitingAsk(ask: WaitingAsk | null): void {
   waitingAskEpoch += 1;
   currentAsk = ask;
+  recordedInProcess = true;
   mirrorAsk(ask);
 }
 
@@ -227,10 +235,12 @@ let hydrationPromise: Promise<void> | null = null;
 /**
  * One read of the mirror, epoch-guarded exactly like
  * `restorePersistedGlanceable`: a record that lands during the read owns the
- * state, and an already-set in-memory ask is never overwritten. Best effort —
- * a failed or malformed read leaves the in-memory state alone. A record from
- * another scope is dropped here, at the one boundary where the mirror enters
- * the process.
+ * state, and an already-set in-memory ask is never overwritten. A process that
+ * has recorded anything itself is not hydrated either, because the mirror it
+ * would read can still hold the value that record replaced — a cleared ask
+ * whose delete is queued behind the write chain. Best effort — a failed or
+ * malformed read leaves the in-memory state alone. A record from another scope
+ * is dropped here, at the one boundary where the mirror enters the process.
  */
 async function hydrateStoredAsk(): Promise<void> {
   const startEpoch = waitingAskEpoch;
@@ -239,7 +249,7 @@ async function hydrateStoredAsk(): Promise<void> {
     if (waitingAskEpoch !== startEpoch) {
       return;
     }
-    if (raw !== null && currentAsk === null) {
+    if (raw !== null && currentAsk === null && !recordedInProcess) {
       const parsed = parseStoredAsk(raw);
       if (parsed !== null && isAskInCurrentScope(parsed)) {
         currentAsk = parsed;
@@ -275,6 +285,7 @@ export async function _flushWaitingAskMirrorForTests(): Promise<void> {
 export function _resetWaitingAskForTests(): void {
   currentAsk = null;
   waitingAskEpoch = 0;
+  recordedInProcess = false;
   hydrationPromise = null;
   mirrorWrite = null;
   secureStoreForTests = null;

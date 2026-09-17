@@ -514,6 +514,31 @@ describe('androidSink approve action', () => {
       0
     );
   });
+
+  it('drops the label when a terminal republish has no eligible work', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_done' }));
+    androidSink.startOrUpdate(PERMISSION, CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.approveLabel).toBe(i18n.t('common.approve'));
+
+    // Work stopped being eligible while the ask record was still there (the
+    // background delivery path publishes without reselecting the ask). The
+    // surface is terminal now, so it must not offer an action it no longer
+    // reports; Open stays, because the deep link is still the only route back.
+    androidSink.publish(snapshotFor([], 1, 'empty'));
+
+    expect(mocks.getNotification()?.approveLabel).toBeNull();
+    expect(mocks.native.update).toHaveBeenLastCalledWith(
+      'Active agents',
+      'No agents waiting',
+      i18n.t('glanceable.openSession'),
+      'kiloapp:///cloud/sessions/ses_done',
+      null,
+      null,
+      true,
+      expect.any(Number)
+    );
+  });
 });
 
 describe('androidSink app-state retry', () => {

@@ -112,6 +112,12 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
     val data = Arguments.makeNativeMap(inputData.keyValueMap)
     // startTask must run on the UI thread, like every other Activity/Task hop.
     UiThreadUtil.runOnUiThread {
+      // The guard above runs on the worker's thread; WorkManager stops the worker
+      // on the main thread, so a stop can land between that check and this hop.
+      // Re-checking here is what keeps a late stop from starting JS anyway.
+      if (stopped) {
+        return@runOnUiThread
+      }
       taskId = taskContext.startTask(HeadlessJsTaskConfig(TASK_NAME, data, TASK_TIMEOUT_MS, true))
     }
   }

@@ -3,6 +3,7 @@ import { AppRegistry } from 'react-native';
 import { i18n } from '@/i18n';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { runGlanceableApprove } from '@/lib/glanceable/approve-ask';
+import { restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { readWaitingAsk, recordWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
@@ -95,6 +96,11 @@ export async function handleApproveTask(): Promise<void> {
     // language — and both the failure line below and the notification the
     // republish renders must be in the user's language, not English.
     await applyStoredLanguage();
+    // The ask is fenced on the scope this process publishes, and that scope key
+    // is the persisted one on a cold headless process: restore it before the
+    // mirrored ask is read, or a record left by a signed-out account or another
+    // organization would be answered.
+    await restorePersistedGlanceable();
     ask = await readWaitingAsk();
     if (ask === null) {
       // Nothing is recorded, so there is no ask to answer and no action to drop.

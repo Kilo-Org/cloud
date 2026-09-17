@@ -40,6 +40,7 @@ const ACTIVITY_ID = 'activity-1';
 const mocks = vi.hoisted(() => ({
   readWaitingAsk: vi.fn<() => Promise<WaitingAsk | null>>(),
   recordWaitingAsk: vi.fn<(ask: WaitingAsk | null) => void>(),
+  restorePersistedGlanceable: vi.fn<() => Promise<void>>(),
   runGlanceableApprove: vi.fn<() => Promise<GlanceableApproveResult>>(),
   refreshGlanceableSnapshot: vi.fn<() => Promise<void>>(),
   language: {
@@ -60,6 +61,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/glanceable/waiting-ask', () => ({
   readWaitingAsk: mocks.readWaitingAsk,
   recordWaitingAsk: mocks.recordWaitingAsk,
+}));
+
+// Both headless presses restore the persisted glanceable before reading the
+// mirrored ask (the fence's scope key); the real store needs the native module.
+vi.mock('@/lib/glanceable/persist', () => ({
+  restorePersistedGlanceable: mocks.restorePersistedGlanceable,
 }));
 
 vi.mock('@/lib/glanceable/approve-ask', () => ({
@@ -143,6 +150,7 @@ beforeEach(async () => {
   mocks.readWaitingAsk.mockResolvedValue(ASK);
   mocks.runGlanceableApprove.mockResolvedValue({ kind: 'approved' });
   mocks.refreshGlanceableSnapshot.mockResolvedValue(undefined);
+  mocks.restorePersistedGlanceable.mockResolvedValue(undefined);
   mocks.iosRender.mockResolvedValue(undefined);
   mocks.androidRender.mockResolvedValue(undefined);
   // Each case starts from English so the German case below is a real switch.
@@ -248,6 +256,21 @@ describe('activity Approve parity across platforms', () => {
 
       expect(mocks.recordWaitingAsk).toHaveBeenCalledWith(null);
       expect(harness.notice).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(PLATFORMS)(
+    'fences the mirrored ask behind the restored scope on $platform',
+    async harness => {
+      await harness.press();
+
+      // Both presses can launch the process headless, where the persisted
+      // glanceable holds the scope key the mirrored ask is fenced against.
+      // Reading the ask first would accept one that belongs to another scope.
+      expect(mocks.restorePersistedGlanceable).toHaveBeenCalledTimes(1);
+      expect(mocks.restorePersistedGlanceable.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.readWaitingAsk.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+      );
     }
   );
 

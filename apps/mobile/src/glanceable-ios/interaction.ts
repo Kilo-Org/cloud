@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 import { i18n } from '@/i18n';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { type GlanceableApproveResult, runGlanceableApprove } from '@/lib/glanceable/approve-ask';
+import { restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
 import { readWaitingAsk, recordWaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { setPendingDeepLink } from '@/lib/deep-link-launch';
@@ -123,6 +124,11 @@ async function approveFromCard(): Promise<GlanceableInteractionOutcome> {
   // widget props the republish renders. Switching i18n first is what keeps them
   // in the user's language instead of English.
   await applyStoredLanguage();
+  // The same background launch leaves the persisted glanceable unrestored, and
+  // the mirrored ask's cross-scope fence compares against the scope key that
+  // restore fills: reading the ask first would accept a record left by a
+  // signed-out account or another organization and answer it.
+  await restorePersistedGlanceable();
   const ask = await readWaitingAsk();
   const result = await approveResult();
   if (result.kind === 'retryable') {
@@ -158,6 +164,10 @@ async function approveFromCard(): Promise<GlanceableInteractionOutcome> {
  * be; guessing a session stays the one thing it must not do.
  */
 async function openRecordedSession(): Promise<GlanceableInteractionOutcome> {
+  // The same stored scope as the Approve press: the persisted glanceable is
+  // what the mirrored ask is fenced against, and this press can arrive before
+  // the app root restores it.
+  await restorePersistedGlanceable();
   const ask = await readWaitingAsk();
   const href = resolveIncomingUrl(
     ask === null ? OPEN_AGENTS_URL : `${SESSION_URL_PREFIX}${ask.kiloSessionId}`

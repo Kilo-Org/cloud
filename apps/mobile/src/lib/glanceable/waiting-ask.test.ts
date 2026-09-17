@@ -317,4 +317,28 @@ describe('waiting ask store', () => {
     recordWaitingAsk(ask);
     await expect(readWaitingAsk()).resolves.toEqual(ask);
   });
+
+  it('does not resurrect an ask this process cleared while its delete is queued', async () => {
+    const ask = askFor({ kiloSessionId: 's1' });
+    recordWaitingAsk(ask);
+    await _flushWaitingAskMirrorForTests();
+    expect(store.get(ASK_KEY)).toBe(JSON.stringify(ask));
+
+    // The clear is in memory at once, but its mirror delete waits behind the
+    // write chain (a slow native call, or a burst of records). Hydration reads
+    // the mirror in that window and must not bring the cleared ask back.
+    const queuedDelete = deferred();
+    secureStoreMock.deleteItemAsync.mockImplementationOnce(async (key: string) => {
+      await queuedDelete.promise;
+      store.delete(key);
+    });
+    recordWaitingAsk(null);
+
+    await expect(readWaitingAsk()).resolves.toBeNull();
+    expect(getWaitingAsk()).toBeNull();
+
+    queuedDelete.resolve();
+    await _flushWaitingAskMirrorForTests();
+    expect(store.has(ASK_KEY)).toBe(false);
+  });
 });

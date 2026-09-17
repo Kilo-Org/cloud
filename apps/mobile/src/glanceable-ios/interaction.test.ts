@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   refreshGlanceableSnapshot: vi.fn(),
   readWaitingAsk: vi.fn(),
   recordWaitingAsk: vi.fn(),
+  restorePersistedGlanceable: vi.fn(),
   setPendingDeepLink: vi.fn(),
   setGlanceableActionNotice: vi.fn(),
   renderStoredSnapshotWithNotice: vi.fn(),
@@ -52,6 +53,11 @@ vi.mock('@/lib/glanceable/approve-ask', () => ({
 vi.mock('@/lib/glanceable/waiting-ask', () => ({
   readWaitingAsk: mocks.readWaitingAsk,
   recordWaitingAsk: mocks.recordWaitingAsk,
+}));
+// The persisted glanceable holds the scope key the mirrored ask is fenced
+// against; the real store needs the native SecureStore module.
+vi.mock('@/lib/glanceable/persist', () => ({
+  restorePersistedGlanceable: mocks.restorePersistedGlanceable,
 }));
 vi.mock('@/lib/deep-link-launch', () => ({ setPendingDeepLink: mocks.setPendingDeepLink }));
 
@@ -94,6 +100,7 @@ describe('handleGlanceableInteraction', () => {
     mocks.runGlanceableApprove.mockResolvedValue({ kind: 'approved' });
     mocks.refreshGlanceableSnapshot.mockResolvedValue(undefined);
     mocks.renderStoredSnapshotWithNotice.mockResolvedValue(undefined);
+    mocks.restorePersistedGlanceable.mockResolvedValue(undefined);
     mocks.changeLanguage.mockResolvedValue(undefined);
     mocks.language.whenLanguagePreferenceLoaded.mockResolvedValue(undefined);
   });
@@ -268,6 +275,29 @@ describe('handleGlanceableInteraction', () => {
       'universal-link'
     );
     expect(mocks.runGlanceableApprove).not.toHaveBeenCalled();
+  });
+
+  it('restores the persisted scope before Approve reads the mirrored ask', async () => {
+    await handleGlanceableInteraction(fromCard(GLANCEABLE_APPROVE_TARGET));
+
+    // A press can launch this process in the background, before any app root
+    // restores the persisted glanceable — and the mirrored ask's cross-scope
+    // fence compares against the scope key that restore fills. Reading the ask
+    // first would accept an ask left by a signed-out account or another org.
+    expect(mocks.restorePersistedGlanceable).toHaveBeenCalledTimes(1);
+    expect(callOrder(mocks.restorePersistedGlanceable)).toBeLessThan(
+      callOrder(mocks.readWaitingAsk)
+    );
+  });
+
+  it('restores the persisted scope before Open reads the mirrored ask', async () => {
+    await handleGlanceableInteraction(fromCard(GLANCEABLE_OPEN_TARGET));
+
+    // The same stored scope: Open names the recorded session, so a foreign ask
+    // must not become the deep link either.
+    expect(callOrder(mocks.restorePersistedGlanceable)).toBeLessThan(
+      callOrder(mocks.readWaitingAsk)
+    );
   });
 
   it('lands on the Agents tab when Open has no recorded session', async () => {

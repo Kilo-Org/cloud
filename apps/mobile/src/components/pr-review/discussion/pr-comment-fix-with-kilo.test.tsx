@@ -201,7 +201,7 @@ describe('PrCommentFixWithKilo', () => {
     expect(button?.props.accessibilityRole).toBe('button');
     expect(button?.props.accessibilityLabel).toBe('Fix with Kilo');
     // >=44pt effective target on a ~26pt pill; horizontal slop capped at 2pt
-    // so the 4pt gap-1 to the overflow button's hitSlop={8} never overlaps.
+    // so the 12pt gap-3 to the overflow button's hitSlop={8} never overlaps.
     expect(button?.props.hitSlop).toEqual({ top: 10, bottom: 10, left: 2, right: 2 });
     expect(
       renderer.root.findAll(

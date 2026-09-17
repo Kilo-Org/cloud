@@ -34,10 +34,17 @@ import { db } from '@/lib/drizzle';
  * app (which reaches these routes through `API_BASE_URL`), and neither that
  * host nor its origin can satisfy the associated-domain/credential binding the
  * browser or platform authenticator created against `app.kilo.ai`.
+ *
+ * Resolved per ceremony rather than at module load: `@/lib/user/server` imports
+ * this module for the sign-in provider, so importing it must not require a
+ * WebAuthn configuration. A process without a relying party still loads the
+ * route graph and only fails when a ceremony actually runs.
  */
-const relyingPartyUrl = new URL(NEXTAUTH_URL);
-const rpId = relyingPartyUrl.hostname;
-const expectedOrigin = relyingPartyUrl.origin;
+function getRelyingParty(): { rpId: string; expectedOrigin: string } {
+  const url = new URL(NEXTAUTH_URL);
+  return { rpId: url.hostname, expectedOrigin: url.origin };
+}
+
 const rpName = 'Kilo Code';
 
 /** Challenges are single-use and short-lived: the user completes the ceremony now. */
@@ -158,6 +165,8 @@ export async function createRegistrationOptions(
   kiloUserId: string,
   email: string
 ): Promise<RegistrationOptionsResult> {
+  const { rpId } = getRelyingParty();
+
   const existingCredentials = await db
     .select({
       credential_id: passkey_credentials.credential_id,
@@ -209,6 +218,8 @@ export async function verifyRegistration(
   challengeId: string,
   response: RegistrationResponseJSON
 ): Promise<PasskeyCredential> {
+  const { rpId, expectedOrigin } = getRelyingParty();
+
   const challenge = await consumeChallenge(challengeId, 'registration');
 
   if (challenge.kilo_user_id !== kiloUserId) {
@@ -283,6 +294,8 @@ export async function verifyRegistration(
  * — and therefore the user — is resolved from the assertion response.
  */
 export async function createAuthenticationOptions(): Promise<AuthenticationOptionsResult> {
+  const { rpId } = getRelyingParty();
+
   const options = await generateAuthenticationOptions({
     rpID: rpId,
     allowCredentials: [],
@@ -322,6 +335,8 @@ export async function verifyAuthentication(
   if (typeof credentialId !== 'string' || credentialId.length === 0) {
     throw new PasskeyVerificationError('VERIFICATION_FAILED');
   }
+
+  const { rpId, expectedOrigin } = getRelyingParty();
 
   const challenge = await consumeChallenge(challengeId, 'authentication');
 

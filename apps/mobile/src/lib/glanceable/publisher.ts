@@ -5,7 +5,6 @@ import {
   GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
   type GlanceableAgentsSnapshotStatus,
-  type GlanceableSessionRow,
   isEligibleGlanceableWork,
   shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
@@ -18,6 +17,7 @@ import {
   guardSink,
 } from './sink-registry';
 import { getSurfaceExtras, setSurfaceExtras } from './surface-extras';
+import { selectWaitingAsk, type WaitingAsk, type WaitingAskRow } from './waiting-ask';
 
 /**
  * Framework-agnostic publisher state machine. Derives one versioned snapshot
@@ -50,6 +50,13 @@ export type GlanceablePublisherOptions = {
    * silent until a successful org list confirms membership again.
    */
   orgLost?: () => boolean;
+  /**
+   * The one waiting ask the activity's action buttons can name, or null when
+   * nothing waits (see `selectWaitingAsk`). Data in, data out: the publisher
+   * never touches the store itself, so the headless wiring and the app wiring
+   * cannot drift. Absent when no surface can action an ask.
+   */
+  onWaitingAskChange?: (ask: WaitingAsk | null) => void;
 };
 
 type TimerHandle = ReturnType<typeof setTimeout>;
@@ -90,6 +97,7 @@ export class GlanceablePublisher {
   private readonly terminalBlankEpoch: () => number;
   private readonly blankEpochAtStart: number;
   private readonly orgLost: () => boolean;
+  private readonly onWaitingAskChange?: (ask: WaitingAsk | null) => void;
   private current: GlanceableAgentsSnapshot | null;
   private activityStarted: boolean;
   private coalesceTimer: TimerHandle | null = null;
@@ -107,16 +115,24 @@ export class GlanceablePublisher {
     this.terminalBlankEpoch = options.terminalBlankEpoch ?? (() => 0);
     this.blankEpochAtStart = this.terminalBlankEpoch();
     this.orgLost = options.orgLost ?? (() => false);
+    this.onWaitingAskChange = options.onWaitingAskChange;
     this.current = options.initial ?? null;
     this.activityStarted = false;
   }
 
-  /** Cache success: derive the next snapshot from the current session rows. */
+  /**
+   * Cache success: derive the next snapshot from the current session rows. The
+   * rows carry both the newest-session fields the Home Screen widgets read and
+   * the session id the activity's action buttons need.
+   */
   handleSessions(
-    sessions: readonly (GlanceableSessionRow & NewestSessionRow)[],
+    sessions: readonly (NewestSessionRow & WaitingAskRow)[],
     ctx: GlanceablePublisherContext
   ): void {
     if (this.isGated()) {
+      // Nothing is asking while the publisher is gated: a terminal blank must
+      // not leave an approvable ask behind for the action buttons.
+      this.noteWaitingAsk(null);
       return;
     }
     // The newest session's title never enters the snapshot (privacy contract):
@@ -138,6 +154,9 @@ export class GlanceablePublisher {
     });
 
     if (isEligibleGlanceableWork(snapshot)) {
+      // The rows are the only place the session id exists, so the ask is
+      // selected here, beside the snapshot derived from the same rows.
+      this.noteWaitingAsk(selectWaitingAsk(sessions, ctx, now));
       this.cancelTerminal();
       if (!this.activityStarted) {
         // First eligible emit starts the activity immediately, no coalesce wait.
@@ -151,6 +170,7 @@ export class GlanceablePublisher {
         this.scheduleCoalesced(snapshot, ctx);
       }
     } else {
+      this.noteWaitingAsk(null);
       this.cancelCoalesce();
       this.publish(snapshot);
       if (this.activityStarted) {
@@ -184,6 +204,9 @@ export class GlanceablePublisher {
 
   /** Cache update failed: keep the last counts only until their original deadline. */
   handleFetchError(_ctx: GlanceablePublisherContext): void {
+    // A failed refetch supersedes the ask: the surface now shows stale counts,
+    // so a still-recorded waiting session must not stay approvable from it.
+    this.noteWaitingAsk(null);
     if (this.isGated() || this.current === null) {
       return;
     }
@@ -237,6 +260,11 @@ export class GlanceablePublisher {
 
   private isGated(): boolean {
     return this.terminalBlankEpoch() !== this.blankEpochAtStart || this.orgLost();
+  }
+
+  /** Hand the current ask to the consumer, when one is wired. */
+  private noteWaitingAsk(ask: WaitingAsk | null): void {
+    this.onWaitingAskChange?.(ask);
   }
 
   private emit(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext): void {

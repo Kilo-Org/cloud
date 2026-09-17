@@ -170,6 +170,8 @@ export type PasskeySignInResult =
       failure: PasskeyFailure;
       /** A server code the caller maps to its own copy, when the server sent one. */
       errorCode?: string;
+      /** The organization a forced-SSO refusal names, for the SSO recovery block. */
+      ssoOrganizationId?: string;
       /** The failure already showed its own message; the caller must not toast again. */
       reported?: boolean;
     };
@@ -259,7 +261,12 @@ export async function signInWithPasskey(
     if (!tokenResult.errorCode) {
       return { status: 'error', failure: 'cancelled' };
     }
-    return { status: 'error', failure: 'failed', errorCode: tokenResult.errorCode };
+    return {
+      status: 'error',
+      failure: 'failed',
+      errorCode: tokenResult.errorCode,
+      ssoOrganizationId: tokenResult.ssoOrganizationId,
+    };
   }
 
   const parsed = parseTokenPair(tokenResult.data);

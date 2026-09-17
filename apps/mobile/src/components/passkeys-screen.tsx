@@ -71,14 +71,15 @@ function InlineFailure({
  *
  * Four states: loading reserves the final rows' boxes, empty offers creation as
  * its only action, happy lists a row per passkey, and a failure is either
- * retryable in place (the list request or a removal, with the rows it was shown
- * with kept) or non-retryable (a device that cannot create passkeys: the Add
- * control is not offered, and the unsupported notice takes the hint's place
- * while the existing rows stay). A cancelled creation sheet changed nothing, so
- * the list is left as it was and the toast says so. A retry is single-flight —
- * its control is disabled while the request it starts is pending — and a removal
- * failure is only actionable while that delete runs or its row has rolled back,
- * never after the server list drops it.
+ * retryable in place (the list request or a removal, with whatever the query
+ * last rendered kept — the rows or the empty state) or non-retryable (a device
+ * that cannot create passkeys: the Add control is not offered, and the
+ * unsupported notice takes the hint's place while the existing rows stay). A
+ * cancelled creation sheet changed nothing, so the list is left as it was and
+ * the toast says so. A retry is single-flight — its control is disabled while
+ * the request it starts is pending — and a removal failure is only actionable
+ * while that delete runs or its row has rolled back, never after the server
+ * list drops it.
  *
  * The Add control is the screen's one action and sits outside the scrolling
  * list, in the footer above the tab bar: the header and the control then keep
@@ -268,7 +269,9 @@ export function PasskeysScreen() {
     failureNotice = (
       <InlineFailure
         message={t('profile.passkeyRemoveFailed')}
-        pending={remove.isPending}
+        // The retry names one passkey's delete, so it is locked by that delete
+        // alone: another removal in flight must not load this control.
+        pending={removalInFlight}
         onRetry={() => {
           remove.mutate({ id: removeFailureId });
         }}
@@ -331,16 +334,23 @@ export function PasskeysScreen() {
     // hint's place: "Add a passkey…" would instruct the control this device has
     // just withdrawn, and the notice is then the state's only content.
     //
+    // A failed background refresh is reported above the empty state, not
+    // hidden by it: the cached list is empty, so the notice is the only thing
+    // that says the request failed and offers the retry.
+    //
     // The state carries no action of its own: the Add control it describes
     // lives in the footer, where it holds the same coordinates whether the
     // query renders this state or a list of rows.
     body = (
-      <EmptyState
-        placement="top"
-        icon={KeyRound}
-        title={t('profile.passkeysEmpty')}
-        description={canCreatePasskeys ? t('profile.passkeysEmptyHint') : addFailureNotice}
-      />
+      <>
+        {failureNotice}
+        <EmptyState
+          placement="top"
+          icon={KeyRound}
+          title={t('profile.passkeysEmpty')}
+          description={canCreatePasskeys ? t('profile.passkeysEmptyHint') : addFailureNotice}
+        />
+      </>
     );
   } else {
     body = (

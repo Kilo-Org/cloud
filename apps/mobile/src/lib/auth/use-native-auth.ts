@@ -246,6 +246,14 @@ export function useNativeAuth(): NativeAuthResult {
         // repeat it.
         return;
       }
+      if (result.errorCode === 'SSO_ERROR') {
+        // A forced-SSO refusal is the same gate Apple, Google, and the email
+        // code take: offer the SSO recovery block instead of a toast. The
+        // usernameless ceremony names no address, so the block is seeded with
+        // the empty email Apple's credential omits on a later sign-in.
+        handleSsoError('', result.ssoOrganizationId);
+        return;
+      }
       toast.error(
         result.errorCode ? mapError(result.errorCode) : i18n.t(passkeyFailureKey(result.failure))
       );
@@ -256,7 +264,7 @@ export function useNativeAuth(): NativeAuthResult {
     } finally {
       finishAction('passkey');
     }
-  }, [finishAction, signIn, startAction]);
+  }, [finishAction, handleSsoError, signIn, startAction]);
 
   const requestEmailCode = useCallback(
     async (rawEmail: string) => {

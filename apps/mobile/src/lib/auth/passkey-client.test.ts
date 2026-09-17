@@ -300,6 +300,28 @@ describe('signInWithPasskey', () => {
     expect(result).toEqual({ status: 'error', failure: 'failed', errorCode: 'BLOCKED' });
   });
 
+  it('carries the SSO organization a refused token exchange names', async () => {
+    const api = fakeApi();
+    api.get.mockResolvedValue(assertion);
+    mockPostAuth
+      .mockResolvedValueOnce(optionsResponse)
+      .mockResolvedValueOnce(ticketResponse)
+      .mockResolvedValueOnce({
+        ok: false as const,
+        errorCode: 'SSO_ERROR',
+        ssoOrganizationId: 'org_1',
+      });
+
+    const result = await signInWithPasskey(api);
+
+    expect(result).toEqual({
+      status: 'error',
+      failure: 'failed',
+      errorCode: 'SSO_ERROR',
+      ssoOrganizationId: 'org_1',
+    });
+  });
+
   it('marks a failed admission as already reported', async () => {
     const api = fakeApi();
     api.get.mockResolvedValue(assertion);

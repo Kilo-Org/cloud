@@ -559,6 +559,26 @@ describe('useNativeAuth passkey sign-in', () => {
     );
   });
 
+  it('routes a forced-SSO refusal to the recovery block instead of a toast', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({
+      status: 'error',
+      failure: 'failed',
+      errorCode: 'SSO_ERROR',
+      ssoOrganizationId: 'org_1',
+    });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    // The usernameless ceremony names no address, so the block is seeded with
+    // the empty email Apple's credential omits on a later sign-in.
+    expect(resultRef.current?.ssoRecovery).toEqual({ email: '', ssoOrganizationId: 'org_1' });
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(authMock.signIn).not.toHaveBeenCalled();
+  });
+
   it('does not add a second toast when the failure reported itself', async () => {
     mockRunPasskeySignIn.mockResolvedValue({
       status: 'error',

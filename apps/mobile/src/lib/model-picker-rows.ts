@@ -133,7 +133,8 @@ function groupForModel(model: SessionModelOption): Pick<ModelGroup, 'key' | 'tit
   if (model.provider) {
     return {
       key: `provider:${model.provider.id}`,
-      title: model.provider.name.toUpperCase(),
+      // Locale-aware: a Turkish provider name uppercases `i` to `İ`.
+      title: model.provider.name.toLocaleUpperCase(i18n.language),
     };
   }
   if (model.isPreferred) {

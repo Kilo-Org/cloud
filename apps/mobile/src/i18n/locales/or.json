@@ -343,7 +343,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} ମଧ୍ୟରୁ {{displayCount}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
       "filesStillLoading": "ଫାଇଲ୍ ଏବେ ବି ଲୋଡ୍ ହେଉଛି। ରିଫ୍ରେସ୍ କରିବାକୁ ତଳକୁ ଟାଣନ୍ତୁ।",
       "goToOverview": "ସାରାଂଶକୁ ଯାଆନ୍ତୁ",
-      "goToOverviewTab": "ସାରାଂଶ ଟ୍ୟାବ୍‌କୁ ଯାଆନ୍ତୁ"
+      "goToOverviewTab": "ସାରାଂଶ ଟ୍ୟାବ୍‌କୁ ଯାଆନ୍ତୁ",
+      "expandAllLines_one": "ସମସ୍ତ {{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ",
+      "expandAllLines_other": "ସମସ୍ତ {{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ",
+      "expandLines_one": "{{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "ଆଖପାଖ କୋଡ୍‌ର {{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ",
+      "expandLinesOfContext_other": "ଆଖପାଖ କୋଡ୍‌ର {{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ",
+      "expandMoreLines_one": "ଆହୁରି {{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ ({{start}}–{{end}})",
+      "expandMoreLines_other": "ଆହୁରି {{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}} ମଧ୍ୟରୁ {{loaded}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
+      "loadedOfTotalFiles_other": "{{total}} ମଧ୍ୟରୁ {{loaded}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ଫାଇଲ୍ ଶେଷରେ ନୂଆ ଧାଡ଼ି ନାହିଁ",
@@ -533,7 +543,9 @@
         "outdatedOnPath": "{{path}}ରେ ପୁରୁଣା ମନ୍ତବ୍ୟ"
       },
       "deletedUser": "ବିଲୋପ ହୋଇଥିବା ବ୍ୟବହାରକାରୀ",
-      "replyForbiddenTerm": "ଏହି {{term}}ରେ ଉତ୍ତର ଦେବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।"
+      "replyForbiddenTerm": "ଏହି {{term}}ରେ ଉତ୍ତର ଦେବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
+      "moreLinesAbove_one": "… ଉପରେ ଆହୁରି {{displayCount}} ଧାଡ଼ି ଅଛି।",
+      "moreLinesAbove_other": "… ଉପରେ ଆହୁରି {{displayCount}} ଧାଡ଼ି ଅଛି।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ଆପ୍‌ର ସେଟିଂସ୍ ଖୋଲିହେଲା ନାହିଁ।",
     "installKiloGitHubApp": "Kilo GitHub ଆପ୍ ଇନଷ୍ଟଲ୍ କରନ୍ତୁ",
@@ -706,7 +718,9 @@
       "statusContext": "ଆଖପାଖ କୋଡ୍",
       "lineLabel": "{{status}} ଧାଡ଼ି {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(ଖାଲି)"
+      "emptyLine": "(ଖାଲି)",
+      "truncationBanner_one": "GitHub API ସୀମା ଯୋଗୁଁ ମୋଟ {{total}} ପରିବର୍ତ୍ତିତ ଫାଇଲ୍ ମଧ୍ୟରୁ ପ୍ରଥମ {{limit}} ଦେଖାଯାଉଛି।",
+      "truncationBanner_other": "GitHub API ସୀମା ଯୋଗୁଁ ମୋଟ {{total}} ପରିବର୍ତ୍ତିତ ଫାଇଲ୍ ମଧ୍ୟରୁ ପ୍ରଥମ {{limit}} ଦେଖାଯାଉଛି।"
     },
     "linkPasteClipboardEmpty": "କ୍ଲିପବୋର୍ଡ ଖାଲି ଅଛି।",
     "linkPasteNotAPullRequest": "ଏହା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ କିମ୍ବା ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ନୁହେଁ",
@@ -880,7 +894,9 @@
       "uploadFailed": "ଅପଲୋଡ୍ ବିଫଳ ହେଲା।",
       "failedToUploadFile": "ଫାଇଲ୍ ଅପଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ। କାରଣ: {{reason}}",
       "nothingToPaste": "ପେଷ୍ଟ କରିବାକୁ କିଛି ନାହିଁ।",
-      "metadataStripFailed": "ଫଟୋର ମେଟାଡାଟା ହଟାଯାଇପାରିଲା ନାହିଁ।"
+      "metadataStripFailed": "ଫଟୋର ମେଟାଡାଟା ହଟାଯାଇପାରିଲା ନାହିଁ।",
+      "limit_one": "ଆପଣ ଅତି ବେଶୀରେ {{displayCount}}ଟି ଫାଇଲ୍ ସଂଲଗ୍ନ କରିପାରିବେ।",
+      "limit_other": "ଆପଣ ଅତି ବେଶୀରେ {{displayCount}}ଟି ଫାଇଲ୍ ସଂଲଗ୍ନ କରିପାରିବେ।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1640,11 @@
       "syncFindings": "ଚିହ୍ନଟ ସମସ୍ୟା ସିଙ୍କ୍ କରନ୍ତୁ",
       "syncNow": "ବର୍ତ୍ତମାନ ସିଙ୍କ୍ କରନ୍ତୁ",
       "syncQueued": "ସିଙ୍କ୍ ଅପେକ୍ଷା ତାଲିକାରେ ରଖାଗଲା",
-      "syncStatusUnavailable": "ସିଙ୍କ୍ ସ୍ଥିତି ଉପଲବ୍ଧ ନାହିଁ।"
+      "syncStatusUnavailable": "ସିଙ୍କ୍ ସ୍ଥିତି ଉପଲବ୍ଧ ନାହିଁ।",
+      "daysOverdue_one": "{{displayCount}} ଦିନ ବିଳମ୍ବିତ",
+      "daysOverdue_other": "{{displayCount}} ଦିନ ବିଳମ୍ବିତ",
+      "findingsCount_one": "{{displayCount}}ଟି ଚିହ୍ନଟ ସମସ୍ୟା",
+      "findingsCount_other": "{{displayCount}}ଟି ଚିହ୍ନଟ ସମସ୍ୟା"
     },
     "dashboardMetrics": {
       "openFindings": "ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟା",
@@ -2152,7 +2172,13 @@
       "updateTodos": "କାମ ତାଲିକା ଅଦ୍ୟତନ କରନ୍ତୁ",
       "linesBadge": "{{displayCount}}ଟି ଧାଡ଼ି",
       "filesBadge": "{{displayCount}}ଟି ଫାଇଲ୍",
-      "matchesBadge": "{{displayCount}}ଟି ମେଳ"
+      "matchesBadge": "{{displayCount}}ଟି ମେଳ",
+      "filesBadge_one": "{{displayCount}}ଟି ଫାଇଲ୍",
+      "filesBadge_other": "{{displayCount}}ଟି ଫାଇଲ୍",
+      "linesBadge_one": "{{displayCount}}ଟି ଧାଡ଼ି",
+      "linesBadge_other": "{{displayCount}}ଟି ଧାଡ଼ି",
+      "matchesBadge_one": "{{displayCount}}ଟି ମେଳ",
+      "matchesBadge_other": "{{displayCount}}ଟି ମେଳ"
     },
     "readToolMarkdown": {
       "linesTruncated": "ଧାଡ଼ି {{start}}–{{end}} (କାଟି ଦିଆଯାଇଛି)",
@@ -2442,7 +2468,11 @@
       "files": "ଫାଇଲ୍",
       "couldNotOpenPhotoPicker": "ଫଟୋ ବାଛିବା ସୁବିଧା ଖୋଲି ହେଲା ନାହିଁ। Kilo ପୁଣି ଆରମ୍ଭ କରି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "maxFilesAllowed": "ସର୍ବାଧିକ {{displayCount}}ଟି ଫାଇଲ୍ ଯୋଡ଼ିପାରିବେ।",
-      "onlyAddingFiles": "ମୋଟ {{total}}ଟି ଫାଇଲ୍ ମଧ୍ୟରୁ କେବଳ {{accepted}}ଟି ଯୋଡ଼ାଯାଉଛି (ସର୍ବାଧିକ {{max}})"
+      "onlyAddingFiles": "ମୋଟ {{total}}ଟି ଫାଇଲ୍ ମଧ୍ୟରୁ କେବଳ {{accepted}}ଟି ଯୋଡ଼ାଯାଉଛି (ସର୍ବାଧିକ {{max}})",
+      "maxFilesAllowed_one": "ସର୍ବାଧିକ {{displayCount}}ଟି ଫାଇଲ୍ ଯୋଡ଼ିପାରିବେ।",
+      "maxFilesAllowed_other": "ସର୍ବାଧିକ {{displayCount}}ଟି ଫାଇଲ୍ ଯୋଡ଼ିପାରିବେ।",
+      "onlyAddingFiles_one": "ମୋଟ {{total}}ଟି ଫାଇଲ୍ ମଧ୍ୟରୁ କେବଳ {{accepted}}ଟି ଯୋଡ଼ାଯାଉଛି (ସର୍ବାଧିକ {{max}})",
+      "onlyAddingFiles_other": "ମୋଟ {{total}}ଟି ଫାଇଲ୍ ମଧ୍ୟରୁ କେବଳ {{accepted}}ଟି ଯୋଡ଼ାଯାଉଛି (ସର୍ବାଧିକ {{max}})"
     },
     "composer": {
       "addAttachment": "ଫାଇଲ୍ ସଂଲଗ୍ନ କରନ୍ତୁ",
@@ -2460,7 +2490,9 @@
       "discardAttachmentsMessage": "କୌଣସି ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ଯୋଡ଼ା ହୋଇନଥିବା ଅପଲୋଡ୍ ଫାଇଲ୍ ହଟିଯିବ।",
       "discardAttachmentsTitle": "ଯୋଡ଼ା ହୋଇଥିବା ଫାଇଲ୍ ହଟାଇବେ?",
       "charactersRemaining": "{{count}}ଟି ଅକ୍ଷର ବାକି ଅଛି",
-      "insertNewline": "ନୂଆ ଧାଡ଼ି ଯୋଡ଼ନ୍ତୁ"
+      "insertNewline": "ନୂଆ ଧାଡ଼ି ଯୋଡ଼ନ୍ତୁ",
+      "charactersRemaining_one": "{{count}}ଟି ଅକ୍ଷର ବାକି ଅଛି",
+      "charactersRemaining_other": "{{count}}ଟି ଅକ୍ଷର ବାକି ଅଛି"
     },
     "chatLink": {
       "linkCopied": "ଲିଙ୍କ କପି ହେଲା",
@@ -2526,7 +2558,9 @@
       "stepsCount_one": "{{steps}} ପଦକ୍ଷେପ",
       "stepsCount": "{{steps}}ଟି ପର୍ଯ୍ୟାୟ",
       "stepsCount_other": "{{steps}}ଟି ପର୍ଯ୍ୟାୟ",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "ମଡେଲ୍ ({{displayCount}})",
+      "modelsCount_other": "ମଡେଲ୍ ({{displayCount}})"
     },
     "autoApprove": {
       "title": "ସ୍ୱଚାଳିତ ଅନୁମୋଦନ",
@@ -2566,7 +2600,9 @@
     },
     "toolRun": {
       "sheetTitle": "ଟୁଲ୍ କଲ୍",
-      "condensedLabel": "{{itemCount}}ଟି ଆଇଟମ୍; {{last}}"
+      "condensedLabel": "{{itemCount}}ଟି ଆଇଟମ୍; {{last}}",
+      "condensedLabel_one": "{{itemCount}}ଟି ଆଇଟମ୍; {{last}}",
+      "condensedLabel_other": "{{itemCount}}ଟି ଆଇଟମ୍; {{last}}"
     }
   },
   "bootstrap": {
@@ -2700,7 +2736,9 @@
     "cliCantReceiveFilesTitle": "ଏହି ସେସନ୍ ଫାଇଲ୍ ଗ୍ରହଣ କରିପାରିବ ନାହିଁ",
     "cliCantReceiveFilesMessage": "ଏହି ସେସନ୍ ଚଲାଉଥିବା Kilo CLI ଫାଇଲ୍ ଗ୍ରହଣ କରିପାରିବ ନାହିଁ। ସେହି ମେସିନ୍‌ରେ CLI ଅପଡେଟ୍ କରନ୍ତୁ କିମ୍ବା ଏକ ନୂଆ ସେସନ୍‌କୁ ସେୟାର କରନ୍ତୁ।",
     "contentlessMessage": "ସେୟାର କରିବାକୁ କିଛି ନାହିଁ — କୌଣସି ଲେଖା କିମ୍ବା ଫାଇଲ୍ ଦିଆଯାଇନଥିଲା।",
-    "couldNotReadContent": "ସେୟାର କରାଯାଇଥିବା ବିଷୟବସ୍ତୁ ପଢ଼ିହେଲା ନାହିଁ।"
+    "couldNotReadContent": "ସେୟାର କରାଯାଇଥିବା ବିଷୟବସ୍ତୁ ପଢ଼ିହେଲା ନାହିଁ।",
+    "onlyFirstFilesAttached_one": "କେବଳ ପ୍ରଥମ {{displayCount}} ଫାଇଲ୍ ସଂଲଗ୍ନ ହେବ।",
+    "onlyFirstFilesAttached_other": "କେବଳ ପ୍ରଥମ {{displayCount}} ଫାଇଲ୍ ସଂଲଗ୍ନ ହେବ।"
   },
   "kiloPass": {
     "title": "Kilo Pass",

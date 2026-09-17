@@ -39,6 +39,14 @@ export const TOOL_SUMMARY_TRANSLATION_TTL_MS = 2 * 24 * 60 * 60 * 1000;
  */
 export const TOOL_SUMMARY_TRANSLATION_HYDRATION_TIMEOUT_MS = 2000;
 
+/**
+ * Longest sign-out waits for the store writes it already dispatched. A healthy
+ * write settles in milliseconds; past this one is treated as hung — the store
+ * is a native module, and a write that never answers must not hold sign-out
+ * teardown and the disk-scope clear that follows it.
+ */
+export const TOOL_SUMMARY_TRANSLATION_SIGN_OUT_DRAIN_TIMEOUT_MS = 1000;
+
 export type ToolSummaryTranslationConfig = {
   enabled: boolean;
   model: { id: string; name: string };
@@ -133,7 +141,8 @@ let clientPromise: Promise<typeof toolSummaryTranslationClient> | null = null;
  * The store writes `remember` has dispatched that have not settled yet. A
  * sign-out must drain them before it clears the disk scope: a write that
  * started under the signed-out account can otherwise land after the clear and
- * leave its entry behind.
+ * leave its entry behind. `drainPendingPersists` bounds that wait, so a write
+ * that never settles cannot hold sign-out teardown either.
  */
 const pendingPersists = new Set<Promise<void>>();
 
@@ -141,8 +150,15 @@ const pendingPersists = new Set<Promise<void>>();
 function trackPersist(write: Promise<void>): void {
   pendingPersists.add(write);
   void (async () => {
-    await write;
-    pendingPersists.delete(write);
+    try {
+      await write;
+    } catch {
+      // The store already reports its own failure as a cache miss; the tracker
+      // must only stop tracking the write, so a rejection neither leaks the
+      // entry in `pendingPersists` nor escapes as an unhandled rejection.
+    } finally {
+      pendingPersists.delete(write);
+    }
   })();
 }
 
@@ -281,6 +297,7 @@ function isFreshCacheEntry(key: string, text: string, now: number): boolean {
 }
 
 const noopTimeoutResolution = (_entries: CachedToolSummaryTranslation[]) => undefined;
+const noopVoidResolution = () => undefined;
 
 /**
  * Awaits the stored read, or `[]` once {@link
@@ -708,18 +725,46 @@ export function clearToolSummaryTranslationMemory(): void {
 }
 
 /**
+ * Resolves once every write dispatched before the sign-out reset has settled,
+ * or after {@link TOOL_SUMMARY_TRANSLATION_SIGN_OUT_DRAIN_TIMEOUT_MS}. The
+ * drain is best effort, so a write that never settles is abandoned rather than
+ * allowed to hold sign-out teardown; the scope clear that follows still runs.
+ * A write that settles late can only leave an orphaned blob, which never
+ * renders under the next account — the in-memory cache is keyed by the
+ * server-issued part id, and the reset already dropped it — and only costs a
+ * warm start.
+ */
+async function drainPendingPersists(): Promise<void> {
+  if (pendingPersists.size === 0) {
+    return;
+  }
+  let resolveTimeout: () => void = noopVoidResolution;
+  const timeout = new Promise<void>(resolve => {
+    resolveTimeout = resolve;
+  });
+  const timeoutId = setTimeout(resolveTimeout, TOOL_SUMMARY_TRANSLATION_SIGN_OUT_DRAIN_TIMEOUT_MS);
+  try {
+    // `allSettled` never rejects, so no write outcome can abort sign-out.
+    await Promise.race([Promise.allSettled(pendingPersists), timeout]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
  * Sign-out: reset the in-memory state and settle the store writes it already
- * dispatched, so the caller can drop the disk scope afterwards with no write
- * left to land on it.
+ * dispatched, so the caller can drop the disk scope afterwards with as few
+ * writes as possible left to land on it.
  *
  * The order is load-bearing. {@link clearToolSummaryTranslationMemory} bumps
  * the generation first, so a batch that resolves while the scope clear is in
  * flight is discarded by `runBatch` instead of remembered; the drain then
  * covers the writes dispatched before the bump, because a fire-and-forget
  * persist that started under the signed-out account must not reach the scope
- * after it was cleared. Resolves once no such write is outstanding.
+ * after it was cleared. Resolves once no such write is outstanding, or once
+ * the drain bound elapses.
  */
 export async function clearToolSummaryTranslationMemoryForSignOut(): Promise<void> {
   clearToolSummaryTranslationMemory();
-  await Promise.allSettled(pendingPersists);
+  await drainPendingPersists();
 }

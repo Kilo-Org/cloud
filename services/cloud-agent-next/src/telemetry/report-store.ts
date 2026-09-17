@@ -93,7 +93,7 @@ type StoredRunRow = {
   errorExpiresAt: string | null;
 };
 
-function retentionCutoff(now: string): string {
+export function retentionCutoff(now: string): string {
   const cutoff = new Date(now);
   cutoff.setUTCDate(cutoff.getUTCDate() - CLOUD_AGENT_REPORT_RETENTION_DAYS);
   return cutoff.toISOString();

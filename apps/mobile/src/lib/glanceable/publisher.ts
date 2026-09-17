@@ -10,12 +10,14 @@ import {
   shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { type NewestSessionRow, newestSessionTitle } from './newest-session';
 import {
   getGlanceableDelivery,
   type GlanceableSink,
   type GlanceableSinkContext,
   guardSink,
 } from './sink-registry';
+import { getSurfaceExtras, setSurfaceExtras } from './surface-extras';
 
 /**
  * Framework-agnostic publisher state machine. Derives one versioned snapshot
@@ -110,10 +112,19 @@ export class GlanceablePublisher {
   }
 
   /** Cache success: derive the next snapshot from the current session rows. */
-  handleSessions(sessions: readonly GlanceableSessionRow[], ctx: GlanceablePublisherContext): void {
+  handleSessions(
+    sessions: readonly (GlanceableSessionRow & NewestSessionRow)[],
+    ctx: GlanceablePublisherContext
+  ): void {
     if (this.isGated()) {
       return;
     }
+    // The newest session's title never enters the snapshot (privacy contract):
+    // it rides in the surface extras every widget reads on redraw.
+    setSurfaceExtras({
+      ...getSurfaceExtras(),
+      newestSessionTitle: newestSessionTitle(sessions),
+    });
     getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     const now = this.now();
     this.applyExpiry(now, ctx);

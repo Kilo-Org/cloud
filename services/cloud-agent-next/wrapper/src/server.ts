@@ -4,6 +4,7 @@
  * Exposes the wrapper's HTTP API for the Worker to interact with:
  * - GET /health - Health check (includes sessionId)
  * - GET /job/status - Current status
+ * - GET /job/pending-interactions - Interactions this session waits on
  * - POST /job/prompt - Send a prompt (includes session binding)
  * - POST /session/ready - Prepare workspace and Kilo runtime
  * - POST /job/command - Send a command (includes session binding)
@@ -186,10 +187,6 @@ function wrapperFinalizingResponse(state: WrapperState): Response {
     },
     409
   );
-}
-
-function snapshotInitializationForPlatform(platform?: string): 'wait' | undefined {
-  return platform === 'cloud-agent-web' ? 'wait' : undefined;
 }
 
 async function applyCommitAttribution(
@@ -550,7 +547,6 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
     });
 
     try {
-      const snapshotInitialization = snapshotInitializationForPlatform(session.platform);
       await kiloClient.sendPromptAsync({
         sessionId: session.kiloSessionId,
         messageId,
@@ -561,7 +557,6 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
         model: prompt.agent?.model,
         system: prompt.agent?.system,
         tools: prompt.agent?.tools,
-        ...(snapshotInitialization ? { snapshotInitialization } : {}),
       });
       logToFile(`job/prompt: sent messageId=${messageId}`);
       acknowledgeDelivery('async-prompt');
@@ -668,13 +663,11 @@ export function createCommandHandler(config: ServerConfig, deps: ServerDependenc
           });
         }
       } else {
-        const snapshotInitialization = snapshotInitializationForPlatform(session.platform);
         result = await kiloClient.sendCommand({
           sessionId: session.kiloSessionId,
           command: body.command,
           args: body.args,
           messageId,
-          ...(snapshotInitialization ? { snapshotInitialization } : {}),
         });
       }
       state.updateActivity();
@@ -730,6 +723,46 @@ export function createAnswerPermissionHandler(deps: ServerDependencies) {
       const msg = error instanceof Error ? error.message : String(error);
       logToFile(`job/answer-permission: failed: ${msg}`);
       return errorResponse('PERMISSION_ERROR', `Failed to answer permission: ${msg}`, 500);
+    }
+  };
+}
+
+/**
+ * The interactions this session currently waits on, as the Worker's
+ * `getPendingInteractions` read needs them: the same Kilo state the `connected`
+ * snapshot replays, filtered to this session's root Kilo session.
+ *
+ * A legacy `agent_*` Cloud Agent session keeps no pending set of its own — its
+ * Durable Object is only told about `question.asked`/`permission.asked` as
+ * events — so the wrapper is the only place that read can come from. A session
+ * with no bound Kilo session yet has nothing pending.
+ */
+export function createPendingInteractionsHandler(deps: ServerDependencies) {
+  return async (): Promise<Response> => {
+    const { state, kiloClient } = deps;
+
+    if (!state.hasSession) {
+      return errorResponse('NO_SESSION', 'No session context', 400);
+    }
+
+    const kiloSessionId = state.currentSession?.kiloSessionId;
+    if (!kiloSessionId) {
+      return jsonResponse({ questions: [], permissions: [] });
+    }
+
+    try {
+      const [questions, permissions] = await Promise.all([
+        kiloClient.getQuestions(),
+        kiloClient.getPermissions(),
+      ]);
+      return jsonResponse({
+        questions: questions.filter(question => question.sessionID === kiloSessionId),
+        permissions: permissions.filter(permission => permission.sessionID === kiloSessionId),
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logToFile(`job/pending-interactions: failed: ${msg}`);
+      return errorResponse('KILO_STATE_ERROR', `Failed to read pending interactions: ${msg}`, 500);
     }
   };
 }
@@ -1207,6 +1240,7 @@ export function createFetchHandler(
   const commandHandler = createCommandHandler(config, deps);
   const answerPermissionHandler = createAnswerPermissionHandler(deps);
   const answerQuestionHandler = createAnswerQuestionHandler(deps);
+  const pendingInteractionsHandler = createPendingInteractionsHandler(deps);
   const rejectQuestionHandler = createRejectQuestionHandler(deps);
   const abortHandler = createAbortHandler(deps, triggerDrainAndClose);
   const ptyCreateHandler = createPtyCreateHandler(config, deps);
@@ -1220,6 +1254,7 @@ export function createFetchHandler(
     GET: {
       '/health': healthHandler,
       '/job/status': statusHandler,
+      '/job/pending-interactions': pendingInteractionsHandler,
     },
     POST: {
       '/job/prompt': promptHandler,

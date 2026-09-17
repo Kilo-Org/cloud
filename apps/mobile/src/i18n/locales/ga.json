@@ -489,6 +489,8 @@
       "replyBadRequest": "Ní féidir an freagra seo a phostáil. Seans gur athraíodh an snáithe.",
       "replyForbidden": "Níl cead agat freagra a thabhairt ar an iarratas tarraingthe seo.",
       "addCommentCta": "Trácht ar an iarratas tarraingthe seo",
+      "fixWithKilo": "Deisigh le Kilo",
+      "fixWithKiloPrompt": "Le do thoil, déileáil leis an trácht seo a leanas ar an iarratas tarraingthe: {{link}}",
       "commentBadRequest": "Ní féidir an trácht seo a phostáil. Seans gur athraíodh an t-iarratas tarraingthe.",
       "commentForbidden": "Níl cead agat trácht a dhéanamh ar an iarratas tarraingthe seo.",
       "moderation": {
@@ -587,6 +589,11 @@
       "pending": "{{displayCount}} ar feitheamh",
       "skipped": "{{displayCount}} scipeáilte",
       "checksCount": "seiceálacha: {{displayCount}}",
+      "checksCount_one": "seiceáil: {{displayCount}}",
+      "checksCount_two": "sheiceáil: {{displayCount}}",
+      "checksCount_few": "seiceálacha: {{displayCount}}",
+      "checksCount_many": "seiceálacha: {{displayCount}}",
+      "checksCount_other": "seiceálacha: {{displayCount}}",
       "checkDetails": "sonraí seiceála"
     },
     "inbox": {
@@ -3127,6 +3134,12 @@
     "privacy": "Oscail Kilo chun gníomhairí a fheiceáil",
     "openAgents": "Oscail gníomhairí",
     "needsInput": "Ionchur de dhíth",
+    "newestSession": "An ceann is nuaí: {{title}}",
+    "noneWaiting": "Níl aon ghníomhaire ag fanacht",
+    "newAgent": "Gníomhaire nua",
+    "approving": "Á cheadú...",
+    "couldNotApprove": "Níorbh fhéidir ceadú",
+    "couldNotStart": "Níorbh fhéidir tosú",
     "channelName": "Gníomhairí gníomhacha",
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála."
   },
@@ -3162,5 +3175,12 @@
     "remoteFound": "Ríomhaire ceangailte",
     "checkAgain": "Seiceáil arís",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Teastaíonn leid chun gníomhaire a thosú. Cuir leid leis agus rith arís é.",
+      "repositoryUnknown": "Ní aithníonn Kilo {{repository}} mar stór GitHub nó GitLab. Roghnaigh stór eile i Kilo.",
+      "repositoryUnsupported": "Is stór Bitbucket é {{repository}} — Ní féidir le Tosaigh gníomhaire é a úsáid fós. Roghnaigh stór eile i Kilo."
+    }
   }
 }

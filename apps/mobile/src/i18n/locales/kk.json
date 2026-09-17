@@ -480,6 +480,8 @@
       "replyBadRequest": "Бұл жауапты жариялау мүмкін емес. Талқылау тармағы өзгерген болуы мүмкін.",
       "replyForbidden": "Бұл біріктіру сұрауына жауап беруге рұқсатыңыз жоқ.",
       "addCommentCta": "Бұл біріктіру сұрауына пікір жазу",
+      "fixWithKilo": "Kilo арқылы түзету",
+      "fixWithKiloPrompt": "Өтінеміз, келесі біріктіру сұрауының пікірін шешіңіз: {{link}}",
       "commentBadRequest": "Бұл пікірді жариялау мүмкін емес. Біріктіру сұрауы өзгерген болуы мүмкін.",
       "commentForbidden": "Бұл біріктіру сұрауына пікір жазуға рұқсатыңыз жоқ.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} күтілуде",
       "skipped": "{{displayCount}} өткізіп жіберілді",
       "checksCount": "{{displayCount}} тексеру",
+      "checksCount_one": "{{displayCount}} тексеру",
+      "checksCount_other": "{{displayCount}} тексеру",
       "checkDetails": "тексеру мәліметтері"
     },
     "inbox": {
@@ -3058,6 +3062,12 @@
     "privacy": "Агенттерді көру үшін Kilo қолданбасын ашыңыз",
     "openAgents": "Агенттерді ашу",
     "needsInput": "Жауап қажет",
+    "newestSession": "Ең жаңасы: {{title}}",
+    "noneWaiting": "Күтіп тұрған агент жоқ",
+    "newAgent": "Жаңа агент",
+    "approving": "Мақұлдануда...",
+    "couldNotApprove": "Мақұлдау сәтсіз аяқталды",
+    "couldNotStart": "Бастау сәтсіз аяқталды",
     "channelName": "Белсенді агенттер",
     "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз."
   },
@@ -3093,5 +3103,12 @@
     "remoteFound": "Компьютер қосылды",
     "checkAgain": "Қайта тексеру",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Агентті іске қосу үшін сұрау қажет. Сұрау қосып, қайта іске қосыңыз.",
+      "repositoryUnknown": "Kilo {{repository}} ны GitHub немесе GitLab репозиторийі ретінде танымайды. Kilo ішінен басқа репозиторий таңдаңыз.",
+      "repositoryUnsupported": "{{repository}} — Bitbucket репозиторийі. Агентті іске қосу оны әзірге пайдалана алмайды. Kilo ішінен басқа репозиторий таңдаңыз."
+    }
   }
 }

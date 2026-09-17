@@ -31,6 +31,7 @@ import {
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyGrantSchema,
   RUNTIME_PROXY_GRANT_KEY,
+  sameRuntimeProxyControlBinding,
   verifyRuntimeCredentialProxyHandle,
 } from '../runtime-credential-proxy.js';
 import { z } from 'zod';
@@ -643,7 +644,8 @@ export class SandboxSession extends DurableObject<Env> {
     if (input.payload.type === 'session.created' || input.payload.type === 'session.updated') {
       const info = input.payload.properties.info;
       if (typeof info === 'object' && info !== null) {
-        if ('id' in info && info.id !== eventKiloSessionId) return { applied: false };
+        if ('id' in info && info.id !== eventKiloSessionId)
+          return result(false, 'session_id_mismatch');
         if (eventKiloSessionId !== root && ('parentID' in info || 'directory' in info)) {
           const directory = this.directory(metadata);
           const child = childSessionLineage(info, directory);
@@ -652,7 +654,7 @@ export class SandboxSession extends DurableObject<Env> {
             child.sessionId !== eventKiloSessionId ||
             input.identity.directory !== directory
           )
-            return { applied: false };
+            return result(false, 'child_lineage_mismatch');
         }
       }
     }
@@ -948,12 +950,7 @@ export class SandboxSession extends DurableObject<Env> {
     wrapperInstanceId?: string;
   }): Promise<SandboxEventBatchResult> {
     const outcomes: SandboxEventBatchItemOutcome[] = [];
-    let halted = false;
-    for (const item of input.items) {
-      if (halted) {
-        outcomes.push({ receiptId: item.receiptId, status: 'unattempted' });
-        continue;
-      }
+    for (const [index, item] of input.items.entries()) {
       try {
         let applied = false;
         let retryable: boolean | undefined;
@@ -989,7 +986,28 @@ export class SandboxSession extends DurableObject<Env> {
         );
       } catch {
         outcomes.push({ receiptId: item.receiptId, status: 'unknown' });
-        halted = true;
+        try {
+          logControlDiagnostic(
+            'session_event_batch_item_failed',
+            {
+              sessionId: this.sessionId,
+              wrapperInstanceId: input.wrapperInstanceId,
+              receiptId: item.receiptId,
+              sequence: item.sequence,
+              eventFamily: item.event,
+              eventType:
+                item.event === 'session.event'
+                  ? diagnosticEventType(item.payload.type)
+                  : 'session.preparing',
+              eventIndex: index,
+              batchSize: input.items.length,
+              disposition: 'application_exception',
+            },
+            'warn'
+          );
+        } catch {
+          // Containment only: a diagnostic must never replace or alter the batch result.
+        }
       }
     }
     return { outcomes };
@@ -1467,13 +1485,7 @@ export class SandboxSession extends DurableObject<Env> {
       readFence(),
     ]);
     const authorization = RuntimeAuthorizationSchema.safeParse(storedAuthorization);
-    if (
-      !latestFence ||
-      latestFence.allocationId !== fence.allocationId ||
-      latestFence.providerInstanceId !== fence.providerInstanceId ||
-      latestFence.connectionId !== fence.connectionId ||
-      latestFence.wrapperInstanceId !== fence.wrapperInstanceId
-    ) {
+    if (!latestFence || !sameRuntimeProxyControlBinding(fence, latestFence)) {
       return null;
     }
     return issuePersistedRuntimeProxyGrant({
@@ -1590,6 +1602,10 @@ export class SandboxSession extends DurableObject<Env> {
     } catch {
       return { ...unknown, observedAt: Date.now(), detailCode: 'status_unavailable' };
     }
+  }
+
+  async getPendingInteractions(): Promise<{ questions: unknown[]; permissions: unknown[] }> {
+    return this.derivePendingInteractions() ?? { questions: [], permissions: [] };
   }
 
   async getWorktreeChanges(): Promise<GetWorktreeChangesOutput> {
@@ -2177,18 +2193,21 @@ export class SandboxSession extends DurableObject<Env> {
     this.ctx.storage.transactionSync(() => {
       this.ctx.storage.kv.put(DELETED_WORKTREE_KEY, worktreeId);
       this.terminalLifecycle.beginDeletion(metadata);
-      this.worktreeChanges.purge();
       this.snapshotDeletedMessages(metadata);
     });
     if (this.messageCallbacks.pendingCallbackCount() > 0) this.scheduleCallbackRepair();
     if (this.reportOutbox.pendingCount() > 0) this.scheduleReportRepair();
     this.deletedWorktreeId = worktreeId;
     for (const socket of this.ctx.getWebSockets()) socket.close(1001, 'Worktree deleted');
-    if (
-      this.messageCallbacks.pendingCallbackCount() === 0 &&
-      this.reportOutbox.pendingCount() === 0
-    )
-      await this.ctx.storage.deleteAlarm();
+    try {
+      this.ctx.storage.transactionSync(() => this.worktreeChanges.purge());
+    } finally {
+      if (
+        this.messageCallbacks.pendingCallbackCount() === 0 &&
+        this.reportOutbox.pendingCount() === 0
+      )
+        await this.ctx.storage.deleteAlarm();
+    }
     if (!metadata) return null;
     return cloudAgentWorktreeLocationSchema.parse({
       sandboxId: metadata.workspace?.sandboxId,
@@ -2480,7 +2499,6 @@ export class SandboxSession extends DurableObject<Env> {
     const records = this.ctx.storage.transactionSync(() => {
       if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const records = this.terminalLifecycle.beginDeletion(metadata);
-      this.worktreeChanges.purge();
       if (preparing?.wrapperInstanceId && preparing.deliveryRetryScope !== 'message' && metadata) {
         this.retainRuntimeCleanup(metadata, preparing.wrapperInstanceId, 'preparation_interrupted');
       }
@@ -2492,14 +2510,36 @@ export class SandboxSession extends DurableObject<Env> {
     for (const ws of this.ctx.getWebSockets('stream')) {
       ws.close(1000, 'session access revoked');
     }
-    if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
-    else await this.interruptDeletedMessage(metadata, accepted);
-    await this.terminalLifecycle.cleanupSession(metadata, records);
+    const errors: unknown[] = [];
+    try {
+      this.ctx.storage.transactionSync(() => this.worktreeChanges.purge());
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
+      else await this.interruptDeletedMessage(metadata, accepted);
+      await this.terminalLifecycle.cleanupSession(metadata, records);
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, 'Session cleanup failed');
     await this.ingestPublicationChain.catch(() => undefined);
     if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     const callbacksPending = this.messageCallbacks.pendingCallbackCount() > 0;
     const reportsPending = this.reportOutbox.pendingCount() > 0;
     if (!callbacksPending && !reportsPending) await this.ctx.storage.deleteAlarm();
+    const sandboxId = metadata?.workspace?.sandboxId;
+    if (sandboxId && metadata) {
+      try {
+        await sandboxControlRpc(this.env, sandboxId).forgetSessionReference(
+          metadata.identity.sessionId
+        );
+      } catch {
+        // Tombstone remains; over-blocking is safe.
+      }
+    }
     this.ctx.storage.transactionSync(() => {
       if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const pendingCleanup = this.pendingRuntimeCleanup();

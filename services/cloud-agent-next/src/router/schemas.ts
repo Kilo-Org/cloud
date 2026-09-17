@@ -1124,6 +1124,23 @@ export const GetSessionOutput = z.object({
     .optional()
     .describe('Sandbox ID (hashed format like usr-abc123...) for correlating with Cloudflare logs'),
 
+  // Worktree ownership (present only for worktree sessions)
+  worktreeId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Worktree ID when this session belongs to a shared worktree'),
+  parentSessionId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Parent Kilo session ID for a grouped worktree session (null when no group)'),
+  cloudAgentSessionScopeId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Cloud-agent session scope ID for a grouped worktree session (null when no group)'),
+
   // Repository info (no tokens)
   githubRepo: z.string().optional().describe('GitHub repository in org/repo format'),
   gitUrl: z.string().optional().describe('Generic git URL'),

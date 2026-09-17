@@ -16,6 +16,10 @@ import {
   fetchGitHubInstallationDetails,
   fetchGitHubRepositoriesForMaintenance,
 } from '@/lib/integrations/platforms/github/adapter';
+import { disconnectGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
+
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   fetchGitHubInstallationDetails: jest.fn(),
@@ -161,6 +165,113 @@ describe('GitHub connection attempt persistence', () => {
     ).resolves.toMatchObject({ selected_installation_id: stored.selected });
   });
 
+  test('caches the repository inventory for an all-repositories attach so first-use discovery works', async () => {
+    mockedFetchInstallation.mockResolvedValue({
+      id: 123,
+      account: { id: 456, login: 'acme', type: 'Organization' },
+      permissions: { contents: 'read' },
+      events: ['push'],
+      repository_selection: 'all',
+      created_at: '2026-09-07T00:00:00.000Z',
+    } as never);
+    mockedFetchRepositories.mockResolvedValue([
+      {
+        id: 1,
+        name: 'repo',
+        full_name: 'acme/repo',
+        private: false,
+        created_at: '2026-09-07T00:00:00.000Z',
+      },
+    ] as never);
+
+    const organization = await createTestOrganization('Attach inventory org', userId, 0);
+    const attemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'org', id: organization.id },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [candidate],
+    });
+    await selectGitHubConnectionInstallation({
+      attemptId,
+      userId,
+      installationId: candidate.installationId,
+    });
+
+    const completed = await completeGitHubConnectionAttempt({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidate,
+      authorizeOwner: async () => {},
+    });
+    if (!completed.ok) throw new Error('Expected completion');
+
+    // The installation exposes all repositories, so the attach must still
+    // populate the cache rather than leaving repositories=null.
+    expect(mockedFetchRepositories).toHaveBeenCalledWith(candidate.installationId, 'standard');
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, completed.integrationId));
+    expect(row?.repositories).toHaveLength(1);
+    expect(row?.repository_access).toBe('all');
+  });
+
+  test('a failing inventory listing does not block an all-repositories attach', async () => {
+    mockedFetchInstallation.mockResolvedValue({
+      id: 123,
+      account: { id: 456, login: 'acme', type: 'Organization' },
+      permissions: { contents: 'read' },
+      events: ['push'],
+      repository_selection: 'all',
+      created_at: '2026-09-07T00:00:00.000Z',
+    } as never);
+    mockedFetchRepositories.mockRejectedValueOnce(new Error('rate limited'));
+
+    const organization = await createTestOrganization('Attach inventory failure org', userId, 0);
+    const attemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'org', id: organization.id },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [candidate],
+    });
+    await selectGitHubConnectionInstallation({
+      attemptId,
+      userId,
+      installationId: candidate.installationId,
+    });
+
+    // The inventory sync is best-effort for all-repositories installs: a
+    // transient listing failure must not abort the connection.
+    const completed = await completeGitHubConnectionAttempt({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidate,
+      authorizeOwner: async () => {},
+    });
+    if (!completed.ok) throw new Error('Expected completion');
+
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, completed.integrationId));
+    expect(row).toMatchObject({ integration_status: 'active', repository_access: 'all' });
+    expect(row?.repositories).toBeNull();
+  });
+
   test('atomically writes, consumes, and idempotently replays a verified completion', async () => {
     const personalCandidate = {
       ...candidate,
@@ -205,6 +316,86 @@ describe('GitHub connection attempt persistence', () => {
         .from(platform_integrations)
         .where(eq(platform_integrations.id, completed.integrationId))
     ).resolves.toHaveLength(1);
+
+    // Authorization provenance must reflect the identity that actually
+    // completed the connection, not be left null.
+    const [integrationRow] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, completed.integrationId));
+    expect(integrationRow).toMatchObject({
+      github_authorized_by_user_id: userId,
+      github_authorized_user_id: '456',
+      github_authorized_at: expect.any(String),
+    });
+  });
+
+  test('completes a fresh connection attempt for the same installation after a prior local disconnect', async () => {
+    const personalCandidate = {
+      ...candidate,
+      accountLogin: 'picker',
+      accountType: 'User' as const,
+    };
+    const firstAttemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'user', id: userId },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId: firstAttemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [personalCandidate],
+    });
+    await selectGitHubConnectionInstallation({
+      attemptId: firstAttemptId,
+      userId,
+      installationId: '123',
+    });
+    const firstCompleted = await completeGitHubConnectionAttempt({
+      attemptId: firstAttemptId,
+      userId,
+      githubUserId: '456',
+      candidate: personalCandidate,
+      authorizeOwner: async () => {},
+    });
+    expect(firstCompleted.ok).toBe(true);
+    if (!firstCompleted.ok) throw new Error('Expected initial completion');
+
+    await disconnectGitHubInstallation({ type: 'user', id: userId }, firstCompleted.integrationId);
+
+    const secondAttemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'user', id: userId },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId: secondAttemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [personalCandidate],
+    });
+    await selectGitHubConnectionInstallation({
+      attemptId: secondAttemptId,
+      userId,
+      installationId: '123',
+    });
+    const secondCompleted = await completeGitHubConnectionAttempt({
+      attemptId: secondAttemptId,
+      userId,
+      githubUserId: '456',
+      candidate: personalCandidate,
+      authorizeOwner: async () => {},
+    });
+    expect(secondCompleted).toEqual({ ok: true, integrationId: firstCompleted.integrationId });
+
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, firstCompleted.integrationId));
+    expect(row).toMatchObject({ github_disconnected_at: null, integration_status: 'active' });
   });
 
   test('rejects completion when verified identity does not match the locked attempt', async () => {

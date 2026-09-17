@@ -2388,6 +2388,9 @@
     "checkConnection": "Verifica la connessione",
     "checks": {
       "checksCount": "{{displayCount}} controlli",
+      "checksCount_one": "{{displayCount}} controllo",
+      "checksCount_many": "{{displayCount}} controlli",
+      "checksCount_other": "{{displayCount}} controlli",
       "couldNotLoad": "Impossibile caricare i controlli.",
       "failed": "{{displayCount}} non superati",
       "noAccess": "Non hai accesso ai controlli di questo repository.",
@@ -2487,6 +2490,8 @@
       "replyBody": "Testo della risposta",
       "replyForbidden": "Non hai il permesso di rispondere a questa pull request.",
       "addCommentCta": "Commenta questa pull request",
+      "fixWithKilo": "Risolvi con Kilo",
+      "fixWithKiloPrompt": "Per favore, gestisci il seguente commento della pull request: {{link}}",
       "commentBadRequest": "Impossibile pubblicare questo commento. La pull request potrebbe essere stata modificata.",
       "commentForbidden": "Non hai il permesso di commentare questa pull request.",
       "replyPlaceholder": "La tua risposta…",
@@ -3081,6 +3086,12 @@
     "privacy": "Apri Kilo per vedere gli agenti",
     "openAgents": "Apri gli agenti",
     "needsInput": "In attesa di risposta",
+    "newestSession": "La più recente: {{title}}",
+    "noneWaiting": "Nessun agente in attesa",
+    "newAgent": "Nuovo agente",
+    "approving": "Approvazione in corso...",
+    "couldNotApprove": "Approvazione non riuscita",
+    "couldNotStart": "Avvio non riuscito",
     "channelName": "Agenti attivi",
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco."
   },
@@ -3116,5 +3127,12 @@
     "remoteFound": "Computer connesso",
     "checkAgain": "Controlla di nuovo",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Avvia agente richiede un prompt. Aggiungi un prompt e rieseguilo.",
+      "repositoryUnknown": "Kilo non riconosce {{repository}} come repository GitHub o GitLab. Scegli un altro repository in Kilo.",
+      "repositoryUnsupported": "{{repository}} è un repository Bitbucket — Avvia agente non può ancora usarlo. Scegli un altro repository in Kilo."
+    }
   }
 }

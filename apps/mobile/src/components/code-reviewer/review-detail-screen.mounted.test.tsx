@@ -145,7 +145,7 @@ vi.mock('@/lib/analytics/posthog', () => ({
   useFeatureFlag: () => true,
 }));
 vi.mock('@/lib/code-reviewer-open-pr-destination', () => ({
-  resolveCodeReviewerOpenPrDestination: () => ({ kind: 'external' }),
+  resolveCodeReviewerOpenPrDestination: () => ({ kind: 'browser' }),
 }));
 vi.mock('@/lib/code-reviewer-config', () => ({
   reviewerPlatformLabel: () => 'GitHub',
@@ -156,7 +156,6 @@ vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useCancelReview: () => ({ isPending: false, mutate: vi.fn() }),
   useRetriggerReview: () => ({ isPending: false, mutate: vi.fn() }),
 }));
-vi.mock('@/lib/profile-agent-navigation', () => ({ getPrReviewPath: vi.fn() }));
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
   parseTimestamp: (value: unknown) => value,

@@ -2,12 +2,28 @@ jest.mock('@/lib/ai-gateway/byok/encryption', () => ({
   decryptApiKey: jest.fn(() => 'plaintext-api-key'),
 }));
 
+const mockOrderBy = jest.fn<Promise<unknown[]>, []>();
+jest.mock('@/lib/drizzle', () => ({
+  db: {
+    select: jest.fn(() => ({
+      from: jest.fn(() => ({
+        leftJoin: jest.fn(() => ({
+          where: jest.fn(() => ({
+            orderBy: mockOrderBy,
+          })),
+        })),
+      })),
+    })),
+  },
+}));
+
 import { describe, expect, it } from '@jest/globals';
 
 import type { AdminSlackNotification } from '@/lib/slack/admin-notifications';
 import {
   buildMiniMaxTokenHealthSlackNotification,
   checkAllMiniMaxTokenHealth,
+  getMiniMaxTokenHealthTargets,
   needsImmediateFollowUp,
   sendMiniMaxTokenHealthSlackSummary,
   type MiniMaxTokenHealthEntry,
@@ -40,6 +56,50 @@ function entry(overrides: Partial<MiniMaxTokenHealthEntry> = {}): MiniMaxTokenHe
     ...overrides,
   };
 }
+
+describe('getMiniMaxTokenHealthTargets', () => {
+  it('keeps the most recently created live subscription when a key has more than one', async () => {
+    mockOrderBy.mockResolvedValueOnce([
+      {
+        inventoryId: 'inv-1',
+        planId: 'minimax-token-plan-plus',
+        upstreamPlanId: '522927812420526084',
+        encryptedApiKey: null,
+        subscriptionId: 'sub-old',
+        userId: 'user-old',
+        subscriptionStatus: 'active',
+        subscriptionCreatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        inventoryId: 'inv-1',
+        planId: 'minimax-token-plan-plus',
+        upstreamPlanId: '522927812420526084',
+        encryptedApiKey: null,
+        subscriptionId: 'sub-new',
+        userId: 'user-new',
+        subscriptionStatus: 'past_due',
+        subscriptionCreatedAt: '2026-02-01T00:00:00.000Z',
+      },
+      {
+        inventoryId: 'inv-2',
+        planId: 'minimax-token-plan-plus',
+        upstreamPlanId: '522937595127087110',
+        encryptedApiKey: null,
+        subscriptionId: 'sub-2',
+        userId: 'user-2',
+        subscriptionStatus: 'active',
+        subscriptionCreatedAt: '2026-01-15T00:00:00.000Z',
+      },
+    ]);
+
+    const targets = await getMiniMaxTokenHealthTargets();
+
+    expect(targets).toHaveLength(2);
+    expect(targets[0]).toMatchObject({ inventoryId: 'inv-1', subscriptionId: 'sub-new' });
+    expect(targets[0]).not.toHaveProperty('subscriptionCreatedAt');
+    expect(targets[1]).toMatchObject({ inventoryId: 'inv-2', subscriptionId: 'sub-2' });
+  });
+});
 
 describe('needsImmediateFollowUp', () => {
   it('flags non-healthy categories only for active or past_due subscriptions', () => {

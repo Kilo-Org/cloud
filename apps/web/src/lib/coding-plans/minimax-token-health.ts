@@ -91,7 +91,10 @@ export async function probeMiniMaxTokenPlanRemains(
   }
 
   const rows = parsed.data.model_remains;
-  if (rows === null || rows === undefined || rows.length === 0) {
+  if (rows === null || rows === undefined) {
+    return { category: 'bad_response', reason: 'invalid_response' };
+  }
+  if (rows.length === 0) {
     return { category: 'bad_response', reason: 'provider_plan_inactive' };
   }
   // Mirrors normalizeUsage's aggregateRows.length !== 1 check in
@@ -115,12 +118,32 @@ export type MiniMaxTokenHealthTarget = {
   subscriptionStatus: CodingPlanSubscriptionStatus | null;
 };
 
+// Nothing in the schema enforces at most one live (active/past_due)
+// subscription per key_inventory_id (only per user+plan and per
+// user+provider), so the leftJoin below can legitimately fan out to more
+// than one row for the same key. dedupeByMostRecentLiveSubscription collapses
+// that fan-out back to one row per key, keeping the most recently created
+// live subscription, so a duplicate can't cause the same key to be probed
+// (and counted) more than once.
+function dedupeByMostRecentLiveSubscription<
+  T extends { inventoryId: string; subscriptionCreatedAt: string | null },
+>(rows: T[]): T[] {
+  const byInventoryId = new Map<string, T>();
+  for (const row of rows) {
+    const existing = byInventoryId.get(row.inventoryId);
+    if (!existing || (row.subscriptionCreatedAt ?? '') > (existing.subscriptionCreatedAt ?? '')) {
+      byInventoryId.set(row.inventoryId, row);
+    }
+  }
+  return Array.from(byInventoryId.values());
+}
+
 // Every assigned MiniMax key should have a live (active/past_due) subscription
 // per coding_plan_subscriptions_live_access_check, but the join is left so a
 // key whose subscription already canceled (and hasn't been revoked yet) still
 // gets checked instead of silently dropped.
 export async function getMiniMaxTokenHealthTargets(): Promise<MiniMaxTokenHealthTarget[]> {
-  return db
+  const rows = await db
     .select({
       inventoryId: coding_plan_key_inventory.id,
       planId: coding_plan_key_inventory.plan_id,
@@ -129,6 +152,7 @@ export async function getMiniMaxTokenHealthTargets(): Promise<MiniMaxTokenHealth
       subscriptionId: coding_plan_subscriptions.id,
       userId: coding_plan_subscriptions.user_id,
       subscriptionStatus: coding_plan_subscriptions.status,
+      subscriptionCreatedAt: coding_plan_subscriptions.created_at,
     })
     .from(coding_plan_key_inventory)
     .leftJoin(
@@ -149,6 +173,10 @@ export async function getMiniMaxTokenHealthTargets(): Promise<MiniMaxTokenHealth
       )
     )
     .orderBy(coding_plan_key_inventory.plan_id, coding_plan_key_inventory.created_at);
+
+  return dedupeByMostRecentLiveSubscription(rows).map(
+    ({ subscriptionCreatedAt: _subscriptionCreatedAt, ...target }) => target
+  );
 }
 
 export type MiniMaxTokenHealthEntry = Omit<MiniMaxTokenHealthTarget, 'encryptedApiKey'> &
@@ -235,9 +263,20 @@ function formatCount(count: number): string {
   return `\`${count}\``;
 }
 
+// Mirrors escapeSlackText/escapeSlackLabel in inventory-slack-summary.ts:
+// planId, upstreamPlanId, and subscriptionId are DB-derived and must not be
+// interpolated into Slack mrkdwn unescaped.
+function escapeSlackText(value: string): string {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+function escapeSlackLabel(value: string): string {
+  return escapeSlackText(value).replaceAll('`', "'").replaceAll('\n', ' ');
+}
+
 function planDisplayName(planId: string): string {
   const plan = getCodingPlanCatalog().find(entry => entry.planId === planId);
-  return plan ? `${plan.providerName} ${plan.name}` : planId;
+  return escapeSlackLabel(plan ? `${plan.providerName} ${plan.name}` : planId);
 }
 
 function formatTotalsLine(totals: MiniMaxTokenHealthTotals): string {
@@ -247,7 +286,9 @@ function formatTotalsLine(totals: MiniMaxTokenHealthTotals): string {
 function followUpLine(entry: MiniMaxTokenHealthEntry): string {
   const statusLabel = entry.subscriptionStatus ?? 'unknown';
   const httpStatus = entry.httpStatus ? ` (HTTP ${entry.httpStatus})` : '';
-  return `${planDisplayName(entry.planId)} · upstream \`${entry.upstreamPlanId}\` · sub \`${entry.subscriptionId ?? 'n/a'}\` (${statusLabel}) · *${entry.category}*: ${entry.reason}${httpStatus}`;
+  const upstreamPlanId = escapeSlackLabel(entry.upstreamPlanId);
+  const subscriptionId = escapeSlackLabel(entry.subscriptionId ?? 'n/a');
+  return `${planDisplayName(entry.planId)} · upstream \`${upstreamPlanId}\` · sub \`${subscriptionId}\` (${statusLabel}) · *${entry.category}*: ${entry.reason}${httpStatus}`;
 }
 
 export function buildMiniMaxTokenHealthSlackNotification(

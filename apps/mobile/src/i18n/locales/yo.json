@@ -480,6 +480,8 @@
       "replyBadRequest": "A kò lè fi ìdáhùn yìí ránṣẹ́. Ọ̀wọ́ ìjíròrò náà lè ti yí padà.",
       "replyForbidden": "O kò ní àṣẹ láti dáhùn sí ìbéèrè ìṣọ̀kan yìí.",
       "addCommentCta": "Fi àsọyé sí ìbéèrè ìṣọ̀kan yìí",
+      "fixWithKilo": "Ṣàtúnṣe pẹ̀lú Kilo",
+      "fixWithKiloPrompt": "Jọ̀wọ́ yanjú àsọyé ìbéèrè ìṣọ̀kan yìí: {{link}}",
       "commentBadRequest": "A kò lè fi àsọyé yìí ránṣẹ́. Ìbéèrè ìṣọ̀kan náà lè ti yí padà.",
       "commentForbidden": "O kò ní àṣẹ láti fi àsọyé sí ìbéèrè ìṣọ̀kan yìí.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} ń dúró",
       "skipped": "a fo {{displayCount}} kọjá",
       "checksCount": "àyẹ̀wò {{displayCount}}",
+      "checksCount_one": "àyẹ̀wò {{displayCount}}",
+      "checksCount_other": "àyẹ̀wò {{displayCount}}",
       "checkDetails": "àlàyé àyẹ̀wò"
     },
     "inbox": {
@@ -3067,6 +3071,12 @@
     "privacy": "Ṣí Kilo láti rí àwọn aṣojú",
     "openAgents": "Ṣí àwọn aṣojú",
     "needsInput": "Nílò èsì rẹ",
+    "newestSession": "Tuntun jù: {{title}}",
+    "noneWaiting": "Kò sí aṣojú tó ń dúró",
+    "newAgent": "Aṣojú tuntun",
+    "approving": "Ń fọwọ́ sí...",
+    "couldNotApprove": "Kò lè fọwọ́ sí",
+    "couldNotStart": "Kò lè bẹ̀rẹ̀",
     "channelName": "Àwọn aṣojú tó ń ṣiṣẹ́",
     "activityKitDisabledBody": "Tan àwọn ìgbòkègbodò ìsinsìnyí nínú àwọn ètò láti rí àwọn aṣojú tó ń ṣiṣẹ́ lórí ojú ìwé títìpa."
   },
@@ -3102,5 +3112,12 @@
     "remoteFound": "Kọ̀ǹpútà ti so pọ̀",
     "checkAgain": "Tún ṣe àyẹ̀wò",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Bẹ̀rẹ̀ aṣojú nílò ìtọ́ni. Fi ìtọ́ni kún un kí o sì tún gbìyànjú.",
+      "repositoryUnknown": "Kilo kò dá {{repository}} mọ̀ gẹ́gẹ́ bí ibi ìpamọ́ kóòdù GitHub tàbí GitLab. Yan ibi ìpamọ́ kóòdù mìíràn nínú Kilo.",
+      "repositoryUnsupported": "{{repository}} jẹ́ ibi ìpamọ́ kóòdù Bitbucket — Bẹ̀rẹ̀ aṣojú kò tíì lè lò ó. Yan ibi ìpamọ́ kóòdù mìíràn nínú Kilo."
+    }
   }
 }

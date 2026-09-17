@@ -10,6 +10,10 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { addUserToOrganization, createOrganization } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import {
+  connectVerifiedGitHubInstallation,
+  disconnectGitHubInstallation,
+} from '@/lib/integrations/db/github-installations';
 import { getOrganizationOnboardingState } from './onboarding-checklist';
 
 const createdOrganizationIds: string[] = [];
@@ -64,6 +68,72 @@ describe('getOrganizationOnboardingState', () => {
     const state = await getOrganizationOnboardingState(organization.id);
     expect(state.sourceControlConnected).toBe(false);
     expect(state.connectedPlatform).toBeNull();
+  });
+
+  it.each([
+    [
+      'suspended',
+      { integration_status: 'suspended' as const, suspended_at: new Date().toISOString() },
+    ],
+    ['auth-invalid', { auth_invalid_at: new Date().toISOString(), auth_invalid_reason: 'revoked' }],
+    ['locally disconnected', { github_disconnected_at: new Date().toISOString() }],
+    ['pending', { integration_status: 'pending' as const }],
+  ] as const)(
+    'does not treat a %s GitHub integration as guided source control completion',
+    async (_label, unhealthyFields) => {
+      const { organization } = await createFixtureOrganization();
+      await db.insert(platform_integrations).values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: crypto.randomUUID(),
+        integration_status: 'active',
+        repository_access: 'all',
+        ...unhealthyFields,
+      });
+
+      const state = await getOrganizationOnboardingState(organization.id);
+      expect(state.sourceControlConnected).toBe(false);
+      expect(state.connectedPlatform).toBeNull();
+    }
+  );
+
+  it('reflects a connection created through the canonical connectVerifiedGitHubInstallation writer, and clears it on local disconnect', async () => {
+    const owner = await insertTestUser();
+    const organization = await createOrganization(`Onboarding ${crypto.randomUUID()}`, owner.id);
+    createdOrganizationIds.push(organization.id);
+
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      {
+        platformInstallationId: String(100000 + Math.floor(Math.random() * 800000)),
+        platformAccountId: '98765',
+        platformAccountLogin: 'onboarding-acme',
+        permissions: { contents: 'read' },
+        scopes: ['push'],
+        repositoryAccess: 'all',
+        repositories: null,
+        installedAt: new Date().toISOString(),
+        githubAppType: 'standard',
+        kiloUserId: owner.id,
+        githubUserId: '4321',
+        accountType: 'Organization',
+      }
+    );
+    if (!connected.ok) throw new Error('Expected the canonical writer to connect successfully');
+
+    const connectedState = await getOrganizationOnboardingState(organization.id);
+    expect(connectedState.sourceControlConnected).toBe(true);
+    expect(connectedState.connectedPlatform).toBe('github');
+
+    await disconnectGitHubInstallation(
+      { type: 'org', id: organization.id },
+      connected.integrationId
+    );
+
+    const disconnectedState = await getOrganizationOnboardingState(organization.id);
+    expect(disconnectedState.sourceControlConnected).toBe(false);
+    expect(disconnectedState.connectedPlatform).toBeNull();
   });
 
   it('detects enabled GitHub Code Reviewer configuration', async () => {

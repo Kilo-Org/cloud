@@ -486,6 +486,8 @@
       "replyBadRequest": "Túto odpoveď nemožno odoslať. Vlákno sa mohlo zmeniť.",
       "replyForbidden": "Nemáš oprávnenie odpovedať na túto žiadosť o zlúčenie.",
       "addCommentCta": "Skomentovať túto žiadosť o zlúčenie",
+      "fixWithKilo": "Opraviť s Kilo",
+      "fixWithKiloPrompt": "Prosím vyrieš nasledujúci komentár k tejto žiadosti o zlúčenie: {{link}}",
       "commentBadRequest": "Tento komentár nemožno odoslať. Žiadosť o zlúčenie sa mohla zmeniť.",
       "commentForbidden": "Nemáš oprávnenie komentovať túto žiadosť o zlúčenie.",
       "moderation": {
@@ -582,6 +584,10 @@
       "pending": "čakajúce: {{displayCount}}",
       "skipped": "vynechané: {{displayCount}}",
       "checksCount": "počet kontrol: {{displayCount}}",
+      "checksCount_one": "kontrola: {{displayCount}}",
+      "checksCount_few": "kontroly: {{displayCount}}",
+      "checksCount_many": "kontroly: {{displayCount}}",
+      "checksCount_other": "počet kontrol: {{displayCount}}",
       "checkDetails": "podrobnosti kontroly"
     },
     "inbox": {
@@ -3113,6 +3119,12 @@
     "privacy": "Otvor Kilo a zobrazia sa agenty",
     "openAgents": "Otvoriť agenty",
     "needsInput": "Čaká na odpoveď",
+    "newestSession": "Najnovšia: {{title}}",
+    "noneWaiting": "Žiadny agent nečaká",
+    "newAgent": "Nový agent",
+    "approving": "Schvaľuje sa...",
+    "couldNotApprove": "Schválenie zlyhalo",
+    "couldNotStart": "Spustenie zlyhalo",
     "channelName": "Aktívne agenty",
     "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke."
   },
@@ -3148,5 +3160,12 @@
     "remoteFound": "Počítač pripojený",
     "checkAgain": "Skontrolovať znova",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Na spustenie agenta je potrebné zadanie. Pridaj zadanie a spusť ho znova.",
+      "repositoryUnknown": "Kilo nerozpoznáva {{repository}} ako repozitár na GitHube alebo GitLabe. Vyber iný repozitár v Kile.",
+      "repositoryUnsupported": "{{repository}} je repozitár na Bitbuckete — Spustiť agenta ho zatiaľ nemôže použiť. Vyber iný repozitár v Kile."
+    }
   }
 }

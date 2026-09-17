@@ -100,6 +100,7 @@ export function createLifecycleManager(
           onEvent: event => state.sendToIngest(event),
           kiloClient,
           messageId: state.lastAssistantMessageId ?? undefined,
+          userMessageId: state.pendingMessageIds.at(-1),
           upstreamBranch: msgConfig.upstreamBranch,
           ...(msgConfig.commitCoAuthor ? { commitCoAuthor: msgConfig.commitCoAuthor } : {}),
           signal: autoCommitController.signal,

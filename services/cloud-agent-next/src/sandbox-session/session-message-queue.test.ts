@@ -31,6 +31,11 @@ import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { logger } from '../logger.js';
 import { SESSION_DELIVERY_TIMEOUT_MS } from './control-dispatch.js';
 import { RUNTIME_AUTHORIZATION_KEY } from '../session/runtime-authorization-persistence.js';
+import {
+  RUNTIME_PROXY_GRANT_KEY,
+  runtimeProxyGrantSchema,
+  type RuntimeProxyFence,
+} from '../runtime-credential-proxy.js';
 import { PENDING_SESSION_MESSAGE_LIMIT } from '../session/pending-messages.js';
 import { createControlStopRequest } from '../shared/control-plane-session.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
@@ -59,6 +64,7 @@ import {
   recordSessionOperationDispatch,
   releaseCompletedRetryableAttach,
   releaseUnadmittedWaitingMessages,
+  releaseUnconfirmedAttach,
   rotateLostPreparationAttempt,
   resolveSessionMessageIntent,
   streamCloudStatus,
@@ -670,6 +676,89 @@ describe('releaseCompletedRetryableAttach', () => {
   });
 });
 
+describe('releaseUnconfirmedAttach', () => {
+  const authorization: SessionOperationAuthorization = {
+    operation: 'session.attach',
+    operationId: 'attempt-missing',
+    messageId: 'a',
+    session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_root', directory: DIRECTORY },
+    wrapperInstanceId: RUNTIME_ID,
+    dispatchDeadlineAt: 100,
+  };
+
+  function queuedMessage(attach: SessionOperationProof): SessionMessageRecord {
+    return {
+      ...createSessionMessageRecord({ turn: promptTurn, agent: defaultAgent }),
+      unresolvedDispatch: true,
+      wrapperInstanceId: RUNTIME_ID,
+      operations: { attach },
+    };
+  }
+
+  it('retires a dispatched attach the runtime has no record of', () => {
+    const attach = { authorization, dispatched: true };
+    const released = releaseUnconfirmedAttach(
+      [
+        {
+          ...queuedMessage(attach),
+          preparationAttemptId: 'attempt-missing',
+          deliveryDeadlineAt: 500,
+        },
+      ],
+      authorization
+    );
+
+    expect(released?.[0]).toMatchObject({
+      unresolvedDispatch: undefined,
+      wrapperInstanceId: RUNTIME_ID,
+      preparationAttemptId: 'attempt-missing',
+      deliveryDeadlineAt: 500,
+      operations: { retiredAttach: attach },
+    });
+    expect(released?.[0]?.operations?.attach).toBeUndefined();
+  });
+
+  it('refuses a message id that is not in the messages array', () => {
+    expect(releaseUnconfirmedAttach([], authorization)).toBeUndefined();
+  });
+
+  it('refuses a present message with no attach proof', () => {
+    const message: SessionMessageRecord = {
+      ...queuedMessage({ authorization, dispatched: true }),
+      operations: undefined,
+    };
+
+    expect(releaseUnconfirmedAttach([message], authorization)).toBeUndefined();
+  });
+
+  it.each([
+    {
+      name: 'a completed attach result',
+      attach: {
+        authorization,
+        dispatched: true,
+        result: { ok: false as const, error: { code: 'not_ready', message: 'x', retryable: true } },
+      },
+    },
+    {
+      name: 'an undispatched attach proof',
+      attach: { authorization, dispatched: false },
+    },
+    {
+      name: 'an attach proof for another wrapper',
+      attach: {
+        authorization: {
+          ...authorization,
+          wrapperInstanceId: '44444444-4444-4444-8444-444444444444',
+        },
+        dispatched: true,
+      },
+    },
+  ])('refuses to release $name', ({ attach }) => {
+    expect(releaseUnconfirmedAttach([queuedMessage(attach)], authorization)).toBeUndefined();
+  });
+});
+
 describe('rotateLostPreparationAttempt', () => {
   const attachAuthorization: SessionOperationAuthorization = {
     operation: 'session.attach',
@@ -1181,6 +1270,16 @@ function installModernRuntimeAuthorization(fixture: ReturnType<typeof sessionFix
     source: { admissionSource: 'user' },
   });
   return token;
+}
+
+function connectionFence(connectionId: string): Extract<RuntimeProxyFence, { plane: 'control' }> {
+  return {
+    plane: 'control',
+    allocationId: 'allocation_1',
+    providerInstanceId: 'provider_1',
+    connectionId,
+    wrapperInstanceId: RUNTIME_ID,
+  };
 }
 
 describe('SandboxSession orchestration', () => {
@@ -5407,6 +5506,68 @@ describe('SandboxSession orchestration', () => {
     }
   );
 
+  it('resolves and reuses a runtime proxy handle when only the control connection changes', async () => {
+    const fixture = sessionFixture();
+    const backingToken = installModernRuntimeAuthorization(fixture);
+    const fenceMock = fixture.control.getRuntimeCredentialProxyFence;
+    const f1 = connectionFence('connection_1');
+    const f2 = connectionFence('connection_2');
+    fenceMock.mockResolvedValueOnce(f1).mockResolvedValueOnce(f1).mockResolvedValue(f2);
+
+    const handle = await fixture.session.issueRuntimeCredentialProxyGrant({
+      wrapperRunId: 'ignored',
+      wrapperGeneration: 0,
+      wrapperConnectionId: 'ignored',
+    });
+    expect(handle).toEqual(expect.any(String));
+    expect(fixture.values.get(RUNTIME_PROXY_GRANT_KEY)).toMatchObject({
+      plane: 'control',
+      connectionId: 'connection_1',
+    });
+
+    await expect(
+      fixture.session.resolveRuntimeCredentialProxyGrant(handle!)
+    ).resolves.toMatchObject({ token: backingToken });
+
+    const reused = await fixture.session.issueRuntimeCredentialProxyGrant({
+      wrapperRunId: 'ignored',
+      wrapperGeneration: 0,
+      wrapperConnectionId: 'ignored',
+    });
+    expect(reused).toBe(handle);
+    expect(
+      runtimeProxyGrantSchema.parse(fixture.values.get(RUNTIME_PROXY_GRANT_KEY))
+    ).toMatchObject({ plane: 'control', connectionId: 'connection_2' });
+  });
+
+  it('reuses a runtime proxy handle when the control connection changes between the two reads', async () => {
+    const fixture = sessionFixture();
+    installModernRuntimeAuthorization(fixture);
+    const fenceMock = fixture.control.getRuntimeCredentialProxyFence;
+    const f1 = connectionFence('connection_1');
+    const f2 = connectionFence('connection_2');
+
+    fenceMock.mockResolvedValue(f1);
+    const handle = await fixture.session.issueRuntimeCredentialProxyGrant({
+      wrapperRunId: 'ignored',
+      wrapperGeneration: 0,
+      wrapperConnectionId: 'ignored',
+    });
+    expect(handle).toEqual(expect.any(String));
+
+    fenceMock.mockReset();
+    fenceMock.mockResolvedValueOnce(f1).mockResolvedValue(f2);
+    const reused = await fixture.session.issueRuntimeCredentialProxyGrant({
+      wrapperRunId: 'ignored',
+      wrapperGeneration: 0,
+      wrapperConnectionId: 'ignored',
+    });
+    expect(reused).toBe(handle);
+    expect(
+      runtimeProxyGrantSchema.parse(fixture.values.get(RUNTIME_PROXY_GRANT_KEY))
+    ).toMatchObject({ plane: 'control', connectionId: 'connection_2' });
+  });
+
   it.each(['revoked', 'deleted'] as const)(
     'immediately denies runtime proxy issue and resolution after terminal lifecycle is %s despite pending or failed detach',
     async lifecycle => {
@@ -5572,6 +5733,17 @@ describe('SandboxSession orchestration', () => {
         payload: expect.objectContaining({ messageId: 'c', status: 'interrupted' }),
       })
     );
+  });
+
+  it('does not block session deletion on a stalled reference-forget RPC', async () => {
+    const fixture = sessionFixture();
+    fixture.control.forgetSessionReference.mockImplementation(() => new Promise(() => {}));
+    const deletion = fixture.session.deleteSession();
+    await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
+    await deletion;
+    await fixture.flush();
+    expect(fixture.control.forgetSessionReference).toHaveBeenCalledTimes(1);
+    expect(await fixture.session.getMetadata()).toBeNull();
   });
 
   it.each(['completed', 'failed', 'cancelled'] as const)(
@@ -8283,7 +8455,7 @@ describe('recovery chunk 1: proof-based wait classification', () => {
       expect(fixture.record('a')?.operations?.prompt).toBeUndefined();
     });
 
-    it('reconciles an ambiguous attach through the existing operation receipt path', async () => {
+    it('reconciles an ambiguous running attach without failing or quarantining the runtime', async () => {
       const fixture = sessionFixture();
       fixture.setStatus({
         physical: 'running',
@@ -8295,11 +8467,12 @@ describe('recovery chunk 1: proof-based wait classification', () => {
         ...authorization('session.attach', 'a', 'attempt-ambiguous'),
         dispatchDeadlineAt: Date.now() + 60_000,
       };
+      const deadlineAt = attachAuthorization.dispatchDeadlineAt;
       fixture.values.set('session_messages', [
         queuedRecord('a', {
           wrapperInstanceId: wrapper,
           preparationAttemptId: attachAuthorization.operationId,
-          deliveryDeadlineAt: attachAuthorization.dispatchDeadlineAt,
+          deliveryDeadlineAt: deadlineAt,
           unresolvedDispatch: true,
           operations: { attach: { authorization: attachAuthorization, dispatched: true } },
         }),
@@ -8315,6 +8488,14 @@ describe('recovery chunk 1: proof-based wait classification', () => {
       await fixture.fireAlarm();
       await fixture.flush();
 
+      expect(fixture.record('a')).toMatchObject({ state: 'queued' });
+      expect(fixture.record('a')?.failedReason).toBeUndefined();
+      expect(fixture.terminalEvents()).toHaveLength(0);
+      expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+      const retryAt = fixture.alarmAt();
+      if (retryAt === null) throw new Error('Missing queue retry alarm');
+      expect(retryAt).toBeLessThanOrEqual(deadlineAt);
+
       // The durable attach proof is reconciled against its original
       // authorization; no second `session.attach` dispatch is attempted.
       expect(
@@ -8322,6 +8503,173 @@ describe('recovery chunk 1: proof-based wait classification', () => {
           ([input]) => input.operation === 'session.operation.get'
         )
       ).toHaveLength(1);
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
+      ).toHaveLength(0);
+    });
+
+    it('resolves a running attach once it completes and then dispatches the prompt', async () => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: wrapper,
+        operationResults: true,
+      });
+      const attachAuthorization: SessionOperationAuthorization = {
+        ...authorization('session.attach', 'a', 'attempt-continuation'),
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      fixture.values.set('session_messages', [
+        queuedRecord('a', {
+          wrapperInstanceId: wrapper,
+          preparationAttemptId: attachAuthorization.operationId,
+          deliveryDeadlineAt: attachAuthorization.dispatchDeadlineAt,
+          unresolvedDispatch: true,
+          operations: { attach: { authorization: attachAuthorization, dispatched: true } },
+        }),
+      ]);
+      let lookups = 0;
+      delegateRequest(fixture, 'session.operation.get', async () => {
+        lookups += 1;
+        if (lookups === 1)
+          return controlResponse({
+            state: 'running',
+            authorization: attachAuthorization,
+            executionDeadlineAt: Date.now() + 60_000,
+          });
+        return controlResponse({
+          state: 'completed',
+          delivery: {
+            version: 2,
+            authorization: attachAuthorization,
+            completedAt: Date.now(),
+            result: { ok: true, result: { attached: true } },
+            events: [],
+            preparing: [],
+          },
+        });
+      });
+
+      await fixture.fireAlarm();
+      await fixture.flush();
+      expect(fixture.record('a')?.state).toBe('queued');
+
+      const retryAt = fixture.alarmAt();
+      if (retryAt === null) throw new Error('Missing queue retry alarm');
+      vi.setSystemTime(retryAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')?.state).toBe('accepted');
+      expect(lookups).toBe(2);
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
+      ).toHaveLength(0);
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
+      ).toHaveLength(1);
+    });
+
+    it('bounds a persistently running attach by the original head deadline', async () => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: wrapper,
+        operationResults: true,
+      });
+      const attachAuthorization: SessionOperationAuthorization = {
+        ...authorization('session.attach', 'a', 'attempt-persistent'),
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      const deadlineAt = attachAuthorization.dispatchDeadlineAt;
+      fixture.values.set('session_messages', [
+        queuedRecord('a', {
+          wrapperInstanceId: wrapper,
+          preparationAttemptId: attachAuthorization.operationId,
+          deliveryDeadlineAt: deadlineAt,
+          unresolvedDispatch: true,
+          operations: { attach: { authorization: attachAuthorization, dispatched: true } },
+        }),
+      ]);
+      delegateRequest(fixture, 'session.operation.get', async () =>
+        controlResponse({
+          state: 'running',
+          authorization: attachAuthorization,
+          executionDeadlineAt: Date.now() + 60_000,
+        })
+      );
+
+      await fixture.fireAlarm();
+      await fixture.flush();
+      expect(fixture.record('a')?.state).toBe('queued');
+
+      let guard = 0;
+      while (fixture.record('a')?.state === 'queued') {
+        if (++guard > 100) throw new Error('Attach reconcile did not reach the head deadline');
+        const retryAt = fixture.alarmAt();
+        if (retryAt === null) throw new Error('Missing queue retry alarm');
+        expect(retryAt).toBeLessThanOrEqual(deadlineAt);
+        vi.setSystemTime(retryAt);
+        await fixture.fireAlarm();
+        await fixture.flush();
+      }
+
+      expect(fixture.record('a')).toMatchObject({
+        state: 'failed',
+        failedReason: 'preparation_timeout',
+        terminalAt: deadlineAt,
+      });
+      expect(fixture.terminalEvents()).toHaveLength(1);
+    });
+
+    it('keeps the existing terminal policy for a completed attach rejection', async () => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: wrapper,
+        operationResults: true,
+      });
+      const attachAuthorization: SessionOperationAuthorization = {
+        ...authorization('session.attach', 'a', 'attempt-rejected'),
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      fixture.values.set('session_messages', [
+        queuedRecord('a', {
+          wrapperInstanceId: wrapper,
+          preparationAttemptId: attachAuthorization.operationId,
+          deliveryDeadlineAt: attachAuthorization.dispatchDeadlineAt,
+          unresolvedDispatch: true,
+          operations: { attach: { authorization: attachAuthorization, dispatched: true } },
+        }),
+      ]);
+      delegateRequest(fixture, 'session.operation.get', async () =>
+        controlResponse({
+          state: 'completed',
+          delivery: {
+            version: 2,
+            authorization: attachAuthorization,
+            completedAt: Date.now(),
+            result: {
+              ok: false,
+              error: { code: 'not_ready', message: 'attach failed', retryable: false },
+            },
+            events: [],
+            preparing: [],
+          },
+        })
+      );
+
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')).toMatchObject({
+        state: 'failed',
+        failedReason: 'attach_exhausted',
+      });
+      expect(fixture.terminalEvents()).toHaveLength(1);
       expect(
         fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
       ).toHaveLength(0);

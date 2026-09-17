@@ -137,6 +137,13 @@ function createChatProcessor(
         case 'message.part.removed':
           sessionStorage.deletePart(event.messageId, event.partId);
           break;
+        // The CLI drops messages it no longer serves (compaction scaffolding,
+        // reverted turns). Keep the local store in step with the durable
+        // transcript so a removed message cannot keep supplying state — e.g. a
+        // context reading — that a reopened session no longer has.
+        case 'message.removed':
+          sessionStorage.deleteMessage(event.messageId);
+          break;
       }
     },
 
@@ -146,6 +153,11 @@ function createChatProcessor(
       if (!content) return;
       if (sessionStorage.getMessageInfo(messageId)) return;
 
+      // Same unconfirmed marker as the optimistic send-time row: the
+      // authoritative `message.updated` for this id replaces the info (role and
+      // synthetic flag) and its non-synthetic parts drop this placeholder part
+      // (`upsertPartDroppingStaleSyntheticParts`), so a confirmed record wins
+      // the role and the parts.
       const syntheticMessage: UserMessage = {
         id: messageId,
         sessionID: sessionId,
@@ -153,6 +165,7 @@ function createChatProcessor(
         time: { created: Date.now() },
         agent: '',
         model: { providerID: '', modelID: '' },
+        synthetic: true,
       };
       sessionStorage.upsertMessage(syntheticMessage);
 

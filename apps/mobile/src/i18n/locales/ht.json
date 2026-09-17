@@ -480,6 +480,8 @@
       "replyBadRequest": "Pa ka pibliye repons sa a. Petèt fil diskisyon an chanje.",
       "replyForbidden": "Ou pa gen pèmisyon pou reponn demann fizyon sa a.",
       "addCommentCta": "Fè yon kòmantè sou demann fizyon sa a",
+      "fixWithKilo": "Korije ak Kilo",
+      "fixWithKiloPrompt": "Tanpri rezoud kòmantè sa a sou demann fizyon an: {{link}}",
       "commentBadRequest": "Pa ka pibliye kòmantè sa a. Petèt demann fizyon an chanje.",
       "commentForbidden": "Ou pa gen pèmisyon pou fè yon kòmantè sou demann fizyon sa a.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} ap tann",
       "skipped": "{{displayCount}} sote",
       "checksCount": "{{displayCount}} verifikasyon",
+      "checksCount_one": "{{displayCount}} verifikasyon",
+      "checksCount_other": "{{displayCount}} verifikasyon",
       "checkDetails": "detay verifikasyon an"
     },
     "inbox": {
@@ -3067,6 +3071,12 @@
     "privacy": "Louvri Kilo pou wè ajan yo",
     "openAgents": "Louvri ajan yo",
     "needsInput": "Bezwen repons",
+    "newestSession": "Pi nouvo: {{title}}",
+    "noneWaiting": "Pa gen ajan k ap tann",
+    "newAgent": "Nouvo ajan",
+    "approving": "Ap apwouve...",
+    "couldNotApprove": "Pa t kapab apwouve",
+    "couldNotStart": "Pa t kapab kòmanse",
     "channelName": "Ajan aktif",
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an."
   },
@@ -3102,5 +3112,12 @@
     "remoteFound": "Òdinatè konekte",
     "checkAgain": "Tcheke ankò",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Kòmanse ajan bezwen yon enstriksyon. Ajoute yon enstriksyon epi kouri li ankò.",
+      "repositoryUnknown": "Kilo pa rekonèt {{repository}} kòm yon depo GitHub oswa GitLab. Chwazi yon lòt depo nan Kilo.",
+      "repositoryUnsupported": "{{repository}} se yon depo Bitbucket — Kòmanse ajan poko ka itilize li. Chwazi yon lòt depo nan Kilo."
+    }
   }
 }

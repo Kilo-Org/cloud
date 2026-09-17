@@ -9,6 +9,9 @@ import PERMISSION_PROMPT_COPY from './plugins/permission-prompt-copy.json';
 // The widget gallery's own copy. Native bundle metadata, not app copy — see
 // plugins/withWidgetLocalizations.js.
 import WIDGET_GALLERY_COPY from './plugins/widget-gallery-copy.json';
+// The App Intents' own copy, the twin of the widget gallery's. Native bundle
+// metadata, not app copy — see plugins/withAppIntentLocalizations.js.
+import APP_INTENT_COPY from './plugins/app-intent-copy.json';
 import { SENTRY_NATIVE_OPTIONS } from './src/lib/sentry-dsn';
 import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
 import {
@@ -310,6 +313,14 @@ const config: ExpoConfig = {
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
     './plugins/withAndroidExpoModuleRepos',
+    // Localizes the App Intents on the app target itself: the four actions and
+    // their parameters are `LocalizedStringResource`s resolved against
+    // `Localizable.strings` in the app bundle, which no other plugin writes.
+    // The app-target twin of the widget registration below.
+    [
+      './plugins/withAppIntentLocalizations',
+      { languages: [...SUPPORTED_LANGUAGES], copy: APP_INTENT_COPY },
+    ],
     // Declares the app's languages on the widget extension, which expo-widgets
     // leaves English-only. This must be registered BEFORE 'expo-widgets':
     // dangerous mods run in reverse registration order, so the earlier entry

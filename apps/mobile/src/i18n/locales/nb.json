@@ -480,6 +480,8 @@
       "replyBadRequest": "Dette svaret kan ikke publiseres. Tråden kan ha endret seg.",
       "replyForbidden": "Du har ikke tillatelse til å svare på denne PR-en.",
       "addCommentCta": "Kommenter denne PR-en",
+      "fixWithKilo": "Løs med Kilo",
+      "fixWithKiloPrompt": "Vennligst håndter følgende kommentar på PR-en: {{link}}",
       "commentBadRequest": "Denne kommentaren kan ikke publiseres. PR-en kan ha endret seg.",
       "commentForbidden": "Du har ikke tillatelse til å kommentere denne PR-en.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} venter",
       "skipped": "{{displayCount}} hoppet over",
       "checksCount": "{{displayCount}} sjekker",
+      "checksCount_one": "{{displayCount}} sjekk",
+      "checksCount_other": "{{displayCount}} sjekker",
       "checkDetails": "detaljer om sjekken"
     },
     "inbox": {
@@ -3067,6 +3071,12 @@
     "privacy": "Åpne Kilo for å se agenter",
     "openAgents": "Åpne agenter",
     "needsInput": "Venter på svar",
+    "newestSession": "Nyeste: {{title}}",
+    "noneWaiting": "Ingen agenter venter",
+    "newAgent": "Ny agent",
+    "approving": "Godkjenner...",
+    "couldNotApprove": "Kunne ikke godkjenne",
+    "couldNotStart": "Kunne ikke starte",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
   },
@@ -3102,5 +3112,12 @@
     "remoteFound": "Datamaskin tilkoblet",
     "checkAgain": "Sjekk igjen",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Start agenten krever en instruksjon. Legg til en instruksjon og kjør den på nytt.",
+      "repositoryUnknown": "Kilo gjenkjenner ikke {{repository}} som et GitHub- eller GitLab-kodelager. Velg et annet kodelager i Kilo.",
+      "repositoryUnsupported": "{{repository}} er et Bitbucket-kodelager — Start agenten kan ennå ikke bruke det. Velg et annet kodelager i Kilo."
+    }
   }
 }

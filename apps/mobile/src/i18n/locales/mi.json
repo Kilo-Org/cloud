@@ -480,6 +480,8 @@
       "replyBadRequest": "Kāore e taea te tuku i tēnei whakautu. Kua rerekē pea te aho kōrero.",
       "replyForbidden": "Kāore koe e whakaaetia kia whakautu ki tēnei tono kume.",
       "addCommentCta": "Tāpiri kōrero ki tēnei tono kume",
+      "fixWithKilo": "Whakatika mā Kilo",
+      "fixWithKiloPrompt": "Tēnā koa, whakatika i te kōrero e whai ake nei mō te tono kume: {{link}}",
       "commentBadRequest": "Kāore e taea te tuku i tēnei kōrero. Kua rerekē pea te tono kume.",
       "commentForbidden": "Kāore koe e whakaaetia kia tāpiri kōrero ki tēnei tono kume.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} e tatari ana",
       "skipped": "{{displayCount}} kua hipa",
       "checksCount": "{{displayCount}} arowhai",
+      "checksCount_one": "{{displayCount}} arowhai",
+      "checksCount_other": "{{displayCount}} arowhai",
       "checkDetails": "ngā taipitopito arowhai"
     },
     "inbox": {
@@ -3067,6 +3071,12 @@
     "privacy": "Whakatuwheratia a Kilo kia kite ai i ngā māngai",
     "openAgents": "Whakatuwheratia ngā māngai",
     "needsInput": "Me whai urupare",
+    "newestSession": "Hōu rawa: {{title}}",
+    "noneWaiting": "Kāore he māngai e tatari ana",
+    "newAgent": "Māngai hōu",
+    "approving": "E whakaae ana...",
+    "couldNotApprove": "Kāore i taea te whakaae",
+    "couldNotStart": "Kāore i taea te tīmata",
     "channelName": "Ngā māngai e mahi ana",
     "activityKitDisabledBody": "Whakakāngia ngā mahi wā-tūturu i ngā tautuhinga kia kite ai i ngā māngai e mahi ana i te mata maukati."
   },
@@ -3102,5 +3112,12 @@
     "remoteFound": "Kua honoa te rorohiko",
     "checkAgain": "Tirohia anō",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Me whai tohutohu te Tīmata i te kaiāwhina. Tāpirihia he tohutohu ka whakahaere anō.",
+      "repositoryUnknown": "Kāore a Kilo e āhukahuka i a {{repository}} hei pūranga waehere GitHub, GitLab rānei. Kōwhiria tētahi atu pūranga waehere i roto i a Kilo.",
+      "repositoryUnsupported": "He pūranga waehere Bitbucket a {{repository}} — Kāore anō a Tīmata i te kaiāwhina e taea te whakamahi. Kōwhiria tētahi atu pūranga waehere i roto i a Kilo."
+    }
   }
 }

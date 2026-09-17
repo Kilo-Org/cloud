@@ -480,6 +480,8 @@
       "replyBadRequest": "Bu cavabı göndərmək mümkün deyil. Müzakirə dəyişmiş ola bilər.",
       "replyForbidden": "Bu birləşdirmə sorğusuna cavab vermək icazən yoxdur.",
       "addCommentCta": "Bu birləşdirmə sorğusuna şərh yaz",
+      "fixWithKilo": "Kilo ilə düzəlt",
+      "fixWithKiloPrompt": "Zəhmət olmasa aşağıdakı birləşdirmə sorğusu şərhini həll et: {{link}}",
       "commentBadRequest": "Bu şərhi göndərmək mümkün deyil. Birləşdirmə sorğusu dəyişmiş ola bilər.",
       "commentForbidden": "Bu birləşdirmə sorğusuna şərh yazmaq icazən yoxdur.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} gözləmədə",
       "skipped": "{{displayCount}} buraxılıb",
       "checksCount": "{{displayCount}} yoxlama",
+      "checksCount_one": "{{displayCount}} yoxlama",
+      "checksCount_other": "{{displayCount}} yoxlama",
       "checkDetails": "yoxlama təfərrüatları"
     },
     "inbox": {
@@ -3067,6 +3071,12 @@
     "privacy": "Agentləri görmək üçün Kilo-nu aç",
     "openAgents": "Agentləri aç",
     "needsInput": "Cavab gözləyir",
+    "newestSession": "Ən yenisi: {{title}}",
+    "noneWaiting": "Gözləyən agent yoxdur",
+    "newAgent": "Yeni agent",
+    "approving": "Təsdiqlənir...",
+    "couldNotApprove": "Təsdiqlənmədi",
+    "couldNotStart": "Başladılmadı",
     "channelName": "Aktiv agentlər",
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir."
   },
@@ -3102,5 +3112,12 @@
     "remoteFound": "Kompüter qoşuldu",
     "checkAgain": "Yenidən yoxla",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Agenti başlatmaq üçün sorğu lazımdır. Sorğu əlavə et və yenidən işə sal.",
+      "repositoryUnknown": "Kilo {{repository}} adını GitHub və ya GitLab repozitoriyası kimi tanımır. Kilo-da başqa repozitoriya seç.",
+      "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasıdır — Agenti başlat hələ ondan istifadə edə bilmir. Kilo-da başqa repozitoriya seç."
+    }
   }
 }

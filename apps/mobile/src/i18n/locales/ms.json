@@ -480,6 +480,8 @@
       "replyBadRequest": "Balasan ini tidak dapat disiarkan. Rantaian perbincangan ini mungkin telah berubah.",
       "replyForbidden": "Anda tidak mempunyai kebenaran untuk membalas permintaan tarik ini.",
       "addCommentCta": "Beri komen pada permintaan tarik ini",
+      "fixWithKilo": "Baiki dengan Kilo",
+      "fixWithKiloPrompt": "Sila tangani komen permintaan tarik berikut: {{link}}",
       "commentBadRequest": "Komen ini tidak dapat disiarkan. Permintaan tarik ini mungkin telah berubah.",
       "commentForbidden": "Anda tidak mempunyai kebenaran untuk memberi komen pada permintaan tarik ini.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} belum selesai",
       "skipped": "{{displayCount}} dilangkau",
       "checksCount": "{{displayCount}} pemeriksaan",
+      "checksCount_one": "{{displayCount}} pemeriksaan",
+      "checksCount_other": "{{displayCount}} pemeriksaan",
       "checkDetails": "butiran pemeriksaan"
     },
     "inbox": {
@@ -3067,6 +3071,12 @@
     "privacy": "Buka Kilo untuk melihat ejen",
     "openAgents": "Buka ejen",
     "needsInput": "Perlu input",
+    "newestSession": "Terkini: {{title}}",
+    "noneWaiting": "Tiada ejen menunggu",
+    "newAgent": "Ejen baharu",
+    "approving": "Meluluskan...",
+    "couldNotApprove": "Gagal meluluskan",
+    "couldNotStart": "Gagal memulakan",
     "channelName": "Ejen aktif",
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci."
   },
@@ -3102,5 +3112,12 @@
     "remoteFound": "Komputer bersambung",
     "checkAgain": "Semak semula",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Mulakan ejen memerlukan gesaan. Tambah gesaan dan jalankannya semula.",
+      "repositoryUnknown": "Kilo tidak mengenali {{repository}} sebagai repositori GitHub atau GitLab. Pilih repositori lain dalam Kilo.",
+      "repositoryUnsupported": "{{repository}} ialah repositori Bitbucket — Mulakan ejen belum boleh menggunakannya. Pilih repositori lain dalam Kilo."
+    }
   }
 }

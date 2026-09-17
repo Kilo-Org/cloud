@@ -486,6 +486,8 @@
       "replyBadRequest": "Немагчыма апублікаваць гэты адказ. Магчыма, абмеркаванне змянілася.",
       "replyForbidden": "У цябе няма дазволу адказваць у гэтым запыце на зліццё.",
       "addCommentCta": "Каментаваць гэты запыт на зліццё",
+      "fixWithKilo": "Выправіць з Kilo",
+      "fixWithKiloPrompt": "Калі ласка, апрацуй наступны каментарый да запыту на зліццё: {{link}}",
       "commentBadRequest": "Немагчыма апублікаваць гэты каментарый. Магчыма, запыт на зліццё змяніўся.",
       "commentForbidden": "У цябе няма дазволу каментаваць гэты запыт на зліццё.",
       "moderation": {
@@ -582,6 +584,10 @@
       "pending": "у чаканні: {{displayCount}}",
       "skipped": "прапушчана: {{displayCount}}",
       "checksCount": "праверак: {{displayCount}}",
+      "checksCount_one": "праверка: {{displayCount}}",
+      "checksCount_few": "праверкі: {{displayCount}}",
+      "checksCount_many": "праверак: {{displayCount}}",
+      "checksCount_other": "праверак: {{displayCount}}",
       "checkDetails": "падрабязнасці праверкі"
     },
     "inbox": {
@@ -3113,6 +3119,12 @@
     "privacy": "Адкрый Kilo, каб убачыць агентаў",
     "openAgents": "Адкрыць агентаў",
     "needsInput": "Чакае адказу",
+    "newestSession": "Найноўшы: {{title}}",
+    "noneWaiting": "Няма агентаў, якія чакаюць",
+    "newAgent": "Новы агент",
+    "approving": "Ухваляецца...",
+    "couldNotApprove": "Не ўдалося ўхваліць",
+    "couldNotStart": "Не ўдалося запусціць",
     "channelName": "Актыўныя агенты",
     "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі."
   },
@@ -3148,5 +3160,12 @@
     "remoteFound": "Камп'ютар падключаны",
     "checkAgain": "Праверыць яшчэ раз",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Каб запусціць агента, патрэбен запыт. Дадайце запыт і запусціце зноў.",
+      "repositoryUnknown": "Kilo не распазнае {{repository}} як рэпазіторый GitHub або GitLab. Выберыце іншы рэпазіторый у Kilo.",
+      "repositoryUnsupported": "{{repository}} — гэта рэпазіторый Bitbucket, і Запусціць агента пакуль не можа яго выкарыстоўваць. Выберыце іншы рэпазіторый у Kilo."
+    }
   }
 }

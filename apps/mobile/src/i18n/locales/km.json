@@ -480,6 +480,8 @@
       "replyBadRequest": "មិនអាចបង្ហោះការឆ្លើយតបនេះបានទេ។ ការពិភាក្សាអាចបានផ្លាស់ប្តូរ។",
       "replyForbidden": "អ្នកគ្មានសិទ្ធិឆ្លើយតបលើសំណើបញ្ចូលកូដនេះទេ។",
       "addCommentCta": "បញ្ចេញមតិលើសំណើបញ្ចូលកូដនេះ",
+      "fixWithKilo": "ដោះស្រាយជាមួយ Kilo",
+      "fixWithKiloPrompt": "សូមដោះស្រាយមតិយោបល់ខាងក្រោមលើសំណើបញ្ចូលកូដនេះ៖ {{link}}",
       "commentBadRequest": "មិនអាចបង្ហោះមតិយោបល់នេះបានទេ។ សំណើបញ្ចូលកូដអាចបានផ្លាស់ប្តូរ។",
       "commentForbidden": "អ្នកគ្មានសិទ្ធិបញ្ចេញមតិលើសំណើបញ្ចូលកូដនេះទេ។",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "កំពុងរង់ចាំ {{displayCount}}",
       "skipped": "បានរំលង {{displayCount}}",
       "checksCount": "ការត្រួតពិនិត្យ {{displayCount}}",
+      "checksCount_one": "ការត្រួតពិនិត្យ {{displayCount}}",
+      "checksCount_other": "ការត្រួតពិនិត្យ {{displayCount}}",
       "checkDetails": "ព័ត៌មានលម្អិតអំពីការត្រួតពិនិត្យ"
     },
     "inbox": {
@@ -3067,6 +3071,12 @@
     "privacy": "បើក Kilo ដើម្បីមើលភ្នាក់ងារ",
     "openAgents": "បើកភ្នាក់ងារ",
     "needsInput": "ត្រូវការការឆ្លើយតប",
+    "newestSession": "ថ្មីបំផុត: {{title}}",
+    "noneWaiting": "គ្មានភ្នាក់ងារកំពុងរង់ចាំ",
+    "newAgent": "ភ្នាក់ងារថ្មី",
+    "approving": "កំពុងយល់ព្រម...",
+    "couldNotApprove": "មិនអាចយល់ព្រមបានទេ",
+    "couldNotStart": "មិនអាចចាប់ផ្ដើមបានទេ",
     "channelName": "ភ្នាក់ងារសកម្ម",
     "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។"
   },
@@ -3102,5 +3112,12 @@
     "remoteFound": "បានភ្ជាប់កុំព្យូទ័រ",
     "checkAgain": "ពិនិត្យម្តងទៀត",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ការចាប់ផ្តើមភ្នាក់ងារត្រូវការសេចក្តីណែនាំ។ បន្ថែមសេចក្តីណែនាំ ហើយដំណើរការវាម្តងទៀត។",
+      "repositoryUnknown": "Kilo មិនស្គាល់ {{repository}} ជាឃ្លាំងកូដ GitHub ឬ GitLab ទេ។ ជ្រើសរើសឃ្លាំងកូដផ្សេងនៅក្នុង Kilo។",
+      "repositoryUnsupported": "{{repository}} គឺជាឃ្លាំងកូដ Bitbucket — ចាប់ផ្តើមភ្នាក់ងារមិនអាចប្រើវាបាននៅឡើយទេ។ ជ្រើសរើសឃ្លាំងកូដផ្សេងនៅក្នុង Kilo។"
+    }
   }
 }

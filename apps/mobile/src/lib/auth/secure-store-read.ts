@@ -1,5 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
-
+import { readStoredValue, type SecureStoreReadOptions } from '@/lib/auth/secure-store-value';
 import { E2E_SECURE_STORE_FAULT_MS } from '@/lib/config';
 
 /**
@@ -31,24 +30,10 @@ async function delay(ms: number): Promise<void> {
   });
 }
 
-/**
- * One read of `key`; a rejection propagates to the caller. This is the single
- * cross-platform entry point for a plain SecureStore read: `expo-secure-store`
- * exists on both iOS and Android, so there is no per-platform storage branch
- * to keep. The retrying credential read below is built on it.
- */
-export async function readStoredValue(
-  key: string,
-  options?: SecureStore.SecureStoreOptions
-): Promise<string | null> {
-  const value = await SecureStore.getItemAsync(key, options);
-  return value;
-}
-
 /** One attempt: the handed-over read if there is one, otherwise a fresh one. */
 async function readOnce(
   key: string,
-  options: SecureStore.SecureStoreOptions | undefined,
+  options: SecureStoreReadOptions | undefined,
   firstAttempt: Promise<string | null> | undefined
 ): Promise<string | null> {
   if (isFaultWindowOpen()) {
@@ -68,7 +53,7 @@ async function readOnce(
  */
 export async function readStoredValueWithRetry(
   key: string,
-  options?: SecureStore.SecureStoreOptions,
+  options?: SecureStoreReadOptions,
   firstAttempt?: Promise<string | null>
 ): Promise<string | null> {
   let pending = firstAttempt;

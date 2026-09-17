@@ -4,7 +4,7 @@ import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-a
 import {
   countInFlightMessages,
   resolveRetryPrompt,
-  retryMessageAndClear,
+  retryFailedMessage,
 } from './session-detail-content-helpers';
 import { assistantMessage, userMessage } from './message-bubble-test-utils';
 
@@ -33,23 +33,19 @@ describe('countInFlightMessages', () => {
   });
 });
 
-describe('retryMessageAndClear', () => {
-  it('clears the failed row when the retry send succeeds', async () => {
+describe('retryFailedMessage', () => {
+  it('re-sends the failed submission', async () => {
     const send = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-    const clearFailed = vi.fn<() => void>();
-    await retryMessageAndClear(send, clearFailed);
+    await retryFailedMessage(send);
     expect(send).toHaveBeenCalledTimes(1);
-    expect(clearFailed).toHaveBeenCalledTimes(1);
   });
 
-  it('does not clear the failed row when the retry send fails', async () => {
+  it('swallows a rejected re-send so the failed row keeps its footer', async () => {
     const send = vi
       .fn<() => Promise<void>>()
       .mockRejectedValue(new Error('Failed to send message'));
-    const clearFailed = vi.fn<() => void>();
-    await retryMessageAndClear(send, clearFailed);
+    await expect(retryFailedMessage(send)).resolves.toBeUndefined();
     expect(send).toHaveBeenCalledTimes(1);
-    expect(clearFailed).not.toHaveBeenCalled();
   });
 });
 

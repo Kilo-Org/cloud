@@ -2411,6 +2411,10 @@
     "checkConnection": "Проверить подключение",
     "checks": {
       "checksCount": "проверок: {{displayCount}}",
+      "checksCount_one": "проверка: {{displayCount}}",
+      "checksCount_few": "проверки: {{displayCount}}",
+      "checksCount_many": "проверок: {{displayCount}}",
+      "checksCount_other": "проверок: {{displayCount}}",
       "couldNotLoad": "Не удалось загрузить проверки.",
       "failed": "с ошибками: {{displayCount}}",
       "noAccess": "У вас нет доступа к проверкам этого репозитория.",
@@ -2510,6 +2514,8 @@
       "replyBody": "Текст ответа",
       "replyForbidden": "У вас нет прав на ответы в этом запросе на слияние.",
       "addCommentCta": "Комментировать этот запрос на слияние",
+      "fixWithKilo": "Исправить с Kilo",
+      "fixWithKiloPrompt": "Пожалуйста, разбери следующий комментарий к запросу на слияние: {{link}}",
       "commentBadRequest": "Не удаётся опубликовать этот комментарий. Возможно, запрос на слияние изменился.",
       "commentForbidden": "У вас нет прав на комментарии в этом запросе на слияние.",
       "replyPlaceholder": "Ваш ответ…",
@@ -3113,6 +3119,12 @@
     "privacy": "Откройте Kilo, чтобы увидеть агентов",
     "openAgents": "Открыть список агентов",
     "needsInput": "Ожидание ввода",
+    "newestSession": "Новейший: {{title}}",
+    "noneWaiting": "Нет агентов в ожидании",
+    "newAgent": "Новый агент",
+    "approving": "Одобряется...",
+    "couldNotApprove": "Не удалось одобрить",
+    "couldNotStart": "Не удалось запустить",
     "channelName": "Активные агенты",
     "activityKitDisabledBody": "Включите «Эфир активности» в настройках, чтобы видеть активных агентов на экране блокировки."
   },
@@ -3148,5 +3160,12 @@
     "remoteFound": "Компьютер подключён",
     "checkAgain": "Проверить ещё раз",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Для запуска агента нужен запрос. Добавьте запрос и запустите снова.",
+      "repositoryUnknown": "Kilo не распознаёт {{repository}} как репозиторий GitHub или GitLab. Выберите другой репозиторий в Kilo.",
+      "repositoryUnsupported": "{{repository}} — репозиторий Bitbucket, и Запустить агента пока не может его использовать. Выберите другой репозиторий в Kilo."
+    }
   }
 }

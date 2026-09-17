@@ -2397,6 +2397,9 @@
     "checkConnection": "Comprobar conexión",
     "checks": {
       "checksCount": "{{displayCount}} verificaciones",
+      "checksCount_one": "{{displayCount}} verificación",
+      "checksCount_many": "{{displayCount}} verificaciones",
+      "checksCount_other": "{{displayCount}} verificaciones",
       "couldNotLoad": "No se pudieron cargar las verificaciones.",
       "failed": "{{displayCount}} fallidas",
       "noAccess": "No tienes acceso a las verificaciones de este repositorio.",
@@ -2496,6 +2499,8 @@
       "replyBody": "Texto de la respuesta",
       "replyForbidden": "No tienes permiso para responder a esta PR.",
       "addCommentCta": "Comentar en esta PR",
+      "fixWithKilo": "Solucionar con Kilo",
+      "fixWithKiloPrompt": "Por favor, atiende el siguiente comentario de la PR: {{link}}",
       "commentBadRequest": "No se puede publicar este comentario. Puede que la PR haya cambiado.",
       "commentForbidden": "No tienes permiso para comentar en esta PR.",
       "replyPlaceholder": "Tu respuesta…",
@@ -3090,6 +3095,12 @@
     "privacy": "Abre Kilo para ver los agentes",
     "openAgents": "Abrir agentes",
     "needsInput": "En espera de respuesta",
+    "newestSession": "La más reciente: {{title}}",
+    "noneWaiting": "Ningún agente en espera",
+    "newAgent": "Nuevo agente",
+    "approving": "Aprobando...",
+    "couldNotApprove": "No se pudo aprobar",
+    "couldNotStart": "No se pudo iniciar",
     "channelName": "Agentes activos",
     "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo."
   },
@@ -3125,5 +3136,12 @@
     "remoteFound": "Ordenador conectado",
     "checkAgain": "Volver a comprobar",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Iniciar agente necesita instrucciones. Añade unas instrucciones y vuelve a ejecutarlo.",
+      "repositoryUnknown": "Kilo no reconoce {{repository}} como un repositorio de GitHub o GitLab. Elige otro repositorio en Kilo.",
+      "repositoryUnsupported": "{{repository}} es un repositorio de Bitbucket — Iniciar agente aún no puede usarlo. Elige otro repositorio en Kilo."
+    }
   }
 }

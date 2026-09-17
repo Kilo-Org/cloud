@@ -27,6 +27,8 @@ const rnStub = {
   ScrollView: 'ScrollView',
   TouchableHighlight: 'TouchableHighlight',
   Image: 'Image',
+  // CodeBlock reads the color scheme to pick its syntax palette.
+  useColorScheme: () => 'light',
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
     hairlineWidth: 1,
@@ -649,6 +651,62 @@ describe('MarkdownRenderer empty fence mounting', () => {
       { deep: true }
     );
     expect(codeTexts).toHaveLength(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      mounted.unmount();
+    });
+    // Restore the stubbed module graph for any dynamic import that follows.
+    vi.resetModules();
+  });
+
+  it('renders a transcript (non-selectable) fence as a chunk of lines per Text', async () => {
+    // TextPartRenderer renders the chat transcript with selectable={false}.
+    // Android builds one SpannableStringBuilder per ReactTextView on the UI
+    // thread, so the transcript fence must split into chunks instead of putting
+    // the whole fence into one Text (the SetSpanOperation.execute ANR) — and
+    // not one Text per source line either, which would scale the native view
+    // count with the file.
+    vi.doUnmock('./code-block');
+    vi.resetModules();
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const renderer = new RendererClass(palette, false, {});
+    const sourceLines = Array.from({ length: 80 }, (_, index) => `const value${index} = ${index};`);
+    const element = renderer.code(
+      sourceLines.join('\n'),
+      'ts',
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(element);
+    });
+    const mounted = rendererRef.current;
+    if (!mounted) {
+      throw new Error('renderer was not created');
+    }
+
+    const codeTexts = mounted.root.findAll(
+      node => {
+        const className = propOf(node, 'className');
+        return (
+          typeof node.type === 'string' &&
+          typeof className === 'string' &&
+          className.includes('font-mono text-xs')
+        );
+      },
+      { deep: true }
+    );
+    expect(codeTexts.length).toBeGreaterThan(1);
+    expect(codeTexts.length).toBeLessThan(sourceLines.length);
+    for (const codeText of codeTexts) {
+      expect(propOf(codeText, 'selectable')).toBe(false);
+    }
 
     await act(async () => {
       await Promise.resolve();

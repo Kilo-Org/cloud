@@ -480,6 +480,8 @@
       "replyBadRequest": "এই উত্তরটি পোস্ট করা যাচ্ছে না। থ্রেডটি বদলে গিয়ে থাকতে পারে।",
       "replyForbidden": "এই পুল রিকোয়েস্টে উত্তর দেওয়ার অনুমতি আপনার নেই।",
       "addCommentCta": "এই পুল রিকোয়েস্টে মন্তব্য করুন",
+      "fixWithKilo": "Kilo দিয়ে সমাধান করুন",
+      "fixWithKiloPrompt": "অনুগ্রহ করে নিচের পুল রিকোয়েস্ট মন্তব্যটি সমাধান করুন: {{link}}",
       "commentBadRequest": "এই মন্তব্যটি পোস্ট করা যাচ্ছে না। পুল রিকোয়েস্টটি বদলে গিয়ে থাকতে পারে।",
       "commentForbidden": "এই পুল রিকোয়েস্টে মন্তব্য করার অনুমতি আপনার নেই।",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}}টি অপেক্ষমাণ",
       "skipped": "{{displayCount}}টি বাদ দেওয়া হয়েছে",
       "checksCount": "{{displayCount}}টি চেক",
+      "checksCount_one": "{{displayCount}}টি চেক",
+      "checksCount_other": "{{displayCount}}টি চেক",
       "checkDetails": "চেকের বিবরণ"
     },
     "inbox": {
@@ -3067,6 +3071,12 @@
     "privacy": "এজেন্ট দেখতে Kilo খুলুন",
     "openAgents": "এজেন্ট খুলুন",
     "needsInput": "ইনপুট প্রয়োজন",
+    "newestSession": "সর্বশেষ: {{title}}",
+    "noneWaiting": "কোনো এজেন্ট অপেক্ষা করছে না",
+    "newAgent": "নতুন এজেন্ট",
+    "approving": "অনুমোদন করা হচ্ছে...",
+    "couldNotApprove": "অনুমোদন করা যায়নি",
+    "couldNotStart": "শুরু করা যায়নি",
     "channelName": "সক্রিয় এজেন্ট",
     "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।"
   },
@@ -3102,5 +3112,12 @@
     "remoteFound": "কম্পিউটার সংযুক্ত",
     "checkAgain": "আবার যাচাই করুন",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "এজেন্ট চালু করতে একটি প্রম্পট প্রয়োজন। একটি প্রম্পট যোগ করুন এবং আবার চালান।",
+      "repositoryUnknown": "Kilo {{repository}}-কে GitHub বা GitLab রিপোজিটরি হিসেবে চেনে না। Kilo-তে অন্য একটি রিপোজিটরি বেছে নিন।",
+      "repositoryUnsupported": "{{repository}} একটি Bitbucket রিপোজিটরি — এজেন্ট চালু করুন এখনও এটি ব্যবহার করতে পারে না। Kilo-তে অন্য একটি রিপোজিটরি বেছে নিন।"
+    }
   }
 }

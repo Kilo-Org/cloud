@@ -55,6 +55,49 @@ const LOCAL_COMMAND_NAMES = new Set([
   QUIT_COMMAND_NAME,
   'q',
 ]);
+
+/**
+ * Catalog key for every slash-command name the composer's menu can show: the
+ * worker catalog (`goal`, `init`, `resume-claude`, `resume-codex`, `review`),
+ * the session command (`compact`), and the mobile-local reserved commands
+ * (`new`, `exit`, `quit`, `clear`). `quit` shares `/exit`'s key. Names absent
+ * here (a CLI/MCP command the catalogue does not know) keep the description the
+ * CLI reported.
+ */
+const SLASH_COMMAND_DESCRIPTION_KEYS = {
+  compact: 'agentChat.slashCommands.compactDescription',
+  goal: 'agentChat.slashCommands.goalDescription',
+  init: 'agentChat.slashCommands.initDescription',
+  'resume-claude': 'agentChat.slashCommands.resumeClaudeDescription',
+  'resume-codex': 'agentChat.slashCommands.resumeCodexDescription',
+  review: 'agentChat.slashCommands.reviewDescription',
+  new: 'agentChat.slashCommands.startNewSession',
+  exit: 'agentChat.slashCommands.exitSession',
+  quit: 'agentChat.slashCommands.exitSession',
+  clear: 'agentChat.slashCommands.clearSession',
+} as const satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  // The key is an untrusted command name, so match own properties only:
+  // inherited members like 'constructor' would otherwise resolve to a
+  // function and get handed to i18n.t instead of falling back to the
+  // reported description.
+  return Object.hasOwn(dictionary, key)
+    ? (dictionary as Readonly<Record<string, V | undefined>>)[key]
+    : undefined;
+}
+
+/**
+ * Resolve a command's description from the active catalog so it follows the
+ * app language. Returns the reported description for a command the catalogue
+ * does not know, so an unknown CLI/MCP row still shows what the CLI sent.
+ */
+export function getSlashCommandDescription(command: SlashCommandInfo): string | undefined {
+  const key = lookup(SLASH_COMMAND_DESCRIPTION_KEYS, command.name);
+  return key ? i18n.t(key) : command.description;
+}
+
 const SLASH_PREFIX_PATTERN = /^\/[\w.-]*$/;
 const SLASH_FULL_PATTERN = /^\/([\w.-]+)(?:\s+([\s\S]*))?$/;
 

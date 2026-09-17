@@ -31,8 +31,10 @@ export const AGENT_CONTROLS = [
  *  @type {Record<string, string | undefined>} */
 const CONTROL_SYMBOLS = { 'new-agent': 'plus.bubble', 'waiting-agent': 'hourglass' };
 
-/** Controls are an iOS 18 API; the extension's own deployment target is 16.4. */
-const CONTROL_AVAILABILITY = 'iOS 18.0';
+/** Controls are an iOS 18 API; the extension's own deployment target is 16.4.
+ *  Exported so `scripts/assert-widget-sources-unique.mjs` can prove the spliced
+ *  bundle call sits inside the gate this version names. */
+export const CONTROL_AVAILABILITY = 'iOS 18.0';
 
 /** The name the injected bundle call is known by, on both sides of the splice. */
 export const AGENT_CONTROLS_BUNDLE_CALL = 'AgentControlsBundle().body';
@@ -91,6 +93,23 @@ export const AGENT_SHORTCUTS_META_DATA = AGENT_CONTROLS.map(control => ({
   descriptionCopyKey: descriptionCopyKey(control.copyKey),
   shortLabelResource: shortcutResourceName(control.copyKey, 'short'),
   longLabelResource: shortcutResourceName(control.copyKey, 'long'),
+}));
+
+/**
+ * Everything the Swift side of a control is: the `kind` Control Center matches
+ * against, the two Swift type names the extension declares, and the url its
+ * intent opens. Mirrors `AGENT_SHORTCUTS_META_DATA`: one list, so
+ * `agentControlsSwift` and `scripts/assert-widget-sources-unique.mjs` read the
+ * same values and neither spells a `kind`, a type name or a url of its own.
+ */
+export const AGENT_CONTROLS_META_DATA = AGENT_CONTROLS.map(control => ({
+  id: control.id,
+  kind: controlKind(control.id),
+  intentTypeName: `${controlTypeName(control.id)}Intent`,
+  controlTypeName: `${controlTypeName(control.id)}Control`,
+  url: control.url,
+  copyKey: control.copyKey,
+  descriptionCopyKey: descriptionCopyKey(control.copyKey),
 }));
 
 /**
@@ -275,26 +294,26 @@ export function sourcePhaseDefects(project, phase) {
 
 /**
  * The extension's AgentControls.swift: one AppIntent and one ControlWidget per
- * contract entry, plus the bundle index.swift splices in. Every url comes from
- * `urls` — this generator never spells one of its own.
- * @param {{ copy: Record<string, Record<string, string | undefined>>, urls: AgentControl[] }} params
+ * `AGENT_CONTROLS_META_DATA` entry, plus the bundle index.swift splices in.
+ * Every `kind`, Swift type name and url comes from that list — this generator
+ * never spells one of its own.
+ * @param {{ copy: Record<string, Record<string, string | undefined>>, controls: typeof AGENT_CONTROLS_META_DATA }} params
  * @returns {string}
  */
-export function agentControlsSwift({ copy, urls }) {
-  const declarations = urls.map(control => {
+export function agentControlsSwift({ copy, controls }) {
+  const declarations = controls.map(control => {
     const symbol = CONTROL_SYMBOLS[control.id];
     if (symbol === undefined) {
       throw new Error(`agentControlsSwift: no SF Symbol for control \`${control.id}\``);
     }
-    const name = controlTypeName(control.id);
     const label = swiftLiteral(englishCopy(copy, control.copyKey));
-    const description = swiftLiteral(englishCopy(copy, descriptionCopyKey(control.copyKey)));
+    const description = swiftLiteral(englishCopy(copy, control.descriptionCopyKey));
     // AppIntents' `OpenURLIntent` (iOS 18) opens the url through its single
     // initializer, `init(_:)`. The labeled `OpenURLIntent(url:)` does not exist:
     // the extension fails to compile with "extraneous argument label 'url:' in
     // call", which fails the whole iOS build.
     return `@available(${CONTROL_AVAILABILITY}, *)
-struct ${name}Intent: AppIntent {
+struct ${control.intentTypeName}: AppIntent {
   static var title: LocalizedStringResource = ${label}
 
   func perform() async throws -> some IntentResult & OpensIntent {
@@ -303,10 +322,10 @@ struct ${name}Intent: AppIntent {
 }
 
 @available(${CONTROL_AVAILABILITY}, *)
-struct ${name}Control: ControlWidget {
+struct ${control.controlTypeName}: ControlWidget {
   var body: some ControlWidgetConfiguration {
-    StaticControlConfiguration(kind: ${swiftLiteral(controlKind(control.id))}) {
-      ControlWidgetButton(action: ${name}Intent()) {
+    StaticControlConfiguration(kind: ${swiftLiteral(control.kind)}) {
+      ControlWidgetButton(action: ${control.intentTypeName}()) {
         Label(${label}, systemImage: ${swiftLiteral(symbol)})
       }
     }
@@ -316,7 +335,7 @@ struct ${name}Control: ControlWidget {
 }`;
   });
 
-  const bundle = urls.map(control => `    ${controlTypeName(control.id)}Control()`).join('\n');
+  const bundle = controls.map(control => `    ${control.controlTypeName}()`).join('\n');
 
   return `${SWIFT_HEADER}
 

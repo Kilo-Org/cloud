@@ -1,29 +1,20 @@
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
-import { IOSConfig } from 'expo/config-plugins';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import agentControlsCopy from '../../plugins/agent-controls-copy.json';
 import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import {
   AGENT_CONTROLS,
   AGENT_CONTROLS_BUNDLE_CALL,
+  AGENT_CONTROLS_META_DATA,
   AGENT_SHORTCUTS_META_DATA,
   AGENT_SHORTCUTS_RESOURCE,
   agentControlsSwift,
   agentShortcutStrings,
   agentShortcutsXml,
+  CONTROL_AVAILABILITY,
   injectAgentControlBundle,
-  sourceFileEntryCount,
-  targetSourcesBuildPhases,
 } from './agent-controls';
-import {
-  attachMock,
-  runControlsXcodeMod,
-  SWIFT_FILE,
-  TARGET_NAME,
-  TARGET_UUID,
-  widgetTargetProject,
-} from './agent-controls.test-helpers';
 
 // The extension's bundle copy, one object per language tag. The English values
 // are the keys Swift binds, so they are what the generated code must carry.
@@ -44,12 +35,17 @@ function copyValue(tag: string, key: string): string {
 }
 
 function generatedSwift(): string {
-  return agentControlsSwift({ copy, urls: AGENT_CONTROLS });
+  return agentControlsSwift({ copy, controls: AGENT_CONTROLS_META_DATA });
 }
 
 /** Every `kiloapp://` url the source spells, in order. */
 function foundUrls(source: string): string[] {
   return source.match(/kiloapp:\/\/[^"'\s<]*/g) ?? [];
+}
+
+/** How many times `needle` occurs in `source`. */
+function occurrences(source: string, needle: string): number {
+  return source.split(needle).length - 1;
 }
 
 describe('AGENT_CONTROLS', () => {
@@ -80,6 +76,78 @@ describe('AGENT_CONTROLS', () => {
       const expected = expectedRoutes.get(control.id);
       expect(expected, `no expected route for ${control.id}`).toBeDefined();
       expect(resolveIncomingUrl(control.url), control.id).toBe(expected);
+    }
+  });
+});
+
+describe('AGENT_CONTROLS_META_DATA', () => {
+  // The iOS twin of AGENT_SHORTCUTS_META_DATA: the one list the Swift generator
+  // and scripts/assert-widget-sources-unique.mjs both read, so the generated
+  // extension and the assert that proves it cannot spell a kind, a Swift type
+  // name or a url apart.
+  it('mirrors the contract, one entry per control', () => {
+    expect(AGENT_CONTROLS_META_DATA.map(control => control.id)).toEqual(
+      AGENT_CONTROLS.map(control => control.id)
+    );
+    expect(AGENT_CONTROLS_META_DATA.map(control => control.url)).toEqual(
+      AGENT_CONTROLS.map(control => control.url)
+    );
+    expect(AGENT_CONTROLS_META_DATA.map(control => control.kind)).toEqual([
+      'kiloapp.agent-control.new-agent',
+      'kiloapp.agent-control.waiting-agent',
+    ]);
+    expect(AGENT_CONTROLS_META_DATA.map(control => control.controlTypeName)).toEqual([
+      'AgentNewAgentControl',
+      'AgentWaitingAgentControl',
+    ]);
+    expect(AGENT_CONTROLS_META_DATA.map(control => control.intentTypeName)).toEqual([
+      'AgentNewAgentIntent',
+      'AgentWaitingAgentIntent',
+    ]);
+  });
+
+  it('gives every control a kind of its own', () => {
+    expect(new Set(AGENT_CONTROLS_META_DATA.map(control => control.kind)).size).toBe(
+      AGENT_CONTROLS_META_DATA.length
+    );
+  });
+});
+
+describe('the generated control registration', () => {
+  // The device round cannot read the Control Center list, so the registration is
+  // a property of the extension the build compiles: exactly one ControlWidget per
+  // contract entry, each carrying that entry's kind and url.
+  it('declares exactly one intent and one control per metadata entry', () => {
+    const swift = generatedSwift();
+    expect(occurrences(swift, ': AppIntent {')).toBe(AGENT_CONTROLS_META_DATA.length);
+    expect(occurrences(swift, ': ControlWidget {')).toBe(AGENT_CONTROLS_META_DATA.length);
+    for (const control of AGENT_CONTROLS_META_DATA) {
+      expect(occurrences(swift, `struct ${control.intentTypeName}: AppIntent`), control.id).toBe(1);
+      expect(
+        occurrences(swift, `struct ${control.controlTypeName}: ControlWidget`),
+        control.id
+      ).toBe(1);
+      expect(
+        occurrences(swift, `ControlWidgetButton(action: ${control.intentTypeName}())`),
+        control.id
+      ).toBe(1);
+    }
+  });
+
+  it('carries each control’s kind and url exactly once', () => {
+    const swift = generatedSwift();
+    for (const control of AGENT_CONTROLS_META_DATA) {
+      expect(occurrences(swift, `"${control.kind}"`), control.id).toBe(1);
+      expect(occurrences(swift, `"${control.url}"`), control.id).toBe(1);
+    }
+  });
+
+  // Both controls ride the one @main bundle index.swift carries: a control left
+  // out of it is a ControlWidget the extension never registers.
+  it('lists every control in the spliced bundle', () => {
+    const swift = generatedSwift();
+    for (const control of AGENT_CONTROLS_META_DATA) {
+      expect(occurrences(swift, `${control.controlTypeName}()`), control.id).toBe(1);
     }
   });
 });
@@ -178,7 +246,7 @@ describe('injectAgentControlBundle', () => {
     expect(callAt, 'the bundle call is missing').toBeGreaterThan(bodyStart);
     // Inside the body, not after it.
     expect(callAt).toBeLessThan(injected.indexOf('ActiveAgentsWidget()'));
-    expect(injected).toContain('if #available(iOS 18.0, *) {');
+    expect(injected).toContain(`if #available(${CONTROL_AVAILABILITY}, *) {`);
     // The generated widgets survive the splice untouched.
     expect(injected).toContain('ActiveAgentsWidget()');
     expect(injected).toContain('WidgetLiveActivity()');
@@ -188,131 +256,6 @@ describe('injectAgentControlBundle', () => {
   it('throws a named error when the anchor is missing', () => {
     expect(() => injectAgentControlBundle('struct X {}\n')).toThrow(/injectAgentControlBundle/);
     expect(() => injectAgentControlBundle('')).toThrow(/injectAgentControlBundle/);
-  });
-});
-
-describe('targetSourcesBuildPhases', () => {
-  // The defect this guards: the controls plugin appended a second `Sources`
-  // build phase to the widget extension, and XCBuild rejects a target with two
-  // phases of the same name — "Unexpected duplicate tasks" — before it compiles
-  // anything. The selector must therefore see every phase the target carries,
-  // so a duplicate cannot hide behind the first match.
-  it('reads every Sources phase the target carries and skips other phases', () => {
-    const indexPhase = { files: [{ value: 'bf-index', comment: 'index.swift in Sources' }] };
-    const controlsPhase = {
-      files: [{ value: 'bf-controls', comment: 'AgentControls.swift in Sources' }],
-    };
-    const project = {
-      hash: {
-        project: {
-          objects: {
-            PBXSourcesBuildPhase: {
-              'phase-index': indexPhase,
-              'phase-controls': controlsPhase,
-            },
-          },
-        },
-      },
-      pbxNativeTargetSection: () => ({
-        target: {
-          name: 'ExpoWidgetsTarget',
-          buildPhases: [
-            { value: 'phase-index', comment: 'Sources' },
-            { value: 'phase-frameworks', comment: 'Frameworks' },
-            { value: 'phase-controls', comment: 'Sources' },
-          ],
-        },
-      }),
-    };
-    expect(targetSourcesBuildPhases(project, 'target')).toEqual([indexPhase, controlsPhase]);
-  });
-
-  it('returns nothing for a target with no Sources phase', () => {
-    const project = {
-      hash: { project: { objects: { PBXSourcesBuildPhase: {} } } },
-      pbxNativeTargetSection: () => ({
-        target: { name: 'ExpoWidgetsTarget', buildPhases: [{ value: 'phase-frameworks' }] },
-      }),
-    };
-    expect(targetSourcesBuildPhases(project, 'target')).toEqual([]);
-  });
-});
-
-describe('withAgentControls — the widget target carries one Compile Sources phase', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('joins the phase expo-widgets created instead of appending a second one', async () => {
-    const project = widgetTargetProject(1);
-    const attach = attachMock(project, 1);
-
-    await runControlsXcodeMod(project);
-
-    expect(project.addBuildPhase).not.toHaveBeenCalled();
-    expect(attach).toHaveBeenCalledTimes(1);
-    expect(attach).toHaveBeenCalledWith({
-      filepath: SWIFT_FILE,
-      groupName: TARGET_NAME,
-      project,
-      targetUuid: TARGET_UUID,
-    });
-    const phases = targetSourcesBuildPhases(project, TARGET_UUID);
-    expect(phases).toHaveLength(1);
-    expect(phases[0]?.files.map(file => file.comment)).toEqual([
-      'index.swift in Sources',
-      `${SWIFT_FILE} in Sources`,
-    ]);
-  });
-
-  it('names the duplicate-phase failure instead of adding a third phase', async () => {
-    const project = widgetTargetProject(2);
-    await expect(runControlsXcodeMod(project)).rejects.toThrow(/2 Sources build phases/);
-    expect(project.addBuildPhase).not.toHaveBeenCalled();
-  });
-
-  // Idempotency: the next prebuild must not be able to reintroduce a duplicate.
-  it('leaves one entry and attaches once when the mod runs twice', async () => {
-    const project = widgetTargetProject(1);
-    const attach = attachMock(project, 1);
-
-    await runControlsXcodeMod(project);
-    await runControlsXcodeMod(project);
-
-    expect(attach).toHaveBeenCalledTimes(1);
-    const phases = targetSourcesBuildPhases(project, TARGET_UUID);
-    expect(phases).toHaveLength(1);
-    expect(sourceFileEntryCount(phases[0], SWIFT_FILE)).toBe(1);
-  });
-
-  // Self-heal: a staler run doubled the entry; this one keeps the first and
-  // drops the surplus, `PBXBuildFile` object included, without attaching a third.
-  it('drops a doubled entry and its PBXBuildFile instead of attaching a third', async () => {
-    const project = widgetTargetProject(1);
-    project.hash.project.objects.PBXBuildFile['bf-controls-0'] = {};
-    project.hash.project.objects.PBXBuildFile['bf-controls-1'] = {};
-    targetSourcesBuildPhases(project, TARGET_UUID)[0]?.files.push(
-      { value: 'bf-controls-0', comment: `${SWIFT_FILE} in Sources` },
-      { value: 'bf-controls-1', comment: `${SWIFT_FILE} in Sources` }
-    );
-    const attach = vi.spyOn(IOSConfig.XcodeUtils, 'addBuildSourceFileToGroup');
-
-    await runControlsXcodeMod(project);
-
-    expect(attach).not.toHaveBeenCalled();
-    const phases = targetSourcesBuildPhases(project, TARGET_UUID);
-    expect(sourceFileEntryCount(phases[0], SWIFT_FILE)).toBe(1);
-    expect(project.hash.project.objects.PBXBuildFile['bf-controls-1']).toBeUndefined();
-  });
-
-  // The guard the amendment asks for: uniqueness, not presence. An attach that
-  // doubles the entry must fail the prebuild, not reach XCBuild.
-  it('rejects when the attach helper appends a second entry', async () => {
-    const project = widgetTargetProject(1);
-    const attach = attachMock(project, 2);
-
-    await expect(runControlsXcodeMod(project)).rejects.toThrow(/appears 2 times/);
-    expect(attach).toHaveBeenCalledTimes(1);
   });
 });
 

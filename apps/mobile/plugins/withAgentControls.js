@@ -4,7 +4,7 @@ const path = require('path');
 const { withDangerousMod, withXcodeProject, IOSConfig } = require('expo/config-plugins');
 
 const {
-  AGENT_CONTROLS,
+  AGENT_CONTROLS_META_DATA,
   agentControlsSwift,
   agentShortcutStrings,
   injectAgentControlBundle,
@@ -64,7 +64,7 @@ module.exports = function withAgentControls(config) {
 
       fs.writeFileSync(
         path.join(targetRoot, SWIFT_FILE),
-        agentControlsSwift({ copy: CONTROL_COPY, urls: AGENT_CONTROLS }),
+        agentControlsSwift({ copy: CONTROL_COPY, controls: AGENT_CONTROLS_META_DATA }),
         'utf8'
       );
       fs.writeFileSync(

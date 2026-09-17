@@ -18,6 +18,7 @@ import {
 } from '@/components/agents/session-detail-skeleton';
 import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
+import { SessionCopyLinkAction } from '@/components/agents/session-copy-link-action';
 import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { useIdentityConfirmation } from '@/components/agents/user-web-connection-provider';
 import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
@@ -29,6 +30,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
+import { parseResumeAnchor } from '@/lib/session-resume';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { shouldRetryNotFoundOnSpawnedRoute } from '@/lib/spawned-not-found-retry';
 import { useTRPC } from '@/lib/trpc';
@@ -46,6 +48,7 @@ export default function SessionDetailScreen() {
     shareId: shareIdParam,
     autoSend: autoSendRaw,
     mode: modeParam,
+    at: resumeAtRaw,
   } = useLocalSearchParams<{
     'session-id': string;
     organizationId?: string;
@@ -65,6 +68,12 @@ export default function SessionDetailScreen() {
     autoSend?: string;
     /** Agent mode the spawn was started with; seeds the composer before the CLI reports one. */
     mode?: string;
+    /**
+     * Resume anchor: the message id a `?at=` deep link recorded on the other
+     * device. Missing or unknown is not an error — the session opens at the
+     * bottom exactly as it does without the param.
+     */
+    at?: string;
     /** Legacy title hints remain accepted but carry no account ownership, so ignore them. */
     title?: string;
   }>();
@@ -76,6 +85,7 @@ export default function SessionDetailScreen() {
   const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;
   const spawnedMode = Array.isArray(modeParam) ? modeParam[0] : modeParam;
+  const resumeAt = parseResumeAnchor(resumeAtRaw);
   const trpc = useTRPC();
   const router = useRouter();
   const { t } = useTranslation();
@@ -145,6 +155,10 @@ export default function SessionDetailScreen() {
   ) {
     // The composer placeholder holds its own height: nothing may shift when
     // the query resolves. Route title hints are not bound to an account.
+    // The right cluster reserves the loaded header's Copy-link action too, so
+    // the 44pt control appearing at the swap cannot narrow and re-wrap the
+    // title. The route already knows `sessionId`, so the session-top link is
+    // copyable while the transcript loads; there is no anchor yet.
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
@@ -152,12 +166,15 @@ export default function SessionDetailScreen() {
           reserveTitleSpace
           backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={
-            <SessionContextMetrics
-              info={undefined}
-              totalCostMicrodollars={null}
-              hasMessages={false}
-              loading
-            />
+            <View className="flex-row items-center gap-2">
+              <SessionContextMetrics
+                info={undefined}
+                totalCostMicrodollars={null}
+                hasMessages={false}
+                loading
+              />
+              <SessionCopyLinkAction sessionId={sessionId} anchorMessageId={null} />
+            </View>
           }
         />
         <SessionConnectionIndicator />
@@ -270,6 +287,7 @@ export default function SessionDetailScreen() {
         autoSend={autoSendParam === '1'}
         spawnedMode={spawnedMode}
         openStartedAt={openStart.current.startedAt}
+        resumeAt={resumeAt}
       />
     </AgentSessionProvider>
   );

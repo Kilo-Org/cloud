@@ -67,6 +67,9 @@ describe('googlePlayMoneyToMinorUnits', () => {
     ['non-ISO currencyCode', { currencyCode: 'US', units: '19', nanos: 0 }],
     ['non-numeric units', { currencyCode: 'USD', units: 'not-a-number', nanos: 0 }],
     ['non-numeric nanos', { currencyCode: 'USD', units: '19', nanos: Number.NaN }],
+    ['negative units', { currencyCode: 'USD', units: '-19', nanos: 0 }],
+    ['negative nanos', { currencyCode: 'USD', units: '0', nanos: -100000000 }],
+    ['negative units and nanos', { currencyCode: 'USD', units: '-1', nanos: -500000000 }],
   ] as const)('returns null for %s', (_label, money) => {
     expect(() =>
       googlePlayMoneyToMinorUnits(money as androidpublisher_v3.Schema$Money)
@@ -144,6 +147,39 @@ describe('googlePlayOrderMoneyForProduct', () => {
     );
 
     expect(result).toEqual({ amountChargedMinorUnits: null, currency: 'GBP', taxMinorUnits: 317 });
+  });
+
+  it('treats a negative item amount as no money instead of rejecting the purchase', () => {
+    const result = googlePlayOrderMoneyForProduct(
+      order({
+        lineItems: [
+          {
+            productId: 'kilopass_tier19',
+            total: { currencyCode: 'USD', units: '-19', nanos: 0 },
+          },
+        ],
+      }),
+      'kilopass_tier19'
+    );
+
+    expect(result).toEqual(NO_MONEY);
+  });
+
+  it('drops only a negative tax and keeps the amount', () => {
+    const result = googlePlayOrderMoneyForProduct(
+      order({
+        lineItems: [
+          {
+            productId: 'kilopass_tier19',
+            total: { currencyCode: 'USD', units: '19', nanos: 0 },
+            tax: { currencyCode: 'USD', units: '-3', nanos: -170000000 },
+          },
+        ],
+      }),
+      'kilopass_tier19'
+    );
+
+    expect(result).toEqual({ amountChargedMinorUnits: 1900, currency: 'USD', taxMinorUnits: null });
   });
 
   it.each([

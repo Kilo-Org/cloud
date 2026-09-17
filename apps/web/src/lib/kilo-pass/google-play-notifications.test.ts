@@ -418,6 +418,49 @@ describe('processGooglePlayKiloPassNotification', () => {
     });
   });
 
+  it('completes and stores null money when the Play order amount is negative', async () => {
+    const { obfsAccountId } = await insertGooglePlayUser();
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = 'purchase-token-negative-money';
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId, orderId));
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken,
+      state: 'PROCESSED',
+      lineItems: [
+        {
+          productId: 'kilopass_tier19',
+          total: { currencyCode: 'USD', units: '-19', nanos: 0 },
+          subscriptionDetails: {
+            servicePeriodStartTime: '2026-05-01T09:00:00.000Z',
+            servicePeriodEndTime: '2100-01-01T00:00:00.000Z',
+          },
+        },
+      ],
+    });
+
+    const result = await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 4,
+        purchaseToken,
+        messageId: 'msg-purchased-negative-money',
+      }),
+    });
+
+    // A negative amount cannot satisfy the non-negative check constraint, so it
+    // must reach the row as NULL instead of failing the whole purchase.
+    expect(result).toEqual({ processed: true });
+
+    const purchaseRow = await db.query.kilo_pass_store_purchases.findFirst({
+      where: eq(kilo_pass_store_purchases.provider_transaction_id, orderId),
+    });
+    expect(purchaseRow).toMatchObject({
+      amount_charged_minor_units: null,
+      currency: null,
+      tax_minor_units: null,
+    });
+  });
+
   it('completes a renewed notification as a renewal and tracks google_play', async () => {
     const trackingMock = getPosthogTrackingMock();
     const { obfsAccountId } = await insertGooglePlayUser();

@@ -233,7 +233,7 @@ describe('backfillGooglePlayPurchaseAmounts', () => {
     });
   });
 
-  test('leaves a row whose order carries no money untouched across runs', async () => {
+  test('attempts a no-money row once and leaves it out of later batches', async () => {
     const noMoneyRow = await insertPurchase({
       providerTransactionId: 'GPA.no-money',
       purchasedAt: '2026-01-01T00:00:00.000Z',
@@ -248,16 +248,26 @@ describe('backfillGooglePlayPurchaseAmounts', () => {
       purchasedAt: '2026-01-03T00:00:00.000Z',
       money: { amount: 500, currency: 'USD', tax: 75 },
     });
+    const calls = { count: 0 };
 
     const first = await backfillGooglePlayPurchaseAmounts({
-      orderFetcher: async orderId => orderWithoutMoney(orderId),
+      orderFetcher: async orderId => {
+        calls.count += 1;
+        return orderWithoutMoney(orderId);
+      },
     });
     expect(first).toEqual({ scanned: 1, updated: 0, skipped: 1, failed: 0, failures: [] });
 
     const second = await backfillGooglePlayPurchaseAmounts({
-      orderFetcher: async orderId => orderWithoutMoney(orderId),
+      orderFetcher: async orderId => {
+        calls.count += 1;
+        return orderWithoutMoney(orderId);
+      },
     });
-    expect(second).toEqual({ scanned: 1, updated: 0, skipped: 1, failed: 0, failures: [] });
+    // Play has no money for this order, so the row is retired after one attempt:
+    // the batch converges to nothing to do instead of re-reading it every run.
+    expect(second).toEqual({ scanned: 0, updated: 0, skipped: 0, failed: 0, failures: [] });
+    expect(calls.count).toBe(1);
 
     expect(await readPurchase(noMoneyRow.purchaseId)).toEqual(
       expect.objectContaining({
@@ -282,6 +292,56 @@ describe('backfillGooglePlayPurchaseAmounts', () => {
         tax_minor_units: 75,
       })
     );
+  });
+
+  test('converges past a no-money row within a bounded batch', async () => {
+    const noMoneyRow = await insertPurchase({
+      providerTransactionId: 'GPA.newest-no-money',
+      purchasedAt: '2026-01-02T00:00:00.000Z',
+    });
+    const moneyRow = await insertPurchase({
+      providerTransactionId: 'GPA.older-with-money',
+      purchasedAt: '2026-01-01T00:00:00.000Z',
+    });
+    const fetcher = async (orderId: string) =>
+      orderId === 'GPA.newest-no-money' ? orderWithoutMoney(orderId) : orderWithMoney(orderId);
+
+    const first = await backfillGooglePlayPurchaseAmounts({ limit: 1, orderFetcher: fetcher });
+    expect(first).toEqual({ scanned: 1, updated: 0, skipped: 1, failed: 0, failures: [] });
+
+    // The skipped no-money row must not block the next batch from reaching the
+    // older row, or a `--limit` run would never get past it.
+    const second = await backfillGooglePlayPurchaseAmounts({ limit: 1, orderFetcher: fetcher });
+    expect(second).toEqual({ scanned: 1, updated: 1, skipped: 0, failed: 0, failures: [] });
+    expect((await readPurchase(moneyRow.purchaseId)).amount_charged_minor_units).toBe(1900);
+
+    const third = await backfillGooglePlayPurchaseAmounts({ limit: 1, orderFetcher: fetcher });
+    expect(third).toEqual({ scanned: 0, updated: 0, skipped: 0, failed: 0, failures: [] });
+    expect((await readPurchase(noMoneyRow.purchaseId)).amount_charged_minor_units).toBeNull();
+  });
+
+  test('retries a failed lookup in the next batch so it is never abandoned', async () => {
+    const { purchaseId } = await insertPurchase({
+      providerTransactionId: 'GPA.retry',
+      purchasedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const first = await backfillGooglePlayPurchaseAmounts({
+      orderFetcher: async () => {
+        throw new Error('Play order API unavailable');
+      },
+    });
+    expect(first).toEqual({
+      scanned: 1,
+      updated: 0,
+      skipped: 0,
+      failed: 1,
+      failures: [{ rowId: purchaseId, orderId: 'GPA.retry', reason: 'Play order API unavailable' }],
+    });
+
+    const second = await backfillGooglePlayPurchaseAmounts({ orderFetcher: moneyFetcher() });
+    expect(second).toEqual({ scanned: 1, updated: 1, skipped: 0, failed: 0, failures: [] });
+    expect((await readPurchase(purchaseId)).amount_charged_minor_units).toBe(1900);
   });
 
   test('does not modify an already-filled row on a second run', async () => {

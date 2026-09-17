@@ -6,13 +6,15 @@
  *
  * The stored receipt cannot supply the money, so each purchase's Play order is
  * re-read through the stored `provider_transaction_id`. Rows whose order Google
- * can no longer return stay NULL and are counted in the summary as `skipped`
- * (no money in the order) or `failed` (the lookup itself failed). Each failure
- * also prints one `[FAILED]` line with the purchase row id, the Play order id,
- * and the error message, so a credential problem, a quota rejection, and one
- * bad order are distinguishable without dumping credential material. The run is
- * idempotent and resumable: only rows that still have both amounts NULL are
- * selected, newest purchase first, at most `--limit` per call.
+ * can no longer return are counted in the summary as `skipped` (no money in the
+ * order) or `failed` (the lookup itself failed). A skipped row is retired after
+ * that one attempt, so repeated runs converge; a failed row stays eligible and
+ * the next run retries it. Each failure also prints one `[FAILED]` line with the
+ * purchase row id, the Play order id, and the error message, so a credential
+ * problem, a quota rejection, and one bad order are distinguishable without
+ * dumping credential material. The run is idempotent and resumable: only rows
+ * that are not settled yet and still have both amounts NULL are selected,
+ * newest purchase first, at most `--limit` per call.
  *
  * Requires GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON in the target environment.
  * The service account is validated before the first Play request, so a missing

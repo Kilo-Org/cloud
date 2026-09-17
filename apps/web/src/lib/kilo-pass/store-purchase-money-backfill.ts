@@ -9,14 +9,16 @@
  * module re-reads each purchase's order and maps it with
  * `googlePlayOrderMoneyForProduct`.
  *
- * Idempotent and resumable: only rows that still have both amounts NULL are
- * selected, newest purchase first, at most `limit` per call, so a completed run
- * leaves nothing to do and an interrupted run continues where it stopped. A row
- * whose order carries no money is counted `skipped` and left untouched; a fetch
- * or parse error counts `failed`, records its row/order id and error message in
- * `failures`, and never aborts the batch. Every value is validated against the
- * schema's check constraints before the update, so a single unusable order can
- * never abort the batch.
+ * Idempotent and resumable: only rows that are still unsettled (no
+ * `money_backfill_attempted_at`) and have both amounts NULL are selected,
+ * newest purchase first, at most `limit` per call, so a completed run leaves
+ * nothing to do and an interrupted run continues where it stopped. A row whose
+ * order carries no money is counted `skipped` and marked attempted, so it is
+ * never re-read and a bounded run still converges past it; a fetch or parse
+ * error counts `failed`, records its row/order id and error message in
+ * `failures`, stays unmarked so the next run retries it, and never aborts the
+ * batch. Every value is validated against the schema's check constraints before
+ * the update, so a single unusable order can never abort the batch.
  */
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
@@ -134,6 +136,10 @@ export async function backfillGooglePlayPurchaseAmounts(params?: {
       and(
         eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.GooglePlay),
         isNotNull(kilo_pass_store_purchases.provider_transaction_id),
+        // Settled rows are never looked at again. The money guards also keep
+        // rows the purchase path already filled out of the batch: those carry
+        // no marker but do have money.
+        isNull(kilo_pass_store_purchases.money_backfill_attempted_at),
         isNull(kilo_pass_store_purchases.amount_charged_minor_units),
         isNull(kilo_pass_store_purchases.tax_minor_units)
       )
@@ -145,6 +151,7 @@ export async function backfillGooglePlayPurchaseAmounts(params?: {
   let skipped = 0;
   let failed = 0;
   const failures: BackfillStorePurchaseAmountsFailure[] = [];
+  const attemptedAt = new Date().toISOString();
 
   for (const row of rows) {
     const orderId = row.providerTransactionId;
@@ -167,6 +174,15 @@ export async function backfillGooglePlayPurchaseAmounts(params?: {
 
     const columns = sanitizedMoneyColumns(money);
     if (columns === null) {
+      // Play has no money for this order. Mark the row attempted so later runs
+      // skip it: leaving it NULL would re-select it in every bounded batch and
+      // the backfill would never report completion.
+      if (!dryRun) {
+        await db
+          .update(kilo_pass_store_purchases)
+          .set({ money_backfill_attempted_at: attemptedAt })
+          .where(eq(kilo_pass_store_purchases.id, row.id));
+      }
       skipped += 1;
       continue;
     }
@@ -174,7 +190,7 @@ export async function backfillGooglePlayPurchaseAmounts(params?: {
     if (!dryRun) {
       await db
         .update(kilo_pass_store_purchases)
-        .set(columns)
+        .set({ ...columns, money_backfill_attempted_at: attemptedAt })
         .where(eq(kilo_pass_store_purchases.id, row.id));
     }
     updated += 1;

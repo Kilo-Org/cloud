@@ -49,7 +49,11 @@ export function googlePlayMoneyToMinorUnits(
   if (!Number.isFinite(units) || !Number.isFinite(nanos)) return null;
 
   const minorUnits = Math.round(units * 10 ** exponent + nanos / 10 ** (9 - exponent));
-  return Number.isFinite(minorUnits) ? minorUnits : null;
+  // A negative amount cannot be stored — the column's check constraint rejects
+  // it and the whole insert would fail — so treat it as unusable, like any other
+  // money we cannot record.
+  if (!Number.isFinite(minorUnits) || minorUnits < 0) return null;
+  return minorUnits;
 }
 
 function currencyCodeOf(money: androidpublisher_v3.Schema$Money | null | undefined): string | null {

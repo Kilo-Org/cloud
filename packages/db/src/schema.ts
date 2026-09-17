@@ -2176,6 +2176,15 @@ export const kilo_pass_store_purchases = pgTable(
     amount_charged_minor_units: integer(),
     currency: text(),
     tax_minor_units: integer(),
+    /**
+     * When the money backfill finished with this row: it either wrote the money
+     * columns or found that Play has no money for the order. NULL means the
+     * backfill has not settled the row yet, including rows whose order lookup
+     * failed, which stay eligible so a later run retries them. Without this
+     * marker the rows Play has no money for would be selected by every bounded
+     * run and the backfill would never converge.
+     */
+    money_backfill_attempted_at: timestamp({ withTimezone: true, mode: 'string' }),
     raw_payload_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })

@@ -34,6 +34,7 @@ describe('picker launch context', () => {
     const context: PickerLaunchContext = {
       userId: 'user-1',
       surface: 'agent-picture',
+      source: 'camera',
       sessionId: null,
       launchedAt: 1_700_000_000_000,
     };
@@ -51,6 +52,7 @@ describe('picker launch context', () => {
       JSON.stringify({
         userId: 'user-1',
         surface: 'agent-unknown',
+        source: 'camera',
         sessionId: null,
         launchedAt: 1_700_000_000_000,
       })

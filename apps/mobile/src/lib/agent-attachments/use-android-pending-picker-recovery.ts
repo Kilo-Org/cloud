@@ -74,7 +74,11 @@ export function useAndroidPendingPickerRecovery(
         const assets = await consumeAndroidPendingPickerResult();
         await clearPickerLaunchContext();
         if (assets.length > 0) {
-          await addCandidatesRef.current(assets.map(asset => normalizeImageAsset(asset)));
+          // The recorded source names a recovered camera capture the same way a
+          // fresh camera launch does; a library pick keeps its picker name.
+          await addCandidatesRef.current(
+            assets.map(asset => normalizeImageAsset(asset, { source: context.source }))
+          );
         }
         return;
       }

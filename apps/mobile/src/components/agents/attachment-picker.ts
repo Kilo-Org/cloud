@@ -11,6 +11,7 @@ import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-atta
 import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
 import {
   type AttachmentSurface,
+  type PickerImageSource,
   writePickerLaunchContext,
 } from '@/lib/agent-attachments/picker-launch-context';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
@@ -23,14 +24,22 @@ function showPermissionSettingsAlert({ message, title }: { message: string; titl
   ]);
 }
 
-export function normalizeImageAsset(asset: {
-  uri: string;
-  fileName?: string | null;
-  mimeType?: string | null;
-  fileSize?: number | null;
-}): AgentAttachmentCandidate {
-  // Keep the picker's filename when it is non-empty after trimming.
-  const fileName = asset.fileName?.trim();
+export function normalizeImageAsset(
+  asset: {
+    uri: string;
+    fileName?: string | null;
+    mimeType?: string | null;
+    fileSize?: number | null;
+  },
+  options: { source?: PickerImageSource } = {}
+): AgentAttachmentCandidate {
+  // Keep the picker's filename when it is non-empty after trimming, EXCEPT for
+  // a camera capture: that name is never one the user chose — the platform
+  // picker names its own cache file (`<uuid>.jpeg` on Android) — so showing it
+  // would put an opaque identifier on the chip. A camera capture always takes
+  // the synthesized `image.<ext>` path below; a library pick keeps the file's
+  // real display name.
+  const fileName = options.source === 'camera' ? undefined : asset.fileName?.trim();
   if (fileName) {
     return {
       name: fileName,
@@ -94,7 +103,7 @@ async function pickAgentCameraImage(): Promise<AgentAttachmentCandidate[]> {
     return [];
   }
   const assets = await launchImagePicker(ImagePicker.launchCameraAsync(IMAGE_PICKER_OPTIONS));
-  const candidates = assets.map(asset => normalizeImageAsset(asset));
+  const candidates = assets.map(asset => normalizeImageAsset(asset, { source: 'camera' }));
   for (const candidate of candidates) {
     registerTempFile(candidate.uri);
   }
@@ -207,6 +216,7 @@ function showAttachmentSourceSheet(
           await writePickerLaunchContext({
             userId: context.userId,
             surface: context.surface,
+            source,
             sessionId: context.sessionId,
             launchedAt: Date.now(),
           });

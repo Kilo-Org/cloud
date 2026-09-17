@@ -49,6 +49,7 @@ vi.mock('react-native', () => ({
 type LaunchContext = {
   userId: string;
   surface: AttachmentSurface;
+  source: 'camera' | 'library';
   sessionId: string | null;
   launchedAt: number;
 };
@@ -57,6 +58,7 @@ function makeContext(overrides: Partial<LaunchContext> = {}) {
   return {
     userId: 'user-1',
     surface: 'agent-new' as const,
+    source: 'library' as const,
     sessionId: null as string | null,
     launchedAt: Date.now(),
     ...overrides,
@@ -140,13 +142,21 @@ describe('useAndroidPendingPickerRecovery', () => {
 
   it('consumes a stored agent-picture context on the matching picture surface', async () => {
     mocks.userId = 'user-1';
-    mocks.readPickerLaunchContext.mockResolvedValue(makeContext({ surface: 'agent-picture' }));
+    mocks.readPickerLaunchContext.mockResolvedValue(
+      makeContext({ surface: 'agent-picture', source: 'camera' })
+    );
     mocks.consumeAndroidPendingPickerResult.mockResolvedValue([{ uri: 'file:///photo.jpg' }]);
 
     await mount('agent-picture');
 
     expect(mocks.consumeAndroidPendingPickerResult).toHaveBeenCalledTimes(1);
     expect(mocks.clearPickerLaunchContext).toHaveBeenCalledTimes(1);
+    // The recovered capture is named from the recorded source, exactly like a
+    // fresh camera launch.
+    expect(mocks.normalizeImageAsset).toHaveBeenCalledWith(
+      { uri: 'file:///photo.jpg' },
+      { source: 'camera' }
+    );
     expect(mocks.addCandidates).toHaveBeenCalledWith([
       { name: 'photo.jpg', uri: 'file:///photo.jpg' },
     ]);

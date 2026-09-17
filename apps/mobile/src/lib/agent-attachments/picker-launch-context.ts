@@ -13,9 +13,19 @@ const ATTACHMENT_SURFACES = ['agent-new', 'agent-chat', 'agent-picture'] as cons
 
 export type AttachmentSurface = (typeof ATTACHMENT_SURFACES)[number];
 
+/**
+ * The image-picker sources that record a launch context. Files is excluded:
+ * it uses `startActivityForResult` and cannot lose its result to an Activity
+ * recreation. The source is stored so the recovery hook can name a recovered
+ * camera capture exactly like a fresh one (its picker name is the picker's own
+ * cache file, so the chip uses a synthesized `image.<ext>`).
+ */
+export type PickerImageSource = 'camera' | 'library';
+
 export type PickerLaunchContext = {
   userId: string;
   surface: AttachmentSurface;
+  source: PickerImageSource;
   sessionId: string | null;
   launchedAt: number;
 };
@@ -28,6 +38,7 @@ export async function writePickerLaunchContext(context: PickerLaunchContext): Pr
 const pickerLaunchContextSchema = z.object({
   userId: z.string(),
   surface: z.enum(ATTACHMENT_SURFACES),
+  source: z.enum(['camera', 'library']),
   sessionId: z.string().nullable(),
   launchedAt: z.number(),
 });

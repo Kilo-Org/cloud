@@ -142,6 +142,34 @@ describe('normalizeImageAsset', () => {
     ).toBe('IMG_0001.HEIC');
   });
 
+  it('synthesizes image.<ext> for a camera capture, whose picker name is a cache file', () => {
+    // Android's camera result names the picker's own cache file, so the chip
+    // must not show that identifier; the library keeps a real display name.
+    expect(
+      normalizeImageAsset(
+        {
+          uri: 'file:///cache/ImagePicker/42b9d718-4b28-44fd-82f2-e2d6f0e2bab6.jpeg',
+          fileName: '42b9d718-4b28-44fd-82f2-e2d6f0e2bab6.jpeg',
+          mimeType: 'image/jpeg',
+        },
+        { source: 'camera' }
+      ).name
+    ).toBe('image.jpeg');
+  });
+
+  it('keeps the picker fileName for a library pick', () => {
+    expect(
+      normalizeImageAsset(
+        {
+          uri: 'file:///cache/1000000018.png',
+          fileName: '1000000018.png',
+          mimeType: 'image/png',
+        },
+        { source: 'library' }
+      ).name
+    ).toBe('1000000018.png');
+  });
+
   it('treats a whitespace-only fileName as missing and synthesizes from the URI', () => {
     expect(
       normalizeImageAsset({
@@ -341,6 +369,29 @@ describe('agent picture picker', () => {
     expect(ImagePicker.requestCameraPermissionsAsync).toHaveBeenCalledTimes(1);
     expect(ImagePicker.launchCameraAsync).toHaveBeenCalledTimes(1);
     expect(candidates.map(candidate => candidate.uri)).toEqual(['file:///cache/camera.jpg']);
+  });
+
+  it('names a freshly taken picture image.<ext> instead of the picker cache file', async () => {
+    vi.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValueOnce(
+      grantedCameraPermission()
+    );
+    const result: Awaited<ReturnType<typeof ImagePicker.launchCameraAsync>> = {
+      canceled: false,
+      assets: [
+        {
+          uri: 'file:///cache/ImagePicker/42b9d718-4b28-44fd-82f2-e2d6f0e2bab6.jpeg',
+          fileName: '42b9d718-4b28-44fd-82f2-e2d6f0e2bab6.jpeg',
+          mimeType: 'image/jpeg',
+          width: 100,
+          height: 100,
+        },
+      ],
+    };
+    vi.mocked(ImagePicker.launchCameraAsync).mockResolvedValueOnce(result);
+
+    const candidates = await pickPictureWithSheetSelection(0);
+
+    expect(candidates.map(candidate => candidate.name)).toEqual(['image.jpeg']);
   });
 
   it('launches the photo library single-select on the second option', async () => {

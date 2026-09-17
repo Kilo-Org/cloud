@@ -21,3 +21,17 @@ describe('Anaconda provider metadata', () => {
     expect(AllAuthMethodIds).toContain('anaconda');
   });
 });
+
+describe('OpenAI provider metadata', () => {
+  test('defines ChatGPT as a linkable OAuth sign-in method', () => {
+    expect(AuthProviderIdSchema.parse('openai')).toBe('openai');
+    expect(getProviderById('openai')).toMatchObject({
+      id: 'openai',
+      name: 'ChatGPT',
+      signInLabel: 'Sign in with ChatGPT',
+    });
+    expect(OAuthProviderIds).toContain('openai');
+    expect(ProdNonSSOAuthProviders).toContain('openai');
+    expect(AllAuthMethodIds).toContain('openai');
+  });
+});

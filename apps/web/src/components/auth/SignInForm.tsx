@@ -7,6 +7,7 @@ import { ProviderSelectView } from '@/components/auth/sign-in/ProviderSelectView
 import { EmailInputForm } from '@/components/auth/sign-in/EmailInputForm';
 import { AuthProviderButtons } from '@/components/auth/sign-in/AuthProviderButtons';
 import { SignInButton } from '@/components/auth/SigninButton';
+import { Separator } from '@/components/ui/separator';
 import { FakeLoginForm } from '@/components/auth/FakeLoginForm';
 import { AuthErrorNotification } from '@/components/auth/AuthErrorNotification';
 import { AnimatedLogoMark } from '@/components/AnimatedLogoMark';
@@ -276,6 +277,9 @@ export function SignInForm({
                     placeholder="you@example.com"
                     autoFocus={true}
                     isLoading={flow.showTurnstile || flow.isVerifying}
+                    submitLabel={
+                      !isSignUp && !emailOnly && !ssoMode ? 'Continue with Email' : undefined
+                    }
                   />
 
                   {ssoMode ? (
@@ -296,17 +300,33 @@ export function SignInForm({
                     </button>
                   ) : null}
                   {!isSignUp && !emailOnly && !ssoMode && (
-                    <p className="text-muted-foreground mt-4 text-xs leading-relaxed">
-                      By continuing, you are agreeing to the{' '}
-                      <a
-                        href="https://kilo.ai/terms"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-foreground underline underline-offset-4 transition-colors"
-                      >
-                        Terms &amp; Conditions
-                      </a>
-                    </p>
+                    <>
+                      {/* The sign-in page keeps the email prompt first, but the
+                          OAuth providers (including 'Sign in with ChatGPT') are
+                          offered beside it, as they are on sign-up. */}
+                      <div className="my-6 flex items-center gap-3">
+                        <Separator className="flex-1" />
+                        <span className="text-muted-foreground text-xs font-medium">or</span>
+                        <Separator className="flex-1" />
+                      </div>
+                      <div className="space-y-2">
+                        <AuthProviderButtons
+                          providers={OAuthProviderIds}
+                          onProviderClick={flow.handleOAuthClick}
+                        />
+                      </div>
+                      <p className="text-muted-foreground mt-4 text-xs leading-relaxed">
+                        By continuing, you are agreeing to the{' '}
+                        <a
+                          href="https://kilo.ai/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-foreground underline underline-offset-4 transition-colors"
+                        >
+                          Terms &amp; Conditions
+                        </a>
+                      </p>
+                    </>
                   )}
                 </>
               ) : (

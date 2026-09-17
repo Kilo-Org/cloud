@@ -1,11 +1,6 @@
 import { readStoredValue, type SecureStoreReadOptions } from '@/lib/auth/secure-store-value';
 import { E2E_SECURE_STORE_FAULT_MS } from '@/lib/config';
 
-// The headless OS-action runtime (`lib/app-actions/start-agent-runtime`) reads
-// the stored model preference through this module, so the raw reader is part
-// of its public surface; the action parity test pins that import.
-export { readStoredValue };
-
 /**
  * Bounded retry for a stored credential read.
  *

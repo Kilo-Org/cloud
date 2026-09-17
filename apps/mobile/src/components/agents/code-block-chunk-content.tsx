@@ -10,7 +10,7 @@ import { type HighlightToken } from '@/lib/pr-review/diff/highlight';
  *
  * Only a blank line that sits among other lines needs the placeholder: an
  * empty fence is one blank line and nothing else, so it keeps the zero-height
- * empty code `Text` it rendered before this block chunked the fence (see
+ * empty code `Text` it rendered before the block chunked the fence (see
  * `keepBlankLineBox` in `CodeBlockImpl`).
  */
 const BLANK_CODE_LINE = ' ';
@@ -44,9 +44,6 @@ function renderLineRuns(
  * renders `BLANK_CODE_LINE`, which keeps the line box of a blank line at a
  * chunk's first or last position from collapsing the `Text`; a fence with no
  * other line (`keepBlankLineBox` false) renders that line empty instead.
- *
- * Split out of `code-block.tsx` so that component stays under the max-lines
- * limit; the block itself is the only caller.
  */
 export function renderChunkChildren(
   chunkLines: readonly (readonly HighlightToken[])[],

@@ -1751,6 +1751,20 @@
       "when": 1789585450988,
       "tag": "0249_groovy_agent_zero",
       "breakpoints": true
+    },
+    {
+      "idx": 250,
+      "version": "7",
+      "when": 1789667699289,
+      "tag": "0250_kilo_pass_store_purchase_amounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 251,
+      "version": "7",
+      "when": 1789675013483,
+      "tag": "0251_kilo_pass_store_purchase_money_backfill_attempted",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,7 @@
+/* eslint-disable eslint-plugin-import/no-nodejs-modules, eslint-plugin-unicorn/prefer-module -- this test also reads the pill and its helper module off disk, which is the only place an import-time `Platform` capture is observable */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { type Href } from 'expo-router';
 import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -31,6 +35,17 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#000000' }),
 }));
+
+// The parity matrix below flips `platformState.OS` between two runs of the
+// same render, which only sees reads made while rendering. A read captured at
+// module scope is taken on the first import — before either run — so both
+// snapshots would carry the same value and the fork would pass unseen. These
+// two sources are what makes that half observable.
+const CTA_SOURCE = readFileSync(join(__dirname, 'pr-comment-fix-with-kilo.tsx'), 'utf8');
+const HELPER_SOURCE = readFileSync(
+  join(__dirname, '..', '..', '..', 'lib', 'pr-review', 'fix-with-kilo.ts'),
+  'utf8'
+);
 
 // ── Fixtures ─────────────────────────────────────────────────────────
 
@@ -230,11 +245,18 @@ describe('PrCommentFixWithKilo', () => {
     renderer.unmount();
   });
 
-  // One implementation for both platforms: the CTA, its href builder and the
-  // share-payload staging carry NO `Platform.OS` branch, so iOS and Android
-  // observe the same control, the same staged payload and the same route. A
-  // platform fork added anywhere on this path (pill, `buildFixWithKiloHref`,
-  // `fixWithKiloPrefillRepo`) makes the two snapshots differ and fails here.
+  // One implementation for both platforms: the CTA and its helper module carry
+  // NO `Platform.OS` branch, so iOS and Android observe the same control, the
+  // same staged payload and the same route.
+  //
+  // `snapshotOn` flips `platformState.OS` before each of the two runs, so a
+  // platform read made while rendering (the pill, `buildFixWithKiloHref`,
+  // `fixWithKiloPrefillRepo`) makes the snapshots differ and fails below. The
+  // flip cannot see a read captured at module scope: that value is taken on the
+  // first import, before either run, so both snapshots would carry the same
+  // fork. `keeps no Platform.OS fork on the Fix with Kilo path` covers that
+  // half by reading both modules off disk, so a fork in either of them — at
+  // either scope — fails.
   //
   // Scenarios cover every provider surface the row can render on, plus the
   // no-CTA case (a GitLab MR with no instance hint), so the parity claim holds
@@ -323,6 +345,15 @@ describe('PrCommentFixWithKilo', () => {
       expect(ios.ctaCount).toBe(1);
       expect(ios.payload).not.toBeNull();
       expect(ios.push).not.toBeNull();
+    });
+
+    it('keeps no Platform.OS fork on the Fix with Kilo path', () => {
+      // The two runs above cannot see an import-time capture, so the path is
+      // pinned at the source: with no `Platform` symbol in the pill or its
+      // helpers, neither a render-time nor a module-scope read is possible on
+      // either platform.
+      expect(CTA_SOURCE).not.toMatch(/\bPlatform\b/);
+      expect(HELPER_SOURCE).not.toMatch(/\bPlatform\b/);
     });
   });
 });

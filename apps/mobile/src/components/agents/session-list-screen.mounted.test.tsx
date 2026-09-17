@@ -4,6 +4,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import type * as MotionContextModule from '@/lib/a11y/motion-context';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { AgentSessionListScreen } from './session-list-screen';
 import { RowsRefreshControl } from './rows-refresh-control';
@@ -23,6 +24,9 @@ const state = vi.hoisted(() => ({
   // whether the floating pull-to-refresh indicator is safe (device defect
   // uxs1) or the reserved band carries the in-flight state instead.
   platform: { OS: 'ios' as string },
+  // Mutable so a case can turn reduced motion on: the platform control is then
+  // inert and a centered body draws the pull's static progress itself.
+  reducedMotion: false,
   topInset: 0,
   leftInset: 0,
   rightInset: 0,
@@ -223,6 +227,13 @@ vi.mock('@/lib/a11y/announce', () => ({
     state.announcements.push(message);
   },
 }));
+vi.mock('@/lib/a11y/motion-context', async importOriginal => ({
+  ...(await importOriginal<typeof MotionContextModule>()),
+  useProvidedMotionPolicy: () => ({
+    reducedMotion: state.reducedMotion,
+    scrollAnimated: !state.reducedMotion,
+  }),
+}));
 vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => state.tabBarHeight }));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   useLiveAgentSessions: (options: Parameters<typeof useLiveAgentSessions>[0]) => {
@@ -347,6 +358,7 @@ beforeEach(() => {
   state.focused = true;
   state.fontScale = 1;
   state.platform.OS = 'ios';
+  state.reducedMotion = false;
   state.topInset = 0;
   state.leftInset = 0;
   state.rightInset = 0;
@@ -871,6 +883,40 @@ describe('AgentSessionListScreen live presentation', () => {
       expect(refresh().props.refreshing).toBe(false);
     }
   );
+
+  it('yields the no-match band spinner to the body’s reduced-motion progress on Android', async () => {
+    state.live.activeSessions = [row];
+    const pending = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(pending.promise);
+    state.platform.OS = 'android';
+    state.reducedMotion = true;
+    await renderScreen();
+    const searchHeader = requireNode('SessionListSearchHeader');
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+    const refresh = () =>
+      nodes('CenteredState')[0]?.props.refreshControl as ReactElement<{
+        refreshing: boolean;
+        onRefresh: () => void;
+      }>;
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    // Reduced motion makes the platform control inert, so the no-match body's
+    // static progress is the pull's indicator: the reserved band keeps the
+    // "Updating" copy without drawing a second spinner (device defect uxs1).
+    const updating = nodes('Text').find(node => node.children.includes('Updating'));
+    expect(updating).toBeDefined();
+    expect(updating?.props.className).not.toContain('absolute');
+    expect(nodes('ActivityIndicator')).toHaveLength(0);
+    await act(async () => {
+      pending.resolve(true);
+      await pending.promise;
+    });
+    expect(nodes('ActivityIndicator')).toHaveLength(0);
+    expect(refresh().props.refreshing).toBe(false);
+  });
 
   it('passes a numeric attention revision as extraData to the live FlatList', async () => {
     state.live.activeSessions = [row];

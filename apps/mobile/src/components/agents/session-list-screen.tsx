@@ -248,7 +248,9 @@ export function AgentSessionListScreen() {
     // filter), so the native control gets the same treatment as the rows
     // list: on Android the band carries the in-flight spinner and the
     // platform disc is parked off the body, so no second spinner is drawn
-    // over it (device defect uxs1).
+    // over it (device defect uxs1). That body is centered, so it draws the
+    // pull's own progress while reduced motion is on, and the band then
+    // yields its spinner to it (`progressInBody` on the reserved line).
     body = (
       <EmptyState
         icon={Bot}
@@ -332,6 +334,10 @@ export function AgentSessionListScreen() {
               busy: pull.refreshing || pull.busy,
               failed: pull.failed || retryableRowsFailure,
               onRetry: handleRefreshRetry,
+              // The pull's progress belongs to the centered no-match body (the
+              // same state that mounts it), so the band does not draw a second
+              // spinner while that body shows one.
+              progressInBody: hasLiveRows && visibleSessions.length === 0 && pull.refreshing,
             }}
             refreshControl={refreshControl}
           />

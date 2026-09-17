@@ -10,30 +10,61 @@ const ISO_4217_CURRENCY_CODE = /^[A-Z]{3}$/;
 const DEFAULT_CURRENCY_EXPONENT = 2;
 
 /**
+ * The ISO 4217 minor unit of every currency whose exponent is not the usual
+ * two (ISO 4217 "list one": no decimals, three decimals, four decimals).
+ * `Intl.NumberFormat` cannot supply this: its ICU/CLDR data is display data, and
+ * reports no decimals for currencies whose minor unit is unused in cash (HUF,
+ * IDR, ...) while reporting two for codes ISO leaves without one, so deriving
+ * the exponent from it would mis-scale the stored amount.
+ */
+const NON_DEFAULT_CURRENCY_EXPONENTS: Readonly<Record<string, number>> = {
+  BIF: 0,
+  CLP: 0,
+  DJF: 0,
+  GNF: 0,
+  ISK: 0,
+  JPY: 0,
+  KMF: 0,
+  KRW: 0,
+  PYG: 0,
+  RWF: 0,
+  UGX: 0,
+  UYI: 0,
+  VND: 0,
+  VUV: 0,
+  XAF: 0,
+  XOF: 0,
+  XPF: 0,
+  BHD: 3,
+  IQD: 3,
+  JOD: 3,
+  KWD: 3,
+  LYD: 3,
+  OMR: 3,
+  TND: 3,
+  CLF: 4,
+  UYW: 4,
+};
+
+/**
  * Google Play states every amount as `Money { currencyCode, units, nanos }`,
  * where `units` is a decimal string and `nanos` a number of 10^-9 units. Our
- * records store the amount in the currency's smallest unit, so we need the
- * currency's exponent (2 for USD, 0 for JPY, 3 for KWD, ...).
+ * records store the amount in the currency's ISO 4217 smallest unit, so we need
+ * the currency's exponent (2 for USD, 0 for JPY, 3 for KWD, ...).
+ *
+ * An unrecognized-but-well-formed code is still chargeable; treat it like the
+ * common two-decimal currency rather than failing the purchase. A malformed code
+ * is not a currency at all, so it yields null.
  */
 function currencyExponent(currencyCode: string): number | null {
   if (!ISO_4217_CURRENCY_CODE.test(currencyCode)) return null;
-  try {
-    return (
-      new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currencyCode,
-      }).resolvedOptions().maximumFractionDigits ?? DEFAULT_CURRENCY_EXPONENT
-    );
-  } catch {
-    // An unrecognized-but-well-formed code is still chargeable; treat it like
-    // the common two-decimal currency rather than failing the purchase.
-    return DEFAULT_CURRENCY_EXPONENT;
-  }
+  return NON_DEFAULT_CURRENCY_EXPONENTS[currencyCode] ?? DEFAULT_CURRENCY_EXPONENT;
 }
 
 /**
- * Converts a Play `Money` into the smallest unit of its currency. Returns null
- * for anything unusable — a purchase must never fail because of the new fields.
+ * Converts a Play `Money` into the ISO 4217 smallest unit of its currency.
+ * Returns null for anything unusable — a purchase must never fail because of
+ * the new fields.
  */
 export function googlePlayMoneyToMinorUnits(
   money: androidpublisher_v3.Schema$Money | null | undefined
@@ -87,8 +118,9 @@ function moneyPair(
 
 /**
  * Picks the money of the paid line item out of a Play order. Falls back to the
- * order's only line item, then to the order-level totals when that item carries
- * no money at all. Unusable money (missing or malformed) yields all nulls.
+ * order's only line item, then — only when that is the order's single line item
+ * — to the order-level totals. Unusable money (missing or malformed) yields all
+ * nulls.
  */
 export function googlePlayOrderMoneyForProduct(
   order: androidpublisher_v3.Schema$Order,
@@ -108,5 +140,8 @@ export function googlePlayOrderMoneyForProduct(
     return noMoney();
   }
   if (!item) return noMoney();
+  // Only a single-line order's totals are this product's money: with several
+  // line items they would attribute the whole order to this one product.
+  if (items.length !== 1) return noMoney();
   return moneyPair(order.total, order.tax);
 }

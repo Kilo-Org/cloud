@@ -50,6 +50,22 @@ describe('googlePlayMoneyToMinorUnits', () => {
     );
   });
 
+  it('uses the ISO 4217 exponent, not the ICU display digits', () => {
+    // ICU reports no decimals for HUF and IDR; ISO 4217 gives them two.
+    // (TWD is two in both, and stays two.)
+    expect(googlePlayMoneyToMinorUnits({ currencyCode: 'HUF', units: '1900', nanos: 0 })).toBe(
+      190000
+    );
+    expect(googlePlayMoneyToMinorUnits({ currencyCode: 'IDR', units: '50000', nanos: 0 })).toBe(
+      5000000
+    );
+    expect(googlePlayMoneyToMinorUnits({ currencyCode: 'TWD', units: '19', nanos: 0 })).toBe(1900);
+  });
+
+  it('treats an unknown but well-formed currency code as two-decimal', () => {
+    expect(googlePlayMoneyToMinorUnits({ currencyCode: 'ZZZ', units: '19', nanos: 0 })).toBe(1900);
+  });
+
   it('rounds a sub-minor-unit remainder instead of failing', () => {
     expect(googlePlayMoneyToMinorUnits({ currencyCode: 'USD', units: '1', nanos: 4990000 })).toBe(
       100
@@ -131,6 +147,26 @@ describe('googlePlayOrderMoneyForProduct', () => {
     );
 
     expect(result).toEqual({ amountChargedMinorUnits: 1900, currency: 'USD', taxMinorUnits: 317 });
+  });
+
+  it('does not lend the order totals to one product of a multi-item order', () => {
+    const result = googlePlayOrderMoneyForProduct(
+      order({
+        total: { currencyCode: 'USD', units: '68', nanos: 0 },
+        tax: { currencyCode: 'USD', units: '6', nanos: 0 },
+        lineItems: [
+          { productId: 'kilopass_tier19' },
+          {
+            productId: 'kilopass_tier49',
+            total: { currencyCode: 'USD', units: '49', nanos: 0 },
+            tax: { currencyCode: 'USD', units: '4', nanos: 0 },
+          },
+        ],
+      }),
+      'kilopass_tier19'
+    );
+
+    expect(result).toEqual(NO_MONEY);
   });
 
   it('takes the currency from the tax when only tax is interpretable', () => {

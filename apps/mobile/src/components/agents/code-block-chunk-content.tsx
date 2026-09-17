@@ -10,7 +10,7 @@ import { type HighlightToken } from '@/lib/pr-review/diff/highlight';
  *
  * Only a blank line that sits among other lines needs the placeholder: an
  * empty fence is one blank line and nothing else, so it keeps the zero-height
- * empty code `Text` it rendered before this block chunked the fence (see
+ * empty code `Text` it rendered before the block chunked the fence (see
  * `keepBlankLineBox` in `CodeBlockImpl`).
  */
 const BLANK_CODE_LINE = ' ';

@@ -50,6 +50,24 @@ export type MiniMaxTokenHealthProbeResult = {
   httpStatus?: number;
 };
 
+// Only 401/403 indicate the credential itself was rejected; everything else
+// must not be escalated as `denied`, since that drives immediate follow-up
+// alerts in Slack for what may just be a transient or unrelated failure:
+// - 408/429/5xx reflect timeouts, dynamic rate limiting, or upstream outages
+//   (see the 2026-09-15 Token Plan incident note above), not access denial.
+// - Other unexpected client/protocol statuses (400, 404, 422, etc.) indicate
+//   a changed endpoint or malformed request, not a bad API key, so they are
+//   bucketed with the response-shape failures as `bad_response`.
+function classifyHttpErrorStatus(status: number): MiniMaxTokenHealthCategory {
+  if (status === 401 || status === 403) {
+    return 'denied';
+  }
+  if (status === 408 || status === 429 || status >= 500) {
+    return 'unreachable';
+  }
+  return 'bad_response';
+}
+
 export async function probeMiniMaxTokenPlanRemains(
   apiKey: string
 ): Promise<MiniMaxTokenHealthProbeResult> {
@@ -71,10 +89,7 @@ export async function probeMiniMaxTokenPlanRemains(
 
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
-    // 429/5xx reflect transient rate limiting or upstream outages (see the
-    // 2026-09-15 Token Plan incident note above), not an actual access
-    // denial, so they must not be bucketed with 401/403 as `denied`.
-    const category = response.status === 429 || response.status >= 500 ? 'unreachable' : 'denied';
+    const category = classifyHttpErrorStatus(response.status);
     return { category, reason: `http_${response.status}`, httpStatus: response.status };
   }
 

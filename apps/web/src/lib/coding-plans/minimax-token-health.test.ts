@@ -17,7 +17,7 @@ jest.mock('@/lib/drizzle', () => ({
   },
 }));
 
-import { describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it } from '@jest/globals';
 
 import type { AdminSlackNotification } from '@/lib/slack/admin-notifications';
 import {
@@ -25,6 +25,7 @@ import {
   checkAllMiniMaxTokenHealth,
   getMiniMaxTokenHealthTargets,
   needsImmediateFollowUp,
+  probeMiniMaxTokenPlanRemains,
   sendMiniMaxTokenHealthSlackSummary,
   type MiniMaxTokenHealthEntry,
   type MiniMaxTokenHealthTarget,
@@ -56,6 +57,37 @@ function entry(overrides: Partial<MiniMaxTokenHealthEntry> = {}): MiniMaxTokenHe
     ...overrides,
   };
 }
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe('probeMiniMaxTokenPlanRemains', () => {
+  it.each([
+    [401, 'denied'],
+    [403, 'denied'],
+    [408, 'unreachable'],
+    [429, 'unreachable'],
+    [500, 'unreachable'],
+    [503, 'unreachable'],
+    [400, 'bad_response'],
+    [404, 'bad_response'],
+    [422, 'bad_response'],
+  ] as const)(
+    'classifies HTTP %s as %s instead of always mapping to denied',
+    async (status, expectedCategory) => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(new Response('upstream body', { status }));
+
+      const result = await probeMiniMaxTokenPlanRemains('api-key');
+
+      expect(result).toEqual({
+        category: expectedCategory,
+        reason: `http_${status}`,
+        httpStatus: status,
+      });
+    }
+  );
+});
 
 describe('getMiniMaxTokenHealthTargets', () => {
   it('keeps the most recently created live subscription when a key has more than one', async () => {

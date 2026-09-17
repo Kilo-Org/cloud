@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { skipToken, useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AlertCircle, ExternalLink } from 'lucide-react';
@@ -41,17 +41,45 @@ import {
 } from './spendAlertsPanelState';
 
 /**
- * Every state renders into this slot, and every state gets at least this much
- * room, so the settings arriving (or failing) never moves the dashboard below.
+ * Every state renders into this slot, and every state gets at least as much
+ * room as the ready form needs at that width, so the settings arriving (or
+ * failing) never moves the dashboard below.
  *
- * 47rem is the tallest the ready form gets on a dashboard-width card: the
- * content column narrows to ~24rem just above the `lg` breakpoint, where the
- * rule descriptions wrap and the form reaches 740px (measured; a wide card is
- * 719px). The old 45rem floor was 20px short there, so swapping the skeleton
- * for the form pushed the usage summary and Trends down by exactly that. The
- * skeleton's own blocks are 717px in every state and so stay inside the slot.
+ * The ready form's height follows the card's own width, not the viewport's.
+ * The card is the dashboard's content column: the app sidebar narrows it at
+ * `md`, and the organization usage-details view adds a second sidebar at `lg`,
+ * which squeezes the card to ~385px while the viewport is still wide enough for
+ * the two-column rule fields. The rule descriptions and the channel notes then
+ * wrap, and the fields themselves collapse to one column below `sm`. Measured
+ * ready-form content height by card width, worst case over the viewports that
+ * produce it, on the personal and organization spend views:
+ *
+ * | card width | content | slot  |
+ * |------------|---------|-------|
+ * | < 310px    | ≤1045px | 66rem |
+ * | 310-379px  | ≤917px  | 58rem |
+ * | 380-579px  | ≤872px  | 55rem |
+ * | ≥ 580px    | ≤731px  | 47rem |
+ *
+ * The bands are element queries rather than media queries because the card
+ * width, not the viewport, is what wraps the form: the personal spend view has
+ * no organization sidebar, so the same viewport width gives a wide card there
+ * and a narrow one on the organization view. Both the skeleton (717px of
+ * blocks) and the form render into this same slot, so the two phases are the
+ * same height and nothing below moves.
  */
-const PANEL_SLOT_CLASS = 'min-h-[47rem]';
+const PANEL_SLOT_CLASS =
+  'min-h-[66rem] @min-[310px]:min-h-[58rem] @min-[380px]:min-h-[55rem] @min-[580px]:min-h-[47rem]';
+
+/**
+ * The container that {@link PANEL_SLOT_CLASS}'s element query measures. A
+ * container query can only style descendants, so the Card that owns the slot
+ * has to sit inside this wrapper rather than carry `@container` itself. The
+ * wrapper spans the same width as the Card, so the query sees the card's width.
+ */
+function PanelSlot({ children }: { children: ReactNode }) {
+  return <div className="@container">{children}</div>;
+}
 
 export type SpendAlertsPanelProps = {
   /** Organization scope when set; personal scope when omitted. */
@@ -113,46 +141,52 @@ export function SpendAlertsPanel({ organizationId, callerRole }: SpendAlertsPane
 
   if (view.status === 'loading') {
     return (
-      <Card className={cn(PANEL_SLOT_CLASS)} role="status">
-        <span className="sr-only">Loading spend alerts</span>
-        <CardHeader>
-          <CardTitle>Spend alerts</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6" aria-hidden="true">
-            <div className="bg-muted h-24 rounded-lg" />
-            <div className="bg-muted h-[13.5rem] rounded-lg" />
-            <div className="bg-muted h-[13.5rem] rounded-lg" />
-            <div className="flex justify-end">
-              <div className="bg-muted h-9 w-20 rounded-md" />
+      <PanelSlot>
+        <Card className={cn(PANEL_SLOT_CLASS)} role="status">
+          <span className="sr-only">Loading spend alerts</span>
+          <CardHeader>
+            <CardTitle>Spend alerts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6" aria-hidden="true">
+              <div className="bg-muted h-24 rounded-lg" />
+              <div className="bg-muted h-[13.5rem] rounded-lg" />
+              <div className="bg-muted h-[13.5rem] rounded-lg" />
+              <div className="flex justify-end">
+                <div className="bg-muted h-9 w-20 rounded-md" />
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </PanelSlot>
     );
   }
 
   if (view.status === 'load-error') {
     return (
-      <Card className={cn(PANEL_SLOT_CLASS)}>
-        <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-          <AlertCircle className="text-muted-foreground size-5" />
-          <p className="type-body text-muted-foreground max-w-md">{view.message}</p>
-          <Button variant="secondary" size="sm" onClick={() => void query.refetch()}>
-            Retry
-          </Button>
-        </CardContent>
-      </Card>
+      <PanelSlot>
+        <Card className={cn(PANEL_SLOT_CLASS)}>
+          <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+            <AlertCircle className="text-muted-foreground size-5" />
+            <p className="type-body text-muted-foreground max-w-md">{view.message}</p>
+            <Button variant="secondary" size="sm" onClick={() => void query.refetch()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </PanelSlot>
     );
   }
 
   if (view.status === 'forbidden') {
     return (
-      <Card className={cn(PANEL_SLOT_CLASS)}>
-        <CardContent className="flex h-full items-center justify-center p-6 text-center">
-          <p className="type-body text-muted-foreground max-w-md">{view.message}</p>
-        </CardContent>
-      </Card>
+      <PanelSlot>
+        <Card className={cn(PANEL_SLOT_CLASS)}>
+          <CardContent className="flex h-full items-center justify-center p-6 text-center">
+            <p className="type-body text-muted-foreground max-w-md">{view.message}</p>
+          </CardContent>
+        </Card>
+      </PanelSlot>
     );
   }
 
@@ -186,68 +220,70 @@ export function SpendAlertsPanel({ organizationId, callerRole }: SpendAlertsPane
   };
 
   return (
-    <Card className={cn(PANEL_SLOT_CLASS)}>
-      <CardHeader>
-        <CardTitle>Spend alerts</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
-          <div className="space-y-0.5">
-            <Label htmlFor={`${fieldId}-enabled`} className="text-base font-semibold">
-              Enable spend alerts
-            </Label>
-            {/* Two reserved lines: the copy must not move the rules when the
-                switch toggles. */}
-            <p className="type-body text-muted-foreground min-h-10">
-              {masterOff ? SPEND_ALERTS_OFF_COPY : ''}
-            </p>
+    <PanelSlot>
+      <Card className={cn(PANEL_SLOT_CLASS)}>
+        <CardHeader>
+          <CardTitle>Spend alerts</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-0.5">
+              <Label htmlFor={`${fieldId}-enabled`} className="text-base font-semibold">
+                Enable spend alerts
+              </Label>
+              {/* Two reserved lines: the copy must not move the rules when the
+                  switch toggles. */}
+              <p className="type-body text-muted-foreground min-h-10">
+                {masterOff ? SPEND_ALERTS_OFF_COPY : ''}
+              </p>
+            </div>
+            <Switch
+              id={`${fieldId}-enabled`}
+              checked={currentDraft.enabled}
+              onCheckedChange={enabled => updateDraft({ ...currentDraft, enabled })}
+            />
           </div>
-          <Switch
-            id={`${fieldId}-enabled`}
-            checked={currentDraft.enabled}
-            onCheckedChange={enabled => updateDraft({ ...currentDraft, enabled })}
-          />
-        </div>
 
-        {currentDraft.rules.map(rule => (
-          <RuleEditor
-            key={rule.kind}
-            id={`${fieldId}-${rule.kind}`}
-            rule={rule}
-            disabled={!controlsVisible}
-            errors={validation.errors}
-            pushCategoryEnabled={query.data?.pushCategoryEnabled ?? true}
-            pushChannelBlocked={query.data?.pushChannelBlocked ?? false}
-            onChange={patch => updateRule(rule.kind, patch)}
-          />
-        ))}
-
-        {/* One call to action at a time: a failed save retries the same draft,
-            otherwise Save posts it. The never-configured empty state has
-            nothing to post, so both buttons are absent there and its only
-            action is the switch above. */}
-        {controlsVisible &&
-          (saveMutation.isError ? (
-            <div className="border-destructive/40 bg-destructive/10 flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-              <p className="type-body text-destructive">{view.save.error}</p>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={save}
-                disabled={saveMutation.isPending}
-              >
-                Retry
-              </Button>
-            </div>
-          ) : (
-            <div className="flex justify-end">
-              <Button onClick={save} disabled={!validation.ok || saveMutation.isPending}>
-                Save
-              </Button>
-            </div>
+          {currentDraft.rules.map(rule => (
+            <RuleEditor
+              key={rule.kind}
+              id={`${fieldId}-${rule.kind}`}
+              rule={rule}
+              disabled={!controlsVisible}
+              errors={validation.errors}
+              pushCategoryEnabled={query.data?.pushCategoryEnabled ?? true}
+              pushChannelBlocked={query.data?.pushChannelBlocked ?? false}
+              onChange={patch => updateRule(rule.kind, patch)}
+            />
           ))}
-      </CardContent>
-    </Card>
+
+          {/* One call to action at a time: a failed save retries the same draft,
+              otherwise Save posts it. The never-configured empty state has
+              nothing to post, so both buttons are absent there and its only
+              action is the switch above. */}
+          {controlsVisible &&
+            (saveMutation.isError ? (
+              <div className="border-destructive/40 bg-destructive/10 flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
+                <p className="type-body text-destructive">{view.save.error}</p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={save}
+                  disabled={saveMutation.isPending}
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : (
+              <div className="flex justify-end">
+                <Button onClick={save} disabled={!validation.ok || saveMutation.isPending}>
+                  Save
+                </Button>
+              </div>
+            ))}
+        </CardContent>
+      </Card>
+    </PanelSlot>
   );
 }
 

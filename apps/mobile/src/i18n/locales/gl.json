@@ -326,7 +326,7 @@
       "expandMoreLines": "Amosar {{displayCount}} liñas máis ({{start}}–{{end}})",
       "expandLinesOfContext": "Amosar {{displayCount}} liñas de contexto",
       "expandAll": "Expandir todo",
-      "expandAllLines": "Amosar as {{displayCount}} liñas",
+      "expandAllLines": "Amosar todas as liñas ({{displayCount}})",
       "loadingMoreFiles": "Cargando máis ficheiros…",
       "retryLoadingNextPage": "Volver cargar a seguinte páxina",
       "failedToLoadMoreFiles": "Non se puideron cargar máis ficheiros — toca para tentalo de novo",
@@ -343,7 +343,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} de {{total}} ficheiros cargados",
       "filesStillLoading": "Os ficheiros aínda se están cargando. Arrastra cara abaixo para actualizar.",
       "goToOverview": "Ir á vista xeral",
-      "goToOverviewTab": "Ir á pestana de vista xeral"
+      "goToOverviewTab": "Ir á pestana de vista xeral",
+      "expandAllLines_one": "Amosar todas as liñas ({{displayCount}})",
+      "expandAllLines_other": "Amosar todas as liñas ({{displayCount}})",
+      "expandLines_one": "Amosar {{displayCount}} liña ({{start}}–{{end}})",
+      "expandLines_other": "Amosar {{displayCount}} liñas ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Amosar {{displayCount}} liña de contexto",
+      "expandLinesOfContext_other": "Amosar {{displayCount}} liñas de contexto",
+      "expandMoreLines_one": "Amosar {{displayCount}} liña máis ({{start}}–{{end}})",
+      "expandMoreLines_other": "Amosar {{displayCount}} liñas máis ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} de {{total}} ficheiros cargados",
+      "loadedOfTotalFiles_other": "{{loaded}} de {{total}} ficheiros cargados"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "falta un salto de liña ao final do ficheiro.",
@@ -533,7 +543,9 @@
         "outdatedOnPath": "Desactualizado en {{path}}"
       },
       "deletedUser": "usuario eliminado",
-      "replyForbiddenTerm": "Non tes permiso para responder a esta {{term}}."
+      "replyForbiddenTerm": "Non tes permiso para responder a esta {{term}}.",
+      "moreLinesAbove_one": "… hai {{displayCount}} liña máis arriba.",
+      "moreLinesAbove_other": "… hai {{displayCount}} liñas máis arriba."
     },
     "couldNotOpenGitHubAppSettings": "Non se puideron abrir os axustes da aplicación de GitHub.",
     "installKiloGitHubApp": "Instalar a aplicación de Kilo para GitHub",
@@ -706,7 +718,9 @@
       "statusContext": "Contexto",
       "lineLabel": "liña {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "{{status}} — {{text}}",
-      "emptyLine": "(baleiro)"
+      "emptyLine": "(baleiro)",
+      "truncationBanner_one": "Amósanse os primeiros {{limit}} de {{total}} ficheiros modificados polo límite da API de GitHub.",
+      "truncationBanner_other": "Amósanse os primeiros {{limit}} de {{total}} ficheiros modificados polo límite da API de GitHub."
     },
     "linkPasteClipboardEmpty": "O portapapeis está baleiro.",
     "linkPasteNotAPullRequest": "Non é unha ligazón a unha solicitude de integración ou de fusión",
@@ -880,7 +894,9 @@
       "uploadFailed": "Non se puido completar a subida.",
       "failedToUploadFile": "Non se puido subir o ficheiro: {{reason}}.",
       "nothingToPaste": "Non hai nada que pegar.",
-      "metadataStripFailed": "Non se puideron eliminar os metadatos da foto."
+      "metadataStripFailed": "Non se puideron eliminar os metadatos da foto.",
+      "limit_one": "Podes anexar ata {{displayCount}} ficheiro.",
+      "limit_other": "Podes anexar ata {{displayCount}} ficheiros."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1640,11 @@
       "syncFindings": "Sincronizar achados",
       "syncNow": "Sincronizar agora",
       "syncQueued": "Sincronización na cola",
-      "syncStatusUnavailable": "O estado da sincronización non está dispoñible."
+      "syncStatusUnavailable": "O estado da sincronización non está dispoñible.",
+      "daysOverdue_one": "{{displayCount}} día de atraso",
+      "daysOverdue_other": "{{displayCount}} días de atraso",
+      "findingsCount_one": "{{displayCount}} achado",
+      "findingsCount_other": "{{displayCount}} achados"
     },
     "dashboardMetrics": {
       "openFindings": "Achados abertos",
@@ -2152,7 +2172,13 @@
       "updateTodos": "Actualizar tarefas",
       "linesBadge": "{{displayCount}} liñas",
       "filesBadge": "{{displayCount}} ficheiros",
-      "matchesBadge": "{{displayCount}} coincidencias"
+      "matchesBadge": "{{displayCount}} coincidencias",
+      "filesBadge_one": "{{displayCount}} ficheiro",
+      "filesBadge_other": "{{displayCount}} ficheiros",
+      "linesBadge_one": "{{displayCount}} liña",
+      "linesBadge_other": "{{displayCount}} liñas",
+      "matchesBadge_one": "{{displayCount}} coincidencia",
+      "matchesBadge_other": "{{displayCount}} coincidencias"
     },
     "readToolMarkdown": {
       "linesTruncated": "liñas {{start}}–{{end}} (contido truncado)",
@@ -2442,7 +2468,11 @@
       "files": "Ficheiros",
       "couldNotOpenPhotoPicker": "Non se puido abrir o selector de fotos. Reinicia Kilo e téntao de novo.",
       "maxFilesAllowed": "Podes engadir un máximo de {{displayCount}} ficheiros.",
-      "onlyAddingFiles": "Só se engaden {{accepted}} de {{total}} ficheiros (máx. {{max}})"
+      "onlyAddingFiles": "Só se engaden {{accepted}} de {{total}} ficheiros (máx. {{max}})",
+      "maxFilesAllowed_one": "Podes engadir un máximo de {{displayCount}} ficheiro.",
+      "maxFilesAllowed_other": "Podes engadir un máximo de {{displayCount}} ficheiros.",
+      "onlyAddingFiles_one": "Só se engaden {{accepted}} de {{total}} ficheiros (máx. {{max}})",
+      "onlyAddingFiles_other": "Só se engaden {{accepted}} de {{total}} ficheiros (máx. {{max}})"
     },
     "composer": {
       "addAttachment": "Engadir un anexo",
@@ -2460,7 +2490,9 @@
       "discardAttachmentsMessage": "Eliminaranse os ficheiros subidos que aínda non se enviaron nunha mensaxe.",
       "discardAttachmentsTitle": "Descartar os anexos?",
       "charactersRemaining": "Quedan {{count}} caracteres",
-      "insertNewline": "Inserir un salto de liña"
+      "insertNewline": "Inserir un salto de liña",
+      "charactersRemaining_one": "Queda {{count}} caractere",
+      "charactersRemaining_other": "Quedan {{count}} caracteres"
     },
     "chatLink": {
       "linkCopied": "Ligazón copiada",
@@ -2526,7 +2558,9 @@
       "stepsCount_one": "{{steps}} paso",
       "stepsCount": "{{steps}} pasos",
       "stepsCount_other": "{{steps}} pasos",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Modelo ({{displayCount}})",
+      "modelsCount_other": "Modelos ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Aprobación automática",
@@ -2566,7 +2600,9 @@
     },
     "toolRun": {
       "sheetTitle": "Chamadas de ferramentas",
-      "condensedLabel": "{{itemCount}} elementos; {{last}}"
+      "condensedLabel": "{{itemCount}} elementos; {{last}}",
+      "condensedLabel_one": "{{itemCount}} elemento; {{last}}",
+      "condensedLabel_other": "{{itemCount}} elementos; {{last}}"
     }
   },
   "bootstrap": {
@@ -2700,7 +2736,9 @@
     "cliCantReceiveFilesTitle": "Esta sesión non pode recibir ficheiros",
     "cliCantReceiveFilesMessage": "O Kilo CLI que executa esta sesión non pode recibir ficheiros. Actualiza o CLI nesa máquina ou comparte o contido nunha sesión nova.",
     "contentlessMessage": "Non hai nada que compartir — non se incluíron texto nin ficheiros.",
-    "couldNotReadContent": "Non se puido ler o contido compartido."
+    "couldNotReadContent": "Non se puido ler o contido compartido.",
+    "onlyFirstFilesAttached_one": "Só se anexarán os primeiros {{displayCount}} ficheiro.",
+    "onlyFirstFilesAttached_other": "Só se anexarán os primeiros {{displayCount}} ficheiros."
   },
   "kiloPass": {
     "title": "Kilo Pass",

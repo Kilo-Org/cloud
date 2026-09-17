@@ -58,6 +58,7 @@ import {
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { usePrDiffListScroll } from '@/lib/pr-review/diff/use-pr-diff-list-scroll';
 import { usePrDiffListContentPadding } from '@/lib/pr-review/diff/use-pr-diff-list-content-padding';
+import { usePrDiffPageGate } from '@/lib/pr-review/diff/use-pr-diff-page-gate';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { CenteredState } from '@/components/centered-state';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
@@ -228,6 +229,14 @@ export function PrReviewFileList({
 
   const items = useMemo(() => [...fileItems, paginationItem], [fileItems, paginationItem]);
 
+  // FlashList reports the end as reached as soon as its content fits the
+  // viewport, so a first page shorter than the screen used to be replaced by
+  // the next pages before the partial-load row (`prReview.hunkRows
+  // .loadedOfTotalFiles`, "1 of 5 files loaded") and its Load all action could
+  // be read. `usePrDiffPageGate` keeps the row the resting state until the
+  // user's own drag, and keeps the end report FlashList makes before it.
+  const { onScrollBeginDrag, onEndReached } = usePrDiffPageGate(query);
+
   const stickyHeaderIndices = useMemo(() => stickyFileHeaderIndices(items), [items]);
 
   usePrDiffListScroll({
@@ -345,11 +354,8 @@ export function PrReviewFileList({
             maintainVisibleContentPosition={{ disabled: true }}
             // Re-measure rows when the bounded font scale changes.
             extraData={diffFontMetrics.scale}
-            onEndReached={() => {
-              if (query.hasNextPage && !query.isFetchingNextPage) {
-                void query.fetchNextPage();
-              }
-            }}
+            onScrollBeginDrag={onScrollBeginDrag}
+            onEndReached={onEndReached}
             onEndReachedThreshold={0.5}
             contentContainerStyle={listContentStyle}
             ItemSeparatorComponent={null}

@@ -390,7 +390,9 @@
       "uploadFailed": "Yükleme başarısız oldu.",
       "failedToUploadFile": "Dosya yüklenemedi: {{reason}}.",
       "nothingToPaste": "Yapıştırılacak bir şey yok.",
-      "metadataStripFailed": "Fotoğrafın meta verileri kaldırılamadı."
+      "metadataStripFailed": "Fotoğrafın meta verileri kaldırılamadı.",
+      "limit_one": "En fazla {{displayCount}} dosya ekleyebilirsin.",
+      "limit_other": "En fazla {{displayCount}} dosya ekleyebilirsin."
     },
     "attachmentPreview": {
       "accessibility": "Dosya: {{filename}}, {{status}}",
@@ -1159,7 +1161,11 @@
       "syncNow": "Şimdi eşitle",
       "syncQueued": "Eşitleme kuyruğa alındı",
       "syncStatusUnavailable": "Eşitleme durumu alınamıyor.",
-      "withinDeadline": "Süresi dolmadı"
+      "withinDeadline": "Süresi dolmadı",
+      "daysOverdue_one": "{{displayCount}} gün gecikmiş",
+      "daysOverdue_other": "{{displayCount}} gün gecikmiş",
+      "findingsCount_one": "{{displayCount}} bulgu",
+      "findingsCount_other": "{{displayCount}} bulgu"
     },
     "dashboardMetrics": {
       "openFindings": "Açık bulgular",
@@ -1662,7 +1668,13 @@
       "updateTodos": "Görevleri güncelle",
       "linesBadge": "{{displayCount}} satır",
       "filesBadge": "{{displayCount}} dosya",
-      "matchesBadge": "{{displayCount}} eşleşme"
+      "matchesBadge": "{{displayCount}} eşleşme",
+      "filesBadge_one": "{{displayCount}} dosya",
+      "filesBadge_other": "{{displayCount}} dosya",
+      "linesBadge_one": "{{displayCount}} satır",
+      "linesBadge_other": "{{displayCount}} satır",
+      "matchesBadge_one": "{{displayCount}} eşleşme",
+      "matchesBadge_other": "{{displayCount}} eşleşme"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}. satırlar (kısaltıldı)",
@@ -1952,7 +1964,11 @@
       "files": "Dosya",
       "couldNotOpenPhotoPicker": "Fotoğraf seçici açılamadı. Kilo'yu yeniden başlatıp tekrar dene.",
       "maxFilesAllowed": "En fazla {{displayCount}} dosya ekleyebilirsin.",
-      "onlyAddingFiles": "Toplam {{total}} dosyadan yalnızca {{accepted}} dosya ekleniyor (en fazla {{max}})"
+      "onlyAddingFiles": "Toplam {{total}} dosyadan yalnızca {{accepted}} dosya ekleniyor (en fazla {{max}})",
+      "maxFilesAllowed_one": "En fazla {{displayCount}} dosya ekleyebilirsin.",
+      "maxFilesAllowed_other": "En fazla {{displayCount}} dosya ekleyebilirsin.",
+      "onlyAddingFiles_one": "Toplam {{total}} dosyadan yalnızca {{accepted}} dosya ekleniyor (en fazla {{max}})",
+      "onlyAddingFiles_other": "Toplam {{total}} dosyadan yalnızca {{accepted}} dosya ekleniyor (en fazla {{max}})"
     },
     "composer": {
       "addAttachment": "Ek ekle",
@@ -1970,7 +1986,9 @@
       "discardAttachmentsMessage": "Henüz bir mesaja eklenmemiş yüklemeler silinecek.",
       "discardAttachmentsTitle": "Ekler silinsin mi?",
       "charactersRemaining": "{{count}} karakter kaldı",
-      "insertNewline": "Yeni satır ekle"
+      "insertNewline": "Yeni satır ekle",
+      "charactersRemaining_one": "{{count}} karakter kaldı",
+      "charactersRemaining_other": "{{count}} karakter kaldı"
     },
     "chatLink": {
       "linkCopied": "Bağlantı kopyalandı",
@@ -2036,7 +2054,9 @@
       "stepsCount_one": "{{steps}} adım",
       "stepsCount": "{{steps}} adım",
       "stepsCount_other": "{{steps}} adım",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modeller ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Otomatik onayla",
@@ -2076,7 +2096,9 @@
     },
     "toolRun": {
       "sheetTitle": "Araç çağrıları",
-      "condensedLabel": "{{itemCount}} öğe; {{last}}"
+      "condensedLabel": "{{itemCount}} öğe; {{last}}",
+      "condensedLabel_one": "{{itemCount}} öğe; {{last}}",
+      "condensedLabel_other": "{{itemCount}} öğe; {{last}}"
     }
   },
   "bootstrap": {
@@ -2210,7 +2232,9 @@
     "cliCantReceiveFilesTitle": "Bu oturum dosya alamıyor",
     "cliCantReceiveFilesMessage": "Bu oturumu çalıştıran Kilo CLI dosya alamıyor. O makinedeki CLI'yi güncelle veya dosyaları yeni bir oturumda paylaş.",
     "contentlessMessage": "Paylaşılacak bir şey yok — metin veya dosya eklenmedi.",
-    "couldNotReadContent": "Paylaşılan içerik okunamadı."
+    "couldNotReadContent": "Paylaşılan içerik okunamadı.",
+    "onlyFirstFilesAttached_one": "Yalnızca ilk {{displayCount}} dosya eklenecek.",
+    "onlyFirstFilesAttached_other": "Yalnızca ilk {{displayCount}} dosya eklenecek."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2517,7 +2541,9 @@
         "outdatedOnPath": "{{path}} · Güncel değil"
       },
       "deletedUser": "silinen kullanıcı",
-      "replyForbiddenTerm": "Bu {{term}}ne yanıt verme iznin yok."
+      "replyForbiddenTerm": "Bu {{term}}ne yanıt verme iznin yok.",
+      "moreLinesAbove_one": "… yukarıda {{displayCount}} satır daha var.",
+      "moreLinesAbove_other": "… yukarıda {{displayCount}} satır daha var."
     },
     "entry": {
       "eyebrow": "URL ile bir çekme isteği veya birleştirme isteği aç",
@@ -2615,7 +2641,17 @@
       "loadingLines": "Satırlar yükleniyor: {{loaded}}/{{total}}…",
       "loadingMoreFiles": "Daha fazla dosya yükleniyor…",
       "retryLoadingContext": "Bağlamı yüklemeyi tekrar dene",
-      "retryLoadingNextPage": "Sonraki sayfayı yüklemeyi tekrar dene"
+      "retryLoadingNextPage": "Sonraki sayfayı yüklemeyi tekrar dene",
+      "expandAllLines_one": "{{displayCount}} satırın tümünü göster",
+      "expandAllLines_other": "{{displayCount}} satırın tümünü göster",
+      "expandLines_one": "{{displayCount}} satır göster ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} satır göster ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "{{displayCount}} satırlık bağlamı göster",
+      "expandLinesOfContext_other": "{{displayCount}} satırlık bağlamı göster",
+      "expandMoreLines_one": "{{displayCount}} satır daha göster ({{start}}–{{end}})",
+      "expandMoreLines_other": "{{displayCount}} satır daha göster ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}}/{{total}} dosya yüklendi",
+      "loadedOfTotalFiles_other": "{{loaded}}/{{total}} dosya yüklendi"
     },
     "inbox": {
       "couldNotLoad": "Gelen kutusu yüklenemedi.",
@@ -2812,7 +2848,9 @@
       "statusContext": "Bağlam",
       "lineLabel": "{{line}} numaralı satır, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}} satırı: {{text}}",
-      "emptyLine": "(boş)"
+      "emptyLine": "(boş)",
+      "truncationBanner_one": "GitHub API sınırı nedeniyle değiştirilen {{total}} dosyanın ilk {{limit}} tanesi gösteriliyor.",
+      "truncationBanner_other": "GitHub API sınırı nedeniyle değiştirilen {{total}} dosyanın ilk {{limit}} tanesi gösteriliyor."
     },
     "linkPasteClipboardEmpty": "Pano boş.",
     "linkPasteNotAPullRequest": "Bu bir çekme isteği veya birleştirme isteği bağlantısı değil",

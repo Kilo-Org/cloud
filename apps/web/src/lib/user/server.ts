@@ -719,8 +719,14 @@ const openAiProvider: OAuthConfig<Profile> & { callbackUrl: string } = {
   authorization: { params: { scope: OPENAI_IDENTITY_SCOPE, resource: OPENAI_RESOURCE } },
   token: {
     params: { resource: OPENAI_RESOURCE },
+    // openid-client builds the code exchange from a fixed field set and drops
+    // the resource, so an authorization that requested a resource is redeemed
+    // without one and OpenAI rejects it with `invalid_grant`. `exchangeBody`
+    // merges the resource back into the same token request.
     request: async ({ params, checks, client }) => ({
-      tokens: await client.callback(OPENAI_REDIRECT_URI, params, checks),
+      tokens: await client.callback(OPENAI_REDIRECT_URI, params, checks, {
+        exchangeBody: { resource: OPENAI_RESOURCE },
+      }),
     }),
   },
   profile: parseOpenAiProfile,

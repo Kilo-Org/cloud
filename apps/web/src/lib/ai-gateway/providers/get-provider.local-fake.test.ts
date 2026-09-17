@@ -5,7 +5,7 @@ import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import { getBYOKforUser, getModelUserByokProviders } from '@/lib/ai-gateway/byok';
 import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
-import { getOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
+import { getOpenAiChatGptStoredConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { OpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/types';
 import type { User } from '@kilocode/db/schema';
@@ -25,7 +25,7 @@ jest.mock('@/lib/ai-gateway/providers/vercel', () => ({
   shouldRouteToVercel: jest.fn().mockResolvedValue(false),
 }));
 jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
-  getOpenAiChatGptConnection: jest.fn().mockResolvedValue(null),
+  getOpenAiChatGptStoredConnection: jest.fn().mockResolvedValue(null),
 }));
 jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
   resolveOpenAiChatGptAccessToken: jest.fn().mockResolvedValue({ kind: 'no_connection' }),
@@ -202,7 +202,7 @@ describe('getProvider ChatGPT connection routing order', () => {
     jest.mocked(shouldRouteToVercel).mockReset().mockResolvedValue(false);
     jest.mocked(getModelUserByokProviders).mockReset().mockResolvedValue(['openai']);
     jest.mocked(getBYOKforUser).mockReset().mockResolvedValue(null);
-    jest.mocked(getOpenAiChatGptConnection).mockReset().mockResolvedValue(null);
+    jest.mocked(getOpenAiChatGptStoredConnection).mockReset().mockResolvedValue(null);
     jest
       .mocked(resolveOpenAiChatGptAccessToken)
       .mockReset()
@@ -215,7 +215,9 @@ describe('getProvider ChatGPT connection routing order', () => {
 
   test('an enabled connection beats a Vercel openai BYOK row for an eligible responses request', async () => {
     const env = replaceEnv({ OPENAI_API_KEY: 'partner-project-key' });
-    jest.mocked(getOpenAiChatGptConnection).mockResolvedValue(connection);
+    jest
+      .mocked(getOpenAiChatGptStoredConnection)
+      .mockResolvedValue({ connection, isEnabled: true });
     jest
       .mocked(getBYOKforUser)
       .mockResolvedValue([{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }]);
@@ -239,7 +241,9 @@ describe('getProvider ChatGPT connection routing order', () => {
 
   test('a terminal connection failure never resolves to another billing path', async () => {
     const env = replaceEnv({ OPENAI_API_KEY: 'partner-project-key' });
-    jest.mocked(getOpenAiChatGptConnection).mockResolvedValue(connection);
+    jest
+      .mocked(getOpenAiChatGptStoredConnection)
+      .mockResolvedValue({ connection, isEnabled: true });
     jest.mocked(resolveOpenAiChatGptAccessToken).mockResolvedValue({ kind: 'terminal' });
     jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
     jest
@@ -276,7 +280,9 @@ describe('getProvider ChatGPT connection routing order', () => {
 
   test('an ineligible chat_completions request resolves exactly as before', async () => {
     const env = replaceEnv({ OPENAI_API_KEY: 'partner-project-key' });
-    jest.mocked(getOpenAiChatGptConnection).mockResolvedValue(connection);
+    jest
+      .mocked(getOpenAiChatGptStoredConnection)
+      .mockResolvedValue({ connection, isEnabled: true });
 
     const result = await getProvider(providerInput('openai/gpt-5-nano'));
 
@@ -286,13 +292,15 @@ describe('getProvider ChatGPT connection routing order', () => {
       userByok: null,
       bypassAccessCheck: false,
     });
-    expect(getOpenAiChatGptConnection).not.toHaveBeenCalled();
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
     env.restore();
   });
 
   test('an eligible request without the partner key resolves exactly as before', async () => {
     const env = replaceEnv({});
-    jest.mocked(getOpenAiChatGptConnection).mockResolvedValue(connection);
+    jest
+      .mocked(getOpenAiChatGptStoredConnection)
+      .mockResolvedValue({ connection, isEnabled: true });
     jest
       .mocked(getBYOKforUser)
       .mockResolvedValue([{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }]);

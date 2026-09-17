@@ -88,6 +88,36 @@ describe('tool summary translation sign-out teardown', () => {
     gate.resolve(undefined);
   });
 
+  it('forgets a write the drain abandoned, so a later sign-out arms no bound', async () => {
+    const mod = await loadRuntime();
+    // A store write that never answers, as a hung native module would.
+    const gate = Promise.withResolvers<undefined>();
+    persistMock.mockImplementation(
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- the mock hands back a promise that never settles
+      () => gate.promise
+    );
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await vi.waitFor(() => {
+      expect(persistMock).toHaveBeenCalledTimes(1);
+    });
+
+    vi.useFakeTimers();
+    const first = mod.clearToolSummaryTranslationMemoryForSignOut();
+    expect(vi.getTimerCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(mod.TOOL_SUMMARY_TRANSLATION_SIGN_OUT_DRAIN_TIMEOUT_MS + 1);
+    await first;
+
+    // The write was abandoned by the bound, so it must be forgotten: a later
+    // sign-out with nothing genuinely pending arms no timer instead of waiting
+    // the whole bound again on work the first sign-out already wrote off.
+    const second = mod.clearToolSummaryTranslationMemoryForSignOut();
+    expect(vi.getTimerCount()).toBe(0);
+    await second;
+
+    gate.resolve(undefined);
+  });
+
   it('forgets a rejected store write instead of leaving it pending', async () => {
     const mod = await loadRuntime();
     persistMock.mockRejectedValue(new Error('store write failed'));

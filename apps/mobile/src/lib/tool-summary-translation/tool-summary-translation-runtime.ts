@@ -728,7 +728,9 @@ export function clearToolSummaryTranslationMemory(): void {
  * Resolves once every write dispatched before the sign-out reset has settled,
  * or after {@link TOOL_SUMMARY_TRANSLATION_SIGN_OUT_DRAIN_TIMEOUT_MS}. The
  * drain is best effort, so a write that never settles is abandoned rather than
- * allowed to hold sign-out teardown; the scope clear that follows still runs.
+ * allowed to hold sign-out teardown; the abandoned write is also forgotten, so
+ * it cannot make a later sign-out wait the bound again. The scope clear that
+ * follows still runs.
  * A write that settles late can only leave an orphaned blob, which never
  * renders under the next account — the in-memory cache is keyed by the
  * server-issued part id, and the reset already dropped it — and only costs a
@@ -739,13 +741,25 @@ async function drainPendingPersists(): Promise<void> {
     return;
   }
   let resolveTimeout: () => void = noopVoidResolution;
-  const timeout = new Promise<void>(resolve => {
-    resolveTimeout = resolve;
+  const timeout = new Promise<'timeout'>(resolve => {
+    resolveTimeout = () => {
+      resolve('timeout');
+    };
   });
   const timeoutId = setTimeout(resolveTimeout, TOOL_SUMMARY_TRANSLATION_SIGN_OUT_DRAIN_TIMEOUT_MS);
   try {
-    // `allSettled` never rejects, so no write outcome can abort sign-out.
-    await Promise.race([Promise.allSettled(pendingPersists), timeout]);
+    const outcome = await Promise.race([
+      // `allSettled` never rejects, so no write outcome can abort sign-out.
+      Promise.allSettled(pendingPersists).then(() => 'settled' as const),
+      timeout,
+    ]);
+    // A write the bound gave up on can hang forever, and `trackPersist` only
+    // forgets a write that settles. Drop the abandoned writes here, or the next
+    // sign-out sees them as still pending and re-pays the whole bound for work
+    // already written off.
+    if (outcome === 'timeout') {
+      pendingPersists.clear();
+    }
   } finally {
     clearTimeout(timeoutId);
   }

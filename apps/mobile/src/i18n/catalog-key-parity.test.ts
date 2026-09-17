@@ -79,6 +79,13 @@ describe('catalog key parity', () => {
       expect(translated.has('launcher.newAgent'), `${tag} still carries launcher.newAgent`).toBe(
         false
       );
+      // The whole `launcher` namespace holds the one live label. A dead sibling
+      // left behind there is the same defect under another name, so pin the
+      // namespace rather than the single key that broke CI this time.
+      const launcherKeys = [...translated].filter(key => key.startsWith('launcher.'));
+      expect(launcherKeys, `${tag} launcher holds a dead key`).toEqual([
+        'launcher.openLastSession',
+      ]);
     }
   });
 });

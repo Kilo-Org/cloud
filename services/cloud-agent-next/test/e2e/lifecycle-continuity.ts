@@ -111,7 +111,6 @@ import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 
 export const CONTINUITY_SCENARIO_TIMEOUT_MS: Record<string, number> = {
   'recover-same-session': 8 * 60_000,
-  'interrupt-then-continue': 6 * 60_000,
   'warm-cold-cycles': 25 * 60_000,
   'question-idle-resume': 20 * 60_000,
   'large-stream': 10 * 60_000,
@@ -228,7 +227,7 @@ async function awaitDurableCompletion(
  * `admitAcceptedMessage` path. There is no path that emits `sent` without first
  * emitting `queued`, so the assertion requires the full ordered prefix.
  */
-function assertMessageLifecycle(
+export function assertMessageLifecycle(
   stream: StreamConnection,
   messageId: string,
   label: string
@@ -1105,123 +1104,6 @@ export async function lifecycleRecoverSameSession(args: LifecycleArgs): Promise<
         message: `${result.message}; unpauseFinal=${unpauseOutcome}; frozenContainer=${frozenContainer}`,
       };
       handle = undefined;
-    }
-    const cleanup = await cleanupScenario(resources);
-    result = addCleanupReport(result, cleanup);
-  }
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// interrupt-then-continue (A4)
-// ---------------------------------------------------------------------------
-
-export async function lifecycleInterruptThenContinue(
-  args: LifecycleArgs
-): Promise<LifecycleResult> {
-  const startedAt = Date.now();
-  const resources = createScenarioResources(
-    args.config,
-    args.timeoutMs ?? CONTINUITY_SCENARIO_TIMEOUT_MS['interrupt-then-continue'] ?? 6 * 60_000
-  );
-  let result = scenarioResult(
-    'interrupt-then-continue',
-    args,
-    startedAt,
-    resources.events,
-    false,
-    'scenario did not start'
-  );
-  let gateTag: string | undefined;
-  try {
-    assertScenarioPreconditions(args.config, args.api);
-    const runId = randomUUID();
-    const { session, runtime } = await bootSession(resources, {
-      runId,
-      operation: createScenarioOperation('continuity-interrupt'),
-    });
-    const tag = `interrupt-${runId}`;
-    gateTag = tag;
-    const stream = await resources.connect(session.cloudAgentSessionId, false);
-    resources.ownedGateTags.add(tag);
-    const sent = await resources.within(`send ${tag}`, signal =>
-      sendMessage(resources.kiloConfig, {
-        cloudAgentSessionId: session.cloudAgentSessionId,
-        prompt: fakeDirective('gate', tag, `done-${tag}`),
-        signal,
-      })
-    );
-    await resources.within(`gate ${tag}`, () =>
-      requireWorktreeGate(resources.config, tag, remainingMs(resources, `gate ${tag}`), stream)
-    );
-    const containerBefore = runtime.container.id;
-    await resources.within('interrupt', () =>
-      interruptSession(resources.config, session.cloudAgentSessionId)
-    );
-    const failed = await resources.within('interrupted terminal', () =>
-      stream.waitFor(
-        event =>
-          event.streamEventType === 'cloud.message.failed' &&
-          messageIdFromEvent(event) === sent.messageId,
-        remainingMs(resources, 'interrupted terminal')
-      )
-    );
-    const data = failed?.data as { reason?: string; payload?: { reason?: string } } | undefined;
-    const reason = data?.reason ?? data?.payload?.reason;
-    if (reason !== 'interrupted') {
-      throw new Error(
-        `interrupted message ${sent.messageId} terminal reason=${reason ?? 'none'} (event=${failed?.streamEventType ?? 'none'})`
-      );
-    }
-    await resources.within('release after interrupt', signal =>
-      releaseGate(resources.config.fakeLlmUrl, tag, signal).catch(() => undefined)
-    );
-    resources.ownedGateTags.delete(tag);
-    gateTag = undefined;
-
-    const followup = await sendAndAwaitCompletion(
-      resources,
-      session,
-      fakeDirective('echo', `continue-${runId}`),
-      'follow-up',
-      remainingMs(resources, 'follow-up turn')
-    );
-    const after = await resources.within('post-interrupt runtime', () =>
-      findControlPlaneKiloRuntime(session.kiloSessionId)
-    );
-    if (!after || after.container.id !== containerBefore) {
-      throw new Error(
-        `container changed after interrupt: before=${containerBefore}; after=${after?.container.id ?? 'none'}`
-      );
-    }
-    result = scenarioResult(
-      'interrupt-then-continue',
-      args,
-      startedAt,
-      resources.events,
-      true,
-      [
-        `session=${session.cloudAgentSessionId}`,
-        `interruptedMessage=${sent.messageId}`,
-        `reason=${reason}`,
-        `followUpMessage=${followup.messageId}`,
-        `container=${containerBefore}`,
-        `sameContainer=true`,
-      ].join('; ')
-    );
-  } catch (error) {
-    result = scenarioResult(
-      'interrupt-then-continue',
-      args,
-      startedAt,
-      resources.events,
-      false,
-      errorMessage(error)
-    );
-  } finally {
-    if (gateTag) {
-      await releaseGate(resources.config.fakeLlmUrl, gateTag).catch(() => undefined);
-      resources.ownedGateTags.delete(gateTag);
     }
     const cleanup = await cleanupScenario(resources);
     result = addCleanupReport(result, cleanup);
@@ -2232,7 +2114,10 @@ export async function lifecycleFeedStaleRecovery(args: LifecycleArgs): Promise<L
     record(`rootB=${chatB.kiloSessionId}`);
 
     const ownership = await resources.within('shared worktree ownership', () =>
-      readWorktreeOwnership(resources.config, [chatA.kiloSessionId, chatB.kiloSessionId])
+      readWorktreeOwnership(resources.config, [
+        chatA.cloudAgentSessionId,
+        chatB.cloudAgentSessionId,
+      ])
     );
     const rootARow = ownership.find(row => row.sessionId === chatA.kiloSessionId);
     const rootBRow = ownership.find(row => row.sessionId === chatB.kiloSessionId);
@@ -3228,7 +3113,6 @@ export const CONTINUITY_SCENARIOS: Record<
   (args: LifecycleArgs) => Promise<LifecycleResult>
 > = {
   'recover-same-session': lifecycleRecoverSameSession,
-  'interrupt-then-continue': lifecycleInterruptThenContinue,
   'warm-cold-cycles': lifecycleWarmColdCycles,
   'question-idle-resume': lifecycleQuestionIdleResume,
   'large-stream': lifecycleLargeStream,

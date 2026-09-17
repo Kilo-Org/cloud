@@ -6,6 +6,7 @@
   "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "dev": { "port": 8812 },
   "durable_objects": {
     "bindings": [{ "name": "FAKE_LLM", "class_name": "FakeLlmState" }],
   },

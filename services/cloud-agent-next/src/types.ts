@@ -6,6 +6,9 @@ import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { SandboxControl } from './persistence/SandboxControl.js';
 import type { SandboxSession } from './sandbox-session/SandboxSession.js';
 import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
+// Type-only exception to "no reverse import from production code": erased at
+// build time, so it cannot make the e2e sink reachable or ship e2e code.
+import type { E2eCallbackSink } from './persistence/E2eCallbackSink.js';
 import type { CallbackJob } from './callbacks/index.js';
 import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
@@ -544,6 +547,8 @@ export type Env = {
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   /** Durable Object namespace for one-time stream/terminal ticket nonce consumption */
   STREAM_TICKET_NONCE_DO: DurableObjectNamespace<StreamTicketNonceDO>;
+  /** e2e-only callback sink; bound only by the rendered e2e configs. */
+  E2E_CALLBACK_SINK?: DurableObjectNamespace<E2eCallbackSink>;
   /** One-way shared sandbox failover overrides keyed by shared identity */
   SHARED_SANDBOX_OVERRIDES: KVNamespace;
   /** Service binding for the session ingest worker */

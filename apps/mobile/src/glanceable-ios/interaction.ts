@@ -65,16 +65,24 @@ export type GlanceableInteractionOutcome =
  * id as its node name (`ios/Widgets/WidgetLiveActivity.swift` passes
  * `context.activityID`), so a press from this card reports that id as its
  * source, while a home-screen widget reports its widget name. A press belongs
- * to this surface when it names one of this activity's running instances; the
+ * to this surface when it names one of this activity's instances; the
  * registered name is accepted as well so a widget-style source cannot be
  * mistaken for a foreign one. Any other source is another layout's press.
+ *
+ * Ended instances count: `getInstances()` omits them by default, but a terminal
+ * card stays on screen until ActivityKit dismisses it, and this layout draws
+ * Open on it for that whole window, so a press from it is a press on a control
+ * the user can see and must route like any other rather than drop. `includeEnded`
+ * still excludes dismissed cards, which no press can come from.
  */
 function isActiveAgentsLiveActivity(source: string): boolean {
   if (source === LIVE_ACTIVITY_NAME) {
     return true;
   }
   try {
-    return ActiveAgentsLiveActivity.getInstances().some(instance => instance.getId() === source);
+    return ActiveAgentsLiveActivity.getInstances(true).some(
+      instance => instance.getId() === source
+    );
   } catch {
     // An unreadable or unsupported surface is not an identity: dropping the
     // press beats answering a target that may belong to another layout.
@@ -145,7 +153,10 @@ async function approveFromCard(): Promise<GlanceableInteractionOutcome> {
     recordWaitingAsk(null);
   }
   if (ask !== null) {
-    await republishAnsweredAsk(ask);
+    // The republish skips that session's stale tray row only for an ended ask; a
+    // `none` outcome leaves the ask as it is, so re-selecting it keeps the
+    // session Open names.
+    await republishAnsweredAsk(ask, result.kind === 'approved' || result.kind === 'gone');
   }
   return result;
 }

@@ -419,6 +419,46 @@ describe('GlanceablePublisher waiting ask', () => {
     publisher.dispose();
   });
 
+  it('skips the already-actioned session so the next waiting ask is recorded', () => {
+    const { sink, calls } = makeSink();
+    const asks: (WaitingAsk | null)[] = [];
+    const rows = [
+      {
+        id: 'answered',
+        status: 'permission',
+        statusUpdatedAt: new Date(NOW - 60_000).toISOString(),
+      },
+      { id: 'next', status: 'permission', statusUpdatedAt: new Date(NOW - 1000).toISOString() },
+    ];
+
+    // The answered row is the oldest, so without the skip it wins the selection.
+    const unskipped = new GlanceablePublisher({
+      sinks: [],
+      now: () => NOW,
+      onWaitingAskChange: ask => {
+        asks.push(ask);
+      },
+    });
+    unskipped.handleSessions(rows, PUB_CTX);
+    expect(asks.at(-1)).toMatchObject({ kiloSessionId: 'answered' });
+    unskipped.dispose();
+
+    const publisher = new GlanceablePublisher({
+      sinks: [sink],
+      now: () => NOW,
+      skipWaitingAskSessionId: 'answered',
+      onWaitingAskChange: ask => {
+        asks.push(ask);
+      },
+    });
+    publisher.handleSessions(rows, PUB_CTX);
+    // The next waiting row is recorded instead, so its action stays reachable.
+    expect(asks.at(-1)).toMatchObject({ kiloSessionId: 'next', status: 'permission' });
+    // The skipped row still counts: the snapshot still comes from the tray.
+    expect(lastSnapshot(calls, 'startOrUpdate').needsInput).toBe(2);
+    publisher.dispose();
+  });
+
   it('clears the ask on a fetch error', () => {
     const { publisher, asks } = makePublisher();
     publisher.handleSessions([{ id: 'waiting', status: 'permission' }], PUB_CTX);

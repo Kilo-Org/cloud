@@ -108,7 +108,6 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
       return
     }
     val taskContext = HeadlessJsTaskContext.getInstance(reactContext)
-    taskContext.addTaskEventListener(this)
     val data = Arguments.makeNativeMap(inputData.keyValueMap)
     // startTask must run on the UI thread, like every other Activity/Task hop.
     UiThreadUtil.runOnUiThread {
@@ -118,6 +117,16 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
       if (stopped) {
         return@runOnUiThread
       }
+      // Registering here, after the re-check, is what keeps the listener from
+      // being left on the shared HeadlessJsTaskContext: on this thread the stop
+      // cannot land between the check and the registration, so either the stop
+      // won and nothing was registered, or the registration stands and
+      // onStopped's cleanUpTask removes it. Registered on the worker's thread
+      // instead, a stop in that window found nothing to remove, and the guard
+      // above then returned without ever detaching it. It has to precede
+      // startTask: a finish is delivered only to the listeners registered when
+      // it lands.
+      taskContext.addTaskEventListener(this)
       taskId = taskContext.startTask(HeadlessJsTaskConfig(TASK_NAME, data, TASK_TIMEOUT_MS, true))
     }
   }

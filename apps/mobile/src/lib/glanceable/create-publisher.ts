@@ -2,15 +2,17 @@ import { getTerminalBlankEpoch, isGlanceableOrgLost } from './cleanup';
 import { getLastGlanceableSnapshot } from './persist';
 import { GlanceablePublisher } from './publisher';
 import { getGlanceableSinks } from './sink-registry';
-import { recordWaitingAsk, type WaitingAsk } from './waiting-ask';
+import { recordWaitingAsk } from './waiting-ask';
 
 export type CreateGlanceablePublisherOptions = {
   /**
-   * Replace the ask write for this publisher. The post-answer refresh passes
-   * one so the tray's row can never re-offer the ask its own refresh answered
-   * while the control plane's status sync lands (see `refreshGlanceableSnapshot`).
+   * The session whose ask the post-answer refresh ended. Its tray row can still
+   * read permission/question while the control plane's status sync lands, so
+   * the ask selection skips it and the next waiting session is recorded in its
+   * place. Absent while the ask still waits (see `refreshGlanceableSnapshot`
+   * and `skipWaitingAskSessionId`).
    */
-  onWaitingAskChange?: (ask: WaitingAsk | null) => void;
+  skipWaitingAskSessionId?: string;
 };
 
 /**
@@ -27,6 +29,7 @@ export function createGlanceablePublisher(
     initial: getLastGlanceableSnapshot(),
     terminalBlankEpoch: getTerminalBlankEpoch,
     orgLost: isGlanceableOrgLost,
-    onWaitingAskChange: options.onWaitingAskChange ?? recordWaitingAsk,
+    onWaitingAskChange: recordWaitingAsk,
+    skipWaitingAskSessionId: options.skipWaitingAskSessionId,
   });
 }

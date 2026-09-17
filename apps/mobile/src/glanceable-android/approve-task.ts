@@ -91,6 +91,10 @@ async function showApproveFailed(ask: WaitingAsk): Promise<void> {
 export async function handleApproveTask(): Promise<void> {
   let ask: WaitingAsk | null = null;
   let failed = false;
+  // Only an ask the answer ended leaves a stale tray row to skip. A retryable
+  // failure (and an unexpected throw) keeps the ask waiting, and the republish
+  // has to re-select it so the next tap answers the same session.
+  let askEnded = false;
   try {
     // A headless run has no app root, so nothing else applies the stored
     // language — and both the failure line below and the notification the
@@ -107,6 +111,7 @@ export async function handleApproveTask(): Promise<void> {
       return;
     }
     const result = await runGlanceableApprove({ now: () => Date.now() });
+    askEnded = result.kind === 'approved' || result.kind === 'gone';
     if (result.kind === 'gone') {
       // Answered elsewhere or no longer pending: dropping the record drops Approve.
       recordWaitingAsk(null);
@@ -124,7 +129,7 @@ export async function handleApproveTask(): Promise<void> {
   if (failed) {
     await showApproveFailed(ask);
   }
-  await republishAnsweredAsk(ask);
+  await republishAnsweredAsk(ask, askEnded);
   if (failed) {
     await showApproveFailed(ask);
   }

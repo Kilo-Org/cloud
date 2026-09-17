@@ -168,6 +168,7 @@ describe('activity Approve parity across platforms', () => {
         userId: 'u1',
         organizationId: 'org_1',
         answeredKiloSessionId: 'ses_1',
+        askEnded: true,
       });
       expect(harness.notice).not.toHaveBeenCalled();
     }

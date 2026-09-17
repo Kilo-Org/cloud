@@ -127,6 +127,27 @@ describe('handleGlanceableInteraction', () => {
     expect(mocks.setPendingDeepLink).not.toHaveBeenCalled();
   });
 
+  it('accepts a press from an ended-but-visible card', async () => {
+    // A terminal card stays on screen until ActivityKit dismisses it, and the
+    // layout keeps drawing Open on it for that whole window, so the press has
+    // to route: `getInstances()` omits ended instances unless it is asked for
+    // them. A dismissed card is still no press source.
+    mocks.getInstances.mockImplementation((includeEnded?: boolean) =>
+      includeEnded === true ? [{ getId: () => ACTIVITY_ID }] : []
+    );
+
+    await expect(handleGlanceableInteraction(fromCard(GLANCEABLE_OPEN_TARGET))).resolves.toEqual({
+      kind: 'opened',
+      href: '/(app)/agent-chat/session-7',
+    });
+
+    expect(mocks.getInstances).toHaveBeenCalledWith(true);
+    expect(mocks.setPendingDeepLink).toHaveBeenCalledWith(
+      '/(app)/agent-chat/session-7',
+      'universal-link'
+    );
+  });
+
   it('ignores a press when the running activities cannot be read', async () => {
     mocks.getInstances.mockImplementation(() => {
       throw new Error('ActivityKit unavailable');
@@ -166,6 +187,7 @@ describe('handleGlanceableInteraction', () => {
       userId: 'user-1',
       organizationId: 'org-1',
       answeredKiloSessionId: 'session-7',
+      askEnded: true,
     });
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
     expect(mocks.toastError).not.toHaveBeenCalled();
@@ -234,6 +256,13 @@ describe('handleGlanceableInteraction', () => {
 
     expect(mocks.recordWaitingAsk).toHaveBeenCalledWith(null);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
+    // Gone ends the ask, so its stale tray row is skipped like an answered one.
+    expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
+      userId: 'user-1',
+      organizationId: 'org-1',
+      answeredKiloSessionId: 'session-7',
+      askEnded: true,
+    });
     expect(mocks.toastError).not.toHaveBeenCalled();
   });
 
@@ -248,6 +277,14 @@ describe('handleGlanceableInteraction', () => {
 
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
+    // `none` leaves the ask as it is, so the republish re-selects that row: the
+    // session Open names has to survive a press that answered nothing.
+    expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
+      userId: 'user-1',
+      organizationId: 'org-1',
+      answeredKiloSessionId: 'session-7',
+      askEnded: false,
+    });
   });
 
   it('does nothing on Approve without a record', async () => {

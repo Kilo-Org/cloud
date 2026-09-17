@@ -181,6 +181,7 @@ describe('handleApproveTask', () => {
       userId: 'u1',
       organizationId: 'org_1',
       answeredKiloSessionId: 'ses_1',
+      askEnded: true,
     });
   });
 
@@ -220,6 +221,14 @@ describe('handleApproveTask', () => {
     expect(refreshOrder).toBeLessThan(lastNotice ?? Number.POSITIVE_INFINITY);
     expect(lastNotice).toBeLessThan(lastRender ?? Number.POSITIVE_INFINITY);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
+    // The ask did not end, so the republish re-selects that same row instead of
+    // skipping it: the retry the line promises answers this session.
+    expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
+      userId: 'u1',
+      organizationId: 'org_1',
+      answeredKiloSessionId: 'ses_1',
+      askEnded: false,
+    });
   });
 
   it('waits for the failure line before it republishes and finishes', async () => {
@@ -295,6 +304,13 @@ describe('handleApproveTask', () => {
     expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
     expect(mocks.renderStoredSnapshotWithNotice).not.toHaveBeenCalled();
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
+    // The ask is gone, so its stale tray row is skipped like an answered one.
+    expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
+      userId: 'u1',
+      organizationId: 'org_1',
+      answeredKiloSessionId: 'ses_1',
+      askEnded: true,
+    });
   });
 
   it('republishes with no notice when there is no approvable ask', async () => {
@@ -306,6 +322,14 @@ describe('handleApproveTask', () => {
     expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
     expect(mocks.renderStoredSnapshotWithNotice).not.toHaveBeenCalled();
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
+    // The ask is neither answered nor gone: it is still there, so the republish
+    // re-selects it and the notification keeps the Open it names.
+    expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
+      userId: 'u1',
+      organizationId: 'org_1',
+      answeredKiloSessionId: 'ses_1',
+      askEnded: false,
+    });
   });
 
   it('does nothing when no ask is recorded', async () => {
@@ -329,6 +353,13 @@ describe('handleApproveTask', () => {
       organizationId: 'org_1',
     });
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
+    // Nothing proved the ask ended, so the republish must not skip its row.
+    expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
+      userId: 'u1',
+      organizationId: 'org_1',
+      answeredKiloSessionId: 'ses_1',
+      askEnded: false,
+    });
   });
 
   it('resolves without republishing when the record read itself throws', async () => {
@@ -537,5 +568,29 @@ describe('the headless worker lifecycle', () => {
     // the runnable has to repeat the check before it starts the task.
     expect(stopCheck).toBeGreaterThanOrEqual(0);
     expect(start).toBeGreaterThan(stopCheck);
+  });
+
+  it('registers the task listener behind the stop re-check, not on the worker thread', () => {
+    const invokeStartTask = workerMember('private fun invokeStartTask(reactContext: ReactContext)');
+    const beforeHop = invokeStartTask.slice(
+      0,
+      invokeStartTask.indexOf('UiThreadUtil.runOnUiThread')
+    );
+    const hop = invokeStartTask.slice(invokeStartTask.indexOf('UiThreadUtil.runOnUiThread'));
+    const stopCheck = hop.indexOf('if (stopped)');
+    const register = hop.indexOf('taskContext.addTaskEventListener');
+    const start = hop.indexOf('taskContext.startTask');
+
+    // WorkManager delivers the stop on this runnable's thread, so registering
+    // here, after the re-check, is atomic with the stop: either the stop won and
+    // nothing was registered, or the registration stands and onStopped's
+    // cleanUpTask removes it. Registered on the worker's thread instead, a stop
+    // landing between the checks left the listener attached to the shared
+    // HeadlessJsTaskContext, because cleanUpTask removed nothing and the re-check
+    // returned without starting a task. It has to come before startTask: a finish
+    // only reaches the listeners registered when it lands.
+    expect(beforeHop).not.toContain('addTaskEventListener');
+    expect(register).toBeGreaterThan(stopCheck);
+    expect(start).toBeGreaterThan(register);
   });
 });

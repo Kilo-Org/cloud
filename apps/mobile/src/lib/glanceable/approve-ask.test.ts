@@ -445,7 +445,7 @@ describe('refreshGlanceableSnapshot', () => {
     const rows = [{ id: 'ses_1', status: 'idle' }];
     const fetchRows = vi.fn(async () => rows);
     await refreshGlanceableSnapshot(
-      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1' },
+      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
       { fetchRows, createPublisher: () => publisher, sleep: vi.fn() }
     );
     expect(fetchRows).toHaveBeenCalledTimes(1);
@@ -463,7 +463,7 @@ describe('refreshGlanceableSnapshot', () => {
     const fetchRows = vi.fn(async () => responses.shift() ?? []);
     const sleep = vi.fn();
     await refreshGlanceableSnapshot(
-      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1' },
+      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
       { fetchRows, createPublisher: () => publisher, sleep }
     );
     expect(fetchRows).toHaveBeenCalledTimes(3);
@@ -477,7 +477,7 @@ describe('refreshGlanceableSnapshot', () => {
     const fetchRows = vi.fn(async () => rows);
     const sleep = vi.fn();
     await refreshGlanceableSnapshot(
-      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1' },
+      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
       {
         fetchRows,
         createPublisher: () => publisher,
@@ -498,7 +498,7 @@ describe('refreshGlanceableSnapshot', () => {
       throw new Error('offline');
     });
     await refreshGlanceableSnapshot(
-      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1' },
+      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
       { fetchRows, createPublisher: () => publisher, sleep: vi.fn() }
     );
     expect(publisher.handleSessions).not.toHaveBeenCalled();
@@ -512,7 +512,7 @@ describe('refreshGlanceableSnapshot', () => {
       .mockResolvedValueOnce(rows)
       .mockRejectedValueOnce(new Error('offline'));
     await refreshGlanceableSnapshot(
-      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1' },
+      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
       { fetchRows, createPublisher: () => publisher, sleep: vi.fn() }
     );
     expect(fetchRows).toHaveBeenCalledTimes(2);
@@ -529,6 +529,7 @@ describe('refreshGlanceableSnapshot', () => {
       userId: 'user_1',
       organizationId: 'org_9',
       answeredKiloSessionId: 'ses_1',
+      askEnded: true,
     });
     expect(buildActiveSessionsTrayInput).toHaveBeenCalledWith('org_9');
     expect(listActiveSessionsQuery).toHaveBeenCalledWith(buildActiveSessionsTrayInput('org_9'));
@@ -539,34 +540,50 @@ describe('refreshGlanceableSnapshot', () => {
     });
   });
 
-  it('drops the answered session from the ask so a stale row cannot re-offer it', async () => {
+  it('tells the publisher to skip the answered session so a stale row cannot re-offer it', async () => {
+    const publisher = makePublisher();
+    listActiveSessionsQuery.mockResolvedValue({
+      sessions: [
+        // The tray can still report the answered session as waiting while the
+        // control plane's status sync lands, and it is usually the oldest row.
+        { id: 'ses_1', status: 'permission' },
+        { id: 'ses_2', status: 'permission' },
+      ],
+    });
+    createGlanceablePublisher.mockReturnValue(publisher);
+
+    await refreshGlanceableSnapshot(
+      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
+      { sleep: vi.fn(), deadlineMs: 0 }
+    );
+
+    // The skip happens at selection, not after it: recording the answered row
+    // would put Approve back on the surface the user already actioned, and
+    // discarding it after selection left a second waiting session unrecorded.
+    expect(createGlanceablePublisher).toHaveBeenCalledWith({
+      skipWaitingAskSessionId: 'ses_1',
+    });
+    expect(publisher.handleSessions).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips nothing when the action left the ask waiting', async () => {
     const publisher = makePublisher();
     listActiveSessionsQuery.mockResolvedValue({
       sessions: [{ id: 'ses_1', status: 'permission' }],
     });
     createGlanceablePublisher.mockReturnValue(publisher);
 
-    await refreshGlanceableSnapshot({
-      userId: 'user_1',
-      organizationId: null,
-      answeredKiloSessionId: 'ses_1',
+    await refreshGlanceableSnapshot(
+      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: false },
+      { sleep: vi.fn(), deadlineMs: 0 }
+    );
+
+    // The row of a retryable failure is not stale: the retry has to re-select
+    // the same session, so the refresh passes no skip at all.
+    expect(createGlanceablePublisher).toHaveBeenCalledWith({
+      skipWaitingAskSessionId: undefined,
     });
-
-    const options = createGlanceablePublisher.mock.calls[0]?.[0] as {
-      onWaitingAskChange: (ask: Record<string, unknown> | null) => void;
-    };
-    expect(options.onWaitingAskChange).toBeTypeOf('function');
-
-    // The tray still reports the answered session as waiting: recording it
-    // would put Approve back on the notification the user just actioned.
-    options.onWaitingAskChange({ kiloSessionId: 'ses_1' });
-    expect(recordWaitingAsk).not.toHaveBeenCalled();
-
-    // Another session's ask is untouched, and dropping the ask still lands.
-    options.onWaitingAskChange({ kiloSessionId: 'ses_2' });
-    expect(recordWaitingAsk).toHaveBeenCalledWith({ kiloSessionId: 'ses_2' });
-    options.onWaitingAskChange(null);
-    expect(recordWaitingAsk).toHaveBeenCalledWith(null);
+    expect(publisher.handleSessions).toHaveBeenCalledTimes(1);
   });
 
   it('reads the tray through the same trpc client surface the manager uses', () => {

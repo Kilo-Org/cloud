@@ -273,15 +273,28 @@ function hasWaitingAnsweredSession(
 }
 
 /**
- * Republish the tray after a successful answer, through the same publisher
+ * Republish the tray after an activity action ran, through the same publisher
  * factory the app mounts, so every registered sink (Android notification, iOS
  * activity, widget, persistence) updates. The first real response is published
- * immediately, then polled until the answered session leaves
+ * immediately, then polled until the actioned session leaves
  * permission/question or the 10 s budget runs out. A failed fetch ends the poll
  * and leaves the last real snapshot in place: counts are never invented.
  */
 export async function refreshGlanceableSnapshot(
-  input: { userId: string; organizationId: string | null; answeredKiloSessionId: string },
+  input: {
+    userId: string;
+    organizationId: string | null;
+    /** The session the action named; polled until its row stops waiting. */
+    answeredKiloSessionId: string;
+    /**
+     * Whether the action ended the ask — the answer landed, or it was already
+     * gone. Only then is that session's row a stale one to skip at selection: a
+     * retryable failure leaves the ask waiting, so its row is the truth, and
+     * skipping it would clear the record the second tap needs or move that tap
+     * to another waiting session.
+     */
+    askEnded: boolean;
+  },
   deps?: RefreshGlanceableSnapshotDeps
 ): Promise<void> {
   const fetchRows = deps?.fetchRows ?? defaultFetchTrayRows;
@@ -290,16 +303,13 @@ export async function refreshGlanceableSnapshot(
     (() =>
       createGlanceablePublisher({
         // The tray's row for the session this refresh just answered can still
-        // read permission/question while the control plane's status sync lands.
-        // Recording that row again would put Approve back on the notification
-        // the user already actioned, so the answered session is dropped here
-        // for this refresh only; the counts still come from the tray.
-        onWaitingAskChange: ask => {
-          if (ask !== null && ask.kiloSessionId === input.answeredKiloSessionId) {
-            return;
-          }
-          recordWaitingAsk(ask);
-        },
+        // read permission/question while the control plane's status sync lands,
+        // and it is usually the oldest asking row, so an ended ask's selection
+        // has to skip it: recording it would put Approve back on the
+        // notification the user already actioned. Dropping the selected ask
+        // instead would leave a second waiting session unrecorded, so the skip
+        // happens at selection and the counts still come from the tray.
+        skipWaitingAskSessionId: input.askEnded ? input.answeredKiloSessionId : undefined,
       }));
   const sleep = deps?.sleep ?? defaultSleep;
   const pollMs = deps?.pollIntervalMs ?? GLANCEABLE_REFRESH_POLL_MS;

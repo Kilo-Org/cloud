@@ -41,12 +41,23 @@ vi.mock('expo-secure-store', () => ({
 
 const { refreshGlanceableSnapshot } = await import('./approve-ask');
 const { _resetGlanceablePersistForTests } = await import('./persist');
-const { _resetWaitingAskForTests, getWaitingAsk } = await import('./waiting-ask');
+const { _resetWaitingAskForTests, getWaitingAsk, recordWaitingAsk } = await import('./waiting-ask');
 
 const WAITING_ROW = {
   id: 'ses_1',
   status: 'permission',
   statusUpdatedAt: '2026-01-01T00:00:00.000Z',
+};
+
+/** The record a retryable Approve failure leaves in place. */
+const RETRYABLE_ASK = {
+  kiloSessionId: 'ses_1',
+  status: 'permission',
+  isCloudAgent: true,
+  scopeKey: 'scope',
+  organizationId: null,
+  userId: 'u1',
+  recordedAt: 1,
 };
 
 /** One tick only: the poll's own cadence and budget are covered in approve-ask.test.ts. */
@@ -62,7 +73,7 @@ describe('the republish after an answered ask', () => {
     const fetchRows = vi.fn(async () => [WAITING_ROW]);
 
     await refreshGlanceableSnapshot(
-      { userId: 'u1', organizationId: null, answeredKiloSessionId: 'ses_1' },
+      { userId: 'u1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
       { fetchRows, ...oneTick }
     );
 
@@ -70,11 +81,65 @@ describe('the republish after an answered ask', () => {
     expect(getWaitingAsk()).toBeNull();
   });
 
+  it('keeps the ask a retryable failure left behind while its row is the only one waiting', async () => {
+    // The tap failed retryably, so the record still names the session and the
+    // surface keeps Approve for a second tap. The tray has not re-synced yet:
+    // that answered row is the only asking one. The republish must re-select it,
+    // or the surface loses the only action that can answer the ask.
+    recordWaitingAsk(RETRYABLE_ASK);
+    const fetchRows = vi.fn(async () => [WAITING_ROW]);
+
+    await refreshGlanceableSnapshot(
+      { userId: 'u1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: false },
+      { fetchRows, ...oneTick }
+    );
+
+    expect(getWaitingAsk()).toMatchObject({
+      kiloSessionId: 'ses_1',
+      status: 'permission',
+      userId: 'u1',
+      organizationId: null,
+    });
+  });
+
+  it('keeps the failed session as the ask while another session also waits', async () => {
+    // The retry has to answer the session the failure line named, so the row
+    // the action already failed on stays the selection even though a newer
+    // waiting row would win no selection at all: skipping the failed row would
+    // move the second tap onto a different session silently.
+    recordWaitingAsk(RETRYABLE_ASK);
+    const fetchRows = vi.fn(async () => [
+      WAITING_ROW,
+      { id: 'ses_2', status: 'permission', statusUpdatedAt: '2026-01-01T00:00:01.000Z' },
+    ]);
+
+    await refreshGlanceableSnapshot(
+      { userId: 'u1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: false },
+      { fetchRows, ...oneTick }
+    );
+
+    expect(getWaitingAsk()).toMatchObject({ kiloSessionId: 'ses_1' });
+  });
+
+  it('names the next waiting session once the answered ask ended', async () => {
+    const fetchRows = vi.fn(async () => [
+      WAITING_ROW,
+      { id: 'ses_2', status: 'permission', statusUpdatedAt: '2026-01-01T00:00:01.000Z' },
+    ]);
+
+    await refreshGlanceableSnapshot(
+      { userId: 'u1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
+      { fetchRows, ...oneTick }
+    );
+
+    expect(getWaitingAsk()).toMatchObject({ kiloSessionId: 'ses_2' });
+  });
+
   it("still names another session's ask, so the action reaches the right session", async () => {
     const fetchRows = vi.fn(async () => [{ ...WAITING_ROW, id: 'ses_2' }]);
 
     await refreshGlanceableSnapshot(
-      { userId: 'u1', organizationId: null, answeredKiloSessionId: 'ses_1' },
+      { userId: 'u1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
       { fetchRows, ...oneTick }
     );
 

@@ -57,6 +57,18 @@ export type GlanceablePublisherOptions = {
    * cannot drift. Absent when no surface can action an ask.
    */
   onWaitingAskChange?: (ask: WaitingAsk | null) => void;
+  /**
+   * A session the ask selection must skip, while its row still counts in the
+   * snapshot. The post-answer refresh passes the session it just answered, once
+   * the action that answered it ended the ask: its tray row can still read
+   * permission/question while the control plane's status sync lands and it is
+   * usually the oldest asking row, so selecting it would re-offer the action
+   * the user already took and leave a second waiting session unrecorded.
+   * Skipping it at selection, not by dropping the row, keeps the counts coming
+   * from the tray. Absent while the ask still waits: its row is then the truth,
+   * and the retry has to answer that same session.
+   */
+  skipWaitingAskSessionId?: string;
 };
 
 type TimerHandle = ReturnType<typeof setTimeout>;
@@ -98,6 +110,7 @@ export class GlanceablePublisher {
   private readonly blankEpochAtStart: number;
   private readonly orgLost: () => boolean;
   private readonly onWaitingAskChange?: (ask: WaitingAsk | null) => void;
+  private readonly skipWaitingAskSessionId?: string;
   private current: GlanceableAgentsSnapshot | null;
   private activityStarted: boolean;
   private coalesceTimer: TimerHandle | null = null;
@@ -116,6 +129,7 @@ export class GlanceablePublisher {
     this.blankEpochAtStart = this.terminalBlankEpoch();
     this.orgLost = options.orgLost ?? (() => false);
     this.onWaitingAskChange = options.onWaitingAskChange;
+    this.skipWaitingAskSessionId = options.skipWaitingAskSessionId;
     this.current = options.initial ?? null;
     this.activityStarted = false;
   }
@@ -156,7 +170,7 @@ export class GlanceablePublisher {
     if (isEligibleGlanceableWork(snapshot)) {
       // The rows are the only place the session id exists, so the ask is
       // selected here, beside the snapshot derived from the same rows.
-      this.noteWaitingAsk(selectWaitingAsk(sessions, ctx, now));
+      this.noteWaitingAsk(selectWaitingAsk(this.askRows(sessions), ctx, now));
       this.cancelTerminal();
       if (!this.activityStarted) {
         // First eligible emit starts the activity immediately, no coalesce wait.
@@ -265,6 +279,17 @@ export class GlanceablePublisher {
   /** Hand the current ask to the consumer, when one is wired. */
   private noteWaitingAsk(ask: WaitingAsk | null): void {
     this.onWaitingAskChange?.(ask);
+  }
+
+  /**
+   * The rows the ask selection may name: every row except the session whose ask
+   * was already actioned. That row still counts in the snapshot.
+   */
+  private askRows(
+    sessions: readonly (NewestSessionRow & WaitingAskRow)[]
+  ): readonly (NewestSessionRow & WaitingAskRow)[] {
+    const skip = this.skipWaitingAskSessionId;
+    return skip === undefined ? sessions : sessions.filter(row => row.id !== skip);
   }
 
   private emit(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext): void {

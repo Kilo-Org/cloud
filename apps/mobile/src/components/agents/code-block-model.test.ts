@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeFenceLanguage, tokenizeCodeLines } from './code-block-model';
+import {
+  chunkTokenLines,
+  CODE_CHUNK_TOKENS,
+  normalizeFenceLanguage,
+  tokenizeCodeLines,
+} from './code-block-model';
 
 describe('normalizeFenceLanguage', () => {
   it('returns null for undefined, empty, and whitespace-only info strings', () => {
@@ -51,5 +56,49 @@ describe('tokenizeCodeLines', () => {
     expect(firstLine?.some(token => token.className !== null)).toBe(true);
     const keywordToken = firstLine?.find(token => token.className === 'keyword');
     expect(keywordToken?.text).toBe('const');
+  });
+});
+
+describe('chunkTokenLines', () => {
+  it('splits a run-dense line so no chunk exceeds the run budget', () => {
+    // Regression: the line cap alone left a single long source line in one
+    // `Text` with its whole token run set applied in one frame. A minified read
+    // body (the tool sheet routes up to 50,000 characters here) is one such
+    // line, so the run budget has to break the line as well.
+    const dense = JSON.stringify({
+      items: Array.from({ length: 1200 }, (_, index) => ({ id: index, name: `name-${index}` })),
+    });
+    const lines = tokenizeCodeLines(dense, 'json');
+    expect(lines).toHaveLength(1);
+    const tagged = lines.flat().filter(token => token.className !== null).length;
+    expect(tagged).toBeGreaterThan(CODE_CHUNK_TOKENS);
+
+    const chunks = chunkTokenLines(lines);
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const chunk of chunks) {
+      expect(chunk.flat().filter(token => token.className !== null).length).toBeLessThanOrEqual(
+        CODE_CHUNK_TOKENS
+      );
+    }
+
+    // Nothing is dropped or reordered: the tokens of the chunks in order are
+    // the tokens of the source lines in order.
+    const chunkTokens = chunks.flatMap(chunk => chunk.flat());
+    expect(chunkTokens.map(token => token.text).join('')).toBe(
+      lines
+        .flat()
+        .map(token => token.text)
+        .join('')
+    );
+  });
+
+  it('keeps the line cap for ordinary code', () => {
+    const code = Array.from({ length: 40 }, (_, index) => `const value${index} = ${index};`).join(
+      '\n'
+    );
+    const chunks = chunkTokenLines(tokenizeCodeLines(code, 'typescript'));
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0]).toHaveLength(32);
+    expect(chunks[1]).toHaveLength(8);
   });
 });

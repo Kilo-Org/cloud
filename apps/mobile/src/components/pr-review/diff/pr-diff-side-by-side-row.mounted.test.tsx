@@ -4,12 +4,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { SideBySideRow } from './pr-diff-side-by-side-row';
+import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
 import { type ParsedDiffLine } from '@/lib/pr-review/diff/parse-patch';
 import { type SideBySideRow as SideBySideRowData } from '@/lib/pr-review/diff/side-by-side';
+
+const { useColorSchemeMock } = vi.hoisted(() => ({
+  useColorSchemeMock: vi.fn<() => 'dark' | 'light'>(() => 'light'),
+}));
 
 vi.mock('react-native', () => ({
   Text: 'RNText',
   View: 'View',
+  useColorScheme: useColorSchemeMock,
 }));
 vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
@@ -38,11 +44,14 @@ function row(overrides: Partial<ParsedDiffLine> = {}): SideBySideRowData {
   return { left: { line: line(overrides) }, right: { line: line(overrides) } };
 }
 
-function mountRow(data: SideBySideRowData): TestRenderer.ReactTestRenderer {
+function mountRow(
+  data: SideBySideRowData,
+  language: string | null = null
+): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
   act(() => {
     ref.current = TestRenderer.create(
-      createElement(SideBySideRow, { row: data, language: null, rowKeyId: 'row-7' })
+      createElement(SideBySideRow, { row: data, language, rowKeyId: 'row-7' })
     );
   });
   const created = ref.current;
@@ -51,6 +60,40 @@ function mountRow(data: SideBySideRowData): TestRenderer.ReactTestRenderer {
   }
   return created;
 }
+
+/** The style.color of every painted run: gutter and code token runs. */
+function paintedColors(root: TestRenderer.ReactTestInstance): string[] {
+  return root
+    .findAll(node => {
+      const style = node.props.style as { color?: string } | undefined;
+      return typeof style?.color === 'string';
+    })
+    .map(node => (node.props.style as { color: string }).color);
+}
+
+describe('SideBySideRow syntax palette follows the color scheme', () => {
+  // Same defect class as the unified DiffLine: the palette must come from the
+  // color scheme, never from comparing a theme token to a hex literal.
+  it('paints the dark token and muted palette on a dark color scheme', () => {
+    useColorSchemeMock.mockReturnValue('dark');
+    const renderer = mountRow(row(), 'typescript');
+
+    const colors = paintedColors(renderer.root);
+    expect(colors).toContain(tokenColorFor('keyword', true));
+    expect(colors).toContain(MUTED_COLOR.dark);
+    expect(colors).not.toContain(tokenColorFor('keyword', false));
+  });
+
+  it('paints the light token and muted palette on a light color scheme', () => {
+    useColorSchemeMock.mockReturnValue('light');
+    const renderer = mountRow(row(), 'typescript');
+
+    const colors = paintedColors(renderer.root);
+    expect(colors).toContain(tokenColorFor('keyword', false));
+    expect(colors).toContain(MUTED_COLOR.light);
+    expect(colors).not.toContain(tokenColorFor('keyword', true));
+  });
+});
 
 describe('SideBySideRow gutter alignment', () => {
   // Same defect class as the unified DiffLine gutter: a wrapped code line

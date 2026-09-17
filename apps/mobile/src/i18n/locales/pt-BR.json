@@ -2490,6 +2490,8 @@
       "replyBody": "Texto da resposta",
       "replyForbidden": "Você não tem permissão para responder a este pull request.",
       "addCommentCta": "Comentar neste pull request",
+      "fixWithKilo": "Corrigir com Kilo",
+      "fixWithKiloPrompt": "Por favor, resolva o seguinte comentário do pull request: {{link}}",
       "commentBadRequest": "Não é possível publicar este comentário. O pull request pode ter sido alterado.",
       "commentForbidden": "Você não tem permissão para comentar neste pull request.",
       "replyPlaceholder": "Sua resposta…",
@@ -3084,6 +3086,12 @@
     "privacy": "Abra o Kilo para ver os agentes",
     "openAgents": "Abrir agentes",
     "needsInput": "Aguardando resposta",
+    "newestSession": "Mais recente: {{title}}",
+    "noneWaiting": "Nenhum agente aguardando",
+    "newAgent": "Novo agente",
+    "approving": "Aprovando...",
+    "couldNotApprove": "Não foi possível aprovar",
+    "couldNotStart": "Não foi possível iniciar",
     "channelName": "Agentes ativos",
     "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada."
   },
@@ -3119,5 +3127,12 @@
     "remoteFound": "Computador conectado",
     "checkAgain": "Verificar novamente",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Iniciar agente precisa de um prompt. Adicione um prompt e execute novamente.",
+      "repositoryUnknown": "O Kilo não reconhece {{repository}} como um repositório do GitHub ou GitLab. Escolha outro repositório no Kilo.",
+      "repositoryUnsupported": "{{repository}} é um repositório do Bitbucket — Iniciar agente ainda não pode usá-lo. Escolha outro repositório no Kilo."
+    }
   }
 }

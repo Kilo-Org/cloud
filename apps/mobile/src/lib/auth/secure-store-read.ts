@@ -1,6 +1,11 @@
 import { readStoredValue, type SecureStoreReadOptions } from '@/lib/auth/secure-store-value';
 import { E2E_SECURE_STORE_FAULT_MS } from '@/lib/config';
 
+// The shared action path (`start-agent-runtime.ts`) reads stored preferences
+// through this cross-platform entry point — `platform-parity.test.ts` pins that
+// import — so the raw read is re-exported here beside the retrying one.
+export { readStoredValue };
+
 /**
  * Bounded retry for a stored credential read.
  *

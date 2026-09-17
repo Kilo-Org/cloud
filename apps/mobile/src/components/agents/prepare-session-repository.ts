@@ -1,8 +1,8 @@
-// The repository half of a Cloud Agent `prepareSession` body, shared by the
-// ordinary create path (`useNewSessionCreator`) and the clone path
-// (`useContinueCloudCreate`). Both paths map one selected repository row onto
-// exactly one provider field, so the provider rules live here once and the two
-// paths cannot diverge.
+// The repository half of a Cloud Agent `prepareSession` body, used by the
+// shared `prepareAgentSession` core that both the ordinary create path
+// (`useNewSessionCreator`) and the clone path (`useContinueCloudCreate`) run.
+// Each path maps one selected repository row onto exactly one provider field,
+// so the provider rules live here once and the two paths cannot diverge.
 import {
   type NewSessionRepository,
   type RepositoryPlatform,

@@ -480,6 +480,8 @@
       "replyBadRequest": "Kjo përgjigje nuk mund të postohet. Diskutimi mund të ketë ndryshuar.",
       "replyForbidden": "Nuk ke leje të përgjigjesh në këtë kërkesë për bashkim.",
       "addCommentCta": "Komento në këtë kërkesë për bashkim",
+      "fixWithKilo": "Rregullo me Kilo",
+      "fixWithKiloPrompt": "Ju lutem trajto komentin e mëposhtëm në këtë kërkesë për bashkim: {{link}}",
       "commentBadRequest": "Ky koment nuk mund të postohet. Kërkesa për bashkim mund të ketë ndryshuar.",
       "commentForbidden": "Nuk ke leje të komentosh në këtë kërkesë për bashkim.",
       "moderation": {
@@ -3060,6 +3062,12 @@
     "privacy": "Hap Kilo për të parë agjentët",
     "openAgents": "Hap agjentët",
     "needsInput": "Pret përgjigje",
+    "newestSession": "Më i riu: {{title}}",
+    "noneWaiting": "Asnjë agjent në pritje",
+    "newAgent": "Agjent i ri",
+    "approving": "Po miratohet...",
+    "couldNotApprove": "Miratimi dështoi",
+    "couldNotStart": "Nisja dështoi",
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
   },
@@ -3095,5 +3103,12 @@
     "remoteFound": "Kompjuteri u lidh",
     "checkAgain": "Kontrollo përsëri",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Fillo agjentin kërkon një kërkesë. Shto një kërkesë dhe ekzekutoje përsëri.",
+      "repositoryUnknown": "Kilo nuk e njeh {{repository}} si depo GitHub ose GitLab. Zgjidh një depo tjetër në Kilo.",
+      "repositoryUnsupported": "{{repository}} është një depo Bitbucket — Fillo agjentin nuk mund ta përdorë ende. Zgjidh një depo tjetër në Kilo."
+    }
   }
 }

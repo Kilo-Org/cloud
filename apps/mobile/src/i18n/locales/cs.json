@@ -486,6 +486,8 @@
       "replyBadRequest": "Tuto odpověď nelze odeslat. Vlákno se možná změnilo.",
       "replyForbidden": "Nemáš oprávnění odpovídat v tomto PR.",
       "addCommentCta": "Okomentovat tento PR",
+      "fixWithKilo": "Opravit s Kilo",
+      "fixWithKiloPrompt": "Vyřeš prosím následující komentář k PR: {{link}}",
       "commentBadRequest": "Tento komentář nelze odeslat. PR se možná změnil.",
       "commentForbidden": "Nemáš oprávnění komentovat tento PR.",
       "moderation": {
@@ -3108,6 +3110,12 @@
     "privacy": "Otevři Kilo a zobraz agenty",
     "openAgents": "Otevřít agenty",
     "needsInput": "Čeká na reakci",
+    "newestSession": "Nejnovější: {{title}}",
+    "noneWaiting": "Žádný agent nečeká",
+    "newAgent": "Nový agent",
+    "approving": "Schvaluje se...",
+    "couldNotApprove": "Schválení se nezdařilo",
+    "couldNotStart": "Spuštění se nezdařilo",
     "channelName": "Aktivní agenti",
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce."
   },
@@ -3143,5 +3151,12 @@
     "remoteFound": "Počítač připojen",
     "checkAgain": "Zkontrolovat znovu",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Ke spuštění agenta je potřeba zadání. Přidej zadání a spusť ho znovu.",
+      "repositoryUnknown": "Kilo nerozpoznává {{repository}} jako repozitář na GitHubu nebo GitLabu. Vyber jiný repozitář v Kilu.",
+      "repositoryUnsupported": "{{repository}} je repozitář na Bitbucketu — Spustit agenta ho zatím nemůže použít. Vyber jiný repozitář v Kilu."
+    }
   }
 }

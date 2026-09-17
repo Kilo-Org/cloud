@@ -1241,6 +1241,19 @@ export class WrapperClient {
   async status(): Promise<JobStatus> {
     return this.request<JobStatus>('GET', '/job/status');
   }
+
+  /**
+   * The interactions this session currently waits on. A legacy `agent_*` Cloud
+   * Agent session stores no pending set in its Durable Object, so this read —
+   * the same Kilo state the wrapper's `connected` snapshot replays — is the one
+   * its `getPendingInteractions` handler has.
+   */
+  async getPendingInteractions(): Promise<{ questions: unknown[]; permissions: unknown[] }> {
+    return this.request<{ questions: unknown[]; permissions: unknown[] }>(
+      'GET',
+      '/job/pending-interactions'
+    );
+  }
 }
 
 /**

@@ -3060,6 +3060,12 @@
     "privacy": "Avaa Kilo nähdäksesi agentit",
     "openAgents": "Avaa agentit",
     "needsInput": "Odottaa vastausta",
+    "newestSession": "Uusin: {{title}}",
+    "noneWaiting": "Yksikään agentti ei odota",
+    "newAgent": "Uusi agentti",
+    "approving": "Hyväksytään...",
+    "couldNotApprove": "Hyväksyntä epäonnistui",
+    "couldNotStart": "Käynnistys epäonnistui",
     "channelName": "Aktiiviset agentit",
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä."
   },

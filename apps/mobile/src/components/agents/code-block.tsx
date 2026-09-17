@@ -6,6 +6,7 @@ import {
   type LayoutChangeEvent,
   Pressable,
   Text as RNText,
+  useColorScheme,
   View,
 } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
@@ -117,7 +118,10 @@ function CodeBlockImpl({
   const effectiveSelectable = selectable ?? textSelectable;
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const isDark = colors.background === '#0E0E10';
+  // Same signal `useThemeColors` reads. Never infer dark mode from a
+  // background-token equality: the generated palette can change, and the
+  // tokens would silently flip against their surface.
+  const isDark = useColorScheme() === 'dark';
   const { displayText, isTruncated } = prepareMonoScrollContent(code, maxLength);
   const tokenLines = useMemo(
     () => tokenizeCodeLines(displayText, language),

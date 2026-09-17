@@ -17,6 +17,11 @@ import {
   getSelectedBranchOverride,
   type NewSessionRepository,
 } from '@/components/agents/new-session-repository-state';
+import {
+  type PrepareSessionRepositoryFields,
+  resolveRepoFingerprint,
+  setRepositoryField,
+} from '@/components/agents/prepare-session-repository';
 import { i18n } from '@/i18n';
 import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { trpcClient } from '@/lib/trpc';
@@ -198,19 +203,17 @@ export async function prepareAgentSession(
 }
 
 /**
- * The `prepareSession` body fields both variants share. Exactly one repository
- * field matches the selected row; the schema refines that.
+ * The `prepareSession` body fields both variants share. The repository fields
+ * come from the shared module, so exactly one of them matches the selected row
+ * and the schema refines that; the create path may add `upstreamBranch`.
  */
-type PrepareSessionSharedFields = {
+type PrepareSessionSharedFields = PrepareSessionRepositoryFields & {
   mode: AgentMode;
   model: string;
   variant: string | undefined;
   autoCommit: boolean;
   autoInitiate: true;
   operationKey: string;
-  githubRepo?: string;
-  gitlabProject?: string;
-  bitbucketRepo?: { fullName: string; workspaceUuid: string; repositoryUuid: string };
   upstreamBranch?: string;
   profileId?: string;
   attachments?: AgentAttachmentWire;
@@ -277,31 +280,6 @@ function newIntentFingerprint(
   });
 }
 
-/**
- * The retry fingerprint's repository identity. Includes the platform so two
- * same-named repos on different providers mint distinct retry keys, and the
- * Bitbucket workspace/repository uuids so a workspace rename cannot collide.
- */
-function resolveRepoFingerprint(repository: NewSessionRepository | null): {
-  platform: string;
-  fullName: string;
-  workspaceUuid?: string | null;
-  repositoryUuid?: string | null;
-} | null {
-  if (repository === null) {
-    return null;
-  }
-  if (repository.platform === 'bitbucket') {
-    return {
-      platform: repository.platform,
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid ?? null,
-      repositoryUuid: repository.repositoryUuid ?? null,
-    };
-  }
-  return { platform: repository.platform, fullName: repository.fullName };
-}
-
 /** The model's selected effort, or undefined when the model has no variants. */
 function variantOrUndefined(variant: string | undefined): string | undefined {
   if (variant === undefined || variant.length === 0) {
@@ -327,7 +305,9 @@ function prepareSessionBody(
       operationKey,
       cloneFromKiloSessionId: input.cloneFromKiloSessionId,
     };
-    setRepositoryField(body, input.repository ?? null, false);
+    // The clone variant has no branch: the Continue control clones a session,
+    // not a checkout, so no `upstreamBranch` is written.
+    setRepositoryField(body, input.repository ?? null);
     return body;
   }
   const body: PrepareSessionBody = {
@@ -340,7 +320,11 @@ function prepareSessionBody(
     autoInitiate: true,
     operationKey,
   };
-  setRepositoryField(body, input.repository ?? null, true);
+  // Carry the branch only when the shared writer actually wrote a repository
+  // field, so a Bitbucket row missing its uuids sends neither field nor branch.
+  if (setRepositoryField(body, input.repository ?? null)) {
+    setUpstreamBranch(body, input.repository ?? null);
+  }
   if (input.profileId) {
     body.profileId = input.profileId;
   }
@@ -351,40 +335,6 @@ function prepareSessionBody(
 }
 
 /**
- * Write exactly one repository field into the create body, matching the
- * selected row's platform. Bitbucket requires workspace + repository uuids, so
- * it contributes nothing when those are missing (which cannot happen for a row
- * that came from `listBitbucketRepositories`).
- */
-function setRepositoryField(
-  body: PrepareSessionSharedFields,
-  repository: NewSessionRepository | null,
-  includeBranch: boolean
-): void {
-  if (repository === null) {
-    return;
-  }
-  if (repository.platform === 'github') {
-    body.githubRepo = repository.fullName;
-    setUpstreamBranch(body, repository, includeBranch);
-    return;
-  }
-  if (repository.platform === 'gitlab') {
-    body.gitlabProject = repository.fullName;
-    setUpstreamBranch(body, repository, includeBranch);
-    return;
-  }
-  if (repository.workspaceUuid && repository.repositoryUuid) {
-    body.bitbucketRepo = {
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid,
-      repositoryUuid: repository.repositoryUuid,
-    };
-    setUpstreamBranch(body, repository, includeBranch);
-  }
-}
-
-/**
  * Carry the branch only when a repository field was written for it. The clone
  * variant has no branch: the Continue control clones a session, not a
  * checkout. Deliberately absent from the retry fingerprint: the retry key
@@ -392,10 +342,9 @@ function setRepositoryField(
  */
 function setUpstreamBranch(
   body: PrepareSessionSharedFields,
-  repository: NewSessionRepository,
-  includeBranch: boolean
+  repository: NewSessionRepository | null
 ): void {
-  if (!includeBranch) {
+  if (repository === null) {
     return;
   }
   const branch = getSelectedBranchOverride(repository);

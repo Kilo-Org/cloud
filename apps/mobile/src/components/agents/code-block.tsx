@@ -22,7 +22,6 @@ import {
   nextChunkMountCount,
   tokenizeCodeLines,
 } from './code-block-model';
-import { renderChunkChildren } from './code-block-render';
 import { useMonoScrollSheet } from './mono-scroll-block';
 import {
   MONO_SCROLL_VIEW_PROPS,

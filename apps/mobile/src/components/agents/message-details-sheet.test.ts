@@ -365,7 +365,9 @@ describe('getMessageDetailsContent — canSelectText', () => {
   it('hides selection while an assistant tool part is running', () => {
     const message = storedMessage(assistantInfo(), [textPart('finished text'), runningToolPart()]);
     const content = getMessageDetailsContent(message, catalogOptions);
-    expect(content.copyableText).toBe('finished text');
+    expect(content.copyText).toBe('finished text');
+    // The select view still carries the tool invocation; only Copy is scoped.
+    expect(content.copyableText).toContain('bash');
     expect(content.canSelectText).toBe(false);
   });
 
@@ -418,8 +420,10 @@ describe('getMessageDetailsContent — Copy message payload', () => {
       textPart('Here is the answer.', 'p-answer'),
     ]);
     const content = getMessageDetailsContent(message, catalogOptions);
-    expect(content.copyableText).toBe('Here is the answer.');
     expect(content.copyText).toBe('Here is the answer.');
+    // Select text is a separate affordance: it keeps the thinking block so a
+    // manual selection is not narrowed by the Copy-message scope.
+    expect(content.copyableText).toBe('Let me think about this first.\n\nHere is the answer.');
   });
 
   it('drops a tool call that sits between two reply paragraphs', () => {
@@ -438,8 +442,10 @@ describe('getMessageDetailsContent — Copy message payload', () => {
       runningToolPart(),
     ]);
     const content = getMessageDetailsContent(message, catalogOptions);
-    expect(content.copyableText).toBeNull();
     expect(content.copyText).toBeNull();
+    // The thinking block is still selectable content, but the running tool part
+    // keeps selection unavailable and Copy hidden.
+    expect(content.copyableText).not.toBeNull();
     expect(content.canSelectText).toBe(false);
   });
 });

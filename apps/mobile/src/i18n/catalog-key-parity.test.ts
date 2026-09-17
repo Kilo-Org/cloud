@@ -67,4 +67,18 @@ describe('catalog key parity', () => {
     const missing = [...englishKeys].filter(key => !translated.has(key));
     expect(missing).toEqual([]);
   });
+
+  it('keeps the launcher New agent label under its live key', () => {
+    // The launcher surface renders `glanceable.newAgent`; this pins the exact
+    // leftover that broke `i18n-leftover`. A catalog that still carries
+    // `launcher.newAgent` holds a dead second copy of the label and fails here
+    // with the offending tag named, instead of only in the generic diff above.
+    for (const tag of TRANSLATED_LANGUAGES) {
+      const translated = flatten(CATALOG_LOADERS[tag]());
+      expect(translated.has('glanceable.newAgent'), `${tag} lacks glanceable.newAgent`).toBe(true);
+      expect(translated.has('launcher.newAgent'), `${tag} still carries launcher.newAgent`).toBe(
+        false
+      );
+    }
+  });
 });

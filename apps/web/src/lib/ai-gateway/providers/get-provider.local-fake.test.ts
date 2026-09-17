@@ -69,6 +69,7 @@ function replaceEnv(overrides: {
   FAKE_LLM_URL?: string;
   VERCEL?: string;
   OPENAI_API_KEY?: string;
+  OPENAI_CHATGPT_API_KEY?: string;
 }) {
   const nextEnv = { ...process.env, ...overrides };
   if (!('VERCEL' in overrides)) {
@@ -79,6 +80,9 @@ function replaceEnv(overrides: {
   }
   if (!('OPENAI_API_KEY' in overrides)) {
     delete nextEnv.OPENAI_API_KEY;
+  }
+  if (!('OPENAI_CHATGPT_API_KEY' in overrides)) {
+    delete nextEnv.OPENAI_CHATGPT_API_KEY;
   }
   return jest.replaceProperty(process, 'env', nextEnv as NodeJS.ProcessEnv);
 }
@@ -214,7 +218,7 @@ describe('getProvider ChatGPT connection routing order', () => {
   });
 
   test('an enabled connection beats a Vercel openai BYOK row for an eligible responses request', async () => {
-    const env = replaceEnv({ OPENAI_API_KEY: 'partner-project-key' });
+    const env = replaceEnv({ OPENAI_CHATGPT_API_KEY: 'partner-project-key' });
     jest
       .mocked(getOpenAiChatGptStoredConnection)
       .mockResolvedValue({ connection, isEnabled: true });
@@ -240,7 +244,7 @@ describe('getProvider ChatGPT connection routing order', () => {
   });
 
   test('a terminal connection failure never resolves to another billing path', async () => {
-    const env = replaceEnv({ OPENAI_API_KEY: 'partner-project-key' });
+    const env = replaceEnv({ OPENAI_CHATGPT_API_KEY: 'partner-project-key' });
     jest
       .mocked(getOpenAiChatGptStoredConnection)
       .mockResolvedValue({ connection, isEnabled: true });
@@ -262,7 +266,7 @@ describe('getProvider ChatGPT connection routing order', () => {
   });
 
   test('without a connection the same request keeps the Vercel openai BYOK route', async () => {
-    const env = replaceEnv({ OPENAI_API_KEY: 'partner-project-key' });
+    const env = replaceEnv({ OPENAI_CHATGPT_API_KEY: 'partner-project-key' });
     jest
       .mocked(getBYOKforUser)
       .mockResolvedValue([{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }]);
@@ -279,7 +283,7 @@ describe('getProvider ChatGPT connection routing order', () => {
   });
 
   test('an ineligible chat_completions request resolves exactly as before', async () => {
-    const env = replaceEnv({ OPENAI_API_KEY: 'partner-project-key' });
+    const env = replaceEnv({ OPENAI_CHATGPT_API_KEY: 'partner-project-key' });
     jest
       .mocked(getOpenAiChatGptStoredConnection)
       .mockResolvedValue({ connection, isEnabled: true });

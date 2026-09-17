@@ -175,10 +175,6 @@ export function buildOpenAiChatGptProvider(apiKey: string, accessToken: string):
       // api.openai.com rejects unknown request arguments, exactly like the
       // other raw upstream providers strip it.
       delete body.provider;
-      // `applyTrackingIds` writes `user` for OpenRouter's benefit; the Responses
-      // API replaced it with `safety_identifier`, which is kept, and rejects the
-      // deprecated field.
-      delete body.user;
       // OpenAI requires this traceability metadata on every delegated Responses
       // request, including later turns. Without it the request is rejected once
       // the integration is enabled for it.

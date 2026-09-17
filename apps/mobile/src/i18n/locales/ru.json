@@ -2149,6 +2149,7 @@
     "couldNotLoadActiveSessions": "Не удалось загрузить активные сеансы.",
     "agentSessions": "Сейчас выполняются",
     "newCodingTask": "Новая задача по разработке",
+    "newTaskFromPicture": "Новая задача из изображения",
     "explore": "Возможности",
     "seeAll": "Посмотреть все",
     "noLiveSessions": "Сейчас ничего не запущено"

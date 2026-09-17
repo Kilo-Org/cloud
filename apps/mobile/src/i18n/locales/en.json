@@ -2627,6 +2627,7 @@
     "couldNotLoadActiveSessions": "Couldn't load active sessions",
     "agentSessions": "Live now",
     "newCodingTask": "New coding task",
+    "newTaskFromPicture": "New task from a picture",
     "explore": "Explore",
     "seeAll": "See all",
     "noLiveSessions": "Nothing running right now"

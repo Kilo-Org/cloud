@@ -2611,6 +2611,7 @@
     "couldNotLoadActiveSessions": "Aktiivseid seansse ei õnnestunud laadida.",
     "agentSessions": "Praegu käimas",
     "newCodingTask": "Uus programmeerimisülesanne",
+    "newTaskFromPicture": "Uus ülesanne pildist",
     "explore": "Avasta",
     "seeAll": "Vaata kõiki",
     "noLiveSessions": "Praegu ei tööta midagi"

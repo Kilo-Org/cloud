@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 
 import { normalizeImageAsset } from '@/components/agents/attachment-picker';
 import {
+  type AttachmentSurface,
   clearPickerLaunchContext,
   readPickerLaunchContext,
 } from '@/lib/agent-attachments/picker-launch-context';
@@ -16,7 +17,7 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 const PICKER_LAUNCH_CONTEXT_TTL_MS = 10 * 60 * 1000;
 
 type UseAndroidPendingPickerRecoveryOptions = {
-  surface: 'agent-new' | 'agent-chat';
+  surface: AttachmentSurface;
   sessionId: string | null;
   addCandidates: (candidates: AgentAttachmentCandidate[]) => Promise<void>;
 };

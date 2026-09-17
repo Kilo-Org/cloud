@@ -10,6 +10,8 @@ export const proxyErrorTypeSchema = z.enum([
   'data_collection_required',
   'api_kind_not_supported',
   'byok_error',
+  'byok_invalid_key',
+  'byok_permission_denied',
   'context_length_exceeded',
   'model_not_allowed',
   'unavailable_model',

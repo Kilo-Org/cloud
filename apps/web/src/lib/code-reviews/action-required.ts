@@ -7,6 +7,7 @@ import { NEXTAUTH_URL } from '@/lib/config.server';
 import { sendCodeReviewDisabledEmail } from '@/lib/email';
 import { getOrganizationMembers } from '@/lib/organizations/organizations';
 import { findUserById } from '@/lib/user';
+import { ProxyErrorType, proxyErrorTypeSchema } from '@/lib/proxy-error-types';
 import { logExceptInTest } from '@/lib/utils.server';
 import type { Owner } from '@/lib/code-reviews/core';
 import type { CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';
@@ -40,10 +41,10 @@ const SELECTED_MODEL_UNAVAILABLE_MESSAGE =
   'selected model is not available for this cloud agent session';
 const REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE =
   'the requested model is not allowed for your team';
-const BYOK_INVALID_KEY_MESSAGE =
-  '[byok] your api key is invalid or has been revoked. please check your api key configuration.';
-const BYOK_PERMISSION_DENIED_MESSAGE =
-  '[byok] your api key does not have permission to access this ';
+const BYOK_KEY_ACTION_REQUIRED_ERROR_TYPES = {
+  [ProxyErrorType.byok_invalid_key]: 'byok_invalid_key',
+  [ProxyErrorType.byok_permission_denied]: 'byok_invalid_key',
+} as const satisfies Partial<Record<ProxyErrorType, CodeReviewActionRequiredReason>>;
 const REPEATED_REPOSITORY_CLONE_TIMEOUT_REASON =
   'repeated_repository_clone_timeout' satisfies CodeReviewActionRequiredReason;
 const REPOSITORY_CLONE_TIMEOUT_MESSAGE_FRAGMENT = 'repository clone timed out';
@@ -90,6 +91,34 @@ type PersistActionRequiredDisableArgs = {
 
 type PersistActionRequiredBeforeUpdate = (tx: DrizzleTransaction) => Promise<boolean>;
 
+function proxyErrorTypesIn(errorMessage: string): ProxyErrorType[] {
+  const types: ProxyErrorType[] = [];
+  const seen = new Set<ProxyErrorType>();
+  for (const match of errorMessage.matchAll(/"error_type"\s*:\s*"([a-z0-9_]+)"/gi)) {
+    const parsed = proxyErrorTypeSchema.safeParse(match[1]);
+    if (!parsed.success || seen.has(parsed.data)) continue;
+    seen.add(parsed.data);
+    types.push(parsed.data);
+  }
+  return types;
+}
+
+function isByokKeyActionRequiredErrorType(
+  errorType: ProxyErrorType
+): errorType is keyof typeof BYOK_KEY_ACTION_REQUIRED_ERROR_TYPES {
+  return errorType in BYOK_KEY_ACTION_REQUIRED_ERROR_TYPES;
+}
+
+function byokKeyActionRequiredReason(
+  errorMessage: string
+): CodeReviewActionRequiredReason | undefined {
+  for (const errorType of proxyErrorTypesIn(errorMessage)) {
+    if (!isByokKeyActionRequiredErrorType(errorType)) continue;
+    return BYOK_KEY_ACTION_REQUIRED_ERROR_TYPES[errorType];
+  }
+  return undefined;
+}
+
 function stripKnownErrorPrefixes(errorMessage: string): string {
   let message = errorMessage.trim();
   let next = message.replace(/^dispatch failed:\s*/i, '').trim();
@@ -118,12 +147,8 @@ export function classifyCodeReviewActionRequiredFailure(
     return 'github_installation_required';
   }
 
-  if (
-    normalized.includes(BYOK_INVALID_KEY_MESSAGE) ||
-    normalized.includes(BYOK_PERMISSION_DENIED_MESSAGE)
-  ) {
-    return 'byok_invalid_key';
-  }
+  const byokKeyReason = byokKeyActionRequiredReason(stripped);
+  if (byokKeyReason) return byokKeyReason;
 
   if (
     normalized.includes('project access token') &&

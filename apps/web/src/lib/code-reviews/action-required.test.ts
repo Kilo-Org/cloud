@@ -45,19 +45,19 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
 
     expect(
       classifyCodeReviewActionRequiredFailure(
-        '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.'
+        'Unauthorized: {"error":"[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.","error_type":"byok_invalid_key","message":"[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration."}'
       )
     ).toBe('byok_invalid_key');
 
     expect(
       classifyCodeReviewActionRequiredFailure(
-        'Forbidden: [BYOK] Your API key does not have permission to access this model. Please check your API key permissions.'
+        'Forbidden: {"error":"[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.","error_type":"byok_permission_denied","message":"[BYOK] Your API key does not have permission to access this model. Please check your API key permissions."}'
       )
     ).toBe('byok_invalid_key');
 
     expect(
       classifyCodeReviewActionRequiredFailure(
-        'Forbidden: [BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.'
+        'Forbidden: {"error":"[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.","error_type":"byok_permission_denied","message":"[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go."}'
       )
     ).toBe('byok_invalid_key');
 
@@ -131,7 +131,17 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
     expect(classifyCodeReviewActionRequiredFailure('GitHub returned 403 Forbidden')).toBeNull();
     expect(classifyCodeReviewActionRequiredFailure('Rate limit exceeded: 429')).toBeNull();
     expect(
+      classifyCodeReviewActionRequiredFailure(
+        'Forbidden: [BYOK] Your API key does not have permission to access this model. Please check your API key permissions.'
+      )
+    ).toBeNull();
+    expect(
       classifyCodeReviewActionRequiredFailure('[BYOK] Your account quota is exhausted.')
+    ).toBeNull();
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'Payment Required: {"error":"[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider.","error_type":"byok_error","message":"[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider."}'
+      )
     ).toBeNull();
     expect(
       classifyCodeReviewActionRequiredFailure(

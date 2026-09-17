@@ -913,23 +913,26 @@ describe('makeErrorReadable', () => {
   });
 
   it.each([
-    [401, []],
-    [402, ['anthropic']],
-    [403, []],
-    [429, ['anthropic']],
-  ] as const)('treats a non-null provider set as user BYOK for status %i', async (status, ids) => {
-    const result = await makeErrorReadable({
-      providerId: 'vercel',
-      requestedModel: 'anthropic/claude-sonnet-5',
-      request,
-      response: Response.json({}, { status }),
-      userByokProviderIds: [...ids],
-    });
+    [401, [], 'byok_invalid_key'],
+    [402, ['anthropic'], 'byok_error'],
+    [403, [], 'byok_permission_denied'],
+    [429, ['anthropic'], 'byok_error'],
+  ] as const)(
+    'treats a non-null provider set as user BYOK for status %i',
+    async (status, ids, errorType) => {
+      const result = await makeErrorReadable({
+        providerId: 'vercel',
+        requestedModel: 'anthropic/claude-sonnet-5',
+        request,
+        response: Response.json({}, { status }),
+        userByokProviderIds: [...ids],
+      });
 
-    expect(result).toBeDefined();
-    if (!result) throw new Error('Expected a readable BYOK error response');
-    expect((await result.json()).error_type).toBe('byok_error');
-  });
+      expect(result).toBeDefined();
+      if (!result) throw new Error('Expected a readable BYOK error response');
+      expect((await result.json()).error_type).toBe(errorType);
+    }
+  );
 
   it('names the model in a generic BYOK permission error', async () => {
     const result = await makeErrorReadable({
@@ -943,7 +946,7 @@ describe('makeErrorReadable', () => {
     await expect(result?.json()).resolves.toEqual({
       error:
         '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.',
-      error_type: 'byok_error',
+      error_type: 'byok_permission_denied',
       message:
         '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.',
     });
@@ -961,7 +964,7 @@ describe('makeErrorReadable', () => {
     await expect(result?.json()).resolves.toEqual({
       error:
         '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.',
-      error_type: 'byok_error',
+      error_type: 'byok_permission_denied',
       message:
         '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.',
     });

@@ -263,6 +263,12 @@ function byokErrorMessage(
   return byokErrorMessages[status];
 }
 
+function byokProxyErrorType(status: number): ProxyErrorType {
+  if (status === 401) return ProxyErrorType.byok_invalid_key;
+  if (status === 403) return ProxyErrorType.byok_permission_denied;
+  return ProxyErrorType.byok_error;
+}
+
 function vertexByokModelNotFoundResponse(
   response: Response,
   userByokProviderIds: UserByokProviderId[] | null
@@ -354,7 +360,7 @@ export async function makeErrorReadable({
       return NextResponse.json(
         {
           error: byokMessage,
-          error_type: ProxyErrorType.byok_error,
+          error_type: byokProxyErrorType(response.status),
           message: byokMessage,
         },
         { status: response.status }

@@ -791,7 +791,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeRequest({
           status: 'failed',
           errorMessage:
-            '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.',
+            'Unauthorized: {"error":"[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.","error_type":"byok_invalid_key","message":"[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration."}',
         }),
         makeParams(REVIEW_ID)
       );
@@ -829,7 +829,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
     it('infers BYOK permission callbacks as action-required failures', async () => {
       const errorMessage =
-        'Forbidden: [BYOK] Your API key does not have permission to access this model. Please check your API key permissions.';
+        'Forbidden: {"error":"[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.","error_type":"byok_permission_denied","message":"[BYOK] Your API key does not have permission to access this model. Please check your API key permissions."}';
       mockGetCodeReviewById.mockResolvedValue(makeReview());
 
       const response = await POST(

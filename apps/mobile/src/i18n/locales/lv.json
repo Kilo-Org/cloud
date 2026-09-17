@@ -798,6 +798,15 @@
       "balance": "Brīdinājumi par atlikumu",
       "security": "Drošības konstatējumi"
     },
+    "action": {
+      "openSession": "Atvērt sesiju"
+    },
+    "needsInputAction": {
+      "approved": "Pieprasījums apstiprināts",
+      "replied": "Atbilde nosūtīta",
+      "failed": "Neizdevās atbildēt. Pieskarieties vēlreiz, lai mēģinātu vēlreiz.",
+      "unavailable": "Šis pieprasījums vairs negaida."
+    },
     "category": {
       "chatMessagesSubtitle": "atbildes tavās sarunās",
       "agentAttentionTitle": "Aģents gaida tavu rīcību",

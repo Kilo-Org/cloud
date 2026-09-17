@@ -789,6 +789,15 @@
       "balance": "የቀሪ ሂሳብ ማስጠንቀቂያዎች",
       "security": "የደህንነት ግኝቶች"
     },
+    "action": {
+      "openSession": "ክፍለ ጊዜውን ክፈት"
+    },
+    "needsInputAction": {
+      "approved": "ጥያቄው ጸድቋል",
+      "replied": "መልስ ተልኳል",
+      "failed": "መልስ መስጠት አልተቻለም። እንደገና ለመሞከር እንደገና ይንኩ።",
+      "unavailable": "ይህ ጥያቄ ከእንግዲህ አይጠብቅም።"
+    },
     "category": {
       "chatMessagesSubtitle": "በውይይቶችዎ ውስጥ የሚሰጡ ምላሾች",
       "agentAttentionTitle": "ወኪሉ የእርስዎን እርዳታ ይፈልጋል",

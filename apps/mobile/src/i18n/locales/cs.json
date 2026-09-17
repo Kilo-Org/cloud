@@ -807,6 +807,15 @@
       "balance": "Upozornění na zůstatek",
       "security": "Bezpečnostní zjištění"
     },
+    "action": {
+      "openSession": "Otevřít relaci"
+    },
+    "needsInputAction": {
+      "approved": "Žádost schválena",
+      "replied": "Odpověď odeslána",
+      "failed": "Odpovědět se nepodařilo. Klepnutím to zkuste znovu.",
+      "unavailable": "Tato žádost už nečeká."
+    },
     "category": {
       "chatMessagesSubtitle": "odpovědi ve vašich konverzacích",
       "agentAttentionTitle": "Agent vás potřebuje",

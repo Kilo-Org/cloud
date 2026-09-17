@@ -789,6 +789,15 @@
       "balance": "Fampitandremana momba ny vola sisa",
       "security": "Olana hita amin'ny fiarovana"
     },
+    "action": {
+      "openSession": "Sokafy ny fotoam-piasana"
+    },
+    "needsInputAction": {
+      "approved": "Nankinina ny fangatahana",
+      "replied": "Nalefa ny valiny",
+      "failed": "Tsy nahavaly. Tsindrio indray mba hanandrama.",
+      "unavailable": "Tsy miandry intsony ity fangatahana ity."
+    },
     "category": {
       "chatMessagesSubtitle": "valiny amin'ny resakao",
       "agentAttentionTitle": "Mila anao ny mpanampy",

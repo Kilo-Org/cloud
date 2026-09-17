@@ -1,87 +1,24 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AppState } from 'react-native';
-import { type QueryFunction, useQuery, useQueryClient } from '@tanstack/react-query';
+import { hashKey, type QueryFunction, useQueryClient } from '@tanstack/react-query';
+import { usePathname } from 'expo-router';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
-import { ActiveSessionsLiveSync, refreshActiveSessionsNow } from '@/lib/active-sessions-live-sync';
+import { ActiveSessionsLiveSync } from '@/lib/active-sessions-live-sync';
 import {
   buildActiveSessionsTrayInput,
   type CachedActiveSessionsData,
 } from '@/lib/active-sessions-live';
 import { useAuth } from '@/lib/auth/auth-context';
-import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
-import { type UseAgentSessionsOptions } from '@/lib/hooks/use-agent-sessions';
-import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-state';
+import {
+  applyNeedsInputNotifications,
+  type NeedsInputNotificationRow,
+  notificationIdentifierForSession,
+  planNeedsInputNotifications,
+} from '@/lib/needs-input-notification';
 import { useOrganization } from '@/lib/organization-context';
-import { captureActiveSessionsQueryRefresh, fenceActiveSessionsQuery } from '@/lib/query-client';
 import { useTRPC } from '@/lib/trpc';
-
-/** Shared active query for the live-only and combined hooks. */
-export function useActiveSessions(options?: UseAgentSessionsOptions) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const { token, isLoading, isSigningOut, authEpoch } = useAuth();
-  const { isLoaded } = useOrganization();
-  const canRead =
-    Boolean(token) &&
-    !isLoading &&
-    !isSigningOut &&
-    isLoaded &&
-    options?.enabled !== false &&
-    !isSignOutActive();
-  const wsConnected = useUserWebConnectionState();
-  const input = useMemo(
-    () => buildActiveSessionsTrayInput(options?.organizationId),
-    [options?.organizationId]
-  );
-  const queryKey = useMemo(() => trpc.activeSessions.list.queryKey(input), [trpc, input]);
-  const queryOptions = trpc.activeSessions.list.queryOptions(input, {
-    // Cloud rows need a floor poll; socket writes remain the instant CLI path.
-    refetchInterval: wsConnected ? 30_000 : 10_000,
-    staleTime: 5000,
-    enabled: canRead,
-  });
-  const queryFn = queryOptions.queryFn;
-  const active = useQuery({
-    ...queryOptions,
-    queryFn:
-      queryFn &&
-      fenceActiveSessionsQuery(queryFn, () => isCurrentAuthEpoch(authEpoch) && !isSignOutActive()),
-  });
-  const scope = useMemo(() => ({ queryKey, canRead, authEpoch }), [queryKey, canRead, authEpoch]);
-  const currentScope = useRef<typeof scope | null>(scope);
-  currentScope.current = scope;
-  useEffect(() => {
-    currentScope.current = scope;
-    return () => {
-      currentScope.current = null;
-    };
-  }, [scope]);
-
-  const refetch = async (): Promise<boolean> => {
-    const isCurrentScope = () =>
-      canRead &&
-      currentScope.current === scope &&
-      isCurrentAuthEpoch(authEpoch) &&
-      !isSignOutActive();
-    if (!isCurrentScope()) {
-      return false;
-    }
-    const refresh = captureActiveSessionsQueryRefresh(queryClient, queryKey);
-    const handled = await refreshActiveSessionsNow(queryKey);
-    if (!isCurrentScope() || !refresh.isCurrent()) {
-      return false;
-    }
-    if (handled === false || (!handled.accepted && !handled.canceled)) {
-      await active.refetch();
-    }
-    return (
-      isCurrentScope() && (handled === false || handled.accepted) && refresh.hasAcceptedResult()
-    );
-  };
-  return { ...active, queryKey, canRead, refetch };
-}
 
 /** Holds the socket lease across personal/organization context changes. */
 function useActiveSessionsLiveSync(): void {
@@ -129,7 +66,91 @@ function useActiveSessionsLiveSync(): void {
   }, [connection, enabled, authEpoch, queryClient, queryFn, queryKey]);
 }
 
+/**
+ * Posts (and dismisses) the app-owned needs-input notification from the cached
+ * live rows. The rows are the same cache the Agents tab renders, so one
+ * subscription covers socket writes and refetches; the rows whose notification
+ * is currently posted are the `previous` the next plan diffs against, which is
+ * what keeps a re-plan from re-posting a notification that is already on
+ * screen and a cleared raise from leaving a stale one behind.
+ */
+function useNeedsInputLocalNotifications(): void {
+  const queryClient = useQueryClient();
+  const trpc = useTRPC();
+  const { organizationId, isLoaded } = useOrganization();
+  const { token, isLoading, isSigningOut } = useAuth();
+  const pathname = usePathname();
+  const input = useMemo(() => buildActiveSessionsTrayInput(organizationId), [organizationId]);
+  const queryKey = useMemo(() => trpc.activeSessions.list.queryKey(input), [trpc, input]);
+  const queryHash = useMemo(() => hashKey(queryKey), [queryKey]);
+  const enabled = Boolean(token) && !isLoading && !isSigningOut && isLoaded;
+
+  // The route is read through a ref so a route change re-plans without
+  // re-subscribing to the query cache.
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
+  // The full notified set, not the last plan's delta: a plan that publishes
+  // nothing (an unchanged raise, a withheld post) would otherwise erase the
+  // memory, re-alert on the next recompute, and leave a cleared raise with
+  // nothing to dismiss.
+  const notified = useRef<NeedsInputNotificationRow[]>([]);
+
+  const recompute = useCallback(() => {
+    const next = queryClient.getQueryData<CachedActiveSessionsData>(queryKey)?.sessions ?? [];
+    const plan = planNeedsInputNotifications({
+      previous: notified.current,
+      next,
+      pathname: pathnameRef.current,
+      appState: AppState.currentState,
+    });
+    const dismissed = new Set(plan.dismiss);
+    // A re-published row REPLACES its previous entry instead of joining it. An
+    // append would leave the stale row first in the set, so the next plan's
+    // `find` would compare the raise against the shape it had before the
+    // re-publish, publish again on every recompute, and grow the set without
+    // bound.
+    const republished = new Set(plan.publish.map(row => row.sessionId));
+    notified.current = [
+      ...notified.current.filter(
+        row =>
+          !dismissed.has(notificationIdentifierForSession(row.sessionId)) &&
+          !republished.has(row.sessionId)
+      ),
+      ...plan.publish,
+    ];
+    // The applier reports and swallows every native failure; it never rejects.
+    void applyNeedsInputNotifications(plan);
+  }, [queryClient, queryKey]);
+
+  useEffect(() => {
+    if (!enabled || isSignOutActive()) {
+      // A sign-out clears the cache without a rows change, so the dismissal
+      // must ride the gate flipping rather than a subscription event.
+      if (isSignOutActive()) {
+        recompute();
+      }
+      return undefined;
+    }
+    recompute();
+    return queryClient.getQueryCache().subscribe(event => {
+      if (event.query.queryHash === queryHash) {
+        recompute();
+      }
+    });
+  }, [enabled, queryClient, queryHash, recompute]);
+
+  // The route is a plan input, not only a subscription trigger: leaving a
+  // waiting session's chat is what turns its raise back into a notification,
+  // even though the rows themselves did not change.
+  useEffect(() => {
+    if (enabled) {
+      recompute();
+    }
+  }, [enabled, pathname, recompute]);
+}
+
 export function ActiveSessionsLiveSyncMount(): null {
   useActiveSessionsLiveSync();
+  useNeedsInputLocalNotifications();
   return null;
 }

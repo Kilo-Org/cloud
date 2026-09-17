@@ -798,6 +798,15 @@
       "balance": "Alertes de saldo",
       "security": "Problemes de seguretat"
     },
+    "action": {
+      "openSession": "Obre la sessió"
+    },
+    "needsInputAction": {
+      "approved": "Sol·licitud aprovada",
+      "replied": "Resposta enviada",
+      "failed": "No s’ha pogut respondre. Torna a tocar-ho per reintentar-ho.",
+      "unavailable": "Aquesta sol·licitud ja no està en espera."
+    },
     "category": {
       "chatMessagesSubtitle": "respostes a les teves converses",
       "agentAttentionTitle": "L'agent et necessita",

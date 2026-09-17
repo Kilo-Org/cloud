@@ -37,6 +37,10 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     type: z.literal('cloud_agent_session'),
     cliSessionId: nonEmptyStringSchema,
     category: cloudAgentSessionCategorySchema.optional(),
+    // Needs-input raise detail: which answer the waiting agent wants, and the
+    // PR that can be opened from the notification. Absent on status pushes.
+    attentionKind: z.enum(['question', 'permission']).optional(),
+    prUrl: z.string().optional(),
   }),
   z.object({
     type: z.literal('low_balance'),

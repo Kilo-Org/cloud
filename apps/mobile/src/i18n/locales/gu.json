@@ -789,6 +789,15 @@
       "balance": "બેલેન્સ અંગેની ચેતવણીઓ",
       "security": "સુરક્ષા તપાસનાં તારણો"
     },
+    "action": {
+      "openSession": "સેશન ખોલો"
+    },
+    "needsInputAction": {
+      "approved": "વિનંતી મંજૂર થઈ",
+      "replied": "જવાબ મોકલાયો",
+      "failed": "જવાબ આપી શકાયો નથી. ફરી પ્રયાસ કરવા ફરી ટેપ કરો.",
+      "unavailable": "આ વિનંતી હવે રાહ જોતી નથી."
+    },
     "category": {
       "chatMessagesSubtitle": "તમારી વાતચીતમાં જવાબો",
       "agentAttentionTitle": "એજન્ટને તમારી જરૂર છે",

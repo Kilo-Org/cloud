@@ -299,6 +299,15 @@
       "balance": "Оповещения о балансе",
       "security": "Замечания по безопасности"
     },
+    "action": {
+      "openSession": "Открыть сеанс"
+    },
+    "needsInputAction": {
+      "approved": "Запрос одобрен",
+      "replied": "Ответ отправлен",
+      "failed": "Не удалось ответить. Нажмите ещё раз, чтобы повторить.",
+      "unavailable": "Этот запрос больше не ждёт."
+    },
     "category": {
       "chatMessagesSubtitle": "ответы в вашей переписке",
       "agentAttentionTitle": "Агенту нужна помощь",

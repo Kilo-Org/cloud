@@ -542,6 +542,23 @@ describe('useNativeAuth passkey sign-in', () => {
     expect(message).not.toMatch(/try again/i);
   });
 
+  it('toasts the non-retryable passkey copy that names the other methods', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'error', failure: 'failed' });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    // The server knew the passkey and the assertion did not verify, so the same
+    // button fails identically. The toast names the way out instead of a retry.
+    const message = vi.mocked(toast.error).mock.calls[0]?.[0];
+    expect(message).toBe(
+      'That passkey could not sign you in. Sign in with Apple, Google, or your email instead.'
+    );
+    expect(message).not.toMatch(/try again/i);
+  });
+
   it('prefers the server copy when the refusal carries a code', async () => {
     mockRunPasskeySignIn.mockResolvedValue({
       status: 'error',

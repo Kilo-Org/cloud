@@ -179,7 +179,7 @@
     "passkeyCancelled": "Passkey sign-in was cancelled. Please try again.",
     "passkeyNotFound": "No passkey is saved for this device. Sign in with Apple, Google, or your email instead.",
     "passkeyUnsupported": "Passkeys are not available on this device. Sign in with Apple, Google, or your email instead.",
-    "passkeyFailed": "Could not sign in with a passkey. Please try again.",
+    "passkeyFailed": "That passkey could not sign you in. Sign in with Apple, Google, or your email instead.",
     "couldNotCompleteSignIn": "Could not complete sign in. Please try again.",
     "sessionEnded": "Your session ended. Please sign in again.",
     "signInCodeExpired": "Your sign-in code has expired. Please try again.",

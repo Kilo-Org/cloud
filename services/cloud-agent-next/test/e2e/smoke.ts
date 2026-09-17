@@ -21,7 +21,18 @@ import {
   type LifecycleResult,
 } from './lifecycle.js';
 import { cleanupOwnedSessions } from './smoke-cleanup.js';
-import { printResult } from './run.js';
+import { createLocalScenarioEnvironment } from './capabilities-local.js';
+import { createLocalHttpScenarioEnvironment } from './e2e-surface-client.js';
+import { bootstrapDeployedProfile } from './deployed-auth.js';
+import { SHARED_SCENARIOS } from './scenarios-shared.js';
+import { runSharedScenario } from './scenario-capabilities.js';
+import {
+  buildDeployedConfig,
+  exitCodeForResults,
+  printResult,
+  requireScenarioApi,
+  resultOutcome,
+} from './run.js';
 
 const SERVICE_PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -40,8 +51,15 @@ const DEFAULT_MATRIX: Case[] = [
   // One cold boot followed by several same-session hot turns.
   { lifecycle: 'cold-hot', conversation: 'echo:hi' },
 
+  // The individual cold/hot/follow-up admissions, now one shared definition
+  // across the local and HTTP profiles.
+  { lifecycle: 'cold', conversation: 'echo:hi' },
+  { lifecycle: 'hot', conversation: 'echo:hi' },
+  { lifecycle: 'followup', conversation: 'echo:continue' },
+
   // Queue semantics — the refactor focus of this branch.
   { lifecycle: 'queue-while-busy', conversation: 'gate1' },
+  { lifecycle: 'queue-rapid-fire-no-gate', conversation: '_' },
   { lifecycle: 'queue-overflow', conversation: '_' },
   { lifecycle: 'queue-interrupt-clears', conversation: '_' },
 
@@ -50,10 +68,15 @@ const DEFAULT_MATRIX: Case[] = [
   { lifecycle: 'chunked-streaming', conversation: 'slow:5:50' },
   { lifecycle: 'empty-response', conversation: '_' },
   { lifecycle: 'interrupt-mid-stream', conversation: '_' },
+  { lifecycle: 'interrupt-then-continue', conversation: '_' },
   { lifecycle: 'unknown-model', conversation: '_' },
+  { lifecycle: 'auth-reject', conversation: '_' },
   { lifecycle: 'waiters-clean', conversation: '_' },
 
-  // Callback scenarios remain manual because callbackTarget uses the internal legacy API.
+  // Callback delivery; the registry pins their legacy prepare flow.
+  { lifecycle: 'callback-completion', conversation: 'echo:done' },
+  { lifecycle: 'callback-batch-followup', conversation: '_' },
+  { lifecycle: 'callback-interrupt', conversation: '_' },
 
   // Legacy-API sanity: one cold boot plus the same reused hot turn sequence.
   { lifecycle: 'cold-hot', conversation: 'echo:legacy', api: 'legacy' },
@@ -66,7 +89,70 @@ const DEFAULT_MATRIX: Case[] = [
   { lifecycle: 'kill-mid-flight', conversation: 'hang' },
 ];
 
+/**
+ * `E2E_LOCAL_HTTP=1`: same matrix, but the local Worker is driven over its
+ * public tunnels with the deployed-style auth composition and the HTTP-only
+ * capability set. Local-only (Docker-inspecting) entries are skipped, not
+ * failed. This is not deployed parity evidence; it proves the HTTP profile runs
+ * the shared definitions with no Docker fallback.
+ */
+async function mainLocalHttp(): Promise<void> {
+  const profile = bootstrapDeployedProfile();
+  const auth = profile.auth;
+  const ownedSessionIds = new Set<string>();
+  const config: DriverConfig = {
+    ...buildDeployedConfig(profile, auth, {
+      ...(process.env.E2E_GIT_URL ? { gitUrl: process.env.E2E_GIT_URL } : {}),
+      ...(process.env.E2E_MODEL ? { model: process.env.E2E_MODEL } : {}),
+    }),
+    onSessionCreated: sessionId => {
+      ownedSessionIds.add(sessionId);
+    },
+  };
+  const env = createLocalHttpScenarioEnvironment({
+    surfaceUrl: config.workerUrl,
+    bearerToken: auth.token,
+    internalApiSecret: config.internalApiSecret,
+  });
+
+  const results: LifecycleResult[] = [];
+  for (const { lifecycle, conversation, api: requestedApi } of DEFAULT_MATRIX) {
+    const definition = SHARED_SCENARIOS[lifecycle];
+    if (!definition) {
+      console.log(`\n=== ${lifecycle} [skipped: local-only, needs Docker] ===`);
+      continue;
+    }
+    const api = requireScenarioApi(definition, requestedApi);
+    if (requestedApi === 'legacy' && definition.defaultApi !== 'legacy') {
+      console.log(`\n=== ${lifecycle} [skipped: local-http does not select legacy] ===`);
+      continue;
+    }
+    console.log(`\n=== ${lifecycle}/${conversation} [api=${api}, profile=local-http] ===`);
+    try {
+      const result = await runSharedScenario(definition, { config, conversation, api, env });
+      printResult(result);
+      results.push(result);
+    } finally {
+      await cleanupOwnedSessions(ownedSessionIds, {
+        interrupt: sessionId => interruptSession(config, sessionId),
+        stopOwnedSandboxes: async () => {},
+      });
+      ownedSessionIds.clear();
+    }
+  }
+
+  const counts = { pass: 0, failure: 0, unsupported: 0 };
+  for (const result of results) counts[resultOutcome(result)] += 1;
+  const unsupportedSuffix = counts.unsupported > 0 ? `, ${counts.unsupported} unsupported` : '';
+  console.log(`\nSummary: ${counts.pass} passed, ${counts.failure} failed${unsupportedSuffix}`);
+  process.exit(exitCodeForResults(results));
+}
+
 async function main(): Promise<void> {
+  if (process.env.E2E_LOCAL_HTTP === '1') {
+    await mainLocalHttp();
+    return;
+  }
   loadRepoEnvFiles(SERVICE_PACKAGE_DIR);
   const devVars = loadDevVars(SERVICE_PACKAGE_DIR);
 
@@ -89,15 +175,20 @@ async function main(): Promise<void> {
   };
 
   const results: LifecycleResult[] = [];
-  for (const { lifecycle, conversation, api = 'unified' } of DEFAULT_MATRIX) {
+  const env = createLocalScenarioEnvironment();
+  for (const { lifecycle, conversation, api: requestedApi } of DEFAULT_MATRIX) {
     const scenarioFn = LIFECYCLE_SCENARIOS[lifecycle];
     if (!scenarioFn) {
       console.error(`smoke: unknown lifecycle ${lifecycle}`);
       continue;
     }
+    const api = requireScenarioApi(
+      SHARED_SCENARIOS[lifecycle] ?? { name: lifecycle },
+      requestedApi
+    );
     console.log(`\n=== ${lifecycle}/${conversation} [api=${api}] ===`);
     try {
-      const result = await scenarioFn({ config, conversation, api });
+      const result = await scenarioFn({ config, conversation, api, env });
       printResult(result);
       results.push(result);
     } finally {
@@ -109,10 +200,13 @@ async function main(): Promise<void> {
     }
   }
 
-  const passed = results.filter(r => r.ok).length;
-  const failed = results.filter(r => !r.ok).length;
-  console.log(`\nSummary: ${passed} passed, ${failed} failed`);
-  process.exit(failed > 0 ? 1 : 0);
+  const counts = { pass: 0, failure: 0, unsupported: 0 };
+  for (const result of results) counts[resultOutcome(result)] += 1;
+  // The local matrix produces no unsupported result, so this line keeps its
+  // two-category shape for local runs and only widens when that changes.
+  const unsupportedSuffix = counts.unsupported > 0 ? `, ${counts.unsupported} unsupported` : '';
+  console.log(`\nSummary: ${counts.pass} passed, ${counts.failure} failed${unsupportedSuffix}`);
+  process.exit(exitCodeForResults(results));
 }
 
 main().catch(err => {

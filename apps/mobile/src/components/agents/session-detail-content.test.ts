@@ -378,8 +378,12 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
+// Captured so the goal tests can open the action sheet and pick a control.
+const showActionSheetWithOptions = vi.hoisted(() =>
+  vi.fn<(options: Record<string, unknown>, callback: (index?: number) => void) => void>()
+);
 vi.mock('@expo/react-native-action-sheet', () => ({
-  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+  useActionSheet: () => ({ showActionSheetWithOptions }),
 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 const globalContext = vi.hoisted(() => ({
@@ -514,6 +518,7 @@ function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   openRenameModal.mockClear();
+  showActionSheetWithOptions.mockClear();
   hideThinking.current = false;
   hideThinking.loaded = true;
   goalMountOptions = {};
@@ -1828,5 +1833,46 @@ describe('SessionDetailContent goal visibility', () => {
     goalMountOptions = { goal: pausedGoal, resolvedType: 'read-only' };
     const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
     expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+  });
+});
+
+describe('SessionDetailContent goal edit dialog', () => {
+  // The reported goal shape: one very long unbroken word plus a long sentence.
+  const longGoal: SessionGoal = {
+    text:
+      'the_number_of_consecutive_days_the_workflow_has_not_failed_for_the_first_time_due_to' +
+      '_workflow_issues_is_0_for_3_consecutive_days and the scheduled cleanup job keeps reporting',
+    status: 'active',
+  };
+
+  it('opens the goal text in a wrapping field', async () => {
+    goalMountOptions = { goal: longGoal, resolvedType: 'remote' };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const section = view.renderer.root.findAllByType(SessionGoalSection)[0];
+    if (!section) {
+      throw new Error('goal section did not render');
+    }
+    const { onPress } = section.props as { onPress: () => void };
+    act(onPress);
+
+    // Pick "Edit goal" out of the goal action sheet.
+    const sheetCall = showActionSheetWithOptions.mock.calls.at(-1);
+    expect(sheetCall).toBeDefined();
+    const sheet = sheetCall?.[0] as { options: string[] } | undefined;
+    const onSelect = sheetCall?.[1];
+    const editIndex = sheet?.options.indexOf(i18n.t('agentChat.goal.edit')) ?? -1;
+    expect(editIndex).toBeGreaterThanOrEqual(0);
+    act(() => {
+      onSelect?.(editIndex);
+    });
+
+    // The dialog must hand the goal text to the modal's wrapping field, not a
+    // single-line one that clips its start.
+    const modal = view.renderer.root.findAllByType('RenameModal')[0];
+    expect(modal?.props).toMatchObject({
+      multiline: true,
+      maxLength: 500,
+      initialValue: longGoal.text,
+    });
   });
 });

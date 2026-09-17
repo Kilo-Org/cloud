@@ -48,7 +48,7 @@ dev-debug-request-logs/*
 .tmp/
 test-results/
 playwright-report/
-playwright/.auth/
+**/playwright/.auth/
 
 # debug logs
 npm-debug.log*

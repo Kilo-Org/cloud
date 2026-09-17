@@ -413,11 +413,22 @@ describe('runGlanceableApprove', () => {
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
   });
 
-  it('is gone when the session cannot be recovered at all: no retry can ever succeed', async () => {
+  it('is retryable when the refresh is refused: an unauthenticated tap never proves the ask is gone', async () => {
+    // The headless contexts have no app root, so the first tap after a cold
+    // start lands here with the ask still waiting. Ending the ask would hide a
+    // pending permission from the shade and leave no way to answer it.
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     getSessionQuery.mockRejectedValue(withCode('UNAUTHORIZED'));
     performRefresh.mockResolvedValue({ ok: false, refused: true });
-    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone' });
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
+    expect(recordWaitingAsk).not.toHaveBeenCalled();
+  });
+
+  it('is retryable when the refresh itself rejects', async () => {
+    readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+    getSessionQuery.mockRejectedValue(withCode('UNAUTHORIZED'));
+    performRefresh.mockRejectedValue(new Error('network down'));
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
     expect(recordWaitingAsk).not.toHaveBeenCalled();
   });
 });

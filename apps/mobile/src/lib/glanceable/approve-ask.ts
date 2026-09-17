@@ -141,15 +141,21 @@ function classifyApproveFailure(error: unknown): GlanceableApproveResult {
  *
  * The background contexts have no app root and no foreground refresh timer, so
  * this is the path that first sees a rotated access token; a refresh is the
- * only way to tell a rotation (retryable) from credentials that cannot be
- * recovered at all. An unrecoverable session can never answer this ask from the
- * surface, so the action is dropped like any other terminal answer instead of
- * offering an "tap Approve to try again" that can never succeed.
+ * only way to repair it, and a repaired pair makes the next tap answer.
+ *
+ * It never ends the ask. An unauthenticated request proves nothing about the
+ * permission: the session is still waiting, and only the control plane's own
+ * terminal answers (a refused stream ticket, or NOT_FOUND, PRECONDITION_FAILED,
+ * NOT_APPROVABLE) can show it was answered elsewhere. Dropping the record here
+ * hid a still-waiting permission from the shade and offered no way to answer
+ * it, so the tap stays retryable and the notification keeps Approve with the
+ * retry line.
  */
 async function classifyUnauthorized(): Promise<GlanceableApproveResult> {
-  const refreshed = await performRefresh();
-  if (!refreshed.ok && refreshed.refused) {
-    return { kind: 'gone' };
+  try {
+    await performRefresh();
+  } catch {
+    // A transient refresh failure is the same retryable outcome as a refused one.
   }
   return { kind: 'retryable' };
 }

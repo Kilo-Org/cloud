@@ -480,6 +480,8 @@
       "replyBadRequest": "Ez a válasz nem küldhető el. Lehet, hogy a szál megváltozott.",
       "replyForbidden": "Nincs jogosultságod válaszolni erre a módosítási kérelemre.",
       "addCommentCta": "Hozzászólás ehhez a módosítási kérelemhez",
+      "fixWithKilo": "Javítás Kiloval",
+      "fixWithKiloPrompt": "Kérlek, foglalkozz a következő módosítási kérelemhez írt hozzászólással: {{link}}",
       "commentBadRequest": "Ez a hozzászólás nem küldhető el. Lehet, hogy a módosítási kérelem megváltozott.",
       "commentForbidden": "Nincs jogosultságod hozzászólni ehhez a módosítási kérelemhez.",
       "moderation": {

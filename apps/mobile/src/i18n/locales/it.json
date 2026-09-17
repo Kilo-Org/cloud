@@ -2490,6 +2490,8 @@
       "replyBody": "Testo della risposta",
       "replyForbidden": "Non hai il permesso di rispondere a questa pull request.",
       "addCommentCta": "Commenta questa pull request",
+      "fixWithKilo": "Risolvi con Kilo",
+      "fixWithKiloPrompt": "Per favore, gestisci il seguente commento della pull request: {{link}}",
       "commentBadRequest": "Impossibile pubblicare questo commento. La pull request potrebbe essere stata modificata.",
       "commentForbidden": "Non hai il permesso di commentare questa pull request.",
       "replyPlaceholder": "La tua risposta…",

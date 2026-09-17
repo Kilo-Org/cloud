@@ -480,6 +480,8 @@
       "replyBadRequest": "Seda vastust ei saa postitada. Lõim võis muutuda.",
       "replyForbidden": "Sul pole õigust sellele tõmbetaotlusele vastata.",
       "addCommentCta": "Kommenteeri seda tõmbetaotlust",
+      "fixWithKilo": "Paranda Kiloga",
+      "fixWithKiloPrompt": "Palun tegele järgmise tõmbetaotluse kommentaariga: {{link}}",
       "commentBadRequest": "Seda kommentaari ei saa postitada. Tõmbetaotlus võis muutuda.",
       "commentForbidden": "Sul pole õigust seda tõmbetaotlust kommenteerida.",
       "moderation": {

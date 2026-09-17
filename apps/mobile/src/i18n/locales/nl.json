@@ -2475,6 +2475,8 @@
       "replyBody": "Antwoordtekst",
       "replyForbidden": "Je hebt geen toestemming om op deze PR te reageren.",
       "addCommentCta": "Een opmerking op deze PR plaatsen",
+      "fixWithKilo": "Oplossen met Kilo",
+      "fixWithKiloPrompt": "Los alsjeblieft de volgende opmerking op deze PR op: {{link}}",
       "commentBadRequest": "Deze opmerking kan niet worden geplaatst. De PR is mogelijk gewijzigd.",
       "commentForbidden": "Je hebt geen toestemming om een opmerking op deze PR te plaatsen.",
       "replyPlaceholder": "Je antwoord…",

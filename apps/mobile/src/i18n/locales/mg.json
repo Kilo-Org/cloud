@@ -480,6 +480,8 @@
       "replyBadRequest": "Tsy azo avoaka ity valiny ity. Mety niova ny loha-dresaka.",
       "replyForbidden": "Tsy manana alalana hamaly ity fangatahana fampiraisana ity ianao.",
       "addCommentCta": "Manao fanehoan-kevitra momba ity fangatahana fampiraisana ity",
+      "fixWithKilo": "Amboary miaraka amin'ny Kilo",
+      "fixWithKiloPrompt": "Azafady amboary ity fanehoan-kevitra momba ny fangatahana fampiraisana ity: {{link}}",
       "commentBadRequest": "Tsy azo avoaka ity fanehoan-kevitra ity. Mety niova ny fangatahana fampiraisana.",
       "commentForbidden": "Tsy manana alalana hanao fanehoan-kevitra momba ity fangatahana fampiraisana ity ianao.",
       "moderation": {

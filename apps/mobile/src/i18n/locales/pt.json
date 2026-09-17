@@ -483,6 +483,8 @@
       "replyBadRequest": "Esta resposta não pode ser publicada. A conversa pode ter mudado.",
       "replyForbidden": "Não tens permissão para responder a este PR.",
       "addCommentCta": "Comentar neste PR",
+      "fixWithKilo": "Corrigir com Kilo",
+      "fixWithKiloPrompt": "Por favor, resolve o seguinte comentário do PR: {{link}}",
       "commentBadRequest": "Este comentário não pode ser publicado. O PR pode ter mudado.",
       "commentForbidden": "Não tens permissão para comentar neste PR.",
       "moderation": {

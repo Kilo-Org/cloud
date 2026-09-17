@@ -62,7 +62,14 @@ export function SignInForm({
     isSignUp,
     storybookInitialState,
   });
-  const chatGptAllowed = useChatGptSignInAccess(flow.email);
+  // The ChatGPT option is decided from the email the visitor submits, before the
+  // sign-in options render — not from every keystroke in the field.
+  const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(null);
+  const chatGptAllowed = useChatGptSignInAccess(submittedEmail);
+  const handleEmailSubmit = (event: React.FormEvent) => {
+    setSubmittedEmail(flow.email);
+    flow.handleEmailSubmit(event);
+  };
 
   // Show minimal loading state while checking localStorage for returning user hint
   // This prevents flash of "new user" UI before switching to "returning user" UI
@@ -249,7 +256,7 @@ export function SignInForm({
               <EmailInputForm
                 email={flow.email}
                 emailValidation={flow.emailValidation}
-                onSubmit={flow.handleEmailSubmit}
+                onSubmit={handleEmailSubmit}
                 onEmailChange={flow.handleEmailChange}
                 placeholder="you@example.com"
                 autoFocus={true}
@@ -299,7 +306,7 @@ export function SignInForm({
                   <EmailInputForm
                     email={flow.email}
                     emailValidation={flow.emailValidation}
-                    onSubmit={flow.handleEmailSubmit}
+                    onSubmit={handleEmailSubmit}
                     onEmailChange={flow.handleEmailChange}
                     placeholder="you@example.com"
                     autoFocus={true}

@@ -27,7 +27,7 @@ jest.mock('posthog-js/react', () => ({
 }));
 
 const { useChatGptSignInAccess } = require('./useChatGptSignInAccess') as {
-  useChatGptSignInAccess: (email: string) => boolean;
+  useChatGptSignInAccess: (email: string | null) => boolean;
 };
 
 function installDom(): { cleanup: () => void; container: HTMLElement } {
@@ -115,7 +115,7 @@ function fireFlags(): void {
 
 let allowed: boolean | undefined;
 
-function AccessProbe({ email }: { email: string }) {
+function AccessProbe({ email }: { email: string | null }) {
   allowed = useChatGptSignInAccess(email);
   return null;
 }
@@ -125,7 +125,6 @@ describe('useChatGptSignInAccess', () => {
   let root: Root | undefined;
 
   beforeEach(() => {
-    jest.useFakeTimers();
     flagCallbacks.clear();
     allowed = undefined;
     mounted = installDom();
@@ -141,14 +140,13 @@ describe('useChatGptSignInAccess', () => {
     }
     mounted?.cleanup();
     mounted = undefined;
-    jest.useRealTimers();
   });
 
-  function render(email: string): void {
+  function render(email: string | null): void {
     act(() => root!.render(createElement(AccessProbe, { email })));
   }
 
-  it('evaluates the flag when PostHog loads after the first effect, without an email change', () => {
+  it('evaluates the flag when PostHog loads after the first effect, without a new submission', () => {
     mockPosthog = makeMockPosthog(false);
     render('person@kilo.ai');
 
@@ -159,42 +157,33 @@ describe('useChatGptSignInAccess', () => {
       mockPosthog.flagValue = true;
       fireFlags();
     });
-    act(() => {
-      jest.advanceTimersByTime(300);
-    });
 
     expect(mockPosthog.setPersonCalls).toEqual([{ email: 'person@kilo.ai' }]);
     expect(mockPosthog.reloadCalls).toBe(1);
     expect(allowed).toBe(true);
   });
 
-  it('reloads the flags once for a settled address instead of once per keystroke', () => {
+  it('does not evaluate anything before an address is submitted', () => {
     mockPosthog = makeMockPosthog(true);
 
-    render('p');
-    act(() => jest.advanceTimersByTime(50));
-    render('pe');
-    act(() => jest.advanceTimersByTime(50));
-    render('per');
-    act(() => jest.advanceTimersByTime(50));
-    render('pers');
+    render(null);
 
+    expect(mockPosthog.setPersonCalls).toHaveLength(0);
     expect(mockPosthog.reloadCalls).toBe(0);
-
-    act(() => jest.advanceTimersByTime(300));
-
-    expect(mockPosthog.setPersonCalls).toEqual([{ email: 'pers' }]);
-    expect(mockPosthog.reloadCalls).toBe(1);
+    expect(allowed).toBe(false);
   });
 
-  it('resets an empty email without issuing a second reload', () => {
+  it('issues one reload per submitted address', () => {
     mockPosthog = makeMockPosthog(true);
 
-    render('');
-    act(() => jest.advanceTimersByTime(300));
+    render('first@kilo.ai');
+    expect(mockPosthog.reloadCalls).toBe(1);
 
-    expect(mockPosthog.resetCalls).toBe(1);
-    expect(mockPosthog.reloadCalls).toBe(0);
-    expect(mockPosthog.setPersonCalls).toHaveLength(0);
+    render('second@openai.com');
+    expect(mockPosthog.reloadCalls).toBe(2);
+    expect(mockPosthog.setPersonCalls).toEqual([
+      { email: 'first@kilo.ai' },
+      { email: 'second@openai.com' },
+    ]);
   });
 });

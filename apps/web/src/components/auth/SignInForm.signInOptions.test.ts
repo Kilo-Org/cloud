@@ -21,7 +21,7 @@ jest.mock('@/components/AnimatedLogoMark', () => ({
 }));
 
 jest.mock('@/hooks/useChatGptSignInAccess', () => ({
-  useChatGptSignInAccess: (email: string) => {
+  useChatGptSignInAccess: (email: string | null) => {
     mockHookEmail = email;
     return mockChatGptAllowed;
   },
@@ -102,7 +102,7 @@ beforeEach(() => {
 });
 
 describe('SignInForm sign-in options', () => {
-  it('hides ChatGPT on sign-in when the flag is off for the typed email', () => {
+  it('hides ChatGPT on sign-in when the flag is off for the submitted email', () => {
     const html = renderToStaticMarkup(
       createElement(SignInForm, { searchParams: {}, title: 'Welcome.' })
     );
@@ -110,10 +110,11 @@ describe('SignInForm sign-in options', () => {
     expect(html).not.toContain('Sign in with ChatGPT');
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
-    expect(mockHookEmail).toBe('');
+    // Nothing is submitted in a static render, so the hook gets no address.
+    expect(mockHookEmail).toBe(null);
   });
 
-  it('offers ChatGPT on sign-in when the flag is on for the typed email', () => {
+  it('offers ChatGPT on sign-in when the flag is on for the submitted email', () => {
     mockFlowEmail = 'person@kilo.ai';
     mockChatGptAllowed = true;
     const html = renderToStaticMarkup(
@@ -123,7 +124,8 @@ describe('SignInForm sign-in options', () => {
     expect(html.match(/Sign in with ChatGPT/g)).toHaveLength(1);
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
-    expect(mockHookEmail).toBe('person@kilo.ai');
+    // The typed address is not evaluated; the hook waits for the submit.
+    expect(mockHookEmail).toBe(null);
   });
 
   it('hides ChatGPT on sign-up when the flag is off for the typed email', () => {

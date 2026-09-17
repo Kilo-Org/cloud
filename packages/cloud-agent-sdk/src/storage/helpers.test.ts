@@ -245,9 +245,7 @@ describe('tool part lifecycle ordering', () => {
   test('applies a newer running update over a stored terminal that settled before the run', () => {
     // Mirror reopen replay: the cache still holds a stale stored terminal while
     // the live run (started later) is the current state of the same part.
-    const arr = [
-      makeToolPart('p-1', 'completed', { start: 1700100002000, end: 1700100006000 }),
-    ];
+    const arr = [makeToolPart('p-1', 'completed', { start: 1700100002000, end: 1700100006000 })];
     const result = upsertPartDroppingStaleSyntheticParts(
       arr,
       makeToolPart('p-1', 'running', { start: 1789655865076 })

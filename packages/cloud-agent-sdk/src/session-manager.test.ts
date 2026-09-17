@@ -7549,7 +7549,10 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
         .fn()
         .mockResolvedValue(cachedTaskPage(runningTaskPart(1_789_655_865_076)));
       const fetchSnapshotPage = createPageFetchMock(async () =>
-        makePage({ kiloSessionId: 'ses-1', messages: [taskMessage(completedTaskPart(1_700_100_006_000))] })
+        makePage({
+          kiloSessionId: 'ses-1',
+          messages: [taskMessage(completedTaskPart(1_700_100_006_000))],
+        })
       );
       const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
       const mgr = createSessionManager(config);
@@ -7569,7 +7572,10 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
         .fn()
         .mockResolvedValue(cachedTaskPage(completedTaskPart(1_700_100_006_000)));
       const fetchSnapshotPage = createPageFetchMock(async () =>
-        makePage({ kiloSessionId: 'ses-1', messages: [taskMessage(runningTaskPart(1_789_655_865_076))] })
+        makePage({
+          kiloSessionId: 'ses-1',
+          messages: [taskMessage(runningTaskPart(1_789_655_865_076))],
+        })
       );
       const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
       const mgr = createSessionManager(config);

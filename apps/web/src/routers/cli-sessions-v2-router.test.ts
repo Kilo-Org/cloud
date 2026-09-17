@@ -1744,6 +1744,23 @@ describe('cli-sessions-v2-router', () => {
       ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     });
 
+    it('get distinguishes a session owned by another account from one that does not exist', async () => {
+      // The session exists (created for regularUser in beforeEach) but the
+      // caller is a different signed-in account: an access denial, not a
+      // missing row. The session-resume gate and the mobile session route
+      // render these two denials with different copy, so the lookup must say
+      // which one happened.
+      const caller = await createCallerForUser(otherUser.id);
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: organizationSessionId })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: 'ses_never_ingested_unknown_id' })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
     it('getByCloudAgentSessionId rejects an organization session after its creator loses membership', async () => {
       await removeCreatorMembership();
 

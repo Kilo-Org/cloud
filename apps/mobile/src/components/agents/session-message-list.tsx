@@ -15,8 +15,14 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
+import { useSessionListAnchorReport } from '@/components/agents/use-session-list-anchor-report';
+import { useSessionListResumeScroll } from '@/components/agents/use-session-list-resume-scroll';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
+import {
+  getSessionTranscriptItemMessageId,
+  type SessionTranscriptItem,
+} from '@/components/agents/session-transcript';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getOlderMessagesArrivedAnnouncement,
@@ -46,6 +52,21 @@ type SessionMessageListProps<T> = {
   onLoadOlderMessages: () => void;
   renderItem: ListRenderItem<T>;
   ListFooterComponent?: React.ComponentType | React.ReactElement | null;
+  /**
+   * Message id a `?at=` deep link wants the transcript to open on. When it is
+   * a rendered row the list scrolls to it once; when it lives in an older page
+   * the list loads pages up to a bound and re-plans. Absent/null keeps every
+   * existing caller byte-identical, and an anchor the session no longer has
+   * scrolls nothing and blanks nothing.
+   */
+  resumeAt?: string | null;
+  /**
+   * Optional callback fired when the topmost viewable row's message changes.
+   * The host publishes it as the session's position (route search params and
+   * the OS handoff entry point). Absent keeps every existing caller
+   * byte-identical: no viewability wiring is attached at all.
+   */
+  onAnchorChange?: (messageId: string) => void;
   /**
    * Extra bottom padding (in dp) applied to the list's content container.
    * The default (undefined) keeps the legacy `paddingVertical: 8` behavior
@@ -78,7 +99,28 @@ export function SessionMessageList<T>({
   ListFooterComponent,
   contentBottomInset,
   onReachedBottom,
+  onAnchorChange,
+  resumeAt,
 }: Readonly<SessionMessageListProps<T>>) {
+  // Rows are already present when the list mounts (the resume never mounts a
+  // blank list), so the resume decision is derivable at render: every row's
+  // anchor id via `getSessionTranscriptItemMessageId`, and whether the anchor
+  // is one of them.
+  const anchorIds = useMemo(
+    () => items.map(item => getSessionTranscriptItemMessageId(item as SessionTranscriptItem)),
+    [items]
+  );
+  const resumeAnchor =
+    resumeAt !== undefined && resumeAt !== null && resumeAt.trim().length > 0
+      ? resumeAt.trim()
+      : null;
+  // Follow the newest message at mount exactly as before UNLESS the resume has
+  // work to do: an anchor that is already a row (scroll), or one that may still
+  // arrive with an older page (load-older). An anchor the session no longer has
+  // and no older history to search keeps the list byte-identical to an
+  // anchor-less open — at the bottom, following the tail.
+  const anchorIsRow = resumeAnchor !== null && anchorIds.includes(resumeAnchor);
+  const followTailAtMount = !(anchorIsRow || (resumeAnchor !== null && hasOlderMessages));
   // FlashList v2 renders the list in chronological order (oldest → newest).
   // `startRenderingFromBottom` keeps the viewport anchored at the newest
   // message on first render and after prepended older pages, which is the
@@ -87,6 +129,9 @@ export function SessionMessageList<T>({
     isAtBottom,
     listRef,
     scrollToLatestAnimated,
+    suppressAutoFollow,
+    isUserScrollingRef,
+    userInteractedRef,
     handleContentSizeChange,
     handleKeyboardShow,
     handleListLayout,
@@ -98,6 +143,7 @@ export function SessionMessageList<T>({
   } = useSessionListAutoScroll<T>({
     itemCount: items.length,
     resetKey: sessionId,
+    initialAutoScroll: followTailAtMount,
   });
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -136,6 +182,28 @@ export function SessionMessageList<T>({
   useEffect(() => {
     inFlightRef.current = false;
   }, [sessionId]);
+
+  // Report the viewport's topmost message to the host. Absent `onAnchorChange`,
+  // nothing is wired: no viewability callback, no config.
+  const anchorReport = useSessionListAnchorReport<T>({ sessionId, onAnchorChange });
+
+  // Resume-position scroll for a `?at=` deep link — see
+  // `use-session-list-resume-scroll` for the plan, the page budget, and the
+  // device-proven retry schedule.
+  useSessionListResumeScroll<T>({
+    sessionId,
+    anchorIds,
+    hasOlderMessages,
+    isLoadingOlderMessages,
+    olderMessagesError,
+    onLoadOlderMessages,
+    isInFlightRef: inFlightRef,
+    listRef,
+    isUserScrollingRef,
+    userInteractedRef,
+    suppressAutoFollow,
+    resumeAt,
+  });
 
   // Keep the newest message visible when the keyboard opens, but only while
   // the follow guard is true (the user is still at the bottom). On iOS,
@@ -253,6 +321,9 @@ export function SessionMessageList<T>({
         scrollEventThrottle={16}
         onStartReached={hasOlderMessages ? handleStartReached : undefined}
         onStartReachedThreshold={ON_START_REACHED_THRESHOLD}
+        // Viewability is only wired when a host asked for the position, so
+        // every other caller's list stays byte-identical.
+        {...anchorReport}
         maintainVisibleContentPosition={{
           // Start rendering from the bottom so the newest message is visible
           // on first render. `autoscrollToTopThreshold` is left at its default

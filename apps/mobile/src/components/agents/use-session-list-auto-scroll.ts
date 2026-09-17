@@ -15,6 +15,14 @@ import { useMotionPolicy } from '@/lib/a11y/motion';
 type UseSessionListAutoScrollParams = {
   itemCount: number;
   resetKey: string;
+  /**
+   * Whether the session opens following the newest message. Default true keeps
+   * every existing caller byte-identical. A `?at=` resume passes false: the
+   * list opens on an older row and the mount-time scroll-to-end (and its 80ms
+   * safety-net retry) would otherwise scroll the viewport back to the bottom,
+   * discarding the resume position.
+   */
+  initialAutoScroll?: boolean;
 };
 
 /**
@@ -27,6 +35,7 @@ type UseSessionListAutoScrollParams = {
 export function useSessionListAutoScroll<ItemT>({
   itemCount,
   resetKey,
+  initialAutoScroll = true,
 }: UseSessionListAutoScrollParams) {
   const listRef = useRef<FlashListRef<ItemT>>(null);
   const { scrollAnimated } = useMotionPolicy();
@@ -45,6 +54,12 @@ export function useSessionListAutoScroll<ItemT>({
   // otherwise a content-size update from a streaming response yanks the
   // viewport back to the bottom and the user's drag appears to "bounce back".
   const isUserScrollingRef = useRef(false);
+  // Sticky for the whole session: set on the first user drag, cleared only
+  // when the session (or the follow policy) resets. A scheduled programmatic
+  // scroll (the `?at=` resume retries) must not fight a user who has taken
+  // over the transcript — `isUserScrollingRef` only covers the drag itself,
+  // while this covers everything after the user lets go.
+  const userInteractedRef = useRef(false);
   const lastContentHeightRef = useRef(0);
   const autoScrollResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoScrollRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,6 +111,30 @@ export function useSessionListAutoScroll<ItemT>({
     listRef.current?.scrollToEnd({ animated: scrollAnimated });
   }, [scrollAnimated]);
 
+  /**
+   * Suppresses the tail follow for a bounded window. A scheduled programmatic
+   * resume scroll produces scroll events of its own, and FlashList's own
+   * bottom-start initial scroll races them; every one of those scroll events
+   * reads "at the bottom" and would arm the tail follow
+   * (`shouldAutoScrollRef`), so the next content-size change yanks the
+   * viewport back to the newest message and discards the resume. While the
+   * suppression is on, `handleScroll` skips the at-bottom update (the same
+   * mechanism the 150ms `scrollToEnd` window uses), so the follow stays off
+   * until the resume has landed. A resume open arms this at mount, before
+   * FlashList's bottom-start events arrive, and re-arms it on every retry.
+   */
+  const suppressAutoFollow = useCallback(
+    (ms: number) => {
+      isAutoScrollingRef.current = true;
+      clearAutoScrollResetTimeout();
+      autoScrollResetTimeoutRef.current = setTimeout(() => {
+        isAutoScrollingRef.current = false;
+        autoScrollResetTimeoutRef.current = null;
+      }, ms);
+    },
+    [clearAutoScrollResetTimeout]
+  );
+
   const scheduleScrollToLatestMessage = useCallback(() => {
     if (
       !shouldScheduleSessionAutoScroll({
@@ -127,11 +166,12 @@ export function useSessionListAutoScroll<ItemT>({
   }, [clearAutoScrollRetryTimeout, scrollToLatestMessage]);
 
   useEffect(() => {
-    const initial = getInitialSessionListAutoScrollVisibility();
+    const initial = getInitialSessionListAutoScrollVisibility({ followTail: initialAutoScroll });
     shouldAutoScrollRef.current = initial.shouldAutoScroll;
     lastContentHeightRef.current = 0;
+    userInteractedRef.current = false;
     setIsAtBottom(prev => (prev === initial.isAtBottom ? prev : initial.isAtBottom));
-  }, [resetKey]);
+  }, [resetKey, initialAutoScroll]);
 
   useEffect(() => {
     if (itemCount > 0 && shouldAutoScrollRef.current && !isUserScrollingRef.current) {
@@ -178,6 +218,7 @@ export function useSessionListAutoScroll<ItemT>({
 
   const handleScrollBeginDrag = useCallback(() => {
     isUserScrollingRef.current = true;
+    userInteractedRef.current = true;
     isAutoScrollingRef.current = false;
     clearAutoScrollResetTimeout();
     clearAutoScrollRetryTimeout();
@@ -264,6 +305,19 @@ export function useSessionListAutoScroll<ItemT>({
     isAtBottom,
     listRef,
     scrollToLatestAnimated,
+    suppressAutoFollow,
+    /**
+     * Live "user is dragging or momentum is in flight" flag. A scheduled
+     * programmatic scroll (the `?at=` resume retries) reads it so a retry
+     * never yanks the list out of the user's drag.
+     */
+    isUserScrollingRef,
+    /**
+     * Sticky "the user has grabbed this transcript" flag for the current
+     * session. A scheduled resume scroll cancels itself once this is true:
+     * after the first drag the position belongs to the user, not the link.
+     */
+    userInteractedRef,
     handleContentSizeChange,
     handleKeyboardShow,
     handleListLayout,

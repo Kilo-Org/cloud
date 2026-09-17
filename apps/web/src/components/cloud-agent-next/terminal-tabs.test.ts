@@ -23,6 +23,7 @@ import {
 Object.assign(globalThis, { React });
 
 let mockSessionId: string | null = 'ses_recent';
+let mockAtParam: string | null = null;
 let mockWorktreeId: string | null = 'worktree_shared';
 let mockTabs: ComponentProps<typeof CloudAgentWorkspaceTabs>;
 let mockConversation: ComponentProps<typeof ConversationMessages>;
@@ -58,7 +59,11 @@ jest.mock('jotai', () => ({
   useSetAtom: () => mockSetAtom,
 }));
 jest.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(mockSessionId ? { sessionId: mockSessionId } : {}),
+  useSearchParams: () =>
+    new URLSearchParams({
+      ...(mockSessionId ? { sessionId: mockSessionId } : {}),
+      ...(mockAtParam ? { at: mockAtParam } : {}),
+    }),
 }));
 jest.mock('@tanstack/react-query', () => ({
   useMutation: () => ({ mutateAsync: jest.fn() }),
@@ -367,6 +372,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
 
   beforeEach(() => {
     mockSessionId = 'ses_recent';
+    mockAtParam = null;
     mockWorktreeId = 'worktree_shared';
     mockClosedPtys.length = 0;
     mockAtomValues = {
@@ -736,6 +742,38 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     render();
     expect(dom.container.querySelector('[data-pty-owner]')).toBeNull();
     expect(mockClosedPtys).toEqual(['workspace_ses_recent']);
+  });
+
+  it('hands an unresolvable ?at= link back to the tail, like a link without it', () => {
+    mockAtParam = 'msg_gone';
+    mockAtomValues.staticMessages = [
+      {
+        info: {
+          id: 'msg_1',
+          role: 'user',
+          sessionID: 'ses_recent',
+          parentID: 'ses_recent',
+          error: null,
+        },
+        parts: [],
+      },
+    ];
+    mockSetAtom.mockClear();
+
+    render();
+
+    const chatUiWrites = mockSetAtom.mock.calls
+      .map(call => call[0] as { shouldAutoScroll?: boolean } | null)
+      .filter(
+        (value): value is { shouldAutoScroll: boolean } =>
+          typeof value === 'object' && value !== null && 'shouldAutoScroll' in value
+      );
+
+    // The resume paused follow while it looked for the anchor...
+    expect(chatUiWrites).toContainEqual({ shouldAutoScroll: false });
+    // ...and an anchor the session no longer has opens at the bottom, following
+    // new output, exactly as a link without `at=` does.
+    expect(chatUiWrites.at(-1)).toEqual({ shouldAutoScroll: true });
   });
 });
 

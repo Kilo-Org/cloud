@@ -1,6 +1,6 @@
 import type { KiloClawEnv } from '../../types';
 import type { FlyClientConfig } from '../../fly/client';
-import type { FlyMachineConfig } from '../../fly/types';
+import type { FlyMachineConfig, FlyVolume } from '../../fly/types';
 import type { FlyProviderState } from '../../schemas/instance-config';
 import type { RuntimeSpec } from '../../providers/types';
 import * as fly from '../../fly/client';
@@ -73,8 +73,60 @@ export function buildFlyMachineConfig(
   };
 }
 
+/** Volume states that can never be reused by a new machine. */
+const NON_ADOPTABLE_VOLUME_STATES: ReadonlySet<FlyVolume['state']> = new Set([
+  'pending_destroy',
+  'destroying',
+  'destroyed',
+]);
+
 /**
- * Ensure a Fly Volume exists. Creates one if flyVolumeId is null.
+ * Adopt the newest existing volume that belongs to this instance.
+ *
+ * When the Durable Object loses `flyVolumeId` (for example after an
+ * unexpected-stop recovery that never finished), creating a fresh volume mounts
+ * an empty disk over data that still exists on Fly. Recovery forks and
+ * stranded-volume replacements keep the instance's volume name and are created
+ * last, so the newest usable volume with that name holds the latest data.
+ */
+async function adoptExistingVolume(
+  flyConfig: FlyClientConfig,
+  expectedName: string,
+  state: FlyRuntimeState,
+  reason: string
+): Promise<FlyVolume | null> {
+  const volumes = await fly.listVolumes(flyConfig);
+  const candidates = volumes
+    .filter(volume => volume.name === expectedName)
+    .filter(volume => !NON_ADOPTABLE_VOLUME_STATES.has(volume.state))
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+
+  const [adopted] = candidates;
+  if (!adopted) return null;
+
+  if (candidates.length > 1) {
+    doWarn(state, 'Multiple usable volumes match the instance; adopting the newest', {
+      expected_name: expectedName,
+      volume_ids: candidates.map(volume => volume.id),
+    });
+  }
+
+  reconcileLog(reason, 'adopt_volume', {
+    fly_app_name: flyConfig.appName,
+    volume_id: adopted.id,
+    volume_state: adopted.state,
+    volume_created_at: adopted.created_at,
+    region: adopted.region,
+  });
+  return adopted;
+}
+
+/**
+ * Ensure a Fly Volume exists.
+ *
+ * Reuses the instance's existing volume when the DO lost its reference, so a
+ * restart cannot mount an empty disk over data that is still on Fly. Creates a
+ * fresh volume only when no usable volume exists.
  */
 export async function ensureVolume(
   flyConfig: FlyClientConfig,
@@ -85,6 +137,27 @@ export async function ensureVolume(
 ): Promise<FlyProviderState> {
   if (providerState.volumeId) return providerState;
   if (!state.sandboxId) return providerState;
+
+  const expectedName = volumeNameFromSandboxId(state.sandboxId);
+  let adopted: FlyVolume | null = null;
+  try {
+    adopted = await adoptExistingVolume(flyConfig, expectedName, state, reason);
+  } catch (err) {
+    // A restart must never fall back to creating an empty volume when the
+    // lookup fails: that is the data-loss path this adoption exists to stop.
+    // A never-started instance has no data to protect, so keep old behavior.
+    if (state.lastStartedAt !== null) throw err;
+    doWarn(state, 'Volume adoption lookup failed; creating a fresh volume', {
+      error: toLoggable(err),
+    });
+  }
+  if (adopted) {
+    return {
+      ...providerState,
+      volumeId: adopted.id,
+      region: adopted.region,
+    };
+  }
 
   const regions = providerState.region
     ? parseRegions(providerState.region)

@@ -148,6 +148,8 @@ import { buildChannelConfigPatch } from './kiloclaw-instance/channel-config';
 import { destroyRetryDelay } from './kiloclaw-instance/log';
 import * as flyClient from '../fly/client';
 import { FlyApiError } from '../fly/client';
+import type { FlyVolume } from '../fly/types';
+import { volumeNameFromSandboxId } from './machine-config';
 import * as db from '../db';
 import * as gatewayEnv from '../gateway/env';
 import * as regions from './regions';
@@ -433,6 +435,18 @@ async function seedRecovering(
     recoveryStartedAt: Date.now(),
     ...overrides,
   });
+}
+
+function flyVolume(overrides: Partial<FlyVolume> & Pick<FlyVolume, 'id'>): FlyVolume {
+  return {
+    name: volumeNameFromSandboxId('sandbox-1'),
+    state: 'created',
+    size_gb: 10,
+    region: 'sjc',
+    attached_machine_id: null,
+    created_at: '2026-09-14T00:00:00.000Z',
+    ...overrides,
+  };
 }
 
 function dockerProviderState(overrides: Record<string, unknown> = {}) {
@@ -2484,6 +2498,53 @@ describe('reconciliation: volume', () => {
       return msg.includes('replace_lost_volume') && msg.includes('data_loss');
     });
     expect(dataLossLog).toBeDefined();
+  });
+
+  it('adopts the newest existing volume when flyVolumeId is null after a restart', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyVolumeId: null, lastStartedAt: Date.now() });
+
+    const name = volumeNameFromSandboxId('sandbox-1');
+    (flyClient.listVolumes as Mock).mockResolvedValueOnce([
+      flyVolume({
+        id: 'vol-original',
+        name,
+        state: 'pending_destroy',
+        created_at: '2026-09-08T17:39:32.095Z',
+      }),
+      flyVolume({ id: 'vol-fork', name, created_at: '2026-09-14T22:21:19.270Z' }),
+      flyVolume({
+        id: 'vol-other-sandbox',
+        name: 'kiloclaw_other',
+        created_at: '2026-09-16T00:00:00Z',
+      }),
+    ]);
+
+    await instance.alarm();
+
+    expect(flyClient.createVolumeWithFallback).not.toHaveBeenCalled();
+    expect(storage._store.get('flyVolumeId')).toBe('vol-fork');
+    expect(storage._store.get('flyRegion')).toBe('sjc');
+  });
+
+  it('creates a fresh volume when every matching volume is non-adoptable', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyVolumeId: null, lastStartedAt: Date.now() });
+
+    const name = volumeNameFromSandboxId('sandbox-1');
+    (flyClient.listVolumes as Mock).mockResolvedValueOnce([
+      flyVolume({ id: 'vol-reaping', name, state: 'pending_destroy' }),
+      flyVolume({ id: 'vol-gone', name, state: 'destroyed' }),
+    ]);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'iad',
+    });
+
+    await instance.alarm();
+
+    expect(flyClient.createVolumeWithFallback).toHaveBeenCalled();
+    expect(storage._store.get('flyVolumeId')).toBe('vol-new');
   });
 });
 
@@ -5158,6 +5219,41 @@ describe('start: volume region validation', () => {
     expect(flyClient.getVolume).toHaveBeenCalledWith(expect.anything(), 'vol-1');
     // Region was not changed since volume matches stored flyRegion
     expect(storage._store.get('flyRegion')).toBe('iad');
+  });
+
+  it('adopts the existing data volume on start when flyVolumeId was lost', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyVolumeId: null,
+      flyMachineId: null,
+      flyRegion: null,
+      lastStartedAt: Date.now(),
+    });
+
+    (flyClient.listVolumes as Mock).mockResolvedValueOnce([
+      flyVolume({ id: 'vol-fork', name: volumeNameFromSandboxId('sandbox-1'), region: 'sjc' }),
+    ]);
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'sjc' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(flyClient.createVolumeWithFallback).not.toHaveBeenCalled();
+    expect(storage._store.get('flyVolumeId')).toBe('vol-fork');
+  });
+
+  it('start fails closed instead of creating an empty volume when adoption lookup fails', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyVolumeId: null,
+      flyMachineId: null,
+      lastStartedAt: Date.now(),
+    });
+
+    (flyClient.listVolumes as Mock).mockRejectedValueOnce(new FlyApiError('fly down', 500, '{}'));
+
+    await expect(instance.start('user-1')).rejects.toThrow('fly down');
+    expect(flyClient.createVolumeWithFallback).not.toHaveBeenCalled();
   });
 });
 

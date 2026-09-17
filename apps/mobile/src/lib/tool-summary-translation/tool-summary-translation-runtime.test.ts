@@ -461,6 +461,26 @@ describe('tool summary translation hydration', () => {
     expect(requestMock).not.toHaveBeenCalled();
   });
 
+  it('does not seed the cache from a store read that settles after an account reset', async () => {
+    // Sign-out (or a direct account switch) can reset the memory while the
+    // store read is still in flight. The entries that read returns belong to
+    // the account the reset just dropped, so seeding them would repopulate the
+    // cache the reset cleared.
+    const gate = Promise.withResolvers<StoreEntry[]>();
+    readMock.mockImplementation(
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- the mock hands back a promise the test resolves later
+      () => gate.promise
+    );
+    const mod = await loadRuntime();
+    mod.setConfig({ enabled: true, model: MODEL });
+
+    mod.clearToolSummaryTranslationMemory();
+    gate.resolve([storeEntry({ itemId: 'part-1', text: 'Hello', translation: 'Hallo' })]);
+    await flushBatch();
+
+    expect(mod.getTranslation('part-1', 'Hello', 'de', MODEL.id)).toBeUndefined();
+  });
+
   it('does not serve an entry older than the TTL and re-requests it', async () => {
     const staleStoredAt = Date.now() - (2 * 24 * 60 * 60 * 1000 + 1000);
     readMock.mockResolvedValue([

@@ -118,6 +118,35 @@ describe('tool summary translation sign-out teardown', () => {
     gate.resolve(undefined);
   });
 
+  it('forgets a write older than the drain bound, so a hung store cannot grow the tracker', async () => {
+    const mod = await loadRuntime();
+    // The first write never answers, as a hung native module would; later ones
+    // settle normally.
+    const gate = Promise.withResolvers<undefined>();
+    persistMock.mockReturnValueOnce(gate.promise);
+
+    vi.useFakeTimers();
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await vi.advanceTimersByTimeAsync(50);
+    expect(persistMock).toHaveBeenCalledTimes(1);
+
+    // Past the bound: the hung write is one a sign-out drain would already have
+    // abandoned, so dispatching the next write must forget it instead of
+    // tracking it for the rest of the session.
+    await vi.advanceTimersByTimeAsync(mod.TOOL_SUMMARY_TRANSLATION_SIGN_OUT_DRAIN_TIMEOUT_MS + 1);
+    mod.ensureTranslation({ itemId: 'part-2', text: 'world', language: 'de', model: MODEL });
+    await vi.advanceTimersByTimeAsync(50);
+    expect(persistMock).toHaveBeenCalledTimes(2);
+
+    // Nothing is genuinely pending any more, so the sign-out drains nothing: a
+    // still-tracked hung write would arm the whole bound here.
+    const signOut = mod.clearToolSummaryTranslationMemoryForSignOut();
+    expect(vi.getTimerCount()).toBe(0);
+    await signOut;
+
+    gate.resolve(undefined);
+  });
+
   it('forgets a rejected store write instead of leaving it pending', async () => {
     const mod = await loadRuntime();
     persistMock.mockRejectedValue(new Error('store write failed'));

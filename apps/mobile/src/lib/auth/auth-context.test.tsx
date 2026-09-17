@@ -806,13 +806,37 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
-  it('clears the offline translation cache exactly once, before the query client clear', async () => {
+  it('clears the offline translation cache exactly once, only after the runtime reset settles', async () => {
     const { ctx, unmount } = await mountAndGetContext();
     const { queryClient: queryClientMock } = await import('@/lib/query-client');
     const clearMock = vi.mocked(queryClientMock.clear);
 
+    // The runtime reset (generation bump + drain of the writes already
+    // dispatched) is asynchronous. Hold it open: an invocation-order assertion
+    // alone cannot see a dropped `await`, because both mocks are invoked
+    // synchronously in that order either way.
+    const gate = Promise.withResolvers<undefined>();
+    toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut.mockReturnValueOnce(
+      gate.promise
+    );
+
+    const signOutPromise = ctx.signOut();
+    await vi.waitFor(() => {
+      expect(
+        toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    // The disk scope still holds the signed-out account's tool text, so the
+    // clear must not run while the reset that settles its dispatched writes is
+    // in flight: a persist that settled afterwards would outlive the scope.
+    expect(
+      toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut
+    ).not.toHaveBeenCalled();
+
+    gate.resolve(undefined);
     await act(async () => {
-      await ctx.signOut();
+      await signOutPromise;
     });
 
     // The offline translation cache holds the signed-out account's tool text,

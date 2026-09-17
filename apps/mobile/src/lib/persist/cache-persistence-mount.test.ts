@@ -331,6 +331,14 @@ describe('CachePersistenceMount', () => {
       toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut
     ).not.toHaveBeenCalled();
 
+    // The runtime reset settles the writes it already dispatched, so hold it
+    // open: an invocation-order assertion alone cannot see a dropped `await`,
+    // because both mocks are invoked synchronously in that order either way.
+    const gate = Promise.withResolvers<undefined>();
+    toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut.mockReturnValueOnce(
+      gate.promise
+    );
+
     // A direct account switch (no sign-out): the mount must drop the old
     // account's read-cache scope and offline translation cache before
     // subscribing for the new account.
@@ -341,14 +349,24 @@ describe('CachePersistenceMount', () => {
     await flushMicrotasks();
 
     expect(kvMock.clearScopePrefix).toHaveBeenCalledWith('cache:u1:');
-    expect(
-      toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut
-    ).toHaveBeenCalledTimes(1);
-    // The runtime reset (generation bump + dispatched-write drain) resolves
-    // before the disk scope is cleared, so a fire-and-forget persist from the
-    // previous account cannot land after the scope is gone.
+    // The runtime reset (generation bump + dispatched-write drain) runs before
+    // the disk scope is cleared, so a fire-and-forget persist from the previous
+    // account cannot land after the scope is gone.
     expect(
       toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut
+    ).toHaveBeenCalledTimes(1);
+    // The disk scope still holds the previous account's tool text, so the clear
+    // must not run while the reset that settles its dispatched writes is in
+    // flight.
+    expect(
+      toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut
+    ).not.toHaveBeenCalled();
+
+    gate.resolve(undefined);
+    await flushMicrotasks();
+
+    expect(
+      toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut
     ).toHaveBeenCalledTimes(1);
     const runtimeResetOrder =
       toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut.mock

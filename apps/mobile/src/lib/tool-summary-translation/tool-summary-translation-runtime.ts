@@ -138,17 +138,29 @@ const retryable = new Map<string, QueueItem>();
 let clientPromise: Promise<typeof toolSummaryTranslationClient> | null = null;
 
 /**
- * The store writes `remember` has dispatched that have not settled yet. A
- * sign-out must drain them before it clears the disk scope: a write that
- * started under the signed-out account can otherwise land after the clear and
- * leave its entry behind. `drainPendingPersists` bounds that wait, so a write
- * that never settles cannot hold sign-out teardown either.
+ * The store writes `remember` has dispatched that have not settled yet, each
+ * with the time it was dispatched. A sign-out must drain them before it clears
+ * the disk scope: a write that started under the signed-out account can
+ * otherwise land after the clear and leave its entry behind.
+ * `drainPendingPersists` bounds that wait, so a write that never settles cannot
+ * hold sign-out teardown either; for the same reason a write is remembered only
+ * for that bound, so a store that never answers cannot keep one tracked
+ * promise — and the entry it captured — per resolved translation for the whole
+ * session.
  */
-const pendingPersists = new Set<Promise<void>>();
+const pendingPersists = new Map<Promise<void>, number>();
 
-/** Tracks one fire-and-forget store write until it settles. */
+/** Tracks one fire-and-forget store write until it settles or ages out. */
 function trackPersist(write: Promise<void>): void {
-  pendingPersists.add(write);
+  const dispatchedAt = Date.now();
+  // Drop the writes a sign-out would already have abandoned: a store whose
+  // writes never settle would otherwise grow this map for the whole session.
+  for (const [tracked, trackedAt] of pendingPersists) {
+    if (dispatchedAt - trackedAt >= TOOL_SUMMARY_TRANSLATION_SIGN_OUT_DRAIN_TIMEOUT_MS) {
+      pendingPersists.delete(tracked);
+    }
+  }
+  pendingPersists.set(write, dispatchedAt);
   void (async () => {
     try {
       await write;
@@ -192,6 +204,15 @@ let generation = 0;
  */
 let hydrationStarted = false;
 let hydrated = false;
+/**
+ * Bumped by {@link clearToolSummaryTranslationMemory} on sign-out and on a
+ * direct account switch. {@link startHydration} reads it before it awaits the
+ * store and drops the seed when it changed meanwhile: the entries that read
+ * returns belong to the account the reset just dropped, so seeding them would
+ * repopulate the cache the reset cleared. Only the account reset counts here —
+ * a configuration change keeps the cache and its hydration seed.
+ */
+let accountResetEpoch = 0;
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -326,16 +347,24 @@ async function readStoredTranslationsWithinTimeout(): Promise<CachedToolSummaryT
  * opt-in turns on and from the first `ensureTranslation`. It seeds the memory
  * cache with the unexpired entries, then emits. A store failure or a read that
  * never settles reads as no entries (memory only), so the flush is released
- * either way and translation never waits on the cache.
+ * either way and translation never waits on the cache. A read that settles
+ * after an account reset seeds nothing: the reset's clear is final.
  */
 function startHydration(): void {
   if (hydrationStarted) {
     return;
   }
   hydrationStarted = true;
+  const epochAtStart = accountResetEpoch;
   void (async () => {
     try {
       const entries = await readStoredTranslationsWithinTimeout();
+      // A reset that ran while the read was in flight already cleared the
+      // cache this read was started for; its entries are the signed-out
+      // account's, so the read must neither seed nor notify.
+      if (epochAtStart !== accountResetEpoch) {
+        return;
+      }
       const now = Date.now();
       let seeded = false;
       for (const stored of entries) {
@@ -711,10 +740,13 @@ export function retryUnresolvedTranslations(): void {
  * connection recovery, so without this the signed-out account's summaries
  * would be sent to the gateway under the next account's token. The generation
  * bump discards a batch that is still in flight under the old account, and
- * the emitted version drops every mounted row back to its source text.
+ * the emitted version drops every mounted row back to its source text. The
+ * reset epoch fences a hydration read that is still in flight too, so the
+ * cleared cache stays cleared.
  */
 export function clearToolSummaryTranslationMemory(): void {
   generation += 1;
+  accountResetEpoch += 1;
   queue.length = 0;
   inFlight.clear();
   retryable.clear();
@@ -750,13 +782,12 @@ async function drainPendingPersists(): Promise<void> {
   try {
     const outcome = await Promise.race([
       // `allSettled` never rejects, so no write outcome can abort sign-out.
-      Promise.allSettled(pendingPersists).then(() => 'settled' as const),
+      Promise.allSettled(pendingPersists.keys()).then(() => 'settled' as const),
       timeout,
     ]);
-    // A write the bound gave up on can hang forever, and `trackPersist` only
-    // forgets a write that settles. Drop the abandoned writes here, or the next
-    // sign-out sees them as still pending and re-pays the whole bound for work
-    // already written off.
+    // A write the bound gave up on can hang forever, so drop the abandoned
+    // writes here: the next sign-out must not see them as still pending and
+    // re-pay the whole bound for work already written off.
     if (outcome === 'timeout') {
       pendingPersists.clear();
     }

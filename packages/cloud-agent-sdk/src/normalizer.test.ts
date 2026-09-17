@@ -404,6 +404,40 @@ describe('normalize', () => {
     });
   });
 
+  describe('message.removed', () => {
+    it('normalizes with field name mapping (sessionID → sessionId, etc.)', () => {
+      const result = normalize(
+        createRaw('message.removed', { sessionID: 'ses-1', messageID: 'msg-1' })
+      );
+      expect(result).toEqual({
+        type: 'message.removed',
+        sessionId: 'ses-1',
+        messageId: 'msg-1',
+      });
+    });
+
+    it('is routed as a chat event so storage receives the removal', () => {
+      const result = normalize(
+        createRaw('message.removed', { sessionID: 'ses-1', messageID: 'msg-1' })
+      );
+      expect(result !== null && isChatEvent(result)).toBe(true);
+    });
+
+    it('returns null when sessionID is missing', () => {
+      expect(normalize(createRaw('message.removed', { messageID: 'msg-1' }))).toBeNull();
+    });
+
+    it('returns null when messageID is missing', () => {
+      expect(normalize(createRaw('message.removed', { sessionID: 'ses-1' }))).toBeNull();
+    });
+
+    it('returns null when messageID is not a string', () => {
+      expect(
+        normalize(createRaw('message.removed', { sessionID: 'ses-1', messageID: 1 }))
+      ).toBeNull();
+    });
+  });
+
   describe('session.status', () => {
     it('normalizes valid busy status', () => {
       const result = normalize(

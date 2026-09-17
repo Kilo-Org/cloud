@@ -10,6 +10,8 @@
  * the launch capture runs at `_layout.tsx` module scope.
  */
 
+import { captureTelemetry } from '@/lib/telemetry/error-sink';
+
 import { setPendingDeepLink } from './deep-link-launch';
 import {
   addSystemSearchOpenListener,
@@ -40,16 +42,36 @@ export function routeSystemSearchOpen(routeId: string | null): void {
 }
 
 /**
+ * One report per failed slot read, tagged so the subsystem is filterable. The
+ * native read is a get-and-clear, so a rejection means the tap is gone and the
+ * report is its only trace. Never log the identifier.
+ */
+function reportSystemSearchRouteFailure(error: unknown): void {
+  captureTelemetry({
+    error,
+    level: 'warning',
+    tags: { 'error.subsystem': 'system-search', 'error.operation': 'consume-route' },
+  });
+}
+
+/**
  * Reads the single-shot slot and stashes the route it resolves to.
  *
  * The native read is asynchronous — the module resolves the identifier on its
  * own queue, so a blocking index scan never runs on the JavaScript thread — so
  * the route lands a turn later. The root layout consumes the pending slot
  * reactively, so a later fill still navigates.
+ *
+ * The inner handler owns the rejection, so a failed read can never surface as
+ * an unhandled rejection and is reported instead of dropped silently.
  */
 function consumeAndRoute(): void {
   void (async () => {
-    routeSystemSearchOpen(await consumePendingSystemSearchRoute());
+    try {
+      routeSystemSearchOpen(await consumePendingSystemSearchRoute());
+    } catch (error) {
+      reportSystemSearchRouteFailure(error);
+    }
   })();
 }
 

@@ -51,6 +51,7 @@ vi.mock('@/lib/native-system-search', () => ({
 
 /* eslint-disable import/first */
 import { PENDING_DEEP_LINK_KEY } from '@/lib/storage-keys';
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 import {
   _resetDeepLinkLaunchForTests,
   _setSecureStoreForTests,
@@ -84,6 +85,7 @@ describe('system-search-route', () => {
 
   afterEach(() => {
     _resetDeepLinkLaunchForTests();
+    setTelemetrySink(null);
     store.clear();
   });
 
@@ -167,6 +169,45 @@ describe('system-search-route', () => {
 
       await vi.waitFor(() => {
         expect(mocks.consumePendingRoute).toHaveBeenCalledOnce();
+      });
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+  });
+
+  describe('a rejected native slot read', () => {
+    it.each([
+      [
+        'the launch capture',
+        () => {
+          captureSystemSearchLaunch();
+        },
+      ],
+      [
+        'the wake-up listener',
+        () => {
+          registerSystemSearchOpenListener();
+          const listener = mocks.addListener.mock.calls[0]?.[0];
+          listener?.();
+        },
+      ],
+    ])('reports %s instead of leaving an unhandled rejection', async (_name, trigger) => {
+      const error = new Error('native slot read failed');
+      mocks.consumePendingRoute.mockRejectedValueOnce(error);
+      const events: TelemetryEvent[] = [];
+      setTelemetrySink(event => {
+        events.push(event);
+      });
+
+      trigger();
+
+      await vi.waitFor(() => {
+        expect(events).toHaveLength(1);
+      });
+      expect(events[0]?.error).toBe(error);
+      expect(events[0]?.level).toBe('warning');
+      expect(events[0]?.tags).toMatchObject({
+        'error.subsystem': 'system-search',
+        'error.operation': 'consume-route',
       });
       expect(getPendingDeepLinkSnapshot()).toBeNull();
     });

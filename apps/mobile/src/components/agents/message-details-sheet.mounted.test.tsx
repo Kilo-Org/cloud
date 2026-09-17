@@ -357,6 +357,27 @@ describe('MessageDetailsSheet mounted', () => {
     await unmount(renderer);
   });
 
+  it('puts the message text alone on the clipboard when a thinking block precedes it', async () => {
+    const message = storedMessage(assistantInfo(), [
+      {
+        id: 'p-reasoning',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'reasoning',
+        text: 'I should reason about this first.',
+        time: { start: 1, end: 2 },
+      },
+      textPart('The actual reply.'),
+    ]);
+    const renderer = await mountSheet(message);
+    await act(async () => {
+      press(findByTestID(renderer.root, 'message-details-copy')[0]);
+      await Promise.resolve();
+    });
+    expect(native.clipboard).toBe('The actual reply.');
+    await unmount(renderer);
+  });
+
   it('renders Copy message and Select text for a finished copyable user message', async () => {
     const renderer = await mountSheet(storedMessage(userInfo(), [textPart('hello world')]));
 

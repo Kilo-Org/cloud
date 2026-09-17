@@ -363,9 +363,9 @@ describe('getMessageDetailsContent — canSelectText', () => {
   });
 
   it('hides selection while an assistant tool part is running', () => {
-    const message = storedMessage(assistantInfo(), [runningToolPart()]);
+    const message = storedMessage(assistantInfo(), [textPart('finished text'), runningToolPart()]);
     const content = getMessageDetailsContent(message, catalogOptions);
-    expect(content.copyableText).not.toBeNull();
+    expect(content.copyableText).toBe('finished text');
     expect(content.canSelectText).toBe(false);
   });
 
@@ -408,6 +408,39 @@ describe('getMessageDetailsContent — canSelectText', () => {
     const queued = getMessageDetailsContent(message, catalogOptions, { status: 'queued' });
     expect(queued.copyText).toBe('Continue');
     expect(queued.copyableText).toBe('Continue');
+  });
+});
+
+describe('getMessageDetailsContent — Copy message payload', () => {
+  it('copies the message text without the thinking block above it', () => {
+    const message = storedMessage(assistantInfo(), [
+      reasoningPart('Let me think about this first.', { start: 1, end: 2 }),
+      textPart('Here is the answer.', 'p-answer'),
+    ]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyableText).toBe('Here is the answer.');
+    expect(content.copyText).toBe('Here is the answer.');
+  });
+
+  it('drops a tool call that sits between two reply paragraphs', () => {
+    const message = storedMessage(assistantInfo(), [
+      textPart('First paragraph.', 'p-first'),
+      runningToolPart(),
+      textPart('Second paragraph.', 'p-second'),
+    ]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyText).toBe('First paragraph.\n\nSecond paragraph.');
+  });
+
+  it('hides Copy when the only parts are thinking and a tool call', () => {
+    const message = storedMessage(assistantInfo(), [
+      reasoningPart('thinking...', { start: 1, end: 2 }),
+      runningToolPart(),
+    ]);
+    const content = getMessageDetailsContent(message, catalogOptions);
+    expect(content.copyableText).toBeNull();
+    expect(content.copyText).toBeNull();
+    expect(content.canSelectText).toBe(false);
   });
 });
 

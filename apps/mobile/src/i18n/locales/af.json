@@ -789,6 +789,15 @@
       "balance": "Saldowaarskuwings",
       "security": "Sekuriteitsbevindings"
     },
+    "action": {
+      "openSession": "Maak sessie oop"
+    },
+    "needsInputAction": {
+      "approved": "Versoek goedgekeur",
+      "replied": "Antwoord gestuur",
+      "failed": "Kon nie antwoord nie. Tik weer om weer te probeer.",
+      "unavailable": "Hierdie versoek wag nie meer nie."
+    },
     "category": {
       "chatMessagesSubtitle": "antwoorde in jou gesprekke",
       "agentAttentionTitle": "Agent het jou nodig",

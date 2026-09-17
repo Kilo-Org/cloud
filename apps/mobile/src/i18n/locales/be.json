@@ -807,6 +807,15 @@
       "balance": "Апавяшчэнні аб балансе",
       "security": "Выяўленыя праблемы бяспекі"
     },
+    "action": {
+      "openSession": "Адкрыць сеанс"
+    },
+    "needsInputAction": {
+      "approved": "Запыт ухвалены",
+      "replied": "Адказ дасланы",
+      "failed": "Не ўдалося адказаць. Націсніце яшчэ раз, каб паўтарыць.",
+      "unavailable": "Гэты запыт больш не чакае."
+    },
     "category": {
       "chatMessagesSubtitle": "адказы ў вашых размовах",
       "agentAttentionTitle": "Агенту патрэбна ваша ўвага",

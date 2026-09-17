@@ -789,6 +789,15 @@
       "balance": "शिल्लक रकमेच्या सूचना",
       "security": "सुरक्षा निष्कर्ष"
     },
+    "action": {
+      "openSession": "सत्र उघडा"
+    },
+    "needsInputAction": {
+      "approved": "विनंती मंजूर झाली",
+      "replied": "उत्तर पाठवले",
+      "failed": "उत्तर देता आले नाही. पुन्हा प्रयत्न करण्यासाठी पुन्हा टॅप करा.",
+      "unavailable": "ही विनंती आता प्रतीक्षा करत नाही."
+    },
     "category": {
       "chatMessagesSubtitle": "तुमच्या संभाषणांमधील उत्तरे",
       "agentAttentionTitle": "एजंटला तुमची गरज आहे",

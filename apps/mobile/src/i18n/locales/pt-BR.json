@@ -235,6 +235,15 @@
       "balance": "Alertas de saldo",
       "security": "Problemas de segurança"
     },
+    "action": {
+      "openSession": "Abrir sessão"
+    },
+    "needsInputAction": {
+      "approved": "Solicitação aprovada",
+      "replied": "Resposta enviada",
+      "failed": "Não foi possível responder. Toque novamente para tentar de novo.",
+      "unavailable": "Esta solicitação não está mais aguardando."
+    },
     "liveActivities": "Atividades ao vivo",
     "liveActivitySubtitle": "Mostrar agentes ativos na tela de bloqueio",
     "liveUpdates": "Atualizações em tempo real",

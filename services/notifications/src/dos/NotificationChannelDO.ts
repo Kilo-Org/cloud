@@ -16,6 +16,7 @@ import type { ExpoPushMessage, SendResult, TicketTokenPair } from '../lib/expo-p
 import { sendPushNotifications } from '../lib/expo-push';
 import { glanceableDeliveryDeps } from '../lib/glanceable-delivery-deps';
 import { refreshGlanceableSnapshot } from '../lib/glanceable-refresh';
+import { expoPushExtrasForPushData } from '../lib/push-message-extras';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
@@ -185,6 +186,11 @@ export class NotificationChannelDO extends DurableObject<Env> {
     // sink log can record them (both are non-content). Fail closed: a read
     // that throws, or an absent row, is treated as 'generic'.
     const channelId = androidChannelIdForPushData(input.push.data);
+    // Attention extras: the OS category (action buttons) and the iOS
+    // time-sensitive level. Empty for every non-attention push, so ordinary
+    // progress messages are unchanged. Failure-free by construction — the
+    // absent-kind case is handled inside.
+    const pushExtras = expoPushExtrasForPushData(input.push.data);
     let previews: 'generic' | 'full' = 'generic';
     try {
       const [prefRow] = await db
@@ -276,6 +282,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
         title,
         body,
         data: input.push.data,
+        // OS category + iOS interruption level for a needs-input raise; no
+        // keys for any other push, so their message shape is unchanged.
+        ...pushExtras,
         // Android 8+ drops a notification addressed to a channel that does
         // not exist. Only clients that create channels (a non-null app
         // version at registration) get a channelId; older clients fall back

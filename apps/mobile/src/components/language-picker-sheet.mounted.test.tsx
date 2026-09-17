@@ -15,6 +15,7 @@ const reloadAppAsync = vi.hoisted(() => vi.fn());
 const setLanguagePreferenceAsync = vi.hoisted(() => vi.fn());
 const writeLanguageReturnTarget = vi.hoisted(() => vi.fn());
 const renameAndroidNotificationChannels = vi.hoisted(() => vi.fn());
+const registerNeedsInputCategories = vi.hoisted(() => vi.fn());
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const i18nManager = vi.hoisted(() => ({
   allowRTL: vi.fn(),
@@ -108,6 +109,9 @@ vi.mock('@/i18n/return-target', () => ({
 vi.mock('@/lib/notifications', () => ({
   renameAndroidNotificationChannels,
 }));
+vi.mock('@/lib/notification-actions', () => ({
+  registerNeedsInputCategories,
+}));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -191,6 +195,8 @@ describe('LanguagePickerSheet apply', () => {
     setLanguagePreferenceAsync.mockResolvedValue(true);
     reloadAppAsync.mockReset();
     writeLanguageReturnTarget.mockReset();
+    renameAndroidNotificationChannels.mockReset();
+    registerNeedsInputCategories.mockReset();
     insets.bottom = 0;
     i18nManager.isRTL = false;
     i18nManager.forceRTL.mockReset();
@@ -252,6 +258,9 @@ describe('LanguagePickerSheet apply', () => {
     expect(i18n.language).toBe('es');
     expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(i18nManager.forceRTL).not.toHaveBeenCalled();
+    // The needs-input notification buttons were registered under the English
+    // default; the apply must re-register them in the new language.
+    expect(registerNeedsInputCategories).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
 
     renderer.unmount();

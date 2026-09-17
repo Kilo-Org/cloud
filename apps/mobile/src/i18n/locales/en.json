@@ -789,6 +789,15 @@
       "balance": "Balance alerts",
       "security": "Security findings"
     },
+    "action": {
+      "openSession": "Open session"
+    },
+    "needsInputAction": {
+      "approved": "Request approved",
+      "replied": "Reply sent",
+      "failed": "Couldn't answer. Tap again to retry.",
+      "unavailable": "This request is no longer waiting."
+    },
     "category": {
       "chatMessagesSubtitle": "replies in your conversations",
       "agentAttentionTitle": "Agent needs you",

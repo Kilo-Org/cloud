@@ -816,6 +816,15 @@
       "balance": "Twissijiet tal-bilanċ",
       "security": "Sejbiet tas-sigurtà"
     },
+    "action": {
+      "openSession": "Iftaħ is-sessjoni"
+    },
+    "needsInputAction": {
+      "approved": "It-talba ġiet approvata",
+      "replied": "Ir-risposta ntbagħtet",
+      "failed": "Ma rnexxiex twieġeb. Miss biex terġa’ tipprova.",
+      "unavailable": "Din it-talba ma tistennix aktar."
+    },
     "category": {
       "chatMessagesSubtitle": "tweġibiet fil-konversazzjonijiet tiegħek",
       "agentAttentionTitle": "L-aġent għandu bżonnok",

@@ -789,6 +789,15 @@
       "balance": "Àwọn ìkìlọ̀ nípa owó tó kù",
       "security": "Àwọn àwárí ààbò"
     },
+    "action": {
+      "openSession": "Ṣí ìgbà iṣẹ́"
+    },
+    "needsInputAction": {
+      "approved": "Ìbéèrè náà ti fọwọ́ sí",
+      "replied": "Ìfèsì ti ránṣẹ́",
+      "failed": "Kò lè fèsì. Tẹ lẹ́ẹ̀kansi láti gbìyànjú lẹ́ẹ̀kansi.",
+      "unavailable": "Ìbéèrè yìí kì í retí mọ́."
+    },
     "category": {
       "chatMessagesSubtitle": "àwọn ìdáhùn nínú ìjíròrò rẹ",
       "agentAttentionTitle": "Aṣojú nílò rẹ",

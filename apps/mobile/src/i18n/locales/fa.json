@@ -789,6 +789,15 @@
       "balance": "هشدارهای موجودی",
       "security": "یافته‌های امنیتی"
     },
+    "action": {
+      "openSession": "باز کردن نشست"
+    },
+    "needsInputAction": {
+      "approved": "درخواست تأیید شد",
+      "replied": "پاسخ ارسال شد",
+      "failed": "پاسخ دادن ممکن نشد. برای تلاش دوباره دوباره ضربه بزنید.",
+      "unavailable": "این درخواست دیگر در انتظار نیست."
+    },
     "category": {
       "chatMessagesSubtitle": "پاسخ‌های گفت‌وگوهای شما",
       "agentAttentionTitle": "عامل به شما نیاز دارد",

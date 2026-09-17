@@ -816,6 +816,15 @@
       "balance": "Foláirimh iarmhéid",
       "security": "Torthaí slándála"
     },
+    "action": {
+      "openSession": "Oscail an seisiún"
+    },
+    "needsInputAction": {
+      "approved": "Tá an t-iarratas ceadaithe",
+      "replied": "Tá an freagra seolta",
+      "failed": "Níorbh fhéidir freagra a thabhairt. Tapáil arís chun iarracht eile a dhéanamh.",
+      "unavailable": "Níl an t-iarratas seo ag fanacht a thuilleadh."
+    },
     "category": {
       "chatMessagesSubtitle": "freagraí i do chomhráite",
       "agentAttentionTitle": "Tá do chabhair ag teastáil ón ngníomhaire",

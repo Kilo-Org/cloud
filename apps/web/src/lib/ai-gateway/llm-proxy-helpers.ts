@@ -408,6 +408,20 @@ export function modelDoesNotExistResponse() {
   );
 }
 
+/**
+ * Returned when an enabled "Sign in with ChatGPT" connection can no longer be
+ * refreshed. The stored credential is terminal: the connection has been cleared
+ * and disabled, so this is never a retryable condition and must not be served
+ * by another billing path. The person is told what happened and what to do.
+ */
+export function chatGptReconnectResponse(message: string) {
+  const error = `${message} Reconnect your ChatGPT connection at ${APP_URL}/byok, or choose a different model.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.byok_error, message: error },
+    { status: 400 }
+  );
+}
+
 export function modelDoesNotExistOnOpenRouterResponse(model: string) {
   const error =
     `The requested model '${model}' does not exist. ` +

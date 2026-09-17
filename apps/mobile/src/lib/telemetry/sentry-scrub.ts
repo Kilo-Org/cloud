@@ -37,31 +37,46 @@ function isIdentifierRun(run: string): boolean {
 }
 
 /**
- * Keys whose values are contractually app identifiers rather than payload
- * data: the `error.subsystem` / `error.operation` tags the app sets itself, and
- * the React `componentStack` the render boundary attaches. Only there may a
- * word-chain run stay; under any other key a word chain is redacted like any
- * other token-shaped run.
+ * The exact event paths whose own value is a contractually app-set identifier
+ * rather than payload data: the `error.subsystem` / `error.operation` tags the
+ * app writes, and the React `componentStack` the render boundary attaches as a
+ * direct `extra` field. Each entry is `<section>.<field>` for one of the maps
+ * {@link scrubEvent} walks.
  *
- * The shape alone is not proof a run is safe to send: a slug or passphrase
- * secret (`my-super-secret-prod-token`) is a chain of lowercase words too.
- * Keeping the exception where the app writes identifiers preserves the one
- * copy of the `agent-message-render` / `write_logout_tombstone` diagnostics
- * without letting a word-chain secret through anywhere else.
+ * The exemption is keyed on the full path, never on a bare property name: a
+ * `componentStack` or `error.subsystem` nested inside another object is payload
+ * data, and a word-chain secret there (`my-super-secret-prod-token`) must be
+ * redacted like anywhere else. The shape alone is not proof a run is safe.
  */
-const IDENTIFIER_KEYS = new Set(['error.subsystem', 'error.operation', 'componentStack']);
+const IDENTIFIER_PATHS = new Set([
+  'extra.componentStack',
+  'tags.error.subsystem',
+  'tags.error.operation',
+]);
+
+/** True when a value reached through `path` is an app-set identifier field. */
+function isIdentifierPath(path: readonly (string | number)[]): boolean {
+  if (path.length !== 2) {
+    return false;
+  }
+  const [section, field] = path;
+  return (
+    typeof section === 'string' &&
+    typeof field === 'string' &&
+    IDENTIFIER_PATHS.has(`${section}.${field}`)
+  );
+}
 
 /**
  * Redact every token-shaped run inside one string, keeping the rest of the
  * string so a diagnostic that embeds a long identifier stays readable.
  *
- * A run is 20+ consecutive base64url characters. Inside an identifier key's
- * value a run that is a chain of words is a name, not a credential: without
- * that, the app's `agent-message-render` tags and React's
- * `MessageErrorBoundary` component names are delivered as `[redacted]`, and
- * they are the only copy of the diagnostic the app sends. Everywhere else a
- * run is redacted on shape alone. A `Bearer ` prefix names the whole value a
- * credential, so it redacts whole.
+ * A run is 20+ consecutive base64url characters. At an identifier path a run
+ * that is a chain of words is a name, not a credential: without that, the app's
+ * `agent-message-render` tags and React's `MessageErrorBoundary` component
+ * names are delivered as `[redacted]`, and they are the only copy of the
+ * diagnostic the app sends. Everywhere else a run is redacted on shape alone. A
+ * `Bearer ` prefix names the whole value a credential, so it redacts whole.
  */
 function redactString(value: string, keepIdentifiers: boolean): string {
   if (value.startsWith('Bearer ')) {
@@ -74,20 +89,20 @@ function redactString(value: string, keepIdentifiers: boolean): string {
 
 /**
  * Redact token-shaped runs at any depth in a value tree, returning a scrubbed
- * copy. `keepIdentifiers` applies to the value itself; inside an object each
- * key decides for its own value, so the exemption stays scoped to
- * {@link IDENTIFIER_KEYS}. `seen` maps each visited object to its scrubbed
- * copy, so a repeated or aliased reference resolves to that copy rather than
- * the original (returning the original would leak its unredacted values) and a
- * cycle is bounded.
+ * copy. `path` is the key (or array index) route from the walked map's root, and
+ * decides the exemption for a string: only an exact
+ * {@link IDENTIFIER_PATHS} route keeps word-chain runs. `seen` maps each
+ * visited object to its scrubbed copy, so a repeated or aliased reference
+ * resolves to that copy rather than the original (returning the original would
+ * leak its unredacted values) and a cycle is bounded.
  */
 function redactValue(
   value: unknown,
   seen: WeakMap<object, unknown>,
-  keepIdentifiers: boolean
+  path: readonly (string | number)[]
 ): unknown {
   if (typeof value === 'string') {
-    return redactString(value, keepIdentifiers);
+    return redactString(value, isIdentifierPath(path));
   }
   if (value === null || typeof value !== 'object') {
     return value;
@@ -98,27 +113,28 @@ function redactValue(
   if (Array.isArray(value)) {
     const result: unknown[] = [];
     seen.set(value, result);
-    for (const item of value) {
-      result.push(redactValue(item, seen, keepIdentifiers));
+    for (let index = 0; index < value.length; index += 1) {
+      result.push(redactValue(value[index], seen, [...path, index]));
     }
     return result;
   }
   const result: Record<string, unknown> = {};
   seen.set(value, result);
   for (const [key, item] of Object.entries(value)) {
-    result[key] = redactValue(item, seen, IDENTIFIER_KEYS.has(key));
+    result[key] = redactValue(item, seen, [...path, key]);
   }
   return result;
 }
 
 /** Redact every token-shaped value at any depth in a key-value map. */
 function redactTokens(
-  map: Record<string, unknown> | undefined | null
+  map: Record<string, unknown> | undefined | null,
+  section: string
 ): Record<string, unknown> | undefined {
   if (map == null) {
     return undefined;
   }
-  return redactValue(map, new WeakMap(), false) as Record<string, unknown>;
+  return redactValue(map, new WeakMap(), [section]) as Record<string, unknown>;
 }
 
 /**
@@ -155,8 +171,8 @@ function exceptionContextNames(event: Record<string, unknown>): string[] {
  * - Deletes `user.email`, `user.username`, and `user.ip_address`.
  * - Redacts token-shaped runs (20+ base64url chars, or any `Bearer ` value) at
  *   any depth in `event.extra`, `event.tags`, and the exception-name context
- *   `extraErrorDataIntegration` attaches. A word-chain run stays only under an
- *   identifier key (see {@link IDENTIFIER_KEYS}); under any other key a
+ *   `extraErrorDataIntegration` attaches. A word-chain run stays only at an
+ *   app-set identifier path (see {@link IDENTIFIER_PATHS}); anywhere else a
  *   word-chain secret is redacted on shape alone. Sentry's structured contexts
  *   are left intact: their identifiers trip the token heuristic without holding
  *   secrets.
@@ -188,7 +204,7 @@ export function scrubEvent<T>(event: T): T {
       }
       for (const name of exceptionContextNames(e)) {
         if (name in ctx) {
-          ctx[name] = redactValue(ctx[name], new WeakMap(), false);
+          ctx[name] = redactValue(ctx[name], new WeakMap(), []);
         }
       }
     }
@@ -203,10 +219,10 @@ export function scrubEvent<T>(event: T): T {
 
     // extras and tags
     if ('extra' in e) {
-      e.extra = redactTokens(e.extra as Record<string, unknown> | undefined);
+      e.extra = redactTokens(e.extra as Record<string, unknown> | undefined, 'extra');
     }
     if ('tags' in e) {
-      e.tags = redactTokens(e.tags as Record<string, unknown> | undefined);
+      e.tags = redactTokens(e.tags as Record<string, unknown> | undefined, 'tags');
     }
 
     return event;

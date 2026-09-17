@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Amfani da umarnin / daga nesa yana buƙatar sabuwar sigar Kilo CLI. Sabunta Kilo CLI ka sake haɗawa."
     },
     "sessionConnection": {
+      "label": "Haɗi",
       "connecting": "Ana haɗawa…",
       "reconnecting": "Ana sake haɗawa…",
       "connectionLost": "Haɗi ya katse",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Cire manufa?",
       "removeConfirmMessage": "CLI yana share manufar wannan zaman.",
       "updateFailed": "Ba a iya sabunta manufar ba.",
-      "sectionAccessibility": "{{status}}. Manufa: {{text}}"
+      "sectionAccessibility": "{{status}}. Manufa: {{text}}",
+      "collapse": "Ɓoye manufa",
+      "expand": "Nuna manufa"
     },
     "newSession": {
       "recentlyUsed": "An yi amfani da su kwanan nan",

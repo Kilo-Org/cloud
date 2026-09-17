@@ -2091,6 +2091,7 @@
       "exitNeedsNewerCli": "Za oddaljene ukaze s poševnico potrebuješ novejšo različico Kilo CLI. Posodobi Kilo CLI in se znova poveži."
     },
     "sessionConnection": {
+      "label": "Povezava",
       "connecting": "Povezovanje…",
       "reconnecting": "Ponovno povezovanje…",
       "connectionLost": "Povezava prekinjena",
@@ -2110,7 +2111,9 @@
       "removeConfirmTitle": "Odstranim cilj?",
       "removeConfirmMessage": "CLI izbriše cilj te seje.",
       "updateFailed": "Cilja ni bilo mogoče posodobiti.",
-      "sectionAccessibility": "{{status}}. Cilj: {{text}}"
+      "sectionAccessibility": "{{status}}. Cilj: {{text}}",
+      "collapse": "Strni cilj",
+      "expand": "Razširi cilj"
     },
     "newSession": {
       "recentlyUsed": "Nedavno uporabljeno",

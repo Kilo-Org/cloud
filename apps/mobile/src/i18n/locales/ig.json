@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Iwu ndị na-amalite na / sitere n'ebe dị anya chọrọ ụdị Kilo CLI ka ọhụrụ. Melite Kilo CLI ma jikọọ ọzọ."
     },
     "sessionConnection": {
+      "label": "Njikọ",
       "connecting": "Na-ejikọ…",
       "reconnecting": "Na-ejikọ ọzọ…",
       "connectionLost": "Njikọ akwụsịla",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Wepu ebumnuche?",
       "removeConfirmMessage": "CLI na-ehichapụ ebumnuche nke nnọkọ a.",
       "updateFailed": "Enweghị ike imelite ebumnuche.",
-      "sectionAccessibility": "{{status}}. Ebumnuche: {{text}}"
+      "sectionAccessibility": "{{status}}. Ebumnuche: {{text}}",
+      "collapse": "Zoo ebumnuche",
+      "expand": "Gosi ebumnuche"
     },
     "newSession": {
       "recentlyUsed": "Ndị e ji mee ihe nso nso a",

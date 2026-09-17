@@ -19,11 +19,7 @@ import {
   isOpus5Model,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import {
-  applyMoonshotModelSettings,
-  isKimiModel,
-  KIMI_CURRENT_MODEL_ID,
-} from '@/lib/ai-gateway/providers/moonshotai';
+import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import {
@@ -220,7 +216,7 @@ export function applyAnthropicThinkingDefault(
   const defaultsToThinking =
     (isMinimaxModel(requestedModel) && requestedModel.includes('m3')) ||
     requestedModel === 'z-ai/glm-5.2' ||
-    requestedModel === KIMI_CURRENT_MODEL_ID;
+    requestedModel === 'moonshotai/kimi-k3';
   if (
     defaultsToThinking &&
     requestToMutate.kind === 'messages' &&

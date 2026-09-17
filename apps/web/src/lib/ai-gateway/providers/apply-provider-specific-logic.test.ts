@@ -15,7 +15,6 @@ import {
   type Provider,
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
-import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import {
   gpt_5_6_sol_discounted_model,
   gpt_6_astra_flex_model,
@@ -67,7 +66,7 @@ function makeMessagesRequest(
 }
 
 describe('applyAnthropicThinkingDefault', () => {
-  it.each(['z-ai/glm-5.2', KIMI_CURRENT_MODEL_ID, 'minimax/minimax-m3'])(
+  it.each(['z-ai/glm-5.2', 'moonshotai/kimi-k3', 'minimax/minimax-m3'])(
     'disables implicit thinking for %s',
     model => {
       const request = makeMessagesRequest(model);
@@ -145,7 +144,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
   );
 
   it.each([
-    [KIMI_CURRENT_MODEL_ID, null],
+    ['moonshotai/kimi-k3', null],
     [gpt_6_astra_flex_model.public_id, gpt_6_astra_flex_model],
     ['vendor/standard-model', null],
   ] as const)('preserves the request-level tier for %s', (model, kiloExclusiveModel) => {

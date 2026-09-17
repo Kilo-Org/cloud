@@ -9,6 +9,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { BodyEmpty } from '@/components/agents/session-list-body-empty';
 import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
 import { selectSessionListContentSurface } from '@/components/agents/session-list-content-surface';
@@ -214,7 +215,11 @@ export function AgentSessionListContent({
       className="absolute size-px overflow-hidden"
     />
   ) : null;
+  // The rows list starts at the FlashList's top edge, where Android's floating
+  // indicator would rest on the first row's text (device defect uxs1):
+  // `RowsRefreshControl` carries the platform rule that keeps it off the rows.
   const refreshControl = <RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />;
+  const rowsControl = <RowsRefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />;
 
   // Flatten the date sections into a single row array for the recycling list.
   // While the first page loads with nothing to show, reserved skeleton rows
@@ -354,12 +359,16 @@ export function AgentSessionListContent({
   // a same-pitch data update inside the mounted list.
   return (
     <Animated.View className="flex-1">
-      <SessionListRefreshStatus
-        busy={pullBusy}
-        failed={pull.failed || bodyModel.showInlineError}
-        onRetry={handlePullRetry}
-        className="mx-[22px]"
-      />
+      {/* The band's height is allocated whenever the rows show, so the
+          in-flight spinner and the failure line replace empty space instead of
+          pushing the rows down (device defect uxs1). */}
+      <View className="mx-[22px] min-h-5">
+        <SessionListRefreshStatus
+          busy={pullBusy}
+          failed={pull.failed || bodyModel.showInlineError}
+          onRetry={handlePullRetry}
+        />
+      </View>
       <View className="flex-1" style={landscapeSideInsetStyle}>
         <FlashList<SessionListRow>
           ref={listRef}
@@ -379,7 +388,7 @@ export function AgentSessionListContent({
           keyboardDismissMode="on-drag"
           onEndReached={onEndReached}
           onEndReachedThreshold={0.5}
-          refreshControl={refreshControl}
+          refreshControl={rowsControl}
           maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
         />
       </View>

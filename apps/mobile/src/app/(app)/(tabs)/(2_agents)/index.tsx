@@ -145,8 +145,9 @@ export default function AgentSessionList() {
       void recoverGlanceableActivityKit();
       // A widget press that patched its marker before JS subscribed is picked
       // up here: the intent cannot run this JS itself, so the foreground is
-      // the first moment the press can be answered. iOS-only; the sweep is
-      // guarded to iOS internally.
+      // the first moment the press can be answered. The marker rides the iOS
+      // widget timeline, so the sweep finds nothing on Android and the same
+      // call runs unchanged on both platforms.
       void runPendingWidgetActions();
       const subscription = AppState.addEventListener('change', state => {
         if (state === 'active') {

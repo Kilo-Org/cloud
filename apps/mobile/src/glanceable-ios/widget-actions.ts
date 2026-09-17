@@ -1,5 +1,5 @@
 import { addUserInteractionListener, type UserInteractionEvent } from 'expo-widgets';
-import { Linking, Platform } from 'react-native';
+import { Linking } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { getLastGlanceableSnapshot } from '@/lib/glanceable/persist';
@@ -281,6 +281,13 @@ async function sweepPendingActions(): Promise<void> {
  * timeline read taken at delivery, so the follow-up pass answers it even though
  * the running pass's own writes have since erased its marker.
  *
+ * The press marker rides the `expo-widgets` widget timeline the App Intent
+ * patches, and that timeline exists only on iOS: `expo-widgets` has no widget
+ * timeline or interaction events elsewhere, so this reads an empty timeline and
+ * runs nothing where the surface does not exist. Android answers the same press
+ * from the widget host's headless task (`glanceable-android/register.ts`).
+ * Nothing here forks on the platform, so both platforms run the same code.
+ *
  * `event` is the live path's interaction: the sweep then only runs when the
  * event's source carries one of this widget's press markers — a Live Activity
  * button or another widget kind reports its own source and owns no marker
@@ -289,9 +296,6 @@ async function sweepPendingActions(): Promise<void> {
 export async function runPendingWidgetActions(
   event?: Pick<UserInteractionEvent, 'source'>
 ): Promise<void> {
-  if (Platform.OS !== 'ios') {
-    return;
-  }
   if (sweeping) {
     resweepRequested = true;
     await carryPendingPress(event);
@@ -328,11 +332,13 @@ let registrationId = 0;
 
 /**
  * Subscribe the live path and sweep once at startup. The root layout imports
- * this on both platforms. Only iOS has the App Intent widget extension whose
- * press marker rides the `expo-widgets` timeline, so the registration and the
- * sweep stay guarded to the platform that has the capability; Android runs the
- * same action from the widget host's headless task
- * (`glanceable-android/register.ts`).
+ * this on both platforms, and the module stays platform-neutral: the press
+ * marker rides the `expo-widgets` widget timeline, which exists only on iOS, so
+ * a call elsewhere subscribes to an inert listener and sweeps an empty
+ * timeline. The capability check therefore lives once, at the registration
+ * boundary (`glanceable-ios/register.ts`, the same place the sibling
+ * `registerGlanceableApproveAction` gets its iOS scope); Android runs the same
+ * action from the widget host's headless task (`glanceable-android/register.ts`).
  *
  * The one user-visible difference is when the action runs: Android's task
  * answers the press in the background the moment it is tapped, while an iOS
@@ -346,9 +352,6 @@ let registrationId = 0;
  * it.
  */
 export function registerWidgetActionHandling(): () => void {
-  if (Platform.OS !== 'ios') {
-    return () => undefined;
-  }
   const id = (registrationId += 1);
   subscription ??= addUserInteractionListener(event => {
     void runPendingWidgetActions(event);

@@ -2128,7 +2128,20 @@
       "continueFrom": "Kei te haere tonu te wātū {{title}}.",
       "importingSession": "Kei te kawemai i te wātū",
       "cliCannotContinue": "Kāore e taea e tēnei CLI te haere tonu i tētahi wātū. Kōwhiria a Cloud Agent, tētahi atu CLI rānei.",
-      "importFailed": "Kāore i taea te kawemai i tēnei wātū."
+      "importFailed": "Kāore i taea te kawemai i tēnei wātū.",
+      "sandbox": "Pouaka kirikiri",
+      "sandboxAccessibility": "Pouaka kirikiri: {{label}}",
+      "sandboxDefaultWithDestination": "Taunoa · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Iti",
+      "sandboxInstanceShared": "Tohatoha",
+      "sandboxInstanceLarge": "Nui",
+      "sandboxInstanceDevcontainer": "Pouaka Dev",
+      "sandboxInstanceProviderDefault": "Taunoa a te kaiwhakarato",
+      "sandboxCouldNotLoad": "Kāhore i taea te uta i ngā kōwhiringa pouaka kirikiri",
+      "sandboxUnavailable": "Kāore tēnei pouaka kirikiri i te wātea. Tīpakohia tētahi atu pouaka kirikiri, ko Taunoa rānei.",
+      "sandboxUseDefault": "Whakamahia te Taunoa"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae.",

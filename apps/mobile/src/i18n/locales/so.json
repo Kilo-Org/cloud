@@ -2128,7 +2128,20 @@
       "continueFrom": "Waxaa la sii wadaa {{title}}.",
       "importingSession": "Kalfadhiga waa la soo gelinayaa",
       "cliCannotContinue": "CLI-kan ma sii wadi karo kalfadhi. Dooro Cloud Agent ama CLI kale.",
-      "importFailed": "Kalfadhigan lama soo gelin karin."
+      "importFailed": "Kalfadhigan lama soo gelin karin.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Caadi · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Yar",
+      "sandboxInstanceShared": "La wadaago",
+      "sandboxInstanceLarge": "Weyn",
+      "sandboxInstanceDevcontainer": "Weelka Dev",
+      "sandboxInstanceProviderDefault": "Caadiga bixiyaha",
+      "sandboxCouldNotLoad": "Lama soo dejin karin xulashooyinka sandbox-ka",
+      "sandboxUnavailable": "Sandbox-kan lama heli karo. Dooro sandbox kale ama Caadi.",
+      "sandboxUseDefault": "Isticmaal Caadi"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay.",

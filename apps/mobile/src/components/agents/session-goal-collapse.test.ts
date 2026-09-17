@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  clearSessionGoalCollapseState,
   isSessionGoalCollapsed,
   setSessionGoalCollapsed,
   toggleSessionGoalCollapsed,
@@ -50,5 +51,17 @@ describe('session goal collapse store', () => {
 
     toggleSessionGoalCollapsed('collapse-session-toggle');
     expect(isSessionGoalCollapsed('collapse-session-toggle')).toBe(false);
+  });
+
+  // Last case in the file: this one clears the shared module store.
+  it('drops every session with the sign-out clear', () => {
+    setSessionGoalCollapsed('collapse-session-clear-a', true);
+    setSessionGoalCollapsed('collapse-session-clear-b', true);
+    expect(isSessionGoalCollapsed('collapse-session-clear-a')).toBe(true);
+
+    clearSessionGoalCollapseState();
+
+    expect(isSessionGoalCollapsed('collapse-session-clear-a')).toBe(false);
+    expect(isSessionGoalCollapsed('collapse-session-clear-b')).toBe(false);
   });
 });

@@ -1302,10 +1302,13 @@ export function SessionDetailContent({
     reconnectExhausted,
   });
   // A committed up latch: a drop after the first up reads "Reconnecting…",
-  // a cold start reads "Connecting…".
+  // a cold start reads "Connecting…". Only the session's own transport latches
+  // it; the app-wide user-web leg is that transport only for a `none` transport
+  // (session-connection-indicator-state.ts:39-46), so a remote/cloud-agent
+  // session whose agent never came up must still read "Connecting…".
   const [wasConnected, setWasConnected] = useState(false);
   useEffect(() => {
-    if (connectionState === 'up' || userWebConnected) {
+    if (connectionState === 'up' || (connectionState === 'none' && userWebConnected)) {
       setWasConnected(true);
     }
   }, [connectionState, userWebConnected]);

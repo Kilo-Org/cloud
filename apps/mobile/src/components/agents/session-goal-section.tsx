@@ -37,10 +37,9 @@ type SessionGoalSectionProps = {
  * The action pressable stretches to the reserved row height (`self-stretch`)
  * so the whole row answers the tap and reaches the touch-target minimum, while
  * its own content stays top-aligned.
- * The row only owns its own top padding (`pt-0.5`); the header's own spacing
- * and the reserved connection slot above it are deliberately untouched, and
- * the content stays top-aligned in both states so collapsing never moves the
- * status line the reader is on.
+ * The row only owns its own top padding (`pt-0.5`); the header's own spacing is
+ * deliberately untouched, and the content stays top-aligned in both states so
+ * collapsing never moves the status line the reader is on.
  *
  * The carat rotation and the height transition are the app's shared disclosure
  * primitives (Reanimated, one implementation on iOS and Android), not a

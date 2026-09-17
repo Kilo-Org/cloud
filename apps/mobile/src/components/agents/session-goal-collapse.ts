@@ -42,6 +42,24 @@ export function toggleSessionGoalCollapsed(sessionId: string): void {
   setSessionGoalCollapsed(sessionId, !isSessionGoalCollapsed(sessionId));
 }
 
+/**
+ * Drop every session's disclosure value on sign-out or account switch, so the
+ * next signed-in account starts expanded and the module-scope map cannot carry
+ * a prior account's session ids forward. It notifies the sessions still mounted
+ * (their row re-renders expanded) and is synchronous, like the other
+ * session-scoped clears in `@/lib/auth/session-scoped-state`.
+ */
+export function clearSessionGoalCollapseState(): void {
+  if (collapsedBySession.size === 0) {
+    return;
+  }
+  const sessionIds = [...collapsedBySession.keys()];
+  collapsedBySession.clear();
+  for (const sessionId of sessionIds) {
+    notifySession(sessionId);
+  }
+}
+
 /** React binding for the goal row: subscribes to one session's disclosure value. */
 export function useSessionGoalCollapsed(sessionId: string): boolean {
   const subscribe = useCallback(

@@ -1043,6 +1043,31 @@ describe('session detail cached metadata refresh', () => {
   });
 });
 
+describe('session detail connection latch', () => {
+  it('reads Connecting, not Reconnecting, when the app-wide leg is up but the session transport never came up', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    connectionHealth.isConnected = false;
+    const view = await mountDetails([]);
+    // The app-wide user-web leg comes up while the remote agent reports
+    // disconnected: the session's own transport has still never been up, so the
+    // latch must not inherit the unrelated user-web leg and claim a reconnect.
+    act(() => {
+      connectionHealth.isConnected = true;
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.agentStatus, { type: 'disconnected' });
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('connecting');
+  });
+});
+
 describe('session detail bottom strip', () => {
   it('keeps the home-indicator strip full-bleed (pure background, no side padding)', async () => {
     const { renderer } = await mountDetails([]);

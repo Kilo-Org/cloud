@@ -2089,6 +2089,7 @@
       "exitNeedsNewerCli": "Vzdálené příkazy s lomítkem vyžadují novější verzi Kilo CLI. Aktualizujte Kilo CLI a připojte se znovu."
     },
     "sessionConnection": {
+      "label": "Připojení",
       "connecting": "Připojování…",
       "reconnecting": "Opětovné připojování…",
       "connectionLost": "Připojení přerušeno",
@@ -2108,7 +2109,9 @@
       "removeConfirmTitle": "Odebrat cíl?",
       "removeConfirmMessage": "CLI vymaže cíl této relace.",
       "updateFailed": "Cíl se nepodařilo aktualizovat.",
-      "sectionAccessibility": "{{status}}. Cíl: {{text}}"
+      "sectionAccessibility": "{{status}}. Cíl: {{text}}",
+      "collapse": "Sbalit cíl",
+      "expand": "Rozbalit cíl"
     },
     "newSession": {
       "recentlyUsed": "Nedávno použité",

@@ -2089,6 +2089,7 @@
       "exitNeedsNewerCli": "Для аддаленага выканання каманд з касой рыскай патрэбна навейшая версія Kilo CLI. Абнавіце Kilo CLI і падключыцеся яшчэ раз."
     },
     "sessionConnection": {
+      "label": "Злучэнне",
       "connecting": "Падключэнне…",
       "reconnecting": "Паўторнае падключэнне…",
       "connectionLost": "Сувязь страчана",
@@ -2108,7 +2109,9 @@
       "removeConfirmTitle": "Выдаліць мэту?",
       "removeConfirmMessage": "CLI ачышчае мэту гэтага сеансу.",
       "updateFailed": "Не ўдалося абнавіць мэту.",
-      "sectionAccessibility": "{{status}}. Мэта: {{text}}"
+      "sectionAccessibility": "{{status}}. Мэта: {{text}}",
+      "collapse": "Згарнуць мэту",
+      "expand": "Разгарнуць мэту"
     },
     "newSession": {
       "recentlyUsed": "Нядаўна выкарыстаныя",

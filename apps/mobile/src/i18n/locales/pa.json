@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "ਰਿਮੋਟ ਸਲੈਸ਼ ਕਮਾਂਡਾਂ ਲਈ Kilo CLI ਦੇ ਨਵੇਂ ਸੰਸਕਰਣ ਦੀ ਲੋੜ ਹੈ। Kilo CLI ਅੱਪਡੇਟ ਕਰੋ ਅਤੇ ਮੁੜ ਕਨੈਕਟ ਕਰੋ।"
     },
     "sessionConnection": {
+      "label": "ਕਨੈਕਸ਼ਨ",
       "connecting": "ਕਨੈਕਟ ਹੋ ਰਿਹਾ ਹੈ…",
       "reconnecting": "ਮੁੜ ਕਨੈਕਟ ਹੋ ਰਿਹਾ ਹੈ…",
       "connectionLost": "ਕਨੈਕਸ਼ਨ ਟੁੱਟ ਗਿਆ",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "ਟੀਚਾ ਹਟਾਉਣਾ?",
       "removeConfirmMessage": "CLI ਇਸ ਸੈਸ਼ਨ ਦਾ ਟੀਚਾ ਮਿਟਾਉਂਦਾ ਹੈ।",
       "updateFailed": "ਟੀਚਾ ਅੱਪਡੇਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
-      "sectionAccessibility": "{{status}}। ਟੀਚਾ: {{text}}"
+      "sectionAccessibility": "{{status}}। ਟੀਚਾ: {{text}}",
+      "collapse": "ਟੀਚਾ ਸਮੇਟੋ",
+      "expand": "ਟੀਚਾ ਫੈਲਾਓ"
     },
     "newSession": {
       "recentlyUsed": "ਹਾਲ ਹੀ ਵਿੱਚ ਵਰਤੇ ਗਏ",

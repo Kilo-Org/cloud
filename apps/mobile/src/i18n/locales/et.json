@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "Kaugseansi kaldkriipsukäskude kasutamiseks on vaja uuemat Kilo CLI-d. Uuenda Kilo CLI-d ja ühendu uuesti."
     },
     "sessionConnection": {
+      "label": "Ühendus",
       "connecting": "Ühendamine…",
       "reconnecting": "Taasühendamine…",
       "connectionLost": "Ühendus katkes",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "Eemaldada eesmärk?",
       "removeConfirmMessage": "CLI tühjendab selle seansi eesmärgi.",
       "updateFailed": "Eesmärki ei saanud värskendada.",
-      "sectionAccessibility": "{{status}}. Eesmärk: {{text}}"
+      "sectionAccessibility": "{{status}}. Eesmärk: {{text}}",
+      "collapse": "Ahenda eesmärk",
+      "expand": "Laienda eesmärk"
     },
     "newSession": {
       "recentlyUsed": "Hiljuti kasutatud",

@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "రిమోట్ స్లాష్ కమాండ్‌లకు కొత్త Kilo CLI సంస్కరణ అవసరం. Kilo CLIను నవీకరించి మళ్లీ కనెక్ట్ చేయండి."
     },
     "sessionConnection": {
+      "label": "కనెక్షన్",
       "connecting": "కనెక్ట్ అవుతోంది…",
       "reconnecting": "మళ్లీ కనెక్ట్ అవుతోంది…",
       "connectionLost": "కనెక్షన్ తెగిపోయింది",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "లక్ష్యాన్ని తీసివేయాలా?",
       "removeConfirmMessage": "ఈ సెషన్ లక్ష్యాన్ని CLI క్లియర్ చేస్తుంది.",
       "updateFailed": "లక్ష్యాన్ని నవీకరించలేకపోయాము.",
-      "sectionAccessibility": "{{status}}. లక్ష్యం: {{text}}"
+      "sectionAccessibility": "{{status}}. లక్ష్యం: {{text}}",
+      "collapse": "లక్ష్యాన్ని కుదించండి",
+      "expand": "లక్ష్యాన్ని విస్తరించండి"
     },
     "newSession": {
       "recentlyUsed": "ఇటీవల ఉపయోగించినవి",

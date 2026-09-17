@@ -16,7 +16,6 @@ import {
   SessionComposerSkeleton,
   SessionSkeletonMessages,
 } from '@/components/agents/session-detail-skeleton';
-import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { useIdentityConfirmation } from '@/components/agents/user-web-connection-provider';
@@ -160,7 +159,6 @@ export default function SessionDetailScreen() {
             />
           }
         />
-        <SessionConnectionIndicator />
         <SessionSkeletonMessages sessionId={sessionId} />
         <SessionComposerSkeleton />
       </View>
@@ -217,7 +215,6 @@ export default function SessionDetailScreen() {
           reserveTitleSpace
           backFallback="/(app)/(tabs)/(2_agents)"
         />
-        <SessionConnectionIndicator />
         <CenteredState>
           <View className="items-center gap-3 px-6">
             <QueryError

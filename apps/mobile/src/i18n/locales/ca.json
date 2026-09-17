@@ -2071,6 +2071,7 @@
       "exitNeedsNewerCli": "Les ordres amb barra remotes requereixen una versió més nova de Kilo CLI. Actualitza Kilo CLI i torna't a connectar."
     },
     "sessionConnection": {
+      "label": "Connexió",
       "connecting": "Connectant…",
       "reconnecting": "Reconnectant…",
       "connectionLost": "Connexió perduda",
@@ -2090,7 +2091,9 @@
       "removeConfirmTitle": "Eliminar l'objectiu?",
       "removeConfirmMessage": "El CLI esborra l'objectiu d'aquesta sessió.",
       "updateFailed": "No s'ha pogut actualitzar l'objectiu.",
-      "sectionAccessibility": "{{status}}. Objectiu: {{text}}"
+      "sectionAccessibility": "{{status}}. Objectiu: {{text}}",
+      "collapse": "Plega l'objectiu",
+      "expand": "Desplega l'objectiu"
     },
     "newSession": {
       "recentlyUsed": "Utilitzats recentment",

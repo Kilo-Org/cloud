@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "தொலைநிலை ஸ்லாஷ் கட்டளைகளுக்கு Kilo CLI-இன் புதிய பதிப்பு தேவை. Kilo CLI-ஐப் புதுப்பித்து மீண்டும் இணைக்கவும்."
     },
     "sessionConnection": {
+      "label": "இணைப்பு",
       "connecting": "இணைக்கிறது…",
       "reconnecting": "மீண்டும் இணைக்கிறது…",
       "connectionLost": "இணைப்பு துண்டிக்கப்பட்டது",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "இலக்கை அகற்றவா?",
       "removeConfirmMessage": "இந்த அமர்வின் இலக்கை CLI அழிக்கிறது.",
       "updateFailed": "இலக்கைப் புதுப்பிக்க முடியவில்லை.",
-      "sectionAccessibility": "{{status}}. இலக்கு: {{text}}"
+      "sectionAccessibility": "{{status}}. இலக்கு: {{text}}",
+      "collapse": "இலக்கைச் சுருக்கவும்",
+      "expand": "இலக்கை விரிக்கவும்"
     },
     "newSession": {
       "recentlyUsed": "சமீபத்தில் பயன்படுத்தியவை",

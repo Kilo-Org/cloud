@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "Отдалечените команди с наклонена черта изискват по-нова версия на Kilo CLI. Актуализирай Kilo CLI и се свържи отново."
     },
     "sessionConnection": {
+      "label": "Връзка",
       "connecting": "Свързване…",
       "reconnecting": "Повторно свързване…",
       "connectionLost": "Прекъсната връзка",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "Премахване на целта?",
       "removeConfirmMessage": "CLI изчиства целта на тази сесия.",
       "updateFailed": "Целта не можа да се обнови.",
-      "sectionAccessibility": "{{status}}. Цел: {{text}}"
+      "sectionAccessibility": "{{status}}. Цел: {{text}}",
+      "collapse": "Свий целта",
+      "expand": "Разгъни целта"
     },
     "newSession": {
       "recentlyUsed": "Наскоро използвани",

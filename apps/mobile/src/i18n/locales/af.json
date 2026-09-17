@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "Skuinsstreepopdragte op afstand vereis 'n nuwer weergawe van Kilo CLI. Werk Kilo CLI by en koppel weer."
     },
     "sessionConnection": {
+      "label": "Verbinding",
       "connecting": "Koppel…",
       "reconnecting": "Herkoppel…",
       "connectionLost": "Verbinding verloor",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "Doel verwyder?",
       "removeConfirmMessage": "Die CLI verwyder hierdie sessie se doel.",
       "updateFailed": "Kon nie die doel bywerk nie.",
-      "sectionAccessibility": "{{status}}. Doel: {{text}}"
+      "sectionAccessibility": "{{status}}. Doel: {{text}}",
+      "collapse": "Vou doel toe",
+      "expand": "Vou doel uit"
     },
     "newSession": {
       "recentlyUsed": "Onlangs gebruik",

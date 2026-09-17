@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "Me whai putanga hōu ake o Kilo CLI hei whakamahi mamao i ngā whakahau rītaha. Whakahoutia a Kilo CLI, kātahi ka hono anō."
     },
     "sessionConnection": {
+      "label": "Hononga",
       "connecting": "Kei te hono…",
       "reconnecting": "Kei te hono anō…",
       "connectionLost": "Kua motu te hononga",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "Tango whāinga?",
       "removeConfirmMessage": "Ka muru te CLI i te whāinga o tēnei wātū.",
       "updateFailed": "Kāore i taea te whakahōu te whāinga.",
-      "sectionAccessibility": "{{status}}. Whāinga: {{text}}"
+      "sectionAccessibility": "{{status}}. Whāinga: {{text}}",
+      "collapse": "Whakaitihia te whāinga",
+      "expand": "Whakawhānuitia te whāinga"
     },
     "newSession": {
       "recentlyUsed": "Ngā mea i whakamahia tata nei",

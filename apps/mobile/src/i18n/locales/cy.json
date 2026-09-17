@@ -2125,6 +2125,7 @@
       "exitNeedsNewerCli": "Mae angen fersiwn mwy newydd o Kilo CLI i ddefnyddio gorchmynion slaes o bell. Diweddarwch Kilo CLI ac ailgysylltwch."
     },
     "sessionConnection": {
+      "label": "Cysylltiad",
       "connecting": "Yn cysylltu…",
       "reconnecting": "Yn ailgysylltu…",
       "connectionLost": "Cysylltiad wedi'i golli",
@@ -2144,7 +2145,9 @@
       "removeConfirmTitle": "Tynnu'r nod?",
       "removeConfirmMessage": "Mae'r CLI yn clirio nod y sesiwn hon.",
       "updateFailed": "Methwyd diweddaru'r nod.",
-      "sectionAccessibility": "{{status}}. Nod: {{text}}"
+      "sectionAccessibility": "{{status}}. Nod: {{text}}",
+      "collapse": "Cwympo'r nod",
+      "expand": "Ehangu'r nod"
     },
     "newSession": {
       "recentlyUsed": "Defnyddiwyd yn ddiweddar",

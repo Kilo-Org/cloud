@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "Për të përdorur komandat me / në distancë, duhet një version më i ri i Kilo CLI. Përditëso Kilo CLI dhe lidhu përsëri."
     },
     "sessionConnection": {
+      "label": "Lidhja",
       "connecting": "Duke u lidhur…",
       "reconnecting": "Duke u rilidhur…",
       "connectionLost": "Lidhja u humb",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "Të hiqet qëllimi?",
       "removeConfirmMessage": "CLI fshin qëllimin e këtij sesioni.",
       "updateFailed": "Qëllimi nuk mund të përditësohej.",
-      "sectionAccessibility": "{{status}}. Qëllim: {{text}}"
+      "sectionAccessibility": "{{status}}. Qëllim: {{text}}",
+      "collapse": "Palos qëllimin",
+      "expand": "Shfaq qëllimin"
     },
     "newSession": {
       "recentlyUsed": "Të përdorura së fundmi",

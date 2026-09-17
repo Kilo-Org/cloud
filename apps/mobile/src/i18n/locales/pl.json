@@ -1583,6 +1583,7 @@
       "exitNeedsNewerCli": "Zdalne polecenia z ukośnikiem wymagają nowszej wersji Kilo CLI. Zaktualizuj Kilo CLI i połącz się ponownie."
     },
     "sessionConnection": {
+      "label": "Połączenie",
       "connecting": "Łączenie…",
       "reconnecting": "Ponowne łączenie…",
       "connectionLost": "Utracono połączenie",
@@ -1602,7 +1603,9 @@
       "removeConfirmTitle": "Usunąć cel?",
       "removeConfirmMessage": "CLI czyści cel tej sesji.",
       "updateFailed": "Nie udało się zaktualizować celu.",
-      "sectionAccessibility": "{{status}}. Cel: {{text}}"
+      "sectionAccessibility": "{{status}}. Cel: {{text}}",
+      "collapse": "Zwiń cel",
+      "expand": "Rozwiń cel"
     },
     "newSession": {
       "recentlyUsed": "Ostatnio używane",

@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "Қашықтан слеш-пәрмендерді қолдану үшін Kilo CLI нұсқасын жаңарту қажет. Kilo CLI құралын жаңартып, қайта қосылыңыз."
     },
     "sessionConnection": {
+      "label": "Қосылым",
       "connecting": "Қосылуда…",
       "reconnecting": "Қайта қосылуда…",
       "connectionLost": "Қосылым үзілді",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "Мақсат жойылсын ба?",
       "removeConfirmMessage": "CLI осы сеанстың мақсатын тазалайды.",
       "updateFailed": "Мақсатты жаңарту мүмкін болмады.",
-      "sectionAccessibility": "{{status}}. Мақсат: {{text}}"
+      "sectionAccessibility": "{{status}}. Мақсат: {{text}}",
+      "collapse": "Мақсатты жию",
+      "expand": "Мақсатты ашу"
     },
     "newSession": {
       "recentlyUsed": "Жақында қолданылған",

@@ -13,6 +13,14 @@ type AssistantContextUsageResult =
   | { status: 'usage'; contextUsage: ContextUsage };
 
 /**
+ * True when the message carries an error. An absent optional can arrive as an
+ * explicit `null` (for example after a JSON round trip), which is not an error.
+ */
+function hasError(info: Record<string, unknown>): boolean {
+  return info['error'] !== undefined && info['error'] !== null;
+}
+
+/**
  * The compaction summary an assistant message carries (`summary === true`),
  * once it has finished without error. A summary still streaming (`finish`
  * unset) or one that failed is *not* a boundary: until the compaction
@@ -20,7 +28,18 @@ type AssistantContextUsageResult =
  */
 function isCompletedCompactionSummary(info: Record<string, unknown>): boolean {
   if (info['summary'] !== true) return false;
-  return Boolean(info['finish']) && info['error'] === undefined;
+  return Boolean(info['finish']) && !hasError(info);
+}
+
+/**
+ * A compaction summary that finished with an error. The compaction left the
+ * session's context unchanged, so its request's compaction part must not end
+ * the walk: the pre-compaction reading is still the session's context.
+ */
+function isFailedCompactionSummary(info: unknown): boolean {
+  return (
+    isRecord(info) && info['role'] === 'assistant' && info['summary'] === true && hasError(info)
+  );
 }
 
 /**
@@ -93,15 +112,35 @@ function getAssistantContextUsage(info: unknown): AssistantContextUsageResult {
  * message itself is never treated as a reading (its token buckets belong to
  * the compaction request, and the chunked path leaves them at zero), and
  * everything before the boundary is out of the session's current context.
+ *
+ * A failed compaction is not a boundary: the context it tried to compact is
+ * still in force, so the reading before it stays valid.
  */
 export function findLatestContextUsage(
   messages: readonly { info: unknown; parts?: readonly unknown[] }[]
 ): ContextUsage | undefined {
+  // Set while walking backwards when a newer compaction summary reports a
+  // failure: that request's part must not become a boundary.
+  let failedCompaction = false;
+
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (!message) continue;
 
-    if (message.parts?.some(isCompactionPart)) return undefined;
+    if (message.parts?.some(isCompactionPart)) {
+      // The `/compact` request's own marker. It supersedes everything older
+      // only while that compaction is still in flight.
+      if (failedCompaction) {
+        failedCompaction = false;
+        continue;
+      }
+      return undefined;
+    }
+
+    if (isFailedCompactionSummary(message.info)) {
+      failedCompaction = true;
+      continue;
+    }
 
     const result = getAssistantContextUsage(message.info);
     if (result.status === 'malformed') return undefined;

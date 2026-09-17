@@ -256,6 +256,16 @@ describe('findLatestContextUsage across a compaction', () => {
     });
   });
 
+  it('treats a finished summary whose error is serialized as null as a boundary', () => {
+    // Some serializers write an absent optional as an explicit null; a
+    // finished summary with no error is still the compaction boundary.
+    const completedWithNullError = { ...compactionSummaryMessage(), error: null };
+
+    expect(
+      findLatestContextUsage([{ info: preCompaction }, { info: completedWithNullError }])
+    ).toBeUndefined();
+  });
+
   it('reads from after the newest compaction, not an older compacted context', () => {
     expect(
       findLatestContextUsage([
@@ -335,6 +345,45 @@ describe('findLatestContextUsage across the compaction request part', () => {
         { info: preCompaction },
         compactionRequest,
         { info: compactionSummaryMessage({ finish: undefined }) },
+      ])
+    ).toBeUndefined();
+  });
+
+  it('keeps the pre-compaction reading when the compaction part is followed by a failed summary', () => {
+    // The compaction failed, so the pre-compaction context is still in force;
+    // the request's part must not blank the still-valid reading.
+    const failed = compactionSummaryMessage({
+      error: {
+        name: 'UnknownError',
+        data: { message: 'compaction failed' },
+      },
+    });
+
+    expect(
+      findLatestContextUsage([{ info: preCompaction }, compactionRequest, { info: failed }])
+    ).toEqual({
+      contextTokens: 191_000,
+      providerID: 'kilo',
+      modelID: 'anthropic/claude-sonnet-4',
+    });
+  });
+
+  it('still blanks after a completed compaction that followed a failed one', () => {
+    const failed = compactionSummaryMessage({
+      id: 'msg-summary-1',
+      error: {
+        name: 'UnknownError',
+        data: { message: 'compaction failed' },
+      },
+    });
+
+    expect(
+      findLatestContextUsage([
+        { info: preCompaction },
+        compactionRequest,
+        { info: failed },
+        { info: userMessage({ id: 'msg-second-compaction-user' }) },
+        { info: compactionSummaryMessage({ id: 'msg-summary-2' }) },
       ])
     ).toBeUndefined();
   });

@@ -458,6 +458,31 @@ describe('tool summary translation hydration', () => {
     expect(requestCalls()[0]?.texts).toEqual(['New summary']);
   });
 
+  it('releases the flush when the store read never settles', async () => {
+    // A native store read that never settles must not hold every translation:
+    // the cache is an optimization, never a gate on the transcript.
+    readMock.mockImplementation(
+      // eslint-disable-next-line typescript-eslint/require-await -- the mock never settles, which is the scenario under test
+      async () =>
+        new Promise<StoreEntry[]>(() => {
+          // Pending by design: the store read hangs.
+        })
+    );
+    const mod = await loadRuntime();
+    echoBatch();
+    vi.useFakeTimers();
+    try {
+      mod.ensureTranslation({ itemId: 'part-1', text: 'Hello', language: 'de', model: MODEL });
+      await vi.advanceTimersByTimeAsync(10_000);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(requestMock).toHaveBeenCalledTimes(1);
+      expect(requestCalls()[0]?.texts).toEqual(['Hello']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('still translates when the store read fails', async () => {
     readMock.mockRejectedValue(new Error('kv unavailable'));
     const mod = await loadRuntime();
@@ -563,6 +588,24 @@ describe('retry of unresolved summaries after a connection recovery', () => {
     await waitForTranslations(mod, [{ itemId: 'part-b', text: 'Beta' }]);
 
     expect(requestCalls().at(-1)?.texts).toEqual(['Beta']);
+  });
+
+  it('drops a part’s superseded source text from the retry memory', async () => {
+    const mod = await loadRuntime();
+    requestMock.mockRejectedValue(new Error('gateway down'));
+
+    // The part streams a partial label, then settles on its final text. Both
+    // batches fail while the gateway is unreachable.
+    mod.ensureTranslation({ itemId: 'p1', text: 'partial summary', language: 'de', model: MODEL });
+    await flushBatch();
+    mod.ensureTranslation({ itemId: 'p1', text: 'final summary', language: 'de', model: MODEL });
+    await flushBatch();
+
+    // The reconnect retry must carry only the text the part now renders.
+    mod.retryUnresolvedTranslations();
+    await flushBatch();
+
+    expect(requestCalls().at(-1)?.texts).toEqual(['final summary']);
   });
 
   it('makes no request on a retry when every summary already resolved', async () => {

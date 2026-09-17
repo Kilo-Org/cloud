@@ -8,10 +8,11 @@ import { TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE } from '@/lib/storage-keys';
  * so a translation survives an app restart and reads with no request at all.
  *
  * One encrypted-KV scope ({@link TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE}) holds
- * one JSON entry per translation under `tt:<language>:<modelId>:<itemId>`. The
- * scope holds nothing else, so the cap counts every entry and needs no
- * key-prefix filter — unlike `session-transcript-cache.ts`, whose `transcript:`
- * keys share the read-cache scope with an unrelated blob.
+ * one JSON entry per translation under
+ * `tt:<language>:<modelId>:<itemId>:<text>`. The scope holds nothing else, so
+ * the cap counts every entry and needs no key-prefix filter — unlike
+ * `session-transcript-cache.ts`, whose `transcript:` keys share the read-cache
+ * scope with an unrelated blob.
  * {@link encryptedKv.listEntries} is oldest-first by `updated_at`, so a write
  * past {@link TOOL_SUMMARY_TRANSLATION_CACHE_CAP} deletes the oldest entries
  * first.
@@ -50,8 +51,23 @@ const cachedToolSummaryTranslationSchema = z.object({
   storedAt: z.number(),
 });
 
-function translationItemKey(language: string, modelId: string, itemId: string): string {
-  return `${ITEM_KEY_PREFIX}${language}:${modelId}:${itemId}`;
+/**
+ * The stored key: the same identity the runtime keys its in-memory cache by —
+ * the part id plus the source string it was made from, under one language and
+ * model. The source text is load-bearing: without it a late write for a
+ * superseded text replaces the entry the row now renders, and a cold-start
+ * offline row misses its translation. The item id is encoded so its segment
+ * cannot be split by a colon; the text stays last, so it may keep its readable
+ * form.
+ */
+// eslint-disable-next-line max-params -- the language, model, part id and source text form the key
+function translationItemKey(
+  language: string,
+  modelId: string,
+  itemId: string,
+  text: string
+): string {
+  return `${ITEM_KEY_PREFIX}${language}:${modelId}:${encodeURIComponent(itemId)}:${text}`;
 }
 
 /** Parses one stored value; null for a missing, unparsable, or malformed entry. */
@@ -89,9 +105,10 @@ export async function readToolSummaryTranslations(): Promise<CachedToolSummaryTr
 }
 
 /**
- * Writes one translated summary under `tt:<language>:<modelId>:<itemId>`, then
- * evicts the oldest entries beyond {@link TOOL_SUMMARY_TRANSLATION_CACHE_CAP}.
- * An entry that fails validation is dropped instead of written. Never throws.
+ * Writes one translated summary under
+ * `tt:<language>:<modelId>:<itemId>:<text>`, then evicts the oldest entries
+ * beyond {@link TOOL_SUMMARY_TRANSLATION_CACHE_CAP}. An entry that fails
+ * validation is dropped instead of written. Never throws.
  */
 export async function writeToolSummaryTranslation(
   entry: CachedToolSummaryTranslation
@@ -103,7 +120,12 @@ export async function writeToolSummaryTranslation(
   try {
     await encryptedKv.setItem(
       TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE,
-      translationItemKey(parsed.data.language, parsed.data.modelId, parsed.data.itemId),
+      translationItemKey(
+        parsed.data.language,
+        parsed.data.modelId,
+        parsed.data.itemId,
+        parsed.data.text
+      ),
       JSON.stringify(parsed.data)
     );
     await evictOldestBeyondCap();

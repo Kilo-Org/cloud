@@ -55,7 +55,7 @@ import {
 /* eslint-enable import/first */
 
 const SCOPE = TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE;
-const ITEM_KEY = 'tt:de:kilo-auto/small:item-1';
+const ITEM_KEY = 'tt:de:kilo-auto/small:item-1:Ran the tests';
 
 function makeEntry(
   overrides: Partial<CachedToolSummaryTranslation> = {}
@@ -100,10 +100,10 @@ describe('tool summary translation cache', () => {
   it('drops malformed values and keeps the valid ones', async () => {
     seed([
       [ITEM_KEY, JSON.stringify(makeEntry())],
-      ['tt:de:kilo-auto/small:item-not-json', 'not-json'],
-      ['tt:de:kilo-auto/small:item-wrong-shape', '{"itemId":"item-wrong-shape"}'],
+      ['tt:de:kilo-auto/small:item-not-json:not-json', 'not-json'],
+      ['tt:de:kilo-auto/small:item-wrong-shape:shape', '{"itemId":"item-wrong-shape"}'],
       [
-        'tt:de:kilo-auto/small:item-bad-time',
+        'tt:de:kilo-auto/small:item-bad-time:time',
         JSON.stringify({ ...makeEntry(), itemId: 'item-bad-time', storedAt: null }),
       ],
     ]);
@@ -149,9 +149,9 @@ describe('tool summary translation cache', () => {
 
     const keys = [...(kvMock.scopes.get(SCOPE)?.keys() ?? [])];
     expect(keys).toHaveLength(TOOL_SUMMARY_TRANSLATION_CACHE_CAP);
-    expect(keys).not.toContain('tt:de:kilo-auto/small:item-0');
-    expect(keys).not.toContain('tt:de:kilo-auto/small:item-1');
-    expect(keys).toContain(`tt:de:kilo-auto/small:item-${total - 1}`);
+    expect(keys).not.toContain('tt:de:kilo-auto/small:item-0:Ran the tests');
+    expect(keys).not.toContain('tt:de:kilo-auto/small:item-1:Ran the tests');
+    expect(keys).toContain(`tt:de:kilo-auto/small:item-${total - 1}:Ran the tests`);
   });
 
   it('keeps two entries apart that share the text but not the item id', async () => {
@@ -163,14 +163,35 @@ describe('tool summary translation cache', () => {
     expect(entries.map(entry => entry.itemId).toSorted()).toEqual(['item-1', 'item-2']);
     expect(kvMock.setItem).toHaveBeenCalledWith(
       SCOPE,
-      'tt:de:kilo-auto/small:item-1',
+      'tt:de:kilo-auto/small:item-1:Ran the tests',
       JSON.stringify(makeEntry({ itemId: 'item-1' }))
     );
     expect(kvMock.setItem).toHaveBeenCalledWith(
       SCOPE,
-      'tt:de:kilo-auto/small:item-2',
+      'tt:de:kilo-auto/small:item-2:Ran the tests',
       JSON.stringify(makeEntry({ itemId: 'item-2' }))
     );
+  });
+
+  it('keeps two entries apart that share the item id but not the source text', async () => {
+    // A part whose source string changed: the write for the old text must not
+    // replace the current text's entry, or a cold-start offline row misses its
+    // translation.
+    await writeToolSummaryTranslation(makeEntry({ text: 'Previous summary', translation: 'Alt' }));
+    await writeToolSummaryTranslation(makeEntry({ text: 'Current summary', translation: 'Neu' }));
+
+    const entries = await readToolSummaryTranslations();
+    expect(entries).toHaveLength(2);
+    expect(entries.map(entry => entry.text).toSorted()).toEqual([
+      'Current summary',
+      'Previous summary',
+    ]);
+
+    // A late write for the old text leaves the current text's entry intact.
+    await writeToolSummaryTranslation(makeEntry({ text: 'Previous summary', translation: 'Alt' }));
+    const after = await readToolSummaryTranslations();
+    const current = after.find(entry => entry.text === 'Current summary');
+    expect(current?.translation).toBe('Neu');
   });
 
   it('sign-out clear drops the whole scope', async () => {

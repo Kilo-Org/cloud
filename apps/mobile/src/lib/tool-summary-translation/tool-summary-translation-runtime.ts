@@ -31,6 +31,14 @@ export const DEFAULT_TOOL_SUMMARY_TRANSLATION_MODEL = {
  */
 export const TOOL_SUMMARY_TRANSLATION_TTL_MS = 2 * 24 * 60 * 60 * 1000;
 
+/**
+ * Longest a store read may hold the first flush. The store is a warm-start
+ * optimization, never a source of truth, so a read that never settles — a
+ * native module that hangs — must not block every translation; past this the
+ * flush proceeds memory-only.
+ */
+export const TOOL_SUMMARY_TRANSLATION_HYDRATION_TIMEOUT_MS = 2000;
+
 export type ToolSummaryTranslationConfig = {
   enabled: boolean;
   model: { id: string; name: string };
@@ -112,7 +120,9 @@ const queue: QueueItem[] = [];
 // Every summary that was asked for but has not resolved, keyed like the cache.
 // A failed batch leaves its items here so `retryUnresolvedTranslations` can
 // re-queue them when the session transport comes back; a resolving batch
-// removes them. Insertion order is oldest-first, so eviction is `keys().next()`.
+// removes them. `ensureTranslation` drops the same part's other source texts,
+// so at most one text per part is remembered. Insertion order is oldest-first,
+// so eviction is `keys().next()`.
 const retryable = new Map<string, QueueItem>();
 // The client module loads through one memoized dynamic import, like the
 // store's: concurrent batches share the single in-flight load instead of each
@@ -168,6 +178,27 @@ function translationKey(language: string, modelId: string, itemId: string, text:
   return `${language}\u0000${modelId}\u0000${itemId}\u0000${text}`;
 }
 
+/**
+ * Drops the retry-memory entries of one part whose source text differs from
+ * `key`. A part renders one source string at a time, so a remembered text that
+ * no surface shows any more must not be re-sent by
+ * `retryUnresolvedTranslations` on every reconnect or deep link.
+ */
+// eslint-disable-next-line max-params -- the language, model, part id and source text form the key
+function forgetSupersededRetryEntries(
+  language: string,
+  modelId: string,
+  itemId: string,
+  key: string
+): void {
+  const partPrefix = `${language}\u0000${modelId}\u0000${itemId}\u0000`;
+  for (const remembered of retryable.keys()) {
+    if (remembered !== key && remembered.startsWith(partPrefix)) {
+      retryable.delete(remembered);
+    }
+  }
+}
+
 /** Makes room for one more entry by dropping the oldest (insertion order). */
 function makeCacheRoom(): void {
   while (cache.size >= CACHE_CAP) {
@@ -191,12 +222,36 @@ function isFreshCacheEntry(key: string, text: string, now: number): boolean {
   return entry.text === text && entry.expiresAt > now;
 }
 
+const noopTimeoutResolution = (_entries: CachedToolSummaryTranslation[]) => undefined;
+
+/**
+ * Awaits the stored read, or `[]` once {@link
+ * TOOL_SUMMARY_TRANSLATION_HYDRATION_TIMEOUT_MS} elapses: a read that never
+ * settles must not hold every translation, and the cache is an optimization
+ * either way. The timer is cleared when the read wins; a read that settles
+ * after the timeout is discarded.
+ */
+async function readStoredTranslationsWithinTimeout(): Promise<CachedToolSummaryTranslation[]> {
+  let resolveTimeout: (entries: CachedToolSummaryTranslation[]) => void = noopTimeoutResolution;
+  const timeout = new Promise<CachedToolSummaryTranslation[]>(resolve => {
+    resolveTimeout = resolve;
+  });
+  const timeoutId = setTimeout(() => {
+    resolveTimeout([]);
+  }, TOOL_SUMMARY_TRANSLATION_HYDRATION_TIMEOUT_MS);
+  try {
+    return await Promise.race([readStoredTranslations(), timeout]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 /**
  * One lazy read of the encrypted-KV cache, started from `setConfig` when the
  * opt-in turns on and from the first `ensureTranslation`. It seeds the memory
- * cache with the unexpired entries, then emits. A store failure reads as no
- * entries (memory only), so the flush is released either way and translation
- * never waits on the cache.
+ * cache with the unexpired entries, then emits. A store failure or a read that
+ * never settles reads as no entries (memory only), so the flush is released
+ * either way and translation never waits on the cache.
  */
 function startHydration(): void {
   if (hydrationStarted) {
@@ -205,7 +260,7 @@ function startHydration(): void {
   hydrationStarted = true;
   void (async () => {
     try {
-      const entries = await readStoredTranslations();
+      const entries = await readStoredTranslationsWithinTimeout();
       const now = Date.now();
       let seeded = false;
       for (const stored of entries) {
@@ -479,6 +534,10 @@ export function ensureTranslation(input: {
   // summary is known by the time the flush runs.
   startHydration();
   const key = translationKey(language, model.id, itemId, text);
+  // This part now asks for `text`: any other source string remembered for the
+  // same part is superseded, so drop it from the retry memory before the
+  // freshness and in-flight guards return.
+  forgetSupersededRetryEntries(language, model.id, itemId, key);
   if (isFreshCacheEntry(key, text, Date.now()) || inFlight.has(key)) {
     return;
   }

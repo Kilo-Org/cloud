@@ -140,7 +140,7 @@ describe('backfillGooglePlayPurchaseAmounts', () => {
       },
     });
 
-    expect(result).toEqual({ scanned: 1, updated: 1, skipped: 0, failed: 0 });
+    expect(result).toEqual({ scanned: 1, updated: 1, skipped: 0, failed: 0, failures: [] });
     expect(await readPurchase(purchaseId)).toEqual(
       expect.objectContaining({
         amount_charged_minor_units: 1900,
@@ -157,7 +157,7 @@ describe('backfillGooglePlayPurchaseAmounts', () => {
       },
     });
 
-    expect(result).toEqual({ scanned: 0, updated: 0, skipped: 0, failed: 0 });
+    expect(result).toEqual({ scanned: 0, updated: 0, skipped: 0, failed: 0, failures: [] });
   });
 
   test('counts a failed order lookup and still fills the other row', async () => {
@@ -177,7 +177,19 @@ describe('backfillGooglePlayPurchaseAmounts', () => {
       },
     });
 
-    expect(result).toEqual({ scanned: 2, updated: 1, skipped: 0, failed: 1 });
+    expect(result).toEqual({
+      scanned: 2,
+      updated: 1,
+      skipped: 0,
+      failed: 1,
+      failures: [
+        {
+          rowId: failedRow.purchaseId,
+          orderId: 'GPA.lookup-fails',
+          reason: 'Play order API unavailable',
+        },
+      ],
+    });
     expect(await readPurchase(failedRow.purchaseId)).toEqual(
       expect.objectContaining({
         amount_charged_minor_units: null,
@@ -192,6 +204,33 @@ describe('backfillGooglePlayPurchaseAmounts', () => {
         tax_minor_units: 317,
       })
     );
+  });
+
+  test('records the failed row id, order id, and error message', async () => {
+    const { purchaseId } = await insertPurchase({
+      providerTransactionId: 'GPA.quota',
+      purchasedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const result = await backfillGooglePlayPurchaseAmounts({
+      orderFetcher: async () => {
+        throw new Error('quota exceeded for project kilo');
+      },
+    });
+
+    expect(result).toEqual({
+      scanned: 1,
+      updated: 0,
+      skipped: 0,
+      failed: 1,
+      failures: [
+        {
+          rowId: purchaseId,
+          orderId: 'GPA.quota',
+          reason: 'quota exceeded for project kilo',
+        },
+      ],
+    });
   });
 
   test('leaves a row whose order carries no money untouched across runs', async () => {
@@ -213,12 +252,12 @@ describe('backfillGooglePlayPurchaseAmounts', () => {
     const first = await backfillGooglePlayPurchaseAmounts({
       orderFetcher: async orderId => orderWithoutMoney(orderId),
     });
-    expect(first).toEqual({ scanned: 1, updated: 0, skipped: 1, failed: 0 });
+    expect(first).toEqual({ scanned: 1, updated: 0, skipped: 1, failed: 0, failures: [] });
 
     const second = await backfillGooglePlayPurchaseAmounts({
       orderFetcher: async orderId => orderWithoutMoney(orderId),
     });
-    expect(second).toEqual({ scanned: 1, updated: 0, skipped: 1, failed: 0 });
+    expect(second).toEqual({ scanned: 1, updated: 0, skipped: 1, failed: 0, failures: [] });
 
     expect(await readPurchase(noMoneyRow.purchaseId)).toEqual(
       expect.objectContaining({
@@ -253,10 +292,10 @@ describe('backfillGooglePlayPurchaseAmounts', () => {
     const calls = { count: 0 };
 
     const first = await backfillGooglePlayPurchaseAmounts({ orderFetcher: moneyFetcher(calls) });
-    expect(first).toEqual({ scanned: 1, updated: 1, skipped: 0, failed: 0 });
+    expect(first).toEqual({ scanned: 1, updated: 1, skipped: 0, failed: 0, failures: [] });
 
     const second = await backfillGooglePlayPurchaseAmounts({ orderFetcher: moneyFetcher(calls) });
-    expect(second).toEqual({ scanned: 0, updated: 0, skipped: 0, failed: 0 });
+    expect(second).toEqual({ scanned: 0, updated: 0, skipped: 0, failed: 0, failures: [] });
     expect(calls.count).toBe(1);
 
     expect(await readPurchase(purchaseId)).toEqual(
@@ -286,7 +325,7 @@ describe('backfillGooglePlayPurchaseAmounts', () => {
       limit: 2,
       orderFetcher: moneyFetcher(),
     });
-    expect(first).toEqual({ scanned: 2, updated: 2, skipped: 0, failed: 0 });
+    expect(first).toEqual({ scanned: 2, updated: 2, skipped: 0, failed: 0, failures: [] });
     expect((await readPurchase(newest.purchaseId)).amount_charged_minor_units).toBe(1900);
     expect((await readPurchase(middle.purchaseId)).amount_charged_minor_units).toBe(1900);
     expect((await readPurchase(oldest.purchaseId)).amount_charged_minor_units).toBeNull();
@@ -295,7 +334,7 @@ describe('backfillGooglePlayPurchaseAmounts', () => {
       limit: 2,
       orderFetcher: moneyFetcher(),
     });
-    expect(second).toEqual({ scanned: 1, updated: 1, skipped: 0, failed: 0 });
+    expect(second).toEqual({ scanned: 1, updated: 1, skipped: 0, failed: 0, failures: [] });
     expect((await readPurchase(oldest.purchaseId)).amount_charged_minor_units).toBe(1900);
   });
 
@@ -310,7 +349,7 @@ describe('backfillGooglePlayPurchaseAmounts', () => {
       dryRun: true,
     });
 
-    expect(result).toEqual({ scanned: 1, updated: 1, skipped: 0, failed: 0 });
+    expect(result).toEqual({ scanned: 1, updated: 1, skipped: 0, failed: 0, failures: [] });
     expect((await readPurchase(purchaseId)).amount_charged_minor_units).toBeNull();
   });
 });

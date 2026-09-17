@@ -151,4 +151,31 @@ describe('google-play-sdk', () => {
       'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid'
     );
   });
+
+  it('throws when the service account value is not JSON', () => {
+    process.env.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON = 'not-json';
+
+    const { createGooglePlayAndroidPublisherClient } = loadGooglePlaySdk();
+
+    expect(() => createGooglePlayAndroidPublisherClient()).toThrow(
+      'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid'
+    );
+  });
+
+  it('asserts the service account without building a client', () => {
+    const { assertGooglePlayServiceAccountConfigured } = loadGooglePlaySdk();
+
+    expect(() => assertGooglePlayServiceAccountConfigured()).not.toThrow();
+    expect(mockAndroidPublisher).not.toHaveBeenCalled();
+
+    delete process.env.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON;
+    expect(() => assertGooglePlayServiceAccountConfigured()).toThrow(
+      'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is not set'
+    );
+
+    process.env.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON = 'not-json';
+    expect(() => assertGooglePlayServiceAccountConfigured()).toThrow(
+      'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid'
+    );
+  });
 });

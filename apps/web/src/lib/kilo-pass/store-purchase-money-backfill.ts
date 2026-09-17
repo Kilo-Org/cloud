@@ -13,9 +13,10 @@
  * selected, newest purchase first, at most `limit` per call, so a completed run
  * leaves nothing to do and an interrupted run continues where it stopped. A row
  * whose order carries no money is counted `skipped` and left untouched; a fetch
- * or parse error counts `failed` and never aborts the batch. Every value is
- * validated against the schema's check constraints before the update, so a
- * single unusable order can never abort the batch.
+ * or parse error counts `failed`, records its row/order id and error message in
+ * `failures`, and never aborts the batch. Every value is validated against the
+ * schema's check constraints before the update, so a single unusable order can
+ * never abort the batch.
  */
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm';
@@ -31,12 +32,37 @@ export const DEFAULT_BACKFILL_GOOGLE_PLAY_PURCHASE_AMOUNTS_LIMIT = 500;
 
 const ISO_4217_CURRENCY_CODE = /^[A-Z]{3}$/;
 
+/**
+ * Why one row's order lookup failed. Carries ids and a message only: an auth
+ * failure's stack or payload can contain credential material, so the caller
+ * must never log the thrown value itself.
+ */
+export type BackfillStorePurchaseAmountsFailure = {
+  /** `kilo_pass_store_purchases.id` of the row whose order lookup failed. */
+  rowId: string;
+  /** The Play order id that was looked up (the stored `provider_transaction_id`). */
+  orderId: string;
+  /** `error.message` only. Never the stack, and never the thrown value. */
+  reason: string;
+};
+
 export type BackfillStorePurchaseAmountsResult = {
   scanned: number;
   updated: number;
   skipped: number;
   failed: number;
+  /**
+   * One entry per `failed` row, in scan order, so `failed === failures.length`.
+   * Without these the operator sees a bare `failed=N` and cannot tell a
+   * credential misconfiguration from a quota rejection or one bad order.
+   */
+  failures: BackfillStorePurchaseAmountsFailure[];
 };
+
+/** Message only: the stack of an auth or parse failure can carry key material. */
+function failureReason(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 /**
  * Returns the value only when it is a non-negative integer, which is what the
@@ -79,6 +105,7 @@ function sanitizedMoneyColumns(
  * Fetches the Play order of each eligible Google Play purchase, fills the three
  * money columns from it, and returns the batch counts. `scanned` is the number
  * of rows selected into the batch; `updated + skipped + failed === scanned`.
+ * Each failure records its row/order id and the error message in `failures`.
  */
 export async function backfillGooglePlayPurchaseAmounts(params?: {
   /** Maximum rows per call. Defaults to `DEFAULT_BACKFILL_GOOGLE_PLAY_PURCHASE_AMOUNTS_LIMIT`. */
@@ -117,6 +144,7 @@ export async function backfillGooglePlayPurchaseAmounts(params?: {
   let updated = 0;
   let skipped = 0;
   let failed = 0;
+  const failures: BackfillStorePurchaseAmountsFailure[] = [];
 
   for (const row of rows) {
     const orderId = row.providerTransactionId;
@@ -131,8 +159,9 @@ export async function backfillGooglePlayPurchaseAmounts(params?: {
     try {
       const order = await orderFetcher(orderId);
       money = googlePlayOrderMoneyForProduct(order, row.productId);
-    } catch {
+    } catch (error) {
       failed += 1;
+      failures.push({ rowId: row.id, orderId, reason: failureReason(error) });
       continue;
     }
 
@@ -151,5 +180,5 @@ export async function backfillGooglePlayPurchaseAmounts(params?: {
     updated += 1;
   }
 
-  return { scanned: rows.length, updated, skipped, failed };
+  return { scanned: rows.length, updated, skipped, failed, failures };
 }

@@ -7,11 +7,16 @@
  * The stored receipt cannot supply the money, so each purchase's Play order is
  * re-read through the stored `provider_transaction_id`. Rows whose order Google
  * can no longer return stay NULL and are counted in the summary as `skipped`
- * (no money in the order) or `failed` (the lookup itself failed). The run is
+ * (no money in the order) or `failed` (the lookup itself failed). Each failure
+ * also prints one `[FAILED]` line with the purchase row id, the Play order id,
+ * and the error message, so a credential problem, a quota rejection, and one
+ * bad order are distinguishable without dumping credential material. The run is
  * idempotent and resumable: only rows that still have both amounts NULL are
  * selected, newest purchase first, at most `--limit` per call.
  *
  * Requires GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON in the target environment.
+ * The service account is validated before the first Play request, so a missing
+ * or malformed value exits non-zero instead of reporting `failed=N`.
  *
  * Usage:
  *   pnpm --filter web script src/scripts/d2026-09-17_backfill-store-purchase-amounts.ts --limit 500
@@ -21,6 +26,7 @@
 import '../lib/load-env';
 
 import { closeAllDrizzleConnections } from '@/lib/drizzle';
+import { assertGooglePlayServiceAccountConfigured } from '@/lib/kilo-pass/google-play-sdk';
 import {
   backfillGooglePlayPurchaseAmounts,
   DEFAULT_BACKFILL_GOOGLE_PLAY_PURCHASE_AMOUNTS_LIMIT,
@@ -81,15 +87,31 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log('Requires GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON in the environment.');
+  // Fail fast, before the first query or Play request: a missing or malformed
+  // service account would otherwise fail every order lookup and be reported
+  // only as `failed=N`. The message names the variable; the value is never
+  // printed.
+  assertGooglePlayServiceAccountConfigured();
+  console.log('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON: set and valid');
   console.log(`Mode: ${dryRun ? 'DRY RUN' : 'EXECUTE'}, limit: ${limit}`);
 
   const startedAt = Date.now();
   const result = await backfillGooglePlayPurchaseAmounts({ limit, dryRun });
 
+  for (const failure of result.failures) {
+    // Message only: an auth failure's payload or stack can carry key material.
+    console.error(`[FAILED] row=${failure.rowId} order=${failure.orderId} error=${failure.reason}`);
+  }
+
   console.log(
     `scanned=${result.scanned} updated=${result.updated} skipped=${result.skipped} failed=${result.failed}`
   );
+  if (result.failed > 0) {
+    console.log(
+      'Next: re-run the same command to retry the failed rows. If every failure repeats one ' +
+        'error, check the service account (credentials, quota, or Play project) before retrying.'
+    );
+  }
   console.log(`Duration: ${Date.now() - startedAt}ms`);
 }
 

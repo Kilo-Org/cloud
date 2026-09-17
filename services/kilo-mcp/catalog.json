@@ -10065,37 +10065,6 @@
     ],
     "searchBlob": "githubApps.getInstallation Get the GitHub app installation for the current user or organization, including install status, permissions, and repositories. githubapps getinstallation organizationid organizationId"
   },
-  "githubApps.getRepositoryCustomizations": {
-    "path": "githubApps.getRepositoryCustomizations",
-    "kind": "query",
-    "summary": "Fetch custom repository settings and configurations for a GitHub app integration.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "integrationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "integrationId"
-      ]
-    },
-    "tags": [
-      "githubapps",
-      "getrepositorycustomizations",
-      "organizationid",
-      "integrationid"
-    ],
-    "searchBlob": "githubApps.getRepositoryCustomizations Fetch custom repository settings and configurations for a GitHub app integration. githubapps getrepositorycustomizations organizationid integrationid organizationId integrationId"
-  },
   "githubApps.getUserAuthorization": {
     "path": "githubApps.getUserAuthorization",
     "kind": "query",

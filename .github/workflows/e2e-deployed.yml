@@ -1,0 +1,102 @@
+name: E2E Deployed
+
+on:
+  workflow_dispatch:
+    inputs:
+      worker_url:
+        description: 'HTTPS URL of the deployed cloud-agent-next Worker'
+        required: true
+        type: string
+      fake_llm_url:
+        description: 'HTTPS URL of the deployed fake-LLM Worker'
+        required: true
+        type: string
+      backend_url:
+        description: 'HTTPS URL of the Kilo backend that issues stream tickets'
+        required: true
+        type: string
+        default: 'https://api.kilo.ai'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-deployed
+  cancel-in-progress: false
+
+jobs:
+  e2e-deployed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      WORKER_URL: ${{ inputs.worker_url }}
+      FAKE_LLM_URL: ${{ inputs.fake_llm_url }}
+      E2E_BACKEND_URL: ${{ inputs.backend_url }}
+      # Secrets are exposed as environment variables only; never echoed.
+      E2E_USER_TOKEN: ${{ secrets.E2E_USER_TOKEN }}
+      FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
+      E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run deployed e2e matrix
+        run: |
+          set -o pipefail
+          pnpm --filter cloud-agent-next run e2e:deployed 2>&1 | tee e2e-deployed.log
+
+      - name: Summarize deployed e2e results
+        if: always()
+        run: |
+          log='e2e-deployed.log'
+
+          {
+            echo '## Deployed E2E matrix'
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ ! -f "$log" ]]; then
+            echo 'The runner produced no log.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          counts=$(grep -E '^Summary: [0-9]+ passed, [0-9]+ failed, [0-9]+ unsupported$' "$log" | tail -1 || true)
+          unsupported=$(grep -E '^unsupported: ' "$log" || true)
+
+          if [[ -n "$counts" ]]; then
+            echo "$counts" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'The runner did not reach its summary line.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [[ -n "$unsupported" ]]; then
+            {
+              echo
+              echo '### Unsupported scenarios'
+              echo
+              echo '```'
+              echo "$unsupported"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload deployed e2e log
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-deployed-log
+          path: e2e-deployed.log
+          retention-days: 7

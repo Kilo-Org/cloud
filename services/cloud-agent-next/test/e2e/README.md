@@ -127,7 +127,8 @@ tsx services/cloud-agent-next/test/e2e/run.ts [--api=unified|legacy] [--timeout-
 `--timeout-ms=<n>` sets one finite, positive overall deadline for the selected
 `long-session`, `cold-resume`, `multi-session-collab`, or continuity scenario
 (`recover-same-session`, `interrupt-then-continue`, `warm-cold-cycles`,
-`question-idle-resume`, `large-stream`, `concurrent-chats`); it is not a
+`question-idle-resume`, `large-stream`, `concurrent-chats`), and for any shared
+scenario (`cold-hot`, `unknown-model`, `auth-reject`); it is not a
 per-operation timeout. The flag is rejected for all other scenarios.
 
 Examples:
@@ -156,15 +157,18 @@ tsx services/cloud-agent-next/test/e2e/run.ts interrupt-mid-stream _
 tsx services/cloud-agent-next/test/e2e/run.ts unknown-model _
 tsx services/cloud-agent-next/test/e2e/run.ts waiters-clean _
 
-# Callback delivery — driver stands up a local HTTP sink and asserts on receipt.
-# `callbackTarget` is accepted by prepareSession only (workerd can POST
-# http://127.0.0.1:<ephemeral> on the same host; no tunnel). Use the
+# Callback delivery — the scenario opens a callback sink and asserts on receipt.
+# `callbackTarget` is accepted by prepareSession only, so these scenarios pin
+# `api: 'legacy'` themselves; `--api=legacy` is not needed. Under local Docker
+# the sink is a host HTTP server (workerd can POST http://127.0.0.1:<ephemeral>
+# on the same host; no tunnel). Over HTTP the sink is the e2e surface
+# (`POST /__e2e/callbacks`) and the Worker self-fetches the returned URL. Use the
 # cloud-worktree-setup user so GitHub-backed clones have an installation token.
 E2E_USER_EMAIL=evgeny@kilocode.ai E2E_GITHUB_REPO=na2-org/hi-how-are-you \
   WORKER_URL=http://localhost:<8794+offset> FAKE_LLM_URL=http://localhost:<8811+offset> \
-  tsx services/cloud-agent-next/test/e2e/run.ts --api=legacy callback-completion echo:done
-tsx services/cloud-agent-next/test/e2e/run.ts --api=legacy callback-batch-followup _
-tsx services/cloud-agent-next/test/e2e/run.ts --api=legacy callback-interrupt _
+  tsx services/cloud-agent-next/test/e2e/run.ts callback-completion echo:done
+tsx services/cloud-agent-next/test/e2e/run.ts callback-batch-followup _
+tsx services/cloud-agent-next/test/e2e/run.ts callback-interrupt _
 
 # Legacy API (prepareSession + initiateFromKilocodeSessionV2 / sendMessageV2).
 tsx services/cloud-agent-next/test/e2e/run.ts --api=legacy cold-hot echo:legacy
@@ -190,8 +194,11 @@ The matrix starts with `cold-hot`, which pays one cold sandbox boot and then
 runs several hot same-session turns. The matrix tracks the session IDs returned by its own start/prepare calls.
 After each scenario, including failures, it interrupts those sessions before
 stopping sandboxes with proven exclusive ownership. It does not kill unrelated
-or previous-run sandboxes at startup. Cleanup failures stop the matrix instead
-of allowing pending work to contaminate later scenarios. Kill scenarios inject
+or previous-run sandboxes at startup. A session that is already in its desired
+end state counts as cleaned, not as a failure: the shared scenarios clean up in
+their own `finally`, so the runner cleanup is an idempotent backstop. A genuine
+cleanup failure still stops the matrix instead of allowing pending work to
+contaminate later scenarios. Kill scenarios inject
 their intentional fault before interruption, then cancel remaining work during
 cleanup.
 
@@ -213,6 +220,7 @@ for any other offset, compute the real ports from `pnpm dev:status --json`
 | `E2E_USER_EMAIL` | unset (ephemeral `usr_e2e_*`). Set to the cloud-worktree-setup email to reuse that user and its GitHub integration. |
 | `E2E_BRANCH` | unset. Optional checkout ref (`upstreamBranch` / `repository.branch`). |
 | `E2E_MODEL` | `kilo/fake-deterministic` (the only model the fake serves) |
+| `E2E_INTERNAL_API_SECRET` | unset. Required in the launcher shell for the local HTTP e2e profile (`cloud-agent-next-http`): the render command writes it into the generated `.wrangler/.dev.vars` as the Worker's `INTERNAL_API_SECRET`. The shared rules (`requireE2eInternalSecret`) reject the development default, values shorter than 16 characters, and whitespace; the renderer additionally rejects values outside `[A-Za-z0-9._~-]`, because only it writes a dotenv line. Must differ from production's `INTERNAL_API_SECRET`. The local-HTTP driver resolves it like the deployed driver — the exported value or the auth file's `e2eInternalApiSecret` — so both ends must agree. |
 | `DATABASE_URL` | Optional direct database URL override for this harness |
 | `POSTGRES_URL` | Repo database fallback loaded from root `.env.local` / `.env` |
 
@@ -225,7 +233,211 @@ uses `POSTGRES_URL` for local development.
 side channels). `KILO_OPENROUTER_BASE` stays on Next.js; the gateway routes
 `fake-deterministic` to fake-llm. If you changed the fake's port (e.g.
 non-zero `portOffset`), set `FAKE_LLM_URL` to the matching host-reachable
-view. Next.js picks up the same offset from `apps/web/.env.development.local`.
+view. Next.js picks up the same offset from
+`apps/web/.env.development.local`.
+
+The local HTTP e2e profile (`cloud-agent-next-http`) also requires
+`E2E_INTERNAL_API_SECRET` exported in the shell that launches it: the renderer
+reads `process.env.E2E_INTERNAL_API_SECRET` and writes it into the generated
+`.wrangler/.dev.vars`, which becomes the Worker's `INTERNAL_API_SECRET`. The
+local-HTTP driver calls the same `bootstrapDeployedProfile()` as the deployed
+profile, so it accepts the exported value or an `E2E_AUTH_FILE` whose
+`e2eInternalApiSecret` field supplies it; both ends must resolve to the same
+value. The value is never written into the service command string, because tmux
+mirrors those into `dev/logs/*`. Do not rotate the secret by restarting the
+service: `restartServiceInTmux` reuses the pane environment, and the CLI
+tunnel-restart path reloads `cloud-agent-next` rather than the HTTP variant. Stop
+the HTTP group and start a fresh launcher session with
+`E2E_INTERNAL_API_SECRET` exported (the same value the driver uses), and never
+type the secret into a logged pane command.
+
+## Deployed profile (`E2E_PROFILE=deployed`)
+
+The deployed profile drives a real deployed Cloudflare stack instead of the
+local Docker harness. See [`deploy/README.md`](./deploy/README.md) for the full
+deploy reference.
+
+Two Workers, in deploy order:
+
+1. `fake-llm-e2e-test` — Worker + `FakeLlmState` Durable Object running the
+   shared `fake-llm-core.ts`; deploy first with
+   `test/e2e/deploy/deploy-fake-llm.sh deploy`.
+2. `cloud-agent-next-e2e-test` — private render of this package's Worker;
+   deploy second with
+   `E2E_USER_ID=<id> FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy`.
+   Add `E2E_INTERNAL_API_SECRET=<secret>` on the first deploy or to rotate it; a
+   redeploy without it keeps the deployed Worker secret.
+
+The fake Worker's state model: one Durable Object (`new_sqlite_classes`,
+migration `v1`). Open streams cannot survive Durable Object eviction, so
+`gate`/`hang` directives are unsupported on the deployed profile. The
+`/test/*` scenario counters persist per tag, and the persisted snapshot retains
+the newest 200 tags by insertion order, evicting the oldest first — a reused
+tag that is never re-inserted can be evicted and restart its counters at zero.
+
+Two different fake URL bases — do not conflate them:
+
+- The deploy script prints
+  `FAKE_LLM_BASE_URL=https://<fake-host>/api/openrouter`. That value is for the
+  e2e Worker's provider config (`KILO_OPENROUTER_BASE`); pass it to
+  `deploy-e2e-worker.sh`.
+- The driver's `FAKE_LLM_URL` must be the fake Worker ROOT
+  `https://<fake-host>` with **no** `/api/openrouter`, because the scenarios call
+  `/test/requests` (and the other `/test/*` side channels) on it. Do not reuse
+  the `/api/openrouter` provider base as `FAKE_LLM_URL`.
+
+Driver env: `E2E_PROFILE=deployed`, `WORKER_URL`,
+`E2E_BACKEND_URL=https://api.kilo.ai`, `FAKE_LLM_URL`, and a user token from
+either `E2E_USER_TOKEN` or `E2E_AUTH_FILE`; optional `E2E_MODEL` (default
+`kilo/fake-deterministic`) and `E2E_GIT_URL`. `E2E_USER_TOKEN`, when set and
+non-empty, is an ordinary personal Kilo API token presented verbatim; it needs
+no separate `userId` or `email`. Otherwise `E2E_AUTH_FILE` must name a mode-600
+JSON file carrying the `token` field. When neither supplies a token the run fails
+and names both variables. An empty value counts as unset; a whitespace-padded
+value is present but rejected, never trimmed.
+
+The admin
+bearer for every `/test/*` side channel resolves in order: `FAKE_LLM_ADMIN_TOKEN`
+when it is set and non-empty, else the `fakeLlmAdminToken` field of the auth file
+named by `E2E_AUTH_FILE`, else a failure naming both options. The resolved value
+must be non-empty, must not have leading/trailing whitespace, must not be the
+insecure development default `local-fake-llm-admin`, and is never printed. The
+deployed bootstrap exports the resolved value into `FAKE_LLM_ADMIN_TOKEN` for the
+run, so `releaseGate`, `fetchFakeWaiters`, `fetchFakeRequests`,
+`fetchFakeScenarioStatus` and `waitForGateEngaged` authenticate with no extra
+configuration; precedence is env then auth file. The deployed profile reads the
+auth file at most once and only when a source needs it: never when `E2E_USER_TOKEN`
+and `FAKE_LLM_ADMIN_TOKEN` are both set. The
+deployed profile never reads `.dev.vars`, root env files, or Postgres, and never
+mints valid authentication credentials or stream tickets.
+The `auth-reject` negative probe deliberately signs one **invalid** JWT
+(wrong secret); it is used only for that bad-signature probe and is never
+presented as a valid credential.
+
+The auth file, named by the optional `E2E_AUTH_FILE`, is JSON
+`{ "token", "userId"?, "email"?, "fakeLlmAdminToken"? }` in a mode-600 file:
+`token` is required, `userId` is optional (when present it must equal the
+`kiloUserId` decoded from the token; when omitted it is derived from it), and
+`email` is optional (an omitted value yields no email). The file carries the Kilo
+identity and the fake-llm admin bearer as one alternative to `E2E_USER_TOKEN` and
+`FAKE_LLM_ADMIN_TOKEN`. The token must be an **ordinary
+personal Kilo API token** (the `generateApiToken` family), obtained from the
+user's personal API key or CLI token flow.
+Session/control tokens, organization tokens, and delegated/runtime tokens are
+refused with a diagnostic: they take the runtime-authorization path, and
+admission then fails with `Model catalog authentication unavailable`. The token
+is never printed.
+
+Exact run command, from `services/cloud-agent-next`:
+
+```bash
+E2E_PROFILE=deployed pnpm exec tsx test/e2e/run.ts cold-hot echo:hi
+```
+
+Shared scenarios run under both profiles from one implementation
+(`scenarios-shared.ts`). Capabilities a scenario needs but a profile does not
+provide make it `unsupported`: the run reports `ok: false, unsupported: true`
+with the missing capability names, and it never runs with the assertion
+dropped. `auth-reject` requires `deployedHttpAuthBoundary`, so it is
+`unsupported` under the local profile; `cold-hot` and `unknown-model` need no
+declared capability and run under both, while container identity stays a
+local-only assertion.
+
+Scenario matrix:
+
+| Shared scenario | What it does |
+|---|---|
+| `cold-hot <directive>` | One cold turn plus `echo:hot`, `slow:3:50`, `echo:followup` hot turns on one session. Requires positive cold preparation evidence and per-message hot completion evidence, and rejects any hot-turn preparation event. For an `echo:<token>` directive it also asserts the correlated cold text: assistant messages whose `info.parentID` is the cold user message id, their `text` parts selected by `part.messageID`, latest snapshot per part id, joined equals `<token>`. Non-echo directives skip that assertion (`cold-content=skipped(not-echo:<token>)`). Default `240s` per turn. Under the local profile it also proves the cold container persists and no new container appears. |
+| `unknown-model` | Starts with `kilo/does-not-exist`; requires fail-closed admission (`Selected model is not available`) with no fake chat completion dispatched. Under the local profile it also confirms on a short delay that no sandbox appeared. |
+| `auth-reject _` | Starts no session. Probes the fake Worker directly over HTTPS (every request timeout-bounded): each model route with no bearer → 401; `Bearer not-a-jwt` → 401; a JWT signed with the wrong secret → 401; positive control `GET /api/openrouter/models` with the real `config.bearerToken` → 200; each `/test/*` route without the admin bearer → 401 and with it → 2xx/400/404; crossover both ways (admin bearer on a model route → 401, model token on `/test/*` → 401). It proves the public HTTP auth boundary only: no sandbox credential propagation and no session path. |
+
+Run artifact for `cold-hot`: capture the fake `/test/requests`
+`chatCompletions` count before and after the run and expect **at least 4 new
+completions** across the run (one cold turn plus three hot turns). Record that
+delta with the scenario's
+`session=workspace_<uuid>; cold=complete; cold-content="<token>"; hot=...` line
+and the deployment id from `wrangler deployments list`.
+
+### Deployed matrix runner
+
+```bash
+pnpm --filter cloud-agent-next run e2e:deployed
+```
+
+`smoke-deployed.ts` runs every entry in `SHARED_SCENARIOS` through the shared
+gate against a deployed Worker, passing each scenario's `defaultConversation`
+and `defaultTimeoutMs` under the unified API. It needs no local Docker daemon and
+never reads `.dev.vars`, root env files, or Postgres. It is a separate runner,
+not a profile switch in `smoke.ts`: the local matrix inserts a Postgres user,
+loads `.dev.vars`, and stops Docker sandboxes.
+
+Each scenario owns its own cleanup. The runner tracks session ids through
+`onSessionCreated` and, after each scenario, repeats `interruptSession` and
+`deleteSession` as a tolerant backstop; a backstop failure is logged, never
+thrown, so one stuck session cannot hide the remaining scenarios.
+
+The summary reports passed / failed / unsupported as distinct categories.
+Exit policy: `1` if any scenario failed, else `2` if any was unsupported, else
+`0`. An `unsupported` result also has `ok: false`, so failure means
+`!ok && !unsupported`. The unsupported lines name the missing capabilities.
+
+The `e2e-deployed` GitHub workflow (`.github/workflows/e2e-deployed.yml`) is a
+`workflow_dispatch`-only runner around this script. It maps the `worker_url`,
+`fake_llm_url` and `backend_url` inputs to `WORKER_URL`, `FAKE_LLM_URL` and
+`E2E_BACKEND_URL`, passes `E2E_USER_TOKEN` and `FAKE_LLM_ADMIN_TOKEN` only as
+environment variables, tees the log, uploads it, and writes the counts plus the
+unsupported scenarios and missing capabilities to the job summary even when the
+runner fails.
+
+Accepted production-coupling risk (repeated from `deploy/README.md`): dedicated
+Worker names keep the stack addressable separately from production; they do
+**not** isolate its resources. The e2e Worker render clones the production
+bindings — the production Hyperdrive/Postgres database, the `kilocode-sessions`
+R2 bucket, and production service bindings — and its endpoints are public with
+valid-token admission only, with no per-user isolation.
+
+Docker scope boundary: deploying the fake Worker needs no Docker (it is a Worker
+and a Durable Object, not a container image); deploying the Cloud Agent e2e
+Worker still needs Docker for its sandbox container images; running the deployed
+driver needs no local Docker daemon.
+
+The deployed profile's `auth-reject` scenario is the only deployed negative
+auth proof. It does not exercise a sandbox, so it cannot show that credentials
+reached the fake from inside a session.
+
+Every other scenario is local-only because it needs Docker-backed
+inspection/control. Long `gate`/`hang` directives are outside the supported
+deployed profile (short streams only).
+
+The deployed profile does **not** send `x-skip-balance-check`: the enrolled user
+must have positive balance, and a 403 at `start` means fund the user.
+
+Honest caveat: `cold-hot` proves the warm dispatch path, not physical
+container identity. The absence of hot-turn preparation events is not proof that
+the same container served the turns; identity stays a local-only assertion.
+
+Cleanup and retained artifacts: cleanup against the e2e Worker runs first —
+`interruptSession` and `deleteSession`, each attempted independently and bounded
+by an abort timeout. The public `deleteSession` does not delete live
+`cli_sessions_v2` rows, so one retained row per started session survives for the
+enrolled user. The user-runnable web `cliSessionsV2.delete` flow (which targets
+the PRODUCTION Worker) is the later cleanup for those rows, not a fallback for
+failed e2e cleanup.
+
+Troubleshooting:
+
+- **Token refused with a policy diagnostic** — use an ordinary personal token;
+  the auth-file rule above lists the rejected families.
+- **Missing user token** — set `E2E_USER_TOKEN`, or set `E2E_AUTH_FILE` to a
+  mode-600 JSON file with a `token` field; the failure names both.
+- **`WORKER_URL`/`FAKE_LLM_URL`/`E2E_BACKEND_URL` must be `https://`** — the
+  deployed profile refuses plain HTTP.
+- **403 at `start`** — fund the enrolled user; the deployed profile does not
+  bypass balance admission.
+- **Container cold-start timeout** — `cold-hot` defaults to 240s per
+  turn; a first real container boot can exceed two minutes.
+- **Fake Worker `/health`** — `curl https://fake-llm-e2e-test.<sub>.workers.dev/health`
+  confirms the container Worker is up.
 
 ## Gateway contract
 
@@ -324,15 +536,50 @@ reusable catalog of planned and existing scenarios, see
 | `queue-rapid-fire-no-gate` | Send immediate follow-ups behind `echo:first` and assert they reach their terminal FIFO state without gate coordination. |
 | `queue-overflow` | Block on `gate:overflow`, fill the pending queue until enqueue fails with HTTP 429, release gate, drain. |
 | `queue-interrupt-clears` | Block on `gate:<tag>`, enqueue two, `interruptSession`, assert `cloud.message.failed` with `reason: 'interrupted'` for each. |
-| `llm-error` | Return fake provider HTTP 402, require the retry status to surface, `interruptSession`, then assert `cloud.message.failed reason=interrupted` and a completed follow-up on the same session and container. |
+| `llm-error` | Return fake provider HTTP 402 (terminal credit-exhaustion classification), assert `cloud.message.failed` with `status: 'failed'` and no retry status, assert `interruptSession` is a no-op on the settled message (`failed` stays durable, no `reason=interrupted`), then assert a completed follow-up on the same session and container. |
 | `chunked-streaming` | Stream delayed fake chunks and assert multiple downstream `message.part.delta` events survive. |
 | `empty-response` | Run `idle`, assert completion, and assert no downstream `message.part.delta` is emitted. |
 | `interrupt-mid-stream` | Interrupt an actively gated fake request and assert the active message is interrupted, not a queued message. |
 | `unknown-model` | Use a model rejected by the fake validation route and require synchronous rejection before sandbox creation or fake chat dispatch. |
 | `waiters-clean` | Complete a normal fake turn, then assert the fake server has no parked waiters or live responses. |
-| `callback-completion` | Stand up local HTTP sink, register `callbackTarget.url`, run `echo:done`, assert the sink received `status: 'completed'`. |
-| `callback-batch-followup` | Queue two turns behind a gated callback session, assert one callback for the final queued turn, then assert a later hot turn emits a fresh callback. |
-| `callback-interrupt` | Local HTTP sink + gated active turn + `interruptSession`, assert callback fires with `status: 'interrupted'`. |
+| `callback-completion` | Open the profile's callback sink, register `callbackTarget.url`, run `echo:done`, assert the sink received `status: 'completed'`. |
+| `callback-batch-followup` | Queue two turns behind a gated callback session, assert one callback for the final queued turn, then assert a later hot turn emits a fresh callback and no extra one after the batch settles. |
+| `callback-interrupt` | Gated active turn + `interruptSession`, assert callback fires with `status: 'interrupted'`. |
+
+The three callback scenarios are shared definitions. Their `callbacks` capability
+is provided by the profile: a host HTTP sink under local Docker, and the e2e
+surface sink (`POST /__e2e/callbacks`, `GET`/`DELETE /__e2e/callbacks/:token`)
+over HTTP, where the Worker self-fetches the minted URL.
+
+### e2e surface auth (HTTP profiles)
+
+The `/__e2e/*` surface is mounted only on the e2e entrypoint. Every route needs
+**both** the e2e-scoped `INTERNAL_API_SECRET`, presented as `x-internal-api-key`
+and compared in constant time, and a valid Kilo JWT. The secret gate runs first,
+so an absent or wrong secret is rejected before JWT verification and before any
+Hyperdrive dereference.
+
+`POST /__e2e/callbacks/:token` is the single exemption from both gates: callback
+delivery sends no Kilo credential, so ingest authenticates with its unguessable
+path token. Mint (`POST /__e2e/callbacks`), read/delete (`GET`/`DELETE
+/__e2e/callbacks/:token`) and any extra or trailing path segment stay behind both
+gates.
+
+Security consequence, recorded honestly. Holding the e2e secret with no JWT lets
+a caller replace any sandbox's wrapper credential by id
+(`POST /internal/sandbox-control/seed` is secret-only and unowned) and disrupt
+another user's running sandbox in the e2e Worker's namespace:
+`SandboxControl.setWrapperCredentialHash` overwrites the credential hash and
+destroys the runtime, readiness and heartbeat state. With a valid JWT plus the
+secret, isolation is still partial: session lookups are keyed
+`${JWT userId}:${sessionId}`, so user A cannot reach user B's session Durable
+Object by naming B's session, and `updateSession` only rewrites callback metadata
+inside the selected DO. `cleanupSession` is the exception: it deletes session
+resources without the `requireCurrentSessionAccess` check the public
+`deleteSession` applies, so the secret plus any valid JWT can trigger cleanup of
+an **unowned** session id; seed remains the only no-JWT path.
+`E2E_INTERNAL_API_SECRET` must differ from production's value — an operator
+requirement the scripts cannot prove.
 
 ### API dimension
 
@@ -340,7 +587,11 @@ The harness exercises both tRPC surfaces. Pass `--api=legacy` to drive the
 `prepareSession` + `initiateFromKilocodeSessionV2` + `sendMessageV2`
 procedures (what the web UI uses today); the default `--api=unified` uses
 the newer `start` / `send` procedures. `prepareSession` requires
-`INTERNAL_API_SECRET` — the driver reads it from `.dev.vars` automatically.
+`INTERNAL_API_SECRET`: the driver reads it from `.dev.vars` for the Docker
+profile and from the resolved e2e secret for the deployed and local-HTTP
+profiles, and it always POSTs `/trpc/prepareSession`. The e2e surface has no
+prepare adapter; scenarios that pin the legacy flow (the callback scenarios)
+select it themselves.
 
 ## Troubleshooting
 

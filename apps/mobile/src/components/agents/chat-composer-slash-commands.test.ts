@@ -366,6 +366,15 @@ describe('getSlashCommandDescription', () => {
     );
   });
 
+  it.each(['constructor', 'toString', 'hasOwnProperty', 'valueOf', '__proto__'])(
+    'keeps the reported description for the inherited Object.prototype name %s',
+    name => {
+      expect(getSlashCommandDescription({ name, description: 'Repo command', hints: [] })).toBe(
+        'Repo command'
+      );
+    }
+  );
+
   it('returns undefined for an unknown command with no description', () => {
     expect(getSlashCommandDescription({ name: 'help', hints: [] })).toBeUndefined();
   });

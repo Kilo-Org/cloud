@@ -79,7 +79,13 @@ const SLASH_COMMAND_DESCRIPTION_KEYS = {
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
 function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
-  return (dictionary as Readonly<Record<string, V | undefined>>)[key];
+  // The key is an untrusted command name, so match own properties only:
+  // inherited members like 'constructor' would otherwise resolve to a
+  // function and get handed to i18n.t instead of falling back to the
+  // reported description.
+  return Object.hasOwn(dictionary, key)
+    ? (dictionary as Readonly<Record<string, V | undefined>>)[key]
+    : undefined;
 }
 
 /**

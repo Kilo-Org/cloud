@@ -1,11 +1,13 @@
 /* eslint-disable max-lines -- DOM-free live-list matrix and focus/navigation regressions share one mounted fixture. */
-import { createElement, Fragment, type ReactNode } from 'react';
+import { createElement, Fragment, type ReactElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import type * as MotionContextModule from '@/lib/a11y/motion-context';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { AgentSessionListScreen } from './session-list-screen';
+import { RowsRefreshControl } from './rows-refresh-control';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -18,6 +20,13 @@ type Org = { organizationId: string; organizationName: string };
 const state = vi.hoisted(() => ({
   focused: true,
   fontScale: 1,
+  // Mutable so a case can put the tree on Android: the platform decides
+  // whether the floating pull-to-refresh indicator is safe (device defect
+  // uxs1) or the reserved band carries the in-flight state instead.
+  platform: { OS: 'ios' as string },
+  // Mutable so a case can turn reduced motion on: the platform control is then
+  // inert and a centered body draws the pull's static progress itself.
+  reducedMotion: false,
   topInset: 0,
   leftInset: 0,
   rightInset: 0,
@@ -67,14 +76,14 @@ vi.mock('@/components/centered-state-surface', () => ({
 }));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
-  Platform: { OS: 'ios' },
+  Platform: state.platform,
   Modal: 'Modal',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
-  useWindowDimensions: () => ({ fontScale: state.fontScale }),
+  useWindowDimensions: () => ({ fontScale: state.fontScale, height: 844 }),
   AppState: {
     addEventListener: (_event: string, listener: (next: string) => void) => {
       state.listeners.add(listener);
@@ -218,6 +227,13 @@ vi.mock('@/lib/a11y/announce', () => ({
     state.announcements.push(message);
   },
 }));
+vi.mock('@/lib/a11y/motion-context', async importOriginal => ({
+  ...(await importOriginal<typeof MotionContextModule>()),
+  useProvidedMotionPolicy: () => ({
+    reducedMotion: state.reducedMotion,
+    scrollAnimated: !state.reducedMotion,
+  }),
+}));
 vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => state.tabBarHeight }));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   useLiveAgentSessions: (options: Parameters<typeof useLiveAgentSessions>[0]) => {
@@ -341,6 +357,8 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   state.focused = true;
   state.fontScale = 1;
+  state.platform.OS = 'ios';
+  state.reducedMotion = false;
   state.topInset = 0;
   state.leftInset = 0;
   state.rightInset = 0;
@@ -792,6 +810,112 @@ describe('AgentSessionListScreen live presentation', () => {
     });
     expect(state.refetch).toHaveBeenCalledTimes(1);
     expect(state.announcements).toEqual(['Updating']);
+  });
+
+  it('carries the in-flight pull in the reserved band on Android instead of the floating indicator', async () => {
+    state.live.activeSessions = [row];
+    const pending = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(pending.promise);
+    // Android's SwipeRefreshLayout rests its indicator over the list's first
+    // row and hides that row's text (device defect uxs1), so the rows list
+    // mounts `RowsRefreshControl`, which parks that disc below the fold (see
+    // its test); the reserved band above the rows shows the wait with the
+    // spinner that cannot cover a row.
+    state.platform.OS = 'android';
+    await renderScreen();
+    const refresh = () =>
+      nodes('FlatList')[0]?.props.refreshControl as ReactElement<{
+        refreshing: boolean;
+        onRefresh: () => void;
+      }>;
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    expect(refresh().type).toBe(RowsRefreshControl);
+    expect(refresh().props.refreshing).toBe(true);
+    const updating = nodes('Text').find(node => node.children.includes('Updating'));
+    expect(updating).toBeDefined();
+    expect(updating?.props.className).not.toContain('absolute');
+    expect(nodes('ActivityIndicator')).toHaveLength(1);
+    await act(async () => {
+      pending.resolve(true);
+      await pending.promise;
+    });
+    expect(nodes('ActivityIndicator')).toHaveLength(0);
+  });
+
+  it.each([
+    { platform: 'android' as const, parked: true },
+    { platform: 'ios' as const, parked: false },
+  ])(
+    'carries the no-match body pull in one indicator on $platform',
+    async ({ platform: os, parked }) => {
+      state.live.activeSessions = [row];
+      const pending = Promise.withResolvers<boolean>();
+      state.refetch.mockReturnValue(pending.promise);
+      state.platform.OS = os;
+      await renderScreen();
+      const searchHeader = requireNode('SessionListSearchHeader');
+      act(() => {
+        (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+      });
+      expect(nodes('CenteredState')).toHaveLength(1);
+      const refresh = () =>
+        nodes('CenteredState')[0]?.props.refreshControl as ReactElement<{
+          refreshing: boolean;
+          onRefresh: () => void;
+        }>;
+      act(() => {
+        refresh().props.onRefresh();
+      });
+      // The no-match body mounts the rows control, and the reserved band is
+      // present here too (the sessions still exist behind the filter). Where
+      // the band carries the in-flight spinner (Android), the disc is parked
+      // off the rows there as on the rows list, or one pull draws two spinners
+      // (device defect uxs1).
+      expect(refresh().type).toBe(RowsRefreshControl);
+      expect(nodes('ActivityIndicator')).toHaveLength(parked ? 1 : 0);
+      await act(async () => {
+        pending.resolve(true);
+        await pending.promise;
+      });
+      expect(nodes('ActivityIndicator')).toHaveLength(0);
+      expect(refresh().props.refreshing).toBe(false);
+    }
+  );
+
+  it('yields the no-match band spinner to the body’s reduced-motion progress on Android', async () => {
+    state.live.activeSessions = [row];
+    const pending = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(pending.promise);
+    state.platform.OS = 'android';
+    state.reducedMotion = true;
+    await renderScreen();
+    const searchHeader = requireNode('SessionListSearchHeader');
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+    const refresh = () =>
+      nodes('CenteredState')[0]?.props.refreshControl as ReactElement<{
+        refreshing: boolean;
+        onRefresh: () => void;
+      }>;
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    // Reduced motion makes the platform control inert, so the no-match body's
+    // static progress is the pull's indicator: the reserved band keeps the
+    // "Updating" copy without drawing a second spinner (device defect uxs1).
+    const updating = nodes('Text').find(node => node.children.includes('Updating'));
+    expect(updating).toBeDefined();
+    expect(updating?.props.className).not.toContain('absolute');
+    expect(nodes('ActivityIndicator')).toHaveLength(0);
+    await act(async () => {
+      pending.resolve(true);
+      await pending.promise;
+    });
+    expect(nodes('ActivityIndicator')).toHaveLength(0);
+    expect(refresh().props.refreshing).toBe(false);
   });
 
   it('passes a numeric attention revision as extraData to the live FlatList', async () => {

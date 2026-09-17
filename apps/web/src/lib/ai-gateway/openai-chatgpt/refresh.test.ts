@@ -30,7 +30,7 @@ type MockDb = {
   update: jest.Mock;
 };
 
-type StoredRow = { encrypted_api_key: ReturnType<typeof encryptApiKey> };
+type StoredRow = { encrypted_api_key: ReturnType<typeof encryptApiKey>; is_enabled: boolean };
 
 const TEST_USER_ID = 'user-1';
 
@@ -60,6 +60,7 @@ function buildConnection(
 function encryptedRow(connection: OpenAiChatGptConnection): StoredRow {
   return {
     encrypted_api_key: encryptApiKey(JSON.stringify(connection), BYOK_ENCRYPTION_KEY),
+    is_enabled: true,
   };
 }
 
@@ -323,16 +324,62 @@ describe('resolveOpenAiChatGptAccessToken', () => {
 
     // One attempt only: a terminal error is not retried.
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(txUpdateSetCalls).toHaveLength(0);
-    expect(markUpdateSetCalls).toHaveLength(1);
-    expect(markUpdateSetCalls[0].is_enabled).toBe(false);
-    const persisted = decodeStored(markUpdateSetCalls[0]);
+    expect(markUpdateSetCalls).toHaveLength(0);
+    // The terminal write goes through the locked transaction, not a bare update.
+    expect(txUpdateSetCalls).toHaveLength(1);
+    expect(txUpdateSetCalls[0].is_enabled).toBe(false);
+    const persisted = decodeStored(txUpdateSetCalls[0]);
     expect(persisted.status).toBe('error');
     expect(persisted.error_message).toBe(OPENAI_CHATGPT_RECONNECT_MESSAGE);
     // The dead credential is cleared, never kept at rest.
     expect(persisted.access_token).toBe('');
     expect(persisted.refresh_token).toBeUndefined();
     expect(persisted.expires_at).toBe(0);
+  });
+
+  it('writes the terminal state inside the row lock so a concurrent reconnect survives', async () => {
+    storedRow = encryptedRow(buildConnection());
+    fetchMock.mockResolvedValue(jsonResponse({ error: 'invalid_grant' }, 400));
+
+    const events: string[] = [];
+    mockDb.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) => {
+      events.push('lock:acquire');
+      try {
+        return await callback({
+          select: jest.fn(txSelectChain),
+          update: jest.fn(() => ({
+            set: jest.fn((values: Record<string, unknown>) => {
+              events.push('terminal:write');
+              txUpdateSetCalls.push(values);
+              return { where: jest.fn(() => Promise.resolve(undefined)) };
+            }),
+          })),
+        });
+      } finally {
+        events.push('lock:release');
+      }
+    });
+
+    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+      kind: 'terminal',
+    });
+
+    // The write happens before the lock is released, so a reconnect that saves a
+    // new row cannot be overwritten by this stale failure.
+    expect(events).toEqual(['lock:acquire', 'terminal:write', 'lock:release']);
+    expect(markUpdateSetCalls).toHaveLength(0);
+  });
+
+  it('treats a disabled row as no connection and does not call OpenAI', async () => {
+    storedRow = {
+      ...encryptedRow(buildConnection({ expires_at: nowSeconds() + 3600 })),
+      is_enabled: false,
+    };
+
+    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+      kind: 'no_connection',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('does not call OpenAI when the stored connection has no refresh token', async () => {

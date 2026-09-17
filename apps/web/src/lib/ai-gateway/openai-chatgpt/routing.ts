@@ -7,7 +7,7 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
-import { getOpenAiChatGptConnection } from './store';
+import { getOpenAiChatGptStoredConnection } from './store';
 
 /**
  * Routing for the delegated "Sign in with ChatGPT" connection. When a person
@@ -80,11 +80,11 @@ export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput):
   if (!userId) return false;
   if (!isOpenAiChatGptModel(requestedModel)) return false;
 
-  const connection = await getOpenAiChatGptConnection(userId);
-  // `status` mirrors the row's `is_enabled`: saving sets connected/enabled and a
-  // terminal failure sets error/disabled. An absent or unreadable row returns
-  // null, so neither can be routed.
-  return connection?.status === 'connected';
+  const stored = await getOpenAiChatGptStoredConnection(userId);
+  // The payload's `status` mirrors a save or a terminal failure, but a person
+  // can also disable the row through the ordinary BYOK toggle, which leaves the
+  // payload saying `connected`. Both must hold for the route to be eligible.
+  return stored?.isEnabled === true && stored.connection.status === 'connected';
 }
 
 /**

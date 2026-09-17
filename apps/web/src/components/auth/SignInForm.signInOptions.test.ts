@@ -14,13 +14,17 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 let mockFlowEmail = '';
 let mockChatGptAllowed = false;
+let mockHookEmail: string | null = null;
 
 jest.mock('@/components/AnimatedLogoMark', () => ({
   AnimatedLogoMark: () => null,
 }));
 
 jest.mock('@/hooks/useChatGptSignInAccess', () => ({
-  useChatGptSignInAccess: () => mockChatGptAllowed,
+  useChatGptSignInAccess: (email: string) => {
+    mockHookEmail = email;
+    return mockChatGptAllowed;
+  },
 }));
 
 jest.mock('@/hooks/useSignInFlow', () => ({
@@ -94,6 +98,7 @@ const { SignInForm } = require('./SignInForm') as {
 beforeEach(() => {
   mockFlowEmail = '';
   mockChatGptAllowed = false;
+  mockHookEmail = null;
 });
 
 describe('SignInForm sign-in options', () => {
@@ -105,6 +110,7 @@ describe('SignInForm sign-in options', () => {
     expect(html).not.toContain('Sign in with ChatGPT');
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
+    expect(mockHookEmail).toBe('');
   });
 
   it('offers ChatGPT on sign-in when the flag is on for the typed email', () => {
@@ -117,6 +123,7 @@ describe('SignInForm sign-in options', () => {
     expect(html.match(/Sign in with ChatGPT/g)).toHaveLength(1);
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
+    expect(mockHookEmail).toBe('person@kilo.ai');
   });
 
   it('hides ChatGPT on sign-up when the flag is off for the typed email', () => {

@@ -1,5 +1,5 @@
 jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
-  getOpenAiChatGptConnection: jest.fn(),
+  getOpenAiChatGptStoredConnection: jest.fn(),
 }));
 jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
   resolveOpenAiChatGptAccessToken: jest.fn(),
@@ -20,7 +20,7 @@ jest.mock('next/server', () => ({
 
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
-import { getOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
+import { getOpenAiChatGptStoredConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import type {
   GatewayRequest,
   GatewayResponsesRequest,
@@ -115,7 +115,10 @@ async function transformResponsesRequest(
 
 beforeEach(() => {
   process.env.OPENAI_API_KEY = PARTNER_KEY;
-  jest.mocked(getOpenAiChatGptConnection).mockReset().mockResolvedValue(connectedConnection());
+  jest
+    .mocked(getOpenAiChatGptStoredConnection)
+    .mockReset()
+    .mockResolvedValue({ connection: connectedConnection(), isEnabled: true });
   jest
     .mocked(resolveOpenAiChatGptAccessToken)
     .mockReset()
@@ -134,7 +137,7 @@ afterAll(() => {
 describe('isOpenAiChatGptEligible', () => {
   it('is eligible for a responses request for a prefixed OpenAI model', async () => {
     await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(true);
-    expect(getOpenAiChatGptConnection).toHaveBeenCalledWith(USER_ID);
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(USER_ID);
   });
 
   it('matches and strips the model id case-insensitively, ignoring surrounding whitespace', async () => {
@@ -187,15 +190,25 @@ describe('isOpenAiChatGptEligible', () => {
   );
 
   it('is not eligible when no connection is stored', async () => {
-    jest.mocked(getOpenAiChatGptConnection).mockResolvedValue(null);
+    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(null);
 
     await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(false);
   });
 
   it('is not eligible when the connection is disabled after a failed refresh', async () => {
-    jest
-      .mocked(getOpenAiChatGptConnection)
-      .mockResolvedValue({ ...connectedConnection(), status: 'error', error_message: 'expired' });
+    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue({
+      connection: { ...connectedConnection(), status: 'error', error_message: 'expired' },
+      isEnabled: false,
+    });
+
+    await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(false);
+  });
+
+  it('is not eligible when the row is disabled while the payload still says connected', async () => {
+    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue({
+      connection: connectedConnection(),
+      isEnabled: false,
+    });
 
     await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(false);
   });
@@ -309,7 +322,7 @@ describe('checkOpenAiChatGptByok', () => {
     await expect(
       checkOpenAiChatGptByok(routingInput({ request: chatCompletionsRequest('openai/gpt-5-nano') }))
     ).resolves.toBeNull();
-    expect(getOpenAiChatGptConnection).not.toHaveBeenCalled();
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
     expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
   });
 

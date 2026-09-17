@@ -24,7 +24,8 @@ jest.mock('@/components/organizations/byok/BYOKKeysManager', () => ({
 }));
 
 jest.mock('@/components/organizations/byok/OpenAiChatGptCard', () => ({
-  OpenAiChatGptCard: () => createElement('div', null, 'OpenAiChatGptCard'),
+  OpenAiChatGptCard: () => createElement('div', null, 'card'),
+  OpenAiChatGptCardView: () => createElement('div', null, 'card-skeleton'),
 }));
 
 const { default: PersonalBYOKPage } = require('./page') as {
@@ -36,22 +37,23 @@ describe('PersonalBYOKPage ChatGPT flag gate', () => {
     mockFlagEnabled = false;
     const html = renderToStaticMarkup(createElement(PersonalBYOKPage));
 
-    expect(html).not.toContain('OpenAiChatGptCard');
+    expect(html).not.toContain('card');
     expect(html).toContain('BYOKKeysManager');
   });
 
-  it('hides the ChatGPT card while the flag is still loading', () => {
+  it('holds the card height while the flag is still loading', () => {
     mockFlagEnabled = undefined;
     const html = renderToStaticMarkup(createElement(PersonalBYOKPage));
 
-    expect(html).not.toContain('OpenAiChatGptCard');
+    expect(html).toContain('card-skeleton');
+    expect(html).not.toMatch(/>card</);
   });
 
   it('shows the ChatGPT card when the flag is on', () => {
     mockFlagEnabled = true;
     const html = renderToStaticMarkup(createElement(PersonalBYOKPage));
 
-    expect(html).toContain('OpenAiChatGptCard');
+    expect(html).toMatch(/>card</);
     expect(html).toContain('BYOKKeysManager');
   });
 });

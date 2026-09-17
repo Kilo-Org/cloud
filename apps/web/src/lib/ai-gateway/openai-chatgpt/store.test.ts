@@ -18,6 +18,7 @@ import { OPENAI_CHATGPT_PROVIDER_ID } from './provider-id';
 import {
   clearOpenAiChatGptConnection,
   getOpenAiChatGptConnection,
+  getOpenAiChatGptStoredConnection,
   markOpenAiChatGptError,
   saveOpenAiChatGptConnection,
 } from './store';
@@ -125,6 +126,26 @@ describe('openai-chatgpt connection store', () => {
     expect(JSON.stringify(rows[0].encrypted_api_key)).not.toContain('access-token-1');
 
     await expect(getOpenAiChatGptConnection(TEST_USER_ID)).resolves.toEqual(connection);
+  });
+
+  it('reports the row enabled flag alongside the stored connection', async () => {
+    await saveOpenAiChatGptConnection(TEST_USER_ID, buildConnection());
+
+    await expect(getOpenAiChatGptStoredConnection(TEST_USER_ID)).resolves.toEqual({
+      connection: buildConnection(),
+      isEnabled: true,
+    });
+  });
+
+  it('reports isEnabled false when the row is disabled while the payload still says connected', async () => {
+    await saveOpenAiChatGptConnection(TEST_USER_ID, buildConnection());
+    // Mimics the ordinary BYOK toggle, which only flips the row flag.
+    rows = rows.map(row => ({ ...row, is_enabled: false }));
+
+    const stored = await getOpenAiChatGptStoredConnection(TEST_USER_ID);
+
+    expect(stored?.isEnabled).toBe(false);
+    expect(stored?.connection.status).toBe('connected');
   });
 
   it('replaces the existing row on save instead of inserting a second', async () => {

@@ -9,7 +9,7 @@ import { OPENAI_RESOURCE, OPENAI_TOKEN_ENDPOINT } from '@/lib/auth/openai/config
 import { OPENAI_CHATGPT_PROVIDER_ID } from './provider-id';
 import {
   decryptOpenAiChatGptConnection,
-  markOpenAiChatGptError,
+  markOpenAiChatGptConnectionErrored,
   readOpenAiChatGptConnectionRow,
   type OpenAiChatGptDatabase,
 } from './store';
@@ -42,7 +42,7 @@ export const OPENAI_CHATGPT_RECONNECT_MESSAGE =
 
 /**
  * OAuth error codes that mean the stored refresh token can never work again.
- * The credential is dead: `markOpenAiChatGptError` clears the stored OpenAI
+ * The credential is dead: `markOpenAiChatGptConnectionErrored` clears the stored OpenAI
  * token set, disables the connection, and the user is told to reconnect.
  */
 const TERMINAL_REFRESH_ERROR_CODES = new Set([
@@ -242,14 +242,20 @@ async function attemptRefresh(
 /**
  * Re-reads the connection under the row lock so a sibling instance that already
  * refreshed is not refreshed again, then returns the fresh token, decides to
- * refresh, or reports why it cannot.
+ * refresh, or reports why it cannot. A disabled row is no connection: the row
+ * can be disabled by the ordinary BYOK toggle while the payload still says
+ * `connected`.
+ *
+ * A terminal failure is written back inside this same transaction, while the
+ * row lock is still held. A reconnect that saves a new row between the rejected
+ * token exchange and the write therefore cannot be erased by a stale failure.
  */
 async function resolveInsideLock(
   tx: OpenAiChatGptDatabase,
   userId: string
 ): Promise<RefreshAttempt> {
   const row = await readOpenAiChatGptConnectionRow(tx, userId, { forUpdate: true });
-  if (!row) return { kind: 'no_connection' };
+  if (!row || !row.is_enabled) return { kind: 'no_connection' };
 
   const connection = decryptOpenAiChatGptConnection(row.encrypted_api_key);
   if (!connection) return { kind: 'no_connection' };
@@ -258,7 +264,16 @@ async function resolveInsideLock(
     return { kind: 'access_token', accessToken: connection.access_token };
   }
 
-  return attemptRefresh(tx, userId, connection);
+  const attempt = await attemptRefresh(tx, userId, connection);
+  if (attempt.kind === 'terminal') {
+    await markOpenAiChatGptConnectionErrored(
+      tx,
+      userId,
+      connection,
+      OPENAI_CHATGPT_RECONNECT_MESSAGE
+    );
+  }
+  return attempt;
 }
 
 async function resolveOpenAiChatGptAccessTokenUncached(
@@ -273,9 +288,11 @@ async function resolveOpenAiChatGptAccessTokenUncached(
       return { kind: 'failed' };
     }
 
-    // Fast path: no lock, no network call while the stored token is fresh.
+    // Fast path: no lock, no network call while the stored token is fresh. A
+    // disabled row is skipped so it can never serve a request.
     const row = await readOpenAiChatGptConnectionRow(db, userId);
-    const current = row ? decryptOpenAiChatGptConnection(row.encrypted_api_key) : null;
+    const current =
+      row?.is_enabled === true ? decryptOpenAiChatGptConnection(row.encrypted_api_key) : null;
     if (
       current &&
       current.expires_at - nowSeconds() > OPENAI_CHATGPT_REFRESH_WINDOW_SECONDS &&
@@ -291,10 +308,7 @@ async function resolveOpenAiChatGptAccessTokenUncached(
       // refreshed over.
       const decision = await db.transaction(tx => resolveInsideLock(tx, userId));
 
-      if (decision.kind === 'terminal') {
-        await markOpenAiChatGptError(userId, OPENAI_CHATGPT_RECONNECT_MESSAGE);
-        return { kind: 'terminal' };
-      }
+      // A terminal decision has already disabled the row inside that transaction.
       if (decision.kind !== 'retry') return decision;
 
       if (attempt < OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS) {

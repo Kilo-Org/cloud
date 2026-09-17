@@ -21,7 +21,9 @@ export type OpenAiChatGptDatabase = typeof db | DrizzleTransaction;
 /**
  * Reads the raw connection row. `options.forUpdate` takes a `SELECT ... FOR
  * UPDATE` row lock, used inside a transaction so a concurrent refresh in
- * another process cannot interleave.
+ * another process cannot interleave. `is_enabled` is read with the payload: a
+ * person can disable the row through the ordinary BYOK toggle without touching
+ * the stored status, so the payload alone cannot decide eligibility.
  */
 export async function readOpenAiChatGptConnectionRow(
   fromDb: OpenAiChatGptDatabase,
@@ -29,7 +31,10 @@ export async function readOpenAiChatGptConnectionRow(
   options: { forUpdate?: boolean } = {}
 ) {
   const query = fromDb
-    .select({ encrypted_api_key: byok_api_keys.encrypted_api_key })
+    .select({
+      encrypted_api_key: byok_api_keys.encrypted_api_key,
+      is_enabled: byok_api_keys.is_enabled,
+    })
     .from(byok_api_keys)
     .where(
       and(
@@ -65,6 +70,22 @@ export async function getOpenAiChatGptConnection(
 ): Promise<OpenAiChatGptConnection | null> {
   const row = await readOpenAiChatGptConnectionRow(db, userId);
   return row ? decryptOpenAiChatGptConnection(row.encrypted_api_key) : null;
+}
+
+/**
+ * The stored payload together with the row's own enabled flag. Routing must use
+ * this: a person can disable the row through the ordinary BYOK toggle, and the
+ * payload keeps saying `connected` because the toggle does not rewrite it. The
+ * status router deliberately keeps using `getOpenAiChatGptConnection`, so a
+ * terminal refresh failure still surfaces its reconnect message.
+ */
+export async function getOpenAiChatGptStoredConnection(
+  userId: string
+): Promise<{ connection: OpenAiChatGptConnection; isEnabled: boolean } | null> {
+  const row = await readOpenAiChatGptConnectionRow(db, userId);
+  if (!row) return null;
+  const connection = decryptOpenAiChatGptConnection(row.encrypted_api_key);
+  return connection ? { connection, isEnabled: row.is_enabled } : null;
 }
 
 /**
@@ -123,13 +144,19 @@ export async function clearOpenAiChatGptConnection(userId: string): Promise<void
  * Records a terminal connection failure and clears the stored token set: the
  * access and refresh tokens are dropped because OpenAI has already rejected
  * them, the row is disabled so no request retries the dead credential, and the
- * status fields tell the UI to show the reconnect message. A missing row is a
- * no-op.
+ * status fields tell the UI to show the reconnect message.
+ *
+ * The caller passes the connection it decided on, and the database to write
+ * through. The refresh path calls this inside the transaction that holds the
+ * `SELECT ... FOR UPDATE` row lock, so a reconnect that lands between the
+ * rejected token exchange and this write cannot be erased by a stale failure.
  */
-export async function markOpenAiChatGptError(userId: string, message: string): Promise<void> {
-  const connection = await getOpenAiChatGptConnection(userId);
-  if (!connection) return;
-
+export async function markOpenAiChatGptConnectionErrored(
+  fromDb: OpenAiChatGptDatabase,
+  userId: string,
+  connection: OpenAiChatGptConnection,
+  message: string
+): Promise<void> {
   const { refresh_token: _refreshToken, ...withoutTokens } = connection;
   const errored: OpenAiChatGptConnection = {
     ...withoutTokens,
@@ -140,7 +167,7 @@ export async function markOpenAiChatGptError(userId: string, message: string): P
     error_at: new Date().toISOString(),
   };
 
-  await db
+  await fromDb
     .update(byok_api_keys)
     .set({
       encrypted_api_key: encryptApiKey(JSON.stringify(errored), BYOK_ENCRYPTION_KEY),
@@ -152,4 +179,16 @@ export async function markOpenAiChatGptError(userId: string, message: string): P
         eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
       )
     );
+}
+
+/**
+ * Terminal-failure write for callers outside a transaction. A missing row is a
+ * no-op. The refresh path uses `markOpenAiChatGptConnectionErrored` directly so
+ * the write stays inside the row lock.
+ */
+export async function markOpenAiChatGptError(userId: string, message: string): Promise<void> {
+  const connection = await getOpenAiChatGptConnection(userId);
+  if (!connection) return;
+
+  await markOpenAiChatGptConnectionErrored(db, userId, connection, message);
 }

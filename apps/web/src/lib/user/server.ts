@@ -77,6 +77,7 @@ import {
   OPENAI_ISSUER,
   OPENAI_REDIRECT_URI,
   OPENAI_RESOURCE,
+  isOpenAiTokenSharingGrant,
 } from '@/lib/auth/openai/config';
 import { saveOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import {
@@ -284,9 +285,13 @@ function createOpenAiAccountInfo(
 
 /**
  * Persists the delegated tokens a completed ChatGPT authorization issued, so
- * the same consent that signs a person in also connects OpenAI BYOK. A storage
- * failure is reported to Sentry without any token value and never fails the
- * sign-in: the person is still signed in and can connect again from BYOK.
+ * the same consent that signs a person in also connects OpenAI BYOK. Only a
+ * grant that carries the delegated scopes is stored: a plain identity-only
+ * sign-in cannot invoke the API resource and cannot be refreshed, so storing it
+ * would route eligible requests through a credential OpenAI rejects and would
+ * overwrite a working token-sharing connection. A storage failure is reported to
+ * Sentry without any token value and never fails the sign-in: the person is
+ * still signed in and can connect again from BYOK.
  */
 async function persistOpenAiChatGptConnection(
   userId: string,
@@ -297,6 +302,7 @@ async function persistOpenAiChatGptConnection(
     const accessToken = account.access_token;
     const subject = (profile as { sub?: unknown } | undefined)?.sub;
     if (!accessToken || typeof subject !== 'string' || subject.trim() === '') return;
+    if (!isOpenAiTokenSharingGrant(account)) return;
 
     const email = (profile as { email?: unknown } | undefined)?.email;
     await saveOpenAiChatGptConnection(userId, {

@@ -18,9 +18,10 @@ import type { OpenAiChatGptConnection } from './types';
 /**
  * Refreshes the delegated OpenAI access token for a "Sign in with ChatGPT"
  * connection. The stored access token is returned unchanged while it has more
- * than `REFRESH_WINDOW_SECONDS` left; otherwise the refresh happens under a row
- * lock, in a single transaction, so one refresh happens per connection even
- * across concurrent instances.
+ * than `REFRESH_WINDOW_SECONDS` left; otherwise the refresh request runs under
+ * a row lock that is held for that one request, so one refresh happens per
+ * connection even across concurrent instances, and neither a retry nor its
+ * backoff sleep keeps the lock or a pool connection open.
  *
  * Nothing here ever logs, returns or embeds a token or the client secret in an
  * exception message: only the OAuth error code and the user id are logged.
@@ -74,6 +75,12 @@ type RefreshDecision =
   | { kind: 'no_connection' }
   | { kind: 'terminal' }
   | { kind: 'failed' };
+
+/**
+ * One locked refresh attempt. `retry` is a retryable failure that the caller
+ * backs off from after the lock is released.
+ */
+type RefreshAttempt = RefreshDecision | { kind: 'retry' };
 
 /**
  * Single-flight per user within one process: concurrent callers share the same
@@ -167,16 +174,18 @@ function isRetryableRefreshFailure(response: Response, errorCode: string | undef
 }
 
 /**
- * Runs the refresh and persists the rotated pair on success, inside the
- * transaction that holds the row lock. Retryable failures back off and retry up
- * to `OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS`; terminal failures return
- * `terminal` so the caller can disable the connection outside the lock.
+ * Runs one refresh request inside the transaction that holds the row lock and
+ * persists the rotated pair on success, before the lock is released. A retryable
+ * failure returns `retry`: the caller then releases the lock, backs off outside
+ * it, and re-reads the row on the next attempt. Holding the lock for exactly one
+ * request keeps a backed-off refresh from blocking a sibling instance or a
+ * connection-pool slot across the wait.
  */
-async function refreshWithRetries(
+async function attemptRefresh(
   tx: OpenAiChatGptDatabase,
   userId: string,
   connection: OpenAiChatGptConnection
-): Promise<RefreshDecision> {
+): Promise<RefreshAttempt> {
   const refreshToken = connection.refresh_token;
   if (!refreshToken) {
     // Without a refresh token there is nothing to rotate; the connection can
@@ -184,70 +193,61 @@ async function refreshWithRetries(
     return { kind: 'terminal' };
   }
 
-  for (let attempt = 1; attempt <= OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS; attempt++) {
-    const response = await postRefreshRequest(refreshToken);
-    const body = await readResponseBody(response);
+  const response = await postRefreshRequest(refreshToken);
+  const body = await readResponseBody(response);
 
-    if (response.ok) {
-      const accessToken = readStringField(body, 'access_token');
-      const expiresIn = readExpiresIn(body);
-      if (accessToken && expiresIn) {
-        const updated: OpenAiChatGptConnection = {
-          ...connection,
-          access_token: accessToken,
-          refresh_token: readStringField(body, 'refresh_token') ?? refreshToken,
-          expires_at: nowSeconds() + expiresIn,
-          scope: readStringField(body, 'scope') ?? connection.scope,
-          token_type: readStringField(body, 'token_type') ?? connection.token_type,
-          status: 'connected',
-          error_message: undefined,
-          error_at: undefined,
-        };
+  if (response.ok) {
+    const accessToken = readStringField(body, 'access_token');
+    const expiresIn = readExpiresIn(body);
+    if (accessToken && expiresIn) {
+      const updated: OpenAiChatGptConnection = {
+        ...connection,
+        access_token: accessToken,
+        refresh_token: readStringField(body, 'refresh_token') ?? refreshToken,
+        expires_at: nowSeconds() + expiresIn,
+        scope: readStringField(body, 'scope') ?? connection.scope,
+        token_type: readStringField(body, 'token_type') ?? connection.token_type,
+        status: 'connected',
+        error_message: undefined,
+        error_at: undefined,
+      };
 
-        await tx
-          .update(byok_api_keys)
-          .set({
-            encrypted_api_key: encryptApiKey(JSON.stringify(updated), BYOK_ENCRYPTION_KEY),
-            is_enabled: true,
-          })
-          .where(
-            and(
-              eq(byok_api_keys.kilo_user_id, userId),
-              eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
-            )
-          );
+      await tx
+        .update(byok_api_keys)
+        .set({
+          encrypted_api_key: encryptApiKey(JSON.stringify(updated), BYOK_ENCRYPTION_KEY),
+          is_enabled: true,
+        })
+        .where(
+          and(
+            eq(byok_api_keys.kilo_user_id, userId),
+            eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+          )
+        );
 
-        return { kind: 'access_token', accessToken };
-      }
+      return { kind: 'access_token', accessToken };
     }
-
-    const errorCode = readOAuthErrorCode(body) ?? `http_${response.status}`;
-    logRefreshFailure(userId, errorCode);
-
-    if (TERMINAL_REFRESH_ERROR_CODES.has(errorCode)) {
-      return { kind: 'terminal' };
-    }
-
-    const isLastAttempt = attempt === OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS;
-    if (isLastAttempt || !isRetryableRefreshFailure(response, errorCode)) {
-      return { kind: 'failed' };
-    }
-
-    await sleep(backoffDelayMs(attempt));
   }
 
-  return { kind: 'failed' };
+  const errorCode = readOAuthErrorCode(body) ?? `http_${response.status}`;
+  logRefreshFailure(userId, errorCode);
+
+  if (TERMINAL_REFRESH_ERROR_CODES.has(errorCode)) {
+    return { kind: 'terminal' };
+  }
+
+  return isRetryableRefreshFailure(response, errorCode) ? { kind: 'retry' } : { kind: 'failed' };
 }
 
 /**
  * Re-reads the connection under the row lock so a sibling instance that already
- * refreshed is not refreshed again, then returns the fresh token or decides to
- * refresh.
+ * refreshed is not refreshed again, then returns the fresh token, decides to
+ * refresh, or reports why it cannot.
  */
 async function resolveInsideLock(
   tx: OpenAiChatGptDatabase,
   userId: string
-): Promise<RefreshDecision> {
+): Promise<RefreshAttempt> {
   const row = await readOpenAiChatGptConnectionRow(tx, userId, { forUpdate: true });
   if (!row) return { kind: 'no_connection' };
 
@@ -258,7 +258,7 @@ async function resolveInsideLock(
     return { kind: 'access_token', accessToken: connection.access_token };
   }
 
-  return refreshWithRetries(tx, userId, connection);
+  return attemptRefresh(tx, userId, connection);
 }
 
 async function resolveOpenAiChatGptAccessTokenUncached(
@@ -284,14 +284,25 @@ async function resolveOpenAiChatGptAccessTokenUncached(
       return { kind: 'access_token', accessToken: current.access_token };
     }
 
-    const decision = await db.transaction(tx => resolveInsideLock(tx, userId));
+    for (let attempt = 1; attempt <= OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS; attempt++) {
+      // The row lock is held for one refresh request only. The backoff between
+      // attempts runs with it released, and each attempt re-reads the row, so a
+      // sibling instance that refreshed meanwhile is adopted rather than
+      // refreshed over.
+      const decision = await db.transaction(tx => resolveInsideLock(tx, userId));
 
-    if (decision.kind === 'terminal') {
-      await markOpenAiChatGptError(userId, OPENAI_CHATGPT_RECONNECT_MESSAGE);
-      return { kind: 'terminal' };
+      if (decision.kind === 'terminal') {
+        await markOpenAiChatGptError(userId, OPENAI_CHATGPT_RECONNECT_MESSAGE);
+        return { kind: 'terminal' };
+      }
+      if (decision.kind !== 'retry') return decision;
+
+      if (attempt < OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS) {
+        await sleep(backoffDelayMs(attempt));
+      }
     }
 
-    return decision;
+    return { kind: 'failed' };
   } catch (error) {
     // A thrown error must never carry a credential: log only its type and the user.
     console.error(

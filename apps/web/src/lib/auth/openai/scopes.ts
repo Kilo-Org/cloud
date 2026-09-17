@@ -16,3 +16,32 @@ export const OPENAI_TOKEN_SHARING_SCOPE =
 
 /** The API resource that token sharing targets. */
 export const OPENAI_RESOURCE = 'https://api.openai.com/v1';
+
+/**
+ * The scopes that make a grant a delegated BYOK credential rather than an
+ * identity-only sign-in. `resource.invoke` is what permits calling the API
+ * resource on the person's behalf, and `offline_access` is what makes the token
+ * renewable without another sign-in. An identity-only sign-in grants neither.
+ */
+const OPENAI_DELEGATED_GRANT_SCOPES = ['resource.invoke', 'offline_access'] as const;
+
+/**
+ * True when a completed authorization granted the delegated-access scopes.
+ *
+ * RFC 6749 §5.1 lets a token response omit `scope` when it is identical to the
+ * scope that was requested, so an omitted scope falls back to the refresh token:
+ * `offline_access` is the only scope for which OpenAI issues one, and the
+ * identity-only sign-in flow never requests it.
+ */
+export function isOpenAiTokenSharingGrant(grant: {
+  scope?: string | null;
+  refresh_token?: string | null;
+}): boolean {
+  const scope = typeof grant.scope === 'string' ? grant.scope.trim() : '';
+  if (scope !== '') {
+    const granted = new Set(scope.split(/\s+/));
+    return OPENAI_DELEGATED_GRANT_SCOPES.every(required => granted.has(required));
+  }
+
+  return typeof grant.refresh_token === 'string' && grant.refresh_token !== '';
+}

@@ -58,7 +58,7 @@ import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
 import { and, eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
 import jwt from 'jsonwebtoken';
-import type { Profile } from 'next-auth';
+import type { Account, Profile } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import {
   KILO_API_AUDIENCE,
@@ -67,7 +67,12 @@ import {
 import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET, OPENAI_CLIENT_ID } from '@/lib/config.server';
-import { OPENAI_ISSUER, OPENAI_REDIRECT_URI } from '@/lib/auth/openai/config';
+import {
+  OPENAI_IDENTITY_SCOPE,
+  OPENAI_ISSUER,
+  OPENAI_REDIRECT_URI,
+  OPENAI_TOKEN_SHARING_SCOPE,
+} from '@/lib/auth/openai/config';
 import { hosted_domain_specials } from '@/lib/auth/constants';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
@@ -421,7 +426,12 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
     return { user, email };
   }
 
-  function openAiSignInArgs(userId: string, email: string, sub: string) {
+  function openAiSignInArgs(
+    userId: string,
+    email: string,
+    sub: string,
+    accountOverrides: Partial<Account> = {}
+  ) {
     return {
       token: {} as JWT,
       account: {
@@ -431,8 +441,9 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
         access_token: 'signin-access-token',
         refresh_token: 'signin-refresh-token',
         expires_at: Math.floor(Date.now() / 1000) + 3600,
-        scope: 'openid profile email offline_access',
+        scope: OPENAI_TOKEN_SHARING_SCOPE,
         token_type: 'Bearer',
+        ...accountOverrides,
       },
       user: { id: userId, email, name: 'ChatGPT User', image: null },
       profile: { sub, email, name: 'ChatGPT User' } as Profile,
@@ -467,6 +478,54 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
         )
       );
     expect(row?.is_enabled).toBe(true);
+  });
+
+  test('does not store a connection for an identity-only sign-in', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+
+    await jwtCallback!(
+      openAiSignInArgs(user.id, email, sub, {
+        scope: OPENAI_IDENTITY_SCOPE,
+        refresh_token: undefined,
+      })
+    );
+
+    await expect(getOpenAiChatGptConnection(user.id)).resolves.toBeNull();
+  });
+
+  test('does not overwrite a working connection with an identity-only sign-in', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+    await jwtCallback!(openAiSignInArgs(user.id, email, sub));
+
+    await jwtCallback!(
+      openAiSignInArgs(user.id, email, sub, {
+        scope: OPENAI_IDENTITY_SCOPE,
+        refresh_token: undefined,
+        access_token: 'identity-only-access-token',
+        expires_at: Math.floor(Date.now() / 1000) + 60,
+      })
+    );
+
+    await expect(getOpenAiChatGptConnection(user.id)).resolves.toMatchObject({
+      access_token: 'signin-access-token',
+      refresh_token: 'signin-refresh-token',
+    });
+  });
+
+  test('stores the delegated connection when a grant omits the scope but returns a refresh token', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+
+    // RFC 6749 §5.1 lets the token response omit `scope` when it equals the
+    // requested scope; the refresh token is then the delegated grant's marker.
+    await jwtCallback!(openAiSignInArgs(user.id, email, sub, { scope: undefined }));
+
+    await expect(getOpenAiChatGptConnection(user.id)).resolves.toMatchObject({
+      access_token: 'signin-access-token',
+      refresh_token: 'signin-refresh-token',
+    });
   });
 
   test('does not fail the sign-in when storing the connection fails', async () => {

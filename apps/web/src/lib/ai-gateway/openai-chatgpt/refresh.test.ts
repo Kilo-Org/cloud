@@ -246,6 +246,73 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     expect(markUpdateSetCalls).toHaveLength(0);
   });
 
+  it('releases the row lock between retry attempts', async () => {
+    storedRow = encryptedRow(buildConnection());
+    const events: string[] = [];
+    mockDb.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) => {
+      events.push('lock:acquire');
+      try {
+        return await callback({
+          select: jest.fn(txSelectChain),
+          update: jest.fn(() => ({
+            set: jest.fn((values: Record<string, unknown>) => {
+              txUpdateSetCalls.push(values);
+              return { where: jest.fn(() => Promise.resolve(undefined)) };
+            }),
+          })),
+        });
+      } finally {
+        events.push('lock:release');
+      }
+    });
+    fetchMock.mockImplementation(async () => {
+      events.push('fetch');
+      return jsonResponse({ error: 'refresh_token_conflict' }, 409);
+    });
+
+    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+      kind: 'failed',
+    });
+
+    // Every retry, and the backoff between them, happens with the row lock
+    // released: the lock is taken for exactly one refresh request at a time.
+    expect(events).toEqual([
+      'lock:acquire',
+      'fetch',
+      'lock:release',
+      'lock:acquire',
+      'fetch',
+      'lock:release',
+      'lock:acquire',
+      'fetch',
+      'lock:release',
+    ]);
+  });
+
+  it('adopts a token a concurrent refresh stored instead of retrying', async () => {
+    storedRow = encryptedRow(buildConnection());
+    fetchMock.mockImplementation(async () => {
+      // A sibling instance rotated the pair and stored it while this attempt
+      // was in flight; the next locked read must adopt that credential.
+      storedRow = encryptedRow(
+        buildConnection({
+          access_token: 'sibling-access-token',
+          refresh_token: 'sibling-refresh-token',
+          expires_at: nowSeconds() + 3600,
+        })
+      );
+      return jsonResponse({ error: 'refresh_token_conflict' }, 409);
+    });
+
+    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+      kind: 'access_token',
+      accessToken: 'sibling-access-token',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(txUpdateSetCalls).toHaveLength(0);
+  });
+
   it('disables the connection with the reconnect message on invalid_grant', async () => {
     storedRow = encryptedRow(buildConnection());
     fetchMock.mockResolvedValue(jsonResponse({ error: 'invalid_grant' }, 400));

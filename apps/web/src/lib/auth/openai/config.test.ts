@@ -11,6 +11,7 @@ import {
   OPENAI_RESOURCE,
   OPENAI_TOKEN_ENDPOINT,
   OPENAI_TOKEN_SHARING_SCOPE,
+  isOpenAiTokenSharingGrant,
 } from './config';
 
 // The registered OpenAI client id, assembled from two fragments so that this
@@ -52,6 +53,25 @@ describe('OpenAI OAuth config', () => {
       'chatpass.enable.request',
     ]);
     expect(OPENAI_RESOURCE).toBe('https://api.openai.com/v1');
+  });
+
+  test('recognises a delegated token-sharing grant and rejects an identity-only one', () => {
+    expect(isOpenAiTokenSharingGrant({ scope: OPENAI_TOKEN_SHARING_SCOPE })).toBe(true);
+    expect(isOpenAiTokenSharingGrant({ scope: OPENAI_IDENTITY_SCOPE })).toBe(false);
+    // Each delegated scope is required: offline_access alone, or resource.invoke
+    // alone, does not make the pair a usable BYOK credential.
+    expect(isOpenAiTokenSharingGrant({ scope: 'openid profile email offline_access' })).toBe(false);
+    expect(isOpenAiTokenSharingGrant({ scope: 'openid profile email resource.invoke' })).toBe(
+      false
+    );
+    // RFC 6749 §5.1 lets the response omit `scope`; the refresh token is then the
+    // marker that offline_access, and so the delegated flow, was granted.
+    expect(isOpenAiTokenSharingGrant({ refresh_token: 'refresh-token' })).toBe(true);
+    expect(isOpenAiTokenSharingGrant({ scope: '   ', refresh_token: 'refresh-token' })).toBe(true);
+    expect(isOpenAiTokenSharingGrant({})).toBe(false);
+    expect(isOpenAiTokenSharingGrant({ scope: OPENAI_IDENTITY_SCOPE, refresh_token: null })).toBe(
+      false
+    );
   });
 
   test('reads OPENAI_CLIENT_ID from the environment at module load', () => {

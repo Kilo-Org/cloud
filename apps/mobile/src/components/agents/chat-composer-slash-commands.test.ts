@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+/* eslint-disable max-lines -- the suggestion, parse, and description suites share the composer-command fixtures in one file. */
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
@@ -8,9 +9,12 @@ import {
   getLocalClearSlashCommand,
   getLocalNewSlashCommand,
   getSlashCommandCandidate,
+  getSlashCommandDescription,
   getSlashCommandSuggestions,
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
+import { i18n } from '@/i18n';
+import en from '@/i18n/locales/en.json';
 
 const COMPACT: SlashCommandInfo = { name: 'compact', description: 'Compact', hints: [] };
 const REVIEW: SlashCommandInfo = { name: 'review', description: 'Review', hints: [] };
@@ -313,5 +317,56 @@ describe('parseChatComposerSubmission — non-remote sessions ignore the remote 
         remoteCommandState: remoteState({ refresh: 'upgrade-required' }),
       })
     ).toEqual({ type: 'command', command: 'compact', arguments: '' });
+  });
+});
+
+describe('getSlashCommandDescription', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('resolves a mapped command description from the catalog instead of the reported description', () => {
+    expect(getSlashCommandDescription({ name: 'goal', description: 'Goal', hints: [] })).toBe(
+      'Keep working toward a session goal. /goal <objective> or pause, resume, clear'
+    );
+  });
+
+  it('resolves every built-in command name from the catalog, ignoring the reported description', () => {
+    const expected = {
+      compact: en.agentChat.slashCommands.compactDescription,
+      goal: en.agentChat.slashCommands.goalDescription,
+      init: en.agentChat.slashCommands.initDescription,
+      'resume-claude': en.agentChat.slashCommands.resumeClaudeDescription,
+      'resume-codex': en.agentChat.slashCommands.resumeCodexDescription,
+      review: en.agentChat.slashCommands.reviewDescription,
+      new: en.agentChat.slashCommands.startNewSession,
+      exit: en.agentChat.slashCommands.exitSession,
+      quit: en.agentChat.slashCommands.exitSession,
+      clear: en.agentChat.slashCommands.clearSession,
+    };
+    for (const [name, description] of Object.entries(expected)) {
+      expect(getSlashCommandDescription({ name, description: 'reported', hints: [] })).toBe(
+        description
+      );
+    }
+  });
+
+  it('prefers the active language catalog over the reported English description', async () => {
+    await i18n.changeLanguage('de');
+    i18n.addResource('de', 'translation', 'agentChat.slashCommands.goalDescription', 'Ziel');
+    expect(getSlashCommandDescription({ name: 'goal', description: 'Goal', hints: [] })).toBe(
+      'Ziel'
+    );
+    i18n.removeResourceBundle('de', 'translation');
+  });
+
+  it('keeps the reported description for a command the catalog does not know', () => {
+    expect(getSlashCommandDescription({ name: 'help', description: 'Show help', hints: [] })).toBe(
+      'Show help'
+    );
+  });
+
+  it('returns undefined for an unknown command with no description', () => {
+    expect(getSlashCommandDescription({ name: 'help', hints: [] })).toBeUndefined();
   });
 });

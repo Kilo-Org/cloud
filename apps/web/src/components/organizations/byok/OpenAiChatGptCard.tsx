@@ -24,7 +24,7 @@ const BYOK_PATH = '/byok';
 
 /**
  * The query parameter the OpenAI callback route appends when an authorization
- * is declined or fails (see `apps/web/src/app/testing/oai-redirect/route.ts`).
+ * is declined or fails (see `apps/web/src/app/auth/openai/callback/route.ts`).
  */
 const AUTH_ERROR_PARAM = 'openai_error';
 

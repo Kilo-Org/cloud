@@ -15,8 +15,22 @@ import Link from 'next/link';
 import { SquareUserRound } from 'lucide-react';
 import React from 'react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
-import { OAuthProviderIds } from '@/lib/auth/provider-metadata';
+import { useChatGptSignInAccess } from '@/hooks/useChatGptSignInAccess';
+import { OAuthProviderIds, type AuthProviderId } from '@/lib/auth/provider-metadata';
 import { buildEnterpriseSsoHref, buildNormalSignInHref } from '@/lib/auth/sign-in-navigation';
+
+/**
+ * 'Sign in with ChatGPT' is restricted by the PostHog flag's email allow-list.
+ * A signed-out visitor is not known to PostHog, so the sign-in page evaluates
+ * the flag against the email the visitor typed and hides the ChatGPT button
+ * when the flag is off for that email.
+ */
+function withoutChatGptWhenUnavailable(
+  providers: readonly AuthProviderId[],
+  chatGptAllowed: boolean
+): AuthProviderId[] {
+  return chatGptAllowed ? [...providers] : providers.filter(id => id !== 'openai');
+}
 
 type SignInFormProps = {
   searchParams: Record<string, string>;
@@ -48,6 +62,7 @@ export function SignInForm({
     isSignUp,
     storybookInitialState,
   });
+  const chatGptAllowed = useChatGptSignInAccess(flow.email);
 
   // Show minimal loading state while checking localStorage for returning user hint
   // This prevents flash of "new user" UI before switching to "returning user" UI
@@ -120,7 +135,7 @@ export function SignInForm({
         {errorNotification}
         <ProviderSelectView
           email={flow.email}
-          providers={flow.availableProviders}
+          providers={withoutChatGptWhenUnavailable(flow.availableProviders, chatGptAllowed)}
           onProviderSelect={flow.handleProviderSelect}
           onBack={flow.handleBack}
           purpose={flow.isNewUser ? 'sign-up' : 'sign-in'}
@@ -195,11 +210,23 @@ export function SignInForm({
                     ? { email: 'Email me a magic link' }
                     : undefined;
 
+                // A returning ChatGPT user keeps the shortcut only while the
+                // flag allows it; otherwise the full, filtered group is offered
+                // so they are not left with a single hidden button.
+                const preferredProviders = withoutChatGptWhenUnavailable(
+                  [lastAuthMethod],
+                  chatGptAllowed
+                );
+                const displayedProviders =
+                  preferredProviders.length > 0
+                    ? preferredProviders
+                    : withoutChatGptWhenUnavailable(OAuthProviderIds, chatGptAllowed);
+
                 return (
                   <div className="mx-auto max-w-md space-y-4">
                     {/* Preferred provider button only */}
                     <AuthProviderButtons
-                      providers={[lastAuthMethod]}
+                      providers={displayedProviders}
                       onProviderClick={flow.handleOAuthClick}
                       customLabels={emailCustomLabel}
                     />
@@ -311,7 +338,7 @@ export function SignInForm({
                       </div>
                       <div className="space-y-2">
                         <AuthProviderButtons
-                          providers={OAuthProviderIds}
+                          providers={withoutChatGptWhenUnavailable(OAuthProviderIds, chatGptAllowed)}
                           onProviderClick={flow.handleOAuthClick}
                         />
                       </div>
@@ -335,7 +362,7 @@ export function SignInForm({
                   <div className="space-y-2">
                     {/* OAuth provider buttons - Google first */}
                     <AuthProviderButtons
-                      providers={OAuthProviderIds}
+                      providers={withoutChatGptWhenUnavailable(OAuthProviderIds, chatGptAllowed)}
                       onProviderClick={flow.handleOAuthClick}
                     />
                     <SignInButton onClick={flow.handleShowEmailInput}>

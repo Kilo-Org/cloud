@@ -30,7 +30,7 @@ const scannerFiles = [
 
 describe('OpenAI OAuth config', () => {
   test('uses the registered callback path and derives the redirect URI from the app origin', () => {
-    expect(OPENAI_REDIRECT_PATH).toBe('/testing/oai-redirect');
+    expect(OPENAI_REDIRECT_PATH).toBe('/auth/openai/callback');
     expect(OPENAI_REDIRECT_URI.endsWith(OPENAI_REDIRECT_PATH)).toBe(true);
   });
 

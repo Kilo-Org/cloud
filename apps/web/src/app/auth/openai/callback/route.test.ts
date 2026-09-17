@@ -9,7 +9,7 @@ jest.mock('@/lib/user/server', () => ({
 import { NextRequest } from 'next/server';
 import { GET } from './route';
 
-const CALLBACK_URL = 'https://app.kilo.ai/testing/oai-redirect';
+const CALLBACK_URL = 'https://app.kilo.ai/auth/openai/callback';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -30,7 +30,7 @@ function redirectResponse(location: string): Response {
   return new Response(null, { status: 302, headers: { location } });
 }
 
-describe('GET /testing/oai-redirect', () => {
+describe('GET /auth/openai/callback', () => {
   test('rewrites the registered callback path to the next-auth openai callback', async () => {
     mockGetUserFromSession.mockResolvedValue(null);
     const request = new NextRequest(`${CALLBACK_URL}?code=the-code&state=the-state`);

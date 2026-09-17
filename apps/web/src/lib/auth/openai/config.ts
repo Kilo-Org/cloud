@@ -24,7 +24,7 @@ export const OPENAI_TOKEN_ENDPOINT =
  * The callback path registered with the OpenAI OAuth client. It is a fixed
  * part of the registration and must not be changed without re-registering.
  */
-export const OPENAI_REDIRECT_PATH = '/testing/oai-redirect';
+export const OPENAI_REDIRECT_PATH = '/auth/openai/callback';
 
 /**
  * The exact `redirect_uri` sent to the authorization endpoint. Derived from

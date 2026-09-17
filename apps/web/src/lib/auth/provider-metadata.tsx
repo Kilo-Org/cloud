@@ -5,7 +5,8 @@ import { GitHubLogo } from '@/components/auth/GitHubLogo';
 import { GitLabLogo } from '@/components/auth/GitLabLogo';
 import { GoogleLogo } from '@/components/auth/GoogleLogo';
 import { LinkedInLogo } from '@/components/auth/LinkedInLogo';
-import { Mail, Sparkles, SquareUserRound } from 'lucide-react';
+import { OpenAILogo } from '@/components/auth/OpenAILogo';
+import { Mail, SquareUserRound } from 'lucide-react';
 import React, { type JSX } from 'react';
 import * as z from 'zod';
 
@@ -36,7 +37,7 @@ const AllAuthProviders = [
     id: 'openai',
     name: 'ChatGPT',
     signInLabel: 'Sign in with ChatGPT',
-    icon: <Sparkles className="size-5" />,
+    icon: <OpenAILogo />,
   },
   { id: 'fake-login', name: 'Test Account', icon: fakeLoginIcon },
   { id: 'workos', name: 'Enterprise SSO', icon: <SquareUserRound /> },

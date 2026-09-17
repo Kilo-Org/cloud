@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * The OpenAI OAuth client is registered with the callback path
- * `/testing/oai-redirect` (see `OPENAI_REDIRECT_PATH`). NextAuth only knows how
+ * `/auth/openai/callback` (see `OPENAI_REDIRECT_PATH`). NextAuth only knows how
  * to complete a callback at `/api/auth/callback/<provider>`, so this route
  * rewrites the request to that path before delegating.
  *

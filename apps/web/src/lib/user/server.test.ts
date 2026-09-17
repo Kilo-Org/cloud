@@ -397,7 +397,7 @@ describe('OpenAI (ChatGPT) OAuth provider', () => {
       clientId: OPENAI_CLIENT_ID,
     });
     expect(provider?.checks).toEqual(expect.arrayContaining(['pkce', 'state', 'nonce']));
-    expect(provider?.callbackUrl.endsWith('/testing/oai-redirect')).toBe(true);
+    expect(provider?.callbackUrl.endsWith('/auth/openai/callback')).toBe(true);
     // NextAuth rewrites `callbackUrl` to /api/auth/callback/openai, so the
     // registered redirect URI is declared on the client metadata and repeated
     // in the token exchange.

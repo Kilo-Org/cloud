@@ -694,7 +694,7 @@ const cookiePrefix = useSecureCookies ? '__Secure-' : '';
 /**
  * OpenAI ("Sign in with ChatGPT") provider.
  *
- * The OAuth client's registered callback path is `/testing/oai-redirect`
+ * The OAuth client's registered callback path is `/auth/openai/callback`
  * (`OPENAI_REDIRECT_PATH`). NextAuth rewrites a provider's `callbackUrl` to its
  * own `/api/auth/callback/<id>` at request time, so the registered path is
  * declared on the openid-client metadata (`client.redirect_uris`) for the

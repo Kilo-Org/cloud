@@ -251,3 +251,41 @@ jobs:
 
       - name: Test
         run: pnpm --filter kilo-app run test
+
+  # The native trees are generated, so what the iOS build consumes is only as
+  # good as the prebuild that wrote it: one `Sources` phase per widget target
+  # and each Swift file in it exactly once (a second phase or a doubled entry
+  # fails XCBuild with "Unexpected duplicate tasks"), and one static launcher
+  # shortcut per contract url plus its labels on Android. `expo prebuild` is
+  # code generation for both platforms and needs no Xcode, so the contract is
+  # proved from a fresh native tree on the same runner as the rest of the
+  # suite. The plugin proves uniqueness while it edits; these scripts re-read
+  # the generated project and Android tree, so a PR that breaks the contract
+  # fails here in minutes instead of on the macOS native build.
+  prebuild-contract:
+    needs: mobile-changes
+    if: needs.mobile-changes.outputs.mobile == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prebuild iOS and assert the widget target build phases
+        run: pnpm --filter kilo-app prebuild:ios && pnpm --filter kilo-app assert:widget-sources
+
+      - name: Prebuild Android and assert the static shortcuts
+        run: pnpm --filter kilo-app prebuild:android && pnpm --filter kilo-app assert:agent-shortcuts

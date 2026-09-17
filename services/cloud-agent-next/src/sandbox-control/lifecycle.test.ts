@@ -32,10 +32,20 @@ import type {
 import { DEADLINE_MS } from './deadlines.js';
 import {
   loadDeadlines,
+  loadPhysicalRecord,
   loadRecoveryDecisions,
   loadRouteTable,
   loadSessionCredentialGrants,
+  loadSessionReferences,
 } from './durable-state.js';
+import {
+  addSessionReference,
+  emptySessionReferenceState,
+  markReferencesReconciled,
+} from './session-references.js';
+import { RECONCILIATION_CALL_TIMEOUT_MS } from './worktree-ownership.js';
+import { getWorktreeWorkspacePath } from '../workspace.js';
+import type { ProviderAdapter } from './provider.js';
 import type * as cloudflareProvider from './cloudflare-provider.js';
 import type * as SocketModule from './socket.js';
 import { decodeCloudflareProviderRef } from './cloudflare-provider.js';
@@ -2350,7 +2360,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     }
   );
 
-  it('returns a runtime credential proxy fence only for the current ready routed allocation', async () => {
+  it('returns the runtime credential proxy fence from the established wrapper incarnation across a control reconnect', async () => {
     const h = await harness();
     const input = {
       ownerId: OWNER,
@@ -2358,20 +2368,64 @@ describe('SandboxControl lifecycle boundaries', () => {
       kiloSessionId: ROUTE.kiloSessionId,
       directory: ROUTE.directory,
     };
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+
     await h.create();
-    const identity = await h.ready();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+    expect((await h.control.getStatus()).connection).toBe('ready');
     const physical = await h.control.getPhysicalRecord();
     expect(physical.createIntent).not.toBeNull();
     expect(await h.control.getRuntimeCredentialProxyFence(input)).toEqual({
       plane: 'control',
       allocationId: physical.createIntent?.intentId,
-      providerInstanceId: identity.providerInstanceId,
-      connectionId: identity.connectionId,
-      wrapperInstanceId: identity.wrapperInstanceId,
+      providerInstanceId: first.providerInstanceId,
+      connectionId: first.connectionId,
+      wrapperInstanceId: first.wrapperInstanceId,
     });
     await expect(
       h.control.getRuntimeCredentialProxyFence({ ...input, directory: '/workspace/other' })
     ).resolves.toBeNull();
+
+    await h.hooks.onSocketClosed?.(true, first);
+    expect(await h.control.getRuntimeCredentialProxyFence(input)).toEqual({
+      plane: 'control',
+      allocationId: physical.createIntent?.intentId,
+      providerInstanceId: first.providerInstanceId,
+      connectionId: first.connectionId,
+      wrapperInstanceId: first.wrapperInstanceId,
+    });
+
+    const reconnected = { ...first, connectionId: crypto.randomUUID() };
+    h.replaceConnection(reconnected);
+    await h.hooks.onHandshakeComplete?.(reconnected);
+    expect(await h.control.getRuntimeCredentialProxyFence(input)).toEqual({
+      plane: 'control',
+      allocationId: physical.createIntent?.intentId,
+      providerInstanceId: reconnected.providerInstanceId,
+      connectionId: reconnected.connectionId,
+      wrapperInstanceId: reconnected.wrapperInstanceId,
+    });
 
     await h.control.beginStop('idle');
     await expect(h.control.getRuntimeCredentialProxyFence(input)).resolves.toBeNull();
@@ -2388,7 +2442,11 @@ describe('SandboxControl lifecycle boundaries', () => {
       ...replacement,
       connectionId: crypto.randomUUID(),
     });
-    await expect(h.control.getRuntimeCredentialProxyFence(input)).resolves.toBeNull();
+    expect(await h.control.getRuntimeCredentialProxyFence(input)).toMatchObject({
+      providerInstanceId: replacement.providerInstanceId,
+      connectionId: replacement.connectionId,
+      wrapperInstanceId: replacement.wrapperInstanceId,
+    });
   });
 
   it.each(['session.attach', 'session.prompt'] as const)(
@@ -3195,7 +3253,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     {
       messageId: 'message_1',
       operationId: '33333333-3333-4333-8333-333333333333',
-      cleanupDeadlineAt: Date.now(),
+      cleanupDeadlineAt: 1,
     },
   ])('rejects invalid scoped Stop requests without forwarding them', async payload => {
     const h = await harness();
@@ -3538,6 +3596,161 @@ describe('SandboxControl lifecycle boundaries', () => {
     await expect(h.control.listRoutes()).resolves.toEqual([
       expect.objectContaining({ nativeRuntimeId, retiringNativeRuntimeId: nativeRuntimeId }),
     ]);
+  });
+
+  describe('future-skewed scoped Stop deadline', () => {
+    const OPERATION_ID = '33333333-3333-4333-8333-333333333333';
+    const NATIVE_RUNTIME_ID = '11111111-1111-4111-8111-111111111111';
+
+    function scopedPayload(cleanupDeadlineAt: number) {
+      return { messageId: 'message_1', operationId: OPERATION_ID, cleanupDeadlineAt };
+    }
+
+    it('saturates the deadline through the socket payload and the persisted retirement', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const [route] = await h.control.listRoutes();
+      if (!route) throw new Error('Missing route');
+      h.records.set('session_routes', [{ ...route, nativeRuntimeId: NATIVE_RUNTIME_ID }]);
+      h.socket.supportsNativeRuntimeRetirement = () => true;
+      h.socket.supportsScopedStopAbort = () => true;
+      const now = Date.now();
+      const saturated = now + 10_000;
+      h.sendRequest.mockResolvedValueOnce({
+        type: 'response',
+        requestId: 'stop_1',
+        ok: true,
+        result: {
+          status: 'aborted',
+          quiescent: true,
+          runtimeRetired: true,
+          nativeRuntimeId: NATIVE_RUNTIME_ID,
+        },
+      });
+
+      await expect(
+        h.control.request({
+          operation: 'session.abort',
+          session: {
+            sessionId: route.sessionId,
+            kiloSessionId: route.kiloSessionId,
+            directory: route.directory,
+          },
+          payload: scopedPayload(now + 15_000),
+          expectedWrapperInstanceId: identity.wrapperInstanceId,
+        })
+      ).resolves.toMatchObject({ ok: true });
+
+      expect(h.sendRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: {
+            messageId: 'message_1',
+            operationId: OPERATION_ID,
+            cleanupDeadlineAt: saturated,
+          },
+          deadlineAt: saturated,
+        })
+      );
+      expect(h.records.get('native_runtime_retirements')).toEqual([
+        expect.objectContaining({ operationId: OPERATION_ID, cleanupDeadlineAt: saturated }),
+      ]);
+    });
+
+    it('does not renew the persisted window when a lost scoped Stop reply is retried', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const [route] = await h.control.listRoutes();
+      if (!route) throw new Error('Missing route');
+      h.records.set('session_routes', [{ ...route, nativeRuntimeId: NATIVE_RUNTIME_ID }]);
+      h.socket.supportsNativeRuntimeRetirement = () => true;
+      h.socket.supportsScopedStopAbort = () => true;
+      const now = Date.now();
+      const saturated = now + 10_000;
+      const stop = (cleanupDeadlineAt: number) =>
+        h.control.request({
+          operation: 'session.abort',
+          session: {
+            sessionId: route.sessionId,
+            kiloSessionId: route.kiloSessionId,
+            directory: route.directory,
+          },
+          payload: scopedPayload(cleanupDeadlineAt),
+          expectedWrapperInstanceId: identity.wrapperInstanceId,
+        });
+      h.sendRequest.mockRejectedValueOnce(new Error('lost Stop reply'));
+
+      await expect(stop(now + 15_000)).rejects.toThrow('lost Stop reply');
+      expect(h.records.get('native_runtime_retirements')).toEqual([
+        expect.objectContaining({ operationId: OPERATION_ID, cleanupDeadlineAt: saturated }),
+      ]);
+
+      vi.setSystemTime(now + DEADLINE_MS.nativeRetirementRetry + 1);
+      const reply = {
+        type: 'response' as const,
+        requestId: 'stop_retry',
+        ok: true as const,
+        result: {
+          status: 'aborted' as const,
+          quiescent: true,
+          runtimeRetired: true,
+          nativeRuntimeId: NATIVE_RUNTIME_ID,
+        },
+      };
+      h.sendRequest.mockResolvedValueOnce(reply);
+
+      await expect(stop(now + 20_000)).resolves.toEqual(reply);
+      expect(h.records.get('native_runtime_retirements')).toEqual([
+        expect.objectContaining({ operationId: OPERATION_ID, cleanupDeadlineAt: saturated }),
+      ]);
+      expect(h.sendRequest).toHaveBeenLastCalledWith(
+        expect.objectContaining({ deadlineAt: saturated })
+      );
+    });
+
+    it('uses the parsed deadline directly when the route has no native runtime', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const [route] = await h.control.listRoutes();
+      if (!route) throw new Error('Missing route');
+      h.socket.supportsScopedStopAbort = () => true;
+      const now = Date.now();
+      const saturated = now + 10_000;
+      const reply = {
+        type: 'response' as const,
+        requestId: 'stop_1',
+        ok: true as const,
+        result: { status: 'aborted' as const, quiescent: true },
+      };
+      h.sendRequest.mockResolvedValueOnce(reply);
+
+      await expect(
+        h.control.request({
+          operation: 'session.abort',
+          session: {
+            sessionId: route.sessionId,
+            kiloSessionId: route.kiloSessionId,
+            directory: route.directory,
+          },
+          payload: scopedPayload(now + 15_000),
+          expectedWrapperInstanceId: identity.wrapperInstanceId,
+        })
+      ).resolves.toEqual(reply);
+
+      expect(h.sendRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: {
+            messageId: 'message_1',
+            operationId: OPERATION_ID,
+            cleanupDeadlineAt: saturated,
+          },
+          deadlineAt: saturated,
+        })
+      );
+      expect(h.records.get('native_runtime_retirements')).toBeUndefined();
+    });
   });
 
   it('releases a negotiated unconfirmed root-scoped Stop without retiring the runtime', async () => {
@@ -7156,5 +7369,325 @@ describe('SandboxControl lifecycle boundaries', () => {
         fields.mockRestore();
       }
     });
+  });
+});
+
+const WORKTREE_ID = 'worktree_11111111-1111-4111-8111-111111111111' as const;
+const OTHER_WORKTREE_ID = 'worktree_22222222-2222-4222-8222-222222222222' as const;
+const CONTROL_SESSION_ID = 'workspace_22222222-2222-4222-8222-222222222222';
+const OTHER_SANDBOX_ID = `usr-${'b'.repeat(48)}`;
+
+function cleanupInput(worktreeId: typeof WORKTREE_ID = WORKTREE_ID) {
+  return {
+    worktreeId,
+    kiloUserId: OWNER,
+    location: { sandboxId: SANDBOX_ID, provider: 'cloudflare' as const },
+    sessionIds: [ROUTE.kiloSessionId],
+  };
+}
+
+function seedPhysical(records: Map<string, unknown>, state: 'running' | 'stopped') {
+  records.set('physical_record', {
+    state,
+    providerRef: 'instance_legacy',
+    createIntent: null,
+    stopTombstone: null,
+    resumable: false,
+  });
+}
+
+function installLedger(
+  h: Awaited<ReturnType<typeof harness>>,
+  ownership: ReturnType<typeof vi.fn>
+) {
+  Object.assign(h.env, { SESSION_INGEST: { canDestroyCloudAgentWorktreeSandbox: ownership } });
+}
+
+function installStopProvider(h: Awaited<ReturnType<typeof harness>>) {
+  let confirmed = false;
+  const stop = vi.fn(async () => (confirmed ? ('terminal' as const) : ('retryable' as const)));
+  const provider: ProviderAdapter = {
+    resumable: false,
+    ensureBillingAdmission: vi.fn(async () => undefined),
+    create: vi.fn(async () => ({ providerRef: 'instance_running' })),
+    launch: vi.fn(async () => undefined),
+    observe: vi.fn(async () => ({
+      status: confirmed ? ('terminal' as const) : ('active' as const),
+      providerRef: 'instance_running',
+    })),
+    stop,
+    ensureLeaseAtLeast: vi.fn(async () => undefined),
+    logs: vi.fn(async () => ''),
+  };
+  Object.assign(h.control, {
+    provider,
+    createProviderAdapter: () => provider,
+    providerKind: 'cloudflare',
+  });
+  return { stop, confirm: () => (confirmed = true) };
+}
+
+describe('SandboxControl worktree reference index', () => {
+  it('attachSession records a durable reference that survives detach and eviction', async () => {
+    const h = await harness();
+    await h.create();
+    await h.ready();
+
+    const attached = await loadSessionReferences(h.storage);
+    expect(attached.entries).toEqual([
+      {
+        sessionId: ROUTE.sessionId,
+        kiloSessionId: ROUTE.kiloSessionId,
+        directory: ROUTE.directory,
+      },
+    ]);
+    expect(attached.reconciled).toBe(false);
+
+    await h.control.detachSession(ROUTE.sessionId);
+    await h.evict();
+
+    const survived = await loadSessionReferences(h.storage);
+    expect(survived.entries).toEqual([
+      {
+        sessionId: ROUTE.sessionId,
+        kiloSessionId: ROUTE.kiloSessionId,
+        directory: ROUTE.directory,
+      },
+    ]);
+    expect(survived.reconciled).toBe(false);
+  });
+
+  it('attachSession records a reference even when the route already exists', async () => {
+    const h = await harness();
+    await h.create();
+    await h.ready();
+    h.records.delete('session_references');
+
+    await h.control.attachSession(ROUTE);
+
+    expect((await loadSessionReferences(h.storage)).entries).toEqual([
+      {
+        sessionId: ROUTE.sessionId,
+        kiloSessionId: ROUTE.kiloSessionId,
+        directory: ROUTE.directory,
+      },
+    ]);
+  });
+
+  it("runWorktreeDeletion clears the released worktree's references", async () => {
+    const ownership = vi.fn(async () => ({ kind: 'shared' as const }));
+    const h = await harness();
+    installLedger(h, ownership);
+    seedPhysical(h.records, 'stopped');
+    const directory = getWorktreeWorkspacePath(undefined, OWNER, WORKTREE_ID);
+    const otherDirectory = getWorktreeWorkspacePath(undefined, OWNER, OTHER_WORKTREE_ID);
+    const state = emptySessionReferenceState();
+    addSessionReference(state, {
+      sessionId: 'workspace_target',
+      kiloSessionId: ROUTE.kiloSessionId,
+      directory,
+      worktreeId: WORKTREE_ID,
+    });
+    addSessionReference(state, {
+      sessionId: 'workspace_tombstone',
+      kiloSessionId: 'ses_22222222222222222222222222',
+      directory,
+    });
+    addSessionReference(state, {
+      sessionId: 'workspace_other',
+      kiloSessionId: 'ses_33333333333333333333333333',
+      directory: otherDirectory,
+      worktreeId: OTHER_WORKTREE_ID,
+    });
+    h.records.set('session_references', state);
+
+    await h.control.deleteWorktreeResources({
+      ...cleanupInput(),
+      sessionIds: [ROUTE.kiloSessionId, 'ses_22222222222222222222222222'],
+    });
+
+    expect((await loadSessionReferences(h.storage)).entries).toEqual([
+      {
+        sessionId: 'workspace_other',
+        kiloSessionId: 'ses_33333333333333333333333333',
+        directory: otherDirectory,
+        worktreeId: OTHER_WORKTREE_ID,
+      },
+    ]);
+  });
+
+  it('detachSession tombstones a route that predates the index', async () => {
+    const h = await harness();
+    const route = {
+      sessionId: 'workspace_predeploy',
+      kiloSessionId: ROUTE.kiloSessionId,
+      directory: '/workspace/predeploy',
+      ownerId: OWNER,
+      lastState: null,
+      lastStateAt: null,
+      idleForMs: null,
+      waitingOn: null,
+    };
+    h.records.set('session_routes', [route]);
+    h.records.delete('session_references');
+
+    await h.control.detachSession(route.sessionId);
+
+    expect((await loadSessionReferences(h.storage)).entries).toEqual([
+      {
+        sessionId: route.sessionId,
+        kiloSessionId: route.kiloSessionId,
+        directory: route.directory,
+      },
+    ]);
+  });
+
+  it('reconciles once, writes only the marker, and seeds no references', async () => {
+    const h = await harness();
+    seedPhysical(h.records, 'running');
+    const stop = installStopProvider(h);
+    const getRuntimeLocation = vi.fn<() => Promise<unknown>>(async () => ({
+      cloudAgentSessionId: CONTROL_SESSION_ID,
+      kiloUserId: OWNER,
+      organizationId: null,
+      sessionId: null,
+      worktreeId: null,
+      location: { sandboxId: OTHER_SANDBOX_ID, provider: 'cloudflare' },
+    }));
+    Object.assign(h.session, { getRuntimeLocation });
+    const ownership = vi.fn(async () => ({
+      kind: 'unresolved' as const,
+      owners: [
+        {
+          worktreeId: null,
+          organizationId: null,
+          sessions: [{ sessionId: null, cloudAgentSessionId: CONTROL_SESSION_ID }],
+        },
+      ],
+    }));
+    installLedger(h, ownership);
+    const state = emptySessionReferenceState();
+    const targetDirectory = getWorktreeWorkspacePath(undefined, OWNER, WORKTREE_ID);
+    addSessionReference(state, {
+      sessionId: 'workspace_keep',
+      kiloSessionId: ROUTE.kiloSessionId,
+      directory: targetDirectory,
+      worktreeId: WORKTREE_ID,
+    });
+    h.records.set('session_references', state);
+    const input = cleanupInput();
+
+    await expect(h.control.deleteWorktreeResources(input)).rejects.toThrow(
+      'Worktree provider stop is unconfirmed'
+    );
+
+    const reconciled = await loadSessionReferences(h.storage);
+    expect(reconciled.reconciled).toBe(true);
+    expect(reconciled.entries).toEqual([
+      {
+        sessionId: 'workspace_keep',
+        kiloSessionId: ROUTE.kiloSessionId,
+        directory: targetDirectory,
+        worktreeId: WORKTREE_ID,
+      },
+    ]);
+    expect(ownership).toHaveBeenCalledTimes(1);
+    expect(getRuntimeLocation).toHaveBeenCalledTimes(1);
+
+    stop.confirm();
+    await expect(h.control.deleteWorktreeResources(input)).resolves.toMatchObject({
+      deleted: true,
+    });
+    expect(ownership).toHaveBeenCalledTimes(1);
+    expect(getRuntimeLocation).toHaveBeenCalledTimes(1);
+  });
+
+  it('a shared verdict does not set the marker, so the next decision re-checks the ledger', async () => {
+    const ownership = vi.fn(async () => ({ kind: 'shared' as const }));
+    const h = await harness();
+    installLedger(h, ownership);
+    seedPhysical(h.records, 'stopped');
+    const input = cleanupInput();
+
+    await h.control.deleteWorktreeResources(input);
+    const first = await loadSessionReferences(h.storage);
+    expect(first.reconciled).toBe(false);
+    expect(first.overflowed).toBe(false);
+    expect(ownership).toHaveBeenCalledTimes(2);
+
+    await h.control.deleteWorktreeResources(input);
+    expect(ownership).toHaveBeenCalledTimes(4);
+    expect((await loadSessionReferences(h.storage)).reconciled).toBe(false);
+  });
+
+  it('a missing locator this attempt does not terminalize the sandbox', async () => {
+    const h = await harness();
+    seedPhysical(h.records, 'stopped');
+    const getRuntimeLocation = vi.fn<() => Promise<unknown>>(async () => null);
+    Object.assign(h.session, { getRuntimeLocation });
+    const ownership = vi.fn(async () => ({
+      kind: 'unresolved' as const,
+      owners: [
+        {
+          worktreeId: null,
+          organizationId: null,
+          sessions: [{ sessionId: null, cloudAgentSessionId: CONTROL_SESSION_ID }],
+        },
+      ],
+    }));
+    installLedger(h, ownership);
+    const input = cleanupInput();
+
+    await expect(h.control.deleteWorktreeResources(input)).resolves.toMatchObject({
+      deleted: true,
+    });
+    const first = await loadSessionReferences(h.storage);
+    expect(first.reconciled).toBe(false);
+    expect(first.overflowed).toBe(false);
+    expect(await loadPhysicalRecord(h.storage)).toMatchObject({ state: 'stopped' });
+
+    getRuntimeLocation.mockImplementation(async () => ({
+      cloudAgentSessionId: CONTROL_SESSION_ID,
+      kiloUserId: OWNER,
+      organizationId: null,
+      sessionId: null,
+      worktreeId: null,
+      location: { sandboxId: OTHER_SANDBOX_ID, provider: 'cloudflare' },
+    }));
+    await expect(h.control.deleteWorktreeResources(input)).resolves.toMatchObject({
+      deleted: true,
+    });
+    expect(await loadPhysicalRecord(h.storage)).toMatchObject({ providerRef: null });
+  });
+
+  it('blocks instead of throwing when reconciliation cannot complete', async () => {
+    const ownership = vi.fn(() => new Promise<never>(() => {}));
+    const h = await harness();
+    installLedger(h, ownership);
+    seedPhysical(h.records, 'stopped');
+    const input = cleanupInput();
+
+    const deletion = h.control.deleteWorktreeResources(input);
+    await vi.advanceTimersByTimeAsync(RECONCILIATION_CALL_TIMEOUT_MS * 2);
+
+    await expect(deletion).resolves.toMatchObject({ deleted: true });
+    expect((await loadSessionReferences(h.storage)).reconciled).toBe(false);
+  });
+
+  it('trusts a persisted reconciliation marker instead of re-walking the ledger', async () => {
+    const ownership = vi.fn(async () => ({ kind: 'shared' as const }));
+    const h = await harness();
+    installLedger(h, ownership);
+    seedPhysical(h.records, 'stopped');
+    h.records.set('session_references', markReferencesReconciled(emptySessionReferenceState()));
+
+    await h.control.deleteWorktreeResources({
+      worktreeId: WORKTREE_ID,
+      kiloUserId: OWNER,
+      location: { sandboxId: SANDBOX_ID, provider: 'cloudflare' },
+      sessionIds: [ROUTE.kiloSessionId],
+    });
+
+    expect(ownership).not.toHaveBeenCalled();
   });
 });

@@ -483,6 +483,8 @@
       "replyBadRequest": "Acest răspuns nu poate fi publicat. Este posibil ca firul de discuție să se fi modificat.",
       "replyForbidden": "Nu ai permisiunea să răspunzi la acest PR.",
       "addCommentCta": "Comentează acest PR",
+      "fixWithKilo": "Rezolvă cu Kilo",
+      "fixWithKiloPrompt": "Te rog rezolvă următorul comentariu din acest PR: {{link}}",
       "commentBadRequest": "Acest comentariu nu poate fi publicat. Este posibil ca PR-ul să se fi modificat.",
       "commentForbidden": "Nu ai permisiunea să comentezi acest PR.",
       "moderation": {
@@ -577,6 +579,9 @@
       "pending": "{{displayCount}} în așteptare",
       "skipped": "{{displayCount}} omise",
       "checksCount": "{{displayCount}} verificări",
+      "checksCount_one": "{{displayCount}} verificare",
+      "checksCount_few": "{{displayCount}} verificări",
+      "checksCount_other": "{{displayCount}} verificări",
       "checkDetails": "detaliile verificării"
     },
     "inbox": {
@@ -3081,6 +3086,12 @@
     "privacy": "Deschide Kilo pentru a vedea agenții",
     "openAgents": "Deschide agenții",
     "needsInput": "Așteaptă un răspuns",
+    "newestSession": "Cea mai recentă: {{title}}",
+    "noneWaiting": "Niciun agent în așteptare",
+    "newAgent": "Agent nou",
+    "approving": "Se aprobă...",
+    "couldNotApprove": "Aprobarea nu a reușit",
+    "couldNotStart": "Pornirea nu a reușit",
     "channelName": "Agenți activi",
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare."
   },
@@ -3116,5 +3127,12 @@
     "remoteFound": "Computer conectat",
     "checkAgain": "Verifică din nou",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Pornește un agent necesită o instrucțiune. Adaugă o instrucțiune și rulează-l din nou.",
+      "repositoryUnknown": "Kilo nu recunoaște {{repository}} ca depozit GitHub sau GitLab. Alege alt depozit în Kilo.",
+      "repositoryUnsupported": "{{repository}} este un depozit Bitbucket — Pornește un agent nu îl poate folosi încă. Alege alt depozit în Kilo."
+    }
   }
 }

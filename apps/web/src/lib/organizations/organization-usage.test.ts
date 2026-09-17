@@ -681,6 +681,72 @@ describe('Organization Usage Functions', () => {
       });
 
       expect(result.balance).toBe(-0.025); // -25000 microdollars = -0.025 USD (50000 - 75000)
+      expect(result.balanceLimitedByUserAllowance).toBe(true);
+    });
+
+    test('marks the block as allowance-limited when the allowance is exhausted even if the org balance is lower', async () => {
+      const user = await insertTestUser();
+
+      const organization = await createOrganization('Test Org', user.id);
+      await db
+        .update(organizations)
+        .set({
+          require_seats: false,
+          total_microdollars_acquired: 0,
+          microdollars_used: 5_000_000,
+        })
+        .where(eq(organizations.id, organization.id));
+
+      await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
+
+      await db.insert(organization_user_usage).values({
+        organization_id: organization.id,
+        kilo_user_id: user.id,
+        usage_date: sql`CURRENT_DATE`, // Today
+        limit_type: 'daily',
+        microdollar_usage: 60000, // $0.06 usage (exceeds limit)
+      });
+
+      const result = await getBalanceForOrganizationUser(organization.id, user.id, {
+        limitType: 'daily',
+      });
+
+      // The org balance is the lower bound (-$5), but the member allowance is
+      // also exhausted, so an org top-up cannot clear the member block.
+      expect(result.balance).toBe(-5);
+      expect(result.balanceLimitedByUserAllowance).toBe(true);
+    });
+
+    test('does not mark the block as allowance-limited while the member still has allowance', async () => {
+      const user = await insertTestUser();
+
+      const organization = await createOrganization('Test Org', user.id);
+      await db
+        .update(organizations)
+        .set({
+          require_seats: false,
+          total_microdollars_acquired: 0,
+          microdollars_used: 10_000,
+        })
+        .where(eq(organizations.id, organization.id));
+
+      await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
+
+      await db.insert(organization_user_usage).values({
+        organization_id: organization.id,
+        kilo_user_id: user.id,
+        usage_date: sql`CURRENT_DATE`, // Today
+        limit_type: 'daily',
+        microdollar_usage: 10000, // $0.01 usage (allowance remains)
+      });
+
+      const result = await getBalanceForOrganizationUser(organization.id, user.id, {
+        limitType: 'daily',
+      });
+
+      // The org balance is the lower bound, so a top-up can clear the block.
+      expect(result.balance).toBe(-0.01);
+      expect(result.balanceLimitedByUserAllowance).toBe(false);
     });
 
     test("should only check today's usage, not previous days", async () => {

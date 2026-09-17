@@ -47,6 +47,15 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('openrouter/free')).toBe(true);
     });
 
+    test('should return true for OpenRouter stealth alpha models', async () => {
+      expect(await isFreeModel('stealth/ox-alpha')).toBe(true);
+      expect(await isFreeModel('stealth/other-alpha')).toBe(true);
+      expect(await isFreeModel('stealth/claude-opus-4.7')).toBe(false);
+      expect(await isFreeModel('stealth/qwen3.6-plus')).toBe(false);
+      expect(await isFreeModel('openrouter/model-alpha')).toBe(false);
+      expect(await isFreeModel('stealth/model-beta')).toBe(false);
+    });
+
     test('should return true for enabled Kilo exclusive models with no pricing', async () => {
       // Test with known Kilo exclusive models that are enabled and have no pricing (free)
       const enabledFreeModels = kiloExclusiveModels.filter(

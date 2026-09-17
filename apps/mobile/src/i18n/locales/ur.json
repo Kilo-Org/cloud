@@ -480,6 +480,8 @@
       "replyBadRequest": "یہ جواب پوسٹ نہیں ہو سکتا۔ شاید تھریڈ تبدیل ہو گیا ہے۔",
       "replyForbidden": "آپ کو اس پل ریکویسٹ پر جواب دینے کی اجازت نہیں ہے۔",
       "addCommentCta": "اس پل ریکویسٹ پر تبصرہ کریں",
+      "fixWithKilo": "Kilo کے ساتھ درست کریں",
+      "fixWithKiloPrompt": "براہ کرم درج ذیل پل ریکویسٹ تبصرے کو حل کریں: {{link}}",
       "commentBadRequest": "یہ تبصرہ پوسٹ نہیں ہو سکتا۔ شاید پل ریکویسٹ تبدیل ہو گیا ہے۔",
       "commentForbidden": "آپ کو اس پل ریکویسٹ پر تبصرہ کرنے کی اجازت نہیں ہے۔",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} زیر التوا",
       "skipped": "{{displayCount}} چھوڑی گئیں",
       "checksCount": "{{displayCount}} جانچیں",
+      "checksCount_one": "{{displayCount}} جانچ",
+      "checksCount_other": "{{displayCount}} جانچیں",
       "checkDetails": "جانچ کی تفصیلات"
     },
     "inbox": {
@@ -3058,6 +3062,12 @@
     "privacy": "ایجنٹس دیکھنے کے لیے Kilo کھولیں",
     "openAgents": "ایجنٹس کھولیں",
     "needsInput": "ان پٹ درکار",
+    "newestSession": "تازہ ترین: {{title}}",
+    "noneWaiting": "کوئی ایجنٹ انتظار میں نہیں",
+    "newAgent": "نیا ایجنٹ",
+    "approving": "منظور کیا جا رہا ہے...",
+    "couldNotApprove": "منظور نہیں کیا جا سکا",
+    "couldNotStart": "شروع نہیں کیا جا سکا",
     "channelName": "فعال ایجنٹس",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔"
   },
@@ -3093,5 +3103,12 @@
     "remoteFound": "کمپیوٹر منسلک ہو گیا",
     "checkAgain": "دوبارہ جانچیں",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ایجنٹ شروع کرنے کے لیے پرامپٹ درکار ہے۔ ایک پرامپٹ شامل کریں اور اسے دوبارہ چلائیں۔",
+      "repositoryUnknown": "Kilo، {{repository}} کو GitHub یا GitLab ریپوزٹری کے طور پر نہیں پہچانتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔",
+      "repositoryUnsupported": "{{repository}} ایک Bitbucket ریپوزٹری ہے — ایجنٹ شروع کریں ابھی اسے استعمال نہیں کر سکتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔"
+    }
   }
 }

@@ -1705,6 +1705,7 @@ describe('cold iOS background delivery', () => {
       status: 'empty',
       running: 0,
       needsInput: 0,
+      needsApproval: 0,
       idle: 0,
       needsInputSince: null,
     });

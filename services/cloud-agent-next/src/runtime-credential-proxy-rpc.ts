@@ -7,6 +7,7 @@ import {
   resolveRuntimeProxyCredential,
   RUNTIME_PROXY_GRANT_KEY,
   runtimeProxyGrantSchema,
+  sameRuntimeProxyControlBinding,
   sameRuntimeProxyPhysicalBinding,
   verifyRuntimeCredentialProxyHandle,
   type RuntimeProxyFence,
@@ -41,20 +42,9 @@ function context(metadata: SessionMetadata, fence: RuntimeProxyFence) {
   };
 }
 
-type ControlFence = Extract<RuntimeProxyFence, { plane: 'control' }>;
-
-function sameFence(left: ControlFence, right: ControlFence): boolean {
-  return (
-    left.allocationId === right.allocationId &&
-    left.providerInstanceId === right.providerInstanceId &&
-    left.connectionId === right.connectionId &&
-    left.wrapperInstanceId === right.wrapperInstanceId
-  );
-}
-
 function samePersistedGrantFence(grant: RuntimeProxyGrant, fence: RuntimeProxyFence): boolean {
   if (fence.plane === 'legacy') return sameRuntimeProxyPhysicalBinding(grant, fence);
-  return grant.plane === 'control' && sameFence(grant, fence);
+  return grant.plane === 'control' && sameRuntimeProxyControlBinding(grant, fence);
 }
 
 function upgradeLegacyGrantToV3(
@@ -129,8 +119,14 @@ export async function issuePersistedRuntimeProxyGrant(input: {
       stored.plane === 'legacy' && current.fence.plane === 'legacy' && stored.version !== 3
         ? upgradeLegacyGrantToV3(stored, current.fence.instanceGeneration)
         : stored;
-    if (upgraded !== stored) await input.storage.put(RUNTIME_PROXY_GRANT_KEY, upgraded);
-    return issueRuntimeCredentialProxyHandle(input.env, upgraded, stored.issuedAt);
+    const refreshed: RuntimeProxyGrant =
+      upgraded.plane === 'control' &&
+      current.fence.plane === 'control' &&
+      upgraded.connectionId !== current.fence.connectionId
+        ? { ...upgraded, connectionId: current.fence.connectionId }
+        : upgraded;
+    if (refreshed !== stored) await input.storage.put(RUNTIME_PROXY_GRANT_KEY, refreshed);
+    return issueRuntimeCredentialProxyHandle(input.env, refreshed, stored.issuedAt);
   }
   const issuedAt = now;
   const { fence, ...identity } = current;

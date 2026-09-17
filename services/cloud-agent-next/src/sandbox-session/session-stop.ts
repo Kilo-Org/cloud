@@ -59,7 +59,6 @@ function rejected(request: ControlStopRequest, message: string): StopAdmission {
 function sameRequest(existing: ControlStopRequest, next: ControlStopRequest): boolean {
   return (
     existing.operationId === next.operationId &&
-    existing.cleanupDeadlineAt === next.cleanupDeadlineAt &&
     existing.scope.sandboxId === next.scope.sandboxId &&
     existing.scope.wrapperInstanceId === next.scope.wrapperInstanceId &&
     existing.targets.length === next.targets.length &&
@@ -86,12 +85,13 @@ export function admitSessionStop(input: {
       return rejected(request, 'Stop operation conflicts');
     return { messages: [...messages], stop: existing, receipt: receipt(existing) };
   }
-  if (
-    request.cleanupDeadlineAt <= now ||
-    request.cleanupDeadlineAt > now + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS
-  ) {
+  if (request.cleanupDeadlineAt <= now) {
     return rejected(request, 'Stop cleanup deadline is invalid');
   }
+  const cleanupDeadlineAt = Math.min(
+    request.cleanupDeadlineAt,
+    now + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS
+  );
   if (request.scope.sandboxId !== currentSandboxId) {
     return rejected(request, 'Stop sandbox scope is stale');
   }
@@ -131,7 +131,7 @@ export function admitSessionStop(input: {
   const state = targets.every(target => target.state === 'confirmed') ? 'confirmed' : 'accepted';
   const stop: PersistedSessionStop = {
     version: 1,
-    request: structuredClone(request),
+    request: { ...structuredClone(request), cleanupDeadlineAt },
     state,
     targets,
   };
@@ -140,7 +140,7 @@ export function admitSessionStop(input: {
       if (!requested.has(message.messageId)) return message;
       const cancellation = {
         operationId: request.operationId,
-        deadlineAt: request.cleanupDeadlineAt,
+        deadlineAt: cleanupDeadlineAt,
       };
       return message.state === 'queued'
         ? { ...message, state: 'cancelled', cancellation }

@@ -6,13 +6,14 @@ import {
 
 export function parseScopedStopMaintenance(payload: unknown, now = Date.now()) {
   const parsed = sessionScopedStopAbortPayloadSchema.safeParse(payload);
-  if (
-    !parsed.success ||
-    parsed.data.cleanupDeadlineAt <= now ||
-    parsed.data.cleanupDeadlineAt > now + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS
-  )
-    return undefined;
-  return parsed.data;
+  if (!parsed.success || parsed.data.cleanupDeadlineAt <= now) return undefined;
+  return {
+    ...parsed.data,
+    cleanupDeadlineAt: Math.min(
+      parsed.data.cleanupDeadlineAt,
+      now + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS
+    ),
+  };
 }
 
 export function hasScopedStopMaintenanceFields(payload: unknown): boolean {

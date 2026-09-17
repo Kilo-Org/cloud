@@ -114,6 +114,8 @@ const mockSession = {
     getStatus: jest.fn<{ type: 'idle' | 'disconnected' }, []>(() => ({ type: 'idle' })),
     getCloudStatus: jest.fn<CloudStatus | null, []>(() => null),
     getSetupLog: jest.fn<readonly string[], []>(() => []),
+    getCommits: jest.fn(() => []),
+    clearCommits: jest.fn(),
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
@@ -2432,6 +2434,59 @@ describe('createSessionManager', () => {
       expect((storage!.getParts(messageId!)[0] as TextPart).text).toBe('Hello');
     });
 
+    it('marks the optimistic row unconfirmed until the authoritative record wins the id', async () => {
+      // Production (ses_f58dc0cebfffJoPUmXs05c76pv): the client's three sends
+      // were each accepted ("Sending V2 message to existing session" at
+      // 22:25:21.412Z, 22:25:57.431Z, 22:25:59.068Z) while the wrapper's event
+      // publications were rejected wholesale (`event_batch_rejected`,
+      // rejectedCount 732), so the authoritative `message.updated` for a
+      // prompt never landed. The row the client materialises for the prompt
+      // must stay marked unconfirmed — the flag the transcript's
+      // one-row rendering and typed failure footer key on — and a confirmed
+      // record for the same id must win the role and the parts.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({
+        payload: { type: 'prompt', prompt: 'Continue', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
+
+      const storage = mockSession.storage;
+      expect(storage).not.toBeNull();
+      const [messageId] = storage!.getMessageIds();
+      expect(messageId).toBeDefined();
+
+      // The unconfirmed row carries the marker on the message and on the
+      // placeholder text part, exactly as the mobile selector reads it.
+      expect(storage!.getMessageInfo(messageId!)).toMatchObject({ role: 'user', synthetic: true });
+      expect(storage!.getParts(messageId!)[0]).toMatchObject({
+        type: 'text',
+        text: 'Continue',
+        synthetic: true,
+      });
+
+      // A confirmed record for the id wins: the authoritative update replaces
+      // the info wholesale, dropping the unconfirmed marker and with it the
+      // transcript's unconfirmed-row treatment. The failed-run delivery state
+      // is keyed by that same id — the server honors the `messageId` the client
+      // sent, so the failed row and the run that failed it are one row.
+      const authoritative = stubUserMessage({
+        id: messageId!,
+        sessionID: kiloId('ses-1'),
+        time: { created: 2 },
+        agent: 'test-agent',
+        model: { providerID: 'test-provider', modelID: 'test-model' },
+      });
+      createChatProcessor(storage!).process({ type: 'message.updated', info: authoritative });
+
+      const confirmedInfo = storage!.getMessageInfo(messageId!);
+      expect(confirmedInfo).toBe(authoritative);
+      expect(confirmedInfo?.role === 'user' ? confirmedInfo.synthetic : undefined).toBeUndefined();
+    });
+
     it('deletes the optimistic row on transport failure', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -3417,6 +3472,50 @@ describe('createSessionManager', () => {
 
       expect(atomValue(config.store, mgr.atoms.contextUsage)).toEqual({
         contextTokens: 20,
+        providerID: 'kilo',
+        modelID: 'anthropic/claude-sonnet-4',
+      });
+    });
+
+    it('never falls back to the pre-compaction reading after /compact', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      // The 96%-full turn the session reported before `/compact`.
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-001', 'ses-root', {
+          tokens: { input: 190_000, output: 1_000, reasoning: 0, cache: { read: 0, write: 0 } },
+        }).info
+      );
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toEqual({
+        contextTokens: 191_000,
+        providerID: 'kilo',
+        modelID: 'anthropic/claude-sonnet-4',
+      });
+
+      // `/compact` completes: the summary carries no usable reading of its own,
+      // and the pre-compaction figure must not come back through it.
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-002', 'ses-root', {
+          mode: 'compaction',
+          agent: 'compaction',
+          summary: true,
+          finish: 'stop',
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        }).info
+      );
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toBeUndefined();
+
+      // The first turn on the compacted context reports the new figure.
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-003', 'ses-root', {
+          tokens: { input: 27_000, output: 500, reasoning: 0, cache: { read: 0, write: 0 } },
+        }).info
+      );
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toEqual({
+        contextTokens: 27_500,
         providerID: 'kilo',
         modelID: 'anthropic/claude-sonnet-4',
       });

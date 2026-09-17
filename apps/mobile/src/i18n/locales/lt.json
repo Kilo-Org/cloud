@@ -486,6 +486,8 @@
       "replyBadRequest": "Šio atsakymo negalima paskelbti. Gija galėjo pasikeisti.",
       "replyForbidden": "Neturi teisės atsakyti šios pakeitimų užklausos diskusijoje.",
       "addCommentCta": "Komentuoti šią pakeitimų užklausą",
+      "fixWithKilo": "Ištaisyti su Kilo",
+      "fixWithKiloPrompt": "Prašome išspręsti šį pakeitimų užklausos komentarą: {{link}}",
       "commentBadRequest": "Šio komentaro negalima paskelbti. Pakeitimų užklausa galėjo pasikeisti.",
       "commentForbidden": "Neturi teisės komentuoti šios pakeitimų užklausos.",
       "moderation": {
@@ -582,6 +584,10 @@
       "pending": "laukiama: {{displayCount}}",
       "skipped": "praleista: {{displayCount}}",
       "checksCount": "patikrinimų: {{displayCount}}",
+      "checksCount_one": "patikrinimas: {{displayCount}}",
+      "checksCount_few": "patikrinimai: {{displayCount}}",
+      "checksCount_many": "patikrinimo: {{displayCount}}",
+      "checksCount_other": "patikrinimų: {{displayCount}}",
       "checkDetails": "patikrinimo informacija"
     },
     "inbox": {
@@ -3104,6 +3110,12 @@
     "privacy": "Atidaryk Kilo, kad matytum agentus",
     "openAgents": "Atidaryti agentus",
     "needsInput": "Laukia atsakymo",
+    "newestSession": "Naujausia: {{title}}",
+    "noneWaiting": "Nė vienas agentas nelaukia",
+    "newAgent": "Naujas agentas",
+    "approving": "Tvirtinama...",
+    "couldNotApprove": "Nepavyko patvirtinti",
+    "couldNotStart": "Nepavyko paleisti",
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus."
   },
@@ -3139,5 +3151,12 @@
     "remoteFound": "Kompiuteris prijungtas",
     "checkAgain": "Kartoti patikrinimą",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Norint paleisti agentą, reikia užklausos. Pridėk užklausą ir paleisk iš naujo.",
+      "repositoryUnknown": "Kilo neatpažįsta {{repository}} kaip GitHub ar GitLab saugyklos. Pasirink kitą saugyklą Kilo programoje.",
+      "repositoryUnsupported": "{{repository}} yra Bitbucket saugykla — Paleisti agentą jos dar negali naudoti. Pasirink kitą saugyklą Kilo programoje."
+    }
   }
 }

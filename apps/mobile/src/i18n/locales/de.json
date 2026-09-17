@@ -2374,6 +2374,8 @@
     "checkConnection": "Verbindung prüfen",
     "checks": {
       "checksCount": "{{displayCount}} Prüfungen",
+      "checksCount_one": "{{displayCount}} Prüfung",
+      "checksCount_other": "{{displayCount}} Prüfungen",
       "couldNotLoad": "Die Prüfungen konnten nicht geladen werden.",
       "failed": "{{displayCount}} fehlgeschlagen",
       "noAccess": "Du hast keinen Zugriff auf die Prüfungen dieses Repositorys.",
@@ -2473,6 +2475,8 @@
       "replyBody": "Antworttext",
       "replyForbidden": "Du hast keine Berechtigung, auf diesen Pull-Request zu antworten.",
       "addCommentCta": "Diesen Pull-Request kommentieren",
+      "fixWithKilo": "Mit Kilo beheben",
+      "fixWithKiloPrompt": "Bitte kümmere dich um den folgenden Kommentar zum Pull-Request: {{link}}",
       "commentBadRequest": "Dieser Kommentar kann nicht veröffentlicht werden. Der Pull-Request hat sich möglicherweise geändert.",
       "commentForbidden": "Du hast keine Berechtigung, diesen Pull-Request zu kommentieren.",
       "replyPlaceholder": "Deine Antwort …",
@@ -3058,6 +3062,12 @@
     "privacy": "Kilo öffnen, um Agenten anzuzeigen",
     "openAgents": "Agenten öffnen",
     "needsInput": "Eingabe erforderlich",
+    "newestSession": "Neueste: {{title}}",
+    "noneWaiting": "Keine Agenten warten",
+    "newAgent": "Neuer Agent",
+    "approving": "Genehmigung läuft...",
+    "couldNotApprove": "Genehmigung fehlgeschlagen",
+    "couldNotStart": "Start fehlgeschlagen",
     "channelName": "Aktive Agenten",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
   },
@@ -3093,5 +3103,12 @@
     "remoteFound": "Computer verbunden",
     "checkAgain": "Erneut prüfen",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Agent starten benötigt einen Prompt. Füge einen Prompt hinzu und führe die Aktion erneut aus.",
+      "repositoryUnknown": "Kilo erkennt {{repository}} nicht als GitHub- oder GitLab-Repository. Wähle ein anderes Repository in Kilo.",
+      "repositoryUnsupported": "{{repository}} ist ein Bitbucket-Repository — Agent starten kann es noch nicht verwenden. Wähle ein anderes Repository in Kilo."
+    }
   }
 }

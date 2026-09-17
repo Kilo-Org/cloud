@@ -22,6 +22,7 @@ import {
   messagePartUpdatedDataSchema,
   messagePartDeltaDataSchema,
   messagePartRemovedDataSchema,
+  messageRemovedDataSchema,
   sessionStatusDataSchema,
   sessionCreatedDataSchema,
   sessionUpdatedDataSchema,
@@ -69,6 +70,11 @@ export type ChatEvent =
       sessionId: string;
       messageId: string;
       partId: string;
+    }
+  | {
+      type: 'message.removed';
+      sessionId: string;
+      messageId: string;
     };
 
 /** Service events — lifecycle, status, questions, autocommit, preparation. */
@@ -159,6 +165,11 @@ export type ServiceEvent =
       skipped?: boolean | undefined;
       commitHash?: string | undefined;
       commitMessage?: string | undefined;
+      userMessageId?: string | undefined;
+      committedAt?: string | undefined;
+      pushStatus?: 'pushed' | 'failed' | 'not_attempted' | 'unknown' | undefined;
+      commitMessageTruncated?: boolean | undefined;
+      timestamp?: string | undefined;
     }
   | { type: 'cloud.status'; cloudStatus: CloudStatus }
   | {
@@ -214,6 +225,7 @@ const CHAT_EVENT_TYPES = new Set([
   'message.part.updated',
   'message.part.delta',
   'message.part.removed',
+  'message.removed',
 ]);
 
 export function isChatEvent(event: NormalizedEvent): event is ChatEvent {
@@ -347,6 +359,16 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         sessionId: r.data.sessionID,
         messageId: r.data.messageID,
         partId: r.data.partID,
+      };
+    }
+
+    case 'message.removed': {
+      const r = messageRemovedDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'message.removed',
+        sessionId: r.data.sessionID,
+        messageId: r.data.messageID,
       };
     }
 
@@ -555,6 +577,10 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         skipped: r.data.skipped,
         commitHash: r.data.commitHash,
         commitMessage: r.data.commitMessage,
+        userMessageId: r.data.userMessageId,
+        committedAt: r.data.committedAt,
+        pushStatus: r.data.pushStatus,
+        commitMessageTruncated: r.data.commitMessageTruncated,
       };
     }
 
@@ -685,7 +711,11 @@ export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
   if (raw.streamEventType === 'connected' && event?.type === 'connected') {
     return { ...event, cloudSessionId: raw.sessionId };
   }
-  return event;
+  return event?.type === 'autocommit_completed' &&
+    event.commitHash &&
+    /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(event.commitHash)
+    ? { ...event, timestamp: raw.timestamp }
+    : event;
 }
 
 /**

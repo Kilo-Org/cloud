@@ -200,7 +200,11 @@ describe('normalize', () => {
         messageID: 'msg-1',
         type: 'text',
       };
-      expect(normalize(createRaw('message.part.updated', { part }))).not.toHaveProperty('time');
+      const result = normalize(createRaw('message.part.updated', { part }));
+      // Assert the normalized shape first: `not.toHaveProperty` alone passes
+      // for a null result, so it cannot prove the event was recognized.
+      expect(result).toEqual({ type: 'message.part.updated', part });
+      expect(Object.hasOwn(result as object, 'time')).toBe(false);
     });
   });
 

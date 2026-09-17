@@ -62,11 +62,15 @@ function toolLifecycleRank(part: Part): number | null {
  * began — the only ordering evidence an unsettled part has. A stored running
  * part that was replayed from a snapshot carries no recorded update time, so
  * without this a terminal replay could be ordered against nothing.
+ *
+ * `state.time` is read defensively: an ingest-compacted part keeps only
+ * `state.status`, so a replayed running part can carry no start time and then
+ * has no ordering evidence.
  */
 function toolRunningStartedAt(part: Part): number | undefined {
   if (part.type !== 'tool') return undefined;
   const state = part.state;
-  if (state.status === 'running') return state.time.start;
+  if (state.status === 'running') return state.time?.start;
   return undefined;
 }
 
@@ -165,9 +169,11 @@ function upsertPartDroppingStaleSyntheticParts(
     }
     const nextArr = [...filtered];
     nextArr[idx] = nextPart;
-    // A re-delivery that carries no time of its own keeps the last ordering
-    // evidence for the part; dropping it would let a later stale terminal win.
-    rememberPartUpdateTime(nextPart, eventTime ?? storedEventTime);
+    // Remember the ordering evidence the accepted update actually won on: its
+    // own event time, else the settle time that ordered it here. Dropping that
+    // evidence for an older recorded event time would let a later out-of-order
+    // terminal whose event time falls between the two win.
+    rememberPartUpdateTime(nextPart, eventTime ?? partSettledAt(nextPart) ?? storedEventTime);
     return nextArr;
   }
 

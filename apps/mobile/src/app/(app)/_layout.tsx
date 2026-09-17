@@ -22,6 +22,7 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
+import { ToolSummaryTranslationRetryMount } from '@/lib/tool-summary-translation/tool-summary-translation-retry-mount';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -118,6 +119,7 @@ export default function AppLayout() {
       <ActiveSessionsLiveSyncMount />
       <GlanceablePublisherMount />
       <CachePersistenceMount />
+      <ToolSummaryTranslationRetryMount />
       <LogoutReconciliationMount />
       <PushRegistrationMount />
       <AppWideFreshnessMount />

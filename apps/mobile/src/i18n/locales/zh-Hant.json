@@ -2475,6 +2475,8 @@
       "replyBody": "回覆內容",
       "replyForbidden": "你沒有權限回覆此提取請求。",
       "addCommentCta": "對此提取請求留言",
+      "fixWithKilo": "使用 Kilo 修復",
+      "fixWithKiloPrompt": "請處理以下提取請求留言：{{link}}",
       "commentBadRequest": "無法發佈此留言。此提取請求可能已變更。",
       "commentForbidden": "你沒有權限在此提取請求留言。",
       "replyPlaceholder": "回覆…",

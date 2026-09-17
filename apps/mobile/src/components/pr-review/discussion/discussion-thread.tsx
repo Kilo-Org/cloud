@@ -177,6 +177,10 @@ export function DiscussionThread({
             <View key={comment.nodeId} className={cn(index > 0 && 'border-t border-border pt-4')}>
               <CommentRow
                 comment={comment}
+                owner={owner}
+                repo={repo}
+                number={number}
+                commentKind="review"
                 reactionsDisabled={isReacting}
                 readOnly={!isGithub}
                 reactionsSupported={capabilities.reactions.supported}

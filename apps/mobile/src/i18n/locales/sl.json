@@ -486,6 +486,8 @@
       "replyBadRequest": "Tega odgovora ni mogoče objaviti. Nit se je morda spremenila.",
       "replyForbidden": "Nimaš dovoljenja za odgovarjanje na ta zahtevek za združitev.",
       "addCommentCta": "Komentiraj ta zahtevek za združitev",
+      "fixWithKilo": "Popravi s Kilo",
+      "fixWithKiloPrompt": "Prosimo, reši naslednji komentar v tem zahtevku za združitev: {{link}}",
       "commentBadRequest": "Tega komentarja ni mogoče objaviti. Zahtevek za združitev se je morda spremenil.",
       "commentForbidden": "Nimaš dovoljenja za komentiranje tega zahtevka za združitev.",
       "moderation": {

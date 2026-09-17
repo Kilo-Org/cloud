@@ -1307,15 +1307,22 @@ export function SessionDetailContent({
   });
   // A committed up latch: a drop after the first up reads "Reconnecting…",
   // a cold start reads "Connecting…". Only the session's own transport latches
-  // it; the app-wide user-web leg is that transport only for a `none` transport
-  // (session-connection-indicator-state.ts:39-46), so a remote/cloud-agent
-  // session whose agent never came up must still read "Connecting…".
+  // it; the app-wide user-web leg is that transport only once the session type
+  // is resolved (a `none` transport is then a read-only session,
+  // session-connection-indicator-state.ts:39-46), so a remote/cloud-agent
+  // session whose agent never came up must still read "Connecting…". While the
+  // type is still unresolved — the whole window a cached open paints its
+  // transcript in — the leg is not this session's transport yet and must not
+  // latch one, or a first load reads "Reconnecting…" instead of "Connecting…".
   const [wasConnected, setWasConnected] = useState(false);
   useEffect(() => {
-    if (connectionState === 'up' || (connectionState === 'none' && userWebConnected)) {
+    if (
+      connectionState === 'up' ||
+      (connectionState === 'none' && activeSessionType !== null && userWebConnected)
+    ) {
       setWasConnected(true);
     }
-  }, [connectionState, userWebConnected]);
+  }, [connectionState, userWebConnected, activeSessionType]);
   const connectionDisplay = resolveSessionConnectionDisplay({
     transport: connectionState,
     userWebConnected,

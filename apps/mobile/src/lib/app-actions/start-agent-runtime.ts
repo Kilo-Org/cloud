@@ -14,7 +14,7 @@ import * as Crypto from 'expo-crypto';
 import { detectRepositoryPlatform } from '@/components/agents/new-session-repository-state';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { type ParsedActionRepository } from '@/lib/app-actions/app-action-contract';
-import { readStoredValue } from '@/lib/auth/secure-store-read';
+import { readStoredValue } from '@/lib/auth/secure-store-value';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
 import {
@@ -112,7 +112,7 @@ export async function currentUserId(): Promise<string | null> {
  * start).
  *
  * The read goes through the app's cross-platform entry point for a plain
- * SecureStore read (`secure-store-read.ts`), which the other headless callers
+ * SecureStore read (`secure-store-value.ts`), which the other headless callers
  * use too: `expo-secure-store` exists on iOS and Android alike, so one
  * implementation serves both and this path keeps no per-platform storage
  * branch.

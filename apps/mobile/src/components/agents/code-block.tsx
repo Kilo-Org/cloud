@@ -1,4 +1,4 @@
-import { Fragment, memo, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   type AccessibilityActionEvent,
@@ -11,12 +11,11 @@ import {
 } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 
-import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type HighlightToken } from '@/lib/pr-review/diff/highlight';
 
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
+import { renderChunkChildren } from './code-block-children';
 import {
   chunkTokenLines,
   CODE_FIRST_PAINT_CHUNKS,
@@ -79,61 +78,6 @@ const COPY_ACTION_GAP = 8;
  * Mono sizing on every rendered code text: one per chunk of a fence.
  */
 const CODE_LINE_CLASSNAME = 'font-mono text-xs leading-4';
-
-/**
- * A blank source line still occupies its line box; an `RNText` whose only
- * child is the empty string collapses to zero height, so a blank line renders
- * a space instead.
- *
- * Only a blank line that sits among other lines needs the placeholder: an
- * empty fence is one blank line and nothing else, so it keeps the zero-height
- * empty code `Text` it rendered before this block chunked the fence (see
- * `keepBlankLineBox` in `CodeBlockImpl`).
- */
-const BLANK_CODE_LINE = ' ';
-
-/**
- * Separator between the lines held by one code text.
- */
-const CODE_LINE_BREAK = '\n';
-
-/**
- * Children for one code line. Untagged runs are raw strings and
- * tagged runs are nested `RNText`s — see `highlightRunChildren`, which both
- * diff renderers share too. A line whose runs are all empty keeps its blank
- * line box when the fence has another line (`keepBlankLineBox`).
- */
-function renderLineRuns(
-  tokens: readonly HighlightToken[],
-  isDark: boolean,
-  keepBlankLineBox: boolean
-): ReactNode {
-  if (keepBlankLineBox && tokens.every(token => token.text.length === 0)) {
-    return BLANK_CODE_LINE;
-  }
-  return highlightRunChildren(tokens, isDark);
-}
-
-/**
- * Children for one chunk of code lines: each line's runs, with a line break
- * before every line but the chunk's first, so the chunk lays out exactly as the
- * lines did when each had its own `Text`. A line whose runs are all empty
- * renders `BLANK_CODE_LINE`, which keeps the line box of a blank line at a
- * chunk's first or last position from collapsing the `Text`; a fence with no
- * other line (`keepBlankLineBox` false) renders that line empty instead.
- */
-function renderChunkChildren(
-  chunkLines: readonly (readonly HighlightToken[])[],
-  isDark: boolean,
-  keepBlankLineBox: boolean
-): ReactNode[] {
-  return chunkLines.map((tokens, lineIndex) => (
-    <Fragment key={`line-${lineIndex}`}>
-      {lineIndex > 0 ? CODE_LINE_BREAK : null}
-      {renderLineRuns(tokens, isDark, keepBlankLineBox)}
-    </Fragment>
-  ));
-}
 
 /**
  * Shared highlighted code block for tool detail sheets and markdown fences.
@@ -405,7 +349,8 @@ function CodeBlockImpl({
   // empty fence — an empty ```` ``` ```` in a message — is one blank line and
   // nothing else, so its empty `displayText` skips the placeholder and the
   // fence renders the zero-height empty code `Text` it did before this block
-  // chunked it, instead of gaining a blank code line (see `BLANK_CODE_LINE`).
+  // chunked it, instead of gaining a blank code line (see
+  // `code-block-children.tsx`).
   const keepBlankLineBox = displayText.length > 0;
   const codeContent = useMemo(
     () => (

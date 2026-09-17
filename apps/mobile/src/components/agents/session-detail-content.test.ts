@@ -1071,6 +1071,48 @@ describe('session detail connection latch', () => {
     const sheet = view.renderer.root.findByType(SessionContextSheet);
     expect(sheet.props.connectionDisplay).toBe('connecting');
   });
+
+  it('reads Connecting, not Reconnecting, while a cached first load still refreshes its metadata', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails(cachedRows, { metadataReady: metadata.promise, cachedRows });
+
+    // The cached transcript paints while the session type and metadata are
+    // still resolving, and the app-wide user-web leg is already up. The leg is
+    // not this session's transport yet, so it must not latch the session as
+    // ever connected: the first load reads "Connecting…", not "Reconnecting…".
+    expect(renderedText(view.renderer.root)).toContain('cached root row');
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('connecting');
+  });
+
+  it('still reads Reconnecting after a live session transport drops', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    // The session's own transport comes up: the latch commits.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    // Then it drops. The committed latch is what separates this from a first
+    // load, so the sheet reads "Reconnecting…".
+    act(() => {
+      connectionHealth.isConnected = false;
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('reconnecting');
+  });
 });
 
 describe('session detail bottom strip', () => {

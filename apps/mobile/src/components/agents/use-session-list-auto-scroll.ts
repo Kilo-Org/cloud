@@ -112,6 +112,44 @@ export function useSessionListAutoScroll<ItemT>({
   }, [scrollAnimated]);
 
   /**
+   * A send takes the transcript position over. The user pressed Send wherever
+   * the list sits — including an older row a `?at=` resume left with the tail
+   * follow off — and the output that send produces must be on screen.
+   *
+   * The sticky takeover flag ends a resume that is still looking for its
+   * anchor: its pending retries cancel themselves and its warm scroll drops,
+   * so the take-over is not yanked back to the recorded row. Re-arming the
+   * follow then pins the viewport to the newest row: the optimistic row, the
+   * streamed reply, and every later content-size change.
+   *
+   * The scroll is issued directly instead of through
+   * `scheduleScrollToLatestMessage`: the resume's suppression window can
+   * still be armed when the user hits Send, and the guarded scheduler would
+   * swallow this scroll for the rest of that window.
+   */
+  const followTailFromSend = useCallback(() => {
+    userInteractedRef.current = true;
+    shouldAutoScrollRef.current = true;
+    setIsAtBottom(true);
+    scrollToLatestMessage();
+    clearAutoScrollRetryTimeout();
+    autoScrollRetryTimeoutRef.current = setTimeout(() => {
+      autoScrollRetryTimeoutRef.current = null;
+      // Same safety net as `scheduleScrollToLatestMessage`: the sent rows are
+      // still being measured when the first scroll lands, so the retry
+      // catches the settled height.
+      if (
+        shouldRetrySessionAutoScroll({
+          isUserScrolling: isUserScrollingRef.current,
+          shouldAutoScroll: shouldAutoScrollRef.current,
+        })
+      ) {
+        scrollToLatestMessage();
+      }
+    }, 80);
+  }, [clearAutoScrollRetryTimeout, scrollToLatestMessage]);
+
+  /**
    * Suppresses the tail follow for a bounded window. A scheduled programmatic
    * resume scroll produces scroll events of its own, and FlashList's own
    * bottom-start initial scroll races them; every one of those scroll events
@@ -317,6 +355,11 @@ export function useSessionListAutoScroll<ItemT>({
     listRef,
     scrollToLatestAnimated,
     suppressAutoFollow,
+    /**
+     * The host's send path calls this so the transcript follows the output the
+     * send produces, wherever the viewport sits. See `followTailFromSend`.
+     */
+    followTailFromSend,
     /**
      * Live "user is dragging or momentum is in flight" flag. A scheduled
      * programmatic scroll (the `?at=` resume retries) reads it so a retry

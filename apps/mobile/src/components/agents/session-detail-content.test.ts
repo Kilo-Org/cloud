@@ -1973,3 +1973,63 @@ describe('SessionDetailContent resume link', () => {
     expect(resumeAnchorOf(view)).toBe('msg-a');
   });
 });
+
+// A send takes the transcript position over: both composer send paths must
+// tell the list to follow the output the send produces, so a transcript parked
+// on a `?at=` anchor with follow off never strands the sent message and its
+// reply off-screen (mobile-app e2e e1).
+describe('SessionDetailContent send transcript take-over', () => {
+  function makeSendable(view: Awaited<ReturnType<typeof mountDetails>>) {
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.canSend, true);
+    });
+  }
+
+  function followTailNonceOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    return (list.props as ComponentProps<typeof SessionMessageList>).followTailNonce;
+  }
+
+  it('takes the position over when a prompt is sent from a resumed anchor', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], { resumeAt: 'msg-a' });
+    makeSendable(view);
+    expect(followTailNonceOf(view)).toBe(0);
+
+    const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))[0];
+    if (!composer) {
+      throw new Error('composer did not render');
+    }
+    const onSend = composer.props.onSend as (text: string) => Promise<void>;
+    await act(async () => {
+      // The transport outcome does not gate the take-over: the viewport must
+      // follow the send as soon as the user commits it.
+      await onSend('follow-after-resume').catch(() => undefined);
+    });
+
+    expect(followTailNonceOf(view)).toBe(1);
+  });
+
+  it('takes the position over when a slash command is sent from a resumed anchor', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], { resumeAt: 'msg-a' });
+    makeSendable(view);
+
+    const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))[0];
+    if (!composer) {
+      throw new Error('composer did not render');
+    }
+    const onSendCommand = composer.props.onSendCommand as (
+      command: string,
+      argumentsText: string
+    ) => Promise<boolean>;
+    await act(async () => {
+      await onSendCommand('review', '').catch(() => undefined);
+    });
+
+    expect(followTailNonceOf(view)).toBe(1);
+  });
+});

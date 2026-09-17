@@ -55,6 +55,7 @@ vi.mock('@/components/agents/use-session-list-auto-scroll', () => ({
       listRef: { current: { scrollToIndex: controls.scrollToIndex } },
       scrollToLatestAnimated: vi.fn(),
       suppressAutoFollow: vi.fn(),
+      followTailFromSend: vi.fn(),
       isUserScrollingRef: { current: false },
       userInteractedRef: { current: false },
       handleContentSizeChange: vi.fn(),

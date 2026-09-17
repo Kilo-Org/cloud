@@ -350,6 +350,18 @@ export function SessionDetailContent({
     };
   }, [anchor, router]);
 
+  // A send takes the transcript position over: the sent message and its reply
+  // must be on screen, even when a `?at=` resume left the transcript parked on
+  // an older row with follow off. Bumping this counter is the transcript list's
+  // signal for it; both composer sends (prompt and slash command) bump it
+  // before their transport call, so a resume retry chain still in flight is
+  // cancelled by the take-over instead of yanking the viewport back to the
+  // recorded anchor.
+  const [followTailNonce, setFollowTailNonce] = useState(0);
+  const takeOverTranscriptPositionForSend = useCallback(() => {
+    setFollowTailNonce(count => count + 1);
+  }, []);
+
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
 
@@ -1022,6 +1034,7 @@ export function SessionDetailContent({
       // is the single toast owner for send failures. Throw here, without a
       // second toast, purely so the composer's `await onSend(...)` sees the
       // rejection and preserves the draft.
+      takeOverTranscriptPositionForSend();
       const sent = await manager.send({
         payload: {
           type: 'prompt',
@@ -1050,6 +1063,7 @@ export function SessionDetailContent({
       activeSessionType,
       supportsAttachments,
       analyticsSurface,
+      takeOverTranscriptPositionForSend,
       t,
     ]
   );
@@ -1509,6 +1523,7 @@ export function SessionDetailContent({
       // the sole transport-toast owner; we throw a stable error on a
       // false return purely so the composer preserves the draft, and never
       // emit a duplicate toast of our own.
+      takeOverTranscriptPositionForSend();
       const sent = await manager.send({
         payload: { type: 'command', command, arguments: argumentsText },
       });
@@ -1517,7 +1532,7 @@ export function SessionDetailContent({
       }
       return true;
     },
-    [manager]
+    [manager, takeOverTranscriptPositionForSend]
   );
 
   // Goal controls ride the same `manager.send()` command pipeline as the
@@ -2274,6 +2289,7 @@ export function SessionDetailContent({
           onAnchorChange={handleAnchorChange}
           renderItem={renderItem}
           resumeAt={resumeAnchor}
+          followTailNonce={followTailNonce}
         />
       </Animated.View>
     );

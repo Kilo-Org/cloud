@@ -61,6 +61,15 @@ type SessionMessageListProps<T> = {
    */
   resumeAt?: string | null;
   /**
+   * A send takes the transcript position over. The host bumps this counter on
+   * every send (the composer's prompt or slash-command path): the list ends
+   * any in-flight `?at=` resume, re-arms the tail follow and scrolls to the
+   * newest row, so the sent message and its reply are on screen even when the
+   * transcript was parked on an older anchor with follow off. Absent or
+   * unchanged keeps every existing caller byte-identical.
+   */
+  followTailNonce?: number;
+  /**
    * Optional callback fired when the topmost viewable row's message changes.
    * The host publishes it as the session's position (route search params and
    * the OS handoff entry point). Absent keeps every existing caller
@@ -101,6 +110,7 @@ export function SessionMessageList<T>({
   onReachedBottom,
   onAnchorChange,
   resumeAt,
+  followTailNonce,
 }: Readonly<SessionMessageListProps<T>>) {
   // Rows are already present when the list mounts (the resume never mounts a
   // blank list), so the resume decision is derivable at render: every row's
@@ -132,6 +142,7 @@ export function SessionMessageList<T>({
     suppressAutoFollow,
     isUserScrollingRef,
     userInteractedRef,
+    followTailFromSend,
     handleContentSizeChange,
     handleKeyboardShow,
     handleListLayout,
@@ -204,6 +215,27 @@ export function SessionMessageList<T>({
     suppressAutoFollow,
     resumeAt,
   });
+
+  // The host's send path takes the position over through the counter. A list
+  // that mounts following the tail adopts the mount value as already handled:
+  // an empty transcript receiving its first message follows the tail at mount,
+  // so replaying an earlier send's take-over would be redundant. A list that
+  // mounts NOT following the tail — a `?at=` resume still paging for its
+  // anchor — must honour a counter the host already bumped, or a send issued
+  // while the transcript was in the zero-item `older-loading` state (the list
+  // was not mounted for the change) is dropped and the resume parks on the
+  // recorded anchor with the sent message and its reply off-screen.
+  const handledFollowTailNonceRef = useRef(followTailAtMount ? followTailNonce : 0);
+  useEffect(() => {
+    if (followTailNonce === undefined) {
+      return;
+    }
+    if (handledFollowTailNonceRef.current === followTailNonce) {
+      return;
+    }
+    handledFollowTailNonceRef.current = followTailNonce;
+    followTailFromSend();
+  }, [followTailNonce, followTailFromSend]);
 
   // Keep the newest message visible when the keyboard opens, but only while
   // the follow guard is true (the user is still at the bottom). On iOS,

@@ -510,4 +510,112 @@ describe('SessionMessageList resume anchor vs tail auto-follow', () => {
     });
     expect(scrollCalls).toEqual([]);
   });
+
+  it('ends the resume and follows the tail when the host sends from a resumed position', () => {
+    vi.useFakeTimers();
+
+    const items = [resumeItem('msg-1'), resumeItem('msg-2'), resumeItem('msg-3')];
+    const mounted = mountListKeep({ items, resumeAt: 'msg-2' });
+
+    // The resume lands the anchor through its retry chain.
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(scrollCalls).toEqual(['index:1']);
+
+    // The user sends: the host bumps the counter. The transcript must follow
+    // the output the send produces instead of staying parked on the anchor.
+    updateList(mounted, { items, resumeAt: 'msg-2', followTailNonce: 1 });
+    expect(scrollCalls).toEqual(['index:1', 'end']);
+
+    // The remaining resume retries cancel themselves: nothing pulls the list
+    // back to the recorded row once the send has taken the position over.
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(scrollCalls).toEqual(['index:1', 'end', 'end']);
+
+    // The follow stays armed for the rows the send produces.
+    emitContentSizeChange(3100);
+    expect(scrollCalls).toEqual(['index:1', 'end', 'end', 'end']);
+  });
+
+  it('takes over a resume that is still paging for its anchor', () => {
+    vi.useFakeTimers();
+
+    const onLoad = vi.fn<() => void>();
+    const mounted = mountListKeep({
+      items: [resumeItem('msg-new')],
+      resumeAt: 'msg-older',
+      hasOlderMessages: true,
+      onLoadOlderMessages: onLoad,
+    });
+    expect(onLoad).toHaveBeenCalledTimes(1);
+
+    // The user sends while the anchor's page is still in flight.
+    updateList(mounted, {
+      items: [resumeItem('msg-new')],
+      resumeAt: 'msg-older',
+      hasOlderMessages: true,
+      onLoadOlderMessages: onLoad,
+      followTailNonce: 1,
+    });
+    expect(scrollCalls).toEqual(['end']);
+
+    // The page lands: the resume's warm scroll and its retry chain must drop,
+    // because the position belongs to the send now.
+    updateList(mounted, {
+      items: [resumeItem('msg-older'), resumeItem('msg-new')],
+      resumeAt: 'msg-older',
+      hasOlderMessages: true,
+      onLoadOlderMessages: onLoad,
+      followTailNonce: 1,
+    });
+    expect(scrollCalls).toEqual(['end']);
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(scrollCalls).toEqual(['end', 'end']);
+  });
+
+  it('does not replay an earlier send when the list mounts following the tail', () => {
+    vi.useFakeTimers();
+
+    // A counter the host already holds at mount (the list rendered after the
+    // send, e.g. an empty transcript that just received its first message) is
+    // adopted as handled when the mount follows the tail anyway: the mount
+    // follow alone runs.
+    mountList({ items: [resumeItem('msg-1')], followTailNonce: 3 });
+
+    expect(scrollCalls).toEqual(['end', 'end']);
+  });
+
+  it('takes over when the list mounts after a send from the zero-item older-loading state', () => {
+    vi.useFakeTimers();
+
+    // The transcript was zero-item and paging for a `?at=` anchor (the
+    // `older-loading` view, so this list was not mounted) when the user hit
+    // Send, and the host already holds the bumped counter. The list mounts for
+    // the sent row NOT following the tail: it must honour the take-over instead
+    // of adopting the mount value and parking on the recorded anchor.
+    mountList({
+      items: [resumeItem('msg-sent')],
+      resumeAt: 'msg-older',
+      hasOlderMessages: true,
+      onLoadOlderMessages: vi.fn<() => void>(),
+      followTailNonce: 1,
+    });
+
+    // `scrollToEnd` wins and stays armed for the reply the send produces: the
+    // position is the send's, never the recorded anchor's.
+    expect(scrollCalls).toEqual(['end', 'end']);
+    emitContentSizeChange(3100);
+    expect(scrollCalls).toEqual(['end', 'end', 'end']);
+
+    // The resume retry chain drops instead of re-parking on the anchor.
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(scrollCalls.filter(call => call.startsWith('index:'))).toEqual([]);
+  });
 });

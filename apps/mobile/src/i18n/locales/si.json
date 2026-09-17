@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "දුරස්ථ ස්ලෑෂ් විධාන සඳහා වඩාත් නව Kilo CLI අනුවාදයක් අවශ්‍යයි. Kilo CLI යාවත්කාලීන කර නැවත සම්බන්ධ වන්න."
     },
     "sessionConnection": {
+      "label": "සම්බන්ධතාව",
       "connecting": "සම්බන්ධ වෙමින්…",
       "reconnecting": "නැවත සම්බන්ධ වෙමින්…",
       "connectionLost": "සම්බන්ධතාව බිඳ වැටුණි",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "ඉලක්කය ඉවත් කරන්නද?",
       "removeConfirmMessage": "CLI මෙම සැසියේ ඉලක්කය මකා දමයි.",
       "updateFailed": "ඉලක්කය යාවත්කාලීන කළ නොහැකි විය.",
-      "sectionAccessibility": "{{status}}. ඉලක්කය: {{text}}"
+      "sectionAccessibility": "{{status}}. ඉලක්කය: {{text}}",
+      "collapse": "ඉලක්කය හකුළන්න",
+      "expand": "ඉලක්කය පුළුල් කරන්න"
     },
     "newSession": {
       "recentlyUsed": "මෑතකදී භාවිතා කළ",

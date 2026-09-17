@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "له لرې د سلیش کمانډونو کارول د Kilo CLI نوې نسخې ته اړتیا لري. Kilo CLI تازه کړئ او بیا ونښلئ."
     },
     "sessionConnection": {
+      "label": "اړیکه",
       "connecting": "نښلېږي…",
       "reconnecting": "بیا نښلېږي…",
       "connectionLost": "اړیکه پرې شوه",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "هدف لرې کړو؟",
       "removeConfirmMessage": "CLI د دې غونډې هدف پاکوي.",
       "updateFailed": "هدف نشو کولای تازه شي.",
-      "sectionAccessibility": "{{status}}. هدف: {{text}}"
+      "sectionAccessibility": "{{status}}. هدف: {{text}}",
+      "collapse": "هدف پټ کړئ",
+      "expand": "هدف ښکاره کړئ"
     },
     "newSession": {
       "recentlyUsed": "په دې وروستیو کې کارول شوي",

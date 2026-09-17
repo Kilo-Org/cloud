@@ -1565,6 +1565,7 @@
       "exitNeedsNewerCli": "Eğik çizgi komutlarını uzaktan kullanmak için daha yeni bir Kilo CLI sürümü gerekiyor. Kilo CLI'yı güncelle ve yeniden bağlan."
     },
     "sessionConnection": {
+      "label": "Bağlantı",
       "connecting": "Bağlanıyor…",
       "reconnecting": "Yeniden bağlanıyor…",
       "connectionLost": "Bağlantı koptu",
@@ -1584,7 +1585,9 @@
       "removeConfirmTitle": "Hedef kaldırılsın mı?",
       "removeConfirmMessage": "CLI bu oturumun hedefini temizler.",
       "updateFailed": "Hedef güncellenemedi.",
-      "sectionAccessibility": "{{status}}. Hedef: {{text}}"
+      "sectionAccessibility": "{{status}}. Hedef: {{text}}",
+      "collapse": "Hedefi daralt",
+      "expand": "Hedefi genişlet"
     },
     "newSession": {
       "recentlyUsed": "Son kullanılanlar",

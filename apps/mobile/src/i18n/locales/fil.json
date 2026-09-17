@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Kailangan ng mas bagong Kilo CLI para sa malayuang paggamit ng mga utos na may slash. I-update ang Kilo CLI at muling kumonekta."
     },
     "sessionConnection": {
+      "label": "Koneksyon",
       "connecting": "Kumokonekta…",
       "reconnecting": "Muling kumokonekta…",
       "connectionLost": "Nawala ang koneksyon",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Alisin ang layunin?",
       "removeConfirmMessage": "Kinaklaro ng CLI ang layunin ng session na ito.",
       "updateFailed": "Hindi na-update ang layunin.",
-      "sectionAccessibility": "{{status}}. Layunin: {{text}}"
+      "sectionAccessibility": "{{status}}. Layunin: {{text}}",
+      "collapse": "Itago ang layunin",
+      "expand": "Ipakita ang layunin"
     },
     "newSession": {
       "recentlyUsed": "Mga ginamit kamakailan",

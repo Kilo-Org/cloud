@@ -2091,6 +2091,7 @@
       "exitNeedsNewerCli": "Príkazy s lomkou vykonávané na diaľku vyžadujú novšiu verziu Kilo CLI. Aktualizuj Kilo CLI a znova sa pripoj."
     },
     "sessionConnection": {
+      "label": "Pripojenie",
       "connecting": "Pripája sa…",
       "reconnecting": "Znovu sa pripája…",
       "connectionLost": "Pripojenie sa prerušilo",
@@ -2110,7 +2111,9 @@
       "removeConfirmTitle": "Odstrániť cieľ?",
       "removeConfirmMessage": "CLI vymaže cieľ tejto relácie.",
       "updateFailed": "Cieľ sa nepodarilo aktualizovať.",
-      "sectionAccessibility": "{{status}}. Cieľ: {{text}}"
+      "sectionAccessibility": "{{status}}. Cieľ: {{text}}",
+      "collapse": "Zbaliť cieľ",
+      "expand": "Rozbaliť cieľ"
     },
     "newSession": {
       "recentlyUsed": "Naposledy použité",

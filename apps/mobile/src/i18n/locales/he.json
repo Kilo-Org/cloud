@@ -1574,6 +1574,7 @@
       "exitNeedsNewerCli": "פקודות לוכסן מרוחקות דורשות גרסה חדשה יותר של Kilo CLI. עדכן את Kilo CLI והתחבר מחדש."
     },
     "sessionConnection": {
+      "label": "חיבור",
       "connecting": "מתחבר…",
       "reconnecting": "מתחבר מחדש…",
       "connectionLost": "החיבור נותק",
@@ -1593,7 +1594,9 @@
       "removeConfirmTitle": "להסיר את המטרה?",
       "removeConfirmMessage": "ה-CLI מנקה את מטרת ההפעלה הזו.",
       "updateFailed": "לא ניתן היה לעדכן את המטרה.",
-      "sectionAccessibility": "{{status}}. מטרה: {{text}}"
+      "sectionAccessibility": "{{status}}. מטרה: {{text}}",
+      "collapse": "כיווץ המטרה",
+      "expand": "הרחבת המטרה"
     },
     "newSession": {
       "recentlyUsed": "בשימוש לאחרונה",

@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "टाढाबाट स्ल्यास कमाण्डहरू चलाउन Kilo CLI को नयाँ संस्करण चाहिन्छ। Kilo CLI अद्यावधिक गरेर पुनः जडान गर्नुहोस्।"
     },
     "sessionConnection": {
+      "label": "जडान",
       "connecting": "जडान गर्दै…",
       "reconnecting": "पुनः जडान गर्दै…",
       "connectionLost": "जडान टुट्यो",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "लक्ष्य हटाउने?",
       "removeConfirmMessage": "CLI ले यो सत्रको लक्ष्य हटाउँछ।",
       "updateFailed": "लक्ष्य अद्यावधिक गर्न सकिएन।",
-      "sectionAccessibility": "{{status}}। लक्ष्य: {{text}}"
+      "sectionAccessibility": "{{status}}। लक्ष्य: {{text}}",
+      "collapse": "लक्ष्य लुकाउनुहोस्",
+      "expand": "लक्ष्य देखाउनुहोस्"
     },
     "newSession": {
       "recentlyUsed": "हालै प्रयोग गरिएका",

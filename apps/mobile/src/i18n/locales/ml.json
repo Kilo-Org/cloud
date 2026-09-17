@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "വിദൂര സ്ലാഷ് കമാൻഡുകൾക്ക് Kilo CLI-യുടെ പുതിയ പതിപ്പ് ആവശ്യമാണ്. Kilo CLI അപ്ഡേറ്റ് ചെയ്ത് വീണ്ടും കണക്റ്റ് ചെയ്യുക."
     },
     "sessionConnection": {
+      "label": "കണക്ഷൻ",
       "connecting": "കണക്റ്റ് ചെയ്യുന്നു…",
       "reconnecting": "വീണ്ടും കണക്റ്റ് ചെയ്യുന്നു…",
       "connectionLost": "കണക്ഷൻ നഷ്ടപ്പെട്ടു",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "ലക്ഷ്യം നീക്കണോ?",
       "removeConfirmMessage": "ഈ സെഷന്റെ ലക്ഷ്യം CLI മായ്ക്കുന്നു.",
       "updateFailed": "ലക്ഷ്യം അപ്ഡേറ്റ് ചെയ്യാനായില്ല.",
-      "sectionAccessibility": "{{status}}. ലക്ഷ്യം: {{text}}"
+      "sectionAccessibility": "{{status}}. ലക്ഷ്യം: {{text}}",
+      "collapse": "ലക്ഷ്യം ചുരുക്കുക",
+      "expand": "ലക്ഷ്യം വിരിക്കുക"
     },
     "newSession": {
       "recentlyUsed": "അടുത്തിടെ ഉപയോഗിച്ചവ",

@@ -127,13 +127,20 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // one Approve can answer: an Approve that cannot answer anything is a dead
   // control, and a card whose ask was just answered elsewhere would keep
   // offering the tap that answered it. `needsInput` counts questions and
-  // retried asks too, so the count alone must not offer a control that cannot
-  // act, and `withStatus` zeroes every count on expiry, so the retained expired
-  // frame carries no gate either. An absent field is a server-written state,
-  // where this process cannot know better and the count gate stands. The phone
-  // `actions` and the watch `bannerSmall` control share this one gate, so each
-  // offers exactly the tap its own press can answer.
-  const canApprove = (props.needsInput ?? 0) > 0 && props.canApprove !== false;
+  // retried asks too, so the wait count alone must not offer a control that
+  // cannot act; the pushed `needsApproval` — the `permission` rows, the one
+  // wait the user can clear without choosing an option — narrows it. That
+  // narrower count is also what stands in when the app wrote no flag, which is
+  // every state that arrived over APNs: a question-only server state then
+  // offers Open alone instead of a tap the press answers with `none`, while a
+  // `permission` server state still offers the tap the app-closed press
+  // answers. `withStatus` zeroes the wait count on expiry but leaves
+  // `needsApproval` standing, so the wait term is what keeps the retained
+  // expired frame gateless. The phone `actions` and the watch `bannerSmall`
+  // control share this one gate, so each offers exactly the tap its own press
+  // can answer.
+  const canApprove =
+    (props.needsInput ?? 0) > 0 && (props.needsApproval ?? 0) > 0 && props.canApprove !== false;
 
   // The failure line a retryable Approve left on the card. The app sets it in
   // the content state, because this process cannot translate; a server-written

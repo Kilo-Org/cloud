@@ -47,16 +47,43 @@ describe('Active Agents Live Activity actions', () => {
     expect(source).not.toMatch(/\bi18n\./);
   });
 
+  /**
+   * The gate expression as the widget process evaluates it. The layout is
+   * stringified, so no import runs it under vitest; the literal in the source is
+   * the shipped gate, and evaluating it here is the only way to run that gate
+   * against a content state.
+   */
+  const gate = (): ((props: Record<string, number | boolean | undefined>) => boolean) => {
+    const match = /const canApprove =([\s\S]*?);\n/.exec(source);
+    if (match === null) {
+      throw new Error('the layout declares no canApprove gate');
+    }
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func -- the shipped gate is a source literal, so it cannot be imported and called
+    return new Function('props', `return (${match[1] ?? ''});`) as (
+      props: Record<string, number | boolean | undefined>
+    ) => boolean;
+  };
+
   it('offers Approve only while an approvable ask waits', () => {
-    expect(source).toContain(
-      'const canApprove = (props.needsInput ?? 0) > 0 && props.canApprove !== false;'
-    );
+    const canApprove = gate();
+    // The app's own state: the recorded-ask flag decides, and the wait count
+    // withholds the control from the expired frame `withStatus` leaves the
+    // approvable count on.
+    expect(canApprove({ needsInput: 1, needsApproval: 1, canApprove: true })).toBe(true);
+    expect(canApprove({ needsInput: 1, needsApproval: 1, canApprove: false })).toBe(false);
+    expect(canApprove({ needsInput: 0, needsApproval: 1, canApprove: true })).toBe(false);
     expect(source).toMatch(/canApprove \? \([\s\S]*?target="approve"[\s\S]*?\) : null/);
   });
 
-  it('keeps the count gate when a server push omits the flag', () => {
-    // An absent field is a server-written state, where this process cannot know
-    // better, so only an explicit `false` withholds Approve.
+  it('withholds Approve from a server-written question-only state', () => {
+    // A state that arrived over APNs carries no `canApprove`, and its
+    // `needsApproval` counts the `permission` rows alone. A question-only wait
+    // must not draw the control `runGlanceableApprove` answers with `none`,
+    // while a permission wait keeps the tap the app-closed press answers.
+    const canApprove = gate();
+    expect(canApprove({ needsInput: 1, needsApproval: 0 })).toBe(false);
+    expect(canApprove({ needsInput: 1, needsApproval: 0, canApprove: true })).toBe(false);
+    expect(canApprove({ needsInput: 1, needsApproval: 1 })).toBe(true);
     expect(source).toContain('props.canApprove !== false');
     expect(source).not.toMatch(/props\.canApprove === true/);
   });

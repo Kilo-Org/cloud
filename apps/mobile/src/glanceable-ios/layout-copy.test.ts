@@ -66,17 +66,19 @@ describe('glanceable approve target', () => {
     expect(source).not.toContain('target={APPROVE_TARGET}');
   });
 
-  it('is gated on the recorded ask, not the approvable count alone', () => {
+  it('is gated on the recorded ask and the approvable count, never the count alone', () => {
     // The control has to be one its own press can answer: the press resolves
-    // the ask the app recorded, and the count includes questions and retries
-    // `runGlanceableApprove` answers with `none`, so the approvable count
-    // alone cannot gate it. `canApprove` also keeps the `needsInput` term, and
-    // `withStatus` (lib/glanceable/publisher) zeroes every count on expiry, so
-    // the retained expired frame cannot offer the tap either.
+    // the ask the app recorded, so the app's `canApprove` flag withholds it,
+    // and the approvable count alone cannot gate it because a permission row
+    // the control plane does not own is `needsApproval` but not approvable.
+    // Both count terms are still required: `needsInput` withholds the control
+    // from the expired frame `withStatus` (lib/glanceable/publisher) leaves
+    // `needsApproval` on, and `needsApproval` withholds it from a server-written
+    // question-only state, where `runGlanceableApprove` answers `none`.
     // `view-props.test.ts` pins that expired shape.
-    expect(source).toContain(
-      'const canApprove = (props.needsInput ?? 0) > 0 && props.canApprove !== false;'
-    );
+    expect(source).toContain('props.canApprove !== false');
+    expect(source).toMatch(/\(props\.needsInput \?\? 0\) > 0/);
+    expect(source).toMatch(/\(props\.needsApproval \?\? 0\) > 0/);
     expect(source).not.toMatch(/const needsApproval/);
   });
 

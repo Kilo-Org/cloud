@@ -33,6 +33,7 @@ const widgetState = vi.hoisted(() => ({
   timeline: [] as { date: Date; props: Record<string, unknown> }[],
   snapshots: [] as unknown[],
   listeners: [] as ((event: { source: string; target: string; timestamp: number }) => void)[],
+  removals: 0,
 }));
 
 /** A swift-ui primitive stand-in: the kind tag rides on the function itself. */
@@ -64,6 +65,11 @@ vi.mock('expo-widgets', () => ({
     listener: (event: { source: string; target: string; timestamp: number }) => void
   ) => {
     widgetState.listeners.push(listener);
+    return {
+      remove: () => {
+        widgetState.removals += 1;
+      },
+    };
   },
 }));
 
@@ -282,6 +288,7 @@ describe('runPendingWidgetActions', () => {
     widgetState.timeline = [];
     widgetState.snapshots = [];
     widgetState.listeners = [];
+    widgetState.removals = 0;
     mocks.runWidgetAction.mockReset();
     mocks.linkingOpenURL.mockReset();
     mocks.lastSnapshot = null;
@@ -365,6 +372,85 @@ describe('runPendingWidgetActions', () => {
     await Promise.all([first, second]);
 
     expect(mocks.runWidgetAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers a press that lands while a sweep is running instead of dropping it', async () => {
+    widgetState.timeline = [
+      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
+    ];
+    const gate = Promise.withResolvers<{ kind: string }>();
+    let calls = 0;
+    mocks.runWidgetAction.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 1) {
+        await gate.promise;
+      }
+      return { kind: 'approved' };
+    });
+    const sweep = runPendingWidgetActions();
+    await vi.waitFor(() => {
+      expect(mocks.runWidgetAction).toHaveBeenCalledTimes(1);
+    });
+
+    // The second press lands mid-sweep: the intent patched its marker into the
+    // stored timeline and the live listener delivered the event while the first
+    // action was still in flight. The running sweep owes it a pass, or the tap
+    // would only be answered at the next launch or foreground.
+    widgetState.timeline = [
+      { date: new Date(2), props: { pendingAction: 'new-agent', pendingActionVisible: true } },
+    ];
+    const live = runPendingWidgetActions({ source: WIDGET_NAME });
+    gate.resolve({ kind: 'approved' });
+    await Promise.all([sweep, live]);
+
+    expect(mocks.runWidgetAction).toHaveBeenCalledTimes(2);
+    expect(mocks.runWidgetAction).toHaveBeenLastCalledWith('new-agent');
+    // The follow-up pass cleared the marker it ran, so a later sweep cannot
+    // repeat the press it already answered.
+    expect(widgetState.timeline[0]?.props).not.toHaveProperty('pendingAction');
+    await runPendingWidgetActions();
+    expect(mocks.runWidgetAction).toHaveBeenCalledTimes(2);
+  });
+
+  it("answers a press whose marker the running action's republish erased", async () => {
+    widgetState.timeline = [
+      { date: new Date(1), props: { pendingAction: 'approve', pendingActionVisible: true } },
+    ];
+    const gate = Promise.withResolvers<{ kind: string }>();
+    let calls = 0;
+    mocks.runWidgetAction.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 1) {
+        await gate.promise;
+        // The answered action republishes the tray: the sink builds fresh props
+        // from the snapshot and writes the whole timeline, which is what takes
+        // the mid-sweep press's marker with it.
+        widgetState.timeline = [{ date: new Date(3), props: { primaryCount: 1 } }];
+      }
+      return { kind: 'approved' };
+    });
+    const sweep = runPendingWidgetActions();
+    await vi.waitFor(() => {
+      expect(mocks.runWidgetAction).toHaveBeenCalledTimes(1);
+    });
+
+    // The press lands while the first action runs, so the live listener reads
+    // its marker out of the stored timeline at delivery — the last moment the
+    // marker exists, because the republish replaces the whole timeline.
+    widgetState.timeline = [
+      { date: new Date(2), props: { pendingAction: 'new-agent', pendingActionVisible: true } },
+    ];
+    const live = runPendingWidgetActions({ source: WIDGET_NAME });
+    // Wait for the delivery read before the republish lands: the press is held
+    // as an action, not as a marker a later pass could re-read.
+    await live;
+    gate.resolve({ kind: 'approved' });
+    await sweep;
+
+    // The follow-up pass answers the held press. Re-reading the timeline after
+    // the republish finds no marker, which is the drop this covers.
+    expect(mocks.runWidgetAction).toHaveBeenCalledTimes(2);
+    expect(mocks.runWidgetAction).toHaveBeenLastCalledWith('new-agent');
   });
 
   it('maps a live interaction event through the marker and runs it once', async () => {
@@ -578,6 +664,53 @@ describe('runPendingWidgetActions', () => {
     // The marker is still cleared in place, so the widget stops claiming the
     // press even though no snapshot exists to rebuild full props from.
     expect(widgetState.timeline[0]?.props).toEqual({});
+  });
+});
+
+// ── the live subscription ───────────────────────────────────────────────────
+
+describe('registerWidgetActionHandling', () => {
+  /**
+   * The listener and its ownership are module state, so a fresh module graph is
+   * the only way back to the state the app boots in — the same reset the
+   * sibling `approve-action.test.ts` uses for its registration.
+   */
+  async function loadWidgetActions() {
+    vi.resetModules();
+    widgetState.timeline = [];
+    widgetState.snapshots = [];
+    widgetState.listeners = [];
+    widgetState.removals = 0;
+    mocks.runWidgetAction.mockReset();
+    mocks.lastSnapshot = null;
+    const widgetActions = await import('./widget-actions');
+    return widgetActions;
+  }
+
+  it('subscribes once and removes the listener through the returned unsubscribe', async () => {
+    const mod = await loadWidgetActions();
+    mod.registerWidgetActionHandling();
+    const unsubscribe = mod.registerWidgetActionHandling();
+
+    // Two registrations must not install two listeners: each sweep would race
+    // the same markers, and the second could answer a press the first is
+    // already running.
+    expect(widgetState.listeners).toHaveLength(1);
+
+    unsubscribe();
+    expect(widgetState.removals).toBe(1);
+  });
+
+  it('leaves a later registration alone when an earlier unsubscribe runs', async () => {
+    const mod = await loadWidgetActions();
+    const unsubscribeFirst = mod.registerWidgetActionHandling();
+    mod.registerWidgetActionHandling();
+
+    // The second registration owns the listener now; the first's unsubscribe
+    // must not remove it, or widget presses would be dead until the next launch.
+    unsubscribeFirst();
+    expect(widgetState.removals).toBe(0);
+    expect(widgetState.listeners).toHaveLength(1);
   });
 });
 

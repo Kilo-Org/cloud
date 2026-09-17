@@ -56,11 +56,22 @@ function stripPendingAction(props: WidgetProps | null | undefined): WidgetProps 
   return rest;
 }
 
-/** Map a user-interaction event to the action the pressed entry carries. */
-export function pendingActionForEvent(
+/**
+ * One press: the action its entry carries and the entry's date, which is what
+ * identifies the entry — the App Intent merges the press marker into the
+ * pressed entry's props and never touches its date, so a press read at one
+ * moment can be matched against the timeline read at another.
+ */
+type PressedEntry = { date: number; action: GlanceableWidgetAction };
+
+/**
+ * The pressed entry a user-interaction event maps to, or null when the event
+ * belongs to another surface or no entry still carries a marker.
+ */
+function pressedEntryForEvent(
   event: Pick<UserInteractionEvent, 'source'>,
-  timeline: readonly { props: WidgetProps | null | undefined }[]
-): GlanceableWidgetAction | null {
+  timeline: readonly { date?: Date; props: WidgetProps | null | undefined }[]
+): PressedEntry | null {
   // A Live Activity button or another widget kind reports its own source; only
   // this widget's press markers are ours to run.
   if (event.source !== WIDGET_NAME) {
@@ -69,10 +80,21 @@ export function pendingActionForEvent(
   for (const entry of timeline) {
     const action = pendingActionOf(entry.props);
     if (action !== null) {
-      return action;
+      // A timeline read always carries the entry's date; the fallback keeps a
+      // hand-built entry from a caller out of the key, and no production read
+      // reaches it.
+      return { date: entry.date?.getTime() ?? 0, action };
     }
   }
   return null;
+}
+
+/** Map a user-interaction event to the action the pressed entry carries. */
+export function pendingActionForEvent(
+  event: Pick<UserInteractionEvent, 'source'>,
+  timeline: readonly { props: WidgetProps | null | undefined }[]
+): GlanceableWidgetAction | null {
+  return pressedEntryForEvent(event, timeline)?.action ?? null;
 }
 
 /**
@@ -151,12 +173,113 @@ async function performWidgetAction(action: WidgetAction): Promise<void> {
 }
 
 let sweeping = false;
+/**
+ * Set by a press that lands while a pass is in flight. The running sweep owes
+ * such a press a pass of its own rather than returning, or the tap would only
+ * be answered at the next launch or foreground.
+ */
+let resweepRequested = false;
 
 /**
- * The sweep: run every press the timeline still carries. The marker is cleared
- * from the stored timeline before the action is invoked, so a crash mid-action
- * reads as a dropped press instead of a repeated one, and the widget drops its
- * "Approving…" line immediately (the write reloads the timelines).
+ * The presses a live listener read out of the timeline while a pass was in
+ * flight. Each is held with the action it named, because the marker itself does
+ * not survive to the follow-up pass: the running pass's clearing write replaces
+ * the timeline it read, and the answered action's own republish (`iosSink` or
+ * `republishWidgetProps`) replaces it again — both write whole timelines built
+ * from a snapshot, so a marker patched in after the read is gone.
+ */
+let carriedPresses: PressedEntry[] = [];
+
+/** Read and clear the presses held from mid-pass. */
+function takeCarriedPresses(): PressedEntry[] {
+  const carried = carriedPresses;
+  carriedPresses = [];
+  return carried;
+}
+
+/**
+ * Hold the press a live interaction event maps to, reading the timeline now
+ * rather than after the running pass: the pass's own writes are what take the
+ * marker away. A read failure yields nothing to hold, which leaves the pass
+ * queued for this press to read the timeline again.
+ */
+async function carryPendingPress(
+  event: Pick<UserInteractionEvent, 'source'> | undefined
+): Promise<void> {
+  if (event === undefined) {
+    return;
+  }
+  try {
+    const press = pressedEntryForEvent(event, await ActiveAgentsWidget.getTimeline());
+    if (
+      press !== null &&
+      !carriedPresses.some(
+        carried => carried.date === press.date && carried.action === press.action
+      )
+    ) {
+      carriedPresses.push(press);
+    }
+  } catch {
+    // A native timeline read failure must not reject into the listener's
+    // fire-and-forget call.
+  }
+}
+
+/** Read and clear the queued re-sweep request, if a press asked for one. */
+function takeResweepRequest(): boolean {
+  const requested = resweepRequested;
+  resweepRequested = false;
+  return requested;
+}
+
+/**
+ * One pass: run every press the timeline still carries, plus every press held
+ * from a read taken while a previous pass was in flight. The run set and the
+ * clearing write come from a single read, and the write is issued before any
+ * action runs, so a marker the read saw is run and cleared together: a press is
+ * never cleared without being answered. A held press has no marker left to
+ * clear — the writes it raced already took it — so it is answered from the held
+ * read, which is dropped when this read still carries its marker so the same
+ * press never runs twice. The marker is cleared before the action is invoked, so
+ * a crash mid-action reads as a dropped press instead of a repeated one, and the
+ * widget drops its "Approving…" line immediately (the write reloads the
+ * timelines).
+ */
+async function sweepPendingActions(): Promise<void> {
+  const timeline = await ActiveAgentsWidget.getTimeline();
+  const pending = new Map<number, WidgetAction>();
+  const pressed: PressedEntry[] = [];
+  for (const [index, entry] of timeline.entries()) {
+    const action = pendingActionOf(entry.props);
+    if (action !== null) {
+      pending.set(index, action);
+      pressed.push({ date: entry.date.getTime(), action });
+    }
+  }
+  const carried = takeCarriedPresses().filter(
+    press => !pressed.some(read => read.date === press.date && read.action === press.action)
+  );
+  if (pending.size > 0) {
+    ActiveAgentsWidget.updateTimeline(
+      timeline.map((entry, index) =>
+        pending.has(index) ? { date: entry.date, props: stripPendingAction(entry.props) } : entry
+      )
+    );
+  }
+  for (const action of [...pending.values(), ...carried.map(press => press.action)]) {
+    // Sequential by design: each action can republish the surface, and two
+    // overlapping republishes could push the props out of order.
+    // eslint-disable-next-line no-await-in-loop -- one answer on screen at a time
+    await performWidgetAction(action);
+  }
+}
+
+/**
+ * The sweep: run every press the timeline still carries, and keep sweeping
+ * while a press asked for another pass. A press the live listener delivers
+ * while a pass is in flight sets `resweepRequested` and is held from the
+ * timeline read taken at delivery, so the follow-up pass answers it even though
+ * the running pass's own writes have since erased its marker.
  *
  * `event` is the live path's interaction: the sweep then only runs when the
  * event's source carries one of this widget's press markers — a Live Activity
@@ -166,36 +289,26 @@ let sweeping = false;
 export async function runPendingWidgetActions(
   event?: Pick<UserInteractionEvent, 'source'>
 ): Promise<void> {
-  if (Platform.OS !== 'ios' || sweeping) {
+  if (Platform.OS !== 'ios') {
+    return;
+  }
+  if (sweeping) {
+    resweepRequested = true;
+    await carryPendingPress(event);
     return;
   }
   sweeping = true;
   try {
-    const timeline = await ActiveAgentsWidget.getTimeline();
-    if (event !== undefined && pendingActionForEvent(event, timeline) === null) {
-      return;
-    }
-    const pending = new Map<number, WidgetAction>();
-    for (const [index, entry] of timeline.entries()) {
-      const action = pendingActionOf(entry.props);
-      if (action !== null) {
-        pending.set(index, action);
+    if (event !== undefined) {
+      const timeline = await ActiveAgentsWidget.getTimeline();
+      if (pendingActionForEvent(event, timeline) === null) {
+        return;
       }
     }
-    if (pending.size === 0) {
-      return;
-    }
-    ActiveAgentsWidget.updateTimeline(
-      timeline.map((entry, index) =>
-        pending.has(index) ? { date: entry.date, props: stripPendingAction(entry.props) } : entry
-      )
-    );
-    for (const action of pending.values()) {
-      // Sequential by design: each action can republish the surface, and two
-      // overlapping republishes could push the props out of order.
-      // eslint-disable-next-line no-await-in-loop -- one answer on screen at a time
-      await performWidgetAction(action);
-    }
+    do {
+      // eslint-disable-next-line no-await-in-loop -- a pass republishes the surface, so passes must not overlap
+      await sweepPendingActions();
+    } while (takeResweepRequest());
   } catch {
     // A native timeline read/write failure must not throw into the caller;
     // the next launch or foreground sweep retries.
@@ -203,6 +316,15 @@ export async function runPendingWidgetActions(
     sweeping = false;
   }
 }
+
+/**
+ * The live listener and which registration owns it, mirroring
+ * `registerGlanceableApproveAction`: a second registration must not add a
+ * second listener — two sweeps would race the same markers — and only the
+ * registration still holding this id may remove it.
+ */
+let subscription: ReturnType<typeof addUserInteractionListener> | null = null;
+let registrationId = 0;
 
 /**
  * Subscribe the live path and sweep once at startup. The root layout imports
@@ -218,15 +340,30 @@ export async function runPendingWidgetActions(
  * App Intent cannot run this JS in a cold process. Both draw the press's
  * progress line immediately, and both run the same shared action
  * (`lib/glanceable/widget-actions`).
+ *
+ * A second call replaces neither the listener nor the ownership: the returned
+ * unsubscribe removes the listener only while its own registration still owns
+ * it.
  */
-export function registerWidgetActionHandling(): void {
+export function registerWidgetActionHandling(): () => void {
   if (Platform.OS !== 'ios') {
-    return;
+    return () => undefined;
   }
-  addUserInteractionListener(event => {
+  const id = (registrationId += 1);
+  subscription ??= addUserInteractionListener(event => {
     void runPendingWidgetActions(event);
   });
   // A press that patched the marker before JS subscribed (the app was dead, or
   // still launching) is picked up by this launch sweep instead of being lost.
   void runPendingWidgetActions();
+  return () => {
+    // A later registration owns the listener now, so clearing it here would
+    // disable the press handling that registration installed.
+    if (id !== registrationId) {
+      return;
+    }
+    registrationId += 1;
+    subscription?.remove();
+    subscription = null;
+  };
 }

@@ -8,6 +8,7 @@ import { fetchSessionMetadata } from '../../session-service.js';
 import { protectedProcedure } from '../auth.js';
 import { sessionIdSchema } from '../schemas.js';
 import type { WrapperClient } from '../../kilo/wrapper-client.js';
+import { WrapperError } from '../../kilo/wrapper-client.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { sessionPlaneFromId } from '../../session-plane.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
@@ -50,6 +51,40 @@ async function resolveInteractiveSession(opts: {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'No wrapper found for session' });
   }
   return { kind: 'legacy', wrapper: wrapperClient };
+}
+
+/**
+ * A legacy (`agent_*`) session's pending set, read from its wrapper: that plane
+ * keeps none in a Durable Object, so the wrapper's live Kilo state is the only
+ * read there is. Returns null when the wrapper cannot answer — it is not
+ * running, or it predates the read route — which the caller reports as nothing
+ * pending: the answer this query gave for a legacy session before the wrapper
+ * could be read at all, so the press still hands the user to the app instead of
+ * dead-ending on an error.
+ */
+async function readLegacyPendingInteractions(opts: {
+  sessionId: SessionId;
+  userId: string;
+  env: Env;
+}): Promise<{ questions: unknown[]; permissions: unknown[] } | null> {
+  try {
+    const target = await resolveInteractiveSession(opts);
+    return target.kind === 'legacy' ? await target.wrapper.getPendingInteractions() : null;
+  } catch (error) {
+    // Ownership still fails the read. An absent or unreachable wrapper, and a
+    // wrapper too old to have the read route, have nothing to report: the
+    // answer they leave is "nothing pending", not an error.
+    if (
+      error instanceof TRPCError &&
+      (error.code === 'NOT_FOUND' || error.code === 'PRECONDITION_FAILED')
+    ) {
+      return null;
+    }
+    if (error instanceof WrapperError && (error.statusCode === 404 || error.statusCode === 405)) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export function createSessionQuestionHandlers() {
@@ -169,9 +204,10 @@ export function createSessionQuestionHandlers() {
       }),
 
     /**
-     * Read the interactions a control-plane session currently waits on. A
-     * caller must own the session: an unauthorized read fails rather than
-     * reporting an empty pending set.
+     * Read the interactions a session currently waits on. A caller must own the
+     * session: an unauthorized read fails rather than reporting an empty pending
+     * set. A control-plane session keeps its pending set in its Durable Object;
+     * a legacy `agent_*` session keeps none, so its read comes from the wrapper.
      */
     getPendingInteractions: protectedProcedure
       .input(z.object({ cloudAgentSessionId: sessionIdSchema }))
@@ -183,16 +219,21 @@ export function createSessionQuestionHandlers() {
       )
       .query(async ({ input, ctx }) => {
         const { userId, env } = ctx;
-        await requireCurrentSessionAccess({
-          env,
-          kiloUserId: userId,
-          cloudAgentSessionId: input.cloudAgentSessionId,
-        });
-        return await withDORetry(
-          () => getSandboxSessionStub(env, userId, input.cloudAgentSessionId),
-          stub => stub.getPendingInteractions(),
-          'getPendingInteractions'
-        );
+        const sessionId = input.cloudAgentSessionId as SessionId;
+        if (sessionPlaneFromId(sessionId) === 'control') {
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
+          return await withDORetry(
+            () => getSandboxSessionStub(env, userId, sessionId),
+            stub => stub.getPendingInteractions(),
+            'getPendingInteractions'
+          );
+        }
+        const pending = await readLegacyPendingInteractions({ sessionId, userId, env });
+        return pending ?? { questions: [], permissions: [] };
       }),
   };
 }

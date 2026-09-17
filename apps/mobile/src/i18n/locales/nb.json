@@ -2126,7 +2126,20 @@
       "continueFrom": "Fortsetter økten {{title}}.",
       "importingSession": "Importerer økten",
       "cliCannotContinue": "Denne CLI-en kan ikke fortsette en økt. Velg Cloud Agent eller en annen CLI.",
-      "importFailed": "Kunne ikke importere denne økten."
+      "importFailed": "Kunne ikke importere denne økten.",
+      "sandbox": "Sandkasse",
+      "sandboxAccessibility": "Sandkasse: {{label}}",
+      "sandboxDefaultWithDestination": "Standard · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Liten",
+      "sandboxInstanceShared": "Delt",
+      "sandboxInstanceLarge": "Stor",
+      "sandboxInstanceDevcontainer": "Utviklingscontainer",
+      "sandboxInstanceProviderDefault": "Leverandørstandard",
+      "sandboxCouldNotLoad": "Kunne ikke laste inn sandkassevalg",
+      "sandboxUnavailable": "Denne sandkassen er utilgjengelig. Velg en annen sandkasse eller Standard.",
+      "sandboxUseDefault": "Bruk Standard"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er oppdatert.",

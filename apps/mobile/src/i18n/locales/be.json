@@ -2162,7 +2162,20 @@
       "continueFrom": "Працягваецца сеанс «{{title}}».",
       "importingSession": "Імпартаванне сеанса",
       "cliCannotContinue": "Гэты CLI не падтрымлівае працяг сеанса. Выберыце Cloud Agent або іншы CLI.",
-      "importFailed": "Не ўдалося імпартаваць гэты сеанс."
+      "importFailed": "Не ўдалося імпартаваць гэты сеанс.",
+      "sandbox": "Пясочница",
+      "sandboxAccessibility": "Пясочница: {{label}}",
+      "sandboxDefaultWithDestination": "Па змаўчанні · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Малы",
+      "sandboxInstanceShared": "Агульны",
+      "sandboxInstanceLarge": "Вялікі",
+      "sandboxInstanceDevcontainer": "Кантэйнер распрацоўкі",
+      "sandboxInstanceProviderDefault": "Па змаўчанні пастаўшчыка",
+      "sandboxCouldNotLoad": "Не ўдалося загрузіць варыянты пясочніцы",
+      "sandboxUnavailable": "Гэта пясочница недаступная. Выберыце іншую пясочницу або Па змаўчанні.",
+      "sandboxUseDefault": "Выкарыстоўваць па змаўчанні"
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл.",

@@ -2126,7 +2126,20 @@
       "continueFrom": "Nou ap kontinye {{title}}.",
       "importingSession": "Ap enpòte sesyon an",
       "cliCannotContinue": "CLI sa a pa ka kontinye yon sesyon. Chwazi Cloud Agent oswa yon lòt CLI.",
-      "importFailed": "Nou pa t ka enpòte sesyon sa a."
+      "importFailed": "Nou pa t ka enpòte sesyon sa a.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Pa defo · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Piti",
+      "sandboxInstanceShared": "Pataje",
+      "sandboxInstanceLarge": "Gwo",
+      "sandboxInstanceDevcontainer": "Kontener Dev",
+      "sandboxInstanceProviderDefault": "Pa defo founisè a",
+      "sandboxCouldNotLoad": "Pa ka chaje opsyon sandbox yo",
+      "sandboxUnavailable": "Sandbox sa a pa disponib. Chwazi yon lòt sandbox oswa Pa defo.",
+      "sandboxUseDefault": "Sèvi ak Pa defo"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nou mete {{displayCount}} fichye ajou.",

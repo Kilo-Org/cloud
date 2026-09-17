@@ -2144,7 +2144,20 @@
       "continueFrom": "Tiek turpināta sesija: {{title}}.",
       "importingSession": "Importē sesiju…",
       "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlies Cloud Agent vai citu CLI.",
-      "importFailed": "Neizdevās importēt šo sesiju."
+      "importFailed": "Neizdevās importēt šo sesiju.",
+      "sandbox": "Smilškaste",
+      "sandboxAccessibility": "Smilškaste: {{label}}",
+      "sandboxDefaultWithDestination": "Noklusējums · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Maza",
+      "sandboxInstanceShared": "Kopīga",
+      "sandboxInstanceLarge": "Liela",
+      "sandboxInstanceDevcontainer": "Izstrādes konteiners",
+      "sandboxInstanceProviderDefault": "Piegādātāja noklusējums",
+      "sandboxCouldNotLoad": "Neizdevās ielādēt smilškastes opcijas",
+      "sandboxUnavailable": "Šī smilškaste nav pieejama. Izvēlieties citu smilškasti vai Noklusējumu.",
+      "sandboxUseDefault": "Izmantot Noklusējumu"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails.",

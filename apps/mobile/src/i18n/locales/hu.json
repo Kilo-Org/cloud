@@ -783,7 +783,7 @@
     "previewFullDescription": "Az értesítések megjelenítik az üzenet szövegét a zárolási képernyőn.",
     "previewGenericDescription": "Az értesítések csak azt jelzik, hogy valami történt. A részletek elolvasásához nyisd meg a Kilo alkalmazást.",
     "channel": {
-      "agent": "Ügynökmunkamenetek",
+      "agentProgress": "Ügynök előrehaladása",
       "chat": "Csevegőüzenetek",
       "kiloclaw": "KiloClaw-tevékenység",
       "balance": "Egyenlegértesítések",

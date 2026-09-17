@@ -293,7 +293,7 @@
     "previewFullDescription": "通知會在鎖定畫面上顯示訊息文字。",
     "previewGenericDescription": "通知只會提示有新動態。開啟 Kilo 即可查看內容。",
     "channel": {
-      "agent": "智慧代理工作階段",
+      "agentProgress": "智慧代理進度",
       "chat": "聊天訊息",
       "kiloclaw": "KiloClaw 活動",
       "balance": "餘額提醒",

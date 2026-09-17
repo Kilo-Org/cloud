@@ -783,7 +783,7 @@
     "previewFullDescription": "اطلاعات آپ کی لاک اسکرین پر پیغام کا متن دکھاتی ہیں۔",
     "previewGenericDescription": "اطلاعات صرف کسی سرگرمی کی خبر دیتی ہیں۔ تفصیلات پڑھنے کے لیے Kilo کھولیں۔",
     "channel": {
-      "agent": "ایجنٹ کے سیشنز",
+      "agentProgress": "ایجنٹ کی پیش رفت",
       "chat": "چیٹ کے پیغامات",
       "kiloclaw": "KiloClaw کی سرگرمی",
       "balance": "بیلنس کی تنبیہات",

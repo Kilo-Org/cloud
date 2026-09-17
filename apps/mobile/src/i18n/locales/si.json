@@ -783,7 +783,7 @@
     "previewFullDescription": "දැනුම්දීම් ඔබේ අගුළු තිරයේ පණිවිඩ පෙළ පෙන්වයි.",
     "previewGenericDescription": "දැනුම්දීම් යමක් සිදු වූ බව පෙන්වයි. එය කියවීමට Kilo විවෘත කරන්න.",
     "channel": {
-      "agent": "නියෝජිත සැසි",
+      "agentProgress": "නියෝජිත ප්‍රගතිය",
       "chat": "කතාබස් පණිවිඩ",
       "kiloclaw": "KiloClaw ක්‍රියාකාරකම්",
       "balance": "ශේෂය පිළිබඳ ඇඟවීම්",

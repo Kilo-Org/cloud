@@ -783,7 +783,7 @@
     "previewFullDescription": "Sanarwa suna nuna rubutun saƙo a allon kullenka.",
     "previewGenericDescription": "Sanarwa suna nuna cewa wani abu ya faru. Buɗe Kilo don karanta shi.",
     "channel": {
-      "agent": "Zamannin wakilai",
+      "agentProgress": "Ci gaban wakilai",
       "chat": "Saƙonnin tattaunawa",
       "kiloclaw": "Ayyukan KiloClaw",
       "balance": "Faɗakarwar ragowar kuɗi",

@@ -3063,7 +3063,7 @@
     "newestSession": "Newest: {{title}}",
     "noneWaiting": "No agents waiting",
     "newAgent": "New agent",
-    "approving": "Approving...",
+    "approving": "Approving…",
     "couldNotApprove": "Could not approve",
     "couldNotStart": "Could not start",
     "channelName": "Active agents",

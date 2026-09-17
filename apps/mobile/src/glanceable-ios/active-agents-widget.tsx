@@ -298,11 +298,14 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
   // the same rule as `COPY` above: the widget process is the only consumer.
   const NEWEST_SLOT_HEIGHT = 14;
   // The press patch carries which action was pressed, so the slot names it
-  // instead of always reading "Approving..." under a New agent tap.
+  // instead of always reading "Approving…" under a New agent tap. The baked
+  // fallbacks carry the typographic ellipsis their catalog keys use
+  // (`common.starting`, `glanceable.approving`), so the gallery placeholder
+  // matches the pushed copy in this same reserved slot.
   const pressCopy =
     props.pendingAction === 'new-agent'
-      ? (COPY.starting ?? 'Starting...')
-      : (COPY.approving ?? 'Approving...');
+      ? (COPY.starting ?? 'Starting…')
+      : (COPY.approving ?? 'Approving…');
   const newestLine = props.pendingActionVisible === true ? pressCopy : (props.newestTitle ?? null);
   const actions = props.actions ?? { approve: false, newAgent: false };
   // The slot is laid out whether or not it carries a line, so a title arriving

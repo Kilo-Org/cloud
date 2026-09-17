@@ -883,8 +883,17 @@ describe('activeAgentsWidgetLayout', () => {
 
     // The patch carries which button was pressed, so a New agent tap reads its
     // own line instead of the approving one, in the same reserved slot.
-    expect(collectText(approving)).toContain('Approving...');
-    expect(collectText(starting)).toContain('Starting...');
+    expect(collectText(approving)).toContain('Approving…');
+    expect(collectText(starting)).toContain('Starting…');
+    // One ellipsis style for the two lines that share the slot: both carry the
+    // typographic ellipsis (`common.starting`, `glanceable.approving`), never
+    // three ASCII dots. The baked fallbacks above are what this layout renders
+    // with no injected copy, so the style is pinned where it lives.
+    for (const drawn of [approving, starting]) {
+      const text = collectText(drawn);
+      expect(text.some(line => line.endsWith('…'))).toBe(true);
+      expect(text.some(line => line.endsWith('...'))).toBe(false);
+    }
     expect(slotHeight(reservedSlot(starting))).toBe(slotHeight(reservedSlot(approving)));
   });
 

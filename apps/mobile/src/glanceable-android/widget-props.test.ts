@@ -30,8 +30,8 @@ const COPY: Record<string, string> = {
   'glanceable.openAgents': 'Open agents',
   'glanceable.noneWaiting': 'No agents waiting',
   'glanceable.newAgent': 'New agent',
-  'glanceable.approving': 'Approving...',
-  'common.starting': 'Starting...',
+  'glanceable.approving': 'Approving…',
+  'common.starting': 'Starting…',
   'glanceable.couldNotApprove': 'Could not approve',
   'glanceable.couldNotStart': 'Could not start',
   'glanceable.newestSession': 'Newest: {{title}}',
@@ -375,7 +375,7 @@ describe('widget actions and the newest line', () => {
 
   it('shows the action state ahead of the newest session', () => {
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'approving' });
-    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Approving...');
+    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Approving…');
 
     setSurfaceExtras({
       newestSessionTitle: 'Fix the flaky test',
@@ -386,7 +386,7 @@ describe('widget actions and the newest line', () => {
     // The create's own progress and failure lines, on a surface that shows the
     // newest session too: the action owns the slot while it runs or failed.
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'starting' });
-    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Starting...');
+    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Starting…');
 
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'couldNotStart' });
     expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Could not start');
@@ -397,7 +397,7 @@ describe('widget actions and the newest line', () => {
 
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'starting' });
     const running = buildAndroidWidgetProps(empty, {}, translate);
-    expect(running.newestLine).toBe('Starting...');
+    expect(running.newestLine).toBe('Starting…');
     // The empty surface is the one that offers New agent, so it keeps that row
     // as the retry while no counts draw.
     expect(running.actions).toEqual({

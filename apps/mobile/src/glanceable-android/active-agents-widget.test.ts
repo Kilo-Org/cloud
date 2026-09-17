@@ -45,7 +45,7 @@ const COPY: Record<string, string> = {
   'glanceable.openAgents': 'Open agents',
   'glanceable.noneWaiting': 'No agents waiting',
   'glanceable.newAgent': 'New agent',
-  'glanceable.approving': 'Approving...',
+  'glanceable.approving': 'Approving…',
   'glanceable.couldNotApprove': 'Could not approve',
   'glanceable.newestSession': 'Newest: {{title}}',
   'common.approve': 'Approve',

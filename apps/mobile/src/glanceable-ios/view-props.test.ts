@@ -17,8 +17,8 @@ import {
 const NOW = Date.parse('2026-01-02T00:00:00Z');
 
 const COPY: Record<string, string> = {
-  'glanceable.approving': 'Approving...',
-  'common.starting': 'Starting...',
+  'glanceable.approving': 'Approving…',
+  'common.starting': 'Starting…',
   'glanceable.couldNotApprove': 'Could not approve',
   'glanceable.couldNotStart': 'Could not start',
   'glanceable.newestSession': 'Newest: {{title}}',
@@ -55,8 +55,8 @@ const QUESTION_ROW: GlanceableSessionRow = {
 
 describe('newestTitleFor', () => {
   it.each([
-    ['approving', 'Approving...'],
-    ['starting', 'Starting...'],
+    ['approving', 'Approving…'],
+    ['starting', 'Starting…'],
     ['couldNotApprove', 'Could not approve'],
     ['couldNotStart', 'Could not start'],
   ] as const)('renders the %s action feedback on a happy surface', (feedback, expected) => {

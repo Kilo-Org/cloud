@@ -305,10 +305,10 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     expect(renders).toHaveLength(2);
     const [inFlight, settledRender] = renders;
     // The request goes out with the progress line already drawn...
-    expect(collectText(inFlight?.light)).toContain('Approving...');
+    expect(collectText(inFlight?.light)).toContain('Approving…');
     // ...and the redraw after it drops the line without moving the rows.
     const settled = collectText(settledRender?.light);
-    expect(settled).not.toContain('Approving...');
+    expect(settled).not.toContain('Approving…');
     expect(settled).toEqual(['2', 'Needs input', '2', 'Working', '0', 'Idle', 'Approve']);
     expect(settledRender?.light.props).toMatchObject({
       clickAction: 'OPEN_URI',

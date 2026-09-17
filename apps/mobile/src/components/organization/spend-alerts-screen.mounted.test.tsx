@@ -306,9 +306,29 @@ describe('SpendAlertsScreen happy state', () => {
         },
       ],
     });
-    await waitFor(() => announced.success.mock.calls.length === 1);
-    expect(announced.success).toHaveBeenCalledWith(i18n.t('spendAlerts.saved'));
-    expect(router.back).toHaveBeenCalledTimes(1);
+    // The confirmation is a real Text node on the form, and the screen stays
+    // put so it describes the values on screen: a sonner-native toast alone is
+    // drawn outside the accessibility hierarchy, so assistive tech (and the
+    // on-device digest) never sees it.
+    await waitFor(
+      () => byType(renderer, 'AccessibleStatus')[0]?.props.message === i18n.t('spendAlerts.saved')
+    );
+    expect(byType(renderer, 'AccessibleStatus')[0]?.props.tone).toBe('status');
+    // The inline status is the single announcement owner: the mutation must
+    // not also announce through a toast, or one save speaks (and draws) the
+    // confirmation twice.
+    expect(announced.success).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+
+    // A draft edit clears it: the message never describes superseded values.
+    type(renderer, LIMIT, '30');
+    expect(byType(renderer, 'AccessibleStatus')[0]?.props.message).toBeNull();
+  });
+
+  it('shows no confirmation before the first save', async () => {
+    const { renderer } = await mountLoaded();
+
+    expect(byType(renderer, 'AccessibleStatus')[0]?.props.message).toBeNull();
   });
 
   it('shows the spend summary empty copy when the scope has no spend', async () => {
@@ -483,6 +503,36 @@ describe('SpendAlertsScreen empty state', () => {
 
     await waitFor(() => saveMutationFn.mock.calls.length === 1);
     expect(saveMutationFn.mock.calls[0]?.[0]).toMatchObject({ enabled: false });
+  });
+
+  it('keeps the saved confirmation after a disable save lands', async () => {
+    const { renderer, queryClient } = await mountLoaded();
+
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.enable')), false);
+    press(buttonByVariant(renderer));
+
+    await waitFor(() => saveMutationFn.mock.calls.length === 1);
+    await waitFor(
+      () => byType(renderer, 'AccessibleStatus')[0]?.props.message === i18n.t('spendAlerts.saved')
+    );
+
+    // The save's own refetch lands with the stored value now false, so the
+    // draft no longer differs and the off branch is the only branch left. The
+    // confirmation must survive that: a disable-save is a supported flow, so it
+    // gets the same stable 'settings saved' line as the enable path.
+    act(() => {
+      queryClient.setQueryData(['spendAlerts', 'get', {}], settingsFixture({ enabled: false }));
+    });
+
+    expect(texts(renderer)).toContain(i18n.t('spendAlerts.empty'));
+    expect(byType(renderer, 'AccessibleStatus')[0]?.props.message).toBe(
+      i18n.t('spendAlerts.saved')
+    );
+    expect(byType(renderer, 'Button')).toHaveLength(1);
+
+    // A draft edit clears it again, so the message never outlives its values.
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.enable')), true);
+    expect(byType(renderer, 'AccessibleStatus')[0]?.props.message).toBeNull();
   });
 });
 

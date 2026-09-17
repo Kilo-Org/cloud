@@ -35,7 +35,6 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -225,6 +224,12 @@ function SpendAlertsForm({
   const [anomalyEnabled, setAnomalyEnabled] = useState(anomaly?.enabled ?? true);
   const [anomalyEmail, setAnomalyEmail] = useState(anomaly?.emailEnabled ?? true);
   const [anomalyPush, setAnomalyPush] = useState(anomaly?.pushEnabled ?? false);
+  // The saved confirmation. It is rendered as a real Text node on this screen,
+  // not left to the toast alone: sonner-native draws outside the accessibility
+  // hierarchy, so a toast-only confirmation never reaches assistive tech (and
+  // the on-device hierarchy digest). Every draft edit clears it so it can only
+  // ever describe the values on screen.
+  const [saved, setSaved] = useState(false);
 
   // The wire requires a limit and a multiplier for both kinds whether or not the
   // kind is enabled, but a kind the owner switched off is not being edited: it
@@ -236,6 +241,7 @@ function SpendAlertsForm({
   const canSubmit = () => canSubmitWith(thresholdEnabled, anomalyEnabled);
   const [canSave, setCanSave] = useState(canSubmit);
   const revalidate = () => {
+    setSaved(false);
     setCanSave(canSubmit());
   };
 
@@ -306,8 +312,12 @@ function SpendAlertsForm({
     save.mutate(input, {
       onSuccess: () => {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        announcingToast.success(t('spendAlerts.saved'));
-        router.back();
+        // No toast here: the confirmation below the fields is the single
+        // announcement owner (AccessibleStatus), and it describes the values
+        // that are still on screen. A toast would announce the same sentence a
+        // second time and draw a second copy of it. The owner leaves through
+        // the header's back control.
+        setSaved(true);
       },
     });
   };
@@ -318,6 +328,7 @@ function SpendAlertsForm({
     apply: (value: boolean) => void
   ) => {
     void Haptics.selectionAsync();
+    setSaved(false);
     apply(next);
     // Toggling push also writes the caller's notification category (the
     // server's agreement between the rule channel and the category), so the
@@ -329,14 +340,26 @@ function SpendAlertsForm({
     }
   };
 
-  // save has no mutation toast (inline error pattern P2), so AccessibleStatus is
-  // the single announcement owner; a failure keeps the draft and offers Retry.
+  // save has no mutation toast — success or failure (inline error pattern P2)
+  // — so AccessibleStatus is the single announcement owner on both platforms:
+  // on success it carries the confirmation as a real Text node, on failure the
+  // error, and a failure keeps the draft and offers Retry. A failure outranks
+  // the last confirmation.
+  const confirmedMessage = saved ? t('spendAlerts.saved') : null;
+  const saveMessage = save.isError ? t('spendAlerts.saveError') : confirmedMessage;
+
   const saveControls = (
     <>
-      <AccessibleStatus
-        message={save.isError ? t('spendAlerts.saveError') : null}
-        className="text-sm"
-      />
+      {/* The slot is reserved whether or not a message shows: the confirmation
+          and the error swap in place, so the Save button below never moves
+          when the save settles. */}
+      <View className="min-h-5 justify-center">
+        <AccessibleStatus
+          message={saveMessage}
+          tone={save.isError ? 'error' : 'status'}
+          className="text-sm"
+        />
+      </View>
 
       {save.isError && (
         <Button
@@ -372,6 +395,7 @@ function SpendAlertsForm({
           value={enabled}
           onValueChange={value => {
             void Haptics.selectionAsync();
+            setSaved(false);
             setEnabled(value);
           }}
         />
@@ -385,12 +409,16 @@ function SpendAlertsForm({
             enabled={thresholdEnabled}
             onEnabledChange={value => {
               void Haptics.selectionAsync();
+              setSaved(false);
               setThresholdEnabled(value);
               // Switching the kind off drops its field from the Save gate.
               setCanSave(canSubmitWith(value, anomalyEnabled));
             }}
             emailEnabled={thresholdEmail}
-            onEmailChange={setThresholdEmail}
+            onEmailChange={value => {
+              setSaved(false);
+              setThresholdEmail(value);
+            }}
             pushEnabled={thresholdPush}
             onPushChange={next => {
               onPushChange('threshold', next, setThresholdPush);
@@ -420,7 +448,10 @@ function SpendAlertsForm({
                 accessibilityLabel={t('spendAlerts.windowLabel')}
                 options={windowOptions}
                 value={windowOption}
-                onChange={setWindowOption}
+                onChange={value => {
+                  setSaved(false);
+                  setWindowOption(value);
+                }}
               />
             </View>
           </RuleCard>
@@ -431,12 +462,16 @@ function SpendAlertsForm({
             enabled={anomalyEnabled}
             onEnabledChange={value => {
               void Haptics.selectionAsync();
+              setSaved(false);
               setAnomalyEnabled(value);
               // Switching the kind off drops its field from the Save gate.
               setCanSave(canSubmitWith(thresholdEnabled, value));
             }}
             emailEnabled={anomalyEmail}
-            onEmailChange={setAnomalyEmail}
+            onEmailChange={value => {
+              setSaved(false);
+              setAnomalyEmail(value);
+            }}
             pushEnabled={anomalyPush}
             onPushChange={next => {
               onPushChange('anomaly', next, setAnomalyPush);
@@ -469,7 +504,13 @@ function SpendAlertsForm({
           <Text variant="muted" className="text-sm">
             {t('spendAlerts.empty')}
           </Text>
-          {masterDirty ? saveControls : null}
+          {/* A disable save lands with the stored value now false, so
+              `masterDirty` clears on its own refetch. Keep the controls while a
+              confirmation is live, or the saved line (and its reserved slot)
+              would vanish the moment the save settles. An edit clears `saved`
+              (setSaved(false)), which returns this branch to the master switch
+              alone. */}
+          {masterDirty || saved ? saveControls : null}
         </>
       )}
     </>

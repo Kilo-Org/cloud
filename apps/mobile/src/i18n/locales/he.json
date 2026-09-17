@@ -299,6 +299,15 @@
       "balance": "התראות על היתרה",
       "security": "ממצאי אבטחה"
     },
+    "action": {
+      "openSession": "פתיחת סשן"
+    },
+    "needsInputAction": {
+      "approved": "הבקשה אושרה",
+      "replied": "התשובה נשלחה",
+      "failed": "לא ניתן היה לענות. הקישו שוב כדי לנסות שוב.",
+      "unavailable": "הבקשה הזאת כבר לא מחכה."
+    },
     "category": {
       "chatMessagesSubtitle": "תשובות בשיחות שלך",
       "agentAttentionTitle": "הסוכן צריך אותך",

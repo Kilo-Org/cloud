@@ -245,6 +245,20 @@ type RenameEntry = {
   at: number;
 };
 
+/**
+ * A stored attention clear waiting for its absence window to elapse. Written
+ * when an owning CLI socket goes away and dropped again as soon as a live CLI
+ * owns the session, so a dropped link never clears a raise the CLI is still
+ * waiting on.
+ */
+type PendingAttentionResetEntry = {
+  kiloUserId: string;
+  /** When the absence window elapses and the stored attention may be cleared. */
+  dueAt: number;
+  /** The connection whose departure started the window (for logging). */
+  connectionId: string;
+};
+
 type PendingCommandEntry = {
   sessionId?: string;
   originalId: string;
@@ -264,6 +278,7 @@ type PendingCommandEntry = {
 const READY_PUSH_KEY_PREFIX = 'readyPush:';
 const RENAME_KEY_PREFIX = 'rename:';
 const PENDING_COMMAND_KEY_PREFIX = 'pendingCommand/';
+const ATTENTION_RESET_KEY_PREFIX = 'attentionReset:';
 const SESSION_READY_PUSH_DELAY_MS = 5_000;
 /** Backoff between ready-push claim retries so the 3-attempt bound spans real time. */
 const READY_PUSH_RETRY_BACKOFF_MS = 5_000;
@@ -271,10 +286,35 @@ const READY_PUSH_MAX_ATTEMPTS = 3;
 /** Drop offline rename catch-up entries that never matched a heartbeat title. */
 const RENAME_ENTRY_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 
+/**
+ * How long a session's stored attention survives its owning CLI socket going
+ * away. Exported for the tests that pin it.
+ *
+ * A torn-down socket is not proof the CLI is gone: a session-ingest restart, a
+ * drain, or a network blip severs the CLI's sockets while the CLI process
+ * stays alive and still waits on its raise. During such an outage the CLI
+ * cannot reconnect, so nothing can cancel the held clear — and the alarm may
+ * fire in a runtime that has no sockets at all (a workerd orphaned by a hard
+ * kill of the dev listener, or the restarted deployment before any client
+ * re-attached), where "no live CLI" is true by construction. The window is
+ * therefore measured from the disconnect and must be longer than any
+ * realistic outage plus the CLI's own reconnect backoff, or the clear beats
+ * the reconnect and consumes a raise the user is still trying to answer
+ * (observed on device: kill -> relay re-attach ~3 min, with the shade's
+ * Approve taps still in flight after that). The clear is held while a live
+ * CLI re-owns the session, and applied only after an unbroken absence this
+ * long — a raise nobody can answer any more must not sit in needs-input
+ * forever.
+ */
+export const CLI_ABSENCE_ATTENTION_RESET_MS = 600_000;
+
 export class UserConnectionDO extends DurableObject<Env> {
   private static readonly HEARTBEAT_TIMEOUT_MS = 30_000;
   private static readonly PENDING_COMMAND_TTL_MS = 35_000;
   private static readonly MAX_PENDING_COMMANDS = 128;
+  private static readonly CLI_ABSENCE_ATTENTION_RESET_MS = CLI_ABSENCE_ATTENTION_RESET_MS;
+  /** Backoff before retrying a clear whose SessionIngestDO delegate failed. */
+  private static readonly ATTENTION_RESET_RETRY_BACKOFF_MS = 5_000;
 
   // Which CLI connection owns each session
   private sessionOwners = new Map<string, string>();
@@ -308,6 +348,9 @@ export class UserConnectionDO extends DurableObject<Env> {
   private readyPushFireAt = new Map<string, number>();
   // One-shot post-eviction rebuild gate; reset whenever ensureState actually reconstructs
   private readyPushRebuilt = false;
+  // In-memory mirror of attentionReset KV dueAt values — scheduling only; KV is
+  // the source of truth and `alarm()` re-lists it every wake.
+  private pendingAttentionResetAt = new Map<string, number>();
 
   // Synchronous reservation set for mutationId dedupe (prevents concurrent same-ID dispatch
   // across asynchronous storage reads in the mutationId path).
@@ -513,6 +556,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     const now = Date.now();
     this.expirePendingCommands(now);
     await this.fireReadyPushes(now);
+    await this.firePendingAttentionResets(now);
     const staleConnectionIds: string[] = [];
 
     for (const [connectionId, lastSeen] of this.lastHeartbeatAt) {
@@ -649,6 +693,9 @@ export class UserConnectionDO extends DurableObject<Env> {
         this.scheduleSessionReadyPush(attachment.kiloUserId, session.id, session.title);
       }
       this.sessionOwners.set(session.id, connectionId);
+      // A live CLI owns (or re-owns) the session: whatever raise it was waiting
+      // on is answerable again, so the absence window is over.
+      this.cancelPendingAttentionReset(session.id);
     }
 
     // Offline rename catch-up: re-emit stored renames whose heartbeat title still
@@ -1849,11 +1896,15 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     // Leave webSubscriptions intact — a reconnecting CLI can resume
 
-    // Reset stored attention before broadcasting disconnect so the mobile
-    // departure refetch observes `retry` rather than a stuck `question`.
+    // Hold each owned session's stored attention for the CLI's absence window
+    // instead of clearing it now: a socket close can be our own link dropping
+    // (a session-ingest restart, a drain, a network blip) rather than the CLI
+    // going away, and an immediate clear would throw away a raise the user can
+    // still answer once the CLI is back. `alarm()` applies the clear if no live
+    // CLI re-owns the session within the window.
     // kiloUserId comes from the CLI attachment (authenticated /user/cli route);
     // without it we cannot safely target rows and must no-op.
-    await this.resetOwnedSessionAttentionOnDisconnect(attachment.kiloUserId, ownedSessions);
+    await this.deferOwnedSessionAttentionReset(attachment.kiloUserId, ownedSessions, connectionId);
 
     const rootSessionIds = sessions
       .filter(session => !session.parentSessionId && ownedSessions.has(session.id))
@@ -1875,12 +1926,18 @@ export class UserConnectionDO extends DurableObject<Env> {
   }
 
   /**
-   * Commit attention clears for owned sessions before `cli.disconnected`.
+   * Hold the stored attention of the sessions this connection owned for the
+   * CLI's absence window. The clear itself happens in `alarm()` once the window
+   * elapses with no live CLI owning the session, and is dropped again by
+   * `cancelPendingAttentionReset` when a CLI re-owns it, so a link that drops
+   * under a live CLI never discards the raise it is waiting on.
+   *
    * Identity: attachment `kiloUserId` only — never guess from DO name.
    */
-  private async resetOwnedSessionAttentionOnDisconnect(
+  private async deferOwnedSessionAttentionReset(
     kiloUserId: string | undefined,
-    ownedSessions: ReadonlySet<string>
+    ownedSessions: ReadonlySet<string>,
+    connectionId: string
   ): Promise<void> {
     if (ownedSessions.size === 0) return;
 
@@ -1892,17 +1949,92 @@ export class UserConnectionDO extends DurableObject<Env> {
       return;
     }
 
+    const dueAt = Date.now() + UserConnectionDO.CLI_ABSENCE_ATTENTION_RESET_MS;
     const results = await Promise.allSettled(
       [...ownedSessions].map(async sessionId => {
-        const stub = getSessionIngestDO(this.env, { kiloUserId, sessionId });
-        await stub.resetAttentionStatusOnCliDisconnect(kiloUserId, sessionId);
+        await this.ctx.storage.put(`${ATTENTION_RESET_KEY_PREFIX}${sessionId}`, {
+          kiloUserId,
+          dueAt,
+          connectionId,
+        } satisfies PendingAttentionResetEntry);
+        this.pendingAttentionResetAt.set(sessionId, dueAt);
       })
     );
 
     for (const result of results) {
       if (result.status === 'rejected') {
-        console.error('Failed to reset attention status on CLI disconnect', {
+        console.error('Failed to hold attention status for the CLI absence window', {
           error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        });
+      }
+    }
+
+    this.scheduleNextAlarm(Date.now());
+  }
+
+  /** Drop a held clear once a live CLI owns the session again. */
+  private cancelPendingAttentionReset(sessionId: string): void {
+    if (!this.pendingAttentionResetAt.delete(sessionId)) return;
+    this.ctx.waitUntil(
+      this.ctx.storage
+        .delete(`${ATTENTION_RESET_KEY_PREFIX}${sessionId}`)
+        .catch((error: unknown) => {
+          console.error('Failed to cancel the held attention reset', {
+            sessionId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        })
+    );
+  }
+
+  /**
+   * Apply the held attention clears whose window has elapsed. An entry is
+   * dropped without a write when a live CLI owns the session (the CLI came
+   * back), and re-armed briefly when the delegate write fails so a transient
+   * error cannot strand a raise in needs-input.
+   */
+  private async firePendingAttentionResets(now: number): Promise<void> {
+    let pending: Map<string, PendingAttentionResetEntry>;
+    try {
+      pending = await this.ctx.storage.list<PendingAttentionResetEntry>({
+        prefix: ATTENTION_RESET_KEY_PREFIX,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to list held attention resets', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+
+    for (const [key, entry] of pending) {
+      if (!entry || typeof entry.dueAt !== 'number') continue;
+      const sessionId = key.slice(ATTENTION_RESET_KEY_PREFIX.length);
+      if (!sessionId) continue;
+
+      if (this.hasActiveCliSession(sessionId)) {
+        // The CLI is back with this session: keep the raise it still waits on.
+        this.pendingAttentionResetAt.delete(sessionId);
+        await this.ctx.storage.delete(key);
+        continue;
+      }
+
+      if (entry.dueAt > now) {
+        this.pendingAttentionResetAt.set(sessionId, entry.dueAt);
+        continue;
+      }
+
+      try {
+        const stub = getSessionIngestDO(this.env, { kiloUserId: entry.kiloUserId, sessionId });
+        await stub.resetAttentionStatusOnCliDisconnect(entry.kiloUserId, sessionId);
+        await this.ctx.storage.delete(key);
+        this.pendingAttentionResetAt.delete(sessionId);
+      } catch (error: unknown) {
+        const dueAt = now + UserConnectionDO.ATTENTION_RESET_RETRY_BACKOFF_MS;
+        await this.ctx.storage.put(key, { ...entry, dueAt });
+        this.pendingAttentionResetAt.set(sessionId, dueAt);
+        console.error('Failed to reset attention status after the CLI absence window', {
+          sessionId,
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
@@ -2066,6 +2198,7 @@ export class UserConnectionDO extends DurableObject<Env> {
     if (
       this.lastHeartbeatAt.size === 0 &&
       this.readyPushFireAt.size === 0 &&
+      this.pendingAttentionResetAt.size === 0 &&
       pending.length === 0
     ) {
       await this.ctx.storage.deleteAlarm();
@@ -2784,6 +2917,13 @@ export class UserConnectionDO extends DurableObject<Env> {
     for (const entry of this.pendingCommands.values()) {
       if (entry.expiresAt > now && (nextAlarmAt === undefined || entry.expiresAt < nextAlarmAt)) {
         nextAlarmAt = entry.expiresAt;
+      }
+    }
+
+    for (const dueAt of this.pendingAttentionResetAt.values()) {
+      const armedAt = dueAt <= now ? now : dueAt;
+      if (nextAlarmAt === undefined || armedAt < nextAlarmAt) {
+        nextAlarmAt = armedAt;
       }
     }
 

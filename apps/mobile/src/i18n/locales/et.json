@@ -789,6 +789,15 @@
       "balance": "Saldohoiatused",
       "security": "Turvaleiud"
     },
+    "action": {
+      "openSession": "Ava seanss"
+    },
+    "needsInputAction": {
+      "approved": "Taotlus kiideti heaks",
+      "replied": "Vastus on saadetud",
+      "failed": "Vastamine ei õnnestunud. Uuesti proovimiseks puuduta uuesti.",
+      "unavailable": "See taotlus ei ole enam ootel."
+    },
     "category": {
       "chatMessagesSubtitle": "vastused sinu vestlustes",
       "agentAttentionTitle": "Agent vajab sind",

@@ -14,7 +14,7 @@ import {
   takeOverColdStartRestore,
 } from '@/lib/persist/read-cache';
 import { clearToolSummaryTranslationsForSignOut } from '@/lib/persist/tool-summary-translation-cache';
-import { clearToolSummaryTranslationMemory } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
+import { clearToolSummaryTranslationMemoryForSignOut } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 import { queryClient } from '@/lib/query-client';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
@@ -49,14 +49,17 @@ export function CachePersistenceMount() {
     // holds the previous account's tool text, so it must go too — the runtime's
     // in-memory retry memory and cache hold the same text because a
     // `retryUnresolvedTranslations` call re-sends it under the new account's
-    // token, so the synchronous reset runs with the disk scope clear. Best
+    // token, so the runtime reset runs with the disk scope clear and settles
+    // the writes it already dispatched before the scope is dropped. Best
     // effort: both helpers swallow a storage failure, and a redundant clear
     // only costs a future warm start.
     const previousUserId = previousUserIdRef.current;
     if (previousUserId !== null && previousUserId !== userId) {
       void clearCacheScopeForSignOut(previousUserId);
-      void clearToolSummaryTranslationsForSignOut();
-      clearToolSummaryTranslationMemory();
+      void (async () => {
+        await clearToolSummaryTranslationMemoryForSignOut();
+        await clearToolSummaryTranslationsForSignOut();
+      })();
     }
     previousUserIdRef.current = userId;
 

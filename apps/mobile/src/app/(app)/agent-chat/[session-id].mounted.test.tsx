@@ -678,6 +678,31 @@ describe('SessionDetailScreen metadata read that cannot settle', () => {
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
     expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(0);
   });
+
+  it('keeps the mounted manager when the paused read later resolves an organization', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'paused';
+    const renderer = await mountRoute();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    const mountedManager = managers.at(-1)?.manager;
+    expect(mountedManager).toBeDefined();
+
+    // Connectivity returns and the read resolves the session's organization.
+    // The manager adopts that scope from its own metadata read, so the route
+    // must not re-key the provider for it: a re-key would remount the
+    // transcript and drop the composer text under it.
+    queryState.isPending = false;
+    queryState.fetchStatus = 'idle';
+    queryState.data = { organization_id: 'org-a' };
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(managers).toHaveLength(1);
+    expect(managers.at(-1)?.manager).toBe(mountedManager);
+    expect(propOf(renderer.root.findByType(AgentSessionProvider), 'organizationId')).toBe('org-a');
+  });
 });
 
 describe('SessionDetailScreen restored scope', () => {

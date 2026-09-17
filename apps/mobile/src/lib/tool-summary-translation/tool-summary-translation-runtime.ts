@@ -129,6 +129,23 @@ const retryable = new Map<string, QueueItem>();
 // re-importing, and a failed load is retried by the next batch.
 let clientPromise: Promise<typeof toolSummaryTranslationClient> | null = null;
 
+/**
+ * The store writes `remember` has dispatched that have not settled yet. A
+ * sign-out must drain them before it clears the disk scope: a write that
+ * started under the signed-out account can otherwise land after the clear and
+ * leave its entry behind.
+ */
+const pendingPersists = new Set<Promise<void>>();
+
+/** Tracks one fire-and-forget store write until it settles. */
+function trackPersist(write: Promise<void>): void {
+  pendingPersists.add(write);
+  void (async () => {
+    await write;
+    pendingPersists.delete(write);
+  })();
+}
+
 async function loadClient(): Promise<typeof toolSummaryTranslationClient> {
   const pending = (clientPromise ??= import('./tool-summary-translation-client'));
   try {
@@ -411,7 +428,7 @@ function remember(resolved: ResolvedTranslation[]): void {
   version += 1;
   emit();
   for (const entry of resolved) {
-    void persistTranslation(entry);
+    trackPersist(persistTranslation(entry));
   }
 }
 
@@ -688,4 +705,21 @@ export function clearToolSummaryTranslationMemory(): void {
   surfaceInterest.clear();
   version += 1;
   emit();
+}
+
+/**
+ * Sign-out: reset the in-memory state and settle the store writes it already
+ * dispatched, so the caller can drop the disk scope afterwards with no write
+ * left to land on it.
+ *
+ * The order is load-bearing. {@link clearToolSummaryTranslationMemory} bumps
+ * the generation first, so a batch that resolves while the scope clear is in
+ * flight is discarded by `runBatch` instead of remembered; the drain then
+ * covers the writes dispatched before the bump, because a fire-and-forget
+ * persist that started under the signed-out account must not reach the scope
+ * after it was cleared. Resolves once no such write is outstanding.
+ */
+export async function clearToolSummaryTranslationMemoryForSignOut(): Promise<void> {
+  clearToolSummaryTranslationMemory();
+  await Promise.allSettled(pendingPersists);
 }

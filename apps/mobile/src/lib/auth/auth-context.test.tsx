@@ -123,6 +123,7 @@ const toolSummaryTranslationCacheMock = vi.hoisted(() => ({
 // is dropped with the disk scope, without loading the transcript graph.
 const toolSummaryTranslationRuntimeMock = vi.hoisted(() => ({
   clearToolSummaryTranslationMemory: vi.fn(),
+  clearToolSummaryTranslationMemoryForSignOut: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Hoisted so the FIFO and failure-matrix tests can hold remote cleanup open or
@@ -229,6 +230,8 @@ vi.mock(
     ...(await importOriginal()),
     clearToolSummaryTranslationMemory:
       toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemory,
+    clearToolSummaryTranslationMemoryForSignOut:
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut,
   })
 );
 
@@ -820,12 +823,21 @@ describe('sign-out teardown ordering', () => {
     ).toHaveBeenCalledTimes(1);
     // The runtime's in-memory retry memory and cache hold the same tool text:
     // without this reset the next account's retry re-sends it to the gateway.
+    // It resolves only once the writes already dispatched have settled, so the
+    // disk scope clear can never race one of them.
     expect(
-      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemory
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut
     ).toHaveBeenCalledTimes(1);
+    const runtimeResetOrder: number =
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut.mock
+        .invocationCallOrder[0];
     const translationClearOrder: number =
       toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut.mock
         .invocationCallOrder[0];
+    // The runtime reset (generation bump + dispatched-write drain) resolves
+    // before the disk scope is cleared, so no fire-and-forget persist can land
+    // after the scope is gone.
+    expect(runtimeResetOrder).toBeLessThan(translationClearOrder);
     const clearOrder: number = clearMock.mock.invocationCallOrder[0];
     expect(translationClearOrder).toBeLessThan(clearOrder);
 

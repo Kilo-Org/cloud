@@ -70,6 +70,22 @@ vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
     toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut,
 }));
 
+// Hoisted so the account-switch test can assert the runtime reset settles the
+// writes it dispatched before the disk scope clear, without loading the
+// transcript graph.
+const toolSummaryTranslationRuntimeMock = vi.hoisted(() => ({
+  clearToolSummaryTranslationMemoryForSignOut: vi.fn(async (): Promise<void> => undefined),
+}));
+
+vi.mock(
+  '@/lib/tool-summary-translation/tool-summary-translation-runtime',
+  async importOriginal => ({
+    ...(await importOriginal()),
+    clearToolSummaryTranslationMemoryForSignOut:
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut,
+  })
+);
+
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: vi.fn(() => identityMock.value),
 }));
@@ -328,6 +344,19 @@ describe('CachePersistenceMount', () => {
     expect(
       toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut
     ).toHaveBeenCalledTimes(1);
+    // The runtime reset (generation bump + dispatched-write drain) resolves
+    // before the disk scope is cleared, so a fire-and-forget persist from the
+    // previous account cannot land after the scope is gone.
+    expect(
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut
+    ).toHaveBeenCalledTimes(1);
+    const runtimeResetOrder =
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut.mock
+        .invocationCallOrder[0] ?? 0;
+    const translationClearOrder =
+      toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut.mock
+        .invocationCallOrder[0] ?? 0;
+    expect(runtimeResetOrder).toBeLessThan(translationClearOrder);
     act(() => {
       renderer.unmount();
     });

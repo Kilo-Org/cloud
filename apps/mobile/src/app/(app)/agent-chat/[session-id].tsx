@@ -288,13 +288,22 @@ export default function SessionDetailScreen() {
 
   return (
     <AgentSessionProvider
-      // Keyed on the resolved scope, not the live owner: a cold start mounts
-      // with `owner.userId === null` and the restored id, and the live
+      // Keyed on the resolved account scope, not the live owner: a cold start
+      // mounts with `owner.userId === null` and the restored id, and the live
       // `getMe` confirmation arrives later. Confirming the same account must
       // not remount the session subtree — the manager, transcript and composer
       // text all live below this key — while a stale or different hint still
       // remounts because the resolved id changes.
-      key={`${owner.generation}:${sessionScopeUserId}:${sessionId}:${organizationId ?? 'personal'}`}
+      //
+      // The metadata-derived organization is deliberately not part of the key:
+      // the metadata read can be paused or stalled when this route mounts the
+      // session on its persisted transcript (see `metadataPhase` above), and
+      // the manager adopts the organization its own read resolves, so re-keying
+      // on it would remount — new manager, transcript flash, composer text
+      // lost — for a scope the manager applies in place. An explicit route
+      // organization still re-keys, because it is authoritative from the first
+      // frame.
+      key={`${owner.generation}:${sessionScopeUserId}:${sessionId}:${routeOrganizationId ?? 'personal'}`}
       organizationId={organizationId}
       restoredUserId={restoredUserId ?? undefined}
     >

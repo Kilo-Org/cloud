@@ -855,6 +855,57 @@ describe('retry of unresolved summaries after a connection recovery', () => {
     expect(mod.getTranslation('part-1', 'hello', 'de', MODEL.id)).toBeUndefined();
   });
 
+  it('discards a batch that resolves after the sign-out reset', async () => {
+    const mod = await loadRuntime();
+    mod.setConfig({ enabled: true, model: MODEL });
+    const resolvers = pendingBatches();
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'summary-0', language: 'de', model: MODEL });
+    await vi.waitFor(() => {
+      expect(requestMock).toHaveBeenCalledTimes(1);
+    });
+
+    // Sign-out while the batch is in flight: its result belongs to the
+    // signed-out account's generation, so it must neither cache nor reach the
+    // store after the disk scope clear that follows.
+    await mod.clearToolSummaryTranslationMemoryForSignOut();
+    resolvers[0]?.(['translated']);
+    await flushBatch();
+
+    expect(mod.getTranslation('part-1', 'summary-0', 'de', MODEL.id)).toBeUndefined();
+    expect(writeMock).not.toHaveBeenCalled();
+  });
+
+  it('settles a dispatched store write before the sign-out reset resolves', async () => {
+    const mod = await loadRuntime();
+    echoBatch();
+    // Hold the store write open: the runtime persists fire-and-forget, so a
+    // sign-out that cleared the disk scope without waiting for this write could
+    // let the signed-out account's entry land after the scope is gone.
+    const gate = Promise.withResolvers<null>();
+    writeMock.mockImplementation(
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- the mock hands back a promise the test resolves later
+      () => gate.promise
+    );
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await vi.waitFor(() => {
+      expect(writeMock).toHaveBeenCalledTimes(1);
+    });
+
+    let settled = false;
+    const signOut = (async () => {
+      await mod.clearToolSummaryTranslationMemoryForSignOut();
+      settled = true;
+    })();
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    gate.resolve(null);
+    await signOut;
+    expect(settled).toBe(true);
+  });
+
   it('caps the retry memory, evicting the oldest unresolved summaries', async () => {
     const mod = await loadRuntime();
     requestMock.mockRejectedValue(new Error('gateway down'));

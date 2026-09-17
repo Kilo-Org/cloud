@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { setConfig } from './tool-summary-translation-runtime';
+import { retryUnresolvedTranslations, setConfig } from './tool-summary-translation-runtime';
 import { useTranslatedToolSummary } from './use-translated-tool-summary';
 
 const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
@@ -83,6 +83,13 @@ function mountProbes(specs: ProbeSpec[]): {
 function mount(spec: ProbeSpec): { latest: () => string; unmount: () => void } {
   const probes = mountProbes([spec]);
   return { latest: () => probes.latest(0), unmount: probes.unmount };
+}
+
+function requestedTexts(callIndex: number): readonly string[] {
+  return (
+    (requestMock.mock.calls[callIndex]?.[0] as { texts: readonly string[] } | undefined)?.texts ??
+    []
+  );
 }
 
 async function settle(): Promise<void> {
@@ -213,14 +220,21 @@ describe('useTranslatedToolSummary', () => {
     unmount();
   });
 
-  it('keeps serving a text a second surface still shows when the first surface changes', async () => {
-    // The row and the sheet both show the streaming string. The row's text
-    // then settles while the sheet's stays on it: the row's cleanup releases
-    // only its own interest, so the sheet's copy must still be requested and
-    // the row's settled text requested on its own key.
+  it('releases only the interest of the surface whose text changed', async () => {
+    // The row and the sheet both show the streaming string while the gateway is
+    // unreachable, so the failed text stays remembered for a reconnect. Only
+    // the first surface's text settles: its cleanup must release its own
+    // interest, not the sheet's, so the sheet's copy is still re-requested.
+    // Once the sheet settles too no surface asks for the streaming string any
+    // more, and a reconnect must not re-send it.
     requestMock.mockImplementation(
       // eslint-disable-next-line typescript-eslint/require-await -- the mock answers the batch synchronously
-      async ({ texts }: { texts: readonly string[] }) => texts.map(text => `de:${text}`)
+      async ({ texts }: { texts: readonly string[] }) => {
+        if (texts.includes('partial')) {
+          throw new Error('gateway down');
+        }
+        return texts.map(text => `de:${text}`);
+      }
     );
     setConfig({ enabled: true, model: MODEL });
     const current: string[] = ['', ''];
@@ -239,8 +253,7 @@ describe('useTranslatedToolSummary', () => {
       );
     });
     await settle();
-    expect(current[0]).toBe('de:partial');
-    expect(current[1]).toBe('de:partial');
+    expect(requestMock).toHaveBeenCalledTimes(1);
 
     // Only the first surface's text settles: its effect re-runs, the second
     // surface's does not.
@@ -249,9 +262,31 @@ describe('useTranslatedToolSummary', () => {
     });
     await settle();
 
-    expect(requestMock).toHaveBeenCalledTimes(2);
     expect(current[0]).toBe('de:final');
-    expect(current[1]).toBe('de:partial');
+    expect(current[1]).toBe('partial');
+
+    // The sheet still asks for the streaming string, so a reconnect must still
+    // re-send it.
+    act(() => {
+      retryUnresolvedTranslations();
+    });
+    await settle();
+    expect(requestMock).toHaveBeenCalledTimes(3);
+    expect(requestedTexts(2)).toEqual(['partial']);
+
+    // The sheet settles too. No surface asks for the streaming string any more,
+    // so it must be dropped: the reconnect below re-sends nothing.
+    act(() => {
+      ref.renderer?.update(createElement('View', null, probe('final', 0), probe('final', 1)));
+    });
+    await settle();
+    act(() => {
+      retryUnresolvedTranslations();
+    });
+    await settle();
+
+    expect(current[1]).toBe('de:final');
+    expect(requestMock).toHaveBeenCalledTimes(3);
     act(() => {
       ref.renderer?.unmount();
     });

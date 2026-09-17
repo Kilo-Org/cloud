@@ -87,6 +87,22 @@ async function settle(): Promise<void> {
   });
 }
 
+/** A promise the test settles by hand: holds one keystore read in flight. */
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  // The Promise executor supplies the resolver synchronously; the placeholder
+  // is replaced before any caller can invoke it.
+  const callbacks: { resolve: (value: T) => void } = { resolve: () => undefined };
+  const promise = new Promise<T>(resolve => {
+    callbacks.resolve = resolve;
+  });
+  return {
+    promise,
+    resolve: value => {
+      callbacks.resolve(value);
+    },
+  };
+}
+
 beforeEach(() => {
   getMe.data = undefined;
   getItemAsync.mockReset();
@@ -138,6 +154,27 @@ describe('useRestoredAccountId', () => {
     expect(probe.latest()).toBe('user-a');
 
     await probe.update(2);
+    await settle();
+
+    expect(probe.latest()).toBe('user-b');
+  });
+
+  it('ignores a hint read that settles after the auth epoch moves', async () => {
+    const first = deferred<string | null>();
+    const second = deferred<string | null>();
+    getItemAsync.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const probe = mount(1);
+
+    // The epoch moves while the first read is still in flight, so whatever it
+    // returns belongs to the account the new epoch replaced.
+    await probe.update(2);
+    second.resolve('user-b');
+    await settle();
+    expect(probe.latest()).toBe('user-b');
+
+    // The replaced read settles last: the hint it holds must not scope the next
+    // account's local data.
+    first.resolve('user-a');
     await settle();
 
     expect(probe.latest()).toBe('user-b');

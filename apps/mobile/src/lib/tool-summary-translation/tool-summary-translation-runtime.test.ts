@@ -142,16 +142,26 @@ describe('tool summary translation runtime', () => {
     }
   });
 
-  it('caches a resolved translation and bumps the version once per batch', async () => {
+  it('caches each resolved translation and bumps the version once per batch', async () => {
     const mod = await loadRuntime();
     echoBatch();
     const before = mod.getVersion();
+    const items = ['hello', 'goodbye', 'thanks'].map((text, index) => ({
+      itemId: `part-${index}`,
+      text,
+    }));
 
-    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
-    await waitForTranslations(mod, [{ itemId: 'part-1', text: 'hello' }]);
+    for (const item of items) {
+      mod.ensureTranslation({ ...item, language: 'de', model: MODEL });
+    }
+    await waitForTranslations(mod, items);
 
-    expect(mod.getTranslation('part-1', 'hello', 'de', MODEL.id)).toBe('de:hello');
-    expect(mod.getVersion()).toBeGreaterThan(before);
+    for (const { itemId, text } of items) {
+      expect(mod.getTranslation(itemId, text, 'de', MODEL.id)).toBe(`de:${text}`);
+    }
+    // One notification for the whole resolved batch, not one per item: a
+    // regression that bumped per resolved item would read `before + 3` here.
+    expect(mod.getVersion()).toBe(before + 1);
   });
 
   it('makes a second request for a summary enqueued after the window', async () => {

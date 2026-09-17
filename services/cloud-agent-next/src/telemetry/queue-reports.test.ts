@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
-import { emitRunStateReport } from './queue-reports.js';
+import {
+  CloudAgentQueueReportSchema,
+  type CloudAgentQueueReport,
+} from '@kilocode/worker-utils/cloud-agent-queue-report';
+import { buildRunStateReport, emitRunStateReport } from './queue-reports.js';
 import type { SessionMessageState } from '../session/session-message-state.js';
 import type { WorkspaceFailureSubtype } from '../shared/wrapper-bootstrap.js';
 
@@ -81,6 +84,28 @@ describe('Cloud Agent report emitter', () => {
     expect(JSON.stringify(reports)).not.toContain('never report');
     expect(JSON.stringify(reports)).not.toContain('secret');
     expect(JSON.stringify(reports)).not.toContain('model/test');
+  });
+
+  it('assembles a provider-classified failed run that passes the report validation boundary', () => {
+    const report = buildRunStateReport({
+      cloudAgentSessionId: 'agent_report',
+      run: {
+        messageId: 'msg_provider',
+        status: 'failed',
+        terminalAt: new Date(5).toISOString(),
+        failureStage: 'agent_activity',
+        failureCode: 'assistant_error',
+        failureResponsibility: 'provider',
+        failureReason: 'provider_unavailable',
+      },
+      occurredAt: 6,
+    });
+
+    expect(CloudAgentQueueReportSchema.safeParse(report).success).toBe(true);
+    expect(report.run).toMatchObject({
+      failureResponsibility: 'provider',
+      failureReason: 'provider_unavailable',
+    });
   });
 
   it('keeps diagnostic expiry tied to terminal time when a failed run is reported again later', async () => {

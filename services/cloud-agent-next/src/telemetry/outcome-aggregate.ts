@@ -36,6 +36,7 @@ export type FailureStageCodeCount = {
   stage: string;
   code: string;
   responsibility: string;
+  reason: string;
   count: number;
 };
 export type SessionSetupFailureCount = { stage: string; code: string; count: number };
@@ -43,6 +44,7 @@ export type SessionSetupFailureCount = { stage: string; code: string; count: num
 export type RoleOutcome = {
   completed: number;
   platformFailed: number;
+  providerFailed: number;
   userFailed: number;
   unknownFailed: number;
   interrupted: number;
@@ -50,6 +52,7 @@ export type RoleOutcome = {
   allFailed: number;
   platformFailureShare: number | null;
   unknownClassificationShare: number | null;
+  unknownSettledShare: number | null;
   failureStages: FailureStageCount[];
   failureStageCodes: FailureStageCodeCount[];
 };
@@ -61,6 +64,7 @@ export type GenerationOutcome = {
   followUp: RoleOutcome;
   totals: RoleOutcome;
   distinctPlatformAffectedSessions: number;
+  distinctProviderAffectedSessions: number;
   distinctUnknownAffectedSessions: number;
   sessionSetupFailures: SessionSetupFailureCount[];
   sessionSetupFailureCount: number;
@@ -75,12 +79,14 @@ type RunCountRow = {
   responsibility: string;
   failureStage: string;
   failureCode: string;
+  failureReason: string;
   runCount: number;
 };
 
 type DistinctAffectedRow = {
   generation: OutcomeGeneration;
   distinctPlatformAffectedSessions: number;
+  distinctProviderAffectedSessions: number;
   distinctUnknownAffectedSessions: number;
 };
 
@@ -93,7 +99,7 @@ type SessionSetupFailureRow = {
 
 type DatabaseTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 
-const unknownResponsibilityCondition: SQL = sql`(${cloud_agent_session_runs.failure_responsibility} is null or ${cloud_agent_session_runs.failure_responsibility} not in ('platform', 'user'))`;
+const unknownResponsibilityCondition: SQL = sql`(${cloud_agent_session_runs.failure_responsibility} is null or ${cloud_agent_session_runs.failure_responsibility} not in ('platform', 'provider', 'user'))`;
 
 export function generationExpression(sessionId: AnyColumn): SQL<OutcomeGeneration> {
   return sql<OutcomeGeneration>`case when left(${sessionId}, ${CONTROL_PLANE_SESSION_PREFIX.length}) = ${CONTROL_PLANE_SESSION_PREFIX} then 'control' else 'legacy' end`;
@@ -105,6 +111,7 @@ const responsibilityBucketExpression: SQL<string> = sql<string>`case when ${unkn
 
 const runFailureStageExpression: SQL<string> = sql<string>`coalesce(${cloud_agent_session_runs.failure_stage}, 'unknown')`;
 const runFailureCodeExpression: SQL<string> = sql<string>`coalesce(${cloud_agent_session_runs.failure_code}, 'unclassified')`;
+const runFailureReasonExpression: SQL<string> = sql<string>`coalesce(${cloud_agent_session_runs.failure_reason}, 'unclassified')`;
 const sessionFailureStageExpression: SQL<string> = sql<string>`coalesce(${cloud_agent_sessions.failure_stage}, 'unknown')`;
 const sessionFailureCodeExpression: SQL<string> = sql<string>`coalesce(${cloud_agent_sessions.failure_code}, 'unclassified')`;
 
@@ -136,6 +143,7 @@ async function readRunCounts(
       responsibility: responsibilityBucketExpression,
       failureStage: runFailureStageExpression,
       failureCode: runFailureCodeExpression,
+      failureReason: runFailureReasonExpression,
       runCount: sql<number>`count(*)::int`,
     })
     .from(cloud_agent_session_runs)
@@ -147,7 +155,7 @@ async function readRunCounts(
       )
     )
     .where(retainedWindow(cloud_agent_session_runs.terminal_at, window, retentionCutoffIso))
-    .groupBy(sql`1`, sql`2`, sql`3`, sql`4`, sql`5`, sql`6`);
+    .groupBy(sql`1`, sql`2`, sql`3`, sql`4`, sql`5`, sql`6`, sql`7`);
 }
 
 async function readDistinctAffectedSessions(
@@ -159,6 +167,7 @@ async function readDistinctAffectedSessions(
     .select({
       generation: generationExpression(cloud_agent_session_runs.cloud_agent_session_id),
       distinctPlatformAffectedSessions: sql<number>`(count(distinct ${cloud_agent_session_runs.cloud_agent_session_id}) filter (where ${cloud_agent_session_runs.failure_responsibility} = 'platform'))::int`,
+      distinctProviderAffectedSessions: sql<number>`(count(distinct ${cloud_agent_session_runs.cloud_agent_session_id}) filter (where ${cloud_agent_session_runs.failure_responsibility} = 'provider'))::int`,
       distinctUnknownAffectedSessions: sql<number>`(count(distinct ${cloud_agent_session_runs.cloud_agent_session_id}) filter (where ${unknownResponsibilityCondition}))::int`,
     })
     .from(cloud_agent_session_runs)
@@ -215,17 +224,17 @@ function compareByStageCodeResponsibility(
 ): number {
   const byStageCode = compareByStageCode(left, right);
   if (byStageCode !== 0) return byStageCode;
-  return left.responsibility < right.responsibility
-    ? -1
-    : left.responsibility > right.responsibility
-      ? 1
-      : 0;
+  if (left.responsibility !== right.responsibility) {
+    return left.responsibility < right.responsibility ? -1 : 1;
+  }
+  return left.reason < right.reason ? -1 : left.reason > right.reason ? 1 : 0;
 }
 
 function roleOutcome(rows: RunCountRow[]): RoleOutcome {
   let completed = 0;
   let interrupted = 0;
   let platformFailed = 0;
+  let providerFailed = 0;
   let userFailed = 0;
   let unknownFailed = 0;
   const stageTotals = new Map<string, number>();
@@ -243,11 +252,12 @@ function roleOutcome(rows: RunCountRow[]): RoleOutcome {
     if (row.status !== 'failed') continue;
 
     if (row.responsibility === 'platform') platformFailed += row.runCount;
+    else if (row.responsibility === 'provider') providerFailed += row.runCount;
     else if (row.responsibility === 'user') userFailed += row.runCount;
     else unknownFailed += row.runCount;
 
     stageTotals.set(row.failureStage, (stageTotals.get(row.failureStage) ?? 0) + row.runCount);
-    const key = `${row.failureStage}\u0000${row.failureCode}\u0000${row.responsibility}`;
+    const key = `${row.failureStage}\u0000${row.failureCode}\u0000${row.responsibility}\u0000${row.failureReason}`;
     const existing = stageCodes.get(key);
     if (existing) existing.count += row.runCount;
     else
@@ -255,16 +265,18 @@ function roleOutcome(rows: RunCountRow[]): RoleOutcome {
         stage: row.failureStage,
         code: row.failureCode,
         responsibility: row.responsibility,
+        reason: row.failureReason,
         count: row.runCount,
       });
   }
 
-  const allFailed = platformFailed + userFailed + unknownFailed;
+  const allFailed = platformFailed + providerFailed + userFailed + unknownFailed;
   const settled = completed + allFailed;
 
   return {
     completed,
     platformFailed,
+    providerFailed,
     userFailed,
     unknownFailed,
     interrupted,
@@ -272,6 +284,7 @@ function roleOutcome(rows: RunCountRow[]): RoleOutcome {
     allFailed,
     platformFailureShare: settled > 0 ? platformFailed / settled : null,
     unknownClassificationShare: allFailed > 0 ? unknownFailed / allFailed : null,
+    unknownSettledShare: settled > 0 ? unknownFailed / settled : null,
     failureStages: [...stageTotals]
       .map(([stage, count]) => ({ stage, count }))
       .sort(compareByStage),
@@ -298,6 +311,7 @@ export function assembleGenerationAggregates(
       followUp: roleOutcome(generationRuns.filter(row => row.role === 'follow_up')),
       totals: roleOutcome(generationRuns),
       distinctPlatformAffectedSessions: distinct?.distinctPlatformAffectedSessions ?? 0,
+      distinctProviderAffectedSessions: distinct?.distinctProviderAffectedSessions ?? 0,
       distinctUnknownAffectedSessions: distinct?.distinctUnknownAffectedSessions ?? 0,
       sessionSetupFailures: setupFailures,
       sessionSetupFailureCount: setupFailures.reduce((sum, row) => sum + row.count, 0),

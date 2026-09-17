@@ -90,7 +90,12 @@ export function toAdmissionFailureCode(code: string | undefined): CloudAgentAdmi
     : 'UNKNOWN';
 }
 
-export const CLOUD_AGENT_FAILURE_RESPONSIBILITIES = ['platform', 'user', 'unknown'] as const;
+export const CLOUD_AGENT_FAILURE_RESPONSIBILITIES = [
+  'platform',
+  'provider',
+  'user',
+  'unknown',
+] as const;
 export const CloudAgentFailureResponsibilitySchema = z.enum(CLOUD_AGENT_FAILURE_RESPONSIBILITIES);
 export type CloudAgentFailureResponsibility = z.infer<typeof CloudAgentFailureResponsibilitySchema>;
 

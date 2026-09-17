@@ -103,7 +103,19 @@ export function findPartById(messages: readonly StoredMessage[], partId: string)
 
 /** Sheet header title plus the projection's translation provenance. */
 export type PartDetailTitle = {
-  title: string;
+  /**
+   * The already-localized label the header renders before `text` (`"read: "`
+   * for a read tool), or null when the text stands alone. Never translated:
+   * the projection's title is app copy or a raw tool id.
+   */
+  prefix: string | null;
+  /**
+   * The label the header translates. For a tool this is the row's non-empty
+   * `display.subtitle`, so the row's cached translation is the header's and the
+   * sheet opens already translated; an empty subtitle falls back to the tool
+   * title rather than rendering a blank header.
+   */
+  text: string;
   translatable: boolean;
 };
 
@@ -112,15 +124,17 @@ export type PartDetailTitle = {
  * fixed row uses so the title updates live with the part. Reasoning shows the
  * stream state; anything else is an unreachable fallback.
  *
- * `translatable` carries the projection's provenance: the title is built from
- * the tool label plus its content, so a row the projection marks non-translatable
- * (an already-localized fallback label or a raw tool id) must not be sent to the
- * gateway either.
+ * `translatable` carries the projection's provenance: the text is the row's
+ * projected label, so a row the projection marks non-translatable (an
+ * already-localized fallback label or a raw tool id) must not be sent to the
+ * gateway either. The empty-subtitle fallback is the tool title too, so it is
+ * never translated.
  */
 export function getPartDetailTitle(part: Part): PartDetailTitle {
   if (isReasoningPart(part)) {
     return {
-      title: isPartStreaming(part)
+      prefix: null,
+      text: isPartStreaming(part)
         ? i18n.t('agentChat.partDetail.thinking')
         : i18n.t('agentChat.partDetail.thought'),
       translatable: false,
@@ -128,12 +142,18 @@ export function getPartDetailTitle(part: Part): PartDetailTitle {
   }
   if (isToolPart(part)) {
     const display = getToolDisplay(part);
+    // A bash/task call whose `description` is the empty string projects an
+    // empty subtitle, and an empty header tells the user nothing about the
+    // call; fall back to the tool title the row's prefix would have shown.
+    const hasSubtitle = Boolean(display.subtitle);
     return {
-      title: display.subtitle ? `${display.title}: ${display.subtitle}` : display.title,
-      translatable: display.translatable,
+      prefix: display.subtitle ? display.title : null,
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty subtitle must fall back to the tool title; ?? keeps the blank header
+      text: display.subtitle || display.title,
+      translatable: hasSubtitle && display.translatable,
     };
   }
-  return { title: i18n.t('common.details'), translatable: false };
+  return { prefix: null, text: i18n.t('common.details'), translatable: false };
 }
 
 /**

@@ -30,7 +30,13 @@ describe('scoped Stop maintenance', () => {
         { messageId: 'a', operationId: OPERATION_ID, cleanupDeadlineAt: 11_001 },
         1_000
       )
-    ).toBeUndefined();
+    ).toEqual({ messageId: 'a', operationId: OPERATION_ID, cleanupDeadlineAt: 11_000 });
+    expect(
+      parseScopedStopMaintenance(
+        { messageId: 'a', operationId: OPERATION_ID, cleanupDeadlineAt: 11_500 },
+        1_000
+      )
+    ).toEqual({ messageId: 'a', operationId: OPERATION_ID, cleanupDeadlineAt: 11_000 });
   });
 
   it('sends strict Stop fields only to a negotiated peer', () => {

@@ -8381,6 +8381,36 @@ describe('SandboxSession durable Stop wiring', () => {
     });
   });
 
+  it('saturates a future-skewed Stop deadline to the DO clock before dispatch', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    const state = await fixture.session.getControlState();
+    if (!state) throw new Error('Missing control state');
+    const request = createControlStopRequest(
+      state,
+      Date.now() + 500,
+      '33333333-3333-4333-8333-333333333337'
+    );
+
+    await expect(fixture.session.interruptExecution(request)).resolves.toMatchObject({
+      state: 'accepted',
+      cleanupDeadlineAt: 1_010_000,
+    });
+    await fixture.flush();
+
+    const abort = fixture.control.request.mock.calls
+      .map(([input]) => input)
+      .find(input => input.operation === 'session.abort');
+    expect(abort).toMatchObject({
+      payload: {
+        messageId: 'a',
+        operationId: request.operationId,
+        cleanupDeadlineAt: 1_010_000,
+      },
+    });
+  });
+
   it('retains the immutable pending Stop receipt after A leaves active recovery targets', async () => {
     const fixture = sessionFixture();
     await fixture.admit('a');

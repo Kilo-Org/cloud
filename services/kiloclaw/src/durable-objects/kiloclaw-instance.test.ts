@@ -2546,6 +2546,55 @@ describe('reconciliation: volume', () => {
     expect(flyClient.createVolumeWithFallback).toHaveBeenCalled();
     expect(storage._store.get('flyVolumeId')).toBe('vol-new');
   });
+
+  it('does not adopt a matching volume that another machine holds', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyVolumeId: null,
+      flyMachineId: null,
+      lastStartedAt: Date.now(),
+    });
+
+    const name = volumeNameFromSandboxId('sandbox-1');
+    (flyClient.listVolumes as Mock).mockResolvedValueOnce([
+      flyVolume({ id: 'vol-orphan', name, attached_machine_id: 'machine-other' }),
+    ]);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'iad',
+    });
+
+    await instance.alarm();
+
+    expect(storage._store.get('flyVolumeId')).toBe('vol-new');
+  });
+
+  it('does not log data loss when a lost volume pointer is repaired by adopting a fork', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyVolumeId: 'vol-dead', lastStartedAt: Date.now() });
+
+    (flyClient.getVolume as Mock).mockRejectedValueOnce(new FlyApiError('not found', 404, '{}'));
+    (flyClient.listVolumes as Mock).mockResolvedValueOnce([
+      flyVolume({ id: 'vol-fork', name: volumeNameFromSandboxId('sandbox-1') }),
+    ]);
+
+    await instance.alarm();
+
+    expect(storage._store.get('flyVolumeId')).toBe('vol-fork');
+    expect(flyClient.createVolumeWithFallback).not.toHaveBeenCalled();
+
+    const replaced = (console.log as Mock).mock.calls
+      .map((args: unknown[]) => {
+        try {
+          return JSON.parse(String(args[0])) as { action?: string; data_loss?: boolean };
+        } catch {
+          return null;
+        }
+      })
+      .find(entry => entry?.action === 'replace_lost_volume');
+    expect(replaced).toBeDefined();
+    expect(replaced?.data_loss).toBe(false);
+  });
 });
 
 describe('destroying: no recreation', () => {

@@ -96,13 +96,30 @@ async function adoptExistingVolume(
   reason: string
 ): Promise<FlyVolume | null> {
   const volumes = await fly.listVolumes(flyConfig);
-  const candidates = volumes
+  const matching = volumes
     .filter(volume => volume.name === expectedName)
     .filter(volume => !NON_ADOPTABLE_VOLUME_STATES.has(volume.state))
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
 
+  // A Fly volume is attached to at most one machine. Adopt only volumes that no
+  // machine holds, or ones the DO's known machine already holds, so a new machine
+  // never mounts a volume Fly considers in use.
+  const isReusable = (volume: FlyVolume) =>
+    volume.attached_machine_id === null || volume.attached_machine_id === state.flyMachineId;
+  const candidates = matching.filter(isReusable);
+  const heldElsewhere = matching.filter(volume => !isReusable(volume));
+
   const [adopted] = candidates;
-  if (!adopted) return null;
+  if (!adopted) {
+    if (heldElsewhere.length > 0) {
+      doWarn(state, 'Volume adoption skipped: matching volumes are attached to another machine', {
+        expected_name: expectedName,
+        volume_ids: heldElsewhere.map(volume => volume.id),
+        attached_machine_ids: heldElsewhere.map(volume => volume.attached_machine_id),
+      });
+    }
+    return null;
+  }
 
   if (candidates.length > 1) {
     doWarn(state, 'Multiple usable volumes match the instance; adopting the newest', {
@@ -134,9 +151,9 @@ export async function ensureVolume(
   providerState: FlyProviderState,
   env: KiloClawEnv,
   reason: string
-): Promise<FlyProviderState> {
-  if (providerState.volumeId) return providerState;
-  if (!state.sandboxId) return providerState;
+): Promise<{ providerState: FlyProviderState; adoptedVolumeId: string | null }> {
+  if (providerState.volumeId) return { providerState, adoptedVolumeId: null };
+  if (!state.sandboxId) return { providerState, adoptedVolumeId: null };
 
   const expectedName = volumeNameFromSandboxId(state.sandboxId);
   let adopted: FlyVolume | null = null;
@@ -153,9 +170,12 @@ export async function ensureVolume(
   }
   if (adopted) {
     return {
-      ...providerState,
-      volumeId: adopted.id,
-      region: adopted.region,
+      providerState: {
+        ...providerState,
+        volumeId: adopted.id,
+        region: adopted.region,
+      },
+      adoptedVolumeId: adopted.id,
     };
   }
 
@@ -184,9 +204,12 @@ export async function ensureVolume(
   });
 
   return {
-    ...providerState,
-    volumeId: volume.id,
-    region: volume.region,
+    providerState: {
+      ...providerState,
+      volumeId: volume.id,
+      region: volume.region,
+    },
+    adoptedVolumeId: null,
   };
 }
 

@@ -65,6 +65,11 @@ public final class KiloSystemSearchModule: Module {
     OnStopObserving {
       self.stopForwardingOpenEvents()
     }
+    // A module instance is destroyed without necessarily stopping observation
+    // (a reload tears the bridge down), so the observer is released here too.
+    OnDestroy {
+      self.stopForwardingOpenEvents()
+    }
   }
 
   private func apply(add: [SystemSearchRecord], removeIds: [String], promise: Promise) {

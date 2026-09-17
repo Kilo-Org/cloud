@@ -34,6 +34,7 @@ import expo.modules.kotlin.records.Field
 import expo.modules.kotlin.records.Record
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutionException
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
@@ -123,6 +124,11 @@ class KiloSystemSearchModule : Module() {
   // The launching Intent is the tap on a cold start, and it is delivered once:
   // every later delivery comes from `OnNewIntent` instead.
   private var launchIntentRead = false
+
+  // Serializes the single-shot slot's write against its read-and-clear: the
+  // write runs on the main thread that delivers the Intent, the read on the
+  // module queue that answers JavaScript.
+  private val pendingRouteLock = Any()
 
   override fun definition() = ModuleDefinition {
     Name("KiloSystemSearch")
@@ -268,22 +274,37 @@ class KiloSystemSearchModule : Module() {
   /**
    * Writes the single-shot slot; false when there is no context to write it in.
    * The slot carries the identifier exactly as the platform handed it back.
+   *
+   * Runs on the main thread that delivers `OnNewIntent`, which is why it shares
+   * `pendingRouteLock` with the read-and-clear below.
    */
   private fun writePendingRoute(identifier: String): Boolean {
     val context = appContext.reactContext ?: return false
-    context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
-      .edit()
-      .putString(PENDING_ROUTE_KEY, identifier)
-      .apply()
+    synchronized(pendingRouteLock) {
+      context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+        .edit()
+        .putString(PENDING_ROUTE_KEY, identifier)
+        .apply()
+    }
     return true
   }
 
+  /**
+   * The slot's identifier, read and cleared as one step on the module queue.
+   *
+   * The write above happens on the main thread and `SharedPreferences` has no
+   * read-and-clear operation, so the get and the remove are made atomic under
+   * `pendingRouteLock`: otherwise a tap written between them is removed without
+   * ever being resolved, and that tap never navigates.
+   */
   private fun readAndClearPendingRoute(): String? {
     val context = appContext.reactContext ?: return null
     val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
-    val identifier = preferences.getString(PENDING_ROUTE_KEY, null) ?: return null
-    preferences.edit().remove(PENDING_ROUTE_KEY).apply()
-    return identifier
+    return synchronized(pendingRouteLock) {
+      val identifier = preferences.getString(PENDING_ROUTE_KEY, null) ?: return@synchronized null
+      preferences.edit().remove(PENDING_ROUTE_KEY).apply()
+      identifier
+    }
   }
 }
 
@@ -307,23 +328,42 @@ private fun createSearchBackend(context: Context): SearchBackend =
     JetpackSearchBackend(context)
   }
 
+/**
+ * Opens the platform AppSearch session, releasing what it opened when either
+ * step fails.
+ *
+ * `openBackend` keeps a backend only once its constructor returns, so a throw
+ * here — an unavailable service, a failed `createSearchSession` or `setSchema`
+ * — would otherwise leave the executor's non-daemon thread running, and any
+ * session already created with it, once per retry of the lazy open.
+ */
+@RequiresApi(Build.VERSION_CODES.S)
+private fun openPlatformSession(context: Context, executor: ExecutorService): AppSearchSession {
+  var opened: AppSearchSession? = null
+  try {
+    val manager = context.getSystemService(AppSearchManager::class.java)
+      ?: throw CodedException("The system search index is unavailable on this device.")
+    val searchContext = AppSearchManager.SearchContext.Builder(DATABASE_NAME).build()
+    val created = awaitPlatformResult { callback ->
+      manager.createSearchSession(searchContext, executor, callback)
+    }
+    opened = created
+    awaitPlatformResult { callback ->
+      created.setSchema(platformSchemaRequest(), executor, executor, callback)
+    }
+    return created
+  } catch (error: Throwable) {
+    opened?.close()
+    executor.shutdown()
+    throw error
+  }
+}
+
 /** The platform `android.app.appsearch` store, available from API 31. */
 @RequiresApi(Build.VERSION_CODES.S)
 private class PlatformSearchBackend(context: Context) : SearchBackend {
   private val executor = Executors.newSingleThreadExecutor()
-  private val session: AppSearchSession
-
-  init {
-    val manager = context.getSystemService(AppSearchManager::class.java)
-      ?: throw CodedException("The system search index is unavailable on this device.")
-    val searchContext = AppSearchManager.SearchContext.Builder(DATABASE_NAME).build()
-    session = awaitPlatformResult { callback ->
-      manager.createSearchSession(searchContext, executor, callback)
-    }
-    awaitPlatformResult { callback ->
-      session.setSchema(platformSchemaRequest(), executor, executor, callback)
-    }
-  }
+  private val session: AppSearchSession = openPlatformSession(context, executor)
 
   override fun put(documents: List<IndexedDocument>) {
     if (documents.isEmpty()) return
@@ -368,15 +408,30 @@ private class PlatformSearchBackend(context: Context) : SearchBackend {
   }
 }
 
-/** The Jetpack local store that backs the same session contract below API 31. */
-private class JetpackSearchBackend(context: Context) : SearchBackend {
-  private val session: JetpackSession = LocalStorage
+/**
+ * Opens the Jetpack local store's session, releasing it when the schema write
+ * fails.
+ *
+ * As on the platform store, `openBackend` keeps a backend only once its
+ * constructor returns, so a failed `setSchema` would otherwise leave this
+ * session open once per retry of the lazy open.
+ */
+private fun openJetpackSession(context: Context): JetpackSession {
+  val session = LocalStorage
     .createSearchSessionAsync(LocalStorage.SearchContext.Builder(context, DATABASE_NAME).build())
     .awaitFuture()
-
-  init {
+  try {
     session.setSchemaAsync(jetpackSchemaRequest()).awaitFuture()
+  } catch (error: Throwable) {
+    session.close()
+    throw error
   }
+  return session
+}
+
+/** The Jetpack local store that backs the same session contract below API 31. */
+private class JetpackSearchBackend(context: Context) : SearchBackend {
+  private val session: JetpackSession = openJetpackSession(context)
 
   override fun put(documents: List<IndexedDocument>) {
     if (documents.isEmpty()) return

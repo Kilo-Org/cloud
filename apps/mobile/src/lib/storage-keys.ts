@@ -109,6 +109,13 @@ export const TOUR_COMPLETED_KEY_PREFIX = 'tour-completed-';
  * expiresAt }` entries; ids and timestamps only, no secrets.
  */
 export const SESSION_ATTENTION_KEY = 'session-attention';
+/**
+ * Encrypted-KV scope for the offline tool-summary translation cache. Holds one
+ * entry per translated summary: the item's persistent id, the language tag,
+ * the model id, the source summary, the translated summary, and `storedAt` —
+ * ids, tags, and text only, no secrets. The caller owns the expiry rule.
+ */
+export const TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE = 'tool-summary-translation-cache';
 
 /**
  * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,

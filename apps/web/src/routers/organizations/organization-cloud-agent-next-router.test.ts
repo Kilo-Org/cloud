@@ -3,6 +3,7 @@ import { inspect } from 'node:util';
 import { DrizzleQueryError } from 'drizzle-orm';
 import type * as TrpcInitModule from '@/lib/trpc/init';
 import type { createWorktreeChat as CreateWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
+import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type * as MinimumVersionModule from '@/lib/trpc/min-version';
 import type * as OrganizationUtilsModule from '@/routers/organizations/utils';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
@@ -30,9 +31,18 @@ import type { BitbucketOrganizationRepositoryListResult } from '@/lib/cloud-agen
 import { TRPCError } from '@trpc/server';
 import type { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import type {
-  basePrepareSessionNextSchema,
+  organizationPrepareSessionNextSchema,
   SandboxStatusSnapshot,
 } from '@/routers/cloud-agent-next-schemas';
+import {
+  getSandboxAllocationRequest,
+  SELECTABLE_SANDBOX_ALLOCATIONS,
+  type SandboxAllocationInput,
+  type SandboxSelectionCapabilities,
+  type SelectableSandboxAllocation,
+  type SelectableSandboxAllocationRequest,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import type { GetSandboxSelectionOptionsInput } from '@/lib/cloud-agent-next/cloud-agent-client';
 
 const ORGANIZATION_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
 
@@ -46,6 +56,7 @@ const mockPrepareSession = jest.fn<
     bitbucketWorkspaceUuid?: string;
     bitbucketRepositoryUuid?: string;
     devcontainer?: boolean;
+    sandboxAllocation?: SandboxAllocationInput;
     kilocodeOrganizationId?: string;
     attachments?: AttachmentReference;
   }) => Promise<{
@@ -82,6 +93,11 @@ const mockGenerateCloudAgentAttachmentUploadUrl = jest.fn<
 >(() => Promise.resolve({ signedUrl: 'signed', key: 'key', expiresAt: 'expires' }));
 
 const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
+const mockGetPendingInteractions =
+  jest.fn<
+    (cloudAgentSessionId: string) => Promise<{ questions: unknown[]; permissions: unknown[] }>
+  >();
+const mockGetMessageResult = jest.fn<CloudAgentNextClient['getMessageResult']>();
 const mockCreateWorktreeChat = jest.fn<typeof CreateWorktreeChat>();
 
 const mockCancelQueuedMessage =
@@ -97,10 +113,16 @@ const mockGetWorktreeFile =
     (input: WorktreeFileQuery & { cloudAgentSessionId: string }) => Promise<GetWorktreeFileOutput>
   >();
 
+const mockGetSandboxSelectionOptions =
+  jest.fn<(input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>>();
+
 const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
+  getSandboxSelectionOptions: mockGetSandboxSelectionOptions,
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
+  getMessageResult: mockGetMessageResult,
+  getPendingInteractions: mockGetPendingInteractions,
   cancelQueuedMessage: mockCancelQueuedMessage,
   getSandboxStatus: mockGetSandboxStatus,
   getWorktreeChanges: mockGetWorktreeChanges,
@@ -235,6 +257,11 @@ jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
   generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
 }));
 
+jest.mock('@/lib/r2/cloud-agent-pending-uploads', () => ({
+  linkPendingUploads: jest.fn(),
+  releasePendingUploads: jest.fn(),
+}));
+
 jest.mock('@/routers/organizations/utils', () => {
   const trpcInit = jest.requireActual<typeof TrpcInitModule>('@/lib/trpc/init');
   const zod = jest.requireActual<typeof ZodModule>('zod');
@@ -256,9 +283,11 @@ jest.mock('@/routers/organizations/utils', () => {
 });
 
 let createCaller: (ctx: { user: User; headersList?: Headers }) => {
-  prepareSession: (
-    input: z.infer<typeof basePrepareSessionNextSchema> & { organizationId: string }
-  ) => Promise<{
+  getSandboxSelectionOptions: (input: {
+    organizationId: string;
+    devcontainer?: boolean;
+  }) => Promise<SandboxSelectionCapabilities>;
+  prepareSession: (input: z.input<typeof organizationPrepareSessionNextSchema>) => Promise<{
     cloudAgentSessionId: string;
     kiloSessionId: string;
   }>;
@@ -272,9 +301,17 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     worktreeId: string;
     replayed?: boolean;
   }>;
+  getMessageResult: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+    expectedWorktreeId: `worktree_${string}`;
+    messageId: string;
+  }) => ReturnType<CloudAgentNextClient['getMessageResult']>;
   sendMessage: (input: {
     organizationId: string;
     cloudAgentSessionId: string;
+    expectedWorktreeId?: `worktree_${string}`;
+    messageId?: string;
     payload:
       | { type: 'prompt'; prompt: string; mode: string; model: string }
       | { type: 'command'; command: string; arguments: string };
@@ -293,6 +330,10 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     sessionId: string;
     messageId: string;
   }) => Promise<unknown>;
+  getPendingInteractions: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+  }) => Promise<{ questions: unknown[]; permissions: unknown[] }>;
   listBitbucketRepositories: (input: {
     organizationId: string;
     forceRefresh?: boolean;
@@ -571,6 +612,8 @@ describe('organizationCloudAgentNextRouter.getSandboxStatus', () => {
 describe('organizationCloudAgentNextRouter worktree changes access', () => {
   const orgSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
   const personalSessionId = 'workspace_12345678-1234-4234-9234-123456789abd';
+  const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
+  const reviewMessageId = 'msg_123456789abc123456789ABCDE';
   let owner: User;
   let otherMember: User;
   let organization: Organization;
@@ -595,6 +638,7 @@ describe('organizationCloudAgentNextRouter worktree changes access', () => {
       {
         session_id: 'ses_changes_org',
         cloud_agent_session_id: orgSessionId,
+        cloud_agent_worktree_id: worktreeId,
         organization_id: organization.id,
         kilo_user_id: owner.id,
         created_on_platform: 'cloud-agent-web',
@@ -629,6 +673,129 @@ describe('organizationCloudAgentNextRouter worktree changes access', () => {
         role: 'owner',
       })
       .onConflictDoNothing();
+  });
+
+  describe.each(['sendMessage', 'getMessageResult'] as const)('review %s', procedure => {
+    const payload = {
+      type: 'prompt' as const,
+      prompt: 'Review feedback',
+      mode: 'code',
+      model: 'model/target',
+    };
+    function call(
+      user: User,
+      overrides: {
+        organizationId?: string;
+        cloudAgentSessionId?: string;
+        expectedWorktreeId?: `worktree_${string}`;
+      } = {}
+    ) {
+      const caller = createCaller({ user });
+      const input = {
+        organizationId: organization.id,
+        cloudAgentSessionId: orgSessionId,
+        expectedWorktreeId: worktreeId,
+        messageId: reviewMessageId,
+        ...overrides,
+      } satisfies Parameters<typeof caller.getMessageResult>[0];
+      return procedure === 'sendMessage'
+        ? caller.sendMessage({ ...input, payload })
+        : caller.getMessageResult(input);
+    }
+
+    beforeEach(() => {
+      mockGetMessageResult.mockResolvedValue({
+        cloudAgentSessionId: orgSessionId,
+        messageId: reviewMessageId,
+        status: 'queued',
+      });
+      mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValue({
+        isFree: false,
+        hasUserByokAvailable: false,
+      });
+    });
+
+    it('keeps admission billing checks and makes reconciliation passive', async () => {
+      await call(owner);
+      if (procedure === 'sendMessage') {
+        expect(mockRequireActiveSubscription).toHaveBeenCalled();
+        expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+          expect.objectContaining({
+            user: owner,
+            organizationId: organization.id,
+            modelId: payload.model,
+          })
+        );
+        expect(mockSendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            cloudAgentSessionId: orgSessionId,
+            payload,
+            messageId: reviewMessageId,
+          })
+        );
+        expect(mockSendMessage.mock.calls[0]?.[0]).not.toHaveProperty('expectedWorktreeId');
+      } else {
+        expect(mockGetMessageResult).toHaveBeenCalledWith({
+          cloudAgentSessionId: orgSessionId,
+          messageId: reviewMessageId,
+        });
+        expect(mockRequireActiveSubscription).not.toHaveBeenCalled();
+        expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+        expect(mockSendMessage).not.toHaveBeenCalled();
+      }
+    });
+
+    it('rejects the wrong worktree before any Worker call', async () => {
+      await expect(
+        call(owner, { expectedWorktreeId: 'worktree_22345678-1234-4234-9234-123456789abc' })
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
+
+    it('requires the same owner and exact organization', async () => {
+      await expect(call(otherMember)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(call(owner, { organizationId: otherOrganization.id })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+      await expect(call(owner, { cloudAgentSessionId: personalSessionId })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
+
+    it('rejects removed members despite a stale owner row', async () => {
+      await db
+        .delete(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.id),
+            eq(organization_memberships.kilo_user_id, owner.id)
+          )
+        );
+      await expect(call(owner)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleted organizations', async () => {
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, organization.id));
+      await expect(call(owner)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
+
+    it('rejects legacy references with a worktree guard', async () => {
+      await expect(
+        call(owner, { cloudAgentSessionId: 'agent_12345678-1234-4234-9234-123456789abc' })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
   });
 
   describe.each(['getWorktreeChanges', 'refreshWorktreeChanges', 'getWorktreeFile'] as const)(
@@ -978,6 +1145,54 @@ describe('organizationCloudAgentNextRouter.cancelQueuedMessage', () => {
   });
 });
 
+describe('organizationCloudAgentNextRouter.getPendingInteractions', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    mockGetPendingInteractions.mockResolvedValue({
+      questions: [],
+      permissions: [{ id: 'perm-1' }],
+    });
+  });
+
+  it('reads a session the organization owns through the organization-scoped client', async () => {
+    const user = { id: 'org-approver', is_admin: false } as User;
+    const caller = createCaller({ user });
+
+    await expect(
+      caller.getPendingInteractions({ organizationId: ORGANIZATION_ID, cloudAgentSessionId })
+    ).resolves.toEqual({ questions: [], permissions: [{ id: 'perm-1' }] });
+
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ user }),
+      ORGANIZATION_ID
+    );
+    expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).toHaveBeenCalledWith(
+      expect.anything(),
+      ORGANIZATION_ID,
+      user.id,
+      cloudAgentSessionId
+    );
+    expect(mockGetPendingInteractions).toHaveBeenCalledWith(cloudAgentSessionId);
+  });
+
+  it('denies a session outside the organization before reading interactions', async () => {
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValueOnce(null);
+    const caller = createCaller({ user: { id: 'org-approver', is_admin: false } as User });
+
+    await expect(
+      caller.getPendingInteractions({ organizationId: ORGANIZATION_ID, cloudAgentSessionId })
+    ).rejects.toThrow('Organization does not own this session');
+
+    expect(mockGetPendingInteractions).not.toHaveBeenCalled();
+  });
+});
+
 describe('organizationCloudAgentNextRouter helper procedures', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -1070,6 +1285,39 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
     }
   );
 
+  it('preserves the GitHub app type in organization repository listings', async () => {
+    mockFetchGitHubRepositoriesForOrganization.mockResolvedValue({
+      repositories: [
+        {
+          id: 1,
+          name: 'repo',
+          fullName: 'acme/repo',
+          private: true,
+          platformIntegrationId: '11111111-1111-4111-8111-111111111111',
+          platformAccountLogin: 'acme',
+          githubAppType: 'lite',
+        },
+      ],
+      integrationInstalled: true,
+      syncedAt: null,
+    });
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+    await expect(
+      caller.listGitHubRepositories({ organizationId: ORGANIZATION_ID, forceRefresh: false })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        repositories: [
+          expect.objectContaining({
+            fullName: 'acme/repo',
+            platformIntegrationId: '11111111-1111-4111-8111-111111111111',
+            githubAppType: 'lite',
+          }),
+        ],
+      })
+    );
+  });
+
   it('rejects organization repository listing before ranking when membership is denied', async () => {
     mockEnsureOrganizationAccess.mockImplementation(() => {
       throw new TRPCError({
@@ -1134,6 +1382,41 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
     ).rejects.toThrow('provider down');
     expect(mockOrderRepositoriesByUsage).not.toHaveBeenCalled();
   });
+
+  it('does not strip platformIntegrationId/githubAppType from organization GitHub repositories in the response', async () => {
+    // Regression test: the tRPC .output() schema previously omitted
+    // githubAppType, so Zod silently stripped it even though the picker's
+    // "Lite" badge depends on it, and platformIntegrationId is required for
+    // the "Select the GitHub repository again" guard to resolve correctly.
+    const repositories = [
+      {
+        id: 1,
+        name: 'repo',
+        fullName: 'acme/repo',
+        private: false,
+        platformIntegrationId: '11111111-1111-4111-8111-111111111111',
+        platformAccountLogin: 'acme',
+        githubAppType: 'lite' as const,
+      },
+    ];
+    mockFetchGitHubRepositoriesForOrganization.mockResolvedValue({
+      repositories,
+      integrationInstalled: true,
+      syncedAt: null,
+    });
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+    await expect(
+      caller.listGitHubRepositories({
+        organizationId: ORGANIZATION_ID,
+        forceRefresh: false,
+      })
+    ).resolves.toEqual({
+      repositories,
+      integrationInstalled: true,
+      syncedAt: null,
+    });
+  });
 });
 
 describe('organizationCloudAgentNextRouter terminal ownership', () => {
@@ -1192,6 +1475,112 @@ describe('organizationCloudAgentNextRouter terminal ownership', () => {
   });
 });
 
+describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('authorizes membership and forwards the organization with the caller token', async () => {
+    const capabilities: SandboxSelectionCapabilities = {
+      enabled: true,
+      defaultDestination: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+      options: [
+        { allocation: getSandboxAllocationRequest('cloudflare-single') },
+        {
+          allocation: getSandboxAllocationRequest('vercel-large'),
+        },
+      ],
+    };
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce(capabilities);
+    const caller = createCaller({ user: { id: 'oauth/member', is_admin: false } as User });
+
+    await expect(
+      caller.getSandboxSelectionOptions({ organizationId: ORGANIZATION_ID })
+    ).resolves.toEqual(capabilities);
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ user: { id: 'oauth/member', is_admin: false } }),
+      ORGANIZATION_ID
+    );
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
+    expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
+      kilocodeOrganizationId: ORGANIZATION_ID,
+    });
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
+    expect(mockCreateCloudAgentNextClientForModel).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('forwards explicit devcontainer context %s', async devcontainer => {
+    const capabilities: SandboxSelectionCapabilities = {
+      enabled: true,
+      defaultDestination: devcontainer
+        ? { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' }
+        : getSandboxAllocationRequest('cloudflare-shared'),
+      options: [],
+    };
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce(capabilities);
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await expect(
+      caller.getSandboxSelectionOptions({ organizationId: ORGANIZATION_ID, devcontainer })
+    ).resolves.toEqual(capabilities);
+    expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
+      kilocodeOrganizationId: ORGANIZATION_ID,
+      devcontainer,
+    });
+  });
+
+  it('rejects non-members before calling the Worker', async () => {
+    mockEnsureOrganizationAccess.mockImplementationOnce(() => {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Membership required' });
+    });
+    const caller = createCaller({ user: { id: 'non-member', is_admin: false } as User });
+
+    await expect(
+      caller.getSandboxSelectionOptions({ organizationId: ORGANIZATION_ID })
+    ).rejects.toThrow('Membership required');
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+  });
+
+  it('keeps Worker-disabled selection disabled for administrators', async () => {
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce({ enabled: false, options: [] });
+    const caller = createCaller({ user: { id: 'admin-member', is_admin: true } as User });
+
+    await expect(
+      caller.getSandboxSelectionOptions({ organizationId: ORGANIZATION_ID })
+    ).resolves.toEqual({ enabled: false, options: [] });
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
+  });
+
+  it('propagates Worker failure without granting a capability', async () => {
+    mockGetSandboxSelectionOptions.mockRejectedValueOnce(new Error('Worker unavailable'));
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await expect(
+      caller.getSandboxSelectionOptions({ organizationId: ORGANIZATION_ID })
+    ).rejects.toThrow('Worker unavailable');
+  });
+
+  it('rejects a malformed Worker capability response', async () => {
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce({
+      enabled: true,
+      options: [
+        {
+          allocation: {
+            provider: { id: 'vercel', account: 'kilo' },
+            instanceType: 'medium' as 'small',
+          },
+        },
+      ],
+    });
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await expect(
+      caller.getSandboxSelectionOptions({ organizationId: ORGANIZATION_ID })
+    ).rejects.toThrow('Output validation failed');
+  });
+});
+
 describe('organizationCloudAgentNextRouter.prepareSession', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -1247,7 +1636,7 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
       githubRepo: 'acme/repo',
       autoInitiate: true,
       clientProvenance: 'browser',
-    } as z.infer<typeof basePrepareSessionNextSchema> & { organizationId: string });
+    } as z.input<typeof organizationPrepareSessionNextSchema>);
 
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1256,6 +1645,121 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
         clientProvenance: 'mobile',
       })
     );
+  });
+
+  const sandboxInput = {
+    organizationId: ORGANIZATION_ID,
+    prompt: 'Test prompt',
+    mode: 'code',
+    model: 'kilo/test-model',
+    githubRepo: 'acme/repo',
+  };
+
+  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
+    'forwards the normalized legacy organization sandbox preset %s',
+    async sandboxAllocation => {
+      const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+      await caller.prepareSession({ ...sandboxInput, sandboxAllocation });
+
+      expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+        expect.objectContaining({ user: { id: 'member', is_admin: false } }),
+        ORGANIZATION_ID
+      );
+      expect(mockPrepareSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sandboxAllocation: getSandboxAllocationRequest(sandboxAllocation),
+          kilocodeOrganizationId: ORGANIZATION_ID,
+        })
+      );
+    }
+  );
+
+  it.each([
+    ...SELECTABLE_SANDBOX_ALLOCATIONS.map(allocation => getSandboxAllocationRequest(allocation)),
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'large' },
+  ] satisfies SelectableSandboxAllocationRequest[])(
+    'forwards a structured sandbox destination without changing its account: %j',
+    async sandboxAllocation => {
+      const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+      await caller.prepareSession({ ...sandboxInput, sandboxAllocation });
+
+      expect(mockPrepareSession).toHaveBeenCalledWith(
+        expect.objectContaining({ sandboxAllocation, kilocodeOrganizationId: ORGANIZATION_ID })
+      );
+      expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+    }
+  );
+
+  it('forwards the first-chat operation and attachments with the preset and server provenance', async () => {
+    const caller = createCaller({
+      user: { id: 'organization-browser', is_admin: false } as User,
+      headersList: new Headers({ 'x-kilo-client': 'web' }),
+    });
+    const input = {
+      ...sandboxInput,
+      sandboxAllocation: getSandboxAllocationRequest('vercel-small'),
+      operationKey: '12345678-1234-4234-9234-123456789abc',
+      initialMessageId: 'msg_123456789abc123456789ABCDE',
+      autoInitiate: true,
+      attachments: {
+        path: '12345678-1234-4234-9234-123456789abc',
+        files: ['87654321-4321-4321-8321-cba987654321.md'],
+      },
+    };
+
+    await caller.prepareSession(input);
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operationKey: input.operationKey,
+        initialMessageId: input.initialMessageId,
+        autoInitiate: true,
+        attachments: input.attachments,
+        sandboxAllocation: input.sandboxAllocation,
+        kilocodeOrganizationId: ORGANIZATION_ID,
+        clientProvenance: 'browser',
+      })
+    );
+  });
+
+  it('keeps Default omitted and independent of the capability query', async () => {
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await caller.prepareSession(sandboxInput);
+
+    expect(mockPrepareSession).toHaveBeenCalledTimes(1);
+    expect(mockPrepareSession.mock.calls[0][0]).not.toHaveProperty('sandboxAllocation');
+    expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid preset before calling the Worker', async () => {
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await expect(
+      caller.prepareSession({
+        ...sandboxInput,
+        sandboxAllocation: 'vercel-medium' as SelectableSandboxAllocation,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+  });
+
+  it('rejects explicit presets with dev containers before calling the Worker', async () => {
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await expect(
+      caller.prepareSession({
+        ...sandboxInput,
+        sandboxAllocation: 'cloudflare-single',
+        devcontainer: true,
+      })
+    ).rejects.toThrow('Sandbox selection is not available with dev containers');
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
   });
 
   it('rejects devcontainer sessions when the feature flag is disabled', async () => {
@@ -1506,7 +2010,30 @@ describe('organizationCloudAgentNextRouter.createWorktreeChat', () => {
       operationKey: uuid,
       organizationId: ORGANIZATION_ID,
     });
+    expect(mockGetSandboxSelectionOptions).not.toHaveBeenCalled();
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ...SELECTABLE_SANDBOX_ALLOCATIONS,
+    ...SELECTABLE_SANDBOX_ALLOCATIONS.map(allocation => getSandboxAllocationRequest(allocation)),
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'large' },
+  ])(
+    'rejects a sibling chat sandbox override %j before invoking the operation',
+    async sandboxAllocation => {
+      const caller = createCaller({ user: { id: 'organization-owner', is_admin: false } as User });
+      const input = {
+        organizationId: ORGANIZATION_ID,
+        sourceKiloSessionId,
+        operationKey: uuid,
+        sandboxAllocation,
+      };
+
+      await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(mockCreateWorktreeChat).not.toHaveBeenCalled();
+    }
+  );
 
   it('rejects a revoked organization member before resolving the source session', async () => {
     mockEnsureOrganizationAccess.mockImplementation(() => {

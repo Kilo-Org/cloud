@@ -41,6 +41,21 @@ import type { RemoteCommandState } from './remote-command-catalog';
 import type { RemoteAttachmentPart } from './transport';
 import type { NormalizedEvent } from './normalizer';
 
+/** ES2022-safe deferred: this package's `lib` target predates `Promise.withResolvers`. */
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: unknown) => void;
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 // ---------------------------------------------------------------------------
 // Mock createCloudAgentSession — prevents real WebSocket connections
 // ---------------------------------------------------------------------------
@@ -99,6 +114,8 @@ const mockSession = {
     getStatus: jest.fn<{ type: 'idle' | 'disconnected' }, []>(() => ({ type: 'idle' })),
     getCloudStatus: jest.fn<CloudStatus | null, []>(() => null),
     getSetupLog: jest.fn<readonly string[], []>(() => []),
+    getCommits: jest.fn(() => []),
+    clearCommits: jest.fn(),
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
@@ -658,6 +675,327 @@ describe('createSessionManager', () => {
 
       await promise;
       expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
+    });
+
+    describe('cached initial transcript', () => {
+      // Keep the state-subscription fallback and the mock's automatic connect
+      // callbacks from clearing loading, so only the cached paint or an
+      // explicit replay can. This isolates the new hook's behavior.
+      function silenceReplay(): void {
+        mockSession.state.getActivity.mockReturnValue({
+          type: 'connecting',
+        } as SessionActivity);
+        mockSession.connect.mockImplementationOnce(() => {});
+      }
+
+      function cachedPage(id: string, messageIds: string[]): SessionSnapshotPage {
+        return {
+          info: { id },
+          messages: messageIds.map(messageId => ({
+            info: stubUserMessage({ id: messageId, sessionID: id }),
+            parts: [],
+          })),
+          nextCursor: null,
+          omittedItemCount: 0,
+        };
+      }
+
+      it('leaves loading true until replay when no cached-snapshot hook is provided', async () => {
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+
+        mockSessionCallbacks.onReplayComplete?.();
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
+      });
+
+      it('paints a cached transcript and clears loading before the transport connects', async () => {
+        const readCachedSnapshotPage = jest
+          .fn()
+          .mockResolvedValue(cachedPage('ses-1', ['msg-cache-1', 'msg-cache-2']));
+        const config = createMockConfig({ readCachedSnapshotPage });
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(readCachedSnapshotPage).toHaveBeenCalledWith('ses-1');
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(2);
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
+      });
+
+      it('counts the first page omitted items once when the live page repeats the cached page', async () => {
+        const readCachedSnapshotPage = jest.fn().mockResolvedValue({
+          ...cachedPage('ses-1', ['msg-cache-1']),
+          omittedItemCount: 7,
+        });
+        const fetchSnapshotPage = createPageFetchMock(async () =>
+          makePage({
+            kiloSessionId: 'ses-1',
+            messages: [makePageMessage('msg-cache-1', 'ses-1', 'cached')],
+            omittedItemCount: 7,
+          })
+        );
+        const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
+        const mgr = createSessionManager(config);
+
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise<void>(resolve => setImmediate(resolve));
+
+        // The cached replay and the live first page are the same page: the
+        // second must replace the first's contribution, not double it.
+        expect(atomValue<number>(config.store, mgr.atoms.olderMessagesOmittedItemCount)).toBe(7);
+      });
+
+      it('keeps the skeleton when the cached read returns null', async () => {
+        const config = createMockConfig({
+          readCachedSnapshotPage: jest.fn().mockResolvedValue(null),
+        });
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+      });
+
+      it('paints cached rows while metadata is pending and retains them after a network failure', async () => {
+        const metadata = deferred<FetchedSessionData>();
+        const config = createMockConfig({
+          fetchSession: jest.fn().mockReturnValue(metadata.promise),
+          readCachedSnapshotPage: jest.fn().mockResolvedValue(cachedPage('ses-1', ['cached'])),
+        });
+        const mgr = createSessionManager(config);
+        const opening = mgr.switchSession(kiloId('ses-1'));
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(config.store.get(mgr.atoms.messagesList).map(message => message.info.id)).toEqual([
+          'cached',
+        ]);
+        expect(config.store.get(mgr.atoms.canSend)).toBe(false);
+        expect(mockSession.connect).not.toHaveBeenCalled();
+        metadata.reject(new Error('fetch failed'));
+        await opening;
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(1);
+        expect(config.store.get(mgr.atoms.statusIndicator)?.type).toBe('error');
+      });
+
+      it('defers the error screen until an in-flight cached read settles, then paints its rows', async () => {
+        const cache = deferred<SessionSnapshotPage | null>();
+        const config = createMockConfig({
+          fetchSession: jest.fn().mockRejectedValue(new Error('fetch failed')),
+          readCachedSnapshotPage: () => cache.promise,
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+
+        // The cache read is still in flight: no premature error screen.
+        expect(config.store.get(mgr.atoms.statusIndicator)).toBeNull();
+        expect(config.store.get(mgr.atoms.isLoading)).toBe(true);
+
+        cache.resolve(cachedPage('ses-1', ['cached']));
+        await new Promise(resolve => setImmediate(resolve));
+
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(1);
+        expect(config.store.get(mgr.atoms.isLoading)).toBe(false);
+        expect(config.store.get(mgr.atoms.statusIndicator)?.type).toBe('error');
+      });
+
+      it('surfaces the terminal error once a settled cache read paints nothing', async () => {
+        const cache = deferred<SessionSnapshotPage | null>();
+        const config = createMockConfig({
+          fetchSession: jest.fn().mockRejectedValue(new Error('fetch failed')),
+          readCachedSnapshotPage: () => cache.promise,
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        cache.resolve(null);
+        await new Promise(resolve => setImmediate(resolve));
+
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(0);
+        expect(config.store.get(mgr.atoms.isLoading)).toBe(false);
+        expect(config.store.get(mgr.atoms.statusIndicator)?.type).toBe('error');
+      });
+
+      it('keeps the skeleton when a stalled transport fails with nothing cached to paint', async () => {
+        const config = createMockConfig({
+          fetchSession: jest.fn().mockRejectedValue(new Error('Request timed out after 15000ms')),
+          readCachedSnapshotPage: jest.fn().mockResolvedValue(null),
+          isStalledTransportError: err =>
+            err instanceof Error && err.message.startsWith('Request timed out'),
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise(resolve => setImmediate(resolve));
+
+        // A never-answering transport is a stalled open, not a failed one:
+        // no error indicator, loading stays true so the slow-load state can
+        // surface at its own threshold.
+        expect(config.store.get(mgr.atoms.statusIndicator)).toBeNull();
+        expect(config.store.get(mgr.atoms.isLoading)).toBe(true);
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(0);
+      });
+
+      it('paints cached rows with an inline indicator when a stalled transport fails', async () => {
+        const config = createMockConfig({
+          fetchSession: jest.fn().mockRejectedValue(new Error('Request timed out after 15000ms')),
+          readCachedSnapshotPage: jest
+            .fn()
+            .mockResolvedValue(cachedPage('ses-1', ['cached-stall'])),
+          isStalledTransportError: err =>
+            err instanceof Error && err.message.startsWith('Request timed out'),
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        await new Promise(resolve => setImmediate(resolve));
+
+        expect(config.store.get(mgr.atoms.messagesList)).toHaveLength(1);
+        expect(config.store.get(mgr.atoms.isLoading)).toBe(false);
+        expect(config.store.get(mgr.atoms.statusIndicator)?.type).toBe('error');
+      });
+
+      it('does not block the live connection on a stalled cache read or apply late stale rows', async () => {
+        const cache = deferred<SessionSnapshotPage | null>();
+        const config = createMockConfig({ readCachedSnapshotPage: () => cache.promise });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        expect(mockSession.connect).toHaveBeenCalledTimes(1);
+        cache.resolve(cachedPage('ses-1', ['stale']));
+        await Promise.resolve();
+        expect(config.store.get(mgr.atoms.messagesList)).toEqual([]);
+      });
+
+      it.each(['NOT_FOUND', 'UNAUTHORIZED', 'FORBIDDEN'])(
+        'retires cached content on authoritative %s even when the cache settles late',
+        async code => {
+          const cache = deferred<SessionSnapshotPage | null>();
+          const config = createMockConfig({
+            fetchSession: jest.fn().mockRejectedValue({ data: { code } }),
+            readCachedSnapshotPage: () => cache.promise,
+          });
+          const mgr = createSessionManager(config);
+          await mgr.switchSession(kiloId('ses-1'));
+          cache.resolve(cachedPage('ses-1', ['private']));
+          await Promise.resolve();
+          expect(config.store.get(mgr.atoms.messagesList)).toEqual([]);
+          expect(config.store.get(mgr.atoms.statusIndicator)?.type).toBe('error');
+          expect(mockSession.connect).not.toHaveBeenCalled();
+        }
+      );
+
+      it('retries on network return without blanking cached rows, and removes recovery listeners', async () => {
+        let online: (() => void) | undefined;
+        const unsubscribe = jest.fn();
+        const metadata = deferred<FetchedSessionData>();
+        const config = createMockConfig({
+          fetchSession: jest
+            .fn()
+            .mockRejectedValueOnce(new Error('fetch failed'))
+            .mockReturnValueOnce(metadata.promise),
+          readCachedSnapshotPage: jest.fn().mockResolvedValue(cachedPage('ses-1', ['cached'])),
+          lifecycleHooks: {
+            onOnline: handler => {
+              online = handler;
+              return unsubscribe;
+            },
+          },
+        });
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        const rows = config.store.get(mgr.atoms.messagesList);
+        expect(rows).toHaveLength(1);
+        const counts: number[] = [];
+        const stop = config.store.sub(mgr.atoms.messagesList, () => {
+          counts.push(config.store.get(mgr.atoms.messagesList).length);
+        });
+        expect(online).toBeDefined();
+        online?.();
+        expect(config.store.get(mgr.atoms.messagesList)).toBe(rows);
+        expect(config.fetchSession).toHaveBeenCalledTimes(2);
+        metadata.resolve(defaultFetchedSession);
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(mockSession.connect).toHaveBeenCalledTimes(1);
+        expect(counts).not.toContain(0);
+        expect(unsubscribe).toHaveBeenCalledTimes(1);
+        stop();
+        mgr.destroy();
+        online?.();
+        expect(config.fetchSession).toHaveBeenCalledTimes(2);
+      });
+
+      it('keeps the skeleton when the cached page has no messages', async () => {
+        const config = createMockConfig({
+          readCachedSnapshotPage: jest.fn().mockResolvedValue(cachedPage('ses-1', [])),
+        });
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+      });
+
+      it('ignores a cached page whose session id does not match', async () => {
+        const config = createMockConfig({
+          readCachedSnapshotPage: jest
+            .fn()
+            .mockResolvedValue(cachedPage('ses-other', ['msg-other'])),
+        });
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+      });
+
+      it('keeps the skeleton when the cached read rejects', async () => {
+        const config = createMockConfig({
+          readCachedSnapshotPage: jest.fn().mockRejectedValue(new Error('kv unavailable')),
+        });
+        const mgr = createSessionManager(config);
+        silenceReplay();
+
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+        expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(true);
+      });
+
+      it('discards a cached page that resolves after a newer switchSession', async () => {
+        let resolveCached!: (page: SessionSnapshotPage | null) => void;
+        const pending = new Promise<SessionSnapshotPage | null>(resolve => {
+          resolveCached = resolve;
+        });
+        const readCachedSnapshotPage = jest
+          .fn()
+          .mockReturnValueOnce(pending)
+          .mockResolvedValue(null);
+        const config = createMockConfig({ readCachedSnapshotPage });
+        const mgr = createSessionManager(config);
+        mockSession.state.getActivity.mockReturnValue({
+          type: 'connecting',
+        } as SessionActivity);
+
+        const first = mgr.switchSession(kiloId('ses-old'));
+        // Let `ses-old` pass its metadata fetch and park on the cached read.
+        await Promise.resolve();
+        const second = mgr.switchSession(kiloId('ses-new'));
+        resolveCached(cachedPage('ses-old', ['msg-old']));
+        await first;
+        await second;
+
+        expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
+      });
     });
 
     it('calls fetchSession with the right kiloSessionId', async () => {
@@ -2096,6 +2434,59 @@ describe('createSessionManager', () => {
       expect((storage!.getParts(messageId!)[0] as TextPart).text).toBe('Hello');
     });
 
+    it('marks the optimistic row unconfirmed until the authoritative record wins the id', async () => {
+      // Production (ses_f58dc0cebfffJoPUmXs05c76pv): the client's three sends
+      // were each accepted ("Sending V2 message to existing session" at
+      // 22:25:21.412Z, 22:25:57.431Z, 22:25:59.068Z) while the wrapper's event
+      // publications were rejected wholesale (`event_batch_rejected`,
+      // rejectedCount 732), so the authoritative `message.updated` for a
+      // prompt never landed. The row the client materialises for the prompt
+      // must stay marked unconfirmed — the flag the transcript's
+      // one-row rendering and typed failure footer key on — and a confirmed
+      // record for the same id must win the role and the parts.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.send.mockImplementation(() => new Promise(() => {}));
+      void mgr.send({
+        payload: { type: 'prompt', prompt: 'Continue', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
+
+      const storage = mockSession.storage;
+      expect(storage).not.toBeNull();
+      const [messageId] = storage!.getMessageIds();
+      expect(messageId).toBeDefined();
+
+      // The unconfirmed row carries the marker on the message and on the
+      // placeholder text part, exactly as the mobile selector reads it.
+      expect(storage!.getMessageInfo(messageId!)).toMatchObject({ role: 'user', synthetic: true });
+      expect(storage!.getParts(messageId!)[0]).toMatchObject({
+        type: 'text',
+        text: 'Continue',
+        synthetic: true,
+      });
+
+      // A confirmed record for the id wins: the authoritative update replaces
+      // the info wholesale, dropping the unconfirmed marker and with it the
+      // transcript's unconfirmed-row treatment. The failed-run delivery state
+      // is keyed by that same id — the server honors the `messageId` the client
+      // sent, so the failed row and the run that failed it are one row.
+      const authoritative = stubUserMessage({
+        id: messageId!,
+        sessionID: kiloId('ses-1'),
+        time: { created: 2 },
+        agent: 'test-agent',
+        model: { providerID: 'test-provider', modelID: 'test-model' },
+      });
+      createChatProcessor(storage!).process({ type: 'message.updated', info: authoritative });
+
+      const confirmedInfo = storage!.getMessageInfo(messageId!);
+      expect(confirmedInfo).toBe(authoritative);
+      expect(confirmedInfo?.role === 'user' ? confirmedInfo.synthetic : undefined).toBeUndefined();
+    });
+
     it('deletes the optimistic row on transport failure', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -3086,6 +3477,50 @@ describe('createSessionManager', () => {
       });
     });
 
+    it('never falls back to the pre-compaction reading after /compact', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      // The 96%-full turn the session reported before `/compact`.
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-001', 'ses-root', {
+          tokens: { input: 190_000, output: 1_000, reasoning: 0, cache: { read: 0, write: 0 } },
+        }).info
+      );
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toEqual({
+        contextTokens: 191_000,
+        providerID: 'kilo',
+        modelID: 'anthropic/claude-sonnet-4',
+      });
+
+      // `/compact` completes: the summary carries no usable reading of its own,
+      // and the pre-compaction figure must not come back through it.
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-002', 'ses-root', {
+          mode: 'compaction',
+          agent: 'compaction',
+          summary: true,
+          finish: 'stop',
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        }).info
+      );
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toBeUndefined();
+
+      // The first turn on the compacted context reports the new figure.
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-003', 'ses-root', {
+          tokens: { input: 27_000, output: 500, reasoning: 0, cache: { read: 0, write: 0 } },
+        }).info
+      );
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toEqual({
+        contextTokens: 27_500,
+        providerID: 'kilo',
+        modelID: 'anthropic/claude-sonnet-4',
+      });
+    });
+
     it('replaces the metric with the latest eligible root assistant response', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -3459,6 +3894,126 @@ describe('createSessionManager', () => {
         mgr.atoms.childSessionHydrationState
       );
       expect(state('child-fail')).toEqual(expect.objectContaining({ status: 'error' }));
+    });
+
+    it('clears a stored first-page hydration error when a live child chat event arrives', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () => ({
+        kind: 'retryable_failure' as const,
+      }));
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-streams'));
+
+      const readState = () =>
+        atomValue<(childSessionId: string) => { status: string }>(
+          config.store,
+          mgr.atoms.childSessionHydrationState
+        );
+      expect(readState()('child-streams')).toEqual(expect.objectContaining({ status: 'error' }));
+
+      // A live child message reaches the manager as a chat event carrying the
+      // child's session id. The session's chat processor writes the row into
+      // storage before the manager sees the event, so the event is proof the
+      // child has rows and the load failure is stale.
+      const liveMessage = createStoredMessage('msg-child-streams', 'child-streams', 'assistant');
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(liveMessage.info);
+      mockSessionCallbacks.onEvent?.({ type: 'message.updated', info: liveMessage.info });
+
+      expect(readState()('child-streams')).toEqual({ status: 'idle' });
+    });
+
+    it('keeps a stored first-page hydration error while no child chat event arrives', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () => ({
+        kind: 'retryable_failure' as const,
+      }));
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-silent'));
+
+      // An event for a different child must not clear this child's error.
+      const otherMessage = createStoredMessage('msg-child-other', 'child-other', 'assistant');
+      mockSessionCallbacks.onEvent?.({ type: 'message.updated', info: otherMessage.info });
+
+      const state = atomValue<(childSessionId: string) => { status: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      expect(state('child-silent')).toEqual(expect.objectContaining({ status: 'error' }));
+    });
+
+    it('keeps a stored first-page hydration error when only a part for the child arrives', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () => ({
+        kind: 'retryable_failure' as const,
+      }));
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      await mgr.hydrateChildSession(kiloId('child-part-only'));
+
+      const readState = () =>
+        atomValue<(childSessionId: string) => { status: string }>(
+          config.store,
+          mgr.atoms.childSessionHydrationState
+        );
+      expect(readState()('child-part-only')).toEqual(expect.objectContaining({ status: 'error' }));
+
+      // A part without its `message.updated` info writes no message row —
+      // `getChildMessages` only sees ids with stored info. Dropping the stored
+      // failure here would leave the sheet with no rows, no error, and no retry
+      // path, so the clear requires the same row proof the failure store does.
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertPart(
+        'msg-child-part-only',
+        stubTextPart({
+          id: 'part-child-part-only',
+          sessionID: 'child-part-only',
+          messageID: 'msg-child-part-only',
+          text: 'streaming',
+        })
+      );
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.part.delta',
+        sessionId: 'child-part-only',
+        messageId: 'msg-child-part-only',
+        partId: 'part-child-part-only',
+        field: 'text',
+        delta: 'streaming',
+      });
+
+      expect(readState()('child-part-only')).toEqual(expect.objectContaining({ status: 'error' }));
+    });
+
+    it('does not store a first-page hydration error once the child already streamed rows', async () => {
+      const fetchSnapshotPage = createPageFetchMock(async () => ({
+        kind: 'retryable_failure' as const,
+      }));
+      const config = createMockConfig({ fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      // A live child chat event already arrived: its row landed in storage
+      // before the first-page fetch settles.
+      const liveMessage = createStoredMessage('msg-child-live', 'child-live', 'assistant');
+      latestStorage.upsertMessage(liveMessage.info);
+      mockSessionCallbacks.onEvent?.({ type: 'message.updated', info: liveMessage.info });
+
+      await mgr.hydrateChildSession(kiloId('child-live'));
+
+      const state = atomValue<(childSessionId: string) => { status: string; message?: string }>(
+        config.store,
+        mgr.atoms.childSessionHydrationState
+      );
+      // The streamed rows are the truth: the failure must not become a stored
+      // "could not load" error that reappears once the child stops streaming.
+      expect(state('child-live')).not.toEqual(expect.objectContaining({ status: 'error' }));
     });
 
     it('loadOlderChildMessages pages by the child cursor and updates only per-child state', async () => {

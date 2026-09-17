@@ -29,6 +29,33 @@ export class ControlRequestError extends Error {
   }
 }
 
+const CONTROL_ERROR_OWN_FIELDS = Object.keys(controlErrorSchema.shape);
+
+/**
+ * Rebuild a peer-thrown control rejection into the local `ControlRequestError`.
+ * Custom prototypes do not survive Cloudflare RPC, so classify by the
+ * serializable fields the class owns. Only own values of the schema's fields
+ * are projected: Zod reads through the prototype chain, so an object whose
+ * fields are only inherited must not be reconstructed as a valid rejection.
+ * Own-field reads also preserve the non-enumerable own `Error.message`, which
+ * copying enumerable keys would drop. An already-local error is returned
+ * unchanged, and a malformed value is passed through for transport handling.
+ * `rejectionReceived` is never reconstructed: it is only set when a wrapper
+ * response frame was seen (`controlRequestResult`).
+ */
+export function reconstructControlRequestError(error: unknown): unknown {
+  if (error instanceof ControlRequestError) return error;
+  if (typeof error !== 'object' || error === null) return error;
+  const projection: Record<string, unknown> = {};
+  for (const field of CONTROL_ERROR_OWN_FIELDS) {
+    if (Object.hasOwn(error, field)) {
+      projection[field] = (error as Record<string, unknown>)[field];
+    }
+  }
+  const parsed = controlErrorSchema.safeParse(projection);
+  return parsed.success ? new ControlRequestError(parsed.data) : error;
+}
+
 export async function withDeliveryDeadline<T>(
   operation: () => Promise<T>,
   deadlineAt: number,
@@ -71,12 +98,28 @@ export function isRetryableDeliveryError(error: unknown): boolean {
 }
 
 export function deliveryErrorLogFields(error: unknown) {
+  // A logging helper runs inside catch blocks, so a throwing read or conversion
+  // must not propagate and skip the recovery that follows the log call.
+  let errorMessage: string;
+  try {
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else {
+      const message =
+        typeof error === 'object' && error !== null && Object.hasOwn(error, 'message')
+          ? (error as { message?: unknown }).message
+          : undefined;
+      errorMessage = typeof message === 'string' ? message : String(error);
+    }
+  } catch {
+    errorMessage = '[unserializable error]';
+  }
   return {
     errorCode:
       error instanceof ControlRequestError
         ? (controlErrorCodes.find(code => code === error.code) ?? 'unknown_control_error')
         : 'transport_or_internal_error',
-    ...(error instanceof ControlRequestError ? { errorMessage: error.message } : {}),
+    errorMessage,
     retryable: isRetryableDeliveryError(error),
   };
 }
@@ -102,13 +145,28 @@ export type QueueFailureReason =
   | 'missing_metadata';
 
 export function controlDispatchDisposition(status: ControlStatus): ControlDispatchDisposition {
+  // `unknown` is the only physical state from which creating a replacement is
+  // not a legal next step; observation is the whole budget. Everything else
+  // waits for the applicable head deadline so a stopped/failed allocation can
+  // still be realized as a replacement (chunk 2 owns the create).
   if (status.physical === 'unknown') return { action: 'fail', reason: 'provider_unknown' };
-  if (status.physical === 'failed' || status.physical === 'stopped') {
-    return { action: 'fail', reason: 'environment_failed' };
-  }
+  if (status.physical === 'failed' || status.physical === 'stopped') return { action: 'wait' };
   if (status.physical === 'stopping') return { action: 'wait' };
   if (status.connection === 'ready') return { action: 'send' };
   return { action: 'wait' };
+}
+
+/** Reasons that cannot recover on the current environment and stay fail-closed. */
+const FAIL_CLOSED_QUEUE_REASONS = new Set<string>(['missing_metadata', 'provider_unknown']);
+
+/**
+ * A recoverable runtime invalidation may still be replaced or re-created, so
+ * queued work that was never dispatched must wait rather than fail. The two
+ * fail-closed reasons are the only exceptions: after `provider_unknown` has
+ * been observed and `missing_metadata` there is no legal create step.
+ */
+export function isRecoverableRuntimeInvalidation(reason: string): boolean {
+  return !FAIL_CLOSED_QUEUE_REASONS.has(reason);
 }
 
 export async function observeControlAfterStopping(

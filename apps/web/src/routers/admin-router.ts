@@ -62,7 +62,6 @@ import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router'
 import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminModelExperimentsRouter } from '@/routers/admin/model-experiments-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
-import { adminGatewayUsageRouter } from '@/routers/admin/gateway-usage-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
@@ -1395,6 +1394,7 @@ export const adminRouter = createTRPCRouter({
                 input.userId,
                 workerInstanceId(activeInstance),
                 {
+                  skipCooldown: true,
                   reason: 'admin_request',
                 }
               );
@@ -2607,7 +2607,6 @@ export const adminRouter = createTRPCRouter({
   customLlm: adminCustomLlmRouter,
   modelExperiments: adminModelExperimentsRouter,
   gatewayConfig: adminGatewayConfigRouter,
-  gatewayUsage: adminGatewayUsageRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   requestLoggingOptIns: adminRequestLoggingOptInsRouter,
   bulkBlock: adminBulkBlockRouter,

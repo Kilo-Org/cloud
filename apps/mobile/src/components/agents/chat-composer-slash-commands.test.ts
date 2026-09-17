@@ -14,6 +14,7 @@ import {
 
 const COMPACT: SlashCommandInfo = { name: 'compact', description: 'Compact', hints: [] };
 const REVIEW: SlashCommandInfo = { name: 'review', description: 'Review', hints: [] };
+const GOAL: SlashCommandInfo = { name: 'goal', description: 'Goal', hints: [] };
 const SAMPLE_COMMANDS: SlashCommandInfo[] = [COMPACT, REVIEW];
 
 function remoteState(overrides: Partial<RemoteCommandState> = {}): RemoteCommandState {
@@ -77,12 +78,17 @@ describe('createMobileSlashCommandList', () => {
     expect(list).toBe(SAMPLE_COMMANDS);
   });
 
+  it('does not strip a CLI-reported /goal from a remote catalog', () => {
+    const list = createMobileSlashCommandList('remote', [GOAL], remoteState({ commands: [GOAL] }));
+    expect(list.map(command => command.name)).toEqual(['goal', 'new']);
+  });
+
   it('exposes no commands for read-only, unresolved, or other noninteractive session types', () => {
     expect(createMobileSlashCommandList('read-only', SAMPLE_COMMANDS, null)).toEqual([]);
     expect(createMobileSlashCommandList(null, SAMPLE_COMMANDS, null)).toEqual([]);
   });
 
-  it('includes /new, /exit, and /clear when canExitSession is true', () => {
+  it('includes /new, /exit, /quit, and /clear when canExitSession is true', () => {
     const list = createMobileSlashCommandList(
       'remote',
       SAMPLE_COMMANDS,
@@ -93,6 +99,7 @@ describe('createMobileSlashCommandList', () => {
       'review',
       'new',
       'exit',
+      'quit',
       'clear',
     ]);
   });

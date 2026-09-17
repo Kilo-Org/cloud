@@ -1,9 +1,17 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
 import { SUPPORTED_LANGUAGES } from './src/i18n/languages.ts';
+import { buildPermissionPromptLocales } from './src/i18n/permission-prompt-locales.ts';
+// Prebuild-time native copy, not app copy — see the widget gallery precedent in
+// plugins/withWidgetLocalizations.js. Kept in plugins/ so the runtime i18next
+// catalogs (src/i18n/locales) stay free of non-runtime strings.
+import PERMISSION_PROMPT_COPY from './plugins/permission-prompt-copy.json';
 // The widget gallery's own copy. Native bundle metadata, not app copy — see
 // plugins/withWidgetLocalizations.js.
 import WIDGET_GALLERY_COPY from './plugins/widget-gallery-copy.json';
+// The App Intents' own copy, the twin of the widget gallery's. Native bundle
+// metadata, not app copy — see plugins/withAppIntentLocalizations.js.
+import APP_INTENT_COPY from './plugins/app-intent-copy.json';
 import { SENTRY_NATIVE_OPTIONS } from './src/lib/sentry-dsn';
 import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
 import {
@@ -65,7 +73,7 @@ const config: ExpoConfig = {
   name: 'Kilo',
   owner: 'kilocode',
   slug: 'kilo-app',
-  version: '1.0.10',
+  version: '1.0.11',
   // Rotation is supported on iOS and Android: `default` resolves to portrait +
   // both landscapes in UISupportedInterfaceOrientations on iOS and all
   // orientations in the Android manifest, satisfying WCAG 1.3.4 (Orientation)
@@ -76,6 +84,14 @@ const config: ExpoConfig = {
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',
   userInterfaceStyle: 'automatic',
+  // Per-locale Info.plist overrides for the five iOS permission usage
+  // descriptions. Expo's built-in `withLocales` writes a
+  // `<tag>.lproj/InfoPlist.strings` per tag at prebuild; the plugin options
+  // below stay as the base Info.plist value. `ios`-nested so Android's
+  // `withLocales` resolves each tag to nothing. The location copy spells the
+  // app name out: `.lproj` strings are not build-expanded, so the upstream
+  // `$(PRODUCT_NAME)` would render literally there.
+  locales: buildPermissionPromptLocales(PERMISSION_PROMPT_COPY),
   ios: {
     // iOS 18+ appearance variants. `light` is the existing icon unchanged; `dark` keeps the
     // canonical mobile brand yellow on a dark backdrop; `tinted` is grayscale because iOS
@@ -127,7 +143,15 @@ const config: ExpoConfig = {
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-foreground.png',
     },
-    predictiveBackGestureEnabled: true,
+    // Keep the platform's classic back delivery. React Native 0.86 only
+    // installs its OnBackPressedCallback workaround when the device runs
+    // API 36+ (`AndroidVersion.isAtLeastTargetSdk36`), so opting into
+    // predictive back (`android:enableOnBackInvokedCallback="true"`) on an
+    // API 33-35 device routes Back straight to finish() and the JS
+    // `hardwareBackPress` event never fires. API 36 devices enforce
+    // predictive back regardless, where React Native does install the
+    // callback, so `false` is correct on every API level.
+    predictiveBackGestureEnabled: false,
     blockedPermissions: [
       'android.permission.READ_MEDIA_IMAGES',
       'android.permission.READ_MEDIA_VIDEO',
@@ -161,6 +185,17 @@ const config: ExpoConfig = {
         },
         ios: {
           ccacheEnabled: true,
+          // iOS consumes React Native Core prebuilt by default, so the pnpm patch
+          // over RCTComponentViewFactory.mm would never compile into the app.
+          // The Expo Podfile maps this to ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
+          // (KILO-APP-6H; react/react-native#58299).
+          // Compile React Native from the patched source instead of linking the
+          // prebuilt core. The App Store core ships with assertions enabled
+          // (react/react-native#57454), so the Fabric unmount assert must carry
+          // the bounds guard from react/react-native#57865 or a stale child
+          // index SIGABRTs release builds (Kilo-Org/kilocode#14065; see
+          // patches/react-native@0.86.3.patch).
+          buildReactNativeFromSource: true,
           // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop
           // (pulled transitively alongside expo-iap's AppCheckCore); those pods don't define
           // modules, so pod install fails unless we force module maps on them. Unconditional
@@ -183,7 +218,11 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-image',
     'expo-font',
-    'expo-secure-store',
+    // The app owns its Android backup rules (plugins/withAndroidManifestFix.js
+    // writes the union of the SecureStore and AppsFlyer exclusions). Disable the
+    // module's own backup configuration so prebuild does not warn that other
+    // rules are already present.
+    ['expo-secure-store', { configureAndroidBackup: false }],
     [
       'expo-local-authentication',
       { faceIDPermission: 'Allow Kilo to use Face ID to unlock the app.' },
@@ -234,7 +273,11 @@ const config: ExpoConfig = {
       },
     ],
     'expo-apple-authentication',
-    'expo-iap',
+    // Play flavor (the defaults the plugin already applies). The plugin strips
+    // and re-adds the `missingDimensionStrategy "platform", ...` line on every
+    // prebuild, so its "Added missingDimensionStrategy for play flavor" log line
+    // is expected output, not a misconfiguration.
+    ['expo-iap', { isHorizonEnabled: false, isFireOsEnabled: false }],
     [
       'expo-tracking-transparency',
       {
@@ -267,6 +310,14 @@ const config: ExpoConfig = {
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
     './plugins/withAndroidExpoModuleRepos',
+    // Localizes the App Intents on the app target itself: the four actions and
+    // their parameters are `LocalizedStringResource`s resolved against
+    // `Localizable.strings` in the app bundle, which no other plugin writes.
+    // The app-target twin of the widget registration below.
+    [
+      './plugins/withAppIntentLocalizations',
+      { languages: [...SUPPORTED_LANGUAGES], copy: APP_INTENT_COPY },
+    ],
     // Declares the app's languages on the widget extension, which expo-widgets
     // leaves English-only. This must be registered BEFORE 'expo-widgets':
     // dangerous mods run in reverse registration order, so the earlier entry

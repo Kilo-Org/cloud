@@ -7,6 +7,7 @@
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
+import { sessionCommitDataSchema } from './schemas';
 import type {
   SessionInfo,
   SessionActivity,
@@ -19,8 +20,27 @@ import type {
   CloudStatus,
   MessageDeliveryState,
   PreparationAttempt,
+  SessionCommit,
   PreparationStepSnapshot,
 } from './types';
+
+/**
+ * Keep a known goal reason when a later update for the same session carries the
+ * same goal without one. The CLI reports a terminal goal (complete/blocked)
+ * with a reason, but a snapshot replay or a partial event can omit it; without
+ * this, replacing the session info would drop copy the metadata already
+ * provided. Text and status must match, so a resume (status change) or an edit
+ * (text change) still clears the reason.
+ */
+function preserveGoalReason(previous: SessionInfo | null, next: SessionInfo): SessionInfo {
+  const nextGoal = next.goal;
+  const previousGoal = previous?.goal;
+  if (nextGoal === undefined || previousGoal === undefined) return next;
+  if (previous?.id !== next.id) return next;
+  if (nextGoal.reason !== undefined || previousGoal.reason === undefined) return next;
+  if (nextGoal.text !== previousGoal.text || nextGoal.status !== previousGoal.status) return next;
+  return { ...next, goal: { ...nextGoal, reason: previousGoal.reason } };
+}
 
 type ServiceStateConfig = {
   /** The root session ID we're tracking (to detect child sessions). */
@@ -72,6 +92,8 @@ type ServiceState = {
   /** @deprecated Legacy transient setup output. */
   getSetupLog(): readonly string[];
   getPreparationAttempts(): readonly PreparationAttempt[];
+  getCommits(): readonly SessionCommit[];
+  clearCommits(): void;
   getQuestion(): QuestionState | null;
   getPermission(): PermissionState | null;
   getSuggestion(): SuggestionState | null;
@@ -117,6 +139,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let cloudStatus: CloudStatus | null = null;
   let setupLog: string[] = [];
   let preparationAttempts: PreparationAttempt[] = [];
+  let commits: readonly SessionCommit[] = [];
+  const seenCommits = new Set<string>();
   let sessionInfo: SessionInfo | null = null;
   let questions: readonly QuestionState[] = [];
   let permissions: readonly PermissionState[] = [];
@@ -254,18 +278,22 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       rootSessionId = event.info.id;
     }
     // Only track root session info
+    let info = event.info;
     if (isRootSession(event.info.id)) {
-      sessionInfo = event.info;
+      info = preserveGoalReason(sessionInfo, event.info);
+      sessionInfo = info;
     }
-    config.onSessionCreated?.(event.info);
+    config.onSessionCreated?.(info);
     notify();
   }
 
   function processSessionUpdated(event: Extract<ServiceEvent, { type: 'session.updated' }>): void {
+    let info = event.info;
     if (isRootSession(event.info.id)) {
-      sessionInfo = event.info;
+      info = preserveGoalReason(sessionInfo, event.info);
+      sessionInfo = info;
     }
-    config.onSessionUpdated?.(event.info);
+    config.onSessionUpdated?.(info);
     notify();
   }
 
@@ -553,12 +581,30 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processAutocommitCompleted(
     event: Extract<ServiceEvent, { type: 'autocommit_completed' }>
   ): void {
-    if (event.skipped) return;
+    if (event.skipped) {
+      if (status.type === 'autocommit' && status.step === 'started') {
+        status = IDLE_STATUS;
+        notify();
+      }
+      return;
+    }
 
-    if (event.success) {
+    const parsedCommit = sessionCommitDataSchema.safeParse(event);
+    const commitHash = parsedCommit.success ? parsedCommit.data.commitHash : undefined;
+    if (parsedCommit.success) {
+      if (seenCommits.has(parsedCommit.data.commitHash)) return;
+      seenCommits.add(parsedCommit.data.commitHash);
+      commits = [...commits, { ...parsedCommit.data, timestamp: event.timestamp }];
+    }
+    if (event.success || commitHash) {
       const parts = [event.commitHash, event.commitMessage].filter(Boolean);
       const message = parts.length > 0 ? parts.join(' ') : 'Committed';
-      status = { type: 'autocommit', step: 'completed', message };
+      status = {
+        type: 'autocommit',
+        step: 'completed',
+        message,
+        ...(commitHash ? { commitHash } : {}),
+      };
     } else {
       status = { type: 'autocommit', step: 'failed', message: event.message ?? 'Commit failed' };
     }
@@ -643,6 +689,14 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       activity = { type: 'idle' };
       cloudStatus = null;
       setupLog = [];
+      // The status carries `event.error`, the Durable Object's own safe
+      // projection of the failure ("Assistant request failed: insufficient
+      // credits", "Workspace setup failed", "No model was selected", a repo
+      // auth failure), so a client that renders the status verbatim — web and
+      // the extension — keeps the specific reason and the extension's credits
+      // detection still matches. The mobile transcript maps the text to the
+      // app's classified copy and the failed row's typed footer keeps the
+      // original behind its copy action.
       status =
         event.reason === 'interrupted'
           ? { type: 'interrupted' }
@@ -880,6 +934,11 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     getCloudStatus: () => cloudStatus,
     getSetupLog: () => setupLog,
     getPreparationAttempts: () => preparationAttempts,
+    getCommits: () => commits,
+    clearCommits(): void {
+      commits = [];
+      notify();
+    },
     getQuestion: () => questions[0] ?? null,
     getPermission: () => permissions[0] ?? null,
     getSuggestion: () => suggestion,
@@ -897,6 +956,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       cloudStatus,
       setupLog,
       preparationAttempts,
+      commits,
       sessionInfo,
       question: questions[0] ?? null,
       permission: permissions[0] ?? null,
@@ -932,6 +992,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       cloudStatus = null;
       setupLog = [];
       preparationAttempts = [];
+      commits = [];
+      seenCommits.clear();
       sessionInfo = null;
       questions = [];
       permissions = [];

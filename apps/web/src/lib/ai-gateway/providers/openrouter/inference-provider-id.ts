@@ -108,7 +108,6 @@ export const DirectUserByokInferenceProviderIdSchema = z.enum([
   'byteplus-coding',
   'chutes-byok',
   'codestral',
-  'crofai',
   'edenai',
   'inceptron-byok',
   'kimi-coding',
@@ -166,7 +165,6 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum['nvidia-byok']]:
     'nvidia/nemotron-3-super-120b-a12b',
   [DirectUserByokInferenceProviderIdSchema.enum['orcarouter']]: 'google/gemini-3.6-flash',
-  [DirectUserByokInferenceProviderIdSchema.enum['crofai']]: 'deepseek-v4-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['synthetic']]: 'hf:zai-org/GLM-5.1',
   [DirectUserByokInferenceProviderIdSchema.enum['ollama-cloud']]: 'kimi-k2.6:cloud',
   [DirectUserByokInferenceProviderIdSchema.enum['opencode-go']]: 'qwen3.7-plus',

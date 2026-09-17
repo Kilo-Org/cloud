@@ -6,6 +6,7 @@ export const proxyErrorTypeSchema = z.enum([
   'temporarily_unavailable',
   'upgrade_required',
   'usage_limit_exceeded',
+  'top_up_in_progress',
   'data_collection_required',
   'api_kind_not_supported',
   'byok_error',

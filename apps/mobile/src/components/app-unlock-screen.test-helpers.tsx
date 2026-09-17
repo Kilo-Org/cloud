@@ -1,7 +1,7 @@
-/* eslint-disable typescript-eslint/no-deprecated, max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the five layouts reach. */
+/* eslint-disable max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the five layouts reach. */
 import { createElement, type ElementType, type ReactElement, useState } from 'react';
 import { type AppStateStatus } from 'react-native';
-import { act, type ReactTestInstance } from 'react-test-renderer';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { expect, vi } from 'vitest';
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { AppRootProviders } from '@/components/app-root-providers';
@@ -72,6 +72,7 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platform,
+  StatusBar: { currentHeight: 0 },
   I18nManager: { isRTL: false },
   AccessibilityInfo: { announceForAccessibility: announcements },
   AppState: {
@@ -107,12 +108,14 @@ vi.mock('@/components/ui/icons', () => ({
   CheckCircle2: 'Icon',
   CornerDownLeft: 'Icon',
   Cpu: 'Icon',
+  EyeOff: 'Icon',
   Gauge: 'Icon',
   Globe: 'Icon',
   Info: 'Icon',
   Loader: 'Icon',
   MessageSquare: 'Icon',
   Mic: 'Icon',
+  Rows3: 'Icon',
   Shield: 'Icon',
   Smartphone: 'Icon',
   TriangleAlert: 'Icon',
@@ -132,6 +135,7 @@ vi.mock('expo-router', () => ({
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => '/(app)/(tabs)/(0_home)',
   useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
   useSegments: () => ['(app)', '(tabs)', '(3_profile)', 'organization'],
 }));
@@ -257,9 +261,12 @@ vi.mock('@/lib/picker-bridge', () => ({ setLanguagePickerBridge: vi.fn() }));
 // The preferences screen mounts the feature-flag debug surface, which reads
 // PostHog flag statuses; the real module pulls in expo-application's native
 // chain, which no mounted test loads. An empty registry keeps the section
-// out of these scenes.
+// out of these scenes. `subscribeToPostHogReady` is listed because the consent
+// record module (reached through the (app) layout's TourAutoOpen) registers a
+// load-time listener; these scenes never exercise telemetry readiness.
 vi.mock('@/lib/analytics/posthog', () => ({
   useFeatureFlagStatuses: () => [],
+  subscribeToPostHogReady: () => () => undefined,
 }));
 
 function Draft() {

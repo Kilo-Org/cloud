@@ -20,3 +20,11 @@ android {
     abortOnError false
   }
 }
+
+dependencies {
+  // HeadlessJsTaskService and HeadlessJsTaskConfig are React Native classes.
+  // expo-modules-core depends on react-android with `implementation`, so its
+  // consumers get it at runtime only; the Kotlin compile classpath needs its
+  // own declaration, the same one expo-asset's build.gradle carries.
+  implementation 'com.facebook.react:react-android'
+}

@@ -7,6 +7,7 @@ import { UserWebConnectionProvider } from '@/components/agents/user-web-connecti
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
+import { TourAutoOpen } from '@/components/tour/tour-auto-open';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
 import { attemptLogoutReconciliation } from '@/lib/auth/logout-reconciliation';
 import { GlanceablePublisherMount } from '@/lib/glanceable/mount';
@@ -121,6 +122,7 @@ export default function AppLayout() {
       <PushRegistrationMount />
       <AppWideFreshnessMount />
       <SharePayloadNavigator />
+      <TourAutoOpen />
       <KiloChatProvider>
         <KiloChatPresenceMount>
           <Stack
@@ -151,6 +153,15 @@ export default function AppLayout() {
             />
             <Stack.Screen
               name="agent-chat/repo-picker"
+              options={{
+                presentation: 'formSheet',
+                sheetAllowedDetents: [0.5, fullSheetDetent],
+                sheetGrabberVisible: true,
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="agent-chat/branch-picker"
               options={{
                 presentation: 'formSheet',
                 sheetAllowedDetents: [0.5, fullSheetDetent],
@@ -213,6 +224,15 @@ export default function AppLayout() {
               }}
             />
             <Stack.Screen
+              name="voice-language-picker"
+              options={{
+                presentation: 'formSheet',
+                sheetAllowedDetents: [0.5, fullSheetDetent],
+                sheetGrabberVisible: true,
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
               name="kilo-pass"
               options={{
                 presentation: 'modal',
@@ -224,6 +244,18 @@ export default function AppLayout() {
               options={{
                 presentation: 'modal',
                 headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="tour"
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+                // A swipe-down dismissal would bypass the tour's own dismissal
+                // (which records the per-account decision). Match `onboarding`
+                // and `consent`: the only exits are the tour's own controls and
+                // Android hardware Back, both of which record first.
                 gestureEnabled: false,
               }}
             />

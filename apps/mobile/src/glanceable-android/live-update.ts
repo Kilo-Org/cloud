@@ -17,6 +17,7 @@ type LiveUpdateNativeModule = {
     title: string,
     text: string,
     openAgentsLabel: string,
+    approveLabel: string | null,
     compactText: string | null,
     promotion: boolean
   ): void;
@@ -24,6 +25,7 @@ type LiveUpdateNativeModule = {
     title: string,
     text: string,
     openAgentsLabel: string,
+    approveLabel: string | null,
     compactText: string | null,
     promotion: boolean,
     timeoutMs: number
@@ -48,9 +50,17 @@ export function start(
   title: string,
   text: string,
   openAgentsLabel: string,
+  approveLabel: string | null,
   compactText: string | null
 ): void {
-  nativeModule?.start(title, text, openAgentsLabel, compactText, isPromotionCapable());
+  nativeModule?.start(
+    title,
+    text,
+    openAgentsLabel,
+    approveLabel,
+    compactText,
+    isPromotionCapable()
+  );
 }
 
 // eslint-disable-next-line max-params -- translated bridge fields plus the native terminal timeout
@@ -58,10 +68,19 @@ export function update(
   title: string,
   text: string,
   openAgentsLabel: string,
+  approveLabel: string | null,
   compactText: string | null,
   timeoutMs = 0
 ): void {
-  nativeModule?.update(title, text, openAgentsLabel, compactText, isPromotionCapable(), timeoutMs);
+  nativeModule?.update(
+    title,
+    text,
+    openAgentsLabel,
+    approveLabel,
+    compactText,
+    isPromotionCapable(),
+    timeoutMs
+  );
 }
 
 export function end(): void {

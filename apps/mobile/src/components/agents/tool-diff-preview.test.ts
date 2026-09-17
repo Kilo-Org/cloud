@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/test/render-with-providers.tsx */
 import * as React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 
 import { describe, expect, it, vi } from 'vitest';
 import type * as ReactI18next from 'react-i18next';
@@ -14,6 +13,8 @@ vi.mock('react-native', () => ({
   View: 'View',
   Text: 'RNText',
   Pressable: 'Pressable',
+  // The real DiffLine (mounted below) reads the color scheme for its palette.
+  useColorScheme: () => 'light',
 }));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();

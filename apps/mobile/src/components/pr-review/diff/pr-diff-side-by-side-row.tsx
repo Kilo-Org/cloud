@@ -15,7 +15,7 @@
 
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
+import { Text as RNText, type TextStyle, useColorScheme, View, type ViewStyle } from 'react-native';
 
 import { type TFunction } from 'i18next';
 import { Text } from '@/components/ui/text';
@@ -23,13 +23,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlight';
 import { type ParsedDiffLine, type ParsedHunk } from '@/lib/pr-review/diff/parse-patch';
 import { type SideBySideRow as SideBySideRowData } from '@/lib/pr-review/diff/side-by-side';
-import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
+import { MUTED_COLOR } from '@/lib/pr-review/diff/syntax-colors';
 import { cn } from '@/lib/utils';
 import {
   type BoundedFontMetrics,
   DIFF_MAX_FONT_SCALE,
   useDiffFontMetrics,
 } from '@/components/pr-review/diff/diff-font-metrics';
+import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs';
 
 const COLUMN_GUTTER_WIDTH = 56;
 const COLUMN_INNER_PADDING = 2;
@@ -90,6 +91,9 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
   const gutterStyle: ViewStyle = {
     width: COLUMN_GUTTER_WIDTH,
     minHeight: metrics.rowMinHeight,
+    // Top-aligned with the code's first line (see DiffLine's gutter): a
+    // centered number drifts onto a later visual line when the code wraps.
+    paddingTop: VERTICAL_PADDING,
   };
   const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
   const codeBaseStyle: TextStyle = {
@@ -114,7 +118,7 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
       style={rowStyle}
     >
       <View
-        className="items-end justify-center"
+        className="items-end justify-start"
         style={{ ...gutterStyle, paddingRight: COLUMN_INNER_PADDING }}
       >
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme muted color */}
@@ -132,15 +136,9 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
           selectable
           style={{ ...codeBaseStyle, color: foreground }}
         >
-          {tokens.map((token, index) => {
-            const tokenColor = tokenColorFor(token.className, isDark);
-            return (
-              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- per-token syntax color
-              <RNText key={`tok-${index}`} style={{ color: tokenColor }}>
-                {token.text}
-              </RNText>
-            );
-          })}
+          {/* Untagged runs are raw strings inside this Text, so only the
+              highlighter's tagged runs cost an Android span. */}
+          {highlightRunChildren(tokens, isDark)}
           {noNewlineLabel ? (
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color for no-newline marker
             <RNText style={{ ...noNewlineBase, color: noNewlineColor }}>{noNewlineLabel}</RNText>
@@ -205,7 +203,8 @@ function SideBySideRowImpl({ row, language, rowKeyId }: Readonly<SideBySideRowPr
   const colors = useThemeColors();
   const { t } = useTranslation();
   const metrics = useDiffFontMetrics();
-  const isDark = colors.background === '#0E0E10';
+  // Same signal `useThemeColors` reads; never a background-token equality.
+  const isDark = useColorScheme() === 'dark';
   const leftLine = row.left?.line ?? null;
   const rightLine = row.right?.line ?? null;
   const rowStyle: ViewStyle = { minHeight: metrics.rowMinHeight };

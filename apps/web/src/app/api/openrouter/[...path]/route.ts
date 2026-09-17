@@ -51,7 +51,7 @@ import {
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
   temporarilyUnavailableResponse,
-  usageLimitExceededResponse,
+  creditsBlockedResponse,
   unavailableModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
@@ -597,7 +597,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   async function resolveAccessCheck(modelId: string) {
-    const { balance, settings, plan } = await balanceAndSettingsPromise;
+    const { balance, settings, plan, balanceLimitedByUserAllowance } =
+      await balanceAndSettingsPromise;
     const groupPolicy = await organizationGroupPolicyPromise;
     const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
       modelId,
@@ -607,6 +608,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (modelRestrictionError) {
       return {
         balance,
+        balanceLimitedByUserAllowance,
         effectiveProviderConfig: providerConfig,
         groupModelAllowed: true,
         groupProvidersAllowed: true,
@@ -631,6 +633,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
     return {
       balance,
+      balanceLimitedByUserAllowance,
       effectiveProviderConfig,
       groupModelAllowed,
       groupProvidersAllowed,
@@ -716,6 +719,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
     const {
       balance,
+      balanceLimitedByUserAllowance,
       effectiveProviderConfig,
       groupModelAllowed,
       groupProvidersAllowed,
@@ -728,7 +732,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       !(await isFreeModel(effectiveModelIdLowerCased)) &&
       !effectiveProviderContext.userByok
     ) {
-      return await usageLimitExceededResponse(user, balance);
+      return await creditsBlockedResponse({
+        user,
+        balance,
+        organizationId,
+        balanceLimitedByUserAllowance,
+      });
     }
 
     // Organization model/provider restrictions check

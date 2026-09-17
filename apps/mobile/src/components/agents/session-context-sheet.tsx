@@ -1,21 +1,26 @@
 /* eslint-disable max-lines -- The context sheet composes the usage ring, token totals, and per-model cost rows. */
-import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
-import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type ResolvedSession, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 import { SheetHeader } from '@/components/sheet-header';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber, formatPercent } from '@/lib/format';
+import { resolveRunningOnLabel } from '@/lib/instance-target-label';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { useTRPC } from '@/lib/trpc';
 
+import { type SessionAutoApproveState } from './session-auto-approve';
+import { SessionAutoApproveRow } from './session-auto-approve-row';
 import { ContextUsageRing } from './context-usage-ring';
 import {
   type ContextTone,
@@ -35,10 +40,15 @@ import {
 } from './session-cost-breakdown';
 import { friendlyModelName, resolveModelProviderName } from './session-model-display';
 import { SessionPageSheet } from './session-page-sheet';
+import { copySessionId } from './session-row-actions';
 
 type SessionContextSheetProps = {
   visible: boolean;
-  info: SessionContextInfo;
+  info: SessionContextInfo | undefined;
+  sessionId: string;
+  sessionTitle: string;
+  activeSessionType: ResolvedSession['type'] | null;
+  ownerConnectionId: string | null;
   modelDisplay: string;
   providerDisplay: string;
   totalCostMicrodollars: number | null;
@@ -46,6 +56,8 @@ type SessionContextSheetProps = {
   messages: StoredMessage[];
   modelOptions: SessionModelOption[];
   onClose: () => void;
+  autoApproveState: SessionAutoApproveState;
+  onAutoApproveChange: (enabled: boolean) => void;
 };
 
 const SHEET_RING_SIZE = 96;
@@ -62,9 +74,27 @@ function toneTextClass(tone: ContextTone): string {
   return TONE_TEXT_CLASS[tone];
 }
 
+type RunningOnState = { kind: 'hidden' } | { kind: 'pending' } | { kind: 'label'; label: string };
+
+type CopyFeedbackState = 'idle' | 'copied' | 'failed';
+
+function copyStatusLabel(state: CopyFeedbackState, t: (key: string) => string): string | null {
+  if (state === 'copied') {
+    return t('agents.sessionRow.idCopied');
+  }
+  if (state === 'failed') {
+    return t('agents.sessionRow.couldNotCopyId');
+  }
+  return null;
+}
+
 export function SessionContextSheet({
   visible,
   info,
+  sessionId,
+  sessionTitle,
+  activeSessionType,
+  ownerConnectionId,
   modelDisplay,
   providerDisplay,
   totalCostMicrodollars,
@@ -72,12 +102,30 @@ export function SessionContextSheet({
   messages,
   modelOptions,
   onClose,
+  autoApproveState,
+  onAutoApproveChange,
 }: Readonly<SessionContextSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const runningOn = useRunningOnLabel(activeSessionType, ownerConnectionId, visible);
+  const [copyState, setCopyState] = useState<CopyFeedbackState>('idle');
+  const copyFeedbackGeneration = useRef(0);
+  // sonner toasts render in the app root, behind this Modal's window, so the
+  // copy row shows the outcome inline instead of relying on the toast.
+  // Closing the sheet clears feedback and invalidates pending results so a
+  // reopen starts from the CTA even if an earlier copy finishes late.
+  useEffect(() => {
+    if (!visible) {
+      setCopyState('idle');
+    }
+    return () => {
+      copyFeedbackGeneration.current += 1;
+    };
+  }, [visible]);
+  const copyStatus = copyStatusLabel(copyState, t);
   const content = getContextSheetContent(info, totalCostMicrodollars);
-  const tone = getContextTone(info.percentage);
-  const arcFraction = getArcFraction(info.percentage);
+  const tone = getContextTone(info?.percentage);
+  const arcFraction = getArcFraction(info?.percentage);
   const breakdown = useMemo<SessionCostBreakdown>(
     () => getSessionCostBreakdown(messages, breakdownCostUsd),
     [messages, breakdownCostUsd]
@@ -96,7 +144,17 @@ export function SessionContextSheet({
 
   return (
     <SessionPageSheet visible={visible} onClose={onClose}>
-      <SheetHeader title={t('agentChat.contextUsage.title')} onDone={onClose} />
+      <SheetHeader
+        title={t('agentChat.contextUsage.title')}
+        onDone={onClose}
+        topInset="ios-page-sheet"
+      />
+
+      {/* First row of the sheet body, outside the ScrollView so it stays
+          visible while the context details scroll. */}
+      <View className="px-6 pb-2 pt-2">
+        <SessionAutoApproveRow state={autoApproveState} onValueChange={onAutoApproveChange} />
+      </View>
 
       {/* Rows below are exposed individually to screen readers; collapsing
           them behind a single ScrollView accessibilityLabel would shadow the
@@ -110,15 +168,17 @@ export function SessionContextSheet({
             tone={tone}
             testID="session-context-sheet-ring"
           />
-          {content.percentage ? (
-            <Text className={cn('text-2xl font-semibold tabular-nums', toneTextClass(tone))}>
-              {content.percentage}
-            </Text>
-          ) : (
-            <Text className="text-base text-muted-foreground">
-              {content.windowUnavailableLabel}
-            </Text>
-          )}
+          <View className="min-h-[32px] justify-center">
+            {content.percentage ? (
+              <Text className={cn('text-2xl font-semibold tabular-nums', toneTextClass(tone))}>
+                {content.percentage}
+              </Text>
+            ) : (
+              <Text className="text-base text-muted-foreground">
+                {content.windowUnavailableLabel}
+              </Text>
+            )}
+          </View>
         </View>
 
         <View className="mt-6 gap-4">
@@ -139,32 +199,90 @@ export function SessionContextSheet({
             </Text>
           </Row>
 
-          {content.capacityKnown ? (
+          {content.capacityKnown || autoApproveState !== 'unavailable' ? (
             <Row label={t('common.remaining')}>
               <Text className="text-base font-medium text-foreground tabular-nums">
-                {content.remainingTokens}
-                <Text className="text-sm text-muted-foreground">
-                  {' '}
-                  {t('agentChat.contextUsage.tokensWithPercentage', {
-                    percentage: content.remainingPercentage ?? '',
-                  })}
-                </Text>
+                {content.remainingTokens ?? '-'}
+                {content.capacityKnown ? (
+                  <Text className="text-sm text-muted-foreground">
+                    {' '}
+                    {t('agentChat.contextUsage.tokensWithPercentage', {
+                      percentage: content.remainingPercentage ?? '',
+                    })}
+                  </Text>
+                ) : null}
               </Text>
             </Row>
           ) : null}
 
           <Row label={t('common.model')}>
-            <Text className="text-base font-medium text-foreground">{modelDisplay}</Text>
+            <Text className="text-base font-medium text-foreground">{modelDisplay || '-'}</Text>
           </Row>
 
           <Row label={t('agentChat.contextUsage.provider')}>
-            <Text className="text-base font-medium text-foreground">{providerDisplay}</Text>
+            <Text className="text-base font-medium text-foreground">{providerDisplay || '-'}</Text>
           </Row>
 
-          {content.cost !== null ? (
+          {/* Identity group: which session this sheet describes, its id, and
+              where it runs. The sheet surface covers the session page behind
+              it, so without the title row nothing on screen names the
+              session the id below belongs to. */}
+          <Row label={t('agentChat.session.title')}>
+            <Text className="text-base font-medium text-foreground" numberOfLines={1}>
+              {sessionTitle}
+            </Text>
+          </Row>
+
+          <Pressable
+            onPress={() => {
+              void (async () => {
+                const generation = copyFeedbackGeneration.current;
+                const success = await copySessionId(sessionId);
+                if (generation === copyFeedbackGeneration.current) {
+                  setCopyState(success ? 'copied' : 'failed');
+                }
+              })();
+            }}
+            accessibilityRole="button"
+            className="gap-1 active:opacity-70"
+            testID="session-context-sheet-copy-id"
+          >
+            {/* The row keeps its call-to-action name in every state; the copy
+                outcome renders beside it, so one capture of the sheet shows
+                both the row the scenario names and the feedback it demands.
+                The child texts are the accessible name in reading order. */}
+            <View className="flex-row items-center justify-between">
+              <Text className="text-xs uppercase tracking-wide text-muted-foreground">
+                {t('agents.sessionRow.copyId')}
+              </Text>
+              {copyStatus ? (
+                <Text
+                  className={cn(
+                    'text-xs uppercase tracking-wide',
+                    copyState === 'failed' ? 'text-destructive' : 'text-foreground'
+                  )}
+                >
+                  {copyStatus}
+                </Text>
+              ) : null}
+            </View>
+            <Text variant="mono" className="text-xs text-foreground">
+              {sessionId}
+            </Text>
+          </Pressable>
+
+          {runningOn.kind !== 'hidden' ? (
+            <Row label={t('agentChat.instancePicker.runOn')}>
+              <Text className="text-base font-medium text-foreground">
+                {runningOn.kind === 'label' ? runningOn.label : t('common.loading')}
+              </Text>
+            </Row>
+          ) : null}
+
+          {content.cost !== null || autoApproveState !== 'unavailable' ? (
             <Row label={t('agentChat.contextUsage.totalCost')}>
               <Text className="text-base font-medium text-foreground tabular-nums">
-                {content.cost}
+                {content.cost ?? '-'}
               </Text>
             </Row>
           ) : null}
@@ -240,6 +358,33 @@ export function SessionContextSheet({
       <View style={{ height: insets.bottom }} className="bg-background" />
     </SessionPageSheet>
   );
+}
+
+function useRunningOnLabel(
+  activeSessionType: ResolvedSession['type'] | null,
+  ownerConnectionId: string | null,
+  visible: boolean
+): RunningOnState {
+  const trpc = useTRPC();
+  const isRemote = activeSessionType === 'remote';
+  const { data, isPending } = useQuery(
+    trpc.activeSessions.listInstances.queryOptions(undefined, {
+      enabled: isRemote && visible,
+      staleTime: 30_000,
+    })
+  );
+  const label = resolveRunningOnLabel({
+    activeSessionType,
+    ownerConnectionId,
+    instances: data?.instances ?? [],
+  });
+  if (label !== null) {
+    return { kind: 'label', label };
+  }
+  // A live CLI target resolves from the connected-instances list; keep the
+  // row's space while that first lookup is in flight so the rows below it do
+  // not jump when the label arrives.
+  return isRemote && isPending ? { kind: 'pending' } : { kind: 'hidden' };
 }
 
 function Row({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {

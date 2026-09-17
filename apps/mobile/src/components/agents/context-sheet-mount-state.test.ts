@@ -13,21 +13,67 @@ const currentInfo: SessionContextInfo = {
 };
 
 describe('getContextSheetMountState', () => {
-  it('unmounts when there is no context info regardless of open state', () => {
-    expect(getContextSheetMountState(undefined, null, 'current-session')).toEqual({
-      mounted: false,
+  it('opens permission controls before the first usage report and stays open when usage arrives', () => {
+    const identity = { sessionId: 'current-session' };
+    const session = { sessionId: 'current-session', autoApproveAvailable: true };
+    expect(getContextSheetMountState(undefined, identity, session)).toEqual({
+      mounted: true,
+      visible: true,
+      info: undefined,
     });
+    expect(getContextSheetMountState(currentInfo, identity, session)).toEqual({
+      mounted: true,
+      visible: true,
+      info: currentInfo,
+    });
+  });
+
+  it('keeps the no-usage sheet mounted for dismissal without carrying it to another session', () => {
+    const session = { sessionId: 'current-session', autoApproveAvailable: true };
+    expect(getContextSheetMountState(undefined, null, session)).toEqual({
+      mounted: true,
+      visible: false,
+      info: undefined,
+    });
+    expect(
+      getContextSheetMountState(undefined, { sessionId: 'previous-session' }, session)
+    ).toEqual({ mounted: true, visible: false, info: undefined });
+  });
+
+  it('keeps an opened no-usage sheet mounted for a session without permission controls', () => {
     expect(
       getContextSheetMountState(
         undefined,
-        {
-          sessionId: 'current-session',
-          providerID: currentInfo.providerID,
-          modelID: currentInfo.modelID,
-        },
-        'current-session'
+        { sessionId: 'current-session' },
+        { sessionId: 'current-session', autoApproveAvailable: false }
+      )
+    ).toEqual({ mounted: true, visible: true, info: undefined });
+  });
+
+  it('stays open when usage arrives after opening a session without permission controls', () => {
+    const session = { sessionId: 'current-session', autoApproveAvailable: false };
+    expect(getContextSheetMountState(undefined, { sessionId: 'current-session' }, session)).toEqual(
+      { mounted: true, visible: true, info: undefined }
+    );
+    expect(
+      getContextSheetMountState(currentInfo, { sessionId: 'current-session' }, session)
+    ).toEqual({ mounted: true, visible: true, info: currentInfo });
+  });
+
+  it('does not open an unmounted sheet for another session', () => {
+    expect(
+      getContextSheetMountState(
+        undefined,
+        { sessionId: 'previous-session' },
+        { sessionId: 'current-session' }
       )
     ).toEqual({ mounted: false });
+  });
+
+  it('unmounts when there is no context info and the sheet was never opened', () => {
+    expect(getContextSheetMountState(undefined, null, { sessionId: 'current-session' })).toEqual({
+      mounted: false,
+    });
   });
 
   it('mounts visible when context info exists and its identity is open', () => {
@@ -38,14 +84,14 @@ describe('getContextSheetMountState', () => {
         providerID: currentInfo.providerID,
         modelID: currentInfo.modelID,
       },
-      'current-session'
+      { sessionId: 'current-session' }
     );
 
     expect(result).toEqual({ mounted: true, visible: true, info: currentInfo });
   });
 
   it('mounts hidden when context info exists but the sheet is closed', () => {
-    const result = getContextSheetMountState(currentInfo, null, 'current-session');
+    const result = getContextSheetMountState(currentInfo, null, { sessionId: 'current-session' });
 
     expect(result).toEqual({ mounted: true, visible: false, info: currentInfo });
   });
@@ -59,7 +105,7 @@ describe('getContextSheetMountState', () => {
           providerID: currentInfo.providerID,
           modelID: currentInfo.modelID,
         },
-        'current-session'
+        { sessionId: 'current-session' }
       )
     ).toEqual({ mounted: true, visible: false, info: currentInfo });
   });
@@ -75,7 +121,7 @@ describe('getContextSheetMountState', () => {
           providerID: 'kilo',
           modelID: 'previous-model',
         },
-        'current-session'
+        { sessionId: 'current-session' }
       )
     ).toEqual({ mounted: true, visible: false, info: nextInfo });
   });

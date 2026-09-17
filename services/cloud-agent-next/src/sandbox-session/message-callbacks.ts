@@ -39,6 +39,11 @@ export type MessageCallbacks = {
     message: SessionMessageRecord,
     metadata?: SessionMetadata | null
   ): boolean;
+  persistDrainedBatchCallback(
+    messages: readonly SessionMessageRecord[],
+    newlyTerminalMessageIds: ReadonlySet<string>,
+    metadata?: SessionMetadata | null
+  ): boolean;
   pendingCallbackCount(): number;
   nextCallbackDueAt(): number | undefined;
   repair(now?: number): Promise<void>;
@@ -244,6 +249,23 @@ export function createMessageCallbacks(
     return true;
   }
 
+  function persistDrainedBatchCallback(
+    messages: readonly SessionMessageRecord[],
+    newlyTerminalMessageIds: ReadonlySet<string>,
+    metadata = getMetadata()
+  ): boolean {
+    if (newlyTerminalMessageIds.size === 0) return false;
+    if (messages.some(message => message.state === 'queued' || message.state === 'accepted')) {
+      return false;
+    }
+    let representative: SessionMessageRecord | undefined;
+    for (const message of messages) {
+      if (callbackStatus(message) !== undefined) representative = message;
+    }
+    if (!representative) return false;
+    return persistTerminalCallback(representative, metadata);
+  }
+
   function pendingEntries(): Array<[string, PendingCallbackJob | undefined]> {
     return Array.from(storage.kv.list<unknown>({ prefix: CALLBACK_OUTBOX_PREFIX })).map(
       ([key, value]) => [key, parsePendingCallbackJob(value)]
@@ -339,6 +361,7 @@ export function createMessageCallbacks(
 
   return {
     persistTerminalCallback,
+    persistDrainedBatchCallback,
     pendingCallbackCount,
     nextCallbackDueAt,
     repair,

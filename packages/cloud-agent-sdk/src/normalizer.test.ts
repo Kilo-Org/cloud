@@ -404,6 +404,40 @@ describe('normalize', () => {
     });
   });
 
+  describe('message.removed', () => {
+    it('normalizes with field name mapping (sessionID → sessionId, etc.)', () => {
+      const result = normalize(
+        createRaw('message.removed', { sessionID: 'ses-1', messageID: 'msg-1' })
+      );
+      expect(result).toEqual({
+        type: 'message.removed',
+        sessionId: 'ses-1',
+        messageId: 'msg-1',
+      });
+    });
+
+    it('is routed as a chat event so storage receives the removal', () => {
+      const result = normalize(
+        createRaw('message.removed', { sessionID: 'ses-1', messageID: 'msg-1' })
+      );
+      expect(result !== null && isChatEvent(result)).toBe(true);
+    });
+
+    it('returns null when sessionID is missing', () => {
+      expect(normalize(createRaw('message.removed', { messageID: 'msg-1' }))).toBeNull();
+    });
+
+    it('returns null when messageID is missing', () => {
+      expect(normalize(createRaw('message.removed', { sessionID: 'ses-1' }))).toBeNull();
+    });
+
+    it('returns null when messageID is not a string', () => {
+      expect(
+        normalize(createRaw('message.removed', { sessionID: 'ses-1', messageID: 1 }))
+      ).toBeNull();
+    });
+  });
+
   describe('session.status', () => {
     it('normalizes valid busy status', () => {
       const result = normalize(
@@ -550,6 +584,137 @@ describe('normalize', () => {
 
     it('returns null when info.id is missing', () => {
       expect(normalize(createRaw('session.updated', { info: { title: 'No ID' } }))).toBeNull();
+    });
+
+    it('projects a valid goal with a reason from metadata[kilo.goal]', () => {
+      const result = normalizeCliEvent('session.updated', {
+        info: {
+          id: 'ses-1',
+          metadata: {
+            'kilo.goal': { text: 'Ship the slice', status: 'active', reason: 'In review' },
+          },
+        },
+      });
+
+      expect(result).toEqual({
+        type: 'session.updated',
+        info: {
+          id: 'ses-1',
+          parentID: undefined,
+          goal: { text: 'Ship the slice', status: 'active', reason: 'In review' },
+        },
+      });
+    });
+
+    it('projects a goal from nested metadata.kilo.goal', () => {
+      const result = normalizeCliEvent('session.updated', {
+        info: {
+          id: 'ses-1',
+          metadata: { kilo: { goal: { text: 'Nested goal', status: 'paused' } } },
+        },
+      });
+
+      expect(result).toEqual({
+        type: 'session.updated',
+        info: {
+          id: 'ses-1',
+          parentID: undefined,
+          goal: { text: 'Nested goal', status: 'paused' },
+        },
+      });
+    });
+
+    it('projects every goal status value', () => {
+      const statuses = ['active', 'complete', 'blocked', 'paused'] as const;
+      for (const status of statuses) {
+        const result = normalizeCliEvent('session.updated', {
+          info: { id: 'ses-1', metadata: { 'kilo.goal': { text: 'Goal', status } } },
+        });
+        expect(result).toEqual({
+          type: 'session.updated',
+          info: { id: 'ses-1', parentID: undefined, goal: { text: 'Goal', status } },
+        });
+      }
+    });
+
+    it('drops a goal with an unknown status', () => {
+      const result = normalizeCliEvent('session.updated', {
+        info: {
+          id: 'ses-1',
+          metadata: { 'kilo.goal': { text: 'Goal', status: 'done' } },
+        },
+      });
+
+      expect(result).toEqual({
+        type: 'session.updated',
+        info: { id: 'ses-1', parentID: undefined },
+      });
+    });
+
+    it('drops a goal with empty or missing text', () => {
+      const empty = normalizeCliEvent('session.updated', {
+        info: { id: 'ses-1', metadata: { 'kilo.goal': { text: '', status: 'active' } } },
+      });
+      const missing = normalizeCliEvent('session.updated', {
+        info: { id: 'ses-1', metadata: { 'kilo.goal': { status: 'active' } } },
+      });
+
+      expect(empty).toEqual({
+        type: 'session.updated',
+        info: { id: 'ses-1', parentID: undefined },
+      });
+      expect(missing).toEqual({
+        type: 'session.updated',
+        info: { id: 'ses-1', parentID: undefined },
+      });
+    });
+
+    it('keeps the goal key absent when metadata has no goal', () => {
+      const result = normalizeCliEvent('session.updated', {
+        info: { id: 'ses-1', metadata: { other: true } },
+      });
+
+      expect(result).toEqual({
+        type: 'session.updated',
+        info: { id: 'ses-1', parentID: undefined },
+      });
+      expect((result as { info: Record<string, unknown> }).info).not.toHaveProperty('goal');
+    });
+
+    it('does not throw on malformed metadata and drops the goal', () => {
+      const cases: Array<Record<string, unknown> | null | string | number> = [
+        { 'kilo.goal': null },
+        { 'kilo.goal': 'not-an-object' },
+        { kilo: null },
+        { kilo: 'not-an-object' },
+        null,
+        'metadata-string',
+        42,
+      ];
+
+      for (const metadata of cases) {
+        const result = normalizeCliEvent('session.updated', {
+          info: { id: 'ses-1', metadata },
+        });
+        expect(result).toEqual({
+          type: 'session.updated',
+          info: { id: 'ses-1', parentID: undefined },
+        });
+      }
+    });
+
+    it('drops an empty reason while keeping the goal', () => {
+      const result = normalizeCliEvent('session.updated', {
+        info: {
+          id: 'ses-1',
+          metadata: { 'kilo.goal': { text: 'Goal', status: 'active', reason: '' } },
+        },
+      });
+
+      expect(result).toEqual({
+        type: 'session.updated',
+        info: { id: 'ses-1', parentID: undefined, goal: { text: 'Goal', status: 'active' } },
+      });
     });
   });
 

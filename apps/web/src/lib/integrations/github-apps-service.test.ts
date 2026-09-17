@@ -7,11 +7,7 @@ import {
   getIntegrationForOwner,
   getPrimaryGitHubIntegrationForOrganization,
 } from '@/lib/integrations/db/platform-integrations';
-import {
-  getInstallation,
-  isInstallationGoneError,
-  updateModel,
-} from './github-apps-service';
+import { getInstallation, isInstallationGoneError, updateModel } from './github-apps-service';
 
 describe('getInstallation', () => {
   it('prefers a healthy installation when the owner has multiple GitHub rows', async () => {

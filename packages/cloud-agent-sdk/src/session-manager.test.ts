@@ -24,7 +24,13 @@ import type {
 } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import { createChatProcessor } from './chat-processor';
-import type { AssistantMessage, UserMessage, TextPart, Part } from '@kilocode/app-shared/opencode';
+import type {
+  AssistantMessage,
+  UserMessage,
+  TextPart,
+  Part,
+  ToolPart,
+} from '@kilocode/app-shared/opencode';
 import { kiloId, cloudAgentId, stubUserMessage, stubTextPart, makeSnapshot } from './test-helpers';
 import type {
   CloudStatus,
@@ -7421,6 +7427,136 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     expect(
       atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
     ).toEqual(['msg-current']);
+  });
+
+  // -------------------------------------------------------------------------
+  // applyPage tool lifecycle ordering
+  // -------------------------------------------------------------------------
+
+  describe('page replay tool lifecycle ordering', () => {
+    const taskMessageId = 'msg-task';
+    const taskPartId = 'part-task';
+
+    function taskPartBase(): Omit<ToolPart, 'state'> {
+      return {
+        id: taskPartId,
+        sessionID: 'ses-1',
+        messageID: taskMessageId,
+        type: 'tool',
+        callID: 'call-task',
+        tool: 'task',
+      };
+    }
+
+    function runningTaskPart(): ToolPart {
+      return {
+        ...taskPartBase(),
+        state: { status: 'running', input: {}, time: { start: 1 } },
+      };
+    }
+
+    function completedTaskPart(end: number): ToolPart {
+      return {
+        ...taskPartBase(),
+        state: {
+          status: 'completed',
+          input: {},
+          output: 'done',
+          title: 'task',
+          metadata: {},
+          time: { start: 1, end },
+        },
+      };
+    }
+
+    function erroredTaskPart(end: number): ToolPart {
+      return {
+        ...taskPartBase(),
+        state: { status: 'error', input: {}, error: 'boom', time: { start: 1, end } },
+      };
+    }
+
+    function taskMessage(part: Part): SessionSnapshotPage['messages'][number] {
+      return { info: stubUserMessage({ id: taskMessageId, sessionID: 'ses-1' }), parts: [part] };
+    }
+
+    function cachedTaskPage(part: Part): SessionSnapshotPage {
+      return {
+        info: { id: 'ses-1' },
+        messages: [taskMessage(part)],
+        nextCursor: null,
+        omittedItemCount: 0,
+      };
+    }
+
+    function storedTaskPart(
+      config: SessionManagerConfig,
+      mgr: ReturnType<typeof createSessionManager>
+    ): ToolPart {
+      const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      const message = messages.find(m => m.info.id === taskMessageId);
+      if (!message) throw new Error('task message missing');
+      const part = message.parts.find(p => p.id === taskPartId);
+      if (!part || part.type !== 'tool') throw new Error('task part missing');
+      return part;
+    }
+
+    it('applies a replayed terminal task part over the cached running part', async () => {
+      const readCachedSnapshotPage = jest.fn().mockResolvedValue(cachedTaskPage(runningTaskPart()));
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({ kiloSessionId: 'ses-1', messages: [taskMessage(completedTaskPart(250))] })
+      );
+      const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await new Promise<void>(resolve => setImmediate(resolve));
+
+      expect(storedTaskPart(config, mgr).state.status).toBe('completed');
+    });
+
+    it('keeps a live running task when a replayed terminal predates the live update', async () => {
+      const livePage = deferred<SessionSnapshotPageOutcome>();
+      const readCachedSnapshotPage = jest.fn().mockResolvedValue(cachedTaskPage(runningTaskPart()));
+      const fetchSnapshotPage = createPageFetchMock(() => livePage.promise);
+      const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      if (!latestStorage) throw new Error('expected session storage');
+      const livePart = runningTaskPart();
+      latestStorage.upsertPart(taskMessageId, livePart, 200);
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.part.updated',
+        part: livePart,
+        time: 200,
+      });
+
+      livePage.resolve(
+        makePage({ kiloSessionId: 'ses-1', messages: [taskMessage(completedTaskPart(150))] })
+      );
+      await new Promise<void>(resolve => setImmediate(resolve));
+
+      expect(storedTaskPart(config, mgr).state.status).toBe('running');
+    });
+
+    it('applies a replayed error task part over the cached running part', async () => {
+      const readCachedSnapshotPage = jest.fn().mockResolvedValue(cachedTaskPage(runningTaskPart()));
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({ kiloSessionId: 'ses-1', messages: [taskMessage(erroredTaskPart(250))] })
+      );
+      const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await new Promise<void>(resolve => setImmediate(resolve));
+
+      const part = storedTaskPart(config, mgr);
+      expect(part.state.status).toBe('error');
+      expect(part.state.status).not.toBe('completed');
+      if (part.state.status !== 'error') throw new Error('expected error part');
+      expect(part.state.error).toBe('boom');
+    });
   });
 
   // -------------------------------------------------------------------------

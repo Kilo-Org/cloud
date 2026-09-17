@@ -35,4 +35,3 @@ export const OPENAI_REDIRECT_URI = `${APP_URL}${OPENAI_REDIRECT_PATH}`;
 // The scope sets and the API resource live in a client-safe module so the BYOK
 // card can add the token-sharing scope without importing this server-only file.
 export { OPENAI_IDENTITY_SCOPE, OPENAI_RESOURCE, OPENAI_TOKEN_SHARING_SCOPE } from './scopes';
-

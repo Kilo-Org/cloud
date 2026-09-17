@@ -88,9 +88,21 @@ describe('useSandboxSelection state', () => {
     expect(callHook(undefined).status).toBe('loading');
   });
 
-  it('maps a rejected query to error', () => {
+  it('maps a rejected query with nothing cached to error', () => {
     state.isError = true;
     expect(callHook(undefined).status).toBe('error');
+  });
+
+  it('keeps the last good options ready when a background refetch fails', () => {
+    // A refetch of already-loaded options fails (offline, server hiccup): v5
+    // keeps `data` and flips `status` to 'error'. The cached options are still
+    // the backend's own, so the field stays on screen instead of being replaced
+    // by the error row and losing the pick's recovery.
+    state.data = { enabled: true, options: [] };
+    state.isError = true;
+    const selection = callHook(undefined);
+    expect(selection.status).toBe('ready');
+    expect(selection.capabilities).toEqual({ enabled: true, options: [] });
   });
 
   it('maps a settled query to ready and surfaces its fetch progress', () => {

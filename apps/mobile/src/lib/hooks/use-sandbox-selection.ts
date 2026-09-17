@@ -52,10 +52,15 @@ export function useSandboxSelection(organizationId: string | undefined): Sandbox
   }, [query]);
 
   let status: SandboxSelectionStatus = 'ready';
-  if (query.isError) {
-    status = 'error';
-  } else if (query.isPending) {
+  if (query.isPending) {
     status = 'loading';
+  } else if (query.isError && query.data === undefined) {
+    // v5 keeps `data` and flips `status` to 'error' when a refetch of loaded
+    // options fails, so `isError` alone would replace the field with the error
+    // row and drop the cached options and the pick's recovery. Only a failure
+    // with nothing cached to show is an error state; a failed background
+    // refetch keeps the last good options on screen. See `use-current-user-id`.
+    status = 'error';
   }
 
   return {

@@ -3191,5 +3191,12 @@
     "remoteFound": "تم توصيل الحاسوب",
     "checkAgain": "تحقق مرة أخرى",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "يتطلب تشغيل وكيل تعليمات. أضف تعليمات ثم شغّله مرة أخرى.",
+      "repositoryUnknown": "لا يتعرّف Kilo على {{repository}} كمستودع GitHub أو GitLab. اختر مستودعًا آخر في Kilo.",
+      "repositoryUnsupported": "{{repository}} مستودع Bitbucket — لا يستطيع تشغيل وكيل استخدامه بعد. اختر مستودعًا آخر في Kilo."
+    }
   }
 }

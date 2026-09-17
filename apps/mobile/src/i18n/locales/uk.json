@@ -3143,5 +3143,12 @@
     "remoteFound": "Комп'ютер підключено",
     "checkAgain": "Перевірити ще раз",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Для запуску агента потрібен запит. Додайте запит і запустіть знову.",
+      "repositoryUnknown": "Kilo не розпізнає {{repository}} як репозиторій GitHub або GitLab. Виберіть інший репозиторій у Kilo.",
+      "repositoryUnsupported": "{{repository}} — репозиторій Bitbucket, і Запустити агента поки не може його використовувати. Виберіть інший репозиторій у Kilo."
+    }
   }
 }

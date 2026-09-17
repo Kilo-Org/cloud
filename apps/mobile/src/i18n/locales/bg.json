@@ -3095,5 +3095,12 @@
     "remoteFound": "Компютърът е свързан",
     "checkAgain": "Провери отново",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "За да стартираш агент, е нужна подкана. Добави подкана и го стартирай отново.",
+      "repositoryUnknown": "Kilo не разпознава {{repository}} като хранилище в GitHub или GitLab. Избери друго хранилище в Kilo.",
+      "repositoryUnsupported": "{{repository}} е хранилище в Bitbucket — Стартирай агент още не може да го използва. Избери друго хранилище в Kilo."
+    }
   }
 }

@@ -3095,5 +3095,12 @@
     "remoteFound": "கணினி இணைக்கப்பட்டது",
     "checkAgain": "மீண்டும் சரிபார்",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "முகவரியைத் தொடங்க வினவல் தேவை. ஒரு வினவலைச் சேர்த்து மீண்டும் இயக்கவும்.",
+      "repositoryUnknown": "Kilo, {{repository}}-ஐ GitHub அல்லது GitLab களஞ்சியமாக அடையாளம் காணவில்லை. Kilo-வில் வேறு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்.",
+      "repositoryUnsupported": "{{repository}} ஒரு Bitbucket களஞ்சியம் — முகவரியைத் தொடங்கு இதுவரை அதைப் பயன்படுத்த முடியாது. Kilo-வில் வேறு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்."
+    }
   }
 }

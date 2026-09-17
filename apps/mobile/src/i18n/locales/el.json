@@ -3095,5 +3095,12 @@
     "remoteFound": "Ο υπολογιστής συνδέθηκε",
     "checkAgain": "Έλεγχος ξανά",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Η έναρξη πράκτορα απαιτεί μήνυμα. Πρόσθεσε ένα μήνυμα και εκτέλεσέ το ξανά.",
+      "repositoryUnknown": "Το Kilo δεν αναγνωρίζει το {{repository}} ως αποθετήριο GitHub ή GitLab. Επίλεξε άλλο αποθετήριο στο Kilo.",
+      "repositoryUnsupported": "Το {{repository}} είναι αποθετήριο Bitbucket — Η έναρξη πράκτορα δεν μπορεί να το χρησιμοποιήσει ακόμη. Επίλεξε άλλο αποθετήριο στο Kilo."
+    }
   }
 }

@@ -3095,5 +3095,12 @@
     "remoteFound": "कम्प्युटर जडान भयो",
     "checkAgain": "फेरि जाँच गर्नुहोस्",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "एजेन्ट सुरु गर्न प्रम्प्ट आवश्यक पर्छ। प्रम्प्ट थप्नुहोस् र यसलाई फेरि चलाउनुहोस्।",
+      "repositoryUnknown": "Kilo ले {{repository}} लाई GitHub वा GitLab रिपोजिटरीका रूपमा चिन्दैन। Kilo मा अर्को रिपोजिटरी छान्नुहोस्।",
+      "repositoryUnsupported": "{{repository}} एउटा Bitbucket रिपोजिटरी हो — एजेन्ट सुरु गर्नुहोस् अझै यसलाई प्रयोग गर्न सक्दैन। Kilo मा अर्को रिपोजिटरी छान्नुहोस्।"
+    }
   }
 }

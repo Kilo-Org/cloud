@@ -3095,5 +3095,12 @@
     "remoteFound": "ಕಂಪ್ಯೂಟರ್ ಸಂಪರ್ಕಗೊಂಡಿದೆ",
     "checkAgain": "ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ಏಜೆಂಟ್ ಆರಂಭಿಸಲು ಪ್ರಾಂಪ್ಟ್ ಬೇಕು. ಪ್ರಾಂಪ್ಟ್ ಸೇರಿಸಿ ಮತ್ತು ಅದನ್ನು ಮತ್ತೆ ರನ್ ಮಾಡಿ.",
+      "repositoryUnknown": "Kilo, {{repository}} ಅನ್ನು GitHub ಅಥವಾ GitLab ರೆಪೊಸಿಟರಿ ಎಂದು ಗುರುತಿಸುವುದಿಲ್ಲ. Kilo ನಲ್ಲಿ ಬೇರೆ ರೆಪೊಸಿಟರಿ ಆಯ್ಕೆಮಾಡಿ.",
+      "repositoryUnsupported": "{{repository}} ಒಂದು Bitbucket ರೆಪೊಸಿಟರಿ — ಏಜೆಂಟ್ ಆರಂಭಿಸಿ ಇನ್ನೂ ಅದನ್ನು ಬಳಸಲಾಗದು. Kilo ನಲ್ಲಿ ಬೇರೆ ರೆಪೊಸಿಟರಿ ಆಯ್ಕೆಮಾಡಿ."
+    }
   }
 }

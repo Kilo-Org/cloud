@@ -22,13 +22,11 @@ import { fromMicrodollars, toMicrodollars } from '@/lib/utils';
 import { logExceptInTest } from '@/lib/utils.server';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import { getBalanceForUser } from '@/lib/user/balance';
-import { processOrganizationExpirations } from '@/lib/creditExpiration';
 import { startInactiveSpan } from '@sentry/nextjs';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
 import { sendBalanceAlertEmail } from '@/lib/email';
 import { dispatchLowBalancePush } from '@/lib/notifications-worker-client';
 import { after } from 'next/server';
-import { subHours } from 'date-fns';
 import { maybePerformOrganizationAutoTopUp } from '@/lib/autoTopUp';
 
 /**
@@ -83,7 +81,6 @@ export async function getBalanceForOrganizationUser(
       require_seats: organizations.require_seats,
       plan: organizations.plan,
       auto_top_up_enabled: organizations.auto_top_up_enabled,
-      next_credit_expiration_at: organizations.next_credit_expiration_at,
     })
     .from(organizations)
     .innerJoin(
@@ -129,40 +126,16 @@ export async function getBalanceForOrganizationUser(
   const {
     microdollar_limit,
     microdollar_usage,
-    total_microdollars_acquired: initial_total_microdollars_acquired,
+    total_microdollars_acquired,
     microdollars_used,
     settings,
     require_seats,
     plan,
     auto_top_up_enabled,
-    next_credit_expiration_at,
   } = result[0];
 
-  let total_microdollars_acquired = initial_total_microdollars_acquired;
-  let organization_balance = total_microdollars_acquired - microdollars_used;
+  const organization_balance = total_microdollars_acquired - microdollars_used;
 
-  // Lazy credit expiry check (mirrors user pattern in getBalanceForUser)
-  const expireBefore = subHours(new Date(), Math.random());
-  const needsExpirationComputation =
-    next_credit_expiration_at && expireBefore >= new Date(next_credit_expiration_at);
-
-  if (needsExpirationComputation) {
-    const expiryResult = await processOrganizationExpirations(
-      {
-        id: organizationId,
-        microdollars_used,
-        next_credit_expiration_at,
-        total_microdollars_acquired,
-      },
-      expireBefore
-    );
-    if (expiryResult) {
-      total_microdollars_acquired = expiryResult.total_microdollars_acquired;
-      organization_balance = total_microdollars_acquired - microdollars_used;
-    }
-  }
-
-  // Trigger org auto-top-up after expiration check so it receives post-expiry values
   after(() =>
     maybePerformOrganizationAutoTopUp({
       id: organizationId,

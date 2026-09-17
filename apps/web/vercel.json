@@ -45,6 +45,10 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/expire-credits",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/deployment-threat-scan",
       "schedule": "*/5 * * * *"
     },

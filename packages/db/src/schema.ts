@@ -543,6 +543,10 @@ export const kilocode_users = pgTable(
       .where(sql`${table.vercel_downstream_safety_identifier} IS NOT NULL`),
     index('IDX_kilocode_users_normalized_email').on(table.normalized_email),
     index('IDX_kilocode_users_email_domain').on(table.email_domain),
+    index('IDX_kilocode_users_next_credit_expiration_at')
+      .on(table.next_credit_expiration_at)
+      .concurrently()
+      .where(sql`${table.next_credit_expiration_at} IS NOT NULL`),
   ]
 );
 
@@ -3252,6 +3256,10 @@ export const organizations = pgTable(
       .where(
         sql`(${table.settings}->>'is_sales_demo')::boolean = true AND ${table.deleted_at} IS NULL`
       ),
+    index('IDX_organizations_next_credit_expiration_at')
+      .on(table.next_credit_expiration_at)
+      .concurrently()
+      .where(sql`${table.next_credit_expiration_at} IS NOT NULL`),
   ]
 );
 

@@ -82,6 +82,8 @@ export function buildAppReturnOutcomeView(input: {
     input.error === 'install_state_user_mismatch' ||
     input.error === 'not_installation_admin' ||
     input.error === 'installation_already_claimed' ||
+    input.error === 'shared_installation_disabled' ||
+    input.error === 'incompatible_workflow' ||
     input.error === 'multiple_installations_disabled';
   const returnQuery = isSuccess
     ? 'github_install=success'
@@ -103,11 +105,15 @@ export function buildAppReturnOutcomeView(input: {
         ? 'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.'
         : input.error === 'installation_already_claimed'
           ? 'That GitHub installation is already connected to another Kilo account. Disconnect it there first.'
-          : input.error === 'multiple_installations_disabled'
-            ? 'This Kilo organization can currently connect only one GitHub organization.'
-            : input.error === 'install_state_user_mismatch'
-              ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
-              : 'The installation did not complete. Try again or return to the Kilo App.';
+          : input.error === 'shared_installation_disabled'
+            ? 'That GitHub installation is connected elsewhere, and shared access is not approved for this organization.'
+            : input.error === 'incompatible_workflow'
+              ? 'That GitHub installation has an existing workflow that is not yet compatible with shared access.'
+              : input.error === 'multiple_installations_disabled'
+                ? 'This Kilo organization can currently connect only one GitHub organization.'
+                : input.error === 'install_state_user_mismatch'
+                  ? 'This connection was started from the Kilo App signed in as a different account. Sign in to the web with that account, or start again from the app.'
+                  : 'The installation did not complete. Try again or return to the Kilo App.';
   const cta = isSuccess ? 'Continue' : isPending ? 'Done' : isNonRetryable ? 'Back' : 'Try again';
 
   return {
@@ -183,6 +189,12 @@ function GitHubIntegrationOutcomeToasts({
       );
     } else if (error === 'multiple_installations_disabled') {
       toast.error('This organization can currently connect only one GitHub organization.', {
+        duration: 8000,
+      });
+    } else if (error === 'shared_installation_disabled') {
+      toast.error('Shared access is not approved for this organization.', { duration: 8000 });
+    } else if (error === 'incompatible_workflow') {
+      toast.error('An existing workflow is not yet compatible with shared access.', {
         duration: 8000,
       });
     } else if (error === 'github_authorization_required') {

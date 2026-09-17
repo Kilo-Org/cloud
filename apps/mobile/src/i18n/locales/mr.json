@@ -480,6 +480,8 @@
       "replyBadRequest": "हे उत्तर पोस्ट करता येत नाही. चर्चेत बदल झाला असेल.",
       "replyForbidden": "तुम्हाला या पुल रिक्वेस्टला उत्तर देण्याची परवानगी नाही.",
       "addCommentCta": "या पुल रिक्वेस्टवर टिप्पणी करा",
+      "fixWithKilo": "Kilo सह दुरुस्त करा",
+      "fixWithKiloPrompt": "कृपया खालील पुल रिक्वेस्ट टिप्पणी सोडवा: {{link}}",
       "commentBadRequest": "ही टिप्पणी पोस्ट करता येत नाही. पुल रिक्वेस्टमध्ये बदल झाला असेल.",
       "commentForbidden": "तुम्हाला या पुल रिक्वेस्टवर टिप्पणी करण्याची परवानगी नाही.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} प्रलंबित",
       "skipped": "{{displayCount}} वगळल्या",
       "checksCount": "{{displayCount}} तपासण्या",
+      "checksCount_one": "{{displayCount}} तपासणी",
+      "checksCount_other": "{{displayCount}} तपासण्या",
       "checkDetails": "तपासणीचे तपशील"
     },
     "inbox": {
@@ -3058,6 +3062,12 @@
     "privacy": "एजंट्स पाहण्यासाठी Kilo उघडा",
     "openAgents": "एजंट्स उघडा",
     "needsInput": "प्रतिसाद आवश्यक",
+    "newestSession": "सर्वात नवीन: {{title}}",
+    "noneWaiting": "प्रतीक्षा करणारा एजंट नाही",
+    "newAgent": "नवा एजंट",
+    "approving": "मंजूर केले जात आहे...",
+    "couldNotApprove": "मंजूर करता आले नाही",
+    "couldNotStart": "सुरू करता आले नाही",
     "channelName": "सक्रिय एजंट्स",
     "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये लाइव्ह अॅक्टिव्हिटी चालू करा."
   },
@@ -3093,5 +3103,12 @@
     "remoteFound": "संगणक जोडला",
     "checkAgain": "पुन्हा तपासा",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "एजंट सुरू करण्यासाठी प्रॉम्प्ट आवश्यक आहे. प्रॉम्प्ट जोडा आणि ते पुन्हा चालवा.",
+      "repositoryUnknown": "Kilo, {{repository}} ला GitHub किंवा GitLab रिपॉझिटरी म्हणून ओळखत नाही. Kilo मध्ये दुसरी रिपॉझिटरी निवडा.",
+      "repositoryUnsupported": "{{repository}} ही Bitbucket रिपॉझिटरी आहे — एजंट सुरू करा अजून ती वापरू शकत नाही. Kilo मध्ये दुसरी रिपॉझिटरी निवडा."
+    }
   }
 }

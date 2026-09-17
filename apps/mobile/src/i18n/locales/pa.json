@@ -480,6 +480,8 @@
       "replyBadRequest": "ਇਹ ਜਵਾਬ ਪੋਸਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ। ਥ੍ਰੈਡ ਬਦਲਿਆ ਹੋ ਸਕਦਾ ਹੈ।",
       "replyForbidden": "ਤੁਹਾਨੂੰ ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "addCommentCta": "ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਟਿੱਪਣੀ ਕਰੋ",
+      "fixWithKilo": "Kilo ਨਾਲ ਠੀਕ ਕਰੋ",
+      "fixWithKiloPrompt": "ਕਿਰਪਾ ਕਰਕੇ ਹੇਠਾਂ ਦਿੱਤੀ ਪੁੱਲ ਰਿਕਵੈਸਟ ਟਿੱਪਣੀ ਨੂੰ ਹੱਲ ਕਰੋ: {{link}}",
       "commentBadRequest": "ਇਹ ਟਿੱਪਣੀ ਪੋਸਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ। ਪੁੱਲ ਰਿਕਵੈਸਟ ਬਦਲਿਆ ਹੋ ਸਕਦਾ ਹੈ।",
       "commentForbidden": "ਤੁਹਾਨੂੰ ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਟਿੱਪਣੀ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} ਬਾਕੀ",
       "skipped": "{{displayCount}} ਛੱਡੀਆਂ ਗਈਆਂ",
       "checksCount": "{{displayCount}} ਜਾਂਚਾਂ",
+      "checksCount_one": "{{displayCount}} ਜਾਂਚ",
+      "checksCount_other": "{{displayCount}} ਜਾਂਚਾਂ",
       "checkDetails": "ਜਾਂਚ ਦੇ ਵੇਰਵੇ"
     },
     "inbox": {
@@ -3058,6 +3062,12 @@
     "privacy": "ਏਜੰਟ ਵੇਖਣ ਲਈ Kilo ਖੋਲ੍ਹੋ",
     "openAgents": "ਏਜੰਟ ਖੋਲ੍ਹੋ",
     "needsInput": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
+    "newestSession": "ਸਭ ਤੋਂ ਨਵਾਂ: {{title}}",
+    "noneWaiting": "ਕੋਈ ਏਜੰਟ ਉਡੀਕ ਨਹੀਂ ਰਿਹਾ",
+    "newAgent": "ਨਵਾਂ ਏਜੰਟ",
+    "approving": "ਮਨਜ਼ੂਰ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
+    "couldNotApprove": "ਮਨਜ਼ੂਰ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "couldNotStart": "ਸ਼ੁਰੂ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "channelName": "ਸਰਗਰਮ ਏਜੰਟ",
     "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।"
   },
@@ -3093,5 +3103,12 @@
     "remoteFound": "ਕੰਪਿਊਟਰ ਕਨੈਕਟ ਹੋਇਆ",
     "checkAgain": "ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ਏਜੰਟ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਪ੍ਰੌਂਪਟ ਲੋੜੀਂਦਾ ਹੈ। ਇੱਕ ਪ੍ਰੌਂਪਟ ਸ਼ਾਮਲ ਕਰੋ ਅਤੇ ਇਸਨੂੰ ਦੁਬਾਰਾ ਚਲਾਓ।",
+      "repositoryUnknown": "Kilo, {{repository}} ਨੂੰ GitHub ਜਾਂ GitLab ਰਿਪੋਜ਼ਿਟਰੀ ਵਜੋਂ ਨਹੀਂ ਪਛਾਣਦਾ। Kilo ਵਿੱਚ ਕੋਈ ਹੋਰ ਰਿਪੋਜ਼ਿਟਰੀ ਚੁਣੋ।",
+      "repositoryUnsupported": "{{repository}} ਇੱਕ Bitbucket ਰਿਪੋਜ਼ਿਟਰੀ ਹੈ — ਏਜੰਟ ਸ਼ੁਰੂ ਕਰੋ ਅਜੇ ਇਸਨੂੰ ਵਰਤ ਨਹੀਂ ਸਕਦਾ। Kilo ਵਿੱਚ ਕੋਈ ਹੋਰ ਰਿਪੋਜ਼ਿਟਰੀ ਚੁਣੋ।"
+    }
   }
 }

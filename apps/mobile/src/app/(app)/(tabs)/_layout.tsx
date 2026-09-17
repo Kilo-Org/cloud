@@ -10,6 +10,7 @@ import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
 import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
+import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
 import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
@@ -37,6 +38,10 @@ const TAB_BAR_ICON_STYLE = {
   alignItems: 'center',
   justifyContent: 'center',
 } satisfies ViewStyle;
+
+/** The plain tab press: the same feedback for every tab without its own move. */
+const TAB_PRESS_HAPTICS = { tabPress: () => void Haptics.selectionAsync() };
+
 export const unstable_settings = {
   initialRouteName: '(0_home)',
 };
@@ -100,15 +105,27 @@ export default function TabsLayout() {
       reconcileSessionAttention(session.id, session.status, null);
     }
   }, [activeSessions, orgLoaded, attentionRevision]);
-  const needsInputCount = activeSessions.filter(session =>
+  const needsInputRows = activeSessions.map(session => ({
+    id: session.id,
+    status: session.status,
+    isAcked: isAttentionAcked(session.id, session.status),
+  }));
+  const needsInputCount = needsInputRows.filter(session =>
     shouldShowNeedsInput({
       status: session.status,
       raiseId: session.status,
-      isAcked: isAttentionAcked(session.id, session.status),
+      isAcked: session.isAcked,
     })
   ).length;
   const needsInputBadge =
     orgLoaded && !isLoading && !isError && needsInputCount > 0 ? needsInputCount : undefined;
+
+  // The in-app consumer for an action another surface asked for: the URL rails
+  // park one (`action-url-handler.ts`), and a completed StartAgent parks the
+  // session it created. The consumer lives in `usePendingAppAction` and is
+  // mounted here because this layout owns both the router and the live session
+  // list — the destination is decided here and nowhere else.
+  usePendingAppAction({ needsInputRows, orgLoaded, isLoading, isError });
 
   // If the flag flips off while the Chat tab is focused, its `href` becomes
   // null but the route is still mounted — move to Home instead.
@@ -157,11 +174,7 @@ export default function TabsLayout() {
               <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={{
-            tabPress: () => {
-              void Haptics.selectionAsync();
-            },
-          }}
+          listeners={TAB_PRESS_HAPTICS}
         />
         <Tabs.Screen
           name="(1_kiloclaw)"
@@ -212,11 +225,7 @@ export default function TabsLayout() {
               <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={{
-            tabPress: () => {
-              void Haptics.selectionAsync();
-            },
-          }}
+          listeners={TAB_PRESS_HAPTICS}
         />
         <Tabs.Screen
           name="(4_chat)"
@@ -233,11 +242,7 @@ export default function TabsLayout() {
               <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
-          listeners={{
-            tabPress: () => {
-              void Haptics.selectionAsync();
-            },
-          }}
+          listeners={TAB_PRESS_HAPTICS}
         />
         <Tabs.Screen
           name="(3_profile)"

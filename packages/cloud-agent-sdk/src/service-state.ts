@@ -689,6 +689,14 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       activity = { type: 'idle' };
       cloudStatus = null;
       setupLog = [];
+      // The status carries `event.error`, the Durable Object's own safe
+      // projection of the failure ("Assistant request failed: insufficient
+      // credits", "Workspace setup failed", "No model was selected", a repo
+      // auth failure), so a client that renders the status verbatim — web and
+      // the extension — keeps the specific reason and the extension's credits
+      // detection still matches. The mobile transcript maps the text to the
+      // app's classified copy and the failed row's typed footer keeps the
+      // original behind its copy action.
       status =
         event.reason === 'interrupted'
           ? { type: 'interrupted' }

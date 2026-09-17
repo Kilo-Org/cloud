@@ -31,6 +31,7 @@ import {
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeProxyGrantSchema,
   RUNTIME_PROXY_GRANT_KEY,
+  sameRuntimeProxyControlBinding,
   verifyRuntimeCredentialProxyHandle,
 } from '../runtime-credential-proxy.js';
 import { z } from 'zod';
@@ -1467,13 +1468,7 @@ export class SandboxSession extends DurableObject<Env> {
       readFence(),
     ]);
     const authorization = RuntimeAuthorizationSchema.safeParse(storedAuthorization);
-    if (
-      !latestFence ||
-      latestFence.allocationId !== fence.allocationId ||
-      latestFence.providerInstanceId !== fence.providerInstanceId ||
-      latestFence.connectionId !== fence.connectionId ||
-      latestFence.wrapperInstanceId !== fence.wrapperInstanceId
-    ) {
+    if (!latestFence || !sameRuntimeProxyControlBinding(fence, latestFence)) {
       return null;
     }
     return issuePersistedRuntimeProxyGrant({
@@ -1590,6 +1585,10 @@ export class SandboxSession extends DurableObject<Env> {
     } catch {
       return { ...unknown, observedAt: Date.now(), detailCode: 'status_unavailable' };
     }
+  }
+
+  async getPendingInteractions(): Promise<{ questions: unknown[]; permissions: unknown[] }> {
+    return this.derivePendingInteractions() ?? { questions: [], permissions: [] };
   }
 
   async getWorktreeChanges(): Promise<GetWorktreeChangesOutput> {
@@ -2514,6 +2513,16 @@ export class SandboxSession extends DurableObject<Env> {
     const callbacksPending = this.messageCallbacks.pendingCallbackCount() > 0;
     const reportsPending = this.reportOutbox.pendingCount() > 0;
     if (!callbacksPending && !reportsPending) await this.ctx.storage.deleteAlarm();
+    const sandboxId = metadata?.workspace?.sandboxId;
+    if (sandboxId && metadata) {
+      try {
+        await sandboxControlRpc(this.env, sandboxId).forgetSessionReference(
+          metadata.identity.sessionId
+        );
+      } catch {
+        // Tombstone remains; over-blocking is safe.
+      }
+    }
     this.ctx.storage.transactionSync(() => {
       if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const pendingCleanup = this.pendingRuntimeCleanup();

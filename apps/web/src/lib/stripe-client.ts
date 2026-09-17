@@ -10,7 +10,9 @@ if (!stripeSecretKey) {
 const skipStripeApi =
   process.env.NODE_ENV !== 'production' && process.env.SKIP_STRIPE_API === 'true';
 
-export const client: Stripe = new Stripe(stripeSecretKey);
+export const client: Stripe = new Stripe(stripeSecretKey, {
+  apiVersion: '2025-10-29.clover',
+});
 
 type ConstrainedMetadata = UserConstrainedMetadata | OrganizationConstrainedMetdata;
 

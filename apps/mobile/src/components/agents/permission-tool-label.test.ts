@@ -32,6 +32,15 @@ describe('permissionToolLabel', () => {
     expect(permissionToolLabel('some_future_tool')).toBe('some_future_tool');
   });
 
+  it('returns an id that names an inherited member unchanged', () => {
+    // A bare object-literal index would hit `Object.prototype` here and hand
+    // `i18n.t` a function instead of the fallback.
+    expect(permissionToolLabel('constructor')).toBe('constructor');
+    expect(permissionToolLabel('toString')).toBe('toString');
+    expect(permissionToolLabel('hasOwnProperty')).toBe('hasOwnProperty');
+    expect(permissionToolLabel('__proto__')).toBe('__proto__');
+  });
+
   it('strips a tool namespace prefix before the lookup', async () => {
     await i18n.changeLanguage('en');
     expect(permissionToolLabel('file_write')).toBe('write');

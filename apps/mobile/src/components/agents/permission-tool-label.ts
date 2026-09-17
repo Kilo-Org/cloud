@@ -50,6 +50,11 @@ function stripNamespace(permission: string): string {
  */
 export function permissionToolLabel(permission: string): string {
   const stripped = stripNamespace(permission);
-  const key: string | null | undefined = TOOL_LABEL_KEYS[stripped as keyof typeof TOOL_LABEL_KEYS];
+  // Object.hasOwn (not a bare index) so an id that names an inherited member
+  // ('constructor', 'toString', '__proto__') falls through to the raw id
+  // instead of handing `i18n.t` a prototype member.
+  const key: string | null | undefined = Object.hasOwn(TOOL_LABEL_KEYS, stripped)
+    ? TOOL_LABEL_KEYS[stripped as keyof typeof TOOL_LABEL_KEYS]
+    : undefined;
   return key ? i18n.t(key) : permission;
 }

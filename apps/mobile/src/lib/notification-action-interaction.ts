@@ -48,9 +48,9 @@ import {
   type SessionActivity,
 } from '@kilocode/cloud-agent-sdk';
 import { createUserWebConnection } from '@kilocode/cloud-agent-sdk/user-web-connection';
-import * as SecureStore from 'expo-secure-store';
 
 import { createMobileAgentSessionManager } from '@/components/agents/mobile-session-manager';
+import { readStoredValue } from '@/lib/auth/secure-store-value';
 import { SESSION_INGEST_WS_URL } from '@/lib/config';
 import { ackSessionAttention } from '@/lib/session-attention';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
@@ -454,13 +454,21 @@ async function readRaiseState(
   }
 }
 
-/* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin trpc / SecureStore / timer passthroughs */
+/* eslint-disable @typescript-eslint/promise-function-async, require-await -- thin trpc / stored-value / timer passthroughs */
 async function defaultGetSession(kiloSessionId: string): Promise<SessionRow> {
   return trpcClient.cliSessionsV2.get.query({ session_id: kiloSessionId });
 }
 
+/**
+ * The active-user id, read through the one cross-platform SecureStore entry
+ * point (`lib/auth/secure-store-value`) the glanceable sink and the in-app
+ * approving surface also read: `expo-secure-store` exists on iOS and Android
+ * alike, so no platform lacks the capability and this headless path keeps no
+ * second, per-platform storage read. A headless Approve must resolve the same
+ * account the in-app control would.
+ */
 async function defaultGetUserId(): Promise<string | null> {
-  return SecureStore.getItemAsync(ACTIVE_USER_ID_KEY);
+  return readStoredValue(ACTIVE_USER_ID_KEY);
 }
 
 async function defaultSleep(ms: number): Promise<void> {

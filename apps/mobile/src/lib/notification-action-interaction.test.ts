@@ -18,13 +18,13 @@ import {
 const {
   getSessionQuery,
   createWebTicketMutate,
-  secureStoreGetItemAsync,
+  readStoredValueMock,
   createMobileAgentSessionManagerMock,
   createUserWebConnectionMock,
 } = vi.hoisted(() => ({
   getSessionQuery: vi.fn(),
   createWebTicketMutate: vi.fn(),
-  secureStoreGetItemAsync: vi.fn(async () => 'user-1'),
+  readStoredValueMock: vi.fn(async () => 'user-1'),
   createMobileAgentSessionManagerMock: vi.fn(
     (_options: ManagerFactoryArgs): NeedsInputSessionManager => {
       throw new Error('createMobileAgentSessionManager not stubbed for this test');
@@ -33,8 +33,11 @@ const {
   createUserWebConnectionMock: vi.fn((_options: UserWebConnectionOptions) => ({})),
 }));
 
-vi.mock('expo-secure-store', () => ({
-  getItemAsync: secureStoreGetItemAsync,
+// The one cross-platform SecureStore entry point is mocked, not
+// `expo-secure-store`: a regression to a direct platform import in the module
+// under test would bypass this mock and fail the storage assertions below.
+vi.mock('@/lib/auth/secure-store-value', () => ({
+  readStoredValue: readStoredValueMock,
 }));
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn() },
@@ -191,8 +194,8 @@ describe('runNeedsInputInteraction', () => {
   beforeEach(() => {
     getSessionQuery.mockReset();
     createWebTicketMutate.mockReset();
-    secureStoreGetItemAsync.mockReset();
-    secureStoreGetItemAsync.mockResolvedValue('user-1');
+    readStoredValueMock.mockReset();
+    readStoredValueMock.mockResolvedValue('user-1');
     getSessionQuery.mockResolvedValue({ organization_id: 'org-1' });
     createMobileAgentSessionManagerMock.mockReset();
     createUserWebConnectionMock.mockReset();
@@ -315,7 +318,7 @@ describe('runNeedsInputInteraction', () => {
 
       expect(outcome).toBe('ok');
       expect(getSessionQuery).toHaveBeenCalledWith({ session_id: SESSION_ID });
-      expect(secureStoreGetItemAsync).toHaveBeenCalledWith('active-user-id');
+      expect(readStoredValueMock).toHaveBeenCalledWith('active-user-id');
       expect(createManager).toHaveBeenCalledWith({
         store: fake.store,
         organizationId: 'org-1',

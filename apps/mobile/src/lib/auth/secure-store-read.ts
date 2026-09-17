@@ -2,14 +2,6 @@ import { readStoredValue, type SecureStoreReadOptions } from '@/lib/auth/secure-
 import { E2E_SECURE_STORE_FAULT_MS } from '@/lib/config';
 
 /**
- * The plain, un-retried read, re-exported for the headless callers that need
- * exactly one SecureStore read (`start-agent-runtime`). The app's action path
- * reads its stored model preference through this module, so the cross-platform
- * entry point stays a single import away from the retrying read below.
- */
-export { readStoredValue };
-
-/**
  * Bounded retry for a stored credential read.
  *
  * A keychain/keystore read can reject transiently — the device just rebooted

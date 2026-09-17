@@ -1,1 +1,1 @@
-DROP TABLE "repository_customizations" CASCADE;
+DROP TABLE "repository_customizations";

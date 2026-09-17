@@ -2475,6 +2475,8 @@
       "replyBody": "Yanıt metni",
       "replyForbidden": "Bu çekme isteğine yanıt verme iznin yok.",
       "addCommentCta": "Bu çekme isteğine yorum yap",
+      "fixWithKilo": "Kilo ile düzelt",
+      "fixWithKiloPrompt": "Lütfen aşağıdaki PR yorumunu ele al: {{link}}",
       "commentBadRequest": "Bu yorum gönderilemiyor. Çekme isteği değişmiş olabilir.",
       "commentForbidden": "Bu çekme isteğine yorum yapma iznin yok.",
       "replyPlaceholder": "Yanıtın…",

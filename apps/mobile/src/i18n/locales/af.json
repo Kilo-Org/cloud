@@ -480,6 +480,8 @@
       "replyBadRequest": "Hierdie antwoord kan nie geplaas word nie. Die draad het dalk verander.",
       "replyForbidden": "Jy het nie toestemming om op hierdie trekversoek te antwoord nie.",
       "addCommentCta": "Kommenteer op hierdie trekversoek",
+      "fixWithKilo": "Maak reg met Kilo",
+      "fixWithKiloPrompt": "Hanteer asseblief die volgende kommentaar op die trekversoek: {{link}}",
       "commentBadRequest": "Hierdie kommentaar kan nie geplaas word nie. Die trekversoek het dalk verander.",
       "commentForbidden": "Jy het nie toestemming om op hierdie trekversoek kommentaar te lewer nie.",
       "moderation": {

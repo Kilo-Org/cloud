@@ -489,6 +489,8 @@
       "replyBadRequest": "Din ir-risposta ma tistax tiġi ppubblikata. Is-sensiela ta' kummenti setgħet inbidlet.",
       "replyForbidden": "M'għandekx permess biex tirrispondi għal din it-talba għall-għaqda.",
       "addCommentCta": "Ikkummenta fuq din it-talba għall-għaqda",
+      "fixWithKilo": "Solvi bil-Kilo",
+      "fixWithKiloPrompt": "Jekk jogħġbok indirizza l-kumment li ġej fuq it-talba għall-għaqda: {{link}}",
       "commentBadRequest": "Dan il-kumment ma jistax jiġi ppubblikat. Jista' jkun li t-talba għall-għaqda nbidlet.",
       "commentForbidden": "M'għandekx permess biex tikkummenta fuq din it-talba għall-għaqda.",
       "moderation": {

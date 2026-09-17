@@ -141,6 +141,23 @@ describe('PrReviewDiscussionList viewer query', () => {
     });
   });
 
+  it('passes the provider triple and the conversation kind to each comment row', () => {
+    const renderer = mountList();
+
+    const row = renderer.root.findAll(node => String(node.type) === 'CommentRow')[0];
+    expect(row?.props).toMatchObject({
+      owner: 'group/sub',
+      repo: 'repo',
+      number: 12,
+      commentKind: 'conversation',
+      comment: { commentId: 1 },
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('never fires the GitHub procedure under a GitLab scope', () => {
     const renderer = mountList({
       ref: { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 },

@@ -480,6 +480,8 @@
       "replyBadRequest": "Kjo përgjigje nuk mund të postohet. Diskutimi mund të ketë ndryshuar.",
       "replyForbidden": "Nuk ke leje të përgjigjesh në këtë kërkesë për bashkim.",
       "addCommentCta": "Komento në këtë kërkesë për bashkim",
+      "fixWithKilo": "Rregullo me Kilo",
+      "fixWithKiloPrompt": "Ju lutem trajto komentin e mëposhtëm në këtë kërkesë për bashkim: {{link}}",
       "commentBadRequest": "Ky koment nuk mund të postohet. Kërkesa për bashkim mund të ketë ndryshuar.",
       "commentForbidden": "Nuk ke leje të komentosh në këtë kërkesë për bashkim.",
       "moderation": {

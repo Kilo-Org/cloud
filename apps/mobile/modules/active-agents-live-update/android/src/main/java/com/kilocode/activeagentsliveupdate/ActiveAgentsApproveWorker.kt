@@ -19,10 +19,24 @@ import com.google.common.util.concurrent.ListenableFuture
  * Boots headless JS for the notification's Approve tap, with the app closed and
  * no Activity.
  *
+ * Android-only by capability, not by a product scope: running this app's JS with
+ * no process at all — which is what an app-closed Approve needs — is what
+ * `WorkManager` plus `HeadlessJsTaskContext` provide, and iOS has no equivalent.
+ * An iOS Live Activity button performs an App Intent inside the app's process
+ * instead (`expo-widgets` `LiveActivityUserInteraction`, routed by
+ * `src/glanceable-ios/interaction.ts`), where the JS the approval needs is
+ * already up, so Apple's side keeps no transport to share with this file. Both
+ * platforms answer through the same `runGlanceableApprove`
+ * (`src/lib/glanceable/approve-ask.ts`) and draw the same Approve control and
+ * retry line; only the app-closed transport is platform-specific.
+ *
  * This mirrors `oss/HeadlessJsTaskWorker.java` from react-native-android-widget
  * (MIT, Copyright (c) 2022 Jay Kim): start the shared ReactHost, wait for the
  * ReactContext, then run one HeadlessJsTask and complete the worker from the
- * task-finished listener. WorkManager owns the wake-up; a `HeadlessJsTaskService`
+ * task-finished listener. That library base class is not extended: it is
+ * Android-only the same way, and it still holds the pending listener after a
+ * stop and matches a finish against the default `taskId` of `0`, the two bugs
+ * this worker fixes. WorkManager owns the wake-up; a `HeadlessJsTaskService`
  * is deliberately not used because a background `startService` is restricted on
  * Android 8+. A force-stopped app is out of scope: Android removes the
  * notification and blocks its receiver, so there is nothing to tap.

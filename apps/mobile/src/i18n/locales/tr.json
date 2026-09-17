@@ -299,6 +299,15 @@
       "balance": "Bakiye uyarıları",
       "security": "Güvenlik bulguları"
     },
+    "action": {
+      "openSession": "Oturumu aç"
+    },
+    "needsInputAction": {
+      "approved": "İstek onaylandı",
+      "replied": "Yanıt gönderildi",
+      "failed": "Yanıtlanamadı. Yeniden denemek için tekrar dokunun.",
+      "unavailable": "Bu istek artık beklemiyor."
+    },
     "category": {
       "chatMessagesSubtitle": "konuşmalarındaki yanıtlar",
       "agentAttentionTitle": "Ajan seni bekliyor",

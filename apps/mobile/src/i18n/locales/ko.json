@@ -299,6 +299,15 @@
       "balance": "잔액 알림",
       "security": "보안 진단 결과"
     },
+    "action": {
+      "openSession": "세션 열기"
+    },
+    "needsInputAction": {
+      "approved": "요청이 승인되었습니다",
+      "replied": "답장을 보냈습니다",
+      "failed": "답변하지 못했습니다. 다시 탭하여 재시도하세요.",
+      "unavailable": "이 요청은 더 이상 대기 중이 아닙니다."
+    },
     "category": {
       "chatMessagesSubtitle": "대화에 달린 답장",
       "agentAttentionTitle": "에이전트 응답 요청",

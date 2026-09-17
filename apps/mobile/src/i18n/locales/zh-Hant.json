@@ -299,6 +299,15 @@
       "balance": "餘額提醒",
       "security": "資安問題"
     },
+    "action": {
+      "openSession": "開啟工作階段"
+    },
+    "needsInputAction": {
+      "approved": "要求已核准",
+      "replied": "回覆已傳送",
+      "failed": "無法回答。再次點按即可重試。",
+      "unavailable": "此要求已不再等待。"
+    },
     "category": {
       "chatMessagesSubtitle": "對話中的回覆",
       "agentAttentionTitle": "智慧代理需要你處理",

@@ -789,6 +789,15 @@
       "balance": "Amaran baki",
       "security": "Dapatan keselamatan"
     },
+    "action": {
+      "openSession": "Buka sesi"
+    },
+    "needsInputAction": {
+      "approved": "Permintaan diluluskan",
+      "replied": "Balasan dihantar",
+      "failed": "Tidak dapat menjawab. Ketik semula untuk mencuba lagi.",
+      "unavailable": "Permintaan ini tidak lagi menunggu."
+    },
     "category": {
       "chatMessagesSubtitle": "balasan dalam perbualan anda",
       "agentAttentionTitle": "Ejen memerlukan tindakan anda",

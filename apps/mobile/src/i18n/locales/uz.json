@@ -789,6 +789,15 @@
       "balance": "Balans haqida ogohlantirishlar",
       "security": "Aniqlangan xavfsizlik muammolari"
     },
+    "action": {
+      "openSession": "Sessiyani ochish"
+    },
+    "needsInputAction": {
+      "approved": "So‘rov tasdiqlandi",
+      "replied": "Javob yuborildi",
+      "failed": "Javob berilmadi. Qayta urinish uchun yana bosing.",
+      "unavailable": "Bu so‘rov endi kutmaydi."
+    },
     "category": {
       "chatMessagesSubtitle": "suhbatlaringizdagi javoblar",
       "agentAttentionTitle": "Agentga yordamingiz kerak",

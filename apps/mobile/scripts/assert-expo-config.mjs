@@ -13,6 +13,9 @@ const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
 const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
 const SCHEME = 'kiloapp';
 const ASSOCIATED_DOMAIN = 'applinks:app.kilo.ai';
+// Time Sensitive Notifications capability: the iOS half of the needs-input
+// raise's `interruptionLevel: 'timeSensitive'` break-through contract.
+const TIME_SENSITIVE_ENTITLEMENT = 'com.apple.developer.usernotifications.time-sensitive';
 // The app name (app.config.ts `name`). `$(PRODUCT_NAME)` resolves to this in
 // the base Info.plist, but `.lproj/InfoPlist.strings` is compiled verbatim, so
 // the localized copy has to spell it out.
@@ -82,6 +85,14 @@ const associatedDomains = config.ios?.associatedDomains ?? [];
 check(
   associatedDomains.includes(ASSOCIATED_DOMAIN),
   `ios.associatedDomains must contain "${ASSOCIATED_DOMAIN}"`
+);
+
+// iOS honors `UNNotificationInterruptionLevel.timeSensitive` only when the app
+// carries the Time Sensitive Notifications capability; without it the
+// needs-input raise is demoted to the platform default and stays quiet in Focus.
+check(
+  config.ios?.entitlements?.[TIME_SENSITIVE_ENTITLEMENT] === true,
+  `ios.entitlements must enable the Time Sensitive Notifications capability (${TIME_SENSITIVE_ENTITLEMENT})`
 );
 
 const blockedPermissions = config.android?.blockedPermissions ?? [];

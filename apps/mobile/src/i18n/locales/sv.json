@@ -789,6 +789,15 @@
       "balance": "Saldovarningar",
       "security": "Säkerhetsanmärkningar"
     },
+    "action": {
+      "openSession": "Öppna session"
+    },
+    "needsInputAction": {
+      "approved": "Begäran godkänd",
+      "replied": "Svar skickat",
+      "failed": "Kunde inte svara. Tryck igen för att försöka igen.",
+      "unavailable": "Denna begäran väntar inte längre."
+    },
     "category": {
       "chatMessagesSubtitle": "svar i dina konversationer",
       "agentAttentionTitle": "Agenten behöver dig",

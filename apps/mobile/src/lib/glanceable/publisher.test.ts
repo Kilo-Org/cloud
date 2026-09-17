@@ -17,6 +17,7 @@ import {
   unregisterGlanceableSink,
 } from './sink-registry';
 import { type WaitingAsk } from './waiting-ask';
+import { getSurfaceExtras, setSurfaceExtras } from './surface-extras';
 
 const NOW = 1_750_000_000_000;
 const PUB_CTX = { userId: 'u1', organizationId: null };
@@ -69,6 +70,7 @@ function snapshotFor(sessions: { status: string }[], now: number, revision = 0) 
 
 afterEach(() => {
   vi.useRealTimers();
+  setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
 });
 
 describe('GlanceablePublisher', () => {
@@ -91,6 +93,24 @@ describe('GlanceablePublisher', () => {
     expect(snapshot.needsInput).toBe(2);
     expect(snapshot.idle).toBe(1);
     expect(snapshot.status).toBe('happy');
+  });
+
+  it('stores the newest session title in the surface extras, never in the snapshot', () => {
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    publisher.handleSessions(
+      [
+        { status: 'idle', title: 'Older session', updatedAt: '2026-01-01T00:00:00.000Z' },
+        { status: 'question', title: 'Newest session', updatedAt: '2026-01-02T00:00:00.000Z' },
+      ],
+      PUB_CTX
+    );
+
+    expect(getSurfaceExtras().newestSessionTitle).toBe('Newest session');
+    // The privacy contract: the title rides beside the snapshot, which stays
+    // content-free and is what the widget host persists.
+    expect(JSON.stringify(lastSnapshot(calls, 'publish'))).not.toContain('Newest session');
+    publisher.dispose();
   });
 
   it('starts the activity immediately on the first eligible emit', () => {

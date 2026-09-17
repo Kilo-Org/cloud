@@ -2475,6 +2475,8 @@
       "replyBody": "Isi balasan",
       "replyForbidden": "Kamu tidak memiliki izin untuk membalas PR ini.",
       "addCommentCta": "Komentari PR ini",
+      "fixWithKilo": "Perbaiki dengan Kilo",
+      "fixWithKiloPrompt": "Mohon tangani komentar PR berikut: {{link}}",
       "commentBadRequest": "Komentar ini tidak dapat dikirim. PR mungkin sudah berubah.",
       "commentForbidden": "Kamu tidak memiliki izin untuk berkomentar di PR ini.",
       "replyPlaceholder": "Balasan…",
@@ -3060,6 +3062,12 @@
     "privacy": "Buka Kilo untuk melihat agen",
     "openAgents": "Buka agen",
     "needsInput": "Perlu masukan",
+    "newestSession": "Terbaru: {{title}}",
+    "noneWaiting": "Tidak ada agen yang menunggu",
+    "newAgent": "Agen baru",
+    "approving": "Menyetujui...",
+    "couldNotApprove": "Tidak dapat menyetujui",
+    "couldNotStart": "Tidak dapat memulai",
     "channelName": "Agen aktif",
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci.",
     "openSession": "Buka",
@@ -3097,5 +3105,12 @@
     "remoteFound": "Komputer terhubung",
     "checkAgain": "Periksa lagi",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Mulai agen memerlukan instruksi. Tambahkan instruksi lalu jalankan lagi.",
+      "repositoryUnknown": "Kilo tidak mengenali {{repository}} sebagai repositori GitHub atau GitLab. Pilih repositori lain di Kilo.",
+      "repositoryUnsupported": "{{repository}} adalah repositori Bitbucket — Mulai agen belum bisa menggunakannya. Pilih repositori lain di Kilo."
+    }
   }
 }

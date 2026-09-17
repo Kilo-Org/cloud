@@ -1,6 +1,7 @@
 import {
   GLANCEABLE_STALE_MS,
   type GlanceableAgentsSnapshot,
+  isIdleOnlyGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
@@ -8,11 +9,13 @@ import {
   type GlanceableCountKind,
   glanceableCountLines,
   glanceableSpokenLabel,
+  type GlanceableStatus,
   glanceableStatusCopyKey,
   type GlanceableSurfaceFlags,
   primaryGlanceableCount,
   resolveGlanceableStatus,
 } from '@/lib/glanceable/presentation';
+import { getSurfaceExtras, type GlanceableSurfaceExtras } from '@/lib/glanceable/surface-extras';
 
 /** One translated count line. `kind` picks the glyph and the color. */
 type GlanceableCount = { label: string; kind: GlanceableCountKind; count: number };
@@ -34,6 +37,16 @@ export type GlanceableViewProps = {
   /** Top-ranked count value for compact surfaces; 0 when no eligible work. */
   primaryCount: number;
   /**
+   * The reserved slot under the counts: the newest session's title, the
+   * in-flight action's progress or failure line, or null. Only the Home Screen
+   * families draw it. The title never enters the snapshot (privacy contract):
+   * it rides in the surface extras every surface reads on redraw (see
+   * surface-extras), and the props builder owns the translated copy.
+   */
+  newestTitle: string | null;
+  /** The two in-place actions the state offers. Disabled actions draw no button. */
+  actions: { approve: boolean; newAgent: boolean };
+  /**
    * ISO timestamp of the longest-running needs-input wait, or null when
    * nothing waits. Only the needs-input row carries a duration: a wait is the
    * one interval the user can act on. Only `systemMedium` is wide enough to
@@ -43,6 +56,64 @@ export type GlanceableViewProps = {
   /** Spoken label: status word, numeric counts, then Open agents. Never a title or id. */
   accessibilityLabel: string;
 };
+
+/**
+ * The marker a widget button's App Intent patches into the pressed entry's
+ * props, until the app answers: `pendingAction` names the action to run and
+ * `pendingActionVisible` holds the "Approving…" line in place of the newest
+ * line. The app clears both the moment it picks the press up, so a crash or a
+ * second sweep can never run the same press twice.
+ */
+export type GlanceableWidgetAction = 'approve' | 'new-agent';
+
+export type GlanceableWidgetProps = Partial<GlanceableViewProps> & {
+  pendingAction?: GlanceableWidgetAction;
+  pendingActionVisible?: boolean;
+};
+
+/**
+ * The reserved slot line: the newest session's title, or the in-flight action's
+ * progress or failure while one is being answered.
+ *
+ * The slot is visible on every surface that offers an in-place action — the two
+ * count statuses, including an idle-only tray, and the empty one — because a
+ * create's progress and failure have nowhere else to appear, and the empty
+ * surface and an idle-only tray are the ones that offer `New agent`. The
+ * newest-session *title* still draws only where the counts do, so a locked or
+ * empty surface stays titleless.
+ */
+function newestTitleFor(
+  extras: GlanceableSurfaceExtras,
+  status: GlanceableStatus,
+  translate: (key: string) => string
+): string | null {
+  if (status !== 'happy' && status !== 'stale' && status !== 'empty') {
+    return null;
+  }
+  if (extras.actionFeedback === 'approving') {
+    return translate('glanceable.approving');
+  }
+  if (extras.actionFeedback === 'starting') {
+    return translate('common.starting');
+  }
+  if (extras.actionFeedback === 'couldNotApprove') {
+    return translate('glanceable.couldNotApprove');
+  }
+  if (extras.actionFeedback === 'couldNotStart') {
+    return translate('glanceable.couldNotStart');
+  }
+  if (status !== 'happy' && status !== 'stale') {
+    return null;
+  }
+  const title = extras.newestSessionTitle;
+  if (title === null) {
+    return null;
+  }
+  // The translator owns the word order around the placeholder. The replacer is
+  // a function so a title containing `$&` or `$'` is inserted literally
+  // instead of being read as a replacement pattern.
+  return translate('glanceable.newestSession').replace('{{title}}', () => title);
+}
 
 /** Build the surface props from a snapshot, surface flags, and a translator. */
 export function buildGlanceableViewProps(
@@ -56,9 +127,13 @@ export function buildGlanceableViewProps(
   // locked frames carry no count payload at all.
   const status = resolveGlanceableStatus(snapshot, flags);
   const showCounts = status === 'happy' || status === 'stale';
+  // The empty surface offers `New agent`, so its copy says what that action is
+  // about — nothing waiting — instead of the generic no-work copy.
+  const copy = (key: string): string =>
+    key === 'glanceable.empty' ? translate('glanceable.noneWaiting') : translate(key);
 
   return {
-    statusLine: statusKey === null ? null : translate(statusKey),
+    statusLine: statusKey === null ? null : copy(statusKey),
     countLines: (showCounts ? glanceableCountLines(snapshot) : []).map(line => ({
       label: translate(line.key),
       kind: line.kind,
@@ -67,8 +142,20 @@ export function buildGlanceableViewProps(
     primaryLabel: primary === null ? null : translate(primary.key),
     primaryKind: primary === null ? null : primary.kind,
     primaryCount: primary === null ? 0 : primary.count,
+    newestTitle: newestTitleFor(getSurfaceExtras(), status, translate),
+    actions: {
+      // Only a permission wait can be answered from the widget, so the button
+      // gates on `needsApproval` (the count the Live Activity's own Approve
+      // control uses). A `question` needs an answer and a `retry` needs the
+      // provider back: neither is approvable, so neither may offer a button the
+      // action can only answer by opening the app.
+      approve: showCounts && (snapshot.needsApproval ?? 0) > 0,
+      // Nothing waiting to act on: the empty state, or an idle-only tray that
+      // keeps a card alive. A locked or expired surface offers neither.
+      newAgent: status === 'empty' || (showCounts && isIdleOnlyGlanceableWork(snapshot)),
+    },
     needsInputSince: showCounts && snapshot.needsInput > 0 ? snapshot.needsInputSince : null,
-    accessibilityLabel: glanceableSpokenLabel(snapshot, flags, translate),
+    accessibilityLabel: glanceableSpokenLabel(snapshot, flags, copy),
   };
 }
 
@@ -147,15 +234,52 @@ export type GlanceableLiveActivityProps = GlanceableLiveActivityContentState & {
 };
 
 /**
+ * The widget timeline for one snapshot running from `now`: the current frame,
+ * then the delayed frame that stops asserting the counts as current and the
+ * expiry frame that zeroes them.
+ *
+ * WidgetKit is the only clock the widget has while the app is not running, so
+ * every writer that replaces the timeline must hand it the whole set — the
+ * publisher's sink (`ios-sink.publish`) and the failure republish after a press
+ * (`glanceable-ios/widget-actions`). A single-frame write drops the two
+ * fallbacks and the widget keeps claiming the line it was last given.
+ *
+ * `null` for a terminal blank: `updateSnapshot` already wrote its single
+ * current frame, and the delayed copy must never replace signed-out or privacy
+ * copy.
+ */
+export function widgetTimelineFrames(
+  snapshot: GlanceableAgentsSnapshot,
+  props: Partial<GlanceableViewProps>,
+  translate: (key: string) => string
+): { date: Date; props: Partial<GlanceableViewProps> }[] | null {
+  if (snapshot.status === 'signed_out' || snapshot.status === 'privacy') {
+    return null;
+  }
+  const now = Date.now();
+  // WidgetKit renders the newest entry at or before `now` and never rewinds, so
+  // a frame whose date has already passed sits behind the current one and only
+  // leaves the timeline unsorted. A press on a widget whose last snapshot
+  // lapsed while the app was away therefore keeps the single current frame.
+  const later = [
+    ...staleTimelineFrame(snapshot, translate),
+    { date: new Date(snapshot.expiresAt), props: buildExpiredWidgetProps(snapshot, translate) },
+  ].filter(frame => frame.date.getTime() > now);
+  return [{ date: new Date(now), props }, ...later];
+}
+
+/**
  * Build the Live Activity content-state from a snapshot. The server pushes the
  * same raw shape, so the widget extension's `active-agents-live-activity.tsx`
  * renders it directly with inlined English copy (the server cannot translate).
  * `canApprove` and `notice` are included only when the caller can decide them;
- * a server-written state omits both. The approvable count rides only here, never
- * in `GlanceableViewProps`: the widget families and the complication stay
- * read-only counts, and the Lock Screen / Watch Smart Stack layout is the one
- * surface that draws an Approve control. A snapshot from an older producer omits
- * the field, so it resolves to 0 and the control is hidden rather than offering
+ * a server-written state omits both.
+ *
+ * The approvable count rides only here, never in `GlanceableViewProps`: the
+ * widget's own in-place buttons read it from the snapshot while `actions` is
+ * built, and the Lock Screen / Watch Smart Stack layout draws its Approve
+ * control from this content state. A snapshot from an older producer omits the
+ * field, so it resolves to 0 and both controls are hidden rather than offering
  * an Approve the service could not complete.
  */
 export function buildGlanceableLiveActivityContentState(

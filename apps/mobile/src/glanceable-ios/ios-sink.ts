@@ -29,12 +29,11 @@ import {
 } from './ending-activities';
 import { ActiveAgentsWidget } from './active-agents-widget';
 import {
-  buildExpiredWidgetProps,
   buildGlanceableLiveActivityContentState,
   buildGlanceableViewProps,
   type GlanceableLiveActivityProps,
-  staleTimelineFrame,
   toWidgetProps,
+  widgetTimelineFrames,
 } from './view-props';
 
 /** ActivityKit takes the stale window in seconds. */
@@ -361,18 +360,13 @@ export const iosSink: GlanceableSink = {
   publish(snapshot) {
     const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate));
     ActiveAgentsWidget.updateSnapshot(props);
-    // updateSnapshot replaces the timeline, so terminal copy needs no expiry frame.
-    if (snapshot.status !== 'signed_out' && snapshot.status !== 'privacy') {
-      ActiveAgentsWidget.updateTimeline([
-        { date: new Date(), props },
-        // WidgetKit is the only clock the widget has while the app is not
-        // running: a background wake can be throttled or, after a force quit,
-        // never delivered at all. Hand it the frame that stops asserting the
-        // counts as current, so a widget nothing has refreshed reads as delayed
-        // rather than as fact.
-        ...staleTimelineFrame(snapshot, translate),
-        { date: new Date(snapshot.expiresAt), props: buildExpiredWidgetProps(snapshot, translate) },
-      ]);
+    // updateSnapshot leaves a single frame behind, so the shared builder adds
+    // the delayed and expiry frames every timeline writer owes WidgetKit (see
+    // `widgetTimelineFrames`). Null means a terminal blank, whose copy needs no
+    // further frame.
+    const frames = widgetTimelineFrames(snapshot, props, translate);
+    if (frames !== null) {
+      ActiveAgentsWidget.updateTimeline(frames);
     }
     const contentState = liveActivityContentState(snapshot);
     if (!isEligibleGlanceableWork(snapshot)) {

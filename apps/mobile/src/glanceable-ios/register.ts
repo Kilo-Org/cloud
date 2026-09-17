@@ -18,6 +18,7 @@ import { refreshActiveAgentsLiveActivityCopy } from './active-agents-live-activi
 import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
 import { handleGlanceableInteraction } from './interaction';
 import { iosSink } from './ios-sink';
+import { registerWidgetActionHandling } from './widget-actions';
 import { ensureWidgetLogo } from './widget-logo';
 
 type InteractionSubscription = ReturnType<typeof addUserInteractionListener>;
@@ -63,6 +64,13 @@ if (Platform.OS === 'ios') {
   // publisher is plain state, and widgets get translated copy through the sink,
   // not through a mounted component tree.
   registerGlanceableSink(iosSink);
+
+  // Widget App Intent buttons: the live subscription answers a press while this
+  // process is up, and the launch sweep picks up a press that patched the
+  // timeline before JS subscribed. Its listener filters on the Home Screen
+  // widget's press marker, while the subscription above owns the Live Activity's
+  // `approve` and `open` targets, so a press is answered by exactly one of them.
+  registerWidgetActionHandling();
 
   // Copy the Kilo mark into the shared app group so the widget extension can read
   // it. Fire and forget: it lands long before the first snapshot arrives, and a

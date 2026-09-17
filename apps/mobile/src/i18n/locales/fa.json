@@ -480,6 +480,8 @@
       "replyBadRequest": "این پاسخ قابل ارسال نیست. ممکن است گفت‌وگو تغییر کرده باشد.",
       "replyForbidden": "اجازهٔ پاسخ دادن در این درخواست ادغام را ندارید.",
       "addCommentCta": "نظر دادن در این درخواست ادغام",
+      "fixWithKilo": "رفع مشکل با Kilo",
+      "fixWithKiloPrompt": "لطفاً به این نظر درخواست ادغام رسیدگی کن: {{link}}",
       "commentBadRequest": "این نظر قابل ارسال نیست. ممکن است درخواست ادغام تغییر کرده باشد.",
       "commentForbidden": "اجازهٔ نظر دادن در این درخواست ادغام را ندارید.",
       "moderation": {
@@ -3060,6 +3062,12 @@
     "privacy": "برای دیدن عامل‌ها Kilo را باز کنید",
     "openAgents": "باز کردن عامل‌ها",
     "needsInput": "در انتظار ورودی",
+    "newestSession": "جدیدترین: {{title}}",
+    "noneWaiting": "هیچ عاملی در انتظار نیست",
+    "newAgent": "عامل جدید",
+    "approving": "در حال تأیید...",
+    "couldNotApprove": "تأیید نشد",
+    "couldNotStart": "شروع نشد",
     "channelName": "عامل‌های فعال",
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید.",
     "openSession": "باز کن",
@@ -3097,5 +3105,12 @@
     "remoteFound": "رایانه متصل شد",
     "checkAgain": "دوباره بررسی کنید",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "برای شروع عامل، یک پیام لازم است. یک پیام اضافه کنید و دوباره اجرا کنید.",
+      "repositoryUnknown": "Kilo مخزن {{repository}} را به عنوان مخزن GitHub یا GitLab نمی‌شناسد. در Kilo مخزن دیگری انتخاب کنید.",
+      "repositoryUnsupported": "{{repository}} یک مخزن Bitbucket است — شروع عامل هنوز نمی‌تواند از آن استفاده کند. در Kilo مخزن دیگری انتخاب کنید."
+    }
   }
 }

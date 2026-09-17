@@ -480,6 +480,8 @@
       "replyBadRequest": "Tätä vastausta ei voi julkaista. Ketju on voinut muuttua.",
       "replyForbidden": "Sinulla ei ole oikeutta vastata tähän muutospyyntöön.",
       "addCommentCta": "Kommentoi tätä muutospyyntöä",
+      "fixWithKilo": "Korjaa Kilolla",
+      "fixWithKiloPrompt": "Käsittele seuraava muutospyynnön kommentti: {{link}}",
       "commentBadRequest": "Tätä kommenttia ei voi julkaista. Muutospyyntö on voinut muuttua.",
       "commentForbidden": "Sinulla ei ole oikeutta kommentoida tätä muutospyyntöä.",
       "moderation": {
@@ -3060,6 +3062,12 @@
     "privacy": "Avaa Kilo nähdäksesi agentit",
     "openAgents": "Avaa agentit",
     "needsInput": "Odottaa vastausta",
+    "newestSession": "Uusin: {{title}}",
+    "noneWaiting": "Yksikään agentti ei odota",
+    "newAgent": "Uusi agentti",
+    "approving": "Hyväksytään...",
+    "couldNotApprove": "Hyväksyntä epäonnistui",
+    "couldNotStart": "Käynnistys epäonnistui",
     "channelName": "Aktiiviset agentit",
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
     "openSession": "Avaa",
@@ -3097,5 +3105,12 @@
     "remoteFound": "Tietokone yhdistetty",
     "checkAgain": "Tarkista uudelleen",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Agentin käynnistys vaatii kehotteen. Lisää kehote ja suorita se uudelleen.",
+      "repositoryUnknown": "Kilo ei tunnista {{repository}}-kohdetta GitHub- tai GitLab-koodivarastoksi. Valitse toinen koodivarasto Kilossa.",
+      "repositoryUnsupported": "{{repository}} on Bitbucket-koodivarasto — Käynnistä agentti ei voi vielä käyttää sitä. Valitse toinen koodivarasto Kilossa."
+    }
   }
 }

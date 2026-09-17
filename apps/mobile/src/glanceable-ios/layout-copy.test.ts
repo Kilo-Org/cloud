@@ -178,21 +178,24 @@ describe('withGlanceableCopy', () => {
     expect(glanceableLayoutCopy().locale).not.toContain('-');
   });
 
-  it('covers every slot the layouts read, plus the language tag', () => {
+  it('covers every status the layouts render, the in-place actions, and the language tag', () => {
     expect(Object.keys(glanceableLayoutCopy()).toSorted()).toEqual([
       'approve',
+      'approving',
       'digits',
       'empty',
       'expired',
       'idle',
       'locale',
       'needsInput',
+      'newAgent',
       'open',
       'openAgents',
       'privacy',
       'running',
       'signed_out',
       'stale',
+      'starting',
       'waiting',
     ]);
   });

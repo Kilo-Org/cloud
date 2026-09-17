@@ -2535,6 +2535,8 @@
       "replyBody": "نص الرد",
       "replyForbidden": "ليست لديك صلاحية للرد على طلب السحب هذا.",
       "addCommentCta": "التعليق على طلب السحب هذا",
+      "fixWithKilo": "الإصلاح باستخدام Kilo",
+      "fixWithKiloPrompt": "يُرجى معالجة التعليق التالي على طلب السحب: {{link}}",
       "commentBadRequest": "لا يمكن نشر هذا التعليق. ربما تغيّر طلب السحب.",
       "commentForbidden": "ليست لديك صلاحية التعليق على طلب السحب هذا.",
       "replyPlaceholder": "الرد…",
@@ -3156,6 +3158,12 @@
     "privacy": "افتح Kilo لعرض الوكلاء",
     "openAgents": "فتح الوكلاء",
     "needsInput": "بانتظار تدخلك",
+    "newestSession": "الأحدث: {{title}}",
+    "noneWaiting": "لا يوجد وكلاء في الانتظار",
+    "newAgent": "وكيل جديد",
+    "approving": "جارٍ الموافقة...",
+    "couldNotApprove": "تعذّرت الموافقة",
+    "couldNotStart": "تعذّر البدء",
     "channelName": "الوكلاء النشطون",
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل.",
     "openSession": "افتح",
@@ -3193,5 +3201,12 @@
     "remoteFound": "تم توصيل الحاسوب",
     "checkAgain": "تحقق مرة أخرى",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "يتطلب تشغيل وكيل تعليمات. أضف تعليمات ثم شغّله مرة أخرى.",
+      "repositoryUnknown": "لا يتعرّف Kilo على {{repository}} كمستودع GitHub أو GitLab. اختر مستودعًا آخر في Kilo.",
+      "repositoryUnsupported": "{{repository}} مستودع Bitbucket — لا يستطيع تشغيل وكيل استخدامه بعد. اختر مستودعًا آخر في Kilo."
+    }
   }
 }

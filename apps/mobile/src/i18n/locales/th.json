@@ -480,6 +480,8 @@
       "replyBadRequest": "ไม่สามารถโพสต์การตอบกลับนี้ได้ เธรดอาจมีการเปลี่ยนแปลง",
       "replyForbidden": "คุณไม่มีสิทธิ์ตอบกลับใน PR นี้",
       "addCommentCta": "แสดงความคิดเห็นใน PR นี้",
+      "fixWithKilo": "แก้ไขด้วย Kilo",
+      "fixWithKiloPrompt": "โปรดจัดการความคิดเห็นใน PR ต่อไปนี้: {{link}}",
       "commentBadRequest": "ไม่สามารถโพสต์ความคิดเห็นนี้ได้ PR อาจมีการเปลี่ยนแปลง",
       "commentForbidden": "คุณไม่มีสิทธิ์แสดงความคิดเห็นใน PR นี้",
       "moderation": {
@@ -3060,6 +3062,12 @@
     "privacy": "เปิด Kilo เพื่อดูเอเจนต์",
     "openAgents": "เปิดเอเจนต์",
     "needsInput": "รอข้อมูลจากคุณ",
+    "newestSession": "ล่าสุด: {{title}}",
+    "noneWaiting": "ไม่มีเอเจนต์ที่รออยู่",
+    "newAgent": "เอเจนต์ใหม่",
+    "approving": "กำลังอนุมัติ...",
+    "couldNotApprove": "อนุมัติไม่สำเร็จ",
+    "couldNotStart": "เริ่มไม่สำเร็จ",
     "channelName": "เอเจนต์ที่กำลังทำงาน",
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก",
     "openSession": "เปิด",
@@ -3097,5 +3105,12 @@
     "remoteFound": "เชื่อมต่อคอมพิวเตอร์แล้ว",
     "checkAgain": "ตรวจสอบอีกครั้ง",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "การเริ่มเอเจนต์ต้องมีพรอมต์ เพิ่มพรอมต์แล้วลองอีกครั้ง",
+      "repositoryUnknown": "Kilo ไม่รู้จัก {{repository}} ว่าเป็นคลังโค้ด GitHub หรือ GitLab เลือกคลังโค้ดอื่นใน Kilo",
+      "repositoryUnsupported": "{{repository}} เป็นคลังโค้ด Bitbucket — เริ่มเอเจนต์ยังใช้ไม่ได้ เลือกคลังโค้ดอื่นใน Kilo"
+    }
   }
 }

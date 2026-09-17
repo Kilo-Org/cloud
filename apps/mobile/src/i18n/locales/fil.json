@@ -480,6 +480,8 @@
       "replyBadRequest": "Hindi ma-post ang sagot na ito. Maaaring nagbago ang talakayan.",
       "replyForbidden": "Wala kang pahintulot na sumagot sa pull request na ito.",
       "addCommentCta": "Magkomento sa pull request na ito",
+      "fixWithKilo": "Ayusin gamit ang Kilo",
+      "fixWithKiloPrompt": "Pakisagawa ang sumusunod na komento sa pull request: {{link}}",
       "commentBadRequest": "Hindi ma-post ang komentong ito. Maaaring nagbago ang pull request.",
       "commentForbidden": "Wala kang pahintulot na magkomento sa pull request na ito.",
       "moderation": {
@@ -3060,6 +3062,12 @@
     "privacy": "Buksan ang Kilo para makita ang mga agent",
     "openAgents": "Buksan ang mga agent",
     "needsInput": "Naghihintay ng sagot",
+    "newestSession": "Pinakabago: {{title}}",
+    "noneWaiting": "Walang naghihintay na agent",
+    "newAgent": "Bagong agent",
+    "approving": "Inaaprubahan...",
+    "couldNotApprove": "Hindi maaprubahan",
+    "couldNotStart": "Hindi masimulan",
     "channelName": "Mga aktibong agent",
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
     "openSession": "Buksan",
@@ -3097,5 +3105,12 @@
     "remoteFound": "Konektado ang computer",
     "checkAgain": "Tingnan muli",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Nangangailangan ng prompt ang Simulan ang agent. Magdagdag ng prompt at patakbuhin itong muli.",
+      "repositoryUnknown": "Hindi kinikilala ng Kilo ang {{repository}} bilang GitHub o GitLab na repositoryo. Pumili ng ibang repositoryo sa Kilo.",
+      "repositoryUnsupported": "Ang {{repository}} ay isang Bitbucket na repositoryo — Hindi pa ito magagamit ng Simulan ang agent. Pumili ng ibang repositoryo sa Kilo."
+    }
   }
 }

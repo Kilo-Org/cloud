@@ -480,6 +480,8 @@
       "replyBadRequest": "Овој одговор не може да се објави. Можеби нишката е променета.",
       "replyForbidden": "Немаш дозвола да одговориш на ова барање за спојување.",
       "addCommentCta": "Коментирај ова барање за спојување",
+      "fixWithKilo": "Поправи со Kilo",
+      "fixWithKiloPrompt": "Те молам реши го следниов коментар на барањето за спојување: {{link}}",
       "commentBadRequest": "Овој коментар не може да се објави. Можеби барањето за спојување е променето.",
       "commentForbidden": "Немаш дозвола да коментираш ова барање за спојување.",
       "moderation": {
@@ -3060,6 +3062,12 @@
     "privacy": "Отвори Kilo за да ги видиш агентите",
     "openAgents": "Отвори ги агентите",
     "needsInput": "Чека внес",
+    "newestSession": "Најнова: {{title}}",
+    "noneWaiting": "Нема агенти што чекаат",
+    "newAgent": "Нов агент",
+    "approving": "Се одобрува...",
+    "couldNotApprove": "Одобрувањето не успеа",
+    "couldNotStart": "Стартувањето не успеа",
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран.",
     "openSession": "Отвори",
@@ -3097,5 +3105,12 @@
     "remoteFound": "Компјутерот е поврзан",
     "checkAgain": "Провери повторно",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "За да стартираш агент, потребно е упатство. Додај упатство и стартувај го повторно.",
+      "repositoryUnknown": "Kilo не го препознава {{repository}} како GitHub или GitLab репозиториум. Избери друг репозиториум во Kilo.",
+      "repositoryUnsupported": "{{repository}} е Bitbucket репозиториум — Стартирај агент сè уште не може да го користи. Избери друг репозиториум во Kilo."
+    }
   }
 }

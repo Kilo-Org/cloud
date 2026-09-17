@@ -9,12 +9,14 @@ import {
   shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { type NewestSessionRow, newestSessionTitle } from './newest-session';
 import {
   getGlanceableDelivery,
   type GlanceableSink,
   type GlanceableSinkContext,
   guardSink,
 } from './sink-registry';
+import { getSurfaceExtras, setSurfaceExtras } from './surface-extras';
 import { selectWaitingAsk, type WaitingAsk, type WaitingAskRow } from './waiting-ask';
 
 /**
@@ -118,14 +120,27 @@ export class GlanceablePublisher {
     this.activityStarted = false;
   }
 
-  /** Cache success: derive the next snapshot from the current session rows. */
-  handleSessions(sessions: readonly WaitingAskRow[], ctx: GlanceablePublisherContext): void {
+  /**
+   * Cache success: derive the next snapshot from the current session rows. The
+   * rows carry both the newest-session fields the Home Screen widgets read and
+   * the session id the activity's action buttons need.
+   */
+  handleSessions(
+    sessions: readonly (NewestSessionRow & WaitingAskRow)[],
+    ctx: GlanceablePublisherContext
+  ): void {
     if (this.isGated()) {
       // Nothing is asking while the publisher is gated: a terminal blank must
       // not leave an approvable ask behind for the action buttons.
       this.noteWaitingAsk(null);
       return;
     }
+    // The newest session's title never enters the snapshot (privacy contract):
+    // it rides in the surface extras every widget reads on redraw.
+    setSurfaceExtras({
+      ...getSurfaceExtras(),
+      newestSessionTitle: newestSessionTitle(sessions),
+    });
     getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     const now = this.now();
     this.applyExpiry(now, ctx);

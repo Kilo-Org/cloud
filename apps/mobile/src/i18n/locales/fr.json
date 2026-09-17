@@ -2490,6 +2490,8 @@
       "replyBody": "Texte de la réponse",
       "replyForbidden": "Vous n'avez pas l'autorisation de répondre à cette demande de fusion.",
       "addCommentCta": "Commenter cette demande de fusion",
+      "fixWithKilo": "Corriger avec Kilo",
+      "fixWithKiloPrompt": "Veuillez traiter le commentaire suivant de la demande de fusion : {{link}}",
       "commentBadRequest": "Ce commentaire ne peut pas être publié. La demande de fusion a peut-être changé.",
       "commentForbidden": "Vous n'avez pas l'autorisation de commenter cette demande de fusion.",
       "replyPlaceholder": "Votre réponse…",
@@ -3084,6 +3086,12 @@
     "privacy": "Ouvrez Kilo pour voir les agents",
     "openAgents": "Ouvrir les agents",
     "needsInput": "Intervention requise",
+    "newestSession": "La plus récente: {{title}}",
+    "noneWaiting": "Aucun agent en attente",
+    "newAgent": "Nouvel agent",
+    "approving": "Approbation en cours...",
+    "couldNotApprove": "Échec de l'approbation",
+    "couldNotStart": "Échec du démarrage",
     "channelName": "Agents actifs",
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé.",
     "openSession": "Ouvrir",
@@ -3121,5 +3129,12 @@
     "remoteFound": "Ordinateur connecté",
     "checkAgain": "Vérifier à nouveau",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Démarrer un agent nécessite une consigne. Ajoutez une consigne et relancez-le.",
+      "repositoryUnknown": "Kilo ne reconnaît pas {{repository}} comme un dépôt GitHub ou GitLab. Choisissez un autre dépôt dans Kilo.",
+      "repositoryUnsupported": "{{repository}} est un dépôt Bitbucket — Démarrer un agent ne peut pas encore l'utiliser. Choisissez un autre dépôt dans Kilo."
+    }
   }
 }

@@ -434,6 +434,11 @@ function evaluateEntry(platform: string): {
       case 'expo-router/entry': {
         return {};
       }
+      case './src/lib/app-actions/app-action-dispatch': {
+        // The entry registers the OS-action dispatcher after the router entry;
+        // the stub answers with the one call it makes.
+        return { registerAppActionDispatcher: (): void => undefined };
+      }
       default: {
         throw new Error(`The entry required an unexpected module: ${id}`);
       }

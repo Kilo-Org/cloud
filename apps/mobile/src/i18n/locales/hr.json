@@ -483,6 +483,8 @@
       "replyBadRequest": "Ovaj odgovor nije moguće objaviti. Nit se možda promijenila.",
       "replyForbidden": "Nemaš dopuštenje za odgovaranje u ovom zahtjevu za spajanje.",
       "addCommentCta": "Komentiraj ovaj zahtjev za spajanje",
+      "fixWithKilo": "Riješi s Kilo",
+      "fixWithKiloPrompt": "Molim te riješi sljedeći komentar na zahtjevu za spajanje: {{link}}",
       "commentBadRequest": "Ovaj komentar nije moguće objaviti. Zahtjev za spajanje se možda promijenio.",
       "commentForbidden": "Nemaš dopuštenje za komentiranje u ovom zahtjevu za spajanje.",
       "moderation": {
@@ -3084,6 +3086,12 @@
     "privacy": "Otvori Kilo za prikaz agenata",
     "openAgents": "Otvori agente",
     "needsInput": "Čeka unos",
+    "newestSession": "Najnovija: {{title}}",
+    "noneWaiting": "Nema agenata koji čekaju",
+    "newAgent": "Novi agent",
+    "approving": "Odobrava se...",
+    "couldNotApprove": "Odobravanje nije uspjelo",
+    "couldNotStart": "Pokretanje nije uspjelo",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama za prikaz aktivnih agenata na zaključanom zaslonu.",
     "openSession": "Otvori",
@@ -3121,5 +3129,12 @@
     "remoteFound": "Računalo povezano",
     "checkAgain": "Provjeri ponovno",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Za pokretanje agenta potreban je upit. Dodaj upit i pokreni ga ponovno.",
+      "repositoryUnknown": "Kilo ne prepoznaje {{repository}} kao GitHub ili GitLab repozitorij. Odaberi drugi repozitorij u Kilu.",
+      "repositoryUnsupported": "{{repository}} je Bitbucketov repozitorij — Pokreni agenta ga još ne može koristiti. Odaberi drugi repozitorij u Kilu."
+    }
   }
 }

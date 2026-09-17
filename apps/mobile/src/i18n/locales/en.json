@@ -480,6 +480,8 @@
       "replyBadRequest": "This reply can't be posted. The thread may have changed.",
       "replyForbidden": "You don't have permission to reply to this pull request.",
       "addCommentCta": "Comment on this pull request",
+      "fixWithKilo": "Fix with Kilo",
+      "fixWithKiloPrompt": "Please address the following PR comment: {{link}}",
       "commentBadRequest": "This comment can't be posted. The pull request may have changed.",
       "commentForbidden": "You don't have permission to comment on this pull request.",
       "moderation": {
@@ -3060,6 +3062,12 @@
     "privacy": "Open Kilo to see agents",
     "openAgents": "Open agents",
     "needsInput": "Needs input",
+    "newestSession": "Newest: {{title}}",
+    "noneWaiting": "No agents waiting",
+    "newAgent": "New agent",
+    "approving": "Approving…",
+    "couldNotApprove": "Could not approve",
+    "couldNotStart": "Could not start",
     "channelName": "Active agents",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
     "openSession": "Open",
@@ -3097,5 +3105,12 @@
     "remoteFound": "Computer connected",
     "checkAgain": "Check again",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Start agent needs a prompt. Add a prompt and run it again.",
+      "repositoryUnknown": "Kilo doesn't recognize {{repository}} as a GitHub or GitLab repository. Choose another repository in Kilo.",
+      "repositoryUnsupported": "{{repository}} is a Bitbucket repository — Start agent can't use it yet. Choose another repository in Kilo."
+    }
   }
 }

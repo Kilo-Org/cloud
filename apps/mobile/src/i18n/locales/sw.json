@@ -480,6 +480,8 @@
       "replyBadRequest": "Jibu hili haliwezi kuchapishwa. Mada huenda imebadilika.",
       "replyForbidden": "Huna ruhusa ya kujibu ombi hili la kuunganisha.",
       "addCommentCta": "Toa maoni kwenye ombi hili la kuunganisha",
+      "fixWithKilo": "Suluhisha kwa Kilo",
+      "fixWithKiloPrompt": "Tafadhali shughulikia maoni yafuatayo kwenye ombi hili la kuunganisha: {{link}}",
       "commentBadRequest": "Maoni haya haliwezi kuchapishwa. Huenda ombi hili la kuunganisha likabadilika.",
       "commentForbidden": "Huna ruhusa ya kutoa maoni kwenye ombi hili la kuunganisha.",
       "moderation": {
@@ -3060,6 +3062,12 @@
     "privacy": "Fungua Kilo ili kuona mawakala",
     "openAgents": "Fungua mawakala",
     "needsInput": "Inasubiri jibu",
+    "newestSession": "Kipya zaidi: {{title}}",
+    "noneWaiting": "Hakuna wakala anayesubiri",
+    "newAgent": "Wakala mpya",
+    "approving": "Inaidhinisha...",
+    "couldNotApprove": "Imeshindwa kuidhinisha",
+    "couldNotStart": "Imeshindwa kuanza",
     "channelName": "Mawakala wanaofanya kazi",
     "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa.",
     "openSession": "Fungua",
@@ -3097,5 +3105,12 @@
     "remoteFound": "Kompyuta imeunganishwa",
     "checkAgain": "Angalia tena",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Anzisha wakala inahitaji maagizo. Ongeza maagizo na uiendeshe tena.",
+      "repositoryUnknown": "Kilo haitambui {{repository}} kama hazina ya GitHub au GitLab. Chagua hazina nyingine katika Kilo.",
+      "repositoryUnsupported": "{{repository}} ni hazina ya Bitbucket — Anzisha wakala bado haiwezi kuitumia. Chagua hazina nyingine katika Kilo."
+    }
   }
 }

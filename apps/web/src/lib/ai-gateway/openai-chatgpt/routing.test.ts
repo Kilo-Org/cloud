@@ -2,7 +2,8 @@ jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptConnection: jest.fn(),
 }));
 jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
-  ensureFreshOpenAiChatGptAccessToken: jest.fn(),
+  resolveOpenAiChatGptAccessToken: jest.fn(),
+  OPENAI_CHATGPT_RECONNECT_MESSAGE: 'Your ChatGPT connection has expired. Reconnect to continue.',
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -18,7 +19,7 @@ jest.mock('next/server', () => ({
 }));
 
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
-import { ensureFreshOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
+import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import type {
   GatewayRequest,
@@ -27,6 +28,7 @@ import type {
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 import {
+  buildOpenAiChatGptProvider,
   checkOpenAiChatGptByok,
   isOpenAiChatGptEligible,
   OPENAI_CHATGPT_API_URL,
@@ -86,7 +88,7 @@ function routingInput(
 
 async function buildProviderForTest() {
   const result = await checkOpenAiChatGptByok(routingInput());
-  if (!result) {
+  if (result?.kind !== 'provider') {
     throw new Error('expected an openai-chatgpt provider');
   }
   return result.provider;
@@ -113,11 +115,11 @@ async function transformResponsesRequest(
 
 beforeEach(() => {
   process.env.OPENAI_API_KEY = PARTNER_KEY;
+  jest.mocked(getOpenAiChatGptConnection).mockReset().mockResolvedValue(connectedConnection());
   jest
-    .mocked(getOpenAiChatGptConnection)
+    .mocked(resolveOpenAiChatGptAccessToken)
     .mockReset()
-    .mockResolvedValue(connectedConnection());
-  jest.mocked(ensureFreshOpenAiChatGptAccessToken).mockReset().mockResolvedValue(DELEGATED_TOKEN);
+    .mockResolvedValue({ kind: 'access_token', accessToken: DELEGATED_TOKEN });
 });
 
 afterAll(() => {
@@ -175,11 +177,14 @@ describe('isOpenAiChatGptEligible', () => {
     }
   );
 
-  it.each(['', '   '])('is not eligible with an empty partner key %p', async apiKey => {
-    process.env.OPENAI_API_KEY = apiKey;
+  it.each(['', '   '])(
+    'stays eligible with an empty partner key %p, leaving the key to the provider',
+    async apiKey => {
+      process.env.OPENAI_API_KEY = apiKey;
 
-    await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(false);
-  });
+      await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(true);
+    }
+  );
 
   it('is not eligible when no connection is stored', async () => {
     jest.mocked(getOpenAiChatGptConnection).mockResolvedValue(null);
@@ -268,24 +273,81 @@ describe('checkOpenAiChatGptByok', () => {
     expect(JSON.parse(init.body as string)).not.toHaveProperty('provider');
   });
 
-  it('returns no provider when the connection cannot refresh', async () => {
-    jest.mocked(ensureFreshOpenAiChatGptAccessToken).mockResolvedValue(null);
+  it('requires a reconnect instead of another billing path when the credential is terminal', async () => {
+    jest.mocked(resolveOpenAiChatGptAccessToken).mockResolvedValue({ kind: 'terminal' });
+
+    await expect(checkOpenAiChatGptByok(routingInput())).resolves.toEqual({
+      kind: 'reconnect',
+      message: 'Your ChatGPT connection has expired. Reconnect to continue.',
+    });
+  });
+
+  it('returns no provider on a transient refresh failure', async () => {
+    jest.mocked(resolveOpenAiChatGptAccessToken).mockResolvedValue({ kind: 'failed' });
 
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
   });
 
+  it('returns no provider when the resolved token cannot build a provider', async () => {
+    jest.mocked(resolveOpenAiChatGptAccessToken).mockResolvedValue({ kind: 'no_connection' });
+
+    await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
+  });
+
+  it('returns no provider without the deployment partner key, keeping the existing route', async () => {
+    process.env.OPENAI_API_KEY = '   ';
+
+    await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(USER_ID);
+  });
+
+  it('builds no provider without the deployment partner key', () => {
+    expect(buildOpenAiChatGptProvider('', DELEGATED_TOKEN)).toBeNull();
+  });
+
   it('returns no provider for an ineligible request without reading the connection', async () => {
     await expect(
-      checkOpenAiChatGptByok(
-        routingInput({ request: chatCompletionsRequest('openai/gpt-5-nano') })
-      )
+      checkOpenAiChatGptByok(routingInput({ request: chatCompletionsRequest('openai/gpt-5-nano') }))
     ).resolves.toBeNull();
     expect(getOpenAiChatGptConnection).not.toHaveBeenCalled();
-    expect(ensureFreshOpenAiChatGptAccessToken).not.toHaveBeenCalled();
+    expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
   });
 
   it('returns no provider for an anonymous caller', async () => {
     await expect(checkOpenAiChatGptByok(routingInput({ userId: null }))).resolves.toBeNull();
-    expect(ensureFreshOpenAiChatGptAccessToken).not.toHaveBeenCalled();
+    expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('OPENAI_CHATGPT_API_URL', () => {
+  const originalApiUrl = process.env.OPENAI_CHATGPT_API_URL;
+
+  afterAll(() => {
+    if (originalApiUrl === undefined) {
+      delete process.env.OPENAI_CHATGPT_API_URL;
+    } else {
+      process.env.OPENAI_CHATGPT_API_URL = originalApiUrl;
+    }
+  });
+
+  function loadApiUrl(): string {
+    let apiUrl = '';
+    jest.isolateModules(() => {
+      apiUrl = (jest.requireActual('./routing') as { OPENAI_CHATGPT_API_URL: string })
+        .OPENAI_CHATGPT_API_URL;
+    });
+    return apiUrl;
+  }
+
+  it('defaults to the production upstream', () => {
+    delete process.env.OPENAI_CHATGPT_API_URL;
+
+    expect(loadApiUrl()).toBe('https://api.openai.com/v1');
+  });
+
+  it('follows the environment override, like the OIDC endpoints', () => {
+    process.env.OPENAI_CHATGPT_API_URL = ' http://localhost:8099/v1/ ';
+
+    expect(loadApiUrl()).toBe('http://localhost:8099/v1');
   });
 });

@@ -4,7 +4,7 @@ import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import { getBYOKforUser, getModelUserByokProviders } from '@/lib/ai-gateway/byok';
-import { ensureFreshOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
+import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { OpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/types';
@@ -28,7 +28,8 @@ jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptConnection: jest.fn().mockResolvedValue(null),
 }));
 jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
-  ensureFreshOpenAiChatGptAccessToken: jest.fn().mockResolvedValue(null),
+  resolveOpenAiChatGptAccessToken: jest.fn().mockResolvedValue({ kind: 'no_connection' }),
+  OPENAI_CHATGPT_RECONNECT_MESSAGE: 'Your ChatGPT connection has expired. Reconnect to continue.',
 }));
 
 const user = { id: 'user-id' } as User;
@@ -203,9 +204,9 @@ describe('getProvider ChatGPT connection routing order', () => {
     jest.mocked(getBYOKforUser).mockReset().mockResolvedValue(null);
     jest.mocked(getOpenAiChatGptConnection).mockReset().mockResolvedValue(null);
     jest
-      .mocked(ensureFreshOpenAiChatGptAccessToken)
+      .mocked(resolveOpenAiChatGptAccessToken)
       .mockReset()
-      .mockResolvedValue('delegated-access-token');
+      .mockResolvedValue({ kind: 'access_token', accessToken: 'delegated-access-token' });
   });
 
   afterEach(() => {
@@ -215,9 +216,9 @@ describe('getProvider ChatGPT connection routing order', () => {
   test('an enabled connection beats a Vercel openai BYOK row for an eligible responses request', async () => {
     const env = replaceEnv({ OPENAI_API_KEY: 'partner-project-key' });
     jest.mocked(getOpenAiChatGptConnection).mockResolvedValue(connection);
-    jest.mocked(getBYOKforUser).mockResolvedValue([
-      { decryptedAPIKey: 'user-vercel-key', providerId: 'openai' },
-    ]);
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValue([{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }]);
     jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
 
     const result = await getProvider(responsesInput('openai/gpt-5-nano'));
@@ -236,11 +237,31 @@ describe('getProvider ChatGPT connection routing order', () => {
     env.restore();
   });
 
+  test('a terminal connection failure never resolves to another billing path', async () => {
+    const env = replaceEnv({ OPENAI_API_KEY: 'partner-project-key' });
+    jest.mocked(getOpenAiChatGptConnection).mockResolvedValue(connection);
+    jest.mocked(resolveOpenAiChatGptAccessToken).mockResolvedValue({ kind: 'terminal' });
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValue([{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }]);
+
+    const result = await getProvider(responsesInput('openai/gpt-5-nano'));
+
+    expect(result).toEqual({
+      kind: 'chatgpt-reconnect',
+      message: 'Your ChatGPT connection has expired. Reconnect to continue.',
+    });
+    expect(shouldRouteToVercel).not.toHaveBeenCalled();
+    expect(getBYOKforUser).not.toHaveBeenCalled();
+    env.restore();
+  });
+
   test('without a connection the same request keeps the Vercel openai BYOK route', async () => {
     const env = replaceEnv({ OPENAI_API_KEY: 'partner-project-key' });
-    jest.mocked(getBYOKforUser).mockResolvedValue([
-      { decryptedAPIKey: 'user-vercel-key', providerId: 'openai' },
-    ]);
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValue([{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }]);
 
     const result = await getProvider(responsesInput('openai/gpt-5-nano'));
 
@@ -272,9 +293,9 @@ describe('getProvider ChatGPT connection routing order', () => {
   test('an eligible request without the partner key resolves exactly as before', async () => {
     const env = replaceEnv({});
     jest.mocked(getOpenAiChatGptConnection).mockResolvedValue(connection);
-    jest.mocked(getBYOKforUser).mockResolvedValue([
-      { decryptedAPIKey: 'user-vercel-key', providerId: 'openai' },
-    ]);
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValue([{ decryptedAPIKey: 'user-vercel-key', providerId: 'openai' }]);
 
     const result = await getProvider(responsesInput('openai/gpt-5-nano'));
 
@@ -287,4 +308,3 @@ describe('getProvider ChatGPT connection routing order', () => {
     env.restore();
   });
 });
-

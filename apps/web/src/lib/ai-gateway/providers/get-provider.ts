@@ -66,12 +66,15 @@ export type GetProviderProviderResult = {
 /**
  * Discriminated routing result. `not-found` maps to the local
  * model-unavailable response (used by paused experiments); `unavailable`
- * maps to a 503 temporarily-unavailable response (cache/DB/config failure).
+ * maps to a 503 temporarily-unavailable response (cache/DB/config failure);
+ * `chatgpt-reconnect` maps to the readable, non-retryable response that tells
+ * the person to reconnect their dead ChatGPT connection.
  */
 export type GetProviderResult =
   | GetProviderProviderResult
   | { kind: 'not-found' }
-  | { kind: 'unavailable' };
+  | { kind: 'unavailable' }
+  | { kind: 'chatgpt-reconnect'; message: string };
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
@@ -242,13 +245,18 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   }
 
   // An enabled "Sign in with ChatGPT" connection wins for an eligible OpenAI
-  // responses request, before the Vercel BYOK lookup. Every other resolution
-  // (including an ineligible request for the same model) stays as it is today.
+  // responses request, before the Vercel BYOK lookup. A connection whose
+  // credential is terminally dead must fail readably instead of resolving to
+  // another billing path. Every other resolution (including an ineligible
+  // request for the same model) stays as it is today.
   const openAiChatGptByok = await checkOpenAiChatGptByok({
     request,
     requestedModel,
     userId: isAnonymousContext(user) ? null : user.id,
   });
+  if (openAiChatGptByok?.kind === 'reconnect') {
+    return { kind: 'chatgpt-reconnect', message: openAiChatGptByok.message };
+  }
   if (openAiChatGptByok) {
     return openAiChatGptByok;
   }

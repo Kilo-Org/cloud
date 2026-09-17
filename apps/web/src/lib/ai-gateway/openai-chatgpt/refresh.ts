@@ -55,6 +55,20 @@ const TERMINAL_REFRESH_ERROR_CODES = new Set([
 /** A conflict is a lost race against a sibling refresh; retrying can win. */
 const RETRYABLE_REFRESH_ERROR_CODE = 'refresh_token_conflict';
 
+/**
+ * The outcome of resolving a usable delegated access token. `terminal` is
+ * distinct from `failed`: a terminal outcome means OpenAI has already rejected
+ * the stored credential for good (the connection is disabled and cleared), so
+ * the caller must not keep serving the request through another billing path.
+ * `failed` is a transient refresh failure that leaves the stored credential in
+ * place.
+ */
+export type OpenAiChatGptAccessTokenOutcome =
+  | { kind: 'access_token'; accessToken: string }
+  | { kind: 'no_connection' }
+  | { kind: 'terminal' }
+  | { kind: 'failed' };
+
 type RefreshDecision =
   | { kind: 'access_token'; accessToken: string }
   | { kind: 'no_connection' }
@@ -65,7 +79,7 @@ type RefreshDecision =
  * Single-flight per user within one process: concurrent callers share the same
  * in-flight refresh instead of each issuing their own request.
  */
-const inFlightRefreshes = new Map<string, Promise<string | null>>();
+const inFlightRefreshes = new Map<string, Promise<OpenAiChatGptAccessTokenOutcome>>();
 
 function nowSeconds(): number {
   return Math.floor(Date.now() / 1000);
@@ -247,14 +261,16 @@ async function resolveInsideLock(
   return refreshWithRetries(tx, userId, connection);
 }
 
-async function refreshOpenAiChatGptAccessToken(userId: string): Promise<string | null> {
+async function resolveOpenAiChatGptAccessTokenUncached(
+  userId: string
+): Promise<OpenAiChatGptAccessTokenOutcome> {
   try {
     if (!OPENAI_CLIENT_ID || !OPENAI_CLIENT_SECRET) {
       console.error(
         '[openai-chatgpt] refresh failed: missing client configuration (user %s)',
         userId
       );
-      return null;
+      return { kind: 'failed' };
     }
 
     // Fast path: no lock, no network call while the stored token is fresh.
@@ -265,17 +281,17 @@ async function refreshOpenAiChatGptAccessToken(userId: string): Promise<string |
       current.expires_at - nowSeconds() > OPENAI_CHATGPT_REFRESH_WINDOW_SECONDS &&
       current.access_token
     ) {
-      return current.access_token;
+      return { kind: 'access_token', accessToken: current.access_token };
     }
 
     const decision = await db.transaction(tx => resolveInsideLock(tx, userId));
 
     if (decision.kind === 'terminal') {
       await markOpenAiChatGptError(userId, OPENAI_CHATGPT_RECONNECT_MESSAGE);
-      return null;
+      return { kind: 'terminal' };
     }
 
-    return decision.kind === 'access_token' ? decision.accessToken : null;
+    return decision;
   } catch (error) {
     // A thrown error must never carry a credential: log only its type and the user.
     console.error(
@@ -283,20 +299,23 @@ async function refreshOpenAiChatGptAccessToken(userId: string): Promise<string |
       error instanceof Error ? error.name : 'UnknownError',
       userId
     );
-    return null;
+    return { kind: 'failed' };
   }
 }
 
 /**
- * Returns a usable OpenAI access token for the user's ChatGPT connection, or
- * null when there is no connection, no refresh token, or the connection can no
- * longer be refreshed. Concurrent calls within one process share one refresh.
+ * Resolves the delegated credential for the user's ChatGPT connection.
+ * Concurrent calls within one process share one refresh. `terminal` means the
+ * stored credential can never work again: the connection has been cleared and
+ * disabled, and the caller must not fall back to another billing path.
  */
-export function ensureFreshOpenAiChatGptAccessToken(userId: string): Promise<string | null> {
+export function resolveOpenAiChatGptAccessToken(
+  userId: string
+): Promise<OpenAiChatGptAccessTokenOutcome> {
   const existing = inFlightRefreshes.get(userId);
   if (existing) return existing;
 
-  const pending = refreshOpenAiChatGptAccessToken(userId).finally(() => {
+  const pending = resolveOpenAiChatGptAccessTokenUncached(userId).finally(() => {
     inFlightRefreshes.delete(userId);
   });
   inFlightRefreshes.set(userId, pending);

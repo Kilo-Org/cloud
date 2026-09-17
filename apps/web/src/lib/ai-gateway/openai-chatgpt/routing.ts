@@ -6,7 +6,7 @@ import type {
   GatewayResponsesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
-import { ensureFreshOpenAiChatGptAccessToken } from './refresh';
+import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
 import { getOpenAiChatGptConnection } from './store';
 
 /**
@@ -18,7 +18,11 @@ import { getOpenAiChatGptConnection } from './store';
 /** The partner project key, already a managed BYOK credential (`ENVIRONMENT.md`). */
 export const OPENAI_CHATGPT_API_KEY_ENV = 'OPENAI_API_KEY';
 
-export const OPENAI_CHATGPT_API_URL = 'https://api.openai.com/v1';
+/** The production upstream; the same discovery-driven environment overrides as
+ *  the OIDC endpoints (`OPENAI_DISCOVERY_URL`, `OPENAI_TOKEN_ENDPOINT`) apply. */
+export const OPENAI_CHATGPT_API_URL =
+  getEnvVariable('OPENAI_CHATGPT_API_URL').trim().replace(/\/+$/, '') ||
+  'https://api.openai.com/v1';
 
 /**
  * The delegated access token travels in its own upstream header. `extraHeaders`
@@ -37,12 +41,23 @@ export type OpenAiChatGptRoutingInput = {
   userId: string | null;
 };
 
-export type OpenAiChatGptRoutingResult = {
-  kind: 'provider';
-  provider: Provider;
-  userByok: null;
-  bypassAccessCheck: false;
-};
+export type OpenAiChatGptRoutingResult =
+  | {
+      kind: 'provider';
+      provider: Provider;
+      userByok: null;
+      bypassAccessCheck: false;
+    }
+  | {
+      /**
+       * The person has an enabled connection for an eligible request, but the
+       * stored credential is terminally dead. The request must fail with the
+       * reconnect message: serving it through another billing path would spend
+       * a different allowance without telling the person.
+       */
+      kind: 'reconnect';
+      message: string;
+    };
 
 function isOpenAiChatGptModel(requestedModel: string): boolean {
   const model = requestedModel.trim();
@@ -50,7 +65,9 @@ function isOpenAiChatGptModel(requestedModel: string): boolean {
 }
 
 /**
- * An enabled, readable ChatGPT connection wins for a delegated OpenAI model.
+ * An enabled, readable ChatGPT connection makes a delegated OpenAI model
+ * eligible. The partner project key is deliberately not part of this check: a
+ * missing deployment credential must not hide the person's connection state.
  * The delegated-token flow is accepted only by `POST /v1/responses`: a
  * `chat/completions` request for the same model keeps its current route, and
  * declaring `chat_completions` support here would make the gateway answer the
@@ -61,7 +78,6 @@ export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput):
 
   if (request.kind !== 'responses') return false;
   if (!userId) return false;
-  if (getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV).trim().length === 0) return false;
   if (!isOpenAiChatGptModel(requestedModel)) return false;
 
   const connection = await getOpenAiChatGptConnection(userId);
@@ -73,19 +89,15 @@ export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput):
 
 /**
  * Builds the provider that serves the delegated request. Returns null when the
- * partner key is missing or no access token can be obtained: a terminally
- * expired connection is already disabled with a readable reason by the store,
- * so the request falls back to the existing route and the person's session
- * never breaks. An upstream failure *after* a token was obtained is returned to
- * the client as-is by the gateway and is never silently replayed through
- * another billing path.
+ * partner key is missing: the deployment is misconfigured for token sharing, so
+ * the request falls back to the existing route and the person's session never
+ * breaks. A terminal connection failure is reported by `checkOpenAiChatGptByok`
+ * before this point, so it never reaches another billing path. An upstream
+ * failure *after* a token was obtained is returned to the client as-is by the
+ * gateway and is never silently replayed through another billing path.
  */
-export async function buildOpenAiChatGptProvider(userId: string): Promise<Provider | null> {
-  const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
+export function buildOpenAiChatGptProvider(apiKey: string, accessToken: string): Provider | null {
   if (apiKey.trim().length === 0) return null;
-
-  const accessToken = await ensureFreshOpenAiChatGptAccessToken(userId);
-  if (!accessToken) return null;
 
   return {
     id: 'openai-chatgpt',
@@ -98,11 +110,11 @@ export async function buildOpenAiChatGptProvider(userId: string): Promise<Provid
     async transformRequest(context) {
       if (context.request.kind !== 'responses') return;
 
-      // The token is fetched once while the provider is resolved, so a
-      // terminal refresh failure can fall back to the existing route instead
-      // of failing after the request was already committed to this provider.
-      // Resolution and the upstream send happen back-to-back in the same
-      // gateway request, so the captured token is still the fresh one.
+      // The delegated token is resolved before the provider is built, so a
+      // terminal refresh failure is reported to the person instead of silently
+      // running this request on another billing path. Resolution and the
+      // upstream send happen back-to-back in the same gateway request, so the
+      // captured token is still the fresh one.
       context.extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = accessToken;
 
       const body = context.request.body as GatewayResponsesRequest;
@@ -123,10 +135,12 @@ export async function buildOpenAiChatGptProvider(userId: string): Promise<Provid
 }
 
 /**
- * Resolves the ChatGPT connection as a provider, or null when the request is
- * not eligible or the connection cannot produce a token. Callers keep the
- * standard balance and abuse checks (`bypassAccessCheck: false`), exactly like
- * the Vercel BYOK path.
+ * Resolves the ChatGPT connection as a provider, a reconnect requirement, or
+ * null when the request is not eligible or cannot be served. A `reconnect`
+ * result is returned when the person's enabled credential is terminally dead:
+ * the request must fail readably instead of silently running on another billing
+ * path. Callers keep the standard balance and abuse checks
+ * (`bypassAccessCheck: false`), exactly like the Vercel BYOK path.
  */
 export async function checkOpenAiChatGptByok(
   input: OpenAiChatGptRoutingInput
@@ -134,7 +148,16 @@ export async function checkOpenAiChatGptByok(
   if (input.userId === null) return null;
   if (!(await isOpenAiChatGptEligible(input))) return null;
 
-  const provider = await buildOpenAiChatGptProvider(input.userId);
+  const outcome = await resolveOpenAiChatGptAccessToken(input.userId);
+
+  if (outcome.kind === 'terminal') {
+    return { kind: 'reconnect', message: OPENAI_CHATGPT_RECONNECT_MESSAGE };
+  }
+  // `no_connection` and a transient `failed` refresh keep the existing route.
+  if (outcome.kind !== 'access_token') return null;
+
+  const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
+  const provider = buildOpenAiChatGptProvider(apiKey, outcome.accessToken);
   if (!provider) return null;
 
   return {

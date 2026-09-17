@@ -25,8 +25,8 @@ const channelCases = [
     },
     'agent-attention',
   ],
-  [{ type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'status' }, 'agent'],
-  [{ type: 'cloud_agent_session', cliSessionId: 'cli1' }, 'agent'],
+  [{ type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'status' }, 'agent-progress'],
+  [{ type: 'cloud_agent_session', cliSessionId: 'cli1' }, 'agent-progress'],
   [{ type: 'low_balance', organizationId: 'org1' }, 'balance'],
   [{ type: 'security_finding', findingId: 'f1', scope: 'org' }, 'security'],
   [
@@ -68,12 +68,23 @@ describe('androidChannelIdForPushData', () => {
 
   it('puts needs-input raises on the high-importance channel and progress on the quiet one', () => {
     const attention = ANDROID_NOTIFICATION_CHANNELS.find(c => c.id === 'agent-attention');
-    const progress = ANDROID_NOTIFICATION_CHANNELS.find(c => c.id === 'agent');
+    const progress = ANDROID_NOTIFICATION_CHANNELS.find(c => c.id === 'agent-progress');
 
     expect(attention?.importance).toBe('high');
     expect(progress?.importance).toBe('default');
     // The two channels must not be the same channel id.
     expect(attention?.id).not.toBe(progress?.id);
+  });
+
+  it('never routes progress to a channel id an existing install created as high', () => {
+    // Android keeps the importance of a channel that already exists, so
+    // lowering a channel's importance is a no-op. Progress must therefore have
+    // an id of its own: reusing `agent` (created high before this contract)
+    // would keep ordinary progress breaking through on existing installs.
+    expect(androidChannelIdForPushData({ type: 'cloud_agent_session', cliSessionId: 'cli1' })).toBe(
+      'agent-progress'
+    );
+    expect(ANDROID_NOTIFICATION_CHANNELS.map(c => c.id)).not.toContain('agent');
   });
 });
 

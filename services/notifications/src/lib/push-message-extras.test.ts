@@ -110,7 +110,7 @@ describe('expoPushExtrasForPushData', () => {
 });
 
 describe('androidChannelIdForPushData (attention routing)', () => {
-  it('routes an attention raise to agent-attention and ordinary progress to agent', () => {
+  it('routes an attention raise to agent-attention and ordinary progress to the quiet channel', () => {
     expect(
       androidChannelIdForPushData({
         type: 'cloud_agent_session',
@@ -124,15 +124,15 @@ describe('androidChannelIdForPushData (attention routing)', () => {
         cliSessionId: 'ses_1',
         category: 'status',
       })
-    ).toBe('agent');
+    ).toBe('agent-progress');
   });
 
-  it('routes a category-less old producer push to the quiet agent channel', () => {
+  it('routes a category-less old producer push to the quiet progress channel', () => {
     expect(
       androidChannelIdForPushData({
         type: 'cloud_agent_session',
         cliSessionId: 'ses_1',
       })
-    ).toBe('agent');
+    ).toBe('agent-progress');
   });
 });

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AppState } from 'react-native';
-import { hashKey, type QueryFunction, useQueryClient } from '@tanstack/react-query';
+import { hashKey, type QueryFunction, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePathname } from 'expo-router';
 
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
@@ -11,6 +11,7 @@ import {
 } from '@/lib/active-sessions-live';
 import { useAuth } from '@/lib/auth/auth-context';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { readAgentPushPreferenceIfLoaded } from '@/lib/hooks/agent-push-preference';
 import {
   applyNeedsInputNotifications,
   type NeedsInputNotificationRow,
@@ -73,6 +74,15 @@ function useActiveSessionsLiveSync(): void {
  * is currently posted are the `previous` the next plan diffs against, which is
  * what keeps a re-plan from re-posting a notification that is already on
  * screen and a cleared raise from leaving a stale one behind.
+ *
+ * The user's `agentAttention` preference is read from the cache the
+ * Notifications screen edits and is a plan input, so the app-owned carrier
+ * alerts exactly when the server's attention push would. The mount subscribes
+ * to that query itself, because the Notifications screen may never be visited:
+ * without the subscription the cache would stay empty after every restart and
+ * the gate would have nothing to read. Until the row loads the plan withholds
+ * the post, so the gate never falls back to ON for a user who turned the
+ * category off.
  */
 function useNeedsInputLocalNotifications(): void {
   const queryClient = useQueryClient();
@@ -83,7 +93,20 @@ function useNeedsInputLocalNotifications(): void {
   const input = useMemo(() => buildActiveSessionsTrayInput(organizationId), [organizationId]);
   const queryKey = useMemo(() => trpc.activeSessions.list.queryKey(input), [trpc, input]);
   const queryHash = useMemo(() => hashKey(queryKey), [queryKey]);
+  const preferencesQueryKey = useMemo(
+    () => trpc.user.getNotificationPreferences.queryOptions().queryKey,
+    [trpc]
+  );
+  const preferencesQueryHash = useMemo(() => hashKey(preferencesQueryKey), [preferencesQueryKey]);
   const enabled = Boolean(token) && !isLoading && !isSigningOut && isLoaded;
+
+  // Subscribe/prefetch the preferences row at app start. The plan reads the
+  // cache and the query-cache subscription below re-plans when the value lands,
+  // so a cold start gates on the server row instead of an empty cache.
+  useQuery({
+    ...trpc.user.getNotificationPreferences.queryOptions(),
+    enabled,
+  });
 
   // The route is read through a ref so a route change re-plans without
   // re-subscribing to the query cache.
@@ -102,6 +125,11 @@ function useNeedsInputLocalNotifications(): void {
       next,
       pathname: pathnameRef.current,
       appState: AppState.currentState,
+      attentionEnabled: readAgentPushPreferenceIfLoaded(
+        queryClient,
+        preferencesQueryKey,
+        'agentAttention'
+      ),
     });
     const dismissed = new Set(plan.dismiss);
     // A re-published row REPLACES its previous entry instead of joining it. An
@@ -120,7 +148,7 @@ function useNeedsInputLocalNotifications(): void {
     ];
     // The applier reports and swallows every native failure; it never rejects.
     void applyNeedsInputNotifications(plan);
-  }, [queryClient, queryKey]);
+  }, [queryClient, queryKey, preferencesQueryKey]);
 
   useEffect(() => {
     if (!enabled || isSignOutActive()) {
@@ -133,11 +161,13 @@ function useNeedsInputLocalNotifications(): void {
     }
     recompute();
     return queryClient.getQueryCache().subscribe(event => {
-      if (event.query.queryHash === queryHash) {
+      // A rows change re-plans from scratch; a preference change re-plans so
+      // turning `agentAttention` off dismisses a raise already on screen.
+      if (event.query.queryHash === queryHash || event.query.queryHash === preferencesQueryHash) {
         recompute();
       }
     });
-  }, [enabled, queryClient, queryHash, recompute]);
+  }, [enabled, queryClient, queryHash, preferencesQueryHash, recompute]);
 
   // The route is a plan input, not only a subscription trigger: leaving a
   // waiting session's chat is what turns its raise back into a notification,

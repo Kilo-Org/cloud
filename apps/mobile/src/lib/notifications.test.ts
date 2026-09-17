@@ -170,7 +170,7 @@ vi.mock('@kilocode/notifications', async importOriginal => ({
   ...(await importOriginal<typeof Notifications>()),
   ANDROID_NOTIFICATION_CHANNELS: [
     { id: 'agent-attention', name: 'Agent needs input', importance: 'high' },
-    { id: 'agent', name: 'Agent sessions', importance: 'default' },
+    { id: 'agent-progress', name: 'Agent sessions', importance: 'default' },
     { id: 'chat', name: 'Chat messages', importance: 'high' },
     { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default' },
     { id: 'balance', name: 'Balance alerts', importance: 'default' },
@@ -255,7 +255,7 @@ describe('ensureAndroidNotificationChannels', () => {
 
     expect(mocks.setNotificationChannelAsync.mock.calls).toEqual([
       ['agent-attention', { name: 'Agent needs input', importance: 4 }],
-      ['agent', { name: 'Agent sessions', importance: 3 }],
+      ['agent-progress', { name: 'Agent sessions', importance: 3 }],
       ['chat', { name: 'Chat messages', importance: 4 }],
       ['kiloclaw', { name: 'KiloClaw activity', importance: 3 }],
       ['balance', { name: 'Balance alerts', importance: 3 }],
@@ -274,7 +274,7 @@ describe('ensureAndroidNotificationChannels', () => {
 
     expect(mocks.setNotificationChannelAsync.mock.calls).toEqual([
       ['agent-attention', { name: expect.any(String), importance: 4 }],
-      ['agent', { name: expect.any(String), importance: 3 }],
+      ['agent-progress', { name: expect.any(String), importance: 3 }],
       ['chat', { name: expect.any(String), importance: 4 }],
       ['kiloclaw', { name: expect.any(String), importance: 3 }],
       ['balance', { name: expect.any(String), importance: 3 }],

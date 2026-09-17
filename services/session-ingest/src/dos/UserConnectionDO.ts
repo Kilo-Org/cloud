@@ -351,6 +351,9 @@ export class UserConnectionDO extends DurableObject<Env> {
   // In-memory mirror of attentionReset KV dueAt values — scheduling only; KV is
   // the source of truth and `alarm()` re-lists it every wake.
   private pendingAttentionResetAt = new Map<string, number>();
+  // One-shot post-eviction rebuild gate; reset whenever ensureState actually
+  // reconstructs. A durable hold whose mirror was lost still needs an alarm.
+  private attentionResetsRebuilt = false;
 
   // Synchronous reservation set for mutationId dedupe (prevents concurrent same-ID dispatch
   // across asynchronous storage reads in the mutationId path).
@@ -413,6 +416,9 @@ export class UserConnectionDO extends DurableObject<Env> {
     this.stateReconstructed = true;
     // Fresh reconstruction must re-list readyPush KV once for scheduling.
     this.readyPushRebuilt = false;
+    // Same for the held attention resets: the mirror is empty after eviction
+    // even though the durable holds are not.
+    this.attentionResetsRebuilt = false;
   }
 
   fetch(request: Request): Response {
@@ -2194,11 +2200,18 @@ export class UserConnectionDO extends DurableObject<Env> {
         });
       }
     }
+    // The held clears are durable state, so the guard must read KV: after
+    // eviction the in-memory mirror is empty while the `attentionReset:*`
+    // entries still wait for the alarm that fires them. Deleting the alarm off
+    // the empty mirror would strand them forever.
+    const heldAttentionResets = [
+      ...this.ctx.storage.kv.list({ prefix: ATTENTION_RESET_KEY_PREFIX }),
+    ];
     const pending = [...this.ctx.storage.kv.list({ prefix: PENDING_COMMAND_KEY_PREFIX })];
     if (
       this.lastHeartbeatAt.size === 0 &&
       this.readyPushFireAt.size === 0 &&
-      this.pendingAttentionResetAt.size === 0 &&
+      heldAttentionResets.length === 0 &&
       pending.length === 0
     ) {
       await this.ctx.storage.deleteAlarm();
@@ -2898,6 +2911,33 @@ export class UserConnectionDO extends DurableObject<Env> {
           } catch (error: unknown) {
             // Leave readyPushRebuilt false so the next schedule retries.
             console.error('Failed to rebuild readyPush mirror', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        })()
+      );
+    }
+
+    // Same one-shot for the held attention resets: the mirror is empty after
+    // eviction, so the durable entries need re-listing before this wake can arm
+    // the alarm that fires them.
+    if (this.pendingAttentionResetAt.size === 0 && !this.attentionResetsRebuilt) {
+      this.ctx.waitUntil(
+        (async () => {
+          try {
+            const pending = await this.ctx.storage.list<PendingAttentionResetEntry>({
+              prefix: ATTENTION_RESET_KEY_PREFIX,
+            });
+            for (const [key, entry] of pending) {
+              if (!entry || typeof entry.dueAt !== 'number') continue;
+              const sessionId = key.slice(ATTENTION_RESET_KEY_PREFIX.length);
+              if (sessionId) this.pendingAttentionResetAt.set(sessionId, entry.dueAt);
+            }
+            this.attentionResetsRebuilt = true;
+            this.scheduleNextAlarm(Date.now());
+          } catch (error: unknown) {
+            // Leave attentionResetsRebuilt false so the next schedule retries.
+            console.error('Failed to rebuild held attention reset mirror', {
               error: error instanceof Error ? error.message : String(error),
             });
           }

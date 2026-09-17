@@ -94,6 +94,7 @@ describe('planNeedsInputNotifications', () => {
       next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
       pathname: AWAY,
       appState: ACTIVE,
+      attentionEnabled: true,
     });
     expect(plan).toEqual({
       publish: [
@@ -132,6 +133,7 @@ describe('planNeedsInputNotifications', () => {
       ],
       pathname: AWAY,
       appState: ACTIVE,
+      attentionEnabled: true,
     });
     expect(plan.publish).toEqual([
       {
@@ -151,6 +153,7 @@ describe('planNeedsInputNotifications', () => {
       next: [makeCached({ id: 'ses_1', status: 'question' })],
       pathname: AWAY,
       appState: ACTIVE,
+      attentionEnabled: true,
     });
     expect(plan).toEqual({ publish: [], dismiss: [] });
   });
@@ -182,6 +185,7 @@ describe('planNeedsInputNotifications', () => {
       ],
       pathname: AWAY,
       appState: ACTIVE,
+      attentionEnabled: true,
     });
     expect(plan.publish).toEqual([notifiedRow({ prUrl: 'https://github.com/org/repo/pull/7' })]);
     expect(plan.dismiss).toEqual([]);
@@ -193,6 +197,7 @@ describe('planNeedsInputNotifications', () => {
       next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'permission' })],
       pathname: AWAY,
       appState: ACTIVE,
+      attentionEnabled: true,
     });
     expect(plan.publish).toEqual([notifiedRow({ kind: 'permission' })]);
     expect(plan.dismiss).toEqual([]);
@@ -221,6 +226,7 @@ describe('planNeedsInputNotifications', () => {
       ],
       pathname: '/agent-chat/ses_1',
       appState: ACTIVE,
+      attentionEnabled: true,
     });
     expect(plan).toEqual({ publish: [], dismiss: [] });
   });
@@ -231,6 +237,7 @@ describe('planNeedsInputNotifications', () => {
       next: [makeCached({ id: 'ses_1', status: 'running' })],
       pathname: AWAY,
       appState: ACTIVE,
+      attentionEnabled: true,
     });
     expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'] });
   });
@@ -241,6 +248,7 @@ describe('planNeedsInputNotifications', () => {
       next: [makeCached({ id: 'ses_other', status: 'running' })],
       pathname: AWAY,
       appState: ACTIVE,
+      attentionEnabled: true,
     });
     expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'] });
   });
@@ -251,6 +259,7 @@ describe('planNeedsInputNotifications', () => {
       next: [makeCached({ id: 'ses_1', status: 'question', organizationId: 'org-a' })],
       pathname: AWAY,
       appState: ACTIVE,
+      attentionEnabled: true,
     });
     expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'] });
   });
@@ -264,10 +273,66 @@ describe('planNeedsInputNotifications', () => {
         planNeedsInputNotifications({
           previous: [notifiedRow()],
           next: [makeCached({ id: 'ses_1', status: 'question' })],
+          attentionEnabled: true,
           ...input,
         })
       ).toEqual({ publish: [], dismiss: [] });
     }
+  });
+
+  it('posts nothing while the agentAttention preference is off', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [],
+      next: [makeCached({ id: 'ses_1', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: false,
+    });
+    expect(plan).toEqual({ publish: [], dismiss: [] });
+  });
+
+  it('dismisses a raise already on screen when agentAttention is turned off', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow(), notifiedRow({ sessionId: 'ses_2', kind: 'permission' })],
+      next: [
+        makeCached({ id: 'ses_1', status: 'question' }),
+        makeCached({ id: 'ses_2', status: 'permission' }),
+      ],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: false,
+    });
+    expect(plan).toEqual({
+      publish: [],
+      dismiss: ['needs-input:ses_1', 'needs-input:ses_2'],
+    });
+  });
+
+  it('withholds posting, and keeps what is posted, until the preference row loads', () => {
+    // Before the `agentAttention` row is in the cache the plan must not fall
+    // back to ON (it would alert a category the user turned off after a
+    // restart) and must not fall back to OFF (it would drop a standing raise):
+    // it waits, leaving both the publish and dismiss sets empty.
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow(), notifiedRow({ sessionId: 'ses_gone', kind: 'permission' })],
+      next: [makeCached({ id: 'ses_1', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: undefined,
+    });
+    expect(plan).toEqual({ publish: [], dismiss: [] });
+  });
+
+  it('signs out even while the preference row has not loaded', () => {
+    setSignOutActive(true);
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow()],
+      next: [makeCached({ id: 'ses_1', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: undefined,
+    });
+    expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'] });
   });
 
   it('dismisses every posted identifier on sign-out and posts nothing', () => {
@@ -277,6 +342,7 @@ describe('planNeedsInputNotifications', () => {
       next: [makeCached({ id: 'ses_1', status: 'question' })],
       pathname: AWAY,
       appState: ACTIVE,
+      attentionEnabled: true,
     });
     expect(plan).toEqual({
       publish: [],
@@ -290,6 +356,7 @@ describe('planNeedsInputNotifications', () => {
       next: [],
       pathname: AWAY,
       appState: ACTIVE,
+      attentionEnabled: true,
     });
     expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'] });
   });

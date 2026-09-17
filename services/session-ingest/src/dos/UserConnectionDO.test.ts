@@ -1982,6 +1982,63 @@ describe('UserConnectionDO', () => {
         expect.objectContaining({ sessionId: 's1', error: 'db down' })
       );
     });
+
+    it('keeps the alarm when a held attention reset outlives its in-memory mirror', async () => {
+      const { ctx } = setup();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      // The hold was written durably, then the DO was evicted: every in-memory
+      // set is gone while the KV entry (the source of truth) remains.
+      await ctx.storage.put('attentionReset:s1', {
+        kiloUserId: 'usr_1',
+        dueAt: now + CLI_ABSENCE_ATTENTION_RESET_MS,
+        connectionId: 'cli-1',
+      });
+      const revived = new UserConnectionDO(ctx as never, {} as Env);
+
+      // Any later RPC that clears an unrelated session must not drop the alarm
+      // the durable hold is waiting on.
+      await revived.clearSession('s-other');
+
+      expect(ctx.storage.deleteAlarm).not.toHaveBeenCalled();
+      // The hold is still armed, so the durable entry cannot strand.
+      await flushAsync();
+      expect(ctx.storage.setAlarm).toHaveBeenCalledWith(now + CLI_ABSENCE_ATTENTION_RESET_MS);
+
+      // The hold still fires once its window elapses.
+      vi.spyOn(Date, 'now').mockReturnValue(now + CLI_ABSENCE_ATTENTION_RESET_MS + 1);
+      await revived.alarm();
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledWith(
+        'usr_1',
+        's1'
+      );
+      expect(ctx.storage.store.has('attentionReset:s1')).toBe(false);
+    });
+
+    it('arms the alarm for a durable held reset whose mirror was lost', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      await ctx.storage.put('attentionReset:s1', {
+        kiloUserId: 'usr_1',
+        dueAt: now + 5_000,
+        connectionId: 'cli-1',
+      });
+      const internal = doInstance as unknown as {
+        pendingAttentionResetAt: Map<string, number>;
+      };
+      expect(internal.pendingAttentionResetAt.size).toBe(0);
+
+      // A wake that only ends in scheduleNextAlarm must re-list KV: the durable
+      // hold has to get the alarm that fires it.
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      ctx.storage.setAlarm.mockClear();
+      sendHeartbeat(doInstance, cliWs, []);
+      await flushAsync();
+
+      expect(internal.pendingAttentionResetAt.get('s1')).toBe(now + 5_000);
+      expect(ctx.storage.setAlarm).toHaveBeenCalledWith(now + 5_000);
+    });
   });
 
   describe('web disconnect', () => {

@@ -76,6 +76,15 @@ export type NeedsInputPlanInput = {
   pathname: string | null;
   /** `AppState.currentState` at plan time. */
   appState: AppStateStatus;
+  /**
+   * The user's `agentAttention` preference, from the same server-resolved row
+   * the Notifications screen edits. The server withholds the attention push
+   * when the category is off, so the app-owned carrier must withhold its post
+   * too, and dismiss a notification the toggle turned off. `undefined` while the
+   * row has not loaded: the plan then neither publishes nor dismisses, because
+   * falling back to ON would alert a category the user turned off.
+   */
+  attentionEnabled: boolean | undefined;
 };
 
 /** The identifier a session's needs-input notification is posted and replaced under. */
@@ -176,8 +185,10 @@ function toNotificationRow(
  * cached rows after a change (`next`): publish the raises that are not yet
  * notified — or whose action-relevant shape (kind, associated PR) changed while
  * still waiting — dismiss the identifiers whose raise cleared, disappeared, or
- * moved to another organization. A sign-out dismisses everything and publishes
- * nothing.
+ * moved to another organization. A sign-out, or the user's `agentAttention`
+ * preference off, dismisses everything and publishes nothing; while that
+ * preference has not loaded neither happens, so a restart can never alert a
+ * category the user turned off.
  *
  * A raise that is still waiting is never dismissed merely because the app is
  * backgrounded or its chat is open — the gate only withholds the post, so the
@@ -188,6 +199,7 @@ export function planNeedsInputNotifications({
   next,
   pathname,
   appState,
+  attentionEnabled,
 }: NeedsInputPlanInput): NeedsInputNotificationPlan {
   const attention = new Map<string, { row: CachedActiveSession; kind: NeedsInputAttentionKind }>();
   for (const row of next) {
@@ -198,13 +210,22 @@ export function planNeedsInputNotifications({
   }
 
   const signedOut = isSignOutActive();
+  // The preference row has not loaded. Posting on the default-ON fallback would
+  // alert a category the user turned off, and dismissing on a default-OFF
+  // fallback would drop a raise the user still wants, so the plan waits for the
+  // row and leaves both the posted set and the notified set untouched.
+  if (attentionEnabled === undefined && !signedOut) {
+    return { publish: [], dismiss: [] };
+  }
+
+  const presentsAttention = !signedOut && attentionEnabled === true;
   const dismiss: string[] = [];
   const alreadyNotified = new Set<string>();
   for (const row of previous) {
     alreadyNotified.add(row.sessionId);
     const current = attention.get(row.sessionId);
     if (
-      signedOut ||
+      !presentsAttention ||
       current === undefined ||
       (current.row.organizationId ?? null) !== row.organizationId
     ) {
@@ -213,7 +234,7 @@ export function planNeedsInputNotifications({
   }
 
   const publish: NeedsInputNotificationRow[] = [];
-  if (!signedOut) {
+  if (presentsAttention) {
     for (const [sessionId, { row, kind }] of attention) {
       if (shouldPublishForSession({ appState, pathname, sessionId })) {
         const notifiedRow = alreadyNotified.has(sessionId)

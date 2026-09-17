@@ -549,7 +549,7 @@ const CHANNEL_NAME_KEYS = {
   // you" preference names, so both read one reviewed key instead of a second
   // copy that a translator would have to keep in step.
   'agent-attention': 'notifications.category.agentAttentionTitle',
-  agent: 'notifications.channel.agent',
+  'agent-progress': 'notifications.channel.agent',
   chat: 'notifications.channel.chat',
   kiloclaw: 'notifications.channel.kiloclaw',
   balance: 'notifications.channel.balance',

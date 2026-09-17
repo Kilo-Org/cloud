@@ -30,6 +30,8 @@ const state = vi.hoisted(() => ({
   },
   organization: { organizationId: null as string | null, isLoaded: true },
   request: vi.fn<() => Promise<CachedActiveSessionsData>>(),
+  // The notification-preference row the mount subscribes to at app start.
+  preferencesRequest: vi.fn<() => Promise<{ agentAttention: boolean }>>(),
   mountSync: false,
   pathname: '/(app)/(tabs)/(2_agents)',
   scheduleNotificationAsync: vi.fn<(request: { identifier: string }) => Promise<void>>(),
@@ -40,6 +42,10 @@ vi.mock('@/lib/organization-context', () => ({ useOrganization: () => state.orga
 function key(input: unknown) {
   return [['activeSessions', 'list'], { input, type: 'query' }];
 }
+/** The preferences row the Notifications screen edits; the mount reads it. */
+function preferencesKey() {
+  return [['user', 'getNotificationPreferences'], { type: 'query' }];
+}
 vi.mock('@/lib/trpc', () => {
   const trpc = {
     activeSessions: {
@@ -49,6 +55,14 @@ vi.mock('@/lib/trpc', () => {
           queryKey: key(input),
           queryFn: state.request,
           ...options,
+        }),
+      },
+    },
+    user: {
+      getNotificationPreferences: {
+        queryOptions: () => ({
+          queryKey: preferencesKey(),
+          queryFn: state.preferencesRequest,
         }),
       },
     },
@@ -128,6 +142,7 @@ beforeEach(() => {
   });
   Object.assign(state.organization, { organizationId: null, isLoaded: true });
   state.request.mockReset().mockResolvedValue({ sessions: [] });
+  state.preferencesRequest.mockReset().mockResolvedValue({ agentAttention: true });
   state.scheduleNotificationAsync.mockClear();
   state.dismissNotificationAsync.mockClear();
   state.mountSync = false;
@@ -329,6 +344,53 @@ describe('live query presentation and refresh contracts', () => {
       client.setQueryData(QUERY_KEY, {
         sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'running' })],
       });
+      await flush();
+    });
+    expect(state.dismissNotificationAsync).toHaveBeenCalledWith('needs-input:ses_1');
+  });
+
+  it('withholds the app-owned raise while the agentAttention preference is off', async () => {
+    state.mountSync = true;
+    state.preferencesRequest.mockResolvedValue({ agentAttention: false });
+    client.setQueryData(preferencesKey(), { agentAttention: false });
+    client.setQueryData(QUERY_KEY, {
+      sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+    });
+    await render();
+    expect(state.scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+
+  it('withholds the raise until the agentAttention row loads, then posts it', async () => {
+    state.mountSync = true;
+    // A cold start: the preferences query is still in flight, so the gate has
+    // no row to read. It must not fall back to ON and post.
+    const preferences = deferred<{ agentAttention: boolean }>();
+    state.preferencesRequest.mockReturnValue(preferences.promise);
+    client.setQueryData(QUERY_KEY, {
+      sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+    });
+    await render();
+    expect(state.scheduleNotificationAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      preferences.resolve({ agentAttention: true });
+      await flush();
+    });
+    expect(state.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ identifier: 'needs-input:ses_1' })
+    );
+  });
+
+  it('dismisses a posted raise when agentAttention is turned off', async () => {
+    state.mountSync = true;
+    client.setQueryData(QUERY_KEY, {
+      sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+    });
+    await render();
+    expect(state.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      client.setQueryData(preferencesKey(), { agentAttention: false });
       await flush();
     });
     expect(state.dismissNotificationAsync).toHaveBeenCalledWith('needs-input:ses_1');

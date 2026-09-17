@@ -89,4 +89,50 @@ describe('GET /admin/api/api-request-log/download', () => {
       payload,
     });
   });
+
+  it('streams oversized payloads without pretty-printing them into memory', async () => {
+    const blob = 'z'.repeat(1024 * 1024 + 64 * 1024);
+    const response = JSON.stringify({ blob });
+    const request = { index: 7, note: 'small' };
+    const error = { message: 'provider failed' };
+    const [row] = await db
+      .insert(api_request_log)
+      .values({
+        created_at: '2026-08-01T12:00:00.000Z',
+        kilo_user_id: TEST_USER_ID,
+        provider: 'test-provider',
+        model: TEST_MODEL,
+        request,
+        response,
+        error,
+      })
+      .returning({ id: api_request_log.id });
+
+    const download = await GET(createRequest());
+    expect(download.status).toBe(200);
+
+    const entries = unzipSync(new Uint8Array(await download.arrayBuffer()));
+    expect(readEntry(entries, `_${row.id}_response.json`)).toBe(response);
+    expect(JSON.parse(readEntry(entries, `_${row.id}_request.json`))).toEqual(request);
+    expect(JSON.parse(readEntry(entries, `_${row.id}_error.json`))).toEqual(error);
+  });
+
+  it('keeps a non-json oversized response as text', async () => {
+    const plain = `plain-text-${'y'.repeat(256 * 1024)}`;
+    const [row] = await db
+      .insert(api_request_log)
+      .values({
+        created_at: '2026-08-01T13:00:00.000Z',
+        kilo_user_id: TEST_USER_ID,
+        provider: 'test-provider',
+        model: TEST_MODEL,
+        request: { index: 8 },
+        response: plain,
+      })
+      .returning({ id: api_request_log.id });
+
+    const download = await GET(createRequest());
+    const entries = unzipSync(new Uint8Array(await download.arrayBuffer()));
+    expect(readEntry(entries, `_${row.id}_response.txt`)).toBe(plain);
+  });
 });

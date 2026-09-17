@@ -1,8 +1,8 @@
 import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
+import { db, pool } from '@/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
+import { and, gte, lte, eq, asc, gt, count, or, isNotNull, sql, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
 
@@ -12,7 +12,52 @@ import { Readable } from 'node:stream';
 // extract it ("Error 79 - Inappropriate file type or format").
 export const maxDuration = 800;
 
-const BATCH_SIZE = 25;
+// Fluid compute functions are 2 GB. A batch of parsed jsonb rows, plus a
+// pretty-printed copy, exceeds that for heavy users. Pretty-print only small
+// payloads, copy medium ones as text, and stream anything larger in chunks.
+const ID_PAGE_SIZE = 25;
+const PRETTY_PRINT_MAX_BYTES = 256 * 1024;
+const IN_MEMORY_MAX_BYTES = 1024 * 1024;
+const STREAM_CHUNK_BYTES = 1024 * 1024;
+
+const PAYLOAD_COLUMNS = ['request', 'response', 'error'] as const;
+type PayloadColumn = (typeof PAYLOAD_COLUMNS)[number];
+
+// Constants only. These are interpolated into SQL, so they must stay fixed.
+const PAYLOAD_TEXT_SQL: Record<PayloadColumn, string> = {
+  request: 'request::text',
+  response: 'response',
+  error: 'error::text',
+};
+
+async function readPayloadText(id: bigint, column: PayloadColumn): Promise<string | null> {
+  const result = await pool.query(
+    `SELECT ${PAYLOAD_TEXT_SQL[column]} AS payload
+     FROM api_request_log
+     WHERE id = $1::bigint`,
+    [id.toString()]
+  );
+  const payload = result.rows[0]?.payload;
+  if (typeof payload !== 'string' || payload.length === 0) return null;
+  return payload;
+}
+
+async function readPayloadChunk(
+  id: bigint,
+  column: PayloadColumn,
+  offset: number,
+  length: number
+): Promise<Buffer | null> {
+  // Each chunk is its own query so a pooled connection is not held for the
+  // whole payload, and a session temp table is not required.
+  const result = await pool.query(
+    `SELECT substring(convert_to(${PAYLOAD_TEXT_SQL[column]}, 'UTF8') from $2::int for $3::int) AS chunk
+     FROM api_request_log
+     WHERE id = $1::bigint`,
+    [id.toString(), offset, length]
+  );
+  return toChunk(result.rows[0]?.chunk);
+}
 
 function formatTimestamp(isoString: string): string {
   return isoString.replaceAll(':', '-').replaceAll(' ', '_');
@@ -47,6 +92,31 @@ function isJson(value: unknown): boolean {
     }
   }
   return false;
+}
+
+function extensionForResponsePrefix(prefix: string | null): 'json' | 'txt' {
+  const start = prefix?.at(0);
+  if (!start) return 'txt';
+  if ('{["-0123456789tfn'.includes(start)) return 'json';
+  return 'txt';
+}
+
+function readByteLength(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'bigint') return Number(value);
+  if (typeof value === 'string' && value !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function toChunk(value: unknown): Buffer | null {
+  if (Buffer.isBuffer(value)) return value.length > 0 ? value : null;
+  if (value instanceof Uint8Array) {
+    return value.byteLength > 0 ? Buffer.from(value) : null;
+  }
+  return null;
 }
 
 function parseDate(value: string): Date | null {
@@ -96,6 +166,16 @@ function buildFilter(
     }
   }
   return and(...conditions);
+}
+
+function smallPayloadLimit(column: PayloadColumn) {
+  const expression =
+    column === 'response'
+      ? sql`coalesce(octet_length(${api_request_log.response}), 0) <= ${PRETTY_PRINT_MAX_BYTES}`
+      : column === 'request'
+        ? sql`coalesce(octet_length(${api_request_log.request}::text), 0) <= ${PRETTY_PRINT_MAX_BYTES}`
+        : sql`coalesce(octet_length(${api_request_log.error}::text), 0) <= ${PRETTY_PRINT_MAX_BYTES}`;
+  return expression;
 }
 
 export async function GET(request: NextRequest) {
@@ -168,53 +248,166 @@ export async function GET(request: NextRequest) {
     });
   };
 
-  // Fetch and archive rows in batches using cursor-based pagination to
-  // avoid loading the entire result set into memory at once.
+  const appendEntry = async (name: string, source: string | Readable) => {
+    totalAppendedEntries += 1;
+    archive.append(source, { name });
+    await waitForEntries(totalAppendedEntries);
+  };
+
+  const appendFormattedPayloads = async (
+    createdAt: string,
+    id: bigint,
+    row: { request: unknown; response: string | null; error: unknown }
+  ) => {
+    const ts = formatTimestamp(createdAt);
+    const idText = String(id);
+
+    const requestContent = tryFormatJson(row.request);
+    if (requestContent) {
+      const requestExt = isJson(row.request) ? 'json' : 'txt';
+      await appendEntry(`${ts}_${idText}_request.${requestExt}`, requestContent);
+    }
+
+    const responseContent = tryFormatJson(row.response);
+    if (responseContent) {
+      const responseExt = isJson(row.response) ? 'json' : 'txt';
+      await appendEntry(`${ts}_${idText}_response.${responseExt}`, responseContent);
+    }
+
+    if (row.error !== null && row.error !== undefined) {
+      const errorContent = tryFormatJson(row.error);
+      if (errorContent) {
+        await appendEntry(`${ts}_${idText}_error.json`, errorContent);
+      }
+    }
+  };
+
+  const appendStreamedPayload = async (id: bigint, column: PayloadColumn, name: string) => {
+    let offset = 1;
+    let finished = false;
+    let reading = false;
+
+    const pump = async (readable: Readable) => {
+      try {
+        while (!finished) {
+          const chunk = await readPayloadChunk(id, column, offset, STREAM_CHUNK_BYTES);
+          if (!chunk) {
+            finished = true;
+            readable.push(null);
+            return;
+          }
+          offset += chunk.length;
+          const last = chunk.length < STREAM_CHUNK_BYTES;
+          const more = readable.push(chunk);
+          if (last) {
+            finished = true;
+            readable.push(null);
+            return;
+          }
+          if (!more) return;
+        }
+      } catch (error) {
+        finished = true;
+        readable.destroy(
+          error instanceof Error ? error : new Error('Failed to read API request log payload')
+        );
+      } finally {
+        reading = false;
+      }
+    };
+
+    const stream = new Readable({
+      highWaterMark: STREAM_CHUNK_BYTES,
+      read() {
+        if (finished || reading) return;
+        reading = true;
+        void pump(this);
+      },
+    });
+    stream.on('error', () => undefined);
+    await appendEntry(name, stream);
+  };
+
+  const appendOversizedRow = async (createdAt: string, id: bigint) => {
+    const [meta] = await db
+      .select({
+        requestBytes: sql<string | null>`octet_length(${api_request_log.request}::text)`,
+        responseBytes: sql<string | null>`octet_length(${api_request_log.response})`,
+        errorBytes: sql<string | null>`octet_length(${api_request_log.error}::text)`,
+        responsePrefix: sql<string | null>`left(ltrim(${api_request_log.response}), 1)`,
+      })
+      .from(api_request_log)
+      .where(eq(api_request_log.id, id))
+      .limit(1);
+    if (!meta) return;
+
+    const ts = formatTimestamp(createdAt);
+    const idText = String(id);
+    const bytesByColumn = {
+      request: readByteLength(meta.requestBytes),
+      response: readByteLength(meta.responseBytes),
+      error: readByteLength(meta.errorBytes),
+    };
+    const extensionByColumn = {
+      request: 'json',
+      response: extensionForResponsePrefix(meta.responsePrefix),
+      error: 'json',
+    } as const;
+
+    for (const column of PAYLOAD_COLUMNS) {
+      const bytes = bytesByColumn[column];
+      if (bytes <= 0) continue;
+      const name = `${ts}_${idText}_${column}.${extensionByColumn[column]}`;
+      if (bytes <= IN_MEMORY_MAX_BYTES) {
+        const text = await readPayloadText(id, column);
+        if (text) await appendEntry(name, text);
+        continue;
+      }
+      await appendStreamedPayload(id, column, name);
+    }
+  };
+
   const appendRows = async () => {
     let cursor: bigint | null = null;
     for (;;) {
       const rows = await db
-        .select()
+        .select({
+          id: api_request_log.id,
+          created_at: api_request_log.created_at,
+        })
         .from(api_request_log)
         .where(cursor ? and(filter, gt(api_request_log.id, cursor)) : filter)
         .orderBy(asc(api_request_log.id))
-        .limit(BATCH_SIZE);
+        .limit(ID_PAGE_SIZE);
 
       if (rows.length === 0) break;
 
       for (const row of rows) {
-        const ts = formatTimestamp(row.created_at);
-        const id = String(row.id);
+        const [small] = await db
+          .select({
+            request: api_request_log.request,
+            response: api_request_log.response,
+            error: api_request_log.error,
+          })
+          .from(api_request_log)
+          .where(
+            and(
+              eq(api_request_log.id, row.id),
+              smallPayloadLimit('request'),
+              smallPayloadLimit('response'),
+              smallPayloadLimit('error')
+            )
+          )
+          .limit(1);
 
-        const requestExt = isJson(row.request) ? 'json' : 'txt';
-        const requestContent = tryFormatJson(row.request);
-        if (requestContent) {
-          totalAppendedEntries += 1;
-          archive.append(requestContent, { name: `${ts}_${id}_request.${requestExt}` });
-        }
-
-        const responseExt = isJson(row.response) ? 'json' : 'txt';
-        const responseContent = tryFormatJson(row.response);
-        if (responseContent) {
-          totalAppendedEntries += 1;
-          archive.append(responseContent, { name: `${ts}_${id}_response.${responseExt}` });
-        }
-
-        if (row.error !== null && row.error !== undefined) {
-          const errorContent = tryFormatJson(row.error);
-          if (errorContent) {
-            totalAppendedEntries += 1;
-            archive.append(errorContent, { name: `${ts}_${id}_error.json` });
-          }
+        if (small) {
+          await appendFormattedPayloads(row.created_at, row.id, small);
+        } else {
+          await appendOversizedRow(row.created_at, row.id);
         }
       }
 
       cursor = rows[rows.length - 1].id;
-
-      // Archiver maintains its own input queue, which is not reflected by the
-      // readable stream's high-water mark. Wait until this batch is emitted so
-      // large exports remain bounded even when compression is slower than DB reads.
-      await waitForEntries(totalAppendedEntries);
     }
 
     await archive.finalize();
@@ -243,6 +436,7 @@ export async function GET(request: NextRequest) {
     headers: {
       'Content-Type': 'application/zip',
       'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'no-store, no-transform',
     },
   });
 }

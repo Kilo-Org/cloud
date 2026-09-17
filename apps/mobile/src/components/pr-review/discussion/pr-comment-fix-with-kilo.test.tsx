@@ -1,22 +1,31 @@
+import { type Href } from 'expo-router';
 import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type PrCommentKind } from '@/lib/pr-review/fix-with-kilo';
 import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import { type SharePayload } from '@/lib/share-payload';
 
 import { PrCommentFixWithKilo } from './pr-comment-fix-with-kilo';
 
 // ── Mocks ────────────────────────────────────────────────────────────
 
 const { pushMock, putSharePayloadMock } = vi.hoisted(() => ({
-  pushMock: vi.fn(),
-  putSharePayloadMock: vi.fn(() => 'share-1'),
+  pushMock: vi.fn((_href: Href | string) => undefined),
+  putSharePayloadMock: vi.fn((_payload: SharePayload) => 'share-1'),
 }));
+
+/** Mutable `Platform.OS` for the iOS/Android parity cases below. */
+const platformState = vi.hoisted(() => ({ OS: 'ios' as string }));
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: pushMock }) }));
 vi.mock('@/lib/share-payload', () => ({ putSharePayload: putSharePayloadMock }));
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native', () => ({
+  Platform: platformState,
+  Pressable: 'Pressable',
+  View: 'View',
+}));
 vi.mock('@/components/ui/icons', () => ({ WandSparkles: 'WandSparkles' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -108,6 +117,7 @@ function pressCta(renderer: TestRenderer.ReactTestRenderer): void {
 
 describe('PrCommentFixWithKilo', () => {
   beforeEach(() => {
+    platformState.OS = 'ios';
     pushMock.mockClear();
     putSharePayloadMock.mockClear();
     putSharePayloadMock.mockReturnValue('share-1');
@@ -218,5 +228,101 @@ describe('PrCommentFixWithKilo', () => {
     ).toHaveLength(1);
 
     renderer.unmount();
+  });
+
+  // One implementation for both platforms: the CTA, its href builder and the
+  // share-payload staging carry NO `Platform.OS` branch, so iOS and Android
+  // observe the same control, the same staged payload and the same route. A
+  // platform fork added anywhere on this path (pill, `buildFixWithKiloHref`,
+  // `fixWithKiloPrefillRepo`) makes the two snapshots differ and fails here.
+  //
+  // Scenarios cover every provider surface the row can render on, plus the
+  // no-CTA case (a GitLab MR with no instance hint), so the parity claim holds
+  // for the empty state too.
+  describe('platform parity', () => {
+    type Scenario = {
+      readonly name: string;
+      readonly props: Partial<CtaProps>;
+      readonly scope: { ref: ProviderPrRef; organizationId: string | null } | undefined;
+      /** The row must show no control at all on either platform. */
+      readonly rendersNothing?: boolean;
+    };
+
+    const matrix: Scenario[] = [
+      { name: 'a GitHub review comment', props: {}, scope: undefined },
+      {
+        name: 'a GitHub conversation comment',
+        props: { kind: 'conversation' },
+        scope: { ref: GITHUB_REF, organizationId: 'org_1' },
+      },
+      {
+        name: 'a GitLab comment on a hinted instance',
+        props: {
+          owner: 'group/sub',
+          repo: 'repo',
+          number: 12,
+          commentId: 12,
+          kind: 'conversation',
+        },
+        scope: { ref: GITLAB_REF_WITH_HINT, organizationId: 'org_1' },
+      },
+      {
+        name: 'a GitLab comment with no instance hint',
+        props: {
+          owner: 'group/sub',
+          repo: 'repo',
+          number: 12,
+          commentId: 12,
+          kind: 'conversation',
+        },
+        scope: { ref: GITLAB_REF_WITHOUT_HINT, organizationId: null },
+        rendersNothing: true,
+      },
+      {
+        name: 'a Bitbucket comment',
+        props: { owner: 'acme', repo: 'api', number: 42, commentId: 12, kind: 'conversation' },
+        scope: { ref: BITBUCKET_REF, organizationId: 'org_1' },
+      },
+    ];
+
+    async function snapshotOn(os: 'ios' | 'android', scenario: Scenario) {
+      platformState.OS = os;
+      pushMock.mockClear();
+      putSharePayloadMock.mockClear();
+
+      const renderer = await renderCta(scenario.props, scenario.scope);
+      const buttons = findPressables(renderer);
+      if (buttons.length > 0) {
+        pressCta(renderer);
+      }
+
+      const snapshot = {
+        ctaCount: buttons.length,
+        payload: putSharePayloadMock.mock.calls[0]?.[0] ?? null,
+        push: pushMock.mock.calls[0]?.[0] ?? null,
+        label: buttons[0]?.props.accessibilityLabel ?? null,
+        hitSlop: buttons[0]?.props.hitSlop ?? null,
+      };
+      renderer.unmount();
+      return snapshot;
+    }
+
+    it.each(matrix)('$name behaves identically on iOS and Android', async scenario => {
+      const ios = await snapshotOn('ios', scenario);
+      const android = await snapshotOn('android', scenario);
+
+      expect(android).toEqual(ios);
+
+      // Keep the equality above from passing on two empty snapshots.
+      if (scenario.rendersNothing) {
+        expect(ios.ctaCount).toBe(0);
+        expect(ios.payload).toBeNull();
+        expect(ios.push).toBeNull();
+        return;
+      }
+      expect(ios.ctaCount).toBe(1);
+      expect(ios.payload).not.toBeNull();
+      expect(ios.push).not.toBeNull();
+    });
   });
 });

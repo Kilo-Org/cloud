@@ -2173,6 +2173,18 @@ export const kilo_pass_store_purchases = pgTable(
     environment: text().notNull(),
     purchased_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    amount_charged_minor_units: integer(),
+    currency: text(),
+    tax_minor_units: integer(),
+    /**
+     * When the money backfill finished with this row: it either wrote the money
+     * columns or found that Play has no money for the order. NULL means the
+     * backfill has not settled the row yet, including rows whose order lookup
+     * failed, which stay eligible so a later run retries them. Without this
+     * marker the rows Play has no money for would be selected by every bounded
+     * run and the backfill would never converge.
+     */
+    money_backfill_attempted_at: timestamp({ withTimezone: true, mode: 'string' }),
     raw_payload_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -2213,6 +2225,22 @@ export const kilo_pass_store_purchases = pgTable(
     check(
       'kilo_pass_store_purchases_store_provider_check',
       sql`${table.payment_provider} IN ('app_store', 'google_play')`
+    ),
+    check(
+      'kilo_pass_store_purchases_amount_charged_non_negative_check',
+      sql`${table.amount_charged_minor_units} IS NULL OR ${table.amount_charged_minor_units} >= 0`
+    ),
+    check(
+      'kilo_pass_store_purchases_tax_non_negative_check',
+      sql`${table.tax_minor_units} IS NULL OR ${table.tax_minor_units} >= 0`
+    ),
+    check(
+      'kilo_pass_store_purchases_currency_check',
+      sql`${table.currency} IS NULL OR ${table.currency} ~ '^[A-Z]{3}$'`
+    ),
+    check(
+      'kilo_pass_store_purchases_currency_required_check',
+      sql`${table.currency} IS NOT NULL OR (${table.amount_charged_minor_units} IS NULL AND ${table.tax_minor_units} IS NULL)`
     ),
     enumCheck(
       'kilo_pass_store_purchases_payment_provider_check',

@@ -1,0 +1,1 @@
+ALTER TABLE "kilo_pass_store_purchases" ADD COLUMN "money_backfill_attempted_at" timestamp with time zone;

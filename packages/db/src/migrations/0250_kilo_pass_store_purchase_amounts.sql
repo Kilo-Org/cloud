@@ -1,0 +1,7 @@
+ALTER TABLE "kilo_pass_store_purchases" ADD COLUMN "amount_charged_minor_units" integer;--> statement-breakpoint
+ALTER TABLE "kilo_pass_store_purchases" ADD COLUMN "currency" text;--> statement-breakpoint
+ALTER TABLE "kilo_pass_store_purchases" ADD COLUMN "tax_minor_units" integer;--> statement-breakpoint
+ALTER TABLE "kilo_pass_store_purchases" ADD CONSTRAINT "kilo_pass_store_purchases_amount_charged_non_negative_check" CHECK ("kilo_pass_store_purchases"."amount_charged_minor_units" IS NULL OR "kilo_pass_store_purchases"."amount_charged_minor_units" >= 0);--> statement-breakpoint
+ALTER TABLE "kilo_pass_store_purchases" ADD CONSTRAINT "kilo_pass_store_purchases_tax_non_negative_check" CHECK ("kilo_pass_store_purchases"."tax_minor_units" IS NULL OR "kilo_pass_store_purchases"."tax_minor_units" >= 0);--> statement-breakpoint
+ALTER TABLE "kilo_pass_store_purchases" ADD CONSTRAINT "kilo_pass_store_purchases_currency_check" CHECK ("kilo_pass_store_purchases"."currency" IS NULL OR "kilo_pass_store_purchases"."currency" ~ '^[A-Z]{3}$');--> statement-breakpoint
+ALTER TABLE "kilo_pass_store_purchases" ADD CONSTRAINT "kilo_pass_store_purchases_currency_required_check" CHECK ("kilo_pass_store_purchases"."currency" IS NOT NULL OR ("kilo_pass_store_purchases"."amount_charged_minor_units" IS NULL AND "kilo_pass_store_purchases"."tax_minor_units" IS NULL));

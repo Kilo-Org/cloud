@@ -65,6 +65,24 @@ describe('PasskeysScreen', () => {
     view.unmount();
   });
 
+  it('keeps the Add control in the footer slot, outside the scrolling body', async () => {
+    const view = await mount();
+    await waitFor(() => texts(view).includes('MacBook'));
+
+    // The control's slot is the footer. Nothing the list renders — skeletons,
+    // rows, or the empty state — carries it, so its coordinates cannot move
+    // when the query settles and swaps one of those for another.
+    const addInsideScroll = first(view, 'ScrollView').findAll(
+      inner =>
+        String(inner.type) === 'Button' &&
+        inner.findAll(
+          leaf => String(leaf.type) === 'Text' && leaf.props.children === 'Add a passkey'
+        ).length > 0
+    );
+    expect(addInsideScroll).toHaveLength(0);
+    view.unmount();
+  });
+
   it('lists a row per passkey with its name and created date', async () => {
     const view = await mount();
     await waitFor(() => texts(view).includes('MacBook'));
@@ -203,7 +221,7 @@ describe('PasskeysScreen', () => {
     // The creation hint would name the Add control this device cannot offer, so
     // the notice is the description and the state has no action at all.
     expect(emptyDescription(view)).toBe('This device cannot create passkeys.');
-    expect(empty.props.action).toBeNull();
+    expect(empty.props.action).toBeUndefined();
     expect(hasButtonLabel(view, 'Add a passkey')).toBe(false);
     view.unmount();
   });

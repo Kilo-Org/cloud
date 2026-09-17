@@ -1,7 +1,7 @@
 import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, View } from 'react-native';
+import { Alert, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -13,7 +13,7 @@ import {
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
-import { TabScreenScrollView } from '@/components/tab-screen';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { KeyRound, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -79,6 +79,11 @@ function InlineFailure({
  * its control is disabled while the request it starts is pending — and a removal
  * failure is only actionable while that delete runs or its row has rolled back,
  * never after the server list drops it.
+ *
+ * The Add control is the screen's one action and sits outside the scrolling
+ * list, in the footer above the tab bar: the header and the control then keep
+ * the same coordinates whatever the query renders (skeletons, no rows, rows),
+ * so data arriving never moves the control the user is reaching for.
  */
 export function PasskeysScreen() {
   const { t } = useTranslation();
@@ -86,6 +91,7 @@ export function PasskeysScreen() {
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { token } = useAuth();
+  const tabBarBottomPadding = useTabBarBottomPadding();
 
   const listKey = trpc.user.getPasskeys.queryKey();
   // Stable per-cache key for the removal generations: overlapping removals must
@@ -213,16 +219,24 @@ export function PasskeysScreen() {
     setAddFailure(result.failure === 'unsupported' ? 'unsupported' : 'failed');
   };
 
+  // The control is full width in every state, in its own footer slot. Its
+  // label's box takes the row's remaining width, so the one line the platform
+  // lays out always has room to spare: a label sized to its own content
+  // measured at its longest word's width and wrapped onto a second line the
+  // button's min height then clipped (e4/p3 spot check: "Add a / passkey" in a
+  // full-width button). The label's right margin mirrors the glyph and its row
+  // gap, which keeps the centred label on the button's own centre.
   const addControl = canCreatePasskeys ? (
     <Button
       variant="outline"
+      className="w-full"
       loading={isAdding}
       onPress={() => {
         void handleAdd();
       }}
     >
       <Plus size={16} color={colors.foreground} />
-      <Text>{t('profile.addPasskey')}</Text>
+      <Text className="mr-[24px] flex-1 text-center">{t('profile.addPasskey')}</Text>
     </Button>
   ) : null;
 
@@ -242,6 +256,12 @@ export function PasskeysScreen() {
       </Text>
     );
   }
+
+  // The notice and the control it explains share the footer. The one exception
+  // is the empty state on a device that cannot create passkeys: there the
+  // notice replaces the hint that would name the withdrawn control, so the
+  // footer must not repeat it.
+  const footerNotice = passkeys.length === 0 && !canCreatePasskeys ? null : addFailureNotice;
 
   let failureNotice: ReactNode = null;
   if (removeFailureId !== null) {
@@ -273,28 +293,25 @@ export function PasskeysScreen() {
     // Loading is checked ahead of error and empty: the first frame of a cold
     // open must be the skeleton, never the empty state.
     body = (
-      <>
-        <View className="gap-3">
-          {SKELETON_ROWS.map(index => (
-            <View key={index} className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-              <Skeleton className="h-[18px] w-[18px] rounded" />
-              <View className="flex-1 gap-1.5">
-                <Skeleton className="h-5 w-28" />
-                <Skeleton className="h-4 w-40" />
-              </View>
-              {/* Reserve the row controls' final 44x44pt boxes (the glyphs stay
-                  16pt) so a loaded row is the same height as its skeleton. */}
-              <View className="min-h-[44px] min-w-[44px] items-center justify-center">
-                <Skeleton className="h-4 w-4 rounded" />
-              </View>
-              <View className="min-h-[44px] min-w-[44px] items-center justify-center">
-                <Skeleton className="h-4 w-4 rounded" />
-              </View>
+      <View className="gap-3">
+        {SKELETON_ROWS.map(index => (
+          <View key={index} className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+            <Skeleton className="h-[18px] w-[18px] rounded" />
+            <View className="flex-1 gap-1.5">
+              <Skeleton className="h-5 w-28" />
+              <Skeleton className="h-4 w-40" />
             </View>
-          ))}
-        </View>
-        {addControl}
-      </>
+            {/* Reserve the row controls' final 44x44pt boxes (the glyphs stay
+                16pt) so a loaded row is the same height as its skeleton. */}
+            <View className="min-h-[44px] min-w-[44px] items-center justify-center">
+              <Skeleton className="h-4 w-4 rounded" />
+            </View>
+            <View className="min-h-[44px] min-w-[44px] items-center justify-center">
+              <Skeleton className="h-4 w-4 rounded" />
+            </View>
+          </View>
+        ))}
+      </View>
     );
   } else if (isError && data === undefined) {
     body = (
@@ -313,20 +330,16 @@ export function PasskeysScreen() {
     // With no passkey to list and no way to create one, the notice takes the
     // hint's place: "Add a passkey…" would instruct the control this device has
     // just withdrawn, and the notice is then the state's only content.
+    //
+    // The state carries no action of its own: the Add control it describes
+    // lives in the footer, where it holds the same coordinates whether the
+    // query renders this state or a list of rows.
     body = (
       <EmptyState
         placement="top"
         icon={KeyRound}
         title={t('profile.passkeysEmpty')}
         description={canCreatePasskeys ? t('profile.passkeysEmptyHint') : addFailureNotice}
-        action={
-          canCreatePasskeys ? (
-            <>
-              {addFailureNotice}
-              {addControl}
-            </>
-          ) : null
-        }
       />
     );
   } else {
@@ -344,8 +357,6 @@ export function PasskeysScreen() {
             />
           ))}
         </View>
-        {addFailureNotice}
-        {addControl}
       </>
     );
   }
@@ -353,13 +364,23 @@ export function PasskeysScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profile.passkeysTitle')} />
-      <TabScreenScrollView
+      <ScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {body}
-      </TabScreenScrollView>
+      </ScrollView>
+
+      {/* The Add control's slot: outside the scrolling body and above the tab
+          bar, it holds the coordinates the empty state first shows it at while
+          the query renders skeletons, no rows, or rows. The notice that
+          explains a failed or unavailable add shares the slot, beside the
+          control it is about. */}
+      <View className="gap-2 px-6 pt-3" style={{ paddingBottom: tabBarBottomPadding }}>
+        {footerNotice}
+        {addControl}
+      </View>
 
       {renameTarget && (
         <RenameModal

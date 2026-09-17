@@ -1583,6 +1583,7 @@
       "exitNeedsNewerCli": "Для удалённого выполнения команд со слешем нужна более новая версия Kilo CLI. Обновите Kilo CLI и подключитесь заново."
     },
     "sessionConnection": {
+      "label": "Подключение",
       "connecting": "Подключение…",
       "reconnecting": "Переподключение…",
       "connectionLost": "Соединение прервано",
@@ -1602,7 +1603,9 @@
       "removeConfirmTitle": "Удалить цель?",
       "removeConfirmMessage": "CLI очищает цель этой сессии.",
       "updateFailed": "Не удалось обновить цель.",
-      "sectionAccessibility": "{{status}}. Цель: {{text}}"
+      "sectionAccessibility": "{{status}}. Цель: {{text}}",
+      "collapse": "Свернуть цель",
+      "expand": "Развернуть цель"
     },
     "newSession": {
       "recentlyUsed": "Недавно использованные",

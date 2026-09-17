@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "Ташуу зураасаар эхэлсэн командыг алсаас ашиглахад Kilo CLI-ийн шинэ хувилбар шаардлагатай. Kilo CLI-ээ шинэчлээд дахин холбогдоно уу."
     },
     "sessionConnection": {
+      "label": "Холболт",
       "connecting": "Холбогдож байна…",
       "reconnecting": "Дахин холбогдож байна…",
       "connectionLost": "Холболт тасарсан",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "Зорилгыг устгах уу?",
       "removeConfirmMessage": "CLI энэ сессийн зорилгыг арилгана.",
       "updateFailed": "Зорилгыг шинэчлэх боломжгүй.",
-      "sectionAccessibility": "{{status}}. Зорилго: {{text}}"
+      "sectionAccessibility": "{{status}}. Зорилго: {{text}}",
+      "collapse": "Зорилгыг хураах",
+      "expand": "Зорилгыг дэлгэх"
     },
     "newSession": {
       "recentlyUsed": "Сүүлд ашигласан",

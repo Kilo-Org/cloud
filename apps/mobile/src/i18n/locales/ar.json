@@ -1601,6 +1601,7 @@
       "exitNeedsNewerCli": "تتطلب أوامر الشرطة المائلة عن بُعد إصدارًا أحدث من Kilo CLI. حدّث Kilo CLI وأعد الاتصال."
     },
     "sessionConnection": {
+      "label": "الاتصال",
       "connecting": "جارٍ الاتصال…",
       "reconnecting": "جارٍ إعادة الاتصال…",
       "connectionLost": "انقطع الاتصال",
@@ -1620,7 +1621,9 @@
       "removeConfirmTitle": "إزالة الهدف؟",
       "removeConfirmMessage": "يمسح CLI هدف هذه الجلسة.",
       "updateFailed": "تعذّر تحديث الهدف.",
-      "sectionAccessibility": "{{status}}. الهدف: {{text}}"
+      "sectionAccessibility": "{{status}}. الهدف: {{text}}",
+      "collapse": "طي الهدف",
+      "expand": "توسيع الهدف"
     },
     "newSession": {
       "recentlyUsed": "المستخدمة مؤخرًا",

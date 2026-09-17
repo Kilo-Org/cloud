@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "За далечински команди со коса црта е потребна понова верзија на Kilo CLI. Ажурирај го Kilo CLI и поврзи се повторно."
     },
     "sessionConnection": {
+      "label": "Врска",
       "connecting": "Поврзување…",
       "reconnecting": "Повторно поврзување…",
       "connectionLost": "Прекината врска",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "Да се отстрани целта?",
       "removeConfirmMessage": "CLI ја брише целта на оваа сесија.",
       "updateFailed": "Целта не можеше да се ажурира.",
-      "sectionAccessibility": "{{status}}. Цел: {{text}}"
+      "sectionAccessibility": "{{status}}. Цел: {{text}}",
+      "collapse": "Собери ја целта",
+      "expand": "Прошири ја целта"
     },
     "newSession": {
       "recentlyUsed": "Неодамна користени",

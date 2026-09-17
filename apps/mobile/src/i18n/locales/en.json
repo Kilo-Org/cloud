@@ -2061,6 +2061,7 @@
       "exitNeedsNewerCli": "Remote slash commands require a newer Kilo CLI. Update Kilo CLI and reconnect."
     },
     "sessionConnection": {
+      "label": "Connection",
       "connecting": "Connecting…",
       "reconnecting": "Reconnecting…",
       "connectionLost": "Connection lost",
@@ -2080,7 +2081,9 @@
       "removeConfirmTitle": "Remove goal?",
       "removeConfirmMessage": "The CLI clears this session's goal.",
       "updateFailed": "Could not update the goal.",
-      "sectionAccessibility": "{{status}}. Goal: {{text}}"
+      "sectionAccessibility": "{{status}}. Goal: {{text}}",
+      "collapse": "Collapse goal",
+      "expand": "Expand goal"
     },
     "newSession": {
       "recentlyUsed": "Recently used",

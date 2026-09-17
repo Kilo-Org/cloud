@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "คำสั่งที่ขึ้นต้นด้วย / ในเซสชันระยะไกลต้องใช้ Kilo CLI เวอร์ชันใหม่กว่า อัปเดต Kilo CLI แล้วเชื่อมต่ออีกครั้ง"
     },
     "sessionConnection": {
+      "label": "การเชื่อมต่อ",
       "connecting": "กำลังเชื่อมต่อ…",
       "reconnecting": "กำลังเชื่อมต่อใหม่…",
       "connectionLost": "การเชื่อมต่อขาดหาย",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "ลบเป้าหมายหรือไม่",
       "removeConfirmMessage": "CLI จะล้างเป้าหมายของเซสชันนี้",
       "updateFailed": "ไม่สามารถอัปเดตเป้าหมายได้",
-      "sectionAccessibility": "{{status}} เป้าหมาย: {{text}}"
+      "sectionAccessibility": "{{status}} เป้าหมาย: {{text}}",
+      "collapse": "ย่อเป้าหมาย",
+      "expand": "ขยายเป้าหมาย"
     },
     "newSession": {
       "recentlyUsed": "ที่ใช้ล่าสุด",

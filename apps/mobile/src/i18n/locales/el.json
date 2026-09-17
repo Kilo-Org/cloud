@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "Οι απομακρυσμένες εντολές με κάθετο απαιτούν νεότερη έκδοση του Kilo CLI. Ενημέρωσε το Kilo CLI και συνδέσου ξανά."
     },
     "sessionConnection": {
+      "label": "Σύνδεση",
       "connecting": "Σύνδεση…",
       "reconnecting": "Επανασύνδεση…",
       "connectionLost": "Χάθηκε η σύνδεση",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "Αφαίρεση στόχου;",
       "removeConfirmMessage": "Το CLI καθαρίζει τον στόχο αυτής της συνεδρίας.",
       "updateFailed": "Δεν ήταν δυνατή η ενημέρωση του στόχου.",
-      "sectionAccessibility": "{{status}}. Στόχος: {{text}}"
+      "sectionAccessibility": "{{status}}. Στόχος: {{text}}",
+      "collapse": "Σύμπτυξη στόχου",
+      "expand": "Επέκταση στόχου"
     },
     "newSession": {
       "recentlyUsed": "Πρόσφατη χρήση",

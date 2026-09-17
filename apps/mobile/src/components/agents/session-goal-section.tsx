@@ -2,6 +2,10 @@ import { type SessionGoal, type SessionGoalStatus } from '@kilocode/cloud-agent-
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
+import {
+  DisclosureChevron,
+  DisclosureLayout,
+} from '@/components/security-agent/collapsible-section';
 import { CircleDot } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -16,6 +20,9 @@ const STATUS_LABEL_KEY = {
 
 type SessionGoalSectionProps = {
   goal: SessionGoal;
+  /** Collapsed shows the icon and the status only; the parent owns the value. */
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   onPress: () => void;
 };
 
@@ -24,36 +31,72 @@ type SessionGoalSectionProps = {
  * transcript list, so it stays put while the transcript scrolls. The
  * `min-h-*` reserves the row height across every status, and the optional
  * `reason` is the only part that can add a line.
+ *
+ * The disclosure pressable is a sibling of the action pressable: a nested
+ * pressable disappears from assistive technology inside an accessible parent.
+ * The action pressable stretches to the reserved row height (`self-stretch`)
+ * so the whole row answers the tap and reaches the touch-target minimum, while
+ * its own content stays top-aligned.
+ * The row only owns its own top padding (`pt-0.5`); the header's own spacing
+ * and the reserved connection slot above it are deliberately untouched, and
+ * the content stays top-aligned in both states so collapsing never moves the
+ * status line the reader is on.
+ *
+ * The carat rotation and the height transition are the app's shared disclosure
+ * primitives (Reanimated, one implementation on iOS and Android), not a
+ * second copy of the animation.
  */
-export function SessionGoalSection({ goal, onPress }: Readonly<SessionGoalSectionProps>) {
+export function SessionGoalSection({
+  goal,
+  collapsed,
+  onToggleCollapsed,
+  onPress,
+}: Readonly<SessionGoalSectionProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const isActive = goal.status === 'active';
   const status = t(STATUS_LABEL_KEY[goal.status]);
 
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={t('agentChat.goal.sectionAccessibility', { status, text: goal.text })}
-      className="min-h-12 flex-row items-start gap-2 border-b border-hair-soft px-4 py-2 active:opacity-70"
-    >
-      <View className="pt-0.5">
-        <CircleDot size={14} color={isActive ? colors.primary : colors.mutedForeground} />
+    <DisclosureLayout>
+      <View className="min-h-12 flex-row items-start gap-2 border-b border-hair-soft px-4 pt-0.5 pb-2">
+        <Pressable
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={
+            collapsed
+              ? status
+              : t('agentChat.goal.sectionAccessibility', { status, text: goal.text })
+          }
+          className="min-w-0 flex-1 self-stretch flex-row items-start gap-2 active:opacity-70"
+        >
+          <View className="pt-0.5">
+            <CircleDot size={14} color={isActive ? colors.primary : colors.mutedForeground} />
+          </View>
+          <View className="min-w-0 flex-1">
+            <Text className={cn('text-xs', isActive ? 'text-primary' : 'text-muted-foreground')}>
+              {status}
+            </Text>
+            {collapsed ? null : (
+              <>
+                <Text className="text-sm text-foreground" numberOfLines={2}>
+                  {goal.text}
+                </Text>
+                {goal.reason ? (
+                  <Text className="text-xs text-muted-foreground" numberOfLines={2}>
+                    {goal.reason}
+                  </Text>
+                ) : null}
+              </>
+            )}
+          </View>
+        </Pressable>
+        <DisclosureChevron
+          expanded={!collapsed}
+          label={collapsed ? t('agentChat.goal.expand') : t('agentChat.goal.collapse')}
+          onPress={onToggleCollapsed}
+        />
       </View>
-      <View className="min-w-0 flex-1">
-        <Text className={cn('text-xs', isActive ? 'text-primary' : 'text-muted-foreground')}>
-          {status}
-        </Text>
-        <Text className="text-sm text-foreground" numberOfLines={2}>
-          {goal.text}
-        </Text>
-        {goal.reason ? (
-          <Text className="text-xs text-muted-foreground" numberOfLines={2}>
-            {goal.reason}
-          </Text>
-        ) : null}
-      </View>
-    </Pressable>
+    </DisclosureLayout>
   );
 }

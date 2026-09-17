@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "Du behöver en nyare version av Kilo CLI för att använda snedstreckskommandon i fjärrsessioner. Uppdatera Kilo CLI och anslut igen."
     },
     "sessionConnection": {
+      "label": "Anslutning",
       "connecting": "Ansluter…",
       "reconnecting": "Återansluter…",
       "connectionLost": "Anslutningen bröts",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "Ta bort mål?",
       "removeConfirmMessage": "CLI rensar den här sessionens mål.",
       "updateFailed": "Målet kunde inte uppdateras.",
-      "sectionAccessibility": "{{status}}. Mål: {{text}}"
+      "sectionAccessibility": "{{status}}. Mål: {{text}}",
+      "collapse": "Fäll ihop målet",
+      "expand": "Fäll ut målet"
     },
     "newSession": {
       "recentlyUsed": "Nyligen använda",

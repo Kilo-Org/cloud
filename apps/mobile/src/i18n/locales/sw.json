@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "Amri za mbali zinazoanza kwa / zinahitaji toleo jipya zaidi la Kilo CLI. Sasisha Kilo CLI na uunganishe tena."
     },
     "sessionConnection": {
+      "label": "Muunganisho",
       "connecting": "Inaunganisha…",
       "reconnecting": "Inaunganisha tena…",
       "connectionLost": "Muunganisho umekatika",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "Ondoa lengo?",
       "removeConfirmMessage": "CLI hufuta lengo la kikao hiki.",
       "updateFailed": "Lengo halikuweza kusasishwa.",
-      "sectionAccessibility": "{{status}}. Lengo: {{text}}"
+      "sectionAccessibility": "{{status}}. Lengo: {{text}}",
+      "collapse": "Kunja lengo",
+      "expand": "Panua lengo"
     },
     "newSession": {
       "recentlyUsed": "Zilizotumika hivi karibuni",

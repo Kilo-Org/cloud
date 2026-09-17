@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "Kauttaviivakomentojen etäkäyttö edellyttää uudempaa Kilo CLI:tä. Päivitä Kilo CLI ja yhdistä uudelleen."
     },
     "sessionConnection": {
+      "label": "Yhteys",
       "connecting": "Yhdistetään…",
       "reconnecting": "Yhdistetään uudelleen…",
       "connectionLost": "Yhteys katkesi",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "Poistetaanko tavoite?",
       "removeConfirmMessage": "CLI tyhjentää tämän istunnon tavoitteen.",
       "updateFailed": "Tavoitetta ei voitu päivittää.",
-      "sectionAccessibility": "{{status}}. Tavoite: {{text}}"
+      "sectionAccessibility": "{{status}}. Tavoite: {{text}}",
+      "collapse": "Kutista tavoite",
+      "expand": "Laajenna tavoite"
     },
     "newSession": {
       "recentlyUsed": "Äskettäin käytetyt",

@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "დისტანციური სლეშ-ბრძანებებისთვის საჭიროა Kilo CLI-ის უფრო ახალი ვერსია. განაახლეთ Kilo CLI და ხელახლა დაუკავშირდით."
     },
     "sessionConnection": {
+      "label": "კავშირი",
       "connecting": "დაკავშირება…",
       "reconnecting": "ხელახლა დაკავშირება…",
       "connectionLost": "კავშირი გაწყდა",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "წავშალოთ მიზანი?",
       "removeConfirmMessage": "CLI ასუფთავებს ამ სესიის მიზანს.",
       "updateFailed": "მიზნის განახლება ვერ მოხერხდა.",
-      "sectionAccessibility": "{{status}}. მიზანი: {{text}}"
+      "sectionAccessibility": "{{status}}. მიზანი: {{text}}",
+      "collapse": "მიზნის ჩაკეცვა",
+      "expand": "მიზნის გაშლა"
     },
     "newSession": {
       "recentlyUsed": "ბოლოს გამოყენებული",

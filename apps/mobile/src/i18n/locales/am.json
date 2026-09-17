@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "ከርቀት በ/ የሚጀምሩ ትዕዛዞችን ለመጠቀም አዲስ የKilo CLI ስሪት ያስፈልጋል። Kilo CLIን ያዘምኑና እንደገና ይገናኙ።"
     },
     "sessionConnection": {
+      "label": "ግንኙነት",
       "connecting": "በማገናኘት ላይ…",
       "reconnecting": "እንደገና በማገናኘት ላይ…",
       "connectionLost": "ግንኙነቱ ተቋርጧል",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "ግብ ይወገድ?",
       "removeConfirmMessage": "CLI የዚህን ክፍለ ጊዜ ግብ ያጸዳል።",
       "updateFailed": "ግቡን ማዘመን አልተቻለም።",
-      "sectionAccessibility": "{{status}}። ግብ፦ {{text}}"
+      "sectionAccessibility": "{{status}}። ግብ፦ {{text}}",
+      "collapse": "ግብን ሰብስብ",
+      "expand": "ግብን ዘርጋ"
     },
     "newSession": {
       "recentlyUsed": "በቅርቡ ጥቅም ላይ የዋሉ",

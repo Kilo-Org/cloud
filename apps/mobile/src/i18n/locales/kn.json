@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "ರಿಮೋಟ್ ಸ್ಲ್ಯಾಶ್ ಆಜ್ಞೆಗಳಿಗೆ Kilo CLI ನ ಹೊಸ ಆವೃತ್ತಿ ಅಗತ್ಯವಿದೆ. Kilo CLI ಅನ್ನು ನವೀಕರಿಸಿ ಮತ್ತೆ ಸಂಪರ್ಕಿಸಿ."
     },
     "sessionConnection": {
+      "label": "ಸಂಪರ್ಕ",
       "connecting": "ಸಂಪರ್ಕಿಸುತ್ತಿದೆ…",
       "reconnecting": "ಮರುಸಂಪರ್ಕಿಸುತ್ತಿದೆ…",
       "connectionLost": "ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದೆ",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "ಗುರಿ ತೆಗೆದುಹಾಕಬೇಕೆ?",
       "removeConfirmMessage": "CLI ಈ ಅಧಿವೇಶನದ ಗುರಿಯನ್ನು ಅಳಿಸುತ್ತದೆ.",
       "updateFailed": "ಗುರಿಯನ್ನು ನವೀಕರಿಸಲಾಗಲಿಲ್ಲ.",
-      "sectionAccessibility": "{{status}}. ಗುರಿ: {{text}}"
+      "sectionAccessibility": "{{status}}. ಗುರಿ: {{text}}",
+      "collapse": "ಗುರಿ ಮಡಚಿ",
+      "expand": "ಗುರಿ ವಿಸ್ತರಿಸಿ"
     },
     "newSession": {
       "recentlyUsed": "ಇತ್ತೀಚೆಗೆ ಬಳಸಿದವು",

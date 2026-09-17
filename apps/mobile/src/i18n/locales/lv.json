@@ -2071,6 +2071,7 @@
       "exitNeedsNewerCli": "Lai attāli izmantotu slīpsvītras komandas, nepieciešama jaunāka Kilo CLI versija. Atjaunini Kilo CLI un izveido savienojumu vēlreiz."
     },
     "sessionConnection": {
+      "label": "Savienojums",
       "connecting": "Savienojas…",
       "reconnecting": "Savienojas atkārtoti…",
       "connectionLost": "Savienojums pārtrūcis",
@@ -2090,7 +2091,9 @@
       "removeConfirmTitle": "Noņemt mērķi?",
       "removeConfirmMessage": "CLI notīra šīs sesijas mērķi.",
       "updateFailed": "Mērķi neizdevās atjaunināt.",
-      "sectionAccessibility": "{{status}}. Mērķis: {{text}}"
+      "sectionAccessibility": "{{status}}. Mērķis: {{text}}",
+      "collapse": "Sakļaut mērķi",
+      "expand": "Izvērst mērķi"
     },
     "newSession": {
       "recentlyUsed": "Nesen lietotie",

@@ -2053,6 +2053,7 @@
       "exitNeedsNewerCli": "ریموٹ سلیش کمانڈز کے لیے Kilo CLI کا نیا ورژن درکار ہے۔ Kilo CLI اپ ڈیٹ کریں اور دوبارہ کنکشن قائم کریں۔"
     },
     "sessionConnection": {
+      "label": "کنکشن",
       "connecting": "کنکشن قائم ہو رہا ہے…",
       "reconnecting": "کنکشن دوبارہ قائم ہو رہا ہے…",
       "connectionLost": "کنکشن ٹوٹ گیا",
@@ -2072,7 +2073,9 @@
       "removeConfirmTitle": "ہدف ہٹائیں؟",
       "removeConfirmMessage": "CLI اس سیشن کا ہدف صاف کر دیتا ہے۔",
       "updateFailed": "ہدف اپ ڈیٹ نہیں ہو سکا۔",
-      "sectionAccessibility": "{{status}}. ہدف: {{text}}"
+      "sectionAccessibility": "{{status}}. ہدف: {{text}}",
+      "collapse": "ہدف چھپائیں",
+      "expand": "ہدف دکھائیں"
     },
     "newSession": {
       "recentlyUsed": "حال ہی میں استعمال شدہ",

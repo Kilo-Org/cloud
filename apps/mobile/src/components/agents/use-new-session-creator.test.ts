@@ -1317,6 +1317,29 @@ describe('useNewSessionCreator upstream branch', () => {
     });
   });
 
+  // A Bitbucket row without uuids cannot be written as a repository field, so
+  // it must not carry the branch chosen for it either (the branch is only
+  // meaningful alongside the repository it belongs to).
+  it('omits both the repository field and upstreamBranch for a Bitbucket row missing its uuids', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const rowWithoutUuids: NewSessionRepository = {
+      platform: 'bitbucket',
+      fullName: 'workspace/repo',
+      isPrivate: true,
+    };
+    setSelectedBranchOverride(rowWithoutUuids, 'develop');
+    const creator = runCreator({ organizationId: 'org-1', selectedRepository: rowWithoutUuids });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('bitbucketRepo');
+    expect(payload).not.toHaveProperty('githubRepo');
+    expect(payload).not.toHaveProperty('gitlabProject');
+    expect(payload).not.toHaveProperty('upstreamBranch');
+  });
+
   it('never carries a branch chosen for another repository', async () => {
     prepareSessionMutate.mockResolvedValue(sessionResult());
     setSelectedBranchOverride(gitlabRow, 'feature/x');

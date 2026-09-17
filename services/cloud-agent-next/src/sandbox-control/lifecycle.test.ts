@@ -3253,7 +3253,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     {
       messageId: 'message_1',
       operationId: '33333333-3333-4333-8333-333333333333',
-      cleanupDeadlineAt: Date.now(),
+      cleanupDeadlineAt: 1,
     },
   ])('rejects invalid scoped Stop requests without forwarding them', async payload => {
     const h = await harness();
@@ -3596,6 +3596,161 @@ describe('SandboxControl lifecycle boundaries', () => {
     await expect(h.control.listRoutes()).resolves.toEqual([
       expect.objectContaining({ nativeRuntimeId, retiringNativeRuntimeId: nativeRuntimeId }),
     ]);
+  });
+
+  describe('future-skewed scoped Stop deadline', () => {
+    const OPERATION_ID = '33333333-3333-4333-8333-333333333333';
+    const NATIVE_RUNTIME_ID = '11111111-1111-4111-8111-111111111111';
+
+    function scopedPayload(cleanupDeadlineAt: number) {
+      return { messageId: 'message_1', operationId: OPERATION_ID, cleanupDeadlineAt };
+    }
+
+    it('saturates the deadline through the socket payload and the persisted retirement', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const [route] = await h.control.listRoutes();
+      if (!route) throw new Error('Missing route');
+      h.records.set('session_routes', [{ ...route, nativeRuntimeId: NATIVE_RUNTIME_ID }]);
+      h.socket.supportsNativeRuntimeRetirement = () => true;
+      h.socket.supportsScopedStopAbort = () => true;
+      const now = Date.now();
+      const saturated = now + 10_000;
+      h.sendRequest.mockResolvedValueOnce({
+        type: 'response',
+        requestId: 'stop_1',
+        ok: true,
+        result: {
+          status: 'aborted',
+          quiescent: true,
+          runtimeRetired: true,
+          nativeRuntimeId: NATIVE_RUNTIME_ID,
+        },
+      });
+
+      await expect(
+        h.control.request({
+          operation: 'session.abort',
+          session: {
+            sessionId: route.sessionId,
+            kiloSessionId: route.kiloSessionId,
+            directory: route.directory,
+          },
+          payload: scopedPayload(now + 15_000),
+          expectedWrapperInstanceId: identity.wrapperInstanceId,
+        })
+      ).resolves.toMatchObject({ ok: true });
+
+      expect(h.sendRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: {
+            messageId: 'message_1',
+            operationId: OPERATION_ID,
+            cleanupDeadlineAt: saturated,
+          },
+          deadlineAt: saturated,
+        })
+      );
+      expect(h.records.get('native_runtime_retirements')).toEqual([
+        expect.objectContaining({ operationId: OPERATION_ID, cleanupDeadlineAt: saturated }),
+      ]);
+    });
+
+    it('does not renew the persisted window when a lost scoped Stop reply is retried', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const [route] = await h.control.listRoutes();
+      if (!route) throw new Error('Missing route');
+      h.records.set('session_routes', [{ ...route, nativeRuntimeId: NATIVE_RUNTIME_ID }]);
+      h.socket.supportsNativeRuntimeRetirement = () => true;
+      h.socket.supportsScopedStopAbort = () => true;
+      const now = Date.now();
+      const saturated = now + 10_000;
+      const stop = (cleanupDeadlineAt: number) =>
+        h.control.request({
+          operation: 'session.abort',
+          session: {
+            sessionId: route.sessionId,
+            kiloSessionId: route.kiloSessionId,
+            directory: route.directory,
+          },
+          payload: scopedPayload(cleanupDeadlineAt),
+          expectedWrapperInstanceId: identity.wrapperInstanceId,
+        });
+      h.sendRequest.mockRejectedValueOnce(new Error('lost Stop reply'));
+
+      await expect(stop(now + 15_000)).rejects.toThrow('lost Stop reply');
+      expect(h.records.get('native_runtime_retirements')).toEqual([
+        expect.objectContaining({ operationId: OPERATION_ID, cleanupDeadlineAt: saturated }),
+      ]);
+
+      vi.setSystemTime(now + DEADLINE_MS.nativeRetirementRetry + 1);
+      const reply = {
+        type: 'response' as const,
+        requestId: 'stop_retry',
+        ok: true as const,
+        result: {
+          status: 'aborted' as const,
+          quiescent: true,
+          runtimeRetired: true,
+          nativeRuntimeId: NATIVE_RUNTIME_ID,
+        },
+      };
+      h.sendRequest.mockResolvedValueOnce(reply);
+
+      await expect(stop(now + 20_000)).resolves.toEqual(reply);
+      expect(h.records.get('native_runtime_retirements')).toEqual([
+        expect.objectContaining({ operationId: OPERATION_ID, cleanupDeadlineAt: saturated }),
+      ]);
+      expect(h.sendRequest).toHaveBeenLastCalledWith(
+        expect.objectContaining({ deadlineAt: saturated })
+      );
+    });
+
+    it('uses the parsed deadline directly when the route has no native runtime', async () => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+      const [route] = await h.control.listRoutes();
+      if (!route) throw new Error('Missing route');
+      h.socket.supportsScopedStopAbort = () => true;
+      const now = Date.now();
+      const saturated = now + 10_000;
+      const reply = {
+        type: 'response' as const,
+        requestId: 'stop_1',
+        ok: true as const,
+        result: { status: 'aborted' as const, quiescent: true },
+      };
+      h.sendRequest.mockResolvedValueOnce(reply);
+
+      await expect(
+        h.control.request({
+          operation: 'session.abort',
+          session: {
+            sessionId: route.sessionId,
+            kiloSessionId: route.kiloSessionId,
+            directory: route.directory,
+          },
+          payload: scopedPayload(now + 15_000),
+          expectedWrapperInstanceId: identity.wrapperInstanceId,
+        })
+      ).resolves.toEqual(reply);
+
+      expect(h.sendRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: {
+            messageId: 'message_1',
+            operationId: OPERATION_ID,
+            cleanupDeadlineAt: saturated,
+          },
+          deadlineAt: saturated,
+        })
+      );
+      expect(h.records.get('native_runtime_retirements')).toBeUndefined();
+    });
   });
 
   it('releases a negotiated unconfirmed root-scoped Stop without retiring the runtime', async () => {

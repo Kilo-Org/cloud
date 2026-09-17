@@ -11031,6 +11031,17 @@
     ],
     "searchBlob": "user.getNotificationPreferences Get the current user's notification preferences for push notifications, chat messages, balance alerts, security findings, and more. user getnotificationpreferences"
   },
+  "user.getPasskeys": {
+    "path": "user.getPasskeys",
+    "kind": "query",
+    "summary": "List all passkeys (WebAuthn security keys) registered to the current user's account, including each key's name, device type, backup status, and when it was created and last used.",
+    "inputSchema": {},
+    "tags": [
+      "user",
+      "getpasskeys"
+    ],
+    "searchBlob": "user.getPasskeys List all passkeys (WebAuthn security keys) registered to the current user's account, including each key's name, device type, backup status, and when it was created and last used. user getpasskeys"
+  },
   "user.listDeviceSessions": {
     "path": "user.listDeviceSessions",
     "kind": "query",

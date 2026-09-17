@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} uitstaande",
       "skipped": "{{displayCount}} oorgeslaan",
       "checksCount": "{{displayCount}} kontroles",
+      "checksCount_one": "{{displayCount}} kontrole",
+      "checksCount_other": "{{displayCount}} kontroles",
       "checkDetails": "kontrolebesonderhede"
     },
     "inbox": {

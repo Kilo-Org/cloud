@@ -2428,6 +2428,10 @@
     "checkConnection": "Проверить подключение",
     "checks": {
       "checksCount": "проверок: {{displayCount}}",
+      "checksCount_one": "проверка: {{displayCount}}",
+      "checksCount_few": "проверки: {{displayCount}}",
+      "checksCount_many": "проверок: {{displayCount}}",
+      "checksCount_other": "проверок: {{displayCount}}",
       "couldNotLoad": "Не удалось загрузить проверки.",
       "failed": "с ошибками: {{displayCount}}",
       "noAccess": "У вас нет доступа к проверкам этого репозитория.",

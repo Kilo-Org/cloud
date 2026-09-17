@@ -618,6 +618,12 @@
       "pending": "{{displayCount}} yn aros",
       "skipped": "{{displayCount}} wedi'u hepgor",
       "checksCount": "{{displayCount}} gwiriad",
+      "checksCount_zero": "{{displayCount}} gwiriad",
+      "checksCount_one": "{{displayCount}} gwiriad",
+      "checksCount_two": "{{displayCount}} gwiriad",
+      "checksCount_few": "{{displayCount}} gwiriad",
+      "checksCount_many": "{{displayCount}} gwiriad",
+      "checksCount_other": "{{displayCount}} gwiriad",
       "checkDetails": "manylion gwiriad"
     },
     "inbox": {

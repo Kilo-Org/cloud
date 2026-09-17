@@ -608,6 +608,10 @@
       "pending": "čakajúce: {{displayCount}}",
       "skipped": "vynechané: {{displayCount}}",
       "checksCount": "počet kontrol: {{displayCount}}",
+      "checksCount_one": "kontrola: {{displayCount}}",
+      "checksCount_few": "kontroly: {{displayCount}}",
+      "checksCount_many": "kontroly: {{displayCount}}",
+      "checksCount_other": "počet kontrol: {{displayCount}}",
       "checkDetails": "podrobnosti kontroly"
     },
     "inbox": {

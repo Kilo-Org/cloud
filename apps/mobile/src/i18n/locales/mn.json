@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} хүлээгдэж байна",
       "skipped": "{{displayCount}} алгассан",
       "checksCount": "{{displayCount}} шалгалт",
+      "checksCount_one": "{{displayCount}} шалгалт",
+      "checksCount_other": "{{displayCount}} шалгалт",
       "checkDetails": "шалгалтын дэлгэрэнгүй"
     },
     "inbox": {

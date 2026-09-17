@@ -2456,6 +2456,12 @@
     "checkConnection": "التحقق من الاتصال",
     "checks": {
       "checksCount": "الفحوصات: {{displayCount}}",
+      "checksCount_zero": "عدد الفحوصات: {{displayCount}}",
+      "checksCount_one": "{{displayCount}} فحص",
+      "checksCount_two": "{{displayCount}} فحصان",
+      "checksCount_few": "{{displayCount}} فحوصات",
+      "checksCount_many": "{{displayCount}} فحصًا",
+      "checksCount_other": "الفحوصات: {{displayCount}}",
       "couldNotLoad": "تعذّر تحميل الفحوصات.",
       "failed": "فاشلة: {{displayCount}}",
       "noAccess": "ليست لديك صلاحية للوصول إلى فحوصات هذا المستودع.",

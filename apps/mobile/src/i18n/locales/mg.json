@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} miandry",
       "skipped": "{{displayCount}} nodiavina",
       "checksCount": "{{displayCount}} fanamarinana",
+      "checksCount_one": "{{displayCount}} fanamarinana",
+      "checksCount_other": "{{displayCount}} fanamarinana",
       "checkDetails": "antsipirian'ny fanamarinana"
     },
     "inbox": {

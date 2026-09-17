@@ -608,6 +608,10 @@
       "pending": "laukiama: {{displayCount}}",
       "skipped": "praleista: {{displayCount}}",
       "checksCount": "patikrinimų: {{displayCount}}",
+      "checksCount_one": "patikrinimas: {{displayCount}}",
+      "checksCount_few": "patikrinimai: {{displayCount}}",
+      "checksCount_many": "patikrinimo: {{displayCount}}",
+      "checksCount_other": "patikrinimų: {{displayCount}}",
       "checkDetails": "patikrinimo informacija"
     },
     "inbox": {

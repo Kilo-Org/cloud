@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} ਬਾਕੀ",
       "skipped": "{{displayCount}} ਛੱਡੀਆਂ ਗਈਆਂ",
       "checksCount": "{{displayCount}} ਜਾਂਚਾਂ",
+      "checksCount_one": "{{displayCount}} ਜਾਂਚ",
+      "checksCount_other": "{{displayCount}} ਜਾਂਚਾਂ",
       "checkDetails": "ਜਾਂਚ ਦੇ ਵੇਰਵੇ"
     },
     "inbox": {

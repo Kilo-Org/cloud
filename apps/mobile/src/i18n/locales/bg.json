@@ -598,6 +598,8 @@
       "pending": "изчакващи: {{displayCount}}",
       "skipped": "пропуснати: {{displayCount}}",
       "checksCount": "{{displayCount}} проверки",
+      "checksCount_one": "{{displayCount}} проверка",
+      "checksCount_other": "{{displayCount}} проверки",
       "checkDetails": "подробности за проверката"
     },
     "inbox": {

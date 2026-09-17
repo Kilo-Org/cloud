@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} tasi kutilmoqda",
       "skipped": "{{displayCount}} tasi o'tkazib yuborildi",
       "checksCount": "{{displayCount}} tekshiruv",
+      "checksCount_one": "{{displayCount}} tekshiruv",
+      "checksCount_other": "{{displayCount}} tekshiruv",
       "checkDetails": "tekshiruv tafsilotlari"
     },
     "inbox": {

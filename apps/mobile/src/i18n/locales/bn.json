@@ -598,6 +598,8 @@
       "pending": "{{displayCount}}টি অপেক্ষমাণ",
       "skipped": "{{displayCount}}টি বাদ দেওয়া হয়েছে",
       "checksCount": "{{displayCount}}টি চেক",
+      "checksCount_one": "{{displayCount}}টি চেক",
+      "checksCount_other": "{{displayCount}}টি চেক",
       "checkDetails": "চেকের বিবরণ"
     },
     "inbox": {

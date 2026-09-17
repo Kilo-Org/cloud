@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} მოლოდინშია",
       "skipped": "{{displayCount}} გამოტოვებულია",
       "checksCount": "{{displayCount}} შემოწმება",
+      "checksCount_one": "{{displayCount}} შემოწმება",
+      "checksCount_other": "{{displayCount}} შემოწმება",
       "checkDetails": "შემოწმების დეტალები"
     },
     "inbox": {

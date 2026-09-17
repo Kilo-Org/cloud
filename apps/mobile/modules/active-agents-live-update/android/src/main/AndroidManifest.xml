@@ -9,5 +9,11 @@
         <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
       </intent-filter>
     </receiver>
+    <receiver
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsApproveReceiver"
+      android:exported="false" />
+    <service
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsApproveTaskService"
+      android:exported="false" />
   </application>
 </manifest>

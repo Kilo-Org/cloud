@@ -2414,6 +2414,9 @@
     "checkConnection": "Comprobar conexión",
     "checks": {
       "checksCount": "{{displayCount}} verificaciones",
+      "checksCount_one": "{{displayCount}} verificación",
+      "checksCount_many": "{{displayCount}} verificaciones",
+      "checksCount_other": "{{displayCount}} verificaciones",
       "couldNotLoad": "No se pudieron cargar las verificaciones.",
       "failed": "{{displayCount}} fallidas",
       "noAccess": "No tienes acceso a las verificaciones de este repositorio.",

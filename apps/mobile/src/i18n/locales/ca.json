@@ -603,6 +603,9 @@
       "pending": "{{displayCount}} pendents",
       "skipped": "{{displayCount}} omeses",
       "checksCount": "{{displayCount}} comprovacions",
+      "checksCount_one": "{{displayCount}} comprovació",
+      "checksCount_many": "{{displayCount}} comprovacions",
+      "checksCount_other": "{{displayCount}} comprovacions",
       "checkDetails": "detalls de la comprovació"
     },
     "inbox": {

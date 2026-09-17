@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} күтілуде",
       "skipped": "{{displayCount}} өткізіп жіберілді",
       "checksCount": "{{displayCount}} тексеру",
+      "checksCount_one": "{{displayCount}} тексеру",
+      "checksCount_other": "{{displayCount}} тексеру",
       "checkDetails": "тексеру мәліметтері"
     },
     "inbox": {

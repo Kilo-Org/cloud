@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} ootel",
       "skipped": "{{displayCount}} vahele jäetud",
       "checksCount": "{{displayCount}} kontrolli",
+      "checksCount_one": "{{displayCount}} kontroll",
+      "checksCount_other": "{{displayCount}} kontrolli",
       "checkDetails": "kontrolli üksikasjad"
     },
     "inbox": {

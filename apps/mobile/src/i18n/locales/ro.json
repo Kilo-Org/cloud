@@ -603,6 +603,9 @@
       "pending": "{{displayCount}} în așteptare",
       "skipped": "{{displayCount}} omise",
       "checksCount": "{{displayCount}} verificări",
+      "checksCount_one": "{{displayCount}} verificare",
+      "checksCount_few": "{{displayCount}} verificări",
+      "checksCount_other": "{{displayCount}} verificări",
       "checkDetails": "detaliile verificării"
     },
     "inbox": {

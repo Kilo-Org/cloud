@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} e tatari ana",
       "skipped": "{{displayCount}} kua hipa",
       "checksCount": "{{displayCount}} arowhai",
+      "checksCount_one": "{{displayCount}} arowhai",
+      "checksCount_other": "{{displayCount}} arowhai",
       "checkDetails": "ngā taipitopito arowhai"
     },
     "inbox": {

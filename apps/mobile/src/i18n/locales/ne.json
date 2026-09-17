@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} प्रतीक्षामा",
       "skipped": "{{displayCount}} छोडियो",
       "checksCount": "{{displayCount}} जाँच",
+      "checksCount_one": "{{displayCount}} जाँच",
+      "checksCount_other": "{{displayCount}} जाँच",
       "checkDetails": "जाँचको विवरण"
     },
     "inbox": {

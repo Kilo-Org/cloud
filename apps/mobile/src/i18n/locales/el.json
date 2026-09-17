@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} σε εκκρεμότητα",
       "skipped": "{{displayCount}} παραλείφθηκαν",
       "checksCount": "{{displayCount}} έλεγχοι",
+      "checksCount_one": "{{displayCount}} έλεγχος",
+      "checksCount_other": "{{displayCount}} έλεγχοι",
       "checkDetails": "λεπτομέρειες ελέγχου"
     },
     "inbox": {

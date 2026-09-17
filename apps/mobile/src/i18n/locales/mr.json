@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} प्रलंबित",
       "skipped": "{{displayCount}} वगळल्या",
       "checksCount": "{{displayCount}} तपासण्या",
+      "checksCount_one": "{{displayCount}} तपासणी",
+      "checksCount_other": "{{displayCount}} तपासण्या",
       "checkDetails": "तपासणीचे तपशील"
     },
     "inbox": {

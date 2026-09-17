@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} ang nakabinbin",
       "skipped": "{{displayCount}} ang nilaktawan",
       "checksCount": "{{displayCount}} na pagsusuri",
+      "checksCount_one": "{{displayCount}} na pagsusuri",
+      "checksCount_other": "{{displayCount}} na pagsusuri",
       "checkDetails": "mga detalye ng pagsusuri"
     },
     "inbox": {

@@ -152,6 +152,36 @@ export function useAdminOrganizationKiloPassSummary(organizationId: string) {
   );
 }
 
+export function useAdminOrganizationServiceFeeExemption(organizationId: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.admin.getServiceFeeExemption.queryOptions({
+      organizationId,
+    })
+  );
+}
+
+export function useSetOrganizationServiceFeeExemption() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.organizations.admin.setServiceFeeExemption.mutationOptions({
+      onSuccess: (_data, variables) => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.admin.getServiceFeeExemption.queryKey({
+            organizationId: variables.organizationId,
+          }),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.admin.getDetails.queryKey({
+            organizationId: variables.organizationId,
+          }),
+        });
+      },
+    })
+  );
+}
+
 export function useAdminOrganizationHierarchy(organizationId: string, enabled: boolean) {
   const trpc = useTRPC();
   return useQuery(

@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} zilindile",
       "skipped": "{{displayCount}} zeqiwe",
       "checksCount": "izihlolo ezingu-{{displayCount}}",
+      "checksCount_one": "isihlolo esingu-{{displayCount}}",
+      "checksCount_other": "izihlolo ezingu-{{displayCount}}",
       "checkDetails": "imininingwane yesihlolo"
     },
     "inbox": {

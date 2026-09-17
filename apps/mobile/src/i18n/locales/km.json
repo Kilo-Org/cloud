@@ -598,6 +598,8 @@
       "pending": "កំពុងរង់ចាំ {{displayCount}}",
       "skipped": "បានរំលង {{displayCount}}",
       "checksCount": "ការត្រួតពិនិត្យ {{displayCount}}",
+      "checksCount_one": "ការត្រួតពិនិត្យ {{displayCount}}",
+      "checksCount_other": "ការត្រួតពិនិត្យ {{displayCount}}",
       "checkDetails": "ព័ត៌មានលម្អិតអំពីការត្រួតពិនិត្យ"
     },
     "inbox": {

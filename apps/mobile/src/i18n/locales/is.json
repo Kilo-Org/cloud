@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} í bið",
       "skipped": "{{displayCount}} sleppt",
       "checksCount": "fjöldi athugana: {{displayCount}}",
+      "checksCount_one": "{{displayCount}} athugun",
+      "checksCount_other": "fjöldi athugana: {{displayCount}}",
       "checkDetails": "upplýsingar um athugun"
     },
     "inbox": {

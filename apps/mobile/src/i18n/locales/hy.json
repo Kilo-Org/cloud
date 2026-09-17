@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} սպասման մեջ",
       "skipped": "{{displayCount}} բաց թողնված",
       "checksCount": "{{displayCount}} ստուգում",
+      "checksCount_one": "{{displayCount}} ստուգում",
+      "checksCount_other": "{{displayCount}} ստուգում",
       "checkDetails": "ստուգման մանրամասներ"
     },
     "inbox": {

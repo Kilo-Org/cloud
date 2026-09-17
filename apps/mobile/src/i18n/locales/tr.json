@@ -2400,6 +2400,8 @@
     "checkConnection": "Bağlantıyı kontrol et",
     "checks": {
       "checksCount": "{{displayCount}} kontrol",
+      "checksCount_one": "{{displayCount}} kontrol",
+      "checksCount_other": "{{displayCount}} kontrol",
       "couldNotLoad": "Kontroller yüklenemedi.",
       "failed": "{{displayCount}} başarısız",
       "noAccess": "Bu deponun kontrollerine erişimin yok.",

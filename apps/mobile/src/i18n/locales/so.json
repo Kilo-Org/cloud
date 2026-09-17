@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} ayaa la sugayaa",
       "skipped": "{{displayCount}} waa la dhaafay",
       "checksCount": "{{displayCount}} hubin",
+      "checksCount_one": "{{displayCount}} hubin",
+      "checksCount_other": "{{displayCount}} hubin",
       "checkDetails": "faahfaahinta hubinta"
     },
     "inbox": {

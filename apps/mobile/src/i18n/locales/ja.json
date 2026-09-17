@@ -2400,6 +2400,8 @@
     "checkConnection": "接続を確認",
     "checks": {
       "checksCount": "{{displayCount}}件のチェック",
+      "checksCount_one": "{{displayCount}}件のチェック",
+      "checksCount_other": "{{displayCount}}件のチェック",
       "couldNotLoad": "チェックを読み込めませんでした。",
       "failed": "{{displayCount}}件失敗",
       "noAccess": "このリポジトリのチェックにアクセスできません。",

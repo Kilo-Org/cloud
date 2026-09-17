@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} ಬಾಕಿ",
       "skipped": "{{displayCount}} ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ",
       "checksCount": "{{displayCount}} ತಪಾಸಣೆಗಳು",
+      "checksCount_one": "{{displayCount}} ತಪಾಸಣೆ",
+      "checksCount_other": "{{displayCount}} ತಪಾಸಣೆಗಳು",
       "checkDetails": "ತಪಾಸಣೆಯ ವಿವರಗಳು"
     },
     "inbox": {

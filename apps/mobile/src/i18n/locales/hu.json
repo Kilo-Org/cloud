@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} függőben",
       "skipped": "{{displayCount}} kihagyva",
       "checksCount": "{{displayCount}} ellenőrzés",
+      "checksCount_one": "{{displayCount}} ellenőrzés",
+      "checksCount_other": "{{displayCount}} ellenőrzés",
       "checkDetails": "ellenőrzés részletei"
     },
     "inbox": {

@@ -2400,6 +2400,8 @@
     "checkConnection": "Verbinding controleren",
     "checks": {
       "checksCount": "{{displayCount}} controles",
+      "checksCount_one": "{{displayCount}} controle",
+      "checksCount_other": "{{displayCount}} controles",
       "couldNotLoad": "De controles konden niet worden geladen.",
       "failed": "{{displayCount}} mislukt",
       "noAccess": "Je hebt geen toegang tot de controles voor deze repository.",

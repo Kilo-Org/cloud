@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} ක් තවමත් අවසන් නැත",
       "skipped": "{{displayCount}} ක් මඟ හැර ඇත",
       "checksCount": "පරීක්ෂණ {{displayCount}} ක්",
+      "checksCount_one": "පරීක්ෂණය {{displayCount}} ක්",
+      "checksCount_other": "පරීක්ෂණ {{displayCount}} ක්",
       "checkDetails": "පරීක්ෂණ විස්තර"
     },
     "inbox": {

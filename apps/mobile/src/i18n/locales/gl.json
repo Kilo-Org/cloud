@@ -598,6 +598,8 @@
       "pending": "{{displayCount}} pendentes",
       "skipped": "{{displayCount}} omitidas",
       "checksCount": "{{displayCount}} comprobacións",
+      "checksCount_one": "{{displayCount}} comprobación",
+      "checksCount_other": "{{displayCount}} comprobacións",
       "checkDetails": "detalles da comprobación"
     },
     "inbox": {

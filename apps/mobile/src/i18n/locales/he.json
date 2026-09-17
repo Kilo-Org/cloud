@@ -2414,6 +2414,9 @@
     "checkConnection": "בדיקת החיבור",
     "checks": {
       "checksCount": "{{displayCount}} בדיקות",
+      "checksCount_one": "{{displayCount}} בדיקה",
+      "checksCount_two": "{{displayCount}} בדיקות",
+      "checksCount_other": "{{displayCount}} בדיקות",
       "couldNotLoad": "לא ניתן היה לטעון את הבדיקות.",
       "failed": "{{displayCount}} נכשלו",
       "noAccess": "אין לך גישה לבדיקות של המאגר הזה.",

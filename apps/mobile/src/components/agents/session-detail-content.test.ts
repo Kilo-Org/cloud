@@ -207,8 +207,9 @@ vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('@/components/agents/session-row-actions', () => ({ copySessionId: vi.fn() }));
 // The copy-link path reaches the browser helper; its native module cannot load here.
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
-// The handoff advertiser is a platform boundary with its own mounted suites;
-// recording its props here proves the screen hands it the live position.
+// The handoff advertiser owns the OS entry point (Head plus Android's launcher
+// module) and has its own mounted suite; recording its props here proves the
+// screen hands it the live position.
 vi.mock('@/lib/session-handoff', () => ({
   SessionHandoffAdvertiser: (props: { anchorMessageId?: string | null }) => {
     handoffAdvertiserCalls.props.push(props);

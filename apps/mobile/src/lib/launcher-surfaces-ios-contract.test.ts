@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 // Source-contract guard for the iOS launcher-surfaces module.
 //
 // The host that runs this suite has no Xcode and no iOS simulator, and CI does
-// not build the iOS app, so the two Quick Action rules below cannot be exercised
+// not build the iOS app, so the Quick Action rules below cannot be exercised
 // by a running test. They are pinned against the sources instead, the way
 // `launcher-surfaces-native-api.test.ts` pins the Android API-level guards.
 //
@@ -19,6 +19,13 @@ import { describe, expect, it } from 'vitest';
 //   travels in `userInfo`.
 // - The url a cold start parks in UserDefaults must not survive sign-out, or it
 //   routes the next account to the previous account's session.
+// - UIKit re-delivers the launched item through
+//   `application(_:performActionFor:completionHandler:)` while the parked copy
+//   still waits for the JS mount. Opening it there too navigates twice for one
+//   tap, so the callback must leave the parked copy to the mount. Expo's
+//   subscriber manager ignores a subscriber's launch return value
+//   (`ExpoAppDelegateSubscriberManager.swift:36`), so `return false` cannot be
+//   that guard; the parked url itself is the marker.
 
 const IOS_DIR = fileURLToPath(new URL('../../modules/kilo-launcher-surfaces/ios', import.meta.url));
 
@@ -26,10 +33,11 @@ function readSource(name: string): string {
   return readFileSync(join(IOS_DIR, name), 'utf8');
 }
 
-/** The body between the braces of a `func <name>(` declaration, or ''. */
-function functionBody(source: string, name: string): string {
-  const signature = new RegExp(String.raw`func\s+${name}\s*\(`).exec(source);
-  if (signature === null) {
+/** The body between the braces of the nth `func <name>(` declaration, or ''. */
+function functionBody(source: string, name: string, occurrence = 0): string {
+  const matches = [...source.matchAll(new RegExp(String.raw`func\s+${name}\s*\(`, 'g'))];
+  const signature = matches[occurrence];
+  if (signature === undefined) {
     return '';
   }
   const open = source.indexOf('{', signature.index);
@@ -102,5 +110,27 @@ describe('iOS Quick Action url handoff contract', () => {
   it('stores and consumes the parked url under one key', () => {
     expect(functionBody(storeSource, 'storePendingLaunchUrl')).toContain('pendingLaunchUrlKey');
     expect(functionBody(storeSource, 'consumePendingLaunchUrl')).toContain('pendingLaunchUrlKey');
+  });
+
+  it('reads the parked url without dropping it, so only consume clears the slot', () => {
+    const body = functionBody(storeSource, 'pendingLaunchUrl');
+    expect(body).not.toBe('');
+    expect(body).toContain('pendingLaunchUrlKey');
+    expect(body).not.toContain('removeObject');
+  });
+
+  it('skips the action callback for the cold-start item it already parked', () => {
+    const callbackBody = functionBody(subscriberSource, 'application', 1);
+    expect(callbackBody).not.toBe('');
+    // The callback runs for the item the launch already parked while the JS
+    // mount has not consumed it yet: opening both is two navigations for one
+    // tap, so the parked url is checked before `application.open`.
+    expect(callbackBody).toContain('KiloLauncherSurfacesStore.pendingLaunchUrl()');
+    expect(callbackBody.indexOf('KiloLauncherSurfacesStore.pendingLaunchUrl()')).toBeLessThan(
+      callbackBody.indexOf('application.open')
+    );
+    // The check must not swallow a later warm tap: the mount empties the slot by
+    // consuming it, and this callback leaves the parked copy for the mount.
+    expect(callbackBody).not.toContain('consumePendingLaunchUrl');
   });
 });

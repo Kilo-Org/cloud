@@ -38,6 +38,16 @@ enum KiloLauncherSurfacesStore {
     UserDefaults.standard.removeObject(forKey: pendingLaunchUrlKey)
   }
 
+  /**
+   * Reads the parked url without clearing it. The action callback uses this to
+   * recognise the cold-start item UIKit delivers a second time; only
+   * `consumePendingLaunchUrl` may drop the value, because it is the JS mount
+   * that performs the tap.
+   */
+  static func pendingLaunchUrl() -> String? {
+    UserDefaults.standard.string(forKey: pendingLaunchUrlKey)
+  }
+
   /** Reads and clears the parked url, so a cold start is consumed exactly once. */
   static func consumePendingLaunchUrl() -> String? {
     let url = UserDefaults.standard.string(forKey: pendingLaunchUrlKey)

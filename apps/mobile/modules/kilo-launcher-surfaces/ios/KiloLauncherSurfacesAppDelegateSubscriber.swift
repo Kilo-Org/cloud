@@ -11,6 +11,12 @@ import UIKit
  * not its `type`: the type is a stable action identifier, so two actions opening
  * the same session stay two items. Either way the url re-enters the app through
  * the same pipeline a notification tap uses.
+ *
+ * UIKit also hands the launched item to `performActionFor`, so that callback
+ * leaves a url that is still parked to the JS mount instead of opening it a
+ * second time. Expo's subscriber manager discards a subscriber's launch return
+ * value and answers `true` itself, so the parked url is the marker, not a
+ * `false` return.
  */
 public final class KiloLauncherSurfacesAppDelegateSubscriber: ExpoAppDelegateSubscriber {
   public func application(
@@ -31,6 +37,15 @@ public final class KiloLauncherSurfacesAppDelegateSubscriber: ExpoAppDelegateSub
   ) {
     guard let rawUrl = shortcutItem.launcherUrl, let url = URL(string: rawUrl) else {
       completionHandler(false)
+      return
+    }
+    // UIKit delivers the item a cold start was launched with through this
+    // callback too, while that item's url is still parked for the JS mount. The
+    // mount is the delivery the tap gets, so opening the url here as well is a
+    // second navigation for one tap; drop the repeat. Only a warm tap, whose url
+    // the mount has already consumed, reaches the open below.
+    if KiloLauncherSurfacesStore.pendingLaunchUrl() == rawUrl {
+      completionHandler(true)
       return
     }
     // Warm start: JS is up, so the url enters the deep-link pipeline now. This

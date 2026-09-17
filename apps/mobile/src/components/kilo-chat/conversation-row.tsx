@@ -17,6 +17,12 @@ import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 type ConversationRowProps = {
   conversation: ConversationListItem;
   sandboxId: string;
+  /**
+   * The list's ticker clock. The relative timestamp must be derived from this
+   * prop, not from a live `Date.now()` read: React Compiler memoizes the label
+   * against its traced inputs, so an untracked clock would freeze the text.
+   */
+  now: number;
   onPress: (conversationId: string) => void;
   onLeave: (conversationId: string) => void;
 };
@@ -35,6 +41,7 @@ function hasUnread(conversation: ConversationListItem): boolean {
 export function ConversationRow({
   conversation,
   sandboxId,
+  now,
   onPress,
   onLeave,
 }: Readonly<ConversationRowProps>) {
@@ -49,6 +56,7 @@ export function ConversationRow({
     sandboxId
   );
   const title = conversation.title ?? t('chat.conversation.untitledConversation');
+  const timestampLabel = timeAgo(new Date(conversationTimestamp(conversation)), undefined, now);
 
   function confirmLeave() {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -116,7 +124,7 @@ export function ConversationRow({
               />
             ) : null}
             <Text variant="muted" numberOfLines={1}>
-              {timeAgo(new Date(conversationTimestamp(conversation)))}
+              {timestampLabel}
             </Text>
           </View>
         </View>

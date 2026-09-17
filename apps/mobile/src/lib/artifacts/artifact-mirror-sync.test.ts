@@ -13,21 +13,37 @@ import {
   syncArtifactMirror,
 } from '@/lib/artifacts/artifact-mirror-sync';
 import { type ArtifactMirrorManifest } from '@/lib/artifacts/artifact-mirror-manifest';
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
 
 // Real-entry-shaped stand-in for expo-file-system: an entry is a File (the
-// mirror sets `size` and calls `delete`) and a Directory (the sync creates the
-// session folder before materializing into it).
+// mirror sets `size`, promotes with `moveSync` and calls `delete`) and a
+// Directory (the sync creates the session folder before materializing into it).
+// It tracks paths as well as instances: the fence's job is to not remove a path
+// a later generation wrote, so a delete has to be visible at the path, not only
+// on the instance that called it.
 const fakeFs = vi.hoisted(() => {
-  type Tracked = { created: boolean; deleted: boolean; size: number };
+  type Tracked = { created: boolean; deleted: boolean; path: string; size: number };
   const entries: Tracked[] = [];
+  const deletedPaths = new Set<string>();
 
   class EntryMock {
     created = false;
     deleted = false;
+    path: string;
     size = 0;
 
-    constructor() {
+    constructor(...parts: unknown[]) {
+      // The `downloaded` stand-in is built with no arguments; give it a unique
+      // path so its size bookkeeping cannot collide with a mirror entry.
+      this.path =
+        parts.length === 0
+          ? `download-${entries.length}`
+          : parts
+              .map(part =>
+                typeof part === 'string' ? part : ((part as { path?: string }).path ?? '')
+              )
+              .join('/');
       entries.push(this);
     }
 
@@ -37,15 +53,24 @@ const fakeFs = vi.hoisted(() => {
 
     delete(): void {
       this.deleted = true;
+      deletedPaths.add(this.path);
+    }
+
+    moveSync(destination: EntryMock): void {
+      this.deleted = true;
+      deletedPaths.add(this.path);
+      destination.created = true;
     }
   }
 
   return {
     Directory: EntryMock,
     File: EntryMock,
+    deleted: (path: string) => deletedPaths.has(path),
     entries,
     reset: () => {
       entries.length = 0;
+      deletedPaths.clear();
     },
   };
 });
@@ -513,6 +538,60 @@ describe('syncArtifactMirror crawling', () => {
     expect(h.applied).toHaveLength(0);
     expect(h.notify).not.toHaveBeenCalled();
     expect(h.store.size).toBe(0);
+  });
+
+  it('keeps the bytes a later generation wrote when a stale download finishes', async () => {
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+
+    // The old generation parks inside its download, so the newer generation can
+    // finish the same artifact first.
+    const releaseOld = vi.fn<() => void>();
+    const oldDownload = new Promise<void>(resolve => {
+      releaseOld.mockImplementation(resolve);
+    });
+    const markEntered = vi.fn<() => void>();
+    const enteredDownload = new Promise<void>(resolve => {
+      markEntered.mockImplementation(resolve);
+    });
+    const canonical = 'file:///mirror/sessions/f1';
+    let firstDownload = true;
+    h.deps.downloadFile = vi.fn(async (_url: string) => {
+      if (firstDownload) {
+        firstDownload = false;
+        markEntered();
+        await oldDownload;
+      }
+      return downloaded(10);
+    });
+
+    const oldRun = syncArtifactMirror({ force: true, deps: h.deps });
+    // Wait until the old generation is provably inside its download, so the
+    // sign-out below lands after the fence that gated starting it.
+    await enteredDownload;
+
+    // Sign out and back in while the old download is still parked: the epoch it
+    // captured is stale, and teardown has dropped the single-flight memo, so the
+    // next run is a new generation writing the same canonical path.
+    setSignOutActive(true);
+    bumpAuthEpoch();
+    setSignOutActive(false);
+    resetArtifactMirrorSyncState();
+
+    expect(await syncArtifactMirror({ force: true, deps: h.deps })).toMatchObject({
+      status: 'synced',
+      files: 1,
+    });
+    expect(fakeFs.deleted(canonical)).toBe(false);
+
+    releaseOld();
+    expect(await oldRun).toEqual({ status: 'discarded' });
+
+    // The stale run may only remove bytes it wrote itself: the file the newer
+    // generation published is still on disk and still in its manifest.
+    expect(fakeFs.deleted(canonical)).toBe(false);
+    expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1']);
   });
 
   it('does not signal the provider when a sign-out lands inside the state write', async () => {

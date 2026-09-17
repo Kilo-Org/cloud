@@ -135,6 +135,8 @@ const DEFAULT_DEPS: ArtifactMirrorSyncDeps = {
 type SyncRun = {
   deps: ArtifactMirrorSyncDeps;
   epoch: number;
+  /** Identity of this run, used to name the staging bytes it alone owns. */
+  generation: number;
   states: Record<string, MirrorSyncSessionState>;
 };
 
@@ -142,6 +144,7 @@ type SyncRun = {
 type SessionAdvance = {
   deps: ArtifactMirrorSyncDeps;
   epoch: number;
+  generation: number;
   known: Set<string>;
   sessionId: string;
   state: MirrorSyncSessionState;
@@ -189,7 +192,7 @@ async function runSync(
   generation: number
 ): Promise<ArtifactMirrorSyncOutcome> {
   try {
-    return await runSyncOnce(options);
+    return await runSyncOnce(options, generation);
   } catch {
     // Derived data: a crawl or storage failure never reaches the caller, which
     // may be a foreground refresh with no place to report it.
@@ -201,7 +204,10 @@ async function runSync(
   }
 }
 
-async function runSyncOnce(options: ArtifactMirrorSyncOptions): Promise<ArtifactMirrorSyncOutcome> {
+async function runSyncOnce(
+  options: ArtifactMirrorSyncOptions,
+  generation: number
+): Promise<ArtifactMirrorSyncOutcome> {
   const deps: ArtifactMirrorSyncDeps = { ...DEFAULT_DEPS, ...options.deps };
   // Captured before the first await: every awaited step below can straddle a
   // sign-out, and the fence at each write compares against this epoch.
@@ -226,6 +232,7 @@ async function runSyncOnce(options: ArtifactMirrorSyncOptions): Promise<Artifact
   const run: SyncRun = {
     deps,
     epoch,
+    generation,
     states: nextSessionStates(page.sessions, state.sessions),
   };
   const advanced = await advanceSessions(page.sessions, run);
@@ -299,6 +306,7 @@ async function advanceSession(
   const advance: SessionAdvance = {
     deps: run.deps,
     epoch: run.epoch,
+    generation: run.generation,
     known: new Set(state.files.map(file => file.id)),
     sessionId: row.id,
     state,
@@ -351,6 +359,13 @@ async function materializePage(
  * Materialize one artifact: skip what is already mirrored, honor the byte cap
  * through {@link materializeArtifact}, and report a failed download as
  * retryable so the caller holds the cursor.
+ *
+ * The bytes land in a staging file named for this run and are promoted onto the
+ * canonical path only once the fence still holds. A discarded run therefore
+ * only ever removes bytes it wrote itself: the canonical path may already hold
+ * what a later generation wrote for the same artifact after sign-out/sign-in,
+ * and a stale cleanup there would delete that newer file under a manifest that
+ * still lists it.
  */
 async function materializeOne(
   artifact: CrawledArtifact,
@@ -362,41 +377,48 @@ async function materializeOne(
   if (!canPublish(advance.epoch)) {
     return artifactNote({ discarded: true });
   }
-  const target = mirrorTarget(advance.sessionId, artifact, advance.deps);
-  if (target === null) {
+  const staged = mirrorStagedTarget(advance.sessionId, artifact, advance);
+  if (staged === null) {
     return artifactNote();
   }
 
-  const result = await materializeArtifact(artifact, target, advance.deps);
+  const result = await materializeArtifact(artifact, staged.staging, advance.deps);
   // The download is the run's longest await, and sign-out can land inside it:
   // teardown has already cleared the mirror by then, so the fence is read again
-  // before the bytes that just arrived join the run's state or the disk.
+  // before the bytes that just arrived are promoted to the canonical path.
   if (!canPublish(advance.epoch)) {
-    deleteQuietly(target);
+    deleteQuietly(staged.staging);
     return artifactNote({ discarded: true });
   }
-  if (result.ok) {
-    advance.state.files.push({ ...artifact, size: result.size });
-    advance.known.add(artifact.id);
-    return artifactNote({ files: 1 });
+  if (!result.ok) {
+    deleteQuietly(staged.staging);
+    return result.reason === 'download-failed'
+      ? artifactNote({ failed: 1, retryable: true })
+      : artifactNote();
   }
-  deleteQuietly(target);
-  return result.reason === 'download-failed'
-    ? artifactNote({ failed: 1, retryable: true })
-    : artifactNote();
+  if (!promote(staged.staging, staged.canonical)) {
+    deleteQuietly(staged.staging);
+    return artifactNote({ failed: 1, retryable: true });
+  }
+  advance.state.files.push({ ...artifact, size: result.size });
+  advance.known.add(artifact.id);
+  return artifactNote({ files: 1 });
 }
 
+/** This run's private staging file, plus the canonical path it becomes. */
+type StagedTarget = { canonical: File; staging: File };
+
 /**
- * The target file for one artifact, with its session folder created first
- * because a run materializes before the snapshot creates the layout. Null
- * means this build has nowhere browsable to put the bytes.
+ * The target files for one artifact, with its session folder created first
+ * because a run materializes before the snapshot creates the layout. Null means
+ * this build has nowhere browsable to put the bytes.
  */
-function mirrorTarget(
+function mirrorStagedTarget(
   sessionId: string,
   artifact: CrawledArtifact,
-  deps: ArtifactMirrorSyncDeps
-): File | null {
-  const directory = deps.mirrorSessionDir(sessionId);
+  advance: SessionAdvance
+): StagedTarget | null {
+  const directory = advance.deps.mirrorSessionDir(sessionId);
   if (directory === null) {
     return null;
   }
@@ -405,7 +427,29 @@ function mirrorTarget(
   } catch {
     return null;
   }
-  return new File(directory, artifact.id);
+  return {
+    canonical: new File(directory, artifact.id),
+    staging: new File(directory, stagingFileName(artifact.id, advance.generation)),
+  };
+}
+
+/**
+ * Name of a run's staging file. The generation makes the name the run's own: a
+ * cleanup can only match bytes this run wrote, and a leftover from a crashed run
+ * is pruned by the next applied snapshot, which keeps only the manifest's ids.
+ */
+function stagingFileName(artifactId: string, generation: number): string {
+  return `${artifactId}.part-${generation}`;
+}
+
+/** Move a run's staged bytes onto the canonical path. False means retry it. */
+function promote(staging: File, canonical: File): boolean {
+  try {
+    staging.moveSync(canonical, { overwrite: true });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

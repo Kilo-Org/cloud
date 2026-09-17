@@ -43,6 +43,16 @@ const mutationLeaf = (path: string, firstInput?: CatalogLeaf['firstInput']): Cat
 const allowlistedMutationLeaves = (): CatalogLeaf[] =>
   MCP_MUTATION_ALLOWLIST.map(path => mutationLeaf(path));
 
+/**
+ * A synthetic leaf set that satisfies the rot guard: the fixture's own leaves
+ * plus every allowlisted mutation. The guard now compares the allowlist even
+ * when no mutation leaf is enumerated, so a query-only fixture would throw.
+ */
+const withAllowlistedMutations = (leaves: CatalogLeaf[]): CatalogLeaf[] => [
+  ...leaves,
+  ...allowlistedMutationLeaves(),
+];
+
 describe('mcp-catalog catalog', () => {
   describe('collectCatalogLeaves', () => {
     it('yields leaves from the real rootRouter', () => {
@@ -115,7 +125,7 @@ describe('mcp-catalog catalog', () => {
 
     it('shapes rows with derived tags, input schema and search blob', () => {
       const { rows } = buildCatalogRows(
-        [queryLeaf('user.getProfile', z.object({ userId: z.string() }))],
+        withAllowlistedMutations([queryLeaf('user.getProfile', z.object({ userId: z.string() }))]),
         new Map([['user.getProfile', 'Returns the profile of a user.']])
       );
       const row = rows[0];
@@ -135,7 +145,7 @@ describe('mcp-catalog catalog', () => {
 
     it('emits an empty input schema for procedures without input', () => {
       const { rows } = buildCatalogRows(
-        [queryLeaf('user.listSessions')],
+        withAllowlistedMutations([queryLeaf('user.listSessions')]),
         new Map([['user.listSessions', 'Lists active sessions.']])
       );
       expect(rows[0]?.inputSchema).toEqual({});
@@ -144,7 +154,7 @@ describe('mcp-catalog catalog', () => {
     it('keeps committed summaries byte-for-byte, including whitespace', () => {
       const summary = '  Returns the user profile.  ';
       const { rows } = buildCatalogRows(
-        [queryLeaf('user.getProfile')],
+        withAllowlistedMutations([queryLeaf('user.getProfile')]),
         new Map([['user.getProfile', summary]])
       );
       expect(rows[0]?.summary).toBe(summary);
@@ -161,7 +171,7 @@ describe('mcp-catalog catalog', () => {
   describe('buildCatalogJson', () => {
     it('sorts rows by path and ends with a trailing newline', () => {
       const { rows } = buildCatalogRows(
-        [queryLeaf('b.b'), queryLeaf('a.a')],
+        withAllowlistedMutations([queryLeaf('b.b'), queryLeaf('a.a')]),
         new Map([
           ['a.a', 'A'],
           ['b.b', 'B'],

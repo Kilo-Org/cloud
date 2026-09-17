@@ -177,22 +177,20 @@ function shapeRow(leaf: CatalogLeaf, summary: string): CatalogRow {
  * whether it was renamed or deleted, its top-level segment is withheld by the
  * denylist, or its procedure was demoted to a query. The guard therefore
  * compares the allowlist against the paths that survived the denylist *and*
- * published with kind `mutation`, and is scoped to enumerations that actually
- * carry mutations, so a synthetic or query-only leaf set (unit fixtures) has
- * nothing to compare against.
+ * published with kind `mutation`. The comparison is unconditional: a query-only
+ * enumeration (a wholesale router drift) has nothing to satisfy it, so it
+ * throws too, rather than publishing a mutation-free catalog in silence.
  */
 export function buildCatalogRows(
   leaves: CatalogLeaf[],
   summaries: Map<string, string> = new Map()
 ): { rows: CatalogRow[]; missing: CatalogLeaf[] } {
   const denylisted = new Set<string>(DENYLISTED_TOP_LEVEL_SEGMENTS);
-  const mutationPaths = new Set<string>();
   /** Every allowlisted path the catalog will publish with kind `mutation`. */
   const publishedMutationPaths = new Set<string>();
   const rows: CatalogRow[] = [];
   const missing: CatalogLeaf[] = [];
   for (const leaf of leaves) {
-    if (leaf.type === 'mutation') mutationPaths.add(leaf.path);
     const kept =
       leaf.type === 'query' || (leaf.type === 'mutation' && isAllowedMutation(leaf.path));
     if (!kept) continue;
@@ -207,19 +205,20 @@ export function buildCatalogRows(
       missing.push(leaf);
     }
   }
-  if (mutationPaths.size > 0) {
-    const stale = MCP_MUTATION_ALLOWLIST.filter(path => !publishedMutationPaths.has(path));
-    if (stale.length > 0) {
-      throw new Error(
-        `MCP mutation allowlist entries are not published as mutations: ${stale.join(', ')}. ` +
-          'A renamed, deleted, denylisted, or demoted procedure must never silently vanish from the catalog — ' +
-          'update MCP_MUTATION_ALLOWLIST in apps/web/src/scripts/mcp-catalog/mutations.ts.'
-      );
-    }
-  }
   if (rows.length === 0 && missing.length === 0) {
     throw new Error(
       'Catalog enumeration produced zero catalog rows — refusing to emit an empty catalog'
+    );
+  }
+  // Compare unconditionally: a leaf set with no mutation leaf at all has nothing
+  // to satisfy the allowlist, so deletion or wholesale router drift cannot
+  // silently publish a query-only catalog.
+  const stale = MCP_MUTATION_ALLOWLIST.filter(path => !publishedMutationPaths.has(path));
+  if (stale.length > 0) {
+    throw new Error(
+      `MCP mutation allowlist entries are not published as mutations: ${stale.join(', ')}. ` +
+        'A renamed, deleted, denylisted, or demoted procedure must never silently vanish from the catalog — ' +
+        'update MCP_MUTATION_ALLOWLIST in apps/web/src/scripts/mcp-catalog/mutations.ts.'
     );
   }
   return { rows, missing };

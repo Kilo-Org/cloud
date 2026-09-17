@@ -51,11 +51,15 @@ describe('buildCatalogRows rot guard', () => {
     ).toThrow(/agentProfiles\.create/);
   });
 
-  it('stays scoped: a query-only leaf set has nothing to compare', () => {
-    const { rows } = buildCatalogRows(
-      [queryLeaf('user.getProfile')],
-      new Map([['user.getProfile', 'Returns the profile of a user.']])
-    );
-    expect(rows.map(row => row.path)).toEqual(['user.getProfile']);
+  it('fails when a query-only enumeration leaves every allowlisted mutation unpublished', () => {
+    // Wholesale router drift — every mutation leaf gone — must not publish a
+    // query-only catalog in silence: the allowlist is compared even when the
+    // enumeration carried no mutation leaf at all.
+    expect(() =>
+      buildCatalogRows(
+        [queryLeaf('user.getProfile')],
+        new Map([['user.getProfile', 'Returns the profile of a user.']])
+      )
+    ).toThrow(/agentProfiles\.create/);
   });
 });

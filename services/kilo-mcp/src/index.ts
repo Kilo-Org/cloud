@@ -9,7 +9,7 @@ import {
 } from './analytics';
 import { forwardedAuthFromProps } from './auth';
 import { MCP_SCOPE, scopeTokens } from './auth/http';
-import { callCatalogEndpoint, MAX_RESULT_BYTES, serializeWithCap } from './call';
+import { callCatalogEndpoint, MAX_RESULT_BYTES } from './call';
 import { createDefaultHandler } from './oauth/consent';
 import { onError, tokenExchangeCallback } from './oauth/provider-hooks';
 import { createRefreshReuseHandler, isTokenRequest } from './oauth/refresh-reuse';
@@ -245,6 +245,23 @@ function cappedSearchResults(results: SearchResult[]): { text: string; truncated
   return { text: JSON.stringify({ results: [], truncated: true }), truncated: true };
 }
 
+/**
+ * The longest piece of a caller's search query echoed back in the empty-results
+ * payload. `searchArgsSchema` gives `query` no length bound, so echoing it
+ * verbatim could push the payload past `MAX_RESULT_BYTES`, and the generic cap
+ * would cut the structured payload mid-token and leave unparseable JSON. A
+ * bounded echo keeps the recovery payload valid JSON and inside the cap.
+ */
+const MAX_ECHOED_QUERY_CHARACTERS = 200;
+
+/** Trim a query and bound its length on code-point boundaries for the echo. */
+function boundedQueryEcho(query: string): string {
+  const trimmed = query.trim();
+  const codePoints = [...trimmed];
+  if (codePoints.length <= MAX_ECHOED_QUERY_CHARACTERS) return trimmed;
+  return `${codePoints.slice(0, MAX_ECHOED_QUERY_CHARACTERS).join('')}…`;
+}
+
 /** JSON object guard used only to recover the JSON-RPC `id` from a malformed envelope. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -281,13 +298,16 @@ async function runTool(
       limit: Math.max(1, Math.floor(limit ?? DEFAULT_SEARCH_LIMIT)),
     });
     if (results.length === 0) {
-      // Empty state, not an error: tell the agent how to recover.
-      return toolResult(
-        serializeWithCap({
+      // Empty state, not an error: tell the agent how to recover. The echoed
+      // query is bounded before serialization — never passed to the byte cap,
+      // which would cut the structured payload into invalid JSON.
+      return toolResult({
+        text: JSON.stringify({
           results: [],
-          message: `No endpoints matched "${query.trim()}". Refine your query: use fewer or different keywords, or describe the task in plain language.`,
-        })
-      );
+          message: `No endpoints matched "${boundedQueryEcho(query)}". Refine your query: use fewer or different keywords, or describe the task in plain language.`,
+        }),
+        truncated: false,
+      });
     }
     // Every hit carries its published input schema, and a 50-row result can
     // exceed the tool-result cap: drop the lowest-ranked hits so the payload

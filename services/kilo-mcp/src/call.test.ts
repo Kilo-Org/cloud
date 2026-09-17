@@ -306,6 +306,28 @@ describe('callCatalogEndpoint', () => {
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
   });
 
+  it('does not read a malformed result object as a successful void mutation', async () => {
+    // Only the shapes tRPC emits are a success envelope: `{"result":{}}` for a
+    // void procedure, or `{"result":{"data":…}}` for one with output. A 2xx body
+    // like `{"result":{"nonsense":true}}` is neither, so the write's outcome is
+    // unknown — reporting success would tell the agent a change it never made.
+    const fetchImpl = vi.fn(async () => upstreamResponse({ result: { nonsense: true } }));
+    const error = await callCatalogEndpoint({
+      catalog: testCatalog,
+      path: 'agentProfiles.bindToRepo',
+      input: { profileId: 'prof-1', repoFullName: 'acme/widgets' },
+      auth,
+      webBaseUrl: WEB_BASE_URL,
+      fetchImpl,
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(JsonRpcFailure);
+    expect((error as JsonRpcFailure).data).toMatchObject({
+      path: 'agentProfiles.bindToRepo',
+      ambiguous: true,
+    });
+    expect((error as Error).message).toContain('may or may not have been applied');
+  });
+
   it('a mutation network failure is ambiguous, never a blind retry, and leaks no token', async () => {
     const fetchImpl = vi.fn(async () => {
       throw new TypeError('fetch failed: https://tok_123@secret.invalid');
@@ -469,6 +491,22 @@ describe('callCatalogEndpoint', () => {
 
   it('rejects a 200 response without a tRPC result body', async () => {
     const fetchImpl = vi.fn(async () => upstreamResponse({ nonsense: true }));
+    await expect(
+      callCatalogEndpoint({
+        catalog: testCatalog,
+        path: 'organizations.list',
+        input: undefined,
+        auth,
+        webBaseUrl: WEB_BASE_URL,
+        fetchImpl,
+      })
+    ).rejects.toThrow(/without a tRPC result body/);
+  });
+
+  it('rejects a 200 query response whose result object is not a tRPC envelope', async () => {
+    // A `result` object with keys tRPC never emits is not a success body, so the
+    // query must not be handed an arbitrary payload as if it were the data.
+    const fetchImpl = vi.fn(async () => upstreamResponse({ result: { nonsense: true } }));
     await expect(
       callCatalogEndpoint({
         catalog: testCatalog,

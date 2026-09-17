@@ -375,6 +375,7 @@ describe('tools/call search', () => {
     const text = (json as { result: { content: Array<{ text: string }> } }).result.content[0]!.text;
     const payload = JSON.parse(text) as { results: unknown[]; message: string };
     expect(payload.results).toEqual([]);
+    expect(payload.message).toContain('zzqqx nothing');
     expect(payload.message.toLowerCase()).toContain('refine your query');
   });
 
@@ -498,9 +499,10 @@ describe('tools/call search', () => {
     expect(payload.message).toContain('Dropped 1 of 3');
   });
 
-  it('caps the empty-results payload too', async () => {
-    // The empty state echoes the query back, and the query has no length bound,
-    // so that payload must be capped as well.
+  it('keeps the empty-results payload parseable for an oversized query', async () => {
+    // The empty state echoes the query back, and the query has no length bound.
+    // The echo is bounded before JSON.stringify, so the payload stays valid JSON
+    // under the cap instead of being cut mid-token by the generic cap.
     const { json } = await rpcResult({
       jsonrpc: '2.0',
       id: 23,
@@ -509,11 +511,17 @@ describe('tools/call search', () => {
     });
     const result = (json as { result: { content: Array<{ text: string }>; truncated?: boolean } })
       .result;
-    expect(result.truncated).toBe(true);
-    expect(result.content[0]!.text.endsWith('[truncated]')).toBe(true);
+    expect(result.truncated).toBeUndefined();
     expect(new TextEncoder().encode(result.content[0]!.text).byteLength).toBeLessThanOrEqual(
       16 * 1024
     );
+    // Parseable, unlike a payload cut at a byte boundary.
+    const payload = JSON.parse(result.content[0]!.text) as { results: unknown[]; message: string };
+    expect(payload.results).toEqual([]);
+    expect(payload.message).toContain('No endpoints matched');
+    expect(payload.message.toLowerCase()).toContain('refine your query');
+    // The echo is bounded, so an unbounded query is never printed in full.
+    expect(payload.message).not.toContain('z'.repeat(1_000));
   });
 
   it('does not mark a small search payload truncated', async () => {

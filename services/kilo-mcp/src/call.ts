@@ -91,13 +91,20 @@ type TrpcErrorBody = {
  * `result` object without `data` is a successful void result, not a missing
  * body. Missing the distinction would report an error after a write landed and
  * push an agent to re-apply it.
+ *
+ * Only the shapes tRPC actually emits count: an empty object (void) or an
+ * object whose only key is `data`. An arbitrary 2xx body that happens to carry
+ * a `result` object — `{"result":{"nonsense":true}}` — is not a success
+ * envelope, and reading it as a successful void write would tell the agent a
+ * mutation landed that may never have run.
  */
 type TrpcSuccessBody = { result: { data?: unknown } };
 
 function isTrpcSuccessBody(body: unknown): body is TrpcSuccessBody {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) return false;
   const result = (body as { result?: unknown }).result;
-  return typeof result === 'object' && result !== null && !Array.isArray(result);
+  if (typeof result !== 'object' || result === null || Array.isArray(result)) return false;
+  return Object.keys(result).every(key => key === 'data');
 }
 
 /**

@@ -5,7 +5,7 @@ import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 
-type DeepLinkSource = 'universal-link' | 'notification';
+type DeepLinkSource = 'universal-link' | 'notification' | 'system-search';
 
 type GetLinkingURL = () => string | null;
 
@@ -132,22 +132,26 @@ function deletePersistedPendingDeepLink(): void {
  * Stash a deep-link href for the root layout to consume after gates clear.
  * Source is required so the type checker enforces precedence:
  * - `'universal-link'` always wins (overwrites anything).
+ * - `'system-search'` applies unless the slot holds a universal link: the user
+ *   tapped a result, which is newer evidence than a pending notification.
  * - `'notification'` applies only when the slot is empty or already a notification.
  * Rationale: `getLastNotificationResponse()` can return a *stale* response on a
  * launch actually caused by a link, so the link is the better evidence of what
  * started this process.
  */
 export function setPendingDeepLink(href: string, source: DeepLinkSource): void {
-  if (source === 'universal-link') {
-    pendingDeepLink = href;
-    pendingSource = source;
-  } else if (pendingDeepLink === null || pendingSource === 'notification') {
-    // notification
-    pendingDeepLink = href;
-    pendingSource = source;
-  } else {
+  // A universal link always wins: it is the evidence of what started this process.
+  if (source !== 'universal-link' && pendingSource === 'universal-link') {
     return;
   }
+  // A notification applies only when the slot is empty or already a notification:
+  // a system-search tap is newer evidence and must not be overwritten by a
+  // stale notification response.
+  if (source === 'notification' && pendingDeepLink !== null && pendingSource !== 'notification') {
+    return;
+  }
+  pendingDeepLink = href;
+  pendingSource = source;
   pendingDeepLinkUserId = currentDeepLinkUserId;
   pendingDeepLinkEpoch += 1;
   persistPendingDeepLink(href, source);
@@ -263,7 +267,7 @@ async function readPersistedPendingDeepLink(): Promise<string | null> {
 
 const pendingDeepLinkRecordSchema = z.object({
   href: z.string(),
-  source: z.enum(['universal-link', 'notification']),
+  source: z.enum(['universal-link', 'notification', 'system-search']),
   storedAt: z.number(),
   userId: z.string().nullable(),
 });

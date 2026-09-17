@@ -1,5 +1,9 @@
 import { Platform } from 'react-native';
 
+// iOS-only by capability: the press subscription below reaches the Live
+// Activity through `expo-widgets` (WidgetKit/ActivityKit), which has no Android
+// implementation. Android registers its own Live Update sink in
+// `src/glanceable-android/register.ts`.
 import { addUserInteractionListener } from 'expo-widgets';
 
 import { i18n } from '@/i18n';

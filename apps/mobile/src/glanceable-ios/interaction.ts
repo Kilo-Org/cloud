@@ -1,15 +1,14 @@
 import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
+// `expo-widgets` is iOS-only by capability (WidgetKit/ActivityKit); the type is
+// the one press envelope both Live Activity targets arrive in.
 import { type UserInteractionEvent } from 'expo-widgets';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
-import {
-  type GlanceableApproveResult,
-  refreshGlanceableSnapshot,
-  runGlanceableApprove,
-} from '@/lib/glanceable/approve-ask';
-import { readWaitingAsk, recordWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
+import { type GlanceableApproveResult, runGlanceableApprove } from '@/lib/glanceable/approve-ask';
+import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
+import { readWaitingAsk, recordWaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { setPendingDeepLink } from '@/lib/deep-link-launch';
 
 import {
@@ -83,24 +82,6 @@ function isActiveAgentsLiveActivity(source: string): boolean {
 }
 
 /**
- * Republish through the publisher the app mounts, so every registered sink
- * (the Live Activity itself, the widget, persistence) reads the new state. Best
- * effort: the record the flow left behind is still the truth the next press or
- * publish acts on. Mirrors the Android headless task's republish.
- */
-async function republish(ask: WaitingAsk): Promise<void> {
-  try {
-    await refreshGlanceableSnapshot({
-      userId: ask.userId,
-      organizationId: ask.organizationId,
-      answeredKiloSessionId: ask.kiloSessionId,
-    });
-  } catch {
-    // The next publish corrects the surface; the card keeps its actions.
-  }
-}
-
-/**
  * Answer through the shared flow. `runGlanceableApprove` classifies its own
  * failures; anything that still escapes is a failure the user can retry, never
  * a missing answer.
@@ -158,7 +139,7 @@ async function approveFromCard(): Promise<GlanceableInteractionOutcome> {
     recordWaitingAsk(null);
   }
   if (ask !== null) {
-    await republish(ask);
+    await republishAnsweredAsk(ask);
   }
   return result;
 }

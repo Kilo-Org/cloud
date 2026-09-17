@@ -2,7 +2,8 @@ import { AppRegistry } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
-import { refreshGlanceableSnapshot, runGlanceableApprove } from '@/lib/glanceable/approve-ask';
+import { runGlanceableApprove } from '@/lib/glanceable/approve-ask';
+import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { readWaitingAsk, recordWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 
@@ -50,24 +51,6 @@ const APPROVE_FAILED_KEY = 'glanceable.approveFailed';
 
 function translate(key: string): string {
   return i18n.t(key);
-}
-
-/**
- * Republish through the publisher the app mounts, so every registered sink
- * (the Android notification and widget here) reads the current record and the
- * notice. Best effort: a failed refresh must not reject the task, and the record
- * it left behind is still the truth the next tap or publish acts on.
- */
-async function republish(ask: WaitingAsk): Promise<void> {
-  try {
-    await refreshGlanceableSnapshot({
-      userId: ask.userId,
-      organizationId: ask.organizationId,
-      answeredKiloSessionId: ask.kiloSessionId,
-    });
-  } catch {
-    // The next publish corrects the surface; the notification keeps its action.
-  }
 }
 
 /**
@@ -135,7 +118,7 @@ export async function handleApproveTask(): Promise<void> {
   if (failed) {
     await showApproveFailed(ask);
   }
-  await republish(ask);
+  await republishAnsweredAsk(ask);
   if (failed) {
     await showApproveFailed(ask);
   }

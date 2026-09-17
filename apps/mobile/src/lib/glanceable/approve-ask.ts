@@ -19,6 +19,16 @@ import { readWaitingAsk, recordWaitingAsk } from './waiting-ask';
  *
  * Nothing here touches React or a component: the background contexts (Android
  * headless worker, iOS intent) run it with the app closed.
+ *
+ * One implementation serves both platforms. Only the app-closed transport
+ * differs, and each is named at its own file: iOS has WidgetKit/ActivityKit
+ * through `expo-widgets` (a Live Activity press rides an in-process
+ * `LiveActivityUserInteraction`, `src/glanceable-ios/interaction.ts`) and has
+ * no promoted ongoing notification; Android has the Live Update notification
+ * whose Approve broadcast boots WorkManager headless JS
+ * (`modules/active-agents-live-update/android/`, `src/glanceable-android/`)
+ * and has no ActivityKit. The answer body, the failure classification, and the
+ * republish stay here so the two surfaces cannot disagree.
  */
 
 /** The three answers the in-app permission card sends. */

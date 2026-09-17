@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Android-only by capability: the receivers and the timeout/boot
+       permission behind the Live Update notification. iOS has no promoted
+       ongoing notification; its counterpart is the ActivityKit Live Activity
+       rendered through expo-widgets (src/glanceable-ios/). -->
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
   <application>
     <receiver

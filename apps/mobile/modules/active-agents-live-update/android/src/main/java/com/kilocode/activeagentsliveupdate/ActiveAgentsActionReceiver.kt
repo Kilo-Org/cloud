@@ -17,6 +17,11 @@ import androidx.work.WorkManager
  * one answer is in flight enqueues nothing, so the same ask cannot be answered
  * twice. A force-stopped app has no notification to tap, so there is nothing to
  * handle there.
+ *
+ * Android-only by capability: an iOS Live Activity press performs inside the
+ * app's process through `expo-widgets` (`src/glanceable-ios/interaction.ts`) and
+ * needs no broadcast. Both then answer through the same JS body,
+ * `src/lib/glanceable/approve-ask.ts`.
  */
 class ActiveAgentsActionReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {

@@ -22,6 +22,12 @@ import expo.modules.kotlin.modules.ModuleDefinition
  * gate, the content intent plus Open action that deep-link into the recorded
  * session's route (the Agents tab when nothing waits), and the Approve action
  * whose broadcast runs the headless approval when a permission waits.
+ *
+ * Android-only by capability, not by a product scope: this is Android's
+ * promoted ongoing notification, and iOS has no equivalent surface. The iOS
+ * counterpart is the ActivityKit Live Activity rendered through `expo-widgets`
+ * (`src/glanceable-ios/`), and both surfaces answer through the same JS body,
+ * `src/lib/glanceable/approve-ask.ts`.
  */
 class ActiveAgentsLiveUpdateModule : Module() {
   override fun definition() = ModuleDefinition {

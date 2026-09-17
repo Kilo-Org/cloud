@@ -1,3 +1,8 @@
+// Android-only by capability: this library owns Android's Live Update
+// notification surface and has no iOS counterpart to share. iOS renders the
+// same feature as an ActivityKit Live Activity through `expo-widgets`
+// (src/glanceable-ios/); both drive the shared pipeline in
+// src/lib/glanceable/, whose one answer body is approve-ask.ts.
 apply plugin: 'com.android.library'
 
 group = 'com.kilocode.activeagentsliveupdate'

@@ -16,7 +16,8 @@ type LiveUpdateNativeModule = {
   start(
     title: string,
     text: string,
-    openAgentsLabel: string,
+    openLabel: string,
+    openUrl: string,
     approveLabel: string | null,
     compactText: string | null,
     promotion: boolean
@@ -24,7 +25,8 @@ type LiveUpdateNativeModule = {
   update(
     title: string,
     text: string,
-    openAgentsLabel: string,
+    openLabel: string,
+    openUrl: string,
     approveLabel: string | null,
     compactText: string | null,
     promotion: boolean,
@@ -45,18 +47,26 @@ function isPromotionCapable(): boolean {
   return nativeModule?.isPromotionCapable() ?? false;
 }
 
+/**
+ * Open action and content intent. `openUrl` is the recorded waiting session's
+ * deep link, or the Agents tab when nothing waits; `approveLabel` is non-null
+ * only while a cloud-agent permission ask can be answered, and adds the
+ * Approve action the receiver answers headlessly.
+ */
 // eslint-disable-next-line max-params -- mirrors the native presentation fields
 export function start(
   title: string,
   text: string,
-  openAgentsLabel: string,
+  openLabel: string,
+  openUrl: string,
   approveLabel: string | null,
   compactText: string | null
 ): void {
   nativeModule?.start(
     title,
     text,
-    openAgentsLabel,
+    openLabel,
+    openUrl,
     approveLabel,
     compactText,
     isPromotionCapable()
@@ -67,7 +77,8 @@ export function start(
 export function update(
   title: string,
   text: string,
-  openAgentsLabel: string,
+  openLabel: string,
+  openUrl: string,
   approveLabel: string | null,
   compactText: string | null,
   timeoutMs = 0
@@ -75,7 +86,8 @@ export function update(
   nativeModule?.update(
     title,
     text,
-    openAgentsLabel,
+    openLabel,
+    openUrl,
     approveLabel,
     compactText,
     isPromotionCapable(),

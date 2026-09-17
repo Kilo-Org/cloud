@@ -3061,7 +3061,9 @@
     "openAgents": "Abrir axentes",
     "needsInput": "Agardando resposta",
     "channelName": "Axentes activos",
-    "activityKitDisabledBody": "Activa as actividades en directo nos axustes para ver os axentes activos na pantalla de bloqueo."
+    "activityKitDisabledBody": "Activa as actividades en directo nos axustes para ver os axentes activos na pantalla de bloqueo.",
+    "openSession": "Abrir",
+    "approveFailed": "Non se puido aprobar. Toca $t(common.approve) para tentalo de novo."
   },
   "transcriptionModel": {
     "title": "Modelo de transcrición",

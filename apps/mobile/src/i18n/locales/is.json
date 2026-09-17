@@ -3061,7 +3061,9 @@
     "openAgents": "Opna fulltrúa",
     "needsInput": "Bíður eftir svari",
     "channelName": "Virkir fulltrúar",
-    "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum."
+    "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum.",
+    "openSession": "Opna",
+    "approveFailed": "Ekki tókst að samþykkja. Ýttu á $t(common.approve) til að reyna aftur."
   },
   "transcriptionModel": {
     "title": "Umritunarlíkan",

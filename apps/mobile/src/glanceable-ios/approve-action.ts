@@ -1,3 +1,8 @@
+// iOS-only by capability: `expo-widgets` bridges WidgetKit/ActivityKit, which
+// Android has no equivalent of. Android answers the same press through the Live
+// Update notification's broadcast and WorkManager headless JS
+// (src/glanceable-android/approve-task.ts); both answer through the shared
+// src/lib/glanceable/approve-ask.ts.
 import { addUserInteractionListener } from 'expo-widgets';
 
 /**

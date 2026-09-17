@@ -3483,6 +3483,50 @@ describe('createSessionManager', () => {
       });
     });
 
+    it('never falls back to the pre-compaction reading after /compact', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      // The 96%-full turn the session reported before `/compact`.
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-001', 'ses-root', {
+          tokens: { input: 190_000, output: 1_000, reasoning: 0, cache: { read: 0, write: 0 } },
+        }).info
+      );
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toEqual({
+        contextTokens: 191_000,
+        providerID: 'kilo',
+        modelID: 'anthropic/claude-sonnet-4',
+      });
+
+      // `/compact` completes: the summary carries no usable reading of its own,
+      // and the pre-compaction figure must not come back through it.
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-002', 'ses-root', {
+          mode: 'compaction',
+          agent: 'compaction',
+          summary: true,
+          finish: 'stop',
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        }).info
+      );
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toBeUndefined();
+
+      // The first turn on the compacted context reports the new figure.
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-003', 'ses-root', {
+          tokens: { input: 27_000, output: 500, reasoning: 0, cache: { read: 0, write: 0 } },
+        }).info
+      );
+      expect(atomValue(config.store, mgr.atoms.contextUsage)).toEqual({
+        contextTokens: 27_500,
+        providerID: 'kilo',
+        modelID: 'anthropic/claude-sonnet-4',
+      });
+    });
+
     it('replaces the metric with the latest eligible root assistant response', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

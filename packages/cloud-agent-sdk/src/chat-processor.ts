@@ -137,6 +137,13 @@ function createChatProcessor(
         case 'message.part.removed':
           sessionStorage.deletePart(event.messageId, event.partId);
           break;
+        // The CLI drops messages it no longer serves (compaction scaffolding,
+        // reverted turns). Keep the local store in step with the durable
+        // transcript so a removed message cannot keep supplying state — e.g. a
+        // context reading — that a reopened session no longer has.
+        case 'message.removed':
+          sessionStorage.deleteMessage(event.messageId);
+          break;
       }
     },
 

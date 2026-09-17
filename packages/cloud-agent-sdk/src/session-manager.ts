@@ -232,6 +232,7 @@ function chatEventSessionId(event: NormalizedEvent): string | null {
       return event.part.sessionID;
     case 'message.part.delta':
     case 'message.part.removed':
+    case 'message.removed':
       return event.sessionId;
     default:
       return null;

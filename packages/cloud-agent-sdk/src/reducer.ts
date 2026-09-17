@@ -29,6 +29,8 @@ function reduce(event: ChatEvent): StorageMutation[] {
       ];
     case 'message.part.removed':
       return [{ type: 'delete_part', messageId: event.messageId, partId: event.partId }];
+    case 'message.removed':
+      return [{ type: 'delete_message', messageId: event.messageId }];
   }
 }
 

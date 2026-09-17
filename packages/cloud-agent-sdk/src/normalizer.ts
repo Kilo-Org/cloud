@@ -22,6 +22,7 @@ import {
   messagePartUpdatedDataSchema,
   messagePartDeltaDataSchema,
   messagePartRemovedDataSchema,
+  messageRemovedDataSchema,
   sessionStatusDataSchema,
   sessionCreatedDataSchema,
   sessionUpdatedDataSchema,
@@ -69,6 +70,11 @@ export type ChatEvent =
       sessionId: string;
       messageId: string;
       partId: string;
+    }
+  | {
+      type: 'message.removed';
+      sessionId: string;
+      messageId: string;
     };
 
 /** Service events — lifecycle, status, questions, autocommit, preparation. */
@@ -219,6 +225,7 @@ const CHAT_EVENT_TYPES = new Set([
   'message.part.updated',
   'message.part.delta',
   'message.part.removed',
+  'message.removed',
 ]);
 
 export function isChatEvent(event: NormalizedEvent): event is ChatEvent {
@@ -356,6 +363,16 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         sessionId: r.data.sessionID,
         messageId: r.data.messageID,
         partId: r.data.partID,
+      };
+    }
+
+    case 'message.removed': {
+      const r = messageRemovedDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'message.removed',
+        sessionId: r.data.sessionID,
+        messageId: r.data.messageID,
       };
     }
 

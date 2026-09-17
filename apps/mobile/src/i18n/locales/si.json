@@ -480,6 +480,8 @@
       "replyBadRequest": "මෙම පිළිතුර පළ කළ නොහැක. සාකච්ඡා පෙළ වෙනස් වී තිබිය හැක.",
       "replyForbidden": "මෙම පුල් ඉල්ලීමට පිළිතුරු දීමට ඔබට අවසර නොමැත.",
       "addCommentCta": "මෙම පුල් ඉල්ලීම පිළිබඳ අදහස් දක්වන්න",
+      "fixWithKilo": "Kilo සමඟ විසඳන්න",
+      "fixWithKiloPrompt": "කරුණාකර පහත පුල් ඉල්ලීම් අදහස විසඳන්න: {{link}}",
       "commentBadRequest": "මෙම අදහස පළ කළ නොහැක. පුල් ඉල්ලීම වෙනස් වී තිබිය හැක.",
       "commentForbidden": "මෙම පුල් ඉල්ලීම පිළිබඳ අදහස් දැක්වීමට ඔබට අවසර නොමැත.",
       "moderation": {
@@ -3060,6 +3062,12 @@
     "privacy": "නියෝජිතයන් බැලීමට Kilo විවෘත කරන්න",
     "openAgents": "නියෝජිතයන් විවෘත කරන්න",
     "needsInput": "ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
+    "newestSession": "නවතම: {{title}}",
+    "noneWaiting": "රැඳී සිටින නියෝජිතයෙක් නැත",
+    "newAgent": "නව නියෝජිතයෙක්",
+    "approving": "අනුමත කරමින්...",
+    "couldNotApprove": "අනුමත කළ නොහැකි විය",
+    "couldNotStart": "ආරම්භ කළ නොහැකි විය",
     "channelName": "සක්‍රීය නියෝජිතයන්",
     "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න."
   },
@@ -3095,5 +3103,12 @@
     "remoteFound": "පරිගණකය සම්බන්ධ විය",
     "checkAgain": "නැවත පරීක්ෂා කරන්න",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "නියෝජිතයා දියත් කිරීමට ඉල්ලීමක් අවශ්‍යයි. ඉල්ලීමක් එක් කර නැවත ධාවනය කරන්න.",
+      "repositoryUnknown": "Kilo, {{repository}} GitHub හෝ GitLab කේත ගබඩාවක් ලෙසවත් හඳුනා නොගනී. Kilo තුළ තවත් කේත ගබඩාවක් තෝරන්න.",
+      "repositoryUnsupported": "{{repository}} යනු Bitbucket කේත ගබඩාවකි — නියෝජිතයා දියත් කරන්නට තවම එය භාවිත කළ නොහැක. Kilo තුළ තවත් කේත ගබඩාවක් තෝරන්න."
+    }
   }
 }

@@ -498,6 +498,44 @@ describe('handleGitHubWebhook', () => {
     expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
   });
 
+  it('captures the 500 path with safe delivery tags and no payload or secret', async () => {
+    mockAssertGitHubInstallationRuntimeAuthorized.mockRejectedValueOnce(
+      new Error('database unavailable')
+    );
+    const payload = reviewCommentPayload({
+      comment: {
+        id: 456,
+        body: 'secret-payload-marker',
+        diff_hunk: '@@ -1 +1 @@ secret-payload-marker',
+      },
+    });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request_review_comment', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(500);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          source: 'github_webhook_handler',
+          event: 'pull_request_review_comment',
+          delivery: 'delivery-pull_request_review_comment',
+          installation: '98765',
+          action: 'created',
+        }),
+      })
+    );
+
+    const captured = JSON.stringify(jest.mocked(captureException).mock.calls);
+    expect(captured).not.toContain('secret-payload-marker');
+    expect(captured).not.toContain('sha256=test');
+    expect(captured).not.toContain('x-hub-signature-256');
+    expect(captured).not.toContain('x-github-delivery');
+  });
+
   it('logs review memory feedback only when it records feedback', async () => {
     mockHandleGitHubReviewCommentReply.mockResolvedValueOnce({ recorded: true, eventId: 'evt_1' });
 

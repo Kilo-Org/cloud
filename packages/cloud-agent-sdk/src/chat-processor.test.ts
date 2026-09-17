@@ -767,6 +767,37 @@ describe('createChatProcessor', () => {
     });
   });
 
+  describe('message.removed', () => {
+    it('deletes the message and its parts from storage', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const message = makeAssistantMsg('msg-1', 'msg-user-1');
+      const part = makeTextPart('part-1', 'msg-1', 'hello');
+
+      processor.process({ type: 'message.updated', info: message });
+      processor.process({ type: 'message.part.updated', part });
+      expect(storage.getMessageIds()).toEqual(['msg-1']);
+      expect(storage.getParts('msg-1')).toHaveLength(1);
+
+      processor.process({ type: 'message.removed', sessionId: 'ses-1', messageId: 'msg-1' });
+
+      expect(storage.getMessageIds()).toEqual([]);
+      expect(storage.getMessageInfo('msg-1')).toBeUndefined();
+      expect(storage.getParts('msg-1')).toHaveLength(0);
+    });
+
+    it('ignores a removal for a message the store never had', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const message = makeAssistantMsg('msg-1', 'msg-user-1');
+      processor.process({ type: 'message.updated', info: message });
+
+      processor.process({ type: 'message.removed', sessionId: 'ses-1', messageId: 'msg-other' });
+
+      expect(storage.getMessageIds()).toEqual(['msg-1']);
+    });
+  });
+
   describe('synthesizeQueuedUserMessage', () => {
     it('inserts a synthetic user message with text part when storage is empty', () => {
       const storage = createMemoryStorage();

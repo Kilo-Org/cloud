@@ -480,6 +480,8 @@
       "replyBadRequest": "Ez a válasz nem küldhető el. Lehet, hogy a szál megváltozott.",
       "replyForbidden": "Nincs jogosultságod válaszolni erre a módosítási kérelemre.",
       "addCommentCta": "Hozzászólás ehhez a módosítási kérelemhez",
+      "fixWithKilo": "Javítás Kiloval",
+      "fixWithKiloPrompt": "Kérlek, foglalkozz a következő módosítási kérelemhez írt hozzászólással: {{link}}",
       "commentBadRequest": "Ez a hozzászólás nem küldhető el. Lehet, hogy a módosítási kérelem megváltozott.",
       "commentForbidden": "Nincs jogosultságod hozzászólni ehhez a módosítási kérelemhez.",
       "moderation": {
@@ -3060,6 +3062,12 @@
     "privacy": "Nyisd meg a Kilo alkalmazást az ügynökök megtekintéséhez",
     "openAgents": "Ügynökök megnyitása",
     "needsInput": "Válaszra vár",
+    "newestSession": "Legújabb: {{title}}",
+    "noneWaiting": "Egyetlen ügynök sem vár",
+    "newAgent": "Új ügynök",
+    "approving": "Jóváhagyás folyamatban...",
+    "couldNotApprove": "Nem sikerült jóváhagyni",
+    "couldNotStart": "Nem sikerült elindítani",
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
   },
@@ -3095,5 +3103,12 @@
     "remoteFound": "Számítógép csatlakoztatva",
     "checkAgain": "Ellenőrzés újra",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Az ügynök indításához utasítás szükséges. Adj hozzá utasítást, és futtasd újra.",
+      "repositoryUnknown": "A Kilo nem ismeri fel a {{repository}} nevet GitHub- vagy GitLab-adattárként. Válassz másik adattárat a Kilóban.",
+      "repositoryUnsupported": "A {{repository}} egy Bitbucket-adattár — Az Ügynök indítása még nem tudja használni. Válassz másik adattárat a Kilóban."
+    }
   }
 }

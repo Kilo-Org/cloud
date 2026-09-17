@@ -162,6 +162,7 @@ import {
   SESSION_VIEWED_EVENT,
 } from '@/lib/analytics/posthog';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { useMotionPolicy } from '@/lib/a11y/motion';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
@@ -290,6 +291,9 @@ export function SessionDetailContent({
   // id, so the collapsed/expanded state survives leaving and reopening the
   // session. Absence means expanded.
   const goalCollapsed = useSessionGoalCollapsed(sessionId);
+  // The goal block's height transition is gated by the app's motion policy, the
+  // same one the disclosure uses inside.
+  const { reducedMotion } = useMotionPolicy();
   const autoApproveAvailable = canAutoApprovePermissions({ activeSessionType, isReadOnly });
   const autoApproveReplyAvailable = canAutoApproveReply({ activeSessionType, isReadOnly });
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
@@ -1793,7 +1797,7 @@ export function SessionDetailContent({
             <Animated.View
               entering={FadeIn.duration(200)}
               exiting={FadeOut.duration(150)}
-              layout={LinearTransition.duration(150)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(150)}
             >
               <SessionGoalSection
                 goal={sessionGoal}

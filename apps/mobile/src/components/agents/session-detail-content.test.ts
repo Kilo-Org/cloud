@@ -2,6 +2,7 @@
 import {
   type ComponentProps,
   createElement,
+  type ElementType,
   Fragment,
   type ReactElement,
   type ReactNode,
@@ -120,8 +121,12 @@ vi.mock('react-native-reanimated', () => ({
   useAnimatedStyle: () => ({}),
   withTiming: (value: number) => value,
 }));
+const motionPolicy = vi.hoisted(() => ({ reducedMotion: false }));
 vi.mock('@/lib/a11y/motion', () => ({
-  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+  useMotionPolicy: () => ({
+    reducedMotion: motionPolicy.reducedMotion,
+    scrollAnimated: !motionPolicy.reducedMotion,
+  }),
   selectReducedMotionEntrance: <T>(_reducedMotion: boolean, entrance: T) => entrance,
 }));
 vi.mock('react-native-safe-area-context', () => ({
@@ -1950,6 +1955,7 @@ describe('SessionDetailContent goal visibility', () => {
   // starts from expanded (there is no test-only reset export).
   beforeEach(() => {
     setSessionGoalCollapsed(ROOT_ID, false);
+    motionPolicy.reducedMotion = false;
   });
 
   function goalSectionOf(view: Awaited<ReturnType<typeof mountDetails>>) {
@@ -1958,6 +1964,18 @@ describe('SessionDetailContent goal visibility', () => {
       throw new Error('Missing SessionGoalSection');
     }
     return section;
+  }
+
+  /** The Animated.View the screen draws around the fixed goal row. */
+  function goalWrapperOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    let node: ReactTestInstance | null = goalSectionOf(view);
+    while (node != null && node.type !== ('AnimatedView' as ElementType)) {
+      node = node.parent;
+    }
+    if (node === null) {
+      throw new Error('Missing the goal wrapper');
+    }
+    return node;
   }
 
   it('shows the fixed goal row for a live session whose snapshot carries a goal', async () => {
@@ -2000,5 +2018,16 @@ describe('SessionDetailContent goal visibility', () => {
     // outlives the component tree.
     const reopened = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
     expect(goalSectionOf(reopened).props.collapsed).toBe(true);
+  });
+
+  it('drops the goal wrapper height transition under reduced motion', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+
+    const animated = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalWrapperOf(animated).props.layout).toBeDefined();
+
+    motionPolicy.reducedMotion = true;
+    const reduced = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalWrapperOf(reduced).props.layout).toBeUndefined();
   });
 });

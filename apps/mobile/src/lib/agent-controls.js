@@ -80,10 +80,13 @@ const shortcutId = id => `${AGENT_SHORTCUTS_RESOURCE}_${id.replaceAll('-', '_')}
 
 /**
  * Everything a platform plugin needs about a shortcut besides its copy: the
- * copy keys it renders and the Android resource names those values land on.
+ * Android shortcut id, the copy keys it renders and the Android resource names
+ * those values land on. `scripts/assert-agent-shortcuts.mjs` reads this list
+ * against the generated tree, so the id it checks is the id the plugin wrote.
  */
 export const AGENT_SHORTCUTS_META_DATA = AGENT_CONTROLS.map(control => ({
   id: control.id,
+  shortcutId: shortcutId(control.id),
   copyKey: control.copyKey,
   descriptionCopyKey: descriptionCopyKey(control.copyKey),
   shortLabelResource: shortcutResourceName(control.copyKey, 'short'),
@@ -374,7 +377,7 @@ export function agentShortcutsXml({ urls, targetPackage, targetClass }) {
       throw new Error(`agentShortcutsXml: no shortcut metadata for control \`${control.id}\``);
     }
     return `  <shortcut
-    android:shortcutId="${shortcutId(control.id)}"
+    android:shortcutId="${metadata.shortcutId}"
     android:enabled="true"
     android:shortcutShortLabel="@string/${metadata.shortLabelResource}"
     android:shortcutLongLabel="@string/${metadata.longLabelResource}">

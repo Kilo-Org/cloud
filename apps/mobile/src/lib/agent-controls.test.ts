@@ -118,6 +118,12 @@ describe('the generated control surfaces', () => {
       'kilo_shortcut_new_agent_short',
       'kilo_shortcut_open_waiting_agent_short',
     ]);
+    // The static shortcut ids the launcher matches, and the id
+    // scripts/assert-agent-shortcuts.mjs reads out of the generated tree.
+    expect(AGENT_SHORTCUTS_META_DATA.map(metadata => metadata.shortcutId)).toEqual([
+      'kilo_agent_shortcuts_new_agent',
+      'kilo_agent_shortcuts_waiting_agent',
+    ]);
     for (const metadata of AGENT_SHORTCUTS_META_DATA) {
       expect(xml).toContain(`@string/${metadata.shortLabelResource}`);
       expect(xml).toContain(`@string/${metadata.longLabelResource}`);

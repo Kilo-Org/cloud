@@ -2126,7 +2126,20 @@
       "continueFrom": "Συνεχίζεται η συνεδρία {{title}}.",
       "importingSession": "Εισαγωγή συνεδρίας…",
       "cliCannotContinue": "Αυτό το CLI δεν μπορεί να συνεχίσει μια συνεδρία. Επίλεξε τον Cloud Agent ή άλλο CLI.",
-      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας."
+      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας.",
+      "sandbox": "Απομονωμένο περιβάλλον",
+      "sandboxAccessibility": "Απομονωμένο περιβάλλον: {{label}}",
+      "sandboxDefaultWithDestination": "Προεπιλογή · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Μικρό",
+      "sandboxInstanceShared": "Κοινόχρηστο",
+      "sandboxInstanceLarge": "Μεγάλο",
+      "sandboxInstanceDevcontainer": "Κοντέινερ ανάπτυξης",
+      "sandboxInstanceProviderDefault": "Προεπιλογή παρόχου",
+      "sandboxCouldNotLoad": "Δεν ήταν δυνατή η φόρτωση των επιλογών sandbox",
+      "sandboxUnavailable": "Αυτό το απομονωμένο περιβάλλον δεν είναι διαθέσιμο. Επιλέξτε άλλο περιβάλλον ή Προεπιλογή.",
+      "sandboxUseDefault": "Χρήση Προεπιλογής"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο.",

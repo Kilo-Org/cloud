@@ -2126,7 +2126,20 @@
       "continueFrom": "{{title}} जारी राखिँदैछ।",
       "importingSession": "सत्र आयात गर्दै",
       "cliCannotContinue": "यो CLI ले सत्र जारी राख्न सक्दैन। Cloud Agent वा अर्को CLI छान्नुहोस्।",
-      "importFailed": "यो सत्र आयात गर्न सकिएन।"
+      "importFailed": "यो सत्र आयात गर्न सकिएन।",
+      "sandbox": "स्यान्डबक्स",
+      "sandboxAccessibility": "स्यान्डबक्स: {{label}}",
+      "sandboxDefaultWithDestination": "पूर्वनिर्धारित · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "सानो",
+      "sandboxInstanceShared": "साझा",
+      "sandboxInstanceLarge": "ठूलो",
+      "sandboxInstanceDevcontainer": "डेभ कन्टेनर",
+      "sandboxInstanceProviderDefault": "प्रदायकको पूर्वनिर्धारित",
+      "sandboxCouldNotLoad": "स्यान्डबक्स विकल्पहरू लोड गर्न सकिएन",
+      "sandboxUnavailable": "यो स्यान्डबक्स उपलब्ध छैन। अर्को स्यान्डबक्स वा पूर्वनिर्धारित रोज्नुहोस्।",
+      "sandboxUseDefault": "पूर्वनिर्धारित प्रयोग गर्नुहोस्"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो।",

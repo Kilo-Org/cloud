@@ -214,6 +214,66 @@ describe('tool summary translation runtime', () => {
     expect(mod.getTranslation('p1', 'partial', 'de', MODEL.id)).toBe('translated-partial');
   });
 
+  it('drops the queued copy when the source changes inside the batch window', async () => {
+    const mod = await loadRuntime();
+    echoBatch();
+
+    // The row streams a partial label, then settles on its final text before
+    // the 40 ms batch window closes. React runs the streaming effect's cleanup
+    // (releasing the superseded text) before the settled effect: the queued
+    // superseded copy must be dropped, so the request carries only the text
+    // the row now renders.
+    mod.ensureTranslation({ itemId: 'p1', text: 'partial', language: 'de', model: MODEL });
+    mod.releaseTranslationInterest({ itemId: 'p1', text: 'partial', language: 'de', model: MODEL });
+    mod.ensureTranslation({ itemId: 'p1', text: 'final', language: 'de', model: MODEL });
+    await flushBatch();
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(requestCalls()[0]?.texts).toEqual(['final']);
+    expect(mod.getTranslation('p1', 'final', 'de', MODEL.id)).toBe('de:final');
+  });
+
+  it('keeps a queued copy another mounted surface still asks for', async () => {
+    const mod = await loadRuntime();
+    echoBatch();
+
+    // The row and the detail sheet render two source strings of one part side
+    // by side: the second surface's ensure must not prune the first surface's
+    // queued copy, and one batch carries and resolves both.
+    mod.ensureTranslation({ itemId: 'p1', text: 'row text', language: 'de', model: MODEL });
+    mod.ensureTranslation({ itemId: 'p1', text: 'sheet text', language: 'de', model: MODEL });
+    await flushBatch();
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(requestCalls()[0]?.texts).toEqual(['row text', 'sheet text']);
+    await waitForTranslations(mod, [
+      { itemId: 'p1', text: 'row text' },
+      { itemId: 'p1', text: 'sheet text' },
+    ]);
+  });
+
+  it('drops a queued copy once the surface that asked for it releases it', async () => {
+    const mod = await loadRuntime();
+    echoBatch();
+
+    // The sheet showed a streaming string, then unmounted before the batch
+    // window closed; the row's own text settled meanwhile. With no surface
+    // asking for the streaming string any more, the row's settled ensure
+    // prunes the queued copy: the request carries only the settled text.
+    mod.ensureTranslation({ itemId: 'p1', text: 'streaming', language: 'de', model: MODEL });
+    mod.releaseTranslationInterest({
+      itemId: 'p1',
+      text: 'streaming',
+      language: 'de',
+      model: MODEL,
+    });
+    mod.ensureTranslation({ itemId: 'p1', text: 'settled', language: 'de', model: MODEL });
+    await flushBatch();
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    expect(requestCalls()[0]?.texts).toEqual(['settled']);
+  });
+
   it('carries the same item and text once in the batch', async () => {
     const mod = await loadRuntime();
     echoBatch();
@@ -594,10 +654,17 @@ describe('retry of unresolved summaries after a connection recovery', () => {
     const mod = await loadRuntime();
     requestMock.mockRejectedValue(new Error('gateway down'));
 
-    // The part streams a partial label, then settles on its final text. Both
-    // batches fail while the gateway is unreachable.
+    // The part streams a partial label, then settles on its final text: the
+    // effect cleanup releases the streaming text before the settled effect.
+    // Both batches fail while the gateway is unreachable.
     mod.ensureTranslation({ itemId: 'p1', text: 'partial summary', language: 'de', model: MODEL });
     await flushBatch();
+    mod.releaseTranslationInterest({
+      itemId: 'p1',
+      text: 'partial summary',
+      language: 'de',
+      model: MODEL,
+    });
     mod.ensureTranslation({ itemId: 'p1', text: 'final summary', language: 'de', model: MODEL });
     await flushBatch();
 
@@ -637,6 +704,105 @@ describe('retry of unresolved summaries after a connection recovery', () => {
     resolvers[0]?.(['de:hello']);
     await waitForTranslations(mod, [{ itemId: 'part-1', text: 'hello' }]);
     expect(requestMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-sends a re-queued summary once the attempt it raced has settled', async () => {
+    const mod = await loadRuntime();
+    const resolvers = pendingBatches();
+
+    // The gateway is unreachable: the row's first attempt stays pending.
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await vi.waitFor(() => {
+      expect(requestMock).toHaveBeenCalledTimes(1);
+    });
+
+    // Connectivity returns while that attempt is still pending and the deep
+    // link re-enters the mounted transcript: the retry re-queues the row.
+    mod.retryUnresolvedTranslations();
+    await flushBatch();
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    // The pending attempt then fails. The re-queued summary must not be
+    // dropped with it: it is requested again and the row resolves.
+    echoBatch();
+    resolvers[0]?.([null]);
+    await waitForTranslations(mod, [{ itemId: 'part-1', text: 'hello' }]);
+
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(requestCalls()[1]?.texts).toEqual(['hello']);
+  });
+
+  it('does not re-send a superseded text once the raced attempt settles unresolved', async () => {
+    const mod = await loadRuntime();
+    const resolvers = pendingBatches();
+
+    // The gateway is unreachable: the row's first attempt stays pending.
+    mod.ensureTranslation({ itemId: 'part-1', text: 'partial', language: 'de', model: MODEL });
+    await vi.waitFor(() => {
+      expect(requestMock).toHaveBeenCalledTimes(1);
+    });
+
+    // Connectivity returns while that attempt is pending: the retry re-queues
+    // the row while its own attempt is still in flight.
+    mod.retryUnresolvedTranslations();
+    await flushBatch();
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    // The row's source text settles while the raced attempt is still pending:
+    // its effect cleanup releases 'partial' and the settled effect requests
+    // the replacement on its own key.
+    mod.releaseTranslationInterest({
+      itemId: 'part-1',
+      text: 'partial',
+      language: 'de',
+      model: MODEL,
+    });
+    mod.ensureTranslation({ itemId: 'part-1', text: 'final', language: 'de', model: MODEL });
+    await vi.waitFor(() => {
+      expect(requestMock).toHaveBeenCalledTimes(2);
+    });
+    expect(requestCalls()[1]?.texts).toEqual(['final']);
+
+    // The raced attempt settles unresolved. The superseded 'partial' copy the
+    // retry left queued must not be dispatched by the next flush: no surface
+    // renders it any more.
+    echoBatch();
+    resolvers[0]?.([null]);
+    await flushBatch();
+
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(requestCalls().at(-1)?.texts).toEqual(['final']);
+  });
+
+  it('does not dispatch a superseded copy a retry left queued', async () => {
+    const mod = await loadRuntime();
+    requestMock.mockRejectedValueOnce(new Error('gateway down'));
+
+    // The row's first attempt fails: 'partial' settles unresolved and stays
+    // in the retry memory.
+    mod.ensureTranslation({ itemId: 'p1', text: 'partial', language: 'de', model: MODEL });
+    await flushBatch();
+    expect(mod.getTranslation('p1', 'partial', 'de', MODEL.id)).toBeUndefined();
+
+    // Connectivity returns and the deep link re-enters the mounted transcript:
+    // the retry re-queues the row. Before the batch window closes, its source
+    // text settles on the final value: the effect cleanup releases 'partial'
+    // and the settled effect supersedes it, so no surface renders 'partial'
+    // any more — the queued superseded copy must be dropped, not dispatched.
+    mod.retryUnresolvedTranslations();
+    echoBatch();
+    mod.releaseTranslationInterest({
+      itemId: 'p1',
+      text: 'partial',
+      language: 'de',
+      model: MODEL,
+    });
+    mod.ensureTranslation({ itemId: 'p1', text: 'final', language: 'de', model: MODEL });
+    await flushBatch();
+
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(requestCalls()[1]?.texts).toEqual(['final']);
+    expect(mod.getTranslation('p1', 'final', 'de', MODEL.id)).toBe('de:final');
   });
 
   it('drops the retry memory when the configuration changes', async () => {

@@ -179,13 +179,39 @@ function translationKey(language: string, modelId: string, itemId: string, text:
 }
 
 /**
- * Drops the retry-memory entries of one part whose source text differs from
- * `key`. A part renders one source string at a time, so a remembered text that
- * no surface shows any more must not be re-sent by
- * `retryUnresolvedTranslations` on every reconnect or deep link.
+ * How many mounted surfaces currently ask for one key's source text. The hook
+ * effect registers its surface while it renders the text and releases it on
+ * cleanup, so a part shown by two surfaces (row and detail sheet) under
+ * different source strings holds both keys, while a part whose text streamed
+ * on holds only the settled one.
+ */
+const surfaceInterest = new Map<string, number>();
+
+function addSurfaceInterest(key: string): void {
+  surfaceInterest.set(key, (surfaceInterest.get(key) ?? 0) + 1);
+}
+
+function removeSurfaceInterest(key: string): void {
+  const count = surfaceInterest.get(key) ?? 0;
+  if (count <= 1) {
+    surfaceInterest.delete(key);
+  } else {
+    surfaceInterest.set(key, count - 1);
+  }
+}
+
+/**
+ * Drops one part's superseded source text from the retry memory and from the
+ * queue. A text is superseded only when no mounted surface asks for it any
+ * more: a part renders one source string at a time, but two surfaces may
+ * render two strings of one part side by side, so a text another surface still
+ * shows must neither be dropped from the queue nor from the retry memory. A
+ * text no surface shows any more, though, must neither be dispatched from the
+ * queue by a later flush nor re-sent by `retryUnresolvedTranslations`: either
+ * would carry a summary the rows no longer show.
  */
 // eslint-disable-next-line max-params -- the language, model, part id and source text form the key
-function forgetSupersededRetryEntries(
+function forgetSupersededEntries(
   language: string,
   modelId: string,
   itemId: string,
@@ -193,8 +219,23 @@ function forgetSupersededRetryEntries(
 ): void {
   const partPrefix = `${language}\u0000${modelId}\u0000${itemId}\u0000`;
   for (const remembered of retryable.keys()) {
-    if (remembered !== key && remembered.startsWith(partPrefix)) {
+    if (
+      remembered !== key &&
+      remembered.startsWith(partPrefix) &&
+      !surfaceInterest.has(remembered)
+    ) {
       retryable.delete(remembered);
+    }
+  }
+  for (let index = queue.length - 1; index >= 0; index -= 1) {
+    const queued = queue[index];
+    if (
+      queued !== undefined &&
+      queued.key !== key &&
+      queued.key.startsWith(partPrefix) &&
+      !surfaceInterest.has(queued.key)
+    ) {
+      queue.splice(index, 1);
     }
   }
 }
@@ -326,6 +367,9 @@ export function setConfig(next: ToolSummaryTranslationConfig): void {
   queue.length = 0;
   inFlight.clear();
   retryable.clear();
+  // The hook effect re-runs for every active row (its deps carry the config),
+  // so interest re-registers under the new generation.
+  surfaceInterest.clear();
   if (config.enabled) {
     // Warm the disk read as soon as the opt-in is on, in parallel with the
     // first transcript mount, so a cached summary is known before the flush.
@@ -379,24 +423,44 @@ function remember(resolved: ResolvedTranslation[]): void {
  */
 function takeBatch(): FlushBatch | null {
   // Work queued before the last configuration change (opt-in off or model
-  // switch) is stale, same as a key that already resolved or is in flight. An
-  // expired entry or one made from different text is not "already resolved".
+  // switch) is stale, same as a key that already resolved. An expired entry or
+  // one made from different text is not "already resolved". A key another
+  // request already owns is neither: it stays queued instead of being dropped.
+  // A retry that arrives while the attempt it races is still pending would
+  // otherwise lose its re-queued work here and never issue it, leaving the row
+  // in the source language; kept in the queue, it is dispatched when that
+  // attempt settles unresolved, and the freshness check drops it when the
+  // attempt resolves.
   const now = Date.now();
-  const eligible = queue.filter(item => {
-    if (item.generation !== generation) {
-      return false;
-    }
+  const current = queue.filter(item => item.generation === generation);
+  const eligible: QueueItem[] = [];
+  const owned: QueueItem[] = [];
+  for (const item of current) {
     if (isFreshCacheEntry(item.key, item.text, now)) {
       // Resolved through hydration or a duplicate request while this item
       // waited: no retry memory is needed for a summary already translated.
       retryable.delete(item.key);
-      return false;
+    } else if (inFlight.has(item.key)) {
+      // A retry re-queued this row while the attempt it races is still
+      // pending, so the row's re-request would be lost here. Kept, it is
+      // dispatched when that attempt settles unresolved. The part must still
+      // ask for this text: `ensureTranslation` prunes a superseded source
+      // text from the queue and the retry memory together once no surface
+      // asks for it, so an owned key the part no longer asks for is gone
+      // from the queue, and one that resolved while it waited (no longer in
+      // `retryable`) is dropped here instead of being dispatched by a later
+      // flush.
+      if (retryable.has(item.key)) {
+        owned.push(item);
+      }
+    } else {
+      eligible.push(item);
     }
-    return !inFlight.has(item.key);
-  });
+  }
   const head = eligible[0];
   if (head === undefined) {
     queue.length = 0;
+    queue.push(...owned);
     return null;
   }
   // The first eligible item decides the request's language and model: one
@@ -405,7 +469,7 @@ function takeBatch(): FlushBatch | null {
   const modelId = head.model.id;
   const texts: string[] = [];
   const items: QueueItem[] = [];
-  const remaining: QueueItem[] = [];
+  const remaining: QueueItem[] = [...owned];
   const seenTexts = new Set<string>();
 
   for (const item of eligible) {
@@ -534,10 +598,15 @@ export function ensureTranslation(input: {
   // summary is known by the time the flush runs.
   startHydration();
   const key = translationKey(language, model.id, itemId, text);
-  // This part now asks for `text`: any other source string remembered for the
-  // same part is superseded, so drop it from the retry memory before the
-  // freshness and in-flight guards return.
-  forgetSupersededRetryEntries(language, model.id, itemId, key);
+  // This mounted surface asks for `text` until its effect cleanup runs: the
+  // supersede prune below must not drop a queued copy another surface still
+  // renders, and this text's own copy must outlive unrelated work.
+  addSurfaceInterest(key);
+  // This part now asks for `text`: any other source string remembered or
+  // queued for the same part that no surface asks for any more is superseded,
+  // so drop it from the retry memory and the queue before the freshness and
+  // in-flight guards return.
+  forgetSupersededEntries(language, model.id, itemId, key);
   if (isFreshCacheEntry(key, text, Date.now()) || inFlight.has(key)) {
     return;
   }
@@ -557,15 +626,37 @@ export function ensureTranslation(input: {
 }
 
 /**
+ * Records that one mounted surface stopped asking for a key's source text: the
+ * hook effect's cleanup calls this when its row unmounts or its source text,
+ * language or model changed. Once no surface asks for a part's text any more,
+ * the next `ensureTranslation` for the same part drops that text from the
+ * queue and the retry memory, so a superseded copy is neither dispatched by a
+ * later flush nor re-sent by `retryUnresolvedTranslations`. A text another
+ * surface still renders keeps its interest and stays served.
+ */
+export function releaseTranslationInterest(input: {
+  itemId: string;
+  text: string;
+  language: string;
+  model: { id: string; name: string };
+}): void {
+  if (input.text.trim() === '') {
+    return;
+  }
+  removeSurfaceInterest(translationKey(input.language, input.model.id, input.itemId, input.text));
+}
+
+/**
  * Re-queue every summary that was asked for but never resolved. The session
  * transport calls this when it reconnects: a batch that failed while the
  * gateway was unreachable left its items in `retryable`, and re-entering an
  * already-mounted transcript is a navigation no-op, so no remount would
  * re-request them and the rows would keep showing the source language.
- * Idempotent while a request is still in flight: `takeBatch` drops keys
- * another batch already owns. The opt-in lifecycle needs no check here:
- * `setConfig` clears this memory on any change, so what remains was asked
- * for under the current configuration.
+ * Idempotent while a request is still in flight: `takeBatch` keeps keys
+ * another batch already owns queued, so they are requested once that attempt
+ * settles unresolved, and drops them if it resolves them. The opt-in lifecycle
+ * needs no check here: `setConfig` clears this memory on any change, so what
+ * remains was asked for under the current configuration.
  */
 export function retryUnresolvedTranslations(): void {
   if (retryable.size === 0) {
@@ -594,6 +685,7 @@ export function clearToolSummaryTranslationMemory(): void {
   inFlight.clear();
   retryable.clear();
   cache.clear();
+  surfaceInterest.clear();
   version += 1;
   emit();
 }

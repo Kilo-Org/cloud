@@ -212,4 +212,48 @@ describe('useTranslatedToolSummary', () => {
     expect(latest(1)).toBe('de:Sheet text');
     unmount();
   });
+
+  it('keeps serving a text a second surface still shows when the first surface changes', async () => {
+    // The row and the sheet both show the streaming string. The row's text
+    // then settles while the sheet's stays on it: the row's cleanup releases
+    // only its own interest, so the sheet's copy must still be requested and
+    // the row's settled text requested on its own key.
+    requestMock.mockImplementation(
+      // eslint-disable-next-line typescript-eslint/require-await -- the mock answers the batch synchronously
+      async ({ texts }: { texts: readonly string[] }) => texts.map(text => `de:${text}`)
+    );
+    setConfig({ enabled: true, model: MODEL });
+    const current: string[] = ['', ''];
+    const ref: { renderer: TestRenderer.ReactTestRenderer | undefined } = { renderer: undefined };
+    const probe = (text: string, index: number) =>
+      createElement(Probe, {
+        text,
+        itemId: 'part-1',
+        onRender: value => {
+          current[index] = value;
+        },
+      });
+    act(() => {
+      ref.renderer = TestRenderer.create(
+        createElement('View', null, probe('partial', 0), probe('partial', 1))
+      );
+    });
+    await settle();
+    expect(current[0]).toBe('de:partial');
+    expect(current[1]).toBe('de:partial');
+
+    // Only the first surface's text settles: its effect re-runs, the second
+    // surface's does not.
+    act(() => {
+      ref.renderer?.update(createElement('View', null, probe('final', 0), probe('partial', 1)));
+    });
+    await settle();
+
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(current[0]).toBe('de:final');
+    expect(current[1]).toBe('de:partial');
+    act(() => {
+      ref.renderer?.unmount();
+    });
+  });
 });

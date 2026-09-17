@@ -9,9 +9,13 @@ import { type AgentMode } from '@/components/agents/mode-selector';
 import {
   getSelectedBranchOverride,
   type NewSessionRepository,
-  type RepositoryPlatform,
 } from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
+import {
+  type PrepareSessionRepositoryFields,
+  resolveRepoFingerprint,
+  setRepositoryField,
+} from '@/components/agents/prepare-session-repository';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
@@ -57,16 +61,12 @@ type UseNewSessionCreatorInput = {
   profileId?: string | null;
 };
 
-type PrepareSessionInput = {
+type PrepareSessionInput = PrepareSessionRepositoryFields & {
   prompt: string;
   initialMessageId: string;
   mode: AgentMode;
   model: string;
   variant: string | undefined;
-  /** Exactly one repository field is set, matching the selected row's platform. */
-  githubRepo?: string;
-  gitlabProject?: string;
-  bitbucketRepo?: { fullName: string; workspaceUuid: string; repositoryUuid: string };
   /** The chosen non-default branch; omitted, the provider's default is checked out. */
   upstreamBranch?: string;
   autoCommit: boolean;
@@ -214,7 +214,12 @@ export function useNewSessionCreator({
         autoInitiate: true,
         operationKey,
       };
-      setRepositoryField(baseInput, selectedRepository);
+      // Exactly one repository field, matching the selected row's platform; the
+      // branch rides along only when the writer actually wrote one, so a
+      // Bitbucket row missing its uuids sends neither field nor branch.
+      if (setRepositoryField(baseInput, selectedRepository) && selectedRepository) {
+        setUpstreamBranch(baseInput, selectedRepository);
+      }
       if (profileId) {
         baseInput.profileId = profileId;
       }
@@ -331,71 +336,16 @@ export function useNewSessionCreator({
 }
 
 /**
- * The retry fingerprint's repository identity. Includes the platform so two
- * same-named repos on different providers mint distinct retry keys, and the
- * Bitbucket workspace/repository uuids so a workspace rename cannot collide.
- */
-function resolveRepoFingerprint(repository: NewSessionRepository | null): {
-  platform: RepositoryPlatform;
-  fullName: string;
-  workspaceUuid?: string | null;
-  repositoryUuid?: string | null;
-} | null {
-  if (!repository) {
-    return null;
-  }
-  if (repository.platform === 'bitbucket') {
-    return {
-      platform: repository.platform,
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid ?? null,
-      repositoryUuid: repository.repositoryUuid ?? null,
-    };
-  }
-  return { platform: repository.platform, fullName: repository.fullName };
-}
-
-/**
- * Write exactly one repository field into the create body, matching the
- * selected row's platform, plus the branch the user picked for that exact
- * repository. Bitbucket requires workspace + run ids, so it contributes
- * nothing when those are missing (which cannot happen for a row that came
- * from `listBitbucketRepositories`).
- *
- * The branch is read by repository identity, so a branch chosen for another
- * repository can never ride along; only a non-default choice is stored, so an
- * unset `upstreamBranch` means "check out the provider's own default". It is
+ * Carry the branch the user picked for exactly this repository. The branch is
+ * read by repository identity, so a branch chosen for another repository can
+ * never ride along; only a non-default choice is stored, so an unset
+ * `upstreamBranch` means "check out the provider's own default". It is
  * deliberately absent from the retry fingerprint: the retry key stays
  * repository-scoped, and changing the branch must not fork it.
+ *
+ * The caller runs this only when the shared writer wrote a repository field for
+ * the same row, so a row that contributes no repository sends no branch either.
  */
-function setRepositoryField(
-  input: PrepareSessionInput,
-  repository: NewSessionRepository | null
-): void {
-  if (!repository) {
-    return;
-  }
-  if (repository.platform === 'github') {
-    input.githubRepo = repository.fullName;
-    setUpstreamBranch(input, repository);
-    return;
-  }
-  if (repository.platform === 'gitlab') {
-    input.gitlabProject = repository.fullName;
-    setUpstreamBranch(input, repository);
-    return;
-  }
-  if (repository.workspaceUuid && repository.repositoryUuid) {
-    input.bitbucketRepo = {
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid,
-      repositoryUuid: repository.repositoryUuid,
-    };
-    setUpstreamBranch(input, repository);
-  }
-}
-
-/** Carry the branch only when a repository field was written for it. */
 function setUpstreamBranch(input: PrepareSessionInput, repository: NewSessionRepository): void {
   const branch = getSelectedBranchOverride(repository);
   if (branch !== null) {

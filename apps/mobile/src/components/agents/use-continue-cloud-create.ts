@@ -7,10 +7,12 @@ import * as Haptics from 'expo-haptics';
 
 import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
+import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 import {
-  type NewSessionRepository,
-  type RepositoryPlatform,
-} from '@/components/agents/new-session-repository-state';
+  type PrepareSessionRepositoryFields,
+  resolveRepoFingerprint,
+  setRepositoryField,
+} from '@/components/agents/prepare-session-repository';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
 import { i18n } from '@/i18n';
@@ -160,74 +162,13 @@ export function useContinueCloudCreate(
   );
 }
 
-/** Clone-only prepare body. Mirrors the ordinary create path's repository fields. */
-type ContinuePrepareInput = {
+/** Clone-only prepare body. Shares the create path's repository fields. */
+type ContinuePrepareInput = PrepareSessionRepositoryFields & {
   mode: AgentMode;
   model: string;
   variant: string | undefined;
-  githubRepo?: string;
-  gitlabProject?: string;
-  bitbucketRepo?: { fullName: string; workspaceUuid: string; repositoryUuid: string };
   autoCommit: boolean;
   autoInitiate: true;
   operationKey: string;
   cloneFromKiloSessionId: KiloSessionId;
 };
-
-/**
- * The retry fingerprint's repository identity. Mirrors the ordinary create
- * path: includes the platform so two same-named repos on different providers
- * mint distinct retry keys, and the Bitbucket workspace/repository uuids so a
- * workspace rename cannot collide.
- */
-function resolveRepoFingerprint(repository: NewSessionRepository | null): {
-  platform: RepositoryPlatform;
-  fullName: string;
-  workspaceUuid?: string | null;
-  repositoryUuid?: string | null;
-} | null {
-  if (!repository) {
-    return null;
-  }
-  if (repository.platform === 'bitbucket') {
-    return {
-      platform: repository.platform,
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid ?? null,
-      repositoryUuid: repository.repositoryUuid ?? null,
-    };
-  }
-  return { platform: repository.platform, fullName: repository.fullName };
-}
-
-/**
- * Write exactly one repository field into the clone prepare body, matching
- * the selected row's platform. Mirrors the ordinary create path's
- * `setRepositoryField`: a picker key (`platform:fullName`) must never reach
- * `githubRepo`. Bitbucket requires workspace + repository uuids, so it
- * contributes nothing when those are missing (which cannot happen for a row
- * that came from `listBitbucketRepositories`).
- */
-function setRepositoryField(
-  input: ContinuePrepareInput,
-  repository: NewSessionRepository | null
-): void {
-  if (!repository) {
-    return;
-  }
-  if (repository.platform === 'github') {
-    input.githubRepo = repository.fullName;
-    return;
-  }
-  if (repository.platform === 'gitlab') {
-    input.gitlabProject = repository.fullName;
-    return;
-  }
-  if (repository.workspaceUuid && repository.repositoryUuid) {
-    input.bitbucketRepo = {
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid,
-      repositoryUuid: repository.repositoryUuid,
-    };
-  }
-}

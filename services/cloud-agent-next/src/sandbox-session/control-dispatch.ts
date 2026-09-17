@@ -98,11 +98,19 @@ export function isRetryableDeliveryError(error: unknown): boolean {
 }
 
 export function deliveryErrorLogFields(error: unknown) {
-  // A logging helper runs inside catch blocks, so a throwing conversion must
-  // not propagate and skip the recovery that follows the log call.
+  // A logging helper runs inside catch blocks, so a throwing read or conversion
+  // must not propagate and skip the recovery that follows the log call.
   let errorMessage: string;
   try {
-    errorMessage = error instanceof Error ? error.message : String(error);
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else {
+      const message =
+        typeof error === 'object' && error !== null && Object.hasOwn(error, 'message')
+          ? (error as { message?: unknown }).message
+          : undefined;
+      errorMessage = typeof message === 'string' ? message : String(error);
+    }
   } catch {
     errorMessage = '[unserializable error]';
   }

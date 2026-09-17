@@ -204,6 +204,47 @@ describe('deliveryErrorLogFields', () => {
     });
   });
 
+  it('logs the message of a passed-through malformed rejection', () => {
+    const malformed = { code: '', message: 'Invalid rejection', retryable: true };
+    expect(deliveryErrorLogFields(malformed)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: 'Invalid rejection',
+      retryable: true,
+    });
+  });
+
+  it('falls back for a non-Error object whose message is not a string', () => {
+    const error = { message: { nested: true } };
+    expect(deliveryErrorLogFields(error)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[object Object]',
+      retryable: false,
+    });
+  });
+
+  it('refuses an inherited message for a non-Error value', () => {
+    const error = Object.create({ message: 'inherited' });
+    expect(deliveryErrorLogFields(error)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[object Object]',
+      retryable: false,
+    });
+  });
+
+  it('falls back for a non-Error object whose message read throws', () => {
+    const error = {
+      get message(): string {
+        throw new Error('message exploded');
+      },
+    };
+    expect(() => deliveryErrorLogFields(error)).not.toThrow();
+    expect(deliveryErrorLogFields(error)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[unserializable error]',
+      retryable: false,
+    });
+  });
+
   it('falls back for a null-prototype value that cannot be stringified', () => {
     expect(() => deliveryErrorLogFields(Object.create(null))).not.toThrow();
     expect(deliveryErrorLogFields(Object.create(null))).toEqual({

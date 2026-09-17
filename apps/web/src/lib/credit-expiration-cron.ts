@@ -2,7 +2,7 @@ import 'server-only';
 
 import { kilocode_users, organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { and, asc, inArray, isNotNull, lte, notInArray, type SQL } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull, lte, or, type SQL } from 'drizzle-orm';
 import {
   processLocalExpirations,
   processOrganizationExpirationsBatch,
@@ -28,14 +28,20 @@ type ExpireCreditsCronOptions = {
   userIds?: readonly string[];
   organizationIds?: readonly string[];
   timeBudgetMs?: number;
+  userBatchSize?: number;
+  organizationBatchSize?: number;
+  clock?: () => number;
 };
+
+type DueCursor = { at: string; id: string };
 
 export async function runExpireCreditsCron(
   options: ExpireCreditsCronOptions = {}
 ): Promise<ExpireCreditsCronSummary> {
   const now = options.now ?? new Date();
   const timeBudgetMs = options.timeBudgetMs ?? DEFAULT_TIME_BUDGET_MS;
-  const startedAt = Date.now();
+  const clock = options.clock ?? Date.now;
+  const startedAt = clock();
   const summary: ExpireCreditsCronSummary = {
     usersExamined: 0,
     usersFailed: 0,
@@ -43,39 +49,40 @@ export async function runExpireCreditsCron(
     organizationsFailed: 0,
     hasMore: false,
   };
-  const skippedUserIds = new Set<string>();
-  const skippedOrganizationIds = new Set<string>();
-  const outOfTime = () => Date.now() - startedAt >= timeBudgetMs;
+  const userBatchSize = options.userBatchSize ?? USER_BATCH_SIZE;
+  const organizationBatchSize = options.organizationBatchSize ?? ORGANIZATION_BATCH_SIZE;
+  let userCursor: DueCursor | null = null;
+  let organizationCursor: DueCursor | null = null;
+  const fullDeadline = startedAt + timeBudgetMs;
+  const organizationDeadline = startedAt + Math.floor(timeBudgetMs / 2);
 
-  while (!outOfTime()) {
-    const dueUsers = await fetchDueUsers(now, skippedUserIds, options.userIds);
-    const dueOrganizations = await fetchDueOrganizations(
-      now,
-      skippedOrganizationIds,
-      options.organizationIds
-    );
-    if (dueUsers.length === 0 && dueOrganizations.length === 0) break;
+  const organizationsIncomplete = await drainOrganizations(organizationDeadline);
+  const usersIncomplete = await drainUsers(fullDeadline);
+  const organizationsStillIncomplete =
+    organizationsIncomplete && clock() < fullDeadline
+      ? await drainOrganizations(fullDeadline)
+      : organizationsIncomplete;
+  summary.hasMore = organizationsStillIncomplete || usersIncomplete;
+  return summary;
 
-    for (const user of dueUsers) {
-      if (outOfTime()) {
-        summary.hasMore = true;
-        break;
+  async function drainOrganizations(deadline: number): Promise<boolean> {
+    if (clock() >= deadline) return false;
+    while (clock() < deadline) {
+      const dueOrganizations = await fetchDueOrganizations(
+        now,
+        organizationCursor,
+        options.organizationIds,
+        organizationBatchSize
+      );
+      if (dueOrganizations.length === 0) return false;
+
+      const lastOrganization = dueOrganizations[dueOrganizations.length - 1];
+      if (lastOrganization?.next_credit_expiration_at) {
+        organizationCursor = {
+          at: lastOrganization.next_credit_expiration_at,
+          id: lastOrganization.id,
+        };
       }
-      skippedUserIds.add(user.id);
-      summary.usersExamined += 1;
-      try {
-        await processLocalExpirations(user, now);
-      } catch (error) {
-        summary.usersFailed += 1;
-        sentryLogger('expire-credits-cron', 'error')('failed to expire user credits', {
-          kilo_user_id: user.id,
-          error: error instanceof Error ? error.message : 'unknown',
-        });
-      }
-    }
-
-    if (!summary.hasMore && dueOrganizations.length > 0) {
-      for (const organization of dueOrganizations) skippedOrganizationIds.add(organization.id);
       summary.organizationsExamined += dueOrganizations.length;
       try {
         await processOrganizationExpirationsBatch(dueOrganizations, now);
@@ -86,24 +93,48 @@ export async function runExpireCreditsCron(
           error: error instanceof Error ? error.message : 'unknown',
         });
       }
-    }
 
-    const usersRemain = dueUsers.length === USER_BATCH_SIZE;
-    const organizationsRemain = dueOrganizations.length === ORGANIZATION_BATCH_SIZE;
-    if (!usersRemain && !organizationsRemain) break;
-    if (outOfTime()) summary.hasMore = true;
+      if (dueOrganizations.length < organizationBatchSize) return false;
+    }
+    return true;
   }
 
-  return summary;
+  async function drainUsers(deadline: number): Promise<boolean> {
+    if (clock() >= deadline) return false;
+    while (clock() < deadline) {
+      const dueUsers = await fetchDueUsers(now, userCursor, options.userIds, userBatchSize);
+      if (dueUsers.length === 0) return false;
+
+      for (const user of dueUsers) {
+        if (clock() >= deadline) return true;
+        if (user.next_credit_expiration_at) {
+          userCursor = { at: user.next_credit_expiration_at, id: user.id };
+        }
+        summary.usersExamined += 1;
+        try {
+          await processLocalExpirations(user, now);
+        } catch (error) {
+          summary.usersFailed += 1;
+          sentryLogger('expire-credits-cron', 'error')('failed to expire user credits', {
+            kilo_user_id: user.id,
+            error: error instanceof Error ? error.message : 'unknown',
+          });
+        }
+      }
+
+      if (dueUsers.length < userBatchSize) return false;
+    }
+    return true;
+  }
 }
 
 async function fetchDueUsers(
   now: Date,
-  skippedUserIds: ReadonlySet<string>,
-  userIds: readonly string[] | undefined
+  cursor: DueCursor | null,
+  userIds: readonly string[] | undefined,
+  batchSize: number
 ): Promise<UserForLocalExpiration[]> {
-  const idFilter = scopedIdFilter(kilocode_users.id, userIds, skippedUserIds);
-  if (idFilter === null) return [];
+  if (userIds && userIds.length === 0) return [];
 
   return db
     .select({
@@ -118,20 +149,21 @@ async function fetchDueUsers(
       and(
         isNotNull(kilocode_users.next_credit_expiration_at),
         lte(kilocode_users.next_credit_expiration_at, now.toISOString()),
-        idFilter
+        userIds ? inArray(kilocode_users.id, [...userIds]) : undefined,
+        afterCursor(kilocode_users.next_credit_expiration_at, kilocode_users.id, cursor)
       )
     )
-    .orderBy(asc(kilocode_users.next_credit_expiration_at))
-    .limit(USER_BATCH_SIZE);
+    .orderBy(asc(kilocode_users.next_credit_expiration_at), asc(kilocode_users.id))
+    .limit(batchSize);
 }
 
 async function fetchDueOrganizations(
   now: Date,
-  skippedOrganizationIds: ReadonlySet<string>,
-  organizationIds: readonly string[] | undefined
+  cursor: DueCursor | null,
+  organizationIds: readonly string[] | undefined,
+  batchSize: number
 ): Promise<OrganizationForExpiration[]> {
-  const idFilter = scopedIdFilter(organizations.id, organizationIds, skippedOrganizationIds);
-  if (idFilter === null) return [];
+  if (organizationIds && organizationIds.length === 0) return [];
 
   const rows = await db
     .select({
@@ -145,11 +177,12 @@ async function fetchDueOrganizations(
       and(
         isNotNull(organizations.next_credit_expiration_at),
         lte(organizations.next_credit_expiration_at, now.toISOString()),
-        idFilter
+        organizationIds ? inArray(organizations.id, [...organizationIds]) : undefined,
+        afterCursor(organizations.next_credit_expiration_at, organizations.id, cursor)
       )
     )
-    .orderBy(asc(organizations.next_credit_expiration_at))
-    .limit(ORGANIZATION_BATCH_SIZE);
+    .orderBy(asc(organizations.next_credit_expiration_at), asc(organizations.id))
+    .limit(batchSize);
 
   return rows.flatMap(organization =>
     organization.next_credit_expiration_at === null
@@ -158,16 +191,13 @@ async function fetchDueOrganizations(
   );
 }
 
-function scopedIdFilter(
-  column: typeof kilocode_users.id | typeof organizations.id,
-  ids: readonly string[] | undefined,
-  skippedIds: ReadonlySet<string>
-): SQL | undefined | null {
-  if (ids) {
-    const remaining = ids.filter(id => !skippedIds.has(id));
-    if (remaining.length === 0) return null;
-    return inArray(column, remaining);
-  }
-  if (skippedIds.size === 0) return undefined;
-  return notInArray(column, [...skippedIds]);
+function afterCursor(
+  atColumn:
+    | typeof kilocode_users.next_credit_expiration_at
+    | typeof organizations.next_credit_expiration_at,
+  idColumn: typeof kilocode_users.id | typeof organizations.id,
+  cursor: DueCursor | null
+): SQL | undefined {
+  if (!cursor) return undefined;
+  return or(gt(atColumn, cursor.at), and(eq(atColumn, cursor.at), gt(idColumn, cursor.id)));
 }

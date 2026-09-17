@@ -171,4 +171,58 @@ describe('runExpireCreditsCron', () => {
       );
     expect(futureOrgCredits).toHaveLength(0);
   });
+
+  it('pages due rows that share an expiration timestamp', async () => {
+    const firstUser = await insertTestUser({
+      total_microdollars_acquired: 500,
+      microdollars_used: 0,
+      next_credit_expiration_at: dueAt,
+    });
+    const secondUser = await insertTestUser({
+      total_microdollars_acquired: 700,
+      microdollars_used: 0,
+      next_credit_expiration_at: dueAt,
+    });
+    userIds.push(firstUser.id, secondUser.id);
+    await db.insert(credit_transactions).values([
+      {
+        kilo_user_id: firstUser.id,
+        amount_microdollars: 500,
+        is_free: true,
+        expiry_date: dueAt,
+        expiration_baseline_microdollars_used: 0,
+        original_baseline_microdollars_used: 0,
+        description: 'First shared expiry',
+      },
+      {
+        kilo_user_id: secondUser.id,
+        amount_microdollars: 700,
+        is_free: true,
+        expiry_date: dueAt,
+        expiration_baseline_microdollars_used: 0,
+        original_baseline_microdollars_used: 0,
+        description: 'Second shared expiry',
+      },
+    ]);
+
+    const summary = await runExpireCreditsCron({
+      now,
+      userIds,
+      organizationIds: [],
+      userBatchSize: 1,
+    });
+
+    expect(summary.usersExamined).toBe(2);
+    expect(summary.usersFailed).toBe(0);
+    expect(summary.hasMore).toBe(false);
+
+    const updated = await db
+      .select({
+        id: kilocode_users.id,
+        next_credit_expiration_at: kilocode_users.next_credit_expiration_at,
+      })
+      .from(kilocode_users)
+      .where(inArray(kilocode_users.id, userIds));
+    expect(updated.every(user => user.next_credit_expiration_at === null)).toBe(true);
+  });
 });

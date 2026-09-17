@@ -171,10 +171,10 @@ function createJotaiStorage(
       return store.get(messagesAtom).get(messageId);
     },
 
-    upsertPart(messageId, part) {
+    upsertPart(messageId, part, eventTime) {
       flushPendingDeltas();
       const arr = partsMap.get(messageId) ?? [];
-      const nextArr = upsertPartDroppingStaleSyntheticParts(arr, part);
+      const nextArr = upsertPartDroppingStaleSyntheticParts(arr, part, eventTime);
       partsMap.set(messageId, nextArr);
       bumpPartsRevision();
       partsSnapshot.set(messageId, null);

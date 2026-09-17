@@ -2402,6 +2402,10 @@
     "checkConnection": "Перевірити з’єднання",
     "checks": {
       "checksCount": "перевірок: {{displayCount}}",
+      "checksCount_one": "перевірка: {{displayCount}}",
+      "checksCount_few": "перевірки: {{displayCount}}",
+      "checksCount_many": "перевірок: {{displayCount}}",
+      "checksCount_other": "перевірок: {{displayCount}}",
       "couldNotLoad": "Не вдалося завантажити перевірки.",
       "failed": "з помилками: {{displayCount}}",
       "noAccess": "У вас немає доступу до перевірок цього репозиторію.",
@@ -2501,6 +2505,8 @@
       "replyBody": "Текст відповіді",
       "replyForbidden": "У вас немає дозволу відповідати в цьому запиті на злиття.",
       "addCommentCta": "Коментувати цей запит на злиття",
+      "fixWithKilo": "Виправити з Kilo",
+      "fixWithKiloPrompt": "Будь ласка, опрацюй наступний коментар у запиті на злиття: {{link}}",
       "commentBadRequest": "Цей коментар неможливо опублікувати. Можливо, запит на злиття змінився.",
       "commentForbidden": "У вас немає дозволу коментувати в цьому запиті на злиття.",
       "replyPlaceholder": "Ваша відповідь…",
@@ -3104,6 +3110,12 @@
     "privacy": "Відкрийте Kilo, щоб побачити агентів",
     "openAgents": "Відкрити агентів",
     "needsInput": "Очікує відповіді",
+    "newestSession": "Найновіший: {{title}}",
+    "noneWaiting": "Немає агентів в очікуванні",
+    "newAgent": "Новий агент",
+    "approving": "Схвалюється...",
+    "couldNotApprove": "Не вдалося схвалити",
+    "couldNotStart": "Не вдалося запустити",
     "channelName": "Активні агенти",
     "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані."
   },
@@ -3139,6 +3151,13 @@
     "remoteFound": "Комп'ютер підключено",
     "checkAgain": "Перевірити ще раз",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Для запуску агента потрібен запит. Додайте запит і запустіть знову.",
+      "repositoryUnknown": "Kilo не розпізнає {{repository}} як репозиторій GitHub або GitLab. Виберіть інший репозиторій у Kilo.",
+      "repositoryUnsupported": "{{repository}} — репозиторій Bitbucket, і Запустити агента поки не може його використовувати. Виберіть інший репозиторій у Kilo."
+    }
   },
   "launcher": {
     "newAgent": "Новий агент",

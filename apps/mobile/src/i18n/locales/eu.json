@@ -480,6 +480,8 @@
       "replyBadRequest": "Erantzun hau ezin da argitaratu. Baliteke haria aldatu izana.",
       "replyForbidden": "Ez duzu baimenik bateratze-eskaera honi erantzuteko.",
       "addCommentCta": "Egin iruzkina bateratze-eskaera honetan",
+      "fixWithKilo": "Konpondu Kilorekin",
+      "fixWithKiloPrompt": "Mesedez, landu honako bateratze-eskaerako iruzkin hau: {{link}}",
       "commentBadRequest": "Iruzkin hau ezin da argitaratu. Baliteke bateratze-eskaera aldatu izana.",
       "commentForbidden": "Ez duzu baimenik bateratze-eskaera honetan iruzkinik egiteko.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} zain",
       "skipped": "{{displayCount}} alde batera utzita",
       "checksCount": "{{displayCount}} egiaztapen",
+      "checksCount_one": "{{displayCount}} egiaztapen",
+      "checksCount_other": "{{displayCount}} egiaztapen",
       "checkDetails": "egiaztapenaren xehetasunak"
     },
     "inbox": {
@@ -3058,6 +3062,12 @@
     "privacy": "Ireki Kilo agenteak ikusteko",
     "openAgents": "Ireki agenteak",
     "needsInput": "Zure erantzunaren zain",
+    "newestSession": "Berriena: {{title}}",
+    "noneWaiting": "Ez dago agente zainik",
+    "newAgent": "Agente berria",
+    "approving": "Onartzen ari da...",
+    "couldNotApprove": "Ezin izan da onartu",
+    "couldNotStart": "Ezin izan da hasi",
     "channelName": "Agente aktiboak",
     "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko."
   },
@@ -3093,6 +3103,13 @@
     "remoteFound": "Ordenagailua konektatuta",
     "checkAgain": "Egiaztatu berriro",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Agentea hasteko eskaera behar da. Gehitu eskaera bat eta exekutatu berriro.",
+      "repositoryUnknown": "Kilok ez du {{repository}} GitHub edo GitLab biltegi gisa ezagutzen. Aukeratu beste biltegi bat Kilon.",
+      "repositoryUnsupported": "{{repository}} Bitbucket biltegia da — Hasi agentea oraindik ezin du erabili. Aukeratu beste biltegi bat Kilon."
+    }
   },
   "launcher": {
     "newAgent": "Agente berria",

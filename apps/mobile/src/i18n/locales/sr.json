@@ -483,6 +483,8 @@
       "replyBadRequest": "Ovaj odgovor se ne može objaviti. Nit se možda promenila.",
       "replyForbidden": "Nemaš dozvolu da odgovoriš na ovaj zahtev za spajanje.",
       "addCommentCta": "Komentariši ovaj zahtev za spajanje",
+      "fixWithKilo": "Reši sa Kilo",
+      "fixWithKiloPrompt": "Molim te reši sledeći komentar na ovom zahtevu za spajanje: {{link}}",
       "commentBadRequest": "Ovaj komentar se ne može objaviti. Zahtev za spajanje se možda promenio.",
       "commentForbidden": "Nemaš dozvolu da komentarišeš ovaj zahtev za spajanje.",
       "moderation": {
@@ -577,6 +579,9 @@
       "pending": "{{displayCount}} na čekanju",
       "skipped": "preskočeno: {{displayCount}}",
       "checksCount": "broj provera: {{displayCount}}",
+      "checksCount_one": "{{displayCount}} provera",
+      "checksCount_few": "{{displayCount}} provere",
+      "checksCount_other": "broj provera: {{displayCount}}",
       "checkDetails": "detalji provere"
     },
     "inbox": {
@@ -3081,6 +3086,12 @@
     "privacy": "Otvori Kilo da vidiš agente",
     "openAgents": "Otvori agente",
     "needsInput": "Čeka unos",
+    "newestSession": "Najnovija: {{title}}",
+    "noneWaiting": "Nema agenata koji čekaju",
+    "newAgent": "Novi agent",
+    "approving": "Odobrava se...",
+    "couldNotApprove": "Odobravanje nije uspelo",
+    "couldNotStart": "Pokretanje nije uspelo",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu."
   },
@@ -3116,6 +3127,13 @@
     "remoteFound": "Računar povezan",
     "checkAgain": "Proveri ponovo",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Za pokretanje agenta potreban je upit. Dodaj upit i pokreni ga ponovo.",
+      "repositoryUnknown": "Kilo ne prepoznaje {{repository}} kao GitHub ili GitLab repozitorijum. Izaberi drugi repozitorijum u Kilo.",
+      "repositoryUnsupported": "{{repository}} je Bitbucket repozitorijum — Pokreni agenta ga još ne može koristiti. Izaberi drugi repozitorijum u Kilo."
+    }
   },
   "launcher": {
     "newAgent": "Novi agent",

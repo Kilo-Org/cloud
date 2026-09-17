@@ -480,6 +480,8 @@
       "replyBadRequest": "Този отговор не може да бъде публикуван. Нишката може да се е променила.",
       "replyForbidden": "Нямаш права да отговаряш в тази заявка за обединяване.",
       "addCommentCta": "Коментирай тази заявка за обединяване",
+      "fixWithKilo": "Отстрани с Kilo",
+      "fixWithKiloPrompt": "Моля, разгледай следния коментар към заявката за обединяване: {{link}}",
       "commentBadRequest": "Този коментар не може да бъде публикуван. Заявката за обединяване може да се е променила.",
       "commentForbidden": "Нямаш права да коментираш в тази заявка за обединяване.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "изчакващи: {{displayCount}}",
       "skipped": "пропуснати: {{displayCount}}",
       "checksCount": "{{displayCount}} проверки",
+      "checksCount_one": "{{displayCount}} проверка",
+      "checksCount_other": "{{displayCount}} проверки",
       "checkDetails": "подробности за проверката"
     },
     "inbox": {
@@ -3058,6 +3062,12 @@
     "privacy": "Отвори Kilo, за да видиш агентите",
     "openAgents": "Отвори агентите",
     "needsInput": "Нужен е отговор",
+    "newestSession": "Най-новата: {{title}}",
+    "noneWaiting": "Няма чакащи агенти",
+    "newAgent": "Нов агент",
+    "approving": "Одобрява се...",
+    "couldNotApprove": "Одобряването не бе успешно",
+    "couldNotStart": "Стартирането не бе успешно",
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран."
   },
@@ -3093,6 +3103,13 @@
     "remoteFound": "Компютърът е свързан",
     "checkAgain": "Провери отново",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "За да стартираш агент, е нужна подкана. Добави подкана и го стартирай отново.",
+      "repositoryUnknown": "Kilo не разпознава {{repository}} като хранилище в GitHub или GitLab. Избери друго хранилище в Kilo.",
+      "repositoryUnsupported": "{{repository}} е хранилище в Bitbucket — Стартирай агент още не може да го използва. Избери друго хранилище в Kilo."
+    }
   },
   "launcher": {
     "newAgent": "Нов агент",

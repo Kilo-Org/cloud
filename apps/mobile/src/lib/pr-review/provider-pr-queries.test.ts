@@ -223,7 +223,10 @@ describe('normalizeProviderChecks', () => {
       ['in_progress', null],
       ['completed', 'cancelled'],
     ]);
-    expect(result.rollup).toEqual({ total: 4, success: 1, failure: 1, pending: 1, skipped: 1 });
+    // The canceled pipeline rolls up as a failure, the bucket the server's
+    // `rollupState` (`cancelled`) and the provider merge gate both use, so the
+    // rollup agrees with the row the section renders it under.
+    expect(result.rollup).toEqual({ total: 4, success: 1, failure: 2, pending: 1, skipped: 0 });
     // Empty: a provider with no pipeline at all reports a zeroed rollup.
     const empty = { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 };
     expect(normalizeProviderChecks({ checks: [] })).toEqual({ checkRuns: [], rollup: empty });

@@ -480,6 +480,8 @@
       "replyBadRequest": "यो जवाफ पोस्ट गर्न सकिँदैन। थ्रेड परिवर्तन भएको हुन सक्छ।",
       "replyForbidden": "तपाईंसँग यो पुल रिक्वेस्टमा जवाफ दिने अनुमति छैन।",
       "addCommentCta": "यो पुल रिक्वेस्टमा टिप्पणी गर्नुहोस्",
+      "fixWithKilo": "Kilo सँग समाधान गर्नुहोस्",
+      "fixWithKiloPrompt": "कृपया निम्न पुल रिक्वेस्ट टिप्पणी समाधान गर्नुहोस्: {{link}}",
       "commentBadRequest": "यो टिप्पणी पोस्ट गर्न सकिँदैन। पुल रिक्वेस्ट परिवर्तन भएको हुन सक्छ।",
       "commentForbidden": "तपाईंसँग यो पुल रिक्वेस्टमा टिप्पणी गर्ने अनुमति छैन।",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} प्रतीक्षामा",
       "skipped": "{{displayCount}} छोडियो",
       "checksCount": "{{displayCount}} जाँच",
+      "checksCount_one": "{{displayCount}} जाँच",
+      "checksCount_other": "{{displayCount}} जाँच",
       "checkDetails": "जाँचको विवरण"
     },
     "inbox": {
@@ -3058,6 +3062,12 @@
     "privacy": "एजेन्टहरू हेर्न Kilo खोल्नुहोस्",
     "openAgents": "एजेन्टहरू खोल्नुहोस्",
     "needsInput": "जवाफ चाहिन्छ",
+    "newestSession": "सबैभन्दा नयाँ: {{title}}",
+    "noneWaiting": "पर्खिरहेको एजेन्ट छैन",
+    "newAgent": "नयाँ एजेन्ट",
+    "approving": "स्वीकृति गरिँदैछ...",
+    "couldNotApprove": "स्वीकृति गर्न सकिएन",
+    "couldNotStart": "सुरु गर्न सकिएन",
     "channelName": "सक्रिय एजेन्टहरू",
     "activityKitDisabledBody": "लक स्क्रिनमा सक्रिय एजेन्टहरू हेर्न सेटिङ्समा प्रत्यक्ष गतिविधिहरू चालू गर्नुहोस्।"
   },
@@ -3093,6 +3103,13 @@
     "remoteFound": "कम्प्युटर जडान भयो",
     "checkAgain": "फेरि जाँच गर्नुहोस्",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "एजेन्ट सुरु गर्न प्रम्प्ट आवश्यक पर्छ। प्रम्प्ट थप्नुहोस् र यसलाई फेरि चलाउनुहोस्।",
+      "repositoryUnknown": "Kilo ले {{repository}} लाई GitHub वा GitLab रिपोजिटरीका रूपमा चिन्दैन। Kilo मा अर्को रिपोजिटरी छान्नुहोस्।",
+      "repositoryUnsupported": "{{repository}} एउटा Bitbucket रिपोजिटरी हो — एजेन्ट सुरु गर्नुहोस् अझै यसलाई प्रयोग गर्न सक्दैन। Kilo मा अर्को रिपोजिटरी छान्नुहोस्।"
+    }
   },
   "launcher": {
     "newAgent": "नयाँ एजेन्ट",

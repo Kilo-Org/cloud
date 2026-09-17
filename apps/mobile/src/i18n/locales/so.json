@@ -480,6 +480,8 @@
       "replyBadRequest": "Jawaabtan lama daabici karo. Waxaa laga yaabaa in dooddu isbeddeshay.",
       "replyForbidden": "Ma haysatid oggolaansho aad uga jawaabto codsigan isku-darka.",
       "addCommentCta": "Faallo ku dari codsigan isku-darka",
+      "fixWithKilo": "Ku xalli Kilo",
+      "fixWithKiloPrompt": "Fadlan wax ka qabo faallada soo socota ee codsigan isku-darka: {{link}}",
       "commentBadRequest": "Faalladan lama daabici karo. Waxaa laga yaabaa in codsiga isku-darku isbeddelay.",
       "commentForbidden": "Ma haysatid oggolaansho aad faallo ku darto codsigan isku-darka.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} ayaa la sugayaa",
       "skipped": "{{displayCount}} waa la dhaafay",
       "checksCount": "{{displayCount}} hubin",
+      "checksCount_one": "{{displayCount}} hubin",
+      "checksCount_other": "{{displayCount}} hubin",
       "checkDetails": "faahfaahinta hubinta"
     },
     "inbox": {
@@ -3058,6 +3062,12 @@
     "privacy": "Fur Kilo si aad wakiillada u aragto",
     "openAgents": "Fur wakiillada",
     "needsInput": "Jawaab sugaya",
+    "newestSession": "Ugu cusub: {{title}}",
+    "noneWaiting": "Ma jiro wakiil sugaya",
+    "newAgent": "Wakiil cusub",
+    "approving": "Waa la oggolaanayaa...",
+    "couldNotApprove": "Lama oggolaan karin",
+    "couldNotStart": "Lama bilaabin karin",
     "channelName": "Wakiillada firfircoon",
     "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka."
   },
@@ -3093,6 +3103,13 @@
     "remoteFound": "Kombiyuutarka la xidhay",
     "checkAgain": "Mar kale hubi",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Bilow wakiilka wuxuu u baahan yahay tilmaan. Ku dar tilmaan kadibna mar kale orod.",
+      "repositoryUnknown": "Kilo kama aqoonsado {{repository}} kayd GitHub ama GitLab ah. Dooro kayd kale gudaha Kilo.",
+      "repositoryUnsupported": "{{repository}} waa kayd Bitbucket — Bilow wakiilka weli ma isticmaali karo. Dooro kayd kale gudaha Kilo."
+    }
   },
   "launcher": {
     "newAgent": "Wakiil cusub",

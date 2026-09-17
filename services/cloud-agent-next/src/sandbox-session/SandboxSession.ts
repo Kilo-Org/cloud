@@ -1587,6 +1587,10 @@ export class SandboxSession extends DurableObject<Env> {
     }
   }
 
+  async getPendingInteractions(): Promise<{ questions: unknown[]; permissions: unknown[] }> {
+    return this.derivePendingInteractions() ?? { questions: [], permissions: [] };
+  }
+
   async getWorktreeChanges(): Promise<GetWorktreeChangesOutput> {
     if (this.deletedWorktreeId || this.terminalLifecycle.isBlocked()) return { snapshot: null };
     return this.worktreeChanges.get();
@@ -2509,6 +2513,16 @@ export class SandboxSession extends DurableObject<Env> {
     const callbacksPending = this.messageCallbacks.pendingCallbackCount() > 0;
     const reportsPending = this.reportOutbox.pendingCount() > 0;
     if (!callbacksPending && !reportsPending) await this.ctx.storage.deleteAlarm();
+    const sandboxId = metadata?.workspace?.sandboxId;
+    if (sandboxId && metadata) {
+      try {
+        await sandboxControlRpc(this.env, sandboxId).forgetSessionReference(
+          metadata.identity.sessionId
+        );
+      } catch {
+        // Tombstone remains; over-blocking is safe.
+      }
+    }
     this.ctx.storage.transactionSync(() => {
       if (this.deletedWorktreeId) throw new Error('worktree_deleting');
       const pendingCleanup = this.pendingRuntimeCleanup();

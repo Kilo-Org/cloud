@@ -480,6 +480,8 @@
       "replyBadRequest": "இந்தப் பதிலை இடுகையிட முடியாது. கருத்துத் தொடர் மாறியிருக்கலாம்.",
       "replyForbidden": "இந்த இணைப்புக் கோரிக்கைக்குப் பதிலளிக்க உங்களுக்கு அனுமதி இல்லை.",
       "addCommentCta": "இந்த இணைப்புக் கோரிக்கையில் கருத்துத் தெரிவிக்கவும்",
+      "fixWithKilo": "Kilo மூலம் சரிசெய்யவும்",
+      "fixWithKiloPrompt": "தயவுசெய்து பின்வரும் இணைப்புக் கோரிக்கை கருத்தைச் சரிசெய்யவும்: {{link}}",
       "commentBadRequest": "இந்தக் கருத்தை இடுகையிட முடியாது. இணைப்புக் கோரிக்கை மாறியிருக்கலாம்.",
       "commentForbidden": "இந்த இணைப்புக் கோரிக்கையில் கருத்துத் தெரிவிக்க உங்களுக்கு அனுமதி இல்லை.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "நிலுவையில்: {{displayCount}}",
       "skipped": "தவிர்க்கப்பட்டவை: {{displayCount}}",
       "checksCount": "{{displayCount}} சோதனைகள்",
+      "checksCount_one": "{{displayCount}} சோதனை",
+      "checksCount_other": "{{displayCount}} சோதனைகள்",
       "checkDetails": "சோதனை விவரங்கள்"
     },
     "inbox": {
@@ -3058,6 +3062,12 @@
     "privacy": "ஏஜெண்டுகளைப் பார்க்க Kilo-ஐத் திறக்கவும்",
     "openAgents": "ஏஜெண்டுகளைத் திறக்கவும்",
     "needsInput": "உள்ளீடு தேவை",
+    "newestSession": "சமீபத்திய: {{title}}",
+    "noneWaiting": "காத்திருக்கும் ஏஜெண்ட் இல்லை",
+    "newAgent": "புதிய ஏஜெண்ட்",
+    "approving": "ஒப்புதல் அளிக்கப்படுகிறது...",
+    "couldNotApprove": "ஒப்புதல் அளிக்க முடியவில்லை",
+    "couldNotStart": "தொடங்க முடியவில்லை",
     "channelName": "செயலில் உள்ள ஏஜெண்டுகள்",
     "activityKitDisabledBody": "பூட்டுத் திரையில் செயலில் உள்ள ஏஜெண்டுகளைப் பார்க்க, அமைப்புகளில் நேரலைச் செயல்பாடுகளை இயக்கவும்."
   },
@@ -3094,8 +3104,15 @@
     "checkAgain": "மீண்டும் சரிபார்",
     "networkError": "$t(authErrors.networkError)"
   },
+  "appActions": {
+    "start": {
+      "promptRequired": "முகவரியைத் தொடங்க வினவல் தேவை. ஒரு வினவலைச் சேர்த்து மீண்டும் இயக்கவும்.",
+      "repositoryUnknown": "Kilo, {{repository}}-ஐ GitHub அல்லது GitLab களஞ்சியமாக அடையாளம் காணவில்லை. Kilo-வில் வேறு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்.",
+      "repositoryUnsupported": "{{repository}} ஒரு Bitbucket களஞ்சியம் — முகவரியைத் தொடங்கு இதுவரை அதைப் பயன்படுத்த முடியாது. Kilo-வில் வேறு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்."
+    }
+  },
   "launcher": {
-    "newAgent": "புதிய முகவர்",
+    "newAgent": "புதிய ஏஜெண்ட்",
     "openLastSession": "கடைசி அமர்வைத் திறக்கவும்"
   }
 }

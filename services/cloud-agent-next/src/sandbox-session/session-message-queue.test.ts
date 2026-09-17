@@ -5735,6 +5735,17 @@ describe('SandboxSession orchestration', () => {
     );
   });
 
+  it('does not block session deletion on a stalled reference-forget RPC', async () => {
+    const fixture = sessionFixture();
+    fixture.control.forgetSessionReference.mockImplementation(() => new Promise(() => {}));
+    const deletion = fixture.session.deleteSession();
+    await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
+    await deletion;
+    await fixture.flush();
+    expect(fixture.control.forgetSessionReference).toHaveBeenCalledTimes(1);
+    expect(await fixture.session.getMetadata()).toBeNull();
+  });
+
   it.each(['completed', 'failed', 'cancelled'] as const)(
     'settles an early %s outcome once without resurrecting work on acknowledgement',
     async status => {
@@ -8444,7 +8455,7 @@ describe('recovery chunk 1: proof-based wait classification', () => {
       expect(fixture.record('a')?.operations?.prompt).toBeUndefined();
     });
 
-    it('reconciles an ambiguous attach through the existing operation receipt path', async () => {
+    it('reconciles an ambiguous running attach without failing or quarantining the runtime', async () => {
       const fixture = sessionFixture();
       fixture.setStatus({
         physical: 'running',
@@ -8456,11 +8467,12 @@ describe('recovery chunk 1: proof-based wait classification', () => {
         ...authorization('session.attach', 'a', 'attempt-ambiguous'),
         dispatchDeadlineAt: Date.now() + 60_000,
       };
+      const deadlineAt = attachAuthorization.dispatchDeadlineAt;
       fixture.values.set('session_messages', [
         queuedRecord('a', {
           wrapperInstanceId: wrapper,
           preparationAttemptId: attachAuthorization.operationId,
-          deliveryDeadlineAt: attachAuthorization.dispatchDeadlineAt,
+          deliveryDeadlineAt: deadlineAt,
           unresolvedDispatch: true,
           operations: { attach: { authorization: attachAuthorization, dispatched: true } },
         }),
@@ -8476,6 +8488,14 @@ describe('recovery chunk 1: proof-based wait classification', () => {
       await fixture.fireAlarm();
       await fixture.flush();
 
+      expect(fixture.record('a')).toMatchObject({ state: 'queued' });
+      expect(fixture.record('a')?.failedReason).toBeUndefined();
+      expect(fixture.terminalEvents()).toHaveLength(0);
+      expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+      const retryAt = fixture.alarmAt();
+      if (retryAt === null) throw new Error('Missing queue retry alarm');
+      expect(retryAt).toBeLessThanOrEqual(deadlineAt);
+
       // The durable attach proof is reconciled against its original
       // authorization; no second `session.attach` dispatch is attempted.
       expect(
@@ -8483,6 +8503,173 @@ describe('recovery chunk 1: proof-based wait classification', () => {
           ([input]) => input.operation === 'session.operation.get'
         )
       ).toHaveLength(1);
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
+      ).toHaveLength(0);
+    });
+
+    it('resolves a running attach once it completes and then dispatches the prompt', async () => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: wrapper,
+        operationResults: true,
+      });
+      const attachAuthorization: SessionOperationAuthorization = {
+        ...authorization('session.attach', 'a', 'attempt-continuation'),
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      fixture.values.set('session_messages', [
+        queuedRecord('a', {
+          wrapperInstanceId: wrapper,
+          preparationAttemptId: attachAuthorization.operationId,
+          deliveryDeadlineAt: attachAuthorization.dispatchDeadlineAt,
+          unresolvedDispatch: true,
+          operations: { attach: { authorization: attachAuthorization, dispatched: true } },
+        }),
+      ]);
+      let lookups = 0;
+      delegateRequest(fixture, 'session.operation.get', async () => {
+        lookups += 1;
+        if (lookups === 1)
+          return controlResponse({
+            state: 'running',
+            authorization: attachAuthorization,
+            executionDeadlineAt: Date.now() + 60_000,
+          });
+        return controlResponse({
+          state: 'completed',
+          delivery: {
+            version: 2,
+            authorization: attachAuthorization,
+            completedAt: Date.now(),
+            result: { ok: true, result: { attached: true } },
+            events: [],
+            preparing: [],
+          },
+        });
+      });
+
+      await fixture.fireAlarm();
+      await fixture.flush();
+      expect(fixture.record('a')?.state).toBe('queued');
+
+      const retryAt = fixture.alarmAt();
+      if (retryAt === null) throw new Error('Missing queue retry alarm');
+      vi.setSystemTime(retryAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')?.state).toBe('accepted');
+      expect(lookups).toBe(2);
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
+      ).toHaveLength(0);
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
+      ).toHaveLength(1);
+    });
+
+    it('bounds a persistently running attach by the original head deadline', async () => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: wrapper,
+        operationResults: true,
+      });
+      const attachAuthorization: SessionOperationAuthorization = {
+        ...authorization('session.attach', 'a', 'attempt-persistent'),
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      const deadlineAt = attachAuthorization.dispatchDeadlineAt;
+      fixture.values.set('session_messages', [
+        queuedRecord('a', {
+          wrapperInstanceId: wrapper,
+          preparationAttemptId: attachAuthorization.operationId,
+          deliveryDeadlineAt: deadlineAt,
+          unresolvedDispatch: true,
+          operations: { attach: { authorization: attachAuthorization, dispatched: true } },
+        }),
+      ]);
+      delegateRequest(fixture, 'session.operation.get', async () =>
+        controlResponse({
+          state: 'running',
+          authorization: attachAuthorization,
+          executionDeadlineAt: Date.now() + 60_000,
+        })
+      );
+
+      await fixture.fireAlarm();
+      await fixture.flush();
+      expect(fixture.record('a')?.state).toBe('queued');
+
+      let guard = 0;
+      while (fixture.record('a')?.state === 'queued') {
+        if (++guard > 100) throw new Error('Attach reconcile did not reach the head deadline');
+        const retryAt = fixture.alarmAt();
+        if (retryAt === null) throw new Error('Missing queue retry alarm');
+        expect(retryAt).toBeLessThanOrEqual(deadlineAt);
+        vi.setSystemTime(retryAt);
+        await fixture.fireAlarm();
+        await fixture.flush();
+      }
+
+      expect(fixture.record('a')).toMatchObject({
+        state: 'failed',
+        failedReason: 'preparation_timeout',
+        terminalAt: deadlineAt,
+      });
+      expect(fixture.terminalEvents()).toHaveLength(1);
+    });
+
+    it('keeps the existing terminal policy for a completed attach rejection', async () => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: wrapper,
+        operationResults: true,
+      });
+      const attachAuthorization: SessionOperationAuthorization = {
+        ...authorization('session.attach', 'a', 'attempt-rejected'),
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      fixture.values.set('session_messages', [
+        queuedRecord('a', {
+          wrapperInstanceId: wrapper,
+          preparationAttemptId: attachAuthorization.operationId,
+          deliveryDeadlineAt: attachAuthorization.dispatchDeadlineAt,
+          unresolvedDispatch: true,
+          operations: { attach: { authorization: attachAuthorization, dispatched: true } },
+        }),
+      ]);
+      delegateRequest(fixture, 'session.operation.get', async () =>
+        controlResponse({
+          state: 'completed',
+          delivery: {
+            version: 2,
+            authorization: attachAuthorization,
+            completedAt: Date.now(),
+            result: {
+              ok: false,
+              error: { code: 'not_ready', message: 'attach failed', retryable: false },
+            },
+            events: [],
+            preparing: [],
+          },
+        })
+      );
+
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')).toMatchObject({
+        state: 'failed',
+        failedReason: 'attach_exhausted',
+      });
+      expect(fixture.terminalEvents()).toHaveLength(1);
       expect(
         fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
       ).toHaveLength(0);

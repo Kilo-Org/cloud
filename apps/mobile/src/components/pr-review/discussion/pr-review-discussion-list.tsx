@@ -149,6 +149,10 @@ export function PrReviewDiscussionList({
               <View className="gap-2.5 rounded-xl border border-border bg-card p-3.5">
                 <CommentRow
                   comment={item.comment}
+                  owner={owner}
+                  repo={repo}
+                  number={number}
+                  commentKind="conversation"
                   readOnly
                   // s6: reactions render only when the provider exposes them;
                   // a provider without them shows no reaction row at all.

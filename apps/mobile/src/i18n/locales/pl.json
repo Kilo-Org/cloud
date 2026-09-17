@@ -2402,6 +2402,10 @@
     "checkConnection": "Sprawdź połączenie",
     "checks": {
       "checksCount": "kontrole: {{displayCount}}",
+      "checksCount_one": "kontrola: {{displayCount}}",
+      "checksCount_few": "kontrole: {{displayCount}}",
+      "checksCount_many": "kontroli: {{displayCount}}",
+      "checksCount_other": "kontrole: {{displayCount}}",
       "couldNotLoad": "Nie udało się wczytać kontroli.",
       "failed": "nieudane: {{displayCount}}",
       "noAccess": "Nie masz dostępu do kontroli tego repozytorium.",
@@ -2501,6 +2505,8 @@
       "replyBody": "Treść odpowiedzi",
       "replyForbidden": "Nie masz uprawnień do odpowiadania w tym PR.",
       "addCommentCta": "Skomentuj ten PR",
+      "fixWithKilo": "Napraw z Kilo",
+      "fixWithKiloPrompt": "Rozwiąż następujący komentarz w tym PR: {{link}}",
       "commentBadRequest": "Tego komentarza nie można opublikować. PR mógł się zmienić.",
       "commentForbidden": "Nie masz uprawnień do komentowania w tym PR.",
       "replyPlaceholder": "Odpowiedź…",
@@ -3104,6 +3110,12 @@
     "privacy": "Otwórz Kilo, aby zobaczyć agentów",
     "openAgents": "Otwórz listę agentów",
     "needsInput": "Czeka na odpowiedź",
+    "newestSession": "Najnowsza: {{title}}",
+    "noneWaiting": "Żaden agent nie czeka",
+    "newAgent": "Nowy agent",
+    "approving": "Zatwierdzanie...",
+    "couldNotApprove": "Nie udało się zatwierdzić",
+    "couldNotStart": "Nie udało się uruchomić",
     "channelName": "Aktywni agenci",
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
   },
@@ -3139,6 +3151,13 @@
     "remoteFound": "Komputer połączony",
     "checkAgain": "Sprawdź ponownie",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Uruchomienie agenta wymaga polecenia. Dodaj polecenie i uruchom go ponownie.",
+      "repositoryUnknown": "Kilo nie rozpoznaje {{repository}} jako repozytorium GitHub lub GitLab. Wybierz inne repozytorium w Kilo.",
+      "repositoryUnsupported": "{{repository}} to repozytorium Bitbucket — Uruchom agenta nie może jeszcze go użyć. Wybierz inne repozytorium w Kilo."
+    }
   },
   "launcher": {
     "newAgent": "Nowy agent",

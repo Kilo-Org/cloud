@@ -2374,6 +2374,8 @@
     "checkConnection": "檢查連線",
     "checks": {
       "checksCount": "{{displayCount}} 項檢查",
+      "checksCount_one": "{{displayCount}} 項檢查",
+      "checksCount_other": "{{displayCount}} 項檢查",
       "couldNotLoad": "無法載入檢查。",
       "failed": "{{displayCount}} 項失敗",
       "noAccess": "你沒有權限檢視此存放庫的檢查結果。",
@@ -2473,6 +2475,8 @@
       "replyBody": "回覆內容",
       "replyForbidden": "你沒有權限回覆此提取請求。",
       "addCommentCta": "對此提取請求留言",
+      "fixWithKilo": "使用 Kilo 修復",
+      "fixWithKiloPrompt": "請處理以下提取請求留言：{{link}}",
       "commentBadRequest": "無法發佈此留言。此提取請求可能已變更。",
       "commentForbidden": "你沒有權限在此提取請求留言。",
       "replyPlaceholder": "回覆…",
@@ -3058,6 +3062,12 @@
     "privacy": "開啟 Kilo 以查看代理程式",
     "openAgents": "開啟代理程式",
     "needsInput": "等待輸入",
+    "newestSession": "最新: {{title}}",
+    "noneWaiting": "沒有等待中的代理程式",
+    "newAgent": "新增代理程式",
+    "approving": "正在核准...",
+    "couldNotApprove": "無法核准",
+    "couldNotStart": "無法開始",
     "channelName": "執行中的代理程式",
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。"
   },
@@ -3093,6 +3103,13 @@
     "remoteFound": "電腦已連線",
     "checkAgain": "重新檢查",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "啟動代理程式需要提示詞。請新增提示詞後重新執行。",
+      "repositoryUnknown": "Kilo 無法將 {{repository}} 辨識為 GitHub 或 GitLab 存放庫。請在 Kilo 中選擇其他存放庫。",
+      "repositoryUnsupported": "{{repository}} 是 Bitbucket 存放庫——啟動代理程式暫時無法使用它。請在 Kilo 中選擇其他存放庫。"
+    }
   },
   "launcher": {
     "newAgent": "新增代理程式",

@@ -2388,6 +2388,9 @@
     "checkConnection": "בדיקת החיבור",
     "checks": {
       "checksCount": "{{displayCount}} בדיקות",
+      "checksCount_one": "{{displayCount}} בדיקה",
+      "checksCount_two": "{{displayCount}} בדיקות",
+      "checksCount_other": "{{displayCount}} בדיקות",
       "couldNotLoad": "לא ניתן היה לטעון את הבדיקות.",
       "failed": "{{displayCount}} נכשלו",
       "noAccess": "אין לך גישה לבדיקות של המאגר הזה.",
@@ -2487,6 +2490,8 @@
       "replyBody": "תוכן התשובה",
       "replyForbidden": "אין לך הרשאה להשיב לבקשת המשיכה הזו.",
       "addCommentCta": "הגב על בקשת המשיכה הזו",
+      "fixWithKilo": "תקן עם Kilo",
+      "fixWithKiloPrompt": "נא לטפל בתגובה הבאה על בקשת המשיכה: {{link}}",
       "commentBadRequest": "לא ניתן לפרסם את התגובה הזו. ייתכן שבקשת המשיכה השתנתה.",
       "commentForbidden": "אין לך הרשאה להגיב על בקשת המשיכה הזו.",
       "replyPlaceholder": "תשובה…",
@@ -3081,6 +3086,12 @@
     "privacy": "פתיחת Kilo להצגת הסוכנים",
     "openAgents": "הצגת הסוכנים",
     "needsInput": "נדרש קלט",
+    "newestSession": "החדש ביותר: {{title}}",
+    "noneWaiting": "אין סוכנים בהמתנה",
+    "newAgent": "סוכן חדש",
+    "approving": "מאשר...",
+    "couldNotApprove": "לא ניתן לאשר",
+    "couldNotStart": "לא ניתן להתחיל",
     "channelName": "סוכנים פעילים",
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
   },
@@ -3116,6 +3127,13 @@
     "remoteFound": "המחשב חובר",
     "checkAgain": "בדוק שוב",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "כדי להפעיל סוכן נדרשת הנחיה. הוסף הנחיה והפעל שוב.",
+      "repositoryUnknown": "Kilo לא מזהה את {{repository}} כמאגר GitHub או GitLab. בחר מאגר אחר ב-Kilo.",
+      "repositoryUnsupported": "{{repository}} הוא מאגר Bitbucket — הפעל סוכן עדיין לא יכול להשתמש בו. בחר מאגר אחר ב-Kilo."
+    }
   },
   "launcher": {
     "newAgent": "סוכן חדש",

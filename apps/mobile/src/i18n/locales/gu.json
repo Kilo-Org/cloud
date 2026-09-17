@@ -480,6 +480,8 @@
       "replyBadRequest": "આ જવાબ પોસ્ટ કરી શકાતો નથી. થ્રેડ બદલાયો હોઈ શકે છે.",
       "replyForbidden": "તમને આ પુલ રિક્વેસ્ટ પર જવાબ આપવાની પરવાનગી નથી.",
       "addCommentCta": "આ પુલ રિક્વેસ્ટ પર ટિપ્પણી કરો",
+      "fixWithKilo": "Kilo વડે ઠીક કરો",
+      "fixWithKiloPrompt": "કૃપા કરીને નીચેની પુલ રિક્વેસ્ટ ટિપ્પણી સંભાળો: {{link}}",
       "commentBadRequest": "આ ટિપ્પણી પોસ્ટ કરી શકાતી નથી. પુલ રિક્વેસ્ટ બદલાયો હોઈ શકે છે.",
       "commentForbidden": "તમને આ પુલ રિક્વેસ્ટ પર ટિપ્પણી કરવાની પરવાનગી નથી.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} બાકી",
       "skipped": "{{displayCount}} છોડેલી",
       "checksCount": "{{displayCount}} તપાસો",
+      "checksCount_one": "{{displayCount}} તપાસ",
+      "checksCount_other": "{{displayCount}} તપાસો",
       "checkDetails": "તપાસની વિગતો"
     },
     "inbox": {
@@ -3058,6 +3062,12 @@
     "privacy": "એજન્ટો જોવા માટે Kilo ખોલો",
     "openAgents": "એજન્ટો ખોલો",
     "needsInput": "જવાબ જરૂરી",
+    "newestSession": "સૌથી નવું: {{title}}",
+    "noneWaiting": "કોઈ એજન્ટ રાહ જોતો નથી",
+    "newAgent": "નવો એજન્ટ",
+    "approving": "મંજૂર કરવામાં આવી રહ્યું છે...",
+    "couldNotApprove": "મંજૂર કરી શકાયું નથી",
+    "couldNotStart": "શરૂ કરી શકાયું નથી",
     "channelName": "સક્રિય એજન્ટો",
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો."
   },
@@ -3093,6 +3103,13 @@
     "remoteFound": "કમ્પ્યુટર કનેક્ટ થયું",
     "checkAgain": "ફરી તપાસો",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "એજન્ટ શરૂ કરવા માટે પ્રોમ્પ્ટ જરૂરી છે. પ્રોમ્પ્ટ ઉમેરો અને ફરી ચલાવો.",
+      "repositoryUnknown": "Kilo {{repository}} ને GitHub કે GitLab રિપોઝિટરી તરીકે ઓળખતું નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો.",
+      "repositoryUnsupported": "{{repository}} એ Bitbucket રિપોઝિટરી છે — એજન્ટ શરૂ કરો હજી તેનો ઉપયોગ કરી શકતું નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો."
+    }
   },
   "launcher": {
     "newAgent": "નવો એજન્ટ",

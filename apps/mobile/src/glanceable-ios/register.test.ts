@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
     endImmediate: vi.fn(),
     startOrUpdate: vi.fn(),
   },
+  // The Home Screen widget's App Intent buttons (the timeline-patch sweep) and
+  // the Live Activity's Approve control are two registrations with two
+  // listeners, so both modules are mocked here.
+  registerWidgetActionHandling: vi.fn(),
   registerApprove: vi.fn((_approve: () => Promise<void>) => vi.fn()),
   approveFrontAgent: vi.fn().mockResolvedValue({ kind: 'approved' }),
 }));
@@ -25,6 +29,9 @@ vi.mock('./active-agents-live-activity', () => ({
 vi.mock('./active-agents-widget', () => ({
   refreshActiveAgentsWidgetCopy: vi.fn(),
 }));
+vi.mock('./widget-actions', () => ({
+  registerWidgetActionHandling: mocks.registerWidgetActionHandling,
+}));
 vi.mock('./approve-action', () => ({
   registerGlanceableApproveAction: mocks.registerApprove,
 }));
@@ -42,6 +49,7 @@ describe('glanceable-ios register', () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mocks.registerWidgetActionHandling.mockClear();
   });
 
   it('does not register the iOS sink on Android', async () => {
@@ -59,6 +67,20 @@ describe('glanceable-ios register', () => {
     const { getGlanceableSinks } = await import('@/lib/glanceable/sink-registry');
     await import('./register');
     expect(getGlanceableSinks()).toContain(mocks.iosSink);
+  });
+
+  it('subscribes the widget press handling on iOS', async () => {
+    mocks.platform.OS = 'ios';
+    vi.resetModules();
+    await import('./register');
+    expect(mocks.registerWidgetActionHandling).toHaveBeenCalledTimes(1);
+  });
+
+  it('subscribes no widget press handling on Android', async () => {
+    mocks.platform.OS = 'android';
+    vi.resetModules();
+    await import('./register');
+    expect(mocks.registerWidgetActionHandling).not.toHaveBeenCalled();
   });
 
   it('wires the Live Activity approve press to the front-approval service', async () => {

@@ -240,14 +240,26 @@ async function redactedErrorResponse(response: Response) {
   );
 }
 
+const BYOK_MODEL_PERMISSION_DENIED_MESSAGE =
+  '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.';
+
+const OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE =
+  '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.';
+
 const byokErrorMessages: Record<number, string> = {
   401: '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.',
   402: '[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider.',
-  403: '[BYOK] Your API key does not have permission to access this resource. Please check your API key permissions.',
+  403: BYOK_MODEL_PERMISSION_DENIED_MESSAGE,
   429: '[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.',
 };
 
-function byokErrorMessage(status: number): string | undefined {
+function byokErrorMessage(
+  status: number,
+  userByokProviderIds: UserByokProviderId[]
+): string | undefined {
+  if (status === 403 && userByokProviderIds.includes('opencode-go')) {
+    return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
+  }
   return byokErrorMessages[status];
 }
 
@@ -336,7 +348,7 @@ export async function makeErrorReadable({
   if (vertexByokResponse) return vertexByokResponse;
 
   if (userByokProviderIds !== null) {
-    const byokMessage = byokErrorMessage(response.status);
+    const byokMessage = byokErrorMessage(response.status, userByokProviderIds);
     if (byokMessage) {
       warnExceptInTest(`Responding with ${response.status} ${byokMessage}`);
       return NextResponse.json(

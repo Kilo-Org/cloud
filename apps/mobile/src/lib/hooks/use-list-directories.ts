@@ -83,8 +83,9 @@ const LISTING_RETRY_RESEND_DELAY_MS = 1200;
 /**
  * One-level directory listing client for the folder picker.
  *
- * React Query owns the per-path cache, the in-flight dedupe and the error
- * state; the query key `['list-directories', connectionId, path]` replaces the
+ * React Query owns the per-path cache, the in-flight dedupe, the error state
+ * and the abort signal that ends the Retry loop when the picker unmounts; the
+ * query key `['list-directories', connectionId, path]` replaces the
  * hand-rolled per-path cache and the generation counter whose only job was to
  * drop a result for a path the user had already left. `listDirectoriesOnConnection`
  * never throws, so the SDK remains the classifier and this hook only projects
@@ -117,7 +118,7 @@ export function useListDirectories(connectionId: string | null): UseListDirector
 
   const query = useQuery<DirectoryEntry[]>({
     queryKey: ['list-directories', connectionId, path],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       // `enabled` guarantees both are set; the guard narrows the types and
       // keeps the queryFn total for the impossible case.
       if (connectionId === null || path === null) {
@@ -131,6 +132,14 @@ export function useListDirectories(connectionId: string | null): UseListDirector
       const maxSends = isRetry ? LISTING_RETRY_MAX_SENDS : 1;
       let nudged = false;
       for (let send = 1; ; send += 1) {
+        // React Query aborts this signal when the picker unmounts and clears
+        // the connection's listings. The paced Retry must not keep sending for
+        // a screen that is gone: stop before the next send. `withDeadline`
+        // below takes the same signal, so an abort during a send settles that
+        // wait immediately instead of holding it to its deadline.
+        if (signal.aborted) {
+          throw new Error('directory listing cancelled');
+        }
         const remaining = deadlineAt - Date.now();
         if (remaining <= 0) {
           throw new Error('directory listing unavailable');
@@ -149,14 +158,18 @@ export function useListDirectories(connectionId: string | null): UseListDirector
           connection.retryConnection();
         }
         // eslint-disable-next-line no-await-in-loop -- each send must settle before the next: what the send failed with is what the next send reacts to
-        const result = await withDeadline(remaining, async () => {
-          const listing = await listDirectoriesOnConnection(
-            connection,
-            connectionId,
-            path === '' ? undefined : path
-          );
-          return listing;
-        });
+        const result = await withDeadline(
+          remaining,
+          async () => {
+            const listing = await listDirectoriesOnConnection(
+              connection,
+              connectionId,
+              path === '' ? undefined : path
+            );
+            return listing;
+          },
+          signal
+        );
         if (result.ok) {
           return result.directories;
         }

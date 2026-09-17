@@ -211,6 +211,48 @@ describe('useListDirectories transport failures, nudges and retry pacing', () =>
     unmount();
   });
 
+  it('stops the Retry loop when the picker unmounts mid-attempt', async () => {
+    // React Query aborts the query when the picker unmounts (its cleanup drops
+    // the connection's listings); the paced Retry loop must observe that and
+    // stop sending for a screen that is gone.
+    vi.useFakeTimers();
+    try {
+      listFn.mockResolvedValue({ ok: false, reason: 'transport' });
+      const { api, renderer } = await mount('conn-1');
+
+      act(() => {
+        api().list('src');
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(listFn).toHaveBeenCalledTimes(1);
+
+      // The Retry CTA repeats the path on screen: the loop paces its sends and
+      // is waiting out its first resend delay when the picker unmounts.
+      act(() => {
+        api().list('src');
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(listFn).toHaveBeenCalledTimes(2);
+
+      act(() => {
+        renderer.unmount();
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+
+      // The abort ends the loop: no send after the unmount, whatever the
+      // remaining Retry budget.
+      expect(listFn).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('leaves a connected transport alone when Retry only refetches', async () => {
     listFn.mockResolvedValue({ ok: false, reason: 'transport' });
     const { api, unmount } = await mount('conn-1');

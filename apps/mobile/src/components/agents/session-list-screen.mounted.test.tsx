@@ -831,7 +831,7 @@ describe('AgentSessionListScreen live presentation', () => {
       nodes('FlatList')[0]?.props.contentContainerStyle as Record<string, number>;
     expect(contentContainerStyle()).toEqual({
       paddingTop: 0,
-      paddingBottom: state.tabBarHeight + 64,
+      paddingBottom: 0,
       paddingLeft: 0,
       paddingRight: 0,
     });
@@ -842,10 +842,21 @@ describe('AgentSessionListScreen live presentation', () => {
     await renderScreen();
     expect(contentContainerStyle()).toEqual({
       paddingTop: 0,
-      paddingBottom: state.tabBarHeight + 64,
+      paddingBottom: 0,
       paddingLeft: 47,
       paddingRight: 59,
     });
+  });
+
+  it('insets the live list viewport by the FAB band so no row sits under the button', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    // The viewport must end above the band on both platforms: a frame margin
+    // shrinks the list, where a content or frame padding would let iOS rows
+    // park under the bar (and a content inset only cleared the row under the
+    // button once the user scrolled).
+    const listStyle = () => nodes('FlatList')[0]?.props.style as Record<string, number>;
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight + 64 });
   });
 
   it('renders no history list, animated wrappers, or active-now section and keeps one history label without a plus icon', async () => {

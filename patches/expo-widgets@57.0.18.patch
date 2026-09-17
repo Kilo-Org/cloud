@@ -318,6 +318,118 @@ index 4b8a632..7f4524c 100644
      let activeIDs = Set(activities.map(\.id))
      instances = instances.filter { activeIDs.contains($0.key) }
  
+diff --git a/ios/Widgets/AppIntent.swift b/ios/Widgets/AppIntent.swift
+index 972fa4f..97c1a0f 100644
+--- a/ios/Widgets/AppIntent.swift
++++ b/ios/Widgets/AppIntent.swift
+@@ -100,6 +100,17 @@ struct WidgetUserInteraction: AppIntent {
+   }
+ }
+ 
++/// The one press event both Live Activity intents send. The app's JavaScript
++/// listener is the single handler for a button press, so which intent ran is
++/// not something the app has to tell apart.
++func sendLiveActivityUserInteraction(source: String?, target: String?) {
++  WidgetsEvents.shared.sendNotification(type: .userEvent, data: [
++    "source": source as Any,
++    "target": target as Any,
++    "timestamp": Int(Date().timeIntervalSince1970 * 1000)
++  ])
++}
++
+ @available(iOS 16.0, *)
+ struct LiveActivityUserInteraction: LiveActivityIntent {
+   // title is not used for non-discoverable intents, but it is required
+@@ -119,11 +130,40 @@ struct LiveActivityUserInteraction: LiveActivityIntent {
+   }
+ 
+   func perform() async throws -> some IntentResult {
+-    WidgetsEvents.shared.sendNotification(type: .userEvent, data: [
+-      "source": source as Any,
+-      "target": target as Any,
+-      "timestamp": Int(Date().timeIntervalSince1970 * 1000)
+-    ])
++    sendLiveActivityUserInteraction(source: source, target: target)
++
++    return .result()
++  }
++}
++
++/// The intent a button whose press must land the user inside the app uses.
++///
++/// A Live Activity intent performs in the app's process without bringing it
++/// forward, so a press that only stashes a destination would run where the
++/// user cannot see it. `openAppWhenRun` asks the system for the foreground, so
++/// the app is up — and its press listener attached — when the destination the
++/// press records is consumed.
++@available(iOS 16.0, *)
++struct LiveActivityOpenInteraction: LiveActivityIntent {
++  // title is not used for non-discoverable intents, but it is required
++  static var title: LocalizedStringResource = "Open App"
++  static var isDiscoverable: Bool = false
++  static var openAppWhenRun: Bool = true
++
++  @Parameter(title: "source")
++  var source: String?
++
++  @Parameter(title: "target")
++  var target: String?
++
++  init() {}
++  init(source: String?, target: String?) {
++    self.source = source
++    self.target = target
++  }
++
++  func perform() async throws -> some IntentResult {
++    sendLiveActivityUserInteraction(source: source, target: target)
+ 
+     return .result()
+   }
+diff --git a/ios/Widgets/Buttons.swift b/ios/Widgets/Buttons.swift
+index 55fb9b3..e13e8ea 100644
+--- a/ios/Widgets/Buttons.swift
++++ b/ios/Widgets/Buttons.swift
+@@ -1,4 +1,5 @@
+ import SwiftUI
++import AppIntents
+ import ExpoModulesCore
+ import ExpoUI
+ 
+@@ -7,6 +8,11 @@ final class ButtonProps: ExpoUI.ButtonProps {
+   @Field var target: String?
+   @Field var entryIndex: Int?
+   @Field var environmentString: String?
++  /// Whether this button's press opens the app. A Live Activity intent performs
++  /// in the app's process without foregrounding it, so a button whose press has
++  /// to show the user something declares this and gets the intent variant that
++  /// asks the system for the foreground.
++  @Field var openAppWhenRun: Bool?
+ }
+ 
+ @available(iOS 17.0, *)
+@@ -41,12 +47,17 @@ struct LiveActivityButtonView: ExpoSwiftUI.View {
+   @ObservedObject var props: ButtonProps
+ 
+   var body: some View {
++    if props.openAppWhenRun == true {
++      button(intent: LiveActivityOpenInteraction(source: props.source, target: props.target))
++    } else {
++      button(intent: LiveActivityUserInteraction(source: props.source, target: props.target))
++    }
++  }
++
++  private func button<I: AppIntent>(intent: I) -> some View {
+     SwiftUI.Button(
+       role: props.role?.toNativeRole(),
+-      intent: LiveActivityUserInteraction(
+-        source: props.source,
+-        target: props.target
+-      )
++      intent: intent
+     ) {
+       if let label = props.label {
+         if let systemImage = props.systemImage {
 diff --git a/ios/Widgets/Utils.swift b/ios/Widgets/Utils.swift
 index 2b4c044..e5a0b1e 100644
 --- a/ios/Widgets/Utils.swift

@@ -7,6 +7,7 @@ import {
   SPEND_ALERTS_FORBIDDEN,
   SPEND_ALERTS_LOAD_ERROR,
   SPEND_ALERTS_OFF_IN_NOTIFICATIONS,
+  SPEND_ALERTS_PANEL_SLOT_CLASS,
   SPEND_ALERTS_PUSH_NEEDS_DEVICE,
   SPEND_ALERTS_SAVE_ERROR,
   THRESHOLD_FIELD_ERROR,
@@ -571,5 +572,88 @@ describe('saved settings vs the never-configured empty state', () => {
     expect(panelControlsVisible({ enabled: true }, false)).toBe(true);
     expect(panelControlsVisible({ enabled: false }, true)).toBe(true);
     expect(panelControlsVisible({ enabled: true }, true)).toBe(true);
+  });
+});
+
+/**
+ * The tallest ready form measured in each band, by CDP probe on the personal
+ * and organization spend views with the settings saved and the push channel
+ * blocked (the tallest state: every rule carries the "Get the mobile app"
+ * note). The form's height is a step function of the card width because its
+ * copy wraps, so a band has to cover its whole range's worst case, not the
+ * common one.
+ *
+ * The `>= 580px` row is the reviewed e3/e8 evidence rather than a single
+ * measurement: the e3 run reported the loading slot at 752px and the saved,
+ * enabled form at 804px on the organization usage-details view at a 1024px
+ * viewport, and the e8 sweep recorded 816px for the blocked-push form at
+ * 1024-1080px viewports. Both numbers have to fit under one floor because the
+ * element query that picks the band can resolve to `>= 580px` for either.
+ *
+ * The band below a 310px card is deliberately absent: there the form's height
+ * grows without bound as the copy wraps one word per line (1101px at a 238px
+ * card, 1354px at 138px), so no finite floor closes it. That band keeps the
+ * pre-existing 66rem; the narrower spend views are a phone-width web layout
+ * this panel does not target for shift-free reservation.
+ */
+const WORST_READY_FORM_HEIGHT_BY_CARD_WIDTH = [
+  { fromPx: 310, toPx: 380, worstPx: 892.5 },
+  { fromPx: 380, toPx: 580, worstPx: 871.5 },
+  { fromPx: 580, toPx: Number.POSITIVE_INFINITY, worstPx: 816 },
+];
+
+type SlotBand = { minCardWidthPx: number; minHeightPx: number };
+
+/** `min-h-[66rem] @min-[310px]:min-h-[58rem] ...` → the bands it reserves. */
+function parseSlotBands(classText: string): SlotBand[] {
+  const matches = classText.matchAll(/(?:@min-\[(\d+)px\]:)?min-h-\[(\d+)rem\]/g);
+  return [...matches].map(match => ({
+    minCardWidthPx: match[1] === undefined ? 0 : Number(match[1]),
+    minHeightPx: Number(match[2]) * 16,
+  }));
+}
+
+function reserveAt(bands: SlotBand[], cardWidthPx: number): number {
+  const band = bands
+    .filter(candidate => candidate.minCardWidthPx <= cardWidthPx)
+    .sort((a, b) => a.minCardWidthPx - b.minCardWidthPx)
+    .at(-1);
+  if (band === undefined) throw new Error(`no slot band covers a ${cardWidthPx}px card`);
+  return band.minHeightPx;
+}
+
+describe('panel slot reservation', () => {
+  const bands = parseSlotBands(SPEND_ALERTS_PANEL_SLOT_CLASS);
+
+  it('reserves from a base band for the narrowest card', () => {
+    expect(bands[0]?.minCardWidthPx).toBe(0);
+  });
+
+  it('never shrinks the reservation as the card grows', () => {
+    for (let index = 1; index < bands.length; index += 1) {
+      expect(bands[index]!.minHeightPx).toBeLessThanOrEqual(bands[index - 1]!.minHeightPx);
+    }
+  });
+
+  it('covers the worst ready-form height in every band', () => {
+    for (const band of WORST_READY_FORM_HEIGHT_BY_CARD_WIDTH) {
+      // Checked at both edges: a reserved boundary dropped inside a measured
+      // band would lower the reservation partway through it.
+      const edges = [band.fromPx];
+      if (Number.isFinite(band.toPx)) edges.push(band.toPx - 1);
+      for (const cardWidthPx of edges) {
+        expect(reserveAt(bands, cardWidthPx)).toBeGreaterThanOrEqual(band.worstPx);
+      }
+    }
+  });
+
+  it('covers the e3 form height at every card width that view reported', () => {
+    // The e3 probe measured an 804px saved form on the organization
+    // usage-details view at a 1024px viewport, with the loading slot at 752px.
+    // The card widths that view produces are 370px (with the organization
+    // sidebar) and 786px (wide), and whichever band the element query lands on
+    // has to be at least as tall as that form.
+    expect(reserveAt(bands, 370)).toBeGreaterThanOrEqual(804);
+    expect(reserveAt(bands, 786)).toBeGreaterThanOrEqual(804);
   });
 });

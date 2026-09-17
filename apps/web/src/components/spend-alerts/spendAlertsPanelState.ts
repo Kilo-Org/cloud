@@ -71,6 +71,49 @@ export const MULTIPLIER_FIELD_ERROR = 'Enter a spike multiplier between 1x and 5
  */
 export const MOBILE_APP_SETUP_HREF = 'https://kilo.ai/mobile';
 
+/**
+ * The reserved height of the panel's slot: every render state (loading,
+ * load-error, forbidden, ready) puts a Card carrying this class inside a
+ * `@container` wrapper, so the slot is at least as tall as the ready form needs
+ * at the card's own width and the dashboard below never moves when the settings
+ * arrive, fail, or are refused.
+ *
+ * The ready form's height is a step function of the card width, not a single
+ * number: the rule descriptions and the push channel note wrap differently
+ * across a window of card widths, and how tall that window's step is varies
+ * with the host's text metrics and with whether push is blocked. The bands
+ * therefore reserve the *worst reported* ready-form height for their whole
+ * range, not the common one — a form below the floor costs nothing but the
+ * space the slot already holds.
+ *
+ * The `>= 580px` band was the one that shrank under the ready form: the e3 run
+ * measured the loading slot at 47rem (752px) and the saved, enabled form at
+ * 804px on the organization usage-details view at a 1024px viewport, so the
+ * cards below the panel jumped 52px as the settings arrived
+ * (`e3-slot-1024.log`). The e8 sweep recorded the same shape at 816px once the
+ * push channel is blocked ("Get the mobile app" on both rules), and this band
+ * has to cover both numbers under every resolution of the element query, so it
+ * has no upper width boundary: a card whose width resolves the query to
+ * `>= 580px` gets 52rem (832px). Narrower cards keep their own, larger floors
+ * (measured worst 871.5px in 380-579px and 892.5px in 310-379px).
+ *
+ * Below a 310px card the form's height grows without bound as the copy wraps
+ * one word per line (1101px at a 238px card, 1354px at 138px), so no finite
+ * floor closes that band; it keeps the pre-existing 66rem.
+ *
+ * `spendAlertsPanelState.test.ts` parses this class and asserts that each band
+ * covers the worst ready-form height recorded for it, so the numbers cannot
+ * drift apart again. The constant lives in this React-free module for that
+ * test: the web suite matches `*.test.ts` only, so a class written inline in
+ * the component could not be pinned this way.
+ *
+ * The class string is written as one literal (rather than composed from a band
+ * table) because Tailwind only generates utilities for candidates it can read
+ * verbatim from the source.
+ */
+export const SPEND_ALERTS_PANEL_SLOT_CLASS =
+  'min-h-[66rem] @min-[310px]:min-h-[58rem] @min-[380px]:min-h-[55rem] @min-[580px]:min-h-[52rem]';
+
 /** One rule as the router returns it: USD threshold, basis-point multiplier. */
 export type SpendAlertRuleWire = {
   kind: SpendAlertRuleKind;

@@ -24,6 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import {
   SPEND_ALERTS_OFF_COPY,
+  SPEND_ALERTS_PANEL_SLOT_CLASS,
   SPEND_ALERTS_SAVED,
   SPEND_ALERT_WINDOW_HOURS,
   WINDOW_LABELS,
@@ -50,16 +51,10 @@ import {
  * `md`, and the organization usage-details view adds a second sidebar at `lg`,
  * which squeezes the card to ~385px while the viewport is still wide enough for
  * the two-column rule fields. The rule descriptions and the channel notes then
- * wrap, and the fields themselves collapse to one column below `sm`. Measured
- * ready-form content height by card width, worst case over the viewports that
- * produce it, on the personal and organization spend views:
- *
- * | card width | content | slot  |
- * |------------|---------|-------|
- * | < 310px    | ≤1045px | 66rem |
- * | 310-379px  | ≤917px  | 58rem |
- * | 380-579px  | ≤872px  | 55rem |
- * | ≥ 580px    | ≤731px  | 47rem |
+ * wrap, and the fields themselves collapse to one column below `sm`. The
+ * reserved heights per band, and the worst ready-form height each one covers,
+ * live next to the class in `spendAlertsPanelState.ts`; the unit test there
+ * holds the two together.
  *
  * The bands are element queries rather than media queries because the card
  * width, not the viewport, is what wraps the form: the personal spend view has
@@ -68,8 +63,7 @@ import {
  * blocks) and the form render into this same slot, so the two phases are the
  * same height and nothing below moves.
  */
-const PANEL_SLOT_CLASS =
-  'min-h-[66rem] @min-[310px]:min-h-[58rem] @min-[380px]:min-h-[55rem] @min-[580px]:min-h-[47rem]';
+const PANEL_SLOT_CLASS = SPEND_ALERTS_PANEL_SLOT_CLASS;
 
 /**
  * The container that {@link PANEL_SLOT_CLASS}'s element query measures. A

@@ -338,7 +338,10 @@ export function SignInForm({
                       </div>
                       <div className="space-y-2">
                         <AuthProviderButtons
-                          providers={withoutChatGptWhenUnavailable(OAuthProviderIds, chatGptAllowed)}
+                          providers={withoutChatGptWhenUnavailable(
+                            OAuthProviderIds,
+                            chatGptAllowed
+                          )}
                           onProviderClick={flow.handleOAuthClick}
                         />
                       </div>

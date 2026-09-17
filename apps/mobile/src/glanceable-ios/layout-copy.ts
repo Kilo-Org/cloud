@@ -57,10 +57,13 @@ export function glanceableLayoutCopy() {
     running: i18n.t('common.working'),
     idle: i18n.t('common.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
-    // The Live Activity's Approve control. `common.approve` is the existing
-    // label the permission card uses, so the wrist control and the phone name
-    // the same action; `check:i18n` forbids a second key with the same copy.
+    // The Live Activity's two buttons. Approve answers the recorded ask under
+    // the existing `common.approve` label the permission card and the wrist
+    // control use; Open navigates to the recorded session, under the key the
+    // Android notification's Open action reads, so the two surfaces cannot
+    // drift — one key each, and `check:i18n` forbids a second with the same copy.
     approve: i18n.t('common.approve'),
+    open: i18n.t('glanceable.openSession'),
     locale: resolveGlanceableLocale(i18n.language),
     digits: glanceableDigits(),
   };

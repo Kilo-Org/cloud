@@ -13,12 +13,22 @@ import {
   setLiveActivityEnabledValue,
 } from '@/lib/glanceable/live-activity-switch';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
+import {
+  _resetGlanceablePersistForTests,
+  _setLastGlanceableSnapshotForTests,
+  _setSecureStoreForTests,
+} from '@/lib/glanceable/persist';
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
 import {
   registerGlanceableSink,
   setGlanceableDelivery,
   unregisterGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
+import {
+  _resetWaitingAskForTests,
+  recordWaitingAsk,
+  type WaitingAsk,
+} from '@/lib/glanceable/waiting-ask';
 
 import {
   _resetIosSinkForTests,
@@ -26,6 +36,8 @@ import {
   clearActivityKitDeniedIfAvailable,
   getActivityKitDenied,
   iosSink,
+  renderStoredSnapshotWithNotice,
+  setGlanceableActionNotice,
 } from './ios-sink';
 import {
   buildGlanceableLiveActivityContentState,
@@ -160,6 +172,20 @@ vi.mock('expo-widgets', () => ({
 const NOW = 1_750_000_000_000;
 const CTX = { userId: 'u1', organizationId: null };
 
+// Fake SecureStore surface so the persisted-snapshot read never loads the
+// native module; the notice path reads the mirror a background press leaves.
+const secureStore = new Map<string, string>();
+const secureStoreMock = {
+  setItemAsync: async (key: string, value: string) => {
+    secureStore.set(key, value);
+    await Promise.resolve();
+  },
+  getItemAsync: async (key: string) => {
+    await Promise.resolve();
+    return secureStore.get(key) ?? null;
+  },
+};
+
 const subscriptions = new Set<string>();
 const delivery = {
   registerScopeTokens: vi.fn(() => subscriptions.add('scope')),
@@ -198,6 +224,10 @@ function snapshotFor(
 beforeEach(() => {
   _resetLiveActivitySwitchForTests();
   _resetIosSinkForTests();
+  _resetWaitingAskForTests();
+  _resetGlanceablePersistForTests();
+  secureStore.clear();
+  _setSecureStoreForTests(secureStoreMock);
   mockAppState.currentState = 'active';
   mockAppState.listeners.clear();
   subscriptions.clear();
@@ -973,6 +1003,136 @@ describe('iosSink Live Activity content-state', () => {
   });
 });
 
+describe('iosSink Approve gate', () => {
+  const recordedAsk = (overrides: Partial<WaitingAsk> = {}): WaitingAsk => ({
+    kiloSessionId: 'session-1',
+    status: 'permission',
+    isCloudAgent: true,
+    scopeKey: 'scope',
+    organizationId: null,
+    userId: 'u1',
+    recordedAt: NOW,
+    ...overrides,
+  });
+
+  it('carries canApprove only while a cloud-agent permission ask waits', () => {
+    recordWaitingAsk(recordedAsk());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+    expect(mockState.started.at(-1)?.props).toMatchObject({ canApprove: true });
+
+    // A question ask resolves to `none`, so the layout must not offer Approve.
+    recordWaitingAsk(recordedAsk({ status: 'question' }));
+    iosSink.startOrUpdate(snapshotFor([{ status: 'question' }], 1), CTX);
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+
+    // A legacy wrapper session has no single approval either.
+    recordWaitingAsk(recordedAsk({ isCloudAgent: false }));
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 2), CTX);
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+
+    recordWaitingAsk(null);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 3), CTX);
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+  });
+
+  it('carries the flag through a publish update', () => {
+    recordWaitingAsk(recordedAsk());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+
+    recordWaitingAsk(null);
+    iosSink.publish(snapshotFor([{ status: 'permission' }], 1));
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+
+    recordWaitingAsk(recordedAsk());
+    iosSink.publish(snapshotFor([{ status: 'permission' }], 2));
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: true });
+  });
+});
+
+describe('iosSink approve-failed notice', () => {
+  const recordedAsk = (overrides: Partial<WaitingAsk> = {}): WaitingAsk => ({
+    kiloSessionId: 'session-1',
+    status: 'permission',
+    isCloudAgent: true,
+    scopeKey: 'scope',
+    organizationId: null,
+    userId: 'u1',
+    recordedAt: NOW,
+    ...overrides,
+  });
+
+  const stored = () => snapshotFor([{ status: 'permission' }], 1);
+
+  it('draws the failure line on the stored snapshot when the press cannot reach the backend', async () => {
+    // The press runs with the app closed, so the only snapshot it has is the
+    // persisted one: the counts already on the card, plus the failure line.
+    recordWaitingAsk(recordedAsk());
+    _setLastGlanceableSnapshotForTests(stored());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+
+    setGlanceableActionNotice("Couldn't approve. Tap Approve to try again.");
+    await renderStoredSnapshotWithNotice();
+
+    expect(mockState.updated.at(-1)).toMatchObject({
+      needsInput: 1,
+      canApprove: true,
+      notice: "Couldn't approve. Tap Approve to try again.",
+    });
+  });
+
+  it('renders nothing when no snapshot was ever published', async () => {
+    recordWaitingAsk(recordedAsk());
+    _setLastGlanceableSnapshotForTests(null);
+
+    setGlanceableActionNotice('failed');
+    await renderStoredSnapshotWithNotice();
+
+    expect(mockState.started).toEqual([]);
+    expect(mockState.updated).toEqual([]);
+  });
+
+  it('drops the notice when a different ask is recorded', () => {
+    recordWaitingAsk(recordedAsk());
+    setGlanceableActionNotice('failed');
+    recordWaitingAsk(recordedAsk({ kiloSessionId: 'session-2' }));
+
+    iosSink.startOrUpdate(stored(), CTX);
+
+    // A failure line must never describe the ask that replaced it.
+    expect(mockState.started.at(-1)?.props).not.toHaveProperty('notice');
+  });
+
+  it('drops the notice once no work needs input', () => {
+    recordWaitingAsk(recordedAsk());
+    setGlanceableActionNotice('failed');
+    iosSink.publish(snapshotFor([], 1, 'empty'));
+
+    iosSink.startOrUpdate(stored(), CTX);
+
+    expect(mockState.started.at(-1)?.props).not.toHaveProperty('notice');
+  });
+
+  it('keeps the notice when an older revision is discarded unrendered', () => {
+    recordWaitingAsk(recordedAsk());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+    setGlanceableActionNotice('failed');
+
+    // The revision guard drops this snapshot without rendering it: it must not
+    // prune the line the card on screen is still carrying (its zero needs-input
+    // count would clear the notice).
+    const stale = {
+      ...snapshotFor([{ status: 'busy' }], 0),
+      updatedAt: new Date(NOW - 60_000).toISOString(),
+    };
+    iosSink.startOrUpdate(stale, CTX);
+    expect(mockState.updated).toEqual([]);
+
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 1), CTX);
+
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: true, notice: 'failed' });
+  });
+});
+
 describe('iosSink idle updates', () => {
   it('keeps the same card when every agent goes idle', async () => {
     vi.useFakeTimers();
@@ -1108,6 +1268,18 @@ describe('buildGlanceableViewProps', () => {
 
     const empty = snapshotFor([], 1, 'empty');
     expect(buildGlanceableLiveActivityContentState(empty).needsInputSince).toBeNull();
+  });
+
+  it('carries a notice only when a caller sets one', () => {
+    const waiting = snapshotFor([{ status: 'permission' }], 0);
+
+    // A server-written state and a card with nothing to say omit the field, so
+    // the layout draws no line rather than an empty one.
+    expect(buildGlanceableLiveActivityContentState(waiting).notice).toBeUndefined();
+
+    expect(buildGlanceableLiveActivityContentState(waiting, true, 'Could not approve').notice).toBe(
+      'Could not approve'
+    );
   });
 
   it('speaks the status word, numeric counts, then Open agents', () => {

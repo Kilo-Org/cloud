@@ -4,6 +4,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import { ACTIVE_AGENTS_LIVE_ACTIVITY_NAME, APPROVE_TARGET } from './approve-action';
 import { glanceableLayoutCopy, withGlanceableCopy } from './layout-copy';
 
@@ -64,14 +66,20 @@ describe('glanceable approve target', () => {
     expect(source).not.toContain('target={APPROVE_TARGET}');
   });
 
-  it('is gated on the card still drawing a wait, not the approvable count alone', () => {
-    // `withStatus` (lib/glanceable/publisher) zeroes every count on expiry but
-    // keeps `needsApproval`, so the retained expired frame carries an approvable
-    // count with nothing to approve. `hasCounts` is false exactly when every
-    // count is zero, and the gate must include it or the card reads Expired and
-    // still offers Approve. `view-props.test.ts` pins that expired shape.
-    expect(source).toMatch(/const needsApproval\s*=\s*hasCounts\s*&&/);
-    expect(source).not.toMatch(/const needsApproval\s*=\s*\(props\.needsApproval/);
+  it('is gated on the recorded ask and the approvable count, never the count alone', () => {
+    // The control has to be one its own press can answer: the press resolves
+    // the ask the app recorded, so the app's `canApprove` flag withholds it,
+    // and the approvable count alone cannot gate it because a permission row
+    // the control plane does not own is `needsApproval` but not approvable.
+    // Both count terms are still required: `needsInput` withholds the control
+    // from the expired frame `withStatus` (lib/glanceable/publisher) leaves
+    // `needsApproval` on, and `needsApproval` withholds it from a server-written
+    // question-only state, where `runGlanceableApprove` answers `none`.
+    // `view-props.test.ts` pins that expired shape.
+    expect(source).toContain('props.canApprove !== false');
+    expect(source).toMatch(/\(props\.needsInput \?\? 0\) > 0/);
+    expect(source).toMatch(/\(props\.needsApproval \?\? 0\) > 0/);
+    expect(source).not.toMatch(/const needsApproval/);
   });
 
   it('declares the bannerSmall section the Apple Watch and CarPlay draw', () => {
@@ -86,10 +94,12 @@ describe('glanceable approve target', () => {
   it('carries the control in the bannerSmall block under the wait gate', () => {
     // The watch draws one row and the Approve control after it. The press has to
     // answer on the wrist, so the block itself must hold the literal target and
-    // the same wait gate the phone banner uses.
+    // the same gate the phone banner uses: `canApprove`, the flag that says the
+    // recorded ask is one the press can answer.
     const block = section('bannerSmall');
     expect(block).toContain('target="approve"');
-    expect(block).toMatch(/needsApproval/);
+    expect(block).toMatch(/\{canApprove \? \(/);
+    expect(block).not.toMatch(/needsApproval/);
   });
 
   it('draws the watch card count row outside the Approve gate', () => {
@@ -98,7 +108,7 @@ describe('glanceable approve target', () => {
     // from the count payload, and the gate that hides the control must sit after
     // it, so a permission-less wait still reads on the watch.
     const block = section('bannerSmall');
-    const gate = block.indexOf('{needsApproval ? (');
+    const gate = block.indexOf('{canApprove ? (');
     expect(gate).toBeGreaterThanOrEqual(0);
     expect(block.slice(0, gate)).toContain('countRow(primary, true, false)');
     expect(block.slice(gate)).toContain('target="approve"');
@@ -154,7 +164,7 @@ describe('withGlanceableCopy', () => {
     expect(glanceableLayoutCopy().locale).not.toContain('-');
   });
 
-  it('covers every status the layouts render, plus the language tag and Approve', () => {
+  it('covers every slot the layouts read, plus the language tag', () => {
     expect(Object.keys(glanceableLayoutCopy()).toSorted()).toEqual([
       'approve',
       'digits',
@@ -163,6 +173,7 @@ describe('withGlanceableCopy', () => {
       'idle',
       'locale',
       'needsInput',
+      'open',
       'openAgents',
       'privacy',
       'running',
@@ -170,5 +181,15 @@ describe('withGlanceableCopy', () => {
       'stale',
       'waiting',
     ]);
+  });
+
+  it('bakes both Live Activity action labels from the reviewed keys', () => {
+    // A missing key would come back as the key itself, so the copy is asserted
+    // against the catalog and not only against the slot.
+    const copy = glanceableLayoutCopy();
+    expect(copy.approve).toBe(i18n.t('common.approve'));
+    expect(copy.approve).not.toBe('common.approve');
+    expect(copy.open).toBe(i18n.t('glanceable.openSession'));
+    expect(copy.open).not.toBe('glanceable.openSession');
   });
 });

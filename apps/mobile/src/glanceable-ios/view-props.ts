@@ -134,20 +134,35 @@ export function buildExpiredWidgetProps(
 }
 
 /**
+ * The Live Activity content-state plus the two facts the widget extension
+ * cannot derive: whether the recorded ask is one Approve can answer, and the
+ * one-line notice a retryable Approve leaves on the card. Both fields are
+ * additive — a server-written state omits them, and the layout reads an absent
+ * notice as "nothing to say".
+ */
+export type GlanceableLiveActivityProps = GlanceableLiveActivityContentState & {
+  canApprove?: boolean;
+  /** Translated failure line for the next update; omitted when there is none. */
+  notice?: string;
+};
+
+/**
  * Build the Live Activity content-state from a snapshot. The server pushes the
  * same raw shape, so the widget extension's `active-agents-live-activity.tsx`
  * renders it directly with inlined English copy (the server cannot translate).
- *
- * The approvable count rides only here, never in `GlanceableViewProps`: the
- * widget families and the complication stay read-only counts, and the Lock
- * Screen / Watch Smart Stack layout is the one surface that draws an Approve
- * control. A snapshot from an older producer omits the field, so it resolves
- * to 0 and the control is hidden rather than offering an Approve the service
- * could not complete.
+ * `canApprove` and `notice` are included only when the caller can decide them;
+ * a server-written state omits both. The approvable count rides only here, never
+ * in `GlanceableViewProps`: the widget families and the complication stay
+ * read-only counts, and the Lock Screen / Watch Smart Stack layout is the one
+ * surface that draws an Approve control. A snapshot from an older producer omits
+ * the field, so it resolves to 0 and the control is hidden rather than offering
+ * an Approve the service could not complete.
  */
 export function buildGlanceableLiveActivityContentState(
-  snapshot: GlanceableAgentsSnapshot
-): GlanceableLiveActivityContentState {
+  snapshot: GlanceableAgentsSnapshot,
+  canApprove?: boolean,
+  notice?: string
+): GlanceableLiveActivityProps {
   return {
     status: snapshot.status,
     running: snapshot.running,
@@ -155,5 +170,7 @@ export function buildGlanceableLiveActivityContentState(
     needsApproval: snapshot.needsApproval ?? 0,
     idle: snapshot.idle,
     needsInputSince: snapshot.needsInputSince,
+    ...(canApprove === undefined ? {} : { canApprove }),
+    ...(notice === undefined ? {} : { notice }),
   };
 }

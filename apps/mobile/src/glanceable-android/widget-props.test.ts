@@ -182,6 +182,27 @@ describe('buildOngoingNotificationText', () => {
       'No work in progress'
     );
   });
+
+  it('prefixes a pending action notice to the counts', () => {
+    expect(buildOngoingNotificationText(MIXED, {}, translate, String, 'Approval failed')).toBe(
+      'Approval failed 2 Needs input, 4 Working, 3 Idle'
+    );
+  });
+
+  it('prefixes the notice to the stale warning and to the locked copy', () => {
+    expect(
+      buildOngoingNotificationText(
+        { ...MIXED, status: 'stale' },
+        {},
+        translate,
+        String,
+        'Approval failed'
+      )
+    ).toBe('Approval failed Updates delayed, 2 Needs input, 4 Working, 3 Idle');
+    expect(
+      buildOngoingNotificationText(snapshotFor([]), {}, translate, String, 'Approval failed')
+    ).toBe('Approval failed No work in progress');
+  });
 });
 
 describe('buildApproveLabel', () => {

@@ -3109,7 +3109,9 @@
     "openAgents": "Otevřít agenty",
     "needsInput": "Čeká na reakci",
     "channelName": "Aktivní agenti",
-    "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce."
+    "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce.",
+    "openSession": "Otevřít",
+    "approveFailed": "Schválení se nepodařilo. Klepnutím na $t(common.approve) to zkuste znovu."
   },
   "transcriptionModel": {
     "title": "Model přepisu",

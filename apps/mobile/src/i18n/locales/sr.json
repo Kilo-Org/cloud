@@ -3085,7 +3085,9 @@
     "openAgents": "Otvori agente",
     "needsInput": "Čeka unos",
     "channelName": "Aktivni agenti",
-    "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu."
+    "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu.",
+    "openSession": "Otvori",
+    "approveFailed": "Odobravanje nije uspelo. Dodirni $t(common.approve) da pokušaš ponovo."
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",

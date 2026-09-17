@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   buildGlanceableSnapshot,
   buildOpaqueScopeKey,
+  countGlanceableApprovals,
   countGlanceableSessions,
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
+  glanceableAgentsSnapshotSchema,
   glanceableStatusKind,
   isEligibleGlanceableWork,
   oldestNeedsInputSince,
@@ -55,6 +57,66 @@ describe('countGlanceableSessions', () => {
         { status: '' },
       ])
     ).toEqual({ running: 4, needsInput: 0, idle: 0 });
+  });
+});
+
+describe('countGlanceableApprovals', () => {
+  const cases = [
+    {
+      label: 'permission-only',
+      sessions: [{ status: 'permission' }],
+      approvals: 1,
+      counts: { running: 0, needsInput: 1, idle: 0 },
+    },
+    {
+      label: 'question-only',
+      sessions: [{ status: 'question' }],
+      approvals: 0,
+      counts: { running: 0, needsInput: 1, idle: 0 },
+    },
+    {
+      label: 'retry-only',
+      sessions: [{ status: 'retry' }],
+      approvals: 0,
+      counts: { running: 0, needsInput: 1, idle: 0 },
+    },
+    {
+      label: 'mixed',
+      sessions: [
+        { status: 'busy' },
+        { status: 'question' },
+        { status: 'permission' },
+        { status: 'retry' },
+        { status: 'idle' },
+      ],
+      approvals: 1,
+      counts: { running: 1, needsInput: 3, idle: 1 },
+    },
+  ] as const;
+
+  it.each(cases)(
+    'counts $label as $approvals approvable while every existing count is unchanged',
+    ({ sessions, approvals, counts }) => {
+      // Narrower than needsInput: only a permission can be approved without
+      // choosing an option, so question and retry must not move this count.
+      expect(countGlanceableApprovals(sessions)).toBe(approvals);
+      expect(countGlanceableSessions(sessions)).toEqual(counts);
+    }
+  );
+
+  it('counts each permission row and ignores every other status', () => {
+    expect(
+      countGlanceableApprovals([
+        { status: 'busy' },
+        { status: 'permission' },
+        { status: 'permission' },
+        { status: 'question' },
+        { status: 'retry' },
+        { status: 'idle' },
+        { status: 'mystery' },
+      ])
+    ).toBe(2);
+    expect(countGlanceableApprovals([])).toBe(0);
   });
 });
 
@@ -167,6 +229,30 @@ describe('buildGlanceableSnapshot', () => {
     });
     expect(snapshot.status).toBe('happy');
     expect(snapshot.needsInputSince).toBeNull();
+  });
+
+  it('produces the approvable permission count next to needsInput', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'permission' }, { status: 'question' }, { status: 'permission' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(snapshot.needsApproval).toBe(2);
+    // The narrower approval count never changes the needs-input total.
+    expect(snapshot.needsInput).toBe(3);
+  });
+
+  it('parses with and without needsApproval, since an older producer omits it', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'permission' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(glanceableAgentsSnapshotSchema.safeParse(snapshot).success).toBe(true);
+    const { needsApproval: _needsApproval, ...withoutCount } = snapshot;
+    expect(glanceableAgentsSnapshotSchema.safeParse(withoutCount).success).toBe(true);
   });
 
   it('sets organizationBound only when organizationId is a string', () => {

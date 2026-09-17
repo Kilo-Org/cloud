@@ -273,10 +273,13 @@ export function TabStateMessage({ title, message }: { title: string; message: st
 
 export function EmptyFilesView({
   changedFiles,
+  noChangesDescription,
   onRequestOverview,
   refreshControl,
 }: {
   changedFiles: number;
+  /** Provider wording for the 0-changed-files case; GitHub copy when absent. */
+  noChangesDescription?: string;
   onRequestOverview?: () => void;
   refreshControl?: ScrollViewProps['refreshControl'];
 }) {
@@ -291,7 +294,7 @@ export function EmptyFilesView({
         </Text>
         <Text variant="muted" className="text-center">
           {changedFiles === 0
-            ? t('prReview.noFilesChangedDescription')
+            ? (noChangesDescription ?? t('prReview.noFilesChangedDescription'))
             : t('prReview.hunkRows.filesStillLoading')}
         </Text>
         {onRequestOverview ? (

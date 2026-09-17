@@ -5,11 +5,38 @@ import type {
   Owner,
   PlatformRepository,
 } from '@/lib/integrations/core/types';
-import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
-import { canOrganizationUseMultipleGitHubInstallations } from '@/lib/integrations/github/multiple-installations';
+import {
+  github_app_installations,
+  github_installation_webhook_receipts,
+  platform_integrations,
+} from '@kilocode/db/schema';
+import { and, eq, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import {
+  canOrganizationCreateSharedGitHubConnection,
+  canOrganizationUseMultipleGitHubInstallations,
+} from '@/lib/integrations/github/multiple-installations';
+import { evaluateGitHubSharingCompatibility } from '@/lib/integrations/github/sharing-compatibility';
+import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-attempts';
+import { parsePlatformRepositoryCache } from '@/lib/integrations/core/schemas';
+import {
+  cancelActiveCodeReviewsForIntegration,
+  settleCancelledReviews,
+} from '@/lib/code-reviews/db/code-reviews';
 
 export type DbTransaction = DrizzleTransaction;
+
+/**
+ * Serializes every writer that must reason about the full set of tenant
+ * associations for one GitHub App installation identity. Callers must run
+ * inside a transaction; the lock is released at commit/rollback.
+ */
+export async function lockGitHubInstallationIdentity(
+  tx: DbTransaction,
+  appType: 'standard' | 'lite',
+  installationId: string
+): Promise<void> {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${installationId}`}))`);
+}
 
 export type VerifiedGitHubInstallationData = {
   platformInstallationId: string;
@@ -33,6 +60,9 @@ export type ConnectVerifiedGitHubInstallationResult =
       ok: false;
       reason:
         | 'claimed_by_other_owner'
+        | 'shared_installation_disabled'
+        | 'incompatible_workflow'
+        | 'retryable_conflict'
         | 'multiple_installations_disabled'
         | 'installation_unavailable';
     };
@@ -47,7 +77,7 @@ function ownerCondition(owner: Owner) {
     : eq(platform_integrations.owned_by_organization_id, owner.id);
 }
 
-function effectiveAppTypeCondition(appType: 'standard' | 'lite') {
+export function effectiveAppTypeCondition(appType: 'standard' | 'lite') {
   return appType === 'standard'
     ? or(
         eq(platform_integrations.github_app_type, 'standard'),
@@ -62,15 +92,49 @@ export async function connectVerifiedGitHubInstallation(
   transaction?: DbTransaction
 ): Promise<ConnectVerifiedGitHubInstallationResult> {
   const execute = async (tx: DbTransaction): Promise<ConnectVerifiedGitHubInstallationResult> => {
+    await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
+    await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+    await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '60s'`);
     if (!isCanonicalInstallationId(data.platformInstallationId)) {
       return { ok: false, reason: 'installation_unavailable' };
     }
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext(${`${data.githubAppType}:${data.platformInstallationId}`}))`
     );
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`${owner.type}:${owner.id}`}))`);
-
-    if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
+    const requiresOwnerCardinalityLock =
+      owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id);
+    if (requiresOwnerCardinalityLock) {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`${owner.type}:${owner.id}`}))`);
+    }
+    const participantRows = await tx
+      .select({
+        userId: platform_integrations.owned_by_user_id,
+        organizationId: platform_integrations.owned_by_organization_id,
+      })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          eq(platform_integrations.platform_installation_id, data.platformInstallationId),
+          effectiveAppTypeCondition(data.githubAppType)
+        )
+      );
+    const participants = new Map<string, Owner>();
+    participants.set(`${owner.type}:${owner.id}`, owner);
+    for (const participant of participantRows) {
+      const participantOwner: Owner | null = participant.organizationId
+        ? { type: 'org', id: participant.organizationId }
+        : participant.userId
+          ? { type: 'user', id: participant.userId }
+          : null;
+      if (participantOwner) {
+        participants.set(`${participantOwner.type}:${participantOwner.id}`, participantOwner);
+      }
+    }
+    for (const participant of [...participants.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      await lockProviderOAuthOwnerRow(tx, participant[1]);
+    }
+    if (requiresOwnerCardinalityLock) {
       const ownerIntegrations = await tx
         .select({
           installationId: platform_integrations.platform_installation_id,
@@ -80,7 +144,10 @@ export async function connectVerifiedGitHubInstallation(
         .where(
           and(
             eq(platform_integrations.owned_by_organization_id, owner.id),
-            eq(platform_integrations.platform, PLATFORM.GITHUB)
+            eq(platform_integrations.platform, PLATFORM.GITHUB),
+            // A locally disconnected connection has relinquished its slot; it
+            // must not block attaching a different installation.
+            isNull(platform_integrations.github_disconnected_at)
           )
         );
       const hasAnotherInstallation = ownerIntegrations.some(
@@ -161,19 +228,83 @@ export async function connectVerifiedGitHubInstallation(
           effectiveAppTypeCondition(data.githubAppType)
         )
       )
-      .limit(2)
       .for('update');
 
-    if (existingMatches.length > 1) {
+    if (
+      existingMatches.some(
+        association =>
+          association.github_installation_id !== null &&
+          association.github_installation_id !== canonical.id
+      )
+    ) {
       return { ok: false, reason: 'installation_unavailable' };
     }
-    const existing = existingMatches[0];
+    const ownerMatches = existingMatches.filter(
+      association =>
+        (owner.type === 'user' && association.owned_by_user_id === owner.id) ||
+        (owner.type === 'org' && association.owned_by_organization_id === owner.id)
+    );
+    if (ownerMatches.length > 1) {
+      return { ok: false, reason: 'installation_unavailable' };
+    }
+    const existing = ownerMatches[0];
+    const otherOwnerAssociations = existingMatches.filter(
+      association => association.id !== existing?.id
+    );
 
-    if (existing) {
-      const sameOwner =
-        (owner.type === 'user' && existing.owned_by_user_id === owner.id) ||
-        (owner.type === 'org' && existing.owned_by_organization_id === owner.id);
-      if (!sameOwner) return { ok: false, reason: 'claimed_by_other_owner' };
+    if (
+      existing &&
+      otherOwnerAssociations.length > 0 &&
+      existing.github_installation_id !== canonical.id
+    ) {
+      return { ok: false, reason: 'installation_unavailable' };
+    }
+
+    // A locally disconnected other-owner association has relinquished the
+    // installation and is no longer an active incumbent tenant, so it must
+    // not force a destination through sharing-admission on its own; only an
+    // *actively connected* other owner represents real concurrent sharing
+    // that needs approval and a compatibility check.
+    const activeOtherOwnerAssociations = otherOwnerAssociations.filter(
+      association => association.github_disconnected_at === null
+    );
+
+    // A personal (non-org) owner can never become a NEW second tenant on an
+    // installation an active other owner already holds. Gate this on the
+    // caller having no association of its own: an incumbent personal owner
+    // reconnecting or refreshing their own existing association is not a
+    // new claim, and must not be locked out by another tenant that attached
+    // afterwards (see the sharing-admission branch below for how that other
+    // tenant was admitted). A purely disconnected other-owner row is not an
+    // active incumbent either, so it does not block a personal owner here.
+    if (!existing && activeOtherOwnerAssociations.length > 0 && owner.type !== 'org') {
+      return { ok: false, reason: 'claimed_by_other_owner' };
+    }
+
+    const requiresSharingAdmission =
+      activeOtherOwnerAssociations.length > 0 &&
+      (!existing ||
+        existing.github_disconnected_at !== null ||
+        canonical.sharing_mode !== 'web_cloud_agent');
+    if (requiresSharingAdmission) {
+      if (!canOrganizationCreateSharedGitHubConnection(owner.id)) {
+        return { ok: false, reason: 'shared_installation_disabled' };
+      }
+      if (activeOtherOwnerAssociations.some(association => !association.github_installation_id)) {
+        return { ok: false, reason: 'installation_unavailable' };
+      }
+      const compatibility = await evaluateGitHubSharingCompatibility(tx, canonical.id, owner);
+      if (!compatibility.compatible) {
+        return { ok: false, reason: 'incompatible_workflow' };
+      }
+      await tx
+        .update(github_app_installations)
+        .set({
+          sharing_mode: 'web_cloud_agent',
+          sharing_admission_checked_at: now,
+          updated_at: now,
+        })
+        .where(eq(github_app_installations.id, canonical.id));
     }
 
     const values = {
@@ -252,30 +383,205 @@ export async function connectVerifiedGitHubInstallation(
     return { ok: true, integrationId: created.id };
   };
 
-  return transaction ? execute(transaction) : db.transaction(execute);
+  try {
+    return await (transaction ? execute(transaction) : db.transaction(execute));
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && 'cause' in error
+        ? (error.cause as { code?: string } | undefined)?.code
+        : (error as { code?: string } | undefined)?.code;
+    if (code === '55P03' || code === '40P01' || code === '57014') {
+      return { ok: false, reason: 'retryable_conflict' };
+    }
+    throw error;
+  }
 }
 
 export async function disconnectGitHubInstallation(
   owner: Owner,
   integrationId: string
 ): Promise<void> {
-  const disconnected = await db
-    .update(platform_integrations)
-    .set({
-      github_disconnected_at: new Date().toISOString(),
-      integration_status: INTEGRATION_STATUS.SUSPENDED,
-      suspended_by: 'local_disconnect',
-      updated_at: new Date().toISOString(),
-    })
-    .where(
-      and(
-        eq(platform_integrations.id, integrationId),
-        eq(platform_integrations.platform, PLATFORM.GITHUB),
-        ownerCondition(owner)
+  const cancelledReviews = await db.transaction(async tx => {
+    const [integration] = await tx
+      .select({
+        installationId: platform_integrations.platform_installation_id,
+        appType: platform_integrations.github_app_type,
+        canonicalId: platform_integrations.github_installation_id,
+      })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.id, integrationId),
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          ownerCondition(owner)
+        )
       )
-    )
-    .returning({ id: platform_integrations.id });
-  if (disconnected.length !== 1) throw new Error('GitHub connection not found');
+      .limit(1);
+    if (!integration?.installationId) throw new Error('GitHub connection not found');
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`${integration.appType ?? 'standard'}:${integration.installationId}`}))`
+    );
+    const disconnected = await tx
+      .update(platform_integrations)
+      .set({
+        github_disconnected_at: new Date().toISOString(),
+        integration_status: INTEGRATION_STATUS.SUSPENDED,
+        suspended_by: 'local_disconnect',
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(platform_integrations.id, integrationId),
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          ownerCondition(owner)
+        )
+      )
+      .returning({ id: platform_integrations.id });
+    if (disconnected.length !== 1) throw new Error('GitHub connection not found');
+    // Terminalize this association's own active review work as part of the
+    // same disconnect: otherwise a queued/running review keeps its dispatch
+    // reservation and never reaches a terminal status, leaving it (and the
+    // reservation) permanently stuck once the association is gone.
+    const cancelled = await cancelActiveCodeReviewsForIntegration(
+      { owner, platform: PLATFORM.GITHUB, integrationId },
+      tx
+    );
+    if (integration.canonicalId) {
+      const connectedAssociations = await tx
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.github_installation_id, integration.canonicalId),
+            isNull(platform_integrations.github_disconnected_at)
+          )
+        )
+        .for('update');
+      if (connectedAssociations.length === 1) {
+        await tx
+          .update(github_app_installations)
+          .set({
+            sharing_mode: 'exclusive',
+            sharing_admission_checked_at: null,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(github_app_installations.id, integration.canonicalId));
+      }
+    }
+    return cancelled;
+  });
+  // Settle only after this transaction has committed — see the
+  // settleCancelledReviews doc comment for why.
+  await settleCancelledReviews(cancelledReviews, 'user_cancelled');
+}
+
+export async function uninstallExclusiveGitHubInstallation(input: {
+  owner: Owner;
+  integrationId: string;
+  deleteUpstream: (installationId: string, appType: 'standard' | 'lite') => Promise<void>;
+}): Promise<void> {
+  const cancelledReviews = await db.transaction(async tx => {
+    const [identity] = await tx
+      .select({
+        installationId: platform_integrations.platform_installation_id,
+        appType: platform_integrations.github_app_type,
+      })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.id, input.integrationId),
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          ownerCondition(input.owner)
+        )
+      )
+      .limit(1);
+    if (!identity?.installationId) throw new Error('GitHub connection not found');
+    const appType = identity.appType ?? 'standard';
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${identity.installationId}`}))`
+    );
+    const [lockedTarget] = await tx
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.id, input.integrationId),
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          ownerCondition(input.owner)
+        )
+      )
+      .for('update');
+    if (!lockedTarget) throw new Error('GitHub connection not found');
+    // Resolve the canonical installation by its stable identity
+    // (github_app_type, installation_id) rather than through the target
+    // row's own binding. A legacy association may be unbound
+    // (github_installation_id IS NULL) — the canonical backfill skipped rows
+    // that were already disconnected or suspended — and reading the sharing
+    // mode only from a bound target would let such a row skip the
+    // shared-installation guard entirely.
+    const [canonical] = await tx
+      .select({
+        id: github_app_installations.id,
+        sharingMode: github_app_installations.sharing_mode,
+      })
+      .from(github_app_installations)
+      .where(
+        and(
+          eq(github_app_installations.installation_id, identity.installationId),
+          eq(github_app_installations.github_app_type, appType)
+        )
+      )
+      .for('update');
+    if (canonical && canonical.sharingMode !== 'exclusive') {
+      throw new Error('GitHub installation must be disconnected locally');
+    }
+    // Uninstalling upstream is only safe when no *other* tenant association
+    // still depends on this installation. The target association itself may
+    // be either currently connected or already locally disconnected — either
+    // way it is the one being removed, so its own state must not gate this
+    // check the way it did previously (which made an already-disconnected
+    // association impossible to ever hard-uninstall). Siblings are matched by
+    // the stable installation identity, not by the target's binding mode:
+    // matching on the binding would make an unbound legacy row invisible to a
+    // bound, actively connected sibling and delete the upstream installation
+    // out from under that sibling's tenant.
+    const otherConnectedAssociations = await tx
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          eq(platform_integrations.platform_installation_id, identity.installationId),
+          effectiveAppTypeCondition(appType),
+          isNull(platform_integrations.github_disconnected_at),
+          ne(platform_integrations.id, input.integrationId)
+        )
+      )
+      .for('update');
+    if (otherConnectedAssociations.length > 0) {
+      throw new Error('GitHub installation must be disconnected locally');
+    }
+
+    // Terminalize this association's own active review work before it is
+    // deleted below: the FK is ON DELETE SET NULL, not cascade, so without
+    // this a still-queued/running review would just lose its integration
+    // reference and never reach a terminal status.
+    const cancelled = await cancelActiveCodeReviewsForIntegration(
+      { owner: input.owner, platform: PLATFORM.GITHUB, integrationId: input.integrationId },
+      tx
+    );
+
+    await input.deleteUpstream(identity.installationId, appType);
+    await observeGitHubInstallationLifecycle(
+      { installationId: identity.installationId, appType, state: 'deleted' },
+      tx
+    );
+    await tx.delete(platform_integrations).where(eq(platform_integrations.id, input.integrationId));
+    return cancelled;
+  });
+  // Settle only after this transaction has committed — see the
+  // settleCancelledReviews doc comment for why.
+  await settleCancelledReviews(cancelledReviews, 'user_cancelled');
 }
 
 export async function observeGitHubInstallationLifecycle(
@@ -299,7 +605,7 @@ export async function observeGitHubInstallationLifecycle(
       sql`SELECT pg_advisory_xact_lock(hashtext(${`${input.appType}:${input.installationId}`}))`
     );
     const [existing] = await tx
-      .select({ state: github_app_installations.lifecycle_state })
+      .select({ id: github_app_installations.id, state: github_app_installations.lifecycle_state })
       .from(github_app_installations)
       .where(
         and(
@@ -309,7 +615,7 @@ export async function observeGitHubInstallationLifecycle(
       )
       .for('update');
     if (existing?.state === 'deleted' && input.state !== 'deleted') return;
-    await tx
+    const [canonical] = await tx
       .insert(github_app_installations)
       .values({
         github_app_type: input.appType,
@@ -345,7 +651,17 @@ export async function observeGitHubInstallationLifecycle(
           revision: sql`${github_app_installations.revision} + 1`,
           updated_at: now,
         },
-      });
+      })
+      .returning({ id: github_app_installations.id });
+    if (!canonical) throw new Error('Canonical GitHub installation lifecycle update failed');
+    const associationCondition = or(
+      eq(platform_integrations.github_installation_id, canonical.id),
+      and(
+        isNull(platform_integrations.github_installation_id),
+        eq(platform_integrations.platform_installation_id, input.installationId),
+        effectiveAppTypeCondition(input.appType)
+      )
+    );
     if (input.state !== 'active') {
       await tx
         .update(platform_integrations)
@@ -358,8 +674,7 @@ export async function observeGitHubInstallationLifecycle(
         .where(
           and(
             eq(platform_integrations.platform, PLATFORM.GITHUB),
-            eq(platform_integrations.platform_installation_id, input.installationId),
-            effectiveAppTypeCondition(input.appType),
+            associationCondition,
             isNull(platform_integrations.github_disconnected_at)
           )
         );
@@ -375,8 +690,7 @@ export async function observeGitHubInstallationLifecycle(
         .where(
           and(
             eq(platform_integrations.platform, PLATFORM.GITHUB),
-            eq(platform_integrations.platform_installation_id, input.installationId),
-            effectiveAppTypeCondition(input.appType),
+            associationCondition,
             isNull(platform_integrations.github_disconnected_at),
             eq(platform_integrations.suspended_by, 'github_suspended')
           )
@@ -394,6 +708,9 @@ export async function updateGitHubInstallationRepositories(input: {
 }) {
   const now = new Date().toISOString();
   await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`${input.appType}:${input.installationId}`}))`
+    );
     const [canonical] = await tx
       .select()
       .from(github_app_installations)
@@ -419,11 +736,11 @@ export async function updateGitHubInstallationRepositories(input: {
         .for('update');
       for (const integration of legacy) {
         const removed = new Set(input.repositoryIdsRemoved ?? []);
-        const current = (integration.repositories ?? []).filter(
-          repository => !removed.has(Number(repository.id))
+        const current = parsePlatformRepositoryCache(integration.repositories).filter(
+          repository => !removed.has(repository.id)
         );
         const additions = (input.repositoriesAdded ?? []).filter(
-          repository => !removed.has(Number(repository.id))
+          repository => !removed.has(repository.id)
         );
         const repositories = [
           ...current.filter(
@@ -447,8 +764,10 @@ export async function updateGitHubInstallationRepositories(input: {
       return;
     }
     const removed = new Set(input.repositoryIdsRemoved ?? []);
-    const existing = (canonical.repositories ?? []).filter(repo => !removed.has(Number(repo.id)));
-    const additions = (input.repositoriesAdded ?? []).filter(repo => !removed.has(Number(repo.id)));
+    const existing = parsePlatformRepositoryCache(canonical.repositories).filter(
+      repo => !removed.has(repo.id)
+    );
+    const additions = (input.repositoriesAdded ?? []).filter(repo => !removed.has(repo.id));
     const repositories = [
       ...existing.filter(repo => !additions.some(addition => addition.id === repo.id)),
       ...additions,
@@ -489,56 +808,16 @@ export async function updateGitHubInstallationRepositories(input: {
 }
 
 export async function updateGitHubInstallationAccountIdentity(input: {
-  integrationId: string;
+  installationId: string;
+  appType: 'standard' | 'lite';
   accountId: string;
   accountLogin: string;
 }) {
   const now = new Date().toISOString();
   await db.transaction(async tx => {
-    const [integration] = await tx
-      .select({
-        canonicalId: platform_integrations.github_installation_id,
-        disconnectedAt: platform_integrations.github_disconnected_at,
-      })
-      .from(platform_integrations)
-      .where(eq(platform_integrations.id, input.integrationId))
-      .for('update');
-    if (!integration) return;
-    if (!integration.disconnectedAt) {
-      await tx
-        .update(platform_integrations)
-        .set({
-          platform_account_id: input.accountId,
-          platform_account_login: input.accountLogin,
-          updated_at: now,
-        })
-        .where(
-          and(
-            eq(platform_integrations.id, input.integrationId),
-            isNull(platform_integrations.github_disconnected_at)
-          )
-        );
-    }
-    if (integration.canonicalId) {
-      await tx
-        .update(github_app_installations)
-        .set({
-          account_id: input.accountId,
-          account_login: input.accountLogin,
-          observed_at: now,
-          updated_at: now,
-        })
-        .where(eq(github_app_installations.id, integration.canonicalId));
-    }
-  });
-}
-
-export async function bindGitHubIntegrationToCanonicalInstallation(input: {
-  integrationId: string;
-  installationId: string;
-  appType: 'standard' | 'lite';
-}) {
-  await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`${input.appType}:${input.installationId}`}))`
+    );
     const [canonical] = await tx
       .select({ id: github_app_installations.id })
       .from(github_app_installations)
@@ -548,8 +827,268 @@ export async function bindGitHubIntegrationToCanonicalInstallation(input: {
           eq(github_app_installations.installation_id, input.installationId)
         )
       )
-      .limit(1);
-    if (!canonical) throw new Error('Canonical GitHub installation not found');
+      .for('update');
+    if (!canonical) return;
+    await tx
+      .update(github_app_installations)
+      .set({
+        account_id: input.accountId,
+        account_login: input.accountLogin,
+        observed_at: now,
+        revision: sql`${github_app_installations.revision} + 1`,
+        updated_at: now,
+      })
+      .where(eq(github_app_installations.id, canonical.id));
+    await tx
+      .update(platform_integrations)
+      .set({
+        platform_account_id: input.accountId,
+        platform_account_login: input.accountLogin,
+        updated_at: now,
+      })
+      .where(
+        and(
+          eq(platform_integrations.github_installation_id, canonical.id),
+          isNull(platform_integrations.github_disconnected_at)
+        )
+      );
+  });
+}
+
+export async function isSharedGitHubInstallation(
+  installationId: string,
+  appType: 'standard' | 'lite'
+): Promise<boolean> {
+  const [installation] = await db
+    .select({ sharingMode: github_app_installations.sharing_mode })
+    .from(github_app_installations)
+    .where(
+      and(
+        eq(github_app_installations.github_app_type, appType),
+        eq(github_app_installations.installation_id, installationId)
+      )
+    )
+    .limit(1);
+  return installation?.sharingMode === 'web_cloud_agent';
+}
+
+export async function materializeGitHubInstallationIdentity(input: {
+  installationId: string;
+  appType: 'standard' | 'lite';
+}): Promise<void> {
+  await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`${input.appType}:${input.installationId}`}))`
+    );
+    await tx
+      .insert(github_app_installations)
+      .values({ github_app_type: input.appType, installation_id: input.installationId })
+      .onConflictDoNothing({
+        target: [
+          github_app_installations.github_app_type,
+          github_app_installations.installation_id,
+        ],
+      });
+  });
+}
+
+export async function getGitHubInstallationDeliveryStatus(input: {
+  installationId: string;
+  appType: 'standard' | 'lite';
+  deliveryId: string;
+}): Promise<'completed' | 'processing' | 'not_completed' | 'missing_canonical'> {
+  const [installation] = await db
+    .select({ id: github_app_installations.id })
+    .from(github_app_installations)
+    .where(
+      and(
+        eq(github_app_installations.github_app_type, input.appType),
+        eq(github_app_installations.installation_id, input.installationId)
+      )
+    )
+    .limit(1);
+  if (!installation) return 'missing_canonical';
+  const [receipt] = await db
+    .select({ status: github_installation_webhook_receipts.status })
+    .from(github_installation_webhook_receipts)
+    .where(
+      and(
+        eq(github_installation_webhook_receipts.github_installation_id, installation.id),
+        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId)
+      )
+    )
+    .limit(1);
+  if (!receipt) return 'not_completed';
+  return receipt.status === 'completed' ? 'completed' : 'processing';
+}
+
+export type GitHubInstallationDeliveryClaim =
+  | { status: 'claimed'; githubInstallationId: string }
+  | { status: 'completed' | 'processing' | 'missing_canonical' };
+
+// A dispatch is bounded by the webhook function timeout (well under 5 minutes), so a
+// processing receipt older than this window can only belong to a killed request and
+// may be safely reclaimed instead of suppressing GitHub's redelivery forever.
+export const GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS = 10 * 60_000;
+
+export async function claimGitHubInstallationDelivery(input: {
+  installationId: string;
+  appType: 'standard' | 'lite';
+  deliveryId: string;
+  eventType: string;
+}): Promise<GitHubInstallationDeliveryClaim> {
+  const [installation] = await db
+    .select({ id: github_app_installations.id })
+    .from(github_app_installations)
+    .where(
+      and(
+        eq(github_app_installations.github_app_type, input.appType),
+        eq(github_app_installations.installation_id, input.installationId)
+      )
+    )
+    .limit(1);
+  if (!installation) return { status: 'missing_canonical' };
+
+  const claimed = await db
+    .insert(github_installation_webhook_receipts)
+    .values({
+      github_installation_id: installation.id,
+      delivery_id: input.deliveryId,
+      event_type: input.eventType,
+      status: 'processing',
+    })
+    .onConflictDoNothing({
+      target: [
+        github_installation_webhook_receipts.github_installation_id,
+        github_installation_webhook_receipts.delivery_id,
+      ],
+    })
+    .returning({ id: github_installation_webhook_receipts.id });
+  if (claimed.length === 1) {
+    return { status: 'claimed', githubInstallationId: installation.id };
+  }
+
+  const [receipt] = await db
+    .select({ status: github_installation_webhook_receipts.status })
+    .from(github_installation_webhook_receipts)
+    .where(
+      and(
+        eq(github_installation_webhook_receipts.github_installation_id, installation.id),
+        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId)
+      )
+    )
+    .limit(1);
+  if (!receipt) return { status: 'processing' };
+  if (receipt.status === 'completed') return { status: 'completed' };
+
+  // created_at is the claim timestamp: it is set on insert and refreshed on reclaim.
+  // The conditional update plus row lock lets exactly one concurrent redelivery win.
+  const staleBefore = new Date(
+    Date.now() - GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS
+  ).toISOString();
+  const reclaimed = await db
+    .update(github_installation_webhook_receipts)
+    .set({ created_at: new Date().toISOString() })
+    .where(
+      and(
+        eq(github_installation_webhook_receipts.github_installation_id, installation.id),
+        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId),
+        eq(github_installation_webhook_receipts.status, 'processing'),
+        lt(github_installation_webhook_receipts.created_at, staleBefore)
+      )
+    )
+    .returning({ id: github_installation_webhook_receipts.id });
+  return reclaimed.length === 1
+    ? { status: 'claimed', githubInstallationId: installation.id }
+    : { status: 'processing' };
+}
+
+export async function completeGitHubInstallationDelivery(input: {
+  githubInstallationId: string;
+  deliveryId: string;
+}): Promise<void> {
+  await db
+    .update(github_installation_webhook_receipts)
+    .set({ status: 'completed' })
+    .where(
+      and(
+        eq(github_installation_webhook_receipts.github_installation_id, input.githubInstallationId),
+        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId),
+        eq(github_installation_webhook_receipts.status, 'processing')
+      )
+    );
+}
+
+export async function releaseGitHubInstallationDelivery(input: {
+  githubInstallationId: string;
+  deliveryId: string;
+}): Promise<void> {
+  await db
+    .delete(github_installation_webhook_receipts)
+    .where(
+      and(
+        eq(github_installation_webhook_receipts.github_installation_id, input.githubInstallationId),
+        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId),
+        eq(github_installation_webhook_receipts.status, 'processing')
+      )
+    );
+}
+
+export async function recordCompletedGitHubInstallationDelivery(input: {
+  installationId: string;
+  appType: 'standard' | 'lite';
+  deliveryId: string;
+  eventType: string;
+}): Promise<void> {
+  const [installation] = await db
+    .select({ id: github_app_installations.id })
+    .from(github_app_installations)
+    .where(
+      and(
+        eq(github_app_installations.github_app_type, input.appType),
+        eq(github_app_installations.installation_id, input.installationId)
+      )
+    )
+    .limit(1);
+  if (!installation) throw new Error('Canonical GitHub installation not found for delivery');
+  await db
+    .insert(github_installation_webhook_receipts)
+    .values({
+      github_installation_id: installation.id,
+      delivery_id: input.deliveryId,
+      event_type: input.eventType,
+      status: 'completed',
+    })
+    .onConflictDoNothing({
+      target: [
+        github_installation_webhook_receipts.github_installation_id,
+        github_installation_webhook_receipts.delivery_id,
+      ],
+    });
+}
+
+export async function bindGitHubIntegrationToCanonicalInstallation(
+  input: {
+    integrationId: string;
+    installationId: string;
+    appType: 'standard' | 'lite';
+  },
+  transaction?: DbTransaction
+) {
+  const execute = async (tx: DbTransaction) => {
+    await lockGitHubInstallationIdentity(tx, input.appType, input.installationId);
+    const [canonical] = await tx
+      .select({ id: github_app_installations.id })
+      .from(github_app_installations)
+      .where(
+        and(
+          eq(github_app_installations.github_app_type, input.appType),
+          eq(github_app_installations.installation_id, input.installationId),
+          eq(github_app_installations.lifecycle_state, 'active')
+        )
+      )
+      .for('update');
+    if (!canonical) throw new Error('Canonical GitHub installation is not active');
     const bound = await tx
       .update(platform_integrations)
       .set({ github_installation_id: canonical.id, updated_at: new Date().toISOString() })
@@ -564,5 +1103,6 @@ export async function bindGitHubIntegrationToCanonicalInstallation(input: {
       )
       .returning({ id: platform_integrations.id });
     if (bound.length !== 1) throw new Error('GitHub integration could not be bound');
-  });
+  };
+  return transaction ? execute(transaction) : db.transaction(execute);
 }

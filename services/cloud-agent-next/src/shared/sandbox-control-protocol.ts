@@ -42,11 +42,30 @@ export const SANDBOX_HELLO_DEADLINE_MS = 10_000;
 
 export const SANDBOX_CONTROL_REQUEST_TIMEOUT_MS = 30_000;
 
+export const SANDBOX_ACQUISITION_LOST_MESSAGE =
+  'Sandbox acquisition no longer owns this allocation';
+
+export class SandboxAcquisitionLostError extends Error {
+  constructor(message: string = SANDBOX_ACQUISITION_LOST_MESSAGE) {
+    super(message);
+    this.name = 'SandboxAcquisitionLostError';
+  }
+}
+
+export function isSandboxAcquisitionLostError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === 'SandboxAcquisitionLostError' ||
+      error.message === SANDBOX_ACQUISITION_LOST_MESSAGE)
+  );
+}
+
 export const SANDBOX_CONTROL_ATTACH_TIMEOUT_MS = 8 * 60_000;
 
 export const SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS = 60 * 60_000;
 export const SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS = 10_000;
 export const SANDBOX_CONTROL_OPERATION_LIMIT = 32;
+export const SANDBOX_CONTROL_FORWARD_OPERATION_LIMIT = 2048;
 export const SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS = 90_000;
 export const SANDBOX_CONTROL_OUTCOME_RETRY_MS = 1_000;
 export const SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS = 3;
@@ -57,6 +76,7 @@ export const SANDBOX_OPERATIONS = [
   'sandbox.status',
   'sandbox.reconcile',
   'sandbox.event.publish',
+  'sandbox.event.publishBatch',
   'sandbox.shutdown',
   'worktree.prepareDeletion',
   'worktree.delete',
@@ -192,6 +212,7 @@ export const sandboxHelloPayloadSchema = z.object({
       eventReceipts: z.boolean().optional(),
       runtimeIsolation: z.literal(true).optional(),
       runtimeRecovery: z.literal(true).optional(),
+      eventBatches: z.boolean().optional(),
       scopedCleanupResult: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
     })
@@ -211,6 +232,7 @@ export const sandboxHelloResultSchema = z.object({
       eventReceipts: z.boolean().optional(),
       runtimeIsolation: z.literal(true).optional(),
       runtimeRecovery: z.literal(true).optional(),
+      eventBatches: z.boolean().optional(),
       scopedCleanupResult: z.boolean().optional(),
     })
     .optional(),
@@ -745,6 +767,28 @@ export const sandboxEventPublicationResultSchema = z
   .object({ receiptId: z.string().uuid(), applied: z.literal(true) })
   .strict();
 
+export const SANDBOX_EVENT_BATCH_MAX_ITEMS = 64;
+
+export const sandboxEventBatchPayloadSchema = z
+  .object({
+    items: z.array(sandboxEventPublicationPayloadSchema).min(1).max(SANDBOX_EVENT_BATCH_MAX_ITEMS),
+  })
+  .strict();
+
+export const sandboxEventBatchItemOutcomeSchema = z
+  .object({
+    receiptId: z.string().uuid(),
+    status: z.enum(['applied', 'rejected', 'unknown', 'unattempted']),
+    retryable: z.boolean().optional(),
+  })
+  .strict();
+
+export const sandboxEventBatchResultSchema = z
+  .object({
+    outcomes: z.array(sandboxEventBatchItemOutcomeSchema).min(1).max(SANDBOX_EVENT_BATCH_MAX_ITEMS),
+  })
+  .strict();
+
 export type SandboxReadyPayload = z.infer<typeof sandboxReadyPayloadSchema>;
 export type SandboxHeartbeatPayload = z.infer<typeof sandboxHeartbeatPayloadSchema>;
 export type SandboxStatusPayload = z.infer<typeof sandboxStatusPayloadSchema>;
@@ -782,6 +826,9 @@ export type SessionEventPayload = z.infer<typeof sessionEventPayloadSchema>;
 export type SessionPreparingPayload = z.infer<typeof sessionPreparingPayloadSchema>;
 export type SandboxEventPublicationPayload = z.infer<typeof sandboxEventPublicationPayloadSchema>;
 export type SandboxEventPublicationResult = z.infer<typeof sandboxEventPublicationResultSchema>;
+export type SandboxEventBatchPayload = z.infer<typeof sandboxEventBatchPayloadSchema>;
+export type SandboxEventBatchItemOutcome = z.infer<typeof sandboxEventBatchItemOutcomeSchema>;
+export type SandboxEventBatchResult = z.infer<typeof sandboxEventBatchResultSchema>;
 
 export const sessionOperationAuthorizationSchema = z
   .object({
@@ -796,6 +843,18 @@ export const sessionOperationAuthorizationSchema = z
   .refine(value => value.operation !== 'session.prompt' || value.operationId === value.messageId);
 
 export type SessionOperationAuthorization = z.infer<typeof sessionOperationAuthorizationSchema>;
+
+export function sameSessionEventIdentity(
+  left: SessionEventIdentity,
+  right: SessionEventIdentity
+): boolean {
+  return (
+    left.directory === right.directory &&
+    left.kiloSessionId === right.kiloSessionId &&
+    left.rootKiloSessionId === right.rootKiloSessionId &&
+    left.nativeRuntimeId === right.nativeRuntimeId
+  );
+}
 
 export function sameSessionOperation(
   left: SessionOperationAuthorization,
@@ -959,6 +1018,8 @@ export const sandboxControlSocketAttachmentSchema = z.object({
       scopedStopAbort: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
       connectionRecovery: z.boolean().optional(),
+      eventReceipts: z.boolean().optional(),
+      eventBatches: z.boolean().optional(),
       scopedCleanupResult: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
     })

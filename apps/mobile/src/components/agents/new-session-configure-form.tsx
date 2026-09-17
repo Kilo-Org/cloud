@@ -1,25 +1,26 @@
-import { type ReactNode, type RefObject } from 'react';
+import { type RefObject } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { InstanceSelector } from '@/components/agents/instance-selector';
 import { LaunchFolderField } from '@/components/agents/folder-selector';
+import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
 import { renderProfileRow } from '@/components/agents/new-session-profile-row';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
+import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import {
   type NewSessionRepository,
   type RepositoryGroup,
   type RepositoryPlatform,
 } from '@/components/agents/new-session-repository-state';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
+import { type CloudCreateFailure } from '@/components/agents/use-new-session-creator';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { type ModeOption } from '@/components/agents/mode-normalize';
-import { Button } from '@/components/ui/button';
-import { RefreshCw } from '@/components/ui/icons';
+import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { Text } from '@/components/ui/text';
 import {
   type AgentAttachment,
@@ -30,6 +31,7 @@ import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 type NewSessionConfigureFormProps = {
   // Prompt / model / attachments (Cloud Agent only).
@@ -87,6 +89,8 @@ type NewSessionConfigureFormProps = {
   /** Recently used rows, threaded to the picker's "Recently used" section. */
   recents: NewSessionRepository[];
   selectedRepo: string;
+  /** The route's organization scope; `undefined` is a personal session. */
+  organizationId: string | undefined;
   // Environment profile (Cloud Agent only).
   profile: EffectiveAgentProfile | null;
   isProfileLoading: boolean;
@@ -99,6 +103,10 @@ type NewSessionConfigureFormProps = {
   isSpawningRemote: boolean;
   isStartDisabled: boolean;
   onStartSession: () => void;
+  /** The last cloud-create rejection, or null before one. */
+  cloudCreateError?: CloudCreateFailure | null;
+  /** Re-runs the cloud create with the same draft (the retryable recovery). */
+  onRetryCloudCreate?: () => void;
 };
 
 /**
@@ -153,6 +161,7 @@ export function NewSessionConfigureForm({
   repositories,
   recents,
   selectedRepo,
+  organizationId,
   profile,
   isProfileLoading,
   isProfileError,
@@ -162,61 +171,42 @@ export function NewSessionConfigureForm({
   isSpawningRemote,
   isStartDisabled,
   onStartSession,
+  cloudCreateError = null,
+  onRetryCloudCreate,
 }: Readonly<NewSessionConfigureFormProps>) {
   const { t } = useTranslation();
-  const colors = useThemeColors();
+  // Clears the system navigation bar under the scroll content. Without it the
+  // primary Start action can sit in the bar's translucent region a formSheet
+  // leaves exposed below itself (the picker's bottom strip showed its sliver).
+  const bottomClearance = useDetailScreenBottomPadding();
+  // The form is edge-to-edge and the window never resizes for the IME on
+  // either platform, so the scroll body needs two floors: the navigation-bar
+  // inset, and the keyboard height — the composer auto-focuses on open, and
+  // without the keyboard floor the Start control stays half-hidden behind
+  // the keyboard strip. The keyboard-lift view is the app's cross-platform
+  // IME primitive (keyboardDidShow/DidHide on Android, keyboardWillShow/
+  // WillHide on iOS), so the same implementation runs on both platforms.
+  // The ScrollView's keyboard-inset adjustment stays on for focused-field
+  // scroll-into-view; it sizes against the scroll view's own frame, which
+  // already ends above the IME, so the two never stack into a double lift.
+  // (The picker-sheet sliver of the e1 spot check is fixed at the sheet
+  // triggers: a formSheet anchors over the keyboard that is up at its first
+  // layout and never re-anchors, so the keyboard must be dismissed before
+  // the sheet opens.)
+  const { bottom } = useSafeAreaInsets();
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
-  const targetLabel = isRemote ? `${runOnInstance.name} · ${runOnInstance.projectName}` : null;
-  let runTargetBlock: ReactNode = null;
-  if (showRunOnSelector) {
-    runTargetBlock = (
-      <View className="mt-5">
-        <Text className="mb-2 text-sm font-medium text-muted-foreground">
-          {t('agentChat.instancePicker.runOn')}
-        </Text>
-        <View className="flex-row items-center gap-2">
-          <View className="flex-1">
-            <InstanceSelector
-              value={runOnInstance}
-              instances={instanceList}
-              isLoading={isLoadingInstances}
-              onChange={onChangeRunOnInstance}
-              disabled={isStarting}
-            />
-          </View>
-          <Button
-            variant="outline"
-            size="icon"
-            onPress={onRefreshInstances}
-            disabled={isStarting || isFetchingInstances}
-            loading={isFetchingInstances}
-            accessibilityLabel={t('common.refresh')}
-          >
-            {!isFetchingInstances ? <RefreshCw size={18} color={colors.foreground} /> : null}
-          </Button>
-        </View>
-      </View>
-    );
-  } else if (targetLabel) {
-    runTargetBlock = (
-      <View className="mt-2">
-        <Text className="text-sm text-muted-foreground">
-          {t('agentChat.newSession.runOnWithTarget', { target: targetLabel })}
-        </Text>
-      </View>
-    );
-  }
 
-  return (
+  const body = (
     <ScrollView
       className="flex-1"
-      contentContainerClassName="flex-grow px-4 pb-8 pt-4"
+      contentContainerClassName="flex-grow px-4 pt-4"
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="on-drag"
     >
       <NewSessionPrompt
         attachments={attachments}
@@ -248,7 +238,16 @@ export function NewSessionConfigureForm({
         isCloneEntry={isCloneEntry}
       />
 
-      {runTargetBlock}
+      <NewSessionRunTarget
+        showRunOnSelector={showRunOnSelector}
+        runOnInstance={runOnInstance}
+        instanceList={instanceList}
+        isLoadingInstances={isLoadingInstances}
+        isFetchingInstances={isFetchingInstances}
+        onChangeRunOnInstance={onChangeRunOnInstance}
+        onRefreshInstances={onRefreshInstances}
+        disabled={isStarting}
+      />
 
       {isRemote ? (
         <LaunchFolderField
@@ -276,6 +275,8 @@ export function NewSessionConfigureForm({
           repositories={repositories}
           recents={recents}
           value={selectedRepo}
+          organizationId={organizationId}
+          isCloneEntry={isCloneEntry}
         />
       ) : null}
 
@@ -302,6 +303,23 @@ export function NewSessionConfigureForm({
         ? renderProfileRow({ t, profile, isProfileLoading, isProfileError, onRetryProfile })
         : null}
 
+      {
+        // Persistent failure feedback for the cloud create, in the same
+        // reserved spot above Start. A retryable rejection carries the retry
+        // control; a terminal one says what the server reported instead. The
+        // form owns this feedback, so the creator hook stays silent for it.
+        // Cloud-only: the route also clears the failure when the target
+        // changes, and this gate keeps a stale one off a remote target no
+        // matter which path selected it.
+      }
+      {cloudCreateError && !isRemote ? (
+        <NewSessionCloudCreateError
+          failure={cloudCreateError}
+          onRetry={onRetryCloudCreate}
+          isRetryDisabled={isStartDisabled}
+        />
+      ) : null}
+
       <NewSessionStartButton
         isCloneEntry={isCloneEntry}
         isRemote={isRemote}
@@ -309,6 +327,14 @@ export function NewSessionConfigureForm({
         isStarting={isStarting}
         onStartSession={onStartSession}
       />
+
+      <View style={{ height: bottomClearance }} pointerEvents="none" />
     </ScrollView>
+  );
+
+  return (
+    <View className="flex-1 bg-background" style={{ paddingBottom: bottom }}>
+      <AppAwareKeyboardPaddingView className="flex-1">{body}</AppAwareKeyboardPaddingView>
+    </View>
   );
 }

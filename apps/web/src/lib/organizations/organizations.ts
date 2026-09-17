@@ -21,6 +21,7 @@ import {
   organization_user_limits,
   organization_user_usage,
   organizations,
+  provider_oauth_attempts,
   external_side_effect_outbox,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
@@ -155,10 +156,6 @@ export async function userHasOrganizations(userId: User['id']): Promise<boolean>
   return result.length > 0;
 }
 
-/**
- * Returns the full organization object only if the user is a member of exactly one organization.
- * Returns null if the user has zero or multiple organizations.
- */
 export async function getSingleUserOrganization(userId: User['id']): Promise<Organization | null> {
   const result = await db
     .select({ organization: organizations })
@@ -166,7 +163,6 @@ export async function getSingleUserOrganization(userId: User['id']): Promise<Org
     .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
     .where(and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at)))
     .limit(2);
-  // Only return the org if user has exactly one organization
   return result.length === 1 ? result[0].organization : null;
 }
 
@@ -253,8 +249,6 @@ export async function getProfileOrganizations(
 
 export async function createOrganization(
   name: string,
-  // this is only used in tests
-  // TODO(bmc): remove this from tests in the future. nbd rn.
   userId?: User['id'] | null,
   addUserAsOwner: boolean = true,
   company_domain?: string,
@@ -272,9 +266,7 @@ export async function createOrganization(
         created_by_kilo_user_id: userId,
         free_trial_end_at: trialEndDate.toISOString(),
         settings: {
-          // all new orgs will have usage limits disabled by default
           enable_usage_limits: false,
-          // all new orgs will have code indexing enabled by default
           code_indexing_enabled: true,
           ...(plan === 'enterprise' ? { recommendations_digest_enabled: true } : {}),
         },
@@ -284,7 +276,6 @@ export async function createOrganization(
       .returning();
 
     if (!userId || !addUserAsOwner) {
-      // If no user ID is provided or addUserAsOwner is false, return the organization without adding a member
       return org;
     }
     await tx.insert(organization_memberships).values({
@@ -426,7 +417,6 @@ export async function removeUserFromOrganization(
   const run = async (tx: DrizzleTransaction) => {
     await lockOrganizationMembershipMutation(tx, organizationId, userId);
     await bumpOrganizationGroupPolicyRevision(tx, organizationId, removedBy ?? userId);
-    // Look up the user's current role before deleting
     const [membership] = await tx
       .select({ role: organization_memberships.role })
       .from(organization_memberships)
@@ -518,7 +508,6 @@ async function invalidateRemovedMemberSessionAccess(
   }
 
   // Best-effort: close the removed member's live Cloud Agent stream sockets.
-  // A failure here must not fail member removal.
   try {
     await closeCloudAgentOrgStreams(userId, organizationId);
   } catch (error) {
@@ -539,7 +528,6 @@ export async function updateUserRoleInOrganization(
   const run = async (
     tx: DrizzleTransaction
   ): Promise<{ success: boolean; updated: 'membership' | 'invitation' | 'none' }> => {
-    // First, try to update existing membership
     const membershipUpdateResult = await tx
       .update(organization_memberships)
       .set({ role })
@@ -564,7 +552,6 @@ export async function updateUserRoleInOrganization(
       return { success: false, updated: 'none' };
     }
 
-    // Update any non-accepted, non-expired invitations for this user's email
     const invitationUpdateResult = await tx
       .update(organization_invitations)
       .set({ role })
@@ -681,7 +668,6 @@ export async function inviteUserToOrganization(
 export async function getOrganizationMembers(
   organizationId: Organization['id']
 ): Promise<OrganizationMember[]> {
-  // Optimize by using a single query with LEFT JOIN and UNION ALL
   const [activeMembers, pendingInvitations] = await Promise.all([
     db
       .select({
@@ -787,11 +773,8 @@ export async function acceptOrganizationInvite(
   authentication: InvitationAuthenticationContext = {}
 ): Promise<AcceptInviteResult> {
   try {
-    // The accepting user's google_user_email, read inside the transaction and
-    // used as the PostHog distinct id after a successful membership insert.
     let joinedDistinctId: string | null = null;
     const result = await db.transaction(async tx => {
-      // Find and lock the invitation to prevent race conditions
       const [invitation] = await tx
         .select()
         .from(organization_invitations)
@@ -802,14 +785,12 @@ export async function acceptOrganizationInvite(
         return failureResult('Invitation not found');
       }
 
-      // Check if invitation is expired
       const now = new Date();
       const expiresAt = new Date(invitation.expires_at);
       if (now > expiresAt) {
         return failureResult('Invitation has expired');
       }
 
-      // Check if invitation is already accepted
       if (invitation.accepted_at) {
         return failureResult('Invitation has already been accepted');
       }
@@ -873,7 +854,6 @@ export async function acceptOrganizationInvite(
 
       await lockOrganizationMembershipMutation(tx, invitation.organization_id, userId);
 
-      // Check if user is already a member of the organization
       const existingMembership = await tx
         .select()
         .from(organization_memberships)
@@ -910,8 +890,6 @@ export async function acceptOrganizationInvite(
         invited_by: invitation.invited_by,
       });
 
-      // Users who join through an invitation should not be asked how they
-      // heard about Kilo.
       await skipCustomerSourceSurveyForOrgJoin(userId, tx);
 
       // If the invitation predates the account, the account was created after
@@ -938,7 +916,6 @@ export async function acceptOrganizationInvite(
           )
         );
 
-      // Mark invitation as accepted
       const [updatedInvitation] = await tx
         .update(organization_invitations)
         .set({ accepted_at: sql`NOW()` })
@@ -1080,10 +1057,23 @@ export async function markOrganizationAsDeleted(
   organizationId: Organization['id'],
   txn?: DrizzleTransaction
 ): Promise<void> {
-  await (txn ?? db)
-    .update(organizations)
-    .set({ ...auto_deleted_at })
-    .where(eq(organizations.id, organizationId));
+  const execute = async (tx: DrizzleTransaction) => {
+    const [organization] = await tx
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .for('update');
+    if (!organization) return;
+    await tx
+      .delete(provider_oauth_attempts)
+      .where(eq(provider_oauth_attempts.owned_by_organization_id, organizationId));
+    await tx
+      .update(organizations)
+      .set({ ...auto_deleted_at })
+      .where(eq(organizations.id, organizationId));
+  };
+  if (txn) await execute(txn);
+  else await db.transaction(execute);
 }
 
 export async function getOrganizationMemberByEmail(

@@ -17,7 +17,6 @@ import { DurableObject } from 'cloudflare:workers';
 import * as Sentry from '@sentry/cloudflare';
 import { z } from 'zod';
 
-// Sub-modules (plain functions, not classes — per coding style)
 import * as beadOps from './town/beads';
 import type { FailureReason } from './town/types';
 import * as agents from './town/agents';
@@ -45,7 +44,6 @@ import type { Action, ApplyActionContext } from './town/actions';
 import { buildPolecatSystemPrompt } from '../prompts/polecat-system.prompt';
 import { buildRefinerySystemPrompt } from '../prompts/refinery-system.prompt';
 
-// Table imports for beads-centric operations
 import {
   beads,
   BeadRecord,
@@ -143,11 +141,8 @@ function formatEventMessage(row: Record<string, unknown>): string {
   }
 }
 
-// Alarm intervals
-const ACTIVE_ALARM_INTERVAL_MS = 5_000; // 5s when agents are active
-const IDLE_ALARM_INTERVAL_MS = 5 * 60_000; // 5m when idle (no working agents)
-
-// Escalation constants
+const ACTIVE_ALARM_INTERVAL_MS = 5_000;
+const IDLE_ALARM_INTERVAL_MS = 5 * 60_000;
 const STALE_ESCALATION_THRESHOLD_MS = 4 * 60 * 60 * 1000;
 const MAX_RE_ESCALATIONS = 3;
 const SEVERITY_ORDER = ['low', 'medium', 'high', 'critical'] as const;
@@ -160,7 +155,6 @@ function now(): string {
   return new Date().toISOString();
 }
 
-// ── Rig config stored per-rig in KV (mirrors what was in Rig DO) ────
 type RigConfig = {
   townId: string;
   rigId: string;
@@ -173,7 +167,6 @@ type RigConfig = {
   merge_strategy?: MergeStrategy;
 };
 
-// ── Escalation API type (derived from EscalationBeadRecord) ─────────
 type EscalationEntry = {
   id: string;
   source_rig_id: string;
@@ -202,7 +195,6 @@ function toEscalation(row: EscalationBeadRecord): EscalationEntry {
   };
 }
 
-// ── Convoy API type (derived from ConvoyBeadRecord) ─────────────────
 type ConvoyEntry = {
   id: string;
   title: string;
@@ -595,8 +587,6 @@ export class TownDO extends DurableObject<Env> {
     }
   }
 
-  // ── WebSocket: status broadcast ──────────────────────────────────────
-
   /**
    * Handle HTTP requests to the DO. Only used for the /status/ws
    * WebSocket upgrade — all other requests use RPC methods.
@@ -759,8 +749,6 @@ export class TownDO extends DurableObject<Env> {
     }
   }
 
-  // ── Initialization ──────────────────────────────────────────────────
-
   private async ensureInitialized(): Promise<void> {
     if (!this.initPromise) {
       this.initPromise = this.initializeDatabase();
@@ -769,15 +757,12 @@ export class TownDO extends DurableObject<Env> {
   }
 
   private async initializeDatabase(): Promise<void> {
-    // Load persisted town ID if available
     const storedId = await this.ctx.storage.get<string>('town:id');
     if (storedId) this._townId = storedId;
 
-    // Cache owner_user_id for analytics events
     const townConfig = await config.getTownConfig(this.ctx.storage);
     this._ownerUserId = townConfig.owner_user_id;
 
-    // Load persisted draining flag, nonce, and start time
     this._draining = (await this.ctx.storage.get<boolean>('town:draining')) ?? false;
     this._drainNonce = (await this.ctx.storage.get<string>('town:drainNonce')) ?? null;
     this._drainStartedAt = (await this.ctx.storage.get<number>('town:drainStartedAt')) ?? null;
@@ -785,9 +770,6 @@ export class TownDO extends DurableObject<Env> {
     this._containerRunPolicy =
       (await this.ctx.storage.get<ContainerRunPolicy>('container:runPolicy')) ?? 'automatic';
 
-    // All tables are now initialized via beads.initBeadTables():
-    // beads, bead_events, bead_dependencies, agent_metadata, review_metadata,
-    // escalation_metadata, convoy_metadata
     beadOps.initBeadTables(this.sql);
 
     // These are no-ops now but kept for clarity
@@ -795,19 +777,15 @@ export class TownDO extends DurableObject<Env> {
     mail.initMailTables(this.sql);
     reviewQueue.initReviewQueueTables(this.sql);
 
-    // Rig registry
     rigs.initRigTables(this.sql);
 
-    // Nudges
     query(this.sql, createTableAgentNudges(), []);
     for (const idx of getIndexesAgentNudges()) {
       query(this.sql, idx, []);
     }
 
-    // Wasteland connections
     wasteland.initWastelandTables(this.sql);
 
-    // Reconciler event log
     events.initTownEventsTable(this.sql);
 
     // One-shot cleanup: older versions of this DO stored a separate
@@ -869,10 +847,6 @@ export class TownDO extends DurableObject<Env> {
   async getDashboardContext(): Promise<string | null> {
     return this._dashboardContext;
   }
-
-  // ══════════════════════════════════════════════════════════════════
-  // Container Eviction (graceful drain)
-  // ══════════════════════════════════════════════════════════════════
 
   /**
    * Record a container eviction event and set the draining flag.
@@ -940,10 +914,6 @@ export class TownDO extends DurableObject<Env> {
   async getDrainStartedAt(): Promise<number | null> {
     return this._drainStartedAt;
   }
-
-  // ══════════════════════════════════════════════════════════════════
-  // Town Configuration
-  // ══════════════════════════════════════════════════════════════════
 
   async getTownConfig(): Promise<TownConfig> {
     return config.getTownConfig(this.ctx.storage);
@@ -1148,7 +1118,6 @@ export class TownDO extends DurableObject<Env> {
       getTownConfig: () => Promise.resolve(townConfig),
     });
 
-    // Phase 1: Persist to DO storage for next boot.
     const envMapping: Array<[string, string | undefined]> = [
       ['GIT_TOKEN', githubToken ?? undefined],
       ['GITLAB_TOKEN', townConfig.git_auth?.gitlab_token],
@@ -1219,9 +1188,6 @@ export class TownDO extends DurableObject<Env> {
     }
     await this.ctx.storage.put(CUSTOM_ENV_KEYS_STORAGE_KEY, newCustomKeys);
 
-    // Phase 2: Push to the running container's process.env via the
-    // /sync-config endpoint. The X-Town-Config header delivers the
-    // full config; the endpoint applies CONFIG_ENV_MAP to process.env.
     try {
       const containerConfig = await config.buildContainerConfig(
         this.ctx.storage,
@@ -1243,10 +1209,6 @@ export class TownDO extends DurableObject<Env> {
       );
     }
   }
-
-  // ══════════════════════════════════════════════════════════════════
-  // Rig Registry
-  // ══════════════════════════════════════════════════════════════════
 
   async addRig(input: {
     rigId: string;
@@ -1288,8 +1250,6 @@ export class TownDO extends DurableObject<Env> {
     return rigs.getRig(this.sql, rigId);
   }
 
-  // ── Wasteland Connection ─────────────────────────────────────────────
-
   async connectWasteland(input: {
     connectionId: string;
     wastelandId: string;
@@ -1307,8 +1267,6 @@ export class TownDO extends DurableObject<Env> {
   async getWastelandConnection(): Promise<wasteland.WastelandConnectionRecord | null> {
     return wasteland.getWastelandConnection(this.sql);
   }
-
-  // ── Rig Config (KV, per-rig — configuration needed for container dispatch) ──
 
   async configureRig(rigConfig: RigConfig): Promise<void> {
     return withLogTags({ source: 'Town.do', tags: { townId: this.townId } }, () =>
@@ -1434,10 +1392,6 @@ export class TownDO extends DurableObject<Env> {
     return (await this.ctx.storage.get<RigConfig>(`rig:${rigId}:config`)) ?? null;
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // Beads
-  // ══════════════════════════════════════════════════════════════════
-
   async createBead(input: CreateBeadInput): Promise<Bead> {
     const bead = beadOps.createBead(this.sql, input);
     this.emitEvent({
@@ -1501,7 +1455,6 @@ export class TownDO extends DurableObject<Env> {
         status: 'closed',
         rigId: bead.rig_id ?? undefined,
       });
-      // When a bead closes, check if any blocked beads are now unblocked and dispatch them.
       this.dispatchUnblockedBeads(beadId);
     } else if (status === 'failed') {
       this.emitEvent({
@@ -1617,7 +1570,6 @@ export class TownDO extends DurableObject<Env> {
       beadOps.setDependencies(this.sql, beadId, depends_on);
     }
 
-    // When a bead closes via field update, check for newly unblocked beads
     if (fields.status === 'closed' || fields.status === 'failed') {
       this.dispatchUnblockedBeads(beadId);
     }
@@ -1835,10 +1787,6 @@ export class TownDO extends DurableObject<Env> {
     return this.getConvoy(convoyId);
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // Agents
-  // ══════════════════════════════════════════════════════════════════
-
   async registerAgent(input: RegisterAgentInput): Promise<Agent> {
     return agents.registerAgent(this.sql, input);
   }
@@ -1886,8 +1834,6 @@ export class TownDO extends DurableObject<Env> {
     return agents.getOrCreateAgent(this.sql, role, rigId, this.townId);
   }
 
-  // ── Agent Events (delegated to AgentDO) ───────────────────────────
-
   async appendAgentEvent(agentId: string, eventType: string, data: unknown): Promise<number> {
     const agentDO = getAgentDOStub(this.env, agentId);
     return agentDO.appendEvent(eventType, data);
@@ -1915,8 +1861,6 @@ export class TownDO extends DurableObject<Env> {
       return '';
     }
   }
-
-  // ── Prime & Checkpoint ────────────────────────────────────────────
 
   async prime(agentId: string): Promise<PrimeContext> {
     return agents.prime(this.sql, agentId);
@@ -1950,8 +1894,6 @@ export class TownDO extends DurableObject<Env> {
     const updatedBody = (bead.body ?? '') + evictionNote;
     beadOps.updateBeadFields(this.sql, bead.bead_id, { body: updatedBody }, 'system');
   }
-
-  // ── Heartbeat ─────────────────────────────────────────────────────
 
   /**
    * Update an agent's heartbeat timestamp. Returns the current drain
@@ -2050,10 +1992,6 @@ export class TownDO extends DurableObject<Env> {
     );
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // Mail
-  // ══════════════════════════════════════════════════════════════════
-
   async sendMail(input: SendMailInput): Promise<void> {
     mail.sendMail(this.sql, input);
   }
@@ -2061,10 +1999,6 @@ export class TownDO extends DurableObject<Env> {
   async checkMail(agentId: string): Promise<Mail[]> {
     return mail.checkMail(this.sql, agentId);
   }
-
-  // ══════════════════════════════════════════════════════════════════
-  // Nudges
-  // ══════════════════════════════════════════════════════════════════
 
   /**
    * Queue a nudge for an agent. If mode is 'immediate', attempts to push
@@ -2220,10 +2154,6 @@ export class TownDO extends DurableObject<Env> {
 
     return result.length;
   }
-
-  // ══════════════════════════════════════════════════════════════════
-  // Review Queue & Molecules
-  // ══════════════════════════════════════════════════════════════════
 
   async submitToReviewQueue(input: ReviewQueueInput): Promise<void> {
     reviewQueue.submitToReviewQueue(this.sql, input);
@@ -2458,7 +2388,6 @@ export class TownDO extends DurableObject<Env> {
       );
     }
 
-    // ── Apply the chosen action ────────────────────────────────────
     const targetAgentId =
       typeof triageBead.metadata?.agent_bead_id === 'string'
         ? triageBead.metadata.agent_bead_id
@@ -2627,7 +2556,6 @@ export class TownDO extends DurableObject<Env> {
                 source: 'triage',
               });
             } else {
-              // Reset the bead to open so the scheduler can re-assign it
               query(
                 this.sql,
                 /* sql */ `
@@ -2653,7 +2581,6 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
-    // ── Close the triage request bead with resolution metadata ──────
     const timestamp = now();
     query(
       this.sql,
@@ -2755,10 +2682,6 @@ export class TownDO extends DurableObject<Env> {
     return reviewQueue.getMergeQueueData(this.sql, params);
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // Atomic Sling (create bead + agent + hook)
-  // ══════════════════════════════════════════════════════════════════
-
   async slingBead(input: {
     rigId: string;
     title: string;
@@ -2788,7 +2711,6 @@ export class TownDO extends DurableObject<Env> {
     const agent = agents.getOrCreateAgent(this.sql, 'polecat', input.rigId, this.townId);
     agents.hookBead(this.sql, agent.id, createdBead.bead_id);
 
-    // Re-read bead and agent after hook (hookBead updates both)
     const bead = beadOps.getBead(this.sql, createdBead.bead_id) ?? createdBead;
     const hookedAgent = agents.getAgent(this.sql, agent.id) ?? agent;
 
@@ -2904,10 +2826,6 @@ export class TownDO extends DurableObject<Env> {
       })
     );
   }
-
-  // ══════════════════════════════════════════════════════════════════
-  // Mayor (just another agent)
-  // ══════════════════════════════════════════════════════════════════
 
   async sendMayorMessage(
     message: string,
@@ -3042,9 +2960,6 @@ export class TownDO extends DurableObject<Env> {
           beadTitle: combinedMessage,
           beadBody: '',
           checkpoint: agents.readCheckpoint(this.sql, mayor.id),
-          // conversationHistory is no longer needed — the mayor's kilo.db
-          // is persisted to KV and hydrated on boot, preserving the full
-          // session state across container evictions.
           gitUrl: rigConfig?.gitUrl ?? '',
           defaultBranch: rigConfig?.defaultBranch ?? 'main',
           kilocodeToken,
@@ -3259,8 +3174,6 @@ export class TownDO extends DurableObject<Env> {
         beadTitle: 'Mayor ready. Waiting for instructions.',
         beadBody: '',
         checkpoint: agents.readCheckpoint(this.sql, mayor.id),
-        // conversationHistory is no longer needed — kilo.db persistence
-        // handles session continuity across container evictions.
         gitUrl: rigConfig?.gitUrl ?? '',
         defaultBranch: rigConfig?.defaultBranch ?? 'main',
         kilocodeToken,
@@ -3305,8 +3218,6 @@ export class TownDO extends DurableObject<Env> {
       // header parsing fails on the container side).
       const townConfig = await config.getTownConfig(this.ctx.storage);
 
-      // conversationHistory is no longer needed for model updates —
-      // kilo.db persistence handles session continuity.
       const updated = await dispatch.updateAgentModelInContainer(
         this.env,
         townId,
@@ -3431,10 +3342,6 @@ export class TownDO extends DurableObject<Env> {
     return undefined;
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // Convoys (beads with type='convoy' + convoy_metadata + bead_dependencies)
-  // ══════════════════════════════════════════════════════════════════
-
   async createConvoy(input: {
     title: string;
     beads: Array<{ bead_id: string; rig_id: string }>;
@@ -3451,7 +3358,6 @@ export class TownDO extends DurableObject<Env> {
     const convoyId = generateId();
     const timestamp = now();
 
-    // Create the convoy bead
     query(
       this.sql,
       /* sql */ `
@@ -3483,7 +3389,6 @@ export class TownDO extends DurableObject<Env> {
       ]
     );
 
-    // Create convoy_metadata with merge_mode from the town config default
     const townConfig = await this.getTownConfig();
     const convoyMergeMode = townConfig.convoy_merge_mode ?? 'review-then-land';
     query(
@@ -3498,7 +3403,6 @@ export class TownDO extends DurableObject<Env> {
       [convoyId, parsed.beads.length, 0, null, convoyMergeMode]
     );
 
-    // Track beads via bead_dependencies
     for (const bead of parsed.beads) {
       query(
         this.sql,
@@ -3524,7 +3428,6 @@ export class TownDO extends DurableObject<Env> {
   }
 
   async onBeadClosed(input: { convoyId: string; beadId: string }): Promise<ConvoyEntry | null> {
-    // Count closed tracked beads
     const closedRows = [
       ...query(
         this.sql,
@@ -3594,7 +3497,6 @@ export class TownDO extends DurableObject<Env> {
 
     const timestamp = now();
 
-    // Find all tracked beads
     const trackedRows = [
       ...query(
         this.sql,
@@ -3619,7 +3521,6 @@ export class TownDO extends DurableObject<Env> {
       const row = TrackedRow.parse(raw);
       if (row.status === 'closed' || row.status === 'failed') continue;
 
-      // Unhook agent if still assigned
       if (row.assignee_agent_bead_id) {
         try {
           agents.unhookBead(this.sql, row.assignee_agent_bead_id);
@@ -3826,7 +3727,6 @@ export class TownDO extends DurableObject<Env> {
         );
     }
 
-    // 2. Create all beads and track their IDs (needed for depends_on resolution)
     const beadIds: string[] = [];
     const results: Array<{ bead: Bead; agent: Agent | null }> = [];
 
@@ -3848,7 +3748,6 @@ export class TownDO extends DurableObject<Env> {
       });
       beadIds.push(createdBead.bead_id);
 
-      // Link bead → convoy via 'tracks'
       query(
         this.sql,
         /* sql */ `
@@ -3862,7 +3761,6 @@ export class TownDO extends DurableObject<Env> {
       );
     }
 
-    // 4. Create 'blocks' dependencies from depends_on indices
     for (let i = 0; i < input.tasks.length; i++) {
       const deps = input.tasks[i].depends_on;
       if (!deps || deps.length === 0) continue;
@@ -3931,7 +3829,6 @@ export class TownDO extends DurableObject<Env> {
     if (!convoy) throw new Error(`Convoy not found: ${convoyId}`);
     if (!convoy.staged) throw new Error(`Convoy is not staged: ${convoyId}`);
 
-    // Find all beads tracked by this convoy
     const trackedRows = [
       ...query(
         this.sql,
@@ -4086,7 +3983,6 @@ export class TownDO extends DurableObject<Env> {
       assignee_agent_name: z.string().nullable(),
     });
 
-    // Get DAG edges (blocks dependencies) between tracked beads
     const dependencyEdges = beadOps.getConvoyDependencyEdges(this.sql, convoyId);
 
     return {
@@ -4103,10 +3999,6 @@ export class TownDO extends DurableObject<Env> {
     if (rows.length === 0) return null;
     return toConvoy(ConvoyBeadRecord.parse(rows[0]));
   }
-
-  // ══════════════════════════════════════════════════════════════════
-  // Escalations (beads with type='escalation' + escalation_metadata)
-  // ══════════════════════════════════════════════════════════════════
 
   async acknowledgeEscalation(escalationId: string): Promise<EscalationEntry | null> {
     query(
@@ -4298,10 +4190,6 @@ export class TownDO extends DurableObject<Env> {
     return toEscalation(EscalationBeadRecord.parse(rows[0]));
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  // Alarm (Scheduler + Witness Patrol + Review Queue)
-  // ══════════════════════════════════════════════════════════════════
-
   async alarm(): Promise<void> {
     return withLogTags({ source: 'Town.do' }, async () => {
       await this._alarm();
@@ -4383,7 +4271,6 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
-    // ── Pre-phase: Observe container status for working agents ────────
     // Poll the container for each working/stalled agent and emit
     // container_status events. These are drained in Phase 0 and applied
     // before reconciliation.
@@ -4436,7 +4323,6 @@ export class TownDO extends DurableObject<Env> {
       });
     }
 
-    // ── Reconciler loop (Phase 0-2) with metrics ─────────────────────
     const reconcilerStart = Date.now();
     const metrics: reconciler.ReconcilerMetrics = {
       eventsDrained: 0,
@@ -4560,7 +4446,6 @@ export class TownDO extends DurableObject<Env> {
       }
     }
 
-    // Post-reconcile: Invariant checker
     try {
       const violations = reconciler.checkInvariants(this.sql);
       metrics.invariantViolations = violations.length;
@@ -4632,7 +4517,6 @@ export class TownDO extends DurableObject<Env> {
       label: JSON.stringify(metrics.actionsByType),
     });
 
-    // ── Post-reconciliation: cache activity snapshot ────────────────
     // Computed after Phases 0-2 so re-arm and getAlarmStatus reflect
     // any work created during reconciliation (hooks, dispatches, triage).
     const activeWork = this.hasActiveWork();
@@ -4667,7 +4551,6 @@ export class TownDO extends DurableObject<Env> {
               })
             ),
           ]),
-      // Prune processed reconciler events older than 7 days
       Promise.resolve().then(() => {
         try {
           events.pruneOldEvents(this.sql, 7 * 24 * 60 * 60 * 1000);
@@ -4685,7 +4568,6 @@ export class TownDO extends DurableObject<Env> {
       })
     );
 
-    // Re-arm: fast when active, slow when idle
     const interval = activeWork ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
     await this.ctx.storage.setAlarm(Date.now() + interval);
 
@@ -4731,7 +4613,7 @@ export class TownDO extends DurableObject<Env> {
     const mayorAlive = mayor && (mayor.status === 'working' || mayor.status === 'stalled');
     if (!this.hasActiveWork() && !mayorAlive) return;
 
-    const TOKEN_REFRESH_INTERVAL_MS = 60 * 60_000; // 1 hour
+    const TOKEN_REFRESH_INTERVAL_MS = 60 * 60_000;
     const now = Date.now();
     const lastRefresh = (await this.ctx.storage.get<number>('container:lastTokenRefreshAt')) ?? 0;
     if (now - lastRefresh < TOKEN_REFRESH_INTERVAL_MS) return;
@@ -4842,8 +4724,8 @@ export class TownDO extends DurableObject<Env> {
    */
   private lastKilocodeTokenCheckAt = 0;
   private async refreshKilocodeTokenIfExpiring(): Promise<void> {
-    const CHECK_INTERVAL_MS = 24 * 60 * 60_000; // once per day
-    const REFRESH_WINDOW_SECONDS = 7 * 24 * 60 * 60; // 7 days
+    const CHECK_INTERVAL_MS = 24 * 60 * 60_000;
+    const REFRESH_WINDOW_SECONDS = 7 * 24 * 60 * 60;
     const now = Date.now();
     if (now - this.lastKilocodeTokenCheckAt < CHECK_INTERVAL_MS) return;
     this.lastKilocodeTokenCheckAt = now;
@@ -4893,7 +4775,6 @@ export class TownDO extends DurableObject<Env> {
     const nowSeconds = Math.floor(now / 1000);
     if (exp - nowSeconds > REFRESH_WINDOW_SECONDS) return;
 
-    // Token expires within 7 days — remint it
     const userId = payload.kiloUserId;
     if (!userId) return;
 
@@ -4995,7 +4876,6 @@ export class TownDO extends DurableObject<Env> {
     const townConfig = await this.getTownConfig();
     const kilocodeToken = await this.resolveKilocodeToken();
 
-    // Build the triage prompt from pending requests
     const pendingRequests = patrol.listPendingTriageRequests(this.sql);
     const { buildTriageSystemPrompt } = await import('../prompts/triage-system.prompt');
     const systemPrompt = buildTriageSystemPrompt(pendingRequests);
@@ -5119,9 +4999,6 @@ export class TownDO extends DurableObject<Env> {
     await Promise.allSettled(deliveries);
   }
 
-  // NOTE: resolveGitHubToken, checkPRStatus, checkPRFeedback,
-  // areThreadsBlocking, and mergePR were extracted to town/town-scm.ts.
-  // Callers use `scm.*` imports above.
   /**
    * Bump severity of stale unacknowledged escalations.
    */
@@ -5436,7 +5313,6 @@ export class TownDO extends DurableObject<Env> {
   }> {
     const townId = this.townId;
 
-    // Check if alarm is set
     const currentAlarm = await this.ctx.storage.getAlarm();
     const alarmSet = currentAlarm !== null && currentAlarm > Date.now();
 
@@ -5525,7 +5401,6 @@ export class TownDO extends DurableObject<Env> {
     const active = cached?.activeWork ?? this.hasActiveWork();
     const intervalMs = active ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
 
-    // Agent counts by status
     const agentRows = [
       ...query(
         this.sql,
@@ -5545,7 +5420,6 @@ export class TownDO extends DurableObject<Env> {
       agentCounts.total += c;
     }
 
-    // Bead counts (live)
     const beadRows = [
       ...query(
         this.sql,
@@ -5620,7 +5494,6 @@ export class TownDO extends DurableObject<Env> {
       ][0]?.cnt ?? 0
     );
 
-    // Recent bead events (last 20) for the activity feed
     const recentRows = [
       ...query(
         this.sql,
@@ -5721,18 +5594,15 @@ export class TownDO extends DurableObject<Env> {
         ),
       ]);
 
-      // Apply each event to reconstruct state transitions
       for (const event of rangeEvents) {
         reconciler.applyEvent(this.sql, event);
       }
 
-      // Run reconciler against the resulting state
       const tc = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
         townConfig: tc,
       });
 
-      // Capture a state snapshot before rollback
       const agentSnapshot = [
         ...query(
           this.sql,
@@ -5808,7 +5678,6 @@ export class TownDO extends DurableObject<Env> {
         events.markProcessed(this.sql, event.event_id);
       }
 
-      // Phase 1: Reconcile against now-current state
       const tc2 = await this.getTownConfig();
       const actions = reconciler.reconcile(this.sql, {
         townConfig: tc2,
@@ -5829,7 +5698,6 @@ export class TownDO extends DurableObject<Env> {
         },
       };
     } finally {
-      // Roll back all state mutations — this is a dry run
       this.sql.exec('ROLLBACK TO SAVEPOINT debug_dry_run');
       this.sql.exec('RELEASE SAVEPOINT debug_dry_run');
     }
@@ -5855,7 +5723,6 @@ export class TownDO extends DurableObject<Env> {
     return BeadRecord.array().parse(rows);
   }
 
-  // DEBUG: concise non-terminal bead summary — remove after debugging
   async debugBeadSummary(): Promise<unknown[]> {
     return [
       ...query(
@@ -5881,7 +5748,6 @@ export class TownDO extends DurableObject<Env> {
     ];
   }
 
-  // DEBUG: raw agent_metadata dump — remove after debugging
   async debugPendingNudges(): Promise<unknown[]> {
     return [
       ...query(

@@ -5,7 +5,9 @@
  *
  * Pattern syntax: literal segments plus `*`, where `*` matches exactly ONE
  * path segment ([^/]+) and is captured for substitution into the target as
- * `<n>` (nth capture, 1-based). No regex.
+ * `<n>` (nth capture, 1-based). A trailing `**` matches ONE-OR-MORE tail
+ * segments, joined by `/` into a single capture — GitLab project paths nest
+ * to any depth, so the provider rows need it. No regex.
  */
 
 export type UniversalLinkRoute = {
@@ -66,10 +68,19 @@ export const UNIVERSAL_LINK_ROUTES: readonly UniversalLinkRoute[] = [
     webPath: '/organizations/*/overview',
     appPath: '/(app)/(tabs)/(3_profile)/organization/<1>',
   },
+  // Provider rows BEFORE the GitHub row: `/pr-review/gitlab/x/123` has the
+  // same segment count as a GitHub PR path, and the literal platform segment
+  // must win over the GitHub wildcards. The GitHub row stays byte-identical
+  // to the one that shipped before multi-provider review.
   {
-    webPath: '/pr-review/*/*/*',
-    appPath: '/(app)/pr-review/<1>/<2>/<3>',
+    webPath: '/pr-review/gitlab/**',
+    appPath: '/(app)/pr-review/gitlab/<1>',
   },
+  {
+    webPath: '/pr-review/bitbucket/**',
+    appPath: '/(app)/pr-review/bitbucket/<1>',
+  },
+  { webPath: '/pr-review/*/*/*', appPath: '/(app)/pr-review/<1>/<2>/<3>' },
 ] as const;
 
 const KILO_WEB_HOST = 'app.kilo.ai';
@@ -213,22 +224,26 @@ export function webPathToAppPath(webPath: string): string | null {
 
 /**
  * Match `pattern` against `path`. Both are absolute pathnames.
- * `*` matches exactly one non-empty segment. Returns captures or null.
+ * `*` matches exactly one non-empty segment. A trailing `**` matches
+ * one-or-more tail segments, captured as one `/`-joined value.
+ * Returns captures or null.
  */
 function matchPattern(pattern: string, path: string): string[] | null {
   const patternSegments = splitSegments(pattern);
   const pathSegments = splitSegments(path);
+  const hasTail = patternSegments.at(-1) === '**';
+  const fixed = hasTail ? patternSegments.slice(0, -1) : patternSegments;
 
-  if (patternSegments.length !== pathSegments.length) {
+  if (hasTail ? pathSegments.length < fixed.length + 1 : pathSegments.length !== fixed.length) {
     return null;
   }
 
   const captures: string[] = [];
 
-  for (const [i, pSeg] of patternSegments.entries()) {
+  for (const [i, pSeg] of fixed.entries()) {
     const pathSeg = pathSegments[i];
     if (pathSeg === undefined) {
-      // Unreachable: segment counts are checked equal above.
+      // Unreachable: the length checks above bound the loop.
       return null;
     }
 
@@ -244,6 +259,12 @@ function matchPattern(pattern: string, path: string): string[] | null {
     if (pSeg !== pathSeg) {
       return null;
     }
+  }
+
+  if (hasTail) {
+    // One-or-more tail segments, joined into a single capture. splitSegments
+    // never yields empty ones, so the join is unambiguous.
+    captures.push(pathSegments.slice(fixed.length).join('/'));
   }
 
   return captures;
@@ -348,15 +369,16 @@ function patternWithFinalWildcardReplaced(pattern: string, value: string): strin
 
 /**
  * Compile the table to Android `pathPattern` strings.
- * Each `*` segment becomes `.*`. Android cannot express exclusions — the
- * runtime matcher (`webPathToAppPath` / `resolveIncomingUrl`) is the
- * exclusion enforcement.
+ * Each `*` or trailing `**` segment becomes `.*` (Android's pattern crosses
+ * `/`, so the multi-segment tail needs no special form). Android cannot
+ * express exclusions — the runtime matcher (`webPathToAppPath` /
+ * `resolveIncomingUrl`) is the exclusion enforcement.
  */
 export function androidPathPatterns(): string[] {
   return UNIVERSAL_LINK_ROUTES.map(route =>
     route.webPath
       .split('/')
-      .map(seg => (seg === '*' ? '.*' : seg))
+      .map(seg => (seg === '*' || seg === '**' ? '.*' : seg))
       .join('/')
   );
 }

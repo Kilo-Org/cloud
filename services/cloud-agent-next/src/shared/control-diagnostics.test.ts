@@ -2,9 +2,69 @@ import { describe, expect, it } from 'vitest';
 import { heartbeatReasonFrom } from './sandbox-control-protocol.js';
 import {
   classifyRetirementCause,
+  controlLogBatchSchema,
   createControlDiagnosticRecord,
   diagnosticDetail,
 } from './control-diagnostics.js';
+
+describe('control diagnostic schema compatibility', () => {
+  it('accepts records written before publication diagnostics were extended', () => {
+    expect(
+      controlLogBatchSchema.parse({
+        version: 1,
+        sequence: 7,
+        droppedRecords: 0,
+        records: [
+          {
+            timestamp: 1,
+            event: 'control.event',
+            fields: { phase: 'sent', category: 'session_event', sequence: 1 },
+          },
+        ],
+      }).records
+    ).toHaveLength(1);
+  });
+
+  it('preserves publication correlation fields through the accepted batch schema', () => {
+    const record = createControlDiagnosticRecord(
+      'control.event',
+      {
+        phase: 'publication_failed',
+        category: 'session_event',
+        wrapperInstanceId: '11111111-1111-4111-8111-111111111111',
+        nativeRuntimeId: '22222222-2222-4222-8222-222222222222',
+        rootKiloSessionId: 'ses_root',
+        receiptId: '33333333-3333-4333-8333-333333333333',
+        requestId: '44444444-4444-4444-8444-444444444444',
+        sequence: 4,
+        eventType: 'message.part.updated',
+        failureReason: 'socket_overflow',
+        pendingCount: 2,
+        pendingBytes: 512,
+        socketBufferedBytes: 1024,
+      },
+      1
+    );
+    const [accepted] = controlLogBatchSchema.parse({
+      version: 1,
+      sequence: 1,
+      droppedRecords: 0,
+      records: [record],
+    }).records;
+    expect(accepted?.fields).toMatchObject({
+      wrapperInstanceId: '11111111-1111-4111-8111-111111111111',
+      nativeRuntimeId: '22222222-2222-4222-8222-222222222222',
+      rootKiloSessionId: 'ses_root',
+      receiptId: '33333333-3333-4333-8333-333333333333',
+      requestId: '44444444-4444-4444-8444-444444444444',
+      eventType: 'message.part.updated',
+      failureReason: 'socket_overflow',
+      pendingCount: 2,
+      pendingBytes: 512,
+      socketBufferedBytes: 1024,
+    });
+  });
+});
 
 describe('classifyRetirementCause', () => {
   it('maps feed machine reasons that previously became unknown', () => {

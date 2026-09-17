@@ -1,9 +1,8 @@
 /* eslint-disable max-lines -- the session test renders the full SessionDetailContent and mocks its RN/expo/SDK surface, so the wiring is long. */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/app/(app)/agent-chat/[session-id].mounted.test.tsx. */
 /* eslint-disable require-await, @typescript-eslint/require-await -- mock factories settle without await because they resolve immediately */
 import { createElement, type ElementType, type ReactElement } from 'react';
 import { Modal, Pressable } from 'react-native';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sdk';
@@ -42,8 +41,17 @@ const hoisted = vi.hoisted(() => {
 // Mock every RN / Expo / SDK side-effect import that `mobile-session-manager.ts`
 // and `session-detail-content.tsx` pull in transitively before loading either
 // module.
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
+// The header's offline-banner reservation reads the committed connectivity
+// hook; these states are online, and the hook module pulls NetInfo (unmocked
+// in the pure project).
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useOfflineBannerState: () => false,
+}));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),
 }));
@@ -68,6 +76,11 @@ vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
 }));
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
   fetchMobileSessionSnapshotPage: vi.fn(),
+}));
+// Keep the real queue-error classifier without loading the native encrypted KV.
+vi.mock('@/lib/persist/session-transcript-cache', () => ({
+  readSessionTranscriptPage: vi.fn(async () => null),
+  writeSessionTranscriptPage: vi.fn(async () => undefined),
 }));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
@@ -217,6 +230,19 @@ vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   useKeepScreenOnPreference: () => ({ hasLoaded: true, keepScreenOn: false }),
 }));
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  useCondenseToolCallsPreference: () => ({
+    condenseToolCalls: false,
+    hasLoaded: true,
+    setCondenseToolCalls: vi.fn(),
+  }),
+}));
+// The real hook reaches SecureStore via `@sentry/react-native`, which imports
+// the native react-native entry; mock the preference the way the other
+// preference hooks above are mocked so the suite stays DOM/native-free.
+vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
+  useHideThinkingPreference: () => ({ hideThinking: false, hasLoaded: true }),
+}));
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
   useReasoningPreference: () => ({ defaultExpanded: false }),
 }));
@@ -339,7 +365,7 @@ vi.mock('@/components/agents/use-message-copy', () => ({
 vi.mock('@/components/agents/session-detail-content-helpers', () => ({
   countInFlightMessages: () => 0,
   resolveRetryPrompt: () => null,
-  retryMessageAndClear: vi.fn(),
+  retryFailedMessage: vi.fn(),
 }));
 vi.mock('@/components/agents/create-and-navigate-agent-session', () => ({
   createAndNavigateAgentSession: vi.fn(),
@@ -414,6 +440,12 @@ vi.mock('@/components/agents/child-session-sheet', () => ({
 }));
 vi.mock('@/components/agents/part-detail-sheet-host', () => ({
   PartDetailSheetHost: 'PartDetailSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-sheet-host', () => ({
+  ToolRunSheetHost: 'ToolRunSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-rows', () => ({
+  CondensedToolRunRow: 'CondensedToolRunRow',
 }));
 vi.mock('@/components/agents/part-renderer', () => ({
   PartRenderer: 'PartRenderer',
@@ -497,6 +529,7 @@ function makeManager() {
       remoteModelOverride: { value: null },
       cloudAgentModelOverride: { value: null },
       availableCommands: { value: [] },
+      sessionInfo: { value: null },
       remoteCommandState: { value: null },
       contextUsage: { value: null },
       hasOlderMessages: { value: false },

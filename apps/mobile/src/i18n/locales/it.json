@@ -3,6 +3,9 @@
     "cancel": "Annulla",
     "done": "Fatto",
     "retry": "Riprova",
+    "tryAgain": "Riprova",
+    "continue": "Continua",
+    "notNow": "Non ora",
     "language": "Lingua",
     "device": "Dispositivo",
     "share": "Condividi {{title}}",
@@ -14,15 +17,12 @@
     "approve": "Approva",
     "refresh": "Aggiorna",
     "couldNotRefresh": "Impossibile aggiornare. Trascina verso il basso per riprovare.",
-    "tryAgain": "Riprova",
     "openInBrowser": "Apri nel browser",
     "openSettings": "Apri le impostazioni",
     "copiedToClipboard": "Copiato negli appunti",
     "couldNotCopyToClipboard": "Impossibile copiare negli appunti.",
     "required": "obbligatorio",
     "error": "errore: {{error}}",
-    "notNow": "Non ora",
-    "continue": "Continua",
     "back": "Indietro",
     "somethingWentWrong": "Si è verificato un errore.",
     "couldNotOpen": "Impossibile aprire {{label}}.",
@@ -36,6 +36,7 @@
     "cost": "Costo",
     "discard": "Scarta",
     "findings": "Problemi rilevati",
+    "mergeRequest": "merge request",
     "notConnected": "Non collegato",
     "notifications": "Notifiche",
     "pullRequest": "pR",
@@ -1542,12 +1543,48 @@
       "connectionLost": "Connessione persa",
       "retryConnection": "Riprova a connetterti"
     },
+    "goal": {
+      "title": "Obiettivo",
+      "statusActive": "Obiettivo attivo",
+      "statusPaused": "Obiettivo in pausa",
+      "statusComplete": "Obiettivo completato",
+      "statusBlocked": "Obiettivo bloccato",
+      "edit": "Modifica obiettivo",
+      "remove": "Rimuovi obiettivo",
+      "pause": "Metti in pausa l'obiettivo",
+      "resume": "Riprendi l'obiettivo",
+      "editPlaceholder": "Descrivi l'obiettivo",
+      "removeConfirmTitle": "Rimuovere l'obiettivo?",
+      "removeConfirmMessage": "Il CLI cancella l'obiettivo di questa sessione.",
+      "updateFailed": "Impossibile aggiornare l'obiettivo.",
+      "sectionAccessibility": "{{status}}. Obiettivo: {{text}}"
+    },
     "newSession": {
+      "recentlyUsed": "Usati di recente",
+      "couldNotLoadGithubRepositories": "Impossibile caricare i repository GitHub.",
+      "couldNotLoadGitlabRepositories": "Impossibile caricare i repository GitLab.",
+      "couldNotLoadBitbucketRepositories": "Impossibile caricare i repository Bitbucket.",
       "connectGithubDescription": "Collega GitHub nel browser, poi torna qui per scegliere un repository.",
+      "connectGitlabDescription": "Collega GitLab nel browser, poi torna qui per scegliere un repository.",
+      "connectBitbucketDescription": "Collega Bitbucket nel browser, poi torna qui per scegliere un repository.",
       "openGithub": "Apri GitHub",
+      "openGitlab": "Apri GitLab",
+      "openBitbucket": "Apri Bitbucket",
       "refreshRepositories": "Aggiorna i repository",
       "githubConnected": "GitHub collegato",
+      "gitlabConnected": "GitLab collegato",
       "noRepositoriesVisible": "Nessun repository visibile. Controlla le autorizzazioni di accesso ai repository dell'app Kilo per GitHub, poi aggiorna l'elenco.",
+      "noRepositoriesVisibleGitlab": "Nessun repository visibile. Controlla le autorizzazioni di accesso ai repository su GitLab, poi aggiorna l'elenco.",
+      "noRepositoriesVisibleBitbucket": "Nessun repository visibile. Controlla le autorizzazioni di accesso ai repository su Bitbucket, poi aggiorna l'elenco.",
+      "bitbucketOrganizationsOnly": "Bitbucket è disponibile solo per le organizzazioni.",
+      "branchPickerTitle": "Seleziona branch",
+      "branchDefault": "Predefinito",
+      "branchAccessibility": "Branch: {{label}}",
+      "branchLoading": "Caricamento dei branch",
+      "branchLoadError": "Impossibile caricare i branch",
+      "branchUnavailable": "Nessun branch disponibile per questo repository. Verifica i tuoi accessi con il provider, poi scegli un altro repository.",
+      "branchEmpty": "Nessun branch disponibile",
+      "branchPlaceholder": "Seleziona un branch",
       "runOnWithTarget": "Esegui su: {{target}}",
       "environment": "Ambiente",
       "couldNotLoadEnvironment": "Impossibile caricare il tuo ambiente.",
@@ -1566,26 +1603,15 @@
       "couldNotReadPendingSessions": "Impossibile leggere le sessioni in sospeso. Riprova.",
       "failedToCreate": "Impossibile creare la sessione.",
       "couldNotRefreshRepositories": "Impossibile aggiornare i repository. Riprova.",
-      "discardDraftMessage": "Il tuo prompt andrà perso.",
       "discardDraftTitle": "Eliminare la bozza?",
+      "discardDraftMessage": "Il tuo prompt andrà perso.",
+      "discardWithUploadsMessage": "Il tuo prompt e i file caricati non allegati a messaggi inviati verranno eliminati.",
       "discardFailed": "Impossibile eliminare la bozza. Riprova.",
       "remoteHint": "Esegui `kilo remote` sul tuo computer, oppure `/remote` in una sessione CLI attiva, per controllare un processo kilo locale.",
-      "connectBitbucketDescription": "Collega Bitbucket nel browser, poi torna qui per scegliere un repository.",
-      "connectGitlabDescription": "Collega GitLab nel browser, poi torna qui per scegliere un repository.",
-      "couldNotLoadBitbucketRepositories": "Impossibile caricare i repository Bitbucket.",
-      "couldNotLoadGithubRepositories": "Impossibile caricare i repository GitHub.",
-      "couldNotLoadGitlabRepositories": "Impossibile caricare i repository GitLab.",
-      "gitlabConnected": "GitLab collegato",
-      "noRepositoriesVisibleBitbucket": "Nessun repository visibile. Controlla le autorizzazioni di accesso ai repository su Bitbucket, poi aggiorna l'elenco.",
-      "noRepositoriesVisibleGitlab": "Nessun repository visibile. Controlla le autorizzazioni di accesso ai repository su GitLab, poi aggiorna l'elenco.",
-      "openBitbucket": "Apri Bitbucket",
-      "openGitlab": "Apri GitLab",
-      "recentlyUsed": "Usati di recente",
       "continueFrom": "Stai continuando la sessione {{title}}.",
       "importingSession": "Importazione in corso…",
       "cliCannotContinue": "Questa CLI non può continuare una sessione. Scegli Cloud Agent o un'altra CLI.",
-      "importFailed": "Impossibile importare questa sessione.",
-      "discardWithUploadsMessage": "Il tuo prompt e i file caricati non allegati a messaggi inviati verranno eliminati."
+      "importFailed": "Impossibile importare questa sessione."
     },
     "partRenderer": {
       "updatedFileCount_one": "È stato aggiornato {{displayCount}} file.",
@@ -1990,6 +2016,11 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_many": "{{steps}} passaggi"
     },
+    "autoApprove": {
+      "title": "Approvazione automatica",
+      "description": "Approva automaticamente le richieste di autorizzazione per questa sessione. Gli strumenti vengono poi eseguiti senza richiesta.",
+      "unavailable": "Questa sessione non può ricevere richieste di autorizzazione."
+    },
     "prBadge": {
       "open": "apri la PR",
       "closed": "pull request chiusa",
@@ -2020,6 +2051,10 @@
       "tapToListHint": "Tocca una cartella per visualizzarne il contenuto.",
       "unsupportedDescription": "Questa CLI non può elencare le cartelle. Tocca Fatto per mantenere la cartella di avvio, poi Avvia sessione per avviare la sessione in quella cartella.",
       "unsupportedTitle": "Impossibile elencare le cartelle"
+    },
+    "toolRun": {
+      "sheetTitle": "Chiamate degli strumenti",
+      "condensedLabel": "{{itemCount}} elementi; {{last}}"
     }
   },
   "bootstrap": {
@@ -2035,6 +2070,8 @@
     "voiceInput": "Input vocale",
     "autoExpandThinking": "Espandi automaticamente il ragionamento",
     "autoExpandThinkingSubtitle": "Mostra il ragionamento completo dell'agente al termine dell'elaborazione.",
+    "hideThinking": "Nascondi i dettagli del ragionamento",
+    "hideThinkingSubtitle": "Non mostrare il ragionamento dell'agente nella schermata della sessione.",
     "keepScreenOn": "Mantieni lo schermo acceso nella schermata della sessione",
     "keepScreenOnSubtitle": "Mantieni lo schermo acceso mentre la sessione è in esecuzione.",
     "appearance": "Aspetto",
@@ -2057,7 +2094,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Trascrizione con Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Trascrivi la dettatura con un modello Kilo Gateway anziché con il riconoscimento vocale del dispositivo. La registrazione viene inviata a Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Comprimi le chiamate degli strumenti",
+    "condenseToolCallsSubtitle": "Raggruppa le chiamate degli strumenti consecutive in una riga che puoi aprire.",
+    "toolSummaryTranslation": "Traduci i riepiloghi degli strumenti",
+    "toolSummaryTranslationSubtitle": "Invia ogni riepilogo di strumento a un modello per tradurlo nella lingua della tua app. Se la traduzione non riesce, viene mostrato l'originale.",
+    "toolSummaryTranslationModelUnavailableNotice": "Questo modello non è più offerto. Tocca $t(common.model) per sceglierne un altro."
   },
   "addCredits": {
     "cta": "Aggiungi crediti",
@@ -2161,7 +2203,10 @@
     "gatewayModelUnavailable": "Questo modello di trascrizione non è disponibile. Scegline un altro in Preferenze.",
     "gatewayModelUnavailableNotice": "Questo modello non è più offerto. Tocca $t(transcriptionModel.title) per sceglierne un altro.",
     "gatewaySignInRequired": "Accedi per usare la trascrizione con Kilo Gateway.",
-    "gatewayNoModel": "Scegli prima un modello di trascrizione in Preferenze."
+    "gatewayNoModel": "Scegli prima un modello di trascrizione in Preferenze.",
+    "testTitle": "Prova la dettatura",
+    "testPlaceholder": "Tocca il microfono e inizia a parlare.",
+    "testClear": "Cancella testo"
   },
   "share": {
     "title": "Condivisione su Kilo",
@@ -2343,6 +2388,9 @@
     "checkConnection": "Verifica la connessione",
     "checks": {
       "checksCount": "{{displayCount}} controlli",
+      "checksCount_one": "{{displayCount}} controllo",
+      "checksCount_many": "{{displayCount}} controlli",
+      "checksCount_other": "{{displayCount}} controlli",
       "couldNotLoad": "Impossibile caricare i controlli.",
       "failed": "{{displayCount}} non superati",
       "noAccess": "Non hai accesso ai controlli di questo repository.",
@@ -2378,11 +2426,17 @@
       "tapDiffLineToSuggest": "Tocca una riga del confronto per attivare i suggerimenti."
     },
     "connect": {
-      "checkFailedMessage": "Lo stato di accesso sarà disponibile al termine del caricamento.",
       "checkFailedTitle": "Impossibile verificare la connessione a GitHub.",
-      "description": "Connetti il tuo account GitHub per revisionare le pull request dall'app.",
+      "checkFailedMessage": "Lo stato di accesso sarà disponibile al termine del caricamento.",
+      "checkFailedTitleGitLab": "Impossibile verificare la connessione a GitLab.",
+      "checkFailedTitleBitbucket": "Impossibile verificare la connessione a Bitbucket.",
+      "providerCheckFailedMessage": "Lo stato della connessione sarà disponibile al termine del caricamento.",
+      "reconnectTitle": "Riconnetti GitHub",
       "reconnectDescription": "L'autorizzazione a connetterti a GitHub è stata revocata. Riconnettiti per continuare a revisionare le pull request dall'app.",
-      "reconnectTitle": "Riconnetti GitHub"
+      "description": "Connetti il tuo account GitHub per revisionare le pull request dall'app.",
+      "gitlabDescription": "Connetti il tuo account GitLab per revisionare le merge request dall'app.",
+      "bitbucketDescription": "Connetti Bitbucket a questa organizzazione per revisionare le pull request dall'app.",
+      "bitbucketOrgOnlyDescription": "Seleziona un'organizzazione nel tuo profilo per revisionarne le pull request di Bitbucket."
     },
     "connectionExpired": "La connessione a GitHub è scaduta.",
     "couldNotLoadPullRequest": "Impossibile caricare la pull request.",
@@ -2436,6 +2490,8 @@
       "replyBody": "Testo della risposta",
       "replyForbidden": "Non hai il permesso di rispondere a questa pull request.",
       "addCommentCta": "Commenta questa pull request",
+      "fixWithKilo": "Risolvi con Kilo",
+      "fixWithKiloPrompt": "Per favore, gestisci il seguente commento della pull request: {{link}}",
       "commentBadRequest": "Impossibile pubblicare questo commento. La pull request potrebbe essere stata modificata.",
       "commentForbidden": "Non hai il permesso di commentare questa pull request.",
       "replyPlaceholder": "La tua risposta…",
@@ -2477,21 +2533,24 @@
         "outdatedOnLines": "Non più attuale: {{lines}}",
         "outdatedOnPath": "Non più attuale: {{path}}"
       },
-      "deletedUser": "utente eliminato"
+      "deletedUser": "utente eliminato",
+      "replyForbiddenTerm": "Non hai il permesso di rispondere a {{term}}."
     },
     "entry": {
-      "clearLink": "Cancella il collegamento alla pull request",
+      "eyebrow": "Apri una pull request o una merge request tramite URL",
+      "pastePrLink": "Incolla il collegamento a una pull request o merge request",
+      "noRecentPrs": "Nessuna revisione recente",
+      "noRecentPrsDescription": "Incolla qui sopra un collegamento per iniziare una revisione — la prossima volta comparirà qui.",
       "couldNotLoad": "Impossibile caricare i dati.",
-      "eyebrow": "Apri una pull request tramite URL.",
-      "noRecentPrs": "Nessuna PR recente",
-      "noRecentPrsDescription": "Incolla qui sopra il collegamento a una PR per iniziare una revisione. La PR comparirà qui la prossima volta.",
-      "open": "Apri",
-      "pasteLink": "Incolla il collegamento alla pull request",
-      "pastePrLink": "Incolla il collegamento a una PR",
-      "removeFromRecentsMessage": "Questa pull request verrà rimossa dall'elenco delle PR recenti.",
       "removeFromRecentsTitle": "Rimuovere dall'elenco delle PR recenti?",
+      "removeFromRecentsMessage": "Questa revisione verrà rimossa dall'elenco delle recenti.",
       "removeRecentAccessibility": "Rimuovi {{repo}} dall'elenco delle PR recenti",
-      "urlAccessibility": "URL della pull request su GitHub"
+      "urlAccessibility": "Inserisci l'URL di una pull request o merge request",
+      "urlPlaceholder": "URL di pull request o merge request",
+      "openAccessibility": "Apri una pull request o un merge request",
+      "clearLink": "Cancella il collegamento",
+      "pasteLink": "Incolla il collegamento alla pull request o merge request",
+      "open": "Apri"
     },
     "eventChips": {
       "comment": "Commenta",
@@ -2586,47 +2645,52 @@
     },
     "installKiloGitHubApp": "Installa l'app Kilo per GitHub",
     "merge": {
-      "autoMergeDescription": "GitHub unirà automaticamente questa pull request quando tutti i controlli obbligatori saranno superati (metodo: {{method}}).",
-      "autoMergeOn": "Unione automatica attiva",
-      "blockedTitle": "Motivi che impediscono l'unione",
-      "cannotMerge": "Questa pull request non può essere unita così com'è.",
-      "checking": "Verifica dei requisiti per l'unione…",
-      "commitMessage": "Messaggio di commit",
-      "commitMessagePlaceholder": "Descrizione facoltativa del commit di unione",
-      "commitTitle": "Titolo del commit",
-      "confirmMessage": "Le tue modifiche verranno unite al branch di base.",
-      "confirmTitle": "Unire la pull request?",
-      "couldNotDetermine": "Impossibile verificare se la pull request può essere unita.",
-      "couldNotMerge": "Impossibile unire la pull request.",
-      "deleteBranch": "Elimina il branch",
-      "deleteBranchAfterMerge": "Elimina il branch dopo l'unione",
-      "disableAutoMerge": "Disattiva l'unione automatica",
-      "enableAutoMerge": "Attiva l'unione automatica",
-      "enableAutoMergeConfirmMessage": "GitHub unirà automaticamente questa pull request quando tutti i controlli obbligatori saranno superati.",
-      "enableAutoMergeConfirmTitle": "Attivare l'unione automatica?",
-      "forbidden": "Non hai il permesso di unire questa pull request.",
-      "loadFailedTitle": "Impossibile caricare le opzioni di unione.",
       "merge": "Unione",
       "mergeNow": "Unisci ora",
       "mergePullRequest": "Unione della pull request",
+      "mergeTermTitle": "Unisci {{term}}",
+      "enableAutoMerge": "Attiva l'unione automatica",
+      "disableAutoMerge": "Disattiva l'unione automatica",
+      "autoMergeOn": "Unione automatica attiva",
+      "autoMergeDescription": "GitHub unirà automaticamente questa pull request quando tutti i controlli obbligatori saranno superati (metodo: {{method}}).",
+      "checking": "Verifica dei requisiti per l'unione…",
+      "couldNotDetermine": "Impossibile verificare se la pull request può essere unita.",
+      "refreshMergeability": "Verifica di nuovo i requisiti per l'unione",
+      "blockedTitle": "Motivi che impediscono l'unione",
+      "updateBranch": "Aggiorna il branch",
+      "updateBranchFromBase": "Aggiorna il branch con le modifiche del branch di base",
       "methodLabel": "Metodo",
+      "commitTitle": "Titolo del commit",
+      "commitMessage": "Messaggio di commit",
+      "commitMessagePlaceholder": "Descrizione facoltativa del commit di unione",
+      "deleteBranch": "Elimina il branch",
+      "deleteBranchAfterMerge": "Elimina il branch dopo l'unione",
+      "noEnabledMethods": "Nessun metodo di unione è attivo in questo repository. Chiedi a un amministratore del repository di attivare l'unione con commit, l'accorpamento o il riallineamento dei commit.",
+      "confirmTitle": "Unire la pull request?",
+      "confirmTitleTerm": "Unire {{term}}?",
+      "confirmMessage": "Le tue modifiche verranno unite al branch di base.",
+      "enableAutoMergeConfirmTitle": "Attivare l'unione automatica?",
+      "enableAutoMergeConfirmMessage": "GitHub unirà automaticamente questa pull request quando tutti i controlli obbligatori saranno superati.",
+      "enableAutoMergeConfirmMessageTerm": "Una volta completata la pipeline, {{term}} si unirà automaticamente.",
+      "enableAutoMergeDescriptionTerm": "GitLab unirà {{term}} automaticamente una volta completata la pipeline.",
+      "forbidden": "Non hai il permesso di unire questa pull request.",
+      "cannotMerge": "Questa pull request non può essere unita così com'è.",
+      "couldNotMerge": "Impossibile unire la pull request.",
       "methods": {
         "merge": "Unione",
         "rebase": "Riallineamento",
         "squash": "Accorpamento"
       },
-      "noEnabledMethods": "Nessun metodo di unione è attivo in questo repository. Chiedi a un amministratore del repository di attivare l'unione con commit, l'accorpamento o il riallineamento dei commit.",
+      "terminal": {
+        "alreadyMerged": "Già unita",
+        "closed": "Questa pull request è chiusa",
+        "closedMergeRequest": "Questo merge request è chiuso"
+      },
       "partialSuccessBanner": {
         "accessibility": "Pull request unita. Impossibile eliminare il branch: {{reason}}",
         "body": "Impossibile eliminare il branch: {{reason}}."
       },
-      "refreshMergeability": "Verifica di nuovo i requisiti per l'unione",
-      "terminal": {
-        "alreadyMerged": "Già unita",
-        "closed": "Questa pull request è chiusa"
-      },
-      "updateBranch": "Aggiorna il branch",
-      "updateBranchFromBase": "Aggiorna il branch con le modifiche del branch di base",
+      "loadFailedTitle": "Impossibile caricare le opzioni di unione.",
       "blocked": {
         "unknownStateTitle": "GitHub non ha confermato che l'unione è possibile",
         "unknownStateDetail": "Riprova ad aggiornare la panoramica tra poco.",
@@ -2645,6 +2709,19 @@
         "behindDetail": "Il branch di origine non contiene le ultime modifiche del branch di base. Riallinea i commit o aggiorna il branch prima dell'unione.",
         "notMergeableTitle": "Questa pull request non può ancora essere unita",
         "notMergeableDetail": "GitHub ha segnalato questo stato per l'unione: {{state}}."
+      },
+      "restrictions": {
+        "title": "Restrizioni di unione",
+        "approvalsRequired_one": "È richiesta {{displayCount}} approvazione",
+        "approvalsRequired_other": "Sono richieste {{displayCount}} approvazioni",
+        "pipelineMustSucceed": "La pipeline deve concludersi con successo prima dell'unione.",
+        "approvalsRequired_many": "Sono richieste {{displayCount}} approvazioni"
+      },
+      "providerBlocked": {
+        "failingPipeline": "La pipeline è in errore sull'ultimo commit.",
+        "pendingPipeline": "La pipeline è ancora in esecuzione sull'ultimo commit.",
+        "permission": "Non hai il permesso di unire {{term}}.",
+        "draft": "Cambia lo stato di {{term}} in pronto per la revisione prima di unire."
       },
       "methodLabels": {
         "merge": "Crea un commit di unione",
@@ -2705,8 +2782,11 @@
     "pullRequestUnavailable": "Pull request non disponibile",
     "pullRequestUnavailableDescription": "Impossibile aprire questa PR. Potrebbe essere stata eliminata, il repository potrebbe essere privato oppure l'app Kilo per GitHub potrebbe non essere installata nel repository.",
     "reconnectNotice": {
+      "title": "La connessione a GitHub è scaduta.",
       "message": "La tua connessione a GitHub non è più valida. Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario.",
-      "title": "La connessione a GitHub è scaduta."
+      "gitlabTitle": "La connessione a GitLab è scaduta.",
+      "bitbucketTitle": "La connessione a Bitbucket è scaduta.",
+      "providerMessage": "La tua connessione a {{provider}} non è più valida. Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario."
     },
     "review": "Revisione",
     "reviewPullRequest": "Revisiona la pull request",
@@ -2758,7 +2838,7 @@
       "emptyLine": "(vuoto)"
     },
     "linkPasteClipboardEmpty": "Gli appunti sono vuoti.",
-    "linkPasteNotAPullRequest": "Questo non è un collegamento a una pull request di GitHub.",
+    "linkPasteNotAPullRequest": "Non è un collegamento a una pull request o merge request",
     "announce": {
       "commentPosted": "Commento pubblicato",
       "reviewSubmitted": "Revisione inviata",
@@ -2767,6 +2847,7 @@
     "mutationError": {
       "commentNotPosted": "Questo commento non può essere pubblicato. La riga selezionata potrebbe essere cambiata oppure la PR potrebbe essere stata aggiornata.",
       "reviewNotSubmitted": "Impossibile inviare questa revisione così com'è. La PR potrebbe essere stata modificata oppure potresti esserne l'autore: non puoi revisionare le tue pull request.",
+      "reviewNotSubmittedTerm": "Impossibile inviare questa revisione così com'è. {{term}} potrebbe essere cambiato, oppure non puoi revisionare il tuo {{term}}.",
       "couldNotPostComment": "Impossibile pubblicare il commento.",
       "couldNotSubmitReview": "Impossibile inviare la revisione. Controlla la connessione e riprova."
     },
@@ -2774,9 +2855,31 @@
       "couldNotReply": "Non è stato possibile inviare la risposta.",
       "couldNotCompleteAction": "Impossibile completare questa azione.",
       "mergeResultDefaultError": "GitHub non ha completato l'unione.",
+      "mergeResultNotCompleted": "Unione di {{term}} non completata. Verifica lo stato e riprova.",
       "ambiguous": "Impossibile confermare l'esito dell'operazione. Controlla la PR prima di riprovare.",
       "persistenceFailed": "Impossibile registrare questa azione. Riprova più tardi.",
       "forbidden": "Non hai l'autorizzazione per questa operazione."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Non disponibile su questo provider",
+        "accessibility": "Non disponibile su questo provider: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Condividi il merge request",
+      "viewOnProvider": "Visualizza su {{provider}}",
+      "mergeRequestUnavailable": "Merge request non disponibile",
+      "unavailableDescription": "Potrebbe essere stato eliminato, oppure non hai accesso.",
+      "accessDeniedMergeRequest": "Non hai il permesso di visualizzare questo merge request.",
+      "couldNotLoadMergeRequest": "Impossibile caricare il merge request.",
+      "discussionAccessDenied": "Non hai il permesso di visualizzare la discussione di questo merge request.",
+      "discussionUnavailableMessage": "Questo merge request potrebbe essere stato rimosso.",
+      "noDiscussionDescription": "Questo merge request non ha ancora discussioni di revisione né commenti generali.",
+      "noFilesChangedDescription": "Questo merge request non contiene modifiche ai file."
     }
   },
   "organization": {
@@ -2983,6 +3086,12 @@
     "privacy": "Apri Kilo per vedere gli agenti",
     "openAgents": "Apri gli agenti",
     "needsInput": "In attesa di risposta",
+    "newestSession": "La più recente: {{title}}",
+    "noneWaiting": "Nessun agente in attesa",
+    "newAgent": "Nuovo agente",
+    "approving": "Approvazione in corso...",
+    "couldNotApprove": "Approvazione non riuscita",
+    "couldNotStart": "Avvio non riuscito",
     "channelName": "Agenti attivi",
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco."
   },
@@ -2992,5 +3101,38 @@
     "emptyTitle": "Nessun modello di trascrizione",
     "emptyDescription": "Kilo Gateway non offre modelli di trascrizione in questo momento.",
     "loadFailed": "Impossibile caricare i modelli di trascrizione."
+  },
+  "voiceLanguage": {
+    "title": "Lingua della dettatura",
+    "automatic": "Automatico",
+    "loadFailed": "Impossibile caricare le lingue supportate da questo dispositivo.",
+    "emptyTitle": "Nessuna lingua supportata",
+    "emptyDescription": "Il riconoscimento vocale di questo dispositivo non segnala lingue supportate."
+  },
+  "tour": {
+    "eyebrow": "Tour rapido",
+    "forkTitle": "Dove vuoi eseguire Kilo?",
+    "forkSubtitle": "Scegli dove Kilo eseguirà la tua prima sessione.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Esegui Kilo in un ambiente cloud isolato, senza nulla da installare.",
+    "remoteOptionTitle": "Il tuo computer",
+    "remoteOptionBody": "Esegui Kilo sulla tua macchina tramite la CLI `kilo remote`.",
+    "skip": "Salta tour",
+    "tutorialLabel": "Tutorial",
+    "remoteTitle": "Avvia la tua prima sessione remota",
+    "remoteBody": "Collega il tuo computer e poi avvia la sessione da qui.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Nessun computer ancora connesso",
+    "remoteEmptyBody": "Per connetterlo, esegui `kilo remote` sul tuo computer.",
+    "remoteFound": "Computer connesso",
+    "checkAgain": "Controlla di nuovo",
+    "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Avvia agente richiede un prompt. Aggiungi un prompt e rieseguilo.",
+      "repositoryUnknown": "Kilo non riconosce {{repository}} come repository GitHub o GitLab. Scegli un altro repository in Kilo.",
+      "repositoryUnsupported": "{{repository}} è un repository Bitbucket — Avvia agente non può ancora usarlo. Scegli un altro repository in Kilo."
+    }
   }
 }

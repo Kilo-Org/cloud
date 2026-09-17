@@ -4,12 +4,16 @@ import {
   buildTerminalErrorCopyText,
   classifyTerminalError,
   resolveSessionTerminalError,
+  sessionStatusErrorMessage,
 } from './session-terminal-error';
 
 describe('classifyTerminalError', () => {
   it.each([
     ['You are not authorized to use the Cloud Agent.', 'permission'],
     ['Insufficient credits. Please add at least $1 to continue using Cloud Agent.', 'credits'],
+    // The Durable Object's safe projection lowercases the phrase; the same
+    // failure must classify the same way.
+    ['Assistant request failed: insufficient credits', 'credits'],
     ['Previous task is still finishing up. Please wait a moment.', 'busy'],
     [
       'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
@@ -177,5 +181,68 @@ describe('buildTerminalErrorCopyText', () => {
         detail: 'Same',
       })
     ).toBe('sess-1\nTitle\nSame');
+  });
+});
+
+describe('sessionStatusErrorMessage', () => {
+  it.each([
+    ['simulated error', 'The response failed.'],
+    ['Unauthorized: Unauthorized', 'The response failed.'],
+    [
+      'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      'Not enough credits to run Cloud Agent. Add credits and try again.',
+    ],
+    // The DO's safe projection is the producer for a real credits failure; it
+    // writes the phrase lowercase.
+    [
+      'Assistant request failed: insufficient credits',
+      'Not enough credits to run Cloud Agent. Add credits and try again.',
+    ],
+    // Both SDK status strings for a failed delivery reach the delivery copy:
+    // session-manager's exhaustion indicator and the cloud status written for
+    // `cloud.message.failed` (also the normalizer's fallback).
+    ['Message failed to deliver', 'Failed to deliver'],
+    ['Message delivery failed', 'Failed to deliver'],
+  ] as const)('maps %s to typed copy', (raw, expected) => {
+    expect(sessionStatusErrorMessage(raw)).toBe(expected);
+  });
+
+  // The SDK writes these strings itself, so they are already the reader's copy
+  // and must not be replaced by the generic failure line.
+  it.each([
+    ['Agent connection lost'],
+    ['Session terminated'],
+    ['Failed to stop execution'],
+  ] as const)('shows the SDK fixed copy for %s', raw => {
+    expect(sessionStatusErrorMessage(raw)).toBe(raw);
+  });
+
+  // The Durable Object's safe failure projection is the reader's copy too
+  // (services/cloud-agent-next/src/session/safe-failure-projection.ts, and the
+  // assistant failures it re-exports from src/shared/assistant-failure.ts).
+  // None match a classifier rule, so each must pass through unchanged instead
+  // of collapsing to the assistant-failure line.
+  it.each([
+    ['Workspace setup failed'],
+    ['Repository authentication failed'],
+    [
+      'GitHub repository authentication failed. Check that the GitHub App is installed and has access to this repository.',
+    ],
+    ['Could not connect to the sandbox'],
+    ['No model was selected'],
+    ['Agent wrapper disconnected'],
+    ['Assistant request failed: model not found'],
+    ['Assistant request was rate limited'],
+    ['Session metadata is unavailable'],
+    ['Commit failed'],
+    // A bounded workspace failure appends its own detail to the projection.
+    ['Workspace setup failed: Devcontainer workspace preparation failed'],
+  ] as const)('shows the safe projection copy for %s', raw => {
+    expect(sessionStatusErrorMessage(raw)).toBe(raw);
+  });
+
+  it('never returns the raw provider text', () => {
+    const raw = 'Service Unavailable: The service is temporarily unavailable.';
+    expect(sessionStatusErrorMessage(raw)).not.toContain('Service Unavailable');
   });
 });

@@ -40,7 +40,14 @@ export function sortDeviceSessions(sessions: readonly DeviceSession[]): DeviceSe
 type DeviceSessionsQueryState = 'loading' | 'error' | 'empty' | 'happy' | 'no-current';
 
 type ClassifyArgs = {
-  isLoading: boolean;
+  /**
+   * `isPending` (no data yet), NOT React Query v5's `isLoading`
+   * (`isPending && isFetching`): the first render before the observer starts
+   * the fetch and a paused (offline) query are pending but not fetching, so
+   * `isLoading` would classify a cold open as `empty` and flash the empty
+   * state before the request settles.
+   */
+  isPending: boolean;
   isError: boolean;
   data: DeviceSession[] | undefined;
 };
@@ -53,11 +60,11 @@ type ClassifyArgs = {
  * note — never the empty state.
  */
 export function classifyDeviceSessionsState({
-  isLoading,
+  isPending,
   isError,
   data,
 }: ClassifyArgs): DeviceSessionsQueryState {
-  if (isLoading) {
+  if (isPending) {
     return 'loading';
   }
   if (isError) {

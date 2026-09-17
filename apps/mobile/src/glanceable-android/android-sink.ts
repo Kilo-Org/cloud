@@ -25,6 +25,7 @@ import { isNotificationPermissionGranted } from './permission';
 import { showAndroidPermissionAlertOnce } from './permission-alert';
 import {
   type AndroidWidgetProps,
+  buildApproveLabel,
   buildCompactNotificationText,
   buildCurrentWidgetProps,
   buildOngoingNotificationText,
@@ -75,6 +76,11 @@ function hasCurrentWork(snapshot: GlanceableAgentsSnapshot): boolean {
   );
 }
 
+/** The Approve action label for this snapshot, or null when there is none. */
+function approveLabelFor(snapshot: GlanceableAgentsSnapshot): string | null {
+  return buildApproveLabel(snapshot, translate);
+}
+
 function endNotification(): void {
   endLiveUpdate();
   notificationActive = false;
@@ -105,10 +111,11 @@ async function tryStartOrUpdate(
   const title = translate(NOTIFICATION_TITLE_KEY);
   const text = buildOngoingNotificationText(snapshot, {}, translate, formatGlanceableCount);
   const openAgentsLabel = translate(OPEN_AGENTS_LABEL_KEY);
+  const approveLabel = approveLabelFor(snapshot);
   const compactText = buildCompactNotificationText(snapshot, {}, formatGlanceableCount);
 
   if (notificationActive) {
-    updateLiveUpdate(title, text, openAgentsLabel, compactText);
+    updateLiveUpdate(title, text, openAgentsLabel, approveLabel, compactText);
     terminalExpiresAt = null;
     revision = snapshot.revision;
     return;
@@ -123,13 +130,13 @@ async function tryStartOrUpdate(
     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/retry can set notificationActive while awaiting permission
     if (notificationActive) {
       if (snapshot.revision > revision) {
-        updateLiveUpdate(title, text, openAgentsLabel, compactText);
+        updateLiveUpdate(title, text, openAgentsLabel, approveLabel, compactText);
         terminalExpiresAt = null;
         revision = snapshot.revision;
       }
       return;
     }
-    startLiveUpdate(title, text, openAgentsLabel, compactText);
+    startLiveUpdate(title, text, openAgentsLabel, approveLabel, compactText);
     notificationActive = true;
     terminalExpiresAt = null;
     revision = snapshot.revision;
@@ -156,6 +163,7 @@ function retryPendingStart(): void {
     title,
     buildOngoingNotificationText(p.snapshot, {}, translate, formatGlanceableCount),
     translate(OPEN_AGENTS_LABEL_KEY),
+    approveLabelFor(p.snapshot),
     buildCompactNotificationText(p.snapshot, {}, formatGlanceableCount)
   );
   notificationActive = true;
@@ -215,6 +223,7 @@ export const androidSink: GlanceableSink = {
           ? buildOngoingNotificationText(snapshot, {}, translate, formatGlanceableCount)
           : (props.statusLine ?? translate('glanceable.empty')),
         translate(OPEN_AGENTS_LABEL_KEY),
+        eligible ? approveLabelFor(snapshot) : null,
         eligible ? buildCompactNotificationText(snapshot, {}, formatGlanceableCount) : null,
         terminalExpiresAt === null ? 0 : Math.max(1, terminalExpiresAt - Date.now())
       );

@@ -171,6 +171,71 @@ describe('viewed-files', () => {
     expect(getItemMock.mock.calls.length).toBe(callsBefore);
   });
 
+  // s6 (identity rule 17): a provider ref folds the s1 collision-free key
+  // into the storage key, while the legacy GitHub bytes never change.
+  describe('provider refs', () => {
+    const GITLAB_A = {
+      platform: 'gitlab' as const,
+      projectPath: 'group/app',
+      mrIid: 7,
+      instanceHint: 'https://gitlab.example.com',
+    };
+    const GITLAB_B = {
+      platform: 'gitlab' as const,
+      projectPath: 'group/app',
+      mrIid: 7,
+      instanceHint: 'https://gitlab.com',
+    };
+
+    it('keeps a github ProviderPrRef byte-identical to the legacy triple (migration)', async () => {
+      setStored({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } });
+      await expect(
+        getViewedFiles(
+          { platform: 'github', owner: 'octocat', repo: 'hello-world', number: 42 },
+          SHA1
+        )
+      ).resolves.toEqual(['a.ts']);
+
+      await toggleViewedFile({
+        platform: 'github',
+        owner: 'octocat',
+        repo: 'hello-world',
+        number: 42,
+        headSha: SHA1,
+        path: 'b.ts',
+      });
+      // The write landed on the SAME legacy key, not a suffixed one.
+      const written: Record<string, unknown> = JSON.parse(store.get('pr-review-viewed') ?? '{}');
+      expect(Object.keys(written)).toEqual(['octocat/hello-world#42']);
+    });
+
+    it('separates one GitLab project on two instances', async () => {
+      await toggleViewedFile({ ...GITLAB_A, headSha: SHA1, path: 'a.ts' });
+      await expect(getViewedFiles(GITLAB_A, SHA1)).resolves.toEqual(['a.ts']);
+      await expect(getViewedFiles(GITLAB_B, SHA1)).resolves.toEqual([]);
+    });
+
+    it('separates a GitLab MR from a same-triple GitHub PR', async () => {
+      await toggleViewedFile({ ...GITLAB_A, headSha: SHA1, path: 'a.ts' });
+      await expect(
+        getViewedFiles({ owner: 'group', repo: 'app', number: 7 }, SHA1)
+      ).resolves.toEqual([]);
+    });
+
+    it('separates same-numbered Bitbucket PRs across workspaces', async () => {
+      const one = { platform: 'bitbucket' as const, workspace: 'acme', repoSlug: 'app', prId: 7 };
+      const other = {
+        platform: 'bitbucket' as const,
+        workspace: 'other',
+        repoSlug: 'app',
+        prId: 7,
+      };
+      await toggleViewedFile({ ...one, headSha: SHA1, path: 'a.ts' });
+      await expect(getViewedFiles(one, SHA1)).resolves.toEqual(['a.ts']);
+      await expect(getViewedFiles(other, SHA1)).resolves.toEqual([]);
+    });
+  });
+
   it('a concurrent read during clear never returns the prior paths', async () => {
     setStored({ 'octocat/hello-world#42': { headSha: SHA1, viewedPaths: ['a.ts'] } });
     await expect(getViewedFiles(REF, SHA1)).resolves.toEqual(['a.ts']);

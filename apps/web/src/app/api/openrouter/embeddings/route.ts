@@ -21,7 +21,7 @@ import {
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
   temporarilyUnavailableResponse,
-  usageLimitExceededResponse,
+  creditsBlockedResponse,
   wrapInSafeNextResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -202,10 +202,16 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
-    const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
+    const { balance, settings, plan, balanceLimitedByUserAllowance } =
+      await getBalanceAndOrgSettings(organizationId, user);
 
     if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
-      return await usageLimitExceededResponse(user, balance);
+      return await creditsBlockedResponse({
+        user,
+        balance,
+        organizationId,
+        balanceLimitedByUserAllowance,
+      });
     }
 
     const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({

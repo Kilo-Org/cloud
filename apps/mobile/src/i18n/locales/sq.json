@@ -36,6 +36,7 @@
     "cost": "Kostoja",
     "discard": "Mos ruaj",
     "findings": "Gjetjet",
+    "mergeRequest": "kërkesë integrimi",
     "notConnected": "Pa lidhje",
     "notifications": "Njoftimet",
     "pullRequest": "kërkesë bashkimi",
@@ -231,6 +232,8 @@
     "voiceInput": "Hyrje me zë",
     "autoExpandThinking": "Zgjero automatikisht arsyetimin",
     "autoExpandThinkingSubtitle": "Shfaq arsyetimin e plotë të agjentit pasi të përfundojë.",
+    "hideThinking": "Fshih detajet e arsyetimit",
+    "hideThinkingSubtitle": "Mos shfaq arsyetimin e agjentit në faqen e seancës.",
     "keepScreenOn": "Mbaje ekranin ndezur në faqen e seancës",
     "keepScreenOnSubtitle": "Mbaje ekranin ndezur gjatë ekzekutimit të seancës.",
     "appearance": "Pamja",
@@ -253,7 +256,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transkriptim me Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripto diktimin me një model Kilo Gateway në vend të njohjes së të folurit të pajisjes. Regjistrimi yt dërgohet te Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Kondenso thirrjet e mjeteve",
+    "condenseToolCallsSubtitle": "Grupo thirrjet e njëpasnjëshme të mjeteve në një rresht që mund ta hapësh.",
+    "toolSummaryTranslation": "Përkthe përmbledhjet e mjeteve",
+    "toolSummaryTranslationSubtitle": "Dërgo çdo përmbledhje mjeti te një model për ta përkthyer në gjuhën e aplikacionit tënd. Origjinali shfaqet nëse përkthimi dështon.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ky model nuk ofrohet më. Trokit $t(common.model) për të zgjedhur një tjetër."
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa për bashkim nuk është e disponueshme",
@@ -350,6 +358,7 @@
       "merge": "Bashkimi",
       "mergeNow": "Bashko tani",
       "mergePullRequest": "Bashkimi i kërkesës",
+      "mergeTermTitle": "Bashko {{term}}",
       "enableAutoMerge": "Aktivizo bashkimin automatik",
       "disableAutoMerge": "Çaktivizo bashkimin automatik",
       "autoMergeOn": "Bashkimi automatik është aktiv",
@@ -368,9 +377,12 @@
       "deleteBranchAfterMerge": "Fshi degën pas bashkimit",
       "noEnabledMethods": "Kjo depo nuk ka asnjë metodë bashkimi të aktivizuar. Kërkoji një administratori të depos të aktivizojë bashkimin e zakonshëm, bashkimin me ngjeshje ose bashkimin me ribazim.",
       "confirmTitle": "Të bashkohet kërkesa?",
+      "confirmTitleTerm": "Të bashkohet {{term}}?",
       "confirmMessage": "Kjo do t'i bashkojë ndryshimet e tua me degën bazë.",
       "enableAutoMergeConfirmTitle": "Të aktivizohet bashkimi automatik?",
       "enableAutoMergeConfirmMessage": "GitHub do ta bashkojë këtë kërkesë automatikisht kur të kalojnë të gjitha kontrollet e detyrueshme.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} do të bashkohet automatikisht sapo pipeline-i të japë sukses.",
+      "enableAutoMergeDescriptionTerm": "GitLab e bashkon këtë {{term}} automatikisht sapo pipeline-i të japë sukses.",
       "forbidden": "Nuk ke leje për ta bashkuar këtë kërkesë.",
       "cannotMerge": "Kjo kërkesë për bashkim nuk mund të bashkohet në gjendjen aktuale.",
       "couldNotMerge": "Kërkesa nuk u bashkua.",
@@ -381,7 +393,8 @@
       },
       "terminal": {
         "alreadyMerged": "Tashmë e bashkuar",
-        "closed": "Kjo kërkesë për bashkim është mbyllur"
+        "closed": "Kjo kërkesë për bashkim është mbyllur",
+        "closedMergeRequest": "Kjo kërkesë integrimi është mbyllur"
       },
       "partialSuccessBanner": {
         "body": "Dega nuk u fshi: {{reason}}.",
@@ -406,6 +419,18 @@
         "behindDetail": "Dega burimore nuk i përmban ndryshimet e fundit të degës bazë. Ribazoje ose përditësoje përpara bashkimit.",
         "notMergeableTitle": "Kjo kërkesë ende nuk mund të bashkohet",
         "notMergeableDetail": "GitHub raportoi gjendjen {{state}} për mundësinë e bashkimit."
+      },
+      "restrictions": {
+        "title": "Kufizime bashkimi",
+        "approvalsRequired_one": "Kërkohet {{displayCount}} miratim",
+        "approvalsRequired_other": "Kërkohen {{displayCount}} miratime",
+        "pipelineMustSucceed": "Pipeline-i duhet të japë sukses përpara bashkimit."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline-i dështon te depozitimi i fundit.",
+        "pendingPipeline": "Pipeline-i ende ekzekutohet te depozitimi i fundit.",
+        "permission": "Nuk ke leje për ta bashkuar këtë {{term}}.",
+        "draft": "Shëno {{term}} si gati për rishikim përpara se ta bashkosh."
       },
       "methodLabels": {
         "merge": "Krijo një depozitim bashkimi",
@@ -455,6 +480,8 @@
       "replyBadRequest": "Kjo përgjigje nuk mund të postohet. Diskutimi mund të ketë ndryshuar.",
       "replyForbidden": "Nuk ke leje të përgjigjesh në këtë kërkesë për bashkim.",
       "addCommentCta": "Komento në këtë kërkesë për bashkim",
+      "fixWithKilo": "Rregullo me Kilo",
+      "fixWithKiloPrompt": "Ju lutem trajto komentin e mëposhtëm në këtë kërkesë për bashkim: {{link}}",
       "commentBadRequest": "Ky koment nuk mund të postohet. Kërkesa për bashkim mund të ketë ndryshuar.",
       "commentForbidden": "Nuk ke leje të komentosh në këtë kërkesë për bashkim.",
       "moderation": {
@@ -505,7 +532,8 @@
         "outdatedOnLines": "I vjetëruar te {{lines}}",
         "outdatedOnPath": "I vjetëruar te {{path}}"
       },
-      "deletedUser": "përdorues i fshirë"
+      "deletedUser": "përdorues i fshirë",
+      "replyForbiddenTerm": "Nuk ke leje të përgjigjesh në këtë {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Cilësimet e aplikacionit GitHub nuk u hapën.",
     "installKiloGitHubApp": "Instalo aplikacionin Kilo për GitHub",
@@ -517,17 +545,19 @@
     "reviewPullRequest": "Rishiko kërkesën për bashkim",
     "headLine": "{{counts}} · depozitimi i fundit {{sha}}",
     "entry": {
-      "eyebrow": "Hap një kërkesë për bashkim përmes URL-së.",
-      "pastePrLink": "Ngjit lidhjen e një PR-je",
-      "noRecentPrs": "Asnjë PR e hapur së fundmi",
-      "noRecentPrsDescription": "Ngjit lidhjen e një PR-je më sipër për të nisur rishikimin. PR-ja do të shfaqet këtu herën tjetër.",
+      "eyebrow": "Hap një kërkesë për bashkim ose kërkesë integrimi përmes URL-së",
+      "pastePrLink": "Ngjit lidhjen e një kërkeze për bashkim ose kërkeze integrimi",
+      "noRecentPrs": "Asnjë rishikim i fundit",
+      "noRecentPrsDescription": "Ngjit një lidhje më sipër për të filluar një rishikim — do të shfaqet këtu herën tjetër.",
       "couldNotLoad": "Ngarkimi dështoi.",
       "removeFromRecentsTitle": "Të hiqet nga lista e fundit?",
-      "removeFromRecentsMessage": "Kjo kërkesë për bashkim do të hiqet nga lista e kërkesave që ke hapur së fundmi.",
+      "removeFromRecentsMessage": "Ky rishikim do të hiqet nga lista jote e të fundmëve.",
       "removeRecentAccessibility": "Hiq {{repo}} nga lista e fundit",
-      "urlAccessibility": "URL-ja e kërkesës për bashkim në GitHub",
-      "clearLink": "Pastro lidhjen e kërkesës për bashkim",
-      "pasteLink": "Ngjit lidhjen e kërkesës për bashkim",
+      "urlAccessibility": "Jep URL-në e një kërkeze për bashkim ose kërkeze integrimi",
+      "urlPlaceholder": "URL e kërkesës për bashkim ose e kërkesës së integrimit",
+      "openAccessibility": "Hap një kërkesë për bashkim ose kërkesë integrimi",
+      "clearLink": "Pastro lidhjen",
+      "pasteLink": "Ngjit lidhjen e kërkesës për bashkim ose kërkesës së integrimit",
       "open": "Hapje"
     },
     "checks": {
@@ -544,6 +574,8 @@
       "pending": "{{displayCount}} në pritje",
       "skipped": "të anashkaluara: {{displayCount}}",
       "checksCount": "{{displayCount}} kontrolle",
+      "checksCount_one": "{{displayCount}} kontroll",
+      "checksCount_other": "{{displayCount}} kontrolle",
       "checkDetails": "detajet e kontrollit"
     },
     "inbox": {
@@ -576,9 +608,15 @@
     "connect": {
       "checkFailedTitle": "Nuk u kontrollua lidhja me GitHub.",
       "checkFailedMessage": "Statusi i hyrjes nuk është i disponueshëm derisa të ngarkohet ky informacion.",
+      "checkFailedTitleGitLab": "Nuk u kontrollua lidhja me GitLab.",
+      "checkFailedTitleBitbucket": "Nuk u kontrollua lidhja me Bitbucket.",
+      "providerCheckFailedMessage": "Gjendja e lidhjes nuk është e disponueshme derisa të ngarkohet.",
       "reconnectTitle": "Rilidhu me GitHub",
       "reconnectDescription": "Lidhja jote me GitHub është revokuar. Rilidhu për të vazhduar rishikimin e kërkesave për bashkim në telefon.",
-      "description": "Lidh llogarinë tënde të GitHub për të rishikuar kërkesat për bashkim në telefon."
+      "description": "Lidh llogarinë tënde të GitHub për të rishikuar kërkesat për bashkim në telefon.",
+      "gitlabDescription": "Lidho llogarinë tënde GitLab për të rishikuar kërkesat e integrimit në celular.",
+      "bitbucketDescription": "Lidho Bitbucket me këtë organizatë për të rishikuar kërkesat për bashkim në celular.",
+      "bitbucketOrgOnlyDescription": "Përzgjidh një organizatë në profilin tënd për të rishikuar kërkesat e saj për bashkim në Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +638,10 @@
     },
     "reconnectNotice": {
       "title": "Lidhja me GitHub skadoi.",
-      "message": "Lidhja jote me GitHub nuk është më e vlefshme. Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme."
+      "message": "Lidhja jote me GitHub nuk është më e vlefshme. Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme.",
+      "gitlabTitle": "Lidhja me GitLab skadoi.",
+      "bitbucketTitle": "Lidhja me Bitbucket skadoi.",
+      "providerMessage": "Lidhja jote me {{provider}} nuk është më e vlefshme. Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme."
     },
     "eventChips": {
       "comment": "Koment",
@@ -668,7 +709,7 @@
       "emptyLine": "(bosh)"
     },
     "linkPasteClipboardEmpty": "Kujtesa e kopjimit është bosh.",
-    "linkPasteNotAPullRequest": "Kjo nuk është lidhje e një kërkese për bashkim në GitHub.",
+    "linkPasteNotAPullRequest": "Kjo nuk është lidhje për një kërkesë për bashkim ose kërkesë integrimi",
     "announce": {
       "commentPosted": "Komenti u postua",
       "reviewSubmitted": "Rishikimi u dërgua",
@@ -677,6 +718,7 @@
     "mutationError": {
       "commentNotPosted": "Ky koment nuk mund të postohet. Rreshti i përzgjedhur mund të ketë ndryshuar ose PR-ja mund të jetë përditësuar.",
       "reviewNotSubmitted": "Ky rishikim nuk mund të dërgohet në gjendjen aktuale. PR-ja mund të ketë ndryshuar ose nuk lejohet të rishikosh kërkesën tënde për bashkim.",
+      "reviewNotSubmittedTerm": "Ky rishikim nuk mund të dërgohet siç është. Mbase {{term}} ka ndryshuar, ose nuk mund të rishikosh {{term}} tënde.",
       "couldNotPostComment": "Nuk u arrit të postohej komenti.",
       "couldNotSubmitReview": "Nuk u dërgua rishikimi. Kontrollo lidhjen dhe provo përsëri."
     },
@@ -684,9 +726,31 @@
       "couldNotReply": "Përgjigjja nuk u dërgua.",
       "couldNotCompleteAction": "Nuk u arrit të përfundohej ky veprim.",
       "mergeResultDefaultError": "GitHub nuk e përfundoi bashkimin.",
+      "mergeResultNotCompleted": "{{term}} nuk u bashkua. Kontrollo gjendjen dhe provo përsëri.",
       "ambiguous": "Nuk u konfirmua — kontrollo PR-në përpara se të provosh përsëri.",
       "persistenceFailed": "Nuk arritëm ta regjistronim këtë veprim. Provo përsëri më vonë.",
       "forbidden": "Ky veprim nuk lejohet."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Nuk është e disponueshme te ky ofrues",
+        "accessibility": "Nuk është e disponueshme te ky ofrues: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Kërkesë bashkimi",
+      "mergeRequest": "Kërkesë integrimi",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Ndaj kërkesën e integrimit",
+      "viewOnProvider": "Shih te {{provider}}",
+      "mergeRequestUnavailable": "Kërkesa e integrimit nuk është e disponueshme",
+      "unavailableDescription": "Mbase është fshirë, ose mbase nuk ke akses për të.",
+      "accessDeniedMergeRequest": "Nuk ke leje për ta parë këtë kërkesë integrimi.",
+      "couldNotLoadMergeRequest": "Nuk u ngarkua kërkesa e integrimit.",
+      "discussionAccessDenied": "Nuk ke leje për ta parë diskutimin e kësaj kërkeze integrimi.",
+      "discussionUnavailableMessage": "Kjo kërkesë integrimi mund të jetë hequr.",
+      "noDiscussionDescription": "Nuk ka diskutime rishikimi ose komente bisede në këtë kërkesë integrimi.",
+      "noFilesChangedDescription": "Kjo kërkesë integrimi nuk përmban ndryshime në skedarë."
     }
   },
   "notifications": {
@@ -1996,12 +2060,48 @@
       "connectionLost": "Lidhja u humb",
       "retryConnection": "Provo të lidhesh përsëri"
     },
+    "goal": {
+      "title": "Qëllimi",
+      "statusActive": "Qëllim aktiv",
+      "statusPaused": "Qëllim i ndalur",
+      "statusComplete": "Qëllimi u përfundua",
+      "statusBlocked": "Qëllimi u bllokua",
+      "edit": "Redakto qëllimin",
+      "remove": "Hiq qëllimin",
+      "pause": "Ndalo qëllimin",
+      "resume": "Vazhdo qëllimin",
+      "editPlaceholder": "Përshkruaj qëllimin",
+      "removeConfirmTitle": "Të hiqet qëllimi?",
+      "removeConfirmMessage": "CLI fshin qëllimin e këtij sesioni.",
+      "updateFailed": "Qëllimi nuk mund të përditësohej.",
+      "sectionAccessibility": "{{status}}. Qëllim: {{text}}"
+    },
     "newSession": {
+      "recentlyUsed": "Të përdorura së fundmi",
+      "couldNotLoadGithubRepositories": "Nuk u ngarkuan depot nga GitHub.",
+      "couldNotLoadGitlabRepositories": "Nuk u ngarkuan depot nga GitLab.",
+      "couldNotLoadBitbucketRepositories": "Nuk u ngarkuan depot nga Bitbucket.",
       "connectGithubDescription": "Lidh llogarinë e GitHub në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
+      "connectGitlabDescription": "Lidh llogarinë e GitLab në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
+      "connectBitbucketDescription": "Lidh llogarinë e Bitbucket në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
       "openGithub": "Hap GitHub",
+      "openGitlab": "Hap GitLab",
+      "openBitbucket": "Hap Bitbucket",
       "refreshRepositories": "Rifresko depot",
       "githubConnected": "GitHub i lidhur",
+      "gitlabConnected": "GitLab i lidhur",
       "noRepositoriesVisible": "Nuk shfaqet asnjë depo. Kontrollo qasjen në depo për aplikacionin Kilo në GitHub, pastaj rifresko.",
+      "noRepositoriesVisibleGitlab": "Nuk shfaqet asnjë depo. Kontrollo qasjen në depo për GitLab, pastaj rifresko.",
+      "noRepositoriesVisibleBitbucket": "Nuk shfaqet asnjë depo. Kontrollo qasjen në depo për Bitbucket, pastaj rifresko.",
+      "bitbucketOrganizationsOnly": "Bitbucket është i disponueshëm vetëm për organizata.",
+      "branchPickerTitle": "Përzgjidh degën",
+      "branchDefault": "Parazgjedhje",
+      "branchAccessibility": "Dega: {{label}}",
+      "branchLoading": "Degët po ngarkohen",
+      "branchLoadError": "Degët nuk u ngarkuan dot",
+      "branchUnavailable": "Nuk ka degë të disponueshme për këtë depo. Kontrollo aksesin tënd te ofruesi, pastaj përzgjidh një depo tjetër.",
+      "branchEmpty": "Nuk ka degë të disponueshme",
+      "branchPlaceholder": "Përzgjidh një degë",
       "runOnWithTarget": "Ekzekuto në: {{target}}",
       "environment": "Mjedisi",
       "couldNotLoadEnvironment": "Nuk u ngarkua mjedisi yt.",
@@ -2022,24 +2122,13 @@
       "couldNotRefreshRepositories": "Nuk u rifreskuan depot. Provo përsëri.",
       "discardDraftTitle": "Të fshihet drafti?",
       "discardDraftMessage": "Kërkesa jote do të humbasë.",
+      "discardWithUploadsMessage": "Kërkesa jote dhe skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
       "discardFailed": "Nuk u fshi drafti. Provo përsëri.",
       "remoteHint": "Ekzekuto `kilo remote` në kompjuterin tënd ose `/remote` në një seancë aktive CLI për të kontrolluar një proces lokal kilo.",
-      "connectBitbucketDescription": "Lidh llogarinë e Bitbucket në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
-      "connectGitlabDescription": "Lidh llogarinë e GitLab në shfletuesin tënd, pastaj kthehu këtu për të zgjedhur një depo.",
-      "couldNotLoadBitbucketRepositories": "Nuk u ngarkuan depot nga Bitbucket.",
-      "couldNotLoadGithubRepositories": "Nuk u ngarkuan depot nga GitHub.",
-      "couldNotLoadGitlabRepositories": "Nuk u ngarkuan depot nga GitLab.",
-      "gitlabConnected": "GitLab i lidhur",
-      "noRepositoriesVisibleBitbucket": "Nuk shfaqet asnjë depo. Kontrollo qasjen në depo për Bitbucket, pastaj rifresko.",
-      "noRepositoriesVisibleGitlab": "Nuk shfaqet asnjë depo. Kontrollo qasjen në depo për GitLab, pastaj rifresko.",
-      "openBitbucket": "Hap Bitbucket",
-      "openGitlab": "Hap GitLab",
-      "recentlyUsed": "Të përdorura së fundmi",
       "continueFrom": "Po vazhdon seanca {{title}}.",
       "importingSession": "Duke importuar seancën",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidh Cloud Agent ose një CLI tjetër.",
-      "importFailed": "Nuk u arrit të importohej kjo seancë.",
-      "discardWithUploadsMessage": "Kërkesa jote dhe skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen."
+      "importFailed": "Nuk u arrit të importohej kjo seancë."
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar.",
@@ -2439,6 +2528,11 @@
       "stepsCount_other": "{{steps}} hapa",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Miratim automatik",
+      "description": "Mirato automatikisht kërkesat për leje për këtë sesion. Mjetet ekzekutohen më pas pa një kërkesë.",
+      "unavailable": "Ky sesion nuk mund të marrë kërkesa për leje."
+    },
     "prBadge": {
       "open": "hapja e kërkesës së bashkimit",
       "closed": "kërkesë për bashkim e mbyllur",
@@ -2469,6 +2563,10 @@
       "tapToListHint": "Prek një dosje për të parë përmbajtjen e saj.",
       "unsupportedDescription": "Ky CLI nuk mund të shfaqë listën e dosjeve. «U krye» ruan dosjen e nisjes dhe «Nis seancën» e nis seancën aty.",
       "unsupportedTitle": "Lista e dosjeve nuk mund të shfaqet"
+    },
+    "toolRun": {
+      "sheetTitle": "Thirrjet e mjeteve",
+      "condensedLabel": "{{itemCount}} elemente; {{last}}"
     }
   },
   "bootstrap": {
@@ -2581,7 +2679,10 @@
     "gatewayModelUnavailable": "Ky model transkriptimi nuk është i disponueshëm. Zgjidh një tjetër te Preferencat.",
     "gatewayModelUnavailableNotice": "Ky model nuk ofrohet më. Trokit $t(transcriptionModel.title) për të zgjedhur një tjetër.",
     "gatewaySignInRequired": "Hyr për të përdorur transkriptimin me Kilo Gateway.",
-    "gatewayNoModel": "Së pari zgjidh një model transkriptimi te Preferencat."
+    "gatewayNoModel": "Së pari zgjidh një model transkriptimi te Preferencat.",
+    "testTitle": "Testo diktimin",
+    "testPlaceholder": "Prek mikrofonin dhe fillo të flasësh.",
+    "testClear": "Pastro tekstin"
   },
   "share": {
     "title": "Ndarja në Kilo",
@@ -2961,6 +3062,12 @@
     "privacy": "Hap Kilo për të parë agjentët",
     "openAgents": "Hap agjentët",
     "needsInput": "Pret përgjigje",
+    "newestSession": "Më i riu: {{title}}",
+    "noneWaiting": "Asnjë agjent në pritje",
+    "newAgent": "Agjent i ri",
+    "approving": "Po miratohet...",
+    "couldNotApprove": "Miratimi dështoi",
+    "couldNotStart": "Nisja dështoi",
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
   },
@@ -2970,5 +3077,38 @@
     "emptyTitle": "Nuk ka modele transkriptimi",
     "emptyDescription": "Kilo Gateway nuk ofron tani asnjë model transkriptimi.",
     "loadFailed": "Modelet e transkriptimit nuk u ngarkuan."
+  },
+  "voiceLanguage": {
+    "title": "Gjuha e diktimit",
+    "automatic": "Automatik",
+    "loadFailed": "Nuk u ngarkuan dot gjuhët që mbështet kjo pajisje.",
+    "emptyTitle": "Asnjë gjuhë e mbështetur",
+    "emptyDescription": "Njohja e të folurit e kësaj pajisjeje nuk raporton asnjë gjuhë të mbështetur."
+  },
+  "tour": {
+    "eyebrow": "Tur i shpejtë",
+    "forkTitle": "Ku dëshiron ta ekzekutosh Kilo-n?",
+    "forkSubtitle": "Zgjidh ku ekzekuton Kilo sesionin tënd të parë.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Ekzekuto Kilo në një mjedis re të izoluar, pa asgjë për t'u instaluar.",
+    "remoteOptionTitle": "Kompjuteri yt",
+    "remoteOptionBody": "Ekzekuto Kilo në makinën tënde përmes CLI-së `kilo remote`.",
+    "skip": "Kapërce turin",
+    "tutorialLabel": "Tutoriali",
+    "remoteTitle": "Nis sesionin tënd të parë në distancë",
+    "remoteBody": "Lidh kompjuterin tënd, pastaj nis sesionin nga këtu.",
+    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
+    "remoteEmptyTitle": "Ende pa kompjuter të lidhur",
+    "remoteEmptyBody": "Për ta lidhur, ekzekuto `kilo remote` në kompjuterin tënd.",
+    "remoteFound": "Kompjuteri u lidh",
+    "checkAgain": "Kontrollo përsëri",
+    "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Fillo agjentin kërkon një kërkesë. Shto një kërkesë dhe ekzekutoje përsëri.",
+      "repositoryUnknown": "Kilo nuk e njeh {{repository}} si depo GitHub ose GitLab. Zgjidh një depo tjetër në Kilo.",
+      "repositoryUnsupported": "{{repository}} është një depo Bitbucket — Fillo agjentin nuk mund ta përdorë ende. Zgjidh një depo tjetër në Kilo."
+    }
   }
 }

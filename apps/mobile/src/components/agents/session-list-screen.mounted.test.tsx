@@ -1,11 +1,13 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- DOM-free live-list matrix and focus/navigation regressions share one mounted fixture. */
-import { createElement, Fragment, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+/* eslint-disable max-lines -- DOM-free live-list matrix and focus/navigation regressions share one mounted fixture. */
+import { createElement, Fragment, type ReactElement, type ReactNode } from 'react';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import type * as MotionContextModule from '@/lib/a11y/motion-context';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { AgentSessionListScreen } from './session-list-screen';
+import { RowsRefreshControl } from './rows-refresh-control';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -18,6 +20,13 @@ type Org = { organizationId: string; organizationName: string };
 const state = vi.hoisted(() => ({
   focused: true,
   fontScale: 1,
+  // Mutable so a case can put the tree on Android: the platform decides
+  // whether the floating pull-to-refresh indicator is safe (device defect
+  // uxs1) or the reserved band carries the in-flight state instead.
+  platform: { OS: 'ios' as string },
+  // Mutable so a case can turn reduced motion on: the platform control is then
+  // inert and a centered body draws the pull's static progress itself.
+  reducedMotion: false,
   topInset: 0,
   leftInset: 0,
   rightInset: 0,
@@ -67,14 +76,14 @@ vi.mock('@/components/centered-state-surface', () => ({
 }));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
-  Platform: { OS: 'ios' },
+  Platform: state.platform,
   Modal: 'Modal',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
-  useWindowDimensions: () => ({ fontScale: state.fontScale }),
+  useWindowDimensions: () => ({ fontScale: state.fontScale, height: 844 }),
   AppState: {
     addEventListener: (_event: string, listener: (next: string) => void) => {
       state.listeners.add(listener);
@@ -218,6 +227,13 @@ vi.mock('@/lib/a11y/announce', () => ({
     state.announcements.push(message);
   },
 }));
+vi.mock('@/lib/a11y/motion-context', async importOriginal => ({
+  ...(await importOriginal<typeof MotionContextModule>()),
+  useProvidedMotionPolicy: () => ({
+    reducedMotion: state.reducedMotion,
+    scrollAnimated: !state.reducedMotion,
+  }),
+}));
 vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => state.tabBarHeight }));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
   useLiveAgentSessions: (options: Parameters<typeof useLiveAgentSessions>[0]) => {
@@ -299,6 +315,13 @@ function headerAction(testID = 'agents-view-history') {
   }
   return button;
 }
+function filterButtonProps() {
+  const button = nodes('Pressable').find(node => node.props.testID === 'agents-open-filters');
+  if (!button) {
+    throw new Error('Missing filter button');
+  }
+  return button.props as { accessibilityLabel?: string; accessibilityValue?: unknown };
+}
 function applyFilters(projectFilter: string[], platformFilter: string[]) {
   act(() => {
     headerAction('agents-open-filters').props.onPress();
@@ -334,6 +357,8 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   state.focused = true;
   state.fontScale = 1;
+  state.platform.OS = 'ios';
+  state.reducedMotion = false;
   state.topInset = 0;
   state.leftInset = 0;
   state.rightInset = 0;
@@ -426,7 +451,12 @@ describe('AgentSessionListScreen live presentation', () => {
       expect(listSkeletons()[0]?.props.className).toContain('h-[76px]');
     }
     expect(text().includes('Nothing running right now')).toBe(Boolean(test.empty));
-    expect(text().includes('Could not load active sessions')).toBe(Boolean(test.error));
+    // With cached rows on screen, a retryable failure is a refresh failure and
+    // speaks through the reserved status line, not the load-failure block.
+    expect(text().includes('Could not load active sessions')).toBe(
+      Boolean(test.error) && !test.rows
+    );
+    expect(text().includes("Couldn't refresh")).toBe(Boolean(test.error) && Boolean(test.rows));
     expect(text().includes('Updating')).toBe(Boolean(test.updating));
     expect(text().includes('Loading…')).toBe(Boolean(test.skeleton));
     expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
@@ -584,17 +614,30 @@ describe('AgentSessionListScreen live presentation', () => {
       const pending = Promise.withResolvers<boolean>();
       state.refetch.mockReturnValue(pending.promise);
       await renderScreen();
-      act(() => {
-        press('Retry');
-        press('Retry');
-      });
-      expect(action('Retry').props.disabled).toBe(true);
-      expect(action('Retry').props.accessibilityState).toMatchObject({
-        busy: true,
-        disabled: true,
-      });
+      if (cached) {
+        // With cached rows the reserved status line owns the retry: no
+        // disabled button, and the second tap must not start a second fetch.
+        expect(text()).toContain("Couldn't refresh");
+        act(() => {
+          press('Retry');
+          press('Retry');
+        });
+        expect(state.refetch).toHaveBeenCalledTimes(1);
+        expect(state.announcements).toContain('Updating');
+      } else {
+        act(() => {
+          press('Retry');
+          press('Retry');
+        });
+        expect(action('Retry').props.disabled).toBe(true);
+        expect(action('Retry').props.accessibilityState).toMatchObject({
+          busy: true,
+          disabled: true,
+        });
+        expect(state.refetch).toHaveBeenCalledTimes(1);
+      }
       expect(action('Retry connection').props.disabled).toBe(false);
-      const queryRetry = action('Retry');
+      const queryRetry = cached ? undefined : action('Retry');
       const socketRetry = action('Retry connection');
       expect(
         nodes('View').filter(
@@ -603,13 +646,22 @@ describe('AgentSessionListScreen live presentation', () => {
             view.findAll(node => node === queryRetry || node === socketRetry).length > 0
         )
       ).toHaveLength(0);
-      expect(state.refetch).toHaveBeenCalledTimes(1);
       await act(async () => {
         pending.resolve(false);
         await pending.promise;
       });
-      expect(action('Retry').props.disabled).toBe(false);
-      expect(text()).toContain('Could not load active sessions');
+      if (cached) {
+        // A rejected pull holds the in-flight feedback through the anti-flicker
+        // beat before the failure line takes over.
+        await act(async () => {
+          await new Promise(resolve => {
+            setTimeout(resolve, PULL_FEEDBACK_MIN_BEAT_MS + 100);
+          });
+        });
+      } else {
+        expect(action('Retry').props.disabled).toBe(false);
+      }
+      expect(text()).toContain(cached ? "Couldn't refresh" : 'Could not load active sessions');
       state.refetch.mockImplementation(async () => {
         await Promise.resolve();
         state.live.terminalError = null;
@@ -621,6 +673,7 @@ describe('AgentSessionListScreen live presentation', () => {
       });
       await renderScreen();
       expect(text()).not.toContain('Could not load active sessions');
+      expect(text()).not.toContain("Couldn't refresh");
       expect(nodes('FlatList')).toHaveLength(cached ? 1 : 0);
       state.socketRetry.mockImplementation(() => {
         state.connection.reconnectExhausted = false;
@@ -639,8 +692,9 @@ describe('AgentSessionListScreen live presentation', () => {
     state.live.hasAcceptedSuccess = false;
     state.live.terminalError = failure;
     await renderScreen();
-    const message = 'Could not load active sessions';
-    expect(text()).toContain(message);
+    const loadFailure = 'Could not load active sessions';
+    const refreshFailure = "Couldn't refresh";
+    expect(text()).toContain(loadFailure);
     expect(nodes('CenteredState')).toHaveLength(1);
 
     async function updateSocketRows(activeSessions: ActiveSession[]) {
@@ -648,8 +702,9 @@ describe('AgentSessionListScreen live presentation', () => {
       await renderScreen();
       expect(nodes('RemoteSessionRow')).toHaveLength(activeSessions.length);
       expect(nodes('CenteredState')).toHaveLength(activeSessions.length === 0 ? 1 : 0);
+      const message = activeSessions.length === 0 ? loadFailure : refreshFailure;
       expect(text()).toContain(message);
-      expect(state.announcements).toEqual([message]);
+      expect(state.announcements).toContain(message);
       await act(async () => {
         press('Retry');
         await Promise.resolve();
@@ -755,6 +810,112 @@ describe('AgentSessionListScreen live presentation', () => {
     });
     expect(state.refetch).toHaveBeenCalledTimes(1);
     expect(state.announcements).toEqual(['Updating']);
+  });
+
+  it('carries the in-flight pull in the reserved band on Android instead of the floating indicator', async () => {
+    state.live.activeSessions = [row];
+    const pending = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(pending.promise);
+    // Android's SwipeRefreshLayout rests its indicator over the list's first
+    // row and hides that row's text (device defect uxs1), so the rows list
+    // mounts `RowsRefreshControl`, which parks that disc below the fold (see
+    // its test); the reserved band above the rows shows the wait with the
+    // spinner that cannot cover a row.
+    state.platform.OS = 'android';
+    await renderScreen();
+    const refresh = () =>
+      nodes('FlatList')[0]?.props.refreshControl as ReactElement<{
+        refreshing: boolean;
+        onRefresh: () => void;
+      }>;
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    expect(refresh().type).toBe(RowsRefreshControl);
+    expect(refresh().props.refreshing).toBe(true);
+    const updating = nodes('Text').find(node => node.children.includes('Updating'));
+    expect(updating).toBeDefined();
+    expect(updating?.props.className).not.toContain('absolute');
+    expect(nodes('ActivityIndicator')).toHaveLength(1);
+    await act(async () => {
+      pending.resolve(true);
+      await pending.promise;
+    });
+    expect(nodes('ActivityIndicator')).toHaveLength(0);
+  });
+
+  it.each([
+    { platform: 'android' as const, parked: true },
+    { platform: 'ios' as const, parked: false },
+  ])(
+    'carries the no-match body pull in one indicator on $platform',
+    async ({ platform: os, parked }) => {
+      state.live.activeSessions = [row];
+      const pending = Promise.withResolvers<boolean>();
+      state.refetch.mockReturnValue(pending.promise);
+      state.platform.OS = os;
+      await renderScreen();
+      const searchHeader = requireNode('SessionListSearchHeader');
+      act(() => {
+        (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+      });
+      expect(nodes('CenteredState')).toHaveLength(1);
+      const refresh = () =>
+        nodes('CenteredState')[0]?.props.refreshControl as ReactElement<{
+          refreshing: boolean;
+          onRefresh: () => void;
+        }>;
+      act(() => {
+        refresh().props.onRefresh();
+      });
+      // The no-match body mounts the rows control, and the reserved band is
+      // present here too (the sessions still exist behind the filter). Where
+      // the band carries the in-flight spinner (Android), the disc is parked
+      // off the rows there as on the rows list, or one pull draws two spinners
+      // (device defect uxs1).
+      expect(refresh().type).toBe(RowsRefreshControl);
+      expect(nodes('ActivityIndicator')).toHaveLength(parked ? 1 : 0);
+      await act(async () => {
+        pending.resolve(true);
+        await pending.promise;
+      });
+      expect(nodes('ActivityIndicator')).toHaveLength(0);
+      expect(refresh().props.refreshing).toBe(false);
+    }
+  );
+
+  it('yields the no-match band spinner to the body’s reduced-motion progress on Android', async () => {
+    state.live.activeSessions = [row];
+    const pending = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(pending.promise);
+    state.platform.OS = 'android';
+    state.reducedMotion = true;
+    await renderScreen();
+    const searchHeader = requireNode('SessionListSearchHeader');
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+    const refresh = () =>
+      nodes('CenteredState')[0]?.props.refreshControl as ReactElement<{
+        refreshing: boolean;
+        onRefresh: () => void;
+      }>;
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    // Reduced motion makes the platform control inert, so the no-match body's
+    // static progress is the pull's indicator: the reserved band keeps the
+    // "Updating" copy without drawing a second spinner (device defect uxs1).
+    const updating = nodes('Text').find(node => node.children.includes('Updating'));
+    expect(updating).toBeDefined();
+    expect(updating?.props.className).not.toContain('absolute');
+    expect(nodes('ActivityIndicator')).toHaveLength(0);
+    await act(async () => {
+      pending.resolve(true);
+      await pending.promise;
+    });
+    expect(nodes('ActivityIndicator')).toHaveLength(0);
+    expect(refresh().props.refreshing).toBe(false);
   });
 
   it('passes a numeric attention revision as extraData to the live FlatList', async () => {
@@ -966,6 +1127,22 @@ describe('AgentSessionListScreen live counts', () => {
     expect(reserved?.props.accessibilityElementsHidden).toBe(true);
     expect(nodes('FlatList')).toHaveLength(orgLoaded ? 1 : 0);
   });
+
+  it('keeps the retained count and rows through a retryable refresh failure', async () => {
+    state.live.activeSessions = [row];
+    state.live.terminalError = failure;
+    await renderScreen();
+
+    // The last snapshot stays legible: the count is not blanked, and the
+    // failure cannot grow an in-flow block that pushes the kept rows down.
+    expect(header().props.eyebrow).toBe('1 LIVE');
+    expect(nodes('FlatList')).toHaveLength(1);
+    expect(nodes('RemoteSessionRow')).toHaveLength(1);
+    expect(nodes('CenteredState')).toHaveLength(0);
+    expect(text()).toContain("Couldn't refresh");
+    expect(text()).not.toContain('Could not load active sessions');
+    expect(nodes('View').filter(node => node.props.className === 'min-h-5')).toHaveLength(1);
+  });
 });
 
 describe('AgentSessionListScreen live filtering', () => {
@@ -1140,7 +1317,7 @@ describe('AgentSessionListScreen live filtering', () => {
       expect(header().parent?.children[0]).toBe(header());
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
-        tree.children?.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
+        tree.children.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
       ).toEqual(['View', 'SessionListSearchHeader', 'View', 'FlatList']);
     }
   });
@@ -1248,6 +1425,9 @@ describe('AgentSessionListScreen live filtering', () => {
     const emptyState = renderer.root.findByType(EmptyState);
     expect(emptyState.props.title).toBe('No sessions match');
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
+    // The accessibly-named count matches the visible badge while narrowed.
+    expect(filterButtonProps().accessibilityLabel).toBe('Filter sessions, 1');
+    expect(filterButtonProps().accessibilityValue).toBeUndefined();
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(header().props.eyebrow).toBe('1 LIVE');
 
@@ -1257,6 +1437,9 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(nodes('FlatList')).toHaveLength(1);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(0);
+    // Clearing drops the count from the accessible name too: no stale "1"
+    // survives in the native content description after the badge unmounts.
+    expect(filterButtonProps().accessibilityLabel).toBe('Filter sessions');
     expect(nodes('ScrollView')).toHaveLength(0);
   });
 });

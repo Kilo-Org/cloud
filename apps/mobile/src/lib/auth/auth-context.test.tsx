@@ -1,9 +1,8 @@
 /// <reference lib="es2024.promise" />
-/* oxlint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom) */
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable max-lines -- one cohesive auth-context suite: sign-out teardown ordering and stale sign-in fencing share the provider mount and the SecureStore mock */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
@@ -228,18 +227,32 @@ vi.mock('@/lib/hooks/use-persisted-run-on-destination', () => ({
   clearRunOnDestinationPreference: vi.fn(),
 }));
 
-const { clearKeepScreenOnPreference, clearReasoningPreference, clearPrReviewFooterPreference } =
-  vi.hoisted(() => ({
-    clearKeepScreenOnPreference: vi.fn(),
-    clearReasoningPreference: vi.fn(),
-    clearPrReviewFooterPreference: vi.fn(),
-  }));
+const {
+  clearHideThinkingPreference,
+  clearKeepScreenOnPreference,
+  clearReasoningPreference,
+  clearPrReviewFooterPreference,
+  clearCondenseToolCallsPreference,
+  clearCollapsedConnectCtasPreference,
+} = vi.hoisted(() => ({
+  clearHideThinkingPreference: vi.fn(),
+  clearKeepScreenOnPreference: vi.fn(),
+  clearReasoningPreference: vi.fn(),
+  clearPrReviewFooterPreference: vi.fn(),
+  clearCondenseToolCallsPreference: vi.fn(),
+  clearCollapsedConnectCtasPreference: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({ clearKeepScreenOnPreference }));
 vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
   clearLiveActivityPreference: vi.fn(),
 }));
 
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference }));
+
+// Like use-trusted-hosts below: the real module pulls secure-store-preference
+// -> sonner-native -> react-native (Flow `import typeof`), which crashes the
+// node test environment. Mock it to keep sign-out teardown under test.
+vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({ clearHideThinkingPreference }));
 
 // These imported session-clear modules pull in native bindings that crash the
 // node test environment: use-trusted-hosts -> secure-store-preference ->
@@ -272,6 +285,16 @@ vi.mock('@/lib/temp-file-registry', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({ clearPrReviewFooterPreference }));
+
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  clearCondenseToolCallsPreference,
+}));
+
+// Same reason as use-condense-tool-calls-preference above: the real module
+// pulls secure-store-preference -> sonner-native -> react-native.
+vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
+  clearCollapsedConnectCtasPreference,
+}));
 
 vi.mock('@/lib/last-active-instance', () => ({
   clearLastActiveInstance: vi.fn().mockResolvedValue(undefined),
@@ -608,10 +631,13 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
-  it('clears the trusted hosts and image confirmations on sign-in', async () => {
+  it('clears the session-scoped state on sign-in (account switch)', async () => {
     const { ctx, unmount } = await mountAndGetContext();
     const trustedHosts = await import('@/lib/hooks/use-trusted-hosts');
     const imageConfirm = await import('@/components/agents/markdown-image-confirm');
+    const { getSessionAutoApproveEnabled, setSessionAutoApproveEnabled } =
+      await import('@/components/agents/session-auto-approve');
+    setSessionAutoApproveEnabled('switch-session-a', true);
 
     await act(async () => {
       await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
@@ -619,6 +645,8 @@ describe('sign-out teardown ordering', () => {
 
     expect(trustedHosts.clearTrustedHosts).toHaveBeenCalled();
     expect(imageConfirm.clearMarkdownImageConfirmMemory).toHaveBeenCalled();
+    // A per-session auto-approve flag must not survive the account boundary.
+    expect(getSessionAutoApproveEnabled('switch-session-a')).toBe(false);
 
     unmount();
   });
@@ -632,7 +660,10 @@ describe('sign-out teardown ordering', () => {
 
     expect(clearKeepScreenOnPreference).toHaveBeenCalled();
     expect(clearReasoningPreference).toHaveBeenCalled();
+    expect(clearHideThinkingPreference).toHaveBeenCalled();
     expect(clearPrReviewFooterPreference).toHaveBeenCalled();
+    expect(clearCondenseToolCallsPreference).toHaveBeenCalled();
+    expect(clearCollapsedConnectCtasPreference).toHaveBeenCalled();
     const { clearRunOnDestinationPreference } =
       await import('@/lib/hooks/use-persisted-run-on-destination');
     expect(clearRunOnDestinationPreference).toHaveBeenCalled();

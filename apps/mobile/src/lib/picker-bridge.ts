@@ -71,8 +71,29 @@ export type RepoPickerBridge = {
   repositories: RepoOption[];
   /** Grouped sections (recents, then providers) shown when the search box is empty. */
   sections: RepoPickerSection[];
+  /**
+   * The organization scope the rows were loaded under; `null` is personal.
+   * The picker keys its Bitbucket organization-only note on THIS, not on the
+   * app's globally selected organization: a Continue screen opened with a
+   * session's organization must not be described by the global selection.
+   */
+  organizationId: string | null;
   currentValue: string;
   onSelect: (repo: string) => void;
+};
+
+/**
+ * Bridge for the new-session branch picker. `onSelect` receives the picked
+ * branch NAME; the trigger's closure decides default-vs-override, so the
+ * route stays display-only.
+ */
+export type BranchPickerBridge = {
+  branches: string[];
+  /** The provider's default branch; its row carries the "Default" label. */
+  defaultBranch: string | null;
+  /** The branch the trigger row shows as selected (override or default). */
+  selectedBranch: string | null;
+  onSelect: (branch: string) => void;
 };
 
 /** The complete normalized router row, including all advertised capabilities. */

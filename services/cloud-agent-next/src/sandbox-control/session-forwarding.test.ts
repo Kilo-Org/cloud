@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { SANDBOX_CONTROL_FORWARD_OPERATION_LIMIT } from '../shared/sandbox-control-protocol.js';
 import { createSessionForwarding } from './session-forwarding.js';
 
 describe('createSessionForwarding', () => {
@@ -116,5 +117,57 @@ describe('createSessionForwarding', () => {
       })
     ).resolves.toBe('acknowledged');
     expect(forwarding.stats()).toMatchObject({ waiting: 0, inFlight: 0, bufferedBytes: 0 });
+  });
+
+  it('admits up to the forward operation limit and rejects beyond it', async () => {
+    const forwarding = createSessionForwarding();
+    const release = Promise.withResolvers<void>();
+    const admitted: Array<Promise<unknown>> = [];
+    for (let index = 0; index < SANDBOX_CONTROL_FORWARD_OPERATION_LIMIT; index++) {
+      admitted.push(
+        forwarding.enqueueFenced({
+          sessionId: 'workspace_1',
+          bytes: 1,
+          deadlineAt: Date.now() + 60_000,
+          fence: async () => true,
+          forward: async () => release.promise,
+        })
+      );
+    }
+    expect(forwarding.stats()).toMatchObject({
+      waiting: SANDBOX_CONTROL_FORWARD_OPERATION_LIMIT,
+      inFlight: 0,
+    });
+
+    await expect(
+      forwarding.enqueueFenced({
+        sessionId: 'workspace_1',
+        bytes: 1,
+        deadlineAt: Date.now() + 60_000,
+        fence: async () => true,
+        forward: async () => 'unreachable',
+      })
+    ).rejects.toMatchObject({ retryable: true });
+
+    release.resolve();
+    await Promise.allSettled(admitted);
+    expect(forwarding.stats()).toMatchObject({ waiting: 0, inFlight: 0, bufferedBytes: 0 });
+  });
+
+  it('keeps a detached lane until admitted work settles', async () => {
+    const forwarding = createSessionForwarding();
+    const release = Promise.withResolvers<void>();
+    const first = forwarding.enqueue('workspace_1', async () => release.promise);
+    await Promise.resolve();
+    forwarding.delete('workspace_1');
+    const secondForward = vi.fn(async () => 'second');
+    const second = forwarding.enqueue('workspace_1', secondForward);
+    await Promise.resolve();
+    expect(secondForward).not.toHaveBeenCalled();
+    release.resolve();
+    await expect(first).resolves.toBeUndefined();
+    await expect(second).resolves.toBe('second');
+    expect(secondForward).toHaveBeenCalledTimes(1);
+    expect(forwarding.get('workspace_1')).toBeUndefined();
   });
 });

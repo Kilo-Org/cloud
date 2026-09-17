@@ -521,7 +521,7 @@ export class SessionOperation {
         try {
           work.emitPreparing?.(retained ?? event, this.eventOptions());
         } catch {
-          if (!this.authorization) throw new Error('Preparation event delivery failed');
+          this.diagnostic('send_failed');
         }
       },
     });
@@ -571,10 +571,9 @@ export class SessionOperation {
     if (this.authorization && requiresRetention && !retained) return;
     try {
       const delivered = this.deps.emitSessionEvent(retained ?? payload.data, this.eventOptions());
-      if (delivered === false && !this.authorization)
-        throw new Error('Finalization event delivery failed');
+      if (delivered === false) this.diagnostic('send_failed');
     } catch {
-      if (!this.authorization) throw new Error('Finalization event delivery failed');
+      this.diagnostic('send_failed');
     }
   }
 
@@ -768,6 +767,7 @@ export class SessionOperation {
             kiloClient,
             env,
             messageId: completion?.info.id ?? messageId,
+            userMessageId: messageId,
             signal,
             onEvent: event => this.emitFinalizationEvent(event),
           });
@@ -871,21 +871,17 @@ export class SessionOperation {
     if (!this.authorization) {
       try {
         diagnostic('outcome_sending', outcome.status);
-        if (
-          this.deps.emitSessionEvent(
-            {
-              type: 'session.message.outcome',
-              properties: this.outcome,
-            },
-            this.eventOptions()
-          ) === false
-        )
-          throw new Error('Session outcome delivery failed');
-        diagnostic('outcome_sent', outcome.status);
+        const delivered = this.deps.emitSessionEvent(
+          {
+            type: 'session.message.outcome',
+            properties: this.outcome,
+          },
+          this.eventOptions()
+        );
+        if (delivered === false) diagnostic('send_failed', outcome.status);
+        else diagnostic('outcome_sent', outcome.status);
       } catch {
         diagnostic('outcome_failed', outcome.status);
-        this.requestRetirement('Session outcome delivery failed', this.captureCleanupDeadline());
-        return fail('Session outcome delivery failed', false);
       }
     }
     return result;

@@ -1,4 +1,4 @@
-import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, View } from 'react-native';
@@ -31,6 +31,8 @@ type MessageDetailsSheetProps = {
   visible: boolean;
   message: StoredMessage | null;
   modelOptions: SessionModelOption[];
+  /** The selected message's delivery state; a failed one adds the transport detail to Copy. */
+  deliveryState?: MessageDeliveryState;
   onClose: () => void;
   canCancelQueued?: boolean;
   isCancelingQueued?: boolean;
@@ -43,6 +45,7 @@ export function MessageDetailsSheet({
   visible,
   message,
   modelOptions,
+  deliveryState,
   onClose,
   canCancelQueued = false,
   isCancelingQueued = false,
@@ -57,8 +60,8 @@ export function MessageDetailsSheet({
   const [reportedMessageId, setReportedMessageId] = useState<string | null>(null);
   const [selectVisible, setSelectVisible] = useState(false);
   const content = useMemo(
-    () => (message ? getMessageDetailsContent(message, modelOptions) : null),
-    [message, modelOptions]
+    () => (message ? getMessageDetailsContent(message, modelOptions, deliveryState) : null),
+    [message, modelOptions, deliveryState]
   );
 
   const reportMutation = useMutation(
@@ -92,7 +95,7 @@ export function MessageDetailsSheet({
   }, [visible]);
 
   const handleCopy = () => {
-    handleMessageDetailsCopy(content?.copyableText);
+    handleMessageDetailsCopy(content?.copyText);
   };
 
   const handleReport = () => {
@@ -156,11 +159,12 @@ export function MessageDetailsSheet({
             title={t('agentChat.messageDetails.title')}
             onDone={onClose}
             doneLabel={t('common.done')}
+            topInset="ios-page-sheet"
           />
 
           {content ? (
             <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
-              {content.copyableText ? (
+              {content.copyText ? (
                 <View className="mb-6 gap-2">
                   <Pressable
                     onPress={handleCopy}

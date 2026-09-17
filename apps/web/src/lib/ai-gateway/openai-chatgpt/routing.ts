@@ -15,8 +15,13 @@ import { getOpenAiChatGptStoredConnection } from './store';
  * on the delegated token instead of a managed gateway.
  */
 
-/** The partner project key, already a managed BYOK credential (`ENVIRONMENT.md`). */
-export const OPENAI_CHATGPT_API_KEY_ENV = 'OPENAI_API_KEY';
+/**
+ * The delegated route must carry a key from the project that owns the OAuth
+ * client. `OPENAI_API_KEY` is a different project's key: it is handed to the
+ * Vercel AI Gateway as an OpenAI BYOK credential. Keep the two apart so neither
+ * path inherits the other's project, quota, or billing.
+ */
+export const OPENAI_CHATGPT_API_KEY_ENV = 'OPENAI_CHATGPT_API_KEY';
 
 /** The production upstream; the same discovery-driven environment overrides as
  *  the OIDC endpoints (`OPENAI_DISCOVERY_URL`, `OPENAI_TOKEN_ENDPOINT`) apply. */

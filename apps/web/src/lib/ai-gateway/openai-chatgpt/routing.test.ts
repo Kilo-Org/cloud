@@ -42,7 +42,7 @@ const DELEGATED_TOKEN = 'delegated-access-token';
 const REQUESTED_MODEL = 'openai/gpt-5-nano';
 const USER_ID = 'user-1';
 
-const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
+const originalOpenAiChatGptApiKey = process.env.OPENAI_CHATGPT_API_KEY;
 const originalFetch = global.fetch;
 
 function connectedConnection(): OpenAiChatGptConnection {
@@ -115,7 +115,7 @@ async function transformResponsesRequest(
 }
 
 beforeEach(() => {
-  process.env.OPENAI_API_KEY = PARTNER_KEY;
+  process.env.OPENAI_CHATGPT_API_KEY = PARTNER_KEY;
   jest
     .mocked(getOpenAiChatGptStoredConnection)
     .mockReset()
@@ -127,10 +127,10 @@ beforeEach(() => {
 });
 
 afterAll(() => {
-  if (originalOpenAiApiKey === undefined) {
-    delete process.env.OPENAI_API_KEY;
+  if (originalOpenAiChatGptApiKey === undefined) {
+    delete process.env.OPENAI_CHATGPT_API_KEY;
   } else {
-    process.env.OPENAI_API_KEY = originalOpenAiApiKey;
+    process.env.OPENAI_CHATGPT_API_KEY = originalOpenAiChatGptApiKey;
   }
   global.fetch = originalFetch;
 });
@@ -184,7 +184,7 @@ describe('isOpenAiChatGptEligible', () => {
   it.each(['', '   '])(
     'stays eligible with an empty partner key %p, leaving the key to the provider',
     async apiKey => {
-      process.env.OPENAI_API_KEY = apiKey;
+      process.env.OPENAI_CHATGPT_API_KEY = apiKey;
 
       await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(true);
     }
@@ -348,7 +348,7 @@ describe('checkOpenAiChatGptByok', () => {
   });
 
   it('returns no provider without the deployment partner key, keeping the existing route', async () => {
-    process.env.OPENAI_API_KEY = '   ';
+    process.env.OPENAI_CHATGPT_API_KEY = '   ';
 
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
     expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(USER_ID);

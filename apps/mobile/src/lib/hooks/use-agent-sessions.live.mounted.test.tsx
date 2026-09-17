@@ -334,6 +334,44 @@ describe('live query presentation and refresh contracts', () => {
     expect(state.dismissNotificationAsync).toHaveBeenCalledWith('needs-input:ses_1');
   });
 
+  it('replaces a re-published raise in place so a later recompute does not re-post it', async () => {
+    state.mountSync = true;
+    client.setQueryData(QUERY_KEY, {
+      sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'permission' })],
+    });
+    await render();
+    expect(state.scheduleNotificationAsync.mock.calls.map(c => c[0].identifier)).toEqual([
+      'needs-input:ses_1',
+    ]);
+
+    // The raise flips kind, so its standing notification is re-published with
+    // the new action set under the same per-session identifier.
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, {
+        sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      });
+      await flush();
+    });
+    expect(state.scheduleNotificationAsync.mock.calls.map(c => c[0].identifier)).toEqual([
+      'needs-input:ses_1',
+      'needs-input:ses_1',
+    ]);
+
+    // A later recompute that leaves the raise untouched must not post a third
+    // time: the notified set carries the fresh row, so the next plan compares
+    // the raise against the shape now on screen.
+    await act(async () => {
+      client.setQueryData(QUERY_KEY, {
+        sessions: [
+          makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' }),
+          makeCached({ id: 'ses_2', status: 'running' }),
+        ],
+      });
+      await flush();
+    });
+    expect(state.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
+  });
+
   it.each(['token', 'bootstrap', 'sign-out', 'organization'] as const)(
     'gates cached reads and socket ownership on %s readiness',
     async gate => {

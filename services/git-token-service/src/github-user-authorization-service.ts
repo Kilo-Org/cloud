@@ -137,11 +137,13 @@ export class GitHubUserAuthorizationService {
       const repoParts = params.githubRepo.split('/');
       // Same base override the PR-review client honors (apps/web), so a dev
       // stub serving api.github.com is probed through the stub instead of
-      // rejecting the stub token against real GitHub and revoking the row.
-      const apiBaseUrl = (this.env.GITHUB_API_BASE_URL ?? DEFAULT_GITHUB_API_BASE_URL).replace(
-        /\/+$/,
-        ''
-      );
+      // rejecting the stub token against real GitHub and revoking the row. An
+      // empty override counts as unset — `.dev.vars.example` ships
+      // `GITHUB_API_BASE_URL=`, and `??` would keep it, making the probe target
+      // a relative URL.
+      const apiBaseUrl = (
+        this.env.GITHUB_API_BASE_URL?.trim() || DEFAULT_GITHUB_API_BASE_URL
+      ).replace(/\/+$/, '');
       const endpoint = `${apiBaseUrl}/repos/${encodeURIComponent(repoParts[0])}/${encodeURIComponent(repoParts[1])}`;
       let response: Response;
       try {

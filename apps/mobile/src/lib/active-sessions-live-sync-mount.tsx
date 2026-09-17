@@ -104,9 +104,17 @@ function useNeedsInputLocalNotifications(): void {
       appState: AppState.currentState,
     });
     const dismissed = new Set(plan.dismiss);
+    // A re-published row REPLACES its previous entry instead of joining it. An
+    // append would leave the stale row first in the set, so the next plan's
+    // `find` would compare the raise against the shape it had before the
+    // re-publish, publish again on every recompute, and grow the set without
+    // bound.
+    const republished = new Set(plan.publish.map(row => row.sessionId));
     notified.current = [
       ...notified.current.filter(
-        row => !dismissed.has(notificationIdentifierForSession(row.sessionId))
+        row =>
+          !dismissed.has(notificationIdentifierForSession(row.sessionId)) &&
+          !republished.has(row.sessionId)
       ),
       ...plan.publish,
     ];

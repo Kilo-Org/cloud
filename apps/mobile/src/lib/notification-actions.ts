@@ -217,6 +217,16 @@ async function dispatchNeedsInputResponse(
 ): Promise<boolean> {
   const data = parseResponseData(response);
 
+  // Our four ids are answered here, never replayed: `checkInitialNotification`
+  // dispatches whatever `getLastNotificationResponse()` still holds on a later
+  // cold start, so an uncleared Approve/Reply would answer the same raise a
+  // second time, and an uncleared Open PR/Open session would navigate again.
+  // Any other identifier keeps the tap path, which clears below once it knows
+  // there is a destination to stash.
+  if (isNeedsInputActionIdentifier(response.actionIdentifier)) {
+    Notifications.clearLastNotificationResponse();
+  }
+
   switch (response.actionIdentifier) {
     case NEEDS_INPUT_ACTION_IDS.approve:
     case NEEDS_INPUT_ACTION_IDS.reply: {
@@ -244,7 +254,6 @@ async function dispatchNeedsInputResponse(
         await dismissResponseNotification(response);
         return true;
       }
-      Notifications.clearLastNotificationResponse();
       setPendingDeepLink(notificationPathForData(data), 'notification');
       return true;
     }

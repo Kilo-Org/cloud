@@ -205,6 +205,21 @@ describe('isNeedsInputActionIdentifier', () => {
   });
 });
 
+describe('handleNeedsInputNotificationResponse — last response', () => {
+  it.each(Object.values(NEEDS_INPUT_ACTION_IDS))(
+    'clears the last notification response for %s so a later cold start cannot re-dispatch it',
+    async actionIdentifier => {
+      mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+      await handleNeedsInputNotificationResponse(raiseResponse({ actionIdentifier }), {
+        runInteraction: mocks.runNeedsInputInteraction,
+      });
+
+      expect(mocks.clearLastNotificationResponse).toHaveBeenCalled();
+    }
+  );
+});
+
 describe('handleNeedsInputNotificationResponse — approve and reply', () => {
   it('runs the approve interaction headless and replaces with the confirmation', async () => {
     mocks.runNeedsInputInteraction.mockResolvedValue('ok');

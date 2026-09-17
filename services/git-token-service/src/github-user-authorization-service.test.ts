@@ -181,6 +181,21 @@ describe('GitHubUserAuthorizationService envelope selection', () => {
     expect(String(fetchMock.mock.calls[0][0])).toBe('https://api.github.com/repos/acme/repo');
   });
 
+  it('treats an empty base override as unset and keeps the real api.github.com probe', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ permissions: { push: true } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    // `.dev.vars.example` ships `GITHUB_API_BASE_URL=`, so a copied .dev.vars
+    // sets the override to the empty string.
+    const result = await makeService({ GITHUB_API_BASE_URL: '' }).selectUserAuthorization({
+      userId: 'user_1',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(result).toMatchObject({ selected: true, token: 'access-token' });
+    expect(String(fetchMock.mock.calls[0][0])).toBe('https://api.github.com/repos/acme/repo');
+  });
+
   it('rewrites refreshed credentials with the active envelope key', async () => {
     const row = makeRow();
     row.access_token_expires_at = new Date(Date.now() - 1000).toISOString();

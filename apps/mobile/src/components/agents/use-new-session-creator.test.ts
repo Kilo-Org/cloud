@@ -891,6 +891,40 @@ describe('useNewSessionCreator sandboxAllocation', () => {
     });
     expect(removedRepos).not.toContain('owner/repo');
   });
+
+  // The previous app version persisted the pick-less scoped fingerprint (the
+  // object repo, no `sandboxAllocation` property). A pick-less submit must
+  // marshal those exact bytes so the relaunch retry finds that row and reuses
+  // its key instead of minting a duplicate of a session the server may already
+  // have admitted.
+  it('reuses a previous-version safe-retry key for a pick-less submit', async () => {
+    const PREVIOUS_VERSION_FINGERPRINT = JSON.stringify({
+      prompt: 'hello',
+      mode: 'code',
+      model: 'model-1',
+      variant: 'v1',
+      repo: { platform: 'github', fullName: 'owner/repo' },
+      autoCommit: false,
+      organizationId: null,
+      profileId: null,
+      attachments: null,
+    });
+    outboxMock.getStoredOperationKey.mockImplementation((fingerprint: string) =>
+      fingerprint === PREVIOUS_VERSION_FINGERPRINT ? 'previous-version-key' : null
+    );
+
+    const creator = runCreator({});
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(outboxMock.writeSafeRetry.mock.calls[0]?.[0].fingerprint).toBe(
+      PREVIOUS_VERSION_FINGERPRINT
+    );
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ operationKey: 'previous-version-key' })
+    );
+  });
 });
 
 describe('useNewSessionCreator autoCommit', () => {

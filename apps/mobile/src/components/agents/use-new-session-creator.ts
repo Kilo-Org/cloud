@@ -168,10 +168,14 @@ export function useNewSessionCreator({
       organizationId: organizationId ?? null,
       profileId: profileId ?? null,
       attachments: attachmentWire ?? null,
-      // Changing the sandbox pick is a fresh intent: a same-key retry would
-      // replay the previous pick's ledger result instead of creating with the
-      // newly picked allocation.
-      sandboxAllocation: sandboxAllocation ?? null,
+      // The pick joins the intent only when one was made. A changed pick is a
+      // fresh intent (a same-key retry would replay the previous pick's ledger
+      // result instead of creating with the newly picked allocation), while a
+      // pick-less submit keeps the exact bytes the previous app version
+      // persisted, so its safe-retry row is still found on relaunch instead of
+      // minting a duplicate session. A "no pick" marker key would change those
+      // bytes and hide an already-admitted session's row.
+      ...(sandboxAllocation ? { sandboxAllocation } : {}),
     });
     // Pre-fix safe-retry rows persisted the bare `fullName` as `repo`. A GitHub
     // `owner/repo` is inherently a single-provider identity, so only GitHub

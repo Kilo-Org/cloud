@@ -11,6 +11,7 @@ import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
 import { LiveSessionListEmptyState } from '@/components/agents/live-session-list-empty-state';
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
+import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
@@ -82,7 +83,11 @@ export function AgentSessionListScreen() {
   const pull = usePullRefresh(refetchRequest);
   const handleRefresh = pull.startPull;
   const { markSettled, startRetry } = pull;
+  // The rows list starts at the list's top edge, where Android's floating
+  // indicator would rest on the first row's text (device defect uxs1):
+  // `RowsRefreshControl` carries the platform rule that keeps it off the rows.
   const refreshControl = <RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />;
+  const rowsControl = <RowsRefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />;
 
   // The reserved status line's Retry replaces the removed in-flow failure
   // block, so it inherits that block's idempotence: a second tap before the
@@ -239,11 +244,18 @@ export function AgentSessionListScreen() {
       </View>
     );
   } else if (hasLiveRows && visibleSessions.length === 0) {
+    // The reserved band is mounted here too (the sessions exist behind the
+    // filter), so the native control gets the same treatment as the rows
+    // list: on Android the band carries the in-flight spinner and the
+    // platform disc is parked off the body, so no second spinner is drawn
+    // over it (device defect uxs1). That body is centered, so it draws the
+    // pull's own progress while reduced motion is on, and the band then
+    // yields its spinner to it (`progressInBody` on the reserved line).
     body = (
       <EmptyState
         icon={Bot}
         title={t('agents.sessionList.noMatches')}
-        refreshControl={refreshControl}
+        refreshControl={rowsControl}
         description={
           isSearching
             ? t('agents.sessionList.tryDifferentSearch')
@@ -272,7 +284,7 @@ export function AgentSessionListScreen() {
         keyExtractor={item => item.id}
         extraData={attentionFocusRevision}
         contentContainerStyle={listPadding}
-        refreshControl={refreshControl}
+        refreshControl={rowsControl}
         maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }}
       />
     );
@@ -322,6 +334,10 @@ export function AgentSessionListScreen() {
               busy: pull.refreshing || pull.busy,
               failed: pull.failed || retryableRowsFailure,
               onRetry: handleRefreshRetry,
+              // The pull's progress belongs to the centered no-match body (the
+              // same state that mounts it), so the band does not draw a second
+              // spinner while that body shows one.
+              progressInBody: hasLiveRows && visibleSessions.length === 0 && pull.refreshing,
             }}
             refreshControl={refreshControl}
           />

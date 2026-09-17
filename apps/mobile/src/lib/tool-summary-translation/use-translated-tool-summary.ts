@@ -23,8 +23,9 @@ export type ToolSummaryTranslation = {
  * plain row would keep the original text. The retry belongs to the mounted row,
  * so it stops when the translation lands (`translated` clears the timer) or the
  * row unmounts, and `ensureTranslation` drops each tick while a request is in
- * flight or the translation is already cached, so rows sharing a summary ask
- * the gateway once per cadence.
+ * flight, a request is already queued behind the concurrency limit, or the
+ * translation is already cached, so rows sharing a summary ask the gateway once
+ * per cadence.
  */
 export const TOOL_SUMMARY_TRANSLATION_RETRY_MS = 10_000;
 

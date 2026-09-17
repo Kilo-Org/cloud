@@ -16,6 +16,7 @@ import {
   registerGlanceableSink,
   unregisterGlanceableSink,
 } from './sink-registry';
+import { type WaitingAsk } from './waiting-ask';
 import { getSurfaceExtras, setSurfaceExtras } from './surface-extras';
 
 const NOW = 1_750_000_000_000;
@@ -371,6 +372,80 @@ describe('GlanceablePublisher', () => {
     now = Date.parse(initial.expiresAt);
     publisher.handleFetchError(PUB_CTX);
     expect(lastSnapshot(calls, 'publish')).toEqual({ ...fresh, revision: 45, status: 'stale' });
+    publisher.dispose();
+  });
+});
+
+describe('GlanceablePublisher waiting ask', () => {
+  function makePublisher(overrides: { terminalBlankEpoch?: () => number } = {}) {
+    const asks: (WaitingAsk | null)[] = [];
+    const publisher = new GlanceablePublisher({
+      sinks: [],
+      now: () => NOW,
+      ...overrides,
+      onWaitingAskChange: ask => {
+        asks.push(ask);
+      },
+    });
+    return { publisher, asks };
+  }
+
+  it('reports the oldest waiting ask, then null when the rows go empty', () => {
+    const { publisher, asks } = makePublisher();
+    publisher.handleSessions(
+      [
+        { id: 'newer', status: 'question', statusUpdatedAt: new Date(NOW - 1000).toISOString() },
+        {
+          id: 'older',
+          status: 'permission',
+          statusUpdatedAt: new Date(NOW - 60_000).toISOString(),
+        },
+      ],
+      PUB_CTX
+    );
+    expect(asks).toHaveLength(1);
+    expect(asks.at(-1)).toMatchObject({
+      kiloSessionId: 'older',
+      status: 'permission',
+      isCloudAgent: false,
+      recordedAt: NOW,
+    });
+
+    // Busy-only rows carry no permission or question: nothing is asking.
+    publisher.handleSessions([{ id: 'busy', status: 'busy' }], PUB_CTX);
+    expect(asks.at(-1)).toBeNull();
+    publisher.handleSessions([], PUB_CTX);
+    expect(asks.at(-1)).toBeNull();
+    publisher.dispose();
+  });
+
+  it('clears the ask on a fetch error', () => {
+    const { publisher, asks } = makePublisher();
+    publisher.handleSessions([{ id: 'waiting', status: 'permission' }], PUB_CTX);
+    expect(asks.at(-1)).toMatchObject({ kiloSessionId: 'waiting' });
+
+    publisher.handleFetchError(PUB_CTX);
+    expect(asks.at(-1)).toBeNull();
+    publisher.dispose();
+  });
+
+  it('reports null while the publisher is gated after a terminal blank', () => {
+    const { publisher, asks } = makePublisher({ terminalBlankEpoch: getTerminalBlankEpoch });
+    publisher.handleSessions([{ id: 'waiting', status: 'permission' }], PUB_CTX);
+    expect(asks.at(-1)).toMatchObject({ kiloSessionId: 'waiting' });
+
+    writeSignedOutSnapshotAndEnd();
+    publisher.handleSessions([{ id: 'waiting', status: 'permission' }], PUB_CTX);
+    expect(asks).toHaveLength(2);
+    expect(asks.at(-1)).toBeNull();
+    publisher.dispose();
+  });
+
+  it('keeps working without an ask consumer', () => {
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    publisher.handleSessions([{ id: 'waiting', status: 'permission' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(1);
     publisher.dispose();
   });
 });

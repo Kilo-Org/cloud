@@ -215,8 +215,7 @@ export function applyAnthropicThinkingDefault(
 ) {
   const defaultsToThinking =
     (isMinimaxModel(requestedModel) && requestedModel.includes('m3')) ||
-    requestedModel === 'z-ai/glm-5.2' ||
-    requestedModel === 'moonshotai/kimi-k3';
+    requestedModel === 'z-ai/glm-5.2';
   if (
     defaultsToThinking &&
     requestToMutate.kind === 'messages' &&

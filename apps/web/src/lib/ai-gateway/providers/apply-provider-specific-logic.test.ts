@@ -66,16 +66,13 @@ function makeMessagesRequest(
 }
 
 describe('applyAnthropicThinkingDefault', () => {
-  it.each(['z-ai/glm-5.2', 'moonshotai/kimi-k3', 'minimax/minimax-m3'])(
-    'disables implicit thinking for %s',
-    model => {
-      const request = makeMessagesRequest(model);
+  it.each(['z-ai/glm-5.2', 'minimax/minimax-m3'])('disables implicit thinking for %s', model => {
+    const request = makeMessagesRequest(model);
 
-      applyAnthropicThinkingDefault(model, request);
+    applyAnthropicThinkingDefault(model, request);
 
-      expect(request.body.thinking).toEqual({ type: 'disabled' });
-    }
-  );
+    expect(request.body.thinking).toEqual({ type: 'disabled' });
+  });
 
   it.each([{ type: 'enabled' as const, budget_tokens: 1_024 }, { type: 'adaptive' as const }])(
     'preserves explicitly enabled thinking %p',
@@ -96,8 +93,8 @@ describe('applyAnthropicThinkingDefault', () => {
     expect(request.body.thinking).toBeUndefined();
   });
 
-  it.each(['z-ai/glm-5.1', 'moonshotai/kimi-k3-fast'])(
-    'does not apply the partner thinking default to %s',
+  it.each(['z-ai/glm-5.1', 'moonshotai/kimi-k3', 'moonshotai/kimi-k3-fast'])(
+    'does not add thinking to %s',
     model => {
       const request = makeMessagesRequest(model);
 

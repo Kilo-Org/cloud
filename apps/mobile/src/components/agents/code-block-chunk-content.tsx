@@ -1,8 +1,3 @@
-// Children for one chunk of a highlighted code fence. The block renders one
-// `RNText` per chunk (see `CodeBlockImpl` in `code-block.tsx`), so these
-// helpers build that `RNText`'s content from the chunk's highlighted lines.
-// They live in their own module because they are pure — tokens in, children
-// out — and because `code-block.tsx` sits at the lint line budget.
 import { Fragment, type ReactNode } from 'react';
 
 import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs';
@@ -15,7 +10,7 @@ import { type HighlightToken } from '@/lib/pr-review/diff/highlight';
  *
  * Only a blank line that sits among other lines needs the placeholder: an
  * empty fence is one blank line and nothing else, so it keeps the zero-height
- * empty code `Text` it rendered before this block chunked the fence (see
+ * empty code `Text` it rendered before the block chunked the fence (see
  * `keepBlankLineBox` in `CodeBlockImpl`).
  */
 const BLANK_CODE_LINE = ' ';

@@ -46,7 +46,7 @@ describe('one implementation for both platforms', () => {
     const runtime = sharedSources().find(({ file }) => file === 'start-agent-runtime.ts');
     expect(runtime).toBeDefined();
     expect(runtime?.source).toContain(
-      "import { readStoredValue } from '@/lib/auth/secure-store-read';"
+      "import { readStoredValue } from '@/lib/auth/secure-store-value';"
     );
     expect(runtime?.source, 'no direct expo-secure-store import').not.toMatch(
       /^import .*from 'expo-secure-store';$/m

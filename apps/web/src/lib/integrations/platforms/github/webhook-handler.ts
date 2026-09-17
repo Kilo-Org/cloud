@@ -119,6 +119,14 @@ export async function handleGitHubWebhook(
   const logSuffix = appType === 'lite' ? ' (lite app)' : '';
   const sentryPrefix = appType === 'lite' ? 'github_lite_' : 'github_';
 
+  // Identifying context for the top-level 500 capture. These come from the
+  // delivery headers and the top level of the parsed envelope only — never from
+  // the payload body, headers, tokens, or the webhook secret.
+  let eventType = '';
+  let deliveryId: string | null = null;
+  let deliveryInstallationId: string | undefined;
+  let deliveryAction: string | undefined;
+
   try {
     // 1. Verify signature
     const rawBody = await request.text();
@@ -143,9 +151,24 @@ export async function handleGitHubWebhook(
     }
 
     // 3. Get event type and action from headers
-    const eventType = request.headers.get('x-github-event') || '';
+    eventType = request.headers.get('x-github-event') || '';
     const eventSignature = request.headers.get('x-github-delivery');
+    deliveryId = eventSignature;
     const headers = redactSensitiveHeaders(Object.fromEntries(request.headers));
+
+    // Context for the top-level error capture. Only the delivery envelope is
+    // read here; the payload itself is never captured.
+    const deliveryEnvelope = payload as {
+      action?: unknown;
+      installation?: { id?: unknown };
+    } | null;
+    deliveryAction =
+      typeof deliveryEnvelope?.action === 'string' ? deliveryEnvelope.action : undefined;
+    const envelopeInstallationId = deliveryEnvelope?.installation?.id;
+    deliveryInstallationId =
+      typeof envelopeInstallationId === 'number' || typeof envelopeInstallationId === 'string'
+        ? envelopeInstallationId.toString()
+        : undefined;
 
     if (!eventType) {
       return NextResponse.json({ error: 'Missing x-github-event header' }, { status: 400 });
@@ -925,7 +948,13 @@ export async function handleGitHubWebhook(
   } catch (error) {
     logExceptInTest(`Webhook error${logSuffix}:`, error);
     captureException(error, {
-      tags: { source: `${sentryPrefix}webhook_handler` },
+      tags: {
+        source: `${sentryPrefix}webhook_handler`,
+        ...(eventType ? { event: eventType } : {}),
+        ...(deliveryId ? { delivery: deliveryId } : {}),
+        ...(deliveryInstallationId ? { installation: deliveryInstallationId } : {}),
+        ...(deliveryAction ? { action: deliveryAction } : {}),
+      },
     });
     return new NextResponse('Internal Server Error', { status: 500 });
   }

@@ -663,6 +663,12 @@ export const messagePartRemovedDataSchema = z.object({
 });
 export type MessagePartRemovedData = z.infer<typeof messagePartRemovedDataSchema>;
 
+export const messageRemovedDataSchema = z.object({
+  sessionID: z.string(),
+  messageID: z.string(),
+});
+export type MessageRemovedData = z.infer<typeof messageRemovedDataSchema>;
+
 export const sessionStatusDataSchema = z.object({
   sessionID: z.string(),
   status: sessionStatusSchema,

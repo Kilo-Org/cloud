@@ -15,7 +15,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
-import { renderChunkChildren } from './code-block-chunks';
+import { renderChunkChildren } from './code-block-chunk-content';
 import {
   chunkTokenLines,
   CODE_FIRST_PAINT_CHUNKS,
@@ -349,7 +349,8 @@ function CodeBlockImpl({
   // empty fence — an empty ```` ``` ```` in a message — is one blank line and
   // nothing else, so its empty `displayText` skips the placeholder and the
   // fence renders the zero-height empty code `Text` it did before this block
-  // chunked it, instead of gaining a blank code line (see `BLANK_CODE_LINE`).
+  // chunked it, instead of gaining a blank code line (see `BLANK_CODE_LINE`
+  // in `code-block-chunk-content.ts`).
   const keepBlankLineBox = displayText.length > 0;
   const codeContent = useMemo(
     () => (

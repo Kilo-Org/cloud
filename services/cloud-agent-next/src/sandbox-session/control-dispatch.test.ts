@@ -188,10 +188,49 @@ describe('deliveryErrorLogFields', () => {
     });
   });
 
+  it('logs the detail for an unclassified transport or internal error', () => {
+    expect(deliveryErrorLogFields(new Error('some transport detail'))).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: 'some transport detail',
+      retryable: false,
+    });
+  });
+
+  it('stringifies a non-Error thrown value for an unclassified error', () => {
+    expect(deliveryErrorLogFields('boom')).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: 'boom',
+      retryable: false,
+    });
+  });
+
+  it('falls back for a null-prototype value that cannot be stringified', () => {
+    expect(() => deliveryErrorLogFields(Object.create(null))).not.toThrow();
+    expect(deliveryErrorLogFields(Object.create(null))).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[unserializable error]',
+      retryable: false,
+    });
+  });
+
+  it('falls back for a thrown value whose string conversion throws', () => {
+    const error = {
+      toString() {
+        throw new Error('toString exploded');
+      },
+    };
+    expect(() => deliveryErrorLogFields(error)).not.toThrow();
+    expect(deliveryErrorLogFields(error)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[unserializable error]',
+      retryable: false,
+    });
+  });
+
   it.each([false, true])(
-    'classifies transport exceptions without copying fields when overloaded=%s',
+    'classifies a transport exception with its detail when overloaded=%s',
     overloaded => {
-      const error = Object.assign(new Error('sensitive-message'), {
+      const error = Object.assign(new Error('transport detail'), {
         code: 'session_busy',
         retryable: true,
         overloaded,
@@ -200,6 +239,7 @@ describe('deliveryErrorLogFields', () => {
       });
       expect(deliveryErrorLogFields(error)).toEqual({
         errorCode: 'transport_or_internal_error',
+        errorMessage: 'transport detail',
         retryable: !overloaded,
       });
     }

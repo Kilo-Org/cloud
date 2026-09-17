@@ -3060,6 +3060,12 @@
     "privacy": "Hap Kilo për të parë agjentët",
     "openAgents": "Hap agjentët",
     "needsInput": "Pret përgjigje",
+    "newestSession": "Më i riu: {{title}}",
+    "noneWaiting": "Asnjë agjent në pritje",
+    "newAgent": "Agjent i ri",
+    "approving": "Po miratohet...",
+    "couldNotApprove": "Miratimi dështoi",
+    "couldNotStart": "Nisja dështoi",
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
   },

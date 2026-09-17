@@ -3060,6 +3060,12 @@
     "privacy": "ایجنٹس دیکھنے کے لیے Kilo کھولیں",
     "openAgents": "ایجنٹس کھولیں",
     "needsInput": "ان پٹ درکار",
+    "newestSession": "تازہ ترین: {{title}}",
+    "noneWaiting": "کوئی ایجنٹ انتظار میں نہیں",
+    "newAgent": "نیا ایجنٹ",
+    "approving": "منظور کیا جا رہا ہے...",
+    "couldNotApprove": "منظور نہیں کیا جا سکا",
+    "couldNotStart": "شروع نہیں کیا جا سکا",
     "channelName": "فعال ایجنٹس",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔"
   },

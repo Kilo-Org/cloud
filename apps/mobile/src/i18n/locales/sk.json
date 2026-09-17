@@ -3108,6 +3108,12 @@
     "privacy": "Otvor Kilo a zobrazia sa agenty",
     "openAgents": "Otvoriť agenty",
     "needsInput": "Čaká na odpoveď",
+    "newestSession": "Najnovšia: {{title}}",
+    "noneWaiting": "Žiadny agent nečaká",
+    "newAgent": "Nový agent",
+    "approving": "Schvaľuje sa...",
+    "couldNotApprove": "Schválenie zlyhalo",
+    "couldNotStart": "Spustenie zlyhalo",
     "channelName": "Aktívne agenty",
     "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke."
   },

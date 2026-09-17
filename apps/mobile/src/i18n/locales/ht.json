@@ -3060,6 +3060,12 @@
     "privacy": "Louvri Kilo pou wè ajan yo",
     "openAgents": "Louvri ajan yo",
     "needsInput": "Bezwen repons",
+    "newestSession": "Pi nouvo: {{title}}",
+    "noneWaiting": "Pa gen ajan k ap tann",
+    "newAgent": "Nouvo ajan",
+    "approving": "Ap apwouve...",
+    "couldNotApprove": "Pa t kapab apwouve",
+    "couldNotStart": "Pa t kapab kòmanse",
     "channelName": "Ajan aktif",
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an."
   },

@@ -187,7 +187,7 @@ describe('androidSink start and update', () => {
     publisher.handleSessions([], CTX);
     await flushAsync();
     expect(mocks.getNotification()).toBeNull();
-    expect(getCurrentWidgetProps()?.statusLine).toBe('No work in progress');
+    expect(getCurrentWidgetProps()?.statusLine).toBe('No agents waiting');
     expect(subscriptions).toEqual(new Set(['scope']));
 
     publisher.applySnapshot(snapshotFor([{ status: 'busy' }], 1), CTX);
@@ -624,7 +624,7 @@ describe('androidSink widget publish and end', () => {
     _resetAndroidSinkForTests();
 
     expect(mocks.getNotification()).toMatchObject({
-      text: 'No work in progress',
+      text: 'No agents waiting',
       compactText: null,
     });
     expect(mocks.getRequestedNotificationDeadline()).toBe(NOW + 8000);
@@ -661,7 +661,7 @@ describe('androidSink widget publish and end', () => {
     vi.setSystemTime(NOW + 3000);
     androidSink.publish(empty);
     expect(mocks.getNotification()).toMatchObject({
-      text: 'No work in progress',
+      text: 'No agents waiting',
       compactText: null,
     });
     expect(mocks.getRequestedNotificationDeadline()).toBe(NOW + 8000);

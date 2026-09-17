@@ -3060,6 +3060,12 @@
     "privacy": "Nyisd meg a Kilo alkalmazást az ügynökök megtekintéséhez",
     "openAgents": "Ügynökök megnyitása",
     "needsInput": "Válaszra vár",
+    "newestSession": "Legújabb: {{title}}",
+    "noneWaiting": "Egyetlen ügynök sem vár",
+    "newAgent": "Új ügynök",
+    "approving": "Jóváhagyás folyamatban...",
+    "couldNotApprove": "Nem sikerült jóváhagyni",
+    "couldNotStart": "Nem sikerült elindítani",
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
   },

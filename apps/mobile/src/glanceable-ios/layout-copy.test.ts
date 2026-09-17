@@ -2,21 +2,31 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
 
-import { ACTIVE_AGENTS_LIVE_ACTIVITY_NAME, APPROVE_TARGET } from './approve-action';
 import { glanceableLayoutCopy, withGlanceableCopy } from './layout-copy';
 
-// `approve-action` imports expo-widgets, whose native module is unreachable
-// under vitest. This suite only reads the identifier it exports.
-vi.mock('expo-widgets', () => ({ addUserInteractionListener: vi.fn() }));
-
 const PLACEHOLDER = '__KILO_GLANCEABLE_COPY__';
-const LAYOUT_FILES = ['active-agents-live-activity.tsx', 'active-agents-widget.tsx'];
+const LAYOUT_FILE = 'active-agents-live-activity.tsx';
+const LAYOUT_FILES = [LAYOUT_FILE, 'active-agents-widget.tsx'];
+/**
+ * The module that routes a Live Activity press. Read, never imported: it loads
+ * the native widget modules a node test cannot.
+ */
+const INTERACTION_FILE = 'interaction.ts';
 
 const read = (file: string) => readFileSync(join(__dirname, file), 'utf8');
+
+/** The literal a source file declares for its exported `name`. */
+function declaredLiteral(file: string, name: string): string {
+  const match = new RegExp(`export const ${name} = '([^']+)'`).exec(read(file));
+  if (match === null) {
+    throw new Error(`${file} declares no ${name}`);
+  }
+  return match[1] ?? '';
+}
 
 /** Stands in for an untransformed layout, which is a function, not a string. */
 const untransformedLayout = () => null;
@@ -41,7 +51,7 @@ describe('glanceable layout copy placeholder', () => {
 });
 
 describe('glanceable approve target', () => {
-  const source = read('active-agents-live-activity.tsx');
+  const source = read(LAYOUT_FILE);
 
   /**
    * Extract one section of the returned layout object, from its key to the next
@@ -55,15 +65,16 @@ describe('glanceable approve target', () => {
     return match?.[1] ?? '';
   };
 
-  it('is a literal in the layout, equal to APPROVE_TARGET', () => {
-    // The handler matches the event's `target` against APPROVE_TARGET, and the
-    // widget process reads the target off the layout source. A `target` written
-    // as the imported identifier would be an undefined global there, so the
-    // literal is the contract: this reads the source because no widget
-    // transform runs under vitest.
+  it('is a literal in the layout, equal to the target interaction.ts routes', () => {
+    // The handler matches the event's `target` against
+    // `GLANCEABLE_APPROVE_TARGET` (interaction.ts), and the widget process reads
+    // the target off the layout source. A `target` written as the imported
+    // identifier would be an undefined global there, so the literal is the
+    // contract: this reads the sources because no widget transform runs under
+    // vitest.
     const targets = [...source.matchAll(/target=(['"])([^'"]*)\1/g)].map(match => match[2]);
-    expect(targets).toContain(APPROVE_TARGET);
-    expect(source).not.toContain('target={APPROVE_TARGET}');
+    expect(targets).toContain(declaredLiteral(INTERACTION_FILE, 'GLANCEABLE_APPROVE_TARGET'));
+    expect(source).not.toMatch(/target=\{/);
   });
 
   it('is gated on the recorded ask and the approvable count, never the count alone', () => {
@@ -130,7 +141,10 @@ describe('glanceable approve target', () => {
     // instead of a source name. The registration name still has to be this
     // value: the activity's content state carries it, and it is what makes the
     // card mirror into the Apple Watch Smart Stack.
-    expect(source).toContain(`'${ACTIVE_AGENTS_LIVE_ACTIVITY_NAME}'`);
+    expect(declaredLiteral(LAYOUT_FILE, 'LIVE_ACTIVITY_NAME')).toBe('ActiveAgentsLiveActivity');
+    expect(source).toMatch(/createLiveActivity<ContentState>\(\s*LIVE_ACTIVITY_NAME,/);
+    // The handler recognises a press from this surface by that same constant.
+    expect(read(INTERACTION_FILE)).toContain('source === LIVE_ACTIVITY_NAME');
   });
 });
 

@@ -194,33 +194,38 @@ const handleTabDebuggerRequest = async ({
       return { error: 'WebMCP execution API is unavailable.', ok: false };
     }
 
-    if (debuggerApi) {
-      return {
-        ok: true,
-        result: await evalInTab({
-          code: request.code,
-          debuggerApi,
-          tabId: request.tabId,
-          ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
-        }),
-        type: EVAL_TAB_MESSAGE,
-      };
+    if (request.type === EVAL_TAB_MESSAGE) {
+      if (debuggerApi) {
+        return {
+          ok: true,
+          result: await evalInTab({
+            code: request.code,
+            debuggerApi,
+            tabId: request.tabId,
+            ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+          }),
+          type: EVAL_TAB_MESSAGE,
+        };
+      }
+
+      if (scriptingApi) {
+        return {
+          ok: true,
+          result: await evalInTabWithScripting({
+            code: request.code,
+            scriptingApi,
+            tabId: request.tabId,
+            ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+          }),
+          type: EVAL_TAB_MESSAGE,
+        };
+      }
+
+      return { error: 'Tab evaluation API is unavailable.', ok: false };
     }
 
-    if (scriptingApi) {
-      return {
-        ok: true,
-        result: await evalInTabWithScripting({
-          code: request.code,
-          scriptingApi,
-          tabId: request.tabId,
-          ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
-        }),
-        type: EVAL_TAB_MESSAGE,
-      };
-    }
-
-    return { error: 'Tab evaluation API is unavailable.', ok: false };
+    // The browser-tool runtime is wired by its own slice; until then the message is known but unhandled.
+    return { error: 'Unsupported tab debugger request.', ok: false };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Debugger request failed.',

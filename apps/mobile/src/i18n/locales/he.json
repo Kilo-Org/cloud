@@ -2490,6 +2490,8 @@
       "replyBody": "תוכן התשובה",
       "replyForbidden": "אין לך הרשאה להשיב לבקשת המשיכה הזו.",
       "addCommentCta": "הגב על בקשת המשיכה הזו",
+      "fixWithKilo": "תקן עם Kilo",
+      "fixWithKiloPrompt": "נא לטפל בתגובה הבאה על בקשת המשיכה: {{link}}",
       "commentBadRequest": "לא ניתן לפרסם את התגובה הזו. ייתכן שבקשת המשיכה השתנתה.",
       "commentForbidden": "אין לך הרשאה להגיב על בקשת המשיכה הזו.",
       "replyPlaceholder": "תשובה…",

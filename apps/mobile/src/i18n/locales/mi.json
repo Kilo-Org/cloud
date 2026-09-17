@@ -480,6 +480,8 @@
       "replyBadRequest": "Kāore e taea te tuku i tēnei whakautu. Kua rerekē pea te aho kōrero.",
       "replyForbidden": "Kāore koe e whakaaetia kia whakautu ki tēnei tono kume.",
       "addCommentCta": "Tāpiri kōrero ki tēnei tono kume",
+      "fixWithKilo": "Whakatika mā Kilo",
+      "fixWithKiloPrompt": "Tēnā koa, whakatika i te kōrero e whai ake nei mō te tono kume: {{link}}",
       "commentBadRequest": "Kāore e taea te tuku i tēnei kōrero. Kua rerekē pea te tono kume.",
       "commentForbidden": "Kāore koe e whakaaetia kia tāpiri kōrero ki tēnei tono kume.",
       "moderation": {

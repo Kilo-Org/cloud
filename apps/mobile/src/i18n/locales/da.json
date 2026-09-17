@@ -480,6 +480,8 @@
       "replyBadRequest": "Dette svar kan ikke sendes. Tråden kan have ændret sig.",
       "replyForbidden": "Du har ikke tilladelse til at svare på denne pull request.",
       "addCommentCta": "Kommenter på denne pull request",
+      "fixWithKilo": "Ret med Kilo",
+      "fixWithKiloPrompt": "Håndter venligst følgende kommentar på pull requesten: {{link}}",
       "commentBadRequest": "Denne kommentar kan ikke sendes. Pull requesten kan have ændret sig.",
       "commentForbidden": "Du har ikke tilladelse til at kommentere på denne pull request.",
       "moderation": {

@@ -2505,6 +2505,8 @@
       "replyBody": "Treść odpowiedzi",
       "replyForbidden": "Nie masz uprawnień do odpowiadania w tym PR.",
       "addCommentCta": "Skomentuj ten PR",
+      "fixWithKilo": "Napraw z Kilo",
+      "fixWithKiloPrompt": "Rozwiąż następujący komentarz w tym PR: {{link}}",
       "commentBadRequest": "Tego komentarza nie można opublikować. PR mógł się zmienić.",
       "commentForbidden": "Nie masz uprawnień do komentowania w tym PR.",
       "replyPlaceholder": "Odpowiedź…",

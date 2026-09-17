@@ -176,9 +176,13 @@ export function useNewSessionCreator({
     // Pre-fix safe-retry rows persisted the bare `fullName` as `repo`. A GitHub
     // `owner/repo` is inherently a single-provider identity, so only GitHub
     // intents fall back to the legacy bare-name lookup: two same-named
-    // GitLab/Bitbucket rows must never share the stale retry key.
+    // GitLab/Bitbucket rows must never share the stale retry key. A pre-fix row
+    // predates sandbox picks, so a submit that carries one is a different
+    // intent: matching it would POST the pick under a pre-sandbox operation key
+    // (the server rejects it) and drop the only record of a session the server
+    // may already have admitted. Fall back only for a pick-less submit.
     const legacyIntentFingerprint =
-      selectedRepository?.platform === 'github'
+      selectedRepository?.platform === 'github' && !sandboxAllocation
         ? JSON.stringify({
             prompt,
             mode,

@@ -106,7 +106,7 @@ describe('useSandboxSelection state', () => {
     callHook('org-1');
     const allocationEffect = state.effects[0];
     expect(allocationEffect?.deps).toEqual(['org-1']);
-    expect(allocationEffect).not.toBeNull();
+    expect(allocationEffect).toBeDefined();
     allocationEffect?.effect();
     expect(state.setAllocation).toHaveBeenCalledWith(undefined);
   });

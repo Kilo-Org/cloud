@@ -853,6 +853,44 @@ describe('useNewSessionCreator sandboxAllocation', () => {
     expect(keys[1]).not.toBe(keys[0]);
     expect(prepareSessionMutate.mock.calls[1]?.[0]).not.toHaveProperty('sandboxAllocation');
   });
+
+  // A pre-fix safe-retry row (bare `fullName` repo) cannot represent a sandbox
+  // pick, so a submit that carries one must not fall back to it: reusing its
+  // key would POST the pick under a pre-sandbox operation key (a terminal
+  // rejection) and drop the only record of a session the server may already
+  // have admitted.
+  it('never reuses a pre-sandbox legacy key when a pick is submitted', async () => {
+    outboxMock.getStoredOperationKey.mockImplementation((fingerprint: string) => {
+      const parsed = JSON.parse(fingerprint) as { repo: unknown };
+      return typeof parsed.repo === 'string' && parsed.repo === 'owner/repo'
+        ? 'legacy-stored-key'
+        : null;
+    });
+
+    const creator = runCreator({ sandboxAllocation: CLOUDFLARE_SINGLE });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate).toHaveBeenCalledTimes(1);
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as {
+      operationKey: string;
+      sandboxAllocation: unknown;
+    };
+    expect(payload.operationKey).not.toBe('legacy-stored-key');
+    expect(payload.sandboxAllocation).toEqual(CLOUDFLARE_SINGLE);
+    // Only the scoped fingerprint (repo is an object) was consulted, and the
+    // legacy raw-name row was neither read nor dropped.
+    const lookedUpRepos = outboxMock.getStoredOperationKey.mock.calls.map(
+      call => (JSON.parse(call[0]) as { repo: unknown }).repo
+    );
+    expect(lookedUpRepos.every(repo => typeof repo === 'object')).toBe(true);
+    const removedRepos = outboxMock.remove.mock.calls.map(call => {
+      const parsed = JSON.parse(call[0]) as { repo: unknown };
+      return parsed.repo;
+    });
+    expect(removedRepos).not.toContain('owner/repo');
+  });
 });
 
 describe('useNewSessionCreator autoCommit', () => {

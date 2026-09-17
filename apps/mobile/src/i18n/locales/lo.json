@@ -480,6 +480,8 @@
       "replyBadRequest": "ບໍ່ສາມາດໂພດຄຳຕອບນີ້ໄດ້. ກະທູ້ອາດມີການປ່ຽນແປງແລ້ວ.",
       "replyForbidden": "ທ່ານບໍ່ມີສິດຕອບໃນຄຳຂໍລວມໂຄດນີ້.",
       "addCommentCta": "ສະແດງຄຳເຫັນໃນຄຳຂໍລວມໂຄດນີ້",
+      "fixWithKilo": "ແກ້ໄຂດ້ວຍ Kilo",
+      "fixWithKiloPrompt": "ກະລຸນາແກ້ໄຂຄຳເຫັນຕໍ່ໄປນີ້ໃນຄຳຂໍລວມໂຄດ: {{link}}",
       "commentBadRequest": "ບໍ່ສາມາດໂພດຄຳເຫັນນີ້ໄດ້. ຄຳຂໍລວມໂຄດອາດມີການປ່ຽນແປງແລ້ວ.",
       "commentForbidden": "ທ່ານບໍ່ມີສິດສະແດງຄຳເຫັນໃນຄຳຂໍລວມໂຄດນີ້.",
       "moderation": {
@@ -3073,6 +3075,12 @@
     "privacy": "ເປີດ Kilo ເພື່ອເບິ່ງເອເຈນ",
     "openAgents": "ເປີດເອເຈນ",
     "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ",
+    "newestSession": "ໃໝ່ສຸດ: {{title}}",
+    "noneWaiting": "ບໍ່ມີເອເຈນລໍຖ້າ",
+    "newAgent": "ເອເຈນໃໝ່",
+    "approving": "ກຳລັງອະນຸມັດ...",
+    "couldNotApprove": "ອະນຸມັດບໍ່ໄດ້",
+    "couldNotStart": "ເລີ່ມບໍ່ໄດ້",
     "channelName": "ເອເຈນທີ່ກຳລັງເຮັດວຽກ",
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ."
   },
@@ -3108,5 +3116,12 @@
     "remoteFound": "ຄອມພິວເຕີເຊື່ອມຕໍ່ແລ້ວ",
     "checkAgain": "ກວດສອບອີກຄັ້ງ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ການເລີ່ມເອເຈນຕ້ອງການຂໍ້ຄວາມ. ເພີ່ມຂໍ້ຄວາມແລ້ວລອງອີກຄັ້ງ.",
+      "repositoryUnknown": "Kilo ບໍ່ຮູ້ຈັກ {{repository}} ວ່າເປັນຄັງໂຄ້ດ GitHub ຫຼື GitLab. ເລືອກຄັງໂຄ້ດອື່ນໃນ Kilo.",
+      "repositoryUnsupported": "{{repository}} ເປັນຄັງໂຄ້ດ Bitbucket — ເລີ່ມເອເຈນຍັງໃຊ້ມັນບໍ່ໄດ້. ເລືອກຄັງໂຄ້ດອື່ນໃນ Kilo."
+    }
   }
 }

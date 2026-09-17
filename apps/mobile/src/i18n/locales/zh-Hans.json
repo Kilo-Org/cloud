@@ -2488,6 +2488,8 @@
       "replyBody": "回复正文",
       "replyForbidden": "你无权回复此拉取请求。",
       "addCommentCta": "评论此拉取请求",
+      "fixWithKilo": "使用 Kilo 修复",
+      "fixWithKiloPrompt": "请处理以下 PR 评论：{{link}}",
       "commentBadRequest": "无法发布此评论。此拉取请求可能已发生变化。",
       "commentForbidden": "你无权评论此拉取请求。",
       "replyPlaceholder": "回复…",
@@ -3073,6 +3075,12 @@
     "privacy": "打开 Kilo 查看智能体",
     "openAgents": "打开智能体",
     "needsInput": "等待输入",
+    "newestSession": "最新: {{title}}",
+    "noneWaiting": "没有等待中的智能体",
+    "newAgent": "新建智能体",
+    "approving": "正在批准...",
+    "couldNotApprove": "无法批准",
+    "couldNotStart": "无法启动",
     "channelName": "运行中的智能体",
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。"
   },
@@ -3108,5 +3116,12 @@
     "remoteFound": "电脑已连接",
     "checkAgain": "重新检查",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "启动智能体需要提示词。请添加提示词后重新运行。",
+      "repositoryUnknown": "Kilo 无法将 {{repository}} 识别为 GitHub 或 GitLab 仓库。请在 Kilo 中选择其他仓库。",
+      "repositoryUnsupported": "{{repository}} 是 Bitbucket 仓库——启动智能体暂时无法使用它。请在 Kilo 中选择其他仓库。"
+    }
   }
 }

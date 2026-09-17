@@ -486,6 +486,8 @@
       "replyBadRequest": "Tega odgovora ni mogoče objaviti. Nit se je morda spremenila.",
       "replyForbidden": "Nimaš dovoljenja za odgovarjanje na ta zahtevek za združitev.",
       "addCommentCta": "Komentiraj ta zahtevek za združitev",
+      "fixWithKilo": "Popravi s Kilo",
+      "fixWithKiloPrompt": "Prosimo, reši naslednji komentar v tem zahtevku za združitev: {{link}}",
       "commentBadRequest": "Tega komentarja ni mogoče objaviti. Zahtevek za združitev se je morda spremenil.",
       "commentForbidden": "Nimaš dovoljenja za komentiranje tega zahtevka za združitev.",
       "moderation": {
@@ -3121,6 +3123,12 @@
     "privacy": "Odpri Kilo za ogled agentov",
     "openAgents": "Odpri agente",
     "needsInput": "Čaka na vnos",
+    "newestSession": "Najnovejša: {{title}}",
+    "noneWaiting": "Noben agent ne čaka",
+    "newAgent": "Nov agent",
+    "approving": "Odobritev poteka...",
+    "couldNotApprove": "Odobritev ni uspela",
+    "couldNotStart": "Zagon ni uspel",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu."
   },
@@ -3156,5 +3164,12 @@
     "remoteFound": "Računalnik povezan",
     "checkAgain": "Preveri znova",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Za zagon agenta je potreben poziv. Dodaj poziv in ga znova zaženi.",
+      "repositoryUnknown": "Kilo ne prepozna {{repository}} kot repozitorij GitHub ali GitLab. Izberi drug repozitorij v Kilu.",
+      "repositoryUnsupported": "{{repository}} je repozitorij Bitbucket — Zaženi agenta ga še ne more uporabiti. Izberi drug repozitorij v Kilu."
+    }
   }
 }

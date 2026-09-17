@@ -480,6 +480,8 @@
       "replyBadRequest": "Det här svaret kan inte publiceras. Tråden kan ha ändrats.",
       "replyForbidden": "Du har inte behörighet att svara på den här PR:en.",
       "addCommentCta": "Kommentera den här PR:en",
+      "fixWithKilo": "Åtgärda med Kilo",
+      "fixWithKiloPrompt": "Hantera följande kommentar på PR:en: {{link}}",
       "commentBadRequest": "Den här kommentaren kan inte publiceras. PR:en kan ha ändrats.",
       "commentForbidden": "Du har inte behörighet att kommentera den här PR:en.",
       "moderation": {
@@ -3073,6 +3075,12 @@
     "privacy": "Öppna Kilo för att se agenter",
     "openAgents": "Öppna agenter",
     "needsInput": "Väntar på svar",
+    "newestSession": "Nyaste: {{title}}",
+    "noneWaiting": "Inga agenter väntar",
+    "newAgent": "Ny agent",
+    "approving": "Godkänner...",
+    "couldNotApprove": "Kunde inte godkänna",
+    "couldNotStart": "Kunde inte starta",
     "channelName": "Aktiva agenter",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen."
   },
@@ -3108,5 +3116,12 @@
     "remoteFound": "Dator ansluten",
     "checkAgain": "Kontrollera igen",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Starta agenten kräver en prompt. Lägg till en prompt och kör den igen.",
+      "repositoryUnknown": "Kilo känner inte igen {{repository}} som ett GitHub- eller GitLab-kodarkiv. Välj ett annat kodarkiv i Kilo.",
+      "repositoryUnsupported": "{{repository}} är ett Bitbucket-kodarkiv — Starta agenten kan ännu inte använda det. Välj ett annat kodarkiv i Kilo."
+    }
   }
 }

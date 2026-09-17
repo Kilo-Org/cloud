@@ -480,6 +480,8 @@
       "replyBadRequest": "ناتوانرێت ئەم وەڵامە بڵاو بکرێتەوە. ڕەنگە زنجیرەی گفتوگۆکە گۆڕابێت.",
       "replyForbidden": "مۆڵەتی وەڵامدانەوەی ئەم داواکارییەی ڕاکێشانت نییە.",
       "addCommentCta": "بۆچوون لەسەر ئەم داواکارییەی ڕاکێشان",
+      "fixWithKilo": "بە Kilo چاکی بکەوە",
+      "fixWithKiloPrompt": "تکایە ئەم بۆچوونەی داواکارییەی ڕاکێشان چارەسەر بکە: {{link}}",
       "commentBadRequest": "ناتوانرێت ئەم بۆچوونە بڵاو بکرێتەوە. ڕەنگە داواکارییە ڕاکێشراوەکە گۆڕابێت.",
       "commentForbidden": "مۆڵەتی بۆچوونکردن لەسەر ئەم داواکارییەی ڕاکێشانت نییە.",
       "moderation": {
@@ -3073,6 +3075,12 @@
     "privacy": "Kilo بکەرەوە بۆ بینینی ئەجێنتەکان",
     "openAgents": "ئەجێنتەکان بکەرەوە",
     "needsInput": "چاوەڕێی وەڵام",
+    "newestSession": "نوێترین: {{title}}",
+    "noneWaiting": "هیچ ئەجێنتێک چاوەڕێ ناکات",
+    "newAgent": "ئەجێنتی نوێ",
+    "approving": "لە پەسەندکردندایە...",
+    "couldNotApprove": "نەتوانرا پەسەند بکرێت",
+    "couldNotStart": "نەتوانرا دەست پێبکرێت",
     "channelName": "ئەجێنتە چالاکەکان",
     "activityKitDisabledBody": "بۆ بینینی ئەجێنتە چالاکەکان لە شاشەی قوفڵدا، چالاکییە ڕاستەوخۆکان لە ڕێکخستنەکاندا چالاک بکە."
   },
@@ -3108,5 +3116,12 @@
     "remoteFound": "کۆمپیوتەر پەیوەست بوو",
     "checkAgain": "دووبارە پشکنین بکە",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "بۆ دەستپێکردنی بریکار داواکاری پێویستە. داواکارییەک زیاد بکە و دووبارە بیخە کار.",
+      "repositoryUnknown": "Kilo {{repository}} وەک کۆگای GitHub یان GitLab ناناسێت. لە Kilo کۆگایەکی تر هەڵبژێرە.",
+      "repositoryUnsupported": "{{repository}} کۆگای Bitbucket ە — بریکار دەستپێبکە هێشتا ناتوانێت بەکاری بهێنێت. لە Kilo کۆگایەکی تر هەڵبژێرە."
+    }
   }
 }

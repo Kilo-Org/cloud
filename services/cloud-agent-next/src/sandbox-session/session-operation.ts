@@ -32,6 +32,7 @@ import {
   type SessionMessageRecord,
 } from './session-message-queue.js';
 import { applyControlPlanePreparingEvent } from './control-plane-preparing.js';
+import { logControlDiagnostic } from '../sandbox-control/diagnostics.js';
 import { persistSandboxControlSessionEvent } from './sandbox-control-event.js';
 import {
   ControlRequestError,
@@ -131,23 +132,35 @@ export async function reconcileSessionOperation(
     effects.assertScope();
     if (Date.now() >= operationDeadlineAt) throw new Error('Operation observation expired');
     const lookup = sessionOperationLookupResultSchema.parse(controlRequestResult(response));
-    if (lookup.state === 'missing') return { state: 'uncertain', reason: 'missing' };
+    const unconfirmed = (reason: 'missing' | 'unverified'): UncertainOperation => {
+      logControlDiagnostic('session_operation_reconcile', {
+        sessionId: authorization.session.sessionId,
+        messageId: authorization.messageId,
+        operation: authorization.operation,
+        operationId: authorization.operationId,
+        reason,
+        lookupState: lookup.state,
+      });
+      return { state: 'uncertain', reason };
+    };
+    if (lookup.state === 'missing') return unconfirmed('missing');
     const observed =
       lookup.state === 'completed' ? lookup.delivery.authorization : lookup.authorization;
     if (!sameSessionOperation(observed, authorization))
       throw new Error('Operation observation identity changed');
     if (
+      authorization.operation === 'session.prompt' &&
       lookup.state === 'running' &&
       lookup.executionDeadlineAt !== undefined &&
       effects.recordExecutionDeadline?.(authorization, lookup.executionDeadlineAt) === false
     )
-      return { state: 'uncertain', reason: 'unverified' };
+      return unconfirmed('unverified');
     if (lookup.state === 'completed') {
       if (
         (await persistSessionOperationDelivery(lookup.delivery, operationDeadlineAt, effects)) ===
         'unverified'
       )
-        return { state: 'uncertain', reason: 'unverified' };
+        return unconfirmed('unverified');
     }
     return lookup;
   } catch (error) {

@@ -480,6 +480,8 @@
       "replyBadRequest": "دا ځواب نه شي خپرېدای. کېدای شي د بحث لړۍ بدله شوې وي.",
       "replyForbidden": "تاسو دې پل ریکویسټ ته د ځواب ورکولو اجازه نه لرئ.",
       "addCommentCta": "په دې پل ریکویسټ باندې تبصره وکړئ",
+      "fixWithKilo": "له Kilo سره حل کړئ",
+      "fixWithKiloPrompt": "مهرباني وکړئ لاندې پل ریکویسټ تبصره حل کړئ: {{link}}",
       "commentBadRequest": "دا تبصره نه شي خپرېدای. کېدای شي پل ریکویسټ بدل شوی وي.",
       "commentForbidden": "تاسو دې پل ریکویسټ ته د تبصرې کولو اجازه نه لرئ.",
       "moderation": {
@@ -3073,6 +3075,12 @@
     "privacy": "د اجنټانو د لیدلو لپاره Kilo پرانیزئ",
     "openAgents": "اجنټان پرانیزئ",
     "needsInput": "ځواب ته اړتیا لري",
+    "newestSession": "تر ټولو نوې: {{title}}",
+    "noneWaiting": "هیڅ اجنټ انتظار نه کوي",
+    "newAgent": "نوی اجنټ",
+    "approving": "منظور کېږي...",
+    "couldNotApprove": "منظور نه شو",
+    "couldNotStart": "پیل نه شو",
     "channelName": "فعال اجنټان",
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ."
   },
@@ -3108,5 +3116,12 @@
     "remoteFound": "کمپیوټر وڌل شو",
     "checkAgain": "بیا وګورئ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "د اجنټ پیل کولو لپاره پرامپټ ته اړتیا ده. پرامپټ اضافه کړئ او بیا یې وچلوئ.",
+      "repositoryUnknown": "Kilo {{repository}} د GitHub یا GitLab زېرمتون په توګه نه پېژني. په Kilo کې بل زېرمتون وټاکئ.",
+      "repositoryUnsupported": "{{repository}} د Bitbucket زېرمتون دی — اجنټ پیل کړئ لاهم نشي کولی ترې وکار اخلي. په Kilo کې بل زېرمتون وټاکئ."
+    }
   }
 }

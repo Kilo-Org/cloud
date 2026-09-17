@@ -2488,6 +2488,8 @@
       "replyBody": "उत्तर का टेक्स्ट",
       "replyForbidden": "आपको इस पुल रिक्वेस्ट पर उत्तर देने की अनुमति नहीं है।",
       "addCommentCta": "इस पुल रिक्वेस्ट पर टिप्पणी करें",
+      "fixWithKilo": "Kilo के साथ ठीक करें",
+      "fixWithKiloPrompt": "कृपया निम्नलिखित पुल रिक्वेस्ट टिप्पणी को सुलझाएँ: {{link}}",
       "commentBadRequest": "यह टिप्पणी पोस्ट नहीं की जा सकती। हो सकता है कि पुल रिक्वेस्ट बदल गया हो।",
       "commentForbidden": "आपको इस पुल रिक्वेस्ट पर टिप्पणी करने की अनुमति नहीं है।",
       "replyPlaceholder": "आपका उत्तर…",
@@ -3073,6 +3075,12 @@
     "privacy": "एजेंट देखने के लिए Kilo खोलें",
     "openAgents": "एजेंट खोलें",
     "needsInput": "इनपुट चाहिए",
+    "newestSession": "सबसे नया: {{title}}",
+    "noneWaiting": "कोई एजेंट प्रतीक्षा में नहीं",
+    "newAgent": "नया एजेंट",
+    "approving": "स्वीकृत किया जा रहा है...",
+    "couldNotApprove": "स्वीकृत नहीं किया जा सका",
+    "couldNotStart": "शुरू नहीं किया जा सका",
     "channelName": "सक्रिय एजेंट",
     "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।"
   },
@@ -3108,5 +3116,12 @@
     "remoteFound": "कंप्यूटर कनेक्ट हो गया",
     "checkAgain": "फ़िर से जाँचें",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "एजेंट शुरू करने के लिए प्रॉम्प्ट चाहिए। एक प्रॉम्प्ट जोड़ें और इसे फिर से चलाएँ।",
+      "repositoryUnknown": "Kilo, {{repository}} को GitHub या GitLab रिपॉज़िटरी के रूप में नहीं पहचानता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।",
+      "repositoryUnsupported": "{{repository}} एक Bitbucket रिपॉज़िटरी है — एजेंट शुरू करें अभी इसका उपयोग नहीं कर सकता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।"
+    }
   }
 }

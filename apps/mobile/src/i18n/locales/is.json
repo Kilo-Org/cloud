@@ -480,6 +480,8 @@
       "replyBadRequest": "Ekki er hægt að birta þetta svar. Þráðurinn gæti hafa breyst.",
       "replyForbidden": "Þú hefur ekki heimild til að svara þessari sameiningarbeiðni.",
       "addCommentCta": "Gera athugasemd við þessa sameiningarbeiðni",
+      "fixWithKilo": "Laga með Kilo",
+      "fixWithKiloPrompt": "Vinsamlegast fjallaðu um eftirfarandi athugasemd við sameiningarbeiðnina: {{link}}",
       "commentBadRequest": "Ekki er hægt að birta þessa athugasemd. Sameiningarbeiðnin gæti hafa breyst.",
       "commentForbidden": "Þú hefur ekki heimild til að gera athugasemd við þessa sameiningarbeiðni.",
       "moderation": {
@@ -3073,6 +3075,12 @@
     "privacy": "Opnaðu Kilo til að sjá fulltrúa",
     "openAgents": "Opna fulltrúa",
     "needsInput": "Bíður eftir svari",
+    "newestSession": "Nýjasta: {{title}}",
+    "noneWaiting": "Enginn fulltrúi bíður",
+    "newAgent": "Nýr fulltrúi",
+    "approving": "Samþykkir...",
+    "couldNotApprove": "Gat ekki samþykkt",
+    "couldNotStart": "Gat ekki ræst",
     "channelName": "Virkir fulltrúar",
     "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum."
   },
@@ -3108,5 +3116,12 @@
     "remoteFound": "Tölva tengd",
     "checkAgain": "Athuga aftur",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Ræsa fulltrúa krefst skilaboða. Bættu við skilaboðum og keyrðu aftur.",
+      "repositoryUnknown": "Kilo þekkir ekki {{repository}} sem GitHub- eða GitLab-kóðasafn. Veldu annað kóðasafn í Kilo.",
+      "repositoryUnsupported": "{{repository}} er Bitbucket-kóðasafn — Ræsa fulltrúa getur ekki notað það enn. Veldu annað kóðasafn í Kilo."
+    }
   }
 }

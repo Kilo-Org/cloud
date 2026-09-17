@@ -96,7 +96,8 @@ async function buildProviderForTest() {
 
 async function transformResponsesRequest(
   provider: Awaited<ReturnType<typeof buildProviderForTest>>,
-  body: GatewayResponsesRequest
+  body: GatewayResponsesRequest,
+  sessionId: string | null = null
 ): Promise<Record<string, string>> {
   const extraHeaders: Record<string, string> = {};
   await provider.transformRequest({
@@ -108,7 +109,7 @@ async function transformResponsesRequest(
     userByok: null,
     kilo_user_id: USER_ID,
     organization_id: null,
-    session_id: null,
+    session_id: sessionId,
   });
   return extraHeaders;
 }
@@ -252,6 +253,45 @@ describe('checkOpenAiChatGptByok', () => {
     expect('conversation' in body).toBe(false);
     expect('background' in body).toBe(false);
     expect('provider' in body).toBe(false);
+    // OpenAI requires the traceability metadata on every delegated request.
+    expect(body.metadata).toEqual({
+      subscription_sharing_activity: 'coding_agent',
+      subscription_sharing_purpose: "Run the user's coding task in Kilo Code.",
+    });
+  });
+
+  it('reports the run id and keeps caller metadata when a session is present', async () => {
+    const provider = await buildProviderForTest();
+    const body: GatewayResponsesRequest = {
+      model: 'openai/gpt-5-nano',
+      input: 'hello',
+      metadata: { user_key: 'user_value' },
+    };
+
+    await transformResponsesRequest(provider, body, 'sess_abc');
+
+    expect(body.metadata).toEqual({
+      user_key: 'user_value',
+      subscription_sharing_activity: 'coding_agent',
+      subscription_sharing_purpose: "Run the user's coding task in Kilo Code.",
+      subscription_sharing_activity_id: 'sess_abc',
+    });
+  });
+
+  it('keeps the required metadata keys when caller metadata fills the entry limit', async () => {
+    const provider = await buildProviderForTest();
+    const metadata = Object.fromEntries(
+      Array.from({ length: 16 }, (_, index) => [`k${index}`, `v${index}`])
+    );
+    const body: GatewayResponsesRequest = { model: 'openai/gpt-5-nano', input: 'hello', metadata };
+
+    await transformResponsesRequest(provider, body, 'sess_limit');
+
+    const result = body.metadata as Record<string, string>;
+    expect(Object.keys(result)).toHaveLength(16);
+    expect(result.subscription_sharing_activity).toBe('coding_agent');
+    expect(result.subscription_sharing_purpose).toBe("Run the user's coding task in Kilo Code.");
+    expect(result.subscription_sharing_activity_id).toBe('sess_limit');
   });
 
   it('sends the partner key as Authorization and the delegated token upstream', async () => {

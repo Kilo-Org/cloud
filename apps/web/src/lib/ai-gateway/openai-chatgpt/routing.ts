@@ -34,6 +34,46 @@ export const OPENAI_ON_BEHALF_OF_TOKEN_HEADER = 'OpenAI-On-Behalf-Of-Token';
 /** The gateway addresses this model as `openai/...`; api.openai.com does not. */
 const OPENAI_MODEL_PREFIX = /^openai\//i;
 
+/**
+ * OpenAI's traceability metadata for subscription sharing. The activity type is
+ * stable for the integration; the purpose is a short, human-readable reason and
+ * must never contain prompt, document, or credential content.
+ */
+const OPENAI_CHATGPT_ACTIVITY = 'coding_agent';
+const OPENAI_CHATGPT_PURPOSE = "Run the user's coding task in Kilo Code.";
+
+/** OpenAI's metadata limits: 16 entries and 512 characters per value. */
+const METADATA_ENTRY_LIMIT = 16;
+const METADATA_VALUE_LIMIT = 512;
+
+/**
+ * Adds the required traceability keys to the request metadata, keeping any
+ * caller-supplied entries. `session_id` is the gateway's identifier for one
+ * run, which is what `subscription_sharing_activity_id` expects; it is optional
+ * and is omitted when absent. When the merge would exceed the entry limit the
+ * caller's oldest entries are dropped before the required ones.
+ */
+function withTraceabilityMetadata(
+  metadata: Record<string, string> | null | undefined,
+  sessionId: string | null
+): Record<string, string> {
+  const traceability: Record<string, string> = {
+    subscription_sharing_activity: OPENAI_CHATGPT_ACTIVITY,
+    subscription_sharing_purpose: OPENAI_CHATGPT_PURPOSE,
+  };
+  const activityId = sessionId?.trim() ?? '';
+  if (activityId !== '' && activityId.length <= METADATA_VALUE_LIMIT) {
+    traceability.subscription_sharing_activity_id = activityId;
+  }
+
+  const merged: Record<string, string> = { ...(metadata ?? {}), ...traceability };
+  const removable = Object.keys(merged).filter(key => !(key in traceability));
+  while (Object.keys(merged).length > METADATA_ENTRY_LIMIT && removable.length > 0) {
+    delete merged[removable.shift() as string];
+  }
+  return merged;
+}
+
 export type OpenAiChatGptRoutingInput = {
   request: GatewayRequest;
   requestedModel: string;
@@ -130,6 +170,14 @@ export function buildOpenAiChatGptProvider(apiKey: string, accessToken: string):
       // api.openai.com rejects unknown request arguments, exactly like the
       // other raw upstream providers strip it.
       delete body.provider;
+      // `applyTrackingIds` writes `user` for OpenRouter's benefit; the Responses
+      // API replaced it with `safety_identifier`, which is kept, and rejects the
+      // deprecated field.
+      delete body.user;
+      // OpenAI requires this traceability metadata on every delegated Responses
+      // request, including later turns. Without it the request is rejected once
+      // the integration is enabled for it.
+      body.metadata = withTraceabilityMetadata(body.metadata, context.session_id);
     },
   };
 }

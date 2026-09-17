@@ -480,6 +480,8 @@
       "replyBadRequest": "Le mpendulo ayikwazi ukuthunyelwa. Kungenzeka uchungechunge lwengxoxo lushintshile.",
       "replyForbidden": "Awunayo imvume yokuphendula kulesi sicelo sokuhlanganisa.",
       "addCommentCta": "Phawula kulesi sicelo sokuhlanganisa",
+      "fixWithKilo": "Lungisa nge-Kilo",
+      "fixWithKiloPrompt": "Sicela ubhekane nokuphawula okulandelayo kwesicelo sokuhlanganisa: {{link}}",
       "commentBadRequest": "Le phawula ayikwazi ukuthunyelwa. Kungenzeka lesi sicelo sokuhlanganisa sishintshile.",
       "commentForbidden": "Awunayo imvume yokuphawula kulesi sicelo sokuhlanganisa.",
       "moderation": {

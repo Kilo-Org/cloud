@@ -483,6 +483,8 @@
       "replyBadRequest": "Ovaj odgovor se ne može objaviti. Nit se možda promijenila.",
       "replyForbidden": "Nemaš dozvolu da odgovoriš na ovaj zahtjev za spajanje.",
       "addCommentCta": "Komentariši ovaj zahtjev za spajanje",
+      "fixWithKilo": "Popravi s Kilo",
+      "fixWithKiloPrompt": "Molim te riješi sljedeći komentar na zahtjevu za spajanje: {{link}}",
       "commentBadRequest": "Ovaj komentar se ne može objaviti. Zahtjev za spajanje se možda promijenio.",
       "commentForbidden": "Nemaš dozvolu da komentarišeš ovaj zahtjev za spajanje.",
       "moderation": {

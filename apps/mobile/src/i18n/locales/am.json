@@ -480,6 +480,8 @@
       "replyBadRequest": "ይህን ምላሽ መለጠፍ አይቻልም። የውይይት ሰንሰለቱ ተለውጦ ሊሆን ይችላል።",
       "replyForbidden": "ለዚህ የማዋሃድ ጥያቄ ምላሽ ለመስጠት ፈቃድ የለህም።",
       "addCommentCta": "በዚህ የማዋሃድ ጥያቄ ላይ አስተያየት ስጥ",
+      "fixWithKilo": "በKilo አስተካክል",
+      "fixWithKiloPrompt": "እባክህ የሚከተለውን የማዋሃድ ጥያቄ አስተያየት አስተካክል፦ {{link}}",
       "commentBadRequest": "ይህ አስተያየት መለጠፍ አይቻልም። የማዋሃዱ ጥያቄ ተለውጦ ሊሆን ይችላል።",
       "commentForbidden": "በዚህ የማዋሃድ ጥያቄ ላይ አስተያየት ለመስጠት ፈቃድ የለህም።",
       "moderation": {

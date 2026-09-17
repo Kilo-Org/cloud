@@ -2475,6 +2475,8 @@
       "replyBody": "Nội dung trả lời",
       "replyForbidden": "Bạn không có quyền trả lời trong PR này.",
       "addCommentCta": "Bình luận trong PR này",
+      "fixWithKilo": "Sửa bằng Kilo",
+      "fixWithKiloPrompt": "Vui lòng xử lý bình luận PR sau: {{link}}",
       "commentBadRequest": "Không thể đăng bình luận này. PR có thể đã thay đổi.",
       "commentForbidden": "Bạn không có quyền bình luận trong PR này.",
       "replyPlaceholder": "Trả lời…",

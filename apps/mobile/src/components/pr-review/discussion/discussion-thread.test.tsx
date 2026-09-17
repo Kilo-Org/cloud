@@ -264,6 +264,28 @@ describe('DiscussionThread expanded card', () => {
   });
 });
 
+describe('DiscussionThread comment row CTA scope (s2)', () => {
+  it('passes the provider triple and the review kind to each comment row', async () => {
+    const thread = makeThread();
+    const renderer = await render(
+      createElement(DiscussionThread, { ...baseProps, thread, expanded: true })
+    );
+
+    const row = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'CommentRow'
+    );
+    expect(row.props).toMatchObject({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentKind: 'review',
+      comment: { commentId: 1 },
+    });
+
+    renderer.unmount();
+  });
+});
+
 describe('DiscussionThread anchor label', () => {
   it('renders anchor Text single-line with flex-1 class', async () => {
     const thread = makeThread();

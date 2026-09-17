@@ -489,6 +489,8 @@
       "replyBadRequest": "Ní féidir an freagra seo a phostáil. Seans gur athraíodh an snáithe.",
       "replyForbidden": "Níl cead agat freagra a thabhairt ar an iarratas tarraingthe seo.",
       "addCommentCta": "Trácht ar an iarratas tarraingthe seo",
+      "fixWithKilo": "Deisigh le Kilo",
+      "fixWithKiloPrompt": "Le do thoil, déileáil leis an trácht seo a leanas ar an iarratas tarraingthe: {{link}}",
       "commentBadRequest": "Ní féidir an trácht seo a phostáil. Seans gur athraíodh an t-iarratas tarraingthe.",
       "commentForbidden": "Níl cead agat trácht a dhéanamh ar an iarratas tarraingthe seo.",
       "moderation": {

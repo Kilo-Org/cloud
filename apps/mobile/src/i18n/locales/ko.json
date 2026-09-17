@@ -2475,6 +2475,8 @@
       "replyBody": "답글 내용",
       "replyForbidden": "이 풀 리퀘스트에 답글을 달 권한이 없습니다.",
       "addCommentCta": "이 풀 리퀘스트에 댓글 달기",
+      "fixWithKilo": "Kilo로 수정",
+      "fixWithKiloPrompt": "다음 풀 리퀘스트 댓글을 처리해 주세요: {{link}}",
       "commentBadRequest": "이 댓글을 게시할 수 없습니다. 풀 리퀘스트가 변경되었을 수 있습니다.",
       "commentForbidden": "이 풀 리퀘스트에 댓글을 달 권한이 없습니다.",
       "replyPlaceholder": "답글…",

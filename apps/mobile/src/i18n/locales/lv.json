@@ -483,6 +483,8 @@
       "replyBadRequest": "Šo atbildi nevar publicēt. Pavediens, iespējams, ir mainījies.",
       "replyForbidden": "Tev nav atļaujas atbildēt šajā izmaiņu pieprasījumā.",
       "addCommentCta": "Komentēt šo izmaiņu pieprasījumu",
+      "fixWithKilo": "Novērst ar Kilo",
+      "fixWithKiloPrompt": "Lūdzu, risini šo izmaiņu pieprasījuma komentāru: {{link}}",
       "commentBadRequest": "Šo komentāru nevar publicēt. Iespējams, izmaiņu pieprasījums ir mainījies.",
       "commentForbidden": "Tev nav atļaujas komentēt šajā izmaiņu pieprasījumā.",
       "moderation": {

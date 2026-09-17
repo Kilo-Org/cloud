@@ -480,6 +480,8 @@
       "replyBadRequest": "Enweghị ike ibipụta azịza a. O nwere ike ịbụ na usoro mkparịta ụka ahụ agbanweela.",
       "replyForbidden": "Ị nweghị ikike ịzaghachi arịrịọ njikọta a.",
       "addCommentCta": "Nye nkwupụta na arịrịọ njikọta a",
+      "fixWithKilo": "Dozie na Kilo",
+      "fixWithKiloPrompt": "Biko dozie nkwupụta a na arịrịọ njikọta: {{link}}",
       "commentBadRequest": "Enweghị ike ibipụta nkwupụta a. O nwere ike ịbụ na arịrịọ njikọta a agbanweela.",
       "commentForbidden": "Ị nweghị ikike inye nkwupụta na arịrịọ njikọta a.",
       "moderation": {

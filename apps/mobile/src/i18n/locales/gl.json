@@ -480,6 +480,8 @@
       "replyBadRequest": "Non se pode publicar esta resposta. Pode que o fío cambiase.",
       "replyForbidden": "Non tes permiso para responder a esta solicitude de integración.",
       "addCommentCta": "Comentar esta solicitude de integración",
+      "fixWithKilo": "Corrixir con Kilo",
+      "fixWithKiloPrompt": "Atende o seguinte comentario da solicitude de integración: {{link}}",
       "commentBadRequest": "Non se pode publicar este comentario. Pode que a solicitude de integración cambiase.",
       "commentForbidden": "Non tes permiso para comentar nesta solicitude de integración.",
       "moderation": {

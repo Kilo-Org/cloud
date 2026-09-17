@@ -486,6 +486,8 @@
       "replyBadRequest": "Tuto odpověď nelze odeslat. Vlákno se možná změnilo.",
       "replyForbidden": "Nemáš oprávnění odpovídat v tomto PR.",
       "addCommentCta": "Okomentovat tento PR",
+      "fixWithKilo": "Opravit s Kilo",
+      "fixWithKiloPrompt": "Vyřeš prosím následující komentář k PR: {{link}}",
       "commentBadRequest": "Tento komentář nelze odeslat. PR se možná změnil.",
       "commentForbidden": "Nemáš oprávnění komentovat tento PR.",
       "moderation": {

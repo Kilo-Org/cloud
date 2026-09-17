@@ -2475,6 +2475,8 @@
       "replyBody": "返信の本文",
       "replyForbidden": "このプルリクエストに返信する権限がありません。",
       "addCommentCta": "このプルリクエストにコメントする",
+      "fixWithKilo": "Kiloで修正",
+      "fixWithKiloPrompt": "次のプルリクエストのコメントに対応してください：{{link}}",
       "commentBadRequest": "このコメントは投稿できません。プルリクエストが変更された可能性があります。",
       "commentForbidden": "このプルリクエストにコメントする権限がありません。",
       "replyPlaceholder": "返信…",

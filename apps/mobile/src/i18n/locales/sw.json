@@ -480,6 +480,8 @@
       "replyBadRequest": "Jibu hili haliwezi kuchapishwa. Mada huenda imebadilika.",
       "replyForbidden": "Huna ruhusa ya kujibu ombi hili la kuunganisha.",
       "addCommentCta": "Toa maoni kwenye ombi hili la kuunganisha",
+      "fixWithKilo": "Suluhisha kwa Kilo",
+      "fixWithKiloPrompt": "Tafadhali shughulikia maoni yafuatayo kwenye ombi hili la kuunganisha: {{link}}",
       "commentBadRequest": "Maoni haya haliwezi kuchapishwa. Huenda ombi hili la kuunganisha likabadilika.",
       "commentForbidden": "Huna ruhusa ya kutoa maoni kwenye ombi hili la kuunganisha.",
       "moderation": {

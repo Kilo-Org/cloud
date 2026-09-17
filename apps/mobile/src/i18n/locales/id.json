@@ -2475,6 +2475,8 @@
       "replyBody": "Isi balasan",
       "replyForbidden": "Kamu tidak memiliki izin untuk membalas PR ini.",
       "addCommentCta": "Komentari PR ini",
+      "fixWithKilo": "Perbaiki dengan Kilo",
+      "fixWithKiloPrompt": "Mohon tangani komentar PR berikut: {{link}}",
       "commentBadRequest": "Komentar ini tidak dapat dikirim. PR mungkin sudah berubah.",
       "commentForbidden": "Kamu tidak memiliki izin untuk berkomentar di PR ini.",
       "replyPlaceholder": "Balasan…",

@@ -2475,6 +2475,8 @@
       "replyBody": "回复正文",
       "replyForbidden": "你无权回复此拉取请求。",
       "addCommentCta": "评论此拉取请求",
+      "fixWithKilo": "使用 Kilo 修复",
+      "fixWithKiloPrompt": "请处理以下 PR 评论：{{link}}",
       "commentBadRequest": "无法发布此评论。此拉取请求可能已发生变化。",
       "commentForbidden": "你无权评论此拉取请求。",
       "replyPlaceholder": "回复…",

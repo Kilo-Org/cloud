@@ -480,6 +480,8 @@
       "replyBadRequest": "Jawaabtan lama daabici karo. Waxaa laga yaabaa in dooddu isbeddeshay.",
       "replyForbidden": "Ma haysatid oggolaansho aad uga jawaabto codsigan isku-darka.",
       "addCommentCta": "Faallo ku dari codsigan isku-darka",
+      "fixWithKilo": "Ku xalli Kilo",
+      "fixWithKiloPrompt": "Fadlan wax ka qabo faallada soo socota ee codsigan isku-darka: {{link}}",
       "commentBadRequest": "Faalladan lama daabici karo. Waxaa laga yaabaa in codsiga isku-darku isbeddelay.",
       "commentForbidden": "Ma haysatid oggolaansho aad faallo ku darto codsigan isku-darka.",
       "moderation": {

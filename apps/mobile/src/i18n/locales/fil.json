@@ -480,6 +480,8 @@
       "replyBadRequest": "Hindi ma-post ang sagot na ito. Maaaring nagbago ang talakayan.",
       "replyForbidden": "Wala kang pahintulot na sumagot sa pull request na ito.",
       "addCommentCta": "Magkomento sa pull request na ito",
+      "fixWithKilo": "Ayusin gamit ang Kilo",
+      "fixWithKiloPrompt": "Pakisagawa ang sumusunod na komento sa pull request: {{link}}",
       "commentBadRequest": "Hindi ma-post ang komentong ito. Maaaring nagbago ang pull request.",
       "commentForbidden": "Wala kang pahintulot na magkomento sa pull request na ito.",
       "moderation": {

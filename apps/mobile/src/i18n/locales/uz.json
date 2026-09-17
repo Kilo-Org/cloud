@@ -480,6 +480,8 @@
       "replyBadRequest": "Bu javobni joylab bo'lmaydi. Izohlar zanjiri o'zgargan bo'lishi mumkin.",
       "replyForbidden": "Bu PRga javob yozishga ruxsatingiz yo'q.",
       "addCommentCta": "Bu PRga izoh yozish",
+      "fixWithKilo": "Kilo bilan tuzatish",
+      "fixWithKiloPrompt": "Iltimos, quyidagi PR izohini hal qiling: {{link}}",
       "commentBadRequest": "Bu izohni joylab bo'lmaydi. PR o'zgargan bo'lishi mumkin.",
       "commentForbidden": "Bu PRga izoh yozishga ruxsatingiz yo'q.",
       "moderation": {

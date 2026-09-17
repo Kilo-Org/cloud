@@ -483,6 +483,8 @@
       "replyBadRequest": "Aquesta resposta no es pot publicar. Pot ser que el fil hagi canviat.",
       "replyForbidden": "No tens permís per respondre a aquesta sol·licitud d'integració.",
       "addCommentCta": "Comenta aquesta sol·licitud d'integració",
+      "fixWithKilo": "Resol-ho amb Kilo",
+      "fixWithKiloPrompt": "Si us plau, resol el següent comentari de la sol·licitud d'integració: {{link}}",
       "commentBadRequest": "Aquest comentari no es pot publicar. Pot ser que la sol·licitud d'integració hagi canviat.",
       "commentForbidden": "No tens permís per comentar aquesta sol·licitud d'integració.",
       "moderation": {

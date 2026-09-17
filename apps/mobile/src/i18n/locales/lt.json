@@ -486,6 +486,8 @@
       "replyBadRequest": "Šio atsakymo negalima paskelbti. Gija galėjo pasikeisti.",
       "replyForbidden": "Neturi teisės atsakyti šios pakeitimų užklausos diskusijoje.",
       "addCommentCta": "Komentuoti šią pakeitimų užklausą",
+      "fixWithKilo": "Ištaisyti su Kilo",
+      "fixWithKiloPrompt": "Prašome išspręsti šį pakeitimų užklausos komentarą: {{link}}",
       "commentBadRequest": "Šio komentaro negalima paskelbti. Pakeitimų užklausa galėjo pasikeisti.",
       "commentForbidden": "Neturi teisės komentuoti šios pakeitimų užklausos.",
       "moderation": {

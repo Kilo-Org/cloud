@@ -463,9 +463,8 @@ function CodeBlockImpl({
   // Until the label is measured the same pill renders hidden, purely to report
   // its width; it unmounts as soon as the gutter is reserved, so a hidden "Copy"
   // never lingers in the accessibility tree.
-  const copyActionMeasuring = canCopyCode && copyActionWidth === null;
   const copyAction =
-    copyActionRevealed || copyActionMeasuring ? (
+    copyActionRevealed || (canCopyCode && copyActionWidth === null) ? (
       <Pressable
         onPress={copyActionRevealed ? handleCopyCode : undefined}
         onLayout={handleCopyActionLayout}

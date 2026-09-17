@@ -16,6 +16,39 @@ function makePart(id: string, text = '', messageID = 'm'): Part {
   return { id, sessionID: 's', messageID, type: 'text', text } as Part;
 }
 
+function makeToolPart(
+  id: string,
+  status: 'pending' | 'running' | 'completed' | 'error',
+  time?: { start: number; end?: number },
+  messageID = 'm'
+): Part {
+  const base = { id, sessionID: 's', messageID, type: 'tool', callID: `call-${id}`, tool: 'task' };
+  if (status === 'pending') {
+    return { ...base, state: { status, input: {}, raw: '' } } as Part;
+  }
+  if (status === 'running') {
+    return { ...base, state: { status, input: {}, raw: '', time: time ?? { start: 1 } } } as Part;
+  }
+  return {
+    ...base,
+    state: {
+      status,
+      input: {},
+      raw: '',
+      ...(status === 'completed'
+        ? { output: 'done', title: 'task', metadata: {} }
+        : { error: 'boom' }),
+      time: time ?? { start: 1, end: 2 },
+    },
+  } as Part;
+}
+
+function toolStatus(parts: Part[], id: string): string {
+  const part = parts.find(p => p.id === id);
+  if (!part || part.type !== 'tool') throw new Error(`tool part ${id} missing`);
+  return part.state.status;
+}
+
 describe('insertSorted', () => {
   test('inserts into empty array', () => {
     expect(insertSorted([], 'b')).toEqual(['b']);
@@ -138,6 +171,105 @@ describe('upsertPartDroppingStaleSyntheticParts', () => {
     const result = upsertPartDroppingStaleSyntheticParts([syntheticFile], realFile);
 
     expect(result.map(part => part.id)).toEqual(['msg-1-file-0', 'prt-file']);
+  });
+});
+
+describe('tool part lifecycle ordering', () => {
+  test('drops a terminal update whose event time predates the stored running update', () => {
+    const arr = upsertPartDroppingStaleSyntheticParts([], makeToolPart('p-1', 'running'), 200);
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed'),
+      150
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+    expect(result).toBe(arr);
+  });
+
+  test('drops a terminal update that carries no event time over a live running task', () => {
+    const arr = [makeToolPart('p-1', 'running')];
+    const result = upsertPartDroppingStaleSyntheticParts(arr, makeToolPart('p-1', 'completed'));
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('keeps the recorded event time across a no-time re-delivery so a stale terminal still loses', () => {
+    const arr = upsertPartDroppingStaleSyntheticParts([], makeToolPart('p-1', 'running'), 200);
+    const replayed = upsertPartDroppingStaleSyntheticParts(arr, makeToolPart('p-1', 'running'));
+    const result = upsertPartDroppingStaleSyntheticParts(
+      replayed,
+      makeToolPart('p-1', 'completed'),
+      150
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('applies a terminal that postdates the event time kept across a no-time re-delivery', () => {
+    const arr = upsertPartDroppingStaleSyntheticParts([], makeToolPart('p-1', 'running'), 200);
+    const replayed = upsertPartDroppingStaleSyntheticParts(arr, makeToolPart('p-1', 'running'));
+    const result = upsertPartDroppingStaleSyntheticParts(
+      replayed,
+      makeToolPart('p-1', 'completed'),
+      250
+    );
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('applies a terminal update whose event time postdates the stored running update', () => {
+    const arr = [makeToolPart('p-1', 'running')];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed'),
+      250
+    );
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('drops a stale running update that would downgrade a pending task', () => {
+    const arr = upsertPartDroppingStaleSyntheticParts([], makeToolPart('p-1', 'pending'), 300);
+    const result = upsertPartDroppingStaleSyntheticParts(arr, makeToolPart('p-1', 'running'), 100);
+    expect(toolStatus(result, 'p-1')).toBe('pending');
+  });
+
+  test('pending never overrides running', () => {
+    const arr = [makeToolPart('p-1', 'running')];
+    const result = upsertPartDroppingStaleSyntheticParts(arr, makeToolPart('p-1', 'pending'));
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('running never overrides a terminal state', () => {
+    const arr = [makeToolPart('p-1', 'completed')];
+    const result = upsertPartDroppingStaleSyntheticParts(arr, makeToolPart('p-1', 'running'), 500);
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('settles terminal vs terminal by the tool state time when no event time exists', () => {
+    const arr = [makeToolPart('p-1', 'completed', { start: 1, end: 5 })];
+    const older = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'error', { start: 1, end: 4 })
+    );
+    expect(toolStatus(older, 'p-1')).toBe('completed');
+
+    const newer = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'error', { start: 1, end: 6 })
+    );
+    expect(toolStatus(newer, 'p-1')).toBe('error');
+  });
+
+  test('first settled terminal wins when no ordering evidence exists at all', () => {
+    const arr = [makeToolPart('p-1', 'completed', { start: 1, end: 5 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1, end: 5 })
+    );
+    expect(result).toBe(arr);
+  });
+
+  test('leaves non-tool parts unordered', () => {
+    const arr = [makePart('p-1', 'first')];
+    const result = upsertPartDroppingStaleSyntheticParts(arr, makePart('p-1', 'second'), 1);
+    expect((result[0] as Part & { text: string }).text).toBe('second');
   });
 });
 

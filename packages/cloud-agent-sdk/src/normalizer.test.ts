@@ -175,6 +175,33 @@ describe('normalize', () => {
       const part = { id: 'p-1', sessionID: 'ses-1', messageID: 1 };
       expect(normalize(createRaw('message.part.updated', { part }))).toBeNull();
     });
+
+    it('carries the event time so downstream merges can order by event time', () => {
+      const part = {
+        id: 'p-1',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'tool',
+      };
+      const result = normalize(
+        createRaw('message.part.updated', { part, time: 1_772_214_640_111 })
+      );
+      expect(result).toEqual({
+        type: 'message.part.updated',
+        part,
+        time: 1_772_214_640_111,
+      });
+    });
+
+    it('omits the event time when the wire payload has none', () => {
+      const part = {
+        id: 'p-1',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'text',
+      };
+      expect(normalize(createRaw('message.part.updated', { part }))).not.toHaveProperty('time');
+    });
   });
 
   describe('message.part.delta', () => {
@@ -2050,6 +2077,20 @@ describe('normalizeCliEvent', () => {
       expect(normalizeCliEvent('message.part.updated', { part })).toEqual({
         type: 'message.part.updated',
         part,
+      });
+    });
+
+    it('carries the event time for a CLI part update without envelope', () => {
+      const part = {
+        id: 'p-1',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'tool',
+      };
+      expect(normalizeCliEvent('message.part.updated', { part, time: 42 })).toEqual({
+        type: 'message.part.updated',
+        part,
+        time: 42,
       });
     });
 

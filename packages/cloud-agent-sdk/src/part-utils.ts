@@ -70,6 +70,20 @@ export function normalizeMissingPartText(part: Part): Part {
 }
 
 /**
+ * Settle time a stored tool part carries into the lifecycle merge. Snapshot,
+ * history and cached-transcript replays deliver bare parts with no wire event
+ * time, so a settled tool state is ordered by the `time.end` it stamped when it
+ * settled. An unsettled part carries no ordering evidence.
+ */
+export function partSettledAt(part: Part): number | undefined {
+  if (part.type !== 'tool') return undefined;
+  if (part.state.status === 'completed' || part.state.status === 'error') {
+    return part.state.time.end;
+  }
+  return undefined;
+}
+
+/**
  * The concrete routed model stamped by the CLI onto step-finish parts for
  * kilo-auto turns (`{ providerID, modelID }`). Preserved at runtime on both
  * the live-stream path (`messagePartUpdatedDataSchema` uses `.passthrough()`)

@@ -293,7 +293,7 @@
     "previewFullDescription": "Powiadomienia pokazują treść wiadomości na ekranie blokady.",
     "previewGenericDescription": "Powiadomienia informują o zdarzeniach bez wyświetlania treści wiadomości. Otwórz Kilo, aby ją przeczytać.",
     "channel": {
-      "agent": "Sesje agenta",
+      "agentProgress": "Postęp agenta",
       "chat": "Wiadomości na czacie",
       "kiloclaw": "Aktywność KiloClaw",
       "balance": "Powiadomienia o saldzie",

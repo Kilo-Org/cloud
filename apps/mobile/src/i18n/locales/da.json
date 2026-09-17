@@ -781,7 +781,7 @@
     "previewFullDescription": "Notifikationer viser beskedteksten på din låseskærm.",
     "previewGenericDescription": "Notifikationer viser kun, at der er sket noget. Åbn Kilo for at læse beskeden.",
     "channel": {
-      "agent": "Agentsessioner",
+      "agentProgress": "Agentforløb",
       "chat": "Chatbeskeder",
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Advarsler om saldo",

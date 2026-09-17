@@ -781,7 +781,7 @@
     "previewFullDescription": "Bildirishnomalar qulflangan ekranda xabar matnini ko'rsatadi.",
     "previewGenericDescription": "Bildirishnomalar faqat yangi hodisa haqida xabar beradi. Xabarni o'qish uchun Kilo ilovasini oching.",
     "channel": {
-      "agent": "Agent sessiyalari",
+      "agentProgress": "Agent jarayoni",
       "chat": "Suhbat xabarlari",
       "kiloclaw": "KiloClaw faoliyati",
       "balance": "Balans haqida ogohlantirishlar",

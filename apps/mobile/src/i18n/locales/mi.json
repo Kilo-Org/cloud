@@ -781,7 +781,7 @@
     "previewFullDescription": "Ka whakaatu ngā pānui i te kuputuhi o te karere ki tō mata maukati.",
     "previewGenericDescription": "Ka whakaatu ngā pānui kua puta tētahi takahanga. Whakatuwheratia a Kilo hei pānui i ngā kōrero.",
     "channel": {
-      "agent": "Ngā wātū māngai",
+      "agentProgress": "Te ahunga whakamua o te māngai",
       "chat": "Ngā karere kōrerorero",
       "kiloclaw": "Ngā mahi KiloClaw",
       "balance": "Ngā matohi mō te toenga pūtea",

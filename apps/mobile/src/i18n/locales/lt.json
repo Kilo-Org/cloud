@@ -799,7 +799,7 @@
     "previewFullDescription": "Užrakinimo ekrane rodomas pranešimų žinučių tekstas.",
     "previewGenericDescription": "Pranešimai tik informuoja apie įvykį. Norėdami perskaityti žinutę, atidarykite Kilo.",
     "channel": {
-      "agent": "Agentų sesijos",
+      "agentProgress": "Agentų eiga",
       "chat": "Pokalbių žinutės",
       "kiloclaw": "KiloClaw veikla",
       "balance": "Įspėjimai apie likutį",

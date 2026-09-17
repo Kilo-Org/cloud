@@ -781,7 +781,7 @@
     "previewFullDescription": "การแจ้งเตือนแสดงข้อความบนหน้าจอล็อกของคุณ",
     "previewGenericDescription": "การแจ้งเตือนจะแสดงเพียงว่ามีความเคลื่อนไหว เปิด Kilo เพื่ออ่านข้อความ",
     "channel": {
-      "agent": "เซสชันเอเจนต์",
+      "agentProgress": "ความคืบหน้าของเอเจนต์",
       "chat": "ข้อความแชท",
       "kiloclaw": "กิจกรรม KiloClaw",
       "balance": "การแจ้งเตือนยอดเงิน",

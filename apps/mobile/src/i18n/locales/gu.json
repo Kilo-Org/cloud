@@ -781,7 +781,7 @@
     "previewFullDescription": "સૂચનાઓ તમારી લૉક સ્ક્રીન પર સંદેશનું લખાણ બતાવે છે.",
     "previewGenericDescription": "સૂચનાઓ માત્ર કોઈ પ્રવૃત્તિ થઈ હોવાનું જણાવે છે. સંદેશ વાંચવા Kilo ખોલો.",
     "channel": {
-      "agent": "એજન્ટનાં સત્રો",
+      "agentProgress": "એજન્ટની પ્રગતિ",
       "chat": "ચેટના સંદેશા",
       "kiloclaw": "KiloClawની પ્રવૃત્તિ",
       "balance": "બેલેન્સ અંગેની ચેતવણીઓ",

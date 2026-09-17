@@ -781,7 +781,7 @@
     "previewFullDescription": "Tilkynningar sýna skilaboðatextann á lásskjánum þínum.",
     "previewGenericDescription": "Tilkynningar láta þig vita að eitthvað hafi gerst. Opnaðu Kilo til að lesa skilaboðin.",
     "channel": {
-      "agent": "Lotur fulltrúa",
+      "agentProgress": "Framvinda fulltrúa",
       "chat": "Spjallskilaboð",
       "kiloclaw": "Virkni í KiloClaw",
       "balance": "Inneignarviðvaranir",

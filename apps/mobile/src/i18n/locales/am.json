@@ -781,7 +781,7 @@
     "previewFullDescription": "ማሳወቂያዎች በመቆለፊያ ማያ ገጽዎ ላይ የመልእክቱን ጽሑፍ ያሳያሉ።",
     "previewGenericDescription": "ማሳወቂያዎች አንድ ነገር እንደተከሰተ ያሳያሉ። መልእክቱን ለማንበብ Kiloን ይክፈቱ።",
     "channel": {
-      "agent": "የወኪል ክፍለ ጊዜዎች",
+      "agentProgress": "የወኪል እድገት",
       "chat": "የውይይት መልእክቶች",
       "kiloclaw": "የKiloClaw እንቅስቃሴ",
       "balance": "የቀሪ ሂሳብ ማስጠንቀቂያዎች",

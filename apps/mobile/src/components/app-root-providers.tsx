@@ -18,6 +18,25 @@ import { QueryClientNativeLifecycle } from '@/lib/query-client-lifecycle';
 import { ToolSummaryTranslationRuntimeBootstrap } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
+/**
+ * sonner-native's container for bottom-center toasts is `position: absolute`
+ * with no height, and every toast is one of its children positioned with
+ * `bottom: 0`: each child sits entirely outside the container's bounds. Android
+ * still paints it (the container does not clip), but
+ * `View.isVisibleToUser()` intersects a child's rect with its parent's — an
+ * empty intersection drops the whole toast from the accessibility tree. The
+ * toast is then on screen and silent: TalkBack reads nothing, and a
+ * `uiautomator dump` shows no toast at all, which is how the device harness
+ * lost the "Link copied" confirmation.
+ *
+ * Anchoring the container to the top of the window gives every toast a rect
+ * inside its parent without moving it — the toast still positions itself
+ * against the container's `bottom` inset. `positionerStyle` is merged after
+ * sonner's own container style and its safe-area insets, and `top` is the one
+ * edge the container never sets for bottom-center toasts.
+ */
+const TOAST_POSITIONER_STYLE = { top: 0 } as const;
+
 export function AppRootProviders({
   children,
   languageReady,
@@ -62,6 +81,7 @@ export function AppRootProviders({
                     */}
                     <Toaster
                       position="bottom-center"
+                      positionerStyle={TOAST_POSITIONER_STYLE}
                       icons={{
                         success: <CheckCircle2 size={20} color={colors.good} />,
                         error: <XCircle size={20} color={colors.destructive} />,

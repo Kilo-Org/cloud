@@ -2126,7 +2126,20 @@
       "continueFrom": "{{title}} চালিয়ে যাওয়া হচ্ছে।",
       "importingSession": "সেশন ইমপোর্ট হচ্ছে",
       "cliCannotContinue": "এই CLI দিয়ে আগের সেশন চালিয়ে যাওয়া যায় না। Cloud Agent বা অন্য একটি CLI বেছে নিন।",
-      "importFailed": "এই সেশনটি ইমপোর্ট করা যায়নি।"
+      "importFailed": "এই সেশনটি ইমপোর্ট করা যায়নি।",
+      "sandbox": "স্যান্ডবক্স",
+      "sandboxAccessibility": "স্যান্ডবক্স: {{label}}",
+      "sandboxDefaultWithDestination": "ডিফল্ট · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "ছোট",
+      "sandboxInstanceShared": "শেয়ার্ড",
+      "sandboxInstanceLarge": "বড়",
+      "sandboxInstanceDevcontainer": "ডেভ কনটেইনার",
+      "sandboxInstanceProviderDefault": "প্রোভাইডারের ডিফল্ট",
+      "sandboxCouldNotLoad": "স্যান্ডবক্সের বিকল্পগুলি লোড করা যায়নি",
+      "sandboxUnavailable": "এই স্যান্ডবক্সটি অনুপলব্ধ। অন্য স্যান্ডবক্স বা ডিফল্ট বেছে নিন।",
+      "sandboxUseDefault": "ডিফল্ট ব্যবহার করুন"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}টি ফাইল আপডেট হয়েছে।",

@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { Globe, Shield, Smartphone } from '@/components/ui/icons';
+import { Globe, KeyRound, Shield, Smartphone } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -62,6 +62,15 @@ export function AccountSettingsScreen() {
           disabled={!trustedHostsLoaded}
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/trusted-hosts' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={KeyRound}
+          title={t('profile.passkeysTitle')}
+          subtitle={t('profile.passkeysSubtitle')}
+          className="rounded-lg bg-secondary px-3"
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/passkeys' as Href);
           }}
         />
         <ConfigureRow

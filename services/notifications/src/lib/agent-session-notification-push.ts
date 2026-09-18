@@ -87,7 +87,14 @@ export function buildAgentSessionNotificationDispatchInput(
       // through the catalog templates as params.
       i18nKey: 'agentSession.notification',
       i18nParams: { sessionTitle: content.title, message: content.body },
-      data: { type: 'cloud_agent_session', cliSessionId: params.cliSessionId },
+      // The explicit `notify_user` tool call is a question for the user, so the
+      // push is classified as needs-input (breaks through Do Not Disturb) rather
+      // than falling back to the absent-category default of status.
+      data: {
+        type: 'cloud_agent_session',
+        cliSessionId: params.cliSessionId,
+        category: 'attention',
+      },
       sound: 'default',
       priority: 'high',
     },

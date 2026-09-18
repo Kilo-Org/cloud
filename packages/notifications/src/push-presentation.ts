@@ -149,6 +149,26 @@ export function androidChannelIdForAgentKind(
 }
 
 /**
+ * The kind a posted Android agent channel carries, or null for any other
+ * channel. The reverse of `androidChannelIdForAgentKind`: the mobile ongoing
+ * card reads the channel the native module last posted to decide whether the
+ * card already in the shade is a needs-input one (see
+ * `apps/mobile/src/glanceable-android/android-sink.ts`).
+ */
+export function agentNotificationKindForAndroidChannelId(
+  channelId: string | null | undefined
+): AgentNotificationKind | null {
+  switch (channelId) {
+    case 'needs-input':
+      return 'needs-input';
+    case 'agent-progress':
+      return 'progress';
+    default:
+      return null;
+  }
+}
+
+/**
  * The iOS interruption level for a push. Needs-input breaks through a Focus /
  * Do Not Disturb; every other push, agent or not, stays active.
  */

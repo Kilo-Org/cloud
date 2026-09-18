@@ -56,4 +56,32 @@ describe('ActiveAgentsLiveUpdate channel switch', () => {
     const notify = post.indexOf('notificationManager.notify(');
     expect(notify, 'post no longer posts the notification').toBeGreaterThan(cancel);
   });
+
+  it('exposes the posted marker and removes it on dismiss', () => {
+    // The JS side adopts the kind after a restart from this marker; the widget
+    // snapshot is stored whether or not a card was posted, so it cannot prove
+    // the card exists.
+    expect(MODULE_SOURCE).toContain('Function("getPostedChannel")');
+    const dismiss = segment('private fun dismiss()', 'private companion object');
+    expect(dismiss).toContain('remove(POSTED_CHANNEL)');
+  });
+
+  it('confirms the fixed card is still posted before handing back its channel', () => {
+    // A terminal timeout removes the notification without any further app call,
+    // so the stored marker alone can outlive the card; the getter must also
+    // check the framework's active notifications for the fixed id.
+    const getter = segment('private fun postedChannelOrNull()', 'private fun post(');
+    expect(getter).toContain('postedChannelId()');
+    expect(getter).toContain('activeNotifications');
+    expect(getter).toContain('NOTIFICATION_ID');
+  });
+
+  it('drops the posted marker when the post fails', () => {
+    const post = segment('private fun post(', 'private fun dismiss()');
+    const notify = post.indexOf('notificationManager.notify(');
+    const clearing = post.indexOf('remove(POSTED_CHANNEL)', notify);
+    expect(clearing, 'a failed post must clear the marker it could not confirm').toBeGreaterThan(
+      notify
+    );
+  });
 });

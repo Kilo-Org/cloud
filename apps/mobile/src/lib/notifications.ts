@@ -465,7 +465,9 @@ export function checkInitialNotification(): void {
 
 // Single-flight promise so concurrent callers share one channel-creation pass.
 // The promise never rejects: a per-channel failure is reported to Sentry and
-// the remaining channels still get created.
+// the remaining channels still get created. A pass that failed any required
+// channel is not cached (see `ensureAndroidNotificationChannels`), so a later
+// start retries before it posts to a channel that may not exist.
 let androidChannelsPromise: Promise<void> | null = null;
 
 // The channels the two named kinds replaced. Android keeps an app-created
@@ -598,13 +600,15 @@ async function writeAndroidNotificationChannel(
   );
 }
 
-async function createAndroidNotificationChannels(): Promise<void> {
+async function createAndroidNotificationChannels(): Promise<boolean> {
   const dndAccessGranted = androidDndAccessGranted();
+  let allChannelsWritten = true;
   for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
     try {
       // eslint-disable-next-line no-await-in-loop -- channels are created sequentially so a per-channel failure is isolated
       await writeAndroidNotificationChannel(channel, channel.name, dndAccessGranted);
     } catch (error) {
+      allChannelsWritten = false;
       Sentry.captureException(error, {
         tags: {
           'error.subsystem': 'notifications',
@@ -628,19 +632,30 @@ async function createAndroidNotificationChannels(): Promise<void> {
       });
     }
   }
+  return allChannelsWritten;
 }
 
 /**
  * Create the Android notification channels once. No-op on iOS. Idempotent and
  * single-flight: every call returns the same module-level promise, and a
  * per-channel failure never rejects it (reported to Sentry instead).
+ *
+ * A pass that failed a required channel write is not cached: the framework
+ * drops a post addressed to a channel the app never created, so the next start
+ * must retry the channels before it posts. Channel writes are idempotent, so a
+ * retry is safe, and a fully successful pass is cached again.
  */
 // eslint-disable-next-line promise-function-async -- must return the same module-level promise for single-flight
 export function ensureAndroidNotificationChannels(): Promise<void> {
   if (Platform.OS !== 'android') {
     return Promise.resolve();
   }
-  androidChannelsPromise ??= createAndroidNotificationChannels();
+  androidChannelsPromise ??= (async () => {
+    const allChannelsWritten = await createAndroidNotificationChannels();
+    if (!allChannelsWritten) {
+      androidChannelsPromise = null;
+    }
+  })();
   return androidChannelsPromise;
 }
 

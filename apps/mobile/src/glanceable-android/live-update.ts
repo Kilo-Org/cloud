@@ -41,6 +41,7 @@ type LiveUpdateNativeModule = {
   end(): void;
   setWidgetSnapshot(snapshot: string, expiresAt: number): void;
   getWidgetSnapshot(): string | null;
+  getPostedChannel(): string | null;
 };
 
 const nativeModule = requireOptionalNativeModule<LiveUpdateNativeModule>('ActiveAgentsLiveUpdate');
@@ -139,4 +140,14 @@ export function getStoredWidgetSnapshot(): GlanceableAgentsSnapshot | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * The channel the native module last posted the fixed ongoing notification on,
+ * or null when no card is posted. The module writes the marker only after a
+ * successful post and clears it on dismiss, so it — not the widget snapshot,
+ * which is stored whether or not a card was posted — proves the card exists.
+ */
+export function getPostedNotificationChannel(): string | null {
+  return nativeModule?.getPostedChannel() ?? null;
 }

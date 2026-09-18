@@ -5,6 +5,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
   type AgentNotificationKind,
+  agentNotificationKindForAndroidChannelId,
   agentNotificationKindForGlanceableSnapshot,
   androidChannelIdForAgentKind,
 } from '@kilocode/notifications';
@@ -23,7 +24,7 @@ import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
 import { formatGlanceableCount, isWidgetRtl } from './count-format';
 import {
   end as endLiveUpdate,
-  getStoredWidgetSnapshot,
+  getPostedNotificationChannel,
   setWidgetSnapshot,
   start as startLiveUpdate,
   update as updateLiveUpdate,
@@ -301,15 +302,19 @@ export async function handleAppStateActive(): Promise<void> {
 export const androidSink: GlanceableSink = {
   publish(snapshot) {
     lastWidgetSnapshot = snapshot;
-    // The native card survives a JS restart. Read the durable mirror before it
-    // is overwritten and adopt the kind it recorded, so a needs-input card that
-    // is already in the shade does not alert again on the fresh process.
+    // The native card survives a JS restart. Read the durable posted-channel
+    // marker before it is overwritten and adopt the kind it recorded, so a
+    // needs-input card that is already in the shade does not alert again on the
+    // fresh process. The marker (not the widget snapshot, which is stored
+    // whether or not a card was posted) is what proves the card still exists:
+    // permission denial, a failed start, or a dismissed card leaves no marker,
+    // so the first real needs-input post still alerts.
     if (!storedKindAdopted) {
       storedKindAdopted = true;
       if (!notificationActive) {
-        const stored = getStoredWidgetSnapshot();
-        if (stored !== null) {
-          notificationKind = agentNotificationKindForGlanceableSnapshot(stored);
+        const storedKind = agentNotificationKindForAndroidChannelId(getPostedNotificationChannel());
+        if (storedKind !== null) {
+          notificationKind = storedKind;
         }
       }
     }

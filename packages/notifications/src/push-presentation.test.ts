@@ -5,6 +5,7 @@ import {
   AGENT_NOTIFICATION_KINDS,
   ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
   ANDROID_NOTIFICATION_CHANNELS,
+  agentNotificationKindForAndroidChannelId,
   agentNotificationKindForGlanceableSnapshot,
   agentNotificationKindForPushData,
   androidChannelIdForAgentKind,
@@ -171,6 +172,29 @@ describe('androidChannelIdForAgentKind', () => {
 
   it('routes progress to the agent-progress channel', () => {
     expect(androidChannelIdForAgentKind('progress')).toBe('agent-progress');
+  });
+});
+
+describe('agentNotificationKindForAndroidChannelId', () => {
+  it('reads the kind back from the named agent channels', () => {
+    expect(agentNotificationKindForAndroidChannelId('needs-input')).toBe('needs-input');
+    expect(agentNotificationKindForAndroidChannelId('agent-progress')).toBe('progress');
+  });
+
+  it('is the inverse of androidChannelIdForAgentKind', () => {
+    for (const kind of AGENT_NOTIFICATION_KINDS) {
+      expect(agentNotificationKindForAndroidChannelId(androidChannelIdForAgentKind(kind))).toBe(
+        kind
+      );
+    }
+  });
+
+  it('returns null for a non-agent channel or absent marker', () => {
+    for (const channelId of ['kiloclaw', 'balance', 'security'] as const) {
+      expect(agentNotificationKindForAndroidChannelId(channelId)).toBeNull();
+    }
+    expect(agentNotificationKindForAndroidChannelId(null)).toBeNull();
+    expect(agentNotificationKindForAndroidChannelId(undefined)).toBeNull();
   });
 });
 

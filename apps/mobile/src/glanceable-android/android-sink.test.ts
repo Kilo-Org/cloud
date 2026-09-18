@@ -33,6 +33,9 @@ const mocks = vi.hoisted(() => {
   let notificationDeadline: number | null = null;
   let widgetSnapshot: string | null = null;
   let widgetDeadline = 0;
+  // The native module mirrors the channel its posted card carries and removes
+  // the mirror on dismiss; the sink reads it to adopt the kind after a restart.
+  let postedChannel: string | null = null;
 
   // eslint-disable-next-line max-params -- the fake models the native bridge arguments
   function post(
@@ -48,6 +51,7 @@ const mocks = vi.hoisted(() => {
   ): void {
     notification = { title, text, approveLabel, compactText, channelId, alerting, promotion };
     notificationDeadline = timeoutMs > 0 ? Date.now() + timeoutMs : null;
+    postedChannel = channelId;
   }
 
   const isPromotionCapable = vi.fn(() => true);
@@ -87,12 +91,18 @@ const mocks = vi.hoisted(() => {
       end: vi.fn(() => {
         notification = null;
         notificationDeadline = null;
+        postedChannel = null;
       }),
       setWidgetSnapshot: vi.fn((snapshot: string, deadline: number) => {
         widgetSnapshot = snapshot;
         widgetDeadline = deadline;
       }),
       getWidgetSnapshot: () => widgetSnapshot,
+      getPostedChannel: () => postedChannel,
+    },
+    // Test control for the durable native marker a previous process left behind.
+    setPostedChannel: (channelId: string | null) => {
+      postedChannel = channelId;
     },
     // The sink owns only the ensure call; channel creation lives in @/lib/notifications.
     // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
@@ -381,8 +391,9 @@ describe('androidSink start and update', () => {
 
   it('does not re-alert a needs-input card a previous process left in the shade', async () => {
     const needsInput = { ...MIXED, needsInput: 1 };
-    // The previous JS process posted this card; the native mirror survives the
-    // restart and still holds that snapshot.
+    // The previous JS process posted this card; the native posted-channel
+    // marker survives the restart and still describes the card in the shade.
+    mocks.setPostedChannel('needs-input');
     mocks.native.setWidgetSnapshot(JSON.stringify(needsInput), Date.parse(needsInput.expiresAt));
     _resetAndroidSinkForTests();
     const next = { ...needsInput, revision: needsInput.revision + 1 };
@@ -405,9 +416,67 @@ describe('androidSink start and update', () => {
 
   it('alerts a needs-input entry after a restart that left a progress card', async () => {
     const progress = { ...MIXED, needsInput: 0 };
+    mocks.setPostedChannel('agent-progress');
     mocks.native.setWidgetSnapshot(JSON.stringify(progress), 0);
     _resetAndroidSinkForTests();
     const next = { ...MIXED, needsInput: 1, revision: progress.revision + 1 };
+
+    androidSink.publish(next);
+    androidSink.startOrUpdate(next, CTX);
+    await flushAsync();
+
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      expect.any(String),
+      'Open agents',
+      null,
+      expect.any(String),
+      'needs-input',
+      true,
+      true
+    );
+  });
+
+  it('alerts the first needs-input post after a restart that never posted', async () => {
+    const needsInput = { ...MIXED, needsInput: 1 };
+    // Permission was denied, so a widget snapshot was stored without a card:
+    // the native marker is absent and must not be read as a posted card.
+    mocks.native.setWidgetSnapshot(JSON.stringify(needsInput), Date.parse(needsInput.expiresAt));
+    _resetAndroidSinkForTests();
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('denied'));
+    const next = { ...needsInput, revision: needsInput.revision + 1 };
+
+    androidSink.publish(next);
+    androidSink.startOrUpdate(next, CTX);
+    await flushAsync();
+    expect(mocks.native.start).not.toHaveBeenCalled();
+
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('granted'));
+    await handleAppStateActive();
+
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      expect.any(String),
+      'Open agents',
+      null,
+      expect.any(String),
+      'needs-input',
+      true,
+      true
+    );
+  });
+
+  it('alerts the first needs-input post after the previous card was dismissed', async () => {
+    const needsInput = { ...MIXED, needsInput: 1 };
+    // A previous process posted the card and stored its widget snapshot.
+    mocks.setPostedChannel('needs-input');
+    mocks.native.setWidgetSnapshot(JSON.stringify(needsInput), Date.parse(needsInput.expiresAt));
+    // The card then ended: a native dismiss clears the posted marker.
+    mocks.native.end();
+    _resetAndroidSinkForTests();
+    const next = { ...needsInput, revision: needsInput.revision + 1 };
 
     androidSink.publish(next);
     androidSink.startOrUpdate(next, CTX);

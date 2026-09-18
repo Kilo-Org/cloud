@@ -367,6 +367,44 @@ describe('ensureAndroidNotificationChannels', () => {
       },
     });
   });
+
+  it('retries every channel after a pass that failed one write', async () => {
+    mocks.setNotificationChannelAsync.mockRejectedValueOnce(new Error('channel failed'));
+    const { ensureAndroidNotificationChannels } = await loadNotifications();
+
+    await ensureAndroidNotificationChannels();
+    expect(mocks.captureException).toHaveBeenCalledTimes(1);
+    mocks.setNotificationChannelAsync.mockClear();
+
+    // A pass that failed a required channel is not cached: the next start
+    // retries before it posts, and a channel the framework never created would
+    // drop that post.
+    await ensureAndroidNotificationChannels();
+    expect(mocks.setNotificationChannelAsync.mock.calls.map(call => call[0])).toEqual([
+      'needs-input',
+      'agent-progress',
+      'kiloclaw',
+      'balance',
+      'security',
+    ]);
+
+    // A fully successful pass is cached again.
+    mocks.setNotificationChannelAsync.mockClear();
+    await ensureAndroidNotificationChannels();
+    expect(mocks.setNotificationChannelAsync).not.toHaveBeenCalled();
+  });
+
+  it('keeps a fully successful pass cached', async () => {
+    const { ensureAndroidNotificationChannels } = await loadNotifications();
+
+    await ensureAndroidNotificationChannels();
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(5);
+    mocks.setNotificationChannelAsync.mockClear();
+
+    await ensureAndroidNotificationChannels();
+
+    expect(mocks.setNotificationChannelAsync).not.toHaveBeenCalled();
+  });
 });
 
 describe('planAndroidChannelWrite', () => {

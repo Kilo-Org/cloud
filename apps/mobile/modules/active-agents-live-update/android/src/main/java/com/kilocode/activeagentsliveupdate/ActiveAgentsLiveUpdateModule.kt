@@ -60,6 +60,13 @@ class ActiveAgentsLiveUpdateModule : Module() {
     Function("getWidgetSnapshot") {
       ActiveAgentsDeadlineReceiver.getWidgetSnapshot(context)
     }
+
+    // The channel the posted card carries, or null when the module has posted
+    // nothing. The JS side reads this after a process restart to tell a card
+    // still in the shade from a widget snapshot that was stored without a post.
+    Function("getPostedChannel") {
+      postedChannelOrNull()
+    }
   }
 
   // `AppContext` exposes only the React context. Every entry point here runs
@@ -133,6 +140,21 @@ class ActiveAgentsLiveUpdateModule : Module() {
       intent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
+  }
+
+  /**
+   * The channel a card still in the shade carries, or null when no card is
+   * posted. The stored marker alone can outlive the card: a terminal timeout
+   * removes the notification without any further app call, and the marker
+   * survives a process exit, so confirm the fixed id is still active before the
+   * JS side adopts the kind on a restart.
+   */
+  private fun postedChannelOrNull(): String? {
+    val posted = postedChannelId() ?: return null
+    val stillPosted = notificationManager.activeNotifications.any {
+      it.id == ActiveAgentsDeadlineReceiver.NOTIFICATION_ID
+    }
+    return if (stillPosted) posted else null
   }
 
   private fun post(
@@ -224,7 +246,15 @@ class ActiveAgentsLiveUpdateModule : Module() {
     } else {
       ActiveAgentsDeadlineReceiver.setLegacyNotificationTimeout(context, timeoutMs)
     }
-    notificationManager.notify(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID, builder.build())
+    try {
+      notificationManager.notify(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID, builder.build())
+    } catch (error: Throwable) {
+      // The post did not land, so no card exists for this marker to describe.
+      // Drop it before rethrowing so a later start does not adopt a kind from a
+      // card that is not in the shade.
+      notificationState.edit().remove(POSTED_CHANNEL).remove(HAS_TIMEOUT).apply()
+      throw error
+    }
     // Mirror the posted channel so the next post can tell whether the card moves.
     // Commit, like the timeout flag: the shade card survives a process exit, so
     // the mirror that describes it must too.

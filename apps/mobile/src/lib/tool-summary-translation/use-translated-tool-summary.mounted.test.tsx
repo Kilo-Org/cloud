@@ -328,9 +328,9 @@ function PendingProbe({
 
 function mountPending(text: string): { latest: () => ToolSummaryTranslation; unmount: () => void } {
   let current: ToolSummaryTranslation = { text: '', pending: false };
-  let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+  const ref: { renderer: TestRenderer.ReactTestRenderer | undefined } = { renderer: undefined };
   act(() => {
-    renderer = TestRenderer.create(
+    ref.renderer = TestRenderer.create(
       createElement(PendingProbe, {
         text,
         onRender: value => {
@@ -339,11 +339,15 @@ function mountPending(text: string): { latest: () => ToolSummaryTranslation; unm
       })
     );
   });
+  const renderer = ref.renderer;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
   return {
     latest: () => current,
     unmount: () => {
       act(() => {
-        renderer?.unmount();
+        renderer.unmount();
       });
     },
   };

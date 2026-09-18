@@ -78,7 +78,7 @@ import {
 } from '../sandbox-id.js';
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
-import { sha256Hex } from '../utils/sha256.js';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import { initialAdmissionFailure } from './admission-failure.js';
 import { createMessageId } from './message-id.js';

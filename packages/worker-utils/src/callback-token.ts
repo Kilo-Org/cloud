@@ -1,3 +1,5 @@
+import { bytesToHex } from './sha256.js';
+
 const CALLBACK_TOKEN_HEX_PATTERN = /^[0-9a-f]{64}$/;
 
 export type CallbackTokenParams = {
@@ -16,10 +18,6 @@ function encodeResourceParts(resourceParts: readonly string[]): string {
 
 function buildCallbackTokenMessage(params: Omit<CallbackTokenParams, 'secret'>): string {
   return `callback:v1:${params.scope}:${encodeResourceParts(params.resourceParts)}`;
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function equalLengthStringsMatch(expected: string, actual: string): boolean {

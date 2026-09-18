@@ -210,6 +210,8 @@ export type { RepoCoordinates } from './git-url.js';
 
 export { KILO_MODEL_PREFIX, unprefixKiloGatewayModelId } from './kilo-model-id.js';
 
+export { sha256Hex, bytesToHex } from './sha256.js';
+
 export { ttlCached } from './ttl-cache.js';
 export type { TtlCache } from './ttl-cache.js';
 

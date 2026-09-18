@@ -2,7 +2,7 @@ import type { DirectoryBackup } from '@cloudflare/sandbox';
 import * as z from 'zod';
 
 import { WRAPPER_VERSION } from './shared/wrapper-version.js';
-import { sha256Hex } from './utils/sha256.js';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 
 const CACHE_SCHEMA = 'workspace-backup-v1';
 const CACHE_OBJECT_PREFIX = 'workspace-backups/v1';

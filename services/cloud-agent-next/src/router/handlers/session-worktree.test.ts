@@ -11,7 +11,7 @@ import { t } from '../auth.js';
 import { parseSessionMetadata, type SessionMetadata } from '../../persistence/session-metadata.js';
 import type * as SessionPlane from '../../session-plane.js';
 import type { TRPCContext } from '../../types.js';
-import { sha256Hex } from '../../utils/sha256.js';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import { CreateWorktreeChatInput, createSessionWorktreeHandlers } from './session-worktree.js';
 

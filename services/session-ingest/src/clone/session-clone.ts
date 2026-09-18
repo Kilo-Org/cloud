@@ -1,4 +1,4 @@
-import { withDORetry } from '@kilocode/worker-utils';
+import { sha256Hex, withDORetry } from '@kilocode/worker-utils';
 import {
   kiloSdkSessionInfoSchema,
   messageIdSchema,
@@ -63,13 +63,6 @@ class CloneRejectionError extends Error {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-async function sha256Hex(input: string): Promise<string> {
-  const digest = new Uint8Array(
-    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
-  );
-  return Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function sourceDigestLine(row: CloneBatchRow): string {

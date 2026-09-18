@@ -4,28 +4,42 @@ import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-comman
 import { i18n } from '@/i18n';
 
 /**
+ * A slash command this client registers itself — the mobile-local reserved
+ * commands. The client knows the command's origin, so `getSlashCommandDescription`
+ * may look its description up by name even though the composer memoizes the
+ * list across language changes.
+ *
+ * A catalog entry cannot carry this flag: the client cannot tell whether an
+ * entry named `review` is the built-in command or an external command (a
+ * repository command file, an MCP prompt) that reuses the name.
+ */
+export type BuiltInSlashCommandInfo = SlashCommandInfo & { readonly builtIn: true };
+
+/**
  * Local reserved /new command — surfaced only for remote sessions, never
  * pushed to the CLI. Remote CLIs have no /new (they create sessions through a
  * dedicated control message), so a slash-style "new" must live in the mobile
  * client.
  */
-export function getLocalNewSlashCommand(): SlashCommandInfo {
+export function getLocalNewSlashCommand(): BuiltInSlashCommandInfo {
   return {
     name: 'new',
     description: i18n.t('agentChat.slashCommands.startNewSession'),
     hints: [],
+    builtIn: true,
   };
 }
 
-export function getLocalExitSlashCommand(): SlashCommandInfo {
+export function getLocalExitSlashCommand(): BuiltInSlashCommandInfo {
   return {
     name: 'exit',
     description: i18n.t('agentChat.slashCommands.exitSession'),
     hints: [],
+    builtIn: true,
   };
 }
 
-function getLocalQuitSlashCommand(): SlashCommandInfo {
+function getLocalQuitSlashCommand(): BuiltInSlashCommandInfo {
   return { ...getLocalExitSlashCommand(), name: QUIT_COMMAND_NAME };
 }
 
@@ -35,11 +49,12 @@ function getLocalQuitSlashCommand(): SlashCommandInfo {
  * `canExitSession === true` because /clear needs both create_session and
  * exit_cli.
  */
-export function getLocalClearSlashCommand(): SlashCommandInfo {
+export function getLocalClearSlashCommand(): BuiltInSlashCommandInfo {
   return {
     name: 'clear',
     description: i18n.t('agentChat.slashCommands.clearSession'),
     hints: [],
+    builtIn: true,
   };
 }
 
@@ -55,6 +70,70 @@ const LOCAL_COMMAND_NAMES = new Set([
   QUIT_COMMAND_NAME,
   'q',
 ]);
+
+/**
+ * Catalog key for every slash-command name the composer's menu can show: the
+ * worker catalog (`goal`, `init`, `resume-claude`, `resume-codex`, `review`),
+ * the session command (`compact`), and the mobile-local reserved commands
+ * (`new`, `exit`, `quit`, `clear`). `quit` shares `/exit`'s key. A name here is
+ * looked up only for a command this client registered or for a catalog entry
+ * that reports the built-in English source string; see
+ * `getSlashCommandDescription`.
+ */
+const SLASH_COMMAND_DESCRIPTION_KEYS = {
+  compact: 'agentChat.slashCommands.compactDescription',
+  goal: 'agentChat.slashCommands.goalDescription',
+  init: 'agentChat.slashCommands.initDescription',
+  'resume-claude': 'agentChat.slashCommands.resumeClaudeDescription',
+  'resume-codex': 'agentChat.slashCommands.resumeCodexDescription',
+  review: 'agentChat.slashCommands.reviewDescription',
+  new: 'agentChat.slashCommands.startNewSession',
+  exit: 'agentChat.slashCommands.exitSession',
+  quit: 'agentChat.slashCommands.exitSession',
+  clear: 'agentChat.slashCommands.clearSession',
+} as const satisfies Record<string, string>;
+
+/** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
+function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
+  // The key is an untrusted command name, so match own properties only:
+  // inherited members like 'constructor' would otherwise resolve to a
+  // function and get handed to i18n.t instead of falling back to the
+  // reported description.
+  return Object.hasOwn(dictionary, key)
+    ? (dictionary as Readonly<Record<string, V | undefined>>)[key]
+    : undefined;
+}
+
+/** True for a command this client created, which is always the built-in one. */
+function isBuiltInSlashCommand(command: SlashCommandInfo): boolean {
+  // The wire type has no origin field, so the flag lives on the objects this
+  // module creates and is read back structurally.
+  return (command as Partial<BuiltInSlashCommandInfo>).builtIn === true;
+}
+
+/**
+ * Resolve a command's description from the active catalog so it follows the
+ * app language.
+ *
+ * A name alone is not proof that a row is the built-in command: the worker
+ * catalog, a repository command file, and an MCP prompt can all report a
+ * built-in name with their own description, and the CLI replaces the built-in
+ * entry with that command. Only a command this client registered, or a catalog
+ * entry that reports the built-in English source string, is localized; every
+ * other entry keeps the description it reports, and a command the catalogue
+ * does not know keeps it too.
+ */
+export function getSlashCommandDescription(command: SlashCommandInfo): string | undefined {
+  const key = lookup(SLASH_COMMAND_DESCRIPTION_KEYS, command.name);
+  if (key === undefined) {
+    return command.description;
+  }
+  if (!isBuiltInSlashCommand(command) && command.description !== i18n.t(key, { lng: 'en' })) {
+    return command.description;
+  }
+  return i18n.t(key);
+}
+
 const SLASH_PREFIX_PATTERN = /^\/[\w.-]*$/;
 const SLASH_FULL_PATTERN = /^\/([\w.-]+)(?:\s+([\s\S]*))?$/;
 

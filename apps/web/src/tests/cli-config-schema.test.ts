@@ -104,7 +104,9 @@ describe('kilo config.json schema merge', () => {
     expect(retention.type).toBe('object');
     expect(retention.additionalProperties).toBe(false);
     expect(retention.properties.enabled).toEqual(expect.objectContaining({ type: 'boolean' }));
-    expect(retention.properties.maxAgeDays).toEqual(expect.objectContaining({ type: 'number' }));
+    expect(retention.properties.maxAgeDays).toEqual(
+      expect.objectContaining({ type: 'number', minimum: 1 })
+    );
   });
 
   test('privacy_mode is a boolean', () => {
@@ -215,7 +217,9 @@ describe('kilo config.json schema merge', () => {
     expect(agent.properties.orchestrator).toBeDefined();
     expect(agent.properties.build).toBeDefined();
 
-    const experimental = props.experimental as { properties: Record<string, unknown> };
+    const experimental = props.experimental as {
+      properties: Record<string, unknown>;
+    };
     expect(experimental.properties.codebase_search).toBeUndefined();
     expect(experimental.properties.batch_tool).toBeDefined();
     expect(config.additionalProperties).toBe(false);

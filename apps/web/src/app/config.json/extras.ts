@@ -120,6 +120,7 @@ export const kiloExtras = {
           description:
             'Days a session is kept before retention deletes it. Defaults to 30, minimum 1.',
           type: 'number',
+          minimum: 1,
         },
       },
       additionalProperties: false,

@@ -1,23 +1,31 @@
 import 'server-only';
 
 import { TRPCError } from '@trpc/server';
+import * as z from 'zod';
 import type { User } from '@kilocode/db/schema';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import {
   clearOpenAiChatGptConnection,
   getOpenAiChatGptConnection,
+  type OpenAiChatGptOwner,
 } from '@/lib/ai-gateway/openai-chatgpt/store';
 import {
   OpenAiChatGptStatusSchema,
   type OpenAiChatGptStatus,
 } from '@/lib/ai-gateway/openai-chatgpt/status';
+import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 
 /**
- * The "Sign in with ChatGPT" BYOK connection, scoped to the signed-in user.
- *
- * Both procedures return only `OpenAiChatGptStatus`: a token, a refresh token
- * and a raw OAuth error body are never part of the response.
+ * The "Sign in with ChatGPT" BYOK connection. It is scoped to one account: the
+ * signed-in person, or one organization the caller can manage. Both procedures
+ * return only `OpenAiChatGptStatus`: a token, a refresh token and a raw OAuth
+ * error body are never part of the response.
  */
+
+const OpenAiChatGptOwnerInputSchema = z.object({
+  organizationId: z.uuid().optional(),
+});
 
 /**
  * Authentication is enforced by the tRPC context for every real request; this
@@ -34,9 +42,24 @@ function requireUserId(user: User | null | undefined): string {
   return user.id;
 }
 
+/**
+ * Resolves the account the call operates on. An organization call requires the
+ * organization's billing role, the same permission the pasted-key BYOK
+ * procedures require for organization keys.
+ */
+async function resolveOwner(
+  ctx: TRPCContext,
+  organizationId: string | undefined
+): Promise<OpenAiChatGptOwner> {
+  const userId = requireUserId(ctx.user);
+  if (!organizationId) return { type: 'user', id: userId };
+  await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
+  return { type: 'org', id: organizationId };
+}
+
 /** An absent row is `disconnected`; a disabled row is `error` with its message. */
-async function readStatus(userId: string): Promise<OpenAiChatGptStatus> {
-  const connection = await getOpenAiChatGptConnection(userId);
+async function readStatus(owner: OpenAiChatGptOwner): Promise<OpenAiChatGptStatus> {
+  const connection = await getOpenAiChatGptConnection(owner);
   if (!connection) {
     return { state: 'disconnected' };
   }
@@ -60,14 +83,19 @@ async function readStatus(userId: string): Promise<OpenAiChatGptStatus> {
 
 export const openAiChatGptRouter = createTRPCRouter({
   status: baseProcedure
+    .input(OpenAiChatGptOwnerInputSchema)
     .output(OpenAiChatGptStatusSchema)
-    .query(({ ctx }): Promise<OpenAiChatGptStatus> => readStatus(requireUserId(ctx.user))),
+    .query(
+      async ({ ctx, input }): Promise<OpenAiChatGptStatus> =>
+        readStatus(await resolveOwner(ctx, input.organizationId))
+    ),
 
   disconnect: baseProcedure
+    .input(OpenAiChatGptOwnerInputSchema)
     .output(OpenAiChatGptStatusSchema)
-    .mutation(async ({ ctx }): Promise<OpenAiChatGptStatus> => {
-      const userId = requireUserId(ctx.user);
-      await clearOpenAiChatGptConnection(userId);
-      return readStatus(userId);
+    .mutation(async ({ ctx, input }): Promise<OpenAiChatGptStatus> => {
+      const owner = await resolveOwner(ctx, input.organizationId);
+      await clearOpenAiChatGptConnection(owner);
+      return readStatus(owner);
     }),
 });

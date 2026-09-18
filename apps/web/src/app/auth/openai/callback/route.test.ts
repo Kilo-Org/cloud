@@ -1,19 +1,26 @@
 const mockNextAuthHttpHandler = jest.fn<Promise<Response>, [NextRequest, unknown]>();
 const mockGetUserFromSession = jest.fn<Promise<{ id: string } | null>, []>();
+const mockGetAccountLinkingSession = jest.fn<Promise<{ organizationId?: string } | null>, []>();
 
 jest.mock('@/lib/user/server', () => ({
   nextAuthHttpHandler: (...args: [NextRequest, unknown]) => mockNextAuthHttpHandler(...args),
   getUserFromSession: () => mockGetUserFromSession(),
 }));
 
+jest.mock('@/lib/account-linking-session', () => ({
+  getAccountLinkingSession: () => mockGetAccountLinkingSession(),
+}));
+
 import { NextRequest } from 'next/server';
 import { GET } from './route';
 
 const CALLBACK_URL = 'https://app.kilo.ai/auth/openai/callback';
+const ORG_ID = '00000000-0000-4000-8000-000000000001';
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockNextAuthHttpHandler.mockResolvedValue(new Response(null, { status: 200 }));
+  mockGetAccountLinkingSession.mockResolvedValue(null);
 });
 
 function forwardedRequest(): NextRequest | undefined {
@@ -56,6 +63,18 @@ describe('GET /auth/openai/callback', () => {
     expect(mockNextAuthHttpHandler).not.toHaveBeenCalled();
     const location = new URL(response.headers.get('location') ?? '');
     expect(location.pathname).toBe('/byok');
+    expect(location.searchParams.get('openai_error')).toBe('access_denied');
+  });
+
+  test('redirects a callback error to the organization BYOK page when the linking session carries one', async () => {
+    mockGetUserFromSession.mockResolvedValue({ id: 'user-1' });
+    mockGetAccountLinkingSession.mockResolvedValue({ organizationId: ORG_ID });
+    const request = new NextRequest(`${CALLBACK_URL}?error=access_denied&state=the-state`);
+
+    const response = await GET(request, {});
+
+    const location = new URL(response.headers.get('location') ?? '');
+    expect(location.pathname).toBe(`/organizations/${ORG_ID}/byok`);
     expect(location.searchParams.get('openai_error')).toBe('access_denied');
   });
 

@@ -45,6 +45,7 @@ import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-me
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
 import type { AutoTopUpAmountCents } from '@/lib/autoTopUpConstants';
@@ -140,6 +141,7 @@ const AutocompleteMetricsOutputSchema = z.object({
 
 const LinkAuthProviderInputSchema = z.object({
   provider: AuthProviderIdSchema,
+  organizationId: z.uuid().optional(),
 });
 
 const CreditBlockSchema = z.object({
@@ -494,9 +496,16 @@ export const userRouter = createTRPCRouter({
   linkAuthProvider: baseProcedure
     .input(LinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
+      // An organization-scoped link records the organization on the linking
+      // session so the callback can store the BYOK connection for it. The access
+      // denial must surface as-is, so it stays outside the try.
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_BILLING_ROLES);
+      }
+
       try {
         // Create a secure linking session
-        await createAccountLinkingSession(ctx.user.id, input.provider);
+        await createAccountLinkingSession(ctx.user.id, input.provider, input.organizationId);
 
         return successResult();
       } catch (error) {

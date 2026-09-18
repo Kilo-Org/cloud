@@ -162,7 +162,7 @@ describe('GET /api/openrouter/models', () => {
     await expect(response.json()).resolves.toEqual({
       data: [{ ...openAiModel, hasUserByokAvailable: true }, otherModel],
     });
-    expect(mockedTagOpenAiChatGptByokModels).toHaveBeenCalledWith('user-id', [
+    expect(mockedTagOpenAiChatGptByokModels).toHaveBeenCalledWith({ type: 'user', id: 'user-id' }, [
       openAiModel,
       otherModel,
     ]);

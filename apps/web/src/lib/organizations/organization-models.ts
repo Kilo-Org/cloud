@@ -60,9 +60,10 @@ export async function getAvailableModelsForOrganization(
   availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
   availableModels.push(...(await listAvailableCustomLlms(organizationId, context.groupIds)));
 
-  if (subject.type === 'member') {
-    availableModels = await tagOpenAiChatGptByokModels(subject.kiloUserId, availableModels);
-  }
+  availableModels = await tagOpenAiChatGptByokModels(
+    { type: 'org', id: organizationId },
+    availableModels
+  );
 
   const snapshot = await getEnkryptBenchmarks();
   return {

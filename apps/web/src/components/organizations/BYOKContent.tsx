@@ -1,13 +1,16 @@
 'use client';
 
+import { useFeatureFlagEnabled } from 'posthog-js/react';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { OrganizationPageHeader } from './OrganizationPageHeader';
 import { OrganizationContextProvider } from './OrganizationContext';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { BYOKKeysManager } from './byok/BYOKKeysManager';
+import { OpenAiChatGptCard, OpenAiChatGptCardView } from './byok/OpenAiChatGptCard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { CHATGPT_ACCESS_FLAG } from '@/lib/auth/openai/access';
 
 export function BYOKContent({
   organizationId,
@@ -17,6 +20,7 @@ export function BYOKContent({
   role?: OrganizationRole;
 }) {
   const { assumedRole } = useRoleTesting();
+  const chatGptEnabled = useFeatureFlagEnabled(CHATGPT_ACCESS_FLAG);
 
   // Use assumed role if available, otherwise use actual role
   const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || role || 'member';
@@ -42,7 +46,14 @@ export function BYOKContent({
             </AlertDescription>
           </Alert>
         ) : (
-          <BYOKKeysManager organizationId={organizationId} />
+          <div className="space-y-4">
+            {chatGptEnabled === true ? (
+              <OpenAiChatGptCard organizationId={organizationId} />
+            ) : chatGptEnabled === undefined ? (
+              <OpenAiChatGptCardView status={undefined} />
+            ) : null}
+            <BYOKKeysManager organizationId={organizationId} />
+          </div>
         )}
       </div>
     </OrganizationContextProvider>

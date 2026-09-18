@@ -76,7 +76,7 @@ export async function GET(
       getUserByokProviderIds(readDb, auth.user.id),
     ]);
     const modelsWithByokAvailability = await tagOpenAiChatGptByokModels(
-      auth.user.id,
+      { type: 'user', id: auth.user.id },
       await addUserByokAvailability(models, enabledByokProviderIds)
     );
     return await modelResponse({

@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, type SQL } from 'drizzle-orm';
 import { byok_api_keys } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { decryptApiKey, encryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
@@ -11,9 +11,29 @@ import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './t
 /**
  * The delegated "Sign in with ChatGPT" tokens are the OpenAI BYOK credential.
  * They live in `byok_api_keys` under the dedicated `openai-chatgpt` provider id,
- * encrypted with the same AES-256-GCM helpers as every other BYOK key and
- * upserted on the table's `(kilo_user_id, provider_id)` unique constraint.
+ * encrypted with the same AES-256-GCM helpers as every other BYOK key. A
+ * connection is owned by exactly one account: a person or an organization, one
+ * connection per owner.
  */
+
+/** The account a connection belongs to. */
+export type OpenAiChatGptOwner = { type: 'user'; id: string } | { type: 'org'; id: string };
+
+/** Stable identity for per-owner state such as the in-flight refresh map. */
+export function openAiChatGptOwnerKey(owner: OpenAiChatGptOwner): string {
+  return `${owner.type}:${owner.id}`;
+}
+
+function ownerCondition(owner: OpenAiChatGptOwner): SQL {
+  return owner.type === 'org'
+    ? eq(byok_api_keys.organization_id, owner.id)
+    : eq(byok_api_keys.kilo_user_id, owner.id);
+}
+
+/** Matches the owner's `openai-chatgpt` row for reads, updates and deletes. */
+export function openAiChatGptConnectionWhere(owner: OpenAiChatGptOwner): SQL | undefined {
+  return and(ownerCondition(owner), eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID));
+}
 
 /** Either the primary database or an open transaction. */
 export type OpenAiChatGptDatabase = typeof db | DrizzleTransaction;
@@ -27,7 +47,7 @@ export type OpenAiChatGptDatabase = typeof db | DrizzleTransaction;
  */
 export async function readOpenAiChatGptConnectionRow(
   fromDb: OpenAiChatGptDatabase,
-  userId: string,
+  owner: OpenAiChatGptOwner,
   options: { forUpdate?: boolean } = {}
 ) {
   const query = fromDb
@@ -36,12 +56,7 @@ export async function readOpenAiChatGptConnectionRow(
       is_enabled: byok_api_keys.is_enabled,
     })
     .from(byok_api_keys)
-    .where(
-      and(
-        eq(byok_api_keys.kilo_user_id, userId),
-        eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
-      )
-    );
+    .where(openAiChatGptConnectionWhere(owner));
 
   const rows = options.forUpdate ? await query.for('update').limit(1) : await query.limit(1);
   return rows[0] ?? null;
@@ -66,9 +81,9 @@ export function decryptOpenAiChatGptConnection(
 }
 
 export async function getOpenAiChatGptConnection(
-  userId: string
+  owner: OpenAiChatGptOwner
 ): Promise<OpenAiChatGptConnection | null> {
-  const row = await readOpenAiChatGptConnectionRow(db, userId);
+  const row = await readOpenAiChatGptConnectionRow(db, owner);
   return row ? decryptOpenAiChatGptConnection(row.encrypted_api_key) : null;
 }
 
@@ -80,24 +95,24 @@ export async function getOpenAiChatGptConnection(
  * terminal refresh failure still surfaces its reconnect message.
  */
 export async function getOpenAiChatGptStoredConnection(
-  userId: string
+  owner: OpenAiChatGptOwner
 ): Promise<{ connection: OpenAiChatGptConnection; isEnabled: boolean } | null> {
-  const row = await readOpenAiChatGptConnectionRow(db, userId);
+  const row = await readOpenAiChatGptConnectionRow(db, owner);
   if (!row) return null;
   const connection = decryptOpenAiChatGptConnection(row.encrypted_api_key);
   return connection ? { connection, isEnabled: row.is_enabled } : null;
 }
 
 /**
- * Inserts or replaces the connection for a user. The upsert targets the
- * `(kilo_user_id, provider_id)` unique constraint, so reconnecting never leaves
- * a second row behind. `organization_id` is null (the connection is personal),
- * and the row is always left enabled and connected with any previous error
- * state cleared.
+ * Inserts or replaces the owner's connection. The upsert targets the owner's
+ * unique constraint, so reconnecting never leaves a second row behind. The row
+ * is always left enabled and connected with any previous error state cleared.
+ * `createdBy` is the acting person and is recorded on organization rows.
  */
 export async function saveOpenAiChatGptConnection(
-  userId: string,
-  connection: OpenAiChatGptConnection
+  owner: OpenAiChatGptOwner,
+  connection: OpenAiChatGptConnection,
+  createdBy: string
 ): Promise<void> {
   const stored: OpenAiChatGptConnection = {
     ...connection,
@@ -107,20 +122,23 @@ export async function saveOpenAiChatGptConnection(
   };
   const encrypted_api_key = encryptApiKey(JSON.stringify(stored), BYOK_ENCRYPTION_KEY);
   const values = {
-    organization_id: null,
-    kilo_user_id: userId,
+    organization_id: owner.type === 'org' ? owner.id : null,
+    kilo_user_id: owner.type === 'user' ? owner.id : null,
     provider_id: OPENAI_CHATGPT_PROVIDER_ID,
     encrypted_api_key,
     management_source: 'user' as const,
     is_enabled: true,
-    created_by: userId,
+    created_by: createdBy,
   };
 
   await db
     .insert(byok_api_keys)
     .values(values)
     .onConflictDoUpdate({
-      target: [byok_api_keys.kilo_user_id, byok_api_keys.provider_id],
+      target:
+        owner.type === 'org'
+          ? [byok_api_keys.organization_id, byok_api_keys.provider_id]
+          : [byok_api_keys.kilo_user_id, byok_api_keys.provider_id],
       set: {
         encrypted_api_key,
         is_enabled: true,
@@ -128,16 +146,9 @@ export async function saveOpenAiChatGptConnection(
     });
 }
 
-/** Deletes the stored connection, for example when the account is unlinked. */
-export async function clearOpenAiChatGptConnection(userId: string): Promise<void> {
-  await db
-    .delete(byok_api_keys)
-    .where(
-      and(
-        eq(byok_api_keys.kilo_user_id, userId),
-        eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
-      )
-    );
+/** Deletes the owner's stored connection. */
+export async function clearOpenAiChatGptConnection(owner: OpenAiChatGptOwner): Promise<void> {
+  await db.delete(byok_api_keys).where(openAiChatGptConnectionWhere(owner));
 }
 
 /**
@@ -153,7 +164,7 @@ export async function clearOpenAiChatGptConnection(userId: string): Promise<void
  */
 export async function markOpenAiChatGptConnectionErrored(
   fromDb: OpenAiChatGptDatabase,
-  userId: string,
+  owner: OpenAiChatGptOwner,
   connection: OpenAiChatGptConnection,
   message: string
 ): Promise<void> {
@@ -173,12 +184,7 @@ export async function markOpenAiChatGptConnectionErrored(
       encrypted_api_key: encryptApiKey(JSON.stringify(errored), BYOK_ENCRYPTION_KEY),
       is_enabled: false,
     })
-    .where(
-      and(
-        eq(byok_api_keys.kilo_user_id, userId),
-        eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
-      )
-    );
+    .where(openAiChatGptConnectionWhere(owner));
 }
 
 /**
@@ -186,9 +192,12 @@ export async function markOpenAiChatGptConnectionErrored(
  * no-op. The refresh path uses `markOpenAiChatGptConnectionErrored` directly so
  * the write stays inside the row lock.
  */
-export async function markOpenAiChatGptError(userId: string, message: string): Promise<void> {
-  const connection = await getOpenAiChatGptConnection(userId);
+export async function markOpenAiChatGptError(
+  owner: OpenAiChatGptOwner,
+  message: string
+): Promise<void> {
+  const connection = await getOpenAiChatGptConnection(owner);
   if (!connection) return;
 
-  await markOpenAiChatGptConnectionErrored(db, userId, connection, message);
+  await markOpenAiChatGptConnectionErrored(db, owner, connection, message);
 }

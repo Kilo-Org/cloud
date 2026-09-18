@@ -2334,7 +2334,7 @@ export async function unlinkAuthProviderFromUser(
   // same external identity, so keeping it would leave a usable key for an
   // account the person just detached.
   if (provider === 'openai') {
-    await clearOpenAiChatGptConnection(kiloUserId);
+    await clearOpenAiChatGptConnection({ type: 'user', id: kiloUserId });
   }
 
   return successResult();

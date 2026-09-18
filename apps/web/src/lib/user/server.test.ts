@@ -458,7 +458,7 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
     const token = await jwtCallback!(openAiSignInArgs(user.id, email, sub));
 
     expect(token.kiloUserId).toBe(user.id);
-    await expect(getOpenAiChatGptConnection(user.id)).resolves.toMatchObject({
+    await expect(getOpenAiChatGptConnection({ type: 'user', id: user.id })).resolves.toMatchObject({
       access_token: 'signin-access-token',
       refresh_token: 'signin-refresh-token',
       issuer: OPENAI_ISSUER,
@@ -480,6 +480,32 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
     expect(row?.is_enabled).toBe(true);
   });
 
+  test('persists an organization connection when the profile carries the organization', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+    const organization = await createTestOrganization(
+      `ChatGPT BYOK ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+
+    const args = openAiSignInArgs(user.id, email, sub);
+    (args.profile as Record<string, unknown>).openAiChatGptOrganizationId = organization.id;
+
+    await jwtCallback!(args);
+
+    await expect(
+      getOpenAiChatGptConnection({ type: 'org', id: organization.id })
+    ).resolves.toMatchObject({
+      access_token: 'signin-access-token',
+      refresh_token: 'signin-refresh-token',
+      subject: sub,
+      status: 'connected',
+    });
+
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+  });
+
   test('does not store a connection for an identity-only sign-in', async () => {
     const sub = `subject-${crypto.randomUUID()}`;
     const { user, email } = await seedOpenAiUser(sub);
@@ -491,7 +517,7 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
       })
     );
 
-    await expect(getOpenAiChatGptConnection(user.id)).resolves.toBeNull();
+    await expect(getOpenAiChatGptConnection({ type: 'user', id: user.id })).resolves.toBeNull();
   });
 
   test('does not overwrite a working connection with an identity-only sign-in', async () => {
@@ -508,7 +534,7 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
       })
     );
 
-    await expect(getOpenAiChatGptConnection(user.id)).resolves.toMatchObject({
+    await expect(getOpenAiChatGptConnection({ type: 'user', id: user.id })).resolves.toMatchObject({
       access_token: 'signin-access-token',
       refresh_token: 'signin-refresh-token',
     });
@@ -522,7 +548,7 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
     // requested scope; the refresh token is then the delegated grant's marker.
     await jwtCallback!(openAiSignInArgs(user.id, email, sub, { scope: undefined }));
 
-    await expect(getOpenAiChatGptConnection(user.id)).resolves.toMatchObject({
+    await expect(getOpenAiChatGptConnection({ type: 'user', id: user.id })).resolves.toMatchObject({
       access_token: 'signin-access-token',
       refresh_token: 'signin-refresh-token',
     });

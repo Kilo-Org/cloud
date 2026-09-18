@@ -22,6 +22,7 @@ import type {
 } from 'next-auth';
 import NextAuth, { getServerSession } from 'next-auth';
 import type { GoogleProfile } from 'next-auth/providers/google';
+import type { OAuthConfig } from 'next-auth/providers/oauth';
 import GoogleProvider from 'next-auth/providers/google';
 import GithubProvider from 'next-auth/providers/github';
 import GitlabProvider from 'next-auth/providers/gitlab';
@@ -72,12 +73,23 @@ import { hosted_domain_specials } from '@/lib/auth/constants';
 import { authFailureRedirectUrl, ssoSignInRedirectUrl } from '@/lib/auth/redirect-urls';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import {
+  OPENAI_DISCOVERY_URL,
+  OPENAI_IDENTITY_SCOPE,
+  OPENAI_ISSUER,
+  OPENAI_REDIRECT_URI,
+  OPENAI_RESOURCE,
+  isOpenAiTokenSharingGrant,
+} from '@/lib/auth/openai/config';
+import { saveOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
+import {
   GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET,
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
   ANACONDA_CLIENT_ID,
   ANACONDA_CLIENT_SECRET,
+  OPENAI_CLIENT_ID,
+  OPENAI_CLIENT_SECRET,
   LINKEDIN_CLIENT_ID,
   LINKEDIN_CLIENT_SECRET,
   WORKOS_API_KEY,
@@ -184,6 +196,28 @@ export function parseAnacondaProfile(profile: unknown) {
   };
 }
 
+const openAiProfileSchema = z.object({
+  sub: z.string().trim().min(1),
+  email: z.string().email(),
+  name: z.string().nullish(),
+  picture: z.string().nullish(),
+});
+
+/**
+ * Maps the verified OpenAI ID-token claims to a NextAuth user. `sub` is the
+ * stable external identity: it is the only claim used to bind the account, so
+ * a missing or empty subject is rejected rather than coerced.
+ */
+export function parseOpenAiProfile(profile: unknown) {
+  const parsedProfile = openAiProfileSchema.parse(profile);
+  return {
+    id: parsedProfile.sub,
+    email: parsedProfile.email,
+    name: parsedProfile.name?.trim() || parsedProfile.email.split('@')[0],
+    image: parsedProfile.picture ?? null,
+  };
+}
+
 function createGoogleAccountInfo(
   account: Account,
   user: NextUser | AdapterUser,
@@ -222,6 +256,74 @@ function createAnacondaAccountInfo(
     provider_account_id: account.providerAccountId,
     display_name: null,
   };
+}
+
+function createOpenAiAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser,
+  profile: Profile | undefined
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'openai') return null;
+  assert(user.email, 'User email is required for OpenAI auth');
+
+  const sub = (profile as { sub?: unknown } | undefined)?.sub;
+  if (typeof sub !== 'string' || sub.trim() === '') {
+    throw new Error('OpenAI auth profile is missing the subject');
+  }
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || user.email.split('@')[0],
+    google_user_image_url: user.image || '',
+    hosted_domain: hosted_domain_specials.openai,
+    provider: account.provider,
+    // Issuer-qualified subject: a `sub` from any other issuer or client can
+    // never collide with an OpenAI account.
+    provider_account_id: `${OPENAI_ISSUER}#${sub}`,
+    display_name: null,
+  };
+}
+
+/**
+ * Persists the delegated tokens a completed ChatGPT authorization issued, so
+ * the same consent that signs a person in also connects OpenAI BYOK. Only a
+ * grant that carries the delegated scopes is stored: a plain identity-only
+ * sign-in cannot invoke the API resource and cannot be refreshed, so storing it
+ * would route eligible requests through a credential OpenAI rejects and would
+ * overwrite a working token-sharing connection. A storage failure is reported to
+ * Sentry without any token value and never fails the sign-in: the person is
+ * still signed in and can connect again from BYOK.
+ */
+async function persistOpenAiChatGptConnection(
+  userId: string,
+  account: Account,
+  profile: Profile | undefined
+): Promise<void> {
+  try {
+    const accessToken = account.access_token;
+    const subject = (profile as { sub?: unknown } | undefined)?.sub;
+    if (!accessToken || typeof subject !== 'string' || subject.trim() === '') return;
+    if (!isOpenAiTokenSharingGrant(account)) return;
+
+    const email = (profile as { email?: unknown } | undefined)?.email;
+    await saveOpenAiChatGptConnection(userId, {
+      access_token: accessToken,
+      ...(account.refresh_token ? { refresh_token: account.refresh_token } : {}),
+      expires_at: account.expires_at ?? Math.floor(Date.now() / 1000) + 3600,
+      ...(account.scope ? { scope: account.scope } : {}),
+      ...(account.token_type ? { token_type: account.token_type } : {}),
+      issuer: OPENAI_ISSUER,
+      client_id: OPENAI_CLIENT_ID,
+      subject,
+      ...(typeof email === 'string' && email ? { email } : {}),
+      connected_at: new Date().toISOString(),
+      status: 'connected',
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'openai_chatgpt_connection_persist' },
+    });
+  }
 }
 
 function createAppleAccountInfo(
@@ -453,6 +555,7 @@ function createAccountInfo(
   const accountInfo =
     createGoogleAccountInfo(account, user, profile) ??
     createAnacondaAccountInfo(account, user) ??
+    createOpenAiAccountInfo(account, user, profile) ??
     createAppleAccountInfo(account, user) ??
     createGitHubAccountInfo(account, user, profile) ??
     createGitlabAccountInfo(account, user) ??
@@ -617,6 +720,47 @@ const logger: LoggerInstance = {
 const useSecureCookies = NEXTAUTH_URL?.startsWith('https://') ?? false;
 const cookiePrefix = useSecureCookies ? '__Secure-' : '';
 
+/**
+ * OpenAI ("Sign in with ChatGPT") provider.
+ *
+ * The OAuth client's registered callback path is `/auth/openai/callback`
+ * (`OPENAI_REDIRECT_PATH`). NextAuth rewrites a provider's `callbackUrl` to its
+ * own `/api/auth/callback/<id>` at request time, so the registered path is
+ * declared on the openid-client metadata (`client.redirect_uris`) for the
+ * authorization request and repeated explicitly when the code is exchanged.
+ * `callbackUrl` is kept because it names the registered path the route serves.
+ */
+const openAiProvider: OAuthConfig<Profile> & { callbackUrl: string } = {
+  id: 'openai',
+  name: 'ChatGPT',
+  type: 'oauth',
+  wellKnown: OPENAI_DISCOVERY_URL,
+  issuer: OPENAI_ISSUER,
+  idToken: true,
+  checks: ['pkce', 'state', 'nonce'],
+  client: {
+    token_endpoint_auth_method: 'client_secret_basic',
+    redirect_uris: [OPENAI_REDIRECT_URI],
+  },
+  clientId: OPENAI_CLIENT_ID,
+  clientSecret: OPENAI_CLIENT_SECRET,
+  callbackUrl: OPENAI_REDIRECT_URI,
+  authorization: { params: { scope: OPENAI_IDENTITY_SCOPE, resource: OPENAI_RESOURCE } },
+  token: {
+    params: { resource: OPENAI_RESOURCE },
+    // openid-client builds the code exchange from a fixed field set and drops
+    // the resource, so an authorization that requested a resource is redeemed
+    // without one and OpenAI rejects it with `invalid_grant`. `exchangeBody`
+    // merges the resource back into the same token request.
+    request: async ({ params, checks, client }) => ({
+      tokens: await client.callback(OPENAI_REDIRECT_URI, params, checks, {
+        exchangeBody: { resource: OPENAI_RESOURCE },
+      }),
+    }),
+  },
+  profile: parseOpenAiProfile,
+};
+
 export const authOptions: NextAuthOptions = {
   secret: NEXTAUTH_SECRET,
   cookies: {
@@ -638,6 +782,7 @@ export const authOptions: NextAuthOptions = {
       clientId: GOOGLE_CLIENT_ID,
       clientSecret: GOOGLE_CLIENT_SECRET,
     }),
+    openAiProvider,
     {
       id: 'anaconda',
       name: 'Anaconda',
@@ -1091,6 +1236,12 @@ export const authOptions: NextAuthOptions = {
 
         token.kiloUserId = existingUser.id;
 
+        // The ChatGPT authorization carries the delegated tokens that are the
+        // OpenAI BYOK credential; store them on the same flow that signs in.
+        if (account.provider === 'openai' && account.access_token) {
+          await persistOpenAiChatGptConnection(existingUser.id, account, profile);
+        }
+
         token.version = JWT_TOKEN_VERSION;
         token.exp = Math.floor(Date.now() / 1000) + secondsInDay * 30;
         token.iat = Math.floor(Date.now() / 1000);
@@ -1160,6 +1311,16 @@ export const authOptions: NextAuthOptions = {
 };
 
 export const nextAuthHttpHandler = NextAuth(authOptions);
+
+/**
+ * Returns the signed-in user id when the request carries a valid NextAuth
+ * session, or null when it does not. This performs no authorization checks and
+ * never redirects; it is used to decide where an OAuth callback error lands.
+ */
+export async function getUserFromSession(): Promise<{ id: string } | null> {
+  const session = await getServerSession(authOptions);
+  return session?.kiloUserId ? { id: session.kiloUserId } : null;
+}
 
 export type RequiredPermissions = {
   adminOnly: boolean;

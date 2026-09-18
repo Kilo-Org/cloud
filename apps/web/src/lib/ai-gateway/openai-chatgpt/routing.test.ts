@@ -34,6 +34,7 @@ import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 import {
   buildOpenAiChatGptProvider,
   checkOpenAiChatGptByok,
+  getOpenAiChatGptByokModelIds,
   isOpenAiChatGptEligible,
   OPENAI_CHATGPT_API_URL,
   OPENAI_ON_BEHALF_OF_TOKEN_HEADER,
@@ -243,6 +244,66 @@ describe('isOpenAiChatGptEligible', () => {
   });
 });
 
+describe('getOpenAiChatGptByokModelIds', () => {
+  it('tags only the served OpenAI models among the candidates', async () => {
+    jest.mocked(isOpenAiModelServed).mockImplementation(async (_apiKey, modelId) => {
+      return modelId === 'gpt-5-nano';
+    });
+
+    await expect(
+      getOpenAiChatGptByokModelIds(USER_ID, [
+        'openai/gpt-5-nano',
+        'openai/gpt-5.6-luna-pro',
+        'anthropic/claude-sonnet-5',
+      ])
+    ).resolves.toEqual(new Set(['openai/gpt-5-nano']));
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(USER_ID);
+    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5-nano');
+    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5.6-luna-pro');
+  });
+
+  it('returns null without a usable connection so the list stays untouched', async () => {
+    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(null);
+    await expect(
+      getOpenAiChatGptByokModelIds(USER_ID, ['openai/gpt-5-nano'])
+    ).resolves.toBeNull();
+
+    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue({
+      connection: connectedConnection(),
+      isEnabled: false,
+    });
+    await expect(
+      getOpenAiChatGptByokModelIds(USER_ID, ['openai/gpt-5-nano'])
+    ).resolves.toBeNull();
+
+    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue({
+      connection: { ...connectedConnection(), status: 'error' },
+      isEnabled: true,
+    });
+    await expect(
+      getOpenAiChatGptByokModelIds(USER_ID, ['openai/gpt-5-nano'])
+    ).resolves.toBeNull();
+  });
+
+  it('returns null without the deployment partner key', async () => {
+    process.env.OPENAI_CHATGPT_API_KEY = '';
+
+    await expect(
+      getOpenAiChatGptByokModelIds(USER_ID, ['openai/gpt-5-nano'])
+    ).resolves.toBeNull();
+  });
+
+  it('never tags a gpt-oss or Kilo-exclusive model', async () => {
+    await expect(
+      getOpenAiChatGptByokModelIds(USER_ID, [
+        'openai/gpt-oss-20b',
+        'openai/gpt-5.6-sol-discounted',
+      ])
+    ).resolves.toEqual(new Set());
+    expect(isOpenAiModelServed).not.toHaveBeenCalled();
+  });
+});
+
 describe('checkOpenAiChatGptByok', () => {
   it('builds a stateless responses provider carrying the delegated token', async () => {
     const result = await checkOpenAiChatGptByok(routingInput());
@@ -251,6 +312,7 @@ describe('checkOpenAiChatGptByok', () => {
       kind: 'provider',
       userByok: null,
       bypassAccessCheck: false,
+      skipBalanceCheck: true,
       provider: {
         id: 'openai-chatgpt',
         apiUrl: OPENAI_CHATGPT_API_URL,

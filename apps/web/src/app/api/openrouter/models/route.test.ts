@@ -19,6 +19,9 @@ jest.mock('@/lib/ai-gateway/byok', () => ({
   addUserByokAvailability: jest.fn(),
   getUserByokProviderIds: jest.fn(),
 }));
+jest.mock('@/lib/ai-gateway/openai-chatgpt/routing', () => ({
+  getOpenAiChatGptByokModelIds: jest.fn().mockResolvedValue(null),
+}));
 jest.mock('@/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
@@ -38,6 +41,9 @@ const { listAvailableExperimentModels } = jest.requireMock(
 );
 const { addUserByokAvailability, getUserByokProviderIds } =
   jest.requireMock('@/lib/ai-gateway/byok');
+const { getOpenAiChatGptByokModelIds } = jest.requireMock(
+  '@/lib/ai-gateway/openai-chatgpt/routing'
+);
 const { getAvailableModelsForOrganization } = jest.requireMock(
   '@/lib/organizations/organization-models'
 );
@@ -50,6 +56,7 @@ const mockedGetDirectByokModelsForUser = jest.mocked(getDirectByokModelsForUser)
 const mockedListAvailableExperimentModels = jest.mocked(listAvailableExperimentModels);
 const mockedAddUserByokAvailability = jest.mocked(addUserByokAvailability);
 const mockedGetUserByokProviderIds = jest.mocked(getUserByokProviderIds);
+const mockedGetOpenAiChatGptByokModelIds = jest.mocked(getOpenAiChatGptByokModelIds);
 const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
 const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
 const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
@@ -87,6 +94,7 @@ describe('GET /api/openrouter/models', () => {
     mockedGetDirectByokModelsForUser.mockResolvedValue([]);
     mockedListAvailableExperimentModels.mockResolvedValue([]);
     mockedGetUserByokProviderIds.mockResolvedValue([]);
+    mockedGetOpenAiChatGptByokModelIds.mockResolvedValue(null);
     mockedGetAvailableModelsForOrganization.mockResolvedValue(null);
     mockedGetCachedRoutingTable.mockResolvedValue(null);
     mockedGetAutoFreeCandidates.mockResolvedValue([]);
@@ -129,6 +137,30 @@ describe('GET /api/openrouter/models', () => {
     await expect(response.json()).resolves.toEqual({
       data: [{ ...publicModel, hasUserByokAvailable: true }, directModel, experimentModel],
     });
+  });
+
+  test('tags models an enabled ChatGPT connection can serve', async () => {
+    const openAiModel = makeModel('openai/gpt-5-nano');
+    const otherModel = makeModel('anthropic/claude');
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-id' },
+      organizationId: null,
+      authFailedResponse: null,
+    } as never);
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [openAiModel, otherModel] });
+    mockedAddUserByokAvailability.mockResolvedValue([openAiModel, otherModel]);
+    mockedGetOpenAiChatGptByokModelIds.mockResolvedValue(new Set(['openai/gpt-5-nano']));
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: [{ ...openAiModel, hasUserByokAvailable: true }, otherModel],
+    });
+    expect(mockedGetOpenAiChatGptByokModelIds).toHaveBeenCalledWith('user-id', [
+      'openai/gpt-5-nano',
+      'anthropic/claude',
+    ]);
   });
 
   test('adds auto-routing models from routing sources', async () => {

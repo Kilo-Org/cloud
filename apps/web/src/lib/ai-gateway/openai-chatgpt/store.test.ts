@@ -14,7 +14,6 @@ jest.mock('@/lib/config.server', () => ({
 import { db } from '@/lib/drizzle';
 import { encryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
-import { OPENAI_CHATGPT_PROVIDER_ID } from './provider-id';
 import {
   clearOpenAiChatGptConnection,
   getOpenAiChatGptConnection,
@@ -33,17 +32,17 @@ type MockDb = {
 };
 
 type StoredRow = {
+  kilo_user_id: string;
   organization_id: string | null;
-  kilo_user_id: string | null;
-  provider_id: string;
-  encrypted_api_key: EncryptedData;
+  encrypted_connection: EncryptedData;
   is_enabled: boolean;
+  created_by: string;
 };
 
 const TEST_USER_ID = 'user-1';
 const TEST_ORG_ID = '00000000-0000-4000-8000-000000000001';
-const USER_OWNER: OpenAiChatGptOwner = { type: 'user', id: TEST_USER_ID };
-const ORG_OWNER: OpenAiChatGptOwner = { type: 'org', id: TEST_ORG_ID };
+const USER_OWNER: OpenAiChatGptOwner = { kiloUserId: TEST_USER_ID, organizationId: null };
+const ORG_OWNER: OpenAiChatGptOwner = { kiloUserId: TEST_USER_ID, organizationId: TEST_ORG_ID };
 
 function buildConnection(
   overrides: Partial<OpenAiChatGptConnection> = {}
@@ -70,9 +69,12 @@ describe('openai-chatgpt connection store', () => {
   let activeOwner: OpenAiChatGptOwner = USER_OWNER;
 
   function matchesActiveOwner(row: StoredRow): boolean {
-    return activeOwner.type === 'user'
-      ? row.kilo_user_id === activeOwner.id && row.organization_id === null
-      : row.organization_id === activeOwner.id && row.kilo_user_id === null;
+    return (
+      row.kilo_user_id === activeOwner.kiloUserId &&
+      (activeOwner.organizationId === null
+        ? row.organization_id === null
+        : row.organization_id === activeOwner.organizationId)
+    );
   }
 
   beforeEach(() => {
@@ -94,10 +96,8 @@ describe('openai-chatgpt connection store', () => {
         onConflictDoUpdate: jest.fn(({ set }: { set: Partial<StoredRow> }) => {
           const index = rows.findIndex(
             row =>
-              row.provider_id === values.provider_id &&
-              (values.organization_id
-                ? row.organization_id === values.organization_id
-                : row.kilo_user_id === values.kilo_user_id)
+              row.kilo_user_id === values.kilo_user_id &&
+              row.organization_id === values.organization_id
           );
           if (index >= 0) {
             rows[index] = { ...rows[index], ...set };
@@ -128,34 +128,34 @@ describe('openai-chatgpt connection store', () => {
     }));
   });
 
-  it('round-trips an encrypted personal connection through the byok row', async () => {
+  it('round-trips an encrypted personal connection', async () => {
     const connection = buildConnection();
 
     await saveOpenAiChatGptConnection(USER_OWNER, connection, TEST_USER_ID);
 
     expect(rows).toHaveLength(1);
-    expect(rows[0].provider_id).toBe(OPENAI_CHATGPT_PROVIDER_ID);
     expect(rows[0].kilo_user_id).toBe(TEST_USER_ID);
     expect(rows[0].organization_id).toBeNull();
     expect(rows[0].is_enabled).toBe(true);
     // The stored blob is ciphertext, never the plaintext token.
-    expect(JSON.stringify(rows[0].encrypted_api_key)).not.toContain('access-token-1');
+    expect(JSON.stringify(rows[0].encrypted_connection)).not.toContain('access-token-1');
 
     await expect(getOpenAiChatGptConnection(USER_OWNER)).resolves.toEqual(connection);
   });
 
-  it('stores an organization connection against the organization row', async () => {
+  it('stores an organization connection for the member who connected it', async () => {
     activeOwner = ORG_OWNER;
 
     await saveOpenAiChatGptConnection(ORG_OWNER, buildConnection(), TEST_USER_ID);
 
     expect(rows).toHaveLength(1);
     expect(rows[0].organization_id).toBe(TEST_ORG_ID);
-    expect(rows[0].kilo_user_id).toBeNull();
+    // The connection is personal, so the member stays the owner.
+    expect(rows[0].kilo_user_id).toBe(TEST_USER_ID);
     await expect(getOpenAiChatGptConnection(ORG_OWNER)).resolves.toEqual(buildConnection());
   });
 
-  it('keeps one connection per owner, so a personal and an organization row coexist', async () => {
+  it('keeps one connection per account, so personal and organization rows coexist', async () => {
     await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
     await saveOpenAiChatGptConnection(
       ORG_OWNER,
@@ -163,6 +163,7 @@ describe('openai-chatgpt connection store', () => {
       TEST_USER_ID
     );
 
+    expect(rows).toHaveLength(2);
     activeOwner = USER_OWNER;
     await expect(getOpenAiChatGptConnection(USER_OWNER)).resolves.toMatchObject({
       access_token: 'access-token-1',
@@ -209,11 +210,11 @@ describe('openai-chatgpt connection store', () => {
 
   it('returns null for an undecryptable payload instead of throwing', async () => {
     rows.push({
-      organization_id: null,
       kilo_user_id: TEST_USER_ID,
-      provider_id: OPENAI_CHATGPT_PROVIDER_ID,
-      encrypted_api_key: { iv: 'not-base64!!!', data: 'also-not', authTag: 'nope' },
+      organization_id: null,
+      encrypted_connection: { iv: 'not-base64!!!', data: 'also-not', authTag: 'nope' },
       is_enabled: true,
+      created_by: TEST_USER_ID,
     });
 
     await expect(getOpenAiChatGptConnection(USER_OWNER)).resolves.toBeNull();
@@ -221,11 +222,14 @@ describe('openai-chatgpt connection store', () => {
 
   it('returns null when the decrypted payload is not the expected shape', async () => {
     rows.push({
-      organization_id: null,
       kilo_user_id: TEST_USER_ID,
-      provider_id: OPENAI_CHATGPT_PROVIDER_ID,
-      encrypted_api_key: encryptApiKey(JSON.stringify({ unexpected: true }), BYOK_ENCRYPTION_KEY),
+      organization_id: null,
+      encrypted_connection: encryptApiKey(
+        JSON.stringify({ unexpected: true }),
+        BYOK_ENCRYPTION_KEY
+      ),
       is_enabled: true,
+      created_by: TEST_USER_ID,
     });
 
     await expect(getOpenAiChatGptConnection(USER_OWNER)).resolves.toBeNull();
@@ -274,7 +278,7 @@ describe('openai-chatgpt connection store', () => {
     expect(rows[0].is_enabled).toBe(true);
   });
 
-  it('clearOpenAiChatGptConnection deletes only the owner row', async () => {
+  it('clearOpenAiChatGptConnection deletes only the account row', async () => {
     await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), TEST_USER_ID);
     await saveOpenAiChatGptConnection(ORG_OWNER, buildConnection(), TEST_USER_ID);
 

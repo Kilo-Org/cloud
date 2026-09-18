@@ -31,10 +31,10 @@ type MockDb = {
   update: jest.Mock;
 };
 
-type StoredRow = { encrypted_api_key: ReturnType<typeof encryptApiKey>; is_enabled: boolean };
+type StoredRow = { encrypted_connection: ReturnType<typeof encryptApiKey>; is_enabled: boolean };
 
 const TEST_USER_ID = 'user-1';
-const USER_OWNER: OpenAiChatGptOwner = { type: 'user', id: TEST_USER_ID };
+const USER_OWNER: OpenAiChatGptOwner = { kiloUserId: TEST_USER_ID, organizationId: null };
 
 function nowSeconds(): number {
   return Math.floor(Date.now() / 1000);
@@ -61,7 +61,7 @@ function buildConnection(
 
 function encryptedRow(connection: OpenAiChatGptConnection): StoredRow {
   return {
-    encrypted_api_key: encryptApiKey(JSON.stringify(connection), BYOK_ENCRYPTION_KEY),
+    encrypted_connection: encryptApiKey(JSON.stringify(connection), BYOK_ENCRYPTION_KEY),
     is_enabled: true,
   };
 }
@@ -75,7 +75,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function decodeStored(setCall: Record<string, unknown>): OpenAiChatGptConnection {
-  const encrypted = setCall.encrypted_api_key as ReturnType<typeof encryptApiKey>;
+  const encrypted = setCall.encrypted_connection as ReturnType<typeof encryptApiKey>;
   return OpenAiChatGptConnectionSchema.parse(
     JSON.parse(decryptApiKey(encrypted, BYOK_ENCRYPTION_KEY))
   );

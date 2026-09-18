@@ -37,24 +37,28 @@ export function BYOKContent({
           title="Bring Your Own Key"
           showBackButton={false}
         />
-        {!hasPermission ? (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Access Denied</AlertTitle>
-            <AlertDescription>
-              You must be an organization owner to access BYOK settings.
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <div className="space-y-4">
-            {chatGptEnabled === true ? (
-              <OpenAiChatGptCard organizationId={organizationId} />
-            ) : chatGptEnabled === undefined ? (
-              <OpenAiChatGptCardView status={undefined} />
-            ) : null}
+        {/*
+          The ChatGPT connection is personal, so every member manages their own
+          for this organization. The pasted-key manager stays owner/admin only.
+        */}
+        <div className="space-y-4">
+          {chatGptEnabled === true ? (
+            <OpenAiChatGptCard organizationId={organizationId} />
+          ) : chatGptEnabled === undefined ? (
+            <OpenAiChatGptCardView status={undefined} />
+          ) : null}
+          {hasPermission ? (
             <BYOKKeysManager organizationId={organizationId} />
-          </div>
-        )}
+          ) : (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Access Denied</AlertTitle>
+              <AlertDescription>
+                You must be an organization owner to manage organization API keys.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
       </div>
     </OrganizationContextProvider>
   );

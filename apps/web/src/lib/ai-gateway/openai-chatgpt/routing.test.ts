@@ -49,8 +49,8 @@ const DELEGATED_TOKEN = 'delegated-access-token';
 const REQUESTED_MODEL = 'openai/gpt-5-nano';
 const USER_ID = 'user-1';
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
-const USER_OWNER: OpenAiChatGptOwner = { type: 'user', id: USER_ID };
-const ORG_OWNER: OpenAiChatGptOwner = { type: 'org', id: ORG_ID };
+const USER_OWNER: OpenAiChatGptOwner = { kiloUserId: USER_ID, organizationId: null };
+const ORG_OWNER: OpenAiChatGptOwner = { kiloUserId: USER_ID, organizationId: ORG_ID };
 
 const originalOpenAiChatGptApiKey = process.env.OPENAI_CHATGPT_API_KEY;
 const originalFetch = global.fetch;

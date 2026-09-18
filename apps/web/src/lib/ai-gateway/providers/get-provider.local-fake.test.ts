@@ -221,16 +221,19 @@ describe('getProvider ChatGPT connection routing order', () => {
     jest.restoreAllMocks();
   });
 
-  test('an organization request reads the organization connection, never the personal one', async () => {
+  test('an organization request reads the member connection for that organization, never the personal one', async () => {
     const env = replaceEnv({ OPENAI_CHATGPT_API_KEY: 'partner-project-key' });
     jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(null);
 
     await getProvider({ ...responsesInput('openai/gpt-5-nano'), organizationId: ORG_ID });
 
-    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith({ type: 'org', id: ORG_ID });
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith({
+      kiloUserId: user.id,
+      organizationId: ORG_ID,
+    });
     expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalledWith({
-      type: 'user',
-      id: user.id,
+      kiloUserId: user.id,
+      organizationId: null,
     });
     env.restore();
   });

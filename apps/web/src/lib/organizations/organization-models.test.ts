@@ -404,7 +404,7 @@ describe('organization model producer publication', () => {
     expect(mockReadRows).toHaveBeenCalledTimes(2);
   });
 
-  it('tags the organization ChatGPT connection for every subject', async () => {
+  it('tags the member ChatGPT connection and skips the default-access subject', async () => {
     mockTagChatGpt.mockImplementation(async (_owner, models: OpenRouterModel[]) =>
       models.map(model =>
         model.id === 'provider/training' ? { ...model, hasUserByokAvailable: true } : model
@@ -413,7 +413,7 @@ describe('organization model producer publication', () => {
 
     const memberResult = await resultFor();
     expect(mockTagChatGpt).toHaveBeenCalledWith(
-      { type: 'org', id: 'fixture-org' },
+      { kiloUserId: 'fixture-user', organizationId: 'fixture-org' },
       expect.any(Array)
     );
     expect(
@@ -422,12 +422,9 @@ describe('organization model producer publication', () => {
 
     mockTagChatGpt.mockClear();
     const defaultResult = await resultFor({ type: 'defaultAccess' });
-    expect(mockTagChatGpt).toHaveBeenCalledWith(
-      { type: 'org', id: 'fixture-org' },
-      expect.any(Array)
-    );
+    expect(mockTagChatGpt).not.toHaveBeenCalled();
     expect(
       defaultResult.data.find(model => model.id === 'provider/training')?.hasUserByokAvailable
-    ).toBe(true);
+    ).toBe(false);
   });
 });

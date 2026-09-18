@@ -307,9 +307,10 @@ async function persistOpenAiChatGptConnection(
 
     const email = (profile as { email?: unknown } | undefined)?.email;
     const organizationId = (profile as ExtendedProfile | undefined)?.openAiChatGptOrganizationId;
-    const owner: OpenAiChatGptOwner = organizationId
-      ? { type: 'org', id: organizationId }
-      : { type: 'user', id: userId };
+    const owner: OpenAiChatGptOwner = {
+      kiloUserId: userId,
+      organizationId: organizationId ?? null,
+    };
     await saveOpenAiChatGptConnection(
       owner,
       {

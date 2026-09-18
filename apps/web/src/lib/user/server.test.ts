@@ -42,7 +42,7 @@ import {
 import { db } from '@/lib/drizzle';
 import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
 import {
-  byok_api_keys,
+  openai_chatgpt_connections,
   kilocode_users,
   organization_domain_claims,
   organization_seats_purchases,
@@ -55,7 +55,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import { generateApiToken, JWT_TOKEN_VERSION } from '@/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
 import jwt from 'jsonwebtoken';
 import type { Account, Profile } from 'next-auth';
@@ -74,7 +74,6 @@ import {
   OPENAI_TOKEN_SHARING_SCOPE,
 } from '@/lib/auth/openai/config';
 import { hosted_domain_specials } from '@/lib/auth/constants';
-import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 
 // Same namespace UUID used in user.server.ts
@@ -458,7 +457,9 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
     const token = await jwtCallback!(openAiSignInArgs(user.id, email, sub));
 
     expect(token.kiloUserId).toBe(user.id);
-    await expect(getOpenAiChatGptConnection({ type: 'user', id: user.id })).resolves.toMatchObject({
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: null })
+    ).resolves.toMatchObject({
       access_token: 'signin-access-token',
       refresh_token: 'signin-refresh-token',
       issuer: OPENAI_ISSUER,
@@ -470,11 +471,11 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
 
     const [row] = await db
       .select()
-      .from(byok_api_keys)
+      .from(openai_chatgpt_connections)
       .where(
         and(
-          eq(byok_api_keys.kilo_user_id, user.id),
-          eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+          eq(openai_chatgpt_connections.kilo_user_id, user.id),
+          isNull(openai_chatgpt_connections.organization_id)
         )
       );
     expect(row?.is_enabled).toBe(true);
@@ -495,7 +496,7 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
     await jwtCallback!(args);
 
     await expect(
-      getOpenAiChatGptConnection({ type: 'org', id: organization.id })
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: organization.id })
     ).resolves.toMatchObject({
       access_token: 'signin-access-token',
       refresh_token: 'signin-refresh-token',
@@ -517,7 +518,9 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
       })
     );
 
-    await expect(getOpenAiChatGptConnection({ type: 'user', id: user.id })).resolves.toBeNull();
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: null })
+    ).resolves.toBeNull();
   });
 
   test('does not overwrite a working connection with an identity-only sign-in', async () => {
@@ -534,7 +537,9 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
       })
     );
 
-    await expect(getOpenAiChatGptConnection({ type: 'user', id: user.id })).resolves.toMatchObject({
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: null })
+    ).resolves.toMatchObject({
       access_token: 'signin-access-token',
       refresh_token: 'signin-refresh-token',
     });
@@ -548,7 +553,9 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
     // requested scope; the refresh token is then the delegated grant's marker.
     await jwtCallback!(openAiSignInArgs(user.id, email, sub, { scope: undefined }));
 
-    await expect(getOpenAiChatGptConnection({ type: 'user', id: user.id })).resolves.toMatchObject({
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: null })
+    ).resolves.toMatchObject({
       access_token: 'signin-access-token',
       refresh_token: 'signin-refresh-token',
     });
@@ -559,7 +566,7 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
     const { user, email } = await seedOpenAiUser(sub);
     const originalInsert = (db.insert as unknown as (table: unknown) => unknown).bind(db);
     const insertSpy = jest.spyOn(db, 'insert').mockImplementation(((table: unknown) => {
-      if (table === byok_api_keys) throw new Error('simulated storage failure');
+      if (table === openai_chatgpt_connections) throw new Error('simulated storage failure');
       return originalInsert(table);
     }) as unknown as typeof db.insert);
 
@@ -572,8 +579,8 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
 
     const rows = await db
       .select()
-      .from(byok_api_keys)
-      .where(eq(byok_api_keys.kilo_user_id, user.id));
+      .from(openai_chatgpt_connections)
+      .where(eq(openai_chatgpt_connections.kilo_user_id, user.id));
     expect(rows).toHaveLength(0);
   });
 });

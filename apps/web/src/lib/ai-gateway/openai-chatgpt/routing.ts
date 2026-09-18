@@ -115,15 +115,16 @@ function isOpenAiChatGptModel(requestedModel: string): boolean {
 }
 
 /**
- * Resolves the connection owner for a request. An organization request uses the
- * organization's connection; every other signed-in request uses the caller's
- * personal one. Anonymous callers have no owner.
+ * Resolves the connection owner for a request. The connection is inherently
+ * personal, so the owner is always the caller and the organization only scopes
+ * which of their connections applies. An organization request uses the
+ * caller's connection for that organization and never their personal one, so an
+ * organization without the caller's connection falls through to the API path.
+ * Anonymous callers have no owner.
  */
 function openAiChatGptOwner(input: OpenAiChatGptRoutingInput): OpenAiChatGptOwner | null {
   if (!input.userId) return null;
-  return input.organizationId
-    ? { type: 'org', id: input.organizationId }
-    : { type: 'user', id: input.userId };
+  return { kiloUserId: input.userId, organizationId: input.organizationId ?? null };
 }
 
 /**

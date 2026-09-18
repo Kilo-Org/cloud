@@ -2332,10 +2332,10 @@ export async function unlinkAuthProviderFromUser(
 
   // Unlinking OpenAI drops the personal delegated ChatGPT credential: it
   // proves the same external identity. An organization connection is a separate
-  // account's BYOK setting and survives this unlink; an organization admin
-  // disconnects it from the organization BYOK page.
+  // account's BYOK setting and survives this unlink; the member disconnects it
+  // from the organization BYOK page.
   if (provider === 'openai') {
-    await clearOpenAiChatGptConnection({ type: 'user', id: kiloUserId });
+    await clearOpenAiChatGptConnection({ kiloUserId, organizationId: null });
   }
 
   return successResult();

@@ -14,13 +14,14 @@ import {
   type OpenAiChatGptStatus,
 } from '@/lib/ai-gateway/openai-chatgpt/status';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 
 /**
- * The "Sign in with ChatGPT" BYOK connection. It is scoped to one account: the
- * signed-in person, or one organization the caller can manage. Both procedures
- * return only `OpenAiChatGptStatus`: a token, a refresh token and a raw OAuth
- * error body are never part of the response.
+ * The "Sign in with ChatGPT" BYOK connection. It is inherently personal: it is
+ * owned by the signed-in person and scoped to one account, either their
+ * personal account or one organization they belong to. Any member can manage
+ * their own connection for an organization; it is their credential, not the
+ * organization's. Both procedures return only `OpenAiChatGptStatus`: a token, a
+ * refresh token and a raw OAuth error body are never part of the response.
  */
 
 const OpenAiChatGptOwnerInputSchema = z.object({
@@ -43,18 +44,19 @@ function requireUserId(user: User | null | undefined): string {
 }
 
 /**
- * Resolves the account the call operates on. An organization call requires the
- * organization's billing role, the same permission the pasted-key BYOK
- * procedures require for organization keys.
+ * Resolves the account the call operates on. The connection always belongs to
+ * the signed-in person; an organization only selects which of their
+ * connections applies. Any organization member can manage their own, so the
+ * check requires membership, not a management role.
  */
 async function resolveOwner(
   ctx: TRPCContext,
   organizationId: string | undefined
 ): Promise<OpenAiChatGptOwner> {
   const userId = requireUserId(ctx.user);
-  if (!organizationId) return { type: 'user', id: userId };
-  await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
-  return { type: 'org', id: organizationId };
+  if (!organizationId) return { kiloUserId: userId, organizationId: null };
+  await ensureOrganizationAccess(ctx, organizationId);
+  return { kiloUserId: userId, organizationId };
 }
 
 /** An absent row is `disconnected`; a disabled row is `error` with its message. */

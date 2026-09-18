@@ -107,6 +107,7 @@ import {
   coding_plan_key_inventory,
   coding_plan_subscriptions,
   byok_api_keys,
+  openai_chatgpt_connections,
   mcp_gateway_configs,
   mcp_gateway_authorization_codes,
   mcp_gateway_authorization_requests,
@@ -137,7 +138,7 @@ import {
   cloud_agent_worktrees,
 } from '@kilocode/db/schema';
 
-import { eq, count, inArray, and, sql } from 'drizzle-orm';
+import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
 import {
   softDeleteUser,
   anonymizeCloudUserData,
@@ -159,7 +160,6 @@ import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/use
 import { hosted_domain_specials } from '@/lib/auth/constants';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
-import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
 import { randomUUID } from 'crypto';
 import {
   KiloPassCadence,
@@ -6375,11 +6375,10 @@ describe('User', () => {
     async function seedOpenAiConnection(userId: string) {
       const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
       const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
-      await db.insert(byok_api_keys).values({
+      await db.insert(openai_chatgpt_connections).values({
         kilo_user_id: userId,
-        provider_id: OPENAI_CHATGPT_PROVIDER_ID,
-        encrypted_api_key: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
-        management_source: 'user',
+        organization_id: null,
+        encrypted_connection: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
         created_by: userId,
       });
     }
@@ -6387,16 +6386,15 @@ describe('User', () => {
     async function seedOpenAiOrganizationConnection(organizationId: string, createdBy: string) {
       const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
       const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
-      await db.insert(byok_api_keys).values({
+      await db.insert(openai_chatgpt_connections).values({
+        kilo_user_id: createdBy,
         organization_id: organizationId,
-        provider_id: OPENAI_CHATGPT_PROVIDER_ID,
-        encrypted_api_key: encryptApiKey('{"access_token":"org-token"}', BYOK_ENCRYPTION_KEY),
-        management_source: 'user',
+        encrypted_connection: encryptApiKey('{"access_token":"org-token"}', BYOK_ENCRYPTION_KEY),
         created_by: createdBy,
       });
     }
 
-    test('deletes the ChatGPT connection when unlinking openai', async () => {
+    test('deletes the personal ChatGPT connection when unlinking openai', async () => {
       const user = await seedUserWithOpenAiProvider();
       await seedOpenAiConnection(user.id);
 
@@ -6405,11 +6403,11 @@ describe('User', () => {
       expect(result.success).toBe(true);
       const rows = await db
         .select()
-        .from(byok_api_keys)
+        .from(openai_chatgpt_connections)
         .where(
           and(
-            eq(byok_api_keys.kilo_user_id, user.id),
-            eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+            eq(openai_chatgpt_connections.kilo_user_id, user.id),
+            isNull(openai_chatgpt_connections.organization_id)
           )
         );
       expect(rows).toHaveLength(0);
@@ -6426,8 +6424,8 @@ describe('User', () => {
       expect(result.success).toBe(true);
       const rows = await db
         .select()
-        .from(byok_api_keys)
-        .where(eq(byok_api_keys.organization_id, organization.id));
+        .from(openai_chatgpt_connections)
+        .where(eq(openai_chatgpt_connections.organization_id, organization.id));
       expect(rows).toHaveLength(1);
     });
 
@@ -6440,11 +6438,11 @@ describe('User', () => {
       expect(result.success).toBe(true);
       const rows = await db
         .select()
-        .from(byok_api_keys)
+        .from(openai_chatgpt_connections)
         .where(
           and(
-            eq(byok_api_keys.kilo_user_id, user.id),
-            eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+            eq(openai_chatgpt_connections.kilo_user_id, user.id),
+            isNull(openai_chatgpt_connections.organization_id)
           )
         );
       expect(rows).toHaveLength(1);

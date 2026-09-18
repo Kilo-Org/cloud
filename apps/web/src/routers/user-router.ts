@@ -45,7 +45,6 @@ import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-me
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
 import type { AutoTopUpAmountCents } from '@/lib/autoTopUpConstants';
@@ -497,10 +496,11 @@ export const userRouter = createTRPCRouter({
     .input(LinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
       // An organization-scoped link records the organization on the linking
-      // session so the callback can store the BYOK connection for it. The access
+      // session so the callback can store the BYOK connection for it. The
+      // connection is the member's own, so membership is enough. The access
       // denial must surface as-is, so it stays outside the try.
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_BILLING_ROLES);
+        await ensureOrganizationAccess(ctx, input.organizationId);
       }
 
       try {

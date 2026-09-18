@@ -4,13 +4,12 @@ jest.mock('./served-models', () => ({
 
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
-import { and, eq, inArray } from 'drizzle-orm';
-import { byok_api_keys, organizations } from '@kilocode/db/schema';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { openai_chatgpt_connections, organizations } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { OPENAI_CHATGPT_PROVIDER_ID } from './provider-id';
 import { getOpenAiChatGptStoredConnection, saveOpenAiChatGptConnection } from './store';
 import { getOpenAiChatGptByokModelIds, isOpenAiChatGptEligible } from './routing';
 import type { OpenAiChatGptConnection } from './types';
@@ -41,6 +40,7 @@ function responsesRequest(): GatewayRequest {
 
 describe('openai-chatgpt owner scope (real database)', () => {
   let user: User;
+  let otherUser: User;
   let personalEmail: string;
   let orgA: { id: string };
   let orgB: { id: string };
@@ -50,19 +50,28 @@ describe('openai-chatgpt owner scope (real database)', () => {
     user = await insertTestUser({
       google_user_email: `chatgpt-owner-${randomUUID()}@example.com`,
     });
+    otherUser = await insertTestUser({
+      google_user_email: `chatgpt-other-${randomUUID()}@example.com`,
+    });
     orgA = await createTestOrganization(`ChatGPT Org A ${randomUUID()}`, user.id, 0);
     orgB = await createTestOrganization(`ChatGPT Org B ${randomUUID()}`, user.id, 0);
 
     personalEmail = `personal-${randomUUID()}@example.com`;
     await saveOpenAiChatGptConnection(
-      { type: 'user', id: user.id },
+      { kiloUserId: user.id, organizationId: null },
       connection(personalEmail),
       user.id
     );
     await saveOpenAiChatGptConnection(
-      { type: 'org', id: orgA.id },
+      { kiloUserId: user.id, organizationId: orgA.id },
       connection(`org-a-${randomUUID()}@example.com`),
       user.id
+    );
+    // A second member of the same organization connects their own account.
+    await saveOpenAiChatGptConnection(
+      { kiloUserId: otherUser.id, organizationId: orgA.id },
+      connection(`org-a-other-${randomUUID()}@example.com`),
+      otherUser.id
     );
   });
 
@@ -73,66 +82,65 @@ describe('openai-chatgpt owner scope (real database)', () => {
       process.env.OPENAI_CHATGPT_API_KEY = originalPartnerKey;
     }
     await db
-      .delete(byok_api_keys)
-      .where(
-        and(
-          eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID),
-          inArray(byok_api_keys.organization_id, [orgA.id, orgB.id])
-        )
-      );
+      .delete(openai_chatgpt_connections)
+      .where(inArray(openai_chatgpt_connections.organization_id, [orgA.id, orgB.id]));
     await db
-      .delete(byok_api_keys)
+      .delete(openai_chatgpt_connections)
       .where(
         and(
-          eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID),
-          eq(byok_api_keys.kilo_user_id, user.id)
+          inArray(openai_chatgpt_connections.kilo_user_id, [user.id, otherUser.id]),
+          isNull(openai_chatgpt_connections.organization_id)
         )
       );
     await db.delete(organizations).where(inArray(organizations.id, [orgA.id, orgB.id]));
   });
 
-  it('stores one connection per account with the owner column set', async () => {
+  it('stores one connection per account with the member as the owner', async () => {
     const [personalRow] = await db
       .select()
-      .from(byok_api_keys)
+      .from(openai_chatgpt_connections)
       .where(
         and(
-          eq(byok_api_keys.kilo_user_id, user.id),
-          eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+          eq(openai_chatgpt_connections.kilo_user_id, user.id),
+          isNull(openai_chatgpt_connections.organization_id)
         )
       );
     const [orgRow] = await db
       .select()
-      .from(byok_api_keys)
+      .from(openai_chatgpt_connections)
       .where(
         and(
-          eq(byok_api_keys.organization_id, orgA.id),
-          eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+          eq(openai_chatgpt_connections.kilo_user_id, user.id),
+          eq(openai_chatgpt_connections.organization_id, orgA.id)
         )
       );
 
     expect(personalRow?.organization_id).toBeNull();
-    expect(orgRow?.kilo_user_id).toBeNull();
+    // The connection is personal, so the member owns the organization row too.
+    expect(orgRow?.kilo_user_id).toBe(user.id);
     expect(orgRow?.created_by).toBe(user.id);
   });
 
   it('reads each account its own connection', async () => {
     await expect(
-      getOpenAiChatGptStoredConnection({ type: 'user', id: user.id })
+      getOpenAiChatGptStoredConnection({ kiloUserId: user.id, organizationId: null })
     ).resolves.toMatchObject({ connection: { email: personalEmail } });
 
-    const orgAStored = await getOpenAiChatGptStoredConnection({ type: 'org', id: orgA.id });
+    const orgAStored = await getOpenAiChatGptStoredConnection({
+      kiloUserId: user.id,
+      organizationId: orgA.id,
+    });
     expect(orgAStored?.connection.email).toContain('org-a-');
     expect(orgAStored?.connection.email).not.toBe(personalEmail);
   });
 
-  it('reads no connection for an organization without one, never the personal connection', async () => {
+  it('reads no connection for an account without one, never another account connection', async () => {
     await expect(
-      getOpenAiChatGptStoredConnection({ type: 'org', id: orgB.id })
+      getOpenAiChatGptStoredConnection({ kiloUserId: user.id, organizationId: orgB.id })
     ).resolves.toBeNull();
   });
 
-  it('routes an organization request to the organization connection', async () => {
+  it('routes an organization request to the member connection for that organization', async () => {
     await expect(
       isOpenAiChatGptEligible({
         request: responsesRequest(),
@@ -143,7 +151,23 @@ describe('openai-chatgpt owner scope (real database)', () => {
     ).resolves.toBe(true);
   });
 
-  it('does not route an organization without a connection, even when the caller has a personal one', async () => {
+  it('keeps two members of the same organization on their own connections', async () => {
+    const first = await getOpenAiChatGptStoredConnection({
+      kiloUserId: user.id,
+      organizationId: orgA.id,
+    });
+    const second = await getOpenAiChatGptStoredConnection({
+      kiloUserId: otherUser.id,
+      organizationId: orgA.id,
+    });
+
+    expect(first?.connection.email).toContain('org-a-');
+    expect(first?.connection.email).not.toContain('other');
+    expect(second?.connection.email).toContain('org-a-other-');
+    expect(second?.connection.email).not.toBe(first?.connection.email);
+  });
+
+  it('does not route an account without a connection, even when another account has one', async () => {
     await expect(
       isOpenAiChatGptEligible({
         request: responsesRequest(),
@@ -154,15 +178,19 @@ describe('openai-chatgpt owner scope (real database)', () => {
     ).resolves.toBe(false);
 
     await expect(
-      getOpenAiChatGptByokModelIds({ type: 'org', id: orgB.id }, [REQUESTED_MODEL])
+      getOpenAiChatGptByokModelIds({ kiloUserId: user.id, organizationId: orgB.id }, [
+        REQUESTED_MODEL,
+      ])
     ).resolves.toBeNull();
-    // The same caller on a personal request, or for the connected organization,
-    // still gets the BYOK set: the empty organization is the only one excluded.
+    // The personal account and the connected organization still get the set:
+    // the empty organization is the only one excluded.
     await expect(
-      getOpenAiChatGptByokModelIds({ type: 'org', id: orgA.id }, [REQUESTED_MODEL])
+      getOpenAiChatGptByokModelIds({ kiloUserId: user.id, organizationId: orgA.id }, [
+        REQUESTED_MODEL,
+      ])
     ).resolves.toEqual(new Set([REQUESTED_MODEL]));
     await expect(
-      getOpenAiChatGptByokModelIds({ type: 'user', id: user.id }, [REQUESTED_MODEL])
+      getOpenAiChatGptByokModelIds({ kiloUserId: user.id, organizationId: null }, [REQUESTED_MODEL])
     ).resolves.toEqual(new Set([REQUESTED_MODEL]));
   });
 });

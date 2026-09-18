@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { byok_api_keys } from '@kilocode/db/schema';
+import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { OPENAI_CLIENT_ID, OPENAI_CLIENT_SECRET, BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -8,7 +8,7 @@ import { OPENAI_RESOURCE, OPENAI_TOKEN_ENDPOINT } from '@/lib/auth/openai/config
 import {
   decryptOpenAiChatGptConnection,
   markOpenAiChatGptConnectionErrored,
-  openAiChatGptConnectionWhere,
+  openAiChatGptOwnerWhere,
   openAiChatGptOwnerKey,
   readOpenAiChatGptConnectionRow,
   type OpenAiChatGptDatabase,
@@ -218,12 +218,12 @@ async function attemptRefresh(
       };
 
       await tx
-        .update(byok_api_keys)
+        .update(openai_chatgpt_connections)
         .set({
-          encrypted_api_key: encryptApiKey(JSON.stringify(updated), BYOK_ENCRYPTION_KEY),
+          encrypted_connection: encryptApiKey(JSON.stringify(updated), BYOK_ENCRYPTION_KEY),
           is_enabled: true,
         })
-        .where(openAiChatGptConnectionWhere(owner));
+        .where(openAiChatGptOwnerWhere(owner));
 
       return { kind: 'access_token', accessToken };
     }
@@ -257,7 +257,7 @@ async function resolveInsideLock(
   const row = await readOpenAiChatGptConnectionRow(tx, owner, { forUpdate: true });
   if (!row || !row.is_enabled) return { kind: 'no_connection' };
 
-  const connection = decryptOpenAiChatGptConnection(row.encrypted_api_key);
+  const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
   if (!connection) return { kind: 'no_connection' };
 
   if (connection.expires_at - nowSeconds() > OPENAI_CHATGPT_REFRESH_WINDOW_SECONDS) {
@@ -292,7 +292,7 @@ async function resolveOpenAiChatGptAccessTokenUncached(
     // disabled row is skipped so it can never serve a request.
     const row = await readOpenAiChatGptConnectionRow(db, owner);
     const current =
-      row?.is_enabled === true ? decryptOpenAiChatGptConnection(row.encrypted_api_key) : null;
+      row?.is_enabled === true ? decryptOpenAiChatGptConnection(row.encrypted_connection) : null;
     if (
       current &&
       current.expires_at - nowSeconds() > OPENAI_CHATGPT_REFRESH_WINDOW_SECONDS &&

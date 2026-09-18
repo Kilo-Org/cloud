@@ -221,3 +221,55 @@ describe('PrReviewInboxList side insets (landscape)', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(1);
   });
 });
+
+// The row's metadata line (ref · time + the provider-term chip) must never
+// push the chip past the row's right edge. At a large font scale the ref/time
+// text measures as wide as the whole row, so the chip used to be laid out
+// after that full-width text box and was clipped by the screen edge (the
+// capture shows "Pull request" cut to "Pull"). `flex-wrap` lets the chip fall
+// to its own line when both cannot share the row; `max-w-full` caps a
+// scaled-up chip at the row width. Host props are the layout contract; only a
+// native render proves the scaled glyph measurement.
+describe('PrReviewInboxList metadata row overflow', () => {
+  beforeEach(() => {
+    inboxState.query.isPending = false;
+    inboxState.query.isFetching = false;
+    inboxState.query.hasNextPage = false;
+    inboxState.query.isFetchingNextPage = false;
+    inboxState.items = [makeItem()];
+    inboxState.firstPageErrorState = null;
+    inboxState.laterPageError = false;
+  });
+
+  it('wraps the provider-term chip instead of letting it leave the row', () => {
+    const renderer = mountInboxList();
+    const row = renderer.root.find(
+      node =>
+        String(node.type) === 'Pressable' &&
+        node.props.accessibilityLabel === 'octocat/hello-world#7'
+    );
+
+    const metadataRow = row.find(
+      node =>
+        String(node.type) === 'View' && String(node.props.className).split(' ').includes('flex-row')
+    );
+    expect(String(metadataRow.props.className).split(' ')).toContain('flex-wrap');
+    // The assertion targets the metadata line, not the row or the chip.
+    expect(
+      metadataRow.find(
+        node => String(node.type) === 'Text' && node.children.includes('octocat/hello-world#7')
+      ).children
+    ).toEqual(['octocat/hello-world#7', ' · ', 'just now']);
+
+    const chip = metadataRow.find(
+      node => String(node.type) === 'View' && String(node.props.className).includes('rounded-full')
+    );
+    expect(String(chip.props.className).split(' ')).toEqual(
+      expect.arrayContaining(['shrink-0', 'max-w-full'])
+    );
+    // The clipped element in the capture is this provider-term chip.
+    expect(chip.find(node => String(node.type) === 'Text').children).toEqual([
+      'prReview.terms.pullRequest',
+    ]);
+  });
+});

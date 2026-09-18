@@ -165,7 +165,7 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
         <Text className="text-sm font-medium" numberOfLines={1}>
           {item.title}
         </Text>
-        <View className="flex-row items-center gap-2">
+        <View className="flex-row flex-wrap items-center gap-2">
           <Text variant="muted" className="text-xs">
             {rowLabel} · {updatedLabel}
           </Text>
@@ -180,7 +180,7 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
 
 function InboxChip({ label }: Readonly<{ label: string }>) {
   return (
-    <View className="rounded-full bg-secondary px-2 py-0.5">
+    <View className="max-w-full shrink-0 rounded-full bg-secondary px-2 py-0.5">
       <Text variant="muted" className="text-[10px] font-medium">
         {label}
       </Text>

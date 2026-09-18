@@ -384,7 +384,16 @@ const config: ExpoConfig = {
     ...Object.fromEntries(
       Object.entries(OPTIONAL_ENV_KEYS).map(([key, env]) => [key, process.env[env]])
     ),
-    router: {},
+    // Expo Head reads this as the handoff origin before it registers the
+    // session's NSUserActivity, and it throws in development when the value is
+    // missing (expo-router/build/head/url.js). Handoff is an iOS capability:
+    // expo-router resolves an Android `Head` that renders nothing and reads no
+    // origin, so this value is inert there and the session-handoff advertiser
+    // needs no platform branch around it. It is the origin of the associated
+    // domain in `ios.associatedDomains`, asserted in
+    // scripts/assert-expo-config.mjs so the requirement is checked rather than
+    // remembered.
+    router: { headOrigin: 'https://app.kilo.ai' },
     isProductionBuild,
     eas: {
       projectId: '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4',

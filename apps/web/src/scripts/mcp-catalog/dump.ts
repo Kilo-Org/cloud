@@ -1,5 +1,6 @@
 /**
- * CLI entry point: dumps the tRPC query catalog to services/kilo-mcp/catalog.json.
+ * CLI entry point: dumps the tRPC catalog (queries and mutations, minus the
+ * admin/debug/test denylist) to services/kilo-mcp/catalog.json.
  *
  * Usage (from apps/web):
  *   pnpm script src/scripts/mcp-catalog/dump.ts              # write or regenerate
@@ -25,6 +26,8 @@ import {
   generateMissingSummaries,
   readCommittedSummaries,
   runKiloCompletion,
+  type CatalogLeaf,
+  type CatalogRow,
 } from './catalog';
 
 // The dump imports the whole router graph, so it needs the app's import-time
@@ -73,6 +76,21 @@ function diffPaths(
   return { added, removed, changed };
 }
 
+/** Per-kind row counts for CLI output: `query 12, mutation 10`. */
+function countByKind(rows: CatalogRow[], missing: CatalogLeaf[]): string {
+  let queries = 0;
+  let mutations = 0;
+  for (const row of rows) {
+    if (row.kind === 'mutation') mutations += 1;
+    else queries += 1;
+  }
+  for (const leaf of missing) {
+    if (leaf.type === 'mutation') mutations += 1;
+    else queries += 1;
+  }
+  return `query ${queries}, mutation ${mutations}`;
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const check = args.includes('--check');
@@ -92,7 +110,9 @@ async function main(): Promise<void> {
   if (dryRun) {
     console.log(`Catalog dry run for ${CATALOG_JSON_DISPLAY_PATH}`);
     console.log(`  procedures enumerated:   ${leaves.length}`);
-    console.log(`  catalog rows (queries):  ${rows.length + missing.length}`);
+    console.log(
+      `  catalog rows:            ${rows.length + missing.length} (${countByKind(rows, missing)})`
+    );
     console.log(`  with committed summary:  ${rows.length}`);
     console.log(`  missing summary (LLM):   ${missing.length}`);
     return;
@@ -142,7 +162,9 @@ async function main(): Promise<void> {
 
   mkdirSync(dirname(CATALOG_JSON_PATH), { recursive: true });
   writeFileSync(CATALOG_JSON_PATH, json);
-  console.log(`✅ wrote ${CATALOG_JSON_DISPLAY_PATH} (${rows.length} query rows)`);
+  console.log(
+    `✅ wrote ${CATALOG_JSON_DISPLAY_PATH} (${rows.length} rows: ${countByKind(rows, [])})`
+  );
 }
 
 main().catch((error: unknown) => {

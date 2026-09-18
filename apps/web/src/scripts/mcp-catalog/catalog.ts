@@ -1,5 +1,5 @@
 /**
- * Library for the Kilo MCP tRPC query catalog dump.
+ * Library for the Kilo MCP tRPC catalog dump.
  *
  * Enumerates every procedure from the live `rootRouter` (never a hand-written
  * list), shapes deterministic catalog rows, preserves author-edited summaries
@@ -8,6 +8,9 @@
  * are never generated at MCP runtime: the committed catalog is the only runtime
  * artifact, and authors edit its summaries by hand. See dump.ts for the CLI
  * entry point.
+ *
+ * Queries and mutations are published wholesale; paths with an internal-only
+ * segment (`admin`, `debug`, `dev`, `test`) and subscriptions stay internal.
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
@@ -34,11 +37,25 @@ export const CATALOG_JSON_DISPLAY_PATH = relative(REPO_ROOT, CATALOG_JSON_PATH);
 export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-router.ts');
 
 /**
- * Top-level router segments that stay internal-only. This is a denylist:
- * every other query procedure is exported, individual procedures cannot opt
- * back in, and mutations are never exported.
+ * Whether a procedure path is internal-only. A path is internal when any
+ * segment is `admin`, `debug`, `dev`, or `test`, or starts with `admin`,
+ * `debug`, or `dev` — the routers name admin and dev-only procedures `adminX`
+ * and `devX` (for example `organizations.admin.grantCredit` and
+ * `slack.devRemoveDbRowOnly`). `test` stays exact-only so user-facing calls
+ * such as `slack.testConnection` remain published. Subscriptions are never
+ * exported regardless of this check.
  */
-export const DENYLISTED_TOP_LEVEL_SEGMENTS = ['admin', 'debug', 'test'] as const;
+export function isDenylistedPath(path: string): boolean {
+  return path.split('.').some(segment => {
+    const lower = segment.toLowerCase();
+    return (
+      lower === 'test' ||
+      lower.startsWith('admin') ||
+      lower.startsWith('debug') ||
+      lower.startsWith('dev')
+    );
+  });
+}
 
 /** Instruction every generated summary must follow. */
 export const SUMMARY_INSTRUCTION =
@@ -59,13 +76,16 @@ const SUMMARY_RUN_TIMEOUT_MS = 10 * 60 * 1000;
 export type CatalogLeaf = {
   path: string;
   type: string;
-  /** First Zod input schema of the procedure, or undefined when it takes none. */
-  firstInput: unknown;
+  /**
+   * Zod input schemas in `.input()` order. A chained procedure has more than
+   * one; the list is empty when the procedure takes no input.
+   */
+  inputs: unknown[];
 };
 
 export type CatalogRow = {
   path: string;
-  kind: 'query';
+  kind: 'query' | 'mutation';
   summary: string;
   inputSchema: Record<string, unknown>;
   tags: string[];
@@ -105,7 +125,7 @@ export function collectCatalogLeaves(router: { _def?: unknown }): CatalogLeaf[] 
     leaves.push({
       path,
       type: typeof def.type === 'string' ? def.type : '',
-      firstInput: inputs[0],
+      inputs,
     });
   }
   if (leaves.length === 0) {
@@ -114,22 +134,106 @@ export function collectCatalogLeaves(router: { _def?: unknown }): CatalogLeaf[] 
   return leaves;
 }
 
-function toInputSchema(firstInput: unknown): Record<string, unknown> {
-  if (!firstInput) return {};
+function singleInputSchema(input: unknown): Record<string, unknown> {
   // `io: 'input'` keeps the schema faithful for callers that build a request;
   // `unrepresentable: 'any'` keeps rare schemas (z.any(), z.date(), …) from
   // failing the whole dump.
-  return z.toJSONSchema(firstInput as z.ZodType, {
+  return z.toJSONSchema(input as z.ZodType, {
     io: 'input',
     unrepresentable: 'any',
   }) as Record<string, unknown>;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Keywords a merged object schema can carry without changing the runtime
+ * contract. `additionalProperties` is deliberately absent: a `.strict()`
+ * subschema rejects keys another subschema contributes, so flattening it into
+ * the union would advertise a more permissive schema than tRPC enforces.
+ */
+const MERGEABLE_OBJECT_KEYWORDS = new Set(['$schema', 'type', 'properties', 'required']);
+
+function isMergeableObjectSchema(schema: Record<string, unknown>): boolean {
+  return (
+    schema.type === 'object' &&
+    isRecord(schema.properties) &&
+    Object.keys(schema).every(key => MERGEABLE_OBJECT_KEYWORDS.has(key))
+  );
+}
+
+/**
+ * Composes every chained `.input()` schema into one JSON Schema. tRPC runs each
+ * `.input()` validator against the same raw input, so a caller must satisfy all
+ * of them: using only the first schema (the old behavior) under-advertised
+ * chained procedures such as `workspaceFolders.create`, whose second input
+ * requires `name` and `color`.
+ *
+ * Plain object schemas merge into a single object: properties are unioned,
+ * required keys are unioned, and a key declared by more than one schema keeps
+ * every constraint through `allOf`. Any other chain — a non-object schema, or
+ * an object carrying extra keywords such as `.strict()`'s
+ * `additionalProperties: false` — falls back to a top-level `allOf`, the
+ * faithful intersection that preserves each schema's own keywords.
+ */
+function toInputSchema(inputs: unknown[]): Record<string, unknown> {
+  const schemas = inputs.map(singleInputSchema);
+  const [first] = schemas;
+  if (first === undefined) return {};
+  if (schemas.length === 1) return first;
+
+  if (schemas.every(isMergeableObjectSchema)) {
+    const properties: Record<string, unknown> = {};
+    const required: string[] = [];
+    for (const schema of schemas) {
+      for (const [key, value] of Object.entries(schema.properties as Record<string, unknown>)) {
+        if (!(key in properties)) properties[key] = value;
+        else if (JSON.stringify(properties[key]) !== JSON.stringify(value)) {
+          properties[key] = { allOf: [properties[key], value] };
+        }
+      }
+      if (Array.isArray(schema.required)) {
+        for (const key of schema.required) {
+          if (typeof key === 'string' && !required.includes(key)) required.push(key);
+        }
+      }
+    }
+    const composed: Record<string, unknown> = {};
+    if (typeof first.$schema === 'string') composed.$schema = first.$schema;
+    composed.type = 'object';
+    composed.properties = properties;
+    if (required.length > 0) composed.required = required;
+    return composed;
+  }
+
+  return {
+    ...(typeof first.$schema === 'string' ? { $schema: first.$schema } : {}),
+    allOf: schemas.map(schema => {
+      const copy = { ...schema };
+      delete copy.$schema;
+      return copy;
+    }),
+  };
+}
+
 function topSchemaKeys(inputSchema: Record<string, unknown>): string[] {
+  const keys: string[] = [];
   const properties = inputSchema.properties;
-  return properties && typeof properties === 'object' && !Array.isArray(properties)
-    ? Object.keys(properties)
-    : [];
+  if (isRecord(properties)) {
+    for (const key of Object.keys(properties)) if (!keys.includes(key)) keys.push(key);
+  }
+  // A chain that falls back to a top-level `allOf` keeps its field keys in the
+  // subschemas; surface them so tags and the search blob stay complete.
+  if (Array.isArray(inputSchema.allOf)) {
+    for (const sub of inputSchema.allOf) {
+      if (isRecord(sub)) {
+        for (const key of topSchemaKeys(sub)) if (!keys.includes(key)) keys.push(key);
+      }
+    }
+  }
+  return keys;
 }
 
 /**
@@ -147,12 +251,12 @@ function deriveTags(segments: string[], schemaKeys: string[]): string[] {
 
 function shapeRow(leaf: CatalogLeaf, summary: string): CatalogRow {
   const segments = leaf.path.split('.');
-  const inputSchema = toInputSchema(leaf.firstInput);
+  const inputSchema = toInputSchema(leaf.inputs);
   const schemaKeys = topSchemaKeys(inputSchema);
   const tags = deriveTags(segments, schemaKeys);
   return {
     path: leaf.path,
-    kind: 'query',
+    kind: leaf.type === 'mutation' ? 'mutation' : 'query',
     summary,
     inputSchema,
     tags,
@@ -161,20 +265,30 @@ function shapeRow(leaf: CatalogLeaf, summary: string): CatalogRow {
 }
 
 /**
- * Filters the leaves down to the exported catalog: queries only, denylisted
- * top-level segments dropped. Rows whose summary is provided keep it
- * byte-for-byte; the rest come back as `missing` for LLM generation.
+ * Filters the leaves down to the exported catalog: every query and mutation
+ * whose path is not internal-only (see {@link isDenylistedPath}). Subscriptions
+ * are never exported. Rows whose summary is provided keep it byte-for-byte; the
+ * rest come back as `missing` for LLM generation.
+ *
+ * Drift guard: an enumeration that exposes no mutation procedure throws instead
+ * of emitting a query-only catalog in silence. Mutations without a committed
+ * summary are legitimate `missing` entries that the dump generates before it
+ * writes, so the guard counts exposed mutation leaves, not emitted rows. A
+ * router refactor that stops exposing mutations, or a top-level segment renamed
+ * into an internal prefix, must fail the dump rather than quietly remove write
+ * support from every MCP client.
  */
 export function buildCatalogRows(
   leaves: CatalogLeaf[],
   summaries: Map<string, string> = new Map()
 ): { rows: CatalogRow[]; missing: CatalogLeaf[] } {
-  const denylisted = new Set<string>(DENYLISTED_TOP_LEVEL_SEGMENTS);
+  let exposedMutations = 0;
   const rows: CatalogRow[] = [];
   const missing: CatalogLeaf[] = [];
   for (const leaf of leaves) {
-    if (leaf.type !== 'query') continue;
-    if (denylisted.has(leaf.path.split('.')[0] ?? '')) continue;
+    if (leaf.type !== 'query' && leaf.type !== 'mutation') continue;
+    if (isDenylistedPath(leaf.path)) continue;
+    if (leaf.type === 'mutation') exposedMutations += 1;
     const summary = summaries.get(leaf.path);
     if (typeof summary === 'string' && summary !== '') {
       rows.push(shapeRow(leaf, summary));
@@ -184,7 +298,14 @@ export function buildCatalogRows(
   }
   if (rows.length === 0 && missing.length === 0) {
     throw new Error(
-      'Catalog enumeration produced zero query rows — refusing to emit an empty catalog'
+      'Catalog enumeration produced zero catalog rows — refusing to emit an empty catalog'
+    );
+  }
+  if (exposedMutations === 0) {
+    throw new Error(
+      'Catalog enumeration exposed zero mutation procedures — refusing to emit a query-only catalog. ' +
+        'Every mutation is either missing from the router or withheld as internal; ' +
+        'check isDenylistedPath in apps/web/src/scripts/mcp-catalog/catalog.ts.'
     );
   }
   return { rows, missing };
@@ -624,7 +745,7 @@ function buildSummaryBatch(
 
 function buildSummaryPrompt(batch: SummaryBatch): string {
   const lines = [
-    "You are writing summaries for an MCP tool catalog built from a web app's tRPC query procedures.",
+    "You are writing summaries for an MCP tool catalog built from a web app's tRPC query and mutation procedures.",
     `For each procedure path below, ${SUMMARY_INSTRUCTION}`,
     'Respond with ONLY a JSON object mapping each procedure path to its summary string. Every listed path must appear exactly once.',
     '',

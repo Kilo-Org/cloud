@@ -24,9 +24,18 @@ export function isSessionListAtBottom({
  * the start of every session — a fresh transcript is rendered anchored
  * to the latest message, so the floating "scroll to bottom" button
  * must never be visible until the user has actually scrolled away.
+ *
+ * `followTail: false` opens the session without following the newest
+ * message: a `?at=` deep-link resume lands on an older row, and the
+ * mount-time scroll-to-end would otherwise override the resume scroll.
+ * The button state stays at-bottom so the first real scroll event decides it.
  */
-export function getInitialSessionListAutoScrollVisibility() {
-  return { shouldAutoScroll: true, isAtBottom: true };
+export function getInitialSessionListAutoScrollVisibility({
+  followTail = true,
+}: {
+  followTail?: boolean;
+} = {}) {
+  return { shouldAutoScroll: followTail, isAtBottom: true };
 }
 
 /**

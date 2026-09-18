@@ -2063,6 +2063,7 @@
       "exitNeedsNewerCli": "Remote slash commands require a newer Kilo CLI. Update Kilo CLI and reconnect."
     },
     "sessionConnection": {
+      "label": "Connection",
       "connecting": "Connecting…",
       "reconnecting": "Reconnecting…",
       "connectionLost": "Connection lost",
@@ -2082,7 +2083,9 @@
       "removeConfirmTitle": "Remove goal?",
       "removeConfirmMessage": "The CLI clears this session's goal.",
       "updateFailed": "Could not update the goal.",
-      "sectionAccessibility": "{{status}}. Goal: {{text}}"
+      "sectionAccessibility": "{{status}}. Goal: {{text}}",
+      "collapse": "Collapse goal",
+      "expand": "Expand goal"
     },
     "newSession": {
       "recentlyUsed": "Recently used",
@@ -2136,7 +2139,20 @@
       "continueFrom": "Continuing {{title}}",
       "importingSession": "Importing session",
       "cliCannotContinue": "This CLI cannot continue a session. Pick Cloud Agent or another CLI.",
-      "importFailed": "Couldn't import this session."
+      "importFailed": "Couldn't import this session.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Default · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Small",
+      "sandboxInstanceShared": "Shared",
+      "sandboxInstanceLarge": "Large",
+      "sandboxInstanceDevcontainer": "Dev container",
+      "sandboxInstanceProviderDefault": "Provider default",
+      "sandboxCouldNotLoad": "Couldn't load sandbox options",
+      "sandboxUnavailable": "This sandbox is unavailable. Choose another sandbox or Default.",
+      "sandboxUseDefault": "Use Default"
     },
     "partRenderer": {
       "updatedFileCount_one": "Updated {{displayCount}} file",
@@ -2525,6 +2541,12 @@
       "startNewSession": "Start a new session",
       "exitSession": "Exit the session",
       "clearSession": "End this session and start a new one",
+      "compactDescription": "compact the current session context",
+      "goalDescription": "Keep working toward a session goal. /goal <objective> or pause, resume, clear",
+      "initDescription": "guided AGENTS.md setup",
+      "resumeClaudeDescription": "import a Claude Code session transcript",
+      "resumeCodexDescription": "import an OpenAI Codex session transcript",
+      "reviewDescription": "review changes [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Use /{{command}}",
       "insert": "Insert",
       "upgradeRequiredFallback": "Please upgrade your CLI to use this command.",
@@ -2627,6 +2649,7 @@
     "couldNotLoadActiveSessions": "Couldn't load active sessions",
     "agentSessions": "Live now",
     "newCodingTask": "New coding task",
+    "newTaskFromPicture": "New task from a picture",
     "explore": "Explore",
     "seeAll": "See all",
     "noLiveSessions": "Nothing running right now"
@@ -2810,6 +2833,7 @@
     "privacyPolicyPrefix": "Your data is handled per the",
     "privacyPolicy": "Kilo privacy policy",
     "onDevice": "On device",
+    "viaGateway": "Via the Kilo gateway",
     "couldNotLoadTranscription": "Could not load your transcription setting.",
     "signInToManageTranscription": "Sign in to manage online transcription.",
     "onlineTranscription": "Online transcription",
@@ -2848,7 +2872,7 @@
     "aiProvidersWhat": "Your prompts, conversation history, and any files you attach.",
     "aiProvidersWhy": "To generate AI responses.",
     "aiProvidersWho": "Anthropic, OpenAI, Google, and other providers you select per request.",
-    "gatewayWhat": "Account ID, request metadata, token usage.",
+    "gatewayWhat": "Account ID, request metadata, token usage, and the prompts and voice recordings the app sends through it.",
     "gatewayWhy": "Authentication, routing requests, billing reconciliation.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Crash and error reports, with app content scrubbed.",
@@ -2868,7 +2892,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Your recording while you dictate.",
     "voiceTranscriptionWhy": "To turn speech into text.",
-    "voiceTranscriptionWho": "On-device only, or Apple or Google when this device cannot transcribe offline.",
+    "voiceTranscriptionWho": "Your device, the Kilo gateway with your chosen transcription model, or Apple or Google for online recognition.",
     "installAttributionPromptTitle": "Allow install attribution?",
     "installAttributionPromptMessage": "Kilo uses Apple's tracking permission only to learn which channel brought you here. Your prompts and conversations are never used.",
     "what": "What",

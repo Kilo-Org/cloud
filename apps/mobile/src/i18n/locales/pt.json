@@ -2073,6 +2073,7 @@
       "exitNeedsNewerCli": "Os comandos de barra remotos exigem uma versão mais recente do Kilo CLI. Atualize o Kilo CLI e volte a estabelecer a ligação."
     },
     "sessionConnection": {
+      "label": "Ligação",
       "connecting": "A ligar…",
       "reconnecting": "A restabelecer a ligação…",
       "connectionLost": "Ligação perdida",
@@ -2092,7 +2093,9 @@
       "removeConfirmTitle": "Remover objetivo?",
       "removeConfirmMessage": "O CLI limpa o objetivo desta sessão.",
       "updateFailed": "Não foi possível atualizar o objetivo.",
-      "sectionAccessibility": "{{status}}. Objetivo: {{text}}"
+      "sectionAccessibility": "{{status}}. Objetivo: {{text}}",
+      "collapse": "Recolher objetivo",
+      "expand": "Expandir objetivo"
     },
     "newSession": {
       "recentlyUsed": "Usados recentemente",
@@ -2146,7 +2149,20 @@
       "continueFrom": "A sessão {{title}} está a ser retomada.",
       "importingSession": "A importar a sessão",
       "cliCannotContinue": "Esta CLI não permite continuar uma sessão. Escolha o Cloud Agent ou outra CLI.",
-      "importFailed": "Não foi possível importar esta sessão."
+      "importFailed": "Não foi possível importar esta sessão.",
+      "sandbox": "Ambiente isolado",
+      "sandboxAccessibility": "Ambiente isolado: {{label}}",
+      "sandboxDefaultWithDestination": "Padrão · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Pequeno",
+      "sandboxInstanceShared": "Partilhado",
+      "sandboxInstanceLarge": "Grande",
+      "sandboxInstanceDevcontainer": "Contentor de desenvolvimento",
+      "sandboxInstanceProviderDefault": "Padrão do fornecedor",
+      "sandboxCouldNotLoad": "Não foi possível carregar as opções de ambiente isolado",
+      "sandboxUnavailable": "Este ambiente isolado não está disponível. Escolha outro ambiente isolado ou Padrão.",
+      "sandboxUseDefault": "Usar Padrão"
     },
     "partRenderer": {
       "updatedFileCount_one": "Foi atualizado {{displayCount}} ficheiro.",
@@ -2516,6 +2532,12 @@
       "startNewSession": "Iniciar uma nova sessão",
       "exitSession": "Sair da sessão",
       "clearSession": "Terminar esta sessão e iniciar uma nova",
+      "compactDescription": "compactar o contexto da sessão atual",
+      "goalDescription": "Continua a trabalhar para um objetivo de sessão. /goal <objective> ou pause, resume, clear",
+      "initDescription": "configuração guiada do AGENTS.md",
+      "resumeClaudeDescription": "importar uma transcrição de sessão do Claude Code",
+      "resumeCodexDescription": "importar uma transcrição de sessão do OpenAI Codex",
+      "reviewDescription": "rever as alterações [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Usar /{{command}}",
       "insert": "Inserir",
       "upgradeRequiredFallback": "Atualize a sua CLI para usar este comando.",
@@ -2634,6 +2656,7 @@
     "couldNotLoadActiveSessions": "Não foi possível carregar as sessões ativas.",
     "agentSessions": "Em curso agora",
     "newCodingTask": "Nova tarefa de programação",
+    "newTaskFromPicture": "Nova tarefa a partir de uma imagem",
     "explore": "Explorar",
     "seeAll": "Ver tudo",
     "noLiveSessions": "Nada em execução neste momento"
@@ -2855,7 +2878,8 @@
     "aiProvidersWhat": "Os seus pedidos, o histórico de conversas e quaisquer ficheiros que anexar.",
     "aiProvidersWhy": "Para gerar respostas de IA.",
     "aiProvidersWho": "Anthropic, OpenAI, Google e outros fornecedores que seleciona em cada pedido.",
-    "gatewayWhat": "ID da conta, metadados dos pedidos e utilização de tokens.",
+    "gatewayWhat": "ID da conta, metadados dos pedidos, utilização de tokens e os prompts e gravações de voz que a app envia através dele.",
+    "viaGateway": "Através do Kilo Gateway",
     "gatewayWhy": "Autenticação, encaminhamento de pedidos, reconciliação de faturação.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Relatórios de falhas e erros, com o conteúdo da aplicação removido.",
@@ -2875,7 +2899,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "A sua gravação enquanto dita.",
     "voiceTranscriptionWhy": "Para transformar a fala em texto.",
-    "voiceTranscriptionWho": "Apenas no dispositivo, ou pela Apple ou Google quando não for possível transcrever sem ligação à Internet.",
+    "voiceTranscriptionWho": "O teu dispositivo, Kilo Gateway com o modelo de transcrição que escolheres, ou a Apple ou a Google para reconhecimento online.",
     "installAttributionPromptTitle": "Permitir identificar a origem da instalação?",
     "installAttributionPromptMessage": "O Kilo usa a permissão de seguimento da Apple apenas para identificar o canal através do qual conheceu a aplicação. Os seus pedidos e conversas nunca são usados para este fim.",
     "what": "O quê",

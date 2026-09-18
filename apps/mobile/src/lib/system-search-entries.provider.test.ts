@@ -69,13 +69,18 @@ describe('providerPrSearchDocument', () => {
     );
   });
 
-  it('emits the same document as the recents builder for the same provider entry', () => {
+  it('emits the same entry as the recents builder for the same provider entry', () => {
     // The collector dedupes by id: the provider inbox row and the stored
     // recent must land on one entry, or the index carries the same PR twice.
-    const fromInbox = providerPrSearchDocument(
-      { platform: 'gitlab', projectPath: 'group/repo', mrIid: 3, instanceHint: 'https://gitl.ab' },
-      'Same MR'
-    );
+    // The fingerprints may differ by the source scope the row was enumerated
+    // from — the collector keeps the first occurrence, so one entry survives.
+    const ref = {
+      platform: 'gitlab' as const,
+      projectPath: 'group/repo',
+      mrIid: 3,
+      instanceHint: 'https://gitl.ab',
+    };
+    const fromInbox = providerPrSearchDocument(ref, 'Same MR', 'pullRequests:gitlab:org-1');
     const fromRecents = recentPrSearchDocument({
       owner: 'group',
       repo: 'repo',
@@ -85,6 +90,14 @@ describe('providerPrSearchDocument', () => {
       instanceHint: 'https://gitl.ab',
     });
 
-    expect(fromInbox).toEqual(fromRecents);
+    expect(fromInbox.id).toBe(fromRecents.id);
+    // The inbox row keeps the organization scope that enumerated it; the
+    // recents entry is account-level, so its source is the provider alone.
+    expect(fingerprintSourceOf(fromInbox.fingerprint)).toBe('pullRequests:gitlab:org-1');
+    expect(fingerprintSourceOf(fromRecents.fingerprint)).toBe('pullRequests:gitlab');
   });
 });
+
+function fingerprintSourceOf(fingerprint: string): string | undefined {
+  return (JSON.parse(fingerprint) as { source?: string }).source;
+}

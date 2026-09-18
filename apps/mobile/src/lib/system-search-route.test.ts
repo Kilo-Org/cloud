@@ -56,6 +56,7 @@ import {
   _resetDeepLinkLaunchForTests,
   _setSecureStoreForTests,
   getPendingDeepLinkSnapshot,
+  setCurrentDeepLinkUserId,
 } from './deep-link-launch';
 import { systemSearchDeeplinkFromId, systemSearchHrefFromRoute } from './system-search-entries';
 import {
@@ -81,6 +82,9 @@ describe('system-search-route', () => {
     _setSecureStoreForTests(secureStoreMock);
     store.clear();
     vi.clearAllMocks();
+    // A system-search destination is session-bound: the account is settled for
+    // every case unless the case itself exercises the signed-out boundary.
+    setCurrentDeepLinkUserId('user-1');
   });
 
   afterEach(() => {
@@ -132,6 +136,37 @@ describe('system-search-route', () => {
 
       expect(getPendingDeepLinkSnapshot()).toBeNull();
       expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+    });
+
+    it('drops a tap taken while signed out, so a later sign-in cannot open it', () => {
+      // A stale identifier can outlive the account that indexed it. Captured
+      // while signed out, it must not be held for whoever signs in next.
+      setCurrentDeepLinkUserId(null);
+
+      routeSystemSearchOpen(SESSION_ID);
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+
+      setCurrentDeepLinkUserId('user-2');
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+
+    it('binds a cold-launch tap once the account settles', async () => {
+      // The module-scope capture runs before auth restores; the destination is
+      // held and bound to the account that then settles.
+      _resetDeepLinkLaunchForTests();
+      mocks.consumePendingRoute.mockResolvedValueOnce(SESSION_ID);
+
+      captureSystemSearchLaunch();
+      await vi.waitFor(() => {
+        expect(mocks.consumePendingRoute).toHaveBeenCalledOnce();
+      });
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+
+      setCurrentDeepLinkUserId('user-1');
+
+      expect(getPendingDeepLinkSnapshot()).toBe(SESSION_ID);
     });
   });
 

@@ -100,6 +100,12 @@ describe('deep-link-launch', () => {
   });
 
   describe('system-search source precedence', () => {
+    // A system-search destination is session-bound, so these cases run with the
+    // account already settled (the signed-in case).
+    beforeEach(() => {
+      setCurrentDeepLinkUserId('user-1');
+    });
+
     it('beats a pending notification', () => {
       setPendingDeepLink('/from-notification', 'notification');
       setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
@@ -140,13 +146,84 @@ describe('deep-link-launch', () => {
       await vi.waitFor(() => {
         expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
       });
-      const record = JSON.parse(store.get(PENDING_DEEP_LINK_KEY) ?? '') as { source: string };
+      const record = JSON.parse(store.get(PENDING_DEEP_LINK_KEY) ?? '') as {
+        source: string;
+        userId: string | null;
+      };
       expect(record.source).toBe('system-search');
+      // The durable record is bound to the account that captured it.
+      expect(record.userId).toBe('user-1');
 
       _resetDeepLinkLaunchForTests();
 
+      setCurrentDeepLinkUserId('user-1');
       await restorePersistedPendingDeepLink();
       expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
+    });
+
+    it('is dropped when the destination was captured while signed out', () => {
+      setCurrentDeepLinkUserId(null);
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+    });
+
+    it('binds a destination captured before the account settled', () => {
+      // A cold-launch tap is captured at module scope, before auth restores;
+      // it must survive the settle of the account it belongs to.
+      _resetDeepLinkLaunchForTests();
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+
+      setCurrentDeepLinkUserId('user-1');
+
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
+    });
+
+    it('drops a destination captured before a signed-out settle', () => {
+      _resetDeepLinkLaunchForTests();
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+
+      setCurrentDeepLinkUserId(null);
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+    });
+
+    it('does not restore a persisted destination with no account identity', async () => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: '/(app)/agent-chat/session-1',
+          source: 'system-search',
+          storedAt: Date.now(),
+          userId: null,
+        })
+      );
+
+      setCurrentDeepLinkUserId('user-2');
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+      });
+    });
+
+    it('does not restore for a different account', async () => {
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
+      });
+
+      _resetDeepLinkLaunchForTests();
+
+      setCurrentDeepLinkUserId('user-2');
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
     });
   });
 
@@ -496,6 +573,7 @@ describe('deep-link-launch', () => {
     });
 
     it('flags an app-scheme launch URL so the exact search route can replace it', () => {
+      setCurrentDeepLinkUserId('user-1');
       _setGetLinkingURLForTests(
         () =>
           'kiloapp://pr-review/gitlab/group/sub/repo/12?instance=https%3A%2F%2Fgitlab.example.com'
@@ -514,7 +592,20 @@ describe('deep-link-launch', () => {
       );
     });
 
+    it('does not let a stale search slot replace an unrelated app-scheme launch link', () => {
+      setCurrentDeepLinkUserId('user-1');
+      _setGetLinkingURLForTests(() => 'kiloapp://pr-review/octocat/hello-world/42');
+      captureLaunchDeepLink();
+
+      // A slot left over from an earlier, unconsumed search tap names a
+      // different destination: the link the launch actually opened wins.
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+
+      expect(getPendingDeepLink()).toBe('/(app)/pr-review/octocat/hello-world/42');
+    });
+
     it('leaves an https launch link unflaggeable by the search route', () => {
+      setCurrentDeepLinkUserId('user-1');
       _setGetLinkingURLForTests(() => 'https://app.kilo.ai/pr-review/octocat/hello-world/42');
       captureLaunchDeepLink();
 

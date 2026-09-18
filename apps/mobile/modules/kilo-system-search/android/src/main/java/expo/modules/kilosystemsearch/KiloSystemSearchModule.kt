@@ -15,6 +15,7 @@ import android.app.appsearch.SetSchemaRequest
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.appsearch.app.AppSearchBatchResult as JetpackBatchResult
 import androidx.appsearch.app.AppSearchSchema as JetpackSchema
@@ -40,6 +41,7 @@ import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
 
 private const val NAMESPACE = "kilo"
+private const val TAG = "KiloSystemSearch"
 private const val SCHEMA_TYPE = "KiloSystemSearchEntity"
 private const val DATABASE_NAME = "kilo-system-search"
 private const val PREFERENCES_NAME = "kilo-system-search"
@@ -259,10 +261,15 @@ class KiloSystemSearchModule : Module() {
     val stored = try {
       backend.stored()
     } catch (error: Exception) {
-      // An unreadable index must not lose a tap that already names its entry: a
-      // `kiloapp://` identifier is the link itself, and the JS side still
-      // refuses anything it did not issue.
-      return identifier.takeIf { it.startsWith(APP_SCHEME_PREFIX) }
+      // Fail closed: the index is the only authority on which identifiers are
+      // ours, and `kiloapp://` is also the scheme the app's ordinary deep links
+      // use. Without the read there is no evidence this Intent came from our
+      // index, so the identifier is refused rather than opened as a search tap.
+      // The JavaScript allowlist only checks a route shape; it cannot prove the
+      // Intent originated here. Report the read failure so the dropped tap is
+      // not silent.
+      Log.w(TAG, "Could not read the system search index to resolve a picked result.", error)
+      return null
     }
     if (identifier.startsWith(APP_SCHEME_PREFIX)) {
       return identifier.takeIf { link -> stored.any { it.route == link } }
@@ -737,7 +744,12 @@ private fun awaitPlatformBatch(start: (BatchResultCallback<String, Void>) -> Uni
     }
 
     override fun onSystemError(error: Throwable?) {
-      failure = error
+      // AppSearch can report a system error without a throwable. A null is
+      // still a failure: leaving `failure` unset would let the latch return and
+      // the caller treat the batch as applied even though the index never
+      // completed it. The Jetpack path's `awaitFuture` throws here, so this
+      // keeps the two stores answering the same way.
+      failure = error ?: platformFailure(AppSearchResult.RESULT_UNKNOWN_ERROR, null)
       latch.countDown()
     }
   })

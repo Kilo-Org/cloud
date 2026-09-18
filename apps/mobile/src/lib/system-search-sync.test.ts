@@ -41,10 +41,10 @@ function sessionDocument(title: string): SystemSearchDocument {
 }
 
 function storedSessions(title: string) {
-  return { pages: [{ cliSessions: [{ ...SESSION_ROW, title }] }] };
+  return { pages: [{ cliSessions: [{ ...SESSION_ROW, title }], nextCursor: null }] };
 }
 
-const EMPTY_SESSIONS = { pages: [{ cliSessions: [] }] };
+const EMPTY_SESSIONS = { pages: [{ cliSessions: [], nextCursor: null }] };
 
 // The sync's trailing coalescing window: a burst of cache writes inside this
 // window must produce exactly one apply.
@@ -194,7 +194,7 @@ describe('SystemSearchIndexSync', () => {
     // screen builds the list key as `[...queryKey(), filters]`, so the
     // unfiltered filters segment sits in the third position.
     queryClient.setQueryData([['securityAgent', 'listFindings'], { type: 'query' }, {}], {
-      pages: [{ findings: [] }],
+      pages: [{ findings: [], totalCount: 0 }],
     });
     await expect(sync.syncNow()).resolves.toBe('applied');
     expect(bridge.index.has(finding.id)).toBe(false);

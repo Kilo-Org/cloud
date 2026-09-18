@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one module owns the document builders, the route allowlist, and the diff plan they feed */
 /**
  * Index documents for the phone's own search (Spotlight on iOS, app search
  * on Android), built from rows the app has already fetched.
@@ -12,6 +13,8 @@
  * describe a screen the app cannot show. `route` is that same id as the link
  * the OS hands back when the result is picked.
  */
+
+import { z } from 'zod';
 
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
 import {
@@ -98,6 +101,15 @@ type DocumentContent = {
   title: string;
   description: string;
   keywords: string[];
+  /**
+   * The source scope this document was enumerated from, when the id alone
+   * cannot name it. A provider pull-request route carries the provider but not
+   * the organization its inbox ran under, so the source rides in the
+   * fingerprint — the one ownership field the platform index stores beside the
+   * id — and `planSystemSearchUpdate` reads it back to match the entry to the
+   * scope that may remove it.
+   */
+  source?: string;
 };
 
 function buildDocument(input: DocumentContent): SystemSearchDocument {
@@ -117,6 +129,7 @@ function buildDocument(input: DocumentContent): SystemSearchDocument {
       description: input.description,
       keywords,
       route,
+      ...(input.source === undefined ? {} : { source: input.source }),
     }),
   };
 }
@@ -210,17 +223,35 @@ export type SystemSearchInboxPrRow = {
 /** A `getRecentPrs()` entry. */
 export type SystemSearchRecentPrRow = RecentPrRef & { title: string };
 
-/** The document for one inbox row. */
-export function inboxPrSearchDocument(row: SystemSearchInboxPrRow): SystemSearchDocument {
-  return providerPrSearchDocument(githubPrRef(row.owner, row.repo, row.number), row.title ?? '');
+/** The document for one inbox row, enumerated from `source` when given. */
+export function inboxPrSearchDocument(
+  row: SystemSearchInboxPrRow,
+  source?: string
+): SystemSearchDocument {
+  return providerPrSearchDocument(
+    githubPrRef(row.owner, row.repo, row.number),
+    row.title ?? '',
+    source
+  );
 }
 
 /**
  * The document for one recents entry. Recents keep their provider (s7), so a
  * GitLab or Bitbucket entry routes through its own provider route.
+ *
+ * Recents carry no organization: the entry is account-level, so its source is
+ * the provider alone. A provider whose inbox is organization-scoped never
+ * enumerates that key, so a recents entry is never removed by one
+ * organization's inbox — it leaves at the account boundary with the recents
+ * themselves.
  */
 export function recentPrSearchDocument(row: SystemSearchRecentPrRow): SystemSearchDocument {
-  return providerPrSearchDocument(providerRefFromRecentPr(row), row.title);
+  const platform = row.platform ?? 'github';
+  return providerPrSearchDocument(
+    providerRefFromRecentPr(row),
+    row.title,
+    systemSearchSourceKey('pullRequests', platform)
+  );
 }
 
 /**
@@ -228,15 +259,37 @@ export function recentPrSearchDocument(row: SystemSearchRecentPrRow): SystemSear
  * recents and the GitLab/Bitbucket provider inbox all funnel through this one
  * builder, so a PR/MR the user already has is indexed under one document
  * shape whichever cache carried it in — and the dedupe by id in the collector
- * sees one entry, not two.
+ * sees one entry, not two. `source` is the scope that enumerated the row, kept
+ * in the fingerprint so removal stays scoped to that scope.
  */
-export function providerPrSearchDocument(ref: ProviderPrRef, title: string): SystemSearchDocument {
+export function providerPrSearchDocument(
+  ref: ProviderPrRef,
+  title: string,
+  source?: string
+): SystemSearchDocument {
   return buildDocument({
     id: providerPrRoutePath(ref) as string,
     title,
     description: providerPrRefLabel(ref),
     keywords: [providerPrRepoPath(ref), String(providerPrNumber(ref))],
+    ...(source === undefined ? {} : { source }),
   });
+}
+
+/**
+ * The source scope one provider inbox enumerated: the provider plus the
+ * organization the query ran under (the personal scope when it named none), so
+ * an authoritative GitLab or Bitbucket cache for one organization never speaks
+ * for another organization's rows.
+ */
+export function providerInboxSourceScope(
+  provider: string,
+  organizationId: string | null | undefined
+): string {
+  return systemSearchSourceKey(
+    'pullRequests',
+    organizationId ? `${provider}:${organizationId}` : `${provider}:${PERSONAL_SOURCE_SCOPE}`
+  );
 }
 
 // ── security findings ──────────────────────────────────────────────────────
@@ -442,14 +495,46 @@ export function planSystemSearchUpdate(input: {
       add.push(document);
     }
   }
-  const remove = [...indexedById.keys()].filter(id => {
-    if (documentsById.has(id)) {
-      return false;
-    }
-    return systemSearchSourceKeysOfId(id).some(source => input.observedSources.has(source));
-  });
+  const remove = [...indexedById.values()]
+    .filter(document => {
+      if (documentsById.has(document.id)) {
+        return false;
+      }
+      return sourceKeysOfIndexedDocument(document).some(source =>
+        input.observedSources.has(source)
+      );
+    })
+    .map(document => document.id);
   return { add, remove };
 }
+
+/**
+ * The source scopes that may remove one indexed document. A document whose
+ * fingerprint names its own source (a provider pull request) is matched on
+ * that source alone: the route cannot say which organization the inbox ran
+ * under, so inferring the scope from the id would let one organization's cache
+ * remove another organization's rows. Every other document — a session or a
+ * finding, whose id already carries its scope — falls back to the id.
+ */
+function sourceKeysOfIndexedDocument(document: SystemSearchDocument): string[] {
+  const embedded = fingerprintSource(document.fingerprint);
+  return embedded === null ? systemSearchSourceKeysOfId(document.id) : [embedded];
+}
+
+/** The source scope a document's fingerprint carries, or null when it names none. */
+function fingerprintSource(fingerprint: string): string | null {
+  try {
+    const parsed = fingerprintSourceSchema.safeParse(JSON.parse(fingerprint));
+    return parsed.success ? parsed.data.source : null;
+  } catch {
+    // A fingerprint this module did not write names no source.
+    return null;
+  }
+}
+
+// A fingerprint without a non-empty `source` names none, so the id-derived
+// scope still governs.
+const fingerprintSourceSchema = z.object({ source: z.string().min(1) });
 
 function indexById(documents: readonly SystemSearchDocument[]): Map<string, SystemSearchDocument> {
   const byId = new Map<string, SystemSearchDocument>();

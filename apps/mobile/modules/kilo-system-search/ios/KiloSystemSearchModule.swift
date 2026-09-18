@@ -55,12 +55,13 @@ public final class KiloSystemSearchModule: Module {
   private let index = CSSearchableIndex.default()
   private var openObserver: NSObjectProtocol?
 
-  /// How long one index call may block the shared operation queue before its
-  /// promise is rejected. `CSSearchableIndex` does not call its completion
-  /// handler when the index is unavailable, and every apply and clear runs on
-  /// the one serial queue, so an unbounded wait would wedge the index for the
-  /// rest of the process. Mirrors the Android module's
-  /// `latch.await(TIMEOUT_SECONDS, …)`.
+  /// How long one index call may wait for its completion before its promise is
+  /// rejected. `CSSearchableIndex` does not call its completion handler when
+  /// the index is unavailable, and every apply and clear runs on the one serial
+  /// queue, so an unbounded *promise* wait would leave the caller pending
+  /// forever. The queue itself stays fenced on a timeout (see
+  /// `awaitIndexCall`), so the bound releases JavaScript, not the ordering.
+  /// Mirrors the Android module's `latch.await(TIMEOUT_SECONDS, …)`.
   private static let indexTimeout: DispatchTimeInterval = .seconds(30)
   private static let timeoutMessage = "The system search index did not respond."
 
@@ -123,32 +124,23 @@ public final class KiloSystemSearchModule: Module {
 
   private func apply(add: [SystemSearchRecord], removeIds: [String], promise: Promise) {
     let items = add.map(Self.searchableItem)
-    let wait = DispatchSemaphore(value: 0)
-    var indexError: Error?
-    indexItems(items) { error in
-      indexError = error
-      wait.signal()
-    }
-    guard Self.waitForIndex(wait) else {
-      promise.reject(Self.indexTimeoutError())
+    switch awaitIndexCall({ self.indexItems(items, completion: $0) }, promise: promise) {
+    case .timedOut:
       return
+    case .completed(let indexError):
+      if let indexError {
+        promise.reject(indexError)
+        return
+      }
     }
-    if let indexError {
-      promise.reject(indexError)
+    switch awaitIndexCall({ self.deleteItems(removeIds, completion: $0) }, promise: promise) {
+    case .timedOut:
       return
-    }
-    var deleteError: Error?
-    self.deleteItems(removeIds) { error in
-      deleteError = error
-      wait.signal()
-    }
-    guard Self.waitForIndex(wait) else {
-      promise.reject(Self.indexTimeoutError())
-      return
-    }
-    if let deleteError {
-      promise.reject(deleteError)
-      return
+    case .completed(let deleteError):
+      if let deleteError {
+        promise.reject(deleteError)
+        return
+      }
     }
     // The ledger advances only after both index calls succeed, so a rejection
     // leaves the previous ledger intact for the caller to retry. The serial
@@ -158,24 +150,60 @@ public final class KiloSystemSearchModule: Module {
   }
 
   private func clear(promise: Promise) {
+    switch awaitIndexCall(
+      { completion in
+        self.index.deleteSearchableItems(
+          withDomainIdentifiers: [KiloSystemSearchStore.domainIdentifier],
+          completionHandler: completion
+        )
+      },
+      promise: promise
+    ) {
+    case .timedOut:
+      return
+    case .completed(let clearError):
+      if let clearError {
+        promise.reject(clearError)
+        return
+      }
+    }
+    UserDefaults.standard.removeObject(forKey: KiloSystemSearchStore.ledgerKey)
+    promise.resolve()
+  }
+
+  /// The outcome of one index call: the completion's error, or a timeout whose
+  /// completion has not been observed yet.
+  private enum IndexCallResult {
+    case completed(Error?)
+    case timedOut
+  }
+
+  /// Runs one index call under the bound above.
+  ///
+  /// A timeout fails the promise, but the call is still in flight: the
+  /// completion is awaited before this method returns, so the serial operation
+  /// queue stays fenced until the native completion is observed. Otherwise a
+  /// late add or delete could land after a later clear and leave the index
+  /// holding records the ledger says are gone — exactly the race the one
+  /// serial queue exists to prevent. A call that never completes holds the
+  /// queue, the same as one that hung before the timeout was introduced; the
+  /// promise is already rejected, so JavaScript is not blocked by it.
+  private func awaitIndexCall(
+    _ start: (@escaping (Error?) -> Void) -> Void,
+    promise: Promise
+  ) -> IndexCallResult {
     let wait = DispatchSemaphore(value: 0)
-    var clearError: Error?
-    index.deleteSearchableItems(
-      withDomainIdentifiers: [KiloSystemSearchStore.domainIdentifier]
-    ) { error in
-      clearError = error
+    var error: Error?
+    start { value in
+      error = value
       wait.signal()
     }
     guard Self.waitForIndex(wait) else {
       promise.reject(Self.indexTimeoutError())
-      return
+      wait.wait()
+      return .timedOut
     }
-    if let clearError {
-      promise.reject(clearError)
-      return
-    }
-    UserDefaults.standard.removeObject(forKey: KiloSystemSearchStore.ledgerKey)
-    promise.resolve()
+    return .completed(error)
   }
 
   /// Waits for one index call to answer, with the bound above. False means the

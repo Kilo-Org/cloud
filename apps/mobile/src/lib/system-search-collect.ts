@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the collector decodes every source shape and the completeness checks live beside the decoders they guard */
 /**
  * Collect the index documents from what the app already holds.
  *
@@ -20,6 +21,7 @@ import {
   findingSearchDocument,
   inboxPrSearchDocument,
   PERSONAL_SOURCE_SCOPE,
+  providerInboxSourceScope,
   providerPrSearchDocument,
   recentPrSearchDocument,
   storedSessionSearchDocument,
@@ -187,6 +189,17 @@ const providerInboxInputSchema = z
 const queryInputSchema = z.record(z.string(), z.unknown());
 const maxPagesSchema = z.number();
 const pagesDataSchema = z.object({ pages: z.array(z.unknown()) });
+// The cursor-paginated lists (sessions, both inboxes) hand back the next
+// cursor on every page and `null` on the terminal one. The schema demands the
+// `null` marker, so a page that advertises a cursor, or carries no cursor field
+// at all, parses as "not the end".
+const terminalCursorPageSchema = z.object({ nextCursor: z.null() });
+// The findings list is offset-paginated: its terminal marker is the page's own
+// `totalCount` against the rows loaded so far, not a cursor.
+const findingsCountPageSchema = z.object({
+  findings: z.array(z.unknown()),
+  totalCount: z.number(),
+});
 
 type QueryInput = z.infer<typeof queryInputSchema>;
 
@@ -239,9 +252,9 @@ function documentsFromQuery(query: Query): QueryDocuments {
     return {
       documents: parsed.data.pages
         .flatMap(page => decodedRows(page.items, inboxItemRowSchema))
-        .map(row => inboxPrSearchDocument(row)),
+        .map(row => inboxPrSearchDocument(row, systemSearchSourceKey('pullRequests', 'github'))),
       observedSource: isDefaultInput
-        ? untrimmedSource(query, systemSearchSourceKey('pullRequests', 'github'))
+        ? untrimmedSource(query, systemSearchSourceKey('pullRequests', 'github'), cursorHasMore)
         : null,
     };
   }
@@ -255,14 +268,25 @@ function documentsFromQuery(query: Query): QueryDocuments {
       return NOT_ENUMERATED;
     }
     const provider = providerInboxProvider(queryInput(queryKey));
+    const organizationId = providerInboxOrganizationId(queryInput(queryKey));
     return {
       documents: parsed.data.pages
         .flatMap(page => decodedRows(page.items, providerInboxItemRowSchema))
-        .map(row => providerPrSearchDocument(row.ref, row.title ?? '')),
+        .map(row =>
+          providerPrSearchDocument(
+            row.ref,
+            row.title ?? '',
+            providerInboxSourceScope(row.ref.platform, organizationId)
+          )
+        ),
       observedSource:
         provider === null
           ? null
-          : untrimmedSource(query, systemSearchSourceKey('pullRequests', provider)),
+          : untrimmedSource(
+              query,
+              providerInboxSourceScope(provider, organizationId),
+              cursorHasMore
+            ),
     };
   }
   if (path === 'securityAgent.listFindings') {
@@ -290,7 +314,7 @@ function findingsFromQuery(query: Query, scope: string): QueryDocuments {
       .map(row => findingSearchDocument(row, scope)),
     observedSource: filtered
       ? null
-      : untrimmedSource(query, systemSearchSourceKey('findings', scope)),
+      : untrimmedSource(query, systemSearchSourceKey('findings', scope), findingsHasMore),
   };
 }
 
@@ -320,21 +344,65 @@ function sessionObservedSource(query: Query): string | null {
   const organizationId = scope.success ? scope.data.organizationId : undefined;
   return untrimmedSource(
     query,
-    systemSearchSourceKey('sessions', organizationId ?? PERSONAL_SOURCE_SCOPE)
+    systemSearchSourceKey('sessions', organizationId ?? PERSONAL_SOURCE_SCOPE),
+    cursorHasMore
   );
 }
 
-/** The candidate source key, or null when `maxPages` may have evicted pages. */
-function untrimmedSource(query: Query, source: string): string | null {
+/**
+ * The candidate source key, or null when the cached pages do not prove the
+ * query enumerated the whole source. Two things can make the window partial:
+ * a full `maxPages` window may already have evicted its oldest pages, and a
+ * last page that advertises a further page means the query stopped early — a
+ * refresh then holds only a prefix of the source, so its rows are a subset and
+ * its success must not authorise removing the rest.
+ */
+function untrimmedSource(
+  query: Query,
+  source: string,
+  hasMore: (pages: readonly unknown[]) => boolean
+): string | null {
   const bound = maxPagesSchema.safeParse(query.options.maxPages);
-  if (!bound.success) {
-    return source;
-  }
   const pages = pagesDataSchema.safeParse(query.state.data);
-  // A full window may already have evicted its oldest pages, so its rows are a
-  // subset of the source; only a window still shorter than the bound is a
-  // complete enumeration of what the query has loaded.
-  return pages.success && pages.data.pages.length >= bound.data ? null : source;
+  if (!pages.success) {
+    return null;
+  }
+  if (bound.success && pages.data.pages.length >= bound.data) {
+    return null;
+  }
+  return hasMore(pages.data.pages) ? null : source;
+}
+
+/**
+ * Whether a cursor-paginated window stopped before the source's end. The last
+ * page's `nextCursor: null` is the terminal marker: a non-null cursor, or a
+ * page that carries no cursor field at all, is not evidence the source is
+ * fully enumerated.
+ */
+function cursorHasMore(pages: readonly unknown[]): boolean {
+  return !terminalCursorPageSchema.safeParse(pages.at(-1)).success;
+}
+
+/**
+ * Whether a findings window stopped before the scope's end. The list is
+ * offset-paginated and reports the scope's `totalCount`, so the rows loaded
+ * across the retained pages are compared against it; a page that omits the
+ * count, or a window whose rows fall short of it, is not a complete
+ * enumeration.
+ */
+function findingsHasMore(pages: readonly unknown[]): boolean {
+  const last = findingsCountPageSchema.safeParse(pages.at(-1));
+  if (!last.success) {
+    return true;
+  }
+  let loaded = 0;
+  for (const page of pages) {
+    const parsed = findingsCountPageSchema.safeParse(page);
+    if (parsed.success) {
+      loaded += parsed.data.findings.length;
+    }
+  }
+  return loaded < last.data.totalCount;
 }
 
 /** Whether the query's input carries any of the narrowing filter keys. */
@@ -353,6 +421,17 @@ function hasNarrowingFilter(input: QueryInput | null, keys: readonly string[]): 
 function providerInboxProvider(input: QueryInput | null): string | null {
   const parsed = providerInboxInputSchema.safeParse(input);
   return parsed.success ? parsed.data.platform : null;
+}
+
+/**
+ * The organization a provider inbox query ran under, or undefined for the
+ * personal scope. It belongs to the source scope: the same provider's inbox
+ * for two organizations is two sources, so one must never authorise removing
+ * the other's rows.
+ */
+function providerInboxOrganizationId(input: QueryInput | null): string | undefined {
+  const parsed = providerInboxInputSchema.safeParse(input);
+  return parsed.success ? parsed.data.organizationId : undefined;
 }
 
 /** Decode one page of rows, dropping a malformed row alone. */

@@ -271,6 +271,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // so the epoch and sign-out fences hold here as for every other
           // publish in this bootstrap.
           clearSystemSearchIndexOnSignedOutLaunch();
+          // The account is now known to be none: a system-search destination
+          // captured before this point is not this process's to open, so the
+          // settle drops it instead of holding it for whoever signs in next.
+          setCurrentDeepLinkUserId(null);
         }
       } catch {
         // Every read exhausted its retries. The session is not known to be

@@ -5,6 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as RecentPrsModule from '@/lib/pr-review/recent-prs';
 import { collectSystemSearchDocuments } from './system-search-collect';
+import {
+  planSystemSearchUpdate,
+  providerInboxSourceScope,
+  providerPrSearchDocument,
+  storedSessionSearchDocument,
+} from './system-search-entries';
 
 // The recents reader is the only storage read in the collector graph: the PR
 // recents come from SecureStore, so it is mocked to a settable list. Every
@@ -65,9 +71,10 @@ const storedSessions = {
         // Malformed: no id. It is skipped on its own, not with its page.
         { title: 'no id' },
       ],
+      nextCursor: 'page-2',
     },
     // A later page repeating a session must not produce a second document.
-    { cliSessions: [{ ...sessionRow, title: 'Fix login bug (stale page)' }] },
+    { cliSessions: [{ ...sessionRow, title: 'Fix login bug (stale page)' }], nextCursor: null },
   ],
 };
 
@@ -85,7 +92,12 @@ const activeSessions = {
 };
 
 const inbox = {
-  pages: [{ items: [{ owner: 'octocat', repo: 'hello-world', number: 42, title: 'Hello PR' }] }],
+  pages: [
+    {
+      items: [{ owner: 'octocat', repo: 'hello-world', number: 42, title: 'Hello PR' }],
+      nextCursor: null,
+    },
+  ],
 };
 
 const providerInbox = {
@@ -136,13 +148,17 @@ const findings = {
         // Malformed finding row: no id.
         { title: 'no id at all' },
       ],
+      totalCount: 1,
     },
   ],
 };
 
 const organizationFindings = {
   pages: [
-    { findings: [{ id: 'finding-2', title: 'XSS', severity: 'high', repo_full_name: 'acme/web' }] },
+    {
+      findings: [{ id: 'finding-2', title: 'XSS', severity: 'high', repo_full_name: 'acme/web' }],
+      totalCount: 1,
+    },
   ],
 };
 
@@ -246,7 +262,7 @@ describe('collectSystemSearchDocuments', () => {
     client.setQueryData(SESSION_LIST_KEY, 'not a page list');
     client.setQueryData(INBOX_KEY, { items: [] });
     client.setQueryData(PROVIDER_INBOX_KEY, { items: [] });
-    client.setQueryData(ORG_FINDINGS_KEY, { pages: [{ findings: [] }] });
+    client.setQueryData(ORG_FINDINGS_KEY, { pages: [{ findings: [], totalCount: 0 }] });
 
     const { documents, observedSources } = await collectSystemSearchDocuments(client);
 
@@ -385,9 +401,12 @@ describe('collectSystemSearchDocuments', () => {
 
     const { observedSources } = await collectSystemSearchDocuments(client);
 
+    // The GitHub inbox is account-wide, so its source is the provider; the
+    // GitLab inbox ran under the personal scope, so its source names that
+    // scope as well.
     expect(observedSources.has('pullRequests:github')).toBe(true);
-    expect(observedSources.has('pullRequests:gitlab')).toBe(true);
-    expect(observedSources.has('pullRequests:bitbucket')).toBe(false);
+    expect(observedSources.has('pullRequests:gitlab:personal')).toBe(true);
+    expect(observedSources.has('pullRequests:bitbucket:personal')).toBe(false);
   });
 
   it('does not claim a provider whose inbox input is not its default', async () => {
@@ -404,7 +423,128 @@ describe('collectSystemSearchDocuments', () => {
 
     const { observedSources } = await collectSystemSearchDocuments(client);
 
-    expect(observedSources.has('pullRequests:gitlab')).toBe(false);
+    expect(observedSources.has('pullRequests:gitlab:personal')).toBe(false);
+  });
+
+  it('keeps a provider source unobserved while a next page is still advertised', async () => {
+    const client = new QueryClient();
+    // A one-page window whose page advertises a next cursor holds only the
+    // first page of the source. Its success is not evidence that the rows on
+    // later pages are gone, so a refresh must not authorise removing them.
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [{ cliSessions: [sessionRow], nextCursor: 'page-2' }],
+    });
+    client.setQueryData(INBOX_KEY, {
+      pages: [
+        {
+          items: [{ owner: 'octocat', repo: 'hello-world', number: 42, title: 'Hello PR' }],
+          nextCursor: 'page-2',
+        },
+      ],
+    });
+    client.setQueryData(PROVIDER_INBOX_KEY, {
+      pages: [
+        {
+          items: [
+            {
+              ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 3 },
+              title: 'First page MR',
+            },
+          ],
+          nextCursor: 'page-2',
+        },
+      ],
+    });
+    client.setQueryData(FINDINGS_KEY, {
+      pages: [
+        {
+          findings: [{ id: 'finding-1', title: 'SQL injection', severity: 'critical' }],
+          totalCount: 5,
+        },
+      ],
+    });
+
+    const { documents, observedSources } = await collectSystemSearchDocuments(client);
+
+    expect(observedSources).toEqual(new Set());
+
+    // The index still holds a session indexed from a later page. The one-page
+    // window is a prefix, so its success must not remove that entry.
+    const laterPage = storedSessionSearchDocument({
+      session_id: 'sess-later-page',
+      title: 'Later page session',
+      organization_id: null,
+      git_branch: null,
+    });
+    expect(laterPage).not.toBeNull();
+    if (laterPage !== null) {
+      const plan = planSystemSearchUpdate({
+        indexed: [laterPage],
+        documents,
+        observedSources,
+      });
+      expect(plan.remove).toEqual([]);
+    }
+  });
+
+  it('claims a provider source once the cached pages reach the end', async () => {
+    const client = new QueryClient();
+    // The same rows with the terminal marker: the window now proves the source
+    // was enumerated to its end, so a removal is authorised.
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [{ cliSessions: [sessionRow], nextCursor: null }],
+    });
+    client.setQueryData(FINDINGS_KEY, {
+      pages: [
+        {
+          findings: [{ id: 'finding-1', title: 'SQL injection', severity: 'critical' }],
+          totalCount: 1,
+        },
+      ],
+    });
+
+    const { observedSources } = await collectSystemSearchDocuments(client);
+
+    expect(observedSources.has('sessions:personal')).toBe(true);
+    expect(observedSources.has('findings:personal')).toBe(true);
+  });
+
+  it('keeps another organization’s pull requests when one organization’s inbox is authoritative', async () => {
+    const client = new QueryClient();
+    // The active organization's GitLab inbox enumerated to its end.
+    const organizationA = { platform: 'gitlab' as const, projectPath: 'acme/api', mrIid: 7 };
+    client.setQueryData(
+      [
+        ['providerReview', 'listInbox'],
+        { type: 'infinite', input: { platform: 'gitlab', organizationId: 'org-a' } },
+      ],
+      { pages: [{ items: [{ ref: organizationA, title: 'A MR' }], nextCursor: null }] }
+    );
+
+    const { documents, observedSources } = await collectSystemSearchDocuments(client);
+
+    // The index still holds an MR enumerated under a different organization.
+    const organizationB = { platform: 'gitlab' as const, projectPath: 'beta/tools', mrIid: 9 };
+    const otherOrganization = providerPrSearchDocument(
+      organizationB,
+      'B MR',
+      providerInboxSourceScope('gitlab', 'org-b')
+    );
+    // And one of org A's own that the inbox no longer carries.
+    const sameOrganization = providerPrSearchDocument(
+      { platform: 'gitlab' as const, projectPath: 'acme/api', mrIid: 8 },
+      'A MR (removed from the inbox)',
+      providerInboxSourceScope('gitlab', 'org-a')
+    );
+
+    const plan = planSystemSearchUpdate({
+      indexed: [otherOrganization, sameOrganization],
+      documents,
+      observedSources,
+    });
+
+    // Org A's own stale row leaves; org B's row is not this scope's to remove.
+    expect(plan.remove).toEqual([sameOrganization.id]);
   });
 
   it('does not claim a family whose source query never produced data', async () => {

@@ -71,6 +71,6 @@ export const CLIENT_REGISTRATION_TTL_SECONDS = SESSION_LIFETIME_SECONDS + 30 * 2
 /**
  * The reuse guard's memory, in milliseconds. The Durable Object alarm's
  * `purgeExpired` deletes history rows past their own `expires_at`
- * (`store/oauth-store.ts:297-308`, scheduled by `alarm` at `:408-411`).
+ * (`store/oauth-store.ts:331-346`, scheduled by `alarm` at `:757-760`).
  */
 export const REFRESH_HISTORY_TTL_MS = SESSION_LIFETIME_SECONDS * 1000;

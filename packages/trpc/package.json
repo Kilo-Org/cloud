@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsgo -p tsconfig.json && rollup -c rollup.config.mjs",
+    "build": "tsgo -p tsconfig.json --checkers 1 && rollup -c rollup.config.mjs",
     "typecheck": "tsgo --noEmit"
   },
   "exports": {

@@ -44,7 +44,13 @@ export async function postAuth(
     let json: unknown = undefined;
     try {
       json = await response.json();
-    } catch {
+    } catch (error) {
+      // An abort also lands here when the server sent headers but stalled the
+      // body, so a failed parse must not swallow the timeout: rethrow so the
+      // outer catch names it TIMEOUT instead of reporting an empty success.
+      if (controller.signal.aborted) {
+        throw error;
+      }
       json = undefined;
     }
 

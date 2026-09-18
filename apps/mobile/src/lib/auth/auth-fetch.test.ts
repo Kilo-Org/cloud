@@ -85,6 +85,32 @@ describe('postAuth', () => {
     expect(signals[0]?.aborted).toBe(true);
   });
 
+  it('names TIMEOUT when the abort lands after the headers arrive but the body stalls', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      const signal = await Promise.resolve(init?.signal ?? undefined);
+      const response = new Response(null);
+      vi.spyOn(response, 'json').mockReturnValue(
+        new Promise<never>((_resolve, reject) => {
+          signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        })
+      );
+      return response;
+    });
+
+    const promise = postAuth('/api/auth/native/otp', { email: 'user@example.com' });
+    await vi.advanceTimersByTimeAsync(AUTH_REQUEST_TIMEOUT_MS);
+    const result = await promise;
+
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'TIMEOUT',
+      ssoOrganizationId: undefined,
+    });
+  });
+
   it('leaves a genuine network failure unnamed', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('Network request failed'));
 

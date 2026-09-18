@@ -80,6 +80,29 @@ describe('SessionMessageList', () => {
 
     expect(flashListProps.current?.removeClippedSubviews).toBe(false);
   });
+
+  it('draws four screens ahead and preloads the older page four viewports early', () => {
+    act(() => {
+      TestRenderer.create(
+        createElement(SessionMessageList<string>, {
+          sessionId: 'session-1',
+          items: ['message-1'],
+          keyExtractor: item => item,
+          hasOlderMessages: false,
+          isLoadingOlderMessages: false,
+          olderMessagesError: null,
+          olderMessagesOmittedItemCount: 0,
+          onLoadOlderMessages: () => undefined,
+          renderItem: () => null,
+        })
+      );
+    });
+
+    // A fast fling must not outrun the draw window (blank rows) and must
+    // reach the top with the next older page already landed.
+    expect(flashListProps.current?.drawDistance).toBe(2500);
+    expect(flashListProps.current?.onStartReachedThreshold).toBe(4);
+  });
 });
 
 // `Object.is` keeps the host-string comparison off the ElementType union.

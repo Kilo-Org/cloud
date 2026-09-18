@@ -29,10 +29,14 @@ const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
 // Prevent `onStartReached` from firing while an older page is already in
 // flight. The manager dedupes too, but the UI guard keeps us from issuing
 // repeated `onStartReached` callbacks during a single drag, which would
-// otherwise spam the FlashList event log.
-const ON_START_REACHED_THRESHOLD = 2;
+// otherwise spam the FlashList event log. Four viewports also starts the
+// next older page far enough ahead that a fast upward fling reaches the
+// top with the page already landed.
+const ON_START_REACHED_THRESHOLD = 4;
 
-const DRAW_DISTANCE = 1000;
+// Four screens of lookahead: a fast fling must not outrun the draw window
+// and show blank rows while the tall markdown rows mount.
+const DRAW_DISTANCE = 2500;
 
 type SessionMessageListProps<T> = {
   sessionId: string;
@@ -79,6 +83,19 @@ export function SessionMessageList<T>({
   contentBottomInset,
   onReachedBottom,
 }: Readonly<SessionMessageListProps<T>>) {
+  // Identity of the oldest and newest rows, derived from the caller's own
+  // `keyExtractor` (the same one FlashList keys rows with). The auto-scroll
+  // companion uses the delta to tell a prepended older page apart from a
+  // streaming append.
+  const firstItemKey = useMemo(() => {
+    const first = items.at(0);
+    return first === undefined ? null : keyExtractor(first);
+  }, [items, keyExtractor]);
+  const lastItemKey = useMemo(() => {
+    const last = items.at(-1);
+    return last === undefined ? null : keyExtractor(last);
+  }, [items, keyExtractor]);
+
   // FlashList v2 renders the list in chronological order (oldest → newest).
   // `startRenderingFromBottom` keeps the viewport anchored at the newest
   // message on first render and after prepended older pages, which is the
@@ -97,6 +114,8 @@ export function SessionMessageList<T>({
     handleMomentumScrollEnd,
   } = useSessionListAutoScroll<T>({
     itemCount: items.length,
+    firstItemKey,
+    lastItemKey,
     resetKey: sessionId,
   });
   const colors = useThemeColors();
@@ -237,7 +256,7 @@ export function SessionMessageList<T>({
         renderItem={renderItem}
         // Transcript rows are tall and parse markdown on mount. The 250 dp
         // default draws under half a screen ahead, so a fast fling shows blank
-        // space until the rows mount. Four screens of lookahead hides that.
+        // space until the rows mount. See `DRAW_DISTANCE` for the lookahead.
         drawDistance={DRAW_DISTANCE}
         // Android Fabric can race clipped-view reattachment with rapid transcript updates.
         // Kept explicit: flash-list ≥ 2.3.2 defaults this to false (PR #2202); the pin

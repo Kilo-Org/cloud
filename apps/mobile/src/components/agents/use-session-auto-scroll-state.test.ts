@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  classifySessionTranscriptGrowth,
   getInitialSessionListAutoScrollVisibility,
   isSessionListAtBottom,
   SESSION_LIST_BOTTOM_THRESHOLD_PX,
@@ -7,6 +8,76 @@ import {
   shouldRetrySessionAutoScroll,
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
+
+describe('classifySessionTranscriptGrowth', () => {
+  it('classifies a page of older messages prepended above the first key', () => {
+    // The transcript is chronological and older pages are inserted before
+    // the existing first item: the first key changes while the last key
+    // (the newest message) stays put. That is a prepend, not new messages.
+    expect(
+      classifySessionTranscriptGrowth({
+        previousCount: 10,
+        nextCount: 20,
+        previousFirstKey: 'm10',
+        nextFirstKey: 'm0',
+        previousLastKey: 'm19',
+        nextLastKey: 'm19',
+      })
+    ).toBe('prepend');
+  });
+
+  it('classifies a streaming insertion at the bottom as an append', () => {
+    expect(
+      classifySessionTranscriptGrowth({
+        previousCount: 10,
+        nextCount: 11,
+        previousFirstKey: 'm0',
+        nextFirstKey: 'm0',
+        previousLastKey: 'm9',
+        nextLastKey: 'm10',
+      })
+    ).toBe('append');
+  });
+
+  it('classifies equal counts as no growth even when keys change', () => {
+    expect(
+      classifySessionTranscriptGrowth({
+        previousCount: 10,
+        nextCount: 10,
+        previousFirstKey: 'm0',
+        nextFirstKey: 'x0',
+        previousLastKey: 'm9',
+        nextLastKey: 'x9',
+      })
+    ).toBe('none');
+  });
+
+  it('classifies a wholesale transcript swap as replace', () => {
+    expect(
+      classifySessionTranscriptGrowth({
+        previousCount: 10,
+        nextCount: 20,
+        previousFirstKey: 'm0',
+        nextFirstKey: 'x0',
+        previousLastKey: 'm9',
+        nextLastKey: 'x19',
+      })
+    ).toBe('replace');
+  });
+
+  it('classifies a first render (no previous keys) as replace', () => {
+    expect(
+      classifySessionTranscriptGrowth({
+        previousCount: 0,
+        nextCount: 5,
+        previousFirstKey: null,
+        nextFirstKey: 'm0',
+        previousLastKey: null,
+        nextLastKey: 'm4',
+      })
+    ).toBe('replace');
+  });
+});
 
 describe('isSessionListAtBottom', () => {
   it('returns true when the viewport bottom is within the bottom threshold', () => {
@@ -219,6 +290,29 @@ describe('shouldFollowSessionContentSize', () => {
         isUserScrolling: false,
         shouldAutoScroll: true,
         didContentHeightChange: false,
+      })
+    ).toBe(false);
+  });
+
+  it('blocks the follow when the growth is a prepend even while at the bottom', () => {
+    // Older messages land above the viewport. Following the content-size
+    // growth would yank the user back to the bottom mid-read; the stale
+    // `shouldAutoScroll` ref (still true inside the 150ms programmatic
+    // window) must not be able to force it.
+    expect(
+      shouldFollowSessionContentSize({
+        isUserScrolling: false,
+        shouldAutoScroll: true,
+        didContentHeightChange: true,
+        isPrepend: true,
+      })
+    ).toBe(false);
+    expect(
+      shouldFollowSessionContentSize({
+        isUserScrolling: false,
+        shouldAutoScroll: false,
+        didContentHeightChange: true,
+        isPrepend: true,
       })
     ).toBe(false);
   });

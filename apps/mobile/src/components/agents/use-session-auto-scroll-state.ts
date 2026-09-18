@@ -85,6 +85,50 @@ export function shouldRetrySessionAutoScroll({
 }
 
 /**
+ * How the transcript changed since the previous render. FlashList only
+ * reports a raw content-size growth, which cannot tell a streaming
+ * insertion at the bottom apart from a page of older messages landing
+ * above the viewport. The key delta can:
+ *  - `none`    – the item count is unchanged.
+ *  - `prepend` – older messages were inserted before the existing first
+ *                key while the newest key stayed put.
+ *  - `append`  – a new message landed after the previous last key while
+ *                the oldest key stayed put (streaming).
+ *  - `replace` – anything else (session swap, first render, item
+ *                identity churn); treated as a fresh transcript.
+ */
+export type SessionTranscriptGrowth = 'none' | 'replace' | 'append' | 'prepend';
+
+export function classifySessionTranscriptGrowth({
+  previousCount,
+  nextCount,
+  previousFirstKey,
+  nextFirstKey,
+  previousLastKey,
+  nextLastKey,
+}: {
+  previousCount: number;
+  nextCount: number;
+  previousFirstKey: string | null;
+  nextFirstKey: string | null;
+  previousLastKey: string | null;
+  nextLastKey: string | null;
+}): SessionTranscriptGrowth {
+  if (previousCount === nextCount) {
+    return 'none';
+  }
+  const firstChanged = previousFirstKey !== nextFirstKey;
+  const lastChanged = previousLastKey !== nextLastKey;
+  if (firstChanged && !lastChanged) {
+    return 'prepend';
+  }
+  if (lastChanged && !firstChanged) {
+    return 'append';
+  }
+  return 'replace';
+}
+
+/**
  * Decide whether a streaming content-size change should trigger a follow
  * scroll to the latest message. Like `shouldRetrySessionAutoScroll`, this
  * does NOT gate on `isAutoScrolling`: rapid streaming content-size changes
@@ -93,15 +137,23 @@ export function shouldRetrySessionAutoScroll({
  * guards and additionally requires the content height to have actually
  * changed since the last call (otherwise every redundant measurement would
  * re-scroll even when no new content was added).
+ *
+ * `isPrepend` blocks the follow outright: a page of older messages grows
+ * the content but must hold the user's reading position, even when the
+ * stale `shouldAutoScroll` ref is still true inside the 150ms window.
+ * Optional (defaults to false) because the part-detail ScrollView has no
+ * paginated prepends.
  */
 export function shouldFollowSessionContentSize({
   isUserScrolling,
   shouldAutoScroll,
   didContentHeightChange,
+  isPrepend = false,
 }: {
   isUserScrolling: boolean;
   shouldAutoScroll: boolean;
   didContentHeightChange: boolean;
+  isPrepend?: boolean;
 }): boolean {
   if (!shouldAutoScroll) {
     return false;
@@ -110,6 +162,9 @@ export function shouldFollowSessionContentSize({
     return false;
   }
   if (!didContentHeightChange) {
+    return false;
+  }
+  if (isPrepend) {
     return false;
   }
   return true;

@@ -3,17 +3,36 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 
 import {
+  classifySessionTranscriptGrowth,
   getInitialSessionListAutoScrollVisibility,
   isSessionListAtBottom,
   SESSION_LIST_BOTTOM_THRESHOLD_PX,
+  type SessionTranscriptGrowth,
   shouldFollowSessionContentSize,
   shouldRetrySessionAutoScroll,
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 
+// A page of older messages grows the content exactly like a streaming
+// append, so the follow must be held for the page's own measurement burst.
+// The hold outlasts the 150ms programmatic-scroll window in which
+// `handleScroll` suppresses `onScroll`, so the page's growth cannot fire
+// through a stale follow guard. It is deliberately bounded: it is released
+// once those measurements settle, so a later in-place growth of the last row
+// (same item count and keys, which the classifier reports as `none`) is
+// followed again instead of staying blocked for the rest of the session.
+const PREPEND_GROWTH_HOLD_MS = 200;
+
 type UseSessionListAutoScrollParams = {
   itemCount: number;
+  /**
+   * Identity of the oldest and newest items. They let the hook tell a
+   * prepended older page apart from a streaming append, so a content-size
+   * growth can be followed or held accordingly.
+   */
+  firstItemKey?: string | null;
+  lastItemKey?: string | null;
   resetKey: string;
 };
 
@@ -26,6 +45,8 @@ type UseSessionListAutoScrollParams = {
  */
 export function useSessionListAutoScroll<ItemT>({
   itemCount,
+  firstItemKey,
+  lastItemKey,
   resetKey,
 }: UseSessionListAutoScrollParams) {
   const listRef = useRef<FlashListRef<ItemT>>(null);
@@ -49,6 +70,16 @@ export function useSessionListAutoScroll<ItemT>({
   const autoScrollResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoScrollRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userScrollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Previous transcript identity, compared against the current props to
+  // classify the growth. `growthRef` is read by the native
+  // `onContentSizeChange` callback, which cannot see the render that
+  // produced the new content.
+  const previousItemCountRef = useRef(0);
+  const previousFirstItemKeyRef = useRef<string | null>(null);
+  const previousLastItemKeyRef = useRef<string | null>(null);
+  const growthRef = useRef<SessionTranscriptGrowth>('none');
+  // Releases the prepend hold once the older page's measurements settle.
+  const prependGrowthReleaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearAutoScrollResetTimeout = useCallback(() => {
     const timeout = autoScrollResetTimeoutRef.current;
@@ -73,6 +104,28 @@ export function useSessionListAutoScroll<ItemT>({
       userScrollingTimeoutRef.current = null;
     }
   }, []);
+
+  const clearPrependGrowthReleaseTimeout = useCallback(() => {
+    const timeout = prependGrowthReleaseTimeoutRef.current;
+    if (timeout) {
+      clearTimeout(timeout);
+      prependGrowthReleaseTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Hold the follow only for the prepend's own measurement burst. Once the
+  // burst settles the classification falls back to `none`, so the next
+  // content-size growth (an in-place streaming update of the last row) is
+  // followed again.
+  const schedulePrependGrowthRelease = useCallback(() => {
+    clearPrependGrowthReleaseTimeout();
+    prependGrowthReleaseTimeoutRef.current = setTimeout(() => {
+      prependGrowthReleaseTimeoutRef.current = null;
+      if (growthRef.current === 'prepend') {
+        growthRef.current = 'none';
+      }
+    }, PREPEND_GROWTH_HOLD_MS);
+  }, [clearPrependGrowthReleaseTimeout]);
 
   const scrollToLatestMessage = useCallback(() => {
     isAutoScrollingRef.current = true;
@@ -130,22 +183,67 @@ export function useSessionListAutoScroll<ItemT>({
     const initial = getInitialSessionListAutoScrollVisibility();
     shouldAutoScrollRef.current = initial.shouldAutoScroll;
     lastContentHeightRef.current = 0;
+    previousItemCountRef.current = 0;
+    previousFirstItemKeyRef.current = null;
+    previousLastItemKeyRef.current = null;
+    growthRef.current = 'none';
+    clearPrependGrowthReleaseTimeout();
     setIsAtBottom(prev => (prev === initial.isAtBottom ? prev : initial.isAtBottom));
-  }, [resetKey]);
+  }, [resetKey, clearPrependGrowthReleaseTimeout]);
 
+  // Classify this render's transcript growth before the native
+  // content-size callback can fire: it needs to know whether the growth is
+  // a prepended older page (hold position) or an append (follow).
   useEffect(() => {
+    const nextFirstKey = firstItemKey ?? null;
+    const nextLastKey = lastItemKey ?? null;
+    const growth = classifySessionTranscriptGrowth({
+      previousCount: previousItemCountRef.current,
+      nextCount: itemCount,
+      previousFirstKey: previousFirstItemKeyRef.current,
+      nextFirstKey,
+      previousLastKey: previousLastItemKeyRef.current,
+      nextLastKey,
+    });
+    growthRef.current = growth;
+    previousItemCountRef.current = itemCount;
+    previousFirstItemKeyRef.current = nextFirstKey;
+    previousLastItemKeyRef.current = nextLastKey;
+    // An older page is a content growth too, but it landed above the
+    // viewport: following it would yank the user to the bottom mid-read.
+    // Hold the follow only for the page's own measurement burst so a later
+    // in-place growth of the last row (same item count and keys) is followed
+    // again instead of staying blocked.
+    if (growth === 'prepend') {
+      schedulePrependGrowthRelease();
+      return;
+    }
+    clearPrependGrowthReleaseTimeout();
     if (itemCount > 0 && shouldAutoScrollRef.current && !isUserScrollingRef.current) {
       scheduleScrollToLatestMessage();
     }
-  }, [itemCount, scheduleScrollToLatestMessage]);
+  }, [
+    itemCount,
+    firstItemKey,
+    lastItemKey,
+    scheduleScrollToLatestMessage,
+    schedulePrependGrowthRelease,
+    clearPrependGrowthReleaseTimeout,
+  ]);
 
   useEffect(
     () => () => {
       clearAutoScrollResetTimeout();
       clearAutoScrollRetryTimeout();
       clearUserScrollingTimeout();
+      clearPrependGrowthReleaseTimeout();
     },
-    [clearAutoScrollResetTimeout, clearAutoScrollRetryTimeout, clearUserScrollingTimeout]
+    [
+      clearAutoScrollResetTimeout,
+      clearAutoScrollRetryTimeout,
+      clearUserScrollingTimeout,
+      clearPrependGrowthReleaseTimeout,
+    ]
   );
 
   const updateAutoScrollFromEvent = useCallback(
@@ -179,10 +277,19 @@ export function useSessionListAutoScroll<ItemT>({
   const handleScrollBeginDrag = useCallback(() => {
     isUserScrollingRef.current = true;
     isAutoScrollingRef.current = false;
+    // A user gesture re-derives the at-bottom position from real scroll
+    // events, so any hold left over from a prepend is no longer needed.
+    clearPrependGrowthReleaseTimeout();
+    growthRef.current = 'none';
     clearAutoScrollResetTimeout();
     clearAutoScrollRetryTimeout();
     clearUserScrollingTimeout();
-  }, [clearAutoScrollResetTimeout, clearAutoScrollRetryTimeout, clearUserScrollingTimeout]);
+  }, [
+    clearAutoScrollResetTimeout,
+    clearAutoScrollRetryTimeout,
+    clearUserScrollingTimeout,
+    clearPrependGrowthReleaseTimeout,
+  ]);
 
   const handleScrollEndDrag = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -232,6 +339,7 @@ export function useSessionListAutoScroll<ItemT>({
           isUserScrolling: isUserScrollingRef.current,
           shouldAutoScroll: shouldAutoScrollRef.current,
           didContentHeightChange,
+          isPrepend: growthRef.current === 'prepend',
         })
       ) {
         scrollToLatestMessage();

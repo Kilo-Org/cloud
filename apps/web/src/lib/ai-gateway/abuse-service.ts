@@ -30,6 +30,7 @@ import { redisClient } from '@/lib/redis';
 import { abuseRulesClassificationRedisKey } from '@/lib/redis-keys';
 import type { FraudDetectionHeaders } from '@/lib/utils';
 import { z } from 'zod';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 
 const CLASSIFY_ABUSE_TIMEOUT_MS = 2000;
 const QUARANTINE_1_LATENCY_MS = 2000;
@@ -275,14 +276,6 @@ function isAnonymousUserId(kiloUserId: string | null | undefined): boolean {
   return kiloUserId?.startsWith('anon:') === true;
 }
 
-async function sha256(value: string): Promise<string> {
-  const data = new TextEncoder().encode(value);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map(byte => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
-
 export async function resolveAbuseClassificationCacheIdentityKey(args: {
   kiloUserId: string | null | undefined;
   fraudHeaders: FraudDetectionHeaders;
@@ -298,7 +291,7 @@ export async function resolveAbuseClassificationCacheIdentityKey(args: {
     args.fraudHeaders.http_user_agent || 'no_ua',
   ].join('|');
 
-  return `fingerprint:${await sha256(compositeParams)}`;
+  return `fingerprint:${await sha256Hex(compositeParams)}`;
 }
 
 function parseCachedRulesEngineAction(raw: string): AbuseRuleAction | null | undefined {

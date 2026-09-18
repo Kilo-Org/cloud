@@ -108,10 +108,7 @@ function isCanonicalGitLabInstanceUrl(instanceUrl: string): boolean {
   return normalizeGitLabInstanceUrl(instanceUrl) === instanceUrl;
 }
 
-export async function sha256Digest(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
-}
+export { sha256Hex as sha256Digest } from '@kilocode/worker-utils/sha256';
 
 export class GitLabSessionCapabilityCodec {
   constructor(private readonly encryptionKey: string) {}

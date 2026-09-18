@@ -3,7 +3,7 @@ import type {
   SandboxControlObservation,
   SandboxHeartbeatPayload,
 } from '../shared/sandbox-control-protocol.js';
-import { sha256Hex } from '../utils/sha256.js';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { DEADLINE_MS } from './deadlines.js';
 import type { StoredSandboxControlState } from './durable-state.js';
 import type { SandboxControlConnectionObservation } from './socket.js';

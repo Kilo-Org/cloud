@@ -38,7 +38,7 @@ import {
 import type { TRPCContext } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
-import { sha256Hex } from '../../utils/sha256.js';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import { protectedProcedure } from '../auth.js';
 import { resolveSecret } from '../../auth.js';

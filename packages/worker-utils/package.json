@@ -33,6 +33,7 @@
     "./cloud-agent-worktree-changes": "./src/cloud-agent-worktree-changes.ts",
     "./cloud-agent-commits": "./src/cloud-agent-commits.ts",
     "./kilo-model-id": "./src/kilo-model-id.ts",
+    "./sha256": "./src/sha256.ts",
     "./extract-bearer-token": "./src/extract-bearer-token.ts",
     "./cloud-agent-queue-report": "./src/cloud-agent-queue-report.ts",
     "./cloud-agent-failure": "./src/cloud-agent-failure.ts",

@@ -1,8 +1,8 @@
 import { timingSafeEqual } from '@kilocode/encryption';
+import { bytesToHex, sha256Hex } from '@kilocode/worker-utils/sha256';
 
 const CREDENTIAL_BYTES = 32;
 const PRESENTED_CREDENTIAL_MAX_CHARS = 256;
-const encoder = new TextEncoder();
 
 export function generateSandboxCredential(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(CREDENTIAL_BYTES));
@@ -10,8 +10,7 @@ export function generateSandboxCredential(): string {
 }
 
 export async function hashSandboxCredential(credential: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(credential));
-  return bytesToHex(new Uint8Array(digest));
+  return sha256Hex(credential);
 }
 
 export async function sandboxCredentialMatchesHash(
@@ -32,8 +31,4 @@ export function parseBearerCredential(authorization: string | null): string | nu
   const credential = match[1];
   if (!credential || credential.length > PRESENTED_CREDENTIAL_MAX_CHARS) return null;
   return credential;
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }

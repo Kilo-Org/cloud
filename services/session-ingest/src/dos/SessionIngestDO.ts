@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { desc, eq, ne, gt, gte, lt, and, or, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
@@ -353,13 +354,6 @@ type CloneStageState =
       rollingDigest: string;
       copiedItemCount: number;
     };
-
-async function sha256Hex(input: string): Promise<string> {
-  const digest = new Uint8Array(
-    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
-  );
-  return Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('');
-}
 
 async function computeCloneBatchDigest(rows: CloneBatchRow[]): Promise<string> {
   const joined = rows

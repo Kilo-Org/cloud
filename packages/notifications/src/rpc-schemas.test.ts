@@ -1,5 +1,51 @@
 import { describe, expect, it } from 'vitest';
-import { refreshGlanceableSessionsInputSchema } from './rpc-schemas';
+import {
+  internalDispatchRequestSchema,
+  internalDispatchSpendAlertRequestSchema,
+  refreshGlanceableSessionsInputSchema,
+} from './rpc-schemas';
+
+describe('internalDispatchSpendAlertRequestSchema', () => {
+  const personal = {
+    kind: 'spend_alert',
+    recipientUserIds: ['user-a'],
+    scope: 'personal',
+    alertKind: 'threshold',
+    scopeName: 'you',
+    amountUsd: 42.5,
+    thresholdUsd: 40,
+  };
+
+  it('parses a personal-scope request without an organizationId', () => {
+    expect(internalDispatchSpendAlertRequestSchema.parse(personal)).toEqual(personal);
+  });
+
+  it('parses an organization-scope request carrying its organizationId', () => {
+    const payload = { ...personal, scope: 'organization', organizationId: 'org-1' };
+    expect(internalDispatchSpendAlertRequestSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('rejects an empty recipient list', () => {
+    expect(
+      internalDispatchSpendAlertRequestSchema.safeParse({ ...personal, recipientUserIds: [] })
+        .success
+    ).toBe(false);
+  });
+
+  it('rejects an unknown scope or alert kind', () => {
+    expect(
+      internalDispatchSpendAlertRequestSchema.safeParse({ ...personal, scope: 'team' }).success
+    ).toBe(false);
+    expect(
+      internalDispatchSpendAlertRequestSchema.safeParse({ ...personal, alertKind: 'budget' })
+        .success
+    ).toBe(false);
+  });
+
+  it('is accepted by the internal dispatch union', () => {
+    expect(internalDispatchRequestSchema.safeParse(personal).success).toBe(true);
+  });
+});
 
 describe('refreshGlanceableSessionsInputSchema', () => {
   it.each([

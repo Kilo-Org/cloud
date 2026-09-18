@@ -4,28 +4,39 @@ import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-comman
 import { i18n } from '@/i18n';
 
 /**
+ * A slash command the mobile composer may show. `catalogueDescription` marks a
+ * description that already comes from the app's i18n catalogue (the reserved
+ * local commands), so the suggestion row never sends it to the translation
+ * gateway; the CLI-reported commands leave it unset and translate.
+ */
+export type MobileSlashCommandInfo = SlashCommandInfo & { catalogueDescription?: boolean };
+
+/**
  * Local reserved /new command — surfaced only for remote sessions, never
  * pushed to the CLI. Remote CLIs have no /new (they create sessions through a
- * dedicated control message), so a slash-style "new" must live in the mobile
+ * dedicated control message), so a slash-style \"new\" must live in the mobile
  * client.
  */
-export function getLocalNewSlashCommand(): SlashCommandInfo {
+export function getLocalNewSlashCommand(): MobileSlashCommandInfo {
   return {
     name: 'new',
     description: i18n.t('agentChat.slashCommands.startNewSession'),
     hints: [],
+    catalogueDescription: true,
   };
 }
 
-export function getLocalExitSlashCommand(): SlashCommandInfo {
+export function getLocalExitSlashCommand(): MobileSlashCommandInfo {
   return {
     name: 'exit',
     description: i18n.t('agentChat.slashCommands.exitSession'),
     hints: [],
+    catalogueDescription: true,
   };
 }
 
-function getLocalQuitSlashCommand(): SlashCommandInfo {
+function getLocalQuitSlashCommand(): MobileSlashCommandInfo {
+  // Inherits `catalogueDescription: true` by spread.
   return { ...getLocalExitSlashCommand(), name: QUIT_COMMAND_NAME };
 }
 
@@ -35,11 +46,12 @@ function getLocalQuitSlashCommand(): SlashCommandInfo {
  * `canExitSession === true` because /clear needs both create_session and
  * exit_cli.
  */
-export function getLocalClearSlashCommand(): SlashCommandInfo {
+export function getLocalClearSlashCommand(): MobileSlashCommandInfo {
   return {
     name: 'clear',
     description: i18n.t('agentChat.slashCommands.clearSession'),
     hints: [],
+    catalogueDescription: true,
   };
 }
 
@@ -121,7 +133,7 @@ export function createMobileSlashCommandList(
   sessionType: ActiveSessionType | null,
   availableCommands: SlashCommandInfo[],
   remoteCommandState: RemoteCommandState | null
-): SlashCommandInfo[] {
+): MobileSlashCommandInfo[] {
   if (sessionType === 'cloud-agent') {
     return availableCommands;
   }
@@ -166,8 +178,8 @@ export function isGoalCommandDraft(input: string): boolean {
  */
 export function getSlashCommandSuggestions(
   input: string,
-  commands: SlashCommandInfo[]
-): SlashCommandInfo[] {
+  commands: MobileSlashCommandInfo[]
+): MobileSlashCommandInfo[] {
   const match = /^\/([\w.-]*)$/.exec(input);
   if (!match) {
     return [];

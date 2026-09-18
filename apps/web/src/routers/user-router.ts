@@ -511,7 +511,11 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
 export const userRouter = createTRPCRouter({
   // Account linking routes
   getMe: baseProcedure.query(async ({ ctx }) => {
-    return successResult({ id: ctx.user.id, email: ctx.user.google_user_email });
+    return successResult({
+      id: ctx.user.id,
+      email: ctx.user.google_user_email,
+      isAdmin: ctx.user.is_admin,
+    });
   }),
 
   getAuthProviders: baseProcedure.query(async ({ ctx }) => {

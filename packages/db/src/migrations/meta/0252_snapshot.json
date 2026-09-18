@@ -1,6 +1,6 @@
 {
-  "id": "e22de6e8-7136-42c2-a412-b31a36442155",
-  "prevId": "f1e7ff2c-da0c-4475-848e-bc68bd2da137",
+  "id": "37e29909-8464-401e-9f73-9975236e69ed",
+  "prevId": "e22de6e8-7136-42c2-a412-b31a36442155",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -18165,6 +18165,12 @@
         "tax_minor_units": {
           "name": "tax_minor_units",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "money_backfill_attempted_at": {
+          "name": "money_backfill_attempted_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

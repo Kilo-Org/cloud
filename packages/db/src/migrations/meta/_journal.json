@@ -1762,6 +1762,20 @@
     {
       "idx": 251,
       "version": "7",
+      "when": 1789751409373,
+      "tag": "0250_kilo_pass_store_purchase_amounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 252,
+      "version": "7",
+      "when": 1789751409374,
+      "tag": "0251_kilo_pass_store_purchase_money_backfill_attempted",
+      "breakpoints": true
+    },
+    {
+      "idx": 253,
+      "version": "7",
       "when": 1789761736437,
       "tag": "0251_rapid_eternity",
       "breakpoints": true

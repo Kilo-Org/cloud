@@ -83,6 +83,32 @@ let testUser: User;
 let surveyTestUser: User;
 let skipTestUser: User;
 
+describe('user router - getMe', () => {
+  it('getMe returns isAdmin: true for an admin user', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.user.getMe()).resolves.toEqual({
+      success: true,
+      id: admin.id,
+      email: admin.google_user_email,
+      isAdmin: true,
+    });
+  });
+
+  it('getMe returns isAdmin: false for a non-admin user', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+
+    await expect(caller.user.getMe()).resolves.toEqual({
+      success: true,
+      id: user.id,
+      email: user.google_user_email,
+      isAdmin: false,
+    });
+  });
+});
+
 describe('user router - updateProfile', () => {
   beforeAll(async () => {
     testUser = await insertTestUser({

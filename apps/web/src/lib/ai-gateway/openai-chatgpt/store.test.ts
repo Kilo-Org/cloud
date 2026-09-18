@@ -38,7 +38,6 @@ type StoredRow = {
   provider_id: string;
   encrypted_api_key: EncryptedData;
   is_enabled: boolean;
-  created_by: string;
 };
 
 const TEST_USER_ID = 'user-1';
@@ -208,14 +207,6 @@ describe('openai-chatgpt connection store', () => {
     expect(stored?.refresh_token).toBe('refresh-token-2');
   });
 
-  it('tracks the latest creator when a connection is replaced', async () => {
-    await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), 'creator-1');
-    await saveOpenAiChatGptConnection(USER_OWNER, buildConnection(), 'creator-2');
-
-    expect(rows).toHaveLength(1);
-    expect(rows[0].created_by).toBe('creator-2');
-  });
-
   it('returns null for an undecryptable payload instead of throwing', async () => {
     rows.push({
       organization_id: null,
@@ -223,7 +214,6 @@ describe('openai-chatgpt connection store', () => {
       provider_id: OPENAI_CHATGPT_PROVIDER_ID,
       encrypted_api_key: { iv: 'not-base64!!!', data: 'also-not', authTag: 'nope' },
       is_enabled: true,
-      created_by: TEST_USER_ID,
     });
 
     await expect(getOpenAiChatGptConnection(USER_OWNER)).resolves.toBeNull();
@@ -236,7 +226,6 @@ describe('openai-chatgpt connection store', () => {
       provider_id: OPENAI_CHATGPT_PROVIDER_ID,
       encrypted_api_key: encryptApiKey(JSON.stringify({ unexpected: true }), BYOK_ENCRYPTION_KEY),
       is_enabled: true,
-      created_by: TEST_USER_ID,
     });
 
     await expect(getOpenAiChatGptConnection(USER_OWNER)).resolves.toBeNull();

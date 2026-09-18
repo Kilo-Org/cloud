@@ -5,7 +5,7 @@ import PostHogClient from '@/lib/posthog';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
-import { clearOpenAiChatGptConnectionsCreatedBy } from '@/lib/ai-gateway/openai-chatgpt/store';
+import { clearOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
 import {
@@ -2330,11 +2330,12 @@ export async function unlinkAuthProviderFromUser(
       .where(eq(kilocode_users.id, kiloUserId));
   }
 
-  // Unlinking OpenAI also drops the delegated ChatGPT credential, personal and
-  // organization: it proves the same external identity, so keeping it would
-  // leave a usable key for an account the person just detached.
+  // Unlinking OpenAI drops the personal delegated ChatGPT credential: it
+  // proves the same external identity. An organization connection is a separate
+  // account's BYOK setting and survives this unlink; an organization admin
+  // disconnects it from the organization BYOK page.
   if (provider === 'openai') {
-    await clearOpenAiChatGptConnectionsCreatedBy(kiloUserId);
+    await clearOpenAiChatGptConnection({ type: 'user', id: kiloUserId });
   }
 
   return successResult();

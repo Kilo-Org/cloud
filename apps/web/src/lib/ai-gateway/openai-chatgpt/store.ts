@@ -142,9 +142,6 @@ export async function saveOpenAiChatGptConnection(
       set: {
         encrypted_api_key,
         is_enabled: true,
-        // The row's grant now comes from the reconnecting person, so the
-        // creator must follow it. Unlink cleanup keys on this column.
-        created_by: createdBy,
       },
     });
 }
@@ -152,23 +149,6 @@ export async function saveOpenAiChatGptConnection(
 /** Deletes the owner's stored connection. */
 export async function clearOpenAiChatGptConnection(owner: OpenAiChatGptOwner): Promise<void> {
   await db.delete(byok_api_keys).where(openAiChatGptConnectionWhere(owner));
-}
-
-/**
- * Deletes every `openai-chatgpt` row this person created, personal and
- * organization. Unlinking the OpenAI identity detaches the grant behind each
- * row, so an organization must not keep serving a credential that came from
- * the detached account.
- */
-export async function clearOpenAiChatGptConnectionsCreatedBy(kiloUserId: string): Promise<void> {
-  await db
-    .delete(byok_api_keys)
-    .where(
-      and(
-        eq(byok_api_keys.created_by, kiloUserId),
-        eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
-      )
-    );
 }
 
 /**

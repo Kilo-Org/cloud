@@ -225,9 +225,12 @@ export async function createManualCodeReviewJob(params: {
     council: councilActive ? (input.council ?? null) : null,
   });
 
-  const source = localMode
-    ? await resolveLocalPublicSource(platform, input.url)
-    : await resolveConnectedProviderSource(params.owner, platform, input.url);
+  const source = await resolveManualReviewSource({
+    owner: params.owner,
+    platform,
+    url: input.url,
+    localMode,
+  });
 
   if (outputMode === 'provider') {
     if (!source.integrationId) {
@@ -346,6 +349,58 @@ async function resolveConnectedProviderSource(
   }
 
   return await resolveConnectedGitLabSource(owner, url);
+}
+
+/**
+ * Resolves the change a manual job targets, translating provider transport and
+ * parse failures into typed tRPC errors.
+ *
+ * A manual job takes a user-supplied URL. When the provider cannot return the
+ * change (missing repo, revoked access, rate limit, timeout, unexpected body),
+ * that is an expected outcome of the request, not an internal defect. Without
+ * this translation the raw fetch/Zod error escapes as INTERNAL_SERVER_ERROR and
+ * the client shows an opaque server error. Existing TRPCErrors (bad URL, draft
+ * PR, unconnected provider) are re-thrown untouched.
+ */
+async function resolveManualReviewSource(params: {
+  owner: Owner;
+  platform: CodeReviewPlatform;
+  url: string;
+  localMode: boolean;
+}): Promise<ResolvedManualReviewSource> {
+  try {
+    return params.localMode
+      ? await resolveLocalPublicSource(params.platform, params.url)
+      : await resolveConnectedProviderSource(params.owner, params.platform, params.url);
+  } catch (error) {
+    if (error instanceof TRPCError) throw error;
+    if (error instanceof ProviderFetchError) {
+      throw providerFetchErrorToTRPCError(error);
+    }
+    throw new TRPCError({
+      code: 'BAD_GATEWAY',
+      message: 'Could not read the change from the provider. Try again in a moment.',
+    });
+  }
+}
+
+function providerFetchErrorToTRPCError(error: ProviderFetchError): TRPCError {
+  if (error.status === 404) {
+    return new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Could not find that pull request. Check the URL and try again.',
+    });
+  }
+  if (error.status === 403 || error.status === 429) {
+    return new TRPCError({
+      code: 'TOO_MANY_REQUESTS',
+      message: 'The provider is rate limiting requests. Wait a moment and try again.',
+    });
+  }
+  return new TRPCError({
+    code: 'BAD_GATEWAY',
+    message: 'Could not read the change from the provider. Try again in a moment.',
+  });
 }
 
 async function resolveLocalPublicSource(

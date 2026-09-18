@@ -691,6 +691,42 @@ describe('personalReviewAgent.createManualReviewJob', () => {
       userId: testUser.id,
     });
   });
+
+  it('returns a typed provider error instead of INTERNAL_SERVER_ERROR when the pull request cannot be read', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    fetchSpy?.mockImplementationOnce(async () => {
+      return new Response(JSON.stringify({ message: 'Not Found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    await expect(
+      caller.personalReviewAgent.createManualReviewJob({
+        platform: 'github',
+        url: `https://github.com/${repo}/pull/404`,
+        modelSlug: 'test-model',
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('maps a provider rate-limit response to a retryable client error', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    fetchSpy?.mockImplementationOnce(async () => {
+      return new Response(JSON.stringify({ message: 'API rate limit exceeded' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    await expect(
+      caller.personalReviewAgent.createManualReviewJob({
+        platform: 'github',
+        url: `https://github.com/${repo}/pull/429`,
+        modelSlug: 'test-model',
+      })
+    ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
+  });
 });
 
 describe('review agent config REVIEW.md setting', () => {

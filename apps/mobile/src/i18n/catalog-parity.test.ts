@@ -32,6 +32,12 @@ function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<
 const ENGLISH_FAMILIES = keyFamilies(CATALOG_LOADERS.en());
 
 describe('catalog keys', () => {
+  it('retires launcher.newAgent from every catalog', () => {
+    for (const tag of SUPPORTED_LANGUAGES) {
+      expect(keyFamilies(CATALOG_LOADERS[tag]())).not.toContain('launcher.newAgent');
+    }
+  });
+
   it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
     '%s defines exactly the English key families',
     tag => {

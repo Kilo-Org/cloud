@@ -1164,11 +1164,13 @@ async function downloadAndMaterializeAttachment(
  * Download and materialize a single attachment, retrying transient failures.
  * The first attempt uses the bounded streaming read; later attempts re-fetch
  * and use the buffered read, which bypasses the flaky Web Streams reader.
- * One overall deadline bounds the whole attachment (retries included) so a
- * stalled body cannot multiply the per-attempt timeout. Local filesystem
- * failures are not retried. Returns the prompt part: a `file://` part on
- * success, or an explanatory text part when retries are exhausted or the
- * failure is permanent.
+ * One overall deadline bounds the whole attachment (retries included): each
+ * attempt's timeout is clamped to the remaining budget, so an in-flight
+ * attempt started just under the deadline cannot run a full extra timeout.
+ * Filesystem failures during directory/file creation throw into the same
+ * bounded retry loop as transient network failures. Returns the prompt part:
+ * a `file://` part on success, or an explanatory text part when retries are
+ * exhausted or the failure is permanent.
  */
 async function materializeAttachment(
   attachment: WrapperBootstrapAttachment,
@@ -1176,11 +1178,15 @@ async function materializeAttachment(
   externalSignal?: AbortSignal
 ): Promise<WrapperPromptPart> {
   const deadline = Date.now() + ATTACHMENT_DOWNLOAD_DEADLINE_MS;
+  let attemptsMade = 0;
   for (let attempt = 1; attempt <= MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS; attempt++) {
+    if (Date.now() >= deadline) break;
+    attemptsMade = attempt;
+    const timeoutMs = Math.min(ATTACHMENT_DOWNLOAD_TIMEOUT_MS, Math.max(1, deadline - Date.now()));
     const abortController = new AbortController();
     const timeout = setTimeout(
       () => abortController.abort(new Error('attachment download timeout')),
-      ATTACHMENT_DOWNLOAD_TIMEOUT_MS
+      timeoutMs
     );
     const signal = externalSignal
       ? AbortSignal.any([abortController.signal, externalSignal])
@@ -1225,7 +1231,7 @@ async function materializeAttachment(
   }
   return {
     type: 'text',
-    text: `attachment ${attachment.filename} could not be retrieved (download failed after ${MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS} attempts)`,
+    text: `attachment ${attachment.filename} could not be retrieved (download failed after ${attemptsMade} ${attemptsMade === 1 ? 'attempt' : 'attempts'})`,
   };
 }
 

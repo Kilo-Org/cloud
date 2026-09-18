@@ -480,6 +480,8 @@
       "replyBadRequest": "Ba za a iya wallafa wannan amsar ba. Wataƙila silsilar tattaunawar ta canza.",
       "replyForbidden": "Ba ka da izinin amsa wannan buƙatar haɗawa.",
       "addCommentCta": "Yi tsokaci a wannan buƙatar haɗawa",
+      "fixWithKilo": "Gyara da Kilo",
+      "fixWithKiloPrompt": "Don Allah a magance wannan tsokacin buƙatar haɗawa: {{link}}",
       "commentBadRequest": "Ba za a iya wallafa wannan tsokaci ba. Wataƙila buƙatar haɗawa ta canza.",
       "commentForbidden": "Ba ka da izinin yin tsokaci a wannan buƙatar haɗawa.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} suna jira",
       "skipped": "an tsallake {{displayCount}}",
       "checksCount": "gwaje-gwaje {{displayCount}}",
+      "checksCount_one": "gwaji {{displayCount}}",
+      "checksCount_other": "gwaje-gwaje {{displayCount}}",
       "checkDetails": "cikakken bayanin gwaji"
     },
     "inbox": {
@@ -2051,6 +2055,7 @@
       "exitNeedsNewerCli": "Amfani da umarnin / daga nesa yana buƙatar sabuwar sigar Kilo CLI. Sabunta Kilo CLI ka sake haɗawa."
     },
     "sessionConnection": {
+      "label": "Haɗi",
       "connecting": "Ana haɗawa…",
       "reconnecting": "Ana sake haɗawa…",
       "connectionLost": "Haɗi ya katse",
@@ -2070,7 +2075,9 @@
       "removeConfirmTitle": "Cire manufa?",
       "removeConfirmMessage": "CLI yana share manufar wannan zaman.",
       "updateFailed": "Ba a iya sabunta manufar ba.",
-      "sectionAccessibility": "{{status}}. Manufa: {{text}}"
+      "sectionAccessibility": "{{status}}. Manufa: {{text}}",
+      "collapse": "Ɓoye manufa",
+      "expand": "Nuna manufa"
     },
     "newSession": {
       "recentlyUsed": "An yi amfani da su kwanan nan",
@@ -2124,7 +2131,20 @@
       "continueFrom": "Ana ci gaba da {{title}}.",
       "importingSession": "Ana shigo da zaman",
       "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zaman ba. Zaɓi Cloud Agent ko wani CLI.",
-      "importFailed": "An kasa shigo da wannan zaman."
+      "importFailed": "An kasa shigo da wannan zaman.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Tsoho · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Ƙarami",
+      "sandboxInstanceShared": "Raba",
+      "sandboxInstanceLarge": "Babba",
+      "sandboxInstanceDevcontainer": "Kwantena Dev",
+      "sandboxInstanceProviderDefault": "Tsohowar mai bayarwa",
+      "sandboxCouldNotLoad": "Ba a iya lodin zaɓuɓɓukan sandbox ba",
+      "sandboxUnavailable": "Wannan sandbox ba ake samunsa ba. Zaɓi wani sandbox ko Tsoho.",
+      "sandboxUseDefault": "Yi amfani da Tsoho"
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta fayil {{displayCount}}.",
@@ -2490,6 +2510,12 @@
       "startNewSession": "Fara sabon zama",
       "exitSession": "Fita daga zaman",
       "clearSession": "Ƙare wannan zaman ka fara sabon zama",
+      "compactDescription": "taƙaita mahallin zaman na yanzu",
+      "goalDescription": "Ci gaba da aiki zuwa manufar zaman. /goal <objective> ko pause, resume, clear",
+      "initDescription": "saitin AGENTS.md mai jagora",
+      "resumeClaudeDescription": "shigo da rubutun zaman Claude Code",
+      "resumeCodexDescription": "shigo da rubutun zaman OpenAI Codex",
+      "reviewDescription": "duba canje-canje [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Yi amfani da /{{command}}",
       "insert": "Saka",
       "upgradeRequiredFallback": "Sabunta CLI ɗinka don amfani da wannan umarnin.",
@@ -2607,6 +2633,7 @@
     "couldNotLoadActiveSessions": "An kasa loda zaman aikin da ke gudana.",
     "agentSessions": "Masu gudana yanzu",
     "newCodingTask": "Sabon aikin rubuta lambar shiri",
+    "newTaskFromPicture": "Sabon aiki daga hoto",
     "explore": "Bincika",
     "seeAll": "Duba duka",
     "noLiveSessions": "Babu abin da ke gudana a yanzu"
@@ -2828,7 +2855,8 @@
     "aiProvidersWhat": "Umarnin aikinka, tarihin tattaunawa, da duk fayilolin da ka haɗa.",
     "aiProvidersWhy": "Don samar da amsoshin AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google, da sauran masu ba da sabis da ka zaɓa don kowace buƙata.",
-    "gatewayWhat": "ID ɗin asusu, ƙarin bayanan buƙata, da yawan guntayen rubutun da aka yi amfani da su.",
+    "gatewayWhat": "ID ɗin asusu, ƙarin bayanan buƙata, yawan guntayen rubutu, da kuma prompts da rikodin murya da manhajar ke aikawa ta cikinsa.",
+    "viaGateway": "Ta hanyar Kilo Gateway",
     "gatewayWhy": "Tantance mai amfani, tura buƙatu, da daidaita lissafin kuɗi.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Rahotannin tsayawar manhaja da kurakurai, bayan an cire abubuwan da ke cikin manhajar.",
@@ -2848,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Rikodinka yayin da kake magana.",
     "voiceTranscriptionWhy": "Don mayar da magana zuwa rubutu.",
-    "voiceTranscriptionWho": "A na'urar kawai, ko Apple ko Google idan na'urar ba za ta iya mayar da magana zuwa rubutu ba tare da intanet ba.",
+    "voiceTranscriptionWho": "Na'urar ka, Kilo Gateway tare da samfurin rubutun da ka zaɓa, ko Apple ko Google don ganewa ta kan layi.",
     "installAttributionPromptTitle": "A ba da izinin gano inda aka samo manhaja?",
     "installAttributionPromptMessage": "Kilo yana amfani da izinin bin diddigi na Apple kawai don sanin hanyar da ta kawo ka nan. Ba a taɓa amfani da umarnin aikinka ko tattaunawarka ba.",
     "what": "Me",
@@ -3058,6 +3086,12 @@
     "privacy": "Buɗe Kilo don ganin wakilai",
     "openAgents": "Buɗe wakilai",
     "needsInput": "Ana buƙatar bayani",
+    "newestSession": "Mafi sabo: {{title}}",
+    "noneWaiting": "Babu wakilin da ke jira",
+    "newAgent": "Sabon wakili",
+    "approving": "Ana amincewa...",
+    "couldNotApprove": "Ba a iya amincewa ba",
+    "couldNotStart": "Ba a iya farawa ba",
     "channelName": "Wakilai da ke aiki",
     "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle."
   },
@@ -3093,5 +3127,12 @@
     "remoteFound": "An haɗa kwamfuta",
     "checkAgain": "Sake dubawa",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Fara wakili na buƙatar umarni. Ƙara umarni sannan ka sake gudanar da shi.",
+      "repositoryUnknown": "Kilo ba ya gane {{repository}} a matsayin ma'ajiyar GitHub ko GitLab. Zaɓi wata ma'ajiya a cikin Kilo.",
+      "repositoryUnsupported": "{{repository}} ma'ajiyar Bitbucket ce — Fara wakili ba zai iya amfani da ita ba tukuna. Zaɓi wata ma'ajiya a cikin Kilo."
+    }
   }
 }

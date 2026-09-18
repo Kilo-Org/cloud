@@ -480,6 +480,8 @@
       "replyBadRequest": "Deebiin kun maxxanfamuu hin danda'u. Dameen marii jijjiirameera ta'a.",
       "replyForbidden": "Gaaffii walitti makuu kanaaf deebii kennuuf hayyama hin qabdu.",
       "addCommentCta": "Gaaffii walitti makuu kanaa irratti yaada kenni",
+      "fixWithKilo": "Kilo waliin sirreessi",
+      "fixWithKiloPrompt": "Maaloo yaada gaaffii walitti makuu armaan gadii sirreessi: {{link}}",
       "commentBadRequest": "Yaadni kun maxxanfamuu hin danda'u. Gaaffiin walitti makuu jijjiirameera ta'a.",
       "commentForbidden": "Gaaffii walitti makuu kanaa irratti yaada kennuuf hayyama hin qabdu.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} eegamaa jiru",
       "skipped": "{{displayCount}} irra darbaman",
       "checksCount": "Qorannoo {{displayCount}}",
+      "checksCount_one": "Qorannoo {{displayCount}}",
+      "checksCount_other": "Qorannoo {{displayCount}}",
       "checkDetails": "bal'ina qorannoo"
     },
     "inbox": {
@@ -2051,6 +2055,7 @@
       "exitNeedsNewerCli": "Ajajoonni / dhaan jalqaban fagootti hojjechuuf Kilo CLI haaraa barbaadu. Kilo CLI haaromsiitii deebi'ii walqabsiisi."
     },
     "sessionConnection": {
+      "label": "Walqabannaa",
       "connecting": "Walqabsiisaa jira…",
       "reconnecting": "Deebi'ee walqabsiisaa jira…",
       "connectionLost": "Walqabannaan citeera",
@@ -2070,7 +2075,9 @@
       "removeConfirmTitle": "Kaayyoo haquu?",
       "removeConfirmMessage": "CLI kaayyoo seesshinii kanaa haqa.",
       "updateFailed": "Kaayyoo haaromsuun hin danda'amne.",
-      "sectionAccessibility": "{{status}}. Kaayyoo: {{text}}"
+      "sectionAccessibility": "{{status}}. Kaayyoo: {{text}}",
+      "collapse": "Kaayyoo cufi",
+      "expand": "Kaayyoo bal'isi"
     },
     "newSession": {
       "recentlyUsed": "Dhiheenya itti fayyadamte",
@@ -2124,7 +2131,20 @@
       "continueFrom": "{{title}} itti fufaa jira.",
       "importingSession": "Turtii galchaa jira",
       "cliCannotContinue": "CLI kun turtii itti fufuu hin danda'u. Cloud Agent yookaan CLI biraa filadhu.",
-      "importFailed": "Turtii kana galchuu hin danda'amne."
+      "importFailed": "Turtii kana galchuu hin danda'amne.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Default · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Xiqqaa",
+      "sandboxInstanceShared": "Qoodama",
+      "sandboxInstanceLarge": "Guddaa",
+      "sandboxInstanceDevcontainer": "Konteenara Dev",
+      "sandboxInstanceProviderDefault": "Kan dhiyeessaa Default",
+      "sandboxCouldNotLoad": "Filannoo sandbox fe'uuf jijjiirama hin qabu",
+      "sandboxUnavailable": "Sandbox kun hin argamu. Sandbox bira ykn Default filadhu.",
+      "sandboxUseDefault": "Default fayyadami"
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayiliin {{displayCount}} haaromfameera.",
@@ -2490,6 +2510,12 @@
       "startNewSession": "Turtii haaraa jalqabi",
       "exitSession": "Turtii keessaa ba'i",
       "clearSession": "Turtii kana xumuriitii haaraa jalqabi",
+      "compactDescription": "haala turtii ammaa gabaabsiisi",
+      "goalDescription": "Kaayyoo turtiitti hojjechuu itti fufi. /goal <objective> yookaan pause, resume, clear",
+      "initDescription": "qophii AGENTS.md qajeelfamaa",
+      "resumeClaudeDescription": "waraabbii turtii Claude Code galchi",
+      "resumeCodexDescription": "waraabbii turtii OpenAI Codex galchi",
+      "reviewDescription": "jijjiiramoota ilaali [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} fayyadami",
       "insert": "Galchi",
       "upgradeRequiredFallback": "Ajaja kana fayyadamuuf CLI kee haaromsi.",
@@ -2607,6 +2633,7 @@
     "couldNotLoadActiveSessions": "Turtiiwwan adeemaa jiran fe'uun hin danda'amne.",
     "agentSessions": "Amma adeemaa jiru",
     "newCodingTask": "Hojii koodii haaraa",
+    "newTaskFromPicture": "Hojii haaraa suuraa irraa",
     "explore": "Qoradhu",
     "seeAll": "Hunda ilaali",
     "noLiveSessions": "Amma wanti hojjechaa jiru hin jiru"
@@ -2828,7 +2855,8 @@
     "aiProvidersWhat": "Gaaffiiwwan kee, seenaa marii fi faayiloota qabachiiftu hunda.",
     "aiProvidersWhy": "Deebii AI uumuuf.",
     "aiProvidersWho": "Anthropic, OpenAI, Google fi dhiyeessitoota biroo gaaffii hundaaf filattu.",
-    "gatewayWhat": "Eenymmeessaa herregaa, odeeffannoo dabalataa gaaffii, fayyadama tookanootaa.",
+    "gatewayWhat": "Eenymmeessaa herregaa, odeeffannoo dabalataa gaaffii, fayyadama tookanootaa, akkasumas promptii fi waraabbii sagalee appiin karaa isaa ergu.",
+    "viaGateway": "Kilo Gateway'n",
     "gatewayWhy": "Eenyummaa mirkaneessuu, gaaffiiwwan gara bakka isaanii qajeelchuu, galmeewwan kaffaltii walitti araarsuu.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Gabaasota tasa cufamuu fi dogoggoraa, qabiyyeen appilikeeshinii keessaa haqame.",
@@ -2848,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Galmee sagalee kee yeroo dubbattu.",
     "voiceTranscriptionWhy": "Haasaa gara barreeffamaatti jijjiiruuf.",
-    "voiceTranscriptionWho": "Meeshaa irratti qofa; yoo meeshaan kun interneetii malee sagalee barreeffamatti jijjiiruu hin dandeenye, Apple yookaan Google.",
+    "voiceTranscriptionWho": "Meeshaa keessan, Kilo Gateway moodeela hiikkaa isin filattaniin, yookaan Apple yookaan Google adda baasuu online.",
     "installAttributionPromptTitle": "Maddi fe'iinsaa akka beekamu hayyamtaa?",
     "installAttributionPromptMessage": "Kilo karaa asitti si fide beekuuf qofa hayyama hordoffii Apple fayyadama. Gaaffiiwwanii fi mariiwwan kee gonkumaa kanaaf hin fayyadamu.",
     "what": "Maal",
@@ -3058,6 +3086,12 @@
     "privacy": "Eejentoota ilaaluuf Kilo bani",
     "openAgents": "Eejentoota bani",
     "needsInput": "Deebii barbaada",
+    "newestSession": "Haaraa ta'e: {{title}}",
+    "noneWaiting": "Eejentiin eegu hin jiru",
+    "newAgent": "Eejentii haaraa",
+    "approving": "Raggaasisaa jira...",
+    "couldNotApprove": "Raggaasisuu hin dandeenye",
+    "couldNotStart": "Kaasuu hin dandeenye",
     "channelName": "Eejentoota hojii irra jiran",
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi."
   },
@@ -3093,5 +3127,12 @@
     "remoteFound": "Kompiitaraan walqabate",
     "checkAgain": "Irra deebi'ii ilaali",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Eejensa jalqabuuf gaaffii barbaachisa. Gaaffii itti dabaliitii irra deebi'ii hojjedhu.",
+      "repositoryUnknown": "Kilo {{repository}} kuusaa koodii GitHub yookaan GitLab jedhee hin beeku. Kilo keessatti kuusaa koodii bira filadhu.",
+      "repositoryUnsupported": "{{repository}} kuusaa koodii Bitbucket ti — Eejensa jalqabi ammallee isa fayyadamuu hin danda'u. Kilo keessatti kuusaa koodii bira filadhu."
+    }
   }
 }

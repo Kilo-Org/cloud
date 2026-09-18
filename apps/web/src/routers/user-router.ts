@@ -140,6 +140,11 @@ const AutocompleteMetricsOutputSchema = z.object({
 
 const LinkAuthProviderInputSchema = z.object({
   provider: AuthProviderIdSchema,
+  organizationId: z.uuid().optional(),
+});
+
+const UnlinkAuthProviderInputSchema = z.object({
+  provider: AuthProviderIdSchema,
 });
 
 const CreditBlockSchema = z.object({
@@ -494,9 +499,25 @@ export const userRouter = createTRPCRouter({
   linkAuthProvider: baseProcedure
     .input(LinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
+      // An organization-scoped link records the organization on the linking
+      // session so the callback can store the BYOK connection for it. Only the
+      // OpenAI (ChatGPT) provider has an organization-scoped connection, so any
+      // other provider must not carry the organization into its callback. The
+      // connection is the member's own, so membership is enough. The access
+      // denial must surface as-is, so it stays outside the try.
+      if (input.organizationId) {
+        if (input.provider !== 'openai') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Organization connections are only supported for OpenAI.',
+          });
+        }
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+
       try {
         // Create a secure linking session
-        await createAccountLinkingSession(ctx.user.id, input.provider);
+        await createAccountLinkingSession(ctx.user.id, input.provider, input.organizationId);
 
         return successResult();
       } catch (error) {
@@ -509,7 +530,7 @@ export const userRouter = createTRPCRouter({
     }),
 
   unlinkAuthProvider: baseProcedure
-    .input(LinkAuthProviderInputSchema)
+    .input(UnlinkAuthProviderInputSchema)
     .mutation(async ({ ctx, input }) => {
       return assertNoTrpcError(await unlinkAuthProviderFromUser(ctx.user.id, input.provider));
     }),

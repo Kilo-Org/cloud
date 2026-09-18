@@ -10,16 +10,23 @@ const jwtSigningAlgorithm = 'HS256';
 export type AccountLinkingSession = {
   existingUserId: string;
   targetProvider: string;
+  /**
+   * Set when the link is an organization-scoped BYOK connect: the callback
+   * stores the resulting ChatGPT connection for this organization.
+   */
+  organizationId?: string;
   createdAt: number;
 };
 
 export async function createAccountLinkingSession(
   existingUserId: string,
-  targetProvider: string
+  targetProvider: string,
+  organizationId?: string
 ): Promise<void> {
   const session: AccountLinkingSession = {
     existingUserId,
     targetProvider,
+    ...(organizationId ? { organizationId } : {}),
     createdAt: Date.now(),
   };
 
@@ -68,6 +75,7 @@ export async function getAccountLinkingSession(): Promise<AccountLinkingSession 
   return {
     existingUserId: session.existingUserId,
     targetProvider: session.targetProvider,
+    ...(session.organizationId ? { organizationId: session.organizationId } : {}),
     createdAt: session.createdAt,
   };
 }

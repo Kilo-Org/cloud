@@ -28,7 +28,11 @@ import { db } from '@/lib/drizzle';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 
 import { getGooglePlaySubscriptionOrder } from './google-play-sdk';
-import { googlePlayOrderMoneyForProduct, type StorePurchaseMoney } from './store-purchase-money';
+import {
+  googlePlayOrderMoneyForProduct,
+  MAX_STORABLE_MINOR_UNITS,
+  type StorePurchaseMoney,
+} from './store-purchase-money';
 
 export const DEFAULT_BACKFILL_GOOGLE_PLAY_PURCHASE_AMOUNTS_LIMIT = 500;
 
@@ -67,12 +71,14 @@ function failureReason(error: unknown): string {
 }
 
 /**
- * Returns the value only when it is a non-negative integer, which is what the
- * `amount_charged_minor_units` / `tax_minor_units` integer columns and their
- * non-negative check constraints accept. Anything else is treated as absent.
+ * Returns the value only when it is a non-negative integer no larger than the
+ * `integer` columns accept, which is what the `amount_charged_minor_units` /
+ * `tax_minor_units` columns and their non-negative check constraints require.
+ * A larger value would fail the update, so it is treated as absent.
  */
 function nonNegativeIntegerOrNull(value: number | null): number | null {
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) return null;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) return null;
+  if (value > MAX_STORABLE_MINOR_UNITS) return null;
   return value;
 }
 

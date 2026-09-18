@@ -75,6 +75,18 @@ describe('googlePlayMoneyToMinorUnits', () => {
     );
   });
 
+  it('keeps the PostgreSQL integer maximum and drops anything above it', () => {
+    // 2_147_483_647 minor units is the largest value the `integer` column takes.
+    expect(
+      googlePlayMoneyToMinorUnits({ currencyCode: 'USD', units: '21474836', nanos: 470000000 })
+    ).toBe(2_147_483_647);
+    // 3_000_000_000 would be rejected by the column and fail the whole insert,
+    // so it is unusable money like any other.
+    expect(
+      googlePlayMoneyToMinorUnits({ currencyCode: 'USD', units: '30000000', nanos: 0 })
+    ).toBeNull();
+  });
+
   it.each([
     ['null money', null],
     ['undefined money', undefined],

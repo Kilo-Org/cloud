@@ -10,6 +10,14 @@ const ISO_4217_CURRENCY_CODE = /^[A-Z]{3}$/;
 const DEFAULT_CURRENCY_EXPONENT = 2;
 
 /**
+ * The largest value the `integer` (int4) columns `amount_charged_minor_units`
+ * and `tax_minor_units` accept. A converted amount above it would be rejected by
+ * PostgreSQL and fail the whole insert, so it counts as unusable money and maps
+ * to null like any other value we cannot record.
+ */
+export const MAX_STORABLE_MINOR_UNITS = 2_147_483_647;
+
+/**
  * The ISO 4217 minor unit of every currency whose exponent is not the usual
  * two (ISO 4217 "list one": no decimals, three decimals, four decimals).
  * `Intl.NumberFormat` cannot supply this: its ICU/CLDR data is display data, and
@@ -81,9 +89,17 @@ export function googlePlayMoneyToMinorUnits(
 
   const minorUnits = Math.round(units * 10 ** exponent + nanos / 10 ** (9 - exponent));
   // A negative amount cannot be stored — the column's check constraint rejects
-  // it and the whole insert would fail — so treat it as unusable, like any other
-  // money we cannot record.
-  if (!Number.isFinite(minorUnits) || minorUnits < 0) return null;
+  // it — and a value above the `integer` maximum (or one that has already lost
+  // precision beyond `Number.MAX_SAFE_INTEGER`) would be rejected or corrupted
+  // by the column. Either way the whole insert would fail, so treat it as
+  // unusable, like any other money we cannot record.
+  if (
+    !Number.isSafeInteger(minorUnits) ||
+    minorUnits < 0 ||
+    minorUnits > MAX_STORABLE_MINOR_UNITS
+  ) {
+    return null;
+  }
   return minorUnits;
 }
 

@@ -121,11 +121,13 @@ import {
 } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
+  collectTranscriptItemKeysByPart,
   condenseTranscriptToolRuns,
   getSessionTranscriptItemKey,
   getSessionTranscriptItemType,
   mergeSessionTranscript,
   type SessionTranscriptItem,
+  type TranscriptItemKeysByPart,
 } from '@/components/agents/session-transcript';
 import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
@@ -873,10 +875,26 @@ export function SessionDetailContent({
   );
   // Condensing is opt-in: with the preference off the derived transcript is the
   // same array identity, so nothing below re-renders differently.
+  //
+  // The previous build's part→item-key map. A later build that folds new parts
+  // into an existing run — an older page prepending, or a tool part streaming
+  // into the run — reuses the key the row was already on screen under, so
+  // FlashList's viewport anchor survives. The effect refreshes the map after the
+  // commit, so the render that first shows the change still reads the old one.
+  const carriedTranscriptKeysByPartRef = useRef<TranscriptItemKeysByPart | null>(null);
   const transcript = useMemo(
-    () => (condenseToolCalls ? condenseTranscriptToolRuns(baseTranscript) : baseTranscript),
+    () =>
+      condenseToolCalls
+        ? condenseTranscriptToolRuns(
+            baseTranscript,
+            carriedTranscriptKeysByPartRef.current ?? undefined
+          )
+        : baseTranscript,
     [condenseToolCalls, baseTranscript]
   );
+  useEffect(() => {
+    carriedTranscriptKeysByPartRef.current = collectTranscriptItemKeysByPart(transcript);
+  }, [transcript]);
 
   // The list branch must never mount with zero items: a zero-item FlashList
   // paints blank dead space with no loading and no empty state (mobile-app

@@ -50,6 +50,7 @@ import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
+import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import {
   resolveSendAttachmentKind,
@@ -248,7 +249,10 @@ vi.mock('@/components/agents/text-part-renderer', () => ({
 vi.mock('@/components/agents/chat-markdown-text', () => ({
   ChatMarkdownText: ({ value }: { value: string }) => createElement('Text', null, value),
 }));
-vi.mock('@/components/agents/tool-cards', () => ({ TaskToolCard: 'TaskToolCard' }));
+vi.mock('@/components/agents/tool-cards', () => ({
+  TaskToolCard: 'TaskToolCard',
+  ReadToolCard: 'ReadToolCard',
+}));
 vi.mock('@/components/agents/suggest-tool-card', () => ({ SuggestToolCard: 'SuggestToolCard' }));
 vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: function MessageList<T>(props: ComponentProps<typeof SessionMessageList<T>>) {
@@ -542,6 +546,23 @@ let rootPageNextCursor: string | null = null;
 
 function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
   return renderer.root.findAll(node => Object.is(node.type, 'MessageList'));
+}
+
+/**
+ * The FlashList keys the first message list would mount rows under. The list is
+ * stubbed, so read the props the stub was handed: the same `keyExtractor` the
+ * real FlashList uses for its viewport anchor.
+ */
+function transcriptKeys(renderer: ReactTestRenderer): string[] {
+  const list = renderer.root.findAllByType(SessionMessageList)[0];
+  if (!list) {
+    return [];
+  }
+  const { items, keyExtractor } = list.props as {
+    items: readonly SessionTranscriptItem[];
+    keyExtractor: (item: SessionTranscriptItem) => string;
+  };
+  return items.map(item => keyExtractor(item));
 }
 
 beforeEach(() => {
@@ -1773,6 +1794,25 @@ describe('SessionDetailContent condensed tool runs', () => {
     const runRows = view.renderer.root.findAll(node => Object.is(node.type, 'CondensedToolRunRow'));
     expect(runRows).toHaveLength(1);
     expect(runRows[0]?.parent?.type).toBe('MessageErrorBoundary');
+  });
+
+  it('keeps the condensed row key when an older tool-only page prepends', async () => {
+    condensePreference.value = true;
+    rootPageNextCursor = 'older-cursor';
+    const view = await mountDetails([toolRunMessage(ROOT_ID, 'm2', ['t2'])]);
+    // A lone tool part condenses to its message row, keyed by the message id.
+    expect(transcriptKeys(view.renderer)).toEqual(['m2']);
+
+    // Loading older messages prepends an older tool-only message whose part
+    // joins the run. The row FlashList anchored on must keep its key, or the
+    // viewport jumps (the reported defect).
+    await act(async () => {
+      void view.manager.loadOlderMessages();
+      await Promise.resolve();
+    });
+    await view.respond(ROOT_ID, [toolRunMessage(ROOT_ID, 'm1', ['t1'])]);
+
+    expect(transcriptKeys(view.renderer)).toEqual(['m2']);
   });
 });
 

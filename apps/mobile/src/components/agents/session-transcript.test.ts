@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  collectTranscriptItemKeysByPart,
   condenseTranscriptToolRuns,
   getSessionTranscriptItemKey,
   mergeSessionTranscript,
@@ -421,6 +422,34 @@ describe('session transcript', () => {
     expect(merged[1]?.type === 'message' ? merged[1].timeMarker : undefined).toBeUndefined();
   });
 
+  it('keeps a condensed tool run key when an older tool-only page is prepended', () => {
+    const base = 1_000_000_000;
+    // Page 2 as the reader first sees it: a lone tool-only message condenses to
+    // its message row, because a run of one falls back to the message.
+    const page2 = [assistantToolOnlyMessageAt('m2', base, ['t2'])];
+    const before = condenseTranscriptToolRuns(mergeSessionTranscript(page2, []));
+    expect(keysOf(before)).toEqual(['m2']);
+
+    // Loading older messages prepends an older tool-only message in the same
+    // burst: its part joins t2 into one run. The carried map pins the run to the
+    // key the row was already on screen under, so FlashList holds the viewport.
+    const merged = mergeSessionTranscript(
+      [assistantToolOnlyMessageAt('m1', base - 1000, ['t1']), ...page2],
+      []
+    );
+    const after = keysOf(
+      condenseTranscriptToolRuns(merged, collectTranscriptItemKeysByPart(before))
+    );
+
+    expect(after).toEqual(['m2']);
+    expect(isContiguousSuffix(keysOf(before), after)).toBe(true);
+
+    // With no carried map the output is byte-identical to before this change:
+    // the run still names itself after its first part. The component is what
+    // threads the map; the pure contract stays the same.
+    expect(keysOf(condenseTranscriptToolRuns(merged))).toEqual(['tool-run:t1']);
+  });
+
   it('marks a day change even when the gap is small, carrying dayChanged on the marker', () => {
     const beforeMidnight = new Date(2026, 0, 1, 23, 59, 30).getTime();
     const afterMidnight = new Date(2026, 0, 2, 0, 0, 10).getTime();
@@ -640,6 +669,55 @@ describe('condenseTranscriptToolRuns', () => {
     expect(keysOf(condensed)).toEqual(['tool-run:ta1']);
     const run = condensed.find(item => item.type === 'tool-run');
     expect(run?.parts.map(part => part.id)).toEqual(['ta1', 'ta2', 'tb1']);
+  });
+
+  it('keeps a run key when a lone tool row becomes a run while streaming', () => {
+    const base = 1_000_000_000;
+    // A lone tool-only message first renders as its message row (a run of one).
+    const page1 = [assistantToolOnlyMessageAt('m1', base, ['t1'])];
+    const before = condenseTranscriptToolRuns(mergeSessionTranscript(page1, []));
+    expect(keysOf(before)).toEqual(['m1']);
+
+    // A later assistant message's leading tool part streams in and joins the run.
+    // The carried map pins the run to the key the row already had.
+    const after = condenseTranscriptToolRuns(
+      mergeSessionTranscript(
+        [
+          assistantToolOnlyMessageAt('m1', base, ['t1']),
+          assistantToolOnlyMessageAt('m2', base + 1000, ['t2']),
+        ],
+        []
+      ),
+      collectTranscriptItemKeysByPart(before)
+    );
+
+    expect(keysOf(after)).toEqual(['m1']);
+  });
+
+  it('falls back to the first part id when a carried key is already taken', () => {
+    const base = 1_000_000_000;
+    // One run holds four parts and keys every one of them `tool-run:t1`.
+    const before = condenseTranscriptToolRuns(
+      mergeSessionTranscript([assistantToolOnlyMessageAt('m1', base, ['t1', 't2', 't3', 't4'])], [])
+    );
+    expect(keysOf(before)).toEqual(['tool-run:t1']);
+
+    // The run now splits at a user message. The first half reuses the carried
+    // key; the second half can no longer take it and falls back to its own
+    // first part's id, so one carried key is never emitted twice.
+    const after = condenseTranscriptToolRuns(
+      mergeSessionTranscript(
+        [
+          assistantToolOnlyMessageAt('m1', base, ['t1', 't2']),
+          userMessageWithTextAt('u', base + 500, 'between'),
+          assistantToolOnlyMessageAt('m2', base + 1000, ['t3', 't4']),
+        ],
+        []
+      ),
+      collectTranscriptItemKeysByPart(before)
+    );
+
+    expect(keysOf(after)).toEqual(['tool-run:t1', 'u', 'tool-run:t3']);
   });
 
   it('splits the run around a user message', () => {

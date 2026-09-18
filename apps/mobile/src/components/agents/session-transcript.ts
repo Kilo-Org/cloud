@@ -71,6 +71,41 @@ export function getSessionTranscriptItemKey(item: SessionTranscriptItem): string
 }
 
 /**
+ * The item key each rendered part had in one transcript build, keyed by part id.
+ * A condensed row's key is derived from the parts it holds, so a later build
+ * cannot recompute the key a row was born with from its parts alone. Carrying
+ * this map from the previous build lets `condenseTranscriptToolRuns` keep a row's
+ * existing key when a prepend or a streaming part changes the run's first part.
+ */
+export type TranscriptItemKeysByPart = ReadonlyMap<string, string>;
+
+/**
+ * Records, for every part an item renders, the key of the item that renders it.
+ * A `message` item maps the subset it actually renders (`item.parts` when a
+ * condensed run split the message, else every content-rendering part); a
+ * `tool-run` item maps the parts it holds; a preparation attempt renders no part
+ * and is skipped.
+ */
+export function collectTranscriptItemKeysByPart(
+  items: readonly SessionTranscriptItem[]
+): Map<string, string> {
+  const keysByPart = new Map<string, string>();
+  for (const item of items) {
+    if (item.type !== 'preparation') {
+      const key = getSessionTranscriptItemKey(item);
+      const parts =
+        item.type === 'tool-run'
+          ? item.parts
+          : (item.parts ?? item.message.parts).filter(part => partRendersContent(part));
+      for (const part of parts) {
+        keysByPart.set(part.id, key);
+      }
+    }
+  }
+  return keysByPart;
+}
+
+/**
  * FlashList's recycling bucket. A row's view shape follows its kind and, for a
  * message, its role and failure state: a user bubble and an assistant bubble
  * share no layout, and a failed turn adds a footer with Retry. Recycling across
@@ -172,8 +207,16 @@ export function mergeSessionTranscript(
  * the subset of parts to render in `parts`. Every other item — a preparation
  * attempt, a user message, or a message-level failure (`info.error`) — flushes the
  * run and passes through whole, so a failed turn keeps its failure footer and
- * Retry. The id is derived from the run's first part, so it stays stable while
- * later parts stream into the same run and the FlashList key never changes.
+ * Retry. Without `carriedKeysByPart` the id is derived from the run's first part,
+ * so it stays stable while later parts stream into the same run.
+ *
+ * `carriedKeysByPart` is the previous build's part→item-key map (see
+ * `collectTranscriptItemKeysByPart`). When a run of two or more holds a part that
+ * an earlier build rendered under its own key — a lone tool part that has just
+ * become a run, or a run whose earlier parts a prepend pushed behind it — the run
+ * reuses that key instead of re-keying. FlashList anchors the viewport on the
+ * first visible row's key, so keeping the key is what stops the jump when an older
+ * page prepends.
  *
  * A time marker now rides on the message that opens its burst. It stays a run
  * boundary here, exactly as the standalone marker item was, and moves onto the
@@ -181,9 +224,20 @@ export function mergeSessionTranscript(
  * markers the reader saw before the marker was folded into the message.
  */
 export function condenseTranscriptToolRuns(
-  items: readonly SessionTranscriptItem[]
+  items: readonly SessionTranscriptItem[],
+  carriedKeysByPart?: TranscriptItemKeysByPart
 ): SessionTranscriptItem[] {
   const condensed: SessionTranscriptItem[] = [];
+
+  // The keys of the items emitted so far in this build. A carried key may be
+  // reused by only one item, so a run never duplicates a row that is already on
+  // screen.
+  const emittedKeys = new Set<string>();
+
+  const emit = (item: SessionTranscriptItem) => {
+    condensed.push(item);
+    emittedKeys.add(getSessionTranscriptItemKey(item));
+  };
 
   // The maximal run of consecutive condensable tool parts, each with its source
   // message so a run of one can fall back to that message's plain rendering.
@@ -219,9 +273,9 @@ export function condenseTranscriptToolRuns(
     // A fragment holding every visible part is the unchanged message: emit it
     // without `parts` so its item key and render path stay identical.
     if (parts.length === visibleCount) {
-      condensed.push({ type: 'message', message, ...(marker ? { timeMarker: marker } : {}) });
+      emit({ type: 'message', message, ...(marker ? { timeMarker: marker } : {}) });
     } else {
-      condensed.push({
+      emit({
         type: 'message',
         message,
         parts,
@@ -256,9 +310,17 @@ export function condenseTranscriptToolRuns(
     }
     if (run.length >= 2) {
       flushFragment();
-      condensed.push({
+      // Reuse the key the first part still-carried from the previous build had,
+      // unless an item already emitted in this build took it. Otherwise nothing
+      // in the run was on screen before, so fall back to the first part's id.
+      const carriedKey = carriedKeysByPart
+        ? run
+            .map(entry => carriedKeysByPart.get(entry.part.id))
+            .find(key => key !== undefined && !emittedKeys.has(key))
+        : undefined;
+      emit({
         type: 'tool-run',
-        id: `tool-run:${run[0]?.part.id ?? ''}`,
+        id: carriedKey ?? `tool-run:${run[0]?.part.id ?? ''}`,
         parts: run.map(entry => entry.part),
         ...(runMarker ? { timeMarker: runMarker } : {}),
       });
@@ -289,7 +351,7 @@ export function condenseTranscriptToolRuns(
       pendingMarker = undefined;
       flushRun();
       flushFragment();
-      condensed.push(
+      emit(
         marker ? { type: 'message', message, timeMarker: marker } : { type: 'message', message }
       );
       return;
@@ -324,7 +386,7 @@ export function condenseTranscriptToolRuns(
     } else {
       flushRun();
       flushFragment();
-      condensed.push(item);
+      emit(item);
     }
   }
   flushRun();

@@ -67,6 +67,28 @@ describe('catalog parity', () => {
   });
 
   /**
+   * A stray `launcher.*` key is dead copy for the same reason: the launcher
+   * surfaces label New agent from `glanceable.newAgent`. Pin the whole scope,
+   * not only the one key that shipped, so any future launcher copy that
+   * en.json does not define fails here.
+   */
+  it('every catalog agrees with en.json on the launcher scope', () => {
+    const englishLauncher = [...english.keys()]
+      .filter(key => key.startsWith('launcher.'))
+      .toSorted()
+      .join(',');
+    const offenders = SUPPORTED_LANGUAGES.filter(tag => {
+      const catalog = flatten(CATALOG_LOADERS[tag]() as unknown as Catalog);
+      const launcher = [...catalog.keys()]
+        .filter(key => key.startsWith('launcher.'))
+        .toSorted()
+        .join(',');
+      return launcher !== englishLauncher;
+    });
+    expect(offenders, 'catalogs disagree with en.json on the launcher scope').toEqual([]);
+  });
+
+  /**
    * The per-language check passes whenever English and the catalog drift
    * together, so a dead key re-added to the reference would slip through it.
    * Pin the English launcher scope to the one key a call site reads.

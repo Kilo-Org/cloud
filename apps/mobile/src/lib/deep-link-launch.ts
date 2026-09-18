@@ -122,6 +122,15 @@ function enqueuePendingDeepLinkWrite(write: () => Promise<void>): void {
 /** Fire-and-forget durable mirror. A failure is reported to Sentry; the
  *  in-memory slot still works for the live process. */
 function persistPendingDeepLink(href: string, source: DeepLinkSource): void {
+  // A system-search destination is session-bound. A tap captured while signed
+  // out carries no account identity, and a durable account-independent record
+  // would survive the next account transition and open a previous account's
+  // result identifier. Keep it in memory for this process; drop any stale
+  // durable record instead of writing an ownerless one.
+  if (source === 'system-search' && currentDeepLinkUserId === null) {
+    deletePersistedPendingDeepLink();
+    return;
+  }
   const record: PendingDeepLinkRecord = {
     href,
     source,
@@ -212,14 +221,29 @@ export function clearPendingDeepLink(): void {
 }
 
 /**
- * Sign-out drop: clear only an account-bound destination (captured while a
- * user was signed in). A destination captured while signed out is
- * account-independent — it is the link the user opened before signing in —
- * so a redundant sign-out must not drop it. The in-memory clear is
- * synchronous; the persisted delete chains behind any in-flight persist.
+ * Sign-out drop: clear an account-bound destination (captured while a user was
+ * signed in), and always a system-search destination (session-bound even when
+ * captured while signed out; see its own builder note). A universal link or
+ * notification captured while signed out is account-independent — it is the
+ * link the user opened before signing in — so a redundant sign-out must not
+ * drop it. The in-memory clear is synchronous; the persisted delete chains
+ * behind any in-flight persist.
  */
 export function clearAccountBoundPendingDeepLink(): void {
-  if (pendingDeepLinkUserId !== null) {
+  if (pendingDeepLinkUserId !== null || pendingSource === 'system-search') {
+    clearPendingDeepLink();
+  }
+}
+
+/**
+ * Account-boundary drop for a system-search destination, called on both
+ * sign-out and sign-in. A universal link or notification may have been opened
+ * by a signed-out user before signing in, so it survives the boundary; a
+ * system-search result is only meaningful for the session that could see it,
+ * so every boundary drops it whether or not it was bound to a user id.
+ */
+export function clearSystemSearchPendingDeepLink(): void {
+  if (pendingSource === 'system-search') {
     clearPendingDeepLink();
   }
 }
@@ -276,8 +300,14 @@ export async function restorePersistedPendingDeepLink(): Promise<void> {
 
   // A record captured for a different signed-in user must never navigate the
   // current account. A null record userId (captured while signed out) still
-  // restores.
+  // restores for a universal link or a notification — but a system-search
+  // record is session-bound, and one captured while signed out has no account
+  // identity at all, so it must never be restored into a later session.
   if (record.userId !== null && record.userId !== currentDeepLinkUserId) {
+    deletePersistedPendingDeepLink();
+    return;
+  }
+  if (record.source === 'system-search' && record.userId === null) {
     deletePersistedPendingDeepLink();
     return;
   }

@@ -65,9 +65,13 @@ const storedSessions = {
         // Malformed: no id. It is skipped on its own, not with its page.
         { title: 'no id' },
       ],
+      nextCursor: 'cursor-2',
     },
     // A later page repeating a session must not produce a second document.
-    { cliSessions: [{ ...sessionRow, title: 'Fix login bug (stale page)' }] },
+    {
+      cliSessions: [{ ...sessionRow, title: 'Fix login bug (stale page)' }],
+      nextCursor: null,
+    },
   ],
 };
 
@@ -85,7 +89,12 @@ const activeSessions = {
 };
 
 const inbox = {
-  pages: [{ items: [{ owner: 'octocat', repo: 'hello-world', number: 42, title: 'Hello PR' }] }],
+  pages: [
+    {
+      items: [{ owner: 'octocat', repo: 'hello-world', number: 42, title: 'Hello PR' }],
+      nextCursor: null,
+    },
+  ],
 };
 
 const providerInbox = {
@@ -136,13 +145,18 @@ const findings = {
         // Malformed finding row: no id.
         { title: 'no id at all' },
       ],
+      // One row decodes, so the list reached the end of its one finding.
+      totalCount: 1,
     },
   ],
 };
 
 const organizationFindings = {
   pages: [
-    { findings: [{ id: 'finding-2', title: 'XSS', severity: 'high', repo_full_name: 'acme/web' }] },
+    {
+      findings: [{ id: 'finding-2', title: 'XSS', severity: 'high', repo_full_name: 'acme/web' }],
+      totalCount: 1,
+    },
   ],
 };
 
@@ -237,7 +251,9 @@ describe('collectSystemSearchDocuments', () => {
   it('collects nothing from an empty cache', async () => {
     await expect(collectSystemSearchDocuments(new QueryClient())).resolves.toEqual({
       documents: [],
-      observedSources: new Set(),
+      // The recents read still ran and enumerated its (empty) list, so its
+      // scope is observed even when no document came out of it.
+      observedSources: new Set(['pullRequests:recents']),
     });
   });
 
@@ -246,7 +262,7 @@ describe('collectSystemSearchDocuments', () => {
     client.setQueryData(SESSION_LIST_KEY, 'not a page list');
     client.setQueryData(INBOX_KEY, { items: [] });
     client.setQueryData(PROVIDER_INBOX_KEY, { items: [] });
-    client.setQueryData(ORG_FINDINGS_KEY, { pages: [{ findings: [] }] });
+    client.setQueryData(ORG_FINDINGS_KEY, { pages: [{ findings: [], totalCount: 0 }] });
 
     const { documents, observedSources } = await collectSystemSearchDocuments(client);
 
@@ -254,7 +270,7 @@ describe('collectSystemSearchDocuments', () => {
     // Only a payload that decodes as the family's list speaks for that family:
     // the empty-but-valid findings page is authoritative, while a payload of
     // the wrong shape is not evidence the family's entries are gone.
-    expect(observedSources).toEqual(new Set(['findings:org-1']));
+    expect(observedSources).toEqual(new Set(['findings:org-1', 'pullRequests:recents']));
   });
 
   it('does not claim a family from a bounded capacity probe', async () => {
@@ -376,6 +392,40 @@ describe('collectSystemSearchDocuments', () => {
     const { observedSources } = await collectSystemSearchDocuments(client);
 
     expect(observedSources.has('sessions:personal')).toBe(true);
+  });
+
+  it('does not claim a scope from a first page that still has a next page', async () => {
+    const client = new QueryClient();
+    const queryFn = vi.fn(async () => storedSessions);
+    client.getQueryCache().build(client, { queryKey: SESSION_LIST_KEY, queryFn, maxPages: 20 });
+    // The window is below `maxPages`, but its last page advertises a next
+    // cursor: the query holds one page of a longer list, so a refresh would
+    // wrongly delete entries indexed from the pages it has not loaded.
+    client.setQueryData(SESSION_LIST_KEY, {
+      pages: [{ cliSessions: [sessionRow], nextCursor: 'cursor-2' }],
+    });
+
+    const { observedSources } = await collectSystemSearchDocuments(client);
+
+    expect(observedSources.has('sessions:personal')).toBe(false);
+  });
+
+  it('claims a provider inbox under its organization, not the account-wide scope', async () => {
+    const client = new QueryClient();
+    client.setQueryData(
+      [
+        ['providerReview', 'listInbox'],
+        { type: 'infinite', input: { platform: 'gitlab', organizationId: 'org-1' } },
+      ],
+      providerInbox
+    );
+
+    const { observedSources } = await collectSystemSearchDocuments(client);
+
+    expect(observedSources.has('pullRequests:gitlab:org-1')).toBe(true);
+    // The organization-qualified scope is the only one this query owns; it
+    // must not speak for the personal/account-wide GitLab list.
+    expect(observedSources.has('pullRequests:gitlab')).toBe(false);
   });
 
   it('claims a pull-request provider only from its own inbox', async () => {

@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type SystemSearchUpdate } from '@/lib/native-system-search';
 import {
   findingSearchDocument,
+  providerPrSearchDocument,
+  providerReviewSourceKey,
   storedSessionSearchDocument,
   type SystemSearchDocument,
 } from '@/lib/system-search-entries';
@@ -31,6 +33,25 @@ const SESSION_ROW = {
   git_branch: 'feature/live',
 };
 
+/** The provider inbox key one organization's GitLab list is cached under. */
+function providerInboxKey(organizationId: string) {
+  return [
+    ['providerReview', 'listInbox'],
+    { type: 'infinite', input: { platform: 'gitlab', organizationId } },
+  ];
+}
+
+const GITLAB_MR_REF = {
+  platform: 'gitlab' as const,
+  projectPath: 'group/repo',
+  mrIid: 3,
+  instanceHint: 'https://gitl.ab',
+};
+
+function emptyProviderInbox() {
+  return { pages: [{ items: [], nextCursor: null }] };
+}
+
 /** The document the app's own route builder derives for the fixture row. */
 function sessionDocument(title: string): SystemSearchDocument {
   const document = storedSessionSearchDocument({ ...SESSION_ROW, title });
@@ -41,10 +62,10 @@ function sessionDocument(title: string): SystemSearchDocument {
 }
 
 function storedSessions(title: string) {
-  return { pages: [{ cliSessions: [{ ...SESSION_ROW, title }] }] };
+  return { pages: [{ cliSessions: [{ ...SESSION_ROW, title }], nextCursor: null }] };
 }
 
-const EMPTY_SESSIONS = { pages: [{ cliSessions: [] }] };
+const EMPTY_SESSIONS = { pages: [{ cliSessions: [], nextCursor: null }] };
 
 // The sync's trailing coalescing window: a burst of cache writes inside this
 // window must produce exactly one apply.
@@ -175,6 +196,33 @@ describe('SystemSearchIndexSync', () => {
     expect(bridge.index.has(id)).toBe(false);
   });
 
+  it('keeps an indexed PR when another organization enumerates the same provider route', async () => {
+    const bridge = createBridge();
+    const harness = await loadHarness(bridge);
+    const queryClient = new QueryClient();
+    // The PR was indexed from org-b's inbox. Its route carries no organization,
+    // so only the fingerprint records which inbox produced it.
+    const indexed = providerPrSearchDocument(
+      GITLAB_MR_REF,
+      'Org B MR',
+      providerReviewSourceKey('gitlab', 'org-b')
+    );
+    bridge.index.set(indexed.id, indexed);
+    queryClient.setQueryData(providerInboxKey('org-a'), emptyProviderInbox());
+    const { sync } = createSync(harness, bridge, queryClient);
+
+    // Org-a's authoritative inbox says nothing about org-b's PR: the same
+    // route does not give it ownership, so the entry stays.
+    await expect(sync.syncNow()).resolves.toBe('skipped');
+    expect(bridge.index.has(indexed.id)).toBe(true);
+
+    // Once its own organization's inbox enumerates and no longer carries it,
+    // the entry leaves the index.
+    queryClient.setQueryData(providerInboxKey('org-b'), emptyProviderInbox());
+    await expect(sync.syncNow()).resolves.toBe('applied');
+    expect(bridge.index.has(indexed.id)).toBe(false);
+  });
+
   it('keeps an indexed entry whose source family the cache cannot enumerate', async () => {
     const bridge = createBridge();
     const harness = await loadHarness(bridge);
@@ -194,7 +242,7 @@ describe('SystemSearchIndexSync', () => {
     // screen builds the list key as `[...queryKey(), filters]`, so the
     // unfiltered filters segment sits in the third position.
     queryClient.setQueryData([['securityAgent', 'listFindings'], { type: 'query' }, {}], {
-      pages: [{ findings: [] }],
+      pages: [{ findings: [], totalCount: 0 }],
     });
     await expect(sync.syncNow()).resolves.toBe('applied');
     expect(bridge.index.has(finding.id)).toBe(false);

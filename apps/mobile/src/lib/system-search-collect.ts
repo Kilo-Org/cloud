@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one collector owns every query shape decoded from the cache and the source-ownership rule that authorises removals; splitting it would scatter one invariant across files. */
 /**
  * Collect the index documents from what the app already holds.
  *
@@ -20,7 +21,9 @@ import {
   findingSearchDocument,
   inboxPrSearchDocument,
   PERSONAL_SOURCE_SCOPE,
+  PR_RECENTS_SOURCE_KEY,
   providerPrSearchDocument,
+  providerReviewSourceKey,
   recentPrSearchDocument,
   storedSessionSearchDocument,
   type SystemSearchDocument,
@@ -42,7 +45,7 @@ const storedSessionRowSchema = z.object({
 });
 
 const storedSessionsDataSchema = z.object({
-  pages: z.array(z.object({ cliSessions: z.array(z.unknown()) })),
+  pages: z.array(z.object({ cliSessions: z.array(z.unknown()), nextCursor: z.string().nullish() })),
 });
 
 const activeSessionRowSchema = z.object({
@@ -62,7 +65,7 @@ const inboxItemRowSchema = z.object({
 });
 
 const inboxDataSchema = z.object({
-  pages: z.array(z.object({ items: z.array(z.unknown()) })),
+  pages: z.array(z.object({ items: z.array(z.unknown()), nextCursor: z.string().nullish() })),
 });
 
 // The GitLab/Bitbucket inbox row carries its own ref, so the document can
@@ -101,7 +104,7 @@ const findingRowSchema = z.object({
 });
 
 const findingsDataSchema = z.object({
-  pages: z.array(z.object({ findings: z.array(z.unknown()) })),
+  pages: z.array(z.object({ findings: z.array(z.unknown()), totalCount: z.number().nullish() })),
 });
 
 const queryKeyMetaSchema = z.object({ input: z.unknown().optional() });
@@ -122,7 +125,8 @@ type RowDecoder<TRow> = {
  * (a cold start hydrates only a subset), so it never drops a still-valid entry
  * just because its query has not loaded yet. A scope is recorded only by a
  * query that enumerated it completely: an unfiltered list whose page window
- * `maxPages` has not trimmed.
+ * `maxPages` has not trimmed and whose last page advertised its terminal
+ * pagination marker.
  */
 export type SystemSearchCollection = {
   documents: SystemSearchDocument[];
@@ -148,7 +152,11 @@ export async function collectSystemSearchDocuments(
       observedSources.add(collected.observedSource);
     }
   }
-  documents.push(...(await recentPrDocuments()));
+  const recents = await recentPrDocuments();
+  documents.push(...recents.documents);
+  if (recents.observedSource !== null) {
+    observedSources.add(recents.observedSource);
+  }
   return { documents: dedupeById(documents), observedSources };
 }
 
@@ -156,9 +164,10 @@ export async function collectSystemSearchDocuments(
  * What one cached query carries: the documents it enumerates, and the source
  * scope key it fully enumerated, or null when it did not enumerate one. The
  * observed source is non-null only when `data` decoded as that source's list
- * payload, the key input carried no narrowing filter, and the page window was
- * not trimmed, so a probe, a filtered list or a partial window never claims a
- * source.
+ * payload, the key input carried no narrowing filter, the page window was not
+ * trimmed, and the last page proved the list reached its end, so a probe, a
+ * filtered list, a partial window or a first page with a next page never claims
+ * a source.
  */
 type QueryDocuments = {
   documents: SystemSearchDocument[];
@@ -178,12 +187,11 @@ const FINDING_NARROWING_KEYS = [
 ] as const;
 
 const sessionScopeInputSchema = z.object({ organizationId: z.string().min(1).nullish() });
-const providerInboxInputSchema = z
-  .object({
-    platform: z.enum(['gitlab', 'bitbucket']),
-    organizationId: z.string().optional(),
-  })
-  .strict();
+const providerInboxInputSchema = z.object({
+  platform: z.enum(['gitlab', 'bitbucket']),
+  organizationId: z.string().optional(),
+});
+const PROVIDER_INBOX_KEYS = new Set(['platform', 'organizationId']);
 const queryInputSchema = z.record(z.string(), z.unknown());
 const maxPagesSchema = z.number();
 const pagesDataSchema = z.object({ pages: z.array(z.unknown()) });
@@ -208,7 +216,7 @@ function documentsFromQuery(query: Query): QueryDocuments {
       documents: collectUnfilteredPages(pages).flatMap(row =>
         presentOrEmpty(storedSessionSearchDocument(row))
       ),
-      observedSource: sessionObservedSource(query),
+      observedSource: sessionObservedSource(query, reachedEndOfCursorPages(parsed.data.pages)),
     };
   }
   if (path === 'activeSessions.list') {
@@ -241,7 +249,11 @@ function documentsFromQuery(query: Query): QueryDocuments {
         .flatMap(page => decodedRows(page.items, inboxItemRowSchema))
         .map(row => inboxPrSearchDocument(row)),
       observedSource: isDefaultInput
-        ? untrimmedSource(query, systemSearchSourceKey('pullRequests', 'github'))
+        ? untrimmedSource(
+            query,
+            systemSearchSourceKey('pullRequests', 'github'),
+            reachedEndOfCursorPages(parsed.data.pages)
+          )
         : null,
     };
   }
@@ -254,15 +266,32 @@ function documentsFromQuery(query: Query): QueryDocuments {
     if (!parsed.success) {
       return NOT_ENUMERATED;
     }
-    const provider = providerInboxProvider(queryInput(queryKey));
+    const rows = parsed.data.pages.flatMap(page =>
+      decodedRows(page.items, providerInboxItemRowSchema)
+    );
+    // The provider route cannot carry an organization, so identity has to: the
+    // source key is organization-qualified, and every document this query
+    // enumerates records that scope in its fingerprint. An organization's
+    // inbox therefore never authorises a removal for another organization's.
+    const scope = providerInboxScope(queryInput(queryKey));
+    if (scope === null) {
+      return {
+        documents: rows.map(row => providerPrSearchDocument(row.ref, row.title ?? '')),
+        observedSource: null,
+      };
+    }
+    const sourceKey = providerReviewSourceKey(scope.provider, scope.organizationId);
     return {
-      documents: parsed.data.pages
-        .flatMap(page => decodedRows(page.items, providerInboxItemRowSchema))
-        .map(row => providerPrSearchDocument(row.ref, row.title ?? '')),
-      observedSource:
-        provider === null
-          ? null
-          : untrimmedSource(query, systemSearchSourceKey('pullRequests', provider)),
+      documents: rows.map(row =>
+        providerPrSearchDocument(
+          row.ref,
+          row.title ?? '',
+          providerReviewSourceKey(row.ref.platform, scope.organizationId)
+        )
+      ),
+      observedSource: scope.isDefault
+        ? untrimmedSource(query, sourceKey, reachedEndOfCursorPages(parsed.data.pages))
+        : null,
     };
   }
   if (path === 'securityAgent.listFindings') {
@@ -284,13 +313,16 @@ function findingsFromQuery(query: Query, scope: string): QueryDocuments {
   // query with any of those keys enumerates only a subset and must not speak
   // for the whole scope. Only the unfiltered list (the "all" status) does.
   const filtered = hasNarrowingFilter(findingsFilters(query.queryKey), FINDING_NARROWING_KEYS);
+  const rows = parsed.data.pages.flatMap(page => decodedRows(page.findings, findingRowSchema));
   return {
-    documents: parsed.data.pages
-      .flatMap(page => decodedRows(page.findings, findingRowSchema))
-      .map(row => findingSearchDocument(row, scope)),
+    documents: rows.map(row => findingSearchDocument(row, scope)),
     observedSource: filtered
       ? null
-      : untrimmedSource(query, systemSearchSourceKey('findings', scope)),
+      : untrimmedSource(
+          query,
+          systemSearchSourceKey('findings', scope),
+          reachedEndOfFindings(parsed.data.pages, rows.length)
+        ),
   };
 }
 
@@ -311,7 +343,7 @@ function findingsFilters(queryKey: readonly unknown[]): QueryInput | null {
  * input narrows the list (a platform or repository filter) so it only carries
  * a subset of its scope.
  */
-function sessionObservedSource(query: Query): string | null {
+function sessionObservedSource(query: Query, reachedEnd: boolean): string | null {
   const input = queryInput(query.queryKey);
   if (hasNarrowingFilter(input, SESSION_NARROWING_KEYS)) {
     return null;
@@ -320,12 +352,23 @@ function sessionObservedSource(query: Query): string | null {
   const organizationId = scope.success ? scope.data.organizationId : undefined;
   return untrimmedSource(
     query,
-    systemSearchSourceKey('sessions', organizationId ?? PERSONAL_SOURCE_SCOPE)
+    systemSearchSourceKey('sessions', organizationId ?? PERSONAL_SOURCE_SCOPE),
+    reachedEnd
   );
 }
 
-/** The candidate source key, or null when `maxPages` may have evicted pages. */
-function untrimmedSource(query: Query, source: string): string | null {
+/**
+ * The candidate source key, or null when the query cannot prove it reached the
+ * end of the source. A source is authoritative only when the last decoded page
+ * advertised its terminal pagination marker (`nextCursor: null`, or a findings
+ * page whose total count is covered) and `maxPages` has not evicted pages: a
+ * first page that still has a next page is a partial window, and treating it as
+ * complete would let a refresh delete results indexed from later pages.
+ */
+function untrimmedSource(query: Query, source: string, reachedEnd: boolean): string | null {
+  if (!reachedEnd) {
+    return null;
+  }
   const bound = maxPagesSchema.safeParse(query.options.maxPages);
   if (!bound.success) {
     return source;
@@ -335,6 +378,30 @@ function untrimmedSource(query: Query, source: string): string | null {
   // subset of the source; only a window still shorter than the bound is a
   // complete enumeration of what the query has loaded.
   return pages.success && pages.data.pages.length >= bound.data ? null : source;
+}
+
+/**
+ * Whether the last page of a cursor-paginated list advertised its terminal
+ * marker. `null` is the server's "no next page"; an absent field is a legacy or
+ * malformed payload and is treated as "more may follow".
+ */
+function reachedEndOfCursorPages(
+  pages: readonly { nextCursor?: string | null | undefined }[]
+): boolean {
+  return pages.at(-1)?.nextCursor === null;
+}
+
+/**
+ * Whether the findings list reached the end of its scope. The findings page
+ * carries `totalCount` instead of a cursor, so the decoded rows (which start at
+ * the query's initial offset) cover every finding when their count reaches it.
+ */
+function reachedEndOfFindings(
+  pages: readonly { totalCount?: number | null | undefined }[],
+  loaded: number
+): boolean {
+  const total = pages.at(-1)?.totalCount;
+  return total !== null && total !== undefined && loaded >= total;
 }
 
 /** Whether the query's input carries any of the narrowing filter keys. */
@@ -349,10 +416,26 @@ function hasNarrowingFilter(input: QueryInput | null, keys: readonly string[]): 
   });
 }
 
-/** The `platform` a provider inbox query enumerates, or null when filtered. */
-function providerInboxProvider(input: QueryInput | null): string | null {
+/**
+ * The provider and organization a provider inbox query enumerates, or null
+ * when the input does not name one this module issued. `isDefault` is false
+ * when the input carries an extra key, so a narrowed list contributes documents
+ * but never claims the source scope.
+ */
+function providerInboxScope(
+  input: QueryInput | null
+): { provider: string; organizationId: string | null; isDefault: boolean } | null {
   const parsed = providerInboxInputSchema.safeParse(input);
-  return parsed.success ? parsed.data.platform : null;
+  if (!parsed.success) {
+    return null;
+  }
+  const organizationId = parsed.data.organizationId;
+  return {
+    provider: parsed.data.platform,
+    organizationId:
+      organizationId !== undefined && organizationId.length > 0 ? organizationId : null,
+    isDefault: input !== null && Object.keys(input).every(key => PROVIDER_INBOX_KEYS.has(key)),
+  };
 }
 
 /** Decode one page of rows, dropping a malformed row alone. */
@@ -389,14 +472,26 @@ function queryKeyPath(queryKey: readonly unknown[]): string | null {
   return segments.success ? segments.data.join('.') : null;
 }
 
-async function recentPrDocuments(): Promise<SystemSearchDocument[]> {
+/**
+ * The stored PR recents and the source scope they enumerate. The recents list
+ * is bounded (ten entries) but it is the whole list, so a successful read
+ * authorises removing a recents-sourced entry that has fallen off it — while a
+ * failed read observes nothing and leaves the index alone.
+ */
+async function recentPrDocuments(): Promise<{
+  documents: SystemSearchDocument[];
+  observedSource: string | null;
+}> {
   try {
     const recents = await getRecentPrs();
-    return recents.map(entry => recentPrSearchDocument(entry));
+    return {
+      documents: recents.map(entry => recentPrSearchDocument(entry)),
+      observedSource: PR_RECENTS_SOURCE_KEY,
+    };
   } catch {
     // SecureStore can fail (locked device, corrupt entry); the index then
     // simply carries no recents rather than failing the whole collection.
-    return [];
+    return { documents: [], observedSource: null };
   }
 }
 

@@ -81,6 +81,7 @@ const hoisted = vi.hoisted(() => {
 
   const deepLinkLaunch = {
     clearAccountBoundPendingDeepLink: vi.fn(),
+    clearSystemSearchPendingDeepLink: vi.fn(),
     setCurrentDeepLinkUserId: vi.fn(),
   };
 
@@ -188,6 +189,7 @@ vi.mock('@/lib/appsflyer', () => ({
 
 vi.mock('@/lib/deep-link-launch', () => ({
   clearAccountBoundPendingDeepLink: hoisted.deepLinkLaunch.clearAccountBoundPendingDeepLink,
+  clearSystemSearchPendingDeepLink: hoisted.deepLinkLaunch.clearSystemSearchPendingDeepLink,
   setCurrentDeepLinkUserId: hoisted.deepLinkLaunch.setCurrentDeepLinkUserId,
 }));
 
@@ -215,6 +217,7 @@ vi.mock('@/lib/persist/read-cache', () => readCacheMock);
 // environment; the clear is a no-op here.
 vi.mock('@/lib/native-system-search', () => ({
   clearSystemSearchIndex: vi.fn().mockResolvedValue(undefined),
+  consumePendingSystemSearchRoute: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@/lib/auth/logout-cleanup', () => logoutCleanupMock);

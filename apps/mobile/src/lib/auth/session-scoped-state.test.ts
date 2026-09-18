@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const nativeSearchMock = vi.hoisted(() => ({
   clearSystemSearchIndex: vi.fn<() => Promise<void>>(),
+  consumePendingSystemSearchRoute: vi.fn<() => Promise<string | null>>(),
 }));
 
 const telemetryMock = vi.hoisted(() => ({
@@ -13,6 +14,11 @@ const recentPrsMock = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/native-system-search', () => nativeSearchMock);
+
+// `session-scoped-state` reaches `deep-link-launch` for the session-bound
+// system-search destination; that module imports `@sentry/react-native`, which
+// would pull React Native into this pure node graph.
+vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 vi.mock('@/lib/telemetry/error-sink', () => telemetryMock);
 
@@ -58,6 +64,7 @@ describe('clearSessionScopedState', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     nativeSearchMock.clearSystemSearchIndex.mockResolvedValue(undefined);
+    nativeSearchMock.consumePendingSystemSearchRoute.mockResolvedValue(null);
     recentPrsMock.clearRecentPrs.mockResolvedValue(undefined);
   });
 
@@ -67,6 +74,14 @@ describe('clearSessionScopedState', () => {
 
     clearSessionScopedState();
     expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(2);
+  });
+
+  it('drains the native system-search slot at every account boundary', () => {
+    clearSessionScopedState();
+    expect(nativeSearchMock.consumePendingSystemSearchRoute).toHaveBeenCalledTimes(1);
+
+    clearSessionScopedState();
+    expect(nativeSearchMock.consumePendingSystemSearchRoute).toHaveBeenCalledTimes(2);
   });
 
   it('drops the stored PR recents the index folds into every document set', () => {

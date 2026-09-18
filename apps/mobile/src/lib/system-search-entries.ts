@@ -13,6 +13,8 @@
  * the OS hands back when the result is picked.
  */
 
+import { z } from 'zod';
+
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
 import {
   githubPrRef,
@@ -98,6 +100,14 @@ type DocumentContent = {
   title: string;
   description: string;
   keywords: string[];
+  /**
+   * The source scope that produced this document. It is written into the
+   * fingerprint (never sent to the index as its own field) so the ledger keeps
+   * the ownership of every indexed id: the plan can then remove an entry only
+   * when the scope that actually produced it was enumerated, which is what
+   * keeps one organization's provider inbox from speaking for another's.
+   */
+  sourceKey: string;
 };
 
 function buildDocument(input: DocumentContent): SystemSearchDocument {
@@ -117,6 +127,7 @@ function buildDocument(input: DocumentContent): SystemSearchDocument {
       description: input.description,
       keywords,
       route,
+      source: input.sourceKey,
     }),
   };
 }
@@ -194,6 +205,7 @@ function sessionSearchDocument(input: {
     title,
     description: input.gitBranch ?? '',
     keywords: [],
+    sourceKey: systemSearchSourceKey('sessions', input.organizationId ?? PERSONAL_SOURCE_SCOPE),
   });
 }
 
@@ -217,10 +229,12 @@ export function inboxPrSearchDocument(row: SystemSearchInboxPrRow): SystemSearch
 
 /**
  * The document for one recents entry. Recents keep their provider (s7), so a
- * GitLab or Bitbucket entry routes through its own provider route.
+ * GitLab or Bitbucket entry routes through its own provider route. The recents
+ * list enumerates itself, so a recents-sourced entry is removed only when the
+ * recents were read this run and no longer carry it.
  */
 export function recentPrSearchDocument(row: SystemSearchRecentPrRow): SystemSearchDocument {
-  return providerPrSearchDocument(providerRefFromRecentPr(row), row.title);
+  return providerPrSearchDocument(providerRefFromRecentPr(row), row.title, PR_RECENTS_SOURCE_KEY);
 }
 
 /**
@@ -229,13 +243,23 @@ export function recentPrSearchDocument(row: SystemSearchRecentPrRow): SystemSear
  * builder, so a PR/MR the user already has is indexed under one document
  * shape whichever cache carried it in — and the dedupe by id in the collector
  * sees one entry, not two.
+ *
+ * `sourceKey` defaults to the account-wide provider scope and the provider
+ * inbox passes the organization-qualified scope, so the id may be the same for
+ * two organizations' inboxes while the ledger still records which one
+ * produced it.
  */
-export function providerPrSearchDocument(ref: ProviderPrRef, title: string): SystemSearchDocument {
+export function providerPrSearchDocument(
+  ref: ProviderPrRef,
+  title: string,
+  sourceKey: string = providerReviewSourceKey(ref.platform, null)
+): SystemSearchDocument {
   return buildDocument({
     id: providerPrRoutePath(ref) as string,
     title,
     description: providerPrRefLabel(ref),
     keywords: [providerPrRepoPath(ref), String(providerPrNumber(ref))],
+    sourceKey,
   });
 }
 
@@ -261,6 +285,7 @@ export function findingSearchDocument(
     title: row.title ?? '',
     description: [repo, severity].filter(part => part.length > 0).join(' · '),
     keywords: [repo, severity],
+    sourceKey: systemSearchSourceKey('findings', scope),
   });
 }
 
@@ -291,6 +316,42 @@ export const PERSONAL_SOURCE_SCOPE = 'personal';
  */
 export function systemSearchSourceKey(family: SystemSearchFamily, scope: string): string {
   return `${family}:${scope}`;
+}
+
+/**
+ * The source scope one provider inbox enumerates, qualified by organization.
+ * The provider route cannot carry an organization (the URL has no place for
+ * one), so two organizations' inboxes produce the same PR ids; the ledger
+ * records which inbox produced each entry through its fingerprint instead. A
+ * personal inbox uses the account-wide provider scope, so it never authorises
+ * a removal for an organization's inbox and vice versa.
+ */
+export function providerReviewSourceKey(provider: string, organizationId: string | null): string {
+  return systemSearchSourceKey(
+    'pullRequests',
+    organizationId === null ? provider : `${provider}:${organizationId}`
+  );
+}
+
+/** The source scope the stored PR recents enumerate. */
+export const PR_RECENTS_SOURCE_KEY = systemSearchSourceKey('pullRequests', 'recents');
+
+/** The optional `source` field of a ledger fingerprint. */
+const fingerprintSourceSchema = z.object({ source: z.string().optional() });
+
+/**
+ * The source key an entry's ledger fingerprint records, or null when the
+ * fingerprint predates source ownership. The plan falls back to the id's own
+ * route shape when this is null, so an entry indexed before this change is
+ * never removed on an inference alone.
+ */
+export function systemSearchSourceKeyFromFingerprint(fingerprint: string): string | null {
+  try {
+    const parsed = fingerprintSourceSchema.safeParse(JSON.parse(fingerprint));
+    return parsed.success && parsed.data.source ? parsed.data.source : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -420,18 +481,28 @@ export type SystemSearchUpdatePlan = {
  * Documents are deduped by id (first occurrence wins, matching the app's own
  * row order). A document is added when its id is unknown or its fingerprint
  * changed. An indexed id is removed only when the documents no longer carry it
- * AND its own source scope was fully enumerated this run: the react-query cache
- * is the only evidence the app has, and a cold start hydrates a subset of the
- * source queries, so an id whose query is simply absent must stay rather than
- * be dropped as if the user could no longer see it. This is still how an item
- * the user can no longer see leaves the index — its source was enumerated, so
- * its absence is evidence, not ignorance.
+ * AND the scope that actually produced it (its ledger fingerprint's source,
+ * falling back to the id's route shape for entries that predate source
+ * ownership) was fully enumerated this run: the react-query cache is the only
+ * evidence the app has, and a cold start hydrates a subset of the source
+ * queries, so an id whose query is simply absent must stay rather than be
+ * dropped as if the user could no longer see it. This is still how an item the
+ * user can no longer see leaves the index — its own source was enumerated, so
+ * its absence is evidence, not ignorance; and because the source is
+ * organization-qualified for provider inboxes, one organization's enumeration
+ * cannot speak for another's.
  */
 export function planSystemSearchUpdate(input: {
   indexed: readonly SystemSearchDocument[];
   documents: readonly SystemSearchDocument[];
   /** The source scopes the current run could fully enumerate from the cache. */
   observedSources: ReadonlySet<string>;
+  /**
+   * The source key each indexed id was written under, recovered from its ledger
+   * fingerprint. An id whose fingerprint predates source ownership is absent,
+   * and the plan falls back to the id's own route shape.
+   */
+  indexedSources?: ReadonlyMap<string, string>;
 }): SystemSearchUpdatePlan {
   const indexedById = indexById(input.indexed);
   const documentsById = indexById(input.documents);
@@ -446,7 +517,9 @@ export function planSystemSearchUpdate(input: {
     if (documentsById.has(id)) {
       return false;
     }
-    return systemSearchSourceKeysOfId(id).some(source => input.observedSources.has(source));
+    const owned = input.indexedSources?.get(id);
+    const sources = owned === undefined ? systemSearchSourceKeysOfId(id) : [owned];
+    return sources.some(source => input.observedSources.has(source));
   });
   return { add, remove };
 }

@@ -4,8 +4,12 @@ import { clearSessionAutoApprove } from '@/components/agents/session-auto-approv
 import { clearSessionGoalCollapseState } from '@/components/agents/session-goal-collapse';
 import { clearToolCardImageCache } from '@/components/agents/tool-card-image-cache';
 import { clearClipboardImages } from '@/lib/agent-attachments/clipboard-image';
+import { clearSystemSearchPendingDeepLink } from '@/lib/deep-link-launch';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
-import { clearSystemSearchIndex } from '@/lib/native-system-search';
+import {
+  clearSystemSearchIndex,
+  consumePendingSystemSearchRoute,
+} from '@/lib/native-system-search';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { reapTempFiles } from '@/lib/temp-file-registry';
@@ -84,15 +88,45 @@ function clearRecentPrsBestEffort(): void {
 }
 
 /**
+ * Drop a session-bound system-search destination at an account boundary, in
+ * both the JavaScript pending slot and the native single-shot slot.
+ *
+ * Unlike a universal link or a notification, a search result is only meaningful
+ * for the account that could see it, so every boundary drops it — including one
+ * captured while signed out, which carries no account identity. The native slot
+ * is a get-and-clear, so consuming it here (and discarding the identifier) is
+ * what stops a tap that landed while the app was signed out from opening after
+ * the next sign-in. Both halves are best-effort: the in-memory clear is
+ * synchronous and a failed native read is reported, never thrown.
+ */
+function clearSystemSearchRouteBestEffort(): void {
+  clearSystemSearchPendingDeepLink();
+  void (async () => {
+    try {
+      await consumePendingSystemSearchRoute();
+    } catch (error) {
+      captureTelemetry({
+        error,
+        level: 'warning',
+        tags: {
+          'error.subsystem': 'system-search',
+          'error.operation': 'clear-pending-route',
+        },
+      });
+    }
+  })();
+}
+
+/**
  * Clear the session-scoped local state that must not leak across an account
  * boundary: trusted hosts, confirmed markdown images, media caches, per-session
  * auto-approve and goal-disclosure flags, app-owned temp copies, the stored PR
- * recents, and the phone's own search index. Every member is best-effort; a
- * throw falls through to the caller's own sign-in/sign-out state reset. The
- * recents delete and the OS search clear are asynchronous and fired without
- * awaiting, so the function stays synchronous and never throws; a rejection is
- * reported through telemetry, and the signed-out-launch re-clear below retries
- * the index clear.
+ * recents, the pending system-search destination, and the phone's own search
+ * index. Every member is best-effort; a throw falls through to the caller's own
+ * sign-in/sign-out state reset. The recents delete and the OS search clear are
+ * asynchronous and fired without awaiting, so the function stays synchronous
+ * and never throws; a rejection is reported through telemetry, and the
+ * signed-out-launch re-clear below retries the index clear.
  */
 export function clearSessionScopedState(): void {
   clearTrustedHosts();
@@ -103,6 +137,9 @@ export function clearSessionScopedState(): void {
   clearSessionAutoApprove();
   clearSessionGoalCollapseState();
   reapTempFiles({ all: true });
+  // A system-search destination is session-bound, so it must not survive the
+  // boundary even when it was captured without an account identity.
+  clearSystemSearchRouteBestEffort();
   // The stored PR recents are account-bound data the index folds in, and the
   // key is device-global, so the account boundary must drop them as well as the
   // index itself. Without this, an account switch re-indexes the previous

@@ -50,12 +50,14 @@ vi.mock('@/lib/native-system-search', () => ({
 }));
 
 /* eslint-disable import/first */
+import { isSignOutActive, setSignOutActive } from '@/lib/auth/sign-out-state';
 import { PENDING_DEEP_LINK_KEY } from '@/lib/storage-keys';
 import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 import {
   _resetDeepLinkLaunchForTests,
   _setSecureStoreForTests,
   getPendingDeepLinkSnapshot,
+  setCurrentDeepLinkUserId,
 } from './deep-link-launch';
 import { systemSearchDeeplinkFromId, systemSearchHrefFromRoute } from './system-search-entries';
 import {
@@ -81,10 +83,14 @@ describe('system-search-route', () => {
     _setSecureStoreForTests(secureStoreMock);
     store.clear();
     vi.clearAllMocks();
+    // The normal tap happens in a signed-in session, which is what binds the
+    // session-bound system-search destination to an account.
+    setCurrentDeepLinkUserId('user-1');
   });
 
   afterEach(() => {
     _resetDeepLinkLaunchForTests();
+    setSignOutActive(false);
     setTelemetrySink(null);
     store.clear();
   });
@@ -131,6 +137,32 @@ describe('system-search-route', () => {
       routeSystemSearchOpen(null);
 
       expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+    });
+
+    it('refuses a stale result while a sign-out is active', () => {
+      setSignOutActive(true);
+      setCurrentDeepLinkUserId(null);
+
+      routeSystemSearchOpen(SESSION_ID);
+      routeSystemSearchOpen('kiloapp://pr-review/owner/repo/42');
+
+      expect(isSignOutActive()).toBe(true);
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+    });
+
+    it('does not persist a destination captured with no account identity', async () => {
+      // A fresh signed-out launch has no sign-out flag, so the destination is
+      // accepted for this process but must never be written durably: a record
+      // with no owner would survive the next account transition.
+      setCurrentDeepLinkUserId(null);
+
+      routeSystemSearchOpen(SESSION_ID);
+
+      expect(getPendingDeepLinkSnapshot()).toBe(SESSION_ID);
+      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+      await Promise.resolve();
       expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
     });
   });

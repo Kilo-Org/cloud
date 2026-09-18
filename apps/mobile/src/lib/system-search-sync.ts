@@ -17,7 +17,11 @@ import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { isSystemSearchAvailable } from '@/lib/native-system-search';
 import { type SystemSearchCollection } from '@/lib/system-search-collect';
-import { planSystemSearchUpdate, type SystemSearchDocument } from '@/lib/system-search-entries';
+import {
+  planSystemSearchUpdate,
+  type SystemSearchDocument,
+  systemSearchSourceKeyFromFingerprint,
+} from '@/lib/system-search-entries';
 
 /** How long a burst of cache writes coalesces before one sync runs. */
 const SYSTEM_SEARCH_SYNC_COALESCE_MS = 750;
@@ -69,6 +73,25 @@ function indexedDocuments(fingerprints: Record<string, string>): SystemSearchDoc
     route: '',
     fingerprint,
   }));
+}
+
+/**
+ * The source scope each indexed id was written under, recovered from the
+ * ledger fingerprint. It is what makes a removal organization-aware: an entry
+ * indexed from one organization's provider inbox is removed only by that same
+ * inbox, never by another organization's enumeration of the same PR route. An
+ * entry whose fingerprint predates source ownership is omitted, so the plan
+ * falls back to the id's route shape rather than inventing an owner.
+ */
+function indexedSources(fingerprints: Record<string, string>): Map<string, string> {
+  const sources = new Map<string, string>();
+  for (const [id, fingerprint] of Object.entries(fingerprints)) {
+    const source = systemSearchSourceKeyFromFingerprint(fingerprint);
+    if (source !== null) {
+      sources.set(id, source);
+    }
+  }
+  return sources;
 }
 
 export class SystemSearchIndexSync {
@@ -186,10 +209,12 @@ export class SystemSearchIndexSync {
         return 'skipped';
       }
       const documents = await this.deps.collect();
+      const fingerprints = await this.deps.fingerprints();
       const plan = planSystemSearchUpdate({
-        indexed: indexedDocuments(await this.deps.fingerprints()),
+        indexed: indexedDocuments(fingerprints),
         documents: documents.documents,
         observedSources: documents.observedSources,
+        indexedSources: indexedSources(fingerprints),
       });
       if (plan.add.length === 0 && plan.remove.length === 0) {
         return 'skipped';

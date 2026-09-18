@@ -36,6 +36,7 @@ import {
   captureLaunchDeepLink,
   clearAccountBoundPendingDeepLink,
   clearPendingDeepLink,
+  clearSystemSearchPendingDeepLink,
   getPendingDeepLink,
   getPendingDeepLinkSnapshot,
   restorePersistedPendingDeepLink,
@@ -135,15 +136,23 @@ describe('deep-link-launch', () => {
       expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
     });
 
-    it('round-trips through the persisted record', async () => {
+    it('round-trips through the persisted record for the same account', async () => {
+      // A system-search destination is session-bound, so the durable record
+      // carries the account that captured it.
+      setCurrentDeepLinkUserId('user-a');
       setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
       await vi.waitFor(() => {
         expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
       });
-      const record = JSON.parse(store.get(PENDING_DEEP_LINK_KEY) ?? '') as { source: string };
+      const record = JSON.parse(store.get(PENDING_DEEP_LINK_KEY) ?? '') as {
+        source: string;
+        userId: string | null;
+      };
       expect(record.source).toBe('system-search');
+      expect(record.userId).toBe('user-a');
 
       _resetDeepLinkLaunchForTests();
+      setCurrentDeepLinkUserId('user-a');
 
       await restorePersistedPendingDeepLink();
       expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
@@ -205,6 +214,33 @@ describe('deep-link-launch', () => {
       });
       // The delete landed after the persist: the key is gone.
       expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+    });
+
+    it('does not persist a system-search destination captured without an account', async () => {
+      setPendingDeepLink('/(app)/agent-chat/sess-1', 'system-search');
+
+      // The slot still works for this process...
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/sess-1');
+      await Promise.resolve();
+      // ...but a session-bound destination captured with no account identity is
+      // never written durably, so it cannot survive an account transition.
+      expect(secureStoreMock.setItemAsync).not.toHaveBeenCalled();
+      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+    });
+
+    it('persists a system-search destination captured for an account', async () => {
+      setCurrentDeepLinkUserId('user-a');
+      setPendingDeepLink('/(app)/agent-chat/sess-1', 'system-search');
+
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
+      });
+      const record = JSON.parse(store.get(PENDING_DEEP_LINK_KEY) ?? '') as {
+        userId: string | null;
+        source: string;
+      };
+      expect(record.userId).toBe('user-a');
+      expect(record.source).toBe('system-search');
     });
 
     it('reports a write failure to Sentry and keeps the in-memory slot', async () => {
@@ -292,6 +328,29 @@ describe('deep-link-launch', () => {
       await restorePersistedPendingDeepLink();
 
       expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
+    });
+
+    it('discards an account-independent system-search record, which is session-bound', async () => {
+      // A system-search record persisted without an owner would otherwise
+      // restore under the next account and open a previous account's result.
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: '/(app)/agent-chat/sess-1',
+          source: 'system-search',
+          storedAt: Date.now(),
+          userId: null,
+        })
+      );
+      _resetDeepLinkLaunchForTests();
+      setCurrentDeepLinkUserId('user-b');
+
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLink()).toBeNull();
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+      });
     });
 
     it('discards an expired record with no navigation', async () => {
@@ -584,6 +643,29 @@ describe('deep-link-launch', () => {
       await vi.waitFor(() => {
         expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
       });
+    });
+
+    it('drops a system-search destination even when it was captured signed out', () => {
+      // A search result is session-bound: it may not outlive the boundary just
+      // because it was captured before a user id was known.
+      setPendingDeepLink('/(app)/agent-chat/sess-1', 'system-search');
+
+      clearAccountBoundPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+  });
+
+  describe('clearSystemSearchPendingDeepLink', () => {
+    it('drops only a system-search destination', () => {
+      setCurrentDeepLinkUserId('user-a');
+      setPendingDeepLink('/(app)/agent-chat/sess-1', 'system-search');
+      clearSystemSearchPendingDeepLink();
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+
+      setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
+      clearSystemSearchPendingDeepLink();
+      expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
     });
   });
 

@@ -69,9 +69,11 @@ describe('providerPrSearchDocument', () => {
     );
   });
 
-  it('emits the same document as the recents builder for the same provider entry', () => {
+  it('emits the same id as the recents builder for the same provider entry', () => {
     // The collector dedupes by id: the provider inbox row and the stored
     // recent must land on one entry, or the index carries the same PR twice.
+    // They differ only in the source scope their fingerprint records, which is
+    // what keeps a removal to the list that actually enumerated the entry.
     const fromInbox = providerPrSearchDocument(
       { platform: 'gitlab', projectPath: 'group/repo', mrIid: 3, instanceHint: 'https://gitl.ab' },
       'Same MR'
@@ -85,6 +87,9 @@ describe('providerPrSearchDocument', () => {
       instanceHint: 'https://gitl.ab',
     });
 
-    expect(fromInbox).toEqual(fromRecents);
+    expect(fromInbox.id).toBe(fromRecents.id);
+    expect(fromInbox.route).toBe(fromRecents.route);
+    expect(fromInbox.description).toBe(fromRecents.description);
+    expect(fromInbox.fingerprint).not.toBe(fromRecents.fingerprint);
   });
 });

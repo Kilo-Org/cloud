@@ -7,12 +7,15 @@ import {
   findingSearchDocument,
   inboxPrSearchDocument,
   planSystemSearchUpdate,
+  providerPrSearchDocument,
+  providerReviewSourceKey,
   recentPrSearchDocument,
   storedSessionSearchDocument,
   systemSearchDeeplinkFromId,
   type SystemSearchDocument,
   systemSearchHrefFromId,
   systemSearchSourceKey,
+  systemSearchSourceKeyFromFingerprint,
   systemSearchSourceKeysOfId,
 } from './system-search-entries';
 
@@ -380,6 +383,56 @@ describe('planSystemSearchUpdate', () => {
 
     expect(idsOf(plan.add)).toEqual(['/(app)/agent-chat/a']);
     expect(plan.add[0]?.title).toBe('Alpha');
+  });
+});
+
+describe('systemSearchSourceKeyFromFingerprint', () => {
+  it('reads the source a document recorded', () => {
+    const document = inboxPrSearchDocument({ owner: 'o', repo: 'r', number: 1, title: 'PR' });
+    expect(systemSearchSourceKeyFromFingerprint(document.fingerprint)).toBe('pullRequests:github');
+  });
+
+  it('returns null for a fingerprint that predates source ownership', () => {
+    expect(
+      systemSearchSourceKeyFromFingerprint(JSON.stringify({ title: 'x', route: 'kiloapp://x' }))
+    ).toBeNull();
+    expect(systemSearchSourceKeyFromFingerprint('not json')).toBeNull();
+  });
+});
+
+describe('planSystemSearchUpdate with ledger source ownership', () => {
+  it('keeps a PR whose own organization was not enumerated, even when another was', () => {
+    const orgB = providerPrSearchDocument(
+      { platform: 'gitlab', projectPath: 'group/repo', mrIid: 3 },
+      'Org B MR',
+      providerReviewSourceKey('gitlab', 'org-b')
+    );
+    const plan = planSystemSearchUpdate({
+      indexed: [orgB],
+      documents: [],
+      // Org-a's authoritative inbox enumerated the same provider route, but it
+      // does not own the entry org-b indexed, so the PR stays.
+      observedSources: new Set([providerReviewSourceKey('gitlab', 'org-a')]),
+      indexedSources: new Map([[orgB.id, providerReviewSourceKey('gitlab', 'org-b')]]),
+    });
+
+    expect(plan.remove).toEqual([]);
+  });
+
+  it('removes a PR once its own organization scope is enumerated', () => {
+    const orgB = providerPrSearchDocument(
+      { platform: 'gitlab', projectPath: 'group/repo', mrIid: 3 },
+      'Org B MR',
+      providerReviewSourceKey('gitlab', 'org-b')
+    );
+    const plan = planSystemSearchUpdate({
+      indexed: [orgB],
+      documents: [],
+      observedSources: new Set([providerReviewSourceKey('gitlab', 'org-b')]),
+      indexedSources: new Map([[orgB.id, providerReviewSourceKey('gitlab', 'org-b')]]),
+    });
+
+    expect(plan.remove).toEqual([orgB.id]);
   });
 });
 

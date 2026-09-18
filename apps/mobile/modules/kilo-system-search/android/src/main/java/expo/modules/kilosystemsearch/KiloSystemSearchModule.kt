@@ -249,21 +249,22 @@ class KiloSystemSearchModule : Module() {
    * one route per entry it indexes, so a `kiloapp://` link the index does not
    * carry is an ordinary deep link — the app's own scheme is what its deep
    * links use — and must not open as a search tap. The qualified-id form is
-   * matched against the same stored entries.
+   * matched against the same stored entries. A read failure proves nothing, so
+   * it fails closed: the failure propagates (the JS consumer reports it) and no
+   * identifier is resolved from the app scheme alone.
    *
    * This is only ever called from an `AsyncFunction`, so the index read runs on
    * the module queue, never on the main thread that delivers the Intent or the
    * JavaScript thread that consumes the slot.
    */
   private fun resolveRoute(identifier: String): String? {
-    val stored = try {
-      backend.stored()
-    } catch (error: Exception) {
-      // An unreadable index must not lose a tap that already names its entry: a
-      // `kiloapp://` identifier is the link itself, and the JS side still
-      // refuses anything it did not issue.
-      return identifier.takeIf { it.startsWith(APP_SCHEME_PREFIX) }
-    }
+    // Fail closed on a failed index read. An unreadable index proves nothing
+    // about the identifier: `kiloapp://` is also the scheme the app's ordinary
+    // deep links use, and the JS allowlist only validates the route shape, so
+    // accepting the link here would let an external Intent open as a search
+    // tap. The read failure propagates — the JS consumer reports the rejected
+    // read — and the tap is dropped rather than resolved from the app scheme.
+    val stored = backend.stored()
     if (identifier.startsWith(APP_SCHEME_PREFIX)) {
       return identifier.takeIf { link -> stored.any { it.route == link } }
     }

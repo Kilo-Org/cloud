@@ -10,6 +10,7 @@
  * the launch capture runs at `_layout.tsx` module scope.
  */
 
+import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 
 import { setPendingDeepLink } from './deep-link-launch';
@@ -29,9 +30,14 @@ import { systemSearchHrefFromRoute } from './system-search-entries';
  * A null or unrecognised identifier returns silently: the result was not for a
  * screen this app issued (a stale index, a hand-made link), so it must never
  * navigate, and it must never throw.
+ *
+ * A system-search destination is session-bound: while a sign-out is in progress
+ * or the user is signed out, the result is refused outright. Otherwise a stale
+ * result tapped on the login screen could be persisted account-independently
+ * and open a previous account's identifier after the next sign-in.
  */
 export function routeSystemSearchOpen(routeId: string | null): void {
-  if (routeId === null) {
+  if (routeId === null || isSignOutActive()) {
     return;
   }
   const href = systemSearchHrefFromRoute(routeId);

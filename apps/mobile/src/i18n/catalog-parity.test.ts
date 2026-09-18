@@ -1,9 +1,12 @@
-// eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, reads the locale directory under Node, never bundled into the app
+/* eslint-disable import/no-nodejs-modules -- vitest-only guard, reads the locale directory under Node, never bundled into the app */
 import { readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
 import { CATALOG_LOADERS } from './catalogs';
+import { isSupportedLanguage } from './languages';
 import en from './locales/en.json';
 
 type Catalog = Record<string, unknown>;
@@ -41,20 +44,26 @@ const englishFamilies = new Set(
  * or removed. Read the directory so this test names exactly the files that
  * exist.
  */
-const LOCALE_TAGS = readdirSync(new URL('locales', import.meta.url))
+const LOCALE_DIR = join(dirname(fileURLToPath(import.meta.url)), 'locales');
+
+const LOCALE_TAGS = readdirSync(LOCALE_DIR)
   .filter(name => name.endsWith('.json'))
   .map(name => name.slice(0, -'.json'.length))
   .toSorted();
 
 const NON_ENGLISH_LOCALES = LOCALE_TAGS.filter(tag => tag !== 'en');
 
-/** Load one catalog through the loader the app itself parses. */
+/**
+ * Load one catalog through the loader the app itself parses. Narrow the
+ * directory-derived name first: a locale file for a tag the app does not
+ * support is a failure this test must report, not a name that indexes
+ * `CATALOG_LOADERS` to `undefined`.
+ */
 function loadCatalog(tag: string): Catalog {
-  const loader = CATALOG_LOADERS[tag as keyof typeof CATALOG_LOADERS];
-  if (typeof loader !== 'function') {
-    throw new TypeError(`no CATALOG_LOADERS entry for locale file "${tag}.json"`);
+  if (!isSupportedLanguage(tag)) {
+    throw new TypeError(`locale file "${tag}.json" is not a supported language`);
   }
-  return loader() as unknown as Catalog;
+  return CATALOG_LOADERS[tag]() as unknown as Catalog;
 }
 
 /**
@@ -63,6 +72,15 @@ function loadCatalog(tag: string): Catalog {
  * is gone. Plural categories the language needs are the only allowed extra.
  */
 describe('catalog parity', () => {
+  /**
+   * `it.each([])` would run nothing and pass, so pin the two facts that make
+   * every check below cover anything at all.
+   */
+  it('reads the catalogs from the locale files that exist', () => {
+    expect(LOCALE_TAGS.length).toBeGreaterThan(0);
+    expect(LOCALE_TAGS).toContain('en');
+  });
+
   it.each(NON_ENGLISH_LOCALES)('%s has no key that en.json does not define', tag => {
     const catalog = flatten(loadCatalog(tag));
     const extra = [...catalog.keys()].filter(key => {

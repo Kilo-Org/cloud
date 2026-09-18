@@ -21,12 +21,7 @@ const pageNamePattern = /^[A-Za-z0-9_-]+$/;
 
 const RESERVED_GATEWAY_TOOL_NAMES = new Set([
   'delete_workflow',
-  'eval',
-  'find_in_page',
-  'get_element_details',
   'get_memory',
-  'get_page_snapshot',
-  'get_viewport_screenshot',
   'get_workflow',
   'run_workflow',
   'save_memory',

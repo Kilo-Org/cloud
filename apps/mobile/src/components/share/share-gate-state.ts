@@ -55,7 +55,8 @@ export type ShareGateStateInput = {
   storedIsError: boolean;
   storedIsSuccess: boolean;
   activeIsError: boolean;
-  storedRowCount: number;
+  /** Destination rows the live-only list would render after the live filter. */
+  destinationCount: number;
   isLoading: boolean;
 };
 
@@ -78,7 +79,9 @@ export function isShareCommitEnabled(input: {
  *   1. stale-share (missing/unknown/consumed shareId) — before any validation
  *   2. non-retryable-classification (all files rejected, no usable text)
  *   3. loading (validation or destination queries in flight)
- *   4. retryable (storedIsError with zero stored rows — never activeIsError alone)
+ *   4. retryable (a destination query failed with zero derivable rows —
+ *      either the stored page failed, or the live lookup failed so no row
+ *      can be known live)
  *   5. empty (settled, not errored, zero destinations)
  *   6. happy
  */
@@ -117,9 +120,12 @@ export function selectShareGateState(input: ShareGateStateInput): ShareGateState
     };
   }
 
-  // Retryable only when the stored list failed with no rows. activeIsError
-  // alone is indistinguishable from "nothing live" (list swallows failures).
-  if (input.storedIsError && input.storedRowCount === 0) {
+  // Retryable when a query that decides destinations failed with nothing to
+  // show: the stored page failed, or the live lookup failed so liveness is
+  // unknown. The list is live-only, so an active failure with no cached ids
+  // yields zero rows — surface that as retryable, never as the misleading
+  // 'empty' (nothing exists) state.
+  if ((input.storedIsError || input.activeIsError) && input.destinationCount === 0) {
     return {
       kind: 'retryable',
       message: i18n.t('share.retryableMessage'),
@@ -129,7 +135,7 @@ export function selectShareGateState(input: ShareGateStateInput): ShareGateState
     };
   }
 
-  if (input.storedRowCount === 0) {
+  if (input.destinationCount === 0) {
     return {
       kind: 'empty',
       message: i18n.t('share.emptyMessage'),

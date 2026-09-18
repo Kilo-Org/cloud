@@ -26,6 +26,7 @@ import { type CreateSessionOutcome } from '@/lib/hooks/remote-instance-spawn-cla
 import type * as sharePayloadModule from '@/lib/share-payload';
 import { type ShareCliSpawnRow } from './share-cli-spawn';
 import { ShareGateSheet } from './share-gate-sheet';
+import { type ShareGateState } from './share-gate-state';
 
 const spawnMock = vi.hoisted(() =>
   vi.fn(
@@ -51,7 +52,21 @@ const shareDestinationListProps = vi.hoisted(() => ({
   current: null as {
     onSpawnInstance: (row: ShareCliSpawnRow) => void;
     instanceRowsDisabled: boolean;
+    state: ShareGateState;
+    onRetry: () => void;
   } | null,
+}));
+const agentSessionsMock = vi.hoisted(() => ({
+  current: {
+    storedSessions: [] as unknown[],
+    activeSessionIds: new Set<string>(),
+    activeSessions: [] as unknown[],
+    storedIsError: false,
+    storedIsSuccess: true,
+    activeIsError: false,
+    isLoading: false,
+    refetch: vi.fn(),
+  },
 }));
 const instanceRows = vi.hoisted((): ShareCliSpawnRow[] => [
   {
@@ -102,16 +117,7 @@ vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null, isLoaded: true }),
 }));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
-  useAgentSessions: () => ({
-    storedSessions: [],
-    activeSessionIds: new Set(),
-    activeSessions: [],
-    storedIsError: false,
-    storedIsSuccess: true,
-    activeIsError: false,
-    isLoading: false,
-    refetch: vi.fn(),
-  }),
+  useAgentSessions: () => agentSessionsMock.current,
 }));
 vi.mock('@/lib/hooks/use-remote-instance-spawn', () => ({
   useRemoteInstanceSpawn: () => ({ spawn: spawnMock }),
@@ -185,6 +191,8 @@ vi.mock('./share-destination-list', () => ({
     onSpawnInstance: (row: ShareCliSpawnRow) => void;
     instanceRowsDisabled: boolean;
     headerContent: ReactNode;
+    state: ShareGateState;
+    onRetry: () => void;
   }): ReactNode => {
     shareDestinationListProps.current = props;
     return props.headerContent;
@@ -248,6 +256,8 @@ async function mountGate(shareId: string): Promise<TestRenderer.ReactTestRendere
 function captureListProps(): {
   onSpawnInstance: (row: ShareCliSpawnRow) => void;
   instanceRowsDisabled: boolean;
+  state: ShareGateState;
+  onRetry: () => void;
 } {
   const props = shareDestinationListProps.current;
   if (!props) {
@@ -286,6 +296,14 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
     refetchInstancesMock.mockClear();
     alertMock.mockClear();
     shareDestinationListProps.current = null;
+    agentSessionsMock.current.storedSessions = [];
+    agentSessionsMock.current.activeSessionIds = new Set();
+    agentSessionsMock.current.activeSessions = [];
+    agentSessionsMock.current.storedIsError = false;
+    agentSessionsMock.current.storedIsSuccess = true;
+    agentSessionsMock.current.activeIsError = false;
+    agentSessionsMock.current.isLoading = false;
+    agentSessionsMock.current.refetch.mockClear();
     vi.mocked(peekSharePayload).mockClear();
     __resetSharePayloadStoreForTests();
     __resetPendingShareNavigationForTests();
@@ -420,6 +438,36 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
       .filter(node => node.props.className === 'text-sm text-muted-foreground')
       .map(node => node.children.filter(child => typeof child === 'string').join(''));
     expect(subtitles).toEqual(['group/sub/repo!7']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('surfaces a retryable state when the live lookup fails and drops every destination', async () => {
+    // The stored page has a row, but the live lookup failed, so no row can be
+    // known live and the live-only list derives zero destinations. The gate
+    // must show the retryable error (with retry), not the misleading empty
+    // "No sessions yet" state — and a retry must refetch both queries.
+    agentSessionsMock.current.storedSessions = [{ session_id: 'stored-1' }];
+    agentSessionsMock.current.activeIsError = true;
+    agentSessionsMock.current.storedIsSuccess = true;
+    agentSessionsMock.current.storedIsError = false;
+    agentSessionsMock.current.isLoading = false;
+
+    const shareId = putSharePayload({ text: 'hello', files: [], failedFiles: [] });
+    const renderer = await mountGate(shareId);
+    const list = captureListProps();
+    expect(list.state.kind).toBe('retryable');
+    if (list.state.kind === 'retryable') {
+      expect(list.state.showRetry).toBe(true);
+      expect(list.state.showNewSession).toBe(true);
+    }
+
+    act(() => {
+      list.onRetry();
+    });
+    expect(agentSessionsMock.current.refetch).toHaveBeenCalledTimes(1);
 
     act(() => {
       renderer.unmount();

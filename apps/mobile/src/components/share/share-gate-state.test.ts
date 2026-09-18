@@ -33,7 +33,7 @@ function base(overrides: Partial<ShareGateStateInput> = {}): ShareGateStateInput
     storedIsError: false,
     storedIsSuccess: true,
     activeIsError: false,
-    storedRowCount: 3,
+    destinationCount: 3,
     isLoading: false,
     ...overrides,
   };
@@ -117,7 +117,7 @@ describe('selectShareGateState', () => {
 
   it('loading while destination queries are in flight', () => {
     const state = selectShareGateState(
-      base({ isLoading: true, storedIsSuccess: false, storedRowCount: 0 })
+      base({ isLoading: true, storedIsSuccess: false, destinationCount: 0 })
     );
     expect(state.kind).toBe('loading');
     expect(state.showNewSession).toBe(true);
@@ -128,7 +128,7 @@ describe('selectShareGateState', () => {
       base({
         storedIsError: true,
         storedIsSuccess: false,
-        storedRowCount: 0,
+        destinationCount: 0,
         isLoading: false,
       })
     );
@@ -141,36 +141,40 @@ describe('selectShareGateState', () => {
     }
   });
 
-  it('activeIsError alone is NOT retryable', () => {
+  it('stays happy when activeIsError still has cached live destinations', () => {
     const state = selectShareGateState(
       base({
         activeIsError: true,
         storedIsError: false,
         storedIsSuccess: true,
-        storedRowCount: 2,
+        destinationCount: 2,
       })
     );
     expect(state.kind).toBe('happy');
     expect(state.showRetry).toBe(false);
   });
 
-  it('activeIsError with empty stored success is empty, not retryable', () => {
+  it('retryable when the live lookup failed and no destination row can be derived', () => {
     const state = selectShareGateState(
       base({
         activeIsError: true,
         storedIsError: false,
         storedIsSuccess: true,
-        storedRowCount: 0,
+        destinationCount: 0,
       })
     );
-    expect(state.kind).toBe('empty');
-    expect(state.showRetry).toBe(false);
-    expect(state.showNewSession).toBe(true);
+    expect(state.kind).toBe('retryable');
+    if (state.kind === 'retryable') {
+      expect(state.message).toBe("Couldn't load your sessions.");
+      expect(state.showRetry).toBe(true);
+      expect(state.showNewSession).toBe(true);
+      expect(state.showList).toBe(false);
+    }
   });
 
   it('empty when settled with zero destinations', () => {
     const state = selectShareGateState(
-      base({ storedRowCount: 0, storedIsSuccess: true, storedIsError: false })
+      base({ destinationCount: 0, storedIsSuccess: true, storedIsError: false })
     );
     expect(state.kind).toBe('empty');
     if (state.kind === 'empty') {
@@ -182,7 +186,7 @@ describe('selectShareGateState', () => {
   });
 
   it('happy when payload valid and queries settled with rows', () => {
-    const state = selectShareGateState(base({ storedRowCount: 5 }));
+    const state = selectShareGateState(base({ destinationCount: 5 }));
     expect(state.kind).toBe('happy');
     if (state.kind === 'happy') {
       expect(state.showNewSession).toBe(true);

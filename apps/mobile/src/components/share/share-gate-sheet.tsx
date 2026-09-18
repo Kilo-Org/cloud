@@ -62,8 +62,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const trpc = useTRPC();
   const { t } = useTranslation();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
-  // Org-scoped stored page only (cloud-agent + cli). Active list is an
-  // id/capability lookup — never a row source.
+  // Org-scoped stored page (cloud-agent + cli), narrowed to live sessions:
+  // `selectShareDestinations` keeps only rows in the active-session id set,
+  // and the active list also supplies per-session capabilities.
   const sessions = useAgentSessions({
     createdOnPlatform: expandPlatformFilter(['cloud-agent', 'cli']),
     organizationId,
@@ -159,7 +160,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         storedIsError: sessions.storedIsError,
         storedIsSuccess: sessions.storedIsSuccess,
         activeIsError: sessions.activeIsError,
-        storedRowCount: destinations.length,
+        destinationCount: destinations.length,
         isLoading: sessions.isLoading || !orgLoaded,
       }),
     [

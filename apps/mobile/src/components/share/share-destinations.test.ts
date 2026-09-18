@@ -27,30 +27,34 @@ function session(id: string, over: Partial<StoredSession> = {}): StoredSession {
 }
 
 describe('selectShareDestinations', () => {
-  it('hoists live rows to the top while preserving relative order', () => {
+  it('lists only live sessions and drops stored sessions that are not live', () => {
     const stored = [session('a'), session('b'), session('c'), session('d')];
     const active = new Set(['c', 'a']);
     const rows = selectShareDestinations(stored, active);
-    expect(rows.map(r => r.session_id)).toEqual(['a', 'c', 'b', 'd']);
-    expect(rows.filter(r => r.live).map(r => r.session_id)).toEqual(['a', 'c']);
+    expect(rows.map(r => r.session_id)).toEqual(['a', 'c']);
+    expect(rows.every(r => r.live)).toBe(true);
   });
 
-  it('marks live by id membership only', () => {
+  it('lists nothing when no stored session is live', () => {
+    const stored = [session('a'), session('b')];
+    expect(selectShareDestinations(stored, new Set())).toEqual([]);
+  });
+
+  it('marks every listed row live by id membership only', () => {
     const stored = [session('a'), session('b')];
     const rows = selectShareDestinations(stored, new Set(['b']));
-    expect(rows.find(r => r.session_id === 'a')?.live).toBe(false);
-    expect(rows.find(r => r.session_id === 'b')?.live).toBe(true);
+    expect(rows.map(r => r.session_id)).toEqual(['b']);
+    expect(rows[0]?.live).toBe(true);
   });
 
-  it('caps at 30 after ordering', () => {
+  it('caps the live list at the destination cap', () => {
     const stored = Array.from({ length: 40 }, (_, i) => session(`s${i}`));
-    const active = new Set(['s35', 's36']);
+    const active = new Set(Array.from({ length: 40 }, (_, i) => `s${i}`));
     const rows = selectShareDestinations(stored, active);
     expect(rows).toHaveLength(SHARE_DESTINATION_CAP);
-    // Live rows that appear in the stored page are hoisted first.
-    expect(rows[0]?.session_id).toBe('s35');
-    expect(rows[1]?.session_id).toBe('s36');
-    expect(rows.every(r => r.session_id.startsWith('s'))).toBe(true);
+    expect(rows.map(r => r.session_id)).toEqual(
+      stored.slice(0, SHARE_DESTINATION_CAP).map(s => s.session_id)
+    );
   });
 
   it('never invents a row for an active id absent from the stored page', () => {
@@ -66,7 +70,7 @@ describe('selectShareDestinations', () => {
 
   it('preserves organization_id on each row for navigation', () => {
     const stored = [session('a', { organization_id: 'org_1' })];
-    const rows = selectShareDestinations(stored, new Set());
+    const rows = selectShareDestinations(stored, new Set(['a']));
     expect(rows[0]?.organization_id).toBe('org_1');
   });
 });

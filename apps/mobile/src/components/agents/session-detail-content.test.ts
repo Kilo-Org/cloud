@@ -386,8 +386,12 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
+// Captured so the goal tests can open the action sheet and pick a control.
+const showActionSheetWithOptions = vi.hoisted(() =>
+  vi.fn<(options: Record<string, unknown>, callback: (index?: number) => void) => void>()
+);
 vi.mock('@expo/react-native-action-sheet', () => ({
-  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+  useActionSheet: () => ({ showActionSheetWithOptions }),
 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 const globalContext = vi.hoisted(() => ({
@@ -522,6 +526,7 @@ function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   openRenameModal.mockClear();
+  showActionSheetWithOptions.mockClear();
   hideThinking.current = false;
   hideThinking.loaded = true;
   goalMountOptions = {};
@@ -944,6 +949,30 @@ describe('session detail cached metadata refresh', () => {
     expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
     const indicator = view.renderer.root.findAllByType(SessionConnectionIndicator)[0];
     expect(indicator?.props.sessionRefresh).toMatchObject({ isLoading: false });
+  });
+});
+
+describe('session detail cached transcript refresh', () => {
+  function refreshFlag(renderer: ReactTestRenderer): unknown {
+    return renderer.root.findAllByType(SessionConnectionIndicator)[0]?.props.isRefreshingTranscript;
+  }
+
+  it('shows a loading indicator while the cached transcript is refreshed', async () => {
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    // The live page never resolves: the cached rows stay on screen, so the
+    // refresh indicator has to stay with them.
+    const view = await mountDetails(null, { cachedRows });
+
+    expect(renderedText(view.renderer.root)).toContain('cached root row');
+    expect(refreshFlag(view.renderer)).toBe(true);
+  });
+
+  it('clears the loading indicator once the live transcript lands', async () => {
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails([childMessage(ROOT_ID, 'live root row')], { cachedRows });
+
+    expect(renderedText(view.renderer.root)).toContain('live root row');
+    expect(refreshFlag(view.renderer)).toBe(false);
   });
 });
 
@@ -1822,6 +1851,81 @@ describe('hide thinking preference', () => {
   );
 });
 
+describe('session detail composer after a failed turn', () => {
+  /**
+   * The Pylon 28248 record: a session open/turn failure lands as the SDK's
+   * generic transient status ("Something went wrong. Please retry in a
+   * moment."), the transcript is empty and the manager cannot send. The user
+   * must still be able to type the next message, with Retry kept beside it.
+   */
+  it('keeps the composer editable while the terminal error keeps its Retry', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.isLoading, false);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          timestamp: 0,
+        }
+      );
+    });
+
+    // Retry stays available in the error card.
+    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(error.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
+    expect(error.onRetry).toBeDefined();
+
+    // The composer stays mounted and editable; only sending waits on the
+    // session being able to accept a message again.
+    const node = view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer'));
+    expect(node.props.disabled).toBe(false);
+    expect(node.props.sendDisabled).toBe(true);
+  });
+
+  it('keeps the composer sendable after a non-retryable turn failure', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, 'cloud-agent');
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isReadOnly, false);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+
+    // The non-retryable class keeps no Retry: the reader continues in the
+    // session instead, so the composer must stay fully usable.
+    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(error.onRetry).toBeUndefined();
+    const node = view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer'));
+    expect(node.props.disabled).toBe(false);
+    expect(node.props.sendDisabled).toBe(false);
+  });
+});
+
 describe('SessionDetailContent goal visibility', () => {
   const pausedGoal: SessionGoal = { text: 'Ship p7 objective', status: 'paused' };
 
@@ -1872,5 +1976,46 @@ describe('SessionDetailContent last-opened record', () => {
     await view.switchRoot(ROOT_ID);
     expect(record).toHaveBeenCalledOnce();
     expect(capture).not.toHaveBeenCalled();
+  });
+});
+
+describe('SessionDetailContent goal edit dialog', () => {
+  // The reported goal shape: one very long unbroken word plus a long sentence.
+  const longGoal: SessionGoal = {
+    text:
+      'the_number_of_consecutive_days_the_workflow_has_not_failed_for_the_first_time_due_to' +
+      '_workflow_issues_is_0_for_3_consecutive_days and the scheduled cleanup job keeps reporting',
+    status: 'active',
+  };
+
+  it('opens the goal text in a wrapping field', async () => {
+    goalMountOptions = { goal: longGoal, resolvedType: 'remote' };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const section = view.renderer.root.findAllByType(SessionGoalSection)[0];
+    if (!section) {
+      throw new Error('goal section did not render');
+    }
+    const { onPress } = section.props as { onPress: () => void };
+    act(onPress);
+
+    // Pick "Edit goal" out of the goal action sheet.
+    const sheetCall = showActionSheetWithOptions.mock.calls.at(-1);
+    expect(sheetCall).toBeDefined();
+    const sheet = sheetCall?.[0] as { options: string[] } | undefined;
+    const onSelect = sheetCall?.[1];
+    const editIndex = sheet?.options.indexOf(i18n.t('agentChat.goal.edit')) ?? -1;
+    expect(editIndex).toBeGreaterThanOrEqual(0);
+    act(() => {
+      onSelect?.(editIndex);
+    });
+
+    // The dialog must hand the goal text to the modal's wrapping field, not a
+    // single-line one that clips its start.
+    const modal = view.renderer.root.findAllByType('RenameModal')[0];
+    expect(modal?.props).toMatchObject({
+      multiline: true,
+      maxLength: 500,
+      initialValue: longGoal.text,
+    });
   });
 });

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LaunchFolderField } from '@/components/agents/folder-selector';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
-import { renderProfileRow } from '@/components/agents/new-session-profile-row';
+import { NewSessionProfileRow } from '@/components/agents/new-session-profile-row';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
@@ -101,7 +101,11 @@ type NewSessionConfigureFormProps = {
   profile: EffectiveAgentProfile | null;
   isProfileLoading: boolean;
   isProfileError: boolean;
+  /** The picked override no longer resolves to a profile. */
+  profileOverrideNeedsAttention: boolean;
   onRetryProfile: () => void;
+  /** Opens the profile picker sheet. */
+  onOpenProfilePicker: () => void;
   // Commit choice (Cloud Agent only).
   autoCommit: boolean;
   onAutoCommitChange: (next: boolean) => void;
@@ -172,7 +176,9 @@ export function NewSessionConfigureForm({
   profile,
   isProfileLoading,
   isProfileError,
+  profileOverrideNeedsAttention,
   onRetryProfile,
+  onOpenProfilePicker,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
@@ -310,9 +316,16 @@ export function NewSessionConfigureForm({
         </View>
       ) : null}
 
-      {!isRemote && !isCloneEntry
-        ? renderProfileRow({ t, profile, isProfileLoading, isProfileError, onRetryProfile })
-        : null}
+      {!isRemote && !isCloneEntry ? (
+        <NewSessionProfileRow
+          profile={profile}
+          isProfileLoading={isProfileLoading}
+          isProfileError={isProfileError}
+          overrideNeedsAttention={profileOverrideNeedsAttention}
+          onRetryProfile={onRetryProfile}
+          onOpenProfilePicker={onOpenProfilePicker}
+        />
+      ) : null}
 
       {
         // Persistent failure feedback for the cloud create, in the same

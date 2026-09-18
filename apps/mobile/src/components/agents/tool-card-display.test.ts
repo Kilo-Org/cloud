@@ -1,5 +1,7 @@
 /* eslint-disable max-lines -- one cohesive pure-projection suite for getToolDisplay and toolPartHasDetails */
 import { type FilePart, type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { buildToolDetail } from '@kilocode/app-shared/tool-detail';
+import type * as toolDetailModule from '@kilocode/app-shared/tool-detail';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -39,6 +41,14 @@ vi.mock('@/components/ui/icons', () => ({
   Sparkles: 'Sparkles',
   Terminal: 'Terminal',
 }));
+
+// The generic row must project only the name/summary header; building the full
+// detail parses and pretty-prints the completed output on every row render, so
+// a call to `buildToolDetail` here is the regression this suite guards.
+vi.mock('@kilocode/app-shared/tool-detail', async importOriginal => {
+  const actual = await importOriginal<typeof toolDetailModule>();
+  return { ...actual, buildToolDetail: vi.fn() };
+});
 
 function makeToolPart(tool: string, state: ToolPart['state']): ToolPart {
   return {
@@ -321,6 +331,16 @@ describe('getToolDisplay mapping', () => {
     });
   });
 
+  it('labels a generic row without building the full tool detail', () => {
+    vi.mocked(buildToolDetail).mockClear();
+    expect(
+      getDisplay(
+        makeToolPart('unknown-tool', completed({ description: 'Find records' }, '{"a":1}'))
+      )
+    ).toEqual({ title: 'unknown-tool', subtitle: 'Find records' });
+    expect(vi.mocked(buildToolDetail)).not.toHaveBeenCalled();
+  });
+
   it('summarizes a question row from its first question text', () => {
     expect(
       getDisplay(
@@ -572,6 +592,25 @@ describe('getToolDisplay translatable provenance', () => {
           time: { start: 0, end: 1 },
         },
       }).translatable
+    ).toBe(true);
+  });
+
+  it('translates a generic summary projected from tool content', () => {
+    // A question's text and a description are tool content, not already-localized
+    // UI copy, so a row that shows the summary must send it to the gateway.
+    expect(
+      getToolDisplay(
+        makeToolPart(
+          'question',
+          completed({
+            questions: [{ header: 'E2E', question: 'Which fields should the sheet show?' }],
+          })
+        )
+      ).translatable
+    ).toBe(true);
+    expect(
+      getToolDisplay(makeToolPart('unknown-tool', completed({ description: 'Find records' })))
+        .translatable
     ).toBe(true);
   });
 });

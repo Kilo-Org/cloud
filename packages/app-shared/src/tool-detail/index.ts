@@ -115,7 +115,7 @@ function buildQuestionFields(input: Record<string, unknown>): ToolDetailField[] 
     // grouped; a single question keeps the plain, unnumbered keys.
     const numbered = questions.length > 1;
     for (let index = 0; index < questions.length; index += 1) {
-      const entry = questions[index];
+      const entry: unknown = questions[index];
       if (!isRecord(entry)) continue;
       const ordinal = numbered ? ` ${index + 1}` : '';
       if (typeof entry.header === 'string' && entry.header.trim().length > 0) {
@@ -204,6 +204,26 @@ export function formatToolDetailOutput(text: string): { text: string; isJson: bo
   }
 }
 
+/**
+ * Name and summary only — the transcript row's label. The full
+ * `buildToolDetail` also projects every field and pretty-prints the completed
+ * output, both of which are proportional to the output size; the row would pay
+ * that cost on every render just to read these two strings.
+ */
+export function buildToolDetailHeader(part: Pick<ToolPart, 'tool' | 'state'>): {
+  name: string;
+  summary?: string;
+} {
+  const { tool, state } = part;
+  const input = state.input;
+  const args = resolveArguments(tool, input);
+  const summary = tool === 'question' ? questionSummary(input) : getArgumentSummary(args);
+  return {
+    name: resolveName(tool, input),
+    summary: summary === undefined ? undefined : collapseWhitespace(summary),
+  };
+}
+
 export function buildToolDetail(
   part: Pick<ToolPart, 'tool' | 'state'>,
   options?: { valueMaxLength?: number }
@@ -212,8 +232,8 @@ export function buildToolDetail(
   const input = state.input;
   const args = resolveArguments(tool, input);
   const maxLength = options?.valueMaxLength ?? DEFAULT_VALUE_MAX_LENGTH;
+  const { name, summary } = buildToolDetailHeader(part);
 
-  const summary = tool === 'question' ? questionSummary(input) : getArgumentSummary(args);
   const projectedFields =
     tool === 'question'
       ? buildQuestionFields(input).map(field => ({
@@ -231,11 +251,11 @@ export function buildToolDetail(
 
   const detail: ToolDetail = {
     status: state.status,
-    name: resolveName(tool, input),
+    name,
     arguments: args,
     fields,
   };
-  if (summary !== undefined) detail.summary = collapseWhitespace(summary);
+  if (summary !== undefined) detail.summary = summary;
   if (state.status === 'completed' && state.output.trim().length > 0) {
     detail.output = formatToolDetailOutput(state.output);
   }

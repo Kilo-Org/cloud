@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { buildToolDetail, formatToolDetailOutput } from './index';
+import { buildToolDetail, buildToolDetailHeader, formatToolDetailOutput } from './index';
 import type { ToolPart } from '../opencode.gen';
 
 type ToolState = ToolPart['state'];
@@ -27,6 +27,47 @@ function errored(input: Record<string, unknown>, error: string): ToolState {
 function detail(tool: string, state: ToolState, options?: { valueMaxLength?: number }) {
   return buildToolDetail({ tool, state }, options);
 }
+
+describe('buildToolDetailHeader', () => {
+  it('resolves the same name and summary as buildToolDetail', () => {
+    const state = completed(
+      { server_name: 'app-builder-images', tool_name: 'transfer_image', arguments: { url: 'x' } },
+      '{"a":1}'
+    );
+
+    expect(buildToolDetailHeader({ tool: 'mcp', state })).toEqual({
+      name: buildToolDetail({ tool: 'mcp', state }).name,
+      summary: buildToolDetail({ tool: 'mcp', state }).summary,
+    });
+  });
+
+  it('does not parse or pretty-print the completed output', () => {
+    const parse = vi.spyOn(JSON, 'parse');
+    try {
+      const header = buildToolDetailHeader({
+        tool: 'mcp',
+        state: completed(
+          { server_name: 'filesystem', tool_name: 'read_file', arguments: { query: 'hi' } },
+          JSON.stringify({ payload: 'x'.repeat(25000) })
+        ),
+      });
+
+      expect(header).toEqual({ name: 'filesystem/read_file', summary: 'hi' });
+      expect(parse).not.toHaveBeenCalled();
+    } finally {
+      parse.mockRestore();
+    }
+  });
+
+  it('projects a question row from its first question text', () => {
+    expect(
+      buildToolDetailHeader({
+        tool: 'question',
+        state: pending({ questions: [{ question: 'Which fields should the sheet show?' }] }),
+      })
+    ).toEqual({ name: 'question', summary: 'Which fields should the sheet show?' });
+  });
+});
 
 describe('buildToolDetail name resolution', () => {
   it('unwraps the mcp envelope and resolves a known server/tool name', () => {

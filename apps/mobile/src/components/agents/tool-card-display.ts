@@ -1,5 +1,5 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
-import { buildToolDetail } from '@kilocode/app-shared/tool-detail';
+import { buildToolDetailHeader } from '@kilocode/app-shared/tool-detail';
 import { z } from 'zod';
 
 import { i18n } from '@/i18n';
@@ -255,16 +255,17 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
     default: {
       const stateTitle =
         status === 'running' || status === 'completed' ? part.state.title : undefined;
-      const detail = buildToolDetail(part);
+      const detail = buildToolDetailHeader(part);
+      // A projected summary is tool content (a question or description), so the
+      // row must translate it. The name fallback is a raw tool id or an
+      // `server/tool` pair, which stays untranslated.
+      const summary = detail.name === part.tool ? detail.summary : undefined;
       return {
         title: part.tool,
         subtitle:
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- a whitespace-only state title must fall through to the projected name; ?? would keep it
-          stateTitle?.trim() ||
-          (detail.name === part.tool && detail.summary
-            ? truncateText(detail.summary, 60)
-            : detail.name),
-        translatable: Boolean(stateTitle?.trim()),
+          stateTitle?.trim() || (summary ? truncateText(summary, 60) : detail.name),
+        translatable: Boolean(stateTitle?.trim()) || Boolean(summary),
       };
     }
   }

@@ -493,9 +493,10 @@ describe('runSpendAlertSweep re-arm walk', () => {
     };
     // The same scope arrives once through the rollup delta and again through the
     // firing read; it must be decided once, not twice.
-    const { database } = pagedFiringDatabase((_size, call) =>
-      call === 0 ? ['user:owner-1'] : []
-    , ['user:owner-1']);
+    const { database } = pagedFiringDatabase(
+      (_size, call) => (call === 0 ? ['user:owner-1'] : []),
+      ['user:owner-1']
+    );
 
     const result = await runSpendAlertSweep(database, { store }, { now: NOW });
 

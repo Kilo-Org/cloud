@@ -90,7 +90,9 @@ function databaseFailingOn(fragment: string): typeof db {
         };
       }
       const value = Reflect.get(target, prop, receiver);
-      return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+      return typeof value === 'function'
+        ? (value as (...a: unknown[]) => unknown).bind(target)
+        : value;
     },
   }) as typeof db;
 }
@@ -216,7 +218,11 @@ describe('drainPendingSpendAlertDeliveries', () => {
   it('does not retry a permanently rejected recipient', async () => {
     const id = await insertDelivery({ channel: 'email' });
     const { deps } = recordingDeps({
-      sendEmail: async () => ({ delivered: [], retryable: [], undeliverable: ['owner@example.com'] }),
+      sendEmail: async () => ({
+        delivered: [],
+        retryable: [],
+        undeliverable: ['owner@example.com'],
+      }),
     });
 
     const summary = await drainPendingSpendAlertDeliveries(db, deps, { limit: 10 });

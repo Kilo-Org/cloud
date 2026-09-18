@@ -48,7 +48,7 @@ vi.mock('@/lib/session-attention', () => ({
 
 const expectedPayload = {
   newAgentUrl: 'kiloapp:///cloud/sessions/new',
-  newAgentLabel: 'launcher.newAgent',
+  newAgentLabel: 'glanceable.newAgent',
   needsInputUrl: 'kiloapp:///cloud/sessions/ses_wait',
   needsInputLabel: 'glanceable.needsInput',
   openLastSessionUrl: null,

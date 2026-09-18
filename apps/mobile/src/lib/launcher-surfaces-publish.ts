@@ -12,9 +12,9 @@ import { type LauncherSurfacesPayload } from '@/lib/native-launcher-surfaces';
 /**
  * The payload for one target set. `needsInputLabel` is always present, even
  * when `needsInputUrl` is null: it is the label of the tile's next state, not
- * a label for a shortcut that exists. "Needs input" reuses
- * `glanceable.needsInput` because a second key holding that exact copy fails
- * the catalog duplicate check.
+ * a label for a shortcut that exists. "Needs input" and "New agent" reuse the
+ * `glanceable` keys the widget surfaces already use: the copy is identical, and
+ * a second key holding that exact copy fails the catalog duplicate check.
  */
 export function buildLauncherSurfacesPayload(
   targets: LauncherSurfaceTargets,
@@ -22,7 +22,7 @@ export function buildLauncherSurfacesPayload(
 ): LauncherSurfacesPayload {
   return {
     newAgentUrl: targets.newAgentUrl,
-    newAgentLabel: translate('launcher.newAgent'),
+    newAgentLabel: translate('glanceable.newAgent'),
     needsInputUrl: targets.needsInputUrl,
     needsInputLabel: translate('glanceable.needsInput'),
     openLastSessionUrl: targets.openLastSessionUrl,

@@ -177,6 +177,21 @@ vi.mock('react-native-reanimated', () => ({
   FadeIn: { duration: () => ({}) },
   FadeOut: { duration: () => ({}) },
   LinearTransition: { duration: () => ({}) },
+  // The goal row's chevron rotation; the disclosure animation itself is
+  // covered by session-goal-section.mounted.test.tsx.
+  useSharedValue: (value: unknown) => ({ value }),
+  useAnimatedStyle: () => ({}),
+  withTiming: (value: number) => value,
+}));
+// `session-detail-content` renders the goal row, which pulls the shared
+// disclosure primitive (`security-agent/collapsible-section`) and then the
+// motion policy; the policy reaches `expo-battery`, whose `expo-modules-core`
+// entry needs React Native's `__DEV__` global the pure node project does not
+// define. The same mock stands in for the sibling `session-detail-content`
+// pure harness.
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+  selectReducedMotionEntrance: <T>(_reducedMotion: boolean, entrance: T) => entrance,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
@@ -415,8 +430,12 @@ vi.mock('@/components/agents/permission-card', () => ({
 vi.mock('@/components/agents/question-card', () => ({
   QuestionCard: 'QuestionCard',
 }));
-vi.mock('@/components/agents/session-connection-indicator', () => ({
-  SessionConnectionIndicator: 'SessionConnectionIndicator',
+vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
+  useUserWebConnectionState: () => true,
+  useUserWebConnectionHealth: () => ({ isConnected: true, reconnectExhausted: false }),
+}));
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  useUserWebConnection: () => ({ retryConnection: vi.fn() }),
 }));
 vi.mock('@/components/agents/session-context-metrics', () => ({
   SessionContextMetrics: 'SessionContextMetrics',
@@ -497,6 +516,7 @@ function makeManager() {
     atoms: {
       messagesList: { value: [] as StoredMessage[] },
       isLoading: { value: false },
+      isRefreshingCachedTranscript: { value: false },
       error: { value: null },
       fetchedSessionData: {
         value: {

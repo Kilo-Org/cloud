@@ -28,6 +28,83 @@ type CollapsibleSectionProps = {
   children: ReactNode;
 };
 
+/**
+ * The rotating disclosure carat, shared so the app animates a carat in one
+ * place. `targetAngle` is the angle the carat settles at (180 is up, 0 is
+ * down); each caller owns its own direction. Reanimated ships the same
+ * implementation on iOS and Android, so this animates both platforms with one
+ * implementation and is not a platform fork. Reduced motion jumps straight to
+ * the angle instead of a 200ms timing.
+ */
+function useDisclosureRotation(targetAngle: 0 | 180) {
+  const { reducedMotion } = useMotionPolicy();
+  const rotation = useSharedValue(targetAngle);
+
+  useEffect(() => {
+    rotation.value = reducedMotion ? targetAngle : withTiming(targetAngle, { duration: 200 });
+  }, [targetAngle, reducedMotion, rotation]);
+
+  return useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
+}
+
+/**
+ * Height transition for a block that grows or shrinks — the same Reanimated
+ * layout transition on iOS and Android, so one implementation covers both and
+ * the change animates instead of snapping. Reduced motion drops the transition.
+ */
+export function DisclosureLayout({
+  className,
+  children,
+}: Readonly<{ className?: string; children: ReactNode }>) {
+  const { reducedMotion } = useMotionPolicy();
+
+  return (
+    <Animated.View
+      layout={reducedMotion ? undefined : LinearTransition.duration(200)}
+      className={className}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/**
+ * The disclosure carat as its own pressable, for a row that already owns an
+ * action: the two stay siblings, because a nested pressable disappears from
+ * assistive technology inside an accessible parent. It points down when
+ * expanded and up when collapsed, the goal row's affordance; `label` names the
+ * action the carat performs and `expanded` is what the carat points at.
+ */
+export function DisclosureChevron({
+  expanded,
+  label,
+  onPress,
+}: Readonly<{
+  expanded: boolean;
+  label: string;
+  onPress: () => void;
+}>) {
+  const colors = useThemeColors();
+  const chevronStyle = useDisclosureRotation(expanded ? 0 : 180);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={12}
+      className="h-6 w-6 shrink-0 items-center justify-center active:opacity-70"
+      accessibilityRole="button"
+      accessibilityState={{ expanded }}
+      accessibilityLabel={label}
+    >
+      <Animated.View style={chevronStyle}>
+        <ChevronDown size={16} color={colors.mutedForeground} />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 // Shared collapsible section for finding-details/-analysis/-remediation
 // panels (source record, technical report, attempt history) — the
 // transcript tool cards dropped this chevron-rotation pattern when they
@@ -49,24 +126,11 @@ export function CollapsibleSection({
   const resolvedExpanded = expanded ?? internalExpanded;
   const colors = useThemeColors();
   const { reducedMotion } = useMotionPolicy();
-  const rotation = useSharedValue((expanded ?? defaultExpanded) ? 180 : 0);
-
-  useEffect(() => {
-    // Reduced motion jumps the chevron straight to its target angle instead of
-    // a 200ms timing; the layout transition and content fade are dropped below.
-    const target = resolvedExpanded ? 180 : 0;
-    rotation.value = reducedMotion ? target : withTiming(target, { duration: 200 });
-  }, [resolvedExpanded, reducedMotion, rotation]);
-
-  const chevronStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
+  // This section's carat points up while it is expanded ("collapse me").
+  const chevronStyle = useDisclosureRotation(resolvedExpanded ? 180 : 0);
 
   return (
-    <Animated.View
-      layout={reducedMotion ? undefined : LinearTransition.duration(200)}
-      className={cn('gap-2 rounded-lg bg-secondary p-3', className)}
-    >
+    <DisclosureLayout className={cn('gap-2 rounded-lg bg-secondary p-3', className)}>
       <Pressable
         className="flex-row items-center justify-between gap-2"
         hitSlop={12}
@@ -93,6 +157,6 @@ export function CollapsibleSection({
           {children}
         </Animated.View>
       )}
-    </Animated.View>
+    </DisclosureLayout>
   );
 }

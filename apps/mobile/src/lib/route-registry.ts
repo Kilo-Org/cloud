@@ -17,6 +17,7 @@ import {
   type ModelPickerBridge,
   type ModePickerBridge,
   type RepoPickerBridge,
+  type SandboxPickerBridge,
 } from './picker-bridge';
 import { type SecurityFindingFilterBridge } from './security-finding-filter-bridge';
 
@@ -51,6 +52,7 @@ type SlotValue = {
   branchPicker: BranchPickerBridge;
   instancePicker: InstancePickerBridge;
   folderPicker: FolderPickerBridge;
+  sandboxPicker: SandboxPickerBridge;
   prFileNav: Set<FileNavigatorListener>;
   prDiffSelection: DiffSelection;
   securityFilter: SecurityFindingFilterBridge;
@@ -67,6 +69,7 @@ const slots: RegistrySlots = {
   branchPicker: new Map<RouteKey, BranchPickerBridge>(),
   instancePicker: new Map<RouteKey, InstancePickerBridge>(),
   folderPicker: new Map<RouteKey, FolderPickerBridge>(),
+  sandboxPicker: new Map<RouteKey, SandboxPickerBridge>(),
   prFileNav: new Map<RouteKey, Set<FileNavigatorListener>>(),
   prDiffSelection: new Map<RouteKey, DiffSelection>(),
   securityFilter: new Map<RouteKey, SecurityFindingFilterBridge>(),
@@ -79,6 +82,7 @@ const ALL_SLOT_KINDS: readonly SlotKind[] = [
   'branchPicker',
   'instancePicker',
   'folderPicker',
+  'sandboxPicker',
   'prFileNav',
   'prDiffSelection',
   'securityFilter',
@@ -113,6 +117,7 @@ export const repoPickerSlot = createSlot('repoPicker');
 export const branchPickerSlot = createSlot('branchPicker');
 export const instancePickerSlot = createSlot('instancePicker');
 export const folderPickerSlot = createSlot('folderPicker');
+export const sandboxPickerSlot = createSlot('sandboxPicker');
 export const prFileNavSlot = createSlot('prFileNav');
 export const prDiffSelectionSlot = createSlot('prDiffSelection');
 export const securityFilterSlot = createSlot('securityFilter');

@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 
 import {
+  buildToolRunCountLabel,
   buildToolRunLabel,
   buildToolRunRows,
   groupMessageParts,
@@ -125,6 +126,15 @@ describe('groupMessageParts', () => {
     expect(rows.every(row => row.status === 'completed')).toBe(true);
   });
 
+  it('carries the display projection translation provenance per row', () => {
+    const rows = buildToolRunRows([
+      makeToolPart('t1', 'read', { filePath: '/repo/app.ts' }),
+      makeToolPart('t2', 'todoread'),
+    ]);
+
+    expect(rows.map(row => row.translatable)).toEqual([true, false]);
+  });
+
   it('labels the condensed run with the item count and the last label', () => {
     const rows = buildToolRunRows([
       makeToolPart('t1', 'read', { filePath: '/repo/app.ts' }),
@@ -133,6 +143,26 @@ describe('groupMessageParts', () => {
     ]);
 
     expect(buildToolRunLabel(rows, t)).toBe('3 items; b.ts');
+  });
+
+  it('labels the condensed run with the summary the caller resolved', () => {
+    const rows = buildToolRunRows([
+      makeToolPart('t1', 'read', { filePath: '/repo/app.ts' }),
+      makeToolPart('t2', 'bash', { description: 'List files' }),
+      makeToolPart('t3', 'edit', { filePath: '/repo/b.ts' }),
+    ]);
+
+    expect(buildToolRunLabel(rows, t, 'Nouveau fichier')).toBe('3 items; Nouveau fichier');
+  });
+
+  it('labels the condensed run with the item count alone while the summary is not ready', () => {
+    const rows = buildToolRunRows([
+      makeToolPart('t1', 'read', { filePath: '/repo/app.ts' }),
+      makeToolPart('t2', 'bash', { description: 'List files' }),
+      makeToolPart('t3', 'edit', { filePath: '/repo/b.ts' }),
+    ]);
+
+    expect(buildToolRunCountLabel(rows, t)).toBe('3 items');
   });
 
   it('splits a run around a text part', () => {

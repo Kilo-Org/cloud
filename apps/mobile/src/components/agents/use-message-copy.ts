@@ -7,12 +7,14 @@ import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 
-import { collectCopyableText } from './collect-copyable-text';
+import { collectCopyableText, messageTextParts } from './collect-copyable-text';
 import { COPY_TOAST_DURATION_MS } from './copy-toast-duration';
 
 export function useMessageCopy() {
   const copyMessage = useCallback(async (message: StoredMessage) => {
-    const text = collectCopyableText(message);
+    // Copy message puts the message's own text on the clipboard: the thinking
+    // block above a reply and its tool calls are not message content.
+    const text = collectCopyableText({ parts: messageTextParts(message.parts) });
     if (!text) {
       return;
     }

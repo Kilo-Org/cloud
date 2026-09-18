@@ -1565,6 +1565,7 @@
       "exitNeedsNewerCli": "Eğik çizgi komutlarını uzaktan kullanmak için daha yeni bir Kilo CLI sürümü gerekiyor. Kilo CLI'yı güncelle ve yeniden bağlan."
     },
     "sessionConnection": {
+      "label": "Bağlantı",
       "connecting": "Bağlanıyor…",
       "reconnecting": "Yeniden bağlanıyor…",
       "connectionLost": "Bağlantı koptu",
@@ -1584,7 +1585,9 @@
       "removeConfirmTitle": "Hedef kaldırılsın mı?",
       "removeConfirmMessage": "CLI bu oturumun hedefini temizler.",
       "updateFailed": "Hedef güncellenemedi.",
-      "sectionAccessibility": "{{status}}. Hedef: {{text}}"
+      "sectionAccessibility": "{{status}}. Hedef: {{text}}",
+      "collapse": "Hedefi daralt",
+      "expand": "Hedefi genişlet"
     },
     "newSession": {
       "recentlyUsed": "Son kullanılanlar",
@@ -1638,7 +1641,20 @@
       "continueFrom": "{{title}} oturumuna devam ediliyor.",
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam etmeyi desteklemiyor. Cloud Agent veya başka bir CLI seç.",
-      "importFailed": "Bu oturum içe aktarılamadı."
+      "importFailed": "Bu oturum içe aktarılamadı.",
+      "sandbox": "Korumalı alan",
+      "sandboxAccessibility": "Korumalı alan: {{label}}",
+      "sandboxDefaultWithDestination": "Varsayılan · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Küçük",
+      "sandboxInstanceShared": "Paylaşımlı",
+      "sandboxInstanceLarge": "Büyük",
+      "sandboxInstanceDevcontainer": "Geliştirme kapsayıcısı",
+      "sandboxInstanceProviderDefault": "Sağlayıcı varsayılanı",
+      "sandboxCouldNotLoad": "Korumalı alan seçenekleri yüklenemedi",
+      "sandboxUnavailable": "Bu korumalı alan kullanılamıyor. Başka bir korumalı alan veya Varsayılan seçin.",
+      "sandboxUseDefault": "Varsayılanı kullan"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi.",
@@ -2004,6 +2020,12 @@
       "startNewSession": "Yeni bir oturum başlat",
       "exitSession": "Oturumdan çık",
       "clearSession": "Bu oturumu sonlandır ve yeni bir oturum başlat",
+      "compactDescription": "geçerli oturum bağlamını sıkıştır",
+      "goalDescription": "Oturum hedefine doğru çalışmaya devam et. /goal <objective> veya pause, resume, clear",
+      "initDescription": "yönlendirmeli AGENTS.md kurulumu",
+      "resumeClaudeDescription": "bir Claude Code oturum dökümünü içe aktar",
+      "resumeCodexDescription": "bir OpenAI Codex oturum dökümünü içe aktar",
+      "reviewDescription": "değişiklikleri incele [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} komutunu kullan",
       "insert": "Ekle",
       "upgradeRequiredFallback": "Bu komutu kullanmak için CLI'yı güncelle.",
@@ -2121,6 +2143,7 @@
     "couldNotLoadActiveSessions": "Etkin oturumlar yüklenemedi.",
     "agentSessions": "Şu anda etkin",
     "newCodingTask": "Yeni kodlama görevi",
+    "newTaskFromPicture": "Resimden yeni görev",
     "explore": "Keşfet",
     "seeAll": "Tümünü gör",
     "noLiveSessions": "Şu anda çalışan oturum yok"
@@ -2342,7 +2365,8 @@
     "aiProvidersWhat": "İstemlerin, konuşma geçmişin ve eklediğin tüm dosyalar.",
     "aiProvidersWhy": "Yapay zekâ yanıtları üretmek için.",
     "aiProvidersWho": "Anthropic, OpenAI, Google ve her istek için seçtiğin diğer sağlayıcılar.",
-    "gatewayWhat": "Hesap kimliği, istek meta verileri, token kullanımı.",
+    "gatewayWhat": "Hesap kimliği, istek meta verileri, token kullanımı ile uygulamanın bunun üzerinden gönderdiği istemler ve ses kayıtları.",
+    "viaGateway": "Kilo Gateway üzerinden",
     "gatewayWhy": "Kimlik doğrulama, istek yönlendirme, faturalandırma mutabakatı.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Uygulama içeriğinden arındırılmış çökme ve hata raporları.",
@@ -2362,7 +2386,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Dikte sırasında alınan ses kaydın.",
     "voiceTranscriptionWhy": "Konuşmayı metne dönüştürmek için.",
-    "voiceTranscriptionWho": "Yalnızca cihazın; cihazın çevrimdışı olarak sesi metne dönüştüremiyorsa Apple veya Google.",
+    "voiceTranscriptionWho": "Cihazın, seçtiğin transkripsiyon modeliyle Kilo Gateway veya çevrimiçi tanıma için Apple ya da Google.",
     "what": "Paylaşılan veriler",
     "why": "Paylaşım amacı",
     "who": "Verileri alan taraf",

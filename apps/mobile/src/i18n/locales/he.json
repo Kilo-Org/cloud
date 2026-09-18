@@ -1574,6 +1574,7 @@
       "exitNeedsNewerCli": "פקודות לוכסן מרוחקות דורשות גרסה חדשה יותר של Kilo CLI. עדכן את Kilo CLI והתחבר מחדש."
     },
     "sessionConnection": {
+      "label": "חיבור",
       "connecting": "מתחבר…",
       "reconnecting": "מתחבר מחדש…",
       "connectionLost": "החיבור נותק",
@@ -1593,7 +1594,9 @@
       "removeConfirmTitle": "להסיר את המטרה?",
       "removeConfirmMessage": "ה-CLI מנקה את מטרת ההפעלה הזו.",
       "updateFailed": "לא ניתן היה לעדכן את המטרה.",
-      "sectionAccessibility": "{{status}}. מטרה: {{text}}"
+      "sectionAccessibility": "{{status}}. מטרה: {{text}}",
+      "collapse": "כיווץ המטרה",
+      "expand": "הרחבת המטרה"
     },
     "newSession": {
       "recentlyUsed": "בשימוש לאחרונה",
@@ -1647,7 +1650,20 @@
       "continueFrom": "ממשיך את הסשן {{title}}.",
       "importingSession": "מייבא סשן…",
       "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
-      "importFailed": "לא ניתן היה לייבא את הסשן הזה."
+      "importFailed": "לא ניתן היה לייבא את הסשן הזה.",
+      "sandbox": "סביבה מבודדת",
+      "sandboxAccessibility": "סביבה מבודדת: {{label}}",
+      "sandboxDefaultWithDestination": "ברירת מחדל · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "קטן",
+      "sandboxInstanceShared": "משותף",
+      "sandboxInstanceLarge": "גדול",
+      "sandboxInstanceDevcontainer": "קונטיינר פיתוח",
+      "sandboxInstanceProviderDefault": "ברירת המחדל של הספק",
+      "sandboxCouldNotLoad": "טעינת אפשרויות הסביבה המבודדת נכשלה",
+      "sandboxUnavailable": "הסביבה המבודדת הזו אינה זמינה. בחרו סביבה מבודדת אחרת או ברירת מחדל.",
+      "sandboxUseDefault": "השתמשו בברירת המחדל"
     },
     "partRenderer": {
       "updatedFileCount_one": "מספר הקבצים שעודכנו הוא {{displayCount}}.",
@@ -2017,6 +2033,12 @@
       "startNewSession": "התחלת סשן חדש",
       "exitSession": "יציאה מהסשן",
       "clearSession": "סיום הסשן הזה והתחלת סשן חדש",
+      "compactDescription": "כווץ את הקשר הסשן הנוכחי",
+      "goalDescription": "המשך לעבוד לקראת מטרת סשן. /goal <objective> או pause, resume, clear",
+      "initDescription": "הגדרת AGENTS.md מודרכת",
+      "resumeClaudeDescription": "ייבא תמלול של סשן Claude Code",
+      "resumeCodexDescription": "ייבא תמלול של סשן OpenAI Codex",
+      "reviewDescription": "סקור את השינויים [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "שימוש בפקודה /{{command}}",
       "insert": "הוספה",
       "upgradeRequiredFallback": "עדכן את ה-CLI שלך כדי להשתמש בפקודה זו.",
@@ -2135,6 +2157,7 @@
     "couldNotLoadActiveSessions": "לא ניתן לטעון את הסשנים הפעילים.",
     "agentSessions": "פעילים עכשיו",
     "newCodingTask": "משימת תכנות חדשה",
+    "newTaskFromPicture": "משימה חדשה מתמונה",
     "explore": "גילוי אפשרויות",
     "seeAll": "הצגת הכול",
     "noLiveSessions": "אין כרגע סשנים פעילים"
@@ -2356,7 +2379,8 @@
     "aiProvidersWhat": "ההנחיות שלך, היסטוריית השיחות וכל הקבצים שאתה מצרף.",
     "aiProvidersWhy": "כדי ליצור תשובות AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google וספקים אחרים שאתה בוחר לכל בקשה.",
-    "gatewayWhat": "מזהה החשבון, המטא-נתונים של הבקשות ונתוני השימוש בטוקנים.",
+    "gatewayWhat": "מזהה החשבון, המטא-נתונים של הבקשות, השימוש בטוקנים, וכן ההנחיות והקלטות הקול שהאפליקציה שולחת דרכו.",
+    "viaGateway": "דרך Kilo Gateway",
     "gatewayWhy": "אימות זהות, ניתוב בקשות והתאמת חיובים.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "דוחות קריסה ושגיאות שתוכן האפליקציה הוסר מהם.",
@@ -2376,7 +2400,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "ההקלטה שלך בזמן שאתה מכתיב.",
     "voiceTranscriptionWhy": "כדי להפוך דיבור לטקסט.",
-    "voiceTranscriptionWho": "במכשיר בלבד, או אצל Apple או Google כשהמכשיר אינו יכול לתמלל ללא חיבור לאינטרנט.",
+    "voiceTranscriptionWho": "המכשיר שלך, Kilo Gateway עם מודל התמלול שבחרת, או Apple או Google לזיהוי מקוון.",
     "what": "אילו נתונים",
     "why": "לאיזו מטרה",
     "who": "למי נשלח",

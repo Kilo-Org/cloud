@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Arahan garis miring dari jauh memerlukan Kilo CLI yang lebih baharu. Kemas kini Kilo CLI dan sambung semula."
     },
     "sessionConnection": {
+      "label": "Sambungan",
       "connecting": "Menyambung…",
       "reconnecting": "Menyambung semula…",
       "connectionLost": "Sambungan terputus",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Buang matlamat?",
       "removeConfirmMessage": "CLI menghapuskan matlamat sesi ini.",
       "updateFailed": "Matlamat tidak dapat dikemas kini.",
-      "sectionAccessibility": "{{status}}. Matlamat: {{text}}"
+      "sectionAccessibility": "{{status}}. Matlamat: {{text}}",
+      "collapse": "Sembunyikan matlamat",
+      "expand": "Paparkan matlamat"
     },
     "newSession": {
       "recentlyUsed": "Digunakan baru-baru ini",
@@ -2128,7 +2131,20 @@
       "continueFrom": "Sesi {{title}} diteruskan.",
       "importingSession": "Mengimport sesi",
       "cliCannotContinue": "CLI ini tidak dapat meneruskan sesi. Pilih Cloud Agent atau CLI lain.",
-      "importFailed": "Tidak dapat mengimport sesi ini."
+      "importFailed": "Tidak dapat mengimport sesi ini.",
+      "sandbox": "Kotak pasir",
+      "sandboxAccessibility": "Kotak pasir: {{label}}",
+      "sandboxDefaultWithDestination": "Lalai · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Kecil",
+      "sandboxInstanceShared": "Kongsi",
+      "sandboxInstanceLarge": "Besar",
+      "sandboxInstanceDevcontainer": "Bekas dev",
+      "sandboxInstanceProviderDefault": "Lalai pembekal",
+      "sandboxCouldNotLoad": "Tidak dapat memuatkan pilihan kotak pasir",
+      "sandboxUnavailable": "Kotak pasir ini tidak tersedia. Pilih kotak pasir lain atau Lalai.",
+      "sandboxUseDefault": "Guna Lalai"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fail telah dikemas kini.",
@@ -2494,6 +2510,12 @@
       "startNewSession": "Mulakan sesi baharu",
       "exitSession": "Keluar daripada sesi",
       "clearSession": "Tamatkan sesi ini dan mulakan yang baharu",
+      "compactDescription": "padatkan konteks sesi semasa",
+      "goalDescription": "Terus bekerja ke arah matlamat sesi. /goal <objective> atau pause, resume, clear",
+      "initDescription": "persediaan AGENTS.md berpandukan",
+      "resumeClaudeDescription": "import transkrip sesi Claude Code",
+      "resumeCodexDescription": "import transkrip sesi OpenAI Codex",
+      "reviewDescription": "semak perubahan [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Gunakan /{{command}}",
       "insert": "Sisipkan",
       "upgradeRequiredFallback": "Sila naik taraf CLI anda untuk menggunakan arahan ini.",
@@ -2611,6 +2633,7 @@
     "couldNotLoadActiveSessions": "Tidak dapat memuatkan sesi aktif.",
     "agentSessions": "Sedang aktif",
     "newCodingTask": "Tugas pengekodan baharu",
+    "newTaskFromPicture": "Tugas baharu daripada gambar",
     "explore": "Teroka",
     "seeAll": "Lihat semua",
     "noLiveSessions": "Tiada sesi yang sedang berjalan"
@@ -2832,7 +2855,8 @@
     "aiProvidersWhat": "Gesaan anda, sejarah perbualan dan sebarang fail yang anda lampirkan.",
     "aiProvidersWhy": "Untuk menjana respons AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google dan penyedia lain yang anda pilih untuk setiap permintaan.",
-    "gatewayWhat": "ID akaun, metadata permintaan, penggunaan token.",
+    "gatewayWhat": "ID akaun, metadata permintaan, penggunaan token, serta gesaan dan rakaman suara yang dihantar oleh aplikasi melaluinya.",
+    "viaGateway": "Melalui Kilo Gateway",
     "gatewayWhy": "Pengesahan identiti, penghalaan permintaan dan penyelarasan rekod pengebilan.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Laporan ranap dan ralat tanpa kandungan apl.",
@@ -2852,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Rakaman suara anda semasa anda menggunakan imlak.",
     "voiceTranscriptionWhy": "Untuk menukar pertuturan kepada teks.",
-    "voiceTranscriptionWho": "Pada peranti sahaja, atau oleh Apple atau Google jika peranti ini tidak dapat mentranskripsikan suara di luar talian.",
+    "voiceTranscriptionWho": "Peranti anda, Kilo Gateway dengan model transkripsi pilihan anda, atau Apple atau Google untuk pengecaman dalam talian.",
     "installAttributionPromptTitle": "Benarkan penjejakan sumber pemasangan?",
     "installAttributionPromptMessage": "Kilo menggunakan kebenaran penjejakan Apple hanya untuk mengetahui saluran mana yang membawa anda ke sini. Gesaan dan perbualan anda tidak pernah digunakan.",
     "what": "Apa",

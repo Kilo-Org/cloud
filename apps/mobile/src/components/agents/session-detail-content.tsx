@@ -52,7 +52,10 @@ import {
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
 import { resolveSessionComposerDisabled } from '@/components/agents/session-composer-disabled';
-import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
+import {
+  resolveSessionConnectionDisplay,
+  resolveSessionConnectionState,
+} from '@/components/agents/session-connection-indicator-state';
 import {
   type GoalAction,
   goalClearsBlockingAfterSend,
@@ -61,6 +64,10 @@ import {
   selectVisibleGoal,
 } from '@/components/agents/session-goal-actions';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
+import {
+  toggleSessionGoalCollapsed,
+  useSessionGoalCollapsed,
+} from '@/components/agents/session-goal-collapse';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import {
@@ -82,6 +89,7 @@ import {
   shouldRefuseSilentAttachmentDrop,
 } from '@/components/agents/session-detail-send-attachment';
 import { useSessionManager } from '@/components/agents/session-provider';
+import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
 import { PreparationGroup } from '@/components/agents/preparation-group';
 import {
@@ -155,8 +163,10 @@ import {
   SESSION_VIEWED_EVENT,
 } from '@/lib/analytics/posthog';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { useMotionPolicy } from '@/lib/a11y/motion';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { agentComposerDraftKey } from '@/lib/persist/drafts';
@@ -289,6 +299,13 @@ export function SessionDetailContent({
   // shows it unavailable. Auto-reply eligibility is separate: an unresolved
   // transport cannot deliver a permission ask.
   const autoApproveEnabled = useSessionAutoApproveEnabled(sessionId);
+  // Per-session goal disclosure lives in an in-memory store keyed by session
+  // id, so the collapsed/expanded state survives leaving and reopening the
+  // session. Absence means expanded.
+  const goalCollapsed = useSessionGoalCollapsed(sessionId);
+  // The goal block's height transition is gated by the app's motion policy, the
+  // same one the disclosure uses inside.
+  const { reducedMotion } = useMotionPolicy();
   const autoApproveAvailable = canAutoApprovePermissions({ activeSessionType, isReadOnly });
   const autoApproveReplyAvailable = canAutoApproveReply({ activeSessionType, isReadOnly });
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
@@ -1346,6 +1363,46 @@ export function SessionDetailContent({
       (fetchedData !== null && fetchedData.kiloSessionId !== sessionId));
   const cachedMetadataRefresh = messages.length > 0 && fetchedData === null;
   const shouldBlockMessages = shouldShowLoading;
+  const { isConnected: userWebConnected, reconnectExhausted } = useUserWebConnectionHealth();
+  const connection = useUserWebConnection();
+  const connectionState = resolveSessionConnectionState({
+    activeSessionType,
+    agentStatusType: agentStatus.type,
+    userWebConnected,
+    reconnectExhausted,
+  });
+  // A committed up latch: a drop after the first up reads "Reconnecting…",
+  // a cold start reads "Connecting…". Only the session's own transport latches
+  // it; the app-wide user-web leg is that transport only once the session type
+  // is resolved (a `none` transport is then a read-only session,
+  // session-connection-indicator-state.ts:39-46), so a remote/cloud-agent
+  // session whose agent never came up must still read "Connecting…". While the
+  // type is still unresolved — the whole window a cached open paints its
+  // transcript in — the leg is not this session's transport yet and must not
+  // latch one, or a first load reads "Reconnecting…" instead of "Connecting…".
+  const [wasConnected, setWasConnected] = useState(false);
+  useEffect(() => {
+    if (
+      connectionState === 'up' ||
+      (connectionState === 'none' && activeSessionType !== null && userWebConnected)
+    ) {
+      setWasConnected(true);
+    }
+  }, [connectionState, userWebConnected, activeSessionType]);
+  const connectionDisplay = resolveSessionConnectionDisplay({
+    transport: connectionState,
+    userWebConnected,
+    reconnectExhausted,
+    everConnected: wasConnected,
+    sessionRefresh: cachedMetadataRefresh ? { isLoading: statusIndicator === null } : undefined,
+  });
+  const retrySessionConnection = useCallback(() => {
+    if (cachedMetadataRefresh) {
+      void manager.switchSession(sessionId);
+    } else {
+      connection.retryConnection();
+    }
+  }, [cachedMetadataRefresh, manager, sessionId, connection]);
   // A stalled open (the skeleton still up, nothing to show, no error and no
   // progress indicator to watch) must stop looking like progress after the
   // threshold: the slow phase swaps the skeleton for a message plus Retry.
@@ -1495,9 +1552,11 @@ export function SessionDetailContent({
   // composer's own content clears the landscape sensor insets.
   const isComposerMounted = !isReadOnly || messages.length === 0;
   const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
+  // Structural locks only. The live send capability is passed separately so a
+  // failed turn (or a session that has not resolved yet) keeps the input
+  // editable beside the error's Retry instead of locking the composer.
   const isComposerDisabled = resolveSessionComposerDisabled({
     isReadOnly,
-    canSend,
     shouldShowLoading,
     hasBlockingInteraction,
     requiresModel,
@@ -1822,27 +1881,20 @@ export function SessionDetailContent({
                 }
               : {})}
           />
-          <SessionConnectionIndicator
-            sessionRefresh={
-              cachedMetadataRefresh
-                ? {
-                    isLoading: statusIndicator === null,
-                    onRetry: () => {
-                      void manager.switchSession(sessionId);
-                    },
-                  }
-                : undefined
-            }
-            activeSessionType={activeSessionType}
-            agentStatusType={agentStatus.type}
-          />
           {sessionGoal ? (
             <Animated.View
               entering={FadeIn.duration(200)}
               exiting={FadeOut.duration(150)}
-              layout={LinearTransition.duration(150)}
+              layout={reducedMotion ? undefined : LinearTransition.duration(150)}
             >
-              <SessionGoalSection goal={sessionGoal} onPress={handleOpenGoalActions} />
+              <SessionGoalSection
+                goal={sessionGoal}
+                collapsed={goalCollapsed}
+                onToggleCollapsed={() => {
+                  toggleSessionGoalCollapsed(sessionId);
+                }}
+                onPress={handleOpenGoalActions}
+              />
             </Animated.View>
           ) : null}
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
@@ -1879,6 +1931,8 @@ export function SessionDetailContent({
               breakdownCostUsd={breakdownCostUsd}
               messages={messages}
               modelOptions={modelOptions}
+              connectionDisplay={connectionDisplay}
+              onRetryConnection={retrySessionConnection}
               autoApproveState={autoApproveState}
               onAutoApproveChange={enabled => {
                 // Selection haptic for the commit: a capability iOS and Android
@@ -1965,6 +2019,9 @@ export function SessionDetailContent({
               placeholder={t('agentChat.goal.editPlaceholder')}
               initialValue={sessionGoal.text}
               maxLength={500}
+              // Goal text is prose and can hold a long unbroken line; the dialog
+              // must wrap it instead of clipping its start.
+              multiline
               onSave={handleGoalEditSave}
               onClose={() => {
                 setIsGoalEditOpen(false);
@@ -2102,6 +2159,7 @@ export function SessionDetailContent({
                 onExitSession={handleExitSession}
                 onStop={handleStop}
                 disabled={isComposerDisabled}
+                sendDisabled={!canSend}
                 isStreaming={isStreaming}
                 placeholder={composerPlaceholder}
                 mode={currentMode}

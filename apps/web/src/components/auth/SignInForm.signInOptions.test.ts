@@ -13,6 +13,7 @@ import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 let mockFlowEmail = '';
+let mockHintEmail = '';
 let mockChatGptAllowed = false;
 let mockHookEmail: string | null = null;
 
@@ -35,7 +36,7 @@ jest.mock('@/hooks/useSignInFlow', () => ({
     showTurnstile: false,
     flowState: 'landing',
     tier: 'new',
-    hint: null,
+    hint: mockHintEmail ? { lastEmail: mockHintEmail, lastAuthMethod: 'openai' } : null,
     showEmailInput: !isSignUp,
     email: mockFlowEmail,
     isVerifying: false,
@@ -97,6 +98,7 @@ const { SignInForm } = require('./SignInForm') as {
 
 beforeEach(() => {
   mockFlowEmail = '';
+  mockHintEmail = '';
   mockChatGptAllowed = false;
   mockHookEmail = null;
 });
@@ -110,7 +112,7 @@ describe('SignInForm sign-in options', () => {
     expect(html).not.toContain('Sign in with ChatGPT');
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
-    // Nothing is submitted in a static render, so the hook gets no address.
+    // Nothing is known before a submit, so the hook gets no address.
     expect(mockHookEmail).toBe(null);
   });
 
@@ -124,8 +126,29 @@ describe('SignInForm sign-in options', () => {
     expect(html.match(/Sign in with ChatGPT/g)).toHaveLength(1);
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
-    // The typed address is not evaluated; the hook waits for the submit.
+    // Typing alone is not evaluated; the hook waits for the submit.
     expect(mockHookEmail).toBe(null);
+  });
+
+  it('evaluates a prefilled ?email= address before the providers render', () => {
+    mockChatGptAllowed = true;
+    renderToStaticMarkup(
+      createElement(SignInForm, {
+        searchParams: { email: 'prefill@kilo.ai' },
+        title: 'Welcome.',
+      })
+    );
+
+    expect(mockHookEmail).toBe('prefill@kilo.ai');
+  });
+
+  it('evaluates a stored returning-user address', () => {
+    mockFlowEmail = 'returning@kilo.ai';
+    mockHintEmail = 'returning@kilo.ai';
+    mockChatGptAllowed = true;
+    renderToStaticMarkup(createElement(SignInForm, { searchParams: {}, title: 'Welcome.' }));
+
+    expect(mockHookEmail).toBe('returning@kilo.ai');
   });
 
   it('hides ChatGPT on sign-up when the flag is off for the typed email', () => {

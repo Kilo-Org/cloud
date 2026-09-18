@@ -62,10 +62,14 @@ export function SignInForm({
     isSignUp,
     storybookInitialState,
   });
-  // The ChatGPT option is decided from the email the visitor submits, before the
-  // sign-in options render — not from every keystroke in the field.
+  // The ChatGPT option is decided from the address the visitor submits, or from
+  // an address already known without typing: a `?email=` prefill or a stored
+  // returning-user hint. Both reach provider selection without this form's
+  // submit, and the option must be decided before the providers render. Typing
+  // alone never evaluates, so one known address costs one flags request.
   const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(null);
-  const chatGptAllowed = useChatGptSignInAccess(submittedEmail);
+  const knownEmail = (flow.hint?.lastEmail ?? searchParams.email ?? '').trim();
+  const chatGptAllowed = useChatGptSignInAccess(submittedEmail ?? (knownEmail || null));
   const handleEmailSubmit = (event: React.FormEvent) => {
     setSubmittedEmail(flow.email);
     flow.handleEmailSubmit(event);

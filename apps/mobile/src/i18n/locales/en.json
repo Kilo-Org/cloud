@@ -783,7 +783,7 @@
     "previewFullDescription": "Notifications show the message text on your lock screen.",
     "previewGenericDescription": "Notifications show that something happened. Open Kilo to read it.",
     "channel": {
-      "agent": "Agent sessions",
+      "agentProgress": "Agent progress",
       "chat": "Chat messages",
       "kiloclaw": "KiloClaw activity",
       "balance": "Balance alerts",

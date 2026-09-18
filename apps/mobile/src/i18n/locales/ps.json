@@ -783,7 +783,7 @@
     "previewFullDescription": "خبرتیاوې د قلف پر سکرین د پیغام متن ښیي.",
     "previewGenericDescription": "خبرتیاوې یوازې د یوې پېښې خبر درکوي. د پیغام د لوستلو لپاره Kilo پرانیزئ.",
     "channel": {
-      "agent": "د ایجنټ ناستې",
+      "agentProgress": "د ایجنټ پرمختګ",
       "chat": "د خبرو اترو پیغامونه",
       "kiloclaw": "د KiloClaw فعالیت",
       "balance": "د بیلانس خبرتیاوې",

@@ -783,7 +783,7 @@
     "previewFullDescription": "Ogeysiisyadu waxay qoraalka farriinta ku muujiyaan shaashaddaada qufulka.",
     "previewGenericDescription": "Ogeysiisyadu waxay muujiyaan in wax dhaceen. Fur Kilo si aad u akhrido.",
     "channel": {
-      "agent": "Kalfadhiyada wakiilka",
+      "agentProgress": "Halka ay wakiilku marayso",
       "chat": "Fariimaha sheekaysiga",
       "kiloclaw": "Hawlaha KiloClaw",
       "balance": "Digniinaha haraaga",

@@ -229,7 +229,7 @@
   },
   "notifications": {
     "channel": {
-      "agent": "Sessions des agents",
+      "agentProgress": "Progression des agents",
       "chat": "Messages de discussion",
       "kiloclaw": "Activité KiloClaw",
       "balance": "Alertes sur le solde",

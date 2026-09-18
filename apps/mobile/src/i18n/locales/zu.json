@@ -783,7 +783,7 @@
     "previewFullDescription": "Izaziso zibonisa umbhalo womlayezo esikrinini sakho sokukhiya.",
     "previewGenericDescription": "Izaziso zibonisa ukuthi kukhona okwenzekile. Vula i-Kilo ukuze ufunde umlayezo.",
     "channel": {
-      "agent": "Iziseshini zabenzeli",
+      "agentProgress": "Inqubekelaphambili yabenzeli",
       "chat": "Imilayezo yengxoxo",
       "kiloclaw": "Umsebenzi we-KiloClaw",
       "balance": "Izexwayiso zebhalansi",

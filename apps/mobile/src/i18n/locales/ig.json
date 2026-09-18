@@ -783,7 +783,7 @@
     "previewFullDescription": "Ọkwa na-egosi ederede ozi n'ihuenyo mkpọchi gị.",
     "previewGenericDescription": "Ọkwa na-egosi na ihe mere. Mepee Kilo ka ị gụọ ya.",
     "channel": {
-      "agent": "Nnọkọ ndị nnọchi anya",
+      "agentProgress": "Ọganihu ndị nnọchi anya",
       "chat": "Ozi nkata",
       "kiloclaw": "Ihe omume KiloClaw",
       "balance": "Ọkwa gbasara ego fọdụrụ",

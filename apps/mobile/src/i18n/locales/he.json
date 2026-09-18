@@ -293,7 +293,7 @@
     "previewFullDescription": "התראות מציגות את טקסט ההודעה במסך הנעילה שלך.",
     "previewGenericDescription": "ההתראות מציינות שיש עדכון, בלי להציג את התוכן. פתח את Kilo כדי לקרוא אותו.",
     "channel": {
-      "agent": "סשנים של סוכנים",
+      "agentProgress": "התקדמות הסוכנים",
       "chat": "הודעות צ׳אט",
       "kiloclaw": "פעילות KiloClaw",
       "balance": "התראות על היתרה",

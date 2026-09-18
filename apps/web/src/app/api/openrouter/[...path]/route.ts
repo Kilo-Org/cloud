@@ -952,51 +952,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
   if (attempt.type === 'error') return attempt.response;
 
-  if (partnerFallback && attempt.response.status >= 400) {
-    const partnerFailureLog = {
-      partner_provider: effectiveProviderContext.provider.id,
-      fallback_provider: partnerFallback.providerContext.provider.id,
-      status_code: attempt.response.status,
-    };
-    const responseForLogging = attempt.response.clone();
-    after(
-      (async () => {
-        try {
-          warnExceptInTest('Partner request failed before managed fallback', {
-            ...partnerFailureLog,
-            body: await responseForLogging.text(),
-          });
-        } catch (error) {
-          warnExceptInTest('Partner request failed before managed fallback', {
-            ...partnerFailureLog,
-            response_body_read_error: String(error),
-          });
-        }
-      })()
-    );
-    try {
-      await attempt.response.body?.cancel();
-    } catch {
-      warnExceptInTest('Failed to cancel discarded partner response body');
-    }
-
-    effectiveProviderContext = partnerFallback.providerContext;
-    requestBodyParsed = partnerFallback.request;
-    usageContext.provider = effectiveProviderContext.provider.id;
-    usageContext.user_byok = !!effectiveProviderContext.userByok;
-
-    attempt = await sendUpstreamAttempt({
-      ...upstreamAttemptOptions,
-      providerContext: effectiveProviderContext,
-      request: requestBodyParsed,
-      delayMs: 0,
-    });
-    if (attempt.type === 'invalid-openrouter-model') {
-      return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
-    }
-    if (attempt.type === 'error') return attempt.response;
-  }
-
   const { response, toolsAvailable, toolsUsed } = attempt;
   const finalUpstreamModel = requestBodyParsed.body.model ?? effectiveModelIdLowerCased;
   logExceptInTest(

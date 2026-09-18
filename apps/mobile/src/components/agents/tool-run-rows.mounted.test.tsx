@@ -10,10 +10,21 @@ import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translati
 import { textWithContent } from './fixed-part-row.mounted.test-helpers';
 import { CondensedToolRunRow } from './tool-run-rows';
 
-const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
+const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
+  requestMock: vi.fn(),
+  readMock: vi.fn(),
+  writeMock: vi.fn(),
+}));
 
 vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
-  requestToolSummaryTranslation: requestMock,
+  requestToolSummaryTranslations: requestMock,
+}));
+// The encrypted-KV cache is a native module, loaded by the runtime's dynamic
+// import; mock it the same way as the client so the suite stays native-free and
+// hydration settles before the batch window closes.
+vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
+  readToolSummaryTranslations: readMock,
+  writeToolSummaryTranslation: writeMock,
 }));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
@@ -96,9 +107,9 @@ function renderCondensed(parts: readonly ToolPart[]): TestRenderer.ReactTestRend
 async function settleTranslation(): Promise<void> {
   await act(async () => {
     for (let i = 0; i < 5; i += 1) {
-      // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the dynamic import and request
+      // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the batch window, the dynamic import and the request
       await new Promise<void>(resolve => {
-        setImmediate(resolve);
+        setTimeout(resolve, 20);
       });
     }
   });
@@ -112,6 +123,10 @@ function texts(renderer: TestRenderer.ReactTestRenderer): string[] {
 
 beforeEach(() => {
   requestMock.mockReset();
+  readMock.mockReset();
+  writeMock.mockReset();
+  readMock.mockResolvedValue([]);
+  writeMock.mockResolvedValue(undefined);
   setConfig({ enabled: false, model: MODEL });
 });
 
@@ -121,6 +136,12 @@ afterEach(() => {
 
 /** Long past any retry cadence the row uses for an unresolved summary. */
 const RETRY_WINDOW_MS = 60_000;
+
+/**
+ * Longer than the runtime's 40 ms batch window: a summary the row asked for has
+ * left the window and its request has been issued.
+ */
+const BATCH_WINDOW_SETTLE_MS = 60;
 
 /** Advance the fake clock and let the pending import/request microtasks settle. */
 async function advance(ms: number): Promise<void> {
@@ -140,7 +161,7 @@ describe('CondensedToolRunRow label', () => {
   });
 
   it('translates the last summary in the label when tool translation is on', async () => {
-    requestMock.mockResolvedValue('Nouveau fichier');
+    requestMock.mockResolvedValue(['Nouveau fichier']);
     setConfig({ enabled: true, model: MODEL });
     const renderer = renderCondensed(runOf('resolved.ts'));
 
@@ -151,7 +172,7 @@ describe('CondensedToolRunRow label', () => {
 
     expect(textWithContent(renderer.root, '3 items; Nouveau fichier')).toHaveLength(1);
     expect(requestMock).toHaveBeenCalledWith({
-      text: 'resolved.ts',
+      texts: ['resolved.ts'],
       targetLanguage: 'en',
       model: MODEL.id,
     });
@@ -171,7 +192,7 @@ describe('CondensedToolRunRow label', () => {
   });
 
   it('recovers the last summary after a failed request instead of staying count-only', async () => {
-    requestMock.mockResolvedValueOnce(null).mockResolvedValue('Nouveau fichier');
+    requestMock.mockResolvedValueOnce([null]).mockResolvedValue(['Nouveau fichier']);
     setConfig({ enabled: true, model: MODEL });
     vi.useFakeTimers();
     // A summary no sibling test cached, so the first request really is made.
@@ -179,7 +200,7 @@ describe('CondensedToolRunRow label', () => {
 
     // The first request settles without a translation, so the label holds the
     // count alone: the untranslated summary must not appear.
-    await advance(0);
+    await advance(BATCH_WINDOW_SETTLE_MS);
     expect(requestMock).toHaveBeenCalledTimes(1);
     expect(textWithContent(renderer.root, '3 items')).toHaveLength(1);
     expect(texts(renderer).some(text => text.includes('retry-target.ts'))).toBe(false);

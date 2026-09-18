@@ -126,19 +126,17 @@ export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput):
   if (!userId) return false;
   if (!isOpenAiChatGptModel(requestedModel)) return false;
 
-  // The catalog can list an OpenAI model the plain API does not serve, such as
-  // `openai/gpt-5.6-luna-pro`. Sending it upstream fails the request, so only a
-  // model this project serves may take the delegated route.
-  const upstreamModel = requestedModel.trim().replace(OPENAI_MODEL_PREFIX, '');
-  if (!(await isOpenAiModelServed(getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV), upstreamModel))) {
-    return false;
-  }
-
   const stored = await getOpenAiChatGptStoredConnection(userId);
   // The payload's `status` mirrors a save or a terminal failure, but a person
   // can also disable the row through the ordinary BYOK toggle, which leaves the
   // payload saying `connected`. Both must hold for the route to be eligible.
-  return stored?.isEnabled === true && stored.connection.status === 'connected';
+  if (stored?.isEnabled !== true || stored.connection.status !== 'connected') return false;
+
+  // The catalog can list an OpenAI model the plain API does not serve, such as
+  // `openai/gpt-5.6-luna-pro`. Sending it upstream fails the request, so only a
+  // model this project serves may take the delegated route.
+  const upstreamModel = requestedModel.trim().replace(OPENAI_MODEL_PREFIX, '');
+  return isOpenAiModelServed(getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV), upstreamModel);
 }
 
 /**

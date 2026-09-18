@@ -1026,7 +1026,13 @@ export const authOptions: NextAuthOptions = {
 
         // we don't need to check gmail domains for SSO for now.
         // This is mostly an optimization so we don't hit the DB on every gmail login since they defacto aren't using SSO
-        if (domainToCheck !== 'gmail.com') {
+        //
+        // Account linking is not a sign-in: the person is already
+        // authenticated and is only attaching another provider. Enforcing the
+        // domain SSO policy here would redirect them to the sign-in page and
+        // abort the link, so a BYOK connection (for example "Sign in with
+        // ChatGPT") would never be stored for an SSO-protected domain.
+        if (domainToCheck !== 'gmail.com' && !isAccountLinking) {
           // Fake login is intentionally exempt in supported non-production environments.
           if (accountInfo.provider !== 'workos' && accountInfo.provider !== 'fake-login') {
             const ssoAuthority = await resolveSsoAuthorityForDomain(domainToCheck);

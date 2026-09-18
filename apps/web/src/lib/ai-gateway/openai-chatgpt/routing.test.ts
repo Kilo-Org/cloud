@@ -202,6 +202,22 @@ describe('isOpenAiChatGptEligible', () => {
     expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5-nano');
   });
 
+  it('keeps a `-pro` reasoning-mode alias off the delegated route', async () => {
+    // `pro` is a reasoning mode on the base model, not an API model id, so the
+    // project does not serve `gpt-5.6-luna-pro`.
+    jest.mocked(isOpenAiModelServed).mockResolvedValue(false);
+
+    await expect(
+      isOpenAiChatGptEligible(
+        routingInput({
+          request: responsesRequest('openai/gpt-5.6-luna-pro'),
+          requestedModel: 'openai/gpt-5.6-luna-pro',
+        })
+      )
+    ).resolves.toBe(false);
+    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5.6-luna-pro');
+  });
+
   it('is not eligible when no connection is stored', async () => {
     jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(null);
 

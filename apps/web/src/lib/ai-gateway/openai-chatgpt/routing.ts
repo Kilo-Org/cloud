@@ -9,12 +9,16 @@ import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
 import { getOpenAiChatGptStoredConnection } from './store';
 import { isOpenAiModelServed } from './served-models';
+import { OPENAI_CHATGPT_API_URL } from './upstream';
 
 /**
  * Routing for the delegated "Sign in with ChatGPT" connection. When a person
  * has an enabled connection, an eligible OpenAI model is served by api.openai.com
  * on the delegated token instead of a managed gateway.
  */
+
+/** The delegated upstream URL, shared with the served-model lookup. */
+export { OPENAI_CHATGPT_API_URL };
 
 /**
  * The delegated route must carry a key from the project that owns the OAuth
@@ -23,12 +27,6 @@ import { isOpenAiModelServed } from './served-models';
  * path inherits the other's project, quota, or billing.
  */
 export const OPENAI_CHATGPT_API_KEY_ENV = 'OPENAI_CHATGPT_API_KEY';
-
-/** The production upstream; the same discovery-driven environment overrides as
- *  the OIDC endpoints (`OPENAI_DISCOVERY_URL`, `OPENAI_TOKEN_ENDPOINT`) apply. */
-export const OPENAI_CHATGPT_API_URL =
-  getEnvVariable('OPENAI_CHATGPT_API_URL').trim().replace(/\/+$/, '') ||
-  'https://api.openai.com/v1';
 
 /**
  * The delegated access token travels in its own upstream header. `extraHeaders`
@@ -126,9 +124,10 @@ export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput):
   if (!userId) return false;
   if (!isOpenAiChatGptModel(requestedModel)) return false;
 
-  // The catalog can list an OpenAI model the plain API does not serve, such as
-  // `openai/gpt-5.6-luna-pro`. Sending it upstream fails the request, so only a
-  // model this project serves may take the delegated route.
+  // The catalog can list an OpenAI model the plain API does not serve. A
+  // `-pro` slug such as `openai/gpt-5.6-luna-pro` is a reasoning mode on the
+  // base model, not an API model id, so sending it upstream fails the request.
+  // Only a model this project actually serves may take the delegated route.
   const upstreamModel = requestedModel.trim().replace(OPENAI_MODEL_PREFIX, '');
   if (!(await isOpenAiModelServed(getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV), upstreamModel))) {
     return false;

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   isSessionGoalCollapsed,
@@ -6,16 +6,174 @@ import {
 } from '@/components/agents/session-goal-collapse';
 import { clearSessionScopedState } from '@/lib/auth/session-scoped-state';
 
-// The sign-out aggregation imports the five members that reach native modules;
-// their own clears are covered by their own suites. The two in-memory stores
-// that hold per-session flags stay real, so the wiring is what is under test.
-vi.mock('@/components/agents/file-part-cache', () => ({ clearFilePartCache: vi.fn() }));
-vi.mock('@/components/agents/tool-card-image-cache', () => ({ clearToolCardImageCache: vi.fn() }));
-vi.mock('@/lib/agent-attachments/clipboard-image', () => ({ clearClipboardImages: vi.fn() }));
-vi.mock('@/lib/hooks/use-trusted-hosts', () => ({ clearTrustedHosts: vi.fn() }));
-vi.mock('@/lib/temp-file-registry', () => ({ reapTempFiles: vi.fn() }));
+/** One tracked entry of the fake filesystem, keyed by the URI parts it was built from. */
+const fakeFs = vi.hoisted(() => {
+  const deleted: string[] = [];
+  const state = { rootExists: true };
+
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- vi.hoisted runs before module scope
+  function segmentOf(part: unknown): string {
+    return typeof part === 'string' ? part : (part as { uri: string }).uri;
+  }
+
+  class DirectoryMock {
+    readonly uri: string;
+    exists = state.rootExists;
+    constructor(...parts: unknown[]) {
+      this.uri = parts.map(part => segmentOf(part)).join('/');
+    }
+    delete(): void {
+      deleted.push(this.uri);
+      state.rootExists = false;
+    }
+  }
+
+  const paths: { appleSharedContainers: Record<string, string>; document: string } = {
+    appleSharedContainers: {},
+    document: 'file:///documents',
+  };
+
+  return {
+    Directory: DirectoryMock,
+    File: vi.fn(),
+    Paths: paths,
+    deleted,
+    state,
+  };
+});
+
+const mocks = vi.hoisted(() => ({
+  clearClipboardImages: vi.fn(),
+  clearFilePartCache: vi.fn(),
+  clearMarkdownImageConfirmMemory: vi.fn(),
+  clearSessionAutoApprove: vi.fn(),
+  clearToolCardImageCache: vi.fn(),
+  clearTrustedHosts: vi.fn(),
+  notifyArtifactsChanged: vi.fn(),
+  reapTempFiles: vi.fn(),
+  resetArtifactMirrorSyncState: vi.fn(),
+}));
+
+vi.mock('expo-file-system', () => ({
+  Directory: fakeFs.Directory,
+  File: fakeFs.File,
+  Paths: fakeFs.Paths,
+}));
+// `artifact-mirror-paths` is the only Platform.OS branch; Android reads the
+// mirror from `Paths.document`.
+vi.mock('react-native', () => ({ Platform: { OS: 'android' } }));
+
+vi.mock('@/components/agents/file-part-cache', () => ({
+  clearFilePartCache: mocks.clearFilePartCache,
+}));
+vi.mock('@/components/agents/markdown-image-confirm', () => ({
+  clearMarkdownImageConfirmMemory: mocks.clearMarkdownImageConfirmMemory,
+}));
+vi.mock('@/components/agents/session-auto-approve', () => ({
+  clearSessionAutoApprove: mocks.clearSessionAutoApprove,
+}));
+// Partial on purpose: the mirror's manifest reads `extensionForMime` from this
+// module, and `clearArtifactMirror` never calls it.
+vi.mock('@/components/agents/tool-card-image-cache', () => ({
+  clearToolCardImageCache: mocks.clearToolCardImageCache,
+}));
+vi.mock('@/lib/agent-attachments/clipboard-image', () => ({
+  clearClipboardImages: mocks.clearClipboardImages,
+}));
+vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
+  clearTrustedHosts: mocks.clearTrustedHosts,
+}));
+vi.mock('@/lib/temp-file-registry', () => ({ reapTempFiles: mocks.reapTempFiles }));
+// The platform provider bridge: sign-out has to tell an open Files app the tree
+// changed, or it keeps the listing it read before the wipe.
+vi.mock('@/lib/artifacts/artifact-provider-native', () => ({
+  notifyArtifactsChanged: mocks.notifyArtifactsChanged,
+}));
+// The engine's memo reset is observed through this spy; its own suite covers
+// what the reset does to a later run.
+vi.mock('@/lib/artifacts/artifact-mirror-sync', () => ({
+  resetArtifactMirrorSyncState: mocks.resetArtifactMirrorSyncState,
+}));
+
+/** Every mocked member, in declaration order; the mirror and goal stores stay real. */
+const SESSION_MEMBERS = [
+  mocks.clearTrustedHosts,
+  mocks.clearMarkdownImageConfirmMemory,
+  mocks.clearToolCardImageCache,
+  mocks.clearFilePartCache,
+  mocks.clearClipboardImages,
+  mocks.clearSessionAutoApprove,
+];
+
+/** Android mirror root: `Paths.document` plus the mirror folder name. */
+const MIRROR_ROOT_URI = 'file:///documents/artifacts';
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  fakeFs.deleted.length = 0;
+  fakeFs.state.rootExists = true;
+});
 
 describe('clearSessionScopedState', () => {
+  it('deletes the browsable mirror root', () => {
+    clearSessionScopedState();
+
+    expect(fakeFs.deleted).toEqual([MIRROR_ROOT_URI]);
+    expect(fakeFs.state.rootExists).toBe(false);
+  });
+
+  it('signals the platform provider once the mirror is gone', () => {
+    // An open Files app keeps the listing it last read until the provider says
+    // the tree changed, so the signal must follow the wipe, never precede it.
+    let mirrorWasGone: boolean | null = null;
+    mocks.notifyArtifactsChanged.mockImplementationOnce(() => {
+      mirrorWasGone = !fakeFs.state.rootExists;
+    });
+
+    clearSessionScopedState();
+
+    expect(mocks.notifyArtifactsChanged).toHaveBeenCalledTimes(1);
+    expect(mirrorWasGone).toBe(true);
+  });
+
+  it('resets the sync engine, clears every member, and reaps all temp copies', () => {
+    clearSessionScopedState();
+
+    expect(mocks.resetArtifactMirrorSyncState).toHaveBeenCalledTimes(1);
+    expect(mocks.reapTempFiles).toHaveBeenCalledWith({ all: true });
+    for (const member of SESSION_MEMBERS) {
+      expect(member).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('still deletes the mirror and reaps when an earlier member throws', () => {
+    mocks.clearTrustedHosts.mockImplementationOnce(() => {
+      throw new Error('secure store unavailable');
+    });
+
+    expect(() => {
+      clearSessionScopedState();
+    }).not.toThrow();
+
+    expect(fakeFs.deleted).toEqual([MIRROR_ROOT_URI]);
+    expect(mocks.reapTempFiles).toHaveBeenCalledWith({ all: true });
+  });
+
+  it('still reaps when the mirror teardown throws', () => {
+    mocks.resetArtifactMirrorSyncState.mockImplementationOnce(() => {
+      throw new Error('engine memo held');
+    });
+
+    expect(() => {
+      clearSessionScopedState();
+    }).not.toThrow();
+
+    expect(fakeFs.deleted).toEqual([MIRROR_ROOT_URI]);
+    expect(mocks.reapTempFiles).toHaveBeenCalledWith({ all: true });
+  });
+
+  // The goal-disclosure store stays real, like the mirror: this asserts the
+  // wiring through the actual in-memory map rather than a spy on its clear.
   it('drops the per-session goal disclosure flag on sign-out', () => {
     setSessionGoalCollapsed('session-scoped-goal', true);
     expect(isSessionGoalCollapsed('session-scoped-goal')).toBe(true);

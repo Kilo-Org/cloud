@@ -3,9 +3,9 @@ import { z } from 'zod';
  * The history has to outlive the grant for which the provider still accepts the
  * token: the provider accepts the current and the immediately previous refresh
  * token, so a superseded hash replayed late in a dormant session must still be
- * in memory when the replay arrives. Tied to the session bound (a year), not
- * the old fixed 30 days, or the guard would forward the replay and the provider
- * would answer it.
+ * in memory when the replay arrives. Tied to the session bound (one month), not
+ * a shorter fixed window, or the guard would forward the replay and the
+ * provider would answer it.
  */
 import { REFRESH_HISTORY_TTL_MS } from './session-lifetime';
 
@@ -105,7 +105,7 @@ export async function detectRefreshTokenReuse(
   if (!issued || issued.current) return null;
   await deps.revokeGrant(issued.grantId, issued.userId);
   // The grant is revoked now, so no hash of it can authenticate another replay:
-  // forget the history rather than leaving it for the one-year TTL.
+  // forget the history rather than leaving it for the history TTL.
   await deps.store.forgetRefreshTokens({ userId: issued.userId, grantId: issued.grantId });
   return reuseDetectedResponse(request);
 }

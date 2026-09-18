@@ -12,7 +12,8 @@
 const MODELS_URL = 'https://api.openai.com/v1/models';
 
 /** How long a fetched list is reused. Model access changes slowly. */
-const CACHE_TTL_MS = 60 * 60 * 1000;
+const CACHE_TTL_SECONDS = 60 * 60;
+const CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
 
 /** A slow list must not hold up a request. */
 const REQUEST_TIMEOUT_MS = 2_000;
@@ -25,6 +26,7 @@ async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> 
   try {
     const response = await fetch(MODELS_URL, {
       headers: { authorization: `Bearer ${apiKey}` },
+      next: { revalidate: CACHE_TTL_SECONDS },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) return null;

@@ -9,6 +9,7 @@
 - Logic bugs (wrong conditions, off-by-one)
 - Typos that cause runtime errors
 - Breaking API changes
+- MCP write exposure: a mutation newly published to the Kilo MCP catalog (`services/kilo-mcp/catalog.json`, generated from `apps/web/src/scripts/mcp-catalog/`) that issues or rotates credentials or tokens, reads or writes secrets, changes organization membership or authorization, deploys, charges or purchases, or deletes data - flag the path unless the PR explains why an MCP agent may call it
 
 **Skip these:**
 

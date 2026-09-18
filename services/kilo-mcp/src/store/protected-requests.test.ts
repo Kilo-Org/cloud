@@ -4,7 +4,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { totpCode } from '../otp/totp';
 import { createMcpHandler } from '../index';
 import type { ForwardedAuth } from '../types';
-import { KiloMcpOAuthStore, MAX_OTP_ATTEMPTS, PROTECTED_REQUEST_TTL_SECONDS } from './oauth-store';
+import {
+  KiloMcpOAuthStore,
+  MAX_OTP_ATTEMPTS,
+  MAX_OTP_FAILURES,
+  OTP_LOCKOUT_SECONDS,
+  PROTECTED_REQUEST_TTL_SECONDS,
+} from './oauth-store';
 
 // Same in-memory/DO pattern as oauth-store.test.ts: a
 // fake `DurableObjectStorage` whose `sql.exec` delegates to a real `node:sqlite`
@@ -292,6 +298,131 @@ describe('protected requests and OTP claims (real drizzle durable-sqlite over no
     expect(await claim(request.id, correctCode)).toEqual({ status: 'invalidated' });
     expect(await store.peekProtectedRequest(request.id, 'session-1', NOW)).toEqual({
       status: 'invalidated',
+    });
+  });
+
+  it('caps wrong codes on the authenticator so a fresh request cannot reset the count', async () => {
+    const secret = await enroll();
+    const correctCode = await totpCode(secret, NOW_MS);
+    const wrongCode = wrongCodeFor(correctCode);
+
+    // Exhaust one request's budget: that invalidates the row, but the
+    // account-wide failure count survives it — that is the point of the cap.
+    const first = await createRequest();
+    for (let attempt = 0; attempt < MAX_OTP_ATTEMPTS; attempt++) {
+      expect((await claim(first.id, wrongCode)).status).toBe('bad_code');
+    }
+    expect(rowFor(db, 'mcp_protected_requests', 'id', first.id)).toMatchObject({
+      status: 'invalidated',
+    });
+    expect(rowFor(db, 'mcp_admin_authenticators', 'kilo_user_id', 'admin-1')).toMatchObject({
+      failed_attempts: MAX_OTP_ATTEMPTS,
+      locked_until: null,
+    });
+
+    // call_protected mints a fresh row with attempts = 0, but the authenticator
+    // keeps counting: the remaining guesses run down the account-wide budget and
+    // the last one locks the gate instead of reporting another bad code.
+    const second = await createRequest();
+    for (let failures = MAX_OTP_ATTEMPTS + 1; failures < MAX_OTP_FAILURES; failures++) {
+      expect(await claim(second.id, wrongCode)).toEqual({
+        status: 'bad_code',
+        attemptsRemaining: MAX_OTP_FAILURES - failures,
+      });
+    }
+    expect(await claim(second.id, wrongCode)).toEqual({
+      status: 'locked',
+      retryAfterSeconds: OTP_LOCKOUT_SECONDS,
+    });
+    const authenticator = rowFor(db, 'mcp_admin_authenticators', 'kilo_user_id', 'admin-1');
+    expect(authenticator.failed_attempts).toBe(MAX_OTP_FAILURES);
+    expect(Date.parse(authenticator.locked_until as string)).toBe(
+      NOW_MS + OTP_LOCKOUT_SECONDS * 1000
+    );
+
+    // While the lock holds, even a fresh request with the correct code refuses:
+    // a stolen grant cannot buy a clean slate, and the caller is told the wait.
+    const oneMinuteLater = '2026-09-16T12:01:00.000Z';
+    const third = await createRequest();
+    expect(await store.peekProtectedRequest(third.id, 'session-1', oneMinuteLater)).toEqual({
+      status: 'locked',
+      retryAfterSeconds: OTP_LOCKOUT_SECONDS - 60,
+    });
+    expect(
+      await claim(third.id, await totpCode(secret, Date.parse(oneMinuteLater)), {
+        nowIso: oneMinuteLater,
+      })
+    ).toEqual({ status: 'locked', retryAfterSeconds: OTP_LOCKOUT_SECONDS - 60 });
+    expect(rowFor(db, 'mcp_protected_requests', 'id', third.id)).toMatchObject({
+      status: 'pending',
+      attempts: 0,
+    });
+  });
+
+  it('starts a fresh window once the account-wide lockout expires', async () => {
+    const secret = await enroll();
+    const wrongCode = wrongCodeFor(await totpCode(secret, NOW_MS));
+    // Fresh requests are exactly what call_protected allows, so the cap has to
+    // be reached across them: the first request's own budget invalidates its
+    // row, the second carries the account-wide count to the limit.
+    for (const budget of [MAX_OTP_ATTEMPTS, MAX_OTP_FAILURES - MAX_OTP_ATTEMPTS]) {
+      const request = await createRequest();
+      for (let attempt = 0; attempt < budget; attempt++) {
+        await claim(request.id, wrongCode);
+      }
+    }
+    expect(
+      Date.parse(
+        rowFor(db, 'mcp_admin_authenticators', 'kilo_user_id', 'admin-1').locked_until as string
+      )
+    ).toBe(NOW_MS + OTP_LOCKOUT_SECONDS * 1000);
+
+    // The lockout outlives a request's own TTL, so wait it out and start a new
+    // call_protected. The expired lock is not carried over: the count restarts
+    // instead of re-locking on the first mistype.
+    const afterLockout = new Date(NOW_MS + (OTP_LOCKOUT_SECONDS + 1) * 1000).toISOString();
+    const fresh = await store.createProtectedRequest({
+      sessionId: 'session-1',
+      kiloUserId: 'admin-1',
+      clientId: 'client-1',
+      path: 'organizations.admin.list',
+      kind: 'admin',
+      inputJson: null,
+      nowIso: afterLockout,
+    });
+    expect(
+      await claim(fresh.id, wrongCodeFor(await totpCode(secret, Date.parse(afterLockout))), {
+        nowIso: afterLockout,
+      })
+    ).toEqual({
+      status: 'bad_code',
+      // The count restarts at 1: the tighter of the per-request and
+      // per-account budgets, not the stale locked one.
+      attemptsRemaining: Math.min(MAX_OTP_ATTEMPTS - 1, MAX_OTP_FAILURES - 1),
+    });
+    expect(rowFor(db, 'mcp_admin_authenticators', 'kilo_user_id', 'admin-1')).toMatchObject({
+      failed_attempts: 1,
+      locked_until: null,
+    });
+
+    // A correct code after the lock expired runs the call and clears the count.
+    const approved = await store.createProtectedRequest({
+      sessionId: 'session-1',
+      kiloUserId: 'admin-1',
+      clientId: 'client-1',
+      path: 'organizations.admin.list',
+      kind: 'admin',
+      inputJson: null,
+      nowIso: afterLockout,
+    });
+    expect(
+      await claim(approved.id, await totpCode(secret, Date.parse(afterLockout)), {
+        nowIso: afterLockout,
+      })
+    ).toEqual({ status: 'ok', path: 'organizations.admin.list', inputJson: null });
+    expect(rowFor(db, 'mcp_admin_authenticators', 'kilo_user_id', 'admin-1')).toMatchObject({
+      failed_attempts: 0,
+      locked_until: null,
     });
   });
 

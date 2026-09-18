@@ -109,7 +109,8 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       // Protocol state stays in the library; local tables bridge consent,
       // authenticate strict refresh replays using issued hashes, and hold the
       // OTP authenticators and protected requests (o2). The dropped approval
-      // queue tables are gone (o5).
+      // queue tables are gone (o5). The account-wide wrong-code limiter adds
+      // `failed_attempts` and `locked_until` in migration 0008.
       expect(tables.map(t => t.name)).toEqual([
         '__drizzle_migrations',
         'mcp_admin_authenticators',
@@ -117,10 +118,15 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
         'oauth_pending_authorizations',
         'oauth_refresh_token_history',
       ]);
+      const authenticatorColumns = db
+        .prepare('PRAGMA table_info(mcp_admin_authenticators)')
+        .all() as Array<{ name: string }>;
+      expect(authenticatorColumns.map(column => column.name)).toContain('failed_attempts');
+      expect(authenticatorColumns.map(column => column.name)).toContain('locked_until');
       const applied = db.prepare('SELECT COUNT(*) AS n FROM __drizzle_migrations').get() as {
         n: number;
       };
-      expect(applied.n).toBe(8);
+      expect(applied.n).toBe(9);
     });
 
     it('a second DO instance over the same storage does not re-apply the migration', async () => {
@@ -128,7 +134,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       const applied = db.prepare('SELECT COUNT(*) AS n FROM __drizzle_migrations').get() as {
         n: number;
       };
-      expect(applied.n).toBe(8);
+      expect(applied.n).toBe(9);
     });
   });
 

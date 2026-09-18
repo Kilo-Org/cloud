@@ -392,6 +392,30 @@ function staleProtectedRequest(status: 'gone' | 'expired' | 'invalidated'): Json
   }
 }
 
+/**
+ * The wait an account-wide wrong-code lockout names, rounded up to whole
+ * minutes so the refusal always reads as a duration. Safe to surface: it
+ * describes the caller's own account, not a secret.
+ */
+function formatLockoutWait(retryAfterSeconds: number): string {
+  const minutes = Math.max(1, Math.ceil(retryAfterSeconds / 60));
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`;
+}
+
+/**
+ * The account-wide wrong-code lockout refusal. The gate is scoped to the
+ * authenticator, so minting a fresh `call_protected` request cannot reset it;
+ * the same copy serves the peek pre-check and the claim outcome.
+ */
+function lockedRefusal(retryAfterSeconds: number): JsonRpcFailure {
+  return new JsonRpcFailure(
+    INVALID_PARAMS,
+    `Too many incorrect codes were submitted for this Kilo account. Try again in ${formatLockoutWait(
+      retryAfterSeconds
+    )}, then start a new admin or debug call with call_protected.`
+  );
+}
+
 async function runTool(
   name: string,
   args: Record<string, unknown>,
@@ -529,6 +553,9 @@ async function runTool(
       // connection's expired/cancelled request gets its own refusal here,
       // before the live admin re-check below (a stale request never reaches it).
       const peek = await requests.peekProtectedRequest(request_id, sessionId, nowIso);
+      if (peek.status === 'locked') {
+        throw lockedRefusal(peek.retryAfterSeconds);
+      }
       if (peek.status !== 'pending') {
         throw staleProtectedRequest(peek.status);
       }
@@ -596,6 +623,10 @@ async function runTool(
           INVALID_PARAMS,
           'No authenticator is registered for this Kilo account. Reconnect the Kilo MCP server and add your authenticator at sign-in.'
         );
+      case 'locked':
+        // The gate is account-wide, so a fresh call_protected cannot reset it.
+        // Naming the wait lets the agent schedule the retry instead of guessing.
+        throw lockedRefusal(outcome.retryAfterSeconds);
       case 'ok': {
         // The payload was fixed by call_protected and re-validated against the
         // published schema; this is the single upstream request for it.

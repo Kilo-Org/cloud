@@ -49,6 +49,18 @@ export const PROTECTED_REQUEST_TTL_SECONDS = 300;
 /** Wrong OTP submissions one protected request accepts before it is invalidated (o2). */
 export const MAX_OTP_ATTEMPTS = 5;
 
+/**
+ * Wrong OTP submissions one authenticator accepts across requests before the
+ * gate locks (o2). The per-request cap alone is bypassable: `call_protected`
+ * mints a fresh row with `attempts = 0` on demand, so a holder of an opted-in
+ * grant could keep guessing. This count lives on the authenticator, so a new
+ * request cannot reset it.
+ */
+export const MAX_OTP_FAILURES = 10;
+
+/** How long an authenticator refuses submissions after `MAX_OTP_FAILURES` (o2). */
+export const OTP_LOCKOUT_SECONDS = 15 * 60;
+
 /** ISO timestamp `seconds` after `nowIso`, computed without reading the clock. */
 function plusSeconds(nowIso: string, seconds: number): string {
   return new Date(Date.parse(nowIso) + seconds * 1000).toISOString();
@@ -341,6 +353,8 @@ export class KiloMcpOAuthStore
         secret: generateAuthenticatorSecret(),
         verified_at: null,
         last_used_step: null,
+        failed_attempts: 0,
+        locked_until: null,
         created_at: nowIso,
         updated_at: nowIso,
       })
@@ -417,7 +431,11 @@ export class KiloMcpOAuthStore
     sessionId: string,
     nowIso: string
   ): Promise<
-    { status: 'pending' } | { status: 'expired' } | { status: 'invalidated' } | { status: 'gone' }
+    | { status: 'pending' }
+    | { status: 'expired' }
+    | { status: 'invalidated' }
+    | { status: 'gone' }
+    | { status: 'locked'; retryAfterSeconds: number }
   > {
     const row = this.db
       .select()
@@ -437,6 +455,14 @@ export class KiloMcpOAuthStore
     }
     if (row.expires_at <= nowIso) {
       return { status: 'expired' };
+    }
+    // The account-wide wrong-code lock follows the owner, not the row, so a
+    // fresh request cannot sidestep it. Reporting it here lets the handler
+    // refuse before it spends an upstream admin re-check on a locked account;
+    // `claimProtectedRequest` checks it again for the peek/claim race.
+    const lock = this.authenticatorLockState(row.kilo_user_id, nowIso);
+    if (lock.locked) {
+      return { status: 'locked', retryAfterSeconds: lock.retryAfterSeconds };
     }
     return { status: 'pending' };
   }
@@ -509,6 +535,15 @@ export class KiloMcpOAuthStore
     if (!verification) {
       return { status: 'no_authenticator' };
     }
+    // The account-wide wrong-code limiter. `call_protected` can mint fresh
+    // requests without bound, so the per-request `attempts` cap alone would let
+    // a holder of an opted-in grant keep guessing; this count is on the
+    // authenticator and survives a new request. A live lock refuses even a
+    // correct code, and an expired lock starts a fresh window.
+    const lock = this.authenticatorLockState(input.kiloUserId, input.nowIso);
+    if (lock.locked) {
+      return { status: 'locked', retryAfterSeconds: lock.retryAfterSeconds };
+    }
     // A code from the recorded step or an earlier one is a replay of an
     // already-accepted execution code and must never run a second call.
     if (verification.ok) {
@@ -520,16 +555,45 @@ export class KiloMcpOAuthStore
     if (!verification.ok) {
       const attempts = row.attempts + 1;
       const invalidated = attempts >= MAX_OTP_ATTEMPTS;
+      const failures = lock.failures + 1;
+      const lockedOut = failures >= MAX_OTP_FAILURES;
       this.db
         .update(mcpProtectedRequests)
         .set({ attempts, status: invalidated ? 'invalidated' : row.status })
         .where(eq(mcpProtectedRequests.id, row.id))
         .run();
-      return { status: 'bad_code', attemptsRemaining: Math.max(0, MAX_OTP_ATTEMPTS - attempts) };
+      this.db
+        .update(mcpAdminAuthenticators)
+        .set({
+          failed_attempts: failures,
+          locked_until: lockedOut ? plusSeconds(input.nowIso, OTP_LOCKOUT_SECONDS) : null,
+          updated_at: input.nowIso,
+        })
+        .where(eq(mcpAdminAuthenticators.kilo_user_id, input.kiloUserId))
+        .run();
+      if (lockedOut) {
+        return { status: 'locked', retryAfterSeconds: OTP_LOCKOUT_SECONDS };
+      }
+      return {
+        status: 'bad_code',
+        // The tighter of the per-request and per-account budgets, so the count
+        // the caller sees is never larger than the one that will refuse it.
+        attemptsRemaining: Math.max(
+          0,
+          Math.min(MAX_OTP_ATTEMPTS - attempts, MAX_OTP_FAILURES - failures)
+        ),
+      };
     }
+    // A verified code clears the account-wide failure count: the admin proved
+    // possession, so earlier mistypes must not count toward a future lockout.
     this.db
       .update(mcpAdminAuthenticators)
-      .set({ last_used_step: verification.step, updated_at: input.nowIso })
+      .set({
+        last_used_step: verification.step,
+        failed_attempts: 0,
+        locked_until: null,
+        updated_at: input.nowIso,
+      })
       .where(eq(mcpAdminAuthenticators.kilo_user_id, input.kiloUserId))
       .run();
     const claimed = this.db
@@ -553,6 +617,34 @@ export class KiloMcpOAuthStore
         .where(eq(mcpAdminAuthenticators.kilo_user_id, kiloUserId))
         .get()?.last_used_step ?? null
     );
+  }
+
+  /**
+   * The authenticator's account-wide wrong-code state at `nowIso`. A
+   * `locked_until` still in the future locks the gate; an expired one starts a
+   * fresh window with no carried-over failures, so waiting out the lockout is
+   * not punished with an immediate re-lock on the next mistype.
+   */
+  private authenticatorLockState(
+    kiloUserId: string,
+    nowIso: string
+  ): { locked: false; failures: number } | { locked: true; retryAfterSeconds: number } {
+    const row = this.db
+      .select({
+        failed_attempts: mcpAdminAuthenticators.failed_attempts,
+        locked_until: mcpAdminAuthenticators.locked_until,
+      })
+      .from(mcpAdminAuthenticators)
+      .where(eq(mcpAdminAuthenticators.kilo_user_id, kiloUserId))
+      .get();
+    if (row?.locked_until) {
+      const remainingMs = Date.parse(row.locked_until) - Date.parse(nowIso);
+      if (remainingMs > 0) {
+        return { locked: true, retryAfterSeconds: Math.ceil(remainingMs / 1000) };
+      }
+      return { locked: false, failures: 0 };
+    }
+    return { locked: false, failures: row?.failed_attempts ?? 0 };
   }
 
   async getRefreshToken(hash: string, nowIso: string) {

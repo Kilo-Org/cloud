@@ -65,6 +65,12 @@ export const oauthRefreshTokenHistory = sqliteTable(
  * `last_used_step` records the RFC 6238 step of the last accepted execution
  * code, which is what makes an accepted code single use.
  *
+ * `failed_attempts` and `locked_until` are the account-wide wrong-code limiter:
+ * a protected request's own `attempts` cap is reset by every new
+ * `call_protected`, so the authenticator carries the count that a fresh request
+ * cannot reset. `MAX_OTP_FAILURES` consecutive failures set `locked_until`, and
+ * an accepted code clears both.
+ *
  * `secret` is base32 and never logged; no code is ever stored.
  */
 export const mcpAdminAuthenticators = sqliteTable('mcp_admin_authenticators', {
@@ -76,6 +82,10 @@ export const mcpAdminAuthenticators = sqliteTable('mcp_admin_authenticators', {
   verified_at: text('verified_at'),
   /** RFC 6238 step of the last accepted execution code (single use). */
   last_used_step: integer('last_used_step'),
+  /** Wrong execution codes since the last accepted code or lockout expiry. */
+  failed_attempts: integer('failed_attempts').notNull().default(0),
+  /** ISO timestamp until which submissions are refused; null when unlocked. */
+  locked_until: text('locked_until'),
   created_at: text('created_at').notNull(),
   updated_at: text('updated_at').notNull(),
 });

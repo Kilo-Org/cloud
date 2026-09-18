@@ -7,6 +7,7 @@ import m0004 from './0004_refresh_token_history.sql';
 import m0005 from './0005_approval_queue.sql';
 import m0006 from './0006_lovely_hammerhead.sql';
 import m0007 from './0007_drop_approval_queue.sql';
+import m0008 from './0008_watery_jazinda.sql';
 
 export default {
   journal,
@@ -19,5 +20,6 @@ export default {
     m0005,
     m0006,
     m0007,
+    m0008,
   },
 };

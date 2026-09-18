@@ -131,7 +131,10 @@ export type ProtectedRequestKind = 'admin' | 'debug';
  * an unknown id, another session's id and an already-used request — it names
  * nothing, so enumerating ids learns nothing. `bad_code` carries the attempts
  * remaining, `reused_code` refuses a code from a step already accepted, and
- * `no_authenticator` means the admin never finished enrollment.
+ * `no_authenticator` means the admin never finished enrollment. `locked` is the
+ * account-wide wrong-code limit: it is scoped to the authenticator, so minting
+ * a fresh `call_protected` request cannot reset it, and it carries how long the
+ * caller must wait before trying again.
  */
 export type OtpSubmitOutcome =
   | { status: 'ok'; path: string; inputJson: string | null }
@@ -140,7 +143,8 @@ export type OtpSubmitOutcome =
   | { status: 'invalidated' }
   | { status: 'bad_code'; attemptsRemaining: number }
   | { status: 'reused_code' }
-  | { status: 'no_authenticator' };
+  | { status: 'no_authenticator' }
+  | { status: 'locked'; retryAfterSeconds: number };
 
 /**
  * The protected-request surface the `call_protected` and `submit_otp` tools
@@ -164,14 +168,19 @@ export type ProtectedRequestsApi = {
    * consuming anything. An unknown id, another session's id and a used row
    * answer `gone`, so the caller's reply for those is uniform; the owning
    * connection, which already holds the id, gets the specific `expired` or
-   * `invalidated` state so its refusal can name the reason.
+   * `invalidated` state so its refusal can name the reason. `locked` reports
+   * the owner's account-wide wrong-code lockout, which no fresh request resets.
    */
   peekProtectedRequest(
     id: string,
     sessionId: string,
     nowIso: string
   ): Promise<
-    { status: 'pending' } | { status: 'expired' } | { status: 'invalidated' } | { status: 'gone' }
+    | { status: 'pending' }
+    | { status: 'expired' }
+    | { status: 'invalidated' }
+    | { status: 'gone' }
+    | { status: 'locked'; retryAfterSeconds: number }
   >;
   /**
    * Verify the submitted code against the owner's authenticator and, on

@@ -133,7 +133,7 @@ type CreatedProtectedRequest = Parameters<ProtectedRequestsApi['createProtectedR
 function fakeRequestsStore(options?: {
   id?: string;
   expiresAt?: string;
-  peek?: 'pending' | 'gone';
+  peek?: 'pending' | 'gone' | { status: 'locked'; retryAfterSeconds: number };
   outcome?: OtpSubmitOutcome;
 }): ProtectedRequestsApi & { created: CreatedProtectedRequest[] } {
   const created: CreatedProtectedRequest[] = [];
@@ -147,6 +147,7 @@ function fakeRequestsStore(options?: {
       };
     },
     async peekProtectedRequest() {
+      if (typeof options?.peek === 'object') return options.peek;
       return options?.peek === 'gone' ? { status: 'gone' } : { status: 'pending' };
     },
     async verifyOtpAndClaim() {
@@ -1451,6 +1452,14 @@ describe('tools/call submit_otp', () => {
         { status: 'no_authenticator' },
         'No authenticator is registered for this Kilo account. Reconnect the Kilo MCP server and add your authenticator at sign-in.',
       ],
+      [
+        { status: 'locked', retryAfterSeconds: 900 },
+        'Too many incorrect codes were submitted for this Kilo account. Try again in 15 minutes, then start a new admin or debug call with call_protected.',
+      ],
+      [
+        { status: 'locked', retryAfterSeconds: 20 },
+        'Too many incorrect codes were submitted for this Kilo account. Try again in 1 minute, then start a new admin or debug call with call_protected.',
+      ],
     ];
     for (const [outcome, message] of cases) {
       const requests = fakeRequestsStore({ outcome });
@@ -1480,6 +1489,25 @@ describe('tools/call submit_otp', () => {
     expect((json['error'] as { message: string }).message).toBe(
       'This request is no longer pending. Start a new admin or debug call with call_protected.'
     );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('refuses a locked account before spending an upstream admin re-check', async () => {
+    const requests = fakeRequestsStore({
+      peek: { status: 'locked', retryAfterSeconds: 900 },
+    });
+    const fetchImpl = adminCheckFetch(true);
+    const { json } = await submit(protectedHandler({ requests, fetchImpl }), {
+      request_id: 'req-1',
+      otp: '123456',
+    });
+    const error = json['error'] as { code: number; message: string };
+    expect(error.code).toBe(-32602);
+    expect(error.message).toBe(
+      'Too many incorrect codes were submitted for this Kilo account. Try again in 15 minutes, then start a new admin or debug call with call_protected.'
+    );
+    // The account-wide lock is consulted at peek, before the live admin check,
+    // so a locked account spends no upstream request on a guess.
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 

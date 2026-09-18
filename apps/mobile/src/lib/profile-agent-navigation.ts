@@ -26,3 +26,37 @@ export function getCodeReviewerProfilePath(scope: string): Href {
 export function getPrReviewEntryPath(): Href {
   return '/(app)/pr-review' as Href;
 }
+
+/**
+ * Profile context carried by a profile route. Org-owned profiles travel with
+ * their `organizationId`; a personal profile has none, exactly like the tRPC
+ * `agentProfiles.*` inputs.
+ */
+function profileContextQuery(organizationId?: string): string {
+  return organizationId ? `?organizationId=${encodeURIComponent(organizationId)}` : '';
+}
+
+/** The Manage Profiles entry on the Profile tab. */
+export function getProfilesPath(): Href {
+  return '/(app)/(tabs)/(3_profile)/profiles' as Href;
+}
+
+/** The profile editor's Overview tab (the profile's own route). */
+export function getProfileOverviewPath(profileId: string, organizationId?: string): Href {
+  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}${profileContextQuery(organizationId)}` as Href;
+}
+
+/** The profile editor's Variables tab. */
+export function getProfileVariablesPath(profileId: string, organizationId?: string): Href {
+  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/variables${profileContextQuery(organizationId)}` as Href;
+}
+
+/** The profile editor's Setup Commands tab. */
+export function getProfileCommandsPath(profileId: string, organizationId?: string): Href {
+  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/commands${profileContextQuery(organizationId)}` as Href;
+}
+
+/** The profile editor's Skills tab. */
+export function getProfileSkillsPath(profileId: string, organizationId?: string): Href {
+  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/skills${profileContextQuery(organizationId)}` as Href;
+}

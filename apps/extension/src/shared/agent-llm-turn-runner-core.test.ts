@@ -11,6 +11,7 @@ import type {
   KiloGatewayToolDefinition,
 } from './kilo-api-client';
 import { runLlmTurn } from './agent-llm-turn-runner-core';
+import { buildGatewayMessagesFromEvents } from './agent-llm-harness';
 
 const kiloApiClientMocks = vi.hoisted(() => ({
   fetchKiloGatewayChatCompletionStream: vi.fn(),
@@ -1267,5 +1268,71 @@ describe('continue nudge', () => {
     await runLlmTurn(nudgeOptions(fetch, []));
 
     expect(calls).toBe(3);
+  });
+});
+
+describe('reasoning details on persisted tool calls', () => {
+  it('persists the streamed reasoning details on the first tool call so the gateway replay carries them', async () => {
+    const reasoningDetails = [
+      { format: 'unknown', index: 0, text: 'Thinking about the page.', type: 'reasoning.text' },
+    ];
+    const appendedEvents: AgentConversationEvent[] = [];
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            `data: {"choices":[{"delta":{"reasoning_details":${JSON.stringify(reasoningDetails)}}}]}\n\n`,
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Done."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: events => {
+        appendedEvents.push(...events);
+      },
+      conversationEvents: [createUserMessage('Read the page')],
+      executeToolCall: () => Promise.resolve({ ok: true as const, value: { text: 'ok' } }),
+      failureMessage: String,
+      fetch,
+      maxToolRounds: 4,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'No response.',
+      onUsage: () => {},
+      signal: undefined,
+      toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
+        toolCalls.map(toolCall =>
+          createToolCall({
+            arguments: {},
+            name: 'kilo_browser_snapshot',
+            providerToolCallId: toolCall.id,
+            tabId: 123,
+          })
+        ),
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many tool rounds.',
+      tools: [getPageSnapshotTool],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    const persistedToolCall = appendedEvents.find(event => event.type === 'tool-call');
+    expect(persistedToolCall).toMatchObject({ reasoningDetails });
+
+    const assistantMessage = buildGatewayMessagesFromEvents(appendedEvents).find(
+      message => message.role === 'assistant'
+    );
+    expect(assistantMessage?.reasoning_details).toStrictEqual(reasoningDetails);
   });
 });

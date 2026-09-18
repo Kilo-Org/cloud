@@ -398,18 +398,14 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         (event): event is ToolResultEvent => event.type === 'tool-result'
       );
       const resolvedToolCallIds = new Set(resolvedToolResultEvents.map(event => event.toolCallId));
-      const toolCallEvents = withReasoningDetails(
-        turnEvents.filter(
-          (event): event is ToolCall =>
-            event.type === 'tool-call' && !resolvedToolCallIds.has(event.id)
-        ),
+      // The reasoning attaches to the first call of the assistant tool_calls message and must reach the persisted events, so replay carries it.
+      const turnToolCallEvents = withReasoningDetails(
+        turnEvents.filter((event): event is ToolCall => event.type === 'tool-call'),
         completion.reasoningDetails
       );
+      const toolCallEvents = turnToolCallEvents.filter(event => !resolvedToolCallIds.has(event.id));
       // Calls first, then resolved results: an interleaved refusal would split the assistant tool_calls message and leave a call unanswered.
-      completionEvents.push(
-        ...turnEvents.filter(event => event.type === 'tool-call'),
-        ...resolvedToolResultEvents
-      );
+      completionEvents.push(...turnToolCallEvents, ...resolvedToolResultEvents);
 
       appendEvents(
         completionEvents.filter(

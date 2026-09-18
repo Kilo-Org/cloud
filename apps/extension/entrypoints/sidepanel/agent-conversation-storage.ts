@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { conversationEventsSchema, storedConversationsSchema } from './agent-conversation-schemas';
-import { isKiloBrowserToolCallName } from './agent-tool-call-events';
 import { toPersistedConversationEvents } from '@/src/shared/agent-conversation-persistence';
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 import { normalizeStoredConversations } from '@/src/shared/agent-conversation-tabs';
@@ -137,31 +136,13 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
           });
           break;
         }
-        // Browser and workflow events both carry arguments; the name tells them apart.
+        // Browser and workflow calls share one shape, so the parsed event is already the event to keep; only the optional field is normalized for the union's exact optional type.
         if ('arguments' in event) {
-          if (isKiloBrowserToolCallName(event.name)) {
-            events.push({
-              arguments: event.arguments,
-              id: event.id,
-              name: event.name,
-              ...(event.providerToolCallId === undefined
-                ? {}
-                : { providerToolCallId: event.providerToolCallId }),
-              tabId: event.tabId,
-              type: event.type,
-            });
-          } else {
-            events.push({
-              arguments: event.arguments,
-              id: event.id,
-              name: event.name,
-              ...(event.providerToolCallId === undefined
-                ? {}
-                : { providerToolCallId: event.providerToolCallId }),
-              tabId: event.tabId,
-              type: event.type,
-            });
-          }
+          const { providerToolCallId, ...call } = event;
+          events.push({
+            ...call,
+            ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
+          });
           break;
         }
         // A persisted retired page tool predates the Playwright tools; load it as its replacement.

@@ -1,7 +1,6 @@
-/* eslint-disable max-lines -- memory-tool cases live with the existing runtime suite */
 import { describe, expect, it, vi } from 'vitest';
-import { PAGE_SNAPSHOT_MESSAGE } from './tab-debugger';
-import { createSafeToolCall } from './agent-conversation';
+import { BROWSER_TOOL_MESSAGE } from './tab-debugger';
+import { createSafeToolCall, createToolCall } from './agent-conversation';
 import type { AgentMemory } from './agent-memories';
 
 const mocks = vi.hoisted(() => ({
@@ -39,317 +38,7 @@ const sampleMemory = (overrides: Partial<AgentMemory> = {}): AgentMemory => ({
   ...overrides,
 });
 
-describe('safe tool runtime', () => {
-  it('resolves element details from the requested cached snapshot', async () => {
-    mocks.sendMessage.mockReset();
-    mocks.sendMessage.mockResolvedValueOnce({
-      ok: true,
-      result: {
-        ok: true,
-        value: {
-          nodes: [
-            {
-              id: 'node-1',
-              role: 'button',
-              tag: 'button',
-              text: 'Original button',
-            },
-          ],
-          snapshotId: 'snapshot-1',
-          text: 'Original button',
-          title: 'Original page',
-          url: 'https://example.com/',
-        },
-      },
-      type: PAGE_SNAPSHOT_MESSAGE,
-    });
-
-    await expect(
-      executeSafeToolCall(
-        createSafeToolCall({
-          name: 'get_page_snapshot',
-          tabId: 7,
-        })
-      )
-    ).resolves.toStrictEqual({
-      ok: true,
-      value: {
-        limits: {
-          maxNodeCount: 80,
-          maxNodeTextLength: 500,
-          maxTextLength: 24_000,
-        },
-        nodes: [
-          {
-            id: 'node-1',
-            role: 'button',
-            tag: 'button',
-            text: 'Original button',
-          },
-        ],
-        nodesTruncated: false,
-        snapshotId: 'snapshot-1',
-        text: 'Original button',
-        textStart: 0,
-        textTotalChars: 'Original button'.length,
-        textTruncated: false,
-        title: 'Original page',
-        url: 'https://example.com/',
-      },
-    });
-
-    await expect(
-      executeSafeToolCall(
-        createSafeToolCall({
-          elementId: 'node-1',
-          name: 'get_element_details',
-          snapshotId: 'snapshot-1',
-          tabId: 7,
-        })
-      )
-    ).resolves.toStrictEqual({
-      ok: true,
-      value: {
-        id: 'node-1',
-        role: 'button',
-        tag: 'button',
-        text: 'Original button',
-      },
-    });
-    expect(mocks.sendMessage.mock.calls[0]?.[0]).toStrictEqual({
-      tabId: 7,
-      type: PAGE_SNAPSHOT_MESSAGE,
-    });
-    expect(mocks.sendMessage.mock.calls[1]).toBeUndefined();
-  });
-
-  it('adds snapshot limits and default truncation metadata', async () => {
-    mocks.sendMessage.mockReset();
-    mocks.sendMessage.mockResolvedValueOnce({
-      ok: true,
-      result: {
-        ok: true,
-        value: {
-          nodes: [],
-          snapshotId: 'snapshot-2',
-          text: 'Small page',
-          title: 'Small',
-          url: 'https://example.com/',
-        },
-      },
-      type: PAGE_SNAPSHOT_MESSAGE,
-    });
-
-    await expect(
-      executeSafeToolCall(
-        createSafeToolCall({
-          name: 'get_page_snapshot',
-          tabId: 7,
-        })
-      )
-    ).resolves.toStrictEqual({
-      ok: true,
-      value: {
-        limits: {
-          maxNodeCount: 80,
-          maxNodeTextLength: 500,
-          maxTextLength: 24_000,
-        },
-        nodes: [],
-        nodesTruncated: false,
-        snapshotId: 'snapshot-2',
-        text: 'Small page',
-        textStart: 0,
-        textTotalChars: 'Small page'.length,
-        textTruncated: false,
-        title: 'Small',
-        url: 'https://example.com/',
-      },
-    });
-  });
-
-  it('returns ranked find results merging full-page text matches and truncation metadata', async () => {
-    mocks.sendMessage.mockReset();
-    // One injection serves find_in_page: the snapshot carries the full-page text matches.
-    mocks.sendMessage.mockResolvedValueOnce({
-      ok: true,
-      result: {
-        ok: true,
-        value: {
-          limits: {
-            maxNodeCount: 80,
-            maxNodeTextLength: 500,
-            maxTextLength: 24_000,
-          },
-          nodes: [
-            {
-              id: 'node-1',
-              label: 'Keyword action',
-              role: 'button',
-              tag: 'button',
-            },
-            {
-              href: 'https://example.com/docs/keyword',
-              id: 'node-2',
-              role: 'link',
-              tag: 'a',
-              text: 'Documentation',
-            },
-          ],
-          nodesTruncated: false,
-          snapshotId: 'snapshot-3',
-          text: 'Plain paragraph has keyword outside captured nodes.',
-          textMatches: [{ excerpt: 'paragraph has keyword outside', offset: 9021 }],
-          textTruncated: true,
-          title: 'Find page',
-          totalTextMatches: 1,
-          url: 'https://example.com/',
-        },
-      },
-      type: PAGE_SNAPSHOT_MESSAGE,
-    });
-
-    await expect(
-      executeSafeToolCall(
-        createSafeToolCall({
-          name: 'find_in_page',
-          query: 'keyword',
-          tabId: 7,
-        })
-      )
-    ).resolves.toStrictEqual({
-      ok: true,
-      value: {
-        matches: [
-          {
-            id: 'node-1',
-            label: 'Keyword action',
-            matchedField: 'label',
-            role: 'button',
-            tag: 'button',
-          },
-          {
-            excerpt: 'paragraph has keyword outside',
-            matchedField: 'pageText',
-            offset: 9021,
-            role: 'document',
-            tag: 'body',
-          },
-          {
-            href: 'https://example.com/docs/keyword',
-            id: 'node-2',
-            matchedField: 'href',
-            role: 'link',
-            tag: 'a',
-            text: 'Documentation',
-          },
-        ],
-        note: 'Each pageText excerpt carries its character offset in the full page text. To read the section around a match, call get_page_snapshot with textStart set near that offset.',
-        snapshotId: 'snapshot-3',
-        totalMatches: 3,
-        truncated: false,
-      },
-    });
-    expect(mocks.sendMessage.mock.calls[0]?.[0]).toStrictEqual({
-      query: 'keyword',
-      tabId: 7,
-      type: PAGE_SNAPSHOT_MESSAGE,
-    });
-    expect(mocks.sendMessage.mock.calls[1]).toBeUndefined();
-  });
-
-  it('reports truncation when the page has more text matches than it returns', async () => {
-    mocks.sendMessage.mockReset();
-    mocks.sendMessage.mockResolvedValueOnce({
-      ok: true,
-      result: {
-        ok: true,
-        value: {
-          nodes: [],
-          snapshotId: 'snapshot-5',
-          text: 'keyword everywhere',
-          textMatches: [...Array.from({ length: 20 }).keys()].map(index => ({
-            excerpt: `match ${String(index)}`,
-            offset: index * 100,
-          })),
-          title: 'Busy page',
-          totalTextMatches: 500,
-          url: 'https://example.com/busy',
-        },
-      },
-      type: PAGE_SNAPSHOT_MESSAGE,
-    });
-
-    const result = await executeSafeToolCall(
-      createSafeToolCall({
-        name: 'find_in_page',
-        query: 'keyword',
-        tabId: 7,
-      })
-    );
-
-    expect(result).toMatchObject({
-      ok: true,
-      value: { totalMatches: 500, truncated: true },
-    });
-  });
-
-  it('pages the snapshot text window with textStart and appends a continuation note', async () => {
-    mocks.sendMessage.mockReset();
-    mocks.sendMessage.mockResolvedValueOnce({
-      ok: true,
-      result: {
-        ok: true,
-        value: {
-          nodes: [],
-          snapshotId: 'snapshot-4',
-          text: 'middle window',
-          textStart: 8000,
-          textTotalChars: 40_000,
-          textTruncated: true,
-          title: 'Long page',
-          url: 'https://example.com/long',
-        },
-      },
-      type: PAGE_SNAPSHOT_MESSAGE,
-    });
-
-    await expect(
-      executeSafeToolCall(
-        createSafeToolCall({
-          name: 'get_page_snapshot',
-          tabId: 7,
-          textStart: 8000,
-        })
-      )
-    ).resolves.toStrictEqual({
-      ok: true,
-      value: {
-        limits: {
-          maxNodeCount: 80,
-          maxNodeTextLength: 500,
-          maxTextLength: 24_000,
-        },
-        nodes: [],
-        nodesTruncated: false,
-        note: 'Page text shows characters 8000-8013 of 40000. To read on, call get_page_snapshot with textStart: 8013; to jump to a specific fact, use find_in_page — it searches the full page text.',
-        snapshotId: 'snapshot-4',
-        text: 'middle window',
-        textStart: 8000,
-        textTotalChars: 40_000,
-        textTruncated: true,
-        title: 'Long page',
-        url: 'https://example.com/long',
-      },
-    });
-
-    expect(mocks.sendMessage.mock.calls[0]?.[0]).toStrictEqual({
-      tabId: 7,
-      textStart: 8000,
-      type: PAGE_SNAPSHOT_MESSAGE,
-    });
-  });
-
+describe('safe tool runtime memory tools', () => {
   it('returns shaped search_memories results without touching the tab snapshot path', async () => {
     mocks.sendMessage.mockReset();
     mocks.loadAgentMemories.mockReset();
@@ -495,5 +184,56 @@ describe('safe tool runtime', () => {
     });
     expect(mocks.loadAgentMemories).not.toHaveBeenCalled();
     expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('safe tool runtime browser dispatch', () => {
+  it('forwards a kilo_browser_ call to the background with its arguments verbatim', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.loadAgentMemories.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({
+      ok: true,
+      result: { ok: true, value: { snapshot: 'page' } },
+      type: BROWSER_TOOL_MESSAGE,
+    });
+
+    const toolCall = createToolCall({
+      arguments: { target: 'e5' },
+      name: 'kilo_browser_click',
+      tabId: 7,
+    });
+
+    await expect(executeSafeToolCall(toolCall)).resolves.toStrictEqual({
+      ok: true,
+      value: { snapshot: 'page' },
+    });
+    expect(mocks.sendMessage).toHaveBeenCalledWith({
+      arguments: { target: 'e5' },
+      tabId: 7,
+      tool: 'kilo_browser_click',
+      type: BROWSER_TOOL_MESSAGE,
+    });
+    expect(mocks.loadAgentMemories).not.toHaveBeenCalled();
+  });
+
+  it('reports a background refusal as a tool error', async () => {
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({
+      error: 'The selected tab is not inspectable.',
+      ok: false,
+    });
+
+    await expect(
+      executeSafeToolCall(
+        createToolCall({
+          arguments: {},
+          name: 'kilo_browser_snapshot',
+          tabId: 7,
+        })
+      )
+    ).resolves.toStrictEqual({
+      error: 'The selected tab is not inspectable.',
+      ok: false,
+    });
   });
 });

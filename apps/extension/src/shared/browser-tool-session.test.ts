@@ -1,12 +1,17 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, max-classes-per-file -- the page-global fakes below need several instanceof-identity classes in this one test file */
 import { describe, expect, it } from 'vitest';
 import {
+  FIREFOX_PLATFORM_LIMIT,
+  FIREFOX_UNSUPPORTED_BROWSER_TOOLS,
   MAX_BROWSER_TOOL_CONSOLE_MESSAGES,
   MAX_BROWSER_TOOL_NETWORK_REQUESTS,
   createBrowserToolSession,
+  getFirefoxUnsupportedToolError,
 } from './browser-tool-session';
 import { TAB_NOT_INSPECTABLE_ERROR } from './tab-debugger';
 import type {
+  BrowserScriptingApi,
+  BrowserScriptingInjectionResult,
   BrowserTabsApi,
   ChromeDebuggerApi,
   ChromeDebuggerDetachListener,
@@ -200,6 +205,185 @@ const createGate = (): { readonly release: () => void; readonly wait: Promise<vo
   };
 };
 
+/**
+ * Stands in for `browser.scripting.executeScript`: it records the injected
+ * page code and returns the envelope `buildWorkflowPageCode` produces around a
+ * script that returns `{ done: true, result }`, so the session's scripting path
+ * is exercised without a real page.
+ */
+const createScriptingApi = (
+  resultForCode: (code: string) => unknown = () => 'ok'
+): {
+  readonly api: BrowserScriptingApi;
+  readonly codes: string[];
+} => {
+  const codes: string[] = [];
+  const api: BrowserScriptingApi = {
+    executeScript: <InjectionResult>(details: {
+      readonly args: string[];
+      readonly func: (...args: string[]) => InjectionResult;
+      readonly target: { readonly tabId: number; readonly documentIds?: string[] };
+      readonly world: 'MAIN';
+    }): Promise<BrowserScriptingInjectionResult[]> => {
+      const code = details.args[0] ?? '';
+
+      codes.push(code);
+
+      const payload = resultForCode(code);
+
+      return Promise.resolve([
+        { documentId: 'doc-1', result: { ok: true, value: { done: true, result: payload } } },
+      ]);
+    },
+  };
+
+  return { api, codes };
+};
+
+const createScriptingSession = (options: { readonly result?: (code: string) => unknown } = {}) => {
+  const scriptingApi = createScriptingApi(options.result);
+  const tabsApi = createTabsApi();
+
+  return {
+    scriptApi: scriptingApi,
+    session: createBrowserToolSession({
+      scriptingApi: scriptingApi.api,
+      tabId: 7,
+      tabsApi: tabsApi.api,
+    }),
+  };
+};
+
+/**
+ * Runs the wrapped page code exactly like `runInjectedEval` in tab-debugger.ts
+ * runs it in the real MAIN world. The workflow wrapper only passes `page` into
+ * the compiled body form, so a page script referencing the wrapper's own
+ * consts (`fillElement`, `sleepMs`) throws a ReferenceError here exactly as it
+ * would in Firefox — this is what proves the scripting actions are
+ * self-contained.
+ */
+const executeWrappedPageCode = (code: string): Promise<unknown> =>
+  // eslint-disable-next-line eslint/no-new-func, typescript-eslint/no-implied-eval, typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-return -- mirrors the real injection in tab-debugger.ts
+  new Function(`return (async () => { ${code} })()`)();
+
+// eslint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- the test installs and restores page globals by name
+const globalScope = globalThis as unknown as Record<string, unknown>;
+
+/** Installs the named page globals for the duration of `run`, then restores the previous values. */
+const withPageGlobals = async (
+  globals: Record<string, unknown>,
+  run: () => Promise<void>
+): Promise<void> => {
+  const previous = new Map<string, unknown>();
+
+  for (const [key, value] of Object.entries(globals)) {
+    previous.set(key, globalScope[key]);
+    globalScope[key] = value;
+  }
+
+  try {
+    await run();
+  } finally {
+    for (const [key, value] of previous) {
+      globalScope[key] = value;
+    }
+  }
+};
+
+class FakeEvent {
+  readonly type: string;
+
+  constructor(type: string) {
+    this.type = type;
+  }
+}
+
+class FakeKeyboardEvent {
+  readonly key: string;
+  readonly type: string;
+
+  constructor(type: string, init?: { readonly key?: string }) {
+    this.type = type;
+    this.key = init?.key ?? '';
+  }
+}
+
+/** Stands in for `HTMLInputElement`: a real value accessor so the native-setter path in `__fillElement` runs. */
+class FakeInputElement {
+  #value = '';
+  readonly events: { type: string; key?: string }[] = [];
+  form = null;
+  isContentEditable = false;
+
+  get value(): string {
+    return this.#value;
+  }
+
+  set value(next: unknown) {
+    this.#value = String(next);
+  }
+
+  dispatchEvent(event: { readonly key?: string; readonly type: string }): void {
+    this.events.push(
+      event.key === undefined ? { type: event.type } : { key: event.key, type: event.type }
+    );
+  }
+
+  focus(): void {}
+
+  scrollIntoView(): void {}
+}
+
+/** A fake `browser.scripting.executeScript` that actually evaluates the wrapped page code. */
+const createExecutingScriptingSession = () => {
+  const codes: string[] = [];
+  const scriptingApi: BrowserScriptingApi = {
+    executeScript: async details => {
+      const code = details.args[0] ?? '';
+
+      codes.push(code);
+
+      const result = await executeWrappedPageCode(code);
+
+      return [{ documentId: 'doc-1', result }];
+    },
+  };
+  const tabsApi = createTabsApi();
+
+  return {
+    codes,
+    session: createBrowserToolSession({
+      scriptingApi,
+      tabId: 7,
+      tabsApi: tabsApi.api,
+    }),
+  };
+};
+
+const createFakePageGlobals = (): {
+  globals: Record<string, unknown>;
+  input: FakeInputElement;
+} => {
+  const input = new FakeInputElement();
+
+  return {
+    globals: {
+      Event: FakeEvent,
+      HTMLInputElement: FakeInputElement,
+      // eslint-disable-next-line typescript-eslint/no-extraneous-class -- instanceof identity only: the page script checks `el instanceof HTMLSelectElement`
+      HTMLSelectElement: class FakeSelectElement {},
+      // eslint-disable-next-line typescript-eslint/no-extraneous-class -- instanceof identity only: the page script checks `el instanceof HTMLTextAreaElement`
+      HTMLTextAreaElement: class FakeTextAreaElement {},
+      KeyboardEvent: FakeKeyboardEvent,
+      document: {
+        querySelector: (selector: string): FakeInputElement | null =>
+          selector === '#name' ? input : null,
+      },
+    },
+    input,
+  };
+};
+
 describe('browser tool session', () => {
   it('attaches once, lazily, and enables every CDP domain before the first send', async () => {
     const { debuggerApi, session } = createSession();
@@ -347,6 +531,82 @@ describe('browser tool session', () => {
     expect(requests).toHaveLength(MAX_BROWSER_TOOL_NETWORK_REQUESTS);
     expect(requests.at(-1)?.requestId).toBe(`r-${MAX_BROWSER_TOOL_NETWORK_REQUESTS + 2}`);
     expect(requests.some(request => request.requestId === 'fail-1')).toBe(false);
+  });
+
+  it('records the frame id and scopes requests since load to the main-frame document', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.frameNavigated', {
+      frame: { id: 'main', url: 'https://example.com/' },
+    });
+    debuggerApi.emitEvent(7, 'Network.requestWillBeSent', {
+      frameId: 'main',
+      request: { url: 'https://example.com/' },
+      requestId: 'doc',
+      type: 'Document',
+    });
+    debuggerApi.emitEvent(7, 'Network.requestWillBeSent', {
+      frameId: 'main',
+      request: { url: 'https://example.com/api' },
+      requestId: 'api',
+      type: 'XHR',
+    });
+    // A same-process iframe's document request must not move the boundary or hide the main document.
+    debuggerApi.emitEvent(7, 'Network.requestWillBeSent', {
+      frameId: 'frame-1',
+      request: { url: 'https://example.com/embed' },
+      requestId: 'frame-doc',
+      type: 'Document',
+    });
+
+    expect(session.networkRequestsSinceLoad().map(request => request.requestId)).toStrictEqual([
+      'doc',
+      'api',
+      'frame-doc',
+    ]);
+    expect(session.networkRequests().find(request => request.requestId === 'doc')?.frameId).toBe(
+      'main'
+    );
+  });
+
+  it('starts requests since load at the newest main-frame document', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Page.frameNavigated', { frame: { id: 'main' } });
+    debuggerApi.emitEvent(7, 'Network.requestWillBeSent', {
+      frameId: 'main',
+      request: { url: 'https://example.com/first' },
+      requestId: 'first-doc',
+      type: 'Document',
+    });
+    debuggerApi.emitEvent(7, 'Network.requestWillBeSent', {
+      frameId: 'main',
+      request: { url: 'https://example.com/second' },
+      requestId: 'second-doc',
+      type: 'Document',
+    });
+
+    expect(session.networkRequestsSinceLoad().map(request => request.requestId)).toStrictEqual([
+      'second-doc',
+    ]);
+  });
+
+  it('keeps the whole buffer when no main-frame navigation was observed', async () => {
+    const { debuggerApi, session } = createSession();
+
+    await session.attach();
+    debuggerApi.emitEvent(7, 'Network.requestWillBeSent', {
+      frameId: 'frame-1',
+      request: { url: 'https://example.com/embed' },
+      requestId: 'frame-doc',
+      type: 'Document',
+    });
+
+    expect(session.networkRequestsSinceLoad().map(request => request.requestId)).toStrictEqual([
+      'frame-doc',
+    ]);
   });
 
   it('hands the pending dialog to exactly one call and clears it on close', async () => {
@@ -598,5 +858,148 @@ describe('browser tool session', () => {
       { nodeId: 11, selector: '#still' },
       { nodeId: 33, selector: '#fresh' },
     ]);
+  });
+});
+
+const scriptingSnapshotPayload = {
+  lines: ['- button "Go" e1'],
+  nextRef: 1,
+  refs: [{ ref: 'e1', selector: 'button.go' }],
+};
+
+// The snapshot builder and every other scripting action run through the same injection.
+// The fake keys its payload off the aria builder in the code.
+const scriptingResultForCode = (code: string): unknown =>
+  code.includes('__buildAria') ? scriptingSnapshotPayload : 'ok';
+
+describe('browser tool session scripting backend', () => {
+  it('selects the scripting backend when chrome.debugger is unavailable', () => {
+    const { session } = createScriptingSession();
+    const { session: debuggerBackedSession } = createSession();
+
+    expect(session.backend).toBe('scripting');
+    expect(debuggerBackedSession.backend).toBe('debugger');
+  });
+
+  it('runs a supported tool through the scripting API and surfaces its value', async () => {
+    const { scriptApi, session } = createScriptingSession({
+      result: () => 'Clicked #submit with the left button.',
+    });
+
+    await expect(
+      session.callTool('kilo_browser_click', { target: '#submit' })
+    ).resolves.toStrictEqual({
+      ok: true,
+      value: 'Clicked #submit with the left button.',
+    });
+    expect(scriptApi.codes).toHaveLength(1);
+    expect(scriptApi.codes[0]).toContain('#submit');
+  });
+
+  it('registers scripting snapshot refs so a later tool call can target them', async () => {
+    const { scriptApi, session } = createScriptingSession({
+      result: scriptingResultForCode,
+    });
+
+    await expect(session.callTool('kilo_browser_snapshot')).resolves.toStrictEqual({
+      ok: true,
+      value: '- button "Go" e1',
+    });
+
+    await session.callTool('kilo_browser_click', { target: 'e1' });
+
+    expect(scriptApi.codes).toHaveLength(2);
+    expect(scriptApi.codes[1]).toContain('button.go');
+  });
+
+  it('types into a fake input by executing the injected page code for real', async () => {
+    const { session } = createExecutingScriptingSession();
+    const { globals, input } = createFakePageGlobals();
+
+    await withPageGlobals(globals, async () => {
+      await expect(
+        session.callTool('kilo_browser_type', { target: '#name', text: 'Ada' })
+      ).resolves.toStrictEqual({ ok: true, value: 'Typed into #name.' });
+    });
+
+    expect(input.value).toBe('Ada');
+    expect(input.events.map(event => event.type)).toStrictEqual(['input', 'change']);
+  });
+
+  it('types slowly character by character with key events through the injected code', async () => {
+    const { session } = createExecutingScriptingSession();
+    const { globals, input } = createFakePageGlobals();
+
+    await withPageGlobals(globals, async () => {
+      await expect(
+        session.callTool('kilo_browser_type', { slowly: true, target: '#name', text: 'Go' })
+      ).resolves.toStrictEqual({ ok: true, value: 'Typed into #name.' });
+    });
+
+    expect(input.value).toBe('Go');
+    expect(
+      input.events.filter(event => event.type === 'keydown').map(event => event.key)
+    ).toStrictEqual(['G', 'o']);
+    expect(input.events.filter(event => event.type === 'input')).toHaveLength(2);
+  });
+
+  it('fills a form field by executing the injected page code for real', async () => {
+    const { session } = createExecutingScriptingSession();
+    const { globals, input } = createFakePageGlobals();
+
+    await withPageGlobals(globals, async () => {
+      await expect(
+        session.callTool('kilo_browser_fill_form', {
+          fields: [{ name: 'email', target: '#name', type: 'text', value: 'ada@example.com' }],
+        })
+      ).resolves.toStrictEqual({
+        ok: true,
+        value: 'Filled 1 field(s).\nemail: filled',
+      });
+    });
+
+    expect(input.value).toBe('ada@example.com');
+  });
+
+  it('waits for a bounded time through the injected page code', async () => {
+    const { session } = createExecutingScriptingSession();
+
+    await expect(session.callTool('kilo_browser_wait_for', { time: 0.2 })).resolves.toStrictEqual({
+      ok: true,
+      value: 'Waited 0 second(s).',
+    });
+  });
+
+  it.each(FIREFOX_UNSUPPORTED_BROWSER_TOOLS)(
+    'returns a named Firefox error for %s instead of a silent no-op',
+    async tool => {
+      const { scriptApi, session } = createScriptingSession();
+
+      await expect(session.callTool(tool)).resolves.toStrictEqual({
+        error: `${tool} is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`,
+        ok: false,
+      });
+      expect(scriptApi.codes).toStrictEqual([]);
+      expect(session.getToolUnavailableError(tool)).toBe(
+        `${tool} is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`
+      );
+    }
+  );
+
+  it('names the upstream tool in the Firefox error and keeps it off the debugger backend', () => {
+    const { session } = createScriptingSession();
+
+    expect(getFirefoxUnsupportedToolError('browser_console_messages')).toBe(
+      `kilo_browser_console_messages is not available in Firefox: ${FIREFOX_PLATFORM_LIMIT}.`
+    );
+    expect(session.getToolUnavailableError('kilo_browser_console_messages')).toContain(
+      FIREFOX_PLATFORM_LIMIT
+    );
+
+    const { session: debuggerBackedSession } = createSession();
+
+    expect(
+      debuggerBackedSession.getToolUnavailableError('kilo_browser_console_messages')
+    ).toBeUndefined();
   });
 });

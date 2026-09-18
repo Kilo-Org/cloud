@@ -19,6 +19,8 @@ const AUTH_ERROR_KEYS = {
   INVALID_EMAIL: 'authErrors.invalidEmail',
   INVALID_REQUEST: 'authErrors.invalidRequest',
   EMAIL_DELIVERY_FAILED: 'authErrors.emailDeliveryFailed',
+  // Client-side: the bounded auth POST aborted before the server answered.
+  TIMEOUT: 'authErrors.signInTimedOut',
   // Admission: server refuses the device under enforce mode — non-retryable.
   ADMISSION_REQUIRED: 'authErrors.admissionRequired',
 } satisfies Record<string, string>;

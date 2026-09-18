@@ -297,6 +297,7 @@
       "chat": "Chat-Nachrichten",
       "kiloclaw": "KiloClaw-Aktivitäten",
       "balance": "Guthaben-Warnungen",
+      "spend": "Ausgaben-Warnungen",
       "security": "Sicherheitsbefunde"
     },
     "category": {
@@ -309,6 +310,8 @@
       "sessionStatusSubtitle": "beendet / fehlgeschlagen / bereit zur Steuerung",
       "kiloclawActivitySubtitle": "instanz bereit/fehlgeschlagen, geplante Aktionen",
       "balanceAlertsSubtitle": "warnungen bei niedrigem Organisationsguthaben",
+      "spendAlertsSubtitle": "Schwellenwertüberschreitungen und stündliche Spitzen",
+      "spendAlertsToggle": "Kategorie „Ausgaben-Warnungen“",
       "securityFindingsSubtitle": "neue Sicherheitsbefunde und SLA-Erinnerungen"
     }
   },
@@ -3134,5 +3137,28 @@
       "repositoryUnknown": "Kilo erkennt {{repository}} nicht als GitHub- oder GitLab-Repository. Wähle ein anderes Repository in Kilo.",
       "repositoryUnsupported": "{{repository}} ist ein Bitbucket-Repository — Agent starten kann es noch nicht verwenden. Wähle ein anderes Repository in Kilo."
     }
+  },
+  "spendAlerts": {
+    "subtitle": "Sende den Abrechnungskontakten eine E-Mail- oder Push-Warnung, wenn die Ausgaben dieses Bereichs ein Limit überschreiten oder über ihre übliche Stundenrate steigen.",
+    "enable": "Ausgaben-Warnungen aktivieren",
+    "thresholdTitle": "Schwellenwertüberschreitung",
+    "thresholdSubtitle": "Laufende Ausgaben überschreiten dein Limit",
+    "anomalyTitle": "Stündliche Spitze",
+    "anomalySubtitle": "Eine Stunde liegt weit über der üblichen Rate dieses Bereichs",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Zeitfenster",
+    "window24h": "24 Stunden",
+    "window7d": "7 Tage",
+    "window30d": "30 Tage",
+    "multiplierLabel": "Spitzen-Multiplikator",
+    "saved": "Einstellungen für Ausgaben-Warnungen gespeichert",
+    "loadError": "Ausgaben-Warnungen konnten nicht geladen werden.",
+    "saveError": "Ausgaben-Warnungen konnten nicht gespeichert werden.",
+    "empty": "Ausgaben-Warnungen sind aus. Schalte sie ein, um die Abrechnungskontakte dieses Bereichs zu warnen.",
+    "noSpend": "Noch keine Ausgaben erfasst",
+    "spend24h": "Ausgaben der letzten 24 Stunden",
+    "multiplierError": "Gib einen Multiplikator von 1 oder mehr ein",
+    "permissionDenied": "Du hast keine Berechtigung, Ausgaben-Warnungen zu verwalten.",
+    "pushOffByCategory": "In Benachrichtigungen aus"
   }
 }

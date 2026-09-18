@@ -17,6 +17,7 @@ const variants = [
   { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sb1' },
   { type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'attention' },
   { type: 'low_balance', organizationId: 'org1' },
+  { type: 'spend_alert', scope: 'organization', organizationId: 'org1' },
   { type: 'security_finding', findingId: 'f1', scope: 'org' },
   { type: 'security_lifecycle', event: 'analysis_completed', findingId: 'f1', scope: 'org' },
   {
@@ -56,6 +57,7 @@ describe('androidChannelIdForPushData', () => {
       'instance-lifecycle': 'kiloclaw',
       'scheduled-action': 'kiloclaw',
       low_balance: 'balance',
+      spend_alert: 'balance',
       security_finding: 'security',
       security_lifecycle: 'security',
       active_agents_glanceable: 'active-agents',
@@ -107,6 +109,19 @@ describe('genericPushContentForPushData', () => {
     expect(genericPushContentForPushData(parsed)).toEqual({
       title: 'Kilo',
       body: 'A security finding needs attention',
+    });
+  });
+
+  it('returns the spend alert copy for the spend_alert variant', () => {
+    const parsed = pushDataSchema.parse({
+      type: 'spend_alert',
+      scope: 'organization',
+      organizationId: 'org1',
+    });
+    expect(androidChannelIdForPushData(parsed)).toBe('balance');
+    expect(genericPushContentForPushData(parsed)).toEqual({
+      title: 'Kilo',
+      body: 'Your spend needs attention',
     });
   });
 

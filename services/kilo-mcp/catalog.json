@@ -10167,6 +10167,28 @@
     ],
     "searchBlob": "slack.getInstallation Check whether the Slack integration is installed for the current organization or workspace, and retrieve installation details like team ID, team name, installation status, scopes, missing scopes, and installed date. slack getinstallation organizationid organizationId"
   },
+  "spendAlerts.get": {
+    "path": "spendAlerts.get",
+    "kind": "query",
+    "summary": "Get the spend alert settings and notification thresholds for your personal account or a given organization, showing whether you have permission to manage them. Use this to check current spend limit alert configuration for yourself or a team.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "spendalerts",
+      "get",
+      "organizationid"
+    ],
+    "searchBlob": "spendAlerts.get Get the spend alert settings and notification thresholds for your personal account or a given organization, showing whether you have permission to manage them. Use this to check current spend limit alert configuration for yourself or a team. spendalerts get organizationid organizationId"
+  },
   "unifiedSessions.list": {
     "path": "unifiedSessions.list",
     "kind": "query",

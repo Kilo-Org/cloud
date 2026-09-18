@@ -787,6 +787,7 @@
       "chat": "Txat-mezuak",
       "kiloclaw": "KiloClaw-en jarduera",
       "balance": "Saldoari buruzko alertak",
+      "spend": "Gastu-alertak",
       "security": "Antzemandako segurtasun-arazoak"
     },
     "category": {
@@ -799,6 +800,8 @@
       "sessionStatusSubtitle": "amaituta / huts eginda / kontrolatzeko prest",
       "kiloclawActivitySubtitle": "instantzia prest edo huts eginda, programatutako ekintzak",
       "balanceAlertsSubtitle": "erakundearen saldo baxuaren abisuak",
+      "spendAlertsSubtitle": "atalaseen gainditzeak eta orduko gorakadak",
+      "spendAlertsToggle": "Gastu-alerten kategoria",
       "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak"
     }
   },
@@ -3134,5 +3137,28 @@
       "repositoryUnknown": "Kilok ez du {{repository}} GitHub edo GitLab biltegi gisa ezagutzen. Aukeratu beste biltegi bat Kilon.",
       "repositoryUnsupported": "{{repository}} Bitbucket biltegia da — Hasi agentea oraindik ezin du erabili. Aukeratu beste biltegi bat Kilon."
     }
+  },
+  "spendAlerts": {
+    "subtitle": "Bidali alerta bat posta elektronikoz edo push bidez fakturatze-kontaktuei, eremu honen gastuak muga bat gainditzen duenean edo bere ohiko ordu-tasaren gainetik igotzen denean.",
+    "enable": "Gaitu gastu-alertak",
+    "thresholdTitle": "Atalasaren gainditzea",
+    "thresholdSubtitle": "Metatutako gastuak zure muga gainditzen du",
+    "anomalyTitle": "Orduko gorakada",
+    "anomalySubtitle": "Ordu bat eremu honen ohiko tasatik oso gainetik dago",
+    "limitLabel": "Muga (USD)",
+    "windowLabel": "Leihoa",
+    "window24h": "24 ordu",
+    "window7d": "7 egun",
+    "window30d": "30 egun",
+    "multiplierLabel": "Gorakadaren biderkatzailea",
+    "saved": "Gastu-alerten ezarpenak gorde dira",
+    "loadError": "Ezin izan dira gastu-alertak kargatu.",
+    "saveError": "Ezin izan dira gastu-alertak gorde.",
+    "empty": "Gastu-alertak itzalita daude. Piztu itzazu eremu honetako fakturatze-kontaktuei abisatzeko.",
+    "noSpend": "Oraindik ez da gasturik erregistratu",
+    "spend24h": "Azken 24 orduetako gastua",
+    "multiplierError": "Sartu 1 edo handiagoa den biderkatzaile bat",
+    "permissionDenied": "Ez duzu gastu-alertak kudeatzeko baimenik.",
+    "pushOffByCategory": "Jakinarazpenetan itzalita"
   }
 }

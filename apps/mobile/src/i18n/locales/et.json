@@ -787,6 +787,7 @@
       "chat": "Vestlussõnumid",
       "kiloclaw": "KiloClaw'i tegevus",
       "balance": "Saldohoiatused",
+      "spend": "Kulutushoiatused",
       "security": "Turvaleiud"
     },
     "category": {
@@ -799,6 +800,8 @@
       "sessionStatusSubtitle": "lõppenud / ebaõnnestunud / juhtimiseks valmis",
       "kiloclawActivitySubtitle": "eksemplar valmis/ebaõnnestunud, ajastatud toimingud",
       "balanceAlertsSubtitle": "organisatsiooni madala saldo hoiatused",
+      "spendAlertsSubtitle": "lävendi ületamised ja tunnipõhised tõusud",
+      "spendAlertsToggle": "Kulutushoiatuste kategooria",
       "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused"
     }
   },
@@ -3134,5 +3137,28 @@
       "repositoryUnknown": "Kilo ei tunne {{repository}} ära GitHubi ega GitLabi hoidlana. Vali Kilos teine hoidla.",
       "repositoryUnsupported": "{{repository}} on Bitbucketi hoidla — Käivita agent ei saa seda veel kasutada. Vali Kilos teine hoidla."
     }
+  },
+  "spendAlerts": {
+    "subtitle": "Saada faktureerimiskontaktidele e-posti või push-teavitus, kui selle piirkonna kulutus ületab limiidi või tõuseb üle tavapärase tunnimäära.",
+    "enable": "Luba kulutushoiatused",
+    "thresholdTitle": "Lävendi ületamine",
+    "thresholdSubtitle": "Jooksev kulutus ületab sinu limiidi",
+    "anomalyTitle": "Tunnipõhine tõus",
+    "anomalySubtitle": "Üks tund on selle piirkonna tavapärasest määrast tunduvalt kõrgem",
+    "limitLabel": "Limiit (USD)",
+    "windowLabel": "Aken",
+    "window24h": "24 tundi",
+    "window7d": "7 päeva",
+    "window30d": "30 päeva",
+    "multiplierLabel": "Tõusu kordaja",
+    "saved": "Kulutushoiatuste seaded on salvestatud",
+    "loadError": "Kulutushoiatuste laadimine ebaõnnestus.",
+    "saveError": "Kulutushoiatuste salvestamine ebaõnnestus.",
+    "empty": "Kulutushoiatused on välja lülitatud. Lülita need sisse, et hoiatada selle piirkonna faktureerimiskontakte.",
+    "noSpend": "Kulutusi pole veel registreeritud",
+    "spend24h": "Viimase 24 tunni kulutus",
+    "multiplierError": "Sisesta kordaja 1 või suurem",
+    "permissionDenied": "Sul puudub õigus kulutushoiatusi hallata.",
+    "pushOffByCategory": "Teavitustes väljas"
   }
 }

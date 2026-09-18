@@ -1,0 +1,53 @@
+/* eslint-disable eslint-plugin-import/no-nodejs-modules, eslint-plugin-unicorn/prefer-module -- this test reads the Kotlin module from disk, the only place its channel-switch contract is observable under vitest */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { describe, expect, it } from 'vitest';
+
+const MODULE_SOURCE = readFileSync(
+  join(
+    __dirname,
+    '../../modules/active-agents-live-update/android/src/main/java/com/kilocode/activeagentsliveupdate/ActiveAgentsLiveUpdateModule.kt'
+  ),
+  'utf8'
+);
+
+/**
+ * The card keeps one fixed notification id while its kind, and so its channel,
+ * changes. The framework replaces a post's channel on that id, but a post to a
+ * channel the user disabled is dropped instead of moved, and the previous
+ * kind's card would stay in the shade on the old channel. `post` must therefore
+ * clear the posted card before it re-posts on a different channel.
+ */
+function segment(from: string, to: string): string {
+  const start = MODULE_SOURCE.indexOf(from);
+  expect(start, `${from} is missing from the native module`).toBeGreaterThan(-1);
+  const end = MODULE_SOURCE.indexOf(to, start);
+  expect(end, `${to} is missing after ${from}`).toBeGreaterThan(start);
+  return MODULE_SOURCE.slice(start, end);
+}
+
+describe('ActiveAgentsLiveUpdate channel switch', () => {
+  it('reads the posted card channel through the fixed notification id', () => {
+    const postedChannelId = segment('private fun postedChannelId()', 'private fun newBuilder');
+    expect(postedChannelId).toContain('notificationManager.activeNotifications');
+    expect(postedChannelId).toContain('it.id == ActiveAgentsDeadlineReceiver.NOTIFICATION_ID');
+    expect(postedChannelId).toContain('?.notification');
+    expect(postedChannelId).toContain('?.channelId');
+  });
+
+  it('clears the posted card before re-posting on a different channel', () => {
+    const post = segment('private fun post(', 'private fun dismiss()');
+    const comparison = post.indexOf('previousChannelId != channelId');
+    expect(
+      comparison,
+      'post does not compare the requested channel with the posted channel'
+    ).toBeGreaterThan(-1);
+    const cancel = post.indexOf('notificationManager.cancel(', comparison);
+    expect(cancel, 'post does not cancel the posted card on a channel switch').toBeGreaterThan(
+      comparison
+    );
+    const notify = post.indexOf('notificationManager.notify(');
+    expect(notify, 'post no longer posts the notification').toBeGreaterThan(cancel);
+  });
+});

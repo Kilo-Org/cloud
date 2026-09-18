@@ -81,6 +81,23 @@ class ActiveAgentsLiveUpdateModule : Module() {
       Build.VERSION.SDK_INT_FULL >= 36_001_000 &&
       notificationManager.canPostPromotedNotifications()
 
+  /**
+   * The channel the posted card sits on, or null when nothing is posted.
+   *
+   * The card changes channel when its kind changes, and the framework drops a
+   * post addressed to a channel the user disabled instead of moving the card,
+   * so `post` needs the posted channel to clear the card first.
+   */
+  private fun postedChannelId(): String? {
+    if (Build.VERSION.SDK_INT < 26) {
+      return null
+    }
+    return notificationManager.activeNotifications
+      .firstOrNull { it.id == ActiveAgentsDeadlineReceiver.NOTIFICATION_ID }
+      ?.notification
+      ?.channelId
+  }
+
   private fun newBuilder(channelId: String): Notification.Builder {
     if (Build.VERSION.SDK_INT >= 26) {
       // The JS side creates and names every channel before the first post.
@@ -189,6 +206,16 @@ class ActiveAgentsLiveUpdateModule : Module() {
       check(notificationState.edit().putBoolean(HAS_TIMEOUT, true).commit()) {
         "Cannot persist the active agents notification timeout"
       }
+    }
+
+    // The card changes channel when its kind changes, so clear the posted card
+    // first: a destination channel the user disabled drops the post rather than
+    // moving the card, which would leave the previous kind's card in the shade.
+    // The alert decision above is unchanged, so the fresh post still alerts only
+    // when the JS side asked it to.
+    val previousChannelId = postedChannelId()
+    if (previousChannelId != null && previousChannelId != channelId) {
+      notificationManager.cancel(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID)
     }
 
     if (Build.VERSION.SDK_INT >= 26) {

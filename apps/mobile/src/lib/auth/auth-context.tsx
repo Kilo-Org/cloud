@@ -63,6 +63,8 @@ import {
   subscribeSignOutActive,
 } from '@/lib/auth/sign-out-state';
 import { clearCacheScopeForSignOut, readCachedUserId } from '@/lib/persist/read-cache';
+import { clearToolSummaryTranslationsForSignOut } from '@/lib/persist/tool-summary-translation-cache';
+import { clearToolSummaryTranslationMemoryForSignOut } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 import { clearSessionAttentionForSignOut } from '@/lib/session-attention';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { clearViewedFiles } from '@/lib/pr-review/viewed-files';
@@ -476,6 +478,17 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             clearRecentPrs(),
             clearViewedFiles(),
             clearSessionAttentionForSignOut(),
+            // The offline translation cache holds the signed-out account's tool
+            // text (paths, commands, descriptions) and is refetchable, so it is
+            // a cache row that must not outlive the account. The runtime reset
+            // runs first and resolves only once the writes it already
+            // dispatched have settled: a fire-and-forget persist that started
+            // before the clear must not land after it and leave the entry
+            // behind. Best effort: both helpers swallow a storage failure.
+            (async () => {
+              await clearToolSummaryTranslationMemoryForSignOut();
+              await clearToolSummaryTranslationsForSignOut();
+            })(),
           ]);
           // Synchronous preference clears (best-effort) so nothing leaks to
           // the next signed-in account.

@@ -80,10 +80,15 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const detailTitle = part ? getPartDetailTitle(part) : null;
-  const shownTitle = useTranslatedToolSummary(
-    detailTitle?.title ?? t('common.details'),
-    detailTitle?.translatable ?? false
+  const shownText = useTranslatedToolSummary(
+    detailTitle?.text ?? t('common.details'),
+    detailTitle?.translatable ?? false,
+    part?.id
   );
+  // The translated summary is the row's own text, so the header opens on the
+  // cached translation; only the separator and the app-copy prefix are added
+  // here. A prefixless title (reasoning, fallback) is the text alone.
+  const shownTitle = detailTitle?.prefix ? `${detailTitle.prefix}: ${shownText}` : shownText;
   const [textMode, setTextMode] = useState<MonoScrollTextMode>('wrap');
   const [monoCount, setMonoCount] = useState(0);
   const [failedImage, setFailedImage] = useState<{ partId: string; uri: string } | null>(null);

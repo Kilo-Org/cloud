@@ -106,17 +106,21 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       const tables = db
         .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         .all() as Array<{ name: string }>;
-      // Protocol state stays in the library; local tables bridge consent and
-      // authenticate strict refresh replays using issued hashes.
+      // Protocol state stays in the library; local tables bridge consent,
+      // authenticate strict refresh replays using issued hashes, and hold the
+      // OTP authenticators and protected requests (o2). The dropped approval
+      // queue tables are gone (o5).
       expect(tables.map(t => t.name)).toEqual([
         '__drizzle_migrations',
+        'mcp_admin_authenticators',
+        'mcp_protected_requests',
         'oauth_pending_authorizations',
         'oauth_refresh_token_history',
       ]);
       const applied = db.prepare('SELECT COUNT(*) AS n FROM __drizzle_migrations').get() as {
         n: number;
       };
-      expect(applied.n).toBe(5);
+      expect(applied.n).toBe(8);
     });
 
     it('a second DO instance over the same storage does not re-apply the migration', async () => {
@@ -124,7 +128,7 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       const applied = db.prepare('SELECT COUNT(*) AS n FROM __drizzle_migrations').get() as {
         n: number;
       };
-      expect(applied.n).toBe(5);
+      expect(applied.n).toBe(8);
     });
   });
 

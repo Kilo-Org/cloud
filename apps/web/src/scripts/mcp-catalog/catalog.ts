@@ -10,7 +10,8 @@
  * entry point.
  *
  * Queries and mutations are published wholesale; paths with an internal-only
- * segment (`admin`, `debug`, `dev`, `test`) and subscriptions stay internal.
+ * segment (`admin`, `dev`, `test`) and subscriptions stay internal. `debug`
+ * paths are published too, marked with `debug: true` for the guard.
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
@@ -38,24 +39,32 @@ export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-rou
 
 /**
  * Whether a procedure path is internal-only. A path is internal when any
- * segment is `admin`, `debug`, `dev`, or `test`, or starts with `admin`,
- * `debug`, or `dev` — the routers name admin and dev-only procedures `adminX`
- * and `devX` (for example `organizations.admin.grantCredit` and
- * `slack.devRemoveDbRowOnly`). `test` stays exact-only so user-facing calls
- * such as `slack.testConnection` remain published. Subscriptions are never
- * exported regardless of this check.
+ * segment is `test` or starts with `admin` or `dev` — the routers name admin
+ * and dev-only procedures `adminX` and `devX` (for example
+ * `organizations.admin.grantCredit` and `slack.devRemoveDbRowOnly`). `test`
+ * stays exact-only so user-facing calls such as `slack.testConnection` remain
+ * published, and `debug` stays published too: its rows carry a `debug: true`
+ * marker and are guarded wherever they are offered or called. Subscriptions
+ * are never exported regardless of this check.
  */
 export function isDenylistedPath(path: string): boolean {
   return path.split('.').some(segment => {
     const lower = segment.toLowerCase();
-    return (
-      lower === 'test' ||
-      lower.startsWith('admin') ||
-      lower.startsWith('debug') ||
-      lower.startsWith('dev')
-    );
+    return lower === 'test' || lower.startsWith('admin') || lower.startsWith('dev');
   });
 }
+
+/**
+ * Procedure builders that reject non-admin users. `apps/web/src/lib/trpc/init.ts`
+ * builds every admin-only procedure from `adminProcedure`, and the other three
+ * variants chain on it, so a chain whose head is any of these is admin-guarded.
+ */
+export const ADMIN_GUARD_PROCEDURES = [
+  'adminProcedure',
+  'creditManagerProcedure',
+  'superadminProcedure',
+  'sessionViewerProcedure',
+] as const;
 
 /** Instruction every generated summary must follow. */
 export const SUMMARY_INSTRUCTION =
@@ -90,6 +99,17 @@ export type CatalogRow = {
   inputSchema: Record<string, unknown>;
   tags: string[];
   searchBlob: string;
+  /**
+   * Emitted only on rows whose procedure sits behind an admin guard;
+   * absent means every grant may use the row.
+   */
+  admin?: true;
+  /**
+   * Emitted only on rows whose procedure's top-level segment is `debug`;
+   * absent means the row is not a debug endpoint. A debug row behind an admin
+   * guard carries both marks.
+   */
+  debug?: true;
 };
 
 /** Failure while generating summaries. `retryable` failures name the failed batch. */
@@ -249,7 +269,7 @@ function deriveTags(segments: string[], schemaKeys: string[]): string[] {
   return tags;
 }
 
-function shapeRow(leaf: CatalogLeaf, summary: string): CatalogRow {
+function shapeRow(leaf: CatalogLeaf, summary: string, admin: boolean, debug: boolean): CatalogRow {
   const segments = leaf.path.split('.');
   const inputSchema = toInputSchema(leaf.inputs);
   const schemaKeys = topSchemaKeys(inputSchema);
@@ -261,6 +281,10 @@ function shapeRow(leaf: CatalogLeaf, summary: string): CatalogRow {
     inputSchema,
     tags,
     searchBlob: [leaf.path, summary, ...tags, ...schemaKeys].filter(Boolean).join(' '),
+    // Emitted at the tail and only when true, in a fixed order, so the dump's
+    // byte-for-byte check stays deterministic for every other row.
+    ...(admin ? { admin: true } : {}),
+    ...(debug ? { debug: true } : {}),
   };
 }
 
@@ -283,6 +307,9 @@ export function buildCatalogRows(
   summaries: Map<string, string> = new Map()
 ): { rows: CatalogRow[]; missing: CatalogLeaf[] } {
   let exposedMutations = 0;
+  // Resolved once for the whole catalog: the guard marker is decided from each
+  // procedure's own extracted source, never the whole router file.
+  const topLevelFiles = extractTopLevelRouterFiles();
   const rows: CatalogRow[] = [];
   const missing: CatalogLeaf[] = [];
   for (const leaf of leaves) {
@@ -291,7 +318,14 @@ export function buildCatalogRows(
     if (leaf.type === 'mutation') exposedMutations += 1;
     const summary = summaries.get(leaf.path);
     if (typeof summary === 'string' && summary !== '') {
-      rows.push(shapeRow(leaf, summary));
+      // An extraction miss counts as non-admin: never hide an endpoint by accident.
+      const admin = procedureRequiresAdmin(
+        extractProcedureSource(leaf.path, topLevelFiles)?.source ?? null
+      );
+      // The debug mark comes from the leaf's own top-level segment, so it never
+      // depends on static extraction succeeding.
+      const debug = leaf.path.split('.')[0] === 'debug';
+      rows.push(shapeRow(leaf, summary, admin, debug));
     } else {
       missing.push(leaf);
     }
@@ -595,6 +629,18 @@ export function extractProcedureSource(
   const block = extractValueAfterKey(source, segments[segments.length - 1] ?? '');
   if (!block) return null;
   return { file: currentFile, source: block };
+}
+
+/**
+ * True when a procedure's extracted value expression is guarded by an admin
+ * procedure builder. The guard must head the chain (`adminProcedure.input(…)`),
+ * so a base procedure that merely mentions a guard in its body is not marked;
+ * a null source (extraction failure) is not admin, because hiding a non-admin
+ * endpoint would be the worse mistake.
+ */
+export function procedureRequiresAdmin(source: string | null): boolean {
+  if (source === null) return false;
+  return ADMIN_GUARD_PROCEDURES.some(guard => new RegExp(`^\\s*${guard}\\b`).test(source));
 }
 
 function capContext(text: string, limit: number): string {

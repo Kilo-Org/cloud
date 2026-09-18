@@ -58,6 +58,22 @@ function collectToolPartText(part: ToolPart): string {
   return [part.tool, ...payload].join('\n');
 }
 
+/**
+ * The message's own prose. The Copy message action reads only these parts:
+ * the thinking block the transcript shows above a reply and the tool calls it
+ * shows between its paragraphs are transcript chrome, not message text, so
+ * they never reach the clipboard ahead of or around the reply.
+ */
+export function messageTextParts(parts: readonly Part[]): Part[] {
+  return parts.filter((part): part is TextPart => isTextPart(part));
+}
+
+/**
+ * Collects every copyable part kind of a message: text prose, reasoning text,
+ * and tool invocations with their input/output. The Copy message paths read it
+ * over `messageTextParts`, so what they put on the clipboard is the message
+ * text alone.
+ */
 export function collectCopyableText(message: CopyableMessage): string {
   return message.parts
     .map(part => {

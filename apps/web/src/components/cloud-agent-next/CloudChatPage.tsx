@@ -39,7 +39,12 @@ import {
   isRenderableSessionCost,
 } from './session-cost-breakdown';
 import { ConversationMessages } from './ConversationMessages';
-import { planResumeAttempt, resumeAnchorForTranscript } from './resume-anchor';
+import {
+  planResumeAttempt,
+  resumeAnchorForTranscript,
+  resumeSuperseded,
+  type ResumeState,
+} from './resume-anchor';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
@@ -112,12 +117,6 @@ const emptyQuestionRequestIds = new Map<string, string>();
 
 /** Older pages the resume fetches while looking for a not-yet-loaded anchor. */
 const MAX_RESUME_OLDER_PAGES = 8;
-
-type ResumeState = {
-  key: string;
-  attempts: number;
-  done: boolean;
-};
 
 /** The rendered element carrying `messageId`, when it is in the DOM. */
 function findMessageElement(container: HTMLElement, messageId: string): HTMLElement | null {
@@ -697,10 +696,13 @@ export default function CloudChatPage({
       if (!accepted) {
         return false;
       }
-      // Take the position over for the output this send produces. Mark the
-      // attempt that was live at send time — a `?at=` link that arrived while
-      // the send was in flight owns the position now.
-      if (resumeStateAtSend && resumeStateRef.current === resumeStateAtSend) {
+      // Take the position over for the output this send produces. A `?at=` link
+      // that arrived while the send was in flight owns the position now: leave
+      // its resume in charge instead of re-arming tail follow over it.
+      if (resumeSuperseded(resumeStateAtSend, resumeStateRef.current)) {
+        return true;
+      }
+      if (resumeStateAtSend) {
         resumeStateAtSend.done = true;
       }
       shouldAutoScrollRef.current = true;
@@ -728,7 +730,11 @@ export default function CloudChatPage({
       if (!accepted) {
         return false;
       }
-      if (resumeStateAtSend && resumeStateRef.current === resumeStateAtSend) {
+      // As with a message send: a newer `?at=` resume keeps the position.
+      if (resumeSuperseded(resumeStateAtSend, resumeStateRef.current)) {
+        return true;
+      }
+      if (resumeStateAtSend) {
         resumeStateAtSend.done = true;
       }
       shouldAutoScrollRef.current = true;

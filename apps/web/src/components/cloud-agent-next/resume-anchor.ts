@@ -4,6 +4,17 @@ import type { StoredMessage } from './types';
 import { groupConversationMessages } from './message-presentation';
 
 /**
+ * One resume attempt, scoped to a `(session, anchor)` pair. The object identity
+ * is stable for as long as that pair is unchanged: the resume effect reuses the
+ * instance when the key matches and makes a new one when it does not.
+ */
+export type ResumeState = {
+  key: string;
+  attempts: number;
+  done: boolean;
+};
+
+/**
  * Where a resumed transcript should land, resolved against the rendered
  * conversation groups. `groupIndex` is the group the anchor belongs to and
  * `selectorIds` are the ids to look up in the DOM, nearest first: the anchor
@@ -139,4 +150,17 @@ export function planResumeAttempt({
     return 'follow-tail';
   }
   return 'load-older';
+}
+
+/**
+ * Whether a `?at=` resume that landed while a send was in flight replaced the
+ * one the send armed against. A send takes the position over for its own output
+ * only when this is false: re-arming tail follow while a newer anchor's resume
+ * is live would override that anchor and abandon it at the bottom.
+ */
+export function resumeSuperseded(
+  resumeAtSend: ResumeState | null,
+  currentResume: ResumeState | null
+): boolean {
+  return currentResume !== resumeAtSend;
 }

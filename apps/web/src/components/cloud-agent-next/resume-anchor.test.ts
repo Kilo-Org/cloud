@@ -2,7 +2,13 @@ import type { PreparationAttempt, SessionCommit } from '@kilocode/cloud-agent-sd
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { StoredMessage } from './types';
 import { groupConversationMessages, commitsByMessageAnchor } from './message-presentation';
-import { planResumeAttempt, resumeAnchor, resumeAnchorForTranscript } from './resume-anchor';
+import {
+  planResumeAttempt,
+  resumeAnchor,
+  resumeAnchorForTranscript,
+  resumeSuperseded,
+  type ResumeState,
+} from './resume-anchor';
 
 describe('resumeAnchor', () => {
   it('resolves the group that starts with the anchor', () => {
@@ -177,5 +183,31 @@ describe('planResumeAttempt', () => {
 
   it('loads one older page when the anchor may still be in it', () => {
     expect(planResumeAttempt(base)).toBe('load-older');
+  });
+});
+
+describe('resumeSuperseded', () => {
+  it('leaves the accepted send in charge when no newer anchor landed', () => {
+    // The resume effect reuses the same instance while the (session, anchor)
+    // pair is unchanged, so the send is still the owner.
+    const resume: ResumeState = { key: 's\u0000m1', attempts: 0, done: false };
+    expect(resumeSuperseded(resume, resume)).toBe(false);
+  });
+
+  it('leaves an anchorless send in charge when no anchor landed', () => {
+    expect(resumeSuperseded(null, null)).toBe(false);
+  });
+
+  it('hands the position to a `?at=` resume that landed during the send', () => {
+    // The new anchor's resume is a new instance. Re-arming tail follow here
+    // would override that anchor and abandon it at the bottom.
+    const atSend: ResumeState = { key: 's\u0000m1', attempts: 0, done: false };
+    const afterAnchorLanded: ResumeState = { key: 's\u0000m2', attempts: 0, done: false };
+    expect(resumeSuperseded(atSend, afterAnchorLanded)).toBe(true);
+  });
+
+  it('hands the position over when an anchor landed after an anchorless send', () => {
+    const afterAnchorLanded: ResumeState = { key: 's\u0000m2', attempts: 0, done: false };
+    expect(resumeSuperseded(null, afterAnchorLanded)).toBe(true);
   });
 });

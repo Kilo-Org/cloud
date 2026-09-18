@@ -343,7 +343,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} पैकी {{displayCount}} फाइली लोड झाल्या",
       "filesStillLoading": "फाइल्स अजूनही लोड होत आहेत. रीफ्रेश करण्यासाठी खाली ओढा.",
       "goToOverview": "आढावा पहा",
-      "goToOverviewTab": "आढावा टॅबवर जा"
+      "goToOverviewTab": "आढावा टॅबवर जा",
+      "expandAllLines_one": "सर्व {{displayCount}} ओळ दाखवा",
+      "expandAllLines_other": "सर्व {{displayCount}} ओळी दाखवा",
+      "expandLines_one": "{{displayCount}} ओळ दाखवा ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} ओळी दाखवा ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "संदर्भासाठी {{displayCount}} ओळ दाखवा",
+      "expandLinesOfContext_other": "संदर्भासाठी {{displayCount}} ओळी दाखवा",
+      "expandMoreLines_one": "आणखी {{displayCount}} ओळ दाखवा ({{start}}–{{end}})",
+      "expandMoreLines_other": "आणखी {{displayCount}} ओळी दाखवा ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}} पैकी {{loaded}} फाइल्स लोड झाल्या",
+      "loadedOfTotalFiles_other": "{{total}} पैकी {{loaded}} फाइल्स लोड झाल्या"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ फाइलच्या शेवटी नवीन ओळ नाही.",
@@ -533,7 +543,9 @@
         "outdatedOnPath": "{{path}} वर कालबाह्य"
       },
       "deletedUser": "हटवलेला वापरकर्ता",
-      "replyForbiddenTerm": "तुम्हाला या {{term}}ला उत्तर देण्याची परवानगी नाही."
+      "replyForbiddenTerm": "तुम्हाला या {{term}}ला उत्तर देण्याची परवानगी नाही.",
+      "moreLinesAbove_one": "… वर आणखी {{displayCount}} ओळ आहे.",
+      "moreLinesAbove_other": "… वर आणखी {{displayCount}} ओळी आहेत."
     },
     "couldNotOpenGitHubAppSettings": "GitHub अॅपच्या सेटिंग्ज उघडता आल्या नाहीत.",
     "installKiloGitHubApp": "Kilo GitHub अॅप इन्स्टॉल करा",
@@ -706,7 +718,9 @@
       "statusContext": "संदर्भ",
       "lineLabel": "{{status}} ओळ {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} ओळ: {{text}}",
-      "emptyLine": "(रिकामे)"
+      "emptyLine": "(रिकामे)",
+      "truncationBanner_one": "GitHub API च्या मर्यादेमुळे बदललेल्या {{total}} फाइल्सपैकी पहिल्या {{limit}} फाइल्स दाखवल्या आहेत.",
+      "truncationBanner_other": "GitHub API च्या मर्यादेमुळे बदललेल्या {{total}} फाइल्सपैकी पहिल्या {{limit}} फाइल्स दाखवल्या आहेत."
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड रिकामा आहे.",
     "linkPasteNotAPullRequest": "ही पुल रिक्वेस्ट किंवा मर्ज रिक्वेस्टची लिंक नाही",
@@ -880,7 +894,9 @@
       "uploadFailed": "अपलोड करता आले नाही.",
       "failedToUploadFile": "फाइल अपलोड करता आली नाही: {{reason}}.",
       "nothingToPaste": "पेस्ट करण्यासाठी काहीही नाही.",
-      "metadataStripFailed": "फोटोतील मेटाडेटा काढता आला नाही."
+      "metadataStripFailed": "फोटोतील मेटाडेटा काढता आला नाही.",
+      "limit_one": "तुम्ही जास्तीत जास्त {{displayCount}} फाइल जोडू शकता.",
+      "limit_other": "तुम्ही जास्तीत जास्त {{displayCount}} फाइल जोडू शकता."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1640,11 @@
       "syncFindings": "निष्कर्ष सिंक करा",
       "syncNow": "आता सिंक करा",
       "syncQueued": "सिंक रांगेत जोडले",
-      "syncStatusUnavailable": "सिंकची स्थिती उपलब्ध नाही."
+      "syncStatusUnavailable": "सिंकची स्थिती उपलब्ध नाही.",
+      "daysOverdue_one": "मुदत उलटून {{displayCount}} दिवस झाले",
+      "daysOverdue_other": "मुदत उलटून {{displayCount}} दिवस झाले",
+      "findingsCount_one": "{{displayCount}} निष्कर्ष",
+      "findingsCount_other": "{{displayCount}} निष्कर्ष"
     },
     "dashboardMetrics": {
       "openFindings": "प्रलंबित निष्कर्ष",
@@ -2168,7 +2188,13 @@
       "updateTodos": "कामांची यादी अद्ययावत करा",
       "linesBadge": "{{displayCount}} ओळी",
       "filesBadge": "{{displayCount}} फाइल्स",
-      "matchesBadge": "{{displayCount}} जुळणारे परिणाम"
+      "matchesBadge": "{{displayCount}} जुळणारे परिणाम",
+      "filesBadge_one": "{{displayCount}} फाइल",
+      "filesBadge_other": "{{displayCount}} फाइल्स",
+      "linesBadge_one": "{{displayCount}} ओळ",
+      "linesBadge_other": "{{displayCount}} ओळी",
+      "matchesBadge_one": "{{displayCount}} जुळणारे परिणाम",
+      "matchesBadge_other": "{{displayCount}} जुळणारे परिणाम"
     },
     "readToolMarkdown": {
       "linesTruncated": "ओळी {{start}}–{{end}} (काही मजकूर वगळला)",
@@ -2458,7 +2484,11 @@
       "files": "फाइली",
       "couldNotOpenPhotoPicker": "फोटो निवडण्याची सुविधा उघडता आली नाही. Kilo पुन्हा सुरू करून पुन्हा प्रयत्न करा.",
       "maxFilesAllowed": "जास्तीत जास्त {{displayCount}} फाइल्स जोडता येतात.",
-      "onlyAddingFiles": "{{total}} पैकी फक्त {{accepted}} फाइल्स जोडत आहोत (कमाल {{max}})"
+      "onlyAddingFiles": "{{total}} पैकी फक्त {{accepted}} फाइल्स जोडत आहोत (कमाल {{max}})",
+      "maxFilesAllowed_one": "जास्तीत जास्त {{displayCount}} फाइल जोडता येतात.",
+      "maxFilesAllowed_other": "जास्तीत जास्त {{displayCount}} फाइल्स जोडता येतात.",
+      "onlyAddingFiles_one": "{{total}} पैकी फक्त {{accepted}} फाइल्स जोडत आहोत (कमाल {{max}})",
+      "onlyAddingFiles_other": "{{total}} पैकी फक्त {{accepted}} फाइल्स जोडत आहोत (कमाल {{max}})"
     },
     "composer": {
       "addAttachment": "संलग्नक जोडा",
@@ -2476,7 +2506,9 @@
       "discardAttachmentsMessage": "पाठवलेल्या संदेशांना संलग्न नसलेल्या अपलोड केलेल्या फाइल्स हटवल्या जातील.",
       "discardAttachmentsTitle": "जोडलेल्या फाइल्स हटवायच्या?",
       "charactersRemaining": "{{count}} अक्षरे शिल्लक",
-      "insertNewline": "नवीन ओळ घाला"
+      "insertNewline": "नवीन ओळ घाला",
+      "charactersRemaining_one": "{{count}} अक्षर शिल्लक",
+      "charactersRemaining_other": "{{count}} अक्षरे शिल्लक"
     },
     "chatLink": {
       "linkCopied": "लिंक कॉपी केली",
@@ -2548,7 +2580,9 @@
       "stepsCount_one": "{{steps}} टप्पा",
       "stepsCount": "{{steps}} टप्पे",
       "stepsCount_other": "{{steps}} टप्पे",
-      "modelAccessibilityLabel": "मॉडेल: {{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "मॉडेल: {{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "मॉडेल ({{displayCount}})",
+      "modelsCount_other": "मॉडेल ({{displayCount}})"
     },
     "autoApprove": {
       "title": "स्वयं-मंजूरी",
@@ -2588,7 +2622,9 @@
     },
     "toolRun": {
       "sheetTitle": "साधन कॉल्स",
-      "condensedLabel": "{{itemCount}} नोंदी; {{last}}"
+      "condensedLabel": "{{itemCount}} नोंदी; {{last}}",
+      "condensedLabel_one": "{{itemCount}} नोंद; {{last}}",
+      "condensedLabel_other": "{{itemCount}} नोंदी; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2759,9 @@
     "cliCantReceiveFilesTitle": "या सत्रात फाइल्स स्वीकारता येत नाहीत",
     "cliCantReceiveFilesMessage": "हे सत्र चालवणारे Kilo CLI फाइल्स स्वीकारू शकत नाही. त्या मशीनवर CLI अपडेट करा किंवा नवीन सत्रात शेअर करा.",
     "contentlessMessage": "शेअर करण्यासाठी काहीही नाही — मजकूर किंवा फाइल्स जोडलेल्या नाहीत.",
-    "couldNotReadContent": "शेअर केलेली सामग्री वाचता आली नाही."
+    "couldNotReadContent": "शेअर केलेली सामग्री वाचता आली नाही.",
+    "onlyFirstFilesAttached_one": "फक्त पहिल्या {{displayCount}} फाइल जोडल्या जातील.",
+    "onlyFirstFilesAttached_other": "फक्त पहिल्या {{displayCount}} फाइल्स जोडल्या जातील."
   },
   "kiloPass": {
     "title": "Kilo Pass",

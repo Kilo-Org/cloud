@@ -354,7 +354,10 @@
       "uploadFailed": "Não foi possível concluir o envio.",
       "failedToUploadFile": "Não foi possível enviar o arquivo: {{reason}}.",
       "nothingToPaste": "Não há nada para colar.",
-      "metadataStripFailed": "Não foi possível remover os metadados da foto."
+      "metadataStripFailed": "Não foi possível remover os metadados da foto.",
+      "limit_one": "Você pode anexar até {{displayCount}} arquivo.",
+      "limit_other": "Você pode anexar até {{displayCount}} arquivos.",
+      "limit_many": "Você pode anexar até {{displayCount}} arquivos."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1126,7 +1129,13 @@
       "syncNow": "Sincronizar agora",
       "syncQueued": "Sincronização na fila",
       "syncStatusUnavailable": "O status da sincronização está indisponível.",
-      "withinDeadline": "Dentro do prazo"
+      "withinDeadline": "Dentro do prazo",
+      "daysOverdue_one": "{{displayCount}} dia em atraso",
+      "daysOverdue_other": "{{displayCount}} dias em atraso",
+      "daysOverdue_many": "{{displayCount}} dias em atraso",
+      "findingsCount_one": "{{displayCount}} ocorrência",
+      "findingsCount_other": "{{displayCount}} ocorrências",
+      "findingsCount_many": "{{displayCount}} ocorrências"
     },
     "dashboardMetrics": {
       "openFindings": "Ocorrências em aberto",
@@ -1652,7 +1661,16 @@
       "updateTodos": "Atualizar tarefas",
       "linesBadge": "{{displayCount}} linhas",
       "filesBadge": "{{displayCount}} arquivos",
-      "matchesBadge": "{{displayCount}} resultados"
+      "matchesBadge": "{{displayCount}} resultados",
+      "filesBadge_one": "{{displayCount}} arquivo",
+      "filesBadge_other": "{{displayCount}} arquivos",
+      "filesBadge_many": "{{displayCount}} arquivos",
+      "linesBadge_one": "{{displayCount}} linha",
+      "linesBadge_other": "{{displayCount}} linhas",
+      "linesBadge_many": "{{displayCount}} linhas",
+      "matchesBadge_one": "{{displayCount}} resultado",
+      "matchesBadge_other": "{{displayCount}} resultados",
+      "matchesBadge_many": "{{displayCount}} resultados"
     },
     "readToolMarkdown": {
       "linesTruncated": "linhas {{start}}–{{end}} (truncadas)",
@@ -1945,7 +1963,13 @@
       "files": "Arquivos",
       "couldNotOpenPhotoPicker": "Não foi possível abrir o seletor de fotos. Reinicie o Kilo e tente novamente.",
       "maxFilesAllowed": "Você pode adicionar no máximo {{displayCount}} arquivos.",
-      "onlyAddingFiles": "Adicionando apenas {{accepted}} de {{total}} arquivos (máx. {{max}})"
+      "onlyAddingFiles": "Adicionando apenas {{accepted}} de {{total}} arquivos (máx. {{max}})",
+      "maxFilesAllowed_one": "Você pode adicionar no máximo {{displayCount}} arquivo.",
+      "maxFilesAllowed_other": "Você pode adicionar no máximo {{displayCount}} arquivos.",
+      "maxFilesAllowed_many": "Você pode adicionar no máximo {{displayCount}} arquivos.",
+      "onlyAddingFiles_one": "Adicionando apenas {{accepted}} de {{total}} arquivos (máx. {{max}})",
+      "onlyAddingFiles_other": "Adicionando apenas {{accepted}} de {{total}} arquivos (máx. {{max}})",
+      "onlyAddingFiles_many": "Adicionando apenas {{accepted}} de {{total}} arquivos (máx. {{max}})"
     },
     "composer": {
       "addAttachment": "Adicionar anexo",
@@ -1963,7 +1987,10 @@
       "discardAttachmentsMessage": "Os arquivos enviados ainda não vinculados a uma mensagem serão excluídos.",
       "discardAttachmentsTitle": "Descartar anexos?",
       "charactersRemaining": "{{count}} caracteres restantes",
-      "insertNewline": "Inserir quebra de linha"
+      "insertNewline": "Inserir quebra de linha",
+      "charactersRemaining_one": "{{count}} caractere restante",
+      "charactersRemaining_other": "{{count}} caracteres restantes",
+      "charactersRemaining_many": "{{count}} caracteres restantes"
     },
     "chatLink": {
       "linkCopied": "Link copiado",
@@ -2036,7 +2063,10 @@
       "stepsCount": "{{steps}} etapas",
       "stepsCount_other": "{{steps}} etapas",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "stepsCount_many": "{{steps}} etapas"
+      "stepsCount_many": "{{steps}} etapas",
+      "modelsCount_one": "Modelo ({{displayCount}})",
+      "modelsCount_other": "Modelos ({{displayCount}})",
+      "modelsCount_many": "Modelos ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Aprovação automática",
@@ -2076,7 +2106,10 @@
     },
     "toolRun": {
       "sheetTitle": "Chamadas de ferramentas",
-      "condensedLabel": "{{itemCount}} itens; {{last}}"
+      "condensedLabel": "{{itemCount}} itens; {{last}}",
+      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_other": "{{itemCount}} itens; {{last}}",
+      "condensedLabel_many": "{{itemCount}} itens; {{last}}"
     }
   },
   "bootstrap": {
@@ -2247,7 +2280,10 @@
     "cliCantReceiveFilesTitle": "Esta sessão não pode receber arquivos",
     "cliCantReceiveFilesMessage": "A Kilo CLI que executa esta sessão não pode receber arquivos. Atualize a CLI nessa máquina ou compartilhe o conteúdo com uma nova sessão.",
     "contentlessMessage": "Nada para compartilhar — nenhum texto ou arquivo foi incluído.",
-    "couldNotReadContent": "Não foi possível ler o conteúdo compartilhado."
+    "couldNotReadContent": "Não foi possível ler o conteúdo compartilhado.",
+    "onlyFirstFilesAttached_one": "Apenas os primeiros {{displayCount}} arquivo serão anexados.",
+    "onlyFirstFilesAttached_other": "Apenas os primeiros {{displayCount}} arquivos serão anexados.",
+    "onlyFirstFilesAttached_many": "Apenas os primeiros {{displayCount}} arquivos serão anexados."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2558,7 +2594,10 @@
         "outdatedOnPath": "Desatualizado em {{path}}"
       },
       "deletedUser": "usuário excluído",
-      "replyForbiddenTerm": "Você não tem permissão para responder a este {{term}}."
+      "replyForbiddenTerm": "Você não tem permissão para responder a este {{term}}.",
+      "moreLinesAbove_one": "… mais {{displayCount}} linha acima",
+      "moreLinesAbove_other": "… mais {{displayCount}} linhas acima",
+      "moreLinesAbove_many": "… mais {{displayCount}} linhas acima"
     },
     "entry": {
       "eyebrow": "Abra um pull request ou merge request pela URL",
@@ -2629,7 +2668,7 @@
     "hunkRows": {
       "contextUnavailable": "O contexto não está disponível nesta referência.",
       "expandAll": "Expandir tudo",
-      "expandAllLines": "Expandir todas as {{displayCount}} linhas",
+      "expandAllLines": "Expandir todas as linhas ({{displayCount}})",
       "expandContext": "Expandir contexto",
       "expandLines": "Expandir {{displayCount}} linhas ({{start}}–{{end}})",
       "expandLinesOfContext": "Expandir {{displayCount}} linhas de contexto",
@@ -2658,7 +2697,22 @@
       "retryLoadingContext": "Tentar carregar o contexto novamente",
       "retryLoadingNextPage": "Tentar carregar a próxima página novamente",
       "fileLoadedCount_many": "{{displayCount}} arquivos carregados",
-      "fileLoadedOfTotalCount_many": "{{displayCount}} de {{total}} arquivos carregados"
+      "fileLoadedOfTotalCount_many": "{{displayCount}} de {{total}} arquivos carregados",
+      "expandAllLines_one": "Expandir todas as linhas ({{displayCount}})",
+      "expandAllLines_other": "Expandir todas as linhas ({{displayCount}})",
+      "expandAllLines_many": "Expandir todas as linhas ({{displayCount}})",
+      "expandLines_one": "Expandir {{displayCount}} linha ({{start}}–{{end}})",
+      "expandLines_other": "Expandir {{displayCount}} linhas ({{start}}–{{end}})",
+      "expandLines_many": "Expandir {{displayCount}} linhas ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Expandir {{displayCount}} linha de contexto",
+      "expandLinesOfContext_other": "Expandir {{displayCount}} linhas de contexto",
+      "expandLinesOfContext_many": "Expandir {{displayCount}} linhas de contexto",
+      "expandMoreLines_one": "Expandir mais {{displayCount}} linha ({{start}}–{{end}})",
+      "expandMoreLines_other": "Expandir mais {{displayCount}} linhas ({{start}}–{{end}})",
+      "expandMoreLines_many": "Expandir mais {{displayCount}} linhas ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} de {{total}} arquivos carregados",
+      "loadedOfTotalFiles_other": "{{loaded}} de {{total}} arquivos carregados",
+      "loadedOfTotalFiles_many": "{{loaded}} de {{total}} arquivos carregados"
     },
     "inbox": {
       "couldNotLoad": "Não foi possível carregar a caixa de entrada.",
@@ -2859,7 +2913,10 @@
       "statusContext": "Contexto",
       "lineLabel": "linha {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(vazio)"
+      "emptyLine": "(vazio)",
+      "truncationBanner_one": "Exibindo os primeiros {{limit}} de {{total}} arquivos alterados devido ao limite da API do GitHub.",
+      "truncationBanner_other": "Exibindo os primeiros {{limit}} de {{total}} arquivos alterados devido ao limite da API do GitHub.",
+      "truncationBanner_many": "Exibindo os primeiros {{limit}} de {{total}} arquivos alterados devido ao limite da API do GitHub."
     },
     "linkPasteClipboardEmpty": "A área de transferência está vazia.",
     "linkPasteNotAPullRequest": "Este link não é de um pull request ou merge request",

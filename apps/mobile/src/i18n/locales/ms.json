@@ -343,7 +343,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} daripada {{total}} fail dimuatkan",
       "filesStillLoading": "Fail masih dimuatkan. Tarik untuk memuat semula.",
       "goToOverview": "Pergi ke gambaran keseluruhan",
-      "goToOverviewTab": "Pergi ke tab gambaran keseluruhan"
+      "goToOverviewTab": "Pergi ke tab gambaran keseluruhan",
+      "expandAllLines_one": "Paparkan kesemua {{displayCount}} baris",
+      "expandAllLines_other": "Paparkan kesemua {{displayCount}} baris",
+      "expandLines_one": "Paparkan {{displayCount}} baris ({{start}}–{{end}})",
+      "expandLines_other": "Paparkan {{displayCount}} baris ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Paparkan {{displayCount}} baris konteks",
+      "expandLinesOfContext_other": "Paparkan {{displayCount}} baris konteks",
+      "expandMoreLines_one": "Paparkan {{displayCount}} baris lagi ({{start}}–{{end}})",
+      "expandMoreLines_other": "Paparkan {{displayCount}} baris lagi ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} daripada {{total}} fail sudah dimuatkan",
+      "loadedOfTotalFiles_other": "{{loaded}} daripada {{total}} fail sudah dimuatkan"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ tiada baris baharu di hujung fail",
@@ -533,7 +543,9 @@
         "outdatedOnPath": "Tidak lagi terkini pada {{path}}"
       },
       "deletedUser": "pengguna yang telah dipadam",
-      "replyForbiddenTerm": "Anda tidak mempunyai kebenaran untuk membalas {{term}} ini."
+      "replyForbiddenTerm": "Anda tidak mempunyai kebenaran untuk membalas {{term}} ini.",
+      "moreLinesAbove_one": "… {{displayCount}} baris lagi di atas",
+      "moreLinesAbove_other": "… {{displayCount}} baris lagi di atas"
     },
     "couldNotOpenGitHubAppSettings": "Tidak dapat membuka tetapan apl GitHub.",
     "installKiloGitHubApp": "Pasang apl GitHub Kilo",
@@ -706,7 +718,9 @@
       "statusContext": "Konteks",
       "lineLabel": "baris {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: teks {{text}}",
-      "emptyLine": "(kosong)"
+      "emptyLine": "(kosong)",
+      "truncationBanner_one": "Memaparkan {{limit}} fail pertama daripada {{total}} fail yang diubah — had API GitHub.",
+      "truncationBanner_other": "Memaparkan {{limit}} fail pertama daripada {{total}} fail yang diubah — had API GitHub."
     },
     "linkPasteClipboardEmpty": "Papan keratan kosong.",
     "linkPasteNotAPullRequest": "Ini bukan pautan permintaan tarik atau permintaan gabungan",
@@ -880,7 +894,9 @@
       "uploadFailed": "Muat naik gagal.",
       "failedToUploadFile": "Gagal memuat naik fail: {{reason}}.",
       "nothingToPaste": "Tiada apa-apa untuk ditampal.",
-      "metadataStripFailed": "Metadata foto tidak dapat dibuang."
+      "metadataStripFailed": "Metadata foto tidak dapat dibuang.",
+      "limit_one": "Anda boleh melampirkan sehingga {{displayCount}} fail.",
+      "limit_other": "Anda boleh melampirkan sehingga {{displayCount}} fail."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1640,11 @@
       "syncFindings": "Segerakkan penemuan",
       "syncNow": "Segerakkan sekarang",
       "syncQueued": "Penyegerakan dimasukkan ke dalam baris gilir",
-      "syncStatusUnavailable": "Status penyegerakan tidak tersedia."
+      "syncStatusUnavailable": "Status penyegerakan tidak tersedia.",
+      "daysOverdue_one": "Lewat {{displayCount}} hari",
+      "daysOverdue_other": "Lewat {{displayCount}} hari",
+      "findingsCount_one": "{{displayCount}} penemuan",
+      "findingsCount_other": "{{displayCount}} penemuan"
     },
     "dashboardMetrics": {
       "openFindings": "Penemuan terbuka",
@@ -2168,7 +2188,13 @@
       "updateTodos": "Kemas kini tugasan",
       "linesBadge": "{{displayCount}} baris",
       "filesBadge": "{{displayCount}} fail",
-      "matchesBadge": "{{displayCount}} padanan"
+      "matchesBadge": "{{displayCount}} padanan",
+      "filesBadge_one": "{{displayCount}} fail",
+      "filesBadge_other": "{{displayCount}} fail",
+      "linesBadge_one": "{{displayCount}} baris",
+      "linesBadge_other": "{{displayCount}} baris",
+      "matchesBadge_one": "{{displayCount}} padanan",
+      "matchesBadge_other": "{{displayCount}} padanan"
     },
     "readToolMarkdown": {
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",
@@ -2458,7 +2484,11 @@
       "files": "Fail",
       "couldNotOpenPhotoPicker": "Tidak dapat membuka pemilih foto. Mulakan semula Kilo dan cuba semula.",
       "maxFilesAllowed": "Maksimum {{displayCount}} fail dibenarkan.",
-      "onlyAddingFiles": "Hanya menambah {{accepted}} daripada {{total}} fail (maks {{max}})"
+      "onlyAddingFiles": "Hanya menambah {{accepted}} daripada {{total}} fail (maks {{max}})",
+      "maxFilesAllowed_one": "Maksimum {{displayCount}} fail dibenarkan.",
+      "maxFilesAllowed_other": "Maksimum {{displayCount}} fail dibenarkan.",
+      "onlyAddingFiles_one": "Hanya menambah {{accepted}} daripada {{total}} fail (maks {{max}})",
+      "onlyAddingFiles_other": "Hanya menambah {{accepted}} daripada {{total}} fail (maks {{max}})"
     },
     "composer": {
       "addAttachment": "Tambah lampiran",
@@ -2476,7 +2506,9 @@
       "discardAttachmentsMessage": "Fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam.",
       "discardAttachmentsTitle": "Buang lampiran?",
       "charactersRemaining": "{{count}} aksara berbaki",
-      "insertNewline": "Sisipkan baris baharu"
+      "insertNewline": "Sisipkan baris baharu",
+      "charactersRemaining_one": "{{count}} aksara berbaki",
+      "charactersRemaining_other": "{{count}} aksara berbaki"
     },
     "chatLink": {
       "linkCopied": "Pautan disalin",
@@ -2548,7 +2580,9 @@
       "stepsCount_one": "{{steps}} langkah",
       "stepsCount": "{{steps}} langkah",
       "stepsCount_other": "{{steps}} langkah",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Model ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Lulus automatik",
@@ -2588,7 +2622,9 @@
     },
     "toolRun": {
       "sheetTitle": "Panggilan alat",
-      "condensedLabel": "{{itemCount}} item; {{last}}"
+      "condensedLabel": "{{itemCount}} item; {{last}}",
+      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_other": "{{itemCount}} item; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2759,9 @@
     "cliCantReceiveFilesTitle": "Sesi ini tidak boleh menerima fail",
     "cliCantReceiveFilesMessage": "CLI Kilo yang menjalankan sesi ini tidak boleh menerima fail. Kemas kini CLI pada mesin itu atau kongsi kandungan ke sesi baharu.",
     "contentlessMessage": "Tiada kandungan untuk dikongsi — tiada teks atau fail disertakan.",
-    "couldNotReadContent": "Tidak dapat membaca kandungan yang dikongsi."
+    "couldNotReadContent": "Tidak dapat membaca kandungan yang dikongsi.",
+    "onlyFirstFilesAttached_one": "Hanya {{displayCount}} fail pertama akan dilampirkan.",
+    "onlyFirstFilesAttached_other": "Hanya {{displayCount}} fail pertama akan dilampirkan."
   },
   "kiloPass": {
     "title": "Kilo Pass",

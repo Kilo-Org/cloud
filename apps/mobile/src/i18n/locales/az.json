@@ -343,7 +343,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} fayldan {{displayCount}} fayl yükləndi",
       "filesStillLoading": "Fayllar hələ yüklənir. Yeniləmək üçün aşağı çək.",
       "goToOverview": "Xülasəyə keç",
-      "goToOverviewTab": "Xülasə vərəqinə keç"
+      "goToOverviewTab": "Xülasə vərəqinə keç",
+      "expandAllLines_one": "Bütün {{displayCount}} sətri göstər",
+      "expandAllLines_other": "Bütün {{displayCount}} sətri göstər",
+      "expandLines_one": "{{displayCount}} sətir göstər ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} sətir göstər ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "{{displayCount}} kontekst sətri göstər",
+      "expandLinesOfContext_other": "{{displayCount}} kontekst sətri göstər",
+      "expandMoreLines_one": "Daha {{displayCount}} sətir göstər ({{start}}–{{end}})",
+      "expandMoreLines_other": "Daha {{displayCount}} sətir göstər ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} / {{total}} fayl yükləndi",
+      "loadedOfTotalFiles_other": "{{loaded}} / {{total}} fayl yükləndi"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ faylın sonunda yeni sətir yoxdur",
@@ -533,7 +543,9 @@
         "outdatedOnPath": "Köhnəlib: {{path}}"
       },
       "deletedUser": "silinmiş istifadəçi",
-      "replyForbiddenTerm": "Bu {{term}}na cavab vermək icazən yoxdur."
+      "replyForbiddenTerm": "Bu {{term}}na cavab vermək icazən yoxdur.",
+      "moreLinesAbove_one": "… yuxarıda daha {{displayCount}} sətir var.",
+      "moreLinesAbove_other": "… yuxarıda daha {{displayCount}} sətir var."
     },
     "couldNotOpenGitHubAppSettings": "GitHub tətbiqinin parametrlərini açmaq mümkün olmadı.",
     "installKiloGitHubApp": "Kilo GitHub tətbiqini quraşdır",
@@ -706,7 +718,9 @@
       "statusContext": "Kontekst",
       "lineLabel": "{{status}}, sətir {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} sətir: {{text}}",
-      "emptyLine": "(boş)"
+      "emptyLine": "(boş)",
+      "truncationBanner_one": "Dəyişdirilmiş {{total}} fayldan ilk {{limit}} fayl göstərilir — bu, GitHub API məhdudiyyətidir.",
+      "truncationBanner_other": "Dəyişdirilmiş {{total}} fayldan ilk {{limit}} fayl göstərilir — bu, GitHub API məhdudiyyətidir."
     },
     "linkPasteClipboardEmpty": "Mübadilə buferi boşdur.",
     "linkPasteNotAPullRequest": "Bu, birləşdirmə sorğusu və ya merge sorğusu keçidi deyil",
@@ -880,7 +894,9 @@
       "uploadFailed": "Yükləmə uğursuz oldu.",
       "failedToUploadFile": "Faylı yükləmək mümkün olmadı: {{reason}}.",
       "nothingToPaste": "Yapışdırılacaq heç nə yoxdur.",
-      "metadataStripFailed": "Şəklin metaməlumatlarını silmək mümkün olmadı."
+      "metadataStripFailed": "Şəklin metaməlumatlarını silmək mümkün olmadı.",
+      "limit_one": "Ən çox {{displayCount}} fayl əlavə edə bilərsən.",
+      "limit_other": "Ən çox {{displayCount}} fayl əlavə edə bilərsən."
     },
     "attachmentPreview": {
       "accessibility": "Fayl: {{filename}}, {{status}}",
@@ -1624,7 +1640,11 @@
       "syncFindings": "Tapıntıları sinxronlaşdır",
       "syncNow": "İndi sinxronlaşdır",
       "syncQueued": "Sinxronlaşdırma növbəyə alındı",
-      "syncStatusUnavailable": "Sinxronlaşdırma statusu əlçatan deyil."
+      "syncStatusUnavailable": "Sinxronlaşdırma statusu əlçatan deyil.",
+      "daysOverdue_one": "{{displayCount}} gün gecikib",
+      "daysOverdue_other": "{{displayCount}} gün gecikib",
+      "findingsCount_one": "{{displayCount}} tapıntı",
+      "findingsCount_other": "{{displayCount}} tapıntı"
     },
     "dashboardMetrics": {
       "openFindings": "Açıq tapıntılar",
@@ -2168,7 +2188,13 @@
       "updateTodos": "Tapşırıqları yenilə",
       "linesBadge": "{{displayCount}} sətir",
       "filesBadge": "{{displayCount}} fayl",
-      "matchesBadge": "{{displayCount}} uyğunluq"
+      "matchesBadge": "{{displayCount}} uyğunluq",
+      "filesBadge_one": "{{displayCount}} fayl",
+      "filesBadge_other": "{{displayCount}} fayl",
+      "linesBadge_one": "{{displayCount}} sətir",
+      "linesBadge_other": "{{displayCount}} sətir",
+      "matchesBadge_one": "{{displayCount}} uyğunluq",
+      "matchesBadge_other": "{{displayCount}} uyğunluq"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} sətirləri (qısaldılıb)",
@@ -2458,7 +2484,11 @@
       "files": "Fayl",
       "couldNotOpenPhotoPicker": "Şəkil seçicisini açmaq mümkün olmadı. Kilo-nu yenidən başlat və yenidən cəhd et.",
       "maxFilesAllowed": "Ən çox {{displayCount}} fayl əlavə etmək olar.",
-      "onlyAddingFiles": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})"
+      "onlyAddingFiles": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})",
+      "maxFilesAllowed_one": "Ən çox {{displayCount}} fayl əlavə etmək olar.",
+      "maxFilesAllowed_other": "Ən çox {{displayCount}} fayl əlavə etmək olar.",
+      "onlyAddingFiles_one": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})",
+      "onlyAddingFiles_other": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})"
     },
     "composer": {
       "addAttachment": "Qoşma əlavə et",
@@ -2476,7 +2506,9 @@
       "discardAttachmentsMessage": "Heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək.",
       "discardAttachmentsTitle": "Əlavələr silinsin?",
       "charactersRemaining": "{{count}} simvol qalıb",
-      "insertNewline": "Yeni sətir əlavə et"
+      "insertNewline": "Yeni sətir əlavə et",
+      "charactersRemaining_one": "{{count}} simvol qalıb",
+      "charactersRemaining_other": "{{count}} simvol qalıb"
     },
     "chatLink": {
       "linkCopied": "Keçid kopyalandı",
@@ -2548,7 +2580,9 @@
       "stepsCount_one": "{{steps}} addım",
       "stepsCount": "{{steps}} addım",
       "stepsCount_other": "{{steps}} addım",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modellər ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Avtomatik təsdiq",
@@ -2588,7 +2622,9 @@
     },
     "toolRun": {
       "sheetTitle": "Alət çağırışları",
-      "condensedLabel": "{{itemCount}} element; {{last}}"
+      "condensedLabel": "{{itemCount}} element; {{last}}",
+      "condensedLabel_one": "{{itemCount}} element; {{last}}",
+      "condensedLabel_other": "{{itemCount}} element; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2759,9 @@
     "cliCantReceiveFilesTitle": "Bu sessiya fayl qəbul edə bilmir",
     "cliCantReceiveFilesMessage": "Bu sessiyanın işlədiyi Kilo CLI fayl qəbul edə bilmir. Həmin kompüterdə CLI-ni yenilə və ya faylları yeni sessiyaya göndər.",
     "contentlessMessage": "Paylaşılacaq heç nə yoxdur — mətn və ya fayl daxil edilməyib.",
-    "couldNotReadContent": "Paylaşılan məzmunu oxumaq mümkün olmadı."
+    "couldNotReadContent": "Paylaşılan məzmunu oxumaq mümkün olmadı.",
+    "onlyFirstFilesAttached_one": "Yalnız ilk {{displayCount}} fayl əlavə ediləcək.",
+    "onlyFirstFilesAttached_other": "Yalnız ilk {{displayCount}} fayl əlavə ediləcək."
   },
   "kiloPass": {
     "title": "Kilo Pass",

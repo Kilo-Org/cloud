@@ -1286,6 +1286,73 @@ describe('NotificationChannelDO preview mode and channel', () => {
     expect(newMessage?.channelId).toBe('chat');
   });
 
+  it('routes an attention push per token: pre-split install keeps the legacy channel', async () => {
+    installDbMock({
+      tokens: [
+        { user_id: 'user-split', token: 'tok-old', app_version: '1.0.10' },
+        // `1.0.11` shipped without the split, so it must not clear the gate.
+        { user_id: 'user-split', token: 'tok-released', app_version: '1.0.11' },
+        { user_id: 'user-split', token: 'tok-new', app_version: '1.0.12' },
+      ],
+    });
+    const stub = getDO('user-split-attention');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-split',
+        idempotencyKey: 'k-split-attention',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_split', category: 'attention' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    const oldMessage = messages.find(m => m.to === 'tok-old');
+    const releasedMessage = messages.find(m => m.to === 'tok-released');
+    const newMessage = messages.find(m => m.to === 'tok-new');
+    // The pre-split installs never created agent-attention; Android 8+ drops a
+    // push addressed to a channel that does not exist, so they keep the legacy id.
+    expect(oldMessage?.channelId).toBe('agent');
+    expect(releasedMessage?.channelId).toBe('agent');
+    expect(newMessage?.channelId).toBe('agent-attention');
+  });
+
+  it('routes a progress push per token: pre-split install keeps the legacy channel', async () => {
+    installDbMock({
+      tokens: [
+        { user_id: 'user-split-progress', token: 'tok-old', app_version: '1.0.10' },
+        { user_id: 'user-split-progress', token: 'tok-released', app_version: '1.0.11' },
+        { user_id: 'user-split-progress', token: 'tok-new', app_version: '1.0.12' },
+      ],
+    });
+    const stub = getDO('user-split-progress');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-split-progress',
+        idempotencyKey: 'k-split-progress',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_split' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    const oldMessage = messages.find(m => m.to === 'tok-old');
+    const releasedMessage = messages.find(m => m.to === 'tok-released');
+    const newMessage = messages.find(m => m.to === 'tok-new');
+    expect(oldMessage?.channelId).toBe('agent');
+    expect(releasedMessage?.channelId).toBe('agent');
+    expect(newMessage?.channelId).toBe('agent-progress');
+  });
+
   it('substitutes generic content when previews is generic', async () => {
     installDbMock({ tokens: [{ user_id: 'user-generic', token: 'tok1' }], previews: 'generic' });
     const stub = getDO('user-generic');

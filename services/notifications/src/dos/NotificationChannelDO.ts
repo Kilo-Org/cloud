@@ -3,6 +3,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { user_notification_preferences, user_push_tokens } from '@kilocode/db/schema';
 import {
   androidChannelIdForPushData,
+  androidChannelIdForPushDataAtAppVersion,
   genericPushContentForPushData,
   resolvePushLocale,
   translatePush,
@@ -183,8 +184,10 @@ export class NotificationChannelDO extends DurableObject<Env> {
       .where(eq(user_push_tokens.user_id, input.userId));
 
     // Preview mode + Android channel. Resolved before the sink branch so the
-    // sink log can record them (both are non-content). Fail closed: a read
-    // that throws, or an absent row, is treated as 'generic'.
+    // sink log can record them (both are non-content). The sink records the
+    // current contract's channel; the per-token send below gates the agent
+    // split on each token's app version. Fail closed: a read that throws, or an
+    // absent row, is treated as 'generic'.
     const channelId = androidChannelIdForPushData(input.push.data);
     // Attention extras: the OS category (action buttons) and the iOS
     // time-sensitive level. Empty for every non-attention push, so ordinary
@@ -286,10 +289,14 @@ export class NotificationChannelDO extends DurableObject<Env> {
         // keys for any other push, so their message shape is unchanged.
         ...pushExtras,
         // Android 8+ drops a notification addressed to a channel that does
-        // not exist. Only clients that create channels (a non-null app
-        // version at registration) get a channelId; older clients fall back
-        // to the default channel. iOS ignores channelId either way.
-        ...(app_version != null && { channelId }),
+        // not exist. A token without an app version never created a channel,
+        // so it gets no channelId and Android uses the default channel; a
+        // token with a version is routed to the channel its own build created,
+        // with the agent split gated on the first version that creates it.
+        // iOS ignores channelId either way.
+        ...(app_version != null && {
+          channelId: androidChannelIdForPushDataAtAppVersion(input.push.data, app_version),
+        }),
         sound: input.push.sound ?? undefined,
         priority: input.push.priority ?? 'default',
       } satisfies ExpoPushMessage;

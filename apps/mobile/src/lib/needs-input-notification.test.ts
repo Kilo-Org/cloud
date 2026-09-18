@@ -9,6 +9,7 @@ import {
   type NeedsInputNotificationRow,
   notificationIdentifierForSession,
   planNeedsInputNotifications,
+  reconcileNotifiedRows,
   shouldPublishForSession,
 } from './needs-input-notification';
 
@@ -438,7 +439,7 @@ describe('applyNeedsInputNotifications', () => {
 
     await expect(
       applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [] })
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ failedPublish: ['ses_1'], failedDismiss: [] });
     expect(events).toHaveLength(1);
     expect(events[0]?.tags?.['error.operation']).toBe('needs_input_publish');
   });
@@ -452,8 +453,62 @@ describe('applyNeedsInputNotifications', () => {
 
     await expect(
       applyNeedsInputNotifications({ publish: [], dismiss: ['needs-input:ses_1'] })
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ failedPublish: [], failedDismiss: ['needs-input:ses_1'] });
     expect(events).toHaveLength(1);
     expect(events[0]?.tags?.['error.operation']).toBe('needs_input_dismiss');
+  });
+
+  it('reports nothing failed when every call lands', async () => {
+    await expect(
+      applyNeedsInputNotifications({
+        publish: [notifiedRow(), notifiedRow({ sessionId: 'ses_2' })],
+        dismiss: ['needs-input:ses_old'],
+      })
+    ).resolves.toEqual({ failedPublish: [], failedDismiss: [] });
+  });
+});
+
+describe('reconcileNotifiedRows', () => {
+  it('forgets a raise whose post did not land so the next plan re-posts it', () => {
+    const published = notifiedRow();
+    // The optimistic carry-forward remembered it as posted even though the
+    // native post failed.
+    expect(
+      reconcileNotifiedRows([published], [], { failedPublish: ['ses_1'], failedDismiss: [] })
+    ).toEqual([]);
+  });
+
+  it('remembers a dismissal that did not land so the next plan re-dismisses it', () => {
+    const dismissed = notifiedRow();
+    // The optimistic carry-forward removed the row even though the notification
+    // is still on screen.
+    expect(
+      reconcileNotifiedRows([], [dismissed], {
+        failedPublish: [],
+        failedDismiss: ['needs-input:ses_1'],
+      })
+    ).toEqual([dismissed]);
+  });
+
+  it('leaves rows untouched when every call landed', () => {
+    const kept = notifiedRow();
+    expect(
+      reconcileNotifiedRows([kept], [notifiedRow({ sessionId: 'ses_old' })], {
+        failedPublish: [],
+        failedDismiss: [],
+      })
+    ).toEqual([kept]);
+  });
+
+  it('does not re-add a row a later plan already re-published', () => {
+    const row = notifiedRow();
+    // A newer plan published this session successfully after the older plan's
+    // dismissal failed; the row must not be duplicated.
+    expect(
+      reconcileNotifiedRows([row], [row], {
+        failedPublish: [],
+        failedDismiss: ['needs-input:ses_1'],
+      })
+    ).toEqual([row]);
   });
 });

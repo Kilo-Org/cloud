@@ -1957,6 +1957,33 @@ describe('UserConnectionDO', () => {
       expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
     });
 
+    it('cancels a durable hold when the re-owning heartbeat beats the mirror rebuild', async () => {
+      const { ctx, mockCtx } = setup();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      // The hold was written durably, then the DO was evicted: every in-memory
+      // set is gone while the KV entry (the source of truth) remains, and the
+      // asynchronous rebuild in `scheduleNextAlarm` has not listed it yet.
+      await ctx.storage.put('attentionReset:s1', {
+        kiloUserId: 'usr_1',
+        dueAt: now + CLI_ABSENCE_ATTENTION_RESET_MS,
+        connectionId: 'cli-1',
+      });
+      const revived = new UserConnectionDO(ctx as never, {} as Env);
+      const internal = revived as unknown as {
+        pendingAttentionResetAt: Map<string, number>;
+      };
+      expect(internal.pendingAttentionResetAt.size).toBe(0);
+
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      sendHeartbeat(revived, cliWs, [makeSession('s1', 'question')]);
+      await flushAsync();
+
+      // The live CLI re-owns the session, so the stale hold must not survive to
+      // fire an absence clear once the connection later goes away unannounced.
+      expect(ctx.storage.store.has('attentionReset:s1')).toBe(false);
+    });
+
     it('re-arms a held clear whose delegate write failed instead of dropping it', async () => {
       const { doInstance, mockCtx, ctx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');

@@ -1980,7 +1980,13 @@ export class UserConnectionDO extends DurableObject<Env> {
 
   /** Drop a held clear once a live CLI owns the session again. */
   private cancelPendingAttentionReset(sessionId: string): void {
-    if (!this.pendingAttentionResetAt.delete(sessionId)) return;
+    const mirrored = this.pendingAttentionResetAt.delete(sessionId);
+    // A mirror miss is not proof there is nothing to delete: after eviction the
+    // mirror is empty while the durable holds are still in KV, and this runs
+    // before the one-shot rebuild in `scheduleNextAlarm` has listed them. Until
+    // that rebuild has completed once, delete durably so a re-owning CLI cannot
+    // leave a stale hold behind for the alarm to fire later.
+    if (!mirrored && this.attentionResetsRebuilt) return;
     this.ctx.waitUntil(
       this.ctx.storage
         .delete(`${ATTENTION_RESET_KEY_PREFIX}${sessionId}`)

@@ -25,7 +25,9 @@
  * rows change or a route change) can tell a row that just raised from one that
  * was already raised, never re-posts a notification that is already on screen,
  * and still knows what to dismiss after a plan that publishes nothing. The
- * caller carries it forward as `previous - dismiss + publish`.
+ * caller carries it forward as `previous - dismiss + publish`, then rolls back
+ * any native call that did not land (`reconcileNotifiedRows`) so a failure is
+ * retried by the next plan instead of being remembered as done.
  */
 
 import * as Notifications from 'expo-notifications';
@@ -58,6 +60,19 @@ export type NeedsInputNotificationPlan = {
   publish: NeedsInputNotificationRow[];
   /** Identifiers to dismiss, derived from the session id. */
   dismiss: string[];
+};
+
+/**
+ * Which of a plan's native calls did not land. The caller keeps its notified set
+ * honest with it: a post that failed was never on screen and must be published
+ * again, a dismissal that failed left the notification up and must be
+ * dismissed again.
+ */
+export type NeedsInputApplyResult = {
+  /** Session ids whose post did not land. */
+  failedPublish: string[];
+  /** Identifiers whose dismissal did not land; the notification is still up. */
+  failedDismiss: string[];
 };
 
 export type NeedsInputPlanInput = {
@@ -287,9 +302,10 @@ function reportFailure(operation: 'publish' | 'dismiss', error: unknown): void {
 /**
  * Post one raise. A rejected schedule (the permission was revoked after login)
  * is reported and swallowed: the app-owned carrier must never crash the mount
- * that owns it.
+ * that owns it. Returns false so the caller does not remember the raise as
+ * posted when nothing reached the OS.
  */
-async function publishRow(row: NeedsInputNotificationRow): Promise<void> {
+async function publishRow(row: NeedsInputNotificationRow): Promise<boolean> {
   const data = pushDataForRow(row);
   try {
     await Notifications.scheduleNotificationAsync({
@@ -306,19 +322,24 @@ async function publishRow(row: NeedsInputNotificationRow): Promise<void> {
       trigger: { channelId: androidChannelIdForPushData(data) },
     });
     postedSessions.add(row.sessionId);
+    return true;
   } catch (error) {
     reportFailure('publish', error);
+    return false;
   }
 }
 
-async function dismissIdentifier(identifier: string): Promise<void> {
+/** Dismiss one identifier. Returns false when the notification is still up. */
+async function dismissIdentifier(identifier: string): Promise<boolean> {
   try {
     await Notifications.dismissNotificationAsync(identifier);
     if (identifier.startsWith(IDENTIFIER_PREFIX)) {
       postedSessions.delete(identifier.slice(IDENTIFIER_PREFIX.length));
     }
+    return true;
   } catch (error) {
     reportFailure('dismiss', error);
+    return false;
   }
 }
 
@@ -326,17 +347,49 @@ async function dismissIdentifier(identifier: string): Promise<void> {
  * Apply a plan. Every dismissal is issued before the first post, so a
  * dismiss/publish pair for one identifier ends with the notification posted.
  * Every native call is reported and swallowed, so the returned promise never
- * rejects.
+ * rejects; the result names the calls that did not land.
  */
 export async function applyNeedsInputNotifications(
   plan: NeedsInputNotificationPlan
-): Promise<void> {
+): Promise<NeedsInputApplyResult> {
+  const result: NeedsInputApplyResult = { failedPublish: [], failedDismiss: [] };
   for (const identifier of plan.dismiss) {
     // eslint-disable-next-line no-await-in-loop -- ordered so a dismiss/publish pair for one identifier ends posted
-    await dismissIdentifier(identifier);
+    if (!(await dismissIdentifier(identifier))) {
+      result.failedDismiss.push(identifier);
+    }
   }
   for (const row of plan.publish) {
     // eslint-disable-next-line no-await-in-loop -- ordered so a dismiss/publish pair for one identifier ends posted
-    await publishRow(row);
+    if (!(await publishRow(row))) {
+      result.failedPublish.push(row.sessionId);
+    }
   }
+  return result;
+}
+
+/**
+ * The notified set after a plan's native calls settle. `committed` is the
+ * optimistic `previous - dismiss + publish` the caller already stored; the
+ * apply result rolls back the operations that did not land, so the next plan
+ * re-posts a raise whose notification never appeared and re-issues a dismissal
+ * whose notification is still on screen. Without the rollback an unchanged
+ * cache would treat both as done and never try again.
+ */
+export function reconcileNotifiedRows(
+  committed: readonly NeedsInputNotificationRow[],
+  previous: readonly NeedsInputNotificationRow[],
+  failed: NeedsInputApplyResult
+): NeedsInputNotificationRow[] {
+  const failedPublish = new Set(failed.failedPublish);
+  const failedDismiss = new Set(failed.failedDismiss);
+  const rows = committed.filter(row => !failedPublish.has(row.sessionId));
+  for (const row of previous) {
+    const stillUp = failedDismiss.has(notificationIdentifierForSession(row.sessionId));
+    const alreadyRemembered = rows.some(existing => existing.sessionId === row.sessionId);
+    if (stillUp && !alreadyRemembered) {
+      rows.push(row);
+    }
+  }
+  return rows;
 }

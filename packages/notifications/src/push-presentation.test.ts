@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { pushDataSchema } from './push-data';
 import {
+  ANDROID_AGENT_CHANNELS_MIN_APP_VERSION,
   ANDROID_NOTIFICATION_CHANNELS,
+  LEGACY_ANDROID_AGENT_CHANNEL_ID,
   androidChannelIdForPushData,
+  androidChannelIdForPushDataAtAppVersion,
   genericPushContentForPushData,
 } from './push-presentation';
 
@@ -85,6 +88,59 @@ describe('androidChannelIdForPushData', () => {
       'agent-progress'
     );
     expect(ANDROID_NOTIFICATION_CHANNELS.map(c => c.id)).not.toContain('agent');
+  });
+});
+
+describe('androidChannelIdForPushDataAtAppVersion', () => {
+  const attention = { type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'attention' };
+  const progress = { type: 'cloud_agent_session', cliSessionId: 'cli1' };
+
+  it('routes a pre-split install to the legacy channel it actually created', () => {
+    // These installs registered a non-null version but predate the split, so
+    // they never created `agent-attention`/`agent-progress`; Android 8+ would
+    // drop a push addressed to either. `1.0.11` is the last version released
+    // without the split, so it must stay below the gate.
+    for (const version of ['1.0.10', '1.0.11']) {
+      expect(
+        androidChannelIdForPushDataAtAppVersion(pushDataSchema.parse(attention), version)
+      ).toBe(LEGACY_ANDROID_AGENT_CHANNEL_ID);
+      expect(androidChannelIdForPushDataAtAppVersion(pushDataSchema.parse(progress), version)).toBe(
+        LEGACY_ANDROID_AGENT_CHANNEL_ID
+      );
+    }
+  });
+
+  it('routes a split install to the split channel', () => {
+    expect(
+      androidChannelIdForPushDataAtAppVersion(
+        pushDataSchema.parse(attention),
+        ANDROID_AGENT_CHANNELS_MIN_APP_VERSION
+      )
+    ).toBe('agent-attention');
+    expect(androidChannelIdForPushDataAtAppVersion(pushDataSchema.parse(progress), '1.2.0')).toBe(
+      'agent-progress'
+    );
+  });
+
+  it('treats an unknown version as pre-split', () => {
+    for (const version of [null, undefined, '', 'not-a-version']) {
+      expect(androidChannelIdForPushDataAtAppVersion(pushDataSchema.parse(progress), version)).toBe(
+        LEGACY_ANDROID_AGENT_CHANNEL_ID
+      );
+    }
+  });
+
+  it('leaves every other channel ungated', () => {
+    // Only the agent split is new; chat and the rest are created by every
+    // install, so their id must not move with the version.
+    const chat = pushDataSchema.parse({
+      type: 'chat.message',
+      sandboxId: 'sb1',
+      conversationId: 'conv1',
+      messageId: 'm1',
+    });
+    expect(androidChannelIdForPushDataAtAppVersion(chat, '1.0.0')).toBe('chat');
+    expect(androidChannelIdForPushDataAtAppVersion(chat, null)).toBe('chat');
   });
 });
 

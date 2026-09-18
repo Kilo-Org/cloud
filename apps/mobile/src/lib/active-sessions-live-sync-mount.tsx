@@ -17,6 +17,7 @@ import {
   type NeedsInputNotificationRow,
   notificationIdentifierForSession,
   planNeedsInputNotifications,
+  reconcileNotifiedRows,
 } from '@/lib/needs-input-notification';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
@@ -120,8 +121,9 @@ function useNeedsInputLocalNotifications(): void {
 
   const recompute = useCallback(() => {
     const next = queryClient.getQueryData<CachedActiveSessionsData>(queryKey)?.sessions ?? [];
+    const previous = notified.current;
     const plan = planNeedsInputNotifications({
-      previous: notified.current,
+      previous,
       next,
       pathname: pathnameRef.current,
       appState: AppState.currentState,
@@ -139,7 +141,7 @@ function useNeedsInputLocalNotifications(): void {
     // bound.
     const republished = new Set(plan.publish.map(row => row.sessionId));
     notified.current = [
-      ...notified.current.filter(
+      ...previous.filter(
         row =>
           !dismissed.has(notificationIdentifierForSession(row.sessionId)) &&
           !republished.has(row.sessionId)
@@ -147,7 +149,17 @@ function useNeedsInputLocalNotifications(): void {
       ...plan.publish,
     ];
     // The applier reports and swallows every native failure; it never rejects.
-    void applyNeedsInputNotifications(plan);
+    // A call that did not land must not stay remembered as done, or an
+    // unchanged cache would never re-post a raise that never appeared and never
+    // re-dismiss a notification that is still on screen. Rolling the optimistic
+    // set back lets the next recompute retry it.
+    void (async () => {
+      const failed = await applyNeedsInputNotifications(plan);
+      if (failed.failedPublish.length === 0 && failed.failedDismiss.length === 0) {
+        return;
+      }
+      notified.current = reconcileNotifiedRows(notified.current, previous, failed);
+    })();
   }, [queryClient, queryKey, preferencesQueryKey]);
 
   useEffect(() => {

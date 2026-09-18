@@ -172,10 +172,10 @@ export default function SessionDetailScreen() {
     metadataErrorCode === 'FORBIDDEN';
   // A failed background refresh does not invalidate owner-scoped cached
   // metadata. Keep its provider mounted; only an authoritative denial retires it.
-  // A retryable metadata failure must not blank a session either: the device may
-  // still hold its persisted transcript, so mount the session and let the SDK
-  // paint the cached content and surface the retryable failure in place. Only a
-  // denial (deleted session / lost access) replaces the screen with the error.
+  // A retryable metadata failure must not blank a session either: mount the
+  // session so its own retryable failure surfaces in place over the skeleton.
+  // Only a denial (deleted session / lost access) replaces the screen with the
+  // error.
   if (
     identityFailed ||
     (routeOrganizationId === undefined && sessionQuery.isError && metadataAccessDenied)

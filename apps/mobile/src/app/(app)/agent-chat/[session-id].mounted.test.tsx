@@ -928,16 +928,16 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     expect(transcriptText(renderer, 'RootText')).toBe('Account B root row');
   });
 
-  it('mounts the session for a temporary metadata failure so the cached transcript can paint', async () => {
+  it('mounts the session for a temporary metadata failure so the retryable state surfaces in place', async () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
     queryState.data = null;
     queryState.isError = true;
     queryState.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     const renderer = await mountRoute();
 
-    // A failed metadata refresh must not replace a session the device can still
-    // show from its persisted transcript: the route hands off to the session,
-    // which reads the cached page first and owns the retryable failure.
+    // A failed metadata refresh must not replace the session screen: the route
+    // hands off to the session, which owns the retryable failure and surfaces
+    // it in place over the skeleton.
     expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
   });

@@ -28,16 +28,11 @@ export function AgentSessionProvider({
   const userWebConnection = useUserWebConnection();
   const storeRef = useRef(createStore());
   const managerRef = useRef<SessionManager | null>(null);
-  // Capture the owner before the manager is created so its transcript cache is
-  // scoped to this account. The route keys the provider on the owner, so a new
-  // account gets a new manager; the provider only renders for a confirmed
-  // owner, and `?? ''` makes the manager skip the cache if it ever is not.
   const owner = useRef(getAuthenticatedOwner()).current;
   managerRef.current ??= createMobileAgentSessionManager({
     store: storeRef.current,
     userWebConnection,
     organizationId,
-    userId: owner.userId ?? '',
   });
 
   // The provider only mounts on the agent-chat route, so the route's session id

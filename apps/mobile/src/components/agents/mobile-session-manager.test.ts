@@ -46,13 +46,6 @@ vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
   fetchMobileSessionSnapshotPage: vi.fn(),
 }));
-// The transcript cache owns the encrypted KV (SQLCipher) chain; this suite is
-// pure and only needs the call seams.
-vi.mock('@/lib/persist/session-transcript-cache', () => ({
-  readSessionTranscriptPage: vi.fn(async () => null),
-  writeSessionTranscriptPage: vi.fn(async () => undefined),
-  clearSessionTranscriptPage: vi.fn(async () => undefined),
-}));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
   CLOUD_AGENT_WS_URL: 'wss://ws.test',
@@ -688,5 +681,23 @@ describe('createMobileAgentSessionManager metadata memo', () => {
       cloudAgentSessionId: 'agent_1',
     });
     expect(getSessionQuery).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('createMobileAgentSessionManager cached transcript', () => {
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+  });
+
+  it('opens a session without a cached-page reader so the skeleton stays until the live page lands', () => {
+    const options = {
+      store: {},
+      userWebConnection: {},
+    };
+    createMobileAgentSessionManager(options as never);
+
+    const config = configHolder.current;
+    expect(config?.readCachedSnapshotPage).toBeUndefined();
   });
 });

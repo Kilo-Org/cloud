@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   dismissNotificationAsync: vi.fn(),
   clearLastNotificationResponse: vi.fn(),
   runNeedsInputInteraction: vi.fn(),
+  refreshGlanceableSurfacesFromTray: vi.fn(),
   captureException: vi.fn(),
 }));
 
@@ -37,6 +38,12 @@ vi.mock('expo-notifications', () => ({
 // so the suite stubs the module the lazy dynamic import resolves to.
 vi.mock('./notification-action-interaction', () => ({
   runNeedsInputInteraction: mocks.runNeedsInputInteraction,
+}));
+
+// The glanceable republish reaches the same RN / tRPC graph; stub the module
+// its lazy dynamic import resolves to.
+vi.mock('./glanceable/approve-front-agent', () => ({
+  refreshGlanceableSurfacesFromTray: mocks.refreshGlanceableSurfacesFromTray,
 }));
 
 vi.mock('@sentry/react-native', () => ({
@@ -108,6 +115,7 @@ beforeEach(() => {
   mocks.dismissNotificationAsync.mockReset().mockResolvedValue(undefined);
   mocks.clearLastNotificationResponse.mockReset();
   mocks.runNeedsInputInteraction.mockReset();
+  mocks.refreshGlanceableSurfacesFromTray.mockReset().mockResolvedValue(undefined);
   mocks.captureException.mockReset();
 });
 
@@ -317,6 +325,77 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
       kiloSessionId: 'ses_1',
       action: 'approve',
     });
+  });
+
+  it('resolves the glanceable republish through its lazy load when deps omit it', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+
+    await handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+    });
+
+    expect(mocks.refreshGlanceableSurfacesFromTray).toHaveBeenCalledTimes(1);
+  });
+
+  it('republishes the glanceable surfaces when the answer ends the raise', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    const refreshGlanceableSurfaces = vi.fn().mockResolvedValue(undefined);
+
+    await handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+      refreshGlanceableSurfaces,
+    });
+
+    expect(refreshGlanceableSurfaces).toHaveBeenCalledTimes(1);
+  });
+
+  it('republishes the glanceable surfaces when the raise was already gone', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('unavailable');
+    const refreshGlanceableSurfaces = vi.fn().mockResolvedValue(undefined);
+
+    await handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+      refreshGlanceableSurfaces,
+    });
+
+    expect(refreshGlanceableSurfaces).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the glanceable surfaces alone while a retryable failure keeps the raise', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('retryable');
+    const refreshGlanceableSurfaces = vi.fn().mockResolvedValue(undefined);
+
+    await handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+      refreshGlanceableSurfaces,
+    });
+
+    expect(refreshGlanceableSurfaces).not.toHaveBeenCalled();
+  });
+
+  it('keeps the confirmation when the glanceable republish fails', async () => {
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    const refreshGlanceableSurfaces = vi.fn().mockRejectedValue(new Error('tray down'));
+
+    const handled = await handleNeedsInputNotificationResponse(raiseResponse(), {
+      runInteraction: mocks.runNeedsInputInteraction,
+      refreshGlanceableSurfaces,
+    });
+
+    expect(handled).toBe(true);
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({ body: 'Request approved' }),
+      })
+    );
+    expect(mocks.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          'error.operation': 'needs_input_action_glanceable_refresh',
+        }),
+      })
+    );
   });
 
   it('treats a thrown interaction as retryable and reports it', async () => {

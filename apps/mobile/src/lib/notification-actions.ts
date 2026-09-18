@@ -117,6 +117,11 @@ type NeedsInputInteractionRunner = (input: {
 export type NeedsInputActionDeps = {
   /** Defaults to the s4 entry point, loaded lazily (see `defaultRunInteraction`). */
   runInteraction?: NeedsInputInteractionRunner;
+  /**
+   * Defaults to the glanceable tray republish, loaded lazily (see
+   * `defaultRefreshGlanceableSurfaces`).
+   */
+  refreshGlanceableSurfaces?: () => Promise<void>;
 };
 
 /** The shape of the s4 entry point, kept as an annotation on the lazy load. */
@@ -133,6 +138,13 @@ async function defaultRunInteraction(
 ): Promise<NeedsInputActionOutcome> {
   const interaction = (await import('./notification-action-interaction')) as InteractionModule;
   return interaction.runNeedsInputInteraction(input);
+}
+
+// Lazy for the same reason: the glanceable republish reaches the mobile session
+// manager graph, and only an answer that ends a raise needs it.
+async function defaultRefreshGlanceableSurfaces(): Promise<void> {
+  const { refreshGlanceableSurfacesFromTray } = await import('./glanceable/approve-front-agent');
+  await refreshGlanceableSurfacesFromTray();
 }
 
 type NeedsInputRaiseData = Extract<PushData, { type: 'cloud_agent_session' }>;
@@ -429,6 +441,23 @@ async function runAnswerAction(args: {
     categoryIdentifier: presentation.categoryIdentifier,
     interruptionLevel: presentation.interruptionLevel,
   });
+
+  if (presentation.raiseCleared) {
+    // The raise is over for the user. The glanceable surfaces count the tray
+    // rows, and the ack only hides the raise from the in-app list, so a
+    // surface already showing it must be republished now — a status-only raise
+    // never pushes the count that would do it.
+    await refreshGlanceableAfterAnswer(deps);
+  }
+}
+
+/** Republish the glanceable surfaces, containing any failure to reporting. */
+async function refreshGlanceableAfterAnswer(deps: NeedsInputActionDeps): Promise<void> {
+  try {
+    await (deps.refreshGlanceableSurfaces ?? defaultRefreshGlanceableSurfaces)();
+  } catch (error) {
+    reportActionFailure('glanceable_refresh', error);
+  }
 }
 
 /**
@@ -487,7 +516,7 @@ async function replaceNotification(args: {
 }
 
 function reportActionFailure(
-  operation: 'publish' | 'dismiss' | 'run_interaction',
+  operation: 'publish' | 'dismiss' | 'run_interaction' | 'glanceable_refresh',
   error: unknown
 ): void {
   Sentry.captureException(error, {

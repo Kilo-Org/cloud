@@ -296,10 +296,15 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
                 onPress={openReviewSubmit}
                 disabled={loadFailed}
                 accessibilityLabel={t('prReview.submit.submitReview')}
-                className={cn('px-3')}
+                // The header caps its trailing action slot at half the row, so
+                // at Android font scale 2 the label has to wrap inside the slot.
+                // The shared Button is `shrink-0` and its Text does not shrink
+                // by default; opting both back in keeps the button off the right
+                // screen edge (pr-empty explorer finding) instead of clipping it.
+                className={cn('shrink px-3')}
               >
                 <Check size={14} color={colors.primaryForeground} />
-                <Text>{t('prReview.submit.submitReview')}</Text>
+                <Text className="shrink">{t('prReview.submit.submitReview')}</Text>
               </Button>
             ) : null}
           </View>

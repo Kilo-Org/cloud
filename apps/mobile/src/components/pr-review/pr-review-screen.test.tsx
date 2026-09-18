@@ -256,6 +256,28 @@ describe('PrReviewScreen Submit review reachability (P1-F-46b)', () => {
     expect(button).not.toBeNull();
   });
 
+  it('keeps the header Submit review button shrinkable so a large font scale cannot clip it', () => {
+    // The header caps its trailing action slot at half the row
+    // (`max-w-[50%]`), so at Android font scale 2 the label must wrap
+    // inside that slot. The shared Button is `shrink-0` and its Text does
+    // not shrink by default, so the screen has to opt both back in or the
+    // button overflows the right screen edge (pr-empty explorer finding).
+    const button = findScreenHeaderSubmitButton();
+    if (!button) {
+      throw new Error('Submit review button not found on Overview tab');
+    }
+    const buttonClassName = (button.props as { className?: string }).className ?? '';
+    expect(buttonClassName).toMatch(/(^|\s)shrink(\s|$)/);
+
+    const childrenProp = (button.props as { children?: React.ReactNode }).children;
+    const children: React.ReactNode[] = Array.isArray(childrenProp) ? childrenProp : [];
+    const label = children.find(child => React.isValidElement(child) && child.type === 'Text');
+    expect(label).toBeDefined();
+    const labelClassName =
+      (label as React.ReactElement<{ className?: string }> | undefined)?.props.className ?? '';
+    expect(labelClassName).toMatch(/(^|\s)shrink(\s|$)/);
+  });
+
   it('navigates to the review-submit route with owner/repo/number on press (Overview)', () => {
     const button = findScreenHeaderSubmitButton();
     if (!button) {

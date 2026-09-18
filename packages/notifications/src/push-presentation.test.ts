@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { pushDataSchema } from './push-data';
 import {
+  AGENT_CHANNEL_SPLIT_APP_VERSION,
   ANDROID_NOTIFICATION_CHANNELS,
   androidChannelIdForPushData,
+  androidChannelIdForPushDataToAppVersion,
   genericPushContentForPushData,
+  LEGACY_AGENT_ANDROID_CHANNEL_ID,
 } from './push-presentation';
 
 // One representative payload per `pushDataSchema` variant, plus both
@@ -85,6 +88,61 @@ describe('androidChannelIdForPushData', () => {
       'agent-progress'
     );
     expect(ANDROID_NOTIFICATION_CHANNELS.map(c => c.id)).not.toContain('agent');
+  });
+});
+
+describe('androidChannelIdForPushDataToAppVersion', () => {
+  const attention = {
+    type: 'cloud_agent_session',
+    cliSessionId: 'cli1',
+    category: 'attention',
+  } as const;
+  const progress = { type: 'cloud_agent_session', cliSessionId: 'cli1' } as const;
+
+  it('keeps an agent push on the legacy channel for a build that predates the split', () => {
+    // 1.0.11 shipped before the split channels existed: its tokens have no
+    // `agent-attention`/`agent-progress`, so directing a push there would be
+    // dropped on Android 8+. Only the split build and later may be addressed.
+    expect(androidChannelIdForPushDataToAppVersion(attention, '1.0.11')).toBe(
+      LEGACY_AGENT_ANDROID_CHANNEL_ID
+    );
+    expect(androidChannelIdForPushDataToAppVersion(attention, '1.0.10')).toBe(
+      LEGACY_AGENT_ANDROID_CHANNEL_ID
+    );
+    expect(androidChannelIdForPushDataToAppVersion(progress, '1.0.11')).toBe(
+      LEGACY_AGENT_ANDROID_CHANNEL_ID
+    );
+    expect(androidChannelIdForPushDataToAppVersion(progress, '1.0.4')).toBe(
+      LEGACY_AGENT_ANDROID_CHANNEL_ID
+    );
+    expect(androidChannelIdForPushDataToAppVersion(progress, null)).toBe(
+      LEGACY_AGENT_ANDROID_CHANNEL_ID
+    );
+    expect(androidChannelIdForPushDataToAppVersion(progress, 'nightly')).toBe(
+      LEGACY_AGENT_ANDROID_CHANNEL_ID
+    );
+  });
+
+  it('reaches the split channels from the first build that creates them', () => {
+    expect(
+      androidChannelIdForPushDataToAppVersion(attention, AGENT_CHANNEL_SPLIT_APP_VERSION)
+    ).toBe('agent-attention');
+    expect(androidChannelIdForPushDataToAppVersion(progress, '1.0.12')).toBe('agent-progress');
+  });
+
+  it('never downgrades a non-agent channel for an older build', () => {
+    expect(
+      androidChannelIdForPushDataToAppVersion(
+        { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
+        '1.0.4'
+      )
+    ).toBe('chat');
+    expect(
+      androidChannelIdForPushDataToAppVersion(
+        { type: 'low_balance', organizationId: 'org1' },
+        '1.0.0'
+      )
+    ).toBe('balance');
   });
 });
 

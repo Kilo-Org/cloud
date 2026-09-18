@@ -9,6 +9,7 @@ import {
   type NeedsInputNotificationRow,
   notificationIdentifierForSession,
   planNeedsInputNotifications,
+  reconcileNotifiedAfterApply,
   shouldPublishForSession,
 } from './needs-input-notification';
 
@@ -438,7 +439,7 @@ describe('applyNeedsInputNotifications', () => {
 
     await expect(
       applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [] })
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ published: [], dismissed: [] });
     expect(events).toHaveLength(1);
     expect(events[0]?.tags?.['error.operation']).toBe('needs_input_publish');
   });
@@ -452,8 +453,100 @@ describe('applyNeedsInputNotifications', () => {
 
     await expect(
       applyNeedsInputNotifications({ publish: [], dismiss: ['needs-input:ses_1'] })
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ published: [], dismissed: [] });
     expect(events).toHaveLength(1);
     expect(events[0]?.tags?.['error.operation']).toBe('needs_input_dismiss');
+  });
+
+  it('names only the operations that actually landed', async () => {
+    const row = notifiedRow();
+    mocks.scheduleNotificationAsync.mockResolvedValue(undefined);
+    mocks.dismissNotificationAsync.mockRejectedValue(new Error('no presenter'));
+
+    await expect(
+      applyNeedsInputNotifications({
+        publish: [row],
+        dismiss: ['needs-input:ses_old'],
+      })
+    ).resolves.toEqual({ published: [row], dismissed: [] });
+  });
+});
+
+describe('reconcileNotifiedAfterApply', () => {
+  it('keeps a failed dismissal so the next plan retries it', () => {
+    const row = notifiedRow();
+    const plan = { publish: [], dismiss: [notificationIdentifierForSession(row.sessionId)] };
+    // The optimistic commit already removed the row.
+    expect(
+      reconcileNotifiedAfterApply([], {
+        plan,
+        dropped: [row],
+        result: { published: [], dismissed: [] },
+      })
+    ).toEqual([row]);
+  });
+
+  it('drops a failed post so the next plan re-posts it', () => {
+    const row = notifiedRow();
+    const plan = { publish: [row], dismiss: [] };
+    // The optimistic commit already added the row.
+    expect(
+      reconcileNotifiedAfterApply([row], {
+        plan,
+        dropped: [],
+        result: { published: [], dismissed: [] },
+      })
+    ).toEqual([]);
+  });
+
+  it('keeps a successful post and a successful dismissal', () => {
+    const posted = notifiedRow();
+    const dismissed = notifiedRow({ sessionId: 'ses_old' });
+    const plan = {
+      publish: [posted],
+      dismiss: [notificationIdentifierForSession(dismissed.sessionId)],
+    };
+    expect(
+      reconcileNotifiedAfterApply([posted], {
+        plan,
+        dropped: [dismissed],
+        result: {
+          published: [posted],
+          dismissed: [notificationIdentifierForSession(dismissed.sessionId)],
+        },
+      })
+    ).toEqual([posted]);
+  });
+
+  it('restores the replaced row when its re-publish failed', () => {
+    const previous = notifiedRow({ prUrl: null });
+    const replacement = notifiedRow({ prUrl: 'https://github.com/org/repo/pull/7' });
+    const plan = { publish: [replacement], dismiss: [] };
+    // The optimistic commit replaced the old row with the new shape, which then
+    // failed to post; the old notification still carries the session's
+    // identifier, so the previous row must stay dismissible in the memory.
+    expect(
+      reconcileNotifiedAfterApply([replacement], {
+        plan,
+        dropped: [previous],
+        result: { published: [], dismissed: [] },
+      })
+    ).toEqual([previous]);
+  });
+
+  it('does not restore a replaced row whose dismissal landed and post did not', () => {
+    const previous = notifiedRow({ prUrl: null });
+    const replacement = notifiedRow({ prUrl: 'https://github.com/org/repo/pull/7' });
+    const identifier = notificationIdentifierForSession(previous.sessionId);
+    const plan = { publish: [replacement], dismiss: [identifier] };
+    // The dismissal removed the old notification; the failed replacement post
+    // left nothing on screen, so nothing is remembered.
+    expect(
+      reconcileNotifiedAfterApply([replacement], {
+        plan,
+        dropped: [previous],
+        result: { published: [], dismissed: [identifier] },
+      })
+    ).toEqual([]);
   });
 });

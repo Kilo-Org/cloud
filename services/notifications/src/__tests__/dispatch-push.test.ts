@@ -1286,6 +1286,55 @@ describe('NotificationChannelDO preview mode and channel', () => {
     expect(newMessage?.channelId).toBe('chat');
   });
 
+  it('keeps an agent push on the legacy channel for a token registered before the split', async () => {
+    installDbMock({
+      tokens: [
+        { user_id: 'user-agent-old', token: 'tok-old', app_version: '1.0.10' },
+        // 1.0.11 shipped before the split channels existed; its tokens must
+        // keep the legacy channel too.
+        { user_id: 'user-agent-old', token: 'tok-released', app_version: '1.0.11' },
+        { user_id: 'user-agent-old', token: 'tok-split', app_version: '1.0.12' },
+      ],
+    });
+    const stub = getDO('user-agent-old');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-agent-old',
+        idempotencyKey: 'k-agent-old',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'attention' },
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages.find(m => m.to === 'tok-old')?.channelId).toBe('agent');
+    expect(messages.find(m => m.to === 'tok-released')?.channelId).toBe('agent');
+    expect(messages.find(m => m.to === 'tok-split')?.channelId).toBe('agent-attention');
+  });
+
+  it('keeps ordinary progress on the legacy channel for a token registered before the split', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-agent-progress', token: 'tok-old', app_version: '1.0.10' }],
+    });
+    const stub = getDO('user-agent-progress');
+    await stub.dispatchPush(
+      baseInput({
+        userId: 'user-agent-progress',
+        idempotencyKey: 'k-agent-progress',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'status' },
+        },
+      })
+    );
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].channelId).toBe('agent');
+  });
+
   it('substitutes generic content when previews is generic', async () => {
     installDbMock({ tokens: [{ user_id: 'user-generic', token: 'tok1' }], previews: 'generic' });
     const stub = getDO('user-generic');

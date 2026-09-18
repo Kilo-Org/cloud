@@ -1980,7 +1980,13 @@ export class UserConnectionDO extends DurableObject<Env> {
 
   /** Drop a held clear once a live CLI owns the session again. */
   private cancelPendingAttentionReset(sessionId: string): void {
-    if (!this.pendingAttentionResetAt.delete(sessionId)) return;
+    // Delete the durable entry unconditionally. After an eviction the in-memory
+    // mirror is empty until `scheduleNextAlarm`'s asynchronous KV re-list lands;
+    // an early return when the mirror has no entry would leave the KV hold in
+    // place, and that re-list could repopulate and re-arm it. KV is the source
+    // of truth (`firePendingAttentionResets` re-lists it), so removing it here
+    // is what actually cancels the clear. A missing entry is a no-op.
+    this.pendingAttentionResetAt.delete(sessionId);
     this.ctx.waitUntil(
       this.ctx.storage
         .delete(`${ATTENTION_RESET_KEY_PREFIX}${sessionId}`)

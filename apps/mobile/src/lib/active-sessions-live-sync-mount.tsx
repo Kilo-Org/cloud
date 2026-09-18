@@ -17,6 +17,7 @@ import {
   type NeedsInputNotificationRow,
   notificationIdentifierForSession,
   planNeedsInputNotifications,
+  reconcileNotifiedAfterApply,
 } from '@/lib/needs-input-notification';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
@@ -120,8 +121,9 @@ function useNeedsInputLocalNotifications(): void {
 
   const recompute = useCallback(() => {
     const next = queryClient.getQueryData<CachedActiveSessionsData>(queryKey)?.sessions ?? [];
+    const previous = notified.current;
     const plan = planNeedsInputNotifications({
-      previous: notified.current,
+      previous,
       next,
       pathname: pathnameRef.current,
       appState: AppState.currentState,
@@ -138,16 +140,29 @@ function useNeedsInputLocalNotifications(): void {
     // re-publish, publish again on every recompute, and grow the set without
     // bound.
     const republished = new Set(plan.publish.map(row => row.sessionId));
-    notified.current = [
-      ...notified.current.filter(
-        row =>
-          !dismissed.has(notificationIdentifierForSession(row.sessionId)) &&
-          !republished.has(row.sessionId)
-      ),
-      ...plan.publish,
-    ];
-    // The applier reports and swallows every native failure; it never rejects.
-    void applyNeedsInputNotifications(plan);
+    // The rows this plan removes from the memory: a dismissed identifier and
+    // the previous entry a re-publish replaces. Kept so a native failure can
+    // restore them below.
+    const dropped = previous.filter(
+      row =>
+        dismissed.has(notificationIdentifierForSession(row.sessionId)) ||
+        republished.has(row.sessionId)
+    );
+    // Commit optimistically so an immediate re-plan does not re-post a raise
+    // that is already on its way. The applier reports and swallows every native
+    // failure; `reconcileNotifiedAfterApply` undoes the operations that never
+    // landed, so the next recompute retries them instead of treating a failed
+    // post as posted or a failed dismissal as cleared.
+    notified.current = [...previous.filter(row => !dropped.includes(row)), ...plan.publish];
+    const applyAndCorrect = async (): Promise<void> => {
+      const result = await applyNeedsInputNotifications(plan);
+      notified.current = reconcileNotifiedAfterApply(notified.current, {
+        plan,
+        dropped,
+        result,
+      });
+    };
+    void applyAndCorrect();
   }, [queryClient, queryKey, preferencesQueryKey]);
 
   useEffect(() => {

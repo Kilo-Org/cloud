@@ -3,6 +3,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { user_notification_preferences, user_push_tokens } from '@kilocode/db/schema';
 import {
   androidChannelIdForPushData,
+  androidChannelIdForPushDataToAppVersion,
   genericPushContentForPushData,
   resolvePushLocale,
   translatePush,
@@ -277,6 +278,16 @@ export class NotificationChannelDO extends DurableObject<Env> {
         body = input.push.body;
       }
 
+      // Android 8+ drops a notification addressed to a channel that does not
+      // exist. Only clients that create channels (a non-null app version at
+      // registration) get a channelId; older clients fall back to the default
+      // channel. The split agent channels are newer than the rest, so a token
+      // registered before they shipped only has the legacy `agent` channel and
+      // keeps routing there. iOS ignores channelId either way.
+      const messageChannelId = androidChannelIdForPushDataToAppVersion(
+        input.push.data,
+        app_version
+      );
       return {
         to: token,
         title,
@@ -285,11 +296,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
         // OS category + iOS interruption level for a needs-input raise; no
         // keys for any other push, so their message shape is unchanged.
         ...pushExtras,
-        // Android 8+ drops a notification addressed to a channel that does
-        // not exist. Only clients that create channels (a non-null app
-        // version at registration) get a channelId; older clients fall back
-        // to the default channel. iOS ignores channelId either way.
-        ...(app_version != null && { channelId }),
+        ...(app_version != null && { channelId: messageChannelId }),
         sound: input.push.sound ?? undefined,
         priority: input.push.priority ?? 'default',
       } satisfies ExpoPushMessage;

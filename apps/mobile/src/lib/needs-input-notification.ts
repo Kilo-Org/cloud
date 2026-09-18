@@ -60,6 +60,18 @@ export type NeedsInputNotificationPlan = {
   dismiss: string[];
 };
 
+/**
+ * What the native layer actually did with a plan. A rejected post or dismissal
+ * is reported and swallowed, so the caller uses this to keep its notified set
+ * honest instead of remembering an operation that never landed.
+ */
+export type NeedsInputNotificationApplyResult = {
+  /** The rows whose post reached the OS. */
+  published: NeedsInputNotificationRow[];
+  /** The identifiers whose dismissal reached the OS. */
+  dismissed: string[];
+};
+
 export type NeedsInputPlanInput = {
   /**
    * The rows whose notification is currently posted — the notified set the
@@ -287,9 +299,10 @@ function reportFailure(operation: 'publish' | 'dismiss', error: unknown): void {
 /**
  * Post one raise. A rejected schedule (the permission was revoked after login)
  * is reported and swallowed: the app-owned carrier must never crash the mount
- * that owns it.
+ * that owns it. Returns whether the post reached the OS, so the caller does not
+ * remember a raise that never appeared.
  */
-async function publishRow(row: NeedsInputNotificationRow): Promise<void> {
+async function publishRow(row: NeedsInputNotificationRow): Promise<boolean> {
   const data = pushDataForRow(row);
   try {
     await Notifications.scheduleNotificationAsync({
@@ -306,19 +319,23 @@ async function publishRow(row: NeedsInputNotificationRow): Promise<void> {
       trigger: { channelId: androidChannelIdForPushData(data) },
     });
     postedSessions.add(row.sessionId);
+    return true;
   } catch (error) {
     reportFailure('publish', error);
+    return false;
   }
 }
 
-async function dismissIdentifier(identifier: string): Promise<void> {
+async function dismissIdentifier(identifier: string): Promise<boolean> {
   try {
     await Notifications.dismissNotificationAsync(identifier);
     if (identifier.startsWith(IDENTIFIER_PREFIX)) {
       postedSessions.delete(identifier.slice(IDENTIFIER_PREFIX.length));
     }
+    return true;
   } catch (error) {
     reportFailure('dismiss', error);
+    return false;
   }
 }
 
@@ -326,17 +343,71 @@ async function dismissIdentifier(identifier: string): Promise<void> {
  * Apply a plan. Every dismissal is issued before the first post, so a
  * dismiss/publish pair for one identifier ends with the notification posted.
  * Every native call is reported and swallowed, so the returned promise never
- * rejects.
+ * rejects; the result names the operations that actually landed.
  */
 export async function applyNeedsInputNotifications(
   plan: NeedsInputNotificationPlan
-): Promise<void> {
+): Promise<NeedsInputNotificationApplyResult> {
+  const dismissed: string[] = [];
   for (const identifier of plan.dismiss) {
     // eslint-disable-next-line no-await-in-loop -- ordered so a dismiss/publish pair for one identifier ends posted
-    await dismissIdentifier(identifier);
+    if (await dismissIdentifier(identifier)) {
+      dismissed.push(identifier);
+    }
   }
+  const published: NeedsInputNotificationRow[] = [];
   for (const row of plan.publish) {
     // eslint-disable-next-line no-await-in-loop -- ordered so a dismiss/publish pair for one identifier ends posted
-    await publishRow(row);
+    if (await publishRow(row)) {
+      published.push(row);
+    }
   }
+  return { published, dismissed };
+}
+
+/** What the caller committed optimistically, paired with the applier's result. */
+export type NeedsInputApplyCorrection = {
+  plan: NeedsInputNotificationPlan;
+  /** Every row the optimistic commit removed from the notified set. */
+  dropped: readonly NeedsInputNotificationRow[];
+  result: NeedsInputNotificationApplyResult;
+};
+
+/**
+ * Correct the caller's optimistically committed notified set with what the
+ * native layer actually did. The caller commits the whole plan before the
+ * native calls resolve, so an immediate re-plan does not re-post what is
+ * already on its way; this undoes the operations that failed so the next plan
+ * retries them.
+ *
+ * A failed dismissal is put back: its notification is still on screen. A failed
+ * post is dropped, and — because a re-publish replaces its previous row under the
+ * same identifier — the previous row comes back instead when the post never
+ * landed: the old notification is still on screen, and the memory has to keep
+ * the row so a later plan where the raise clears can dismiss it. A failed
+ * brand-new raise had no previous row, so nothing is restored. A later plan's
+ * row for the same session is matched by identity, never dropped here.
+ */
+export function reconcileNotifiedAfterApply(
+  notified: readonly NeedsInputNotificationRow[],
+  correction: NeedsInputApplyCorrection
+): NeedsInputNotificationRow[] {
+  const { plan, dropped, result } = correction;
+  const dismissed = new Set(result.dismissed);
+  const published = new Set(result.published);
+  // The exact rows this plan posted that never reached the OS.
+  const failedPosts = new Set(plan.publish.filter(row => !published.has(row)));
+  const failedPublishSessionIds = new Set([...failedPosts].map(row => row.sessionId));
+  const kept = notified.filter(row => !failedPosts.has(row));
+  const restored = dropped.filter(row => {
+    const identifier = notificationIdentifierForSession(row.sessionId);
+    if (dismissed.has(identifier)) {
+      return false;
+    }
+    if (kept.some(current => current.sessionId === row.sessionId)) {
+      return false;
+    }
+    return plan.dismiss.includes(identifier) || failedPublishSessionIds.has(row.sessionId);
+  });
+  return [...restored, ...kept];
 }

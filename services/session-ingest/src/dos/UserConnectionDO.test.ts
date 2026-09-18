@@ -2039,6 +2039,32 @@ describe('UserConnectionDO', () => {
       expect(internal.pendingAttentionResetAt.get('s1')).toBe(now + 5_000);
       expect(ctx.storage.setAlarm).toHaveBeenCalledWith(now + 5_000);
     });
+
+    it('durably cancels a held reset when a reconnect re-owns the session after eviction', async () => {
+      const { mockCtx, ctx } = setup();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      // The hold was written durably, then the DO was evicted: the in-memory
+      // mirror is empty until `scheduleNextAlarm`'s asynchronous re-list.
+      await ctx.storage.put('attentionReset:s1', {
+        kiloUserId: 'usr_1',
+        dueAt: now + CLI_ABSENCE_ATTENTION_RESET_MS,
+        connectionId: 'cli-1',
+      });
+      const revived = new UserConnectionDO(ctx as never, {} as Env);
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+
+      sendHeartbeat(revived, cliWs, [makeSession('s1', 'question')]);
+      await flushAsync();
+
+      // The reconnect must delete the durable hold even though the mirror had
+      // no entry when the cancel ran, and the re-list must not re-arm it.
+      expect(ctx.storage.store.has('attentionReset:s1')).toBe(false);
+
+      vi.spyOn(Date, 'now').mockReturnValue(now + CLI_ABSENCE_ATTENTION_RESET_MS + 1);
+      await revived.alarm();
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+    });
   });
 
   describe('web disconnect', () => {

@@ -1,5 +1,10 @@
-import type { Part, ReasoningPart, StepFinishPart, TextPart, ToolPart } from './types';
-import { getStepFinishRoutedModel, normalizeMissingPartText, partSettledAt } from './part-utils';
+import type { Part, PatchPart, ReasoningPart, StepFinishPart, TextPart, ToolPart } from './types';
+import {
+  getStepFinishRoutedModel,
+  normalizeMissingPartText,
+  normalizeMissingPatchFiles,
+  partSettledAt,
+} from './part-utils';
 
 function stepFinishPart(overrides: Partial<StepFinishPart> = {}): StepFinishPart {
   return {
@@ -248,5 +253,59 @@ describe('partSettledAt', () => {
     };
     expect(partSettledAt(running)).toBeUndefined();
     expect(partSettledAt(text)).toBeUndefined();
+  });
+});
+
+describe('normalizeMissingPatchFiles', () => {
+  function patchPart(overrides: Partial<PatchPart> = {}): PatchPart {
+    return {
+      id: 'p-patch',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'patch',
+      hash: 'abc',
+      files: ['src/a.ts'],
+      ...overrides,
+    };
+  }
+
+  it('returns the identical object when files is already an array', () => {
+    const part = patchPart();
+
+    // Identity is preserved so memoized stored messages keep their reference.
+    expect(normalizeMissingPatchFiles(part)).toBe(part);
+  });
+
+  it('fills an empty array for a patch part the wire sent without files', () => {
+    const part = {
+      id: 'p-patch',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'patch',
+      hash: 'abc',
+    } as unknown as PatchPart;
+
+    const normalized = normalizeMissingPatchFiles(part);
+    expect(normalized).not.toBe(part);
+    expect((normalized satisfies Part as PatchPart).files).toEqual([]);
+    expect(normalized.id).toBe('p-patch');
+  });
+
+  it('fills an empty array for a files field that is not an array', () => {
+    const part = { ...patchPart(), files: null } as unknown as PatchPart;
+
+    expect((normalizeMissingPatchFiles(part) satisfies Part as PatchPart).files).toEqual([]);
+  });
+
+  it('passes non-patch parts through unchanged', () => {
+    const textPart: TextPart = {
+      id: 'p-text',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'text',
+      text: 'hello',
+    };
+
+    expect(normalizeMissingPatchFiles(textPart)).toBe(textPart);
   });
 });

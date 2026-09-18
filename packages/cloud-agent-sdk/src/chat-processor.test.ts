@@ -2,6 +2,7 @@ import type {
   FilePart,
   Message,
   Part,
+  PatchPart,
   ReasoningPart,
   TextPart,
   ToolPart,
@@ -547,6 +548,50 @@ describe('createChatProcessor', () => {
       const stored = storage.getParts('msg-1');
       expect(stored).toHaveLength(1);
       expect((stored[0] satisfies Part as ReasoningPart).text).toBe('streamed reasoning');
+    });
+
+    // --- files-less patch part normalization (KILO-APP-BZ) ---
+    // The generated Part types declare `files: Array<string>`, but the wire can
+    // omit the field (per-event schemas are `.passthrough()`), so a files-less
+    // patch part used to be stored verbatim and crashed the mobile transcript
+    // reader on `part.files.length`.
+
+    it('stores a patch part whose files field is missing with files: []', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      // The cast is the fixture: the wire really omits `files`.
+      const part = {
+        id: 'part-patch',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'patch' as const,
+        hash: 'abc',
+      } as unknown as Part;
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as PatchPart).files).toEqual([]);
+    });
+
+    it('stores a patch part whose files were sent intact', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const part: Part = {
+        id: 'part-patch',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'patch',
+        hash: 'abc',
+        files: ['src/a.ts', 'src/b.ts'],
+      };
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as PatchPart).files).toEqual(['src/a.ts', 'src/b.ts']);
     });
   });
 

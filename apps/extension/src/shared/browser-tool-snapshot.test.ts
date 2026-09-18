@@ -27,13 +27,11 @@ const createFakeSession = ({
   axNodes = [],
   axUnsupported = false,
   boxes = {},
-  layoutMetrics,
   refs = {},
 }: {
   axNodes?: readonly BrowserAriaNode[];
   axUnsupported?: boolean;
   boxes?: Record<number, { content: number[]; height: number; width: number }>;
-  layoutMetrics?: { pageX: number; pageY: number };
   refs?: Record<string, number>;
 } = {}): {
   commands: RecordedCommand[];
@@ -67,12 +65,6 @@ const createFakeSession = ({
         }
 
         return { nodes: axNodes };
-      }
-
-      if (method === 'Page.getLayoutMetrics') {
-        const metrics = layoutMetrics ?? { pageX: 0, pageY: 0 };
-
-        return { cssVisualViewport: metrics };
       }
 
       if (method === 'DOM.getBoxModel') {
@@ -227,12 +219,11 @@ describe('captureBrowserAriaSnapshot', () => {
     const { session } = createFakeSession({
       axNodes: SAMPLE_TREE,
       boxes: { 12: { content: [5, 10, 105, 10, 105, 30, 5, 30], height: 20, width: 100 } },
-      layoutMetrics: { pageX: 5, pageY: 10 },
     });
 
     const capture = await captureBrowserAriaSnapshot(session, { boxes: true });
 
-    expect(capture.text).toContain('- button "Submit" [ref=e12] [box=0,0,100,20]');
+    expect(capture.text).toContain('- button "Submit" [ref=e12] [box=5,10,100,20]');
   });
 
   it('renders a target subtree resolved from a snapshot ref', async () => {

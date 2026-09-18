@@ -124,39 +124,15 @@ const sendOrUndefined = async (
   }
 };
 
-const layoutMetricsResponseSchema = z.object({
-  cssLayoutViewport: z.object({ pageX: z.number(), pageY: z.number() }).optional(),
-  cssVisualViewport: z.object({ pageX: z.number(), pageY: z.number() }).optional(),
-});
-
-/**
- * `DOM.getBoxModel` reports document coordinates, while
- * `Input.dispatchMouseEvent` takes viewport coordinates, so the current scroll
- * offset is subtracted — the same conversion `browser_snapshot` boxes use.
- */
-const readScrollOffset = async (
-  session: BrowserToolInteractSession
-): Promise<{ readonly scrollX: number; readonly scrollY: number }> => {
-  const parsed = layoutMetricsResponseSchema.safeParse(
-    await sendOrUndefined(session, 'Page.getLayoutMetrics', {})
-  );
-
-  if (!parsed.success) {
-    return { scrollX: 0, scrollY: 0 };
-  }
-
-  const viewport = parsed.data.cssVisualViewport ?? parsed.data.cssLayoutViewport;
-
-  return { scrollX: viewport?.pageX ?? 0, scrollY: viewport?.pageY ?? 0 };
-};
-
 const NO_VISIBLE_BOX_ERROR =
   'The element has no visible box to interact with. Scroll it into view, wait for it to render, or target a visible element.';
 
 /**
- * Scrolls the element into view and returns the centre of its content box. A
- * ref whose node was removed without a navigation rejects the CDP call; that is
- * the same stale reference as an unknown ref, so the model gets the same
+ * Scrolls the element into view and returns the centre of its content box.
+ * `DOM.getBoxModel` already reports viewport-relative coordinates (the same
+ * space `Input.dispatchMouseEvent` takes), so no scroll conversion is applied.
+ * A ref whose node was removed without a navigation rejects the CDP call; that
+ * is the same stale reference as an unknown ref, so the model gets the same
  * re-snapshot message instead of a raw protocol error.
  */
 const resolveCentre = async (
@@ -180,11 +156,10 @@ const resolveCentre = async (
   }
 
   const [x1, y1, x2, y2, x3, y3, x4, y4] = parsed.data.model.content;
-  const { scrollX, scrollY } = await readScrollOffset(session);
 
   return {
-    centreX: (x1 + x2 + x3 + x4) / 4 - scrollX,
-    centreY: (y1 + y2 + y3 + y4) / 4 - scrollY,
+    centreX: (x1 + x2 + x3 + x4) / 4,
+    centreY: (y1 + y2 + y3 + y4) / 4,
     ok: true,
   };
 };

@@ -104,14 +104,6 @@ const domBoxModelResultSchema = z.object({
     })
     .optional(),
 });
-const layoutMetricsResultSchema = z.object({
-  cssLayoutViewport: z
-    .object({ pageX: z.number().optional(), pageY: z.number().optional() })
-    .optional(),
-  cssVisualViewport: z
-    .object({ pageX: z.number().optional(), pageY: z.number().optional() })
-    .optional(),
-});
 const runtimeEvaluateResultSchema = z.object({
   result: z.object({ value: z.unknown().optional() }).optional(),
 });
@@ -384,9 +376,8 @@ export const buildBrowserAriaSnapshot = (
 
 /**
  * `browser_snapshot` boxes are viewport-relative CSS pixels, matching
- * `Element.getBoundingClientRect`. `DOM.getBoxModel` reports document
- * coordinates, so the current scroll offset (`Page.getLayoutMetrics`) is
- * subtracted.
+ * `Element.getBoundingClientRect`. `DOM.getBoxModel` already reports
+ * viewport-relative coordinates, so no scroll conversion is applied.
  */
 const readBoxes = async (
   session: BrowserToolPageSession,
@@ -399,17 +390,6 @@ const readBoxes = async (
 
   if (backendNodeIds.length === 0) {
     return boxes;
-  }
-
-  let scrollX = 0;
-  let scrollY = 0;
-  const metrics = layoutMetricsResultSchema.safeParse(await session.send('Page.getLayoutMetrics'));
-
-  if (metrics.success) {
-    const viewport = metrics.data.cssVisualViewport ?? metrics.data.cssLayoutViewport;
-
-    scrollX = viewport?.pageX ?? 0;
-    scrollY = viewport?.pageY ?? 0;
   }
 
   const measured = await Promise.all(
@@ -427,7 +407,7 @@ const readBoxes = async (
 
         return [
           backendNodeId,
-          `box=${String(Math.round((content[0] ?? 0) - scrollX))},${String(Math.round((content[1] ?? 0) - scrollY))},${String(Math.round(model.width ?? 0))},${String(Math.round(model.height ?? 0))}`,
+          `box=${String(Math.round(content[0] ?? 0))},${String(Math.round(content[1] ?? 0))},${String(Math.round(model.width ?? 0))},${String(Math.round(model.height ?? 0))}`,
         ] as const;
       } catch {
         // A node without a layout box (display:none, detached) simply has no box in the snapshot.

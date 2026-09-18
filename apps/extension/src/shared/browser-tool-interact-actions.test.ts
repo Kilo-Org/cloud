@@ -29,7 +29,6 @@ const createFakeSession = ({
   pageHelper,
   pushError,
   resolveNodeError,
-  scroll,
   targets = {},
 }: {
   /** A CDP rejection, as when the ref's node was removed without a navigation. */
@@ -42,8 +41,6 @@ const createFakeSession = ({
   pushError?: string;
   /** A CDP rejection while resolving the ref's node to a remote object. */
   resolveNodeError?: string;
-  /** The scroll offset `Page.getLayoutMetrics` reports, as a scrolled page would. */
-  scroll?: { readonly pageX: number; readonly pageY: number };
   targets?: Record<string, BrowserToolResolvedTarget>;
 } = {}): { commands: RecordedCommand[]; session: BrowserToolInteractSession } => {
   const commands: RecordedCommand[] = [];
@@ -52,10 +49,6 @@ const createFakeSession = ({
     resolveTarget: async (target: string) => targets[target],
     send: async (method, params) => {
       commands.push({ method, params });
-
-      if (method === 'Page.getLayoutMetrics') {
-        return { cssVisualViewport: scroll ?? { pageX: 0, pageY: 0 } };
-      }
 
       if (method === 'DOM.getBoxModel') {
         if (boxModelError !== undefined) {
@@ -164,7 +157,6 @@ describe('browser_click', () => {
     expect(commands.map(command => command.method)).toEqual([
       'DOM.scrollIntoViewIfNeeded',
       'DOM.getBoxModel',
-      'Page.getLayoutMetrics',
       'Input.dispatchMouseEvent',
       'Input.dispatchMouseEvent',
     ]);
@@ -173,16 +165,14 @@ describe('browser_click', () => {
     expect(released).toMatchObject({ button: 'left', type: 'mouseReleased', x: 20, y: 30 });
   });
 
-  it('subtracts the scroll offset so a click lands in the viewport', async () => {
-    const { commands, session } = createFakeSession({
-      scroll: { pageX: 5, pageY: 400 },
-      targets: { e70: ref(70) },
-    });
+  it('uses the box model centre directly, since getBoxModel is viewport-relative', async () => {
+    const { commands, session } = createFakeSession({ targets: { e70: ref(70) } });
 
     await runInteractBrowserTool('browser_click', { target: 'e70' }, session);
 
+    expect(commands.map(command => command.method)).not.toContain('Page.getLayoutMetrics');
     const [pressed] = mouseEvents(commands);
-    expect(pressed).toMatchObject({ type: 'mousePressed', x: 15, y: -370 });
+    expect(pressed).toMatchObject({ type: 'mousePressed', x: 20, y: 30 });
   });
 
   it('resolves a unique CSS selector target', async () => {

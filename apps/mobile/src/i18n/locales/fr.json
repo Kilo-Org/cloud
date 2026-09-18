@@ -3160,7 +3160,6 @@
     }
   },
   "launcher": {
-    "newAgent": "Nouvel agent",
     "openLastSession": "Ouvrir la dernière session"
   }
 }

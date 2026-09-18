@@ -3160,7 +3160,6 @@
     }
   },
   "launcher": {
-    "newAgent": "Novi agent",
     "openLastSession": "Otvori posljednju sesiju"
   }
 }

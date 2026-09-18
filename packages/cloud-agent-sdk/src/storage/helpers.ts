@@ -81,9 +81,13 @@ function toolRunningStartedAt(part: Part): number | undefined {
  * is applied only when it carries ordering evidence that it postdates the
  * stored update (the event's own time, or the tool state's `time.end` when a
  * replay carries no event time). Over a running part, that evidence must also
- * postdate the run's `time.start`: a terminal whose settle time predates the
- * live run is an out-of-order replay, not a completion. A terminal with no
- * evidence at all never replaces a live running task.
+ * postdate the stored running update's ordering evidence — the later of its
+ * recorded event time (when the update came from the wire) and the run's
+ * `time.start` (the only evidence a replayed running part carries, and the bound
+ * that keeps an inherited older event time from dropping the guard below the
+ * live run): a terminal whose settle time predates the live run is an
+ * out-of-order replay, not a completion. A terminal with no evidence at all
+ * never replaces a live running task.
  *
  * The same ordering evidence settles the mirror case: a run whose `time.start`
  * postdates a stored terminal's settle time is a newer observation of that part
@@ -127,9 +131,19 @@ function isStaleToolLifecycleUpdate(
   }
 
   if (incomingRank === 2 && storedRank === 1) {
-    if (eventTime === undefined) return true;
+    const incomingOrder = eventTime ?? partSettledAt(incoming);
+    if (incomingOrder === undefined) return true;
+    // The stored running part carries two pieces of evidence: the event time of
+    // the update that last applied it (which can be inherited from an older part
+    // replaced on the same id) and the run's own `time.start`. A terminal must
+    // postdate both, so bound the guard by the later one — inherited older
+    // evidence must not drop it below the live run.
     const runningStartedAt = toolRunningStartedAt(stored);
-    if (runningStartedAt !== undefined && eventTime <= runningStartedAt) return true;
+    const storedOrder =
+      storedEventTime === undefined || runningStartedAt === undefined
+        ? (storedEventTime ?? runningStartedAt)
+        : Math.max(storedEventTime, runningStartedAt);
+    if (storedOrder !== undefined && incomingOrder <= storedOrder) return true;
   }
 
   return false;

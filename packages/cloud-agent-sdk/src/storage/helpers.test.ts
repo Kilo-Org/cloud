@@ -212,10 +212,58 @@ describe('tool part lifecycle ordering', () => {
     expect(result).toBe(arr);
   });
 
-  test('drops a terminal update that carries no event time over a live running task', () => {
-    const arr = [makeToolPart('p-1', 'running')];
-    const result = upsertPartDroppingStaleSyntheticParts(arr, makeToolPart('p-1', 'completed'));
+  test('drops a terminal update that carries no ordering evidence over a live running task', () => {
+    const arr = [makeToolPart('p-1', 'running', { start: 1 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeCompactedToolPart('p-1', 'completed')
+    );
     expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('applies a terminal whose settle time postdates the running start with no event time', () => {
+    // The wire event time can be absent (schema `time` is optional); the
+    // terminal's own `state.time.end` is then the ordering evidence, exactly as
+    // in the terminal-vs-terminal branch.
+    const arr = [makeToolPart('p-1', 'running', { start: 1 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1, end: 2 })
+    );
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('drops a terminal whose settle time predates the running start with no event time', () => {
+    const arr = [makeToolPart('p-1', 'running', { start: 5 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1, end: 2 })
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('bounds the running guard by the run start when the stored event time is inherited', () => {
+    // A terminal settles at 100; a replayed running part (start 200, no event
+    // time) replaces it and inherits the older part's recorded update time. A
+    // terminal that settled at 150 — before the live run began — must still lose
+    // against the run's own start, not the inherited older evidence.
+    const terminal = upsertPartDroppingStaleSyntheticParts(
+      [],
+      makeToolPart('p-1', 'completed', { start: 1, end: 100 }),
+      100
+    );
+    const arr = upsertPartDroppingStaleSyntheticParts(
+      terminal,
+      makeToolPart('p-1', 'running', { start: 200 })
+    );
+    expect(toolStatus(arr, 'p-1')).toBe('running');
+
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1, end: 150 })
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+    expect(result).toBe(arr);
   });
 
   test('keeps the recorded event time across a no-time re-delivery so a stale terminal still loses', () => {

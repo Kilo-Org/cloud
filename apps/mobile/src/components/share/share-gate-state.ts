@@ -55,6 +55,8 @@ export type ShareGateStateInput = {
   storedIsError: boolean;
   storedIsSuccess: boolean;
   activeIsError: boolean;
+  /** Live-sessions query is paused (offline) — liveness is unresolved. */
+  activeIsPaused: boolean;
   /** Live destination rows the gate can offer (see `selectShareDestinations`). */
   liveRowCount: number;
   /** Stored sessions loaded for this context, live or not. */
@@ -81,7 +83,8 @@ export function isShareCommitEnabled(input: {
  *   1. stale-share (missing/unknown/consumed shareId) — before any validation
  *   2. non-retryable-classification (all files rejected, no usable text)
  *   3. loading (validation or destination queries in flight)
- *   4. retryable (no live rows and the query that decides liveness failed)
+ *   4. retryable (no live rows and the query that decides liveness is
+ *      unresolved: errored or paused offline)
  *   5. empty (settled, zero live rows) — live-aware copy when stored sessions
  *      exist but none are live, `share.emptyMessage` only when there are none
  *   6. happy
@@ -122,11 +125,15 @@ export function selectShareGateState(input: ShareGateStateInput): ShareGateState
   }
 
   // Retryable when nothing live can be offered and a query that decides
-  // liveness failed. The stored list blocks the list on its own; a live-lookup
-  // failure with no live rows is indistinguishable from "nothing live", so it
-  // must offer a retry instead of a settled empty state. Retry refetches both
-  // queries (`useAgentSessions().refetch`), matching the Agents list.
-  const livenessUnknown = input.storedIsError || input.activeIsError;
+  // liveness is unresolved. The stored list blocks the list on its own; a
+  // live-lookup failure with no live rows is indistinguishable from "nothing
+  // live", so it must offer a retry instead of a settled empty state. A paused
+  // query (offline, NetInfo down) is the same: `isError` is false and
+  // `isLoading` is false (`fetchStatus: 'paused'` is not fetching), so without
+  // this it would fall through to a "Nothing running right now" that liveness
+  // never proved. Retry refetches both queries
+  // (`useAgentSessions().refetch`), matching the Agents list.
+  const livenessUnknown = input.storedIsError || input.activeIsError || input.activeIsPaused;
   if (input.liveRowCount === 0 && livenessUnknown) {
     return {
       kind: 'retryable',

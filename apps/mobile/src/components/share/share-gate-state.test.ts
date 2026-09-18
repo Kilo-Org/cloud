@@ -33,6 +33,7 @@ function base(overrides: Partial<ShareGateStateInput> = {}): ShareGateStateInput
     storedIsError: false,
     storedIsSuccess: true,
     activeIsError: false,
+    activeIsPaused: false,
     liveRowCount: 3,
     storedSessionCount: 3,
     isLoading: false,
@@ -187,6 +188,38 @@ describe('selectShareGateState', () => {
     expect(state.kind).toBe('retryable');
     expect(state.showRetry).toBe(true);
     expect(state.showNewSession).toBe(true);
+  });
+
+  it('retryable when the live lookup is paused with zero live rows', () => {
+    const state = selectShareGateState(
+      base({
+        activeIsPaused: true,
+        storedIsError: false,
+        storedIsSuccess: true,
+        liveRowCount: 0,
+        storedSessionCount: 2,
+      })
+    );
+    expect(state.kind).toBe('retryable');
+    if (state.kind === 'retryable') {
+      expect(state.message).toBe("Couldn't load your sessions.");
+      expect(state.showRetry).toBe(true);
+      expect(state.showNewSession).toBe(true);
+      expect(state.showList).toBe(false);
+    }
+  });
+
+  it('happy when the live lookup is paused but cached live rows are offered', () => {
+    const state = selectShareGateState(
+      base({
+        activeIsPaused: true,
+        storedIsError: false,
+        storedIsSuccess: true,
+        liveRowCount: 2,
+      })
+    );
+    expect(state.kind).toBe('happy');
+    expect(state.showRetry).toBe(false);
   });
 
   it('empty when settled with zero live rows and no stored sessions', () => {

@@ -109,6 +109,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
     storedIsError: false,
     storedIsSuccess: true,
     activeIsError: false,
+    activeIsPaused: false,
     isLoading: false,
     refetch: vi.fn(),
   }),

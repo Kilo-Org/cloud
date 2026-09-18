@@ -399,6 +399,11 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // rendered row count, because active-set exclusion can hide whole pages.
     storedLoadedPageCount: stored.data?.pages.length ?? 0,
     activeIsError: active.isError,
+    // A paused active query is neither loading (`isLoading` is
+    // `isPending && isFetching`, and a paused query is not fetching) nor
+    // errored, yet its liveness result is unresolved. Callers that gate on
+    // "nothing live" must treat paused as unknown, not as settled empty.
+    activeIsPaused: active.isPaused,
     hasNextPage: stored.hasNextPage,
     isFetchingNextPage: stored.isFetchingNextPage,
     fetchNextPage,

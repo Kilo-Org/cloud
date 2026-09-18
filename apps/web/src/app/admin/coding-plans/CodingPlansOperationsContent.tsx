@@ -1845,10 +1845,7 @@ function OperationsDialogs({
   const swapCopy = getSwapCredentialDialogCopy(swapSelection?.userName ?? 'this user');
   const parsedExtendDays = Number(extendDays);
   const inventoryReplacementCopy = getInventoryReplacementDialogCopy(inventoryReplacementId);
-  const reduceCopy = getReduceInventoryDialogCopy(
-    reduceSelection?.planId ?? 'this plan',
-    reduceSelection?.availableCount ?? 0
-  );
+  const reduceCopy = getReduceInventoryDialogCopy(reduceSelection?.planId ?? 'this plan');
   const parsedReduceCount = Number(reduceCount);
 
   return (

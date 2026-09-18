@@ -107,10 +107,7 @@ export function getSwapCredentialCompleteToast(): string {
   return 'Subscription moved to a new pooled credential.';
 }
 
-export function getReduceInventoryDialogCopy(
-  planId: string,
-  availableCount: number
-): {
+export function getReduceInventoryDialogCopy(planId: string): {
   title: string;
   description: string;
 } {

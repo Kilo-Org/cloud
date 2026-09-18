@@ -121,17 +121,11 @@ describe('subscription action copy', () => {
 });
 
 describe('reduce inventory copy', () => {
-  it('names the plan and available count, and explains the manual provider-side step', () => {
-    const dialog = getReduceInventoryDialogCopy('minimax-token-plan-plus', 5);
+  it('names the plan and explains the manual provider-side step', () => {
+    const dialog = getReduceInventoryDialogCopy('minimax-token-plan-plus');
     expect(dialog.title).toBe('Queue minimax-token-plan-plus inventory for removal?');
-    expect(dialog.description).toContain('5 credentials are currently available');
-    expect(dialog.description).toContain('Pending Key Rotation');
-    expect(dialog.description).toContain('Kilo never contacts the provider');
-  });
-
-  it('uses singular phrasing for a single available credential', () => {
-    const dialog = getReduceInventoryDialogCopy('minimax-token-plan-plus', 1);
-    expect(dialog.description).toContain('1 credential is currently available');
+    expect(dialog.description).toContain('Pending Key Removal queue');
+    expect(dialog.description).toContain('remove the key from the provider');
   });
 
   it('bounds the requested count to a positive integer no greater than what is available', () => {

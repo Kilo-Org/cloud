@@ -1,7 +1,9 @@
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, reads the locale directory under Node, never bundled into the app
+import { readdirSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { CATALOG_LOADERS } from './catalogs';
-import { SUPPORTED_LANGUAGES } from './languages';
 import en from './locales/en.json';
 
 type Catalog = Record<string, unknown>;
@@ -32,25 +34,46 @@ const englishFamilies = new Set(
 );
 
 /**
+ * The catalogs to check come from the locale files on disk, not a second
+ * hand-kept list. `SUPPORTED_LANGUAGES` is the app's list and must match the
+ * directory — `check-catalogs.mjs` fails when it does not — but a test that
+ * iterates a copy of it silently stops covering a catalog the day one is added
+ * or removed. Read the directory so this test names exactly the files that
+ * exist.
+ */
+const LOCALE_TAGS = readdirSync(new URL('locales', import.meta.url))
+  .filter(name => name.endsWith('.json'))
+  .map(name => name.slice(0, -'.json'.length))
+  .toSorted();
+
+const NON_ENGLISH_LOCALES = LOCALE_TAGS.filter(tag => tag !== 'en');
+
+/** Load one catalog through the loader the app itself parses. */
+function loadCatalog(tag: string): Catalog {
+  const loader = CATALOG_LOADERS[tag as keyof typeof CATALOG_LOADERS];
+  if (typeof loader !== 'function') {
+    throw new TypeError(`no CATALOG_LOADERS entry for locale file "${tag}.json"`);
+  }
+  return loader() as unknown as Catalog;
+}
+
+/**
  * A key that leaves en.json is dead copy: it never renders, and
  * `tools/i18n/check-catalogs.mjs` (run by `check:i18n`) fails the build until it
  * is gone. Plural categories the language needs are the only allowed extra.
  */
 describe('catalog parity', () => {
-  it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
-    '%s has no key that en.json does not define',
-    tag => {
-      const catalog = flatten(CATALOG_LOADERS[tag]() as unknown as Catalog);
-      const extra = [...catalog.keys()].filter(key => {
-        if (english.has(key)) {
-          return false;
-        }
-        const base = pluralBase(key);
-        return !(base !== null && englishFamilies.has(base));
-      });
-      expect(extra, `${tag} carries keys absent from en.json`).toEqual([]);
-    }
-  );
+  it.each(NON_ENGLISH_LOCALES)('%s has no key that en.json does not define', tag => {
+    const catalog = flatten(loadCatalog(tag));
+    const extra = [...catalog.keys()].filter(key => {
+      if (english.has(key)) {
+        return false;
+      }
+      const base = pluralBase(key);
+      return !(base !== null && englishFamilies.has(base));
+    });
+    expect(extra, `${tag} carries keys absent from en.json`).toEqual([]);
+  });
 
   /**
    * The launcher surfaces label New agent from `glanceable.newAgent`
@@ -59,8 +82,8 @@ describe('catalog parity', () => {
    * non-English catalog once; pin its absence so it cannot come back.
    */
   it('no catalog defines the dead launcher.newAgent key', () => {
-    const offenders = SUPPORTED_LANGUAGES.filter(tag => {
-      const catalog = flatten(CATALOG_LOADERS[tag]() as unknown as Catalog);
+    const offenders = NON_ENGLISH_LOCALES.filter(tag => {
+      const catalog = flatten(loadCatalog(tag));
       return catalog.has('launcher.newAgent');
     });
     expect(offenders, 'catalogs carry dead launcher.newAgent copy').toEqual([]);
@@ -77,8 +100,8 @@ describe('catalog parity', () => {
       .filter(key => key.startsWith('launcher.'))
       .toSorted()
       .join(',');
-    const offenders = SUPPORTED_LANGUAGES.filter(tag => {
-      const catalog = flatten(CATALOG_LOADERS[tag]() as unknown as Catalog);
+    const offenders = NON_ENGLISH_LOCALES.filter(tag => {
+      const catalog = flatten(loadCatalog(tag));
       const launcher = [...catalog.keys()]
         .filter(key => key.startsWith('launcher.'))
         .toSorted()

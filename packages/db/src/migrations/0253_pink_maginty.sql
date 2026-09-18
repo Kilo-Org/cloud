@@ -1,0 +1,1 @@
+CREATE INDEX "idx_passkey_sign_in_tickets_expires_at" ON "passkey_sign_in_tickets" USING btree ("expires_at");

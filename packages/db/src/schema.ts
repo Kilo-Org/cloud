@@ -5411,6 +5411,10 @@ export const passkey_sign_in_tickets = pgTable(
   },
   table => [
     uniqueIndex('UQ_passkey_sign_in_tickets_ticket_hash').on(table.ticket_hash),
+    // The device-auth cleanup cron deletes tickets past `expires_at` once a day,
+    // so a full day of tickets is present when it runs; without the index that
+    // delete is a sequential scan of every ticket minted since the last run.
+    index('idx_passkey_sign_in_tickets_expires_at').on(table.expires_at),
     // Account deletion removes this user's tickets; without the index that
     // delete is a sequential scan of every ticket ever minted.
     index('idx_passkey_sign_in_tickets_kilo_user_id').on(table.kilo_user_id),

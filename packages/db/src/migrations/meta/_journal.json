@@ -1772,6 +1772,13 @@
       "when": 1789638103559,
       "tag": "0245_nice_wrecking_crew",
       "breakpoints": true
+    },
+    {
+      "idx": 253,
+      "version": "7",
+      "when": 1789750576156,
+      "tag": "0253_pink_maginty",
+      "breakpoints": true
     }
   ]
 }

@@ -63,12 +63,12 @@ export function SignInForm({
     storybookInitialState,
   });
   // The ChatGPT option is decided from the address the visitor submits, or from
-  // an address already known without typing: a `?email=` prefill or a stored
-  // returning-user hint. Both reach provider selection without this form's
-  // submit, and the option must be decided before the providers render. Typing
-  // alone never evaluates, so one known address costs one flags request.
+  // an address already known without typing. A `?email=` prefill wins over a
+  // stored returning-user hint: the flow auto-triggers Turnstile for the
+  // prefill and shows it on the provider screen, so the prefill is the address
+  // in use. Typing alone never evaluates, so one address costs one reload.
   const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(null);
-  const knownEmail = (flow.hint?.lastEmail ?? searchParams.email ?? '').trim();
+  const knownEmail = (searchParams.email || flow.hint?.lastEmail || '').trim();
   const chatGptAllowed = useChatGptSignInAccess(submittedEmail ?? (knownEmail || null));
   const handleEmailSubmit = (event: React.FormEvent) => {
     setSubmittedEmail(flow.email);

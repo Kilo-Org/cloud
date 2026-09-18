@@ -151,6 +151,20 @@ describe('SignInForm sign-in options', () => {
     expect(mockHookEmail).toBe('returning@kilo.ai');
   });
 
+  it('evaluates the query prefill over a stored returning-user address', () => {
+    mockFlowEmail = 'prefill@kilo.ai';
+    mockHintEmail = 'hint@kilo.ai';
+    mockChatGptAllowed = true;
+    renderToStaticMarkup(
+      createElement(SignInForm, {
+        searchParams: { email: 'prefill@kilo.ai' },
+        title: 'Welcome.',
+      })
+    );
+
+    expect(mockHookEmail).toBe('prefill@kilo.ai');
+  });
+
   it('hides ChatGPT on sign-up when the flag is off for the typed email', () => {
     const html = renderToStaticMarkup(
       createElement(SignInForm, { searchParams: {}, isSignUp: true, title: 'Create your account' })

@@ -9,6 +9,7 @@ import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 const streamTicketSchema = z.object({
   cloudAgentSessionId: z.string().min(1),
@@ -49,7 +50,7 @@ function handleTRPCError(error: unknown): NextResponse {
  *
  * Ticket expires in 60 seconds to limit replay window.
  */
-export async function POST(request: Request) {
+async function postStreamTicketHandler(request: Request) {
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
 
@@ -127,3 +128,8 @@ export async function POST(request: Request) {
     return handleTRPCError(error);
   }
 }
+
+export const POST = withRestTiming(
+  '/api/cloud-agent-next/sessions/stream-ticket',
+  postStreamTicketHandler
+);

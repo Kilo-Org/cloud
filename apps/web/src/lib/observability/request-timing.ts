@@ -106,10 +106,15 @@ export function buildTimingLine(input: TimingLineInput): TimingLine {
   return line;
 }
 
-export type RestRouteHandler<Ctx> = (
-  request: Request,
-  ctx: Ctx
-) => Promise<Response> | Response;
+export type RestRouteHandler<Ctx> = (request: Request, ctx: Ctx) => Promise<Response> | Response;
+
+/**
+ * The wrapped handler. `ctx` is optional because Next only passes a context to
+ * dynamic routes, and existing callers (route tests, helpers) invoke a handler
+ * with the request alone. It always returns a promise: the wrapper awaits the
+ * handler, so callers can chain `.then`/`.catch` as they did before wrapping.
+ */
+export type TimedRestRouteHandler<Ctx> = (request: Request, ctx?: Ctx) => Promise<Response>;
 
 /**
  * The pattern with its dynamic segments removed: everything from the first
@@ -137,7 +142,7 @@ function staticPrefix(pattern: string): string {
 export function withRestTiming<Ctx>(
   pattern: string,
   handler: RestRouteHandler<Ctx>
-): RestRouteHandler<Ctx> {
+): TimedRestRouteHandler<Ctx> {
   const prefix = staticPrefix(pattern);
   return async (request, ctx) => {
     let pathname = '';
@@ -147,13 +152,13 @@ export function withRestTiming<Ctx>(
       pathname = '';
     }
     if (!pathname.startsWith(prefix)) {
-      return handler(request, ctx);
+      return handler(request, ctx as Ctx);
     }
 
     const start = performance.now();
     let status = 500;
     try {
-      const response = await handler(request, ctx);
+      const response = await handler(request, ctx as Ctx);
       status = response.status;
       return response;
     } finally {

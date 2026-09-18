@@ -499,7 +499,9 @@ describe('Enkrypt catalog publication boundaries', () => {
 
       const raw = await getRawOpenRouterModels();
       const catalog = await GET(createTestRequest('/api/openrouter/models'));
-      const transcription = await transcriptionModelsGET();
+      const transcription = await transcriptionModelsGET(
+        createTestRequest('/api/gateway/transcription-models')
+      );
       expect(catalog.status).toBe(200);
       expect(transcription.status).toBe(200);
       for (const response of [raw, await catalog.json(), await transcription.json()]) {
@@ -521,7 +523,9 @@ describe('Enkrypt catalog publication boundaries', () => {
     expect(await getRawOpenRouterModels()).toEqual({
       data: [{ id: 'provider/invalid', unrelated: 'retained' }],
     });
-    const transcription = await transcriptionModelsGET();
+    const transcription = await transcriptionModelsGET(
+      createTestRequest('/api/gateway/transcription-models')
+    );
     expect(transcription.status).toBe(200);
     expect(await transcription.json()).toEqual({
       data: [{ id: 'provider/invalid', unrelated: 'retained' }],

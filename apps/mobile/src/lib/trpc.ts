@@ -2,6 +2,7 @@ import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { createTRPCClient, httpBatchLink, httpLink, splitLink } from '@trpc/client';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
 import { API_BASE_URL, E2E_LATENCY_MESSAGES_MS, E2E_LATENCY_SESSION_MS } from '@/lib/config';
@@ -10,6 +11,8 @@ import { buildAuthHeaders } from '@/lib/auth/auth-header';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import { shouldRefreshBeforeRequest } from '@/lib/auth/native-auth-contract';
 import { createNetworkErrorFetch, readTrpcResponseError } from '@/lib/telemetry/network-errors';
+import { postLatencyBatch } from '@/lib/telemetry/latency-ingest';
+import { createLatencyBuffer, createLatencyFetch } from '@/lib/telemetry/request-latency';
 import {
   getActiveToken,
   getActiveTokenSnapshot,
@@ -21,6 +24,19 @@ import { TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 export const { TRPCProvider, useTRPC } = createTRPCContext<MobileRouter>();
 
 const trpcUrl = `${API_BASE_URL}/api/trpc`;
+
+/**
+ * Procedures that leave the tRPC batch and get their own HTTP call. Source:
+ * Axiom dashboard d35acea0-747f-4200-9d04-847a2e30a554, panel "Unbatch
+ * candidates — caller-seconds lost", read 2026-09-18T02:48Z: user.getMe
+ * 3,475 batches / 5,836 caller-seconds lost, activeSessions.list 2,129,
+ * cliSessionsV2.getSessionMessagesPage 1,597.
+ */
+export const UNBATCHED_PROCEDURES = new Set([
+  'user.getMe',
+  'activeSessions.list',
+  'cliSessionsV2.getSessionMessagesPage',
+]);
 
 /**
  * E2E-only artificial backend latency (repro for latency-dependent UI states,
@@ -96,6 +112,25 @@ const observedFetch = createNetworkErrorFetch(deadlineFetch, {
   readResponseError: readTrpcResponseError,
 });
 
+const latencyBuffer = createLatencyBuffer({
+  send: postLatencyBatch,
+  now: () => Date.now(),
+  schedule: (fn, ms) => {
+    const timer = setTimeout(fn, ms);
+    return () => {
+      clearTimeout(timer);
+    };
+  },
+});
+
+// Every tRPC HTTP call (single or batched) gets a per-call `x-kilo-request-id`
+// header and records one latency sample, so the server timing line and the
+// client sample join by the same id.
+const measuredFetch = createLatencyFetch(observedFetch, latencyBuffer, {
+  now: () => Date.now(),
+  newId: () => Crypto.randomUUID(),
+});
+
 async function getAuthHeaders() {
   const token = await getAuthTokenForRequest();
   if (!token) {
@@ -142,20 +177,20 @@ async function getAuthHeaders() {
 const singleLink = httpLink({
   url: trpcUrl,
   headers: getAuthHeaders,
-  fetch: observedFetch,
+  fetch: measuredFetch,
   methodOverride: 'POST',
 });
 
 const batchLink = httpBatchLink({
   url: trpcUrl,
   headers: getAuthHeaders,
-  fetch: observedFetch,
+  fetch: measuredFetch,
   methodOverride: 'POST',
 });
 
 const trpcLinks = [
   splitLink({
-    condition: op => op.context.skipBatch === true,
+    condition: op => op.context.skipBatch === true || UNBATCHED_PROCEDURES.has(op.path),
     true: singleLink,
     false: batchLink,
   }),

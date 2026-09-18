@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { buildToolDetail, formatToolDetailOutput } from './index';
+import { buildToolDetail, buildToolDetailSummary, formatToolDetailOutput } from './index';
 import type { ToolPart } from '../opencode.gen';
 
 type ToolState = ToolPart['state'];
@@ -248,6 +248,42 @@ describe('buildToolDetail empty projection fallback', () => {
     );
 
     expect(result.fields).toEqual([{ key: 'query', value: 'hi' }]);
+  });
+});
+
+describe('buildToolDetailSummary', () => {
+  it('returns the same name and summary as buildToolDetail', () => {
+    const part = {
+      tool: 'lookup',
+      state: pending({ description: 'Find matching records', count: 0 }),
+    };
+    const full = detail('lookup', part.state);
+
+    expect(buildToolDetailSummary(part)).toEqual({ name: full.name, summary: full.summary });
+    expect(full.name).toBe('lookup');
+    expect(full.summary).toBe('Find matching records · count=0');
+  });
+
+  it('uses the question text for a question part', () => {
+    const part = {
+      tool: 'question',
+      state: pending({ questions: [{ question: 'Which one?' }] }),
+    };
+
+    expect(buildToolDetailSummary(part)).toEqual({ name: 'question', summary: 'Which one?' });
+  });
+
+  it('does not parse or pretty-print the completed output', () => {
+    const output = '{"b":2}';
+    const part = { tool: 'lookup', state: completed({ a: 1 }, output) };
+    const parse = vi.spyOn(JSON, 'parse');
+
+    try {
+      expect(buildToolDetailSummary(part)).toEqual({ name: 'lookup', summary: 'a=1' });
+      expect(parse.mock.calls.some(([text]) => text === output)).toBe(false);
+    } finally {
+      parse.mockRestore();
+    }
   });
 });
 

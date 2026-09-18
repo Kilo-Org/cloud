@@ -321,6 +321,12 @@ describe('getToolDisplay mapping', () => {
     });
   });
 
+  it('summarizes a generic tool from its arguments', () => {
+    expect(
+      getDisplay(makeToolPart('lookup', completed({ description: 'Find matching records' })))
+    ).toEqual({ title: 'lookup', subtitle: 'Find matching records' });
+  });
+
   it('summarizes a question row from its first question text', () => {
     expect(
       getDisplay(
@@ -556,6 +562,37 @@ describe('getToolDisplay translatable provenance', () => {
       getToolDisplay(
         makeToolPart('mcp', completed({ server_name: 'filesystem', tool_name: 'read_file' }))
       ).translatable
+    ).toBe(false);
+  });
+
+  it('translates the projected argument summary that becomes the subtitle', () => {
+    expect(
+      getToolDisplay(makeToolPart('lookup', completed({ description: 'Find matching records' })))
+        .translatable
+    ).toBe(true);
+    expect(
+      getToolDisplay(makeToolPart('question', completed({ question: 'Pick a color' }))).translatable
+    ).toBe(true);
+  });
+
+  it('keeps a projected name out of translation even when a summary exists', () => {
+    // `mcp` resolves to `server/tool`, an identifier, so the summary is not the
+    // shown subtitle and neither is agent prose to translate.
+    expect(
+      getToolDisplay(
+        makeToolPart(
+          'mcp',
+          completed({
+            server_name: 'filesystem',
+            tool_name: 'read_file',
+            arguments: { path: '/a' },
+          })
+        )
+      ).translatable
+    ).toBe(false);
+    // A summary-less generic tool falls back to its raw id.
+    expect(
+      getToolDisplay(makeToolPart('lookup', completed({ nested: { a: 1 } }))).translatable
     ).toBe(false);
   });
 

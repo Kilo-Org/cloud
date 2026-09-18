@@ -2,6 +2,8 @@ import type { ToolPart } from '../opencode.gen';
 
 export type ToolDetailField = { key: string; value: string };
 
+export type ToolDetailSummary = { name: string; summary?: string };
+
 export type ToolDetail = {
   status: 'pending' | 'running' | 'completed' | 'error';
   name: string;
@@ -91,6 +93,31 @@ function getArgumentSummary(args: Record<string, unknown>): string | undefined {
   return summary === '' ? undefined : collapseWhitespace(summary);
 }
 
+/**
+ * The name and collapsed summary `buildToolDetail` derives, shared by the full
+ * detail and the cheap summary projection.
+ */
+function resolveNameAndSummary(
+  tool: string,
+  input: Record<string, unknown>,
+  args: Record<string, unknown>
+): ToolDetailSummary {
+  const summary = tool === 'question' ? questionSummary(input) : getArgumentSummary(args);
+  const result: ToolDetailSummary = { name: resolveName(tool, input) };
+  if (summary !== undefined) result.summary = collapseWhitespace(summary);
+  return result;
+}
+
+/**
+ * The name and summary alone. The transcript row renders only this pair, so it
+ * must not pay for `buildToolDetail`'s field projection or the completed-output
+ * JSON parse, regex scan, and pretty-print on every render and streaming tick.
+ */
+export function buildToolDetailSummary(part: Pick<ToolPart, 'tool' | 'state'>): ToolDetailSummary {
+  const { tool, state } = part;
+  return resolveNameAndSummary(tool, state.input, resolveArguments(tool, state.input));
+}
+
 function formatQuestionOption(option: unknown): string | undefined {
   if (!isRecord(option) || typeof option.label !== 'string') return undefined;
   const description = typeof option.description === 'string' ? option.description : '';
@@ -115,7 +142,7 @@ function buildQuestionFields(input: Record<string, unknown>): ToolDetailField[] 
     // grouped; a single question keeps the plain, unnumbered keys.
     const numbered = questions.length > 1;
     for (let index = 0; index < questions.length; index += 1) {
-      const entry = questions[index];
+      const entry: unknown = questions[index];
       if (!isRecord(entry)) continue;
       const ordinal = numbered ? ` ${index + 1}` : '';
       if (typeof entry.header === 'string' && entry.header.trim().length > 0) {
@@ -213,7 +240,6 @@ export function buildToolDetail(
   const args = resolveArguments(tool, input);
   const maxLength = options?.valueMaxLength ?? DEFAULT_VALUE_MAX_LENGTH;
 
-  const summary = tool === 'question' ? questionSummary(input) : getArgumentSummary(args);
   const projectedFields =
     tool === 'question'
       ? buildQuestionFields(input).map(field => ({
@@ -229,13 +255,14 @@ export function buildToolDetail(
       ? buildArgumentFields(input, maxLength)
       : projectedFields;
 
+  const { name, summary } = resolveNameAndSummary(tool, input, args);
   const detail: ToolDetail = {
     status: state.status,
-    name: resolveName(tool, input),
+    name,
     arguments: args,
     fields,
   };
-  if (summary !== undefined) detail.summary = collapseWhitespace(summary);
+  if (summary !== undefined) detail.summary = summary;
   if (state.status === 'completed' && state.output.trim().length > 0) {
     detail.output = formatToolDetailOutput(state.output);
   }

@@ -2,6 +2,10 @@ jest.mock('@/lib/ai-gateway/byok/encryption', () => ({
   decryptApiKey: jest.fn(() => 'plaintext-api-key'),
 }));
 
+jest.mock('@/lib/utils.server', () => ({
+  sentryLogger: jest.fn(() => jest.fn()),
+}));
+
 const mockOrderBy = jest.fn<Promise<unknown[]>, []>();
 jest.mock('@/lib/drizzle', () => ({
   db: {
@@ -17,7 +21,8 @@ jest.mock('@/lib/drizzle', () => ({
   },
 }));
 
-import { afterEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeAll, describe, expect, it } from '@jest/globals';
+import { sentryLogger } from '@/lib/utils.server';
 
 import type { AdminSlackNotification } from '@/lib/slack/admin-notifications';
 import {
@@ -30,6 +35,12 @@ import {
   type MiniMaxTokenHealthEntry,
   type MiniMaxTokenHealthTarget,
 } from './minimax-token-health';
+
+// sentryLogger('minimax-token-health', 'info') runs once when
+// minimax-token-health.ts loads (see `logBadResponse`). Module loading
+// finishes before any test lifecycle hook runs, so by `beforeAll` the mocked
+// sentryLogger's first call result is the logger instance under test.
+let mockLogBadResponse: jest.Mock;
 
 function target(overrides: Partial<MiniMaxTokenHealthTarget> = {}): MiniMaxTokenHealthTarget {
   return {
@@ -58,8 +69,13 @@ function entry(overrides: Partial<MiniMaxTokenHealthEntry> = {}): MiniMaxTokenHe
   };
 }
 
+beforeAll(() => {
+  mockLogBadResponse = jest.mocked(sentryLogger).mock.results[0]!.value as jest.Mock;
+});
+
 afterEach(() => {
   jest.restoreAllMocks();
+  mockLogBadResponse.mockClear();
 });
 
 describe('probeMiniMaxTokenPlanRemains', () => {
@@ -229,6 +245,7 @@ describe('buildMiniMaxTokenHealthSlackNotification', () => {
         inventoryId: 'inv-2',
         subscriptionId: 'sub-2',
         upstreamPlanId: '522937595127087110',
+        userId: 'user-2',
         category: 'bad_response',
         reason: 'provider_plan_inactive',
         subscriptionStatus: 'active',
@@ -237,6 +254,7 @@ describe('buildMiniMaxTokenHealthSlackNotification', () => {
         inventoryId: 'inv-3',
         subscriptionId: 'sub-3',
         upstreamPlanId: '522937971515547655',
+        userId: 'user-3',
         category: 'denied',
         reason: 'http_429',
         httpStatus: 429,
@@ -256,8 +274,10 @@ describe('buildMiniMaxTokenHealthSlackNotification', () => {
     const rendered = JSON.stringify(result.notification.blocks);
     expect(rendered).toContain('522937595127087110');
     expect(rendered).toContain('provider_plan_inactive');
+    expect(rendered).toContain('user-2');
     expect(rendered).toContain('522937971515547655');
     expect(rendered).toContain('http_429 (HTTP 429)');
+    expect(rendered).toContain('user-3');
     expect(rendered).not.toContain('inv-4');
     expect(result.notification.text).toContain('`2` active subscriptions need follow-up');
   });
@@ -294,5 +314,42 @@ describe('sendMiniMaxTokenHealthSlackSummary', () => {
     expect(sendNotification).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining('`1` checked') })
     );
+  });
+
+  it('logs full detail for each bad_response entry and skips other categories', async () => {
+    const checkAll = jest.fn(async () => [
+      entry({ inventoryId: 'inv-1', category: 'healthy', reason: 'ok' }),
+      entry({
+        inventoryId: 'inv-2',
+        planId: 'minimax-token-plan-plus',
+        upstreamPlanId: '522935352948625416',
+        subscriptionId: 'sub-2',
+        userId: 'user-2',
+        subscriptionStatus: 'active',
+        category: 'bad_response',
+        reason: 'invalid_response',
+      }),
+      entry({
+        inventoryId: 'inv-3',
+        category: 'denied',
+        reason: 'http_401',
+        httpStatus: 401,
+      }),
+    ]);
+    const sendNotification = jest.fn(async (_notification: AdminSlackNotification) => undefined);
+
+    await sendMiniMaxTokenHealthSlackSummary({ checkAll, sendNotification });
+
+    expect(mockLogBadResponse).toHaveBeenCalledTimes(1);
+    expect(mockLogBadResponse).toHaveBeenCalledWith('MiniMax token health bad_response', {
+      inventoryId: 'inv-2',
+      planId: 'minimax-token-plan-plus',
+      upstreamPlanId: '522935352948625416',
+      subscriptionId: 'sub-2',
+      userId: 'user-2',
+      subscriptionStatus: 'active',
+      reason: 'invalid_response',
+      httpStatus: undefined,
+    });
   });
 });

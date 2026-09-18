@@ -298,9 +298,7 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
               }}
             />
             {part.filename ? (
-              // `my-1` keeps the label off the Pressable's bottom clip edge:
-              // `overflow-hidden` cut the descenders of g/p/y in the filename.
-              <Text className="my-1 text-xs text-muted-foreground">{part.filename}</Text>
+              <Text className="mt-1 text-xs text-muted-foreground">{part.filename}</Text>
             ) : null}
           </Pressable>
           {viewerVisible && (

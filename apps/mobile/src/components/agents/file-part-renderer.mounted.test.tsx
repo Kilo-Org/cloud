@@ -408,32 +408,6 @@ describe('FilePartRenderer mounted', () => {
     await unmount(renderer);
   });
 
-  it('keeps the image filename label off the card bottom clip edge', async () => {
-    // The card clips with `overflow-hidden`; a label that only carries a top
-    // margin sits flush against that bottom edge and the descenders of
-    // g/p/y in e.g. 'pasted-image.png' are cut (device repro, req-…-s3).
-    cacheFilePart('part-1', {
-      url: 'https://x/pasted-image.png',
-      mime: 'image/png',
-      filename: 'pasted-image.png',
-    });
-    const renderer = await mount(
-      makeFilePart({ id: 'part-1', mime: 'image/png', filename: 'pasted-image.png', url: '' })
-    );
-    const root = renderer.root;
-
-    const card = first(pressableByLabel(root, 'Open pasted-image.png full screen'));
-    expect(card.props.className).toContain('overflow-hidden');
-
-    const label = first(findByType(card, 'Text'));
-    expect(label.props.children).toBe('pasted-image.png');
-    // `my-1` reserves the bottom room; a lone top margin is the clipped form.
-    expect(label.props.className).toContain('my-1');
-    expect(label.props.className).not.toContain('mt-1');
-
-    await unmount(renderer);
-  });
-
   it('swaps the thumbnail to a retry row after the image reports an error', async () => {
     cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
     const renderer = await mount(

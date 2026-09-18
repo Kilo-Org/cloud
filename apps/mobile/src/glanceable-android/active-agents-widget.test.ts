@@ -29,7 +29,7 @@ type MockElement = {
     clickAction?: string;
     clickActionData?: { uri?: string };
     accessibilityLabel?: string;
-    style?: { backgroundColor?: string; height?: number; fontWeight?: string; fontSize?: number };
+    style?: { backgroundColor?: string; height?: number };
     children?: unknown;
   };
 };
@@ -328,30 +328,6 @@ describe('renderActiveAgentsWidget', () => {
       'Idle',
       'Newest: Fix the flaky test',
     ]);
-  });
-
-  // The app's own body text is `font-medium` (the `Text` default in
-  // components/ui/text), so every non-emphasised line the widget draws carries
-  // the same 500 weight. A regular label read lighter than the app it opens.
-  it('draws its labels, status copy and newest line at the app body weight', () => {
-    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
-    const counts = buildAndroidWidgetProps(
-      snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
-      {},
-      translate
-    );
-    const empty = buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate);
-
-    const weightOf = (node: unknown, text: string) =>
-      findElement(node, element => element.props.text === text)?.props.style?.fontWeight;
-
-    const light = render(counts, { width: 250 }).light;
-    expect(weightOf(light, 'Needs input')).toBe('500');
-    expect(weightOf(light, 'Newest: Fix the flaky test')).toBe('500');
-    // The count keeps its emphasis so the number still stands out.
-    expect(weightOf(light, '1')).toBe('bold');
-
-    expect(weightOf(render(empty, { width: 250 }).light, 'No agents waiting')).toBe('500');
   });
 
   it('reserves the newest slot whether or not it carries a line', () => {

@@ -4,13 +4,14 @@ import {
   createEvalToolCall,
   createRemoteMcpToolCall,
   createThinkingBlock,
+  createToolCall,
   createToolResult,
   createUserMessage,
   createWorkflowToolCall,
   getConversationScrollKey,
   groupConversationEvents,
 } from './agent-conversation';
-import type { GroupedConversationItem } from './agent-conversation';
+import type { GroupedConversationItem, KiloBrowserToolName } from './agent-conversation';
 
 describe('agent conversation events', () => {
   it('creates stable conversation events for messages and eval tools', () => {
@@ -162,6 +163,29 @@ describe('agent conversation events', () => {
     const items: GroupedConversationItem[] = [{ result, toolCall, type: 'tool-exchange' }];
 
     expect(getConversationScrollKey(items)).toBe(`tc-agent:${result.id}`);
+  });
+
+  it('re-exports the kilo browser tool name as the upstream prefix pattern', () => {
+    expectTypeOf<KiloBrowserToolName>().toEqualTypeOf<`kilo_browser_${string}`>();
+  });
+
+  it('creates a generic browser tool-call event with the upstream arguments verbatim', () => {
+    const toolCall = createToolCall({
+      arguments: { element: 'Save', nested: { deep: { value: [1, 2, 3] } }, ref: 'e5' },
+      name: 'kilo_browser_click',
+      providerToolCallId: 'call-1',
+      tabId: 7,
+    });
+    const { id, ...payload } = toolCall;
+
+    expectTypeOf(id).toBeString();
+    expect(payload).toStrictEqual({
+      arguments: { element: 'Save', nested: { deep: { value: [1, 2, 3] } }, ref: 'e5' },
+      name: 'kilo_browser_click',
+      providerToolCallId: 'call-1',
+      tabId: 7,
+      type: 'tool-call',
+    });
   });
 
   it('creates remote MCP tool-call events', () => {

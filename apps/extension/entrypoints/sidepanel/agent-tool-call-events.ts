@@ -1,13 +1,17 @@
 import { z } from 'zod';
 import {
-  createEvalToolCall,
   createRemoteMcpToolCall,
   createSafeToolCall,
+  createToolCall,
+  createToolResult,
   createWebMcpToolCall,
   createWorkflowToolCall,
 } from '@/src/shared/agent-conversation';
 import type {
   AgentConversationEvent,
+  AgentMode,
+  KiloBrowserToolCallEvent,
+  KiloBrowserToolName,
   RemoteMcpAgentToolName,
   RemoteMcpToolCallEvent,
   SafeToolName,
@@ -15,13 +19,17 @@ import type {
   WorkflowToolCallEvent,
   WorkflowToolName,
 } from '@/src/shared/agent-conversation';
+import {
+  KILO_BROWSER_TOOL_PREFIX,
+  isSafeBrowserToolName,
+} from '@/src/shared/browser-tool-contract';
 import type { KiloGatewayToolCallRequest } from '@/src/shared/kilo-api-client';
 import type { RemoteMcpToolRoute } from '@/src/shared/remote-mcp-tools';
 import type { WebMcpToolRoute } from '@/src/shared/web-mcp-tools';
 
 type SafeToolCallEvent = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
-type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly name: 'eval' }>;
-type DangerousToolCallEvent = EvalToolCallEvent | SafeToolCallEvent | WorkflowToolCallEvent;
+type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
+type DangerousToolCallEvent = SafeToolCallEvent | WorkflowToolCallEvent;
 
 const stringArgumentSchema = z.string();
 
@@ -44,13 +52,7 @@ const getNumberArgument = (args: Record<string, unknown>, name: string): number 
 };
 
 const isSafeToolName = (name: string): name is SafeToolName =>
-  name === 'find_in_page' ||
-  name === 'get_element_details' ||
-  name === 'get_memory' ||
-  name === 'get_page_snapshot' ||
-  name === 'get_viewport_screenshot' ||
-  name === 'search_memories' ||
-  name === 'web_search';
+  name === 'get_memory' || name === 'search_memories' || name === 'web_search';
 
 export const isWorkflowToolName = (name: string): name is WorkflowToolName =>
   name === 'delete_workflow' ||
@@ -94,6 +96,57 @@ export const toSafeToolCallEvents = (
     const event = toSafeToolCallEvent(toolCall, selectedTabId);
 
     return event === undefined ? [] : [event];
+  });
+
+const KILO_BROWSER_TOOL_CALL_PREFIX = `${KILO_BROWSER_TOOL_PREFIX}browser_`;
+
+export const isKiloBrowserToolCallName = (name: string): name is KiloBrowserToolName =>
+  name.startsWith(KILO_BROWSER_TOOL_CALL_PREFIX);
+
+/** The upstream Playwright MCP name (`kilo_browser_click` -> `browser_click`). */
+const toUpstreamToolName = (name: KiloBrowserToolName): string =>
+  name.slice(KILO_BROWSER_TOOL_PREFIX.length);
+
+// Pinned verbatim: the end-to-end spec asserts this text.
+const toSafeModeRefusal = (name: KiloBrowserToolName): string =>
+  `${name} is not read-only: safe mode exposes only the Playwright MCP tools the upstream server marks with readOnlyHint, and this tool does not carry it. Switch to danger mode to run it.`;
+
+export type BrowserToolEvent = KiloBrowserToolCallEvent | ToolResultEvent;
+
+/*
+ * An exposed browser tool call becomes a tool call event with its upstream
+ * arguments verbatim. A call the current mode does not expose becomes a
+ * refusal tool result instead of a silent drop, so the model always gets an
+ * answer for the call it made.
+ */
+export const toBrowserToolCallEvents = (
+  toolCalls: KiloGatewayToolCallRequest[],
+  selectedTabId: number,
+  mode: AgentMode
+): BrowserToolEvent[] =>
+  toolCalls.flatMap((toolCall): BrowserToolEvent[] => {
+    if (!isKiloBrowserToolCallName(toolCall.name)) {
+      return [];
+    }
+
+    if (mode === 'safe' && !isSafeBrowserToolName(toUpstreamToolName(toolCall.name))) {
+      return [
+        createToolResult({
+          error: toSafeModeRefusal(toolCall.name),
+          ok: false,
+          toolCallId: toolCall.id,
+        }),
+      ];
+    }
+
+    return [
+      createToolCall({
+        arguments: toolCall.arguments,
+        name: toolCall.name,
+        providerToolCallId: toolCall.id,
+        tabId: selectedTabId,
+      }),
+    ];
   });
 
 export const isRemoteMcpToolName = (name: string): name is RemoteMcpAgentToolName =>
@@ -205,18 +258,6 @@ export const toDangerousToolCallEvents = (
 
       if (event !== undefined) {
         events.push(event);
-      }
-    } else if (toolCall.name === 'eval') {
-      const code = getStringArgument(toolCall.arguments, 'code');
-
-      if (code !== undefined) {
-        events.push(
-          createEvalToolCall({
-            code,
-            providerToolCallId: toolCall.id,
-            tabId: selectedTabId,
-          })
-        );
       }
     } else {
       const safeToolCall = toSafeToolCallEvent(toolCall, selectedTabId);

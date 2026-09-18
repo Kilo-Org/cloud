@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   EXTENSION_AGENT_SYSTEM_PROMPT,
   buildGatewayMessagesFromEvents,
-  createEvalToolDefinition,
   createSafeToolDefinitions,
   createWorkflowToolDefinitions,
 } from './agent-llm-harness';
@@ -20,7 +19,7 @@ import {
 } from './agent-conversation';
 
 describe('agent LLM harness', () => {
-  it('defines the eval tool as an async function body contract', () => {
+  it('keeps the mode-aware prompt stable', () => {
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('selected browser tab');
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
       'In dangerous mode, you can use the same read-only tools plus eval.'
@@ -31,26 +30,6 @@ describe('agent LLM harness', () => {
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain(
       'In dangerous mode, you have exactly one tool: eval.'
     );
-    expect(createEvalToolDefinition()).toStrictEqual({
-      function: {
-        description:
-          'Run JavaScript in the selected browser tab. The code is inserted inside an async function body, so use return for the value Kilo should read. This is plain JavaScript with DOM access — workflow page helpers like page.click or page.fill do not exist here; use document.querySelector and native DOM calls.',
-        name: 'eval',
-        parameters: {
-          additionalProperties: false,
-          properties: {
-            code: {
-              description:
-                'JavaScript async function body to run in the selected tab. Return a JSON-serializable value. Do not wrap it in markdown fences.',
-              type: 'string',
-            },
-          },
-          required: ['code'],
-          type: 'object',
-        },
-      },
-      type: 'function',
-    });
   });
 
   it('tells the model remote MCP tools may be available', () => {
@@ -81,27 +60,13 @@ describe('agent LLM harness', () => {
     ]);
   });
 
-  it('only exposes viewport screenshots for image-capable models', () => {
+  it('exposes only the extension-native safe tools', () => {
     const toolNames = (supportsImages: boolean): string[] =>
       createSafeToolDefinitions({ supportsImages }).map(tool => tool.function.name);
 
-    expect(toolNames(false)).toStrictEqual([
-      'get_page_snapshot',
-      'get_element_details',
-      'find_in_page',
-      'web_search',
-      'search_memories',
-      'get_memory',
-    ]);
-    expect(toolNames(true)).toStrictEqual([
-      'get_page_snapshot',
-      'get_element_details',
-      'find_in_page',
-      'web_search',
-      'search_memories',
-      'get_memory',
-      'get_viewport_screenshot',
-    ]);
+    const expected = ['web_search', 'search_memories', 'get_memory'];
+    expect(toolNames(false)).toStrictEqual(expected);
+    expect(toolNames(true)).toStrictEqual(expected);
   });
 
   it('maps conversation events to gateway messages with tool results', () => {
@@ -417,19 +382,6 @@ describe('agent LLM harness', () => {
     );
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('page.fillLabel(label, value)');
     expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('page.clickText(text)');
-  });
-
-  it('tells the model that get_element_details never returns a CSS selector', () => {
-    const definitions = createSafeToolDefinitions({ supportsImages: false });
-    const elementDetails = definitions.find(tool => tool.function.name === 'get_element_details');
-
-    expect(EXTENSION_AGENT_SYSTEM_PROMPT).not.toContain(
-      'use targeted reads only when a required selector is missing'
-    );
-    expect(elementDetails?.function.description).toContain(
-      "The record repeats that node's snapshot fields (role, tag, label, text, href, state)"
-    );
-    expect(elementDetails?.function.description).toContain('never contains a CSS selector');
   });
 
   it('run_workflow description names nextStep and drops the absolute user-starts rule', () => {

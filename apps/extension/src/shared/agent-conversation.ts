@@ -1,3 +1,7 @@
+import type { KiloBrowserToolName } from './browser-tool-contract';
+
+export type { KiloBrowserToolName };
+
 export type AgentMode = 'dangerous' | 'safe';
 export type SafeToolName =
   | 'find_in_page'
@@ -15,7 +19,12 @@ export type WorkflowToolName =
   | 'save_workflow'
   | 'search_workflows';
 export type RemoteMcpAgentToolName = `mcp_${string}`;
-export type AgentToolName = 'eval' | RemoteMcpAgentToolName | SafeToolName | WorkflowToolName;
+export type AgentToolName =
+  | 'eval'
+  | KiloBrowserToolName
+  | RemoteMcpAgentToolName
+  | SafeToolName
+  | WorkflowToolName;
 
 export type AgentConversationEvent =
   | {
@@ -85,6 +94,16 @@ export type AgentConversationEvent =
       readonly webMcpOrigin: string;
     }
   | {
+      /** The upstream Playwright MCP tool, carried with its arguments verbatim. */
+      readonly arguments: Record<string, unknown>;
+      readonly id: string;
+      readonly name: KiloBrowserToolName;
+      readonly providerToolCallId?: string;
+      readonly reasoningDetails?: readonly unknown[];
+      readonly tabId: number;
+      readonly type: 'tool-call';
+    }
+  | {
       readonly arguments: Record<string, unknown>;
       readonly id: string;
       /** The agent's own tool name (`read`, `bash`, …), not an extension tool. */
@@ -119,6 +138,10 @@ export type WorkflowToolCallEvent = Extract<
 export type WebMcpToolCallEvent = Extract<
   AgentConversationEvent,
   { readonly webMcpOrigin: string }
+>;
+export type KiloBrowserToolCallEvent = Extract<
+  AgentConversationEvent,
+  { readonly name: KiloBrowserToolName }
 >;
 type SafeToolCallEvent = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
 type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
@@ -175,6 +198,13 @@ interface CreateWebMcpToolCallOptions {
   readonly providerToolCallId?: string;
   readonly tabId: number;
   readonly webMcpOrigin: string;
+}
+
+interface CreateKiloBrowserToolCallOptions {
+  readonly arguments: Record<string, unknown>;
+  readonly name: KiloBrowserToolName;
+  readonly providerToolCallId?: string;
+  readonly tabId: number;
 }
 
 interface CreateToolResultOptions {
@@ -302,6 +332,20 @@ export const createWebMcpToolCall = ({
   tabId,
   type: 'tool-call',
   webMcpOrigin,
+});
+
+export const createToolCall = ({
+  arguments: toolArguments,
+  name,
+  providerToolCallId,
+  tabId,
+}: CreateKiloBrowserToolCallOptions): KiloBrowserToolCallEvent => ({
+  arguments: toolArguments,
+  id: createEventId(),
+  name,
+  ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
+  tabId,
+  type: 'tool-call',
 });
 
 export const createToolResult = ({

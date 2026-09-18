@@ -138,10 +138,10 @@ describe('dangerous turn runner workflow wiring', () => {
     const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
     const [{ tools }] = firstCall;
 
-    const evalIndex = tools.findIndex(tool => tool.function.name === 'eval');
+    const webSearchIndex = tools.findIndex(tool => tool.function.name === 'web_search');
     const searchWorkflowsIndex = tools.findIndex(tool => tool.function.name === 'search_workflows');
-    expect(evalIndex).toBeLessThan(searchWorkflowsIndex);
-    expect(evalIndex).toBeGreaterThan(0);
+    expect(webSearchIndex).toBeLessThan(searchWorkflowsIndex);
+    expect(webSearchIndex).toBe(0);
 
     const workflowNames = tools
       .map(tool => tool.function.name)

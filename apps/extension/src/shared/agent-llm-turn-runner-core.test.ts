@@ -1,7 +1,7 @@
 /* eslint-disable max-lines, sort-keys, no-promise-executor-return, promise/avoid-new, promise/prefer-await-to-then, jest/no-conditional-in-test, consistent-type-imports, jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- Retry fixtures need attempt-conditional fakes and raw promises; the typed stream-client mock needs importOriginal. */
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createSafeToolCall, createUserMessage } from './agent-conversation';
+import { createToolCall, createUserMessage } from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
 import type { FetchLike } from './auth';
 import { maxAgentToolRounds } from './agent-tool-round-limit';
@@ -31,11 +31,11 @@ vi.mock('./kilo-api-client', async importOriginal => {
 const stringBodySchema = z.string();
 
 // The stream gate validates streamed tool-call names against the offered `tools` set.
-// Fixtures stream a `get_page_snapshot` call, so the offered set must include that name.
+// Fixtures stream a `kilo_browser_snapshot` call, so the offered set must include that name.
 const getPageSnapshotTool: KiloGatewayToolDefinition = {
   function: {
     description: 'Read a bounded, sanitized snapshot of the selected browser tab.',
-    name: 'get_page_snapshot',
+    name: 'kilo_browser_snapshot',
     parameters: { type: 'object' },
   },
   type: 'function',
@@ -44,7 +44,7 @@ const getPageSnapshotTool: KiloGatewayToolDefinition = {
 function* createGatewayResponses(): Generator<Response, Response> {
   yield streamResponse([
     'data: {"choices":[{"delta":{"content":"Reading"}}]}\n\n',
-    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]}}]}\n\n',
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]}}]}\n\n',
     'data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":5,"total_tokens":105,"cost":0.0007}}\n\n',
     'data: [DONE]\n\n',
   ]);
@@ -59,7 +59,7 @@ function* createGatewayResponses(): Generator<Response, Response> {
 function* createToolOnlyGatewayResponses(rounds: number): Generator<Response, Response> {
   for (let index = 0; index < rounds; index += 1) {
     yield streamResponse([
-      `data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_${index}","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]}}]}\n\n`,
+      `data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_${index}","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]}}]}\n\n`,
       'data: [DONE]\n\n',
     ]);
   }
@@ -154,8 +154,9 @@ describe('agent LLM turn runner core', () => {
       signal: undefined,
       toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
         toolCalls.map(toolCall =>
-          createSafeToolCall({
-            name: 'get_page_snapshot',
+          createToolCall({
+            arguments: {},
+            name: 'kilo_browser_snapshot',
             providerToolCallId: toolCall.id,
             tabId: 123,
           })
@@ -179,7 +180,7 @@ describe('agent LLM turn runner core', () => {
     expect(appendedEvents).toMatchObject([
       { role: 'assistant', text: 'Reading', type: 'message' },
       {
-        name: 'get_page_snapshot',
+        name: 'kilo_browser_snapshot',
         providerToolCallId: 'call_snapshot',
         tabId: 123,
         type: 'tool-call',
@@ -214,8 +215,9 @@ describe('agent LLM turn runner core', () => {
       signal: undefined,
       toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
         toolCalls.map(toolCall =>
-          createSafeToolCall({
-            name: 'get_page_snapshot',
+          createToolCall({
+            arguments: {},
+            name: 'kilo_browser_snapshot',
             providerToolCallId: toolCall.id,
             tabId: 123,
           })
@@ -382,7 +384,7 @@ describe('prepareTools', () => {
     {
       function: {
         description: 'A tool supplied by prepareTools.',
-        name: 'get_page_snapshot',
+        name: 'kilo_browser_snapshot',
         parameters: { type: 'object' },
       },
       type: 'function',
@@ -438,7 +440,7 @@ describe('prepareTools', () => {
       {
         function: {
           description: 'First attempt tool list.',
-          name: 'get_page_snapshot',
+          name: 'kilo_browser_snapshot',
           parameters: { type: 'object' },
         },
         type: 'function',
@@ -448,7 +450,7 @@ describe('prepareTools', () => {
       {
         function: {
           description: 'Second attempt tool list.',
-          name: 'get_page_snapshot',
+          name: 'kilo_browser_snapshot',
           parameters: { type: 'object' },
         },
         type: 'function',
@@ -554,10 +556,11 @@ describe('stream retry', () => {
     noResponseMessage: 'no response',
     toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
       toolCalls.flatMap(toolCall =>
-        toolCall.name === 'get_page_snapshot'
+        toolCall.name === 'kilo_browser_snapshot'
           ? [
-              createSafeToolCall({
-                name: 'get_page_snapshot',
+              createToolCall({
+                arguments: {},
+                name: 'kilo_browser_snapshot',
                 tabId: 1,
                 providerToolCallId: toolCall.id,
               }),
@@ -824,8 +827,9 @@ describe('identical failing tool call guard', () => {
       signal: undefined,
       toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
         toolCalls.map(toolCall => ({
-          ...createSafeToolCall({
-            name: 'get_page_snapshot',
+          ...createToolCall({
+            arguments: {},
+            name: 'kilo_browser_snapshot',
             providerToolCallId: toolCall.id,
             tabId: 123,
           }),
@@ -883,8 +887,9 @@ describe('per-tool failure cap', () => {
       signal: undefined,
       toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
         toolCalls.map(toolCall =>
-          createSafeToolCall({
-            name: 'get_page_snapshot',
+          createToolCall({
+            arguments: {},
+            name: 'kilo_browser_snapshot',
             providerToolCallId: toolCall.id,
             tabId: 123,
           })
@@ -900,7 +905,7 @@ describe('per-tool failure cap', () => {
     expect(fetchCount).toBe(27);
     const lastEvent = appendedEvents.at(-1);
     expect(JSON.stringify(lastEvent)).toContain(
-      'Stopped: get_page_snapshot failed 25 times this turn'
+      'Stopped: kilo_browser_snapshot failed 25 times this turn'
     );
   });
 });
@@ -921,10 +926,11 @@ describe('continue nudge', () => {
     tooManyToolRoundsMessage: 'too many rounds',
     toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
       toolCalls.flatMap(toolCall =>
-        toolCall.name === 'get_page_snapshot'
+        toolCall.name === 'kilo_browser_snapshot'
           ? [
-              createSafeToolCall({
-                name: 'get_page_snapshot',
+              createToolCall({
+                arguments: {},
+                name: 'kilo_browser_snapshot',
                 providerToolCallId: toolCall.id,
                 tabId: 1,
               }),
@@ -944,7 +950,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );
@@ -985,7 +991,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );
@@ -1061,7 +1067,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );
@@ -1094,7 +1100,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );
@@ -1119,7 +1125,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );
@@ -1144,7 +1150,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );
@@ -1171,7 +1177,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );

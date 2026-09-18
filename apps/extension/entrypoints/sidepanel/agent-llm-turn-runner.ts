@@ -4,10 +4,7 @@ import type {
   RemoteMcpToolCallEvent,
   WebMcpToolCallEvent,
 } from '@/src/shared/agent-conversation';
-import {
-  createEvalToolDefinition,
-  createSafeToolDefinitions,
-} from '@/src/shared/agent-llm-harness';
+import { createSafeToolDefinitions } from '@/src/shared/agent-llm-harness';
 import { runLlmTurn } from '@/src/shared/agent-llm-turn-runner-core';
 import type { OnTurnUsage } from '@/src/shared/agent-llm-turn-runner-core';
 import { maxAgentToolRounds } from '@/src/shared/agent-tool-round-limit';
@@ -19,7 +16,6 @@ import type {
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 import { buildWebMcpToolDefinitions } from '@/src/shared/web-mcp-tools';
 import type { WebMcpToolRoute } from '@/src/shared/web-mcp-tools';
-import { executeEvalToolCall } from './agent-eval-runtime';
 import { createSafeToolExecutor } from './agent-safe-tool-runtime';
 import {
   isRemoteMcpToolCallEvent,
@@ -94,7 +90,6 @@ export const runDangerousLlmTurn = ({
   // The fixed tool set never changes within a turn; WebMCP page tools are appended per-request by prepareTools.
   const fixedTools = [
     ...createSafeToolDefinitions({ supportsImages }),
-    createEvalToolDefinition(),
     ...workflowTools,
     ...remoteMcpTools,
   ];
@@ -123,10 +118,6 @@ export const runDangerousLlmTurn = ({
         return executeRemoteMcpToolCall === undefined
           ? { error: `Remote MCP tool ${toolCall.name} is no longer available.`, ok: false }
           : executeRemoteMcpToolCall(toolCall);
-      }
-
-      if (toolCall.name === 'eval') {
-        return executeEvalToolCall(toolCall);
       }
 
       if (toolCall.name === 'web_search') {

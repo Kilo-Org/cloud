@@ -122,7 +122,7 @@ describe('safe turn runner workflow wiring', () => {
     const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
     const { tools: toolDefs } = firstCall[0];
 
-    expect(toolDefs[0]!.function.name).toBe('get_page_snapshot');
+    expect(toolDefs[0]!.function.name).toBe('web_search');
     const workflowIndex = toolDefs.findIndex(tool => tool.function.name === 'run_workflow');
     const mcpIndex = toolDefs.findIndex(tool => tool.function.name === 'mcp_test_tool');
     expect(workflowIndex).toBeLessThan(mcpIndex);

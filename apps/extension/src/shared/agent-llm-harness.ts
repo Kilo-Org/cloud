@@ -2,7 +2,6 @@
 import { z } from 'zod';
 import type { KiloGatewayChatMessage, KiloGatewayToolDefinition } from './kilo-api-client';
 import type { KiloGatewayToolName } from './kilo-gateway-chat-client';
-import { MAX_SNAPSHOT_TEXT_LENGTH } from './tab-debugger';
 import type { AgentConversationEvent, AgentMode } from './agent-conversation';
 
 type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
@@ -37,93 +36,16 @@ export const EXTENSION_AGENT_SYSTEM_PROMPT = [
   'When the user asks to run a workflow, pass its declared params in run_workflow input; ask the user for missing required values instead of guessing, and simply omit optional values the user did not give.',
 ].join('\n');
 
-export const createEvalToolDefinition = (): KiloGatewayToolDefinition => ({
-  function: {
-    description:
-      'Run JavaScript in the selected browser tab. The code is inserted inside an async function body, so use return for the value Kilo should read. This is plain JavaScript with DOM access — workflow page helpers like page.click or page.fill do not exist here; use document.querySelector and native DOM calls.',
-    name: 'eval',
-    parameters: {
-      additionalProperties: false,
-      properties: {
-        code: {
-          description:
-            'JavaScript async function body to run in the selected tab. Return a JSON-serializable value. Do not wrap it in markdown fences.',
-          type: 'string',
-        },
-      },
-      required: ['code'],
-      type: 'object',
-    },
-  },
-  type: 'function',
-});
-
 export const createSafeToolDefinitions = ({
   supportsImages = false,
 }: {
   readonly supportsImages?: boolean;
 } = {}): KiloGatewayToolDefinition[] => {
-  const definitions: KiloGatewayToolDefinition[] = [
-    {
-      function: {
-        description: `Read a bounded, sanitized snapshot of the selected browser tab. Returns title, URL, visible text, headings, links, controls, and opaque element ids. Form fields carry name, formAction, and formMethod, so a GET search form can be expressed as a URL without submitting it. The visible text is a window of at most ${String(MAX_SNAPSHOT_TEXT_LENGTH)} characters; textStart, textTotalChars, and textTruncated report where the window sits. When textTruncated is true, call again with textStart set to the end of the current window to keep reading — do this until you have read enough for the task.`,
-        name: 'get_page_snapshot',
-        parameters: {
-          additionalProperties: false,
-          properties: {
-            textStart: {
-              description:
-                'Character offset into the full visible page text where the text window starts. Omit for the beginning of the page.',
-              type: 'integer',
-            },
-          },
-          type: 'object',
-        },
-      },
-      type: 'function',
-    },
-    {
-      function: {
-        description:
-          "Read the snapshot record for an element id returned by get_page_snapshot or find_in_page. The record repeats that node's snapshot fields (role, tag, label, text, href, state); it never contains a CSS selector, HTML, or page source.",
-        name: 'get_element_details',
-        parameters: {
-          additionalProperties: false,
-          properties: {
-            elementId: {
-              description: 'Opaque element id from a previous safe-mode page snapshot.',
-              type: 'string',
-            },
-            snapshotId: {
-              description: 'Snapshot id returned with the element id.',
-              type: 'string',
-            },
-          },
-          required: ['elementId', 'snapshotId'],
-          type: 'object',
-        },
-      },
-      type: 'function',
-    },
-    {
-      function: {
-        description:
-          'Search the full visible text of the selected tab — not just the bounded snapshot window — plus the snapshot nodes. Page-text matches carry an excerpt and the character offset of the match; read the surrounding section with get_page_snapshot textStart near that offset. Use this to locate a specific fact on a long page instead of paging through snapshots.',
-        name: 'find_in_page',
-        parameters: {
-          additionalProperties: false,
-          properties: {
-            query: {
-              description: 'Plain text to search for in the selected tab.',
-              type: 'string',
-            },
-          },
-          required: ['query'],
-          type: 'object',
-        },
-      },
-      type: 'function',
-    },
+  // The page tools and the viewport screenshot are Playwright browser tools now (`kilo_browser_*`).
+  // The option stays until the browser tool definitions land with their upstream schemas.
+  void supportsImages;
+
+  return [
     {
       function: {
         description:
@@ -182,24 +104,6 @@ export const createSafeToolDefinitions = ({
       type: 'function',
     },
   ];
-
-  if (supportsImages) {
-    definitions.push({
-      function: {
-        description:
-          'Capture the visible viewport of the selected browser tab as a PNG image. Use this when visual layout, canvas, images, or styling matter.',
-        name: 'get_viewport_screenshot',
-        parameters: {
-          additionalProperties: false,
-          properties: {},
-          type: 'object',
-        },
-      },
-      type: 'function',
-    });
-  }
-
-  return definitions;
 };
 
 export const createWorkflowToolDefinitions = ({

@@ -226,6 +226,8 @@ export const BROWSER_TOOL_CONTRACT: readonly BrowserToolContractEntry[] = ${data
 
 export const KILO_BROWSER_TOOL_PREFIX = 'kilo_';
 
+export type KiloBrowserToolName = \`kilo_browser_\${string}\`;
+
 export const toKiloBrowserToolName = (name: string): string =>
   \`\${KILO_BROWSER_TOOL_PREFIX}\${name}\`;
 

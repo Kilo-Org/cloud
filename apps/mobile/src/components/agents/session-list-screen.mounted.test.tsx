@@ -590,7 +590,19 @@ describe('AgentSessionListScreen live presentation', () => {
       expect(text()).toContain('Nothing running right now');
       state.live.terminalError = failure;
       await renderScreen();
-      expect(text()).toContain(expected);
+      if (mode === 'exhausted') {
+        // The whole-surface load-failure block draws its own Retry for the
+        // outage that also exhausted the connection, so the connection row
+        // yields instead of stacking a second "Connection lost / Retry" above
+        // it (device defect uxs1). One retry, one recovery.
+        expect(text()).not.toContain('Connection lost');
+        expect(action('Retry')).toBeDefined();
+        expect(
+          nodes('Pressable').some(node => node.props.accessibilityLabel === 'Retry connection')
+        ).toBe(false);
+      } else {
+        expect(text()).toContain(expected);
+      }
       expect(text()).toContain('Could not load active sessions');
       expect(text()).not.toContain('Nothing running right now');
       expect(text()).not.toContain('Internet connection restored');
@@ -636,9 +648,19 @@ describe('AgentSessionListScreen live presentation', () => {
         });
         expect(state.refetch).toHaveBeenCalledTimes(1);
       }
-      expect(action('Retry connection').props.disabled).toBe(false);
+      if (cached) {
+        expect(action('Retry connection').props.disabled).toBe(false);
+      } else {
+        // Without cached rows the whole-surface load-failure block owns
+        // recovery, so the connection row yields rather than stacking a second
+        // Retry above the card (device defect uxs1). It returns once the load
+        // lands again (asserted at the end of this case).
+        expect(
+          nodes('Pressable').some(node => node.props.accessibilityLabel === 'Retry connection')
+        ).toBe(false);
+      }
       const queryRetry = cached ? undefined : action('Retry');
-      const socketRetry = action('Retry connection');
+      const socketRetry = cached ? action('Retry connection') : undefined;
       expect(
         nodes('View').filter(
           view =>

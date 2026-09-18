@@ -60,6 +60,9 @@ export type ValidatedStoreKiloPassPurchase = {
   expiresAtIso: string | null;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
+  amountChargedMinorUnits?: number | null;
+  currency?: string | null;
+  taxMinorUnits?: number | null;
   googlePlayReplacement?: {
     linkedPurchaseToken: string;
     deferred: boolean;
@@ -792,6 +795,9 @@ export async function completeStoreKiloPassPurchase(params: {
         environment: purchase.environment,
         purchased_at: purchase.purchasedAtIso,
         expires_at: purchase.expiresAtIso,
+        amount_charged_minor_units: purchase.amountChargedMinorUnits ?? null,
+        currency: purchase.currency ?? null,
+        tax_minor_units: purchase.taxMinorUnits ?? null,
         raw_payload_json: redactStoreAccountLinkedJson(purchase.rawPayload),
       })
       .onConflictDoNothing({

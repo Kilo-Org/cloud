@@ -9,6 +9,7 @@ import {
   _setSecureStoreForTests,
   captureLaunchDeepLink,
   getPendingDeepLink,
+  getPendingDeepLinkSnapshot,
 } from './deep-link-launch';
 import { setGitHubInstallReturnOutcome } from './github-install-return';
 import { resolvePendingNavigation } from './pending-navigation';
@@ -32,11 +33,11 @@ vi.mock('@kilocode/app-shared/universal-links', async importOriginal => {
   const actual = await importOriginal<typeof UniversalLinks>();
   return {
     ...actual,
-    resolveIncomingUrl: (raw: string) => {
+    resolveIncomingResume: (raw: string) => {
       if (mocks.shouldThrow) {
         throw new Error('boom');
       }
-      return actual.resolveIncomingUrl(raw);
+      return actual.resolveIncomingResume(raw);
     },
   };
 });
@@ -57,6 +58,14 @@ const MAPPED_CASES = [
   {
     path: 'https://app.kilo.ai/cloud/sessions/ses_1',
     href: '/(app)/agent-chat/ses_1',
+  },
+  {
+    path: 'https://app.kilo.ai/cloud/sessions/ses_1?at=msg_42',
+    href: '/(app)/agent-chat/ses_1?at=msg_42',
+  },
+  {
+    path: 'https://app.kilo.ai/cloud/sessions/ses_1?at=msg%2042',
+    href: '/(app)/agent-chat/ses_1?at=msg%2042',
   },
   {
     path: 'https://app.kilo.ai/security-agent/findings',
@@ -160,6 +169,28 @@ describe('redirectSystemPath', () => {
     });
   });
 
+  describe('resume anchor', () => {
+    it('reads and re-encodes the decoded anchor exactly once', () => {
+      redirectSystemPath({
+        path: 'kiloapp:///cloud/sessions/ses_1?at=msg%2042',
+        initial: false,
+      });
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1?at=msg%2042');
+      expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+
+    it('keeps hrefs without an anchor byte-identical', () => {
+      redirectSystemPath({ path: 'https://app.kilo.ai/cloud/sessions/ses_1', initial: false });
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1');
+
+      redirectSystemPath({
+        path: 'https://app.kilo.ai/cloud/sessions?github_install=success',
+        initial: false,
+      });
+      expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(2_agents)');
+    });
+  });
+
   describe('launch-capture dedup', () => {
     it('cold initial does not restash when the launch capture already stashed the link', () => {
       _setGetLinkingURLForTests(() => 'kiloapp:///profile');
@@ -170,6 +201,24 @@ describe('redirectSystemPath', () => {
       expect(result).toBeNull();
       // No restash — a later, unrelated effect re-run must find the slot empty.
       expect(getPendingDeepLink()).toBeNull();
+      expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+
+    it('cold launch capture keeps the resume anchor the cold path would drop', () => {
+      // The synchronous launch capture runs first and owns the slot. If it
+      // stashed the anchor-less href, expo-router's cold path would skip its
+      // restash (see the dedup test above) and the anchor would be lost.
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/ses_1?at=msg_42');
+      captureLaunchDeepLink();
+      expect(getPendingDeepLinkSnapshot()).toBe('/(app)/agent-chat/ses_1?at=msg_42');
+
+      const result = redirectSystemPath({
+        path: 'https://app.kilo.ai/cloud/sessions/ses_1?at=msg_42',
+        initial: true,
+      });
+
+      expect(result).toBeNull();
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1?at=msg_42');
       expect(mocks.navigate).not.toHaveBeenCalled();
     });
 

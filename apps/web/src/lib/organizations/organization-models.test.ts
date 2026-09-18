@@ -33,7 +33,7 @@ const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) =>
 const mockAvailability = jest.fn(async (models: OpenRouterModel[], _providers: string[]) =>
   models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
 );
-const mockTagChatGpt = jest.fn(async (_userId: string, models: OpenRouterModel[]) => models);
+const mockTagChatGpt = jest.fn(async (_owner: unknown, models: OpenRouterModel[]) => models);
 
 jest.mock('@/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {
@@ -195,7 +195,7 @@ beforeEach(async () => {
   mockCustom
     .mockReset()
     .mockResolvedValue([catalogModel('kilo-internal/private', { mayTrainOnYourPrompts: true })]);
-  mockTagChatGpt.mockReset().mockImplementation(async (_userId, models) => models);
+  mockTagChatGpt.mockReset().mockImplementation(async (_owner, models) => models);
   [producer, cache, enkrypt] = await Promise.all([
     import('./organization-models'),
     import('@/lib/model-stats/model-stats-cache'),
@@ -395,15 +395,18 @@ describe('organization model producer publication', () => {
     expect(mockReadRows).toHaveBeenCalledTimes(2);
   });
 
-  it('tags ChatGPT-served models for a member and skips the default-access subject', async () => {
-    mockTagChatGpt.mockImplementation(async (_userId: string, models: OpenRouterModel[]) =>
+  it('tags the member ChatGPT connection and skips the default-access subject', async () => {
+    mockTagChatGpt.mockImplementation(async (_owner, models: OpenRouterModel[]) =>
       models.map(model =>
         model.id === 'provider/training' ? { ...model, hasUserByokAvailable: true } : model
       )
     );
 
     const memberResult = await resultFor();
-    expect(mockTagChatGpt).toHaveBeenCalledWith('fixture-user', expect.any(Array));
+    expect(mockTagChatGpt).toHaveBeenCalledWith(
+      { kiloUserId: 'fixture-user', organizationId: 'fixture-org' },
+      expect.any(Array)
+    );
     expect(
       memberResult.data.find(model => model.id === 'provider/training')?.hasUserByokAvailable
     ).toBe(true);

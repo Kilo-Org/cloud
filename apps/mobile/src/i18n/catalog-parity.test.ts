@@ -51,4 +51,18 @@ describe('catalog parity', () => {
       expect(extra, `${tag} carries keys absent from en.json`).toEqual([]);
     }
   );
+
+  /**
+   * The launcher surfaces label New agent from `glanceable.newAgent`
+   * (`src/lib/launcher-surfaces-publish.ts`), so `launcher.newAgent` is dead
+   * copy that `check:i18n` rejects as an extra key. It shipped in every
+   * non-English catalog once; pin its absence so it cannot come back.
+   */
+  it('no catalog defines the dead launcher.newAgent key', () => {
+    const offenders = SUPPORTED_LANGUAGES.filter(tag => {
+      const catalog = flatten(CATALOG_LOADERS[tag]() as unknown as Catalog);
+      return catalog.has('launcher.newAgent');
+    });
+    expect(offenders, 'catalogs carry dead launcher.newAgent copy').toEqual([]);
+  });
 });

@@ -318,7 +318,19 @@ describe('toSaveInput bounds', () => {
     expect(result.ok).toBe(true);
   });
 
-  it.each(['0', '-1', '1000000.01', '', 'abc'])(
+  it('accepts one microdollar, the smallest limit the store can represent', () => {
+    const result = toSaveInput(
+      draft({
+        rules: [
+          draftRule({ kind: 'threshold', thresholdUsd: '0.000001' }),
+          draftRule({ kind: 'anomaly', multiplier: '3' }),
+        ],
+      })
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it.each(['0', '-1', '1000000.01', '', 'abc', '0.0000001'])(
     'rejects the limit %p with an inline field error',
     thresholdUsd => {
       const result = toSaveInput(

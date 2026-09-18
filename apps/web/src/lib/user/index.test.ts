@@ -4926,6 +4926,32 @@ describe('User', () => {
       expect(deliveryRows).toHaveLength(0);
     });
 
+    it('should strip a deleted billing contact from organization scope delivery recipients', async () => {
+      const user = await insertTestUser();
+      const otherUserId = `test-other-${crypto.randomUUID()}`;
+      const otherEmail = 'other-billing@example.com';
+      const dedupeKey = `spend-alert-org-test-${crypto.randomUUID()}`;
+      await db.insert(spend_alert_deliveries).values({
+        dedupe_key: dedupeKey,
+        scope_key: `org:${crypto.randomUUID()}`,
+        channel: 'email',
+        recipients: {
+          userIds: [user.id, otherUserId],
+          emails: [user.google_user_email, otherEmail],
+        },
+      });
+
+      await softDeleteUser(user.id);
+
+      // Organization-scoped rows belong to the organization and stay, but the
+      // deleted member's id and address are their PII and must be removed.
+      const [row] = await db
+        .select()
+        .from(spend_alert_deliveries)
+        .where(eq(spend_alert_deliveries.dedupe_key, dedupeKey));
+      expect(row?.recipients).toEqual({ userIds: [otherUserId], emails: [otherEmail] });
+    });
+
     it('should delete Coding Plan availability notification intents', async () => {
       const user = await insertTestUser();
       await db.insert(coding_plan_availability_intents).values({

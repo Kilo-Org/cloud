@@ -12,8 +12,9 @@
  *
  * The bounds here mirror `SpendAlertRuleInputSchema` in
  * `apps/web/src/routers/spend-alert-router.ts` (s3): the limit is USD in
- * (0, 1_000_000], the window is one of 24/168/720 hours, and the spike
- * multiplier is a basis-point integer in [100, 5000].
+ * [1e-6, 1_000_000] (the floor is the microdollar it is stored in), the window
+ * is one of 24/168/720 hours, and the spike multiplier is a basis-point integer
+ * in [100, 5000].
  */
 import {
   canManageOrganizationBilling,
@@ -34,6 +35,14 @@ export const WINDOW_LABELS: Record<SpendAlertWindowHours, string> = {
 
 /** Inclusive upper bound on a rolling-window limit, in USD. */
 export const MAX_THRESHOLD_USD = 1_000_000;
+
+/**
+ * Smallest limit that survives the router's conversion to microdollars
+ * (`round(threshold * MICRODOLLARS_PER_USD)`). A smaller positive value rounds
+ * to a zero-microdollar threshold, which fires on any spend and whose 95%
+ * hysteresis band is zero, so it never clears.
+ */
+export const MIN_THRESHOLD_USD = 0.000_001;
 
 /** Spike-multiplier bounds in basis points (100 = 1x). */
 export const MIN_MULTIPLIER_BASIS_POINTS = 100;
@@ -282,7 +291,8 @@ export function toSaveInput(draft: SpendAlertsDraft): SpendAlertValidation {
   for (const rule of draft.rules) {
     if (rule.kind === 'threshold') {
       const threshold = parseUsdInput(rule.thresholdUsd);
-      const valid = threshold !== null && threshold > 0 && threshold <= MAX_THRESHOLD_USD;
+      const valid =
+        threshold !== null && threshold >= MIN_THRESHOLD_USD && threshold <= MAX_THRESHOLD_USD;
       if (!valid && rule.enabled) errors.threshold = THRESHOLD_FIELD_ERROR;
       rules.push({
         kind: 'threshold',

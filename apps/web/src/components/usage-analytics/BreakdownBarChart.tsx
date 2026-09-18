@@ -36,11 +36,16 @@ type BarDatum = {
 /**
  * One body height for every state — loading, empty and loaded. The item count
  * is unknown until the breakdown resolves, so a height derived from it (as it
- * was: `max(180, items * 36 + 24)`) grew this card the moment the data landed
- * and pushed the summary and every card below it down. Reserving the floor the
- * body has always used keeps short lists rendering exactly as they did.
+ * was: `min(420, max(180, items * 36 + 24))`) grew this card the moment the
+ * data landed and pushed the summary and every card below it down.
+ *
+ * The body reserves the chart's tallest size (the old ceiling, 420px) rather
+ * than its floor: a fixed 180px floor held the layout still but squashed a tall
+ * breakdown into the short list's height. Reserving the ceiling keeps the tall
+ * case at its full size and still never grows the card, because short lists
+ * render inside the same slot.
  */
-const CHART_BODY_HEIGHT = 180;
+const CHART_BODY_HEIGHT = 420;
 
 /** Approximate pixels per character for the 11px tick font. */
 const CHAR_PIXEL_WIDTH = 6.5;
@@ -91,7 +96,7 @@ export function BreakdownBarChart({
       <CardContent className="pt-3">
         <div style={{ height: CHART_BODY_HEIGHT }} className="w-full">
           {loading ? (
-            <div className="space-y-2">
+            <div className="flex h-full flex-col justify-between py-1">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="bg-muted/30 h-6 w-full animate-pulse rounded" />
               ))}

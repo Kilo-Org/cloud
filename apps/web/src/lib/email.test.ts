@@ -135,4 +135,62 @@ describe('spend alert email', () => {
     expect(html).toContain(`${NEXTAUTH_URL}/usage`);
     expect(html).not.toContain('/organizations/');
   });
+
+  it('reports an accepted recipient as delivered', async () => {
+    await expect(
+      sendSpendAlertEmail({
+        to: ['billing@example.com'],
+        scopeType: 'organization',
+        scopeId: 'org-1',
+        scopeName: 'Acme',
+        kindLabel: 'Spend threshold',
+        amountUsd: 12.5,
+        thresholdUsd: 10,
+      })
+    ).resolves.toEqual({
+      delivered: ['billing@example.com'],
+      retryable: [],
+      undeliverable: [],
+    });
+  });
+
+  it('classifies an unconfigured provider as undeliverable, not retryable', async () => {
+    jest.mocked(sendViaMailgun).mockResolvedValueOnce(false);
+
+    const outcome = await sendSpendAlertEmail({
+      to: ['billing@example.com'],
+      scopeType: 'organization',
+      scopeId: 'org-1',
+      scopeName: 'Acme',
+      kindLabel: 'Spend threshold',
+      amountUsd: 12.5,
+      thresholdUsd: 10,
+    });
+
+    expect(outcome).toEqual({
+      delivered: [],
+      retryable: [],
+      undeliverable: ['billing@example.com'],
+    });
+  });
+
+  it('classifies a thrown transport error as retryable', async () => {
+    jest.mocked(sendViaMailgun).mockRejectedValueOnce(new Error('socket hang up'));
+
+    const outcome = await sendSpendAlertEmail({
+      to: ['billing@example.com'],
+      scopeType: 'organization',
+      scopeId: 'org-1',
+      scopeName: 'Acme',
+      kindLabel: 'Spend threshold',
+      amountUsd: 12.5,
+      thresholdUsd: 10,
+    });
+
+    expect(outcome).toEqual({
+      delivered: [],
+      retryable: ['billing@example.com'],
+      undeliverable: [],
+    });
+  });
 });

@@ -38,7 +38,7 @@ describe('notifications-worker-client internal dispatch', () => {
   it('posts the spend_alert variant to the internal dispatch endpoint', async () => {
     fetchMock.mockResolvedValue(okResponse());
 
-    await dispatchSpendAlertPush(spendAlertInput);
+    await expect(dispatchSpendAlertPush(spendAlertInput)).resolves.toBe(true);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, options] = fetchMock.mock.calls[0];
@@ -91,7 +91,7 @@ describe('notifications-worker-client internal dispatch', () => {
   it('never rejects when the worker call fails', async () => {
     fetchMock.mockRejectedValue(new Error('socket hang up'));
 
-    await expect(dispatchSpendAlertPush(spendAlertInput)).resolves.toBeUndefined();
+    await expect(dispatchSpendAlertPush(spendAlertInput)).resolves.toBe(false);
 
     expect(captureException).toHaveBeenCalledWith(
       expect.any(Error),
@@ -107,7 +107,7 @@ describe('notifications-worker-client internal dispatch', () => {
       text: async () => 'boom',
     });
 
-    await expect(dispatchSpendAlertPush(spendAlertInput)).resolves.toBeUndefined();
+    await expect(dispatchSpendAlertPush(spendAlertInput)).resolves.toBe(false);
 
     expect(captureException).toHaveBeenCalledWith(
       expect.any(Error),

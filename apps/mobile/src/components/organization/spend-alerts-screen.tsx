@@ -238,7 +238,10 @@ function SpendAlertsForm({
   const canSubmitWith = (thresholdOn: boolean, anomalyOn: boolean) =>
     (!thresholdOn || parseThreshold(thresholdRef.current) != null) &&
     (!anomalyOn || parseMultiplier(multiplierRef.current) != null);
-  const canSubmit = () => canSubmitWith(thresholdEnabled, anomalyEnabled);
+  // The master switch off hides the rule cards entirely: no field is on screen
+  // to repair, so a draft left invalid before the switch was turned off must not
+  // hold Save disabled, or the feature could never be turned off.
+  const canSubmit = () => !enabled || canSubmitWith(thresholdEnabled, anomalyEnabled);
   const [canSave, setCanSave] = useState(canSubmit);
   const revalidate = () => {
     setSaved(false);
@@ -271,13 +274,29 @@ function SpendAlertsForm({
     { value: '720', label: t(WINDOW_LABEL_KEYS['720']) },
   ];
 
+  // What a hidden rule field falls back to when its draft is unusable: the last
+  // saved value, kept rather than clobbered by the stand-in. The server's schema
+  // already bounded both, so the checks only guard a legacy zero limit.
+  const storedThresholdUsd =
+    threshold?.threshold != null && threshold.threshold > 0
+      ? threshold.threshold
+      : DISABLED_THRESHOLD_USD;
+  const storedMultiplierTimes =
+    anomaly?.multiplierBasisPoints != null && anomaly.multiplierBasisPoints >= 100
+      ? anomaly.multiplierBasisPoints / 100
+      : DISABLED_MULTIPLIER;
+
   const buildInput = (pushOverride?: PushOverride): SpendAlertSaveInput | null => {
     const limit = parseThreshold(thresholdRef.current);
     const multiplier = parseMultiplier(multiplierRef.current);
-    // A kind the owner switched off need not hold a value; the wire still wants
-    // one per kind, so it falls back to the smallest value the schema accepts.
-    const thresholdUsd = limit ?? (thresholdEnabled ? null : DISABLED_THRESHOLD_USD);
-    const multiplierTimes = multiplier ?? (anomalyEnabled ? null : DISABLED_MULTIPLIER);
+    // A kind the owner switched off — or any kind while the master switch is
+    // off and its card is hidden — need not hold a valid value; the wire still
+    // wants one per kind, so it falls back to the stored value and then to the
+    // smallest value the schema accepts.
+    const thresholdHidden = !enabled || !thresholdEnabled;
+    const anomalyHidden = !enabled || !anomalyEnabled;
+    const thresholdUsd = limit ?? (thresholdHidden ? storedThresholdUsd : null);
+    const multiplierTimes = multiplier ?? (anomalyHidden ? storedMultiplierTimes : null);
     if (thresholdUsd == null || multiplierTimes == null) {
       return null;
     }
@@ -397,6 +416,9 @@ function SpendAlertsForm({
             void Haptics.selectionAsync();
             setSaved(false);
             setEnabled(value);
+            // Off hides the rule fields, so they stop gating Save; on restores
+            // their gate with whatever the fields currently hold.
+            setCanSave(value ? canSubmitWith(thresholdEnabled, anomalyEnabled) : true);
           }}
         />
       </View>

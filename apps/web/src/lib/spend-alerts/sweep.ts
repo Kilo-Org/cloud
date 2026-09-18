@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, gt, sql } from 'drizzle-orm';
 import {
   microdollar_usage,
   spend_alert_deliveries,
@@ -29,6 +29,17 @@ import type { db as defaultDb } from '@/lib/drizzle';
  * per-run cost is proportional to the usage rows written in the window: an idle
  * fleet costs one empty range scan. Nothing is added to the usage write path.
  */
+
+/**
+ * Rows per re-arm pass read. The set holds one row per scope with a still-firing
+ * rule, so it tracks concurrently firing alerts rather than the owner
+ * population, but a firing rule can stay latched for a whole window and the set
+ * can be larger than one run should fetch at once. The run walks it with a
+ * keyset (`scope_key > last`) until it is exhausted, so every firing scope is
+ * re-armed before the next run: no fixed page size can starve the scopes that
+ * sort after it. Scopes with fresh usage still arrive through the rollup delta.
+ */
+const FIRING_SCOPE_PAGE_SIZE = 500;
 
 /**
  * Hours of usage re-derived on every run. Three hours is comfortably longer than
@@ -558,7 +569,8 @@ export type SpendAlertSweepResult = {
  * scope was quiet goes back to armed without waiting for new usage.
  *
  * Nothing here enumerates owners: the candidate set is the usage delta plus the
- * currently firing rules, which is a small, bounded read.
+ * currently firing rules, and the firing rules are walked with a keyset so the
+ * run reads bounded pages while still re-arming every one of them.
  */
 export async function runSpendAlertSweep(
   database: Db,
@@ -568,42 +580,71 @@ export async function runSpendAlertSweep(
   const { now } = options;
   const { scopeKeys } = await sweepHourlyBuckets(database, { lookbackHours: LOOKBACK_HOURS, now });
 
-  const candidates = new Set(scopeKeys);
-  for (const scopeKey of await readFiringScopeKeys(database)) candidates.add(scopeKey);
-
   const result: SpendAlertSweepResult = {
     sweptScopes: scopeKeys.length,
-    candidateScopes: candidates.size,
+    candidateScopes: 0,
     fired: 0,
     cleared: 0,
     deliveriesEnqueued: 0,
   };
 
-  for (const scopeKey of candidates) {
+  // A scope is decided once per run, however it entered the candidate set (the
+  // rollup delta or the re-arm walk), so a scope in both is not evaluated twice.
+  const decided = new Set<string>();
+  const decide = async (scopeKey: string): Promise<void> => {
+    if (decided.has(scopeKey)) return;
+    decided.add(scopeKey);
+
     const evaluation = await evaluateScope(deps.store, scopeKey, now);
-    if (evaluation.transitions.length === 0 && evaluation.deliveries.length === 0) continue;
+    if (evaluation.transitions.length === 0 && evaluation.deliveries.length === 0) return;
 
     for (const transition of evaluation.transitions) {
       if (transition.action === 'fire') result.fired += 1;
       else result.cleared += 1;
     }
     result.deliveriesEnqueued += await persistEvaluation(database, evaluation);
+  };
+
+  for (const scopeKey of scopeKeys) await decide(scopeKey);
+
+  // Walk the still-firing rules with a keyset until the set is exhausted. Each
+  // page is bounded, and the cursor is the last key of the previous page, so a
+  // scope is never read twice and no scope is left behind by a fixed ceiling:
+  // deciding a scope can only remove it from the firing set, never add to it.
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await readFiringScopeKeys(database, cursor);
+    for (const scopeKey of page) await decide(scopeKey);
+    if (page.length < FIRING_SCOPE_PAGE_SIZE) break;
+    const last = page.at(-1);
+    if (last === undefined) break;
+    cursor = last;
   }
 
+  result.candidateScopes = decided.size;
   return result;
 }
 
 /**
- * Scope keys with at least one rule in the firing state. This is the re-arm
- * pass's candidate set; it is not the owner population.
+ * One page of scope keys with at least one rule in the firing state, ordered by
+ * scope key and read with a keyset so the run can walk the whole set in bounded
+ * statements. `selectDistinct` collapses the two rules a scope may have into one
+ * key; `after` is the previous page's last key, so the walk never repeats a row.
+ * This is the re-arm pass's candidate set, not the owner population.
  */
-async function readFiringScopeKeys(database: Db): Promise<string[]> {
+async function readFiringScopeKeys(database: Db, after: string | undefined): Promise<string[]> {
   const rows = await database
     .selectDistinct({ scopeKey: spend_alert_settings.scope_key })
     .from(spend_alert_rule_state)
     .innerJoin(spend_alert_rules, eq(spend_alert_rules.id, spend_alert_rule_state.rule_id))
     .innerJoin(spend_alert_settings, eq(spend_alert_settings.id, spend_alert_rules.settings_id))
-    .where(eq(spend_alert_rule_state.firing, true));
+    .where(
+      after === undefined
+        ? eq(spend_alert_rule_state.firing, true)
+        : and(eq(spend_alert_rule_state.firing, true), gt(spend_alert_settings.scope_key, after))
+    )
+    .orderBy(spend_alert_settings.scope_key)
+    .limit(FIRING_SCOPE_PAGE_SIZE);
   return rows.map(row => row.scopeKey);
 }
 

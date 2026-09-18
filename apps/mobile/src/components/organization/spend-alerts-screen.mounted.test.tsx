@@ -536,6 +536,35 @@ describe('SpendAlertsScreen empty state', () => {
   });
 });
 
+describe('SpendAlertsScreen master switch over an invalid hidden field', () => {
+  it('lets Save pass when the switch hides an invalid limit, keeping the stored value', async () => {
+    const { renderer } = await mountLoaded();
+
+    // A blank, enabled limit disables Save while its card is on screen.
+    type(renderer, LIMIT, '');
+    expect(buttonByVariant(renderer).props.disabled).toBe(true);
+
+    toggle(switchByLabel(renderer, i18n.t('spendAlerts.enable')), false);
+
+    // The rule cards are gone, so no hidden field can gate Save any more.
+    expect(byType(renderer, 'FormField')).toHaveLength(0);
+    expect(buttonByVariant(renderer).props.disabled).toBe(false);
+
+    press(buttonByVariant(renderer));
+
+    await waitFor(() => saveMutationFn.mock.calls.length === 1);
+    const input = saveMutationFn.mock.calls[0]?.[0] as {
+      enabled: boolean;
+      rules: { kind: string; threshold?: number; multiplierBasisPoints?: number }[];
+    };
+    expect(input.enabled).toBe(false);
+    // The unusable hidden limit falls back to the last saved value, so turning
+    // the feature off does not clobber the configured threshold.
+    expect(input.rules.find(rule => rule.kind === 'threshold')?.threshold).toBe(25);
+    expect(input.rules.find(rule => rule.kind === 'anomaly')?.multiplierBasisPoints).toBe(200);
+  });
+});
+
 describe('SpendAlertsScreen push agreement', () => {
   it('saves the rule and the caller category when a push channel is turned on', async () => {
     const { renderer } = await mountLoaded();

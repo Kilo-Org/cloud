@@ -25,6 +25,10 @@ const THRESHOLD_CASES: [string, number | null][] = [
   ['1,000', 1000],
   ['1000000', 1_000_000],
   ['1000000.01', null],
+  // Below one microdollar the wire's `round(usd * 1_000_000)` stores a zero
+  // threshold, which fires on any spend and never clears.
+  ['0.000001', 0.000_001],
+  ['0.0000001', null],
 ];
 
 const MULTIPLIER_CASES: [string, number | null][] = [

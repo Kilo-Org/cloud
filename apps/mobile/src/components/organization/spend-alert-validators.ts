@@ -9,6 +9,14 @@ import { parseLocalizedNumber } from '@/lib/format';
 const MAX_THRESHOLD_USD = 1_000_000;
 const MAX_MULTIPLIER = 50;
 
+/**
+ * Smallest limit that survives the wire's conversion to microdollars. The
+ * router stores `round(threshold * 1_000_000)`, so a smaller positive value
+ * would round to a zero-microdollar threshold: the rule then fires on any
+ * spend and its 95% hysteresis band is zero, so it never clears.
+ */
+const MIN_THRESHOLD_USD = 0.000_001;
+
 /** The rolling windows the wire accepts, in hours. */
 export type SpendAlertWindowHours = 24 | 168 | 720;
 
@@ -28,13 +36,18 @@ export const DISABLED_THRESHOLD_USD = 1;
 export const DISABLED_MULTIPLIER = 1;
 
 /**
- * Parse a USD limit: an empty, unparsable, zero, negative, or above-cap value is
- * `null` (no limit), never a clamped number.
+ * Parse a USD limit: an empty, unparsable, zero, negative, sub-microdollar, or
+ * above-cap value is `null` (no limit), never a clamped number.
  */
 export function parseThreshold(value: string): number | null {
   const trimmed = value.trim();
   const parsed = parseLocalizedNumber(trimmed, i18n.language);
-  if (trimmed === '' || parsed === null || parsed <= 0 || parsed > MAX_THRESHOLD_USD) {
+  if (
+    trimmed === '' ||
+    parsed === null ||
+    parsed < MIN_THRESHOLD_USD ||
+    parsed > MAX_THRESHOLD_USD
+  ) {
     return null;
   }
   return parsed;

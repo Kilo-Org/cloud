@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   LOOKBACK_HOURS,
   evaluateScope,
+  runSpendAlertSweep,
   sweepHourlyBuckets,
   type SpendAlertDeliveryDraft,
   type SpendAlertEvaluation,
@@ -416,6 +417,90 @@ describe('one alert per crossing', () => {
       },
     ]);
     expect(evaluation.deliveries).toEqual([]);
+  });
+});
+
+describe('runSpendAlertSweep re-arm walk', () => {
+  /**
+   * A database whose only reads are the empty rollup and the firing-scope pages.
+   * `makePage` builds each page from the limit the walk actually asked for, so
+   * the test does not hard-code the walk's page size.
+   */
+  function pagedFiringDatabase(
+    makePage: (size: number, call: number) => string[],
+    delta: string[] = []
+  ): {
+    database: Parameters<typeof runSpendAlertSweep>[0];
+    requestedLimits: number[];
+    pages: string[][];
+  } {
+    const requestedLimits: number[] = [];
+    const pages: string[][] = [];
+    const chain = {
+      from: () => chain,
+      innerJoin: () => chain,
+      where: () => chain,
+      orderBy: () => chain,
+      limit: (size: number) => {
+        const call = requestedLimits.length;
+        requestedLimits.push(size);
+        const page = makePage(size, call);
+        pages.push(page);
+        return Promise.resolve(page.map(scopeKey => ({ scopeKey })));
+      },
+    };
+    const database = {
+      execute: async () => ({ rows: delta.map(scope_key => ({ scope_key })) }),
+      selectDistinct: () => chain,
+    } as unknown as Parameters<typeof runSpendAlertSweep>[0];
+    return { database, requestedLimits, pages };
+  }
+
+  it('re-arms every firing scope across keyset pages, not only the first page', async () => {
+    const evaluated: string[] = [];
+    const store: SpendAlertSweepStore = {
+      loadScopeSnapshot: async scopeKey => {
+        evaluated.push(scopeKey);
+        return null;
+      },
+    };
+    const tail = ['user:zzz-1', 'user:zzz-2'];
+    const { database, pages } = pagedFiringDatabase((size, call) =>
+      call === 0
+        ? Array.from({ length: size }, (_, i) => `user:p1-${String(i).padStart(4, '0')}`)
+        : call === 1
+          ? tail
+          : []
+    );
+
+    const result = await runSpendAlertSweep(database, { store }, { now: NOW });
+
+    // The first page is full at the walk's own size, so a fixed single-page read
+    // would stop here; the tail proves the walk continued past it.
+    expect(pages[0].length).toBeGreaterThan(0);
+    expect(pages[1]).toEqual(tail);
+    expect(evaluated).toEqual([...pages[0], ...tail]);
+    expect(result.candidateScopes).toBe(pages[0].length + tail.length);
+  });
+
+  it('decides a scope only once when the rollup delta and the firing set overlap', async () => {
+    const evaluated: string[] = [];
+    const store: SpendAlertSweepStore = {
+      loadScopeSnapshot: async scopeKey => {
+        evaluated.push(scopeKey);
+        return null;
+      },
+    };
+    // The same scope arrives once through the rollup delta and again through the
+    // firing read; it must be decided once, not twice.
+    const { database } = pagedFiringDatabase((_size, call) =>
+      call === 0 ? ['user:owner-1'] : []
+    , ['user:owner-1']);
+
+    const result = await runSpendAlertSweep(database, { store }, { now: NOW });
+
+    expect(evaluated).toEqual(['user:owner-1']);
+    expect(result.candidateScopes).toBe(1);
   });
 });
 

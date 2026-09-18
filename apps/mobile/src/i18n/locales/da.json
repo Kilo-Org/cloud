@@ -2081,6 +2081,7 @@
       "exitNeedsNewerCli": "Du skal have en nyere version af Kilo CLI for at bruge skråstregskommandoer via fjernadgang. Opdatér Kilo CLI og opret forbindelse igen."
     },
     "sessionConnection": {
+      "label": "Forbindelse",
       "connecting": "Opretter forbindelse…",
       "reconnecting": "Genopretter forbindelsen…",
       "connectionLost": "Forbindelsen er afbrudt",
@@ -2100,7 +2101,9 @@
       "removeConfirmTitle": "Fjern mål?",
       "removeConfirmMessage": "CLI rydder dette sessions mål.",
       "updateFailed": "Målet kunne ikke opdateres.",
-      "sectionAccessibility": "{{status}}. Mål: {{text}}"
+      "sectionAccessibility": "{{status}}. Mål: {{text}}",
+      "collapse": "Fold målet sammen",
+      "expand": "Fold målet ud"
     },
     "newSession": {
       "recentlyUsed": "Senest brugt",
@@ -2154,7 +2157,20 @@
       "continueFrom": "Sessionen {{title}} fortsættes.",
       "importingSession": "Importerer session",
       "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
-      "importFailed": "Kunne ikke importere denne session."
+      "importFailed": "Kunne ikke importere denne session.",
+      "sandbox": "Sandkasse",
+      "sandboxAccessibility": "Sandkasse: {{label}}",
+      "sandboxDefaultWithDestination": "Standard · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Lille",
+      "sandboxInstanceShared": "Delt",
+      "sandboxInstanceLarge": "Stor",
+      "sandboxInstanceDevcontainer": "Dev-container",
+      "sandboxInstanceProviderDefault": "Leverandørstandard",
+      "sandboxCouldNotLoad": "Kunne ikke indlæse sandbox-valgmuligheder",
+      "sandboxUnavailable": "Denne sandkasse er ikke tilgængelig. Vælg en anden sandkasse eller Standard.",
+      "sandboxUseDefault": "Brug Standard"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er opdateret.",
@@ -2520,6 +2536,12 @@
       "startNewSession": "Start en ny session",
       "exitSession": "Afslut sessionen",
       "clearSession": "Afslut denne session og start en ny",
+      "compactDescription": "komprimér konteksten for den aktuelle session",
+      "goalDescription": "Fortsæt med at arbejde mod et sessionsmål. /goal <objective> eller pause, resume, clear",
+      "initDescription": "guidet AGENTS.md-opsætning",
+      "resumeClaudeDescription": "importér et Claude Code-sessionstranskript",
+      "resumeCodexDescription": "importér et OpenAI Codex-sessionstranskript",
+      "reviewDescription": "gennemgå ændringer [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Brug /{{command}}",
       "insert": "Indsæt",
       "upgradeRequiredFallback": "Opdatér din CLI for at bruge denne kommando.",
@@ -2637,6 +2659,7 @@
     "couldNotLoadActiveSessions": "De aktive sessioner kunne ikke indlæses.",
     "agentSessions": "I gang nu",
     "newCodingTask": "Ny programmeringsopgave",
+    "newTaskFromPicture": "Ny opgave fra et billede",
     "explore": "Udforsk",
     "seeAll": "Se alle",
     "noLiveSessions": "Intet kører lige nu"
@@ -2858,7 +2881,8 @@
     "aiProvidersWhat": "Dine forespørgsler, din samtalehistorik og eventuelle filer, du vedhæfter.",
     "aiProvidersWhy": "For at generere AI-svar.",
     "aiProvidersWho": "Anthropic, OpenAI, Google og andre udbydere, som du vælger for hver anmodning.",
-    "gatewayWhat": "Konto-id, metadata om anmodninger og tokenforbrug.",
+    "gatewayWhat": "Konto-id, metadata om anmodninger, tokenforbrug samt de prompts og lydoptagelser, som appen sender gennem det.",
+    "viaGateway": "Via Kilo Gateway",
     "gatewayWhy": "Bekræftelse af din identitet, videresendelse af anmodninger og afstemning af fakturering.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Rapporter om nedbrud og fejl, hvor indhold fra appen er fjernet.",
@@ -2878,7 +2902,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Din optagelse, mens du dikterer.",
     "voiceTranscriptionWhy": "For at omdanne tale til tekst.",
-    "voiceTranscriptionWho": "Kun på enheden eller hos Apple eller Google, hvis enheden ikke kan transskribere offline.",
+    "voiceTranscriptionWho": "Din enhed, Kilo Gateway med den transskriptionsmodel, du har valgt, eller Apple eller Google til genkendelse online.",
     "installAttributionPromptTitle": "Tillad sporing af installationskilde?",
     "installAttributionPromptMessage": "Kilo bruger kun Apples sporingstilladelse til at se, hvilken kanal du fandt os gennem. Dine forespørgsler og samtaler bruges aldrig til dette.",
     "what": "Hvad",

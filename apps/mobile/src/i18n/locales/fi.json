@@ -2081,6 +2081,7 @@
       "exitNeedsNewerCli": "Kauttaviivakomentojen etäkäyttö edellyttää uudempaa Kilo CLI:tä. Päivitä Kilo CLI ja yhdistä uudelleen."
     },
     "sessionConnection": {
+      "label": "Yhteys",
       "connecting": "Yhdistetään…",
       "reconnecting": "Yhdistetään uudelleen…",
       "connectionLost": "Yhteys katkesi",
@@ -2100,7 +2101,9 @@
       "removeConfirmTitle": "Poistetaanko tavoite?",
       "removeConfirmMessage": "CLI tyhjentää tämän istunnon tavoitteen.",
       "updateFailed": "Tavoitetta ei voitu päivittää.",
-      "sectionAccessibility": "{{status}}. Tavoite: {{text}}"
+      "sectionAccessibility": "{{status}}. Tavoite: {{text}}",
+      "collapse": "Kutista tavoite",
+      "expand": "Laajenna tavoite"
     },
     "newSession": {
       "recentlyUsed": "Äskettäin käytetyt",
@@ -2154,7 +2157,20 @@
       "continueFrom": "Jatketaan istuntoa: {{title}}.",
       "importingSession": "Tuodaan istuntoa",
       "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
-      "importFailed": "Tätä istuntoa ei voitu tuoda."
+      "importFailed": "Tätä istuntoa ei voitu tuoda.",
+      "sandbox": "Hiekkalaatikko",
+      "sandboxAccessibility": "Hiekkalaatikko: {{label}}",
+      "sandboxDefaultWithDestination": "Oletus · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Pieni",
+      "sandboxInstanceShared": "Jaettu",
+      "sandboxInstanceLarge": "Suuri",
+      "sandboxInstanceDevcontainer": "Kehityssäiliö",
+      "sandboxInstanceProviderDefault": "Palveluntarjoajan oletus",
+      "sandboxCouldNotLoad": "Hiekkalaatikon vaihtoehtoja ei voitu ladata",
+      "sandboxUnavailable": "Tämä hiekkalaatikko ei ole käytettävissä. Valitse toinen hiekkalaatikko tai Oletus.",
+      "sandboxUseDefault": "Käytä Oletusta"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} tiedosto päivitettiin.",
@@ -2520,6 +2536,12 @@
       "startNewSession": "Aloita uusi istunto",
       "exitSession": "Poistu istunnosta",
       "clearSession": "Lopeta tämä istunto ja aloita uusi",
+      "compactDescription": "tiivistä nykyisen istunnon konteksti",
+      "goalDescription": "Jatka työskentelyä istunnon tavoitetta kohti. /goal <objective> tai pause, resume, clear",
+      "initDescription": "opastettu AGENTS.md-asetus",
+      "resumeClaudeDescription": "tuo Claude Code -istunnon litterointi",
+      "resumeCodexDescription": "tuo OpenAI Codex -istunnon litterointi",
+      "reviewDescription": "tarkista muutokset [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Käytä /{{command}}",
       "insert": "Lisää",
       "upgradeRequiredFallback": "Päivitä CLI, jotta voit käyttää tätä komentoa.",
@@ -2637,6 +2659,7 @@
     "couldNotLoadActiveSessions": "Aktiivisia istuntoja ei voitu ladata.",
     "agentSessions": "Käynnissä nyt",
     "newCodingTask": "Uusi koodaustehtävä",
+    "newTaskFromPicture": "Uusi tehtävä kuvasta",
     "explore": "Tutustu",
     "seeAll": "Näytä kaikki",
     "noLiveSessions": "Mitään ei ole käynnissä juuri nyt"
@@ -2858,7 +2881,8 @@
     "aiProvidersWhat": "Kehotteesi, keskusteluhistoriasi ja kaikki liittämäsi tiedostot.",
     "aiProvidersWhy": "AI-vastausten tuottamiseen.",
     "aiProvidersWho": "Anthropic, OpenAI, Google ja muut palveluntarjoajat, jotka valitset pyyntökohtaisesti.",
-    "gatewayWhat": "Tilisi tunnus, pyyntöjen metatiedot, tokenien käyttö.",
+    "gatewayWhat": "Tilisi tunnus, pyyntöjen metatiedot, tokenien käyttö sekä kehotteet ja äänitallenteet, jotka sovellus lähettää sen kautta.",
+    "viaGateway": "Kilo Gatewayn kautta",
     "gatewayWhy": "Tunnistaminen, pyyntöjen reititys ja laskutuksen täsmäytys.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Kaatumis- ja virheraportit, joista sovelluksen sisältö on poistettu.",
@@ -2878,7 +2902,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Sanelun aikana tehty äänitallenne.",
     "voiceTranscriptionWhy": "Puheen muuttamiseen tekstiksi.",
-    "voiceTranscriptionWho": "Käsittely tapahtuu vain laitteessa. Jos laite ei tue puheentunnistusta ilman verkkoyhteyttä, tallenne lähetetään Applelle tai Googlelle.",
+    "voiceTranscriptionWho": "Laitteesi, Kilo Gateway valitsemallasi puheentunnistusmallilla tai Apple tai Google verkkotunnistusta varten.",
     "installAttributionPromptTitle": "Sallitaanko asennuslähteen tunnistus?",
     "installAttributionPromptMessage": "Kilo käyttää Applen seurantalupaa vain selvittääkseen, mistä kanavasta löysit sovelluksen. Kehotteitasi ja keskustelujasi ei koskaan käytetä tähän.",
     "what": "Mitä",

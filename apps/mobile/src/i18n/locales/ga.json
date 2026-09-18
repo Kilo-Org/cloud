@@ -2135,6 +2135,7 @@
       "exitNeedsNewerCli": "Tá leagan níos nuaí de Kilo CLI ag teastáil chun orduithe slais a úsáid go cianda. Nuashonraigh Kilo CLI agus nasc arís."
     },
     "sessionConnection": {
+      "label": "Nasc",
       "connecting": "Ag nascadh…",
       "reconnecting": "Ag athnascadh…",
       "connectionLost": "Cailleadh an nasc",
@@ -2154,7 +2155,9 @@
       "removeConfirmTitle": "Bain an sprioc?",
       "removeConfirmMessage": "Glanann an CLI sprioc an tseisiúin seo.",
       "updateFailed": "Níorbh fhéidir an sprioc a nuashonrú.",
-      "sectionAccessibility": "{{status}}. Sprioc: {{text}}"
+      "sectionAccessibility": "{{status}}. Sprioc: {{text}}",
+      "collapse": "Fill an sprioc",
+      "expand": "Leathnaigh an sprioc"
     },
     "newSession": {
       "recentlyUsed": "A úsáideadh le déanaí",
@@ -2208,7 +2211,20 @@
       "continueFrom": "Táthar ag leanúint ar aghaidh le {{title}}.",
       "importingSession": "Ag iompórtáil an tseisiúin",
       "cliCannotContinue": "Ní féidir leis an CLI seo leanúint ar aghaidh le seisiún. Roghnaigh Cloud Agent nó CLI eile.",
-      "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil."
+      "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil.",
+      "sandbox": "Bosca gaineamh",
+      "sandboxAccessibility": "Bosca gaineamh: {{label}}",
+      "sandboxDefaultWithDestination": "Réamhshocrú · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Beag",
+      "sandboxInstanceShared": "Roinnte",
+      "sandboxInstanceLarge": "Mór",
+      "sandboxInstanceDevcontainer": "Coimeádán forbartha",
+      "sandboxInstanceProviderDefault": "Réamhshocrú an soláthraithe",
+      "sandboxCouldNotLoad": "Níorbh fhéidir roghanna na bosca gaineamh a lódáil",
+      "sandboxUnavailable": "Níl an bosca gaineamh seo ar fáil. Roghnaigh bosca gaineamh eile nó Réamhshocrú.",
+      "sandboxUseDefault": "Úsáid Réamhshocrú"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} chomhad.",
@@ -2586,6 +2602,12 @@
       "startNewSession": "Tosaigh seisiún nua",
       "exitSession": "Scoir den seisiún",
       "clearSession": "Críochnaigh an seisiún seo agus tosaigh ceann nua",
+      "compactDescription": "comhdhlúthaigh comhthéacs na seisiúin reatha",
+      "goalDescription": "Lean ort ag obair i dtreo sprioc seisiúin. /goal <objective> nó pause, resume, clear",
+      "initDescription": "socrú treoraithe AGENTS.md",
+      "resumeClaudeDescription": "iompórtáil tras-scríobh seisiúin Claude Code",
+      "resumeCodexDescription": "iompórtáil tras-scríobh seisiúin OpenAI Codex",
+      "reviewDescription": "athbhreithnigh na hathruithe [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Úsáid /{{command}}",
       "insert": "Cuir isteach",
       "upgradeRequiredFallback": "Uasghrádaigh do CLI le húsáid a bhaint as an ordú seo.",
@@ -2706,6 +2728,7 @@
     "couldNotLoadActiveSessions": "Níorbh fhéidir na seisiúin ghníomhacha a lódáil.",
     "agentSessions": "Ar siúl anois",
     "newCodingTask": "Tasc códaithe nua",
+    "newTaskFromPicture": "Tasc nua ó phictiúr",
     "explore": "Taiscéalaíocht",
     "seeAll": "Féach ar gach ceann",
     "noLiveSessions": "Níl aon rud ar siúl faoi láthair"
@@ -2927,7 +2950,8 @@
     "aiProvidersWhat": "Do leideanna, stair do chomhráite agus aon chomhaid a cheanglaíonn tú.",
     "aiProvidersWhy": "Le freagraí AI a ghiniúint.",
     "aiProvidersWho": "Anthropic, OpenAI, Google, agus soláthraithe eile a roghnaíonn tú in aghaidh an iarratais.",
-    "gatewayWhat": "Aitheantóir cuntais, meiteashonraí iarratais, úsáid comharthaí.",
+    "gatewayWhat": "Aitheantóir cuntais, meiteashonraí iarratais, úsáid comharthaí, chomh maith leis na leideanna agus na taifeadtaí gutha a sheolann an aip tríd.",
+    "viaGateway": "Trí Kilo Gateway",
     "gatewayWhy": "Fíordheimhniú, ródú iarratas, réiteach billeála.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Tuairiscí tuairteála agus earráide, agus ábhar na haipe bainte astu.",
@@ -2947,7 +2971,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Do thaifeadadh agus tú ag deachtú.",
     "voiceTranscriptionWhy": "Le caint a thiontú ina téacs.",
-    "voiceTranscriptionWho": "Ar an ngléas amháin, nó Apple nó Google nuair nach féidir leis an ngléas seo tras-scríobh a dhéanamh as líne.",
+    "voiceTranscriptionWho": "Do ghléas, Kilo Gateway leis an tsamhail tras-scríofa a roghnaigh tú, nó Apple nó Google le haghaidh aithinte ar líne.",
     "installAttributionPromptTitle": "An gceadaíonn tú foinse na suiteála a aithint?",
     "installAttributionPromptMessage": "Ní úsáideann Kilo cead rianaithe Apple ach le foghlaim cén bealach a thug anseo thú. Ní úsáidtear do leideanna ná do chomhráite riamh.",
     "what": "Cad é",

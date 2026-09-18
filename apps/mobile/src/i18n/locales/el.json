@@ -2081,6 +2081,7 @@
       "exitNeedsNewerCli": "Οι απομακρυσμένες εντολές με κάθετο απαιτούν νεότερη έκδοση του Kilo CLI. Ενημέρωσε το Kilo CLI και συνδέσου ξανά."
     },
     "sessionConnection": {
+      "label": "Σύνδεση",
       "connecting": "Σύνδεση…",
       "reconnecting": "Επανασύνδεση…",
       "connectionLost": "Χάθηκε η σύνδεση",
@@ -2100,7 +2101,9 @@
       "removeConfirmTitle": "Αφαίρεση στόχου;",
       "removeConfirmMessage": "Το CLI καθαρίζει τον στόχο αυτής της συνεδρίας.",
       "updateFailed": "Δεν ήταν δυνατή η ενημέρωση του στόχου.",
-      "sectionAccessibility": "{{status}}. Στόχος: {{text}}"
+      "sectionAccessibility": "{{status}}. Στόχος: {{text}}",
+      "collapse": "Σύμπτυξη στόχου",
+      "expand": "Επέκταση στόχου"
     },
     "newSession": {
       "recentlyUsed": "Πρόσφατη χρήση",
@@ -2154,7 +2157,20 @@
       "continueFrom": "Συνεχίζεται η συνεδρία {{title}}.",
       "importingSession": "Εισαγωγή συνεδρίας…",
       "cliCannotContinue": "Αυτό το CLI δεν μπορεί να συνεχίσει μια συνεδρία. Επίλεξε τον Cloud Agent ή άλλο CLI.",
-      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας."
+      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας.",
+      "sandbox": "Απομονωμένο περιβάλλον",
+      "sandboxAccessibility": "Απομονωμένο περιβάλλον: {{label}}",
+      "sandboxDefaultWithDestination": "Προεπιλογή · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Μικρό",
+      "sandboxInstanceShared": "Κοινόχρηστο",
+      "sandboxInstanceLarge": "Μεγάλο",
+      "sandboxInstanceDevcontainer": "Κοντέινερ ανάπτυξης",
+      "sandboxInstanceProviderDefault": "Προεπιλογή παρόχου",
+      "sandboxCouldNotLoad": "Δεν ήταν δυνατή η φόρτωση των επιλογών sandbox",
+      "sandboxUnavailable": "Αυτό το απομονωμένο περιβάλλον δεν είναι διαθέσιμο. Επιλέξτε άλλο περιβάλλον ή Προεπιλογή.",
+      "sandboxUseDefault": "Χρήση Προεπιλογής"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο.",
@@ -2520,6 +2536,12 @@
       "startNewSession": "Έναρξη νέας συνεδρίας",
       "exitSession": "Τερματισμός της συνεδρίας",
       "clearSession": "Τερματισμός αυτής της συνεδρίας και έναρξη νέας",
+      "compactDescription": "συμπίεσε το πλαίσιο της τρέχουσας συνεδρίας",
+      "goalDescription": "Συνέχισε να εργάζεσαι για έναν στόχο συνεδρίας. /goal <objective> ή pause, resume, clear",
+      "initDescription": "καθοδηγούμενη ρύθμιση AGENTS.md",
+      "resumeClaudeDescription": "εισήγαγε απομαγνητοφώνηση συνεδρίας Claude Code",
+      "resumeCodexDescription": "εισήγαγε απομαγνητοφώνηση συνεδρίας OpenAI Codex",
+      "reviewDescription": "έλεγξε τις αλλαγές [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Χρήση /{{command}}",
       "insert": "Εισαγωγή",
       "upgradeRequiredFallback": "Αναβάθμισε το CLI σου για να χρησιμοποιήσεις αυτή την εντολή.",
@@ -2637,6 +2659,7 @@
     "couldNotLoadActiveSessions": "Δεν ήταν δυνατή η φόρτωση των ενεργών συνεδριών.",
     "agentSessions": "Σε εξέλιξη τώρα",
     "newCodingTask": "Νέα εργασία προγραμματισμού",
+    "newTaskFromPicture": "Νέα εργασία από εικόνα",
     "explore": "Εξερεύνηση",
     "seeAll": "Προβολή όλων",
     "noLiveSessions": "Δεν εκτελείται τίποτα αυτή τη στιγμή"
@@ -2858,7 +2881,8 @@
     "aiProvidersWhat": "Τα μηνύματά σου, το ιστορικό συνομιλιών και όσα αρχεία επισυνάπτεις.",
     "aiProvidersWhy": "Για τη δημιουργία απαντήσεων AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google και άλλοι πάροχοι που επιλέγεις για κάθε αίτημα.",
-    "gatewayWhat": "Αναγνωριστικό λογαριασμού, μεταδεδομένα αιτημάτων, χρήση διακριτικών.",
+    "gatewayWhat": "Αναγνωριστικό λογαριασμού, μεταδεδομένα αιτημάτων, χρήση διακριτικών, καθώς και τα prompts και οι ηχογραφήσεις φωνής που στέλνει η εφαρμογή μέσω αυτού.",
+    "viaGateway": "Μέσω Kilo Gateway",
     "gatewayWhy": "Ταυτοποίηση, δρομολόγηση αιτημάτων, συμφωνία χρεώσεων.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Αναφορές απρόσμενων τερματισμών και σφαλμάτων, χωρίς το περιεχόμενο της εφαρμογής.",
@@ -2878,7 +2902,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Η ηχογράφησή σου κατά την υπαγόρευση.",
     "voiceTranscriptionWhy": "Για τη μετατροπή της ομιλίας σε κείμενο.",
-    "voiceTranscriptionWho": "Μόνο στη συσκευή ή στην Apple ή την Google, όταν η συσκευή δεν μπορεί να κάνει απομαγνητοφώνηση χωρίς σύνδεση στο διαδίκτυο.",
+    "voiceTranscriptionWho": "Η συσκευή σου, το Kilo Gateway με το μοντέλο απομαγνητοφώνησης που έχεις επιλέξει, ή η Apple ή η Google για αναγνώριση στο διαδίκτυο.",
     "installAttributionPromptTitle": "Να επιτραπεί ο προσδιορισμός της πηγής εγκατάστασης;",
     "installAttributionPromptMessage": "Το Kilo χρησιμοποιεί την άδεια παρακολούθησης της Apple μόνο για να μάθει από ποιο κανάλι έφτασες εδώ. Τα μηνύματα και οι συνομιλίες σου δεν χρησιμοποιούνται ποτέ.",
     "what": "Τι",

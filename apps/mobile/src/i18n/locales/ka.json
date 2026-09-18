@@ -2081,6 +2081,7 @@
       "exitNeedsNewerCli": "დისტანციური სლეშ-ბრძანებებისთვის საჭიროა Kilo CLI-ის უფრო ახალი ვერსია. განაახლეთ Kilo CLI და ხელახლა დაუკავშირდით."
     },
     "sessionConnection": {
+      "label": "კავშირი",
       "connecting": "დაკავშირება…",
       "reconnecting": "ხელახლა დაკავშირება…",
       "connectionLost": "კავშირი გაწყდა",
@@ -2100,7 +2101,9 @@
       "removeConfirmTitle": "წავშალოთ მიზანი?",
       "removeConfirmMessage": "CLI ასუფთავებს ამ სესიის მიზანს.",
       "updateFailed": "მიზნის განახლება ვერ მოხერხდა.",
-      "sectionAccessibility": "{{status}}. მიზანი: {{text}}"
+      "sectionAccessibility": "{{status}}. მიზანი: {{text}}",
+      "collapse": "მიზნის ჩაკეცვა",
+      "expand": "მიზნის გაშლა"
     },
     "newSession": {
       "recentlyUsed": "ბოლოს გამოყენებული",
@@ -2154,7 +2157,20 @@
       "continueFrom": "გრძელდება სესია: {{title}}.",
       "importingSession": "სესიის იმპორტი მიმდინარეობს…",
       "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
-      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა."
+      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა.",
+      "sandbox": "სენდბოქსი",
+      "sandboxAccessibility": "სენდბოქსი: {{label}}",
+      "sandboxDefaultWithDestination": "ნაგულისხმევი · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "პატარა",
+      "sandboxInstanceShared": "საერთო",
+      "sandboxInstanceLarge": "დიდი",
+      "sandboxInstanceDevcontainer": "დევ კონტეინერი",
+      "sandboxInstanceProviderDefault": "მომწოდებლის ნაგულისხმევი",
+      "sandboxCouldNotLoad": "სენდბოქსის ვარიანტების ჩატვირთვა ვერ მოხერხდა",
+      "sandboxUnavailable": "ეს სენდბოქსი მიუწვდომელია. აირჩიეთ სხვა სენდბოქსი ან ნაგულისხმევი.",
+      "sandboxUseDefault": "ნაგულისხმევის გამოყენება"
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი.",
@@ -2520,6 +2536,12 @@
       "startNewSession": "ახალი სესიის დაწყება",
       "exitSession": "სესიიდან გასვლა",
       "clearSession": "ამ სესიის დასრულება და ახლის დაწყება",
+      "compactDescription": "მიმდინარე სესიის კონტექსტის შეკუმშვა",
+      "goalDescription": "გააგრძელე მუშაობა სესიის მიზნისკენ. /goal <objective> ან pause, resume, clear",
+      "initDescription": "მართული AGENTS.md-ის დაყენება",
+      "resumeClaudeDescription": "Claude Code-ის სესიის ტრანსკრიპტის იმპორტი",
+      "resumeCodexDescription": "OpenAI Codex-ის სესიის ტრანსკრიპტის იმპორტი",
+      "reviewDescription": "ცვლილებების გადახედვა [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ბრძანების გამოყენება",
       "insert": "ჩასმა",
       "upgradeRequiredFallback": "ამ ბრძანების გამოსაყენებლად განაახლეთ CLI.",
@@ -2637,6 +2659,7 @@
     "couldNotLoadActiveSessions": "აქტიური სესიების ჩატვირთვა ვერ მოხერხდა.",
     "agentSessions": "ახლა აქტიურია",
     "newCodingTask": "კოდის წერის ახალი ამოცანა",
+    "newTaskFromPicture": "ახალი ამოცანა სურათიდან",
     "explore": "აღმოაჩინე მეტი",
     "seeAll": "ყველას ნახვა",
     "noLiveSessions": "ამჟამად არაფერი მიმდინარეობს"
@@ -2858,7 +2881,8 @@
     "aiProvidersWhat": "თქვენი მოთხოვნები, საუბრის ისტორია და ნებისმიერი მიმაგრებული ფაილი.",
     "aiProvidersWhy": "AI-ის პასუხების შესაქმნელად.",
     "aiProvidersWho": "Anthropic, OpenAI, Google და სხვა პროვაიდერები, რომლებსაც თითოეული მოთხოვნისთვის ირჩევთ.",
-    "gatewayWhat": "ანგარიშის ID, მოთხოვნის მეტამონაცემები, ტოკენების გამოყენება.",
+    "gatewayWhat": "ანგარიშის ID, მოთხოვნის მეტამონაცემები, ტოკენების გამოყენება, ასევე აპის მიერ მისი მეშვეობით გაგზავნილი პრომპტები და ხმის ჩანაწერები.",
+    "viaGateway": "Kilo Gateway-ის მეშვეობით",
     "gatewayWhy": "ავთენტიფიკაცია, მოთხოვნების გადამისამართება, ანგარიშსწორების მონაცემების შეჯერება.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "ავარიული დახურვისა და შეცდომების ანგარიშები, რომლებიდანაც აპის შიგთავსი ამოღებულია.",
@@ -2878,7 +2902,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "თქვენი ჩანაწერი კარნახის დროს.",
     "voiceTranscriptionWhy": "მეტყველების ტექსტად გადასაყვანად.",
-    "voiceTranscriptionWho": "მხოლოდ მოწყობილობაზე მუშავდება. თუ მოწყობილობა მეტყველებას ტექსტად ინტერნეტის გარეშე ვერ გარდაქმნის, ჩანაწერი Apple-ს ან Google-ს ეგზავნება.",
+    "voiceTranscriptionWho": "თქვენი მოწყობილობა, Kilo Gateway თქვენ მიერ არჩეული ტრანსკრიფციის მოდელით, ან Apple ან Google ონლაინ ამოცნობისთვის.",
     "installAttributionPromptTitle": "დაშვებული იყოს ინსტალაციის წყაროს დადგენა?",
     "installAttributionPromptMessage": "Kilo Apple-ის თვალთვალის ნებართვას მხოლოდ იმის დასადგენად იყენებს, თუ რომელი არხიდან მოხვდით აქ. თქვენი მოთხოვნები და საუბრები ამ მიზნით არასდროს გამოიყენება.",
     "what": "რა",

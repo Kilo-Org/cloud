@@ -151,6 +151,9 @@ import {
   createOrUpdateUser,
   getAllUserProviders,
   getCrossAccountEmailConflicts,
+  getUserAuthProviders,
+  linkAuthProviderToUser,
+  unlinkAuthProviderFromUser,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
@@ -159,6 +162,7 @@ import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/use
 import { hosted_domain_specials } from '@/lib/auth/constants';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
 import { randomUUID } from 'crypto';
 import {
   KiloPassCadence,
@@ -6496,6 +6500,146 @@ describe('User', () => {
 
       expect(result.size).toBe(0);
       expect(result).toEqual(new Map());
+    });
+  });
+
+  describe('unlinkAuthProviderFromUser ChatGPT connection', () => {
+    async function seedUserWithOpenAiProvider() {
+      const user = await insertTestUser();
+      await db.insert(user_auth_provider).values([
+        {
+          kilo_user_id: user.id,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+        {
+          kilo_user_id: user.id,
+          provider: 'openai',
+          provider_account_id: `openai-${user.id}`,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+      ]);
+      return user;
+    }
+
+    async function seedOpenAiConnection(userId: string) {
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      await db.insert(byok_api_keys).values({
+        kilo_user_id: userId,
+        provider_id: OPENAI_CHATGPT_PROVIDER_ID,
+        encrypted_api_key: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
+        management_source: 'user',
+        created_by: userId,
+      });
+    }
+
+    test('deletes the ChatGPT connection when unlinking openai', async () => {
+      const user = await seedUserWithOpenAiProvider();
+      await seedOpenAiConnection(user.id);
+
+      const result = await unlinkAuthProviderFromUser(user.id, 'openai');
+
+      expect(result.success).toBe(true);
+      const rows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.kilo_user_id, user.id),
+            eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+          )
+        );
+      expect(rows).toHaveLength(0);
+    });
+
+    test('keeps the ChatGPT connection when unlinking another provider', async () => {
+      const user = await seedUserWithOpenAiProvider();
+      await seedOpenAiConnection(user.id);
+
+      const result = await unlinkAuthProviderFromUser(user.id, 'google');
+
+      expect(result.success).toBe(true);
+      const rows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(
+          and(
+            eq(byok_api_keys.kilo_user_id, user.id),
+            eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+          )
+        );
+      expect(rows).toHaveLength(1);
+    });
+  });
+
+  describe('linkAuthProviderToUser identical re-link', () => {
+    // The issuer-qualified subject the OpenAI flow stores (`<issuer>#<sub>`).
+    const OPENAI_ACCOUNT_ID = 'https://auth.openai.com#cb-openai-sub';
+
+    async function seedUserWithOpenAiProvider() {
+      const user = await insertTestUser();
+      await db.insert(user_auth_provider).values([
+        {
+          kilo_user_id: user.id,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+        {
+          kilo_user_id: user.id,
+          provider: 'openai',
+          provider_account_id: OPENAI_ACCOUNT_ID,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+      ]);
+      return user;
+    }
+
+    test('re-linking the identical account id succeeds and keeps one row', async () => {
+      const user = await seedUserWithOpenAiProvider();
+
+      const result = await linkAuthProviderToUser({
+        kilo_user_id: user.id,
+        provider: 'openai',
+        provider_account_id: OPENAI_ACCOUNT_ID,
+        email: user.google_user_email,
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: null,
+      });
+
+      expect(result.success).toBe(true);
+      const providers = await getUserAuthProviders(user.id);
+      expect(providers.filter(p => p.provider === 'openai')).toHaveLength(1);
+    });
+
+    test('re-linking a different account id for the same provider still fails', async () => {
+      const user = await seedUserWithOpenAiProvider();
+
+      const result = await linkAuthProviderToUser({
+        kilo_user_id: user.id,
+        provider: 'openai',
+        provider_account_id: 'https://auth.openai.com#other-sub',
+        email: user.google_user_email,
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: null,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('PROVIDER-ALREADY-LINKED');
+      }
     });
   });
 });

@@ -2081,6 +2081,7 @@
       "exitNeedsNewerCli": "Skástriksskipanir með fjarstýringu krefjast nýrri útgáfu af Kilo CLI. Uppfærðu Kilo CLI og tengstu aftur."
     },
     "sessionConnection": {
+      "label": "Tenging",
       "connecting": "Tengist…",
       "reconnecting": "Endurtengist…",
       "connectionLost": "Tenging rofnaði",
@@ -2100,7 +2101,9 @@
       "removeConfirmTitle": "Fjarlægja markmið?",
       "removeConfirmMessage": "CLI hreinsar markmið þessarar lotu.",
       "updateFailed": "Ekki tókst að uppfæra markmiðið.",
-      "sectionAccessibility": "{{status}}. Markmið: {{text}}"
+      "sectionAccessibility": "{{status}}. Markmið: {{text}}",
+      "collapse": "Fella markmið saman",
+      "expand": "Fella markmið út"
     },
     "newSession": {
       "recentlyUsed": "Nýlega notað",
@@ -2154,7 +2157,20 @@
       "continueFrom": "Haldið er áfram með {{title}}.",
       "importingSession": "Flytur lotuna inn",
       "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
-      "importFailed": "Ekki tókst að flytja inn þessa lotu."
+      "importFailed": "Ekki tókst að flytja inn þessa lotu.",
+      "sandbox": "Sandkassi",
+      "sandboxAccessibility": "Sandkassi: {{label}}",
+      "sandboxDefaultWithDestination": "Sjálfgefið · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Lítið",
+      "sandboxInstanceShared": "Deilt",
+      "sandboxInstanceLarge": "Stórt",
+      "sandboxInstanceDevcontainer": "Dev-konteiner",
+      "sandboxInstanceProviderDefault": "Sjálfgefið hjá veitanda",
+      "sandboxCouldNotLoad": "Ekki tókst að hlaða valkostum sandkassans",
+      "sandboxUnavailable": "Þessi sandkassi er ekki tiltækur. Veldu annan sandkassa eða Sjálfgefið.",
+      "sandboxUseDefault": "Nota Sjálfgefið"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} skrá var uppfærð.",
@@ -2520,6 +2536,12 @@
       "startNewSession": "Byrja nýja lotu",
       "exitSession": "Ljúka lotunni",
       "clearSession": "Ljúka þessari lotu og byrja nýja",
+      "compactDescription": "þjappa samhengi núverandi lotu",
+      "goalDescription": "Haltu áfram að vinna að markmiði lotu. /goal <objective> eða pause, resume, clear",
+      "initDescription": "leiðbeind uppsetning AGENTS.md",
+      "resumeClaudeDescription": "flytja inn umritun Claude Code-lotu",
+      "resumeCodexDescription": "flytja inn umritun OpenAI Codex-lotu",
+      "reviewDescription": "fara yfir breytingar [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Nota /{{command}}",
       "insert": "Setja inn",
       "upgradeRequiredFallback": "Uppfærðu CLI til að nota þessa skipun.",
@@ -2637,6 +2659,7 @@
     "couldNotLoadActiveSessions": "Ekki tókst að sækja virkar lotur.",
     "agentSessions": "Í gangi núna",
     "newCodingTask": "Nýtt forritunarverkefni",
+    "newTaskFromPicture": "Nýtt verkefni úr mynd",
     "explore": "Kanna",
     "seeAll": "Sjá allt",
     "noLiveSessions": "Ekkert er í gangi núna"
@@ -2858,7 +2881,8 @@
     "aiProvidersWhat": "Skilaboðin þín, samtalsferillinn og allar skrár sem þú hengir við.",
     "aiProvidersWhy": "Til að mynda svör með gervigreind.",
     "aiProvidersWho": "Anthropic, OpenAI, Google og aðrir veitendur sem þú velur fyrir hverja beiðni.",
-    "gatewayWhat": "Reikningsauðkenni, lýsigögn beiðna og tókanotkun.",
+    "gatewayWhat": "Reikningsauðkenni, lýsigögn beiðna, tókanotkun, auk kvaðninga og hljóðupptaka sem appið sendir í gegnum hann.",
+    "viaGateway": "Í gegnum Kilo Gateway",
     "gatewayWhy": "Auðkenning, beining beiðna og afstemming innheimtu.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Hrun- og villuskýrslur sem efni úr forritinu hefur verið fjarlægt úr.",
@@ -2878,7 +2902,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Hljóðupptakan þín meðan þú lest inn texta.",
     "voiceTranscriptionWhy": "Til að breyta tali í texta.",
-    "voiceTranscriptionWho": "Aðeins í tækinu, eða hjá Apple eða Google ef tækið getur ekki umritað án nettengingar.",
+    "voiceTranscriptionWho": "Tækið þitt, Kilo Gateway með umritunarlíkaninu sem þú velur, eða Apple eða Google fyrir auðkenningu á netinu.",
     "installAttributionPromptTitle": "Leyfa rakningu á uppruna uppsetningar?",
     "installAttributionPromptMessage": "Kilo notar rakningarheimild Apple aðeins til að sjá hvernig þú fannst forritið. Skilaboðin þín og samtöl eru aldrei notuð í þeim tilgangi.",
     "what": "Hvað",

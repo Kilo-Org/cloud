@@ -28,12 +28,18 @@ function segment(from: string, to: string): string {
 }
 
 describe('ActiveAgentsLiveUpdate channel switch', () => {
-  it('reads the posted card channel through the fixed notification id', () => {
+  it('reads the channel the module last posted from its own state', () => {
     const postedChannelId = segment('private fun postedChannelId()', 'private fun newBuilder');
-    expect(postedChannelId).toContain('notificationManager.activeNotifications');
-    expect(postedChannelId).toContain('it.id == ActiveAgentsDeadlineReceiver.NOTIFICATION_ID');
-    expect(postedChannelId).toContain('?.notification');
-    expect(postedChannelId).toContain('?.channelId');
+    expect(postedChannelId).toContain('notificationState.getString(POSTED_CHANNEL, null)');
+    // No version fork: `Notification.channelId` exists only on API 26+, while
+    // the module's mirror holds the channel on every supported API.
+    expect(postedChannelId).not.toContain('Build.VERSION.SDK_INT');
+    expect(postedChannelId).not.toContain('activeNotifications');
+  });
+
+  it('mirrors the posted channel on every post', () => {
+    const post = segment('private fun post(', 'private fun dismiss()');
+    expect(post).toContain('putString(POSTED_CHANNEL, channelId)');
   });
 
   it('clears the posted card before re-posting on a different channel', () => {

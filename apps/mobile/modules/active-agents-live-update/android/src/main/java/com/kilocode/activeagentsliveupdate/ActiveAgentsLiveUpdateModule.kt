@@ -82,21 +82,18 @@ class ActiveAgentsLiveUpdateModule : Module() {
       notificationManager.canPostPromotedNotifications()
 
   /**
-   * The channel the posted card sits on, or null when nothing is posted.
+   * The channel the module last posted, or null when it has posted nothing.
    *
    * The card changes channel when its kind changes, and the framework drops a
    * post addressed to a channel the user disabled instead of moving the card,
    * so `post` needs the posted channel to clear the card first.
+   *
+   * The module mirrors the channel it posted in its own state instead of
+   * reading the framework's copy: `Notification.channelId` only exists on API
+   * 26+, and notification channels do not exist below it, so a version fork
+   * would buy nothing the mirror does not already hold on every API.
    */
-  private fun postedChannelId(): String? {
-    if (Build.VERSION.SDK_INT < 26) {
-      return null
-    }
-    return notificationManager.activeNotifications
-      .firstOrNull { it.id == ActiveAgentsDeadlineReceiver.NOTIFICATION_ID }
-      ?.notification
-      ?.channelId
-  }
+  private fun postedChannelId(): String? = notificationState.getString(POSTED_CHANNEL, null)
 
   private fun newBuilder(channelId: String): Notification.Builder {
     if (Build.VERSION.SDK_INT >= 26) {
@@ -228,9 +225,14 @@ class ActiveAgentsLiveUpdateModule : Module() {
       ActiveAgentsDeadlineReceiver.setLegacyNotificationTimeout(context, timeoutMs)
     }
     notificationManager.notify(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID, builder.build())
+    // Mirror the posted channel so the next post can tell whether the card moves.
+    // Commit, like the timeout flag: the shade card survives a process exit, so
+    // the mirror that describes it must too.
+    val state = notificationState.edit().putString(POSTED_CHANNEL, channelId)
     if (timeoutMs <= 0) {
-      notificationState.edit().putBoolean(HAS_TIMEOUT, false).apply()
+      state.putBoolean(HAS_TIMEOUT, false)
     }
+    check(state.commit()) { "Cannot persist the active agents notification channel" }
   }
 
   private fun dismiss() {
@@ -238,11 +240,12 @@ class ActiveAgentsLiveUpdateModule : Module() {
       ActiveAgentsDeadlineReceiver.setLegacyNotificationTimeout(context, 0)
     }
     notificationManager.cancel(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID)
-    notificationState.edit().remove(HAS_TIMEOUT).apply()
+    notificationState.edit().remove(HAS_TIMEOUT).remove(POSTED_CHANNEL).apply()
   }
 
   private companion object {
     const val HAS_TIMEOUT = "has_timeout"
+    const val POSTED_CHANNEL = "posted_channel"
 
     /** The kind marker in the channel id the JS side creates for needs-input. */
     const val NEEDS_INPUT_CHANNEL_ID = "needs-input"

@@ -387,33 +387,65 @@ async function resolveLocalPublicSource(
   }
 }
 
+// `Response.json()` rejects with a SyntaxError built outside this realm, so
+// `instanceof SyntaxError` misses it; match the error name instead. A ZodError
+// from the response schema is built in this realm and matches directly.
+function isProviderResponseParseError(error: unknown): boolean {
+  if (error instanceof z.ZodError) return true;
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    Reflect.get(error, 'name') === 'SyntaxError'
+  );
+}
+
 function toLocalSourceError(platform: CodeReviewPlatform, error: unknown): TRPCError {
   if (error instanceof TRPCError) return error;
 
   const provider = platform === PLATFORM.GITHUB ? 'GitHub' : 'GitLab';
+  // GitHub calls these pull requests; GitLab calls them merge requests.
+  const requestNoun = platform === PLATFORM.GITHUB ? 'pull request' : 'merge request';
   if (error instanceof ProviderFetchError) {
     if (error.status === 404) {
       return new TRPCError({
         code: 'NOT_FOUND',
-        message: `${provider} could not find that pull request. Check the URL, or make sure the repository is public.`,
+        message: `${provider} could not find that ${requestNoun}. Check the URL, or make sure the repository is public.`,
+        cause: error,
       });
     }
-    if (error.status === 403 || error.status === 429) {
+    // GitHub signals primary and secondary rate limits with 403; GitLab uses 429.
+    // A GitLab 403 is a permission error, not a rate limit, so it falls through.
+    if (error.status === 429 || (error.status === 403 && platform === PLATFORM.GITHUB)) {
       return new TRPCError({
         code: 'TOO_MANY_REQUESTS',
         message: `${provider} rate-limited the request. Try again in a few minutes.`,
+        cause: error,
       });
     }
     return new TRPCError({
       code: 'BAD_GATEWAY',
-      message: `${provider} returned an unexpected response for that pull request.`,
+      message: `${provider} returned an unexpected response for that ${requestNoun}.`,
+      cause: error,
     });
   }
 
-  // Network failure, timeout, redirect, or an unparseable provider response.
+  // The provider answered, but with a body that is not valid JSON or does not
+  // match its documented shape. We reached it, so "could not reach" would
+  // misdescribe what happened.
+  if (isProviderResponseParseError(error)) {
+    return new TRPCError({
+      code: 'BAD_GATEWAY',
+      message: `${provider} returned an unexpected response for that ${requestNoun}.`,
+      cause: error,
+    });
+  }
+
+  // Network failure, timeout, or redirect.
   return new TRPCError({
     code: 'BAD_GATEWAY',
-    message: `Could not reach ${provider} to read that pull request. Try again.`,
+    message: `Could not reach ${provider} to read that ${requestNoun}. Try again.`,
+    cause: error,
   });
 }
 

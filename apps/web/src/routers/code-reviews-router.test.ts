@@ -748,11 +748,119 @@ describe('personalReviewAgent.createManualReviewJob', () => {
 
     expect(rejection.code).toBe('NOT_FOUND');
     expect(rejection.message).toContain('GitLab');
+    expect(rejection.message).toContain('merge request');
+    expect(rejection.message).not.toContain('pull request');
+  });
+
+  it('maps a public GitLab rate limit to TOO_MANY_REQUESTS', async () => {
+    fetchSpy?.mockImplementation(async () => new Response('Too Many Requests', { status: 429 }));
+    const caller = await createCallerForUser(testUser.id);
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'gitlab',
+        url: 'https://gitlab.com/group/project/-/merge_requests/1',
+        modelSlug: 'test-model',
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string }
+      );
+
+    expect(rejection.code).toBe('TOO_MANY_REQUESTS');
+    expect(rejection.message).toContain('rate-limited the request');
+  });
+
+  // GitLab returns 429 for rate limits; a 403 is a permission error and must not
+  // be reported to the user as a rate limit.
+  it('does not map a public GitLab 403 to a rate-limit error', async () => {
+    fetchSpy?.mockImplementation(async () => new Response('Forbidden', { status: 403 }));
+    const caller = await createCallerForUser(testUser.id);
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'gitlab',
+        url: 'https://gitlab.com/group/project/-/merge_requests/1',
+        modelSlug: 'test-model',
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string }
+      );
+
+    expect(rejection.code).toBe('BAD_GATEWAY');
+    expect(rejection.message).toContain('unexpected response');
+    expect(rejection.message).not.toContain('rate-limited');
+  });
+
+  // A provider that answers with an unparseable body was reached; the error must
+  // say so rather than claiming the provider was unreachable, and keep the cause.
+  it('reports an unparseable provider response as unexpected, not unreachable', async () => {
+    fetchSpy?.mockImplementation(
+      async () =>
+        new Response('not json', { status: 200, headers: { 'Content-Type': 'application/json' } })
+    );
+    const caller = await createCallerForUser(testUser.id);
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'github',
+        url: prUrl,
+        modelSlug: 'test-model',
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string; cause?: unknown }
+      );
+
+    expect(rejection.code).toBe('BAD_GATEWAY');
+    expect(rejection.message).toContain('unexpected response');
+    expect(rejection.message).not.toContain('Could not reach');
+    // The original parse error is kept as the cause rather than dropped.
+    expect((rejection.cause as Error | undefined)?.message).toContain('JSON');
+  });
+
+  // A well-formed JSON body that does not match the provider's documented shape
+  // is also a reached-but-unusable response, not an unreachable provider.
+  it('reports a provider response that fails schema validation as unexpected', async () => {
+    fetchSpy?.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ unexpected: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    const caller = await createCallerForUser(testUser.id);
+
+    const rejection = await caller.personalReviewAgent
+      .createManualReviewJob({
+        platform: 'github',
+        url: prUrl,
+        modelSlug: 'test-model',
+      })
+      .then(
+        () => {
+          throw new Error('Expected createManualReviewJob to reject');
+        },
+        error => error as { code?: string; message?: string; cause?: unknown }
+      );
+
+    expect(rejection.code).toBe('BAD_GATEWAY');
+    expect(rejection.message).toContain('unexpected response');
+    expect(rejection.message).not.toContain('Could not reach');
+    expect(rejection.cause).toBeDefined();
   });
 
   it('maps a provider network failure to a client error instead of a 500', async () => {
+    const networkError = new TypeError('fetch failed');
     fetchSpy?.mockImplementation(async () => {
-      throw new TypeError('fetch failed');
+      throw networkError;
     });
     const caller = await createCallerForUser(testUser.id);
 
@@ -766,11 +874,12 @@ describe('personalReviewAgent.createManualReviewJob', () => {
         () => {
           throw new Error('Expected createManualReviewJob to reject');
         },
-        error => error as { code?: string; message?: string }
+        error => error as { code?: string; message?: string; cause?: unknown }
       );
 
     expect(rejection.code).toBe('BAD_GATEWAY');
     expect(rejection.message).toContain('Could not reach GitHub');
+    expect(rejection.cause).toBe(networkError);
   });
 });
 

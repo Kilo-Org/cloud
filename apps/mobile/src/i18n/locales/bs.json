@@ -3158,5 +3158,9 @@
       "repositoryUnknown": "Kilo ne prepoznaje {{repository}} kao GitHub ili GitLab repozitorij. Odaberi drugi repozitorij u Kilo.",
       "repositoryUnsupported": "{{repository}} je Bitbucket repozitorij — Pokreni agenta ga još ne može koristiti. Odaberi drugi repozitorij u Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "Novi agent",
+    "openLastSession": "Otvori posljednju sesiju"
   }
 }

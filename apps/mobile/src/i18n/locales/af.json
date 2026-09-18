@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo herken nie {{repository}} as 'n GitHub- of GitLab-bewaarplek nie. Kies 'n ander bewaarplek in Kilo.",
       "repositoryUnsupported": "{{repository}} is 'n Bitbucket-bewaarplek — Begin agent kan dit nog nie gebruik nie. Kies 'n ander bewaarplek in Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "Nuwe agent",
+    "openLastSession": "Maak laaste sessie oop"
   }
 }

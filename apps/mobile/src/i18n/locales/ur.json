@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo، {{repository}} کو GitHub یا GitLab ریپوزٹری کے طور پر نہیں پہچانتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔",
       "repositoryUnsupported": "{{repository}} ایک Bitbucket ریپوزٹری ہے — ایجنٹ شروع کریں ابھی اسے استعمال نہیں کر سکتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔"
     }
+  },
+  "launcher": {
+    "newAgent": "نیا ایجنٹ",
+    "openLastSession": "آخری سیشن کھولیں"
   }
 }

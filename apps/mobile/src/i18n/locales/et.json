@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo ei tunne {{repository}} ära GitHubi ega GitLabi hoidlana. Vali Kilos teine hoidla.",
       "repositoryUnsupported": "{{repository}} on Bitbucketi hoidla — Käivita agent ei saa seda veel kasutada. Vali Kilos teine hoidla."
     }
+  },
+  "launcher": {
+    "newAgent": "Uus agent",
+    "openLastSession": "Ava viimane seanss"
   }
 }

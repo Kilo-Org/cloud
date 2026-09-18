@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo, {{repository}}-ஐ GitHub அல்லது GitLab களஞ்சியமாக அடையாளம் காணவில்லை. Kilo-வில் வேறு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்.",
       "repositoryUnsupported": "{{repository}} ஒரு Bitbucket களஞ்சியம் — முகவரியைத் தொடங்கு இதுவரை அதைப் பயன்படுத்த முடியாது. Kilo-வில் வேறு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்."
     }
+  },
+  "launcher": {
+    "newAgent": "புதிய ஏஜெண்ட்",
+    "openLastSession": "கடைசி அமர்வைத் திறக்கவும்"
   }
 }

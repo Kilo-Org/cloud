@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo не разпознава {{repository}} като хранилище в GitHub или GitLab. Избери друго хранилище в Kilo.",
       "repositoryUnsupported": "{{repository}} е хранилище в Bitbucket — Стартирай агент още не може да го използва. Избери друго хранилище в Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "Нов агент",
+    "openLastSession": "Отвори последната сесия"
   }
 }

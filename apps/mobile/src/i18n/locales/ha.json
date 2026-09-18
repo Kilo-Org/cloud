@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo ba ya gane {{repository}} a matsayin ma'ajiyar GitHub ko GitLab. Zaɓi wata ma'ajiya a cikin Kilo.",
       "repositoryUnsupported": "{{repository}} ma'ajiyar Bitbucket ce — Fara wakili ba zai iya amfani da ita ba tukuna. Zaɓi wata ma'ajiya a cikin Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "Sabon wakili",
+    "openLastSession": "Buɗe zaman ƙarshe"
   }
 }

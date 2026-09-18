@@ -3206,5 +3206,9 @@
       "repositoryUnknown": "Ní aithníonn Kilo {{repository}} mar stór GitHub nó GitLab. Roghnaigh stór eile i Kilo.",
       "repositoryUnsupported": "Is stór Bitbucket é {{repository}} — Ní féidir le Tosaigh gníomhaire é a úsáid fós. Roghnaigh stór eile i Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "Gníomhaire nua",
+    "openLastSession": "Oscail an seisiún deireanach"
   }
 }

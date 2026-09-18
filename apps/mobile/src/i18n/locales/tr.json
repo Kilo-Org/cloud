@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo, {{repository}} adresini GitHub veya GitLab deposu olarak tanımıyor. Kilo'da başka bir depo seç.",
       "repositoryUnsupported": "{{repository}} bir Bitbucket deposu — Ajanı başlat bunu henüz kullanamıyor. Kilo'da başka bir depo seç."
     }
+  },
+  "launcher": {
+    "newAgent": "Yeni ajan",
+    "openLastSession": "Son oturumu aç"
   }
 }

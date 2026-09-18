@@ -3158,5 +3158,9 @@
       "repositoryUnknown": "Kilo לא מזהה את {{repository}} כמאגר GitHub או GitLab. בחר מאגר אחר ב-Kilo.",
       "repositoryUnsupported": "{{repository}} הוא מאגר Bitbucket — הפעל סוכן עדיין לא יכול להשתמש בו. בחר מאגר אחר ב-Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "סוכן חדש",
+    "openLastSession": "פתיחת הסשן האחרון"
   }
 }

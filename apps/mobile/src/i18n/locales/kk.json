@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo {{repository}} ны GitHub немесе GitLab репозиторийі ретінде танымайды. Kilo ішінен басқа репозиторий таңдаңыз.",
       "repositoryUnsupported": "{{repository}} — Bitbucket репозиторийі. Агентті іске қосу оны әзірге пайдалана алмайды. Kilo ішінен басқа репозиторий таңдаңыз."
     }
+  },
+  "launcher": {
+    "newAgent": "Жаңа агент",
+    "openLastSession": "Соңғы сессияны ашу"
   }
 }

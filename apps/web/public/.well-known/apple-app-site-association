@@ -27,5 +27,8 @@
         ]
       }
     ]
+  },
+  "webcredentials": {
+    "apps": ["X96D76J65Z.com.kilocode.kiloapp"]
   }
 }

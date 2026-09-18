@@ -85,6 +85,20 @@ export function captureSystemSearchLaunch(): void {
 }
 
 /**
+ * Read the single-shot slot once more now that the app tree is mounted.
+ *
+ * The module-scope capture can land before Android's activity exists:
+ * `takeLaunchIdentifier()` returns null in that window without consuming the
+ * launch Intent, deliberately keeping it for a later read rather than
+ * forfeiting the tap for the process's life. Nothing else consumed the slot
+ * again on a cold launch, so this retry is that later read; when the launch
+ * capture already took the tap the read finds an empty slot and is a no-op.
+ */
+export function consumeSystemSearchRouteOnce(): void {
+  consumeAndRoute();
+}
+
+/**
  * Subscribe to the native `onSystemSearchOpen` wake-up. The event is only a
  * signal: the handler re-reads the native slot, so a warm tap cannot route
  * twice (the read is a get-and-clear) and a payload cannot be lost (the slot,

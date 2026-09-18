@@ -1,9 +1,11 @@
+/* eslint-disable max-lines -- one cohesive suite shares the fake bridge harness */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake platform bridge and the SecureStore mock settle synchronously */
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type SystemSearchUpdate } from '@/lib/native-system-search';
 import {
+  findingSearchDocument,
   storedSessionSearchDocument,
   type SystemSearchDocument,
 } from '@/lib/system-search-entries';
@@ -120,10 +122,7 @@ function createSync(harness: Harness, bridge: Bridge, queryClient: QueryClient) 
   const report = vi.fn<(error: unknown) => void>();
   const sync = new harness.SystemSearchIndexSync({
     queryClient,
-    collect: async () => {
-      const documents = await harness.collectSystemSearchDocuments(queryClient);
-      return documents;
-    },
+    collect: async () => harness.collectSystemSearchDocuments(queryClient),
     fingerprints: bridge.indexedSystemSearchFingerprints,
     apply: async update => {
       await bridge.applySystemSearchUpdate({ add: update.add, removeIds: update.remove });
@@ -174,6 +173,29 @@ describe('SystemSearchIndexSync', () => {
 
     expect(bridge.applyUpdate).toHaveBeenLastCalledWith({ add: [], removeIds: [id] });
     expect(bridge.index.has(id)).toBe(false);
+  });
+
+  it('keeps an indexed entry whose source family the cache cannot enumerate', async () => {
+    const bridge = createBridge();
+    const harness = await loadHarness(bridge);
+    const queryClient = new QueryClient();
+    const finding = findingSearchDocument({ id: 'f-1', title: 'SQL injection' }, 'personal');
+    bridge.index.set(finding.id, finding);
+    queryClient.setQueryData(SESSION_LIST_KEY, storedSessions('Fix login bug'));
+    const { sync } = createSync(harness, bridge, queryClient);
+
+    // The findings query is absent — a cold start hydrates only some queries —
+    // so its indexed entries are kept, not dropped as if the user lost them.
+    await expect(sync.syncNow()).resolves.toBe('applied');
+    expect(bridge.index.has(finding.id)).toBe(true);
+
+    // Once the findings query is in the cache and successful, its absence from
+    // the documents is evidence the user can no longer see the finding.
+    queryClient.setQueryData([['securityAgent', 'listFindings'], { type: 'infinite', input: {} }], {
+      pages: [{ findings: [] }],
+    });
+    await expect(sync.syncNow()).resolves.toBe('applied');
+    expect(bridge.index.has(finding.id)).toBe(false);
   });
 
   it('reports a rejected apply once, keeps the index, and retries on the next trigger', async () => {
@@ -306,6 +328,30 @@ describe('SystemSearchIndexSync', () => {
     detach();
   });
 
+  it('runs a sustained burst without waiting for it to end', async () => {
+    vi.useFakeTimers();
+    const bridge = createBridge();
+    const harness = await loadHarness(bridge);
+    const queryClient = new QueryClient();
+    const { sync } = createSync(harness, bridge, queryClient);
+    const detach = sync.attach();
+
+    // A cache write every 300 ms re-arms the 750 ms trailing timer every time,
+    // so a trailing-only debounce never fires while the stream lasts. The
+    // writes are scheduled on the fake clock so the loop itself never awaits.
+    for (let tick = 0; tick < 18; tick += 1) {
+      setTimeout(() => {
+        queryClient.setQueryData(SESSION_LIST_KEY, storedSessions(`Burst ${tick}`));
+      }, tick * 300);
+    }
+    await vi.advanceTimersByTimeAsync(18 * 300 + COALESCE_MS);
+    await sync.getRunQueue();
+
+    expect(bridge.applyUpdate).toHaveBeenCalled();
+    expect(bridge.index.size).toBeGreaterThan(0);
+    detach();
+  });
+
   it('drops the cache subscription on detach', async () => {
     vi.useFakeTimers();
     const bridge = createBridge();
@@ -331,7 +377,7 @@ describe('SystemSearchIndexSync', () => {
     });
     const sync = new harness.SystemSearchIndexSync({
       queryClient,
-      collect: async () => [],
+      collect: async () => ({ documents: [], observedFamilies: new Set() }),
       fingerprints: bridge.indexedSystemSearchFingerprints,
       apply: async () => undefined,
       report,

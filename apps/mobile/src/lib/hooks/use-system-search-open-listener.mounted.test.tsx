@@ -6,12 +6,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   register: vi.fn<() => { remove: () => void }>(),
   remove: vi.fn<() => void>(),
+  consumeOnce: vi.fn<() => void>(),
 }));
 
 // The wake-up bridge is the only thing this hook owns; stubbing it keeps the
 // mounted tree out of the native module, SecureStore and deep-link graph.
 vi.mock('@/lib/system-search-route', () => ({
   registerSystemSearchOpenListener: mocks.register,
+  consumeSystemSearchRouteOnce: mocks.consumeOnce,
 }));
 
 import { useSystemSearchOpenListener } from './use-system-search-open-listener';
@@ -39,6 +41,7 @@ describe('useSystemSearchOpenListener', () => {
   beforeEach(() => {
     mocks.register.mockClear();
     mocks.remove.mockClear();
+    mocks.consumeOnce.mockClear();
     mocks.register.mockReturnValue({ remove: mocks.remove });
   });
 
@@ -53,6 +56,20 @@ describe('useSystemSearchOpenListener', () => {
     });
 
     expect(mocks.remove).toHaveBeenCalledOnce();
+  });
+
+  it('re-reads the launch slot once on mount, not on rerenders', () => {
+    const renderer = mount();
+    expect(mocks.consumeOnce).toHaveBeenCalledOnce();
+
+    act(() => {
+      renderer.update(createElement(Harness));
+    });
+    expect(mocks.consumeOnce).toHaveBeenCalledOnce();
+
+    act(() => {
+      renderer.unmount();
+    });
   });
 
   it('keeps one subscription across rerenders', () => {

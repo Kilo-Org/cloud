@@ -5,13 +5,15 @@ import {
   indexedSystemSearchFingerprints,
 } from '@/lib/native-system-search';
 import { queryClient } from '@/lib/query-client';
-import { collectSystemSearchDocuments } from '@/lib/system-search-collect';
+import {
+  collectSystemSearchDocuments,
+  type SystemSearchCollection,
+} from '@/lib/system-search-collect';
 import {
   isSystemSearchSyncEnabled,
   SystemSearchIndexSync,
   type SystemSearchIndexUpdate,
 } from '@/lib/system-search-sync';
-import { type SystemSearchDocument } from '@/lib/system-search-entries';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 
 /**
@@ -28,9 +30,9 @@ function reportSystemSearchSyncFailure(error: unknown): void {
 }
 
 /** The mount's collect dep: the cache collector bound to the app's client. */
-async function collectIndexUpdates(): Promise<SystemSearchDocument[]> {
-  const documents = await collectSystemSearchDocuments(queryClient);
-  return documents;
+async function collectIndexUpdates(): Promise<SystemSearchCollection> {
+  const collection = await collectSystemSearchDocuments(queryClient);
+  return collection;
 }
 
 /** The mount's apply dep: the plan's `remove` is the bridge's `removeIds`. */

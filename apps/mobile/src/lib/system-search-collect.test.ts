@@ -191,7 +191,7 @@ describe('collectSystemSearchDocuments', () => {
       { owner: 'acme', repo: 'api', number: 7, title: 'Recent PR', lastOpenedAt: 2 },
     ]);
 
-    const documents = await collectSystemSearchDocuments(client);
+    const { documents } = await collectSystemSearchDocuments(client);
 
     expect(documents.map(document => projection(document))).toEqual([
       {
@@ -234,7 +234,10 @@ describe('collectSystemSearchDocuments', () => {
   });
 
   it('collects nothing from an empty cache', async () => {
-    await expect(collectSystemSearchDocuments(new QueryClient())).resolves.toEqual([]);
+    await expect(collectSystemSearchDocuments(new QueryClient())).resolves.toEqual({
+      documents: [],
+      observedFamilies: new Set(),
+    });
   });
 
   it('skips a malformed payload without throwing', async () => {
@@ -244,7 +247,25 @@ describe('collectSystemSearchDocuments', () => {
     client.setQueryData(PROVIDER_INBOX_KEY, { items: [] });
     client.setQueryData(ORG_FINDINGS_KEY, { pages: [{ findings: [] }] });
 
-    await expect(collectSystemSearchDocuments(client)).resolves.toEqual([]);
+    const { documents, observedFamilies } = await collectSystemSearchDocuments(client);
+
+    expect(documents).toEqual([]);
+    // A successful query speaks for its family even when its payload is
+    // malformed or empty, so the diff may still remove that family's stale ids.
+    expect(observedFamilies).toEqual(new Set(['sessions', 'pullRequests', 'findings']));
+  });
+
+  it('does not claim a family whose source query never produced data', async () => {
+    const client = new QueryClient();
+    const queryFn = vi.fn(async () => ({ pages: [{ findings: [] }] }));
+    // A query that is present but never resolved carries no evidence: its data
+    // is undefined, so the findings family stays unobserved and stale findings
+    // are kept rather than dropped.
+    client.getQueryCache().build(client, { queryKey: FINDINGS_KEY, queryFn });
+
+    const { observedFamilies } = await collectSystemSearchDocuments(client);
+
+    expect(observedFamilies.has('findings')).toBe(false);
   });
 
   it('indexes the GitLab and Bitbucket rows the provider inbox cache holds', async () => {
@@ -264,7 +285,7 @@ describe('collectSystemSearchDocuments', () => {
       },
     ]);
 
-    const documents = await collectSystemSearchDocuments(client);
+    const { documents } = await collectSystemSearchDocuments(client);
 
     expect(documents.map(document => projection(document))).toEqual([
       {
@@ -288,7 +309,7 @@ describe('collectSystemSearchDocuments', () => {
     client.getQueryCache().build(client, { queryKey: SESSION_LIST_KEY, queryFn });
     client.setQueryData(SESSION_LIST_KEY, storedSessions);
 
-    const documents = await collectSystemSearchDocuments(client);
+    const { documents } = await collectSystemSearchDocuments(client);
 
     expect(documents.map(document => document.id)).toEqual([
       '/(app)/agent-chat/sess-1?organizationId=org-1',

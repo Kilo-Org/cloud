@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the builder, fingerprint, plan, and allowlist suites share one owned file */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the SecureStore mock settles without await because it resolves immediately */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -10,6 +11,7 @@ import {
   storedSessionSearchDocument,
   systemSearchDeeplinkFromId,
   type SystemSearchDocument,
+  type SystemSearchFamily,
   systemSearchHrefFromId,
 } from './system-search-entries';
 
@@ -83,6 +85,17 @@ describe('session documents', () => {
 
   it('skips an untitled live session', () => {
     expect(activeSessionSearchDocument({ id: 'live-2', title: '  ' })).toBeNull();
+  });
+
+  it('skips a live session the WS push path left unattributed', () => {
+    // `undefined` organizationId means the row cannot say whether it is
+    // personal; indexing it would file an org session under a personal route.
+    expect(activeSessionSearchDocument({ id: 'live-3', title: 'Org session' })).toBeNull();
+    // `null` is an explicit personal attribution and is indexed as personal.
+    expect(
+      activeSessionSearchDocument({ id: 'live-4', title: 'Personal session', organizationId: null })
+        ?.id
+    ).toBe('/(app)/agent-chat/live-4');
   });
 });
 
@@ -184,9 +197,28 @@ describe('finding documents', () => {
 
 describe('fingerprints', () => {
   it('is the same for the same content under the same route', () => {
+    // Two independently built documents for the same entity: the row reaches
+    // the builder with and without an explicit personal organization, so the
+    // two sides are not the same call.
+    const collected = storedSessionSearchDocument({
+      session_id: 'a',
+      title: 'Alpha',
+      organization_id: null,
+    });
+    const reCollected = storedSessionSearchDocument({ session_id: 'a', title: 'Alpha' });
+
+    expect(collected).not.toBeNull();
+    expect(reCollected).not.toBeNull();
+    expect(collected?.fingerprint).toBe(reCollected?.fingerprint);
+
     // What the diff relies on: a row re-collected unchanged is not re-added.
-    const collected = storedSessionSearchDocument({ session_id: 'a', title: 'Alpha' });
-    expect(collected?.fingerprint).toBe(sessionDocument('a', 'Alpha').fingerprint);
+    expect(
+      planSystemSearchUpdate({
+        indexed: collected ? [collected] : [],
+        documents: reCollected ? [reCollected] : [],
+        observedFamilies: new Set(['sessions']),
+      })
+    ).toEqual({ add: [], remove: [] });
   });
 
   it('changes when the route changes, because the route is part of it', () => {
@@ -221,9 +253,15 @@ describe('fingerprints', () => {
 });
 
 describe('planSystemSearchUpdate', () => {
+  const ALL_FAMILIES = new Set<SystemSearchFamily>(['sessions', 'pullRequests', 'findings']);
+
   it('adds an unknown id', () => {
     const next = sessionDocument('a', 'Alpha');
-    const plan = planSystemSearchUpdate({ indexed: [], documents: [next] });
+    const plan = planSystemSearchUpdate({
+      indexed: [],
+      documents: [next],
+      observedFamilies: ALL_FAMILIES,
+    });
 
     expect(plan.add).toEqual([next]);
     expect(plan.remove).toEqual([]);
@@ -234,6 +272,7 @@ describe('planSystemSearchUpdate', () => {
     const plan = planSystemSearchUpdate({
       indexed: [current],
       documents: [sessionDocument('a', 'Alpha')],
+      observedFamilies: ALL_FAMILIES,
     });
 
     expect(plan.add).toEqual([]);
@@ -243,7 +282,11 @@ describe('planSystemSearchUpdate', () => {
   it('re-adds a renamed row with a new fingerprint', () => {
     const current = sessionDocument('a', 'Alpha');
     const renamed = sessionDocument('a', 'Renamed');
-    const plan = planSystemSearchUpdate({ indexed: [current], documents: [renamed] });
+    const plan = planSystemSearchUpdate({
+      indexed: [current],
+      documents: [renamed],
+      observedFamilies: ALL_FAMILIES,
+    });
 
     expect(plan.add).toEqual([renamed]);
     expect(plan.add[0]?.fingerprint).not.toBe(current.fingerprint);
@@ -253,16 +296,36 @@ describe('planSystemSearchUpdate', () => {
   it('removes an indexed id the documents no longer carry', () => {
     const kept = sessionDocument('a', 'Alpha');
     const vanished = sessionDocument('b', 'Beta');
-    const plan = planSystemSearchUpdate({ indexed: [kept, vanished], documents: [kept] });
+    const plan = planSystemSearchUpdate({
+      indexed: [kept, vanished],
+      documents: [kept],
+      observedFamilies: ALL_FAMILIES,
+    });
 
     expect(plan.add).toEqual([]);
     expect(plan.remove).toEqual([vanished.id]);
+  });
+
+  it('keeps an indexed id whose source family was not enumerated', () => {
+    const kept = sessionDocument('a', 'Alpha');
+    const finding = findingSearchDocument({ id: 'f-1', title: 'SQL injection' }, 'personal');
+    const plan = planSystemSearchUpdate({
+      indexed: [kept, finding],
+      documents: [kept],
+      // The findings query was not in the cache this run: its absence from the
+      // documents is ignorance, not evidence the user lost the finding.
+      observedFamilies: new Set<SystemSearchFamily>(['sessions']),
+    });
+
+    expect(plan.add).toEqual([]);
+    expect(plan.remove).toEqual([]);
   });
 
   it('removes everything when the document set is empty', () => {
     const plan = planSystemSearchUpdate({
       indexed: [sessionDocument('a', 'Alpha'), sessionDocument('b', 'Beta')],
       documents: [],
+      observedFamilies: ALL_FAMILIES,
     });
 
     expect(plan.add).toEqual([]);
@@ -273,6 +336,7 @@ describe('planSystemSearchUpdate', () => {
     const plan = planSystemSearchUpdate({
       indexed: [],
       documents: [sessionDocument('a', 'Alpha'), sessionDocument('a', 'Second')],
+      observedFamilies: ALL_FAMILIES,
     });
 
     expect(idsOf(plan.add)).toEqual(['/(app)/agent-chat/a']);
@@ -298,6 +362,22 @@ describe('systemSearchHrefFromId', () => {
     expect(systemSearchHrefFromId('/(app)/settings')).toBeNull();
     expect(systemSearchHrefFromId('/(app)/agent-chat/')).toBeNull();
     expect(systemSearchHrefFromId('kiloapp://agent-chat/sess-1')).toBeNull();
+  });
+
+  it('rejects an id that names more than the three route shapes', () => {
+    // A route prefix, not the shape: extra segments and traversal segments are
+    // not ids this section issued and must never reach `router.navigate`.
+    expect(systemSearchHrefFromId('/(app)/agent-chat/sess-1/extra')).toBeNull();
+    expect(systemSearchHrefFromId('/(app)/pr-review/../../settings')).toBeNull();
+    expect(systemSearchHrefFromId('/(app)/pr-review/a/../b')).toBeNull();
+    expect(
+      systemSearchHrefFromId(
+        '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/f-1/../f-2'
+      )
+    ).toBeNull();
+    expect(
+      systemSearchHrefFromId('/(app)/(tabs)/(3_profile)/security-agent/personal/nope/f-1')
+    ).toBeNull();
   });
 
   it('accepts every id the builders produce', () => {

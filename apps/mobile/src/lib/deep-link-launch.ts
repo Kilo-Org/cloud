@@ -28,9 +28,21 @@ type PendingDeepLinkRecord = {
 /** A persisted record older than this is discarded on restore. */
 const PENDING_DEEP_LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
+/** The app-scheme prefix a system-search launch URL carries. */
+const APP_SCHEME = 'kiloapp://';
+
 let pendingDeepLink: string | null = null;
 let pendingSource: DeepLinkSource | null = null;
 let launchLinkHandled = false;
+
+// True while the pending slot holds a universal link the cold-launch capture
+// derived from an app-scheme (`kiloapp://`) launch URL. On Android a tap on one
+// of the app's own search results IS such a URL, delivered as the launch
+// Intent; the shared web table maps it lossily (it strips the query string), so
+// the lossless `system-search` route for the same tap is allowed to replace it.
+// An `https://` universal link is never flagged, so an ordinary link keeps its
+// precedence over a stale search slot.
+let pendingUniversalLinkFromLaunch = false;
 
 // The signed-in user id at persist time, bound to each durable record so a
 // destination captured for one account is never restored for another. The
@@ -133,15 +145,32 @@ function deletePersistedPendingDeepLink(): void {
  * Source is required so the type checker enforces precedence:
  * - `'universal-link'` always wins (overwrites anything).
  * - `'system-search'` applies unless the slot holds a universal link: the user
- *   tapped a result, which is newer evidence than a pending notification.
+ *   tapped a result, which is newer evidence than a pending notification. The
+ *   one exception is a universal link the launch capture derived from an
+ *   app-scheme URL (`fromLaunchAppScheme`), because that IS the Android search
+ *   tap and the exact route is lossless where the web-table mapping is not.
  * - `'notification'` applies only when the slot is empty or already a notification.
  * Rationale: `getLastNotificationResponse()` can return a *stale* response on a
  * launch actually caused by a link, so the link is the better evidence of what
  * started this process.
  */
-export function setPendingDeepLink(href: string, source: DeepLinkSource): void {
-  // A universal link always wins: it is the evidence of what started this process.
-  if (source !== 'universal-link' && pendingSource === 'universal-link') {
+export function setPendingDeepLink(
+  href: string,
+  source: DeepLinkSource,
+  // Only the cold-launch capture sets this; see the module flag above.
+  options?: { fromLaunchAppScheme?: boolean }
+): void {
+  // A universal link always wins, except that the exact system-search route for
+  // an app-scheme launch URL may replace the web table's lossy mapping of it.
+  const supersedesLaunchAppSchemeLink =
+    source === 'system-search' &&
+    pendingSource === 'universal-link' &&
+    pendingUniversalLinkFromLaunch;
+  if (
+    source !== 'universal-link' &&
+    pendingSource === 'universal-link' &&
+    !supersedesLaunchAppSchemeLink
+  ) {
     return;
   }
   // A notification applies only when the slot is empty or already a notification:
@@ -153,6 +182,7 @@ export function setPendingDeepLink(href: string, source: DeepLinkSource): void {
   pendingDeepLink = href;
   pendingSource = source;
   pendingDeepLinkUserId = currentDeepLinkUserId;
+  pendingUniversalLinkFromLaunch = options?.fromLaunchAppScheme === true;
   pendingDeepLinkEpoch += 1;
   persistPendingDeepLink(href, source);
   notifyPendingDeepLinkListeners();
@@ -175,6 +205,7 @@ export function clearPendingDeepLink(): void {
   pendingDeepLink = null;
   pendingSource = null;
   pendingDeepLinkUserId = null;
+  pendingUniversalLinkFromLaunch = false;
   pendingDeepLinkEpoch += 1;
   deletePersistedPendingDeepLink();
   notifyPendingDeepLinkListeners();
@@ -316,7 +347,12 @@ export function captureLaunchDeepLink(): void {
   }
   const href = resolveIncomingUrl(url);
   if (href) {
-    setPendingDeepLink(href, 'universal-link');
+    // An app-scheme launch URL is the shape the Android system-search tap
+    // delivers; flag it so the exact `system-search` route for that tap may
+    // replace this lossy web-table mapping. An `https://` link is never flagged.
+    setPendingDeepLink(href, 'universal-link', {
+      fromLaunchAppScheme: url.startsWith(APP_SCHEME),
+    });
     launchLinkHandled = true;
   }
 }
@@ -331,6 +367,7 @@ export function _resetDeepLinkLaunchForTests(): void {
   pendingDeepLink = null;
   pendingSource = null;
   pendingDeepLinkUserId = null;
+  pendingUniversalLinkFromLaunch = false;
   launchLinkHandled = false;
   getLinkingURLForTests = null;
   pendingDeepLinkListeners.clear();

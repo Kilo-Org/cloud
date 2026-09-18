@@ -8,9 +8,17 @@ const telemetryMock = vi.hoisted(() => ({
   captureTelemetry: vi.fn(),
 }));
 
+const recentPrsMock = vi.hoisted(() => ({
+  clearRecentPrs: vi.fn<() => Promise<void>>(),
+}));
+
 vi.mock('@/lib/native-system-search', () => nativeSearchMock);
 
 vi.mock('@/lib/telemetry/error-sink', () => telemetryMock);
+
+// The stored PR recents are the other account-bound store this clear owns; the
+// recents module reaches SecureStore on import, so it is mocked here.
+vi.mock('@/lib/pr-review/recent-prs', () => recentPrsMock);
 
 // The remaining session-scoped members pull native bindings that the node test
 // environment cannot load: use-trusted-hosts -> secure-store-preference ->
@@ -50,6 +58,7 @@ describe('clearSessionScopedState', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     nativeSearchMock.clearSystemSearchIndex.mockResolvedValue(undefined);
+    recentPrsMock.clearRecentPrs.mockResolvedValue(undefined);
   });
 
   it('clears the OS search index exactly once per call', () => {
@@ -58,6 +67,30 @@ describe('clearSessionScopedState', () => {
 
     clearSessionScopedState();
     expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops the stored PR recents the index folds into every document set', () => {
+    // A direct account switch runs this clear but not sign-out's own recents
+    // clear; without it the collector re-indexes the previous account's PRs.
+    clearSessionScopedState();
+    expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a rejected recents clear instead of leaving it unhandled', async () => {
+    const failure = new Error('The stored pull requests did not clear.');
+    recentPrsMock.clearRecentPrs.mockRejectedValue(failure);
+
+    expect(() => {
+      clearSessionScopedState();
+    }).not.toThrow();
+
+    await vi.waitFor(() => {
+      expect(telemetryMock.captureTelemetry).toHaveBeenCalledWith({
+        error: failure,
+        level: 'warning',
+        tags: { 'error.subsystem': 'recent-prs', 'error.operation': 'clear' },
+      });
+    });
   });
 
   it('stays synchronous and reports a rejected native clear instead of swallowing it', async () => {

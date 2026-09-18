@@ -1,5 +1,6 @@
 import CoreSpotlight
 import ExpoModulesCore
+import Foundation
 import UniformTypeIdentifiers
 
 /// Names shared by the module and the app delegate subscriber.
@@ -13,6 +14,18 @@ enum KiloSystemSearchStore {
   static let ledgerKey = "kilo-system-search-indexed-fingerprints"
   static let pendingRouteKey = "kilo-system-search-pending-route"
   static let openNotification = Notification.Name("kilo-system-search-open")
+
+  /// Guards the single-shot `pendingRouteKey` slot. The subscriber writes it on
+  /// the main thread while the module reads and clears it on its own queue, so
+  /// the get-then-remove must be atomic: a tap written between the two would be
+  /// deleted without ever being returned and would never navigate.
+  static let pendingRouteLock = NSLock()
+
+  /// Serializes every index mutation with the ledger update that follows it, so
+  /// an `applyUpdate` and a `clear` can never interleave. Without it a clear's
+  /// ledger wipe can land after an apply's index calls but before its commit,
+  /// leaving the ledger claiming records the index no longer holds.
+  static let operationQueue = DispatchQueue(label: "kilo-system-search-operations")
 }
 
 /// One indexed entity. Mirrors `SystemSearchDocument` in `src/lib/native-system-search.ts`.
@@ -32,8 +45,14 @@ public final class KiloSystemSearchModule: Module {
     Name("KiloSystemSearch")
     Events("onSystemSearchOpen")
 
+    // The apply and the clear run on one serial queue, and each blocks that
+    // queue until the index answers, so their index calls and their ledger
+    // updates cannot interleave. The promise is resolved from the queue later;
+    // the closure itself returns immediately.
     AsyncFunction("applyUpdate") { (add: [SystemSearchRecord], removeIds: [String], promise: Promise) in
-      self.apply(add: add, removeIds: removeIds, promise: promise)
+      KiloSystemSearchStore.operationQueue.async {
+        self.apply(add: add, removeIds: removeIds, promise: promise)
+      }
     }
 
     // `CSSearchableIndex` cannot enumerate what it holds, so the module answers
@@ -43,7 +62,9 @@ public final class KiloSystemSearchModule: Module {
     }
 
     AsyncFunction("clear") { (promise: Promise) in
-      self.clear(promise: promise)
+      KiloSystemSearchStore.operationQueue.async {
+        self.clear(promise: promise)
+      }
     }
 
     // The record id last opened from a Spotlight result, or nil when there is
@@ -52,6 +73,11 @@ public final class KiloSystemSearchModule: Module {
     // resolves the id against its index before answering.
     AsyncFunction("consumePendingRoute") { () -> String? in
       let defaults = UserDefaults.standard
+      // Get-and-clear under the same lock the subscriber writes under: a tap
+      // written between the read and the remove would be lost forever.
+      let lock = KiloSystemSearchStore.pendingRouteLock
+      lock.lock()
+      defer { lock.unlock() }
       guard let identifier = defaults.string(forKey: KiloSystemSearchStore.pendingRouteKey) else {
         return nil
       }
@@ -74,33 +100,50 @@ public final class KiloSystemSearchModule: Module {
 
   private func apply(add: [SystemSearchRecord], removeIds: [String], promise: Promise) {
     let items = add.map(Self.searchableItem)
-    indexItems(items) { indexError in
-      if let indexError {
-        promise.reject(indexError)
-        return
-      }
-      self.deleteItems(removeIds) { deleteError in
-        if let deleteError {
-          promise.reject(deleteError)
-          return
-        }
-        // The ledger advances only after both index calls succeed, so a
-        // rejection leaves the previous ledger intact for the caller to retry.
-        Self.commitLedger(add: add, removeIds: removeIds)
-        promise.resolve()
-      }
+    let wait = DispatchSemaphore(value: 0)
+    var indexError: Error?
+    indexItems(items) { error in
+      indexError = error
+      wait.signal()
     }
+    wait.wait()
+    if let indexError {
+      promise.reject(indexError)
+      return
+    }
+    var deleteError: Error?
+    self.deleteItems(removeIds) { error in
+      deleteError = error
+      wait.signal()
+    }
+    wait.wait()
+    if let deleteError {
+      promise.reject(deleteError)
+      return
+    }
+    // The ledger advances only after both index calls succeed, so a rejection
+    // leaves the previous ledger intact for the caller to retry. The serial
+    // operation queue means no clear can have wiped the ledger in between.
+    Self.commitLedger(add: add, removeIds: removeIds)
+    promise.resolve()
   }
 
   private func clear(promise: Promise) {
-    index.deleteSearchableItems(withDomainIdentifiers: [KiloSystemSearchStore.domainIdentifier]) { error in
-      if let error {
-        promise.reject(error)
-        return
-      }
-      UserDefaults.standard.removeObject(forKey: KiloSystemSearchStore.ledgerKey)
-      promise.resolve()
+    let wait = DispatchSemaphore(value: 0)
+    var clearError: Error?
+    index.deleteSearchableItems(
+      withDomainIdentifiers: [KiloSystemSearchStore.domainIdentifier]
+    ) { error in
+      clearError = error
+      wait.signal()
     }
+    wait.wait()
+    if let clearError {
+      promise.reject(clearError)
+      return
+    }
+    UserDefaults.standard.removeObject(forKey: KiloSystemSearchStore.ledgerKey)
+    promise.resolve()
   }
 
   private func indexItems(_ items: [CSSearchableItem], completion: @escaping (Error?) -> Void) {

@@ -16,10 +16,19 @@ import { type QueryClient } from '@tanstack/react-query';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { isSystemSearchAvailable } from '@/lib/native-system-search';
+import { type SystemSearchCollection } from '@/lib/system-search-collect';
 import { planSystemSearchUpdate, type SystemSearchDocument } from '@/lib/system-search-entries';
 
 /** How long a burst of cache writes coalesces before one sync runs. */
 const SYSTEM_SEARCH_SYNC_COALESCE_MS = 750;
+
+/**
+ * The longest a burst may postpone a sync. A sustained stream of cache writes
+ * faster than the coalesce window — the streaming transcript writing to the
+ * same client through a long turn — would otherwise re-arm the trailing timer
+ * forever and leave the index stale until the stream stopped.
+ */
+const SYSTEM_SEARCH_SYNC_MAX_WAIT_MS = 5000;
 
 /** The index delta one sync applies, in the shape the native bridge takes. */
 export type SystemSearchIndexUpdate = {
@@ -29,7 +38,7 @@ export type SystemSearchIndexUpdate = {
 
 export type SystemSearchSyncDeps = {
   queryClient: QueryClient;
-  collect: () => Promise<SystemSearchDocument[]>;
+  collect: () => Promise<SystemSearchCollection>;
   fingerprints: () => Promise<Record<string, string>>;
   apply: (update: SystemSearchIndexUpdate) => Promise<void>;
   report: (error: unknown) => void;
@@ -66,6 +75,7 @@ export class SystemSearchIndexSync {
   private readonly deps: SystemSearchSyncDeps;
   private detachCacheSubscription: (() => void) | null = null;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private debounceWindowStartedAt: number | null = null;
   private runQueue: Promise<void> | null = null;
 
   constructor(deps: SystemSearchSyncDeps) {
@@ -91,6 +101,7 @@ export class SystemSearchIndexSync {
   detach(): void {
     this.detachCacheSubscription?.();
     this.detachCacheSubscription = null;
+    this.debounceWindowStartedAt = null;
     this.clearDebounce();
   }
 
@@ -130,12 +141,29 @@ export class SystemSearchIndexSync {
     if (this.detachCacheSubscription === null) {
       return;
     }
-    // Trailing debounce: a burst re-arms the same timer and runs once.
-    this.clearDebounce();
-    this.debounceTimer = setTimeout(() => {
-      this.debounceTimer = null;
+    const now = Date.now();
+    const windowStartedAt = this.debounceWindowStartedAt ?? now;
+    const waited = now - windowStartedAt;
+    // A burst cannot postpone the sync past the maximum wait: once the window
+    // is older than it, run now and start a fresh window rather than re-arm.
+    if (waited >= SYSTEM_SEARCH_SYNC_MAX_WAIT_MS) {
+      this.clearDebounce();
+      this.debounceWindowStartedAt = now;
       void this.syncNow();
-    }, SYSTEM_SEARCH_SYNC_COALESCE_MS);
+      return;
+    }
+    // Trailing debounce: a burst re-arms the same timer and runs once, but the
+    // timer never reaches past the maximum-wait deadline.
+    this.debounceWindowStartedAt = windowStartedAt;
+    this.clearDebounce();
+    this.debounceTimer = setTimeout(
+      () => {
+        this.debounceTimer = null;
+        this.debounceWindowStartedAt = null;
+        void this.syncNow();
+      },
+      Math.min(SYSTEM_SEARCH_SYNC_COALESCE_MS, SYSTEM_SEARCH_SYNC_MAX_WAIT_MS - waited)
+    );
   }
 
   private clearDebounce(): void {
@@ -160,7 +188,8 @@ export class SystemSearchIndexSync {
       const documents = await this.deps.collect();
       const plan = planSystemSearchUpdate({
         indexed: indexedDocuments(await this.deps.fingerprints()),
-        documents,
+        documents: documents.documents,
+        observedFamilies: documents.observedFamilies,
       });
       if (plan.add.length === 0 && plan.remove.length === 0) {
         return 'skipped';

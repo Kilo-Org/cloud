@@ -19,7 +19,13 @@ public final class KiloSystemSearchOpenSubscriber: ExpoAppDelegateSubscriber {
           !identifier.isEmpty else {
       return false
     }
+    // Written under the same lock `consumePendingRoute` reads and clears
+    // under, so a tap delivered while the module is reading the slot is either
+    // returned or left for the next read, never deleted unresolved.
+    let lock = KiloSystemSearchStore.pendingRouteLock
+    lock.lock()
     UserDefaults.standard.set(identifier, forKey: KiloSystemSearchStore.pendingRouteKey)
+    lock.unlock()
     NotificationCenter.default.post(name: KiloSystemSearchStore.openNotification, object: nil)
     return true
   }

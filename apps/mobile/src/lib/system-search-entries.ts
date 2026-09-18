@@ -46,12 +46,40 @@ export type SystemSearchDocument = {
   fingerprint: string;
 };
 
+/** The route families an indexed id can name, one per source the app indexes. */
+export type SystemSearchFamily = 'sessions' | 'pullRequests' | 'findings';
+
+/**
+ * The three route groups an indexed id is allowed to name, with the source
+ * family each belongs to. The family lets the sync keep an indexed id whose
+ * source could not be enumerated this run (a cold start hydrates only some
+ * queries), so a valid entry is not dropped just because its query is absent.
+ */
+const HREF_FAMILIES: readonly { prefix: string; family: SystemSearchFamily }[] = [
+  { prefix: '/(app)/agent-chat/', family: 'sessions' },
+  { prefix: '/(app)/pr-review/', family: 'pullRequests' },
+  { prefix: '/(app)/(tabs)/(3_profile)/security-agent/', family: 'findings' },
+];
+
 /** The route groups an indexed id is allowed to name. */
-const HREF_PREFIXES = [
-  '/(app)/agent-chat/',
-  '/(app)/pr-review/',
-  '/(app)/(tabs)/(3_profile)/security-agent/',
-] as const;
+const HREF_PREFIXES = HREF_FAMILIES.map(entry => entry.prefix);
+
+/**
+ * The exact shapes the three route groups may take, one segment token at a
+ * time: a non-empty segment that is never `.` or `..`, so an id carrying a
+ * traversal segment or an extra one cannot pass the allowlist and be handed to
+ * `router.navigate` verbatim. `agent-chat` is one segment; `pr-review` nests
+ * for GitLab project paths; a finding is `<scope>/findings/<id>`.
+ */
+const ID_SEGMENT = String.raw`(?!\.\.?(?:[/?#]|$))[^/?#]+`;
+
+const ROUTE_ID_PATTERNS: readonly RegExp[] = [
+  new RegExp(String.raw`^/\(app\)/agent-chat/${ID_SEGMENT}(?:\?[^#]*)?$`),
+  new RegExp(String.raw`^/\(app\)/pr-review/${ID_SEGMENT}(?:/${ID_SEGMENT})*(?:\?[^#]*)?$`),
+  new RegExp(
+    String.raw`^/\(app\)/\(tabs\)/\(3_profile\)/security-agent/${ID_SEGMENT}/findings/${ID_SEGMENT}(?:\?[^#]*)?$`
+  ),
+];
 
 /** The app-scheme prefix every deeplink carries. */
 const APP_SCHEME = 'kiloapp://';
@@ -127,6 +155,15 @@ export function storedSessionSearchDocument(
 export function activeSessionSearchDocument(
   row: SystemSearchActiveSessionRow
 ): SystemSearchDocument | null {
+  // `undefined` means the row was inserted by the WS push path, which cannot
+  // carry an organization. `filterActiveSessionsByOrganization` hides such a
+  // row in every filtered context and only `null` means personal, so indexing
+  // it would put an org session's live row under a personal route under a
+  // different id than the later tRPC-attributed row. Skip it until the next
+  // fetch attributes it.
+  if (row.organizationId === undefined) {
+    return null;
+  }
   return sessionSearchDocument({
     sessionId: row.id,
     title: row.title,
@@ -231,8 +268,26 @@ export function findingSearchDocument(
  * navigate.
  */
 export function systemSearchHrefFromId(id: string): string | null {
-  const known = HREF_PREFIXES.some(prefix => id.startsWith(prefix) && id.length > prefix.length);
+  const known = ROUTE_ID_PATTERNS.some(pattern => pattern.test(id));
   return known ? id : null;
+}
+
+/**
+ * The source family an indexed id belongs to, or null when the id is not one
+ * this section issued. The sync removes an indexed entry only when its family
+ * was enumerated this run, so an id from a source whose query is not in the
+ * cache (a cold start hydrates only some queries) is left in place.
+ */
+export function systemSearchFamilyOfId(id: string): SystemSearchFamily | null {
+  if (systemSearchHrefFromId(id) === null) {
+    return null;
+  }
+  for (const entry of HREF_FAMILIES) {
+    if (id.startsWith(entry.prefix)) {
+      return entry.family;
+    }
+  }
+  return null;
 }
 
 /**
@@ -299,12 +354,19 @@ export type SystemSearchUpdatePlan = {
  *
  * Documents are deduped by id (first occurrence wins, matching the app's own
  * row order). A document is added when its id is unknown or its fingerprint
- * changed; every indexed id the documents no longer carry is removed, which
- * is how an item the user can no longer see leaves the index.
+ * changed. An indexed id is removed only when the documents no longer carry it
+ * AND its source family was enumerated this run: the react-query cache is the
+ * only evidence the app has, and a cold start hydrates a subset of the source
+ * queries, so an id whose query is simply absent must stay rather than be
+ * dropped as if the user could no longer see it. This is still how an item the
+ * user can no longer see leaves the index — its family was enumerated, so its
+ * absence is evidence, not ignorance.
  */
 export function planSystemSearchUpdate(input: {
   indexed: readonly SystemSearchDocument[];
   documents: readonly SystemSearchDocument[];
+  /** The source families the current run could enumerate from the cache. */
+  observedFamilies: ReadonlySet<SystemSearchFamily>;
 }): SystemSearchUpdatePlan {
   const indexedById = indexById(input.indexed);
   const documentsById = indexById(input.documents);
@@ -315,7 +377,13 @@ export function planSystemSearchUpdate(input: {
       add.push(document);
     }
   }
-  const remove = [...indexedById.keys()].filter(id => !documentsById.has(id));
+  const remove = [...indexedById.keys()].filter(id => {
+    if (documentsById.has(id)) {
+      return false;
+    }
+    const family = systemSearchFamilyOfId(id);
+    return family !== null && input.observedFamilies.has(family);
+  });
   return { add, remove };
 }
 

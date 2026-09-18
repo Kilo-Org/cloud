@@ -6,6 +6,7 @@ import { clearToolCardImageCache } from '@/components/agents/tool-card-image-cac
 import { clearClipboardImages } from '@/lib/agent-attachments/clipboard-image';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
+import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { reapTempFiles } from '@/lib/temp-file-registry';
 
@@ -57,14 +58,41 @@ export function clearSystemSearchIndexOnSignedOutLaunch(): void {
 }
 
 /**
+ * Drop the stored PR recents at an account boundary, without awaiting.
+ *
+ * The recents key is device-global with no account namespace, and the index
+ * collector folds `getRecentPrs()` into the OS search documents, so a direct
+ * account switch that only wiped the OS index would immediately re-index the
+ * previous account's pull requests from these recents. Sign-out already awaits
+ * its own `clearRecentPrs()`; firing the same idempotent delete here covers the
+ * account switch, where a full sign-out's clear never runs. The delete is
+ * FIFO-chained per key and unfenced, so it lands after any in-flight recents
+ * write and a later write for the new account chains behind it.
+ */
+function clearRecentPrsBestEffort(): void {
+  void (async () => {
+    try {
+      await clearRecentPrs();
+    } catch (error) {
+      captureTelemetry({
+        error,
+        level: 'warning',
+        tags: { 'error.subsystem': 'recent-prs', 'error.operation': 'clear' },
+      });
+    }
+  })();
+}
+
+/**
  * Clear the session-scoped local state that must not leak across an account
  * boundary: trusted hosts, confirmed markdown images, media caches, per-session
- * auto-approve and goal-disclosure flags, and app-owned temp copies. Every
- * member is best-effort; a throw falls through to the caller's own
- * sign-in/sign-out state reset. The OS search clear is the one asynchronous
- * member and is fired without awaiting, so the function stays synchronous and
- * never throws; a rejection is reported through telemetry, and the
- * signed-out-launch re-clear below retries it.
+ * auto-approve and goal-disclosure flags, app-owned temp copies, the stored PR
+ * recents, and the phone's own search index. Every member is best-effort; a
+ * throw falls through to the caller's own sign-in/sign-out state reset. The
+ * recents delete and the OS search clear are asynchronous and fired without
+ * awaiting, so the function stays synchronous and never throws; a rejection is
+ * reported through telemetry, and the signed-out-launch re-clear below retries
+ * the index clear.
  */
 export function clearSessionScopedState(): void {
   clearTrustedHosts();
@@ -75,6 +103,11 @@ export function clearSessionScopedState(): void {
   clearSessionAutoApprove();
   clearSessionGoalCollapseState();
   reapTempFiles({ all: true });
+  // The stored PR recents are account-bound data the index folds in, and the
+  // key is device-global, so the account boundary must drop them as well as the
+  // index itself. Without this, an account switch re-indexes the previous
+  // account's pull requests from the recents the new account then inherits.
+  clearRecentPrsBestEffort();
   // The phone's search index is device-wide, not scoped to the signed-in
   // session, so without this the previous account's session, pull-request and
   // security titles stay searchable in Spotlight and Android app search after a

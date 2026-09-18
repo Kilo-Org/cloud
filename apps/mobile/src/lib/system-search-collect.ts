@@ -23,6 +23,7 @@ import {
   recentPrSearchDocument,
   storedSessionSearchDocument,
   type SystemSearchDocument,
+  type SystemSearchFamily,
 } from '@/lib/system-search-entries';
 
 // ── cache decoding ─────────────────────────────────────────────────────────
@@ -112,17 +113,53 @@ type RowDecoder<TRow> = {
 
 /**
  * Every document the app can build from its current cache, plus its stored PR
- * recents, deduped by id (first occurrence wins).
+ * recents, deduped by id (first occurrence wins), together with the source
+ * families whose queries this run could actually enumerate.
+ *
+ * The families are what lets the sync distinguish "the source says the user can
+ * no longer see this" from "the source's query is not in the cache this run"
+ * (a cold start hydrates only a subset), so it never drops a still-valid entry
+ * just because its query has not loaded yet.
  */
+export type SystemSearchCollection = {
+  documents: SystemSearchDocument[];
+  observedFamilies: Set<SystemSearchFamily>;
+};
+
 export async function collectSystemSearchDocuments(
   queryClient: QueryClient
-): Promise<SystemSearchDocument[]> {
+): Promise<SystemSearchCollection> {
   const documents: SystemSearchDocument[] = [];
+  const observedFamilies = new Set<SystemSearchFamily>();
   for (const query of queryClient.getQueryCache().getAll()) {
     documents.push(...documentsFromQuery(query.queryKey, query.state.data));
+    // Only a successful query is authoritative: a pending or failed fetch has
+    // not produced the source's row set, so its absence is ignorance, not
+    // evidence that the user can no longer see the entries it once carried.
+    if (query.state.status === 'success') {
+      observeFamily(queryKeyPath(query.queryKey), observedFamilies);
+    }
   }
   documents.push(...(await recentPrDocuments()));
-  return dedupeById(documents);
+  return { documents: dedupeById(documents), observedFamilies };
+}
+
+/** Record the source family one successful source query speaks for. */
+function observeFamily(path: string | null, observed: Set<SystemSearchFamily>): void {
+  if (path === 'cliSessionsV2.list' || path === 'activeSessions.list') {
+    observed.add('sessions');
+    return;
+  }
+  if (path === 'githubPrReview.listInbox' || path === 'providerReview.listInbox') {
+    observed.add('pullRequests');
+    return;
+  }
+  if (
+    path === 'securityAgent.listFindings' ||
+    path === 'organizations.securityAgent.listFindings'
+  ) {
+    observed.add('findings');
+  }
 }
 
 function documentsFromQuery(queryKey: readonly unknown[], data: unknown): SystemSearchDocument[] {

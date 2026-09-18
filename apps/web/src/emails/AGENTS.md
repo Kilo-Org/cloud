@@ -104,4 +104,5 @@ Every template must include this branding footer below the content table:
 | `securityFindingSlaWarning.html` | `severity`, `repository_name`, `finding_title`, `finding_description`, `finding_details`, `sla_deadline`, `action_url`, `manage_notifications_url`, `year` | — |
 | `securityFindingSlaBreach.html` | `severity`, `repository_name`, `finding_title`, `finding_description`, `finding_details`, `sla_deadline`, `action_url`, `manage_notifications_url`, `year` | — |
 | `recommendationsDigest.html` | `organization_name`, `adopted_summary`, `open_count`, `recommendations_section`, `dashboard_url`, `year` | — |
+| `spendAlert.html` | `scope_name`, `kind_label`, `amount_usd`, `threshold_usd`, `spend_url`, `cta_label`, `year`. One email per authorized billing contact; the single CTA opens that scope's spend view (`/usage` for a personal scope, `/organizations/<id>/usage-details` for an organization). | — |
 | `kiloPassOrgBlocked.html` | `organization_name`, `manage_url`, `year` | — |

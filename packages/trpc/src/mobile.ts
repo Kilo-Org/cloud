@@ -19,6 +19,7 @@ import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { kiloChatRouter } from '@/routers/kilo-chat-router';
 import { quickChatRouter } from '@/routers/quick-chat-router';
+import { spendAlertRouter } from '@/routers/spend-alert-router';
 import { agentProfilesMobileRouter } from './agent-profiles-mobile';
 
 /**
@@ -48,6 +49,7 @@ const mobileRouter = createTRPCRouter({
   moderation: moderationRouter,
   kiloChat: kiloChatRouter,
   quickChat: quickChatRouter,
+  spendAlerts: spendAlertRouter,
   agentProfiles: agentProfilesMobileRouter,
 });
 

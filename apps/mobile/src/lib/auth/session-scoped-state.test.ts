@@ -159,7 +159,7 @@ describe('clearSessionScopedState', () => {
     expect(mocks.reapTempFiles).toHaveBeenCalledWith({ all: true });
   });
 
-  it('still reaps when the mirror teardown throws', () => {
+  it('still reaps when the sync-engine memo reset throws', () => {
     mocks.resetArtifactMirrorSyncState.mockImplementationOnce(() => {
       throw new Error('engine memo held');
     });

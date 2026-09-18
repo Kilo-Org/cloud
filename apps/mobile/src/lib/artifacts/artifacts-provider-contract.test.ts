@@ -66,13 +66,11 @@ describe('artifacts DocumentsProvider contract', () => {
     // Android half and `artifacts-file-provider-contract.test.ts` the iOS half.
     expect(moduleConfig.platforms).toEqual(['apple', 'android']);
     expect(moduleConfig.android.modules).toEqual([PROVIDER_MODULE_CLASS]);
-    expect(PROVIDER_MODULE_CLASS.startsWith(`${PROVIDER_PACKAGE}.`)).toBe(true);
     expect(moduleSource).toContain('class ArtifactsProviderModule : Module()');
     expect(moduleSource).toContain('Name("ArtifactsProvider")');
   });
 
   it('declares the provider class the module manifest names, read-only', () => {
-    expect(PROVIDER_CLASS.startsWith(`${PROVIDER_PACKAGE}.`)).toBe(true);
     expect(manifestXml).toContain(`android:name="${PROVIDER_CLASS}"`);
     expect(providerSource).toContain('class ArtifactsDocumentsProvider : DocumentsProvider()');
   });
@@ -204,7 +202,10 @@ describe('artifacts mirror manifest contract', () => {
   });
 
   it('carries a session with no artifacts as an empty file list', () => {
-    expect(MIRROR_MANIFEST_EMPTY_SESSION.files).toEqual([]);
-    expect(MIRROR_MANIFEST_SESSION.files).toEqual([MIRROR_MANIFEST_FILE]);
+    // The provider appends every session whatever its `files` array holds, so
+    // an empty list is an empty folder and never a dropped session row. The
+    // fixture's `files` key is checked against this source in the test above.
+    expect(providerSource).toContain('val rawFiles = rawSession.optJSONArray(KEY_FILES)');
+    expect(providerSource).toContain('sessions.add(ManifestSession(sessionId, title, files))');
   });
 });

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the crawl reads the session tree, bounds and materializes bytes, and assembles the mirror entries as one cohesive module */
 import { File } from 'expo-file-system';
 
 import { parseCloudAgentAttachmentUrl } from '@/components/agents/file-part-preview';
@@ -39,8 +40,17 @@ export type CrawledArtifact = {
   url: string;
 };
 
-/** An artifact whose bytes were written, with the size the mirror records. */
-export type MaterializedArtifact = CrawledArtifact & { size: number };
+/**
+ * An artifact whose bytes were written: exactly the fields the mirror's
+ * manifest records. The source `url` is deliberately absent — it can be a
+ * `data:` URL carrying the whole payload, and nothing reads it back.
+ */
+export type MaterializedArtifact = {
+  filename?: string;
+  id: string;
+  mime: string;
+  size: number;
+};
 
 type ArtifactMaterializeFailure = 'download-failed' | 'too-large' | 'unsupported';
 
@@ -124,6 +134,12 @@ export type ArtifactCrawlDeps = {
     filename: string;
     messageUuid: string;
   }) => Promise<{ signedUrl: string }>;
+  /**
+   * The byte length a URL declares before its body is transferred, or null when
+   * it does not say (or the probe fails). Used to reject an oversized artifact
+   * before the whole response reaches device storage.
+   */
+  probeContentLength: (url: string) => Promise<number | null>;
 };
 
 /* eslint-disable @typescript-eslint/promise-function-async -- production passthroughs hand the tRPC/File promise back untouched */
@@ -133,8 +149,34 @@ const DEFAULT_DEPS: ArtifactCrawlDeps = {
   listSessions: input => trpcClient.cliSessionsV2.list.query(input),
   presignAttachmentDownload: input =>
     trpcClient.cloudAgentNext.getAttachmentDownloadUrl.mutate(input),
+  probeContentLength: url => probeContentLength(url),
 };
 /* eslint-enable @typescript-eslint/promise-function-async */
+
+/**
+ * The byte length a URL declares before its body is transferred, or null.
+ *
+ * A `HEAD` request is the only way to learn the size before writing the body.
+ * Anything unexpected — a server that refuses HEAD, omits `Content-Length`, or
+ * is unreachable — reads as "unknown": the download below still enforces
+ * {@link MAX_ARTIFACT_BYTES} on the bytes it receives.
+ */
+async function probeContentLength(url: string): Promise<number | null> {
+  try {
+    const response = await fetch(url, { method: 'HEAD' });
+    if (!response.ok) {
+      return null;
+    }
+    const header = response.headers.get('content-length');
+    if (header === null) {
+      return null;
+    }
+    const declared = Number(header);
+    return Number.isFinite(declared) && declared >= 0 ? declared : null;
+  } catch {
+    return null;
+  }
+}
 
 // `messages` comes off tRPC as a trusted-shaped but statically unknown payload,
 // so the walk asserts each level once instead of re-parsing the shared contract.
@@ -181,8 +223,11 @@ function loosePartsOf(message: unknown): LoosePart[] {
 }
 
 /**
- * Write one artifact's bytes into `target` and report its size. Never throws:
- * one unreachable artifact must not end the run, and the next run retries it.
+ * Write one artifact's bytes into `target` and report its size. An artifact
+ * over {@link MAX_ARTIFACT_BYTES} is rejected from its declared length before
+ * the transfer, and from the received size when the length was not declared.
+ * Never throws: one unreachable artifact must not end the run, and the next run
+ * retries it.
  */
 export async function materializeArtifact(
   artifact: CrawledArtifact,
@@ -197,6 +242,15 @@ export async function materializeArtifact(
   const downloadUrl = await resolveDownloadUrl(artifact.url, resolved);
   if ('failure' in downloadUrl) {
     return { ok: false, reason: downloadUrl.failure };
+  }
+
+  // Reject an oversized artifact from its declared length before the body is
+  // written: the post-download check below only runs once the whole response
+  // has already reached device storage. A probe that reports nothing is not a
+  // reason to skip the download; the size check still catches it afterwards.
+  const declaredSize = await resolved.probeContentLength(downloadUrl.url);
+  if (declaredSize !== null && declaredSize > MAX_ARTIFACT_BYTES) {
+    return { ok: false, reason: 'too-large' };
   }
 
   try {

@@ -32,6 +32,7 @@ const fakeFs = vi.hoisted(() => {
     deleted = false;
     path: string;
     size = 0;
+    writes = 0;
 
     constructor(...parts: unknown[]) {
       // The `downloaded` stand-in is built with no arguments; give it a unique
@@ -49,6 +50,12 @@ const fakeFs = vi.hoisted(() => {
 
     create(): void {
       this.created = true;
+    }
+
+    // A `data:` URL writes its decoded payload through this; the sync suite
+    // only tracks the resulting size, not the bytes.
+    write(): void {
+      this.writes += 1;
     }
 
     delete(): void {
@@ -197,6 +204,7 @@ function harness(overrides: Partial<ArtifactMirrorSyncDeps> = {}) {
     notify,
     now: () => now,
     presignAttachmentDownload: vi.fn(async () => ({ signedUrl: 'https://x/signed' })),
+    probeContentLength: vi.fn(async () => null),
     readState: async (scope, key) => store.get(`${scope}/${key}`) ?? null,
     resolveUserId: () => USER_ID,
     writeState: async (scope, key, value) => {
@@ -400,7 +408,7 @@ describe('syncArtifactMirror crawling', () => {
     expect(h.downloadFile.mock.calls.filter(([url]) => url === 'https://x/f1')).toHaveLength(1);
   });
 
-  it('does not record a failed page as a finished crawl and retries it next run', async () => {
+  it('does not record a retryable failed page as a finished crawl and retries it next run', async () => {
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });
     registerDownloads(h, [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
@@ -411,33 +419,80 @@ describe('syncArtifactMirror crawling', () => {
         : { history: { kind: failure } }
     );
     h.deps.getSessionMessagesPage = getSessionMessagesPage;
-    let runAt = NOW;
 
-    // Neither a retryable failure nor a terminal one is proof that a session
-    // has no artifacts: both hold the crawl so the page is read again.
-    for (const kind of ['retryable_failure', 'invalid_data']) {
-      failure = kind;
-      // eslint-disable-next-line no-await-in-loop -- each run must see the state and clock the run before it left
-      expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({
-        status: 'synced',
-        failed: 1,
-        files: 0,
-      });
-      expect(sessionIds(h.lastManifest())).toEqual(['s1']);
-      expect(sessionFiles(h.lastManifest(), 's1')).toEqual([]);
-      runAt += MIRROR_SYNC_MIN_INTERVAL_MS;
-      h.setNow(runAt);
-    }
+    // A retryable failure is not proof that a session has no artifacts: the
+    // crawl holds the page so the next run reads it again.
+    expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({
+      status: 'synced',
+      failed: 1,
+      files: 0,
+    });
+    expect(sessionIds(h.lastManifest())).toEqual(['s1']);
+    expect(sessionFiles(h.lastManifest(), 's1')).toEqual([]);
 
     // The page arrives at last: the held cursor re-reads it and f1 lands.
     failure = null;
+    h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
     expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({
       status: 'synced',
       failed: 0,
       files: 1,
     });
     expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1']);
-    expect(getSessionMessagesPage).toHaveBeenCalledTimes(3);
+    expect(getSessionMessagesPage).toHaveBeenCalledTimes(2);
+  });
+
+  it('records a terminal failed page as crawled so it stops spending an advance slot', async () => {
+    const h = harness();
+    h.sessions.push({ id: 'terminal', updatedAt: T1 }, { id: 's2', updatedAt: T1 });
+    registerDownloads(h, [{ id: 'f2', size: 10, url: 'https://x/f2' }]);
+    const getSessionMessagesPage = vi.fn(async (input: { session_id: string }) =>
+      input.session_id === 'terminal'
+        ? { history: { kind: 'invalid_data' } }
+        : { history: { messages: [messageOf(['f2'])], nextCursor: null } }
+    );
+    h.deps.getSessionMessagesPage = getSessionMessagesPage;
+
+    // Run one reads both pages: the unpageable session is recorded as crawled
+    // with no files, and the session behind it still advances.
+    expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({
+      status: 'synced',
+      failed: 1,
+      files: 1,
+    });
+    expect(sessionFiles(h.lastManifest(), 'terminal')).toEqual([]);
+    expect(sessionFiles(h.lastManifest(), 's2')).toEqual(['f2']);
+    expect(getSessionMessagesPage).toHaveBeenCalledTimes(2);
+
+    // Run two does not re-spend a slot on the terminal session.
+    h.setNow(NOW + MIRROR_SYNC_MIN_INTERVAL_MS);
+    expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({
+      status: 'synced',
+      failed: 0,
+      files: 0,
+    });
+    expect(getSessionMessagesPage).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not persist an artifact URL, including a data: payload, in the crawl state', async () => {
+    const h = harness();
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    setFiles(h, 's1', [
+      { id: 'f1', size: 10, url: 'https://x/f1' },
+      { id: 'f2', size: 3, url: 'data:text/plain;base64,QUJD' },
+    ]);
+
+    expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({
+      status: 'synced',
+      files: 2,
+    });
+    expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1', 'f2']);
+
+    // The persisted crawl state holds only what the manifest rebuild reads; the
+    // URL is dead weight, and a data: URL is the whole payload.
+    const persisted = [...h.store.values()].join('\n');
+    expect(persisted).not.toContain('"url"');
+    expect(persisted).not.toContain('base64');
   });
 
   it('advances at most MAX_SESSIONS_PER_RUN sessions per run', async () => {

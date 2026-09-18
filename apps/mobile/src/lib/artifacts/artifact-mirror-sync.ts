@@ -62,13 +62,15 @@ export const MIRROR_BYTE_BUDGET = 250 * 1024 * 1024;
 
 // The persisted run state, validated at the KV boundary: the store is
 // encrypted but still untrusted storage after a restore, so a malformed row
-// reads as "no state" instead of throwing into the run.
+// reads as "no state" instead of throwing into the run. The artifact `url` is
+// deliberately not part of the row: it can be a `data:` URL holding the whole
+// payload, and nothing ever reads it back (`known` keys on `id`, the manifest on
+// `id`/`filename`/`mime`/`size`).
 const materializedArtifactSchema = z.object({
   filename: z.string().optional(),
   id: z.string(),
   mime: z.string(),
   size: z.number(),
-  url: z.string(),
 });
 
 const sessionStateSchema = z.object({
@@ -320,12 +322,19 @@ async function advanceSession(
  * failed download holds the cursor so the same page is re-read next run and the
  * artifact retried.
  *
- * A page the worker returned as a typed failure never moves the crawl state
+ * A page the worker returned as a retryable failure never moves the crawl state
  * either. There are no messages to materialize and no cursor the worker
  * produced, so recording the unchanged cursor as progress would mark the
  * session crawled -- done, or resuming from a cursor that skips ahead -- with
  * none of its artifacts read. The next run re-reads this page, the same bounded
  * retry a failed download gets.
+ *
+ * A `terminal` failure is different: the worker cannot page that stored history
+ * at all (`invalid_data`, `too_large`), so it can never succeed on a later run.
+ * Holding the cursor there would re-read it forever and spend one of
+ * {@link MAX_SESSIONS_PER_RUN}'s slots on every run, starving the sessions
+ * behind it. That session is recorded as crawled instead, with whatever was
+ * already materialized, so the budget reaches the sessions that can advance.
  */
 async function materializePage(
   page: MirrorMessagePage,
@@ -333,6 +342,10 @@ async function materializePage(
 ): Promise<AdvanceOutcome> {
   const outcome: AdvanceOutcome = { discarded: false, failed: 0, files: 0 };
   if (page.failure !== null) {
+    if (page.failure === 'terminal') {
+      advance.state.cursor = page.nextCursor;
+      advance.state.done = true;
+    }
     return { ...outcome, failed: 1 };
   }
   let retryable = false;
@@ -400,7 +413,12 @@ async function materializeOne(
     deleteQuietly(staged.staging);
     return artifactNote({ failed: 1, retryable: true });
   }
-  advance.state.files.push({ ...artifact, size: result.size });
+  advance.state.files.push({
+    id: artifact.id,
+    mime: artifact.mime,
+    size: result.size,
+    ...(artifact.filename === undefined ? {} : { filename: artifact.filename }),
+  });
   advance.known.add(artifact.id);
   return artifactNote({ files: 1 });
 }

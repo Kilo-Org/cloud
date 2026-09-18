@@ -278,7 +278,7 @@ export function systemSearchHrefFromId(id: string): string | null {
  * was enumerated this run, so an id from a source whose query is not in the
  * cache (a cold start hydrates only some queries) is left in place.
  */
-export function systemSearchFamilyOfId(id: string): SystemSearchFamily | null {
+function systemSearchFamilyOfId(id: string): SystemSearchFamily | null {
   if (systemSearchHrefFromId(id) === null) {
     return null;
   }

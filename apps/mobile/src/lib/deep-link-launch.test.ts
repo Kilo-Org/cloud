@@ -464,6 +464,19 @@ describe('deep-link-launch', () => {
       );
     });
 
+    it('carries the resume anchor of a cold launch URL into the stash', () => {
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/ses_1?at=msg%2042');
+      captureLaunchDeepLink();
+      // Assert immediately — no await. The point of the test is synchronicity.
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1?at=msg%2042');
+    });
+
+    it('keeps an anchor-less session launch href byte-identical', () => {
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/ses_1');
+      captureLaunchDeepLink();
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1');
+    });
+
     it('is a no-op when the latch is already set (slot not overwritten)', () => {
       _setGetLinkingURLForTests(() => 'https://app.kilo.ai/profile');
       captureLaunchDeepLink();

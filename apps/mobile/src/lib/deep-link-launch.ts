@@ -1,7 +1,11 @@
 import * as Sentry from '@sentry/react-native';
 import * as z from 'zod';
 
-import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
+import {
+  type IncomingResume,
+  resolveIncomingResume,
+  SESSION_RESUME_ANCHOR_PARAM,
+} from '@kilocode/app-shared/universal-links';
 
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 
@@ -326,6 +330,19 @@ function readLaunchUrl(): string | null {
 }
 
 /**
+ * App href with the `?at=` resume anchor appended. A link without an anchor
+ * keeps its href byte-identical. The synchronous launch capture and
+ * `redirectSystemPath` both stash through this one function, so a cold launch
+ * and a warm open of the same resume link can never format the anchor
+ * differently.
+ */
+export function resumeDeepLinkHref({ href, anchorMessageId }: IncomingResume): string {
+  return anchorMessageId === null
+    ? href
+    : `${href}?${SESSION_RESUME_ANCHOR_PARAM}=${encodeURIComponent(anchorMessageId)}`;
+}
+
+/**
  * SYNCHRONOUS capture of the OS launch URL into the pending slot.
  * Called at `_layout.tsx` module scope so the slot is populated before any effect.
  *
@@ -336,6 +353,11 @@ function readLaunchUrl(): string | null {
  * `Platform.OS` check — it is the correct source on both platforms.
  *
  * Do NOT call `clearInitialURL()` — expo-router's own cold path reads the same value.
+ *
+ * Uses `resolveIncomingResume` (not the bare `resolveIncomingUrl`) so the anchor
+ * of a session resume link rides into the stash: on a cold launch this capture
+ * owns the slot, and expo-router's later cold path must not restash. Capturing
+ * the bare href here would open a resumed session at the bottom.
  */
 export function captureLaunchDeepLink(): void {
   if (launchLinkHandled) {
@@ -345,12 +367,12 @@ export function captureLaunchDeepLink(): void {
   if (!url) {
     return;
   }
-  const href = resolveIncomingUrl(url);
-  if (href) {
+  const resume = resolveIncomingResume(url);
+  if (resume) {
     // An app-scheme launch URL is the shape the Android system-search tap
     // delivers; flag it so the exact `system-search` route for that tap may
     // replace this lossy web-table mapping. An `https://` link is never flagged.
-    setPendingDeepLink(href, 'universal-link', {
+    setPendingDeepLink(resumeDeepLinkHref(resume), 'universal-link', {
       fromLaunchAppScheme: url.startsWith(APP_SCHEME),
     });
     launchLinkHandled = true;

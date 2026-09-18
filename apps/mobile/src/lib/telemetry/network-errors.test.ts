@@ -181,6 +181,31 @@ describe('isAbortError', () => {
     expect(isAbortError(new Error('nope'))).toBe(false);
     expect(isAbortError(undefined)).toBe(false);
   });
+
+  it('is true for an Expo FetchError cancellation by message', () => {
+    const error = new Error(
+      'fetch failed: FetchRequestCanceledException: Fetch request has been canceled'
+    );
+    expect(error.name).toBe('Error');
+    expect(isAbortError(error)).toBe(true);
+  });
+
+  it('is true for an expo-modules-core CodedError cancellation by code', () => {
+    const error = {
+      code: 'FetchRequestCanceledException',
+      message: 'Fetch request has been canceled',
+    };
+    expect(isAbortError(error)).toBe(true);
+  });
+
+  it('is true for a raw FetchRequestCanceledException by name', () => {
+    expect(isAbortError(namedError('FetchRequestCanceledException'))).toBe(true);
+  });
+
+  it('is true when the cancellation is nested one level under cause', () => {
+    const cause = { code: 'FetchRequestCanceledException' };
+    expect(isAbortError({ message: 'wrapped', cause })).toBe(true);
+  });
 });
 
 describe('createNetworkErrorFetch', () => {
@@ -216,6 +241,17 @@ describe('createNetworkErrorFetch', () => {
     const wrapped = createNetworkErrorFetch(rejectingFetch(abort));
 
     await expect(wrapped('https://example.com/api/trpc/session.list')).rejects.toBe(abort);
+
+    expect(events).toHaveLength(0);
+  });
+
+  it('(b2) does not report an Expo FetchRequestCanceledException and re-throws it', async () => {
+    const cancel = new Error(
+      'fetch failed: FetchRequestCanceledException: Fetch request has been canceled'
+    );
+    const wrapped = createNetworkErrorFetch(rejectingFetch(cancel), { source: 'trpc' });
+
+    await expect(wrapped('https://example.com/api/trpc/session.list')).rejects.toBe(cancel);
 
     expect(events).toHaveLength(0);
   });

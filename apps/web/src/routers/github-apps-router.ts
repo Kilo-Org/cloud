@@ -8,6 +8,7 @@ import {
   getGitHubIntegrationById,
   upsertPlatformIntegrationForOwner,
   updateRepositoriesForIntegration,
+  syncIntegrationInstallationDetails,
 } from '@/lib/integrations/db/platform-integrations';
 import {
   fetchGitHubInstallationDetails,
@@ -44,8 +45,11 @@ import {
 } from '@/lib/integrations/platforms/github/user-authorization';
 import { seedUserGithubToken } from '@/lib/github-pr-review/dev-seed';
 import { createInstallState } from '@/lib/integrations/github/install-state';
-import { canOrganizationUseMultipleGitHubInstallations } from '@/lib/integrations/github/multiple-installations';
-import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
+import {
+  canOrganizationCreateSharedGitHubConnection,
+  canOrganizationUseMultipleGitHubInstallations,
+  isGitHubConnectionManagementEnabled,
+} from '@/lib/integrations/github/multiple-installations';
 import {
   createGitHubConnectionAttempt,
   getGitHubConnectionAttempt,
@@ -185,16 +189,34 @@ export const githubAppsRouter = createTRPCRouter({
         type: 'org',
         id: input.organizationId,
       });
+      // A locally disconnected connection has already relinquished its slot:
+      // it must not keep counting toward "this org already has an
+      // installation" cardinality checks, or the org would be unable to add
+      // or connect anything else after disconnecting.
+      const activeIntegrationCount = integrations.filter(
+        integration => !integration.github_disconnected_at
+      ).length;
       const primaryId = integrations.find(isPlatformIntegrationHealthy)?.id ?? null;
       const canManageModel = canManageOrganizationBilling(role);
+      const canManageConnections =
+        canManageOrganization(role) && isGitHubConnectionManagementEnabled();
+      const sharingApproved = canOrganizationCreateSharedGitHubConnection(input.organizationId);
+      const multipleInstallationsApproved =
+        activeIntegrationCount === 0 ||
+        canOrganizationUseMultipleGitHubInstallations(input.organizationId);
+      const existingConnectionAdmission = !canManageConnections
+        ? { allowed: false as const, reason: 'not_authorized' as const }
+        : !sharingApproved
+          ? { allowed: false as const, reason: 'sharing_not_approved' as const }
+          : !multipleInstallationsApproved
+            ? { allowed: false as const, reason: 'multiple_installations_not_approved' as const }
+            : { allowed: true as const, reason: null };
 
       return {
         connectionManagementEnabled: isGitHubConnectionManagementEnabled(),
-        canConnectExisting: canManageOrganization(role) && isGitHubConnectionManagementEnabled(),
-        canAdd:
-          canManageOrganization(role) &&
-          (integrations.length === 0 ||
-            canOrganizationUseMultipleGitHubInstallations(input.organizationId)),
+        canConnectExisting: existingConnectionAdmission.allowed,
+        existingConnectionAdmission,
+        canAdd: canManageOrganization(role) && multipleInstallationsApproved,
         installations: integrations.map(integration => {
           const repositories = requireNumericPlatformRepositories(integration.repositories) ?? [];
           const status: 'connected' | 'disconnected' | 'pending' | 'suspended' | 'needs_attention' =
@@ -293,7 +315,12 @@ export const githubAppsRouter = createTRPCRouter({
       );
       if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
         const integrations = await githubAppsService.listIntegrations(owner);
-        if (integrations.length > 0) {
+        // A locally disconnected connection has relinquished its slot and
+        // must not block starting a fresh installation.
+        const hasActiveIntegration = integrations.some(
+          integration => !integration.github_disconnected_at
+        );
+        if (hasActiveIntegration) {
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'This organization already has a GitHub installation',
@@ -674,30 +701,6 @@ export const githubAppsRouter = createTRPCRouter({
         });
       }
 
-      const upsertResult = await upsertPlatformIntegrationForOwner(owner, {
-        platform: 'github',
-        integrationType: 'app',
-        platformInstallationId: installationId,
-        platformAccountId: installationDetails.account.id.toString(),
-        platformAccountLogin: installationDetails.account.login,
-        permissions: installationDetails.permissions,
-        scopes: installationDetails.events,
-        repositoryAccess: installationDetails.repository_selection,
-        installedAt: installationDetails.created_at,
-        // Keep the integration's app type so a lite refresh is never matched
-        // against (or converted into) the standard app's row.
-        githubAppType: appType,
-      });
-
-      if (!upsertResult.ok) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'This GitHub installation is already claimed by another account.',
-        });
-      }
-
-      const repositories = await fetchGitHubRepositories(installationId, appType);
-      await updateRepositoriesForIntegration(integration.id, repositories);
       await observeGitHubInstallationLifecycle({
         installationId,
         appType,
@@ -714,6 +717,19 @@ export const githubAppsRouter = createTRPCRouter({
         installationId,
         appType,
       });
+      // Keep this association's own cached account/permissions/scopes fields
+      // fresh too: `githubAppsService.getInstallation`/`listIntegrations` read
+      // them straight off `platform_integrations`, not the canonical row.
+      await syncIntegrationInstallationDetails(integration.id, {
+        platformAccountId: installationDetails.account.id.toString(),
+        platformAccountLogin: installationDetails.account.login,
+        permissions: installationDetails.permissions,
+        scopes: installationDetails.events,
+        repositoryAccess: installationDetails.repository_selection,
+        installedAt: installationDetails.created_at,
+      });
+      const repositories = await fetchGitHubRepositories(installationId, appType, integration.id);
+      await updateRepositoriesForIntegration(integration.id, repositories);
 
       if (input?.organizationId) {
         await createAuditLog({
@@ -759,6 +775,12 @@ export const githubAppsRouter = createTRPCRouter({
 
       const owner = resolveOwner(ctx, input.organizationId);
 
+      // Intentionally omits kiloUserId/githubUserId: this dev-only E2E
+      // seeding shortcut never performs a live GitHub OAuth exchange, so
+      // there is no verified GitHub identity to record as authorization
+      // provenance. It is gated to NODE_ENV === 'development' above and can
+      // never run in production, so leaving provenance null here does not
+      // affect production data.
       const devUpsertResult = await upsertPlatformIntegrationForOwner(owner, {
         platform: 'github',
         integrationType: 'app',

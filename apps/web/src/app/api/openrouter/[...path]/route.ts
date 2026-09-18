@@ -51,12 +51,13 @@ import {
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
   temporarilyUnavailableResponse,
-  usageLimitExceededResponse,
+  creditsBlockedResponse,
   unavailableModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
   checkExclusiveModelProviderAllowed,
   modelDoesNotExistOnOpenRouterResponse,
+  chatGptReconnectResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
@@ -608,7 +609,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   async function resolveAccessCheck(modelId: string) {
-    const { balance, settings, plan } = await balanceAndSettingsPromise;
+    const { balance, settings, plan, balanceLimitedByUserAllowance } =
+      await balanceAndSettingsPromise;
     const groupPolicy = await organizationGroupPolicyPromise;
     const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
       modelId,
@@ -618,6 +620,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (modelRestrictionError) {
       return {
         balance,
+        balanceLimitedByUserAllowance,
         effectiveProviderConfig: providerConfig,
         groupModelAllowed: true,
         groupProvidersAllowed: true,
@@ -642,6 +645,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
     return {
       balance,
+      balanceLimitedByUserAllowance,
       effectiveProviderConfig,
       groupModelAllowed,
       groupProvidersAllowed,
@@ -682,6 +686,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
   if (initialProviderResultForAbuseService.kind === 'unavailable') {
     return temporarilyUnavailableResponse();
+  }
+  if (initialProviderResultForAbuseService.kind === 'chatgpt-reconnect') {
+    // The person's enabled ChatGPT connection is terminally dead. Fail readably
+    // instead of silently serving the request through another billing path.
+    return chatGptReconnectResponse(initialProviderResultForAbuseService.message);
   }
   let effectiveProviderContext = initialProviderResultForAbuseService;
 
@@ -812,6 +821,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       }
       return temporarilyUnavailableResponse();
     }
+    if (quarantineProviderResult.kind === 'chatgpt-reconnect') {
+      if (rulesEngineDecision.delayMs > 0) {
+        await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
+      }
+      return chatGptReconnectResponse(quarantineProviderResult.message);
+    }
 
     effectiveProviderContext = quarantineProviderResult;
 
@@ -846,6 +861,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
     const {
       balance,
+      balanceLimitedByUserAllowance,
       effectiveProviderConfig,
       groupModelAllowed,
       groupProvidersAllowed,
@@ -858,7 +874,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       !(await isFreeModel(effectiveModelIdLowerCased)) &&
       !effectiveProviderContext.userByok
     ) {
-      return await usageLimitExceededResponse(user, balance);
+      return await creditsBlockedResponse({
+        user,
+        balance,
+        organizationId,
+        balanceLimitedByUserAllowance,
+      });
     }
 
     // Organization model/provider restrictions check

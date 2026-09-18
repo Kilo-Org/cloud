@@ -480,6 +480,8 @@
       "replyBadRequest": "આ જવાબ પોસ્ટ કરી શકાતો નથી. થ્રેડ બદલાયો હોઈ શકે છે.",
       "replyForbidden": "તમને આ પુલ રિક્વેસ્ટ પર જવાબ આપવાની પરવાનગી નથી.",
       "addCommentCta": "આ પુલ રિક્વેસ્ટ પર ટિપ્પણી કરો",
+      "fixWithKilo": "Kilo વડે ઠીક કરો",
+      "fixWithKiloPrompt": "કૃપા કરીને નીચેની પુલ રિક્વેસ્ટ ટિપ્પણી સંભાળો: {{link}}",
       "commentBadRequest": "આ ટિપ્પણી પોસ્ટ કરી શકાતી નથી. પુલ રિક્વેસ્ટ બદલાયો હોઈ શકે છે.",
       "commentForbidden": "તમને આ પુલ રિક્વેસ્ટ પર ટિપ્પણી કરવાની પરવાનગી નથી.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} બાકી",
       "skipped": "{{displayCount}} છોડેલી",
       "checksCount": "{{displayCount}} તપાસો",
+      "checksCount_one": "{{displayCount}} તપાસ",
+      "checksCount_other": "{{displayCount}} તપાસો",
       "checkDetails": "તપાસની વિગતો"
     },
     "inbox": {
@@ -2051,6 +2055,7 @@
       "exitNeedsNewerCli": "રિમોટ સ્લેશ કમાન્ડ માટે Kilo CLIનું નવું સંસ્કરણ જરૂરી છે. Kilo CLI અપડેટ કરો અને ફરી કનેક્ટ કરો."
     },
     "sessionConnection": {
+      "label": "કનેક્શન",
       "connecting": "કનેક્ટ થઈ રહ્યું છે…",
       "reconnecting": "ફરી કનેક્ટ થઈ રહ્યું છે…",
       "connectionLost": "કનેક્શન તૂટી ગયું",
@@ -2070,7 +2075,9 @@
       "removeConfirmTitle": "ધ્યેય દૂર કરવું?",
       "removeConfirmMessage": "CLI આ સત્રનું ધ્યેય સાફ કરે છે.",
       "updateFailed": "ધ્યેય અપડેટ કરી શકાયું નહીં.",
-      "sectionAccessibility": "{{status}}. ધ્યેય: {{text}}"
+      "sectionAccessibility": "{{status}}. ધ્યેય: {{text}}",
+      "collapse": "ધ્યેય છુપાવો",
+      "expand": "ધ્યેય બતાવો"
     },
     "newSession": {
       "recentlyUsed": "તાજેતરમાં ઉપયોગમાં લેવાયેલું",
@@ -2124,7 +2131,20 @@
       "continueFrom": "{{title}} સત્ર આગળ ચાલુ થઈ રહ્યું છે.",
       "importingSession": "સત્ર આયાત થઈ રહ્યું છે",
       "cliCannotContinue": "આ CLI સત્ર ચાલુ રાખી શકતું નથી. Cloud Agent અથવા બીજું CLI પસંદ કરો.",
-      "importFailed": "આ સત્ર આયાત કરી શકાયું નહીં."
+      "importFailed": "આ સત્ર આયાત કરી શકાયું નહીં.",
+      "sandbox": "સેન્ડબોક્સ",
+      "sandboxAccessibility": "સેન્ડબોક્સ: {{label}}",
+      "sandboxDefaultWithDestination": "ડિફોલ્ટ · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "નાનું",
+      "sandboxInstanceShared": "શેર કરેલું",
+      "sandboxInstanceLarge": "મોટું",
+      "sandboxInstanceDevcontainer": "ડેવ કન્ટેનર",
+      "sandboxInstanceProviderDefault": "પ્રદાતાનું ડિફોલ્ટ",
+      "sandboxCouldNotLoad": "સેન્ડબોક્સના વિકલ્પો લોડ કરી શકાયા નથી",
+      "sandboxUnavailable": "આ સેન્ડબોક્સ અનુપલબ્ધ છે. બીજું સેન્ડબોક્સ અથવા ડિફોલ્ટ પસંદ કરો.",
+      "sandboxUseDefault": "ડિફોલ્ટ વાપરો"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ થઈ.",
@@ -2490,6 +2510,12 @@
       "startNewSession": "નવું સત્ર શરૂ કરો",
       "exitSession": "સત્રમાંથી બહાર નીકળો",
       "clearSession": "આ સત્ર સમાપ્ત કરો અને નવું શરૂ કરો",
+      "compactDescription": "વર્તમાન સત્રનો સંદર્ભ સંકુચિત કરો",
+      "goalDescription": "સત્ર ધ્યેય તરફ કામ ચાલુ રાખો. /goal <objective> અથવા pause, resume, clear",
+      "initDescription": "માર્ગદર્શિત AGENTS.md સેટઅપ",
+      "resumeClaudeDescription": "Claude Code સત્રની ટ્રાન્સક્રિપ્ટ આયાત કરો",
+      "resumeCodexDescription": "OpenAI Codex સત્રની ટ્રાન્સક્રિપ્ટ આયાત કરો",
+      "reviewDescription": "ફેરફારો સમીક્ષા કરો [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} વાપરો",
       "insert": "દાખલ કરો",
       "upgradeRequiredFallback": "આ કમાન્ડ વાપરવા માટે તમારું CLI અપગ્રેડ કરો.",
@@ -2607,6 +2633,7 @@
     "couldNotLoadActiveSessions": "સક્રિય સત્રો લોડ કરી શકાયાં નહીં.",
     "agentSessions": "અત્યારે ચાલુ",
     "newCodingTask": "નવું કોડિંગ કાર્ય",
+    "newTaskFromPicture": "ચિત્રમાંથી નવું કાર્ય",
     "explore": "વધુ જાણો",
     "seeAll": "બધા જુઓ",
     "noLiveSessions": "અત્યારે કંઈ ચાલી રહ્યું નથી"
@@ -2828,7 +2855,8 @@
     "aiProvidersWhat": "તમારા પ્રોમ્પ્ટ, વાતચીતનો ઇતિહાસ અને તમે જોડેલી કોઈપણ ફાઇલો.",
     "aiProvidersWhy": "AIના જવાબો બનાવવા માટે.",
     "aiProvidersWho": "દરેક વિનંતી માટે તમે પસંદ કરેલા Anthropic, OpenAI, Google અને અન્ય પ્રદાતાઓ.",
-    "gatewayWhat": "એકાઉન્ટનો ID, વિનંતીનો મેટાડેટા, ટોકનનો વપરાશ.",
+    "gatewayWhat": "એકાઉન્ટનો ID, વિનંતીનો મેટાડેટા, ટોકનનો વપરાશ, અને એપ તેના દ્વારા મોકલતી પ્રોમ્પ્ટ અને વોઇસ રેકોર્ડિંગ.",
+    "viaGateway": "Kilo Gateway દ્વારા",
     "gatewayWhy": "ઓળખની ખાતરી કરવી, વિનંતીઓને યોગ્ય સ્થળે મોકલવી અને બિલિંગના હિસાબ મેળવવા.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "એપની સામગ્રી દૂર કરેલા ક્રેશ અને ભૂલના અહેવાલો.",
@@ -2848,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "તમે બોલીને લખાવો ત્યારે તમારા અવાજનું રેકોર્ડિંગ.",
     "voiceTranscriptionWhy": "અવાજને લખાણમાં ફેરવવા માટે.",
-    "voiceTranscriptionWho": "માત્ર તમારા ઉપકરણ પર જ પ્રક્રિયા થાય છે. જો ઉપકરણ અવાજને ઑફલાઇન લખાણમાં ફેરવી ન શકે, તો Apple અથવા Googleને મોકલાય છે.",
+    "voiceTranscriptionWho": "તમારું ઉપકરણ, તમે પસંદ કરેલા ટ્રાન્સક્રિપ્શન મોડેલ સાથે Kilo Gateway, અથવા ઑનલાઇન ઓળખ માટે Apple અથવા Google.",
     "installAttributionPromptTitle": "ઇન્સ્ટોલનો સ્ત્રોત ઓળખવાની મંજૂરી આપવી છે?",
     "installAttributionPromptMessage": "તમે કયા માધ્યમથી અહીં આવ્યા તે જાણવા માટે જ Kilo Appleની ટ્રેકિંગ પરવાનગી વાપરે છે. આ માટે તમારા પ્રોમ્પ્ટ અને વાતચીત ક્યારેય વપરાતાં નથી.",
     "what": "શું",
@@ -3058,6 +3086,12 @@
     "privacy": "એજન્ટો જોવા માટે Kilo ખોલો",
     "openAgents": "એજન્ટો ખોલો",
     "needsInput": "જવાબ જરૂરી",
+    "newestSession": "સૌથી નવું: {{title}}",
+    "noneWaiting": "કોઈ એજન્ટ રાહ જોતો નથી",
+    "newAgent": "નવો એજન્ટ",
+    "approving": "મંજૂર કરવામાં આવી રહ્યું છે...",
+    "couldNotApprove": "મંજૂર કરી શકાયું નથી",
+    "couldNotStart": "શરૂ કરી શકાયું નથી",
     "channelName": "સક્રિય એજન્ટો",
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો."
   },
@@ -3093,5 +3127,12 @@
     "remoteFound": "કમ્પ્યુટર કનેક્ટ થયું",
     "checkAgain": "ફરી તપાસો",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "એજન્ટ શરૂ કરવા માટે પ્રોમ્પ્ટ જરૂરી છે. પ્રોમ્પ્ટ ઉમેરો અને ફરી ચલાવો.",
+      "repositoryUnknown": "Kilo {{repository}} ને GitHub કે GitLab રિપોઝિટરી તરીકે ઓળખતું નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો.",
+      "repositoryUnsupported": "{{repository}} એ Bitbucket રિપોઝિટરી છે — એજન્ટ શરૂ કરો હજી તેનો ઉપયોગ કરી શકતું નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો."
+    }
   }
 }

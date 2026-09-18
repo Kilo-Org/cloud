@@ -72,6 +72,9 @@ vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
 vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
   clearCondenseToolCallsPreference: vi.fn(),
 }));
+vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
+  clearCollapsedConnectCtasPreference: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference: vi.fn() }));
 vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
   clearHideThinkingPreference: vi.fn(),

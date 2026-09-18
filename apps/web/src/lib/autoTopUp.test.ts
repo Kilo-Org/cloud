@@ -38,6 +38,7 @@ jest.mock('@/lib/stripe-client', () => {
     client: {
       invoices: {
         create: jest.fn(function (this: void) {}),
+        update: jest.fn(function (this: void) {}),
         pay: jest.fn(function (this: void) {}),
       },
       invoiceItems: {
@@ -639,7 +640,14 @@ describe('maybePerformAutoTopUp with Kilo Pass', () => {
     });
 
     const { client } = await import('@/lib/stripe-client');
-    (client.invoices.create as jest.Mock).mockResolvedValue({ id: 'inv_test_1' });
+    (client.invoices.create as jest.Mock).mockResolvedValue({
+      id: 'inv_test_1',
+      created: 1_700_000_000,
+    });
+    (client.invoices.update as jest.Mock).mockResolvedValue({
+      id: 'inv_test_1',
+      created: 1_700_000_000,
+    });
     (client.invoiceItems.create as jest.Mock).mockResolvedValue({ id: 'ii_test_1' });
     (client.invoices.pay as jest.Mock).mockResolvedValue({ status: 'paid' });
 
@@ -673,7 +681,14 @@ describe('invoice metadata includes traceId', () => {
     });
 
     const { client } = await import('@/lib/stripe-client');
-    (client.invoices.create as jest.Mock).mockResolvedValue({ id: 'inv_trace_test' });
+    (client.invoices.create as jest.Mock).mockResolvedValue({
+      id: 'inv_trace_test',
+      created: 1_700_000_000,
+    });
+    (client.invoices.update as jest.Mock).mockResolvedValue({
+      id: 'inv_trace_test',
+      created: 1_700_000_000,
+    });
     (client.invoiceItems.create as jest.Mock).mockResolvedValue({ id: 'ii_trace_test' });
     (client.invoices.pay as jest.Mock).mockResolvedValue({ id: 'inv_trace_test', status: 'paid' });
 
@@ -687,7 +702,26 @@ describe('invoice metadata includes traceId', () => {
       expect.objectContaining({
         metadata: expect.objectContaining({
           traceId: expect.stringMatching(uuidPattern),
+          type: 'auto-topup',
+          serviceFeePrincipalMinor: '5000',
+          serviceFeeFlow: 'personal_auto_top_up',
         }),
+      })
+    );
+    expect(client.invoices.update).toHaveBeenCalledWith(
+      'inv_trace_test',
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          serviceFeePrincipalMinor: '5000',
+          serviceFeeAssessmentKey: expect.stringMatching(/^invoice:inv_trace_test$/),
+        }),
+      })
+    );
+    expect(client.invoiceItems.create).toHaveBeenCalledTimes(1);
+    expect(client.invoiceItems.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 5000,
+        description: 'Kilo automatic top up',
       })
     );
   });

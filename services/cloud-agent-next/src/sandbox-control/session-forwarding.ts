@@ -1,6 +1,6 @@
 import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
-  SANDBOX_CONTROL_OPERATION_LIMIT,
+  SANDBOX_CONTROL_FORWARD_OPERATION_LIMIT,
 } from '../shared/sandbox-control-protocol.js';
 
 const MAX_SESSION_FORWARD_BYTES = 4 * MAX_SANDBOX_CONTROL_FRAME_BYTES;
@@ -88,7 +88,7 @@ export function createSessionForwarding(): SessionForwarding {
       if (input.bytes > MAX_SANDBOX_CONTROL_FRAME_BYTES)
         return Promise.reject(new SessionForwardingError('Forwarded frame is too large', false));
       if (
-        stats.waiting + stats.inFlight >= SANDBOX_CONTROL_OPERATION_LIMIT ||
+        stats.waiting + stats.inFlight >= SANDBOX_CONTROL_FORWARD_OPERATION_LIMIT ||
         stats.bufferedBytes + input.bytes > MAX_SESSION_FORWARD_BYTES
       )
         return Promise.reject(

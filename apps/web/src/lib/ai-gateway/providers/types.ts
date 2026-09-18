@@ -20,6 +20,7 @@ export type ProviderId =
   | 'perplexity'
   | 'streamlake'
   | 'vercel'
+  | 'openai-chatgpt'
   | 'custom'
   | 'experiment'
   | 'dev-tools';

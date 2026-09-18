@@ -3,7 +3,19 @@ import {
   cloudAgentWorktreeIdSchema,
   WORKTREE_RUNTIME_HISTORY_UNAVAILABLE,
 } from '@kilocode/session-ingest-contracts';
-import { resolveSandboxExclusivity } from '../sandbox-control/worktree-ownership.js';
+import {
+  RECONCILIATION_LIMITS,
+  reconcileSandboxReferences,
+} from '../sandbox-control/worktree-ownership.js';
+import {
+  addSessionReference,
+  hasForeignReference,
+  markReferencesReconciled,
+  removeSessionReference,
+  removeWorktreeReferences,
+  worktreeIdFromDirectory,
+  type SessionReferenceState,
+} from '../sandbox-control/session-references.js';
 import { getWorktreeWorkspacePath } from '../workspace.js';
 import {
   cleanWorktreeRuntime,
@@ -157,6 +169,8 @@ import {
   saveDeadlines,
   savePhysicalRecord,
   saveRouteTable,
+  loadSessionReferences,
+  saveSessionReferences,
   saveTransitionLog,
   loadSessionCredentialGrants,
   saveSessionCredentialGrants,
@@ -781,7 +795,7 @@ export class SandboxControl extends DurableObject<Env> {
     ) {
       return null;
     }
-    const worktreeId = route?.worktreeId ?? this.worktreeIdFromDirectory(input.directory);
+    const worktreeId = route?.worktreeId ?? worktreeIdFromDirectory(input.directory);
     if (
       this.runtimeDeleted ||
       this.exclusiveDeletionWorktreeId ||
@@ -793,7 +807,7 @@ export class SandboxControl extends DurableObject<Env> {
     ) {
       return null;
     }
-    const runtime = this.readyWrapperRuntime();
+    const runtime = this.establishedWrapperForAllocation(physical);
     if (
       !runtime ||
       !runtime.wrapperInstanceId ||
@@ -1240,7 +1254,7 @@ export class SandboxControl extends DurableObject<Env> {
       )
         throw new Error('Session interaction scope is stale');
       this.assertWorktreeAdmission(route.worktreeId);
-      this.assertWorktreeAdmission(this.worktreeIdFromDirectory(session.directory));
+      this.assertWorktreeAdmission(worktreeIdFromDirectory(session.directory));
     });
   }
 
@@ -2167,10 +2181,20 @@ export class SandboxControl extends DurableObject<Env> {
       ) {
         throw new Error('Sandbox credential containment mismatch');
       }
-      const result = await this.mutateRoutes(table => {
+      const result = await this.mutateRoutesAndReferences((table, references) => {
         this.assertWorktreeAdmission(worktreeId);
         const attached = attachRoute(table, input, ownerId);
-        return { value: attached, changed: attached.changed };
+        const added = addSessionReference(references, {
+          sessionId: input.sessionId,
+          kiloSessionId: input.kiloSessionId,
+          directory: input.directory,
+          ...(worktreeId !== undefined ? { worktreeId } : {}),
+        });
+        return {
+          value: attached,
+          routesChanged: attached.changed,
+          referencesChanged: added.changed,
+        };
       });
       if (result.changed) {
         await this.appendLog(
@@ -2288,10 +2312,21 @@ export class SandboxControl extends DurableObject<Env> {
       const result = await this.withCredentialUpdate(() =>
         this.ctx.storage.transaction(async () => {
           const table = await loadRouteTable(this.ctx.storage);
+          const removing = runtimeDetached ? table.get(sessionId) : undefined;
           const detached = runtimeDetached
             ? detachRoute(table, sessionId)
             : { table, existed: false };
           await saveRouteTable(this.ctx.storage, detached.table);
+          if (detached.existed && removing) {
+            const references = await loadSessionReferences(this.ctx.storage);
+            const tombstoned = addSessionReference(references, {
+              sessionId: removing.sessionId,
+              kiloSessionId: removing.kiloSessionId,
+              directory: removing.directory,
+              ...(removing.worktreeId !== undefined ? { worktreeId: removing.worktreeId } : {}),
+            });
+            if (tombstoned.changed) await saveSessionReferences(this.ctx.storage, references);
+          }
           const grants = await loadSessionCredentialGrants(this.ctx.storage);
           if (grants.some(grant => grant.members.some(member => member.sessionId === sessionId))) {
             if (this.providerKind === 'vercel') {
@@ -2324,6 +2359,16 @@ export class SandboxControl extends DurableObject<Env> {
       }
     }
     return { existed };
+  }
+
+  async forgetSessionReference(sessionId: string): Promise<void> {
+    await this.ensureOperationalInitialized();
+    await this.ctx.storage.transaction(async () => {
+      const references = await loadSessionReferences(this.ctx.storage);
+      if (removeSessionReference(references, sessionId).changed) {
+        await saveSessionReferences(this.ctx.storage, references);
+      }
+    });
   }
 
   deleteWorktreeResources(
@@ -2401,7 +2446,7 @@ export class SandboxControl extends DurableObject<Env> {
       await this.revokeWorktreeCredentials(input.worktreeId);
     }
     const deletedIds = new Set(journal.sessionIds);
-    const detached = await this.mutateRoutes(table => {
+    const detached = await this.mutateRoutesAndReferences((table, references) => {
       const sessionIds: string[] = [];
       for (const [sessionId, route] of table) {
         if (
@@ -2412,7 +2457,12 @@ export class SandboxControl extends DurableObject<Env> {
           sessionIds.push(sessionId);
         }
       }
-      return { value: sessionIds, changed: sessionIds.length > 0 };
+      const removed = removeWorktreeReferences(references, input.worktreeId);
+      return {
+        value: sessionIds,
+        routesChanged: sessionIds.length > 0,
+        referencesChanged: removed.changed,
+      };
     });
     await Promise.allSettled(detached.flatMap(id => this.sessionForwarding.get(id) ?? []));
     for (const id of detached) this.sessionForwarding.delete(id);
@@ -2505,41 +2555,62 @@ export class SandboxControl extends DurableObject<Env> {
         )
       )
         return true;
-      const receipts = await loadWorktreeDeletionJournals(this.ctx.storage);
-      const releasedWorktreeIds = [...receipts]
-        .filter(([, receipt]) => receipt.resourcesCleaned)
-        .map(([id]) => id);
-      const released = new Set<string>(releasedWorktreeIds);
-      const requestedIds = new Set(input.sessionIds);
-      const otherRoutes = [...(await loadRouteTable(this.ctx.storage)).values()].some(route => {
-        const worktreeId = route.worktreeId ?? this.worktreeIdFromDirectory(route.directory);
-        if (worktreeId && released.has(worktreeId)) return false;
-        return (
-          route.directory !== directory ||
-          !requestedIds.has(route.kiloSessionId) ||
-          (worktreeId !== undefined && worktreeId !== input.worktreeId)
-        );
-      });
-      const exclusive =
-        !otherRoutes &&
-        (await withTimeout(
-          resolveSandboxExclusivity(this.env, {
+      const storage = this.ctx.storage;
+      const receipts = await loadWorktreeDeletionJournals(storage);
+      const released = new Set(
+        [...receipts].filter(([, receipt]) => receipt.resourcesCleaned).map(([id]) => id)
+      );
+      const target = {
+        worktreeId: input.worktreeId,
+        directory,
+        sessionIds: new Set(input.sessionIds),
+        releasedWorktreeIds: released,
+      };
+      const references = await loadSessionReferences(storage);
+      const foreignEvidence = async () => [
+        ...references.entries,
+        ...(await loadRouteTable(storage)).values(),
+      ];
+      if (hasForeignReference(references, await foreignEvidence(), target)) {
+        await this.releaseWorktreeAdmission(input.worktreeId);
+        return false;
+      }
+      if (!references.reconciled) {
+        const result = await reconcileSandboxReferences(
+          this.env,
+          {
             worktreeId: input.worktreeId,
             kiloUserId: input.kiloUserId,
             organizationId: input.organizationId,
             location: input.location,
-            releasedWorktreeIds,
-          }),
-          DEADLINE_MS.stopAttempt,
-          'Worktree ownership lookup timed out'
-        ));
-      if (exclusive) return true;
+            releasedWorktreeIds: [...released],
+          },
+          RECONCILIATION_LIMITS
+        );
+        if (!result.complete || result.foreign || result.unavailable) {
+          await this.releaseWorktreeAdmission(input.worktreeId);
+          return false;
+        }
+        const confirmed = await storage.transaction(async () => {
+          const current = await loadSessionReferences(storage);
+          if (current.reconciled) return true;
+          const routes = await loadRouteTable(storage);
+          if (hasForeignReference(current, [...current.entries, ...routes.values()], target)) {
+            return false;
+          }
+          await saveSessionReferences(storage, markReferencesReconciled(current));
+          return true;
+        });
+        if (!confirmed) {
+          await this.releaseWorktreeAdmission(input.worktreeId);
+          return false;
+        }
+      }
+      return true;
     } catch (error) {
       await this.releaseWorktreeAdmission(input.worktreeId);
       throw error;
     }
-    await this.releaseWorktreeAdmission(input.worktreeId);
-    return false;
   }
 
   private async releaseWorktreeAdmission(worktreeId: string): Promise<void> {
@@ -2549,17 +2620,12 @@ export class SandboxControl extends DurableObject<Env> {
     if (!this.runtimeDeleted) await this.scheduleAlarm(await loadDeadlines(this.ctx.storage));
   }
 
-  private worktreeIdFromDirectory(directory: string): string | undefined {
-    const parsed = cloudAgentWorktreeIdSchema.safeParse(directory.split('/').at(-1));
-    return parsed.success ? parsed.data : undefined;
-  }
-
   private async assertRequestWorktreeAdmission(
     input: SandboxControlOutboundRequest
   ): Promise<void> {
     const session = input.session;
     if (!session) return;
-    const worktreeId = this.worktreeIdFromDirectory(session.directory);
+    const worktreeId = worktreeIdFromDirectory(session.directory);
     if (input.operation === 'session.sync' && this.exclusiveDeletionWorktreeId) {
       const allowed = await this.ctx.storage.transaction(async () => {
         const exclusiveWorktreeId = this.exclusiveDeletionWorktreeId;
@@ -5136,7 +5202,7 @@ export class SandboxControl extends DurableObject<Env> {
     if (!route || route.ownerId !== input.ownerId) {
       return { allowed: false, reason: 'session_not_attached' };
     }
-    const worktreeId = route.worktreeId ?? this.worktreeIdFromDirectory(route.directory);
+    const worktreeId = route.worktreeId ?? worktreeIdFromDirectory(route.directory);
     if (
       this.runtimeDeleted ||
       this.exclusiveDeletionWorktreeId ||
@@ -5654,13 +5720,18 @@ export class SandboxControl extends DurableObject<Env> {
     return notified.every(Boolean);
   }
 
-  private mutateRoutes<T>(
-    mutation: (table: Map<string, SessionRoute>) => { value: T; changed: boolean }
+  private mutateRoutesAndReferences<T>(
+    mutation: (
+      table: Map<string, SessionRoute>,
+      references: SessionReferenceState
+    ) => { value: T; routesChanged: boolean; referencesChanged: boolean }
   ): Promise<T> {
     return this.ctx.storage.transaction(async () => {
       const table = await loadRouteTable(this.ctx.storage);
-      const updated = mutation(table);
-      if (updated.changed) await saveRouteTable(this.ctx.storage, table);
+      const references = await loadSessionReferences(this.ctx.storage);
+      const updated = mutation(table, references);
+      if (updated.routesChanged) await saveRouteTable(this.ctx.storage, table);
+      if (updated.referencesChanged) await saveSessionReferences(this.ctx.storage, references);
       return updated.value;
     });
   }

@@ -7,6 +7,7 @@ import { i18n } from '@/i18n';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { AgentSessionListContent } from './session-list-content';
+import { RowsRefreshControl } from './rows-refresh-control';
 import { type SessionListRow } from './session-list-rows';
 import { type StoredSessionRow } from './session-row';
 import { PULL_FEEDBACK_BUDGET_MS } from './use-pull-refresh';
@@ -36,6 +37,10 @@ const controls = vi.hoisted(() => ({
   leftInset: 0,
   rightInset: 0,
 }));
+// Mutable so a case can put the tree on Android: the platform decides whether
+// the floating pull-to-refresh indicator is safe (device defect uxs1) or the
+// reserved band carries the in-flight state instead.
+const platform = vi.hoisted(() => ({ OS: 'ios' as string }));
 
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@shopify/flash-list', async () => {
@@ -80,8 +85,8 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
   RefreshControl: 'RefreshControl',
-  Platform: { OS: 'ios' },
-  useWindowDimensions: () => ({ fontScale: 1 }),
+  Platform: platform,
+  useWindowDimensions: () => ({ fontScale: 1, height: 844 }),
 }));
 vi.mock('expo-router', async () => {
   const { useEffect } = await import('react');
@@ -212,6 +217,7 @@ describe('AgentSessionListContent liveness', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     controls.scrollResets = 0;
+    platform.OS = 'ios';
     vi.clearAllMocks();
   });
   afterEach(() => {
@@ -437,6 +443,45 @@ describe('AgentSessionListContent liveness', () => {
       vi.useRealTimers();
     }
   });
+
+  it.each([
+    { platform: 'ios' as const, floating: true },
+    { platform: 'android' as const, floating: false },
+  ])(
+    'carries the in-flight pull on $platform without pinning the indicator over the first row',
+    ({ platform: os, floating }) => {
+      platform.OS = os;
+      const hang = vi.fn<ContentProps['refetch']>(async () => {
+        await new Promise<void>(() => {
+          /* The hung-request shape: never settles on its own. */
+        });
+      });
+      const renderer = mount(
+        contentProps({
+          sections: [{ title: 'Today', data: [session('cached')] }],
+          refetch: hang,
+        })
+      );
+      const control = () =>
+        hosts(renderer, 'FlashList')[0]?.props.refreshControl as
+          | ReactElement<{ refreshing: boolean; onRefresh: () => void }>
+          | undefined;
+      act(() => {
+        control()?.props.onRefresh();
+      });
+      // Android's SwipeRefreshLayout rests its disc on the list's first row
+      // (device defect uxs1), so the rows list mounts `RowsRefreshControl`,
+      // which parks that disc below the fold (see its test); the reserved band
+      // above the rows then shows the wait with a spinner that cannot cover a
+      // row. iOS insets its content, so its native indicator stays.
+      expect(control()?.type).toBe(RowsRefreshControl);
+      expect(control()?.props.refreshing).toBe(true);
+      const [status] = hosts(renderer, 'AccessibleStatus');
+      expect(status?.props.message).toBe(i18n.t('agents.sessionList.updating'));
+      expect(String(status?.props.className).includes('absolute')).toBe(floating);
+      expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(floating ? 0 : 1);
+    }
+  );
 
   it.each([
     { hasAnySessions: false },

@@ -206,6 +206,7 @@ describe('isOpenAiChatGptEligible', () => {
     jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(null);
 
     await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(false);
+    expect(isOpenAiModelServed).not.toHaveBeenCalled();
   });
 
   it('is not eligible when the connection is disabled after a failed refresh', async () => {
@@ -215,6 +216,7 @@ describe('isOpenAiChatGptEligible', () => {
     });
 
     await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(false);
+    expect(isOpenAiModelServed).not.toHaveBeenCalled();
   });
 
   it('is not eligible when the row is disabled while the payload still says connected', async () => {
@@ -224,6 +226,7 @@ describe('isOpenAiChatGptEligible', () => {
     });
 
     await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(false);
+    expect(isOpenAiModelServed).not.toHaveBeenCalled();
   });
 });
 

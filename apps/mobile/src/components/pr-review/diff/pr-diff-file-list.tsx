@@ -237,7 +237,11 @@ export function PrReviewFileList({
   // user's own drag, and keeps the end report FlashList makes before it. The
   // gate is keyed by the provider ref so a drag on one PR never opens the gate
   // of a different PR rendered by the same mounted list.
-  const { onScrollBeginDrag, onEndReached } = usePrDiffPageGate(query, providerPrRefKey(scope.ref));
+  //
+  // The drag arrives on `onScrollBeginDrag` only when the list can scroll; a
+  // page that fits the viewport still delivers the finger's own movement, so
+  // `onTouchMove` opens the same gate (see `usePrDiffPageGate`).
+  const { onDragStart, onEndReached } = usePrDiffPageGate(query, providerPrRefKey(scope.ref));
 
   const stickyHeaderIndices = useMemo(() => stickyFileHeaderIndices(items), [items]);
 
@@ -356,7 +360,11 @@ export function PrReviewFileList({
             maintainVisibleContentPosition={{ disabled: true }}
             // Re-measure rows when the bounded font scale changes.
             extraData={diffFontMetrics.scale}
-            onScrollBeginDrag={onScrollBeginDrag}
+            onScrollBeginDrag={onDragStart}
+            // The reader's finger still moves when the first page fits the
+            // viewport and the list cannot scroll, so this is the drag report
+            // that opens the gate in the case the row exists for.
+            onTouchMove={onDragStart}
             onEndReached={onEndReached}
             onEndReachedThreshold={0.5}
             contentContainerStyle={listContentStyle}

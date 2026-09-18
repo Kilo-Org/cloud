@@ -24,6 +24,15 @@ function freshPageGate(): PageGate {
  * opens the gate would have nothing left to let through: hold that report in
  * `heldEndReach` and load it on the drag.
  *
+ * The drag cannot be read from `onScrollBeginDrag` alone: that event only
+ * fires when a scroll begins, and a page that fits the viewport has nothing
+ * to scroll, so a reader dragging the resting pane never opened the gate (the
+ * android round read "1 of 2 files loaded" after swipe and adb drags, and the
+ * stub served no page 2). `onDragStart` is therefore wired to the list's
+ * `onTouchMove` too — the finger's own movement, which a viewport-fitting
+ * list still reports — and both paths are idempotent: they only consume the
+ * held end report once.
+ *
  * `identity` is the rendered PR's provider ref key. The list can be handed a
  * different PR while it stays mounted, and a drag on the PR the reader left
  * must not open the next PR's gate before its partial-load row can rest, so
@@ -54,7 +63,7 @@ export function usePrDiffPageGate(query: FileListQuery, identity: string) {
     }
   }, []);
 
-  const onScrollBeginDrag = useCallback(() => {
+  const onDragStart = useCallback(() => {
     gate.current.userDragged = true;
     if (gate.current.heldEndReach) {
       gate.current.heldEndReach = false;
@@ -70,5 +79,5 @@ export function usePrDiffPageGate(query: FileListQuery, identity: string) {
     loadNextPage();
   }, [loadNextPage]);
 
-  return { onScrollBeginDrag, onEndReached };
+  return { onDragStart, onEndReached };
 }

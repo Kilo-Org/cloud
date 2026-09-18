@@ -343,6 +343,16 @@ describe('PrReviewFileList pagination gate', () => {
     });
   }
 
+  // A first page that fits the viewport cannot scroll, so Android never
+  // reports `onScrollBeginDrag`; the reader's finger still moves. The live
+  // round read "1 of 2 files loaded" after a swipe and served no page 2.
+  function touchDrag(renderer: TestRenderer.ReactTestRenderer): void {
+    const props = renderer.root.find(node => String(node.type) === 'FlashList').props;
+    act(() => {
+      (props.onTouchMove as () => void)();
+    });
+  }
+
   it('rests on the partial-load row when the first page fits the viewport', () => {
     const renderer = mountList();
     reportEndReached(renderer);
@@ -353,6 +363,23 @@ describe('PrReviewFileList pagination gate', () => {
     const renderer = mountList();
     reportEndReached(renderer);
     beginDrag(renderer);
+    expect(listQueryState.query.fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('loads the reported page when the user drags a pane that cannot scroll', () => {
+    const renderer = mountList();
+    reportEndReached(renderer);
+    touchDrag(renderer);
+    expect(listQueryState.query.fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('lets the impossible-to-scroll drag through only once', () => {
+    const renderer = mountList();
+    reportEndReached(renderer);
+    // One finger drag reports many moves; the held end report is consumed by
+    // the first of them.
+    touchDrag(renderer);
+    touchDrag(renderer);
     expect(listQueryState.query.fetchNextPage).toHaveBeenCalledOnce();
   });
 
@@ -406,7 +433,10 @@ describe('PrReviewFileList pagination gate', () => {
     });
     reportEndReached(renderer);
     expect(listQueryState.query.fetchNextPage).not.toHaveBeenCalled();
-    beginDrag(renderer);
+    // B's row rests until the reader's own drag on B. A page that fits the
+    // viewport only reports the finger's movement, so the reset must hold for
+    // that path too — it is the one the live drag-on-A/open-B round uses.
+    touchDrag(renderer);
     expect(listQueryState.query.fetchNextPage).toHaveBeenCalledOnce();
   });
 });

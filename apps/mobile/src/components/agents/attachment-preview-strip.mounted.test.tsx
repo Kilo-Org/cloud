@@ -242,6 +242,17 @@ function nodesByType(
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
 }
 
+/** The visible rounded card of each attachment chip (thumbnail or document). */
+function chipSurfaces(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      node.props.className.includes('rounded-md border border-border bg-card')
+  );
+}
+
 function findByTestID(
   root: TestRenderer.ReactTestInstance,
   testID: string
@@ -435,6 +446,35 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
   it('unmounts the strip when there are no attachments (empty state is structural)', async () => {
     const renderer = await mount([]);
     expect(renderer.toJSON()).toBeNull();
+    renderer.unmount();
+  });
+});
+
+describe('AttachmentPreviewStrip — composer chip alignment', () => {
+  it('left-pads the strip by the toolbar inset so the first chip lines up', async () => {
+    const renderer = await mount([makeAttachment({})]);
+
+    const scrollViews = nodesByType(renderer.root, 'ScrollView');
+    expect(scrollViews).toHaveLength(1);
+    // pl-3 matches the px-3 composer toolbar the strip sits above, so the first
+    // thumbnail's left edge meets the mode/model chips' left edge.
+    expect(scrollViews[0]?.props.contentContainerClassName).toBe('items-center pl-3');
+
+    renderer.unmount();
+  });
+
+  it('leaves the chip surface spacing to the chips, not the strip', async () => {
+    const renderer = await mount([makeAttachment({})]);
+
+    const surfaces = chipSurfaces(renderer.root);
+    expect(surfaces).toHaveLength(1);
+    // The alignment lives on the strip's content container; the surface keeps
+    // its own size classes and no horizontal padding.
+    expect(surfaces[0]?.props.className).toBe(
+      'overflow-hidden rounded-md border border-border bg-card h-12 w-48'
+    );
+    expect(surfaces[0]?.props.className).not.toContain('pl-');
+
     renderer.unmount();
   });
 });

@@ -22,10 +22,9 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
     console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
     return [];
   }
-  const vercelModelId = await mapModelIdToVercel(modelId);
   const providers: UserByokProviderId[] = [
     ...new Set(
-      vercelModelMetadata[vercelModelId]?.endpoints
+      vercelModelMetadata[await mapModelIdToVercel(modelId)]?.endpoints
         .map(ep => getVercelUserByokProviderIdForEndpoint(ep.provider_name ?? ep.tag))
         .filter(providerId => providerId !== undefined) ?? []
     ),

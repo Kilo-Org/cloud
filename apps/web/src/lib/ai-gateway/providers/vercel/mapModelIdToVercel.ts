@@ -78,6 +78,5 @@ export async function mapModelIdToVercel(modelId: string): Promise<string> {
     return mapResolvedModelIdToVercel(modelId);
   }
 
-  const resolvedModelId = await resolveOpenRouterModelAlias(modelId);
-  return mapResolvedModelIdToVercel(resolvedModelId);
+  return mapResolvedModelIdToVercel(await resolveOpenRouterModelAlias(modelId));
 }

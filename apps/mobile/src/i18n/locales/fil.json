@@ -783,7 +783,7 @@
     "previewFullDescription": "Ipinapakita ng mga notipikasyon ang teksto ng mensahe sa naka-lock mong screen.",
     "previewGenericDescription": "Ipinapaalam ng mga notipikasyon na may nangyari. Buksan ang Kilo para basahin ang mensahe.",
     "channel": {
-      "agent": "Mga sesyon ng ahente",
+      "agentProgress": "Pag-usad ng ahente",
       "chat": "Mga mensahe sa usapan",
       "kiloclaw": "Aktibidad ng KiloClaw",
       "balance": "Mga babala sa balanse",

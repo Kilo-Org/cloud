@@ -293,7 +293,7 @@
     "previewFullDescription": "Bildirimler kilit ekranında mesaj metnini gösterir.",
     "previewGenericDescription": "Bildirimler yalnızca yeni bir gelişme olduğunu gösterir. Mesajı okumak için Kilo'yu aç.",
     "channel": {
-      "agent": "Ajan oturumları",
+      "agentProgress": "Ajan ilerlemesi",
       "chat": "Sohbet mesajları",
       "kiloclaw": "KiloClaw etkinliği",
       "balance": "Bakiye uyarıları",

@@ -55,8 +55,12 @@ export type DispatchAgentSessionNotificationPushDeps = {
   getSession: (userId: string, cliSessionId: string) => Promise<AgentNotificationSession | null>;
   hasOrganizationAccess: (userId: string, organizationId: string) => Promise<boolean>;
   /**
-   * Read the user's notification preferences. The agent-push RPC is
-   * category 3 ("Agent updates") and gates on `agentPushEnabled`. A throw
+   * Read the user's notification preferences. The explicit `notify_user`
+   * push is classified needs-input (see
+   * `buildAgentSessionNotificationDispatchInput`), so it gates on
+   * `agentAttentionEnabled`, the same 'Agent needs you' toggle the
+   * attention producer of `cloud_agent_session` reads — not on
+   * `agentPushEnabled` ('Agent updates'), which no longer governs it. A throw
    * fails closed (§4.5) and propagates as a
    * `{dispatched:false, reason:'failed'}` result; the RPC layer does not
    * translate that into a thrown RPC error because preference read is a
@@ -150,7 +154,7 @@ export async function dispatchAgentSessionNotificationPush(
   } catch {
     return { dispatched: false, reason: 'failed' };
   }
-  if (!prefs.agentPushEnabled) {
+  if (!prefs.agentAttentionEnabled) {
     return { dispatched: false, reason: 'suppressed_preference' };
   }
 

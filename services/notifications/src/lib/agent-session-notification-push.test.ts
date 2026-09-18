@@ -191,19 +191,21 @@ describe('dispatchAgentSessionNotificationPush', () => {
     expect(deps.readPreferences).not.toHaveBeenCalled();
   });
 
-  it('returns suppressed_preference when the user has turned agent pushes off', async () => {
-    const { deps, calls } = fakeDeps({ preferences: { agentPushEnabled: false } });
+  it('returns suppressed_preference when the user has turned the "Agent needs you" kind off', async () => {
+    const { deps, calls } = fakeDeps({ preferences: { agentAttentionEnabled: false } });
     const result = await dispatchAgentSessionNotificationPush(baseParams, deps);
     expect(result).toEqual({ dispatched: false, reason: 'suppressed_preference' });
     expect(calls.dispatchPushInputs).toHaveLength(0);
   });
 
-  it('keeps other category preferences irrelevant — only agentPushEnabled gates this RPC', async () => {
+  it('gates on agentAttentionEnabled only — the needs-input kind, not agentPushEnabled', async () => {
     const { deps, calls } = fakeDeps({
       preferences: {
-        agentPushEnabled: true,
+        // The push is needs-input now, so the 'Agent updates' toggle no longer
+        // governs it; every other category stays irrelevant.
+        agentPushEnabled: false,
         chatMessagesEnabled: false,
-        agentAttentionEnabled: false,
+        agentAttentionEnabled: true,
         sessionStatusEnabled: false,
         kiloclawActivityEnabled: false,
       },

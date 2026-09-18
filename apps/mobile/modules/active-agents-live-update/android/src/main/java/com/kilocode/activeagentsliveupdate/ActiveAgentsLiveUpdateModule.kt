@@ -243,6 +243,11 @@ class ActiveAgentsLiveUpdateModule : Module() {
       builder.setStyle(Notification.ProgressStyle())
     }
 
+    // Snapshot the timeout flag a failed same-channel post must restore: that
+    // post leaves the previous card in the shade, so the flag must keep
+    // describing it rather than the timeout this call could not arm.
+    val previousHasTimeout = notificationState.getBoolean(HAS_TIMEOUT, false)
+
     // Commit before arming a timeout so process exit cannot lose cancellation state.
     if (timeoutMs > 0) {
       check(notificationState.edit().putBoolean(HAS_TIMEOUT, true).commit()) {
@@ -255,16 +260,23 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // moving the card, which would leave the previous kind's card in the shade.
     // The alert decision above is unchanged, so the fresh post still alerts only
     // when the JS side asked it to.
+    //
+    // Each cancel is also what a failed post below needs to know: only a post
+    // that removed the card it found leaves no card for the durable marker to
+    // describe. A same-channel update removes nothing and keeps the previous
+    // card in the shade (see the catch).
     val previousChannelId = postedChannelId()
-    if (previousChannelId != null && previousChannelId != channelId) {
+    val clearsOnChannelSwitch = previousChannelId != null && previousChannelId != channelId
+    if (clearsOnChannelSwitch) {
       notificationManager.cancel(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID)
     }
 
+    // Ordinary updates must retain the notification so onlyAlertOnce suppresses repeat alerts.
+    val clearsOnTimeoutChange = Build.VERSION.SDK_INT >= 26 && timeoutMs <= 0 && previousHasTimeout
+    if (clearsOnTimeoutChange) {
+      notificationManager.cancel(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID)
+    }
     if (Build.VERSION.SDK_INT >= 26) {
-      // Ordinary updates must retain the notification so onlyAlertOnce suppresses repeat alerts.
-      if (timeoutMs <= 0 && notificationState.getBoolean(HAS_TIMEOUT, false)) {
-        notificationManager.cancel(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID)
-      }
       builder.setTimeoutAfter(timeoutMs.coerceAtLeast(0))
     } else {
       ActiveAgentsDeadlineReceiver.setLegacyNotificationTimeout(context, timeoutMs)
@@ -272,10 +284,17 @@ class ActiveAgentsLiveUpdateModule : Module() {
     try {
       notificationManager.notify(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID, builder.build())
     } catch (error: Throwable) {
-      // The post did not land, so no card exists for this marker to describe.
-      // Drop it before rethrowing so a later start does not adopt a kind from a
-      // card that is not in the shade.
-      notificationState.edit().remove(POSTED_CHANNEL).remove(HAS_TIMEOUT).apply()
+      // The post did not land. When this call removed the previous card the
+      // shade holds nothing, so drop the marker before rethrowing a later start
+      // does not adopt a kind from a card that is not there. A same-channel
+      // update removed nothing: its previous card is still posted, so clearing
+      // the marker would strand it on the next channel switch and hide it from a
+      // JS restart's adoption. Restore the timeout flag with the marker.
+      if (previousChannelId != channelId || clearsOnTimeoutChange) {
+        notificationState.edit().remove(POSTED_CHANNEL).remove(HAS_TIMEOUT).apply()
+      } else {
+        notificationState.edit().putBoolean(HAS_TIMEOUT, previousHasTimeout).apply()
+      }
       throw error
     }
     // Mirror the posted channel so the next post can tell whether the card moves.

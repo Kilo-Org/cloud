@@ -76,12 +76,22 @@ describe('ActiveAgentsLiveUpdate channel switch', () => {
     expect(getter).toContain('NOTIFICATION_ID');
   });
 
-  it('drops the posted marker when the post fails', () => {
+  it('clears the failed post marker only when that post removed the card', () => {
     const post = segment('private fun post(', 'private fun dismiss()');
     const notify = post.indexOf('notificationManager.notify(');
-    const clearing = post.indexOf('remove(POSTED_CHANNEL)', notify);
+    const catchStart = post.indexOf('catch (error', notify);
+    expect(catchStart, 'post no longer handles a failed notify').toBeGreaterThan(notify);
+    const clearing = post.indexOf('remove(POSTED_CHANNEL)', catchStart);
     expect(clearing, 'a failed post must clear the marker it could not confirm').toBeGreaterThan(
-      notify
+      catchStart
     );
+    // `notify` is also the update path: a same-channel post removes no card and
+    // leaves the previous one in the shade, so its marker must survive the
+    // failure. The clear is guarded on whether this call removed that card.
+    const guard = post.lastIndexOf('previousChannelId != channelId', clearing);
+    expect(
+      guard,
+      'the failure path must not clear the marker of a card still in the shade'
+    ).toBeGreaterThan(catchStart);
   });
 });

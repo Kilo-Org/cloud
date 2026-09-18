@@ -849,7 +849,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
     const inboundEmailAddress = await getInboundEmailAddressForInstance(instance.id);
 
-    // Fetch live worker status for all instances.
     // DB may be marked destroyed while DO is still retrying destroy.
     let workerStatus: PlatformDebugStatusResponse | null = null;
     let workerStatusError: string | null = null;
@@ -1134,7 +1133,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
       );
 
-    // Time-windowed counts
     const [last24h] = await db
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(kiloclaw_instances)
@@ -1157,7 +1155,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         )
       );
 
-    // Average lifespan of destroyed instances
     const [lifespan] = await db
       .select({
         avg_lifespan_minutes: sql<
@@ -1167,7 +1164,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .from(kiloclaw_instances)
       .where(isNotNull(kiloclaw_instances.destroyed_at));
 
-    // Daily stats for chart
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
@@ -1196,7 +1192,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .groupBy(sql`DATE(${kiloclaw_instances.destroyed_at})`)
       .orderBy(sql`DATE(${kiloclaw_instances.destroyed_at})`);
 
-    // Merge created and destroyed into a single daily series
     const destroyedByDate = new Map(dailyDestroyed.map(d => [d.date, d.destroyed]));
     const createdByDate = new Map(dailyStats.map(d => [d.date, d.created]));
 
@@ -3029,7 +3024,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               message: 'Scheduled action not found',
             });
           }
-          // Already in terminal state — return cancelled:false (no-op)
           return { cancelled: false as const, status: existing.status };
         }
 
@@ -3185,7 +3179,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       const instance = await resolveInstance(input.userId, input.instanceId);
       const client = new KiloClawInternalClient();
 
-      // Verify the appName/machineId match the DO's actual state
       let status: Awaited<ReturnType<KiloClawInternalClient['getDebugStatus']>>;
       try {
         status = await client.getDebugStatus(input.userId, workerInstanceId(instance));
@@ -3763,8 +3756,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }),
 
-  // ── Orphan detection ──────────────────────────────────────────────────
-
   detectOrphans: adminProcedure.input(DetectOrphansSchema).mutation(async ({ input }) => {
     // 1. Fetch all active (non-destroyed) instances created within the date range.
     //    Cap at 1000 to avoid excessively long fan-outs; the UI shows when capped.
@@ -3877,7 +3868,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   destroyOrphan: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
-      // Verify the instance exists and is not already destroyed.
       const [instance] = await db
         .select({
           id: kiloclaw_instances.id,
@@ -3937,8 +3927,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  // ── Orphan-volume reaper ──────────────────────────────────────────────
-  //
   // Finds Fly volumes left behind by destroyed instances and lets an admin
   // reap them one row at a time. Detection is anchored on the (soft-deleted,
   // never hard-deleted) `kiloclaw_instances` row — the Fly app + volume name

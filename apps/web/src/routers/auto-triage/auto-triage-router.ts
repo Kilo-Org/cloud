@@ -290,7 +290,6 @@ export const autoTriageRouter = createTRPCRouter({
           await requireActiveSubscriptionOrTrial(fullInput.organizationId);
         }
 
-        // Build config object with defaults for optional fields
         const config = {
           enabled_for_issues: fullInput.enabled_for_issues,
           repository_selection_mode: fullInput.repository_selection_mode,

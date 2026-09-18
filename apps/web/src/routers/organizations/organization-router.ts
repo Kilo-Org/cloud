@@ -560,8 +560,6 @@ export const organizationsRouter = createTRPCRouter({
   }),
 
   usageStats: organizationMemberProcedure.output(UsageStatsSchema).query(async opts => {
-    // Fetch and return usage stats for the organization (last 30 days)
-    // Get usage statistics
     const rows = await timedUsageQuery(
       {
         db: readDb,

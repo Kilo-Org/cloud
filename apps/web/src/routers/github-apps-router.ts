@@ -172,7 +172,6 @@ export const githubAppsRouter = createTRPCRouter({
       url.searchParams.set('code_challenge_method', 'S256');
       return { authorizationUrl: url.toString() };
     }),
-  // List all integrations
   listIntegrations: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
@@ -299,7 +298,6 @@ export const githubAppsRouter = createTRPCRouter({
     return getGitHubAppTypeForOrganization(input?.organizationId ?? null);
   }),
 
-  // Mint a one-time install state token for the signed-in user.
   mintInstallState: baseProcedure
     .input(
       z.object({
@@ -340,7 +338,6 @@ export const githubAppsRouter = createTRPCRouter({
       return { token };
     }),
 
-  // Get GitHub App installation status
   getInstallation: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
@@ -385,7 +382,6 @@ export const githubAppsRouter = createTRPCRouter({
     };
   }),
 
-  // Update the model for GitHub App integration
   updateModel: baseProcedure
     .input(
       z.object({
@@ -511,7 +507,6 @@ export const githubAppsRouter = createTRPCRouter({
       return result;
     }),
 
-  // Check if current user has a pending installation.
   // Note: This is intentionally user-scoped (ctx.user.id) even when an organizationId is
   // provided, because GitHub App installations are initiated per-user. The org access
   // check only gates visibility — the pending state itself is always user-global.

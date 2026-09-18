@@ -19,7 +19,6 @@ describe('Agent Profiles Router', () => {
   let organizationA: Organization;
 
   beforeAll(async () => {
-    // Create test users
     ownerUser = await insertTestUser({
       google_user_email: 'agent-profiles-owner@example.com',
       google_user_name: 'Agent Profiles Owner',
@@ -35,16 +34,12 @@ describe('Agent Profiles Router', () => {
       google_user_name: 'Other User',
     });
 
-    // Create test organization
     organizationA = await createTestOrganization('Agent Profiles Test Org', ownerUser.id, 100000);
 
-    // Add member to organization
     await addUserToOrganization(organizationA.id, memberUser.id, 'member');
   });
 
   afterEach(async () => {
-    // Clean up profiles after each test
-    // First delete vars and commands (due to FK constraints)
     const profiles = await db
       .select({ id: agent_environment_profiles.id })
       .from(agent_environment_profiles);
@@ -58,7 +53,6 @@ describe('Agent Profiles Router', () => {
         .where(eq(agent_environment_profile_commands.profile_id, profile.id));
     }
 
-    // Then delete profiles
     await db
       .delete(agent_environment_profiles)
       .where(eq(agent_environment_profiles.owned_by_user_id, ownerUser.id));
@@ -85,7 +79,6 @@ describe('Agent Profiles Router', () => {
 
         expect(result.id).toBeDefined();
 
-        // Verify profile exists in database
         const [dbProfile] = await db
           .select()
           .from(agent_environment_profiles)
@@ -127,12 +120,10 @@ describe('Agent Profiles Router', () => {
       test('should return user profiles with counts', async () => {
         const caller = await createCallerForUser(ownerUser.id);
 
-        // Create a profile
         const { id: profileId } = await caller.agentProfiles.create({
           name: 'Test Profile',
         });
 
-        // Add a var
         await caller.agentProfiles.setVar({
           profileId,
           key: 'TEST_VAR',
@@ -140,7 +131,6 @@ describe('Agent Profiles Router', () => {
           isSecret: false,
         });
 
-        // Add commands
         await caller.agentProfiles.setCommands({
           profileId,
           commands: ['npm install', 'npm test'],
@@ -158,11 +148,9 @@ describe('Agent Profiles Router', () => {
         const callerA = await createCallerForUser(ownerUser.id);
         const callerB = await createCallerForUser(otherUser.id);
 
-        // Create profiles for both users
         await callerA.agentProfiles.create({ name: 'Owner Profile' });
         await callerB.agentProfiles.create({ name: 'Other Profile' });
 
-        // Each user should only see their own profiles
         const resultA = await callerA.agentProfiles.list({});
         const resultB = await callerB.agentProfiles.list({});
 
@@ -210,12 +198,10 @@ describe('Agent Profiles Router', () => {
         expect(result.vars).toHaveLength(2);
         expect(result.commands).toHaveLength(1);
 
-        // Secret value should be masked
         const secretVar = result.vars.find(v => v.key === 'API_KEY');
         expect(secretVar?.value).toBe('***');
         expect(secretVar?.isSecret).toBe(true);
 
-        // Non-secret value should be visible
         const debugVar = result.vars.find(v => v.key === 'DEBUG');
         expect(debugVar?.value).toBe('true');
         expect(debugVar?.isSecret).toBe(false);
@@ -288,7 +274,6 @@ describe('Agent Profiles Router', () => {
 
         expect(result.success).toBe(true);
 
-        // Verify profile is deleted
         const profiles = await db
           .select()
           .from(agent_environment_profiles)
@@ -296,7 +281,6 @@ describe('Agent Profiles Router', () => {
 
         expect(profiles).toHaveLength(0);
 
-        // Verify vars are deleted (cascade)
         const vars = await db
           .select()
           .from(agent_environment_profile_vars)
@@ -304,7 +288,6 @@ describe('Agent Profiles Router', () => {
 
         expect(vars).toHaveLength(0);
 
-        // Verify commands are deleted (cascade)
         const commands = await db
           .select()
           .from(agent_environment_profile_commands)
@@ -340,17 +323,13 @@ describe('Agent Profiles Router', () => {
           name: 'Profile 2',
         });
 
-        // Set profile 1 as default
         await caller.agentProfiles.setAsDefault({ profileId: profile1Id });
 
-        // Set profile 2 as default
         await caller.agentProfiles.setAsDefault({ profileId: profile2Id });
 
-        // Profile 1 should no longer be default
         const result1 = await caller.agentProfiles.get({ profileId: profile1Id });
         expect(result1.isDefault).toBe(false);
 
-        // Profile 2 should be default
         const result2 = await caller.agentProfiles.get({ profileId: profile2Id });
         expect(result2.isDefault).toBe(true);
       });
@@ -607,23 +586,19 @@ describe('Agent Profiles Router', () => {
       test('should not mix user and org profiles', async () => {
         const caller = await createCallerForUser(ownerUser.id);
 
-        // Create user profile
         await caller.agentProfiles.create({
           name: 'User Profile',
         });
 
-        // Create org profile
         await caller.agentProfiles.create({
           organizationId: organizationA.id,
           name: 'Org Profile',
         });
 
-        // List user profiles
         const userProfiles = await caller.agentProfiles.list({});
         expect(userProfiles).toHaveLength(1);
         expect(userProfiles[0].name).toBe('User Profile');
 
-        // List org profiles
         const orgProfiles = await caller.agentProfiles.list({
           organizationId: organizationA.id,
         });
@@ -642,7 +617,6 @@ describe('Agent Profiles Router', () => {
           name: 'Shared Org Profile',
         });
 
-        // Member can get the profile
         const result = await memberCaller.agentProfiles.get({
           organizationId: organizationA.id,
           profileId,

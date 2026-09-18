@@ -1,4 +1,3 @@
-// admin-router.ts
 import {
   adminProcedure,
   createTRPCRouter,
@@ -938,12 +937,10 @@ export const adminRouter = createTRPCRouter({
           eq(stytch_fingerprints.kilo_user_id, userId)
         );
 
-        // Get all unique fingerprints of the selected type
         const uniqueFingerprints = [
           ...new Set(userFingerprints.map(fp => fp[fingerprintType]).filter(fp => fp != 'UNKNOWN')),
         ];
 
-        // Find all other users with the same fingerprints (excluding current user)
         const relatedFingerprints =
           uniqueFingerprints.length > 0
             ? await fingerprintsQuery
@@ -960,7 +957,6 @@ export const adminRouter = createTRPCRouter({
 
         const usersById = await findUsersByIds(relatedFingerprints.map(fp => fp.kilo_user_id));
 
-        // Map over unique user IDs to build result
         const relatedUsers = relatedFingerprints.map(fp => {
           const user = toNonNullish(usersById.get(fp.kilo_user_id));
           return {
@@ -1006,7 +1002,6 @@ export const adminRouter = createTRPCRouter({
           };
         }
 
-        // Fetch all issuances with their items for this subscription
         const issuanceRows = await db
           .select({
             issueMonth: kilo_pass_issuances.issue_month,
@@ -1024,7 +1019,6 @@ export const adminRouter = createTRPCRouter({
           .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, subscription.subscriptionId))
           .orderBy(desc(kilo_pass_issuances.issue_month), asc(kilo_pass_issuance_items.created_at));
 
-        // Find the most recent base credit issuance to compute usage since
         const latestBaseIssuance = issuanceRows.find(
           r => r.itemKind === KiloPassIssuanceItemKind.Base
         );
@@ -1159,7 +1153,6 @@ export const adminRouter = createTRPCRouter({
       const hasAccess = earlybirdState.hasAccess || accessReason !== null;
       const effectiveAccessReason = earlybirdState.hasAccess ? 'earlybird' : accessReason;
 
-      // Build instance lookup for per-subscription context
       const instancesById = new Map(allInstances.map(inst => [inst.id, inst]));
 
       const subscriptions = allSubscriptions.map(sub => ({
@@ -1252,7 +1245,6 @@ export const adminRouter = createTRPCRouter({
           isReset = subscription.status === 'canceled';
           const previousTrialEndsAt = subscription.trial_ends_at;
           if (isReset) {
-            // Reset canceled subscription to a new trial
             const [updatedSubscription] = await tx
               .update(kiloclaw_subscriptions)
               .set({
@@ -1320,7 +1312,6 @@ export const adminRouter = createTRPCRouter({
                 )
               );
           } else {
-            // Just update the trial end date for an active trial
             const [updatedSubscription] = await tx
               .update(kiloclaw_subscriptions)
               .set({ trial_ends_at: input.trial_ends_at })
@@ -1711,7 +1702,6 @@ export const adminRouter = createTRPCRouter({
         // SQL expression for random jitter ±$1 (evaluated per-row)
         const jitterSql = sql`(random() - 0.5) * 2000000`;
 
-        // Jitter user balance
         await db
           .update(kilocode_users)
           .set({

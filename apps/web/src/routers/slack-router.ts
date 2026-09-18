@@ -30,7 +30,6 @@ async function deleteChatSdkSlackIdentityCache(teamId: string): Promise<void> {
 }
 
 export const slackRouter = createTRPCRouter({
-  // Get Slack installation status
   getInstallation: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
@@ -64,7 +63,6 @@ export const slackRouter = createTRPCRouter({
     };
   }),
 
-  // Uninstall Slack integration
   uninstallApp: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
@@ -90,7 +88,6 @@ export const slackRouter = createTRPCRouter({
     return result;
   }),
 
-  // Test Slack connection
   testConnection: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
@@ -100,7 +97,6 @@ export const slackRouter = createTRPCRouter({
     return slackService.testConnection(owner);
   }),
 
-  // Update the model for Slack integration
   updateModel: baseProcedure
     .input(
       z.object({

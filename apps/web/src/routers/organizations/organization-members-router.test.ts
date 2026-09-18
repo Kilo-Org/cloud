@@ -39,7 +39,6 @@ jest.mock('@/lib/organizations/organizations', () => {
   };
 });
 
-// Mock the email service to prevent actual API calls during tests
 jest.mock('@/lib/email', () => ({
   sendOrganizationInviteEmail: jest.fn().mockResolvedValue({ sent: true }),
   subjects: { orgInvitation: 'Kilo: Teams Invitation' },
@@ -50,7 +49,6 @@ jest.mock('@/lib/email', () => ({
   },
 }));
 
-// Test users and organization will be created dynamically
 let regularUser: User;
 let adminUser: User;
 let memberUser: User;
@@ -62,7 +60,6 @@ let testOrganization: Organization;
 
 describe('organizations members trpc router', () => {
   beforeAll(async () => {
-    // Create test users using the helper function
     regularUser = await insertTestUser({
       google_user_email: 'regular-members@example.com',
       google_user_name: 'Regular Members User',
@@ -99,10 +96,8 @@ describe('organizations members trpc router', () => {
       is_admin: false,
     });
 
-    // Create test organization using the CRUD method
     testOrganization = await createOrganization('Test Members Organization', regularUser.id);
 
-    // Add member user to organization using CRUD method
     await addUserToOrganization(testOrganization.id, memberUser.id, 'member');
     await addUserToOrganization(testOrganization.id, billingManagerUser.id, 'billing_manager');
     await addUserToOrganization(testOrganization.id, orgAdminUser.id, 'admin');
@@ -371,7 +366,6 @@ describe('organizations members trpc router', () => {
     });
 
     it('should throw FORBIDDEN error when non-owner tries to assign owner role', async () => {
-      // Create a test user to be the target of the role update
       const targetUser = await insertTestUser({
         google_user_email: 'target-role-update@example.com',
         google_user_name: 'Target Role Update User',
@@ -448,7 +442,6 @@ describe('organizations members trpc router', () => {
     it('should validate input schema', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Test invalid UUID
       await expect(
         caller.organizations.members.update({
           organizationId: 'invalid-uuid',
@@ -457,7 +450,6 @@ describe('organizations members trpc router', () => {
         })
       ).rejects.toThrow();
 
-      // Test invalid daily usage limit (too high)
       await expect(
         caller.organizations.members.update({
           organizationId: testOrganization.id,
@@ -466,7 +458,6 @@ describe('organizations members trpc router', () => {
         })
       ).rejects.toThrow();
 
-      // Test invalid daily usage limit (negative)
       await expect(
         caller.organizations.members.update({
           organizationId: testOrganization.id,
@@ -672,7 +663,6 @@ describe('organizations members trpc router', () => {
         is_admin: false,
       });
 
-      // Add them to the organization
       await addUserToOrganization(testOrganization.id, testMemberUser.id, 'member');
     });
 
@@ -754,7 +744,6 @@ describe('organizations members trpc router', () => {
         is_admin: false,
       });
 
-      // Add them to the organization as a regular member (not admin/owner)
       await addUserToOrganization(testOrganization.id, freshMemberUser.id, 'member');
 
       const caller = await createCallerForUser(freshMemberUser.id);
@@ -899,7 +888,6 @@ describe('organizations members trpc router', () => {
     it('should validate input schema', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Test invalid UUID
       await expect(
         caller.organizations.members.remove({
           organizationId: 'invalid-uuid',
@@ -1016,7 +1004,6 @@ describe('organizations members trpc router', () => {
         role: 'member',
       });
 
-      // Simulate a terminal failure after 8 attempts.
       await db
         .update(external_side_effect_outbox)
         .set({ status: 'failed', attempts: 8, last_error: 'send failed' })
@@ -1112,7 +1099,6 @@ describe('organizations members trpc router', () => {
         role: 'member',
       });
 
-      // Simulate a drainer holding a `sending` claim.
       await db
         .update(external_side_effect_outbox)
         .set({ status: 'sending', claimed_at: sql`NOW()` })
@@ -1139,7 +1125,6 @@ describe('organizations members trpc router', () => {
         role: 'member',
       });
 
-      // Simulate a terminal send failure, then expiry.
       await db
         .update(external_side_effect_outbox)
         .set({ status: 'failed', attempts: 8, last_error: 'send failed' })
@@ -1366,7 +1351,6 @@ describe('organizations members trpc router', () => {
     it('should validate input schema', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Test invalid UUID
       await expect(
         caller.organizations.members.invite({
           organizationId: 'invalid-uuid',
@@ -1375,7 +1359,6 @@ describe('organizations members trpc router', () => {
         })
       ).rejects.toThrow();
 
-      // Test invalid email
       await expect(
         caller.organizations.members.invite({
           organizationId: testOrganization.id,
@@ -1384,7 +1367,6 @@ describe('organizations members trpc router', () => {
         })
       ).rejects.toThrow();
 
-      // Test invalid role
       await expect(
         caller.organizations.members.invite({
           organizationId: testOrganization.id,
@@ -1400,7 +1382,6 @@ describe('organizations members trpc router', () => {
     let testInviteId: string;
 
     beforeAll(async () => {
-      // Create a test invitation to delete
       const caller = await createCallerForUser(regularUser.id);
       await caller.organizations.members.invite({
         organizationId: testOrganization.id,
@@ -1621,7 +1602,6 @@ describe('organizations members trpc router', () => {
     it('should validate input schema', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
-      // Test invalid UUID
       await expect(
         caller.organizations.members.deleteInvite({
           organizationId: 'invalid-uuid',

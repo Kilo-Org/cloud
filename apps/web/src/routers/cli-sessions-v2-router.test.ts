@@ -1016,7 +1016,6 @@ describe('cli-sessions-v2-router', () => {
           watermarkEventId: 42,
         });
         expect(mockGetSession).toHaveBeenCalledWith(cloudAgentSessionId);
-        // Verify both the watermark and the page were fetched.
         expect(fetchSessionMessagesPage).toHaveBeenCalled();
       });
 
@@ -1415,7 +1414,6 @@ describe('cli-sessions-v2-router', () => {
     });
 
     it('should throw NOT_FOUND when session belongs to a different org (org trigger)', async () => {
-      // Create a session belonging to testOrganization
       const orgSessionId = 'ses_test_share_v2_org_session_1234';
       await db.insert(cli_sessions_v2).values({
         session_id: orgSessionId,
@@ -1424,7 +1422,6 @@ describe('cli-sessions-v2-router', () => {
         organization_id: testOrganization.id,
       });
 
-      // Create a second org and an org trigger for it
       const [otherOrg] = await db
         .insert(organizations)
         .values({
@@ -1460,7 +1457,6 @@ describe('cli-sessions-v2-router', () => {
 
       try {
         const caller = await createCallerForUser(regularUser.id);
-        // Try to share orgSession (belongs to testOrganization) via otherOrg's trigger
         await expect(
           caller.cliSessionsV2.shareForWebhookTrigger({
             kilo_session_id: orgSessionId,
@@ -2256,7 +2252,6 @@ describe('cli-sessions-v2-router', () => {
     });
 
     it('list exposes reviewDecision when the cache row has it set', async () => {
-      // Update the existing cache row to have an approved review decision.
       await db
         .update(github_branch_pull_requests)
         .set({ pr_review_decision: 'approved' })

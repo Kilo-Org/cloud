@@ -245,6 +245,9 @@ export function SessionDetailContent({
 
   const messages = useAtomValue(manager.atoms.messagesList);
   const isLoading = useAtomValue(manager.atoms.isLoading);
+  // Cached rows are on screen and the session's current transcript is still
+  // being fetched: the open is a refresh over readable content, not a load.
+  const isRefreshingCachedTranscript = useAtomValue(manager.atoms.isRefreshingCachedTranscript);
   const error = useAtomValue(manager.atoms.error);
   const fetchedData = useAtomValue(manager.atoms.fetchedSessionData);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
@@ -1428,9 +1431,11 @@ export function SessionDetailContent({
   // composer's own content clears the landscape sensor insets.
   const isComposerMounted = !isReadOnly || messages.length === 0;
   const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
+  // Structural locks only. The live send capability is passed separately so a
+  // failed turn (or a session that has not resolved yet) keeps the input
+  // editable beside the error's Retry instead of locking the composer.
   const isComposerDisabled = resolveSessionComposerDisabled({
     isReadOnly,
-    canSend,
     shouldShowLoading,
     hasBlockingInteraction,
     requiresModel,
@@ -1744,6 +1749,10 @@ export function SessionDetailContent({
               : {})}
           />
           <SessionConnectionIndicator
+            // The cached transcript is readable while its replacement is
+            // fetched: the refresh indicator owns the row for that window, in
+            // the same fixed slot so nothing below it shifts.
+            isRefreshingTranscript={isRefreshingCachedTranscript && messages.length > 0}
             sessionRefresh={
               cachedMetadataRefresh
                 ? {
@@ -1886,6 +1895,9 @@ export function SessionDetailContent({
               placeholder={t('agentChat.goal.editPlaceholder')}
               initialValue={sessionGoal.text}
               maxLength={500}
+              // Goal text is prose and can hold a long unbroken line; the dialog
+              // must wrap it instead of clipping its start.
+              multiline
               onSave={handleGoalEditSave}
               onClose={() => {
                 setIsGoalEditOpen(false);
@@ -2023,6 +2035,7 @@ export function SessionDetailContent({
                 onExitSession={handleExitSession}
                 onStop={handleStop}
                 disabled={isComposerDisabled}
+                sendDisabled={!canSend}
                 isStreaming={isStreaming}
                 placeholder={composerPlaceholder}
                 mode={currentMode}

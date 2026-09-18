@@ -1020,6 +1020,54 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('returns the reconnect error instead of serving another billing path when the ChatGPT connection is dead', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'chatgpt-reconnect',
+      message: 'Your ChatGPT connection has expired. Reconnect to continue.',
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+    const body = (await response.json()) as { error: string; error_type: string };
+
+    expect(response.status).toBe(400);
+    expect(body.error_type).toBe('byok_error');
+    expect(body.error).toContain('Your ChatGPT connection has expired. Reconnect to continue.');
+    expect(body.error).toContain('/byok');
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    expect(mockedClassifyAbuse).not.toHaveBeenCalled();
+  });
+
+  it('applies delay before returning the reconnect error when quarantine-3 re-resolution is dead', async () => {
+    jest.useFakeTimers();
+    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-3'));
+    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-3'));
+    mockedGetProvider
+      .mockResolvedValueOnce({
+        kind: 'provider',
+        provider,
+        userByok: null,
+        bypassAccessCheck: false,
+      })
+      .mockResolvedValueOnce({
+        kind: 'chatgpt-reconnect',
+        message: 'Your ChatGPT connection has expired. Reconnect to continue.',
+      });
+
+    const { POST } = await import('./route');
+    const responsePromise = POST(makeRequest(makeBody()) as never);
+
+    await jest.advanceTimersByTimeAsync(5999);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(1);
+    const response = await responsePromise;
+
+    expect(response.status).toBe(400);
+    expect(mockedGetProvider).toHaveBeenCalledTimes(2);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('applies delay before returning error when quarantine-3 override API kind is unsupported', async () => {
     jest.useFakeTimers();
     mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-3'));

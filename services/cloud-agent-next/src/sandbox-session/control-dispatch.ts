@@ -98,12 +98,28 @@ export function isRetryableDeliveryError(error: unknown): boolean {
 }
 
 export function deliveryErrorLogFields(error: unknown) {
+  // A logging helper runs inside catch blocks, so a throwing read or conversion
+  // must not propagate and skip the recovery that follows the log call.
+  let errorMessage: string;
+  try {
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else {
+      const message =
+        typeof error === 'object' && error !== null && Object.hasOwn(error, 'message')
+          ? (error as { message?: unknown }).message
+          : undefined;
+      errorMessage = typeof message === 'string' ? message : String(error);
+    }
+  } catch {
+    errorMessage = '[unserializable error]';
+  }
   return {
     errorCode:
       error instanceof ControlRequestError
         ? (controlErrorCodes.find(code => code === error.code) ?? 'unknown_control_error')
         : 'transport_or_internal_error',
-    ...(error instanceof ControlRequestError ? { errorMessage: error.message } : {}),
+    errorMessage,
     retryable: isRetryableDeliveryError(error),
   };
 }

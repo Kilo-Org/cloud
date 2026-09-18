@@ -83,6 +83,9 @@ vi.mock('expo-router', () => ({
   }),
 }));
 vi.mock('@/components/home/new-task-button', () => ({ NewTaskButton: 'NewTaskButton' }));
+vi.mock('@/components/home/new-task-from-picture-button', () => ({
+  NewTaskFromPictureButton: 'NewTaskFromPictureButton',
+}));
 vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
@@ -300,6 +303,21 @@ describe('HomeScreen composition', () => {
     for (const label of ['Code Reviewer', 'Security Agent', 'PR Review']) {
       expect(text()).not.toContain(label);
     }
+  });
+
+  it('shows the picture entry beside the new task action once the Home surface is ready', async () => {
+    state.organization.organizationId = 'org-1';
+    state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Home organization' }];
+    state.boundary.org = state.boundary.orgs[0];
+    await renderHome();
+    expect(nodes('NewTaskButton')).toHaveLength(1);
+    expect(nodes('NewTaskFromPictureButton')).toHaveLength(1);
+    expect(nodes('NewTaskFromPictureButton')[0]?.props.organizationId).toBe('org-1');
+
+    state.auth.isLoading = true;
+    await renderHome();
+    expect(nodes('NewTaskFromPictureButton')).toHaveLength(0);
+    expect(nodes('NewTaskButton')).toHaveLength(0);
   });
 
   it.each([false, true])('admits rows and actions with organization readiness=%s', async loaded => {

@@ -56,7 +56,7 @@ describe('native-scoped control event failures', () => {
         expect(
           transport.enqueue(event, payload, { ...session, nativeRuntimeId: runtime.runtimeId })
         ).toBe(true);
-        clock.mockReturnValue(31_000);
+        clock.mockReturnValue(61_000);
         expect(await transport.resume()).toBe(true);
         expect(reported).toHaveBeenCalledTimes(1);
         expect(retired).toHaveBeenCalledTimes(retires ? 1 : 0);
@@ -99,7 +99,7 @@ describe('native-scoped control event failures', () => {
         identity.nativeRuntimeId = replacement.runtimeId;
         clock.mockReturnValue(2_000);
         expect(transport.enqueue('session.event', payload, identity)).toBe(true);
-        if (reason === 'expired') clock.mockReturnValue(31_000);
+        if (reason === 'expired') clock.mockReturnValue(61_000);
         expect(await transport.resume()).toBe(true);
         expect(failures).toHaveLength(1);
         expect(failures[0]).toMatchObject({

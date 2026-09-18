@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { PRIVACY_URL } from '@/lib/config';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { voiceInputController } from '@/lib/voice-input/native-voice-input';
 import {
   readVoiceNetworkConsent,
@@ -26,7 +27,8 @@ type ConsentDetailsProps = {
 };
 
 export function VoiceTranscriptionControl() {
-  const { userId, isLoading, isError, refetch } = useCurrentUserId();
+  const { userId, isLoading, isFetchError, refetch } = useCurrentUserId();
+  const { gatewayTranscriptionEnabled, hasLoaded } = useGatewayTranscriptionPreference();
   const supportsOnDevice = voiceInputController.supportsOnDevice();
   const [consent, setConsent] = useState<VoiceNetworkConsent>('unset');
   const { t } = useTranslation();
@@ -55,6 +57,52 @@ export function VoiceTranscriptionControl() {
     };
   }, [userId]);
 
+  // The gateway preference owns the whole session while it is on, so it is
+  // named before any on-device claim: a device that supports on-device
+  // recognition still sends every dictation to the gateway when the switch is
+  // on (voice-input-engine-mode.ts), and printing "On device" there was wrong.
+  //
+  // The account read gates every claim the row makes, so its loading and error
+  // states come before the gateway and on-device branches: a device that
+  // supports on-device recognition used to print "On device" while the account
+  // read had failed, so the retryable error branch never surfaced on it (vr1
+  // e1 device repro, 2026-09-15). `isFetchError` (not `isError`) is the gate:
+  // a failed refetch keeps the cached identity, and presenting that cached
+  // destination as the current one is exactly the state this branch exists to
+  // avoid. One loading branch covers both reads so the row never stacks two
+  // indicators.
+  if (!hasLoaded || isLoading) {
+    // A SecureStore or account read is still pending; do not claim a state
+    // that has not been read yet.
+    return <Text className="mt-3 text-sm text-muted-foreground">{t('common.loading')}</Text>;
+  }
+
+  if (isFetchError) {
+    return (
+      <View className="mt-3 gap-2">
+        <Text className="text-sm text-muted-foreground">
+          {t('consent.couldNotLoadTranscription')}
+        </Text>
+        <Button variant="outline" onPress={refetch} accessibilityLabel={t('common.retry')}>
+          <Text>{t('common.retry')}</Text>
+        </Button>
+      </View>
+    );
+  }
+
+  if (gatewayTranscriptionEnabled) {
+    // Status row only: the engine is chosen in Preferences, so this row carries
+    // no switch — matching the on-device row below.
+    return (
+      <View className="mt-3 flex-row items-center justify-between gap-3">
+        <Text className="flex-1 text-sm text-muted-foreground">
+          {t('consent.voiceTranscriptionTitle')}
+        </Text>
+        <Text className="text-sm font-medium text-foreground">{t('consent.viaGateway')}</Text>
+      </View>
+    );
+  }
+
   if (supportsOnDevice) {
     // Status row in the toggle row's geometry (label left, value right) so it
     // reads as the transcription state, not a stray fragment under the Who
@@ -68,23 +116,6 @@ export function VoiceTranscriptionControl() {
           {t('consent.voiceTranscriptionTitle')}
         </Text>
         <Text className="text-sm font-medium text-foreground">{t('consent.onDevice')}</Text>
-      </View>
-    );
-  }
-
-  if (isLoading) {
-    return <Text className="mt-3 text-sm text-muted-foreground">{t('common.loading')}</Text>;
-  }
-
-  if (isError) {
-    return (
-      <View className="mt-3 gap-2">
-        <Text className="text-sm text-muted-foreground">
-          {t('consent.couldNotLoadTranscription')}
-        </Text>
-        <Button variant="outline" onPress={refetch} accessibilityLabel={t('common.retry')}>
-          <Text>{t('common.retry')}</Text>
-        </Button>
       </View>
     );
   }

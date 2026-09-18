@@ -1538,6 +1538,7 @@
       "exitNeedsNewerCli": "Os comandos de barra remotos exigem uma versão mais recente da Kilo CLI. Atualize a Kilo CLI e conecte-se novamente."
     },
     "sessionConnection": {
+      "label": "Conexão",
       "connecting": "Conectando…",
       "reconnecting": "Reconectando…",
       "connectionLost": "Conexão perdida",
@@ -1557,7 +1558,9 @@
       "removeConfirmTitle": "Remover meta?",
       "removeConfirmMessage": "A CLI limpa a meta desta sessão.",
       "updateFailed": "Não foi possível atualizar a meta.",
-      "sectionAccessibility": "{{status}}. Meta: {{text}}"
+      "sectionAccessibility": "{{status}}. Meta: {{text}}",
+      "collapse": "Recolher meta",
+      "expand": "Expandir meta"
     },
     "newSession": {
       "recentlyUsed": "Usados recentemente",

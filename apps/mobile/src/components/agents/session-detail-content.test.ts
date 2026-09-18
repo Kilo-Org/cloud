@@ -2,6 +2,7 @@
 import {
   type ComponentProps,
   createElement,
+  type ElementType,
   Fragment,
   type ReactElement,
   type ReactNode,
@@ -39,8 +40,11 @@ import {
 import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
+import {
+  isSessionGoalCollapsed,
+  setSessionGoalCollapsed,
+} from '@/components/agents/session-goal-collapse';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
-import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
@@ -62,6 +66,11 @@ import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
+const connectionHealth = vi.hoisted(() => ({
+  isConnected: true,
+  reconnectExhausted: false,
+  retryConnection: vi.fn(),
+}));
 const hideThinking = vi.hoisted(() => ({ current: false, loaded: true }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -72,6 +81,16 @@ vi.mock('@/components/agents/session-provider', () => ({
     }
     return managerSlot.current;
   },
+}));
+vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
+  useUserWebConnectionState: () => connectionHealth.isConnected,
+  useUserWebConnectionHealth: () => ({
+    isConnected: connectionHealth.isConnected,
+    reconnectExhausted: connectionHealth.reconnectExhausted,
+  }),
+}));
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  useUserWebConnection: () => ({ retryConnection: connectionHealth.retryConnection }),
 }));
 
 // Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
@@ -98,6 +117,19 @@ vi.mock('react-native-reanimated', () => ({
   FadeIn: { duration: () => ({}) },
   FadeOut: { duration: () => ({}) },
   LinearTransition: { duration: () => ({}) },
+  // The goal row's chevron rotation; the disclosure animation itself is
+  // covered by session-goal-section.mounted.test.tsx.
+  useSharedValue: (value: unknown) => ({ value }),
+  useAnimatedStyle: () => ({}),
+  withTiming: (value: number) => value,
+}));
+const motionPolicy = vi.hoisted(() => ({ reducedMotion: false }));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({
+    reducedMotion: motionPolicy.reducedMotion,
+    scrollAnimated: !motionPolicy.reducedMotion,
+  }),
+  selectReducedMotionEntrance: <T>(_reducedMotion: boolean, entrance: T) => entrance,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 16 }),
@@ -186,9 +218,6 @@ vi.mock('@/components/agents/model-selector', () => ({
 vi.mock('@/components/agents/permission-card', () => ({ PermissionCard: 'PermissionCard' }));
 vi.mock('@/components/agents/question-card', () => ({ QuestionCard: 'QuestionCard' }));
 vi.mock('@/components/agents/preparation-group', () => ({ PreparationGroup: 'PreparationGroup' }));
-vi.mock('@/components/agents/session-connection-indicator', () => ({
-  SessionConnectionIndicator: 'SessionConnectionIndicator',
-}));
 vi.mock('@/components/agents/context-usage-ring', () => ({
   ContextUsageRing: 'ContextUsageRing',
 }));
@@ -535,6 +564,9 @@ beforeEach(() => {
   rootPageNextCursor = null;
   condensePreference.value = false;
   currentUserId.value = 'test-user';
+  connectionHealth.isConnected = true;
+  connectionHealth.reconnectExhausted = false;
+  connectionHealth.retryConnection.mockClear();
 });
 
 type MountDetailsOptions = {
@@ -712,6 +744,22 @@ function renderedText(node: ReactTestInstance) {
   return node
     .findAll(child => typeof child.type === 'string' && (child.type as string) === 'Text')
     .flatMap(child => child.children.filter(value => typeof value === 'string'))
+    .join('\n');
+}
+
+/**
+ * Page text outside the context sheet. The sheet stays mounted (invisible) as
+ * soon as usage is known, so a "nothing renders on the page" assertion must not
+ * count the sheet's own rows.
+ */
+function renderedTextOutsideSheet(root: ReactTestInstance): string {
+  const sheetNodes = new Set<ReactTestInstance>(
+    root.findAllByType(SessionContextSheet).flatMap(sheet => sheet.findAll(() => true))
+  );
+  return root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+    .filter(node => !sheetNodes.has(node))
+    .flatMap(node => node.children.filter((value): value is string => typeof value === 'string'))
     .join('\n');
 }
 
@@ -944,35 +992,140 @@ describe('session detail cached metadata refresh', () => {
     });
 
     // A retryable metadata failure keeps the rows mounted and repoints the
-    // connection banner at a metadata refresh Retry instead of blanking them.
+    // connection status at a metadata refresh Retry instead of blanking them.
     expect(renderedText(view.renderer.root)).toContain('cached root row');
     expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
-    const indicator = view.renderer.root.findAllByType(SessionConnectionIndicator)[0];
-    expect(indicator?.props.sessionRefresh).toMatchObject({ isLoading: false });
+    // The connection status has no row under the header any more: with the
+    // context sheet closed, no connection copy renders on the page.
+    const pageText = renderedTextOutsideSheet(view.renderer.root);
+    expect(pageText).not.toContain(i18n.t('agentChat.sessionConnection.connecting'));
+    expect(pageText).not.toContain(i18n.t('agentChat.sessionConnection.reconnecting'));
+    expect(pageText).not.toContain(i18n.t('agentChat.sessionConnection.connectionLost'));
+  });
+
+  it('shows Connection lost in the sheet and retries the socket when reconnects are exhausted', async () => {
+    connectionHealth.isConnected = false;
+    connectionHealth.reconnectExhausted = true;
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('lost');
+    expect(renderedText(view.renderer.root)).toContain(
+      i18n.t('agentChat.sessionConnection.connectionLost')
+    );
+
+    const retry = view.renderer.root.findByProps({
+      testID: 'session-context-sheet-connection-retry',
+    });
+    act(() => {
+      (retry.props.onPress as () => void)();
+    });
+    expect(connectionHealth.retryConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes the Connection lost Retry to the metadata refresh when the transcript is cached', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails(cachedRows, { metadataReady: metadata.promise, cachedRows });
+    const switchSession = vi.spyOn(view.manager, 'switchSession').mockResolvedValue(undefined);
+
+    await act(async () => {
+      metadata.reject(new Error('offline'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('lost');
+    const retry = view.renderer.root.findByProps({
+      testID: 'session-context-sheet-connection-retry',
+    });
+    act(() => {
+      (retry.props.onPress as () => void)();
+    });
+    expect(switchSession).toHaveBeenCalledTimes(1);
+    expect(connectionHealth.retryConnection).not.toHaveBeenCalled();
   });
 });
 
-describe('session detail cached transcript refresh', () => {
-  function refreshFlag(renderer: ReactTestRenderer): unknown {
-    return renderer.root.findAllByType(SessionConnectionIndicator)[0]?.props.isRefreshingTranscript;
-  }
+describe('session detail connection latch', () => {
+  it('reads Connecting, not Reconnecting, when the app-wide leg is up but the session transport never came up', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    connectionHealth.isConnected = false;
+    const view = await mountDetails([]);
+    // The app-wide user-web leg comes up while the remote agent reports
+    // disconnected: the session's own transport has still never been up, so the
+    // latch must not inherit the unrelated user-web leg and claim a reconnect.
+    act(() => {
+      connectionHealth.isConnected = true;
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.agentStatus, { type: 'disconnected' });
+    });
 
-  it('shows a loading indicator while the cached transcript is refreshed', async () => {
-    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
-    // The live page never resolves: the cached rows stay on screen, so the
-    // refresh indicator has to stay with them.
-    const view = await mountDetails(null, { cachedRows });
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
 
-    expect(renderedText(view.renderer.root)).toContain('cached root row');
-    expect(refreshFlag(view.renderer)).toBe(true);
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('connecting');
   });
 
-  it('clears the loading indicator once the live transcript lands', async () => {
+  it('reads Connecting, not Reconnecting, while a cached first load still refreshes its metadata', async () => {
+    const metadata = Promise.withResolvers<undefined>();
     const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
-    const view = await mountDetails([childMessage(ROOT_ID, 'live root row')], { cachedRows });
+    const view = await mountDetails(cachedRows, { metadataReady: metadata.promise, cachedRows });
 
-    expect(renderedText(view.renderer.root)).toContain('live root row');
-    expect(refreshFlag(view.renderer)).toBe(false);
+    // The cached transcript paints while the session type and metadata are
+    // still resolving, and the app-wide user-web leg is already up. The leg is
+    // not this session's transport yet, so it must not latch the session as
+    // ever connected: the first load reads "Connecting…", not "Reconnecting…".
+    expect(renderedText(view.renderer.root)).toContain('cached root row');
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('connecting');
+  });
+
+  it('still reads Reconnecting after a live session transport drops', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    // The session's own transport comes up: the latch commits.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    // Then it drops. The committed latch is what separates this from a first
+    // load, so the sheet reads "Reconnecting…".
+    act(() => {
+      connectionHealth.isConnected = false;
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('reconnecting');
   });
 });
 
@@ -1929,6 +2082,33 @@ describe('session detail composer after a failed turn', () => {
 describe('SessionDetailContent goal visibility', () => {
   const pausedGoal: SessionGoal = { text: 'Ship p7 objective', status: 'paused' };
 
+  // The store is module-level and outlives every mount here, so each case
+  // starts from expanded (there is no test-only reset export).
+  beforeEach(() => {
+    setSessionGoalCollapsed(ROOT_ID, false);
+    motionPolicy.reducedMotion = false;
+  });
+
+  function goalSectionOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const section = view.renderer.root.findAllByType(SessionGoalSection)[0];
+    if (section === undefined) {
+      throw new Error('Missing SessionGoalSection');
+    }
+    return section;
+  }
+
+  /** The Animated.View the screen draws around the fixed goal row. */
+  function goalWrapperOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    let node: ReactTestInstance | null = goalSectionOf(view);
+    while (node != null && node.type !== ('AnimatedView' as ElementType)) {
+      node = node.parent;
+    }
+    if (node === null) {
+      throw new Error('Missing the goal wrapper');
+    }
+    return node;
+  }
+
   it('shows the fixed goal row for a live session whose snapshot carries a goal', async () => {
     goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
     const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
@@ -1941,6 +2121,45 @@ describe('SessionDetailContent goal visibility', () => {
     goalMountOptions = { goal: pausedGoal, resolvedType: 'read-only' };
     const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
     expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+  });
+
+  it('persists the goal disclosure through the per-session store', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalSectionOf(view).props.collapsed).toBe(false);
+
+    act(() => {
+      (goalSectionOf(view).props.onToggleCollapsed as () => void)();
+    });
+
+    expect(goalSectionOf(view).props.collapsed).toBe(true);
+    expect(isSessionGoalCollapsed(ROOT_ID)).toBe(true);
+  });
+
+  it('keeps the collapsed goal after leaving and reopening the session', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    const first = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    act(() => {
+      (goalSectionOf(first).props.onToggleCollapsed as () => void)();
+    });
+    expect(isSessionGoalCollapsed(ROOT_ID)).toBe(true);
+
+    // A fresh tree for the same session id reads the module store, which
+    // outlives the component tree.
+    const reopened = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalSectionOf(reopened).props.collapsed).toBe(true);
+  });
+
+  it('drops the goal wrapper height transition under reduced motion', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+
+    const animated = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalWrapperOf(animated).props.layout).toBeDefined();
+
+    motionPolicy.reducedMotion = true;
+    const reduced = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalWrapperOf(reduced).props.layout).toBeUndefined();
   });
 });
 

@@ -1565,6 +1565,7 @@
       "exitNeedsNewerCli": "遠端斜線指令需要較新版本的 Kilo CLI。請更新 Kilo CLI 後重新連線。"
     },
     "sessionConnection": {
+      "label": "連線",
       "connecting": "連線中…",
       "reconnecting": "重新連線中…",
       "connectionLost": "連線中斷",
@@ -1584,7 +1585,9 @@
       "removeConfirmTitle": "移除目標？",
       "removeConfirmMessage": "CLI 會清除此工作階段的目標。",
       "updateFailed": "無法更新目標。",
-      "sectionAccessibility": "{{status}}。目標：{{text}}"
+      "sectionAccessibility": "{{status}}。目標：{{text}}",
+      "collapse": "收合目標",
+      "expand": "展開目標"
     },
     "newSession": {
       "recentlyUsed": "最近使用",

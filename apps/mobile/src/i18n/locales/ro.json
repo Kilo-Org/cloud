@@ -2073,6 +2073,7 @@
       "exitNeedsNewerCli": "Comenzile cu / executate de la distanță necesită o versiune mai nouă de Kilo CLI. Actualizează Kilo CLI și reconectează-te."
     },
     "sessionConnection": {
+      "label": "Conexiune",
       "connecting": "Se conectează…",
       "reconnecting": "Se reconectează…",
       "connectionLost": "Conexiune pierdută",
@@ -2092,7 +2093,9 @@
       "removeConfirmTitle": "Elimini obiectivul?",
       "removeConfirmMessage": "CLI șterge obiectivul acestei sesiuni.",
       "updateFailed": "Obiectivul nu a putut fi actualizat.",
-      "sectionAccessibility": "{{status}}. Obiectiv: {{text}}"
+      "sectionAccessibility": "{{status}}. Obiectiv: {{text}}",
+      "collapse": "Restrânge obiectivul",
+      "expand": "Extinde obiectivul"
     },
     "newSession": {
       "recentlyUsed": "Folosite recent",

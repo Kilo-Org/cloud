@@ -1583,6 +1583,7 @@
       "exitNeedsNewerCli": "Віддалені слеш-команди потребують новішої версії Kilo CLI. Оновіть Kilo CLI та підключіться знову."
     },
     "sessionConnection": {
+      "label": "З'єднання",
       "connecting": "Підключення…",
       "reconnecting": "Повторне підключення…",
       "connectionLost": "З'єднання втрачено",
@@ -1602,7 +1603,9 @@
       "removeConfirmTitle": "Видалити ціль?",
       "removeConfirmMessage": "CLI очищає ціль цього сеансу.",
       "updateFailed": "Не вдалося оновити ціль.",
-      "sectionAccessibility": "{{status}}. Ціль: {{text}}"
+      "sectionAccessibility": "{{status}}. Ціль: {{text}}",
+      "collapse": "Згорнути ціль",
+      "expand": "Розгорнути ціль"
     },
     "newSession": {
       "recentlyUsed": "Нещодавно використані",

@@ -2109,6 +2109,7 @@
       "exitNeedsNewerCli": "Il-kmandi remoti li jibdew b'/ jeħtieġu verżjoni aktar ġdida ta' Kilo CLI. Aġġorna Kilo CLI u erġa' aqbad."
     },
     "sessionConnection": {
+      "label": "Konnessjoni",
       "connecting": "Qed jaqbad…",
       "reconnecting": "Qed jerġa' jaqbad…",
       "connectionLost": "Il-konnessjoni ntilfet",
@@ -2128,7 +2129,9 @@
       "removeConfirmTitle": "Neħħi l-għan?",
       "removeConfirmMessage": "Il-CLI iħassar l-għan ta' din is-sessjoni.",
       "updateFailed": "Ma setax jiġi aġġornat l-għan.",
-      "sectionAccessibility": "{{status}}. Għan: {{text}}"
+      "sectionAccessibility": "{{status}}. Għan: {{text}}",
+      "collapse": "Aħbi l-għan",
+      "expand": "Uri l-għan"
     },
     "newSession": {
       "recentlyUsed": "Użati reċentement",

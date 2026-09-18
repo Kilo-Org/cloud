@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Uzaqdan / əmrlərini işlətmək üçün Kilo CLI-nin daha yeni versiyası lazımdır. Kilo CLI-ni yenilə və yenidən qoşul."
     },
     "sessionConnection": {
+      "label": "Bağlantı",
       "connecting": "Qoşulur…",
       "reconnecting": "Yenidən qoşulur…",
       "connectionLost": "Bağlantı kəsildi",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Məqsəd silinsin?",
       "removeConfirmMessage": "CLI bu sessiyanın məqsədini təmizləyir.",
       "updateFailed": "Məqsəd yenilənə bilmədi.",
-      "sectionAccessibility": "{{status}}. Məqsəd: {{text}}"
+      "sectionAccessibility": "{{status}}. Məqsəd: {{text}}",
+      "collapse": "Məqsədi yığ",
+      "expand": "Məqsədi göstər"
     },
     "newSession": {
       "recentlyUsed": "Son istifadə edilənlər",

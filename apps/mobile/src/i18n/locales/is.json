@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Skástriksskipanir með fjarstýringu krefjast nýrri útgáfu af Kilo CLI. Uppfærðu Kilo CLI og tengstu aftur."
     },
     "sessionConnection": {
+      "label": "Tenging",
       "connecting": "Tengist…",
       "reconnecting": "Endurtengist…",
       "connectionLost": "Tenging rofnaði",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Fjarlægja markmið?",
       "removeConfirmMessage": "CLI hreinsar markmið þessarar lotu.",
       "updateFailed": "Ekki tókst að uppfæra markmiðið.",
-      "sectionAccessibility": "{{status}}. Markmið: {{text}}"
+      "sectionAccessibility": "{{status}}. Markmið: {{text}}",
+      "collapse": "Fella markmið saman",
+      "expand": "Fella markmið út"
     },
     "newSession": {
       "recentlyUsed": "Nýlega notað",

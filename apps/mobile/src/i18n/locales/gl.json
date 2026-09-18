@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Para usar comandos de barra de forma remota, necesitas unha versión máis recente de Kilo CLI. Actualiza Kilo CLI e volve conectarte."
     },
     "sessionConnection": {
+      "label": "Conexión",
       "connecting": "Conectando…",
       "reconnecting": "Reconectando…",
       "connectionLost": "Perdeuse a conexión",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Eliminar o obxectivo?",
       "removeConfirmMessage": "O CLI borra o obxectivo desta sesión.",
       "updateFailed": "Non se puido actualizar o obxectivo.",
-      "sectionAccessibility": "{{status}}. Obxectivo: {{text}}"
+      "sectionAccessibility": "{{status}}. Obxectivo: {{text}}",
+      "collapse": "Contraer o obxectivo",
+      "expand": "Expandir o obxectivo"
     },
     "newSession": {
       "recentlyUsed": "Usados recentemente",

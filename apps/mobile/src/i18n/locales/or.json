@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "ଦୂରରୁ ସ୍ଲାସ୍ କମାଣ୍ଡ ଚଲାଇବାକୁ Kilo CLI ର ନୂଆ ସଂସ୍କରଣ ଆବଶ୍ୟକ। Kilo CLI ଅଦ୍ୟତନ କରି ପୁଣି ସଂଯୋଗ କରନ୍ତୁ।"
     },
     "sessionConnection": {
+      "label": "ସଂଯୋଗ",
       "connecting": "ସଂଯୋଗ ହେଉଛି…",
       "reconnecting": "ପୁଣି ସଂଯୋଗ ହେଉଛି…",
       "connectionLost": "ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "ଲକ୍ଷ୍ୟ ହଟାଇବେ?",
       "removeConfirmMessage": "CLI ଏହି ସେସନର ଲକ୍ଷ୍ୟ ଲିଭାଇଦିଏ।",
       "updateFailed": "ଲକ୍ଷ୍ୟ ଅପଡେଟ୍ କରାଯାଇପାରିଲା ନାହିଁ।",
-      "sectionAccessibility": "{{status}}। ଲକ୍ଷ୍ୟ: {{text}}"
+      "sectionAccessibility": "{{status}}। ଲକ୍ଷ୍ୟ: {{text}}",
+      "collapse": "ଲକ୍ଷ୍ୟ ଲୁଚାନ୍ତୁ",
+      "expand": "ଲକ୍ଷ୍ୟ ଦେଖାନ୍ତୁ"
     },
     "newSession": {
       "recentlyUsed": "ନିକଟରେ ବ୍ୟବହୃତ",

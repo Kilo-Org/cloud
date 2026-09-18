@@ -1473,6 +1473,7 @@
       "exitNeedsNewerCli": "Les commandes commençant par / nécessitent une version plus récente de Kilo CLI pour fonctionner à distance. Mettez à jour Kilo CLI et reconnectez-vous."
     },
     "sessionConnection": {
+      "label": "Connexion",
       "connecting": "Connexion…",
       "reconnecting": "Reconnexion…",
       "connectionLost": "Connexion perdue",
@@ -1492,7 +1493,9 @@
       "removeConfirmTitle": "Supprimer l'objectif ?",
       "removeConfirmMessage": "Le CLI efface l'objectif de cette session.",
       "updateFailed": "Impossible de mettre à jour l'objectif.",
-      "sectionAccessibility": "{{status}}. Objectif : {{text}}"
+      "sectionAccessibility": "{{status}}. Objectif : {{text}}",
+      "collapse": "Réduire l'objectif",
+      "expand": "Développer l'objectif"
     },
     "newSession": {
       "recentlyUsed": "Utilisés récemment",

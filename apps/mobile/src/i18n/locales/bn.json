@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "দূর থেকে স্ল্যাশ কমান্ড চালাতে Kilo CLI-এর নতুন সংস্করণ প্রয়োজন। Kilo CLI আপডেট করে আবার সংযোগ করুন।"
     },
     "sessionConnection": {
+      "label": "সংযোগ",
       "connecting": "সংযোগ হচ্ছে…",
       "reconnecting": "পুনরায় সংযোগ হচ্ছে…",
       "connectionLost": "সংযোগ বিচ্ছিন্ন",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "লক্ষ্য সরাবেন?",
       "removeConfirmMessage": "CLI এই সেশনের লক্ষ্য মুছে দেবে।",
       "updateFailed": "লক্ষ্য আপডেট করা যায়নি।",
-      "sectionAccessibility": "{{status}}। লক্ষ্য: {{text}}"
+      "sectionAccessibility": "{{status}}। লক্ষ্য: {{text}}",
+      "collapse": "লক্ষ্য গুটিয়ে নিন",
+      "expand": "লক্ষ্য মেলে ধরুন"
     },
     "newSession": {
       "recentlyUsed": "সম্প্রতি ব্যবহৃত",

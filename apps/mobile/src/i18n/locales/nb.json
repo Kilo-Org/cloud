@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Eksterne skråstrekskommandoer krever en nyere versjon av Kilo CLI. Oppdater Kilo CLI og koble til på nytt."
     },
     "sessionConnection": {
+      "label": "Tilkobling",
       "connecting": "Kobler til…",
       "reconnecting": "Kobler til på nytt…",
       "connectionLost": "Tilkoblingen er brutt",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Fjern mål?",
       "removeConfirmMessage": "CLI sletter målet for denne økten.",
       "updateFailed": "Målet kunne ikke oppdateres.",
-      "sectionAccessibility": "{{status}}. Mål: {{text}}"
+      "sectionAccessibility": "{{status}}. Mål: {{text}}",
+      "collapse": "Skjul målet",
+      "expand": "Vis målet"
     },
     "newSession": {
       "recentlyUsed": "Nylig brukt",

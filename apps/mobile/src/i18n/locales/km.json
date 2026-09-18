@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "ការប្រើពាក្យបញ្ជាដែលផ្តើមដោយ / ពីចម្ងាយត្រូវការ Kilo CLI កំណែថ្មីជាងនេះ។ ធ្វើបច្ចុប្បន្នភាព Kilo CLI ហើយភ្ជាប់ឡើងវិញ។"
     },
     "sessionConnection": {
+      "label": "ការតភ្ជាប់",
       "connecting": "កំពុងភ្ជាប់…",
       "reconnecting": "កំពុងភ្ជាប់ឡើងវិញ…",
       "connectionLost": "ដាច់ការតភ្ជាប់",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "ដកគោលដៅចេញ?",
       "removeConfirmMessage": "CLI សម្អាតគោលដៅរបស់វគ្គនេះ។",
       "updateFailed": "មិនអាចធ្វើបច្ចុប្បន្នភាពគោលដៅបានទេ។",
-      "sectionAccessibility": "{{status}}។ គោលដៅ៖ {{text}}"
+      "sectionAccessibility": "{{status}}។ គោលដៅ៖ {{text}}",
+      "collapse": "លាក់គោលដៅ",
+      "expand": "បង្ហាញគោលដៅ"
     },
     "newSession": {
       "recentlyUsed": "បានប្រើថ្មីៗនេះ",

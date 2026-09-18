@@ -1565,6 +1565,7 @@
       "exitNeedsNewerCli": "원격 슬래시 명령에는 최신 Kilo CLI가 필요합니다. Kilo CLI를 업데이트하고 다시 연결하세요."
     },
     "sessionConnection": {
+      "label": "연결",
       "connecting": "연결 중…",
       "reconnecting": "다시 연결 중…",
       "connectionLost": "연결 끊김",
@@ -1584,7 +1585,9 @@
       "removeConfirmTitle": "목표를 제거할까요?",
       "removeConfirmMessage": "CLI가 이 세션의 목표를 지웁니다.",
       "updateFailed": "목표를 업데이트할 수 없습니다.",
-      "sectionAccessibility": "{{status}}. 목표: {{text}}"
+      "sectionAccessibility": "{{status}}. 목표: {{text}}",
+      "collapse": "목표 접기",
+      "expand": "목표 펼치기"
     },
     "newSession": {
       "recentlyUsed": "최근 사용",

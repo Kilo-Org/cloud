@@ -51,6 +51,7 @@ import {
   platform_oauth_credentials,
   platform_access_token_credentials,
   byok_api_keys,
+  openai_chatgpt_connections,
   agent_configs,
   agent_environment_profiles,
   security_findings,
@@ -1060,7 +1061,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   platform_integrations cascade below. Organization-owned Slack credentials are
  *   intentionally retained, since they belong to the organization, not the user)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
- *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
+ *   openai_chatgpt_connections, agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
  *   security_findings, security_analysis_owner_state, security_agent_commands,
  *   security_agent_repository_sync_state, security_remediations,
@@ -1472,6 +1473,9 @@ export async function anonymizeCloudUserData(
     );
   await tx.delete(user_github_app_tokens).where(eq(user_github_app_tokens.kilo_user_id, userId));
   await tx.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, userId));
+  await tx
+    .delete(openai_chatgpt_connections)
+    .where(eq(openai_chatgpt_connections.kilo_user_id, userId));
   await tx
     .delete(coding_plan_availability_intents)
     .where(eq(coding_plan_availability_intents.user_id, userId));

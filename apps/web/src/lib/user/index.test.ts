@@ -1510,6 +1510,43 @@ describe('User', () => {
         expect(await db.select().from(deleted_user_email_tombstones)).toEqual([]);
       }
     );
+
+    it('removes the ChatGPT connection rows for the deleted user', async () => {
+      const user = await insertTestUser({
+        google_user_email: `chatgpt-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `ChatGPT cleanup ${randomUUID()}`,
+        user.id,
+        0
+      );
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      const encrypted_connection = encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY);
+      await db.insert(openai_chatgpt_connections).values([
+        {
+          kilo_user_id: user.id,
+          organization_id: null,
+          encrypted_connection,
+          created_by: user.id,
+        },
+        {
+          kilo_user_id: user.id,
+          organization_id: organization.id,
+          encrypted_connection,
+          created_by: user.id,
+        },
+      ]);
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(openai_chatgpt_connections)
+          .where(eq(openai_chatgpt_connections.kilo_user_id, user.id))
+      ).toHaveLength(0);
+    });
   });
 
   describe('softDeleteUser', () => {

@@ -937,8 +937,14 @@ export const authOptions: NextAuthOptions = {
 
         // The linking session is consumed here, so it carries the organization
         // through to the jwt callback on the profile, the same way `isNewUser`
-        // travels. Only an OpenAI link stores an organization-scoped connection.
-        if (account.provider === 'openai' && linkingSession?.organizationId && profile) {
+        // travels. Only an OpenAI link stores an organization-scoped
+        // connection, so the session must have targeted OpenAI.
+        if (
+          account.provider === 'openai' &&
+          linkingSession?.targetProvider === 'openai' &&
+          linkingSession.organizationId &&
+          profile
+        ) {
           (profile as ExtendedProfile).openAiChatGptOrganizationId = linkingSession.organizationId;
         }
 

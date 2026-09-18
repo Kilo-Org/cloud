@@ -234,8 +234,7 @@ export async function upstreamRequest({
   });
 
   const apiUrl = provider.apiUrlOverrides[chatApi] ?? provider.apiUrl;
-  const path = CHAT_API_PATHS[chatApi];
-  const targetUrl = `${apiUrl}${path}${search}`;
+  const path = provider.disableUrlSuffix ? '' : CHAT_API_PATHS[chatApi];
 
   const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS);
   const onTimeoutAbort = () => {
@@ -251,6 +250,13 @@ export async function upstreamRequest({
   const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 
   try {
+    let targetUrl = `${apiUrl}${path}${search}`;
+    if (provider.disableUrlSuffix && search) {
+      const url = new URL(apiUrl);
+      url.search += `${url.search ? '&' : '?'}${search.slice(1)}`;
+      targetUrl = url.toString();
+    }
+
     return {
       type: 'success',
       response: await fetch(targetUrl, {

@@ -28,7 +28,7 @@ const CopyCustomLlmSchema = z.object({
   source_public_id: publicIdSchema,
   public_id: publicIdSchema,
   display_name: z.string().trim().min(1, 'display_name is required'),
-  internal_id: z.string().trim().min(1, 'internal_id is required'),
+  internal_id: z.string().trim().min(1, 'internal_id must not be empty').optional(),
 });
 
 const DeleteCustomLlmSchema = z.object({

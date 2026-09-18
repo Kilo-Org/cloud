@@ -8,6 +8,13 @@ import UIKit
 /// written to `KiloSystemSearchStore.pendingRouteKey` (the durable slot the
 /// module reads and clears) and only then announced to a running module. Both
 /// paths therefore hand the JS side exactly one identifier.
+///
+/// The delivery is iOS's own: a Spotlight tap arrives as an `NSUserActivity` of
+/// type `CSSearchableItemActionType` through the app delegate. Android has no
+/// equivalent callback and delivers its app-search tap as the launch `Intent`
+/// that `KiloSystemSearchModule.kt` handles, so there is no shared entry point
+/// to move this to. Both write the same pending slot, consumed through the one
+/// cross-platform surface `src/lib/native-system-search.ts`.
 public final class KiloSystemSearchOpenSubscriber: ExpoAppDelegateSubscriber {
   public func application(
     _ application: UIApplication,

@@ -3,6 +3,20 @@ import ExpoModulesCore
 import Foundation
 import UniformTypeIdentifiers
 
+/// The iOS half of the system-search bridge.
+///
+/// iOS's own search index is CoreSpotlight (`CSSearchableIndex`); Android's is
+/// AppSearch, and no API spans both stores. Each platform therefore binds the
+/// store it has under the Expo module contract, and
+/// `src/lib/native-system-search.ts` is the one surface both answer, so the
+/// user-visible behaviour matches. There is no cross-platform index API to
+/// share, which is why this file exists beside the Android module.
+///
+/// The serialization follows the same split: `NSLock` and a `DispatchQueue`
+/// serialize the CoreSpotlight calls here where the Android module uses a
+/// monitor and its module queue, and both guard the identical pending-route
+/// slot.
+
 /// Names shared by the module and the app delegate subscriber.
 ///
 /// `pendingRouteKey` holds the identifier of the last Spotlight result the user

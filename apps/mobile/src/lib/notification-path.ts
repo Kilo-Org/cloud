@@ -1,7 +1,29 @@
 import { type PushData } from '@kilocode/notifications';
 
 import { chatConversationRoute, chatSandboxRoute } from './kilo-chat-routes';
+import { providerPrRoutePath } from './pr-review/provider-pr-ref';
+import { parseProviderPrUrl } from './pr-review/provider-pr-url';
 import { getSecurityAgentPath } from './security-agent';
+
+/**
+ * The navigable PR-review path for a raise that carries a pull request, or
+ * null when the payload has no parseable PR — the Open PR action falls back to
+ * the session route instead of landing nowhere.
+ */
+export function prPathForData(data: PushData): string | null {
+  if (data.type !== 'cloud_agent_session' || data.prUrl === undefined) {
+    return null;
+  }
+  const ref = parseProviderPrUrl(data.prUrl);
+  if (ref === null) {
+    return null;
+  }
+  // providerPrRoutePath returns Href; coerce to string for query append (cast style of security-agent.ts).
+  // A GitLab instance hint already rides as a query param, so the marker joins
+  // with the right separator.
+  const base = providerPrRoutePath(ref) as string;
+  return `${base}${base.includes('?') ? '&' : '?'}via=push`;
+}
 
 export function notificationPathForData(data: PushData): string {
   // `via=push` marks the resulting session_viewed analytics event as

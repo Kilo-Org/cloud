@@ -7,7 +7,13 @@ import { translatePush } from './i18n';
  * `Notifications.AndroidImportance` on the mobile side.
  */
 export const ANDROID_NOTIFICATION_CHANNELS = [
-  { id: 'agent', name: 'Agent sessions', importance: 'high' },
+  // A needs-input raise is time-sensitive and breaks through on `agent-attention`;
+  // ordinary agent progress stays quiet on `agent-progress`. Progress needs its
+  // own id: Android never lowers the importance of a channel that already
+  // exists, so the `agent` channel created with `high` by earlier installs would
+  // keep breaking through if progress still routed to it.
+  { id: 'agent-attention', name: 'Agent needs input', importance: 'high' },
+  { id: 'agent-progress', name: 'Agent sessions', importance: 'default' },
   { id: 'chat', name: 'Chat messages', importance: 'high' },
   { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default' },
   { id: 'balance', name: 'Balance alerts', importance: 'default' },
@@ -21,7 +27,7 @@ export type AndroidNotificationChannelId = (typeof ANDROID_NOTIFICATION_CHANNELS
 export function androidChannelIdForPushData(data: PushData): AndroidNotificationChannelId {
   switch (data.type) {
     case 'cloud_agent_session':
-      return 'agent';
+      return data.category === 'attention' ? 'agent-attention' : 'agent-progress';
     case 'chat.message':
       return 'chat';
     case 'instance-lifecycle':

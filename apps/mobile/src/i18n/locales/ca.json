@@ -798,6 +798,15 @@
       "balance": "Alertes de saldo",
       "security": "Problemes de seguretat"
     },
+    "action": {
+      "openSession": "Obre la sessió"
+    },
+    "needsInputAction": {
+      "approved": "Sol·licitud aprovada",
+      "replied": "Resposta enviada",
+      "failed": "No s’ha pogut respondre. Torna a tocar-ho per reintentar-ho.",
+      "unavailable": "Aquesta sol·licitud ja no està en espera."
+    },
     "category": {
       "chatMessagesSubtitle": "respostes a les teves converses",
       "agentAttentionTitle": "L'agent et necessita",
@@ -2149,20 +2158,7 @@
       "continueFrom": "S'està continuant la sessió {{title}}.",
       "importingSession": "Important la sessió…",
       "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Tria Cloud Agent o un altre CLI.",
-      "importFailed": "No s'ha pogut importar aquesta sessió.",
-      "sandbox": "Entorn aïllat",
-      "sandboxAccessibility": "Entorn aïllat: {{label}}",
-      "sandboxDefaultWithDestination": "Per defecte · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Petit",
-      "sandboxInstanceShared": "Compartit",
-      "sandboxInstanceLarge": "Gran",
-      "sandboxInstanceDevcontainer": "Contenidor de desenvolupament",
-      "sandboxInstanceProviderDefault": "Per defecte del proveïdor",
-      "sandboxCouldNotLoad": "No s'han pogut carregar les opcions de l'entorn aïllat",
-      "sandboxUnavailable": "Aquest entorn aïllat no està disponible. Tria'n un altre o Per defecte.",
-      "sandboxUseDefault": "Utilitza Per defecte"
+      "importFailed": "No s'ha pogut importar aquesta sessió."
     },
     "partRenderer": {
       "updatedFileCount_one": "S'ha actualitzat {{displayCount}} fitxer.",

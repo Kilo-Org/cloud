@@ -24,7 +24,6 @@ import {
 } from '@/components/agents/prepare-session-repository';
 import { i18n } from '@/i18n';
 import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
-import { type SandboxAllocation } from '@/lib/sandbox-allocation-label';
 import { trpcClient } from '@/lib/trpc';
 
 /**
@@ -47,12 +46,6 @@ export type PrepareAgentSessionInput =
       autoCommit?: boolean;
       attachments?: AgentAttachmentWire;
       organizationId?: string;
-      /**
-       * The sandbox allocation the new-session form picked (the picker row's
-       * shape). Omitted when nothing was picked, so the backend's own default
-       * applies.
-       */
-      sandboxAllocation?: SandboxAllocation;
     }
   | {
       kind: 'continue';
@@ -226,21 +219,13 @@ type PrepareSessionSharedFields = PrepareSessionRepositoryFields & {
   attachments?: AgentAttachmentWire;
 };
 
-/** The new-session create body: the shared fields plus the prompt turn. */
-type NewSessionPrepareBody = PrepareSessionSharedFields & {
-  prompt: string;
-  initialMessageId: string;
-  /** The picked allocation; omitted, the backend's own default applies. */
-  sandboxAllocation?: SandboxAllocation;
-};
-
 /**
  * The `prepareSession` body. The schema's clone variant forbids `prompt` and
  * `initialMessageId` (`z.undefined()`), so the two intents are a discriminated
  * union here too — a loose optional `prompt` would not be assignable.
  */
 type PrepareSessionBody =
-  | NewSessionPrepareBody
+  | (PrepareSessionSharedFields & { prompt: string; initialMessageId: string })
   | (PrepareSessionSharedFields & { cloneFromKiloSessionId: string });
 
 /**
@@ -265,17 +250,13 @@ function intentFingerprint(input: PrepareAgentSessionInput): string {
 /**
  * The pre-fix fingerprint of a new-session intent, which stored the bare
  * `fullName` as `repo`. Only GitHub intents have a legacy form; a GitLab or
- * Bitbucket intent never looks one up. A pre-fix row also predates sandbox
- * picks, so a submit that carries one is a different intent: matching it would
- * POST the pick under a pre-sandbox operation key (the server rejects it) and
- * drop the only record of a session the server may already have admitted. Fall
- * back only for a pick-less submit.
+ * Bitbucket intent never looks one up.
  */
 function legacyIntentFingerprint(
   input: Extract<PrepareAgentSessionInput, { kind: 'new' }>
 ): string | null {
   const repository = input.repository ?? null;
-  if (input.sandboxAllocation || repository?.platform !== 'github') {
+  if (repository?.platform !== 'github') {
     return null;
   }
   return newIntentFingerprint(input, repository.fullName);
@@ -296,14 +277,6 @@ function newIntentFingerprint(
     organizationId: input.organizationId ?? null,
     profileId: input.profileId ?? null,
     attachments: input.attachments ?? null,
-    // The pick joins the intent only when one was made. A changed pick is a
-    // fresh intent (a same-key retry would replay the previous pick's ledger
-    // result instead of creating with the newly picked allocation), while a
-    // pick-less submit keeps the exact bytes the previous app version
-    // persisted, so its safe-retry row is still found on relaunch instead of
-    // minting a duplicate session. A "no pick" marker key would change those
-    // bytes and hide an already-admitted session's row.
-    ...(input.sandboxAllocation ? { sandboxAllocation: input.sandboxAllocation } : {}),
   });
 }
 
@@ -337,7 +310,7 @@ function prepareSessionBody(
     setRepositoryField(body, input.repository ?? null);
     return body;
   }
-  const body: NewSessionPrepareBody = {
+  const body: PrepareSessionBody = {
     prompt: input.prompt,
     initialMessageId: input.initialMessageId ?? generateMessageId(),
     mode: input.mode,
@@ -357,12 +330,6 @@ function prepareSessionBody(
   }
   if (input.attachments) {
     body.attachments = input.attachments;
-  }
-  // The pick rides the create body only when one was made, so a pick-less
-  // submit sends the exact request it always did and the backend's own default
-  // applies.
-  if (input.sandboxAllocation) {
-    body.sandboxAllocation = input.sandboxAllocation;
   }
   return body;
 }

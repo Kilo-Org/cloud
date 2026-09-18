@@ -1,7 +1,55 @@
 import { describe, expect, it } from 'vitest';
 import { pushDataSchema } from '@kilocode/notifications';
 
-import { notificationPathForData } from './notification-path';
+import { notificationPathForData, prPathForData } from './notification-path';
+
+describe('prPathForData', () => {
+  it('routes a GitHub PR payload to the PR review route with via=push', () => {
+    expect(
+      prPathForData({
+        type: 'cloud_agent_session',
+        cliSessionId: 'ses_1',
+        prUrl: 'https://github.com/org/repo/pull/7',
+      })
+    ).toBe('/(app)/pr-review/org/repo/7?via=push');
+  });
+
+  it('routes a GitLab MR payload to the provider route with its instance hint', () => {
+    expect(
+      prPathForData({
+        type: 'cloud_agent_session',
+        cliSessionId: 'ses_1',
+        prUrl: 'https://gitlab.example.com/group/project/-/merge_requests/9',
+      })
+    ).toBe(
+      '/(app)/pr-review/gitlab/group/project/9?instance=https%3A%2F%2Fgitlab.example.com&via=push'
+    );
+  });
+
+  it('routes a Bitbucket PR payload to the provider route', () => {
+    expect(
+      prPathForData({
+        type: 'cloud_agent_session',
+        cliSessionId: 'ses_1',
+        prUrl: 'https://bitbucket.org/workspace/repo/pull-requests/3',
+      })
+    ).toBe('/(app)/pr-review/bitbucket/workspace/repo/3?via=push');
+  });
+
+  it('returns null for a payload without a PR', () => {
+    expect(prPathForData({ type: 'cloud_agent_session', cliSessionId: 'ses_1' })).toBeNull();
+  });
+
+  it('returns null for a PR URL the provider resolver cannot parse', () => {
+    expect(
+      prPathForData({
+        type: 'cloud_agent_session',
+        cliSessionId: 'ses_1',
+        prUrl: 'https://docs.example.com/pull/1',
+      })
+    ).toBeNull();
+  });
+});
 
 describe('notificationPathForData', () => {
   it('routes chat message notifications to the conversation screen', () => {

@@ -76,8 +76,11 @@ const SUMMARY_RUN_TIMEOUT_MS = 10 * 60 * 1000;
 export type CatalogLeaf = {
   path: string;
   type: string;
-  /** First Zod input schema of the procedure, or undefined when it takes none. */
-  firstInput: unknown;
+  /**
+   * Zod input schemas in `.input()` order. A chained procedure has more than
+   * one; the list is empty when the procedure takes no input.
+   */
+  inputs: unknown[];
 };
 
 export type CatalogRow = {
@@ -122,7 +125,7 @@ export function collectCatalogLeaves(router: { _def?: unknown }): CatalogLeaf[] 
     leaves.push({
       path,
       type: typeof def.type === 'string' ? def.type : '',
-      firstInput: inputs[0],
+      inputs,
     });
   }
   if (leaves.length === 0) {
@@ -131,22 +134,89 @@ export function collectCatalogLeaves(router: { _def?: unknown }): CatalogLeaf[] 
   return leaves;
 }
 
-function toInputSchema(firstInput: unknown): Record<string, unknown> {
-  if (!firstInput) return {};
+function singleInputSchema(input: unknown): Record<string, unknown> {
   // `io: 'input'` keeps the schema faithful for callers that build a request;
   // `unrepresentable: 'any'` keeps rare schemas (z.any(), z.date(), …) from
   // failing the whole dump.
-  return z.toJSONSchema(firstInput as z.ZodType, {
+  return z.toJSONSchema(input as z.ZodType, {
     io: 'input',
     unrepresentable: 'any',
   }) as Record<string, unknown>;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Composes every chained `.input()` schema into one JSON Schema. tRPC runs each
+ * `.input()` validator against the same raw input, so a caller must satisfy all
+ * of them: using only the first schema (the old behavior) under-advertised
+ * chained procedures such as `workspaceFolders.create`, whose second input
+ * requires `name` and `color`.
+ *
+ * Object schemas merge into a single object: properties are unioned, required
+ * keys are unioned, and a key declared by more than one schema keeps every
+ * constraint through `allOf`. Any non-object chain falls back to a top-level
+ * `allOf`, which is the faithful intersection for arbitrary schemas.
+ */
+function toInputSchema(inputs: unknown[]): Record<string, unknown> {
+  const schemas = inputs.map(singleInputSchema);
+  const [first] = schemas;
+  if (first === undefined) return {};
+  if (schemas.length === 1) return first;
+
+  const objects = schemas.filter(schema => schema.type === 'object' && isRecord(schema.properties));
+  if (objects.length === schemas.length) {
+    const properties: Record<string, unknown> = {};
+    const required: string[] = [];
+    for (const schema of objects) {
+      for (const [key, value] of Object.entries(schema.properties as Record<string, unknown>)) {
+        if (!(key in properties)) properties[key] = value;
+        else if (JSON.stringify(properties[key]) !== JSON.stringify(value)) {
+          properties[key] = { allOf: [properties[key], value] };
+        }
+      }
+      if (Array.isArray(schema.required)) {
+        for (const key of schema.required) {
+          if (typeof key === 'string' && !required.includes(key)) required.push(key);
+        }
+      }
+    }
+    const composed: Record<string, unknown> = {};
+    if (typeof first.$schema === 'string') composed.$schema = first.$schema;
+    composed.type = 'object';
+    composed.properties = properties;
+    if (required.length > 0) composed.required = required;
+    return composed;
+  }
+
+  return {
+    ...(typeof first.$schema === 'string' ? { $schema: first.$schema } : {}),
+    allOf: schemas.map(schema => {
+      const copy = { ...schema };
+      delete copy.$schema;
+      return copy;
+    }),
+  };
+}
+
 function topSchemaKeys(inputSchema: Record<string, unknown>): string[] {
+  const keys: string[] = [];
   const properties = inputSchema.properties;
-  return properties && typeof properties === 'object' && !Array.isArray(properties)
-    ? Object.keys(properties)
-    : [];
+  if (isRecord(properties)) {
+    for (const key of Object.keys(properties)) if (!keys.includes(key)) keys.push(key);
+  }
+  // A chain that falls back to a top-level `allOf` keeps its field keys in the
+  // subschemas; surface them so tags and the search blob stay complete.
+  if (Array.isArray(inputSchema.allOf)) {
+    for (const sub of inputSchema.allOf) {
+      if (isRecord(sub)) {
+        for (const key of topSchemaKeys(sub)) if (!keys.includes(key)) keys.push(key);
+      }
+    }
+  }
+  return keys;
 }
 
 /**
@@ -164,7 +234,7 @@ function deriveTags(segments: string[], schemaKeys: string[]): string[] {
 
 function shapeRow(leaf: CatalogLeaf, summary: string): CatalogRow {
   const segments = leaf.path.split('.');
-  const inputSchema = toInputSchema(leaf.firstInput);
+  const inputSchema = toInputSchema(leaf.inputs);
   const schemaKeys = topSchemaKeys(inputSchema);
   const tags = deriveTags(segments, schemaKeys);
   return {

@@ -26,16 +26,16 @@ import {
   type CatalogLeaf,
 } from './catalog';
 
-const queryLeaf = (path: string, firstInput?: CatalogLeaf['firstInput']): CatalogLeaf => ({
+const queryLeaf = (path: string, inputs: CatalogLeaf['inputs'] = []): CatalogLeaf => ({
   path,
   type: 'query',
-  firstInput,
+  inputs,
 });
 
-const mutationLeaf = (path: string, firstInput?: CatalogLeaf['firstInput']): CatalogLeaf => ({
+const mutationLeaf = (path: string, inputs: CatalogLeaf['inputs'] = []): CatalogLeaf => ({
   path,
   type: 'mutation',
-  firstInput,
+  inputs,
 });
 
 /**
@@ -80,7 +80,7 @@ describe('mcp-catalog catalog', () => {
           mutationLeaf('slack.devRemoveDbRowOnly'),
           mutationLeaf('organizations.subscription.cancel'),
           mutationLeaf('user.deleteAccount'),
-          { path: 'user.onEvent', type: 'subscription', firstInput: undefined },
+          { path: 'user.onEvent', type: 'subscription', inputs: [] },
           queryLeaf('user.getProfile'),
           mutationLeaf('user.updateProfile'),
           queryLeaf('slack.testConnection'),
@@ -143,7 +143,7 @@ describe('mcp-catalog catalog', () => {
 
     it('shapes rows with derived tags, input schema and search blob', () => {
       const { rows } = buildCatalogRows(
-        withMutation([queryLeaf('user.getProfile', z.object({ userId: z.string() }))]),
+        withMutation([queryLeaf('user.getProfile', [z.object({ userId: z.string() })])]),
         new Map([['user.getProfile', 'Returns the profile of a user.']])
       );
       const row = rows[0];
@@ -167,6 +167,54 @@ describe('mcp-catalog catalog', () => {
         new Map([['user.listSessions', 'Lists active sessions.']])
       );
       expect(rows[0]?.inputSchema).toEqual({});
+    });
+
+    it('composes every chained .input() schema into one object schema', () => {
+      const { rows } = buildCatalogRows(
+        withMutation([
+          mutationLeaf('workspaceFolders.create', [
+            z.object({ organizationId: z.uuid().nullable() }),
+            z.object({ name: z.string(), color: z.string() }),
+          ]),
+        ]),
+        new Map([['workspaceFolders.create', 'Creates a workspace folder.']])
+      );
+      const schema = rows[0]?.inputSchema;
+      expect(schema).toMatchObject({
+        type: 'object',
+        properties: {
+          organizationId: expect.any(Object),
+          name: { type: 'string' },
+          color: { type: 'string' },
+        },
+      });
+      expect(schema?.['required']).toEqual(
+        expect.arrayContaining(['organizationId', 'name', 'color'])
+      );
+    });
+
+    it('keeps every constraint when two chained schemas declare the same key', () => {
+      const { rows } = buildCatalogRows(
+        withMutation([
+          mutationLeaf('user.rename', [z.object({ id: z.string() }), z.object({ id: z.uuid() })]),
+        ]),
+        new Map([['user.rename', 'Renames a user.']])
+      );
+      const properties = rows[0]?.inputSchema['properties'] as Record<string, unknown>;
+      expect(properties['id']).toEqual({ allOf: [{ type: 'string' }, expect.any(Object)] });
+    });
+
+    it('keeps the tags of every chained input schema field', () => {
+      const { rows } = buildCatalogRows(
+        withMutation([
+          mutationLeaf('workspaceFolders.create', [
+            z.object({ organizationId: z.uuid().nullable() }),
+            z.object({ name: z.string(), color: z.string() }),
+          ]),
+        ]),
+        new Map([['workspaceFolders.create', 'Creates a workspace folder.']])
+      );
+      expect(rows[0]?.tags).toEqual(expect.arrayContaining(['organizationid', 'name', 'color']));
     });
 
     it('keeps committed summaries byte-for-byte, including whitespace', () => {
@@ -291,6 +339,21 @@ describe('mcp-catalog catalog', () => {
         expect(catalog[path]?.kind).toBe('mutation');
         expect(catalog[path]?.searchBlob).toContain(path);
       }
+    });
+
+    it('publishes every required field of a chained-input mutation', () => {
+      // workspaceFolders.create chains a second .input() requiring name/color;
+      // a first-input-only catalog advertises organizationId alone and lets an
+      // MCP request pass local validation before failing upstream.
+      const catalog = JSON.parse(readFileSync(CATALOG_JSON_PATH, 'utf8')) as Record<
+        string,
+        { inputSchema?: Record<string, unknown> } | undefined
+      >;
+      const schema = catalog['workspaceFolders.create']?.inputSchema;
+      const required = Array.isArray(schema?.['required']) ? (schema['required'] as string[]) : [];
+      const properties = Object.keys((schema?.['properties'] as object) ?? {});
+      expect(required).toEqual(expect.arrayContaining(['organizationId', 'name', 'color']));
+      expect(properties).toEqual(expect.arrayContaining(['organizationId', 'name', 'color']));
     });
   });
 

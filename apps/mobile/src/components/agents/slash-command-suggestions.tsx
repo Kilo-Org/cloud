@@ -1,5 +1,5 @@
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
-import { Pressable, ScrollView, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 
 import {
   getSlashCommandDescription,
+  isCatalogueSlashCommand,
   type MobileSlashCommandInfo,
 } from './chat-composer-slash-commands';
 
@@ -17,6 +18,14 @@ import {
  * the slash menu's key space disjoint.
  */
 const SLASH_COMMAND_ITEM_PREFIX = 'slash-command:';
+
+/**
+ * Rows the list mounts on its first pass. The menu is at most `max-h-48` tall,
+ * so a handful of rows fills it; bounding the first pass keeps typing `/`
+ * (which matches every command) from enqueuing a whole 256-command catalog to
+ * the translation gateway. Rows beyond the window mount as they scroll in.
+ */
+const SLASH_COMMAND_INITIAL_ROWS = 8;
 
 type SlashCommandSuggestionsProps = {
   commands: MobileSlashCommandInfo[];
@@ -33,11 +42,10 @@ type SlashCommandSuggestionRowProps = {
  * One command row. The app's catalogue localizes a description it accounts for
  * (`getSlashCommandDescription`), and a description that comes from outside it
  * — MCP, skill, and other runtime commands — goes through the same translation
- * runtime as a transcript tool summary. The reserved local commands carry
- * `catalogueDescription` and are already in the app language, so they never
- * reach the gateway. The row is a fixed 44pt touch target with a single-line
- * description, so swapping the source text for its translation cannot move
- * layout.
+ * runtime as a transcript tool summary. A catalogue-accounted row is already in
+ * the app language, so it never reaches the gateway. The row is a fixed 44pt
+ * touch target with a single-line description, so swapping the source text for
+ * its translation cannot move layout.
  */
 function SlashCommandSuggestionRow({
   command,
@@ -46,11 +54,11 @@ function SlashCommandSuggestionRow({
 }: Readonly<SlashCommandSuggestionRowProps>) {
   const { t } = useTranslation();
   const sourceDescription = getSlashCommandDescription(command);
-  // The catalogue resolves the commands it accounts for, so the text it returns
-  // then differs from the raw reported description. Everything it leaves
-  // untouched is runtime text the catalogue cannot know, so it translates.
-  const isRuntimeDescription =
-    command.catalogueDescription !== true && sourceDescription === command.description;
+  // Only the reported text the catalogue does not account for is runtime text
+  // it cannot know, so only that text translates. Comparing the resolved
+  // string with the reported one would miss the English case, where the
+  // catalogue string the CLI reports is identical to the resolved string.
+  const isRuntimeDescription = !isCatalogueSlashCommand(command);
   const description = useTranslatedToolSummary(
     sourceDescription ?? '',
     isRuntimeDescription,
@@ -92,6 +100,11 @@ function SlashCommandSuggestionRow({
  * input via the `onSelect` callback. Rows are 44pt tall to satisfy the
  * platform touch-target minimum and announce their command via accessibility
  * labels.
+ *
+ * The list is virtualized because the catalog can carry up to 256 commands and
+ * a row translates its description as it mounts: rendering every match would
+ * fan a whole catalog out to the translation gateway for the handful of rows
+ * `max-h-48` actually shows.
  */
 export function SlashCommandSuggestions({
   commands,
@@ -102,18 +115,21 @@ export function SlashCommandSuggestions({
   }
 
   return (
-    <ScrollView
+    <FlatList
       className="max-h-48 border-t border-border bg-card"
+      data={commands}
+      keyExtractor={command => command.name}
+      initialNumToRender={SLASH_COMMAND_INITIAL_ROWS}
+      maxToRenderPerBatch={SLASH_COMMAND_INITIAL_ROWS}
+      windowSize={3}
       keyboardShouldPersistTaps="handled"
-    >
-      {commands.map((command, index) => (
+      renderItem={({ item, index }) => (
         <SlashCommandSuggestionRow
-          key={command.name}
-          command={command}
+          command={item}
           isLast={index === commands.length - 1}
           onSelect={onSelect}
         />
-      ))}
-    </ScrollView>
+      )}
+    />
   );
 }

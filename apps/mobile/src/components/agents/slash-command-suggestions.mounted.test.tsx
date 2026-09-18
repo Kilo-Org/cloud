@@ -1,7 +1,8 @@
-import { createElement } from 'react';
+import { createElement, Fragment, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import {
   clearToolSummaryTranslationMemory,
   setConfig,
@@ -16,6 +17,33 @@ const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
   writeMock: vi.fn(),
 }));
 
+// FlatList renders through a callback, so a host-string mock would drop every
+// row. This mock mirrors the first-mount pass of the real list: it renders
+// `initialNumToRender` rows (the window the component bounds its translation
+// fan-out to) and the rest only as they scroll into the window.
+const flatListMock = vi.hoisted(
+  () =>
+    (props: {
+      data: readonly MobileSlashCommandInfo[];
+      renderItem?: (info: { item: MobileSlashCommandInfo; index: number }) => ReactNode;
+      keyExtractor?: (item: MobileSlashCommandInfo) => string;
+      initialNumToRender?: number;
+    }) => {
+      const rendered =
+        typeof props.initialNumToRender === 'number'
+          ? props.data.slice(0, props.initialNumToRender)
+          : props.data;
+      const rows = rendered.map((item, index) =>
+        createElement(
+          Fragment,
+          { key: props.keyExtractor ? props.keyExtractor(item) : String(index) },
+          props.renderItem ? props.renderItem({ item, index }) : null
+        )
+      );
+      return createElement('FlatList', null, ...rows);
+    }
+);
+
 vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
   requestToolSummaryTranslations: requestMock,
 }));
@@ -26,6 +54,7 @@ vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
   writeToolSummaryTranslation: writeMock,
 }));
 vi.mock('react-native', () => ({
+  FlatList: flatListMock,
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
@@ -74,6 +103,15 @@ const LOCAL_NEW: MobileSlashCommandInfo = {
   catalogueDescription: true,
 };
 const NO_DESCRIPTION: MobileSlashCommandInfo = { name: 'bare', hints: [] };
+// The worker/CLI catalog reports the exact English catalogue strings, so with
+// the app language set to English the resolved catalogue string is identical to
+// the reported one — the row must still treat it as catalogue copy.
+const CATALOGUE_GOAL: MobileSlashCommandInfo = {
+  name: 'goal',
+  description: i18n.t('agentChat.slashCommands.goalDescription', { lng: 'en' }),
+  hints: [],
+  source: 'command',
+};
 
 function findHost(
   root: TestRenderer.ReactTestInstance,
@@ -176,6 +214,50 @@ describe('SlashCommandSuggestions translation', () => {
 
     expect(descriptionLines(renderer.root)).toEqual(['Start a new session']);
     expect(requestMock).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('does not request a catalogue-accounted CLI command whose reported text matches the English source', async () => {
+    requestMock.mockResolvedValue(['de:Keep working toward a session goal.']);
+    setConfig({ enabled: true, model: MODEL });
+    const renderer = renderSuggestionsSync([CATALOGUE_GOAL]);
+
+    await settleTranslation();
+
+    // The catalogue string resolves to itself in English, but the row is
+    // catalogue copy, not runtime text, so it stays out of the gateway.
+    expect(descriptionLines(renderer.root)).toEqual([CATALOGUE_GOAL.description]);
+    expect(requestMock).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('translates only the rows the virtualized list mounts for a large catalog', async () => {
+    requestMock.mockImplementation(
+      // eslint-disable-next-line typescript-eslint/require-await -- the mock answers the batch synchronously
+      async ({ texts }: { texts: readonly string[] }) => texts.map(text => `de:${text}`)
+    );
+    setConfig({ enabled: true, model: MODEL });
+    const many: MobileSlashCommandInfo[] = Array.from({ length: 256 }, (_, index) => ({
+      name: `cmd-${index}`,
+      description: `Runtime ${index}`,
+      hints: [],
+      source: 'command',
+    }));
+    const renderer = renderSuggestionsSync(many);
+
+    await settleTranslation();
+
+    const requested = requestMock.mock.calls.flatMap(
+      call => (call[0] as { texts: readonly string[] }).texts
+    );
+    // The menu shows at most a few rows; the first window is what translates,
+    // not the whole 256-command catalog.
+    expect(requested.length).toBeGreaterThan(0);
+    expect(requested.length).toBeLessThanOrEqual(8);
     act(() => {
       renderer.unmount();
     });

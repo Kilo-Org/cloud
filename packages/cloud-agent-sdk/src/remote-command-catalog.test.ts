@@ -1,7 +1,7 @@
 import { parseRemoteCommandCatalog, remoteCommandCatalogV1Schema } from './remote-command-catalog';
 
 describe('remote command catalog schema', () => {
-  it('accepts a strict v1 catalog and excludes skill commands', () => {
+  it('accepts a strict v1 catalog and keeps skill commands', () => {
     expect(
       remoteCommandCatalogV1Schema.parse({
         protocolVersion: 1,
@@ -33,6 +33,12 @@ describe('remote command catalog schema', () => {
           description: 'Review changes',
           source: 'command',
           hints: ['$ARGUMENTS'],
+        },
+        {
+          name: 'hidden-skill',
+          description: 'Not part of the remote surface',
+          source: 'skill',
+          hints: [],
         },
         {
           name: 'compact',
@@ -273,9 +279,9 @@ describe('parseRemoteCommandCatalog', () => {
   });
 
   it('rejects duplicates even when one entry is a skill-sourced command', () => {
-    // Filtering happens only after untrusted catalog validation, so a
-    // `command` entry whose name collides with a `skill` entry is still
-    // ambiguous and the whole catalog must be rejected.
+    // Duplicate-name validation runs over the untrusted wire entries before
+    // the transform, so a `command` entry whose name collides with a `skill`
+    // entry is still ambiguous and the whole catalog must be rejected.
     const result = parseRemoteCommandCatalog({
       protocolVersion: 1,
       commands: [

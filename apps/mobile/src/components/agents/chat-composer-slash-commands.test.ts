@@ -7,6 +7,7 @@ import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-comman
 import {
   createMobileSlashCommandList,
   getLocalClearSlashCommand,
+  getLocalExitSlashCommand,
   getLocalNewSlashCommand,
   getSlashCommandCandidate,
   getSlashCommandDescription,
@@ -317,6 +318,21 @@ describe('parseChatComposerSubmission — non-remote sessions ignore the remote 
         remoteCommandState: remoteState({ refresh: 'upgrade-required' }),
       })
     ).toEqual({ type: 'command', command: 'compact', arguments: '' });
+  });
+});
+
+describe('catalogueDescription marker', () => {
+  it('marks the reserved builders and leaves runtime commands unmarked', () => {
+    expect(getLocalNewSlashCommand().catalogueDescription).toBe(true);
+    expect(getLocalExitSlashCommand().catalogueDescription).toBe(true);
+    expect(getLocalClearSlashCommand().catalogueDescription).toBe(true);
+    const runtime = createMobileSlashCommandList('cloud-agent', SAMPLE_COMMANDS, null);
+    expect(runtime.every(command => command.catalogueDescription === undefined)).toBe(true);
+    const suggestions = getSlashCommandSuggestions(
+      '/ne',
+      createMobileSlashCommandList('remote', SAMPLE_COMMANDS, remoteState())
+    );
+    expect(suggestions[0]?.catalogueDescription).toBe(true);
   });
 });
 

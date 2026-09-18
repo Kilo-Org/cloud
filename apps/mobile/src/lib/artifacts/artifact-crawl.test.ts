@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- one suite for the crawl's reads, the size cap, and the mirror-entry assembly */
+/* eslint-disable require-await, @typescript-eslint/require-await -- the injected probe and download seams resolve immediately, so they settle without await */
 import { File } from 'expo-file-system';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -181,11 +183,12 @@ describe('materializeArtifact', () => {
     const { file } = target();
     const presignAttachmentDownload = presignResolving('https://r2.example.com/signed');
     const downloadFile = downloadResolving(42);
+    const probeContentLength = vi.fn<ArtifactCrawlDeps['probeContentLength']>(async () => null);
 
     const sandboxed = await materializeArtifact(
       { id: 'file-1', mime: 'image/png', filename: 'shot.png', url: SANDBOX_URL },
       file,
-      { downloadFile, presignAttachmentDownload }
+      { downloadFile, presignAttachmentDownload, probeContentLength }
     );
 
     expect(presignAttachmentDownload).toHaveBeenCalledWith({
@@ -198,7 +201,7 @@ describe('materializeArtifact', () => {
     const direct = await materializeArtifact(
       { id: 'file-2', mime: 'text/plain', url: 'https://x/a.txt' },
       file,
-      { downloadFile, presignAttachmentDownload }
+      { downloadFile, presignAttachmentDownload, probeContentLength }
     );
 
     expect(presignAttachmentDownload).toHaveBeenCalledTimes(1);
@@ -237,6 +240,7 @@ describe('materializeArtifact', () => {
         new File(),
         {
           downloadFile: offline,
+          probeContentLength: vi.fn(async () => null),
         }
       )
     ).resolves.toEqual({ ok: false, reason: 'download-failed' });
@@ -255,18 +259,40 @@ describe('materializeArtifact', () => {
     ).resolves.toEqual({ ok: false, reason: 'unsupported' });
   });
 
-  it('drops a download larger than the byte cap', async () => {
+  it('drops a download larger than the byte cap when no length was declared', async () => {
     const { file, tracked } = target();
     const downloadFile = downloadResolving(MAX_ARTIFACT_BYTES + 1);
+    const probeContentLength = vi.fn<ArtifactCrawlDeps['probeContentLength']>(async () => null);
 
     const result = await materializeArtifact(
       { id: 'file-1', mime: 'text/plain', url: 'https://x/big.bin' },
       file,
-      { downloadFile }
+      { downloadFile, probeContentLength }
     );
 
     expect(result).toEqual({ ok: false, reason: 'too-large' });
     expect(tracked.deleted).toBe(true);
+  });
+
+  it('rejects an oversized artifact from its declared length without downloading it', async () => {
+    const { file, tracked } = target();
+    const downloadFile = vi.fn<ArtifactCrawlDeps['downloadFile']>();
+    const probeContentLength = vi.fn<ArtifactCrawlDeps['probeContentLength']>(
+      async () => MAX_ARTIFACT_BYTES + 1
+    );
+
+    const result = await materializeArtifact(
+      { id: 'file-1', mime: 'text/plain', url: 'https://x/big.bin' },
+      file,
+      { downloadFile, probeContentLength }
+    );
+
+    expect(result).toEqual({ ok: false, reason: 'too-large' });
+    expect(probeContentLength).toHaveBeenCalledWith('https://x/big.bin');
+    // The whole point of the pre-check: no byte of body reached the target.
+    expect(downloadFile).not.toHaveBeenCalled();
+    expect(tracked.deleted).toBe(false);
+    expect(tracked.size).toBe(0);
   });
 });
 
@@ -333,7 +359,6 @@ describe('buildSessionArtifacts', () => {
             id: 'file-1',
             mime: 'application/pdf',
             filename: 'reports/q1.pdf',
-            url: 'https://x/q1.pdf',
             size: 2048,
           },
         ],

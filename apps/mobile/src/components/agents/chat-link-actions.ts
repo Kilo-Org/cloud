@@ -5,6 +5,8 @@ import { toast } from 'sonner-native';
 import { i18n } from '@/i18n';
 import { openExternalUrl } from '@/lib/external-link';
 
+import { COPY_TOAST_DURATION_MS } from './copy-toast-duration';
+
 type ChatLinkAction = 'open' | 'copy' | 'share' | 'review-pr';
 
 type ChatLinkActionOption = { kind: ChatLinkAction | 'cancel'; label: string };
@@ -80,7 +82,12 @@ export async function performChatLinkAction(action: ChatLinkAction, href: string
       if (!copied) {
         throw new Error('Clipboard rejected link');
       }
-      toast.success(i18n.t('agentChat.chatLink.linkCopied'));
+      // Same duration as every other clipboard confirmation: on Android the
+      // system clipboard preview covers the bottom-center toast region for
+      // ~6s, so a default-length toast would be hidden for its whole life.
+      toast.success(i18n.t('agentChat.chatLink.linkCopied'), {
+        duration: COPY_TOAST_DURATION_MS,
+      });
     } catch {
       showRetryableError(i18n.t('agentChat.chatLink.couldNotCopyLink'), async () => {
         await performChatLinkAction('copy', href);

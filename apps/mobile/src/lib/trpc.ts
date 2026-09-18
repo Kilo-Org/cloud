@@ -125,7 +125,9 @@ const latencyBuffer = createLatencyBuffer({
 
 // Every tRPC HTTP call (single or batched) gets a per-call `x-kilo-request-id`
 // header and records one latency sample, so the server timing line and the
-// client sample join by the same id.
+// client sample join by the same id. The id comes from `expo-crypto`'s
+// `randomUUID`: UUID generation exists identically on iOS and Android, so
+// neither platform lacks the capability and no per-platform branch is kept.
 const measuredFetch = createLatencyFetch(observedFetch, latencyBuffer, {
   now: () => Date.now(),
   newId: () => Crypto.randomUUID(),

@@ -43,10 +43,10 @@ export type LatencyBatch = {
 };
 
 /** Hands a batch to the ingest transport. Never throws into the caller. */
-export type LatencySend = (batch: LatencyBatch) => void | Promise<void>;
+type LatencySend = (batch: LatencyBatch) => void | Promise<void>;
 
 /** Schedules a flush and returns its cancel function. */
-export type LatencySchedule = (callback: () => void, delayMs: number) => () => void;
+type LatencySchedule = (callback: () => void, delayMs: number) => () => void;
 
 export type LatencyBufferOptions = {
   send: LatencySend;

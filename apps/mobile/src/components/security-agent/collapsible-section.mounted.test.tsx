@@ -5,13 +5,17 @@
 // target angle (no `withTiming`) and the panel must drop the `LinearTransition`
 // layout animation and the content `FadeIn`; with normal motion the existing
 // 200ms chevron timing, 200ms layout transition, and 150ms fade stay.
+//
+// The same file's shared disclosure primitives (`DisclosureLayout`, the height
+// transition the session goal row reuses, and `DisclosureChevron`, the carat as
+// its own pressable) carry the same gate.
 
 import { type ComponentProps, type ElementType, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
 
-import { CollapsibleSection } from './collapsible-section';
+import { CollapsibleSection, DisclosureChevron, DisclosureLayout } from './collapsible-section';
 
 const policy = vi.hoisted(() => ({ reducedMotion: false }));
 const reanimated = vi.hoisted(() => ({
@@ -245,5 +249,100 @@ describe('CollapsibleSection controlled expanded state and class overrides', () 
       'flex-1 text-sm font-medium text-base font-semibold'
     );
     expect(animatedView(renderer, 'gap-2 bg-card p-4 gap-3')).toBeDefined();
+  });
+});
+
+/** The goal row's carat pressable, mounted on its own. */
+function mountChevron(
+  props: Partial<ComponentProps<typeof DisclosureChevron>> = {}
+): ReactTestRenderer {
+  act(() => {
+    mounted = TestRenderer.create(
+      <DisclosureChevron
+        expanded={false}
+        label="expand goal"
+        onPress={vi.fn<() => void>()}
+        {...props}
+      />
+    );
+  });
+  if (!mounted) {
+    throw new Error('DisclosureChevron did not mount');
+  }
+  return mounted;
+}
+
+function mountLayout(className: string): ReactTestRenderer {
+  act(() => {
+    mounted = TestRenderer.create(
+      <DisclosureLayout className={className}>{SECTION_BODY}</DisclosureLayout>
+    );
+  });
+  if (!mounted) {
+    throw new Error('DisclosureLayout did not mount');
+  }
+  return mounted;
+}
+
+describe('shared disclosure primitives', () => {
+  beforeEach(() => {
+    policy.reducedMotion = false;
+    reanimated.sharedValues = [];
+    reanimated.withTiming.mockClear();
+  });
+
+  afterEach(() => {
+    act(() => mounted?.unmount());
+    mounted = undefined;
+  });
+
+  it('points the carat up while collapsed and down while expanded', () => {
+    mountChevron({ expanded: false });
+    expect(reanimated.withTiming).toHaveBeenCalledWith(180, { duration: 200 });
+    expect(rotationValue()).toEqual({ __timing: true, value: 180, config: { duration: 200 } });
+    act(() => mounted?.unmount());
+
+    reanimated.sharedValues = [];
+    reanimated.withTiming.mockClear();
+
+    mountChevron({ expanded: true });
+    expect(reanimated.withTiming).toHaveBeenCalledWith(0, { duration: 200 });
+  });
+
+  it('is its own pressable carrying the disclosure label, state, and touch target', () => {
+    const onPress = vi.fn<() => void>();
+    const renderer = mountChevron({ expanded: true, onPress });
+    const pressable = renderer.root.findByType('Pressable' as ElementType);
+
+    expect(pressable.props.accessibilityRole).toBe('button');
+    expect(pressable.props.accessibilityState).toEqual({ expanded: true });
+    expect(pressable.props.accessibilityLabel).toBe('expand goal');
+    expect(pressable.props.hitSlop).toBe(12);
+
+    act(() => {
+      (pressable.props.onPress as () => void)();
+    });
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('jumps the carat to the angle under reduced motion and keeps its contract', () => {
+    policy.reducedMotion = true;
+    const renderer = mountChevron({ expanded: false });
+
+    expect(reanimated.withTiming).not.toHaveBeenCalled();
+    expect(rotationValue()).toBe(180);
+    expect(renderer.root.findByType('Pressable' as ElementType).props.accessibilityState).toEqual({
+      expanded: false,
+    });
+  });
+
+  it('animates the layout with normal motion and drops the transition under reduced motion', () => {
+    const animated = mountLayout('min-h-12');
+    expect(animatedView(animated, 'min-h-12').props.layout).toEqual({ __linearTransition: 200 });
+    act(() => mounted?.unmount());
+
+    policy.reducedMotion = true;
+    const reduced = mountLayout('min-h-12');
+    expect(animatedView(reduced, 'min-h-12').props.layout).toBeUndefined();
   });
 });

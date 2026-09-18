@@ -2073,6 +2073,7 @@
       "exitNeedsNewerCli": "Les ordres amb barra remotes requereixen una versió més nova de Kilo CLI. Actualitza Kilo CLI i torna't a connectar."
     },
     "sessionConnection": {
+      "label": "Connexió",
       "connecting": "Connectant…",
       "reconnecting": "Reconnectant…",
       "connectionLost": "Connexió perduda",
@@ -2092,7 +2093,9 @@
       "removeConfirmTitle": "Eliminar l'objectiu?",
       "removeConfirmMessage": "El CLI esborra l'objectiu d'aquesta sessió.",
       "updateFailed": "No s'ha pogut actualitzar l'objectiu.",
-      "sectionAccessibility": "{{status}}. Objectiu: {{text}}"
+      "sectionAccessibility": "{{status}}. Objectiu: {{text}}",
+      "collapse": "Plega l'objectiu",
+      "expand": "Desplega l'objectiu"
     },
     "newSession": {
       "recentlyUsed": "Utilitzats recentment",
@@ -2146,7 +2149,20 @@
       "continueFrom": "S'està continuant la sessió {{title}}.",
       "importingSession": "Important la sessió…",
       "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Tria Cloud Agent o un altre CLI.",
-      "importFailed": "No s'ha pogut importar aquesta sessió."
+      "importFailed": "No s'ha pogut importar aquesta sessió.",
+      "sandbox": "Entorn aïllat",
+      "sandboxAccessibility": "Entorn aïllat: {{label}}",
+      "sandboxDefaultWithDestination": "Per defecte · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Petit",
+      "sandboxInstanceShared": "Compartit",
+      "sandboxInstanceLarge": "Gran",
+      "sandboxInstanceDevcontainer": "Contenidor de desenvolupament",
+      "sandboxInstanceProviderDefault": "Per defecte del proveïdor",
+      "sandboxCouldNotLoad": "No s'han pogut carregar les opcions de l'entorn aïllat",
+      "sandboxUnavailable": "Aquest entorn aïllat no està disponible. Tria'n un altre o Per defecte.",
+      "sandboxUseDefault": "Utilitza Per defecte"
     },
     "partRenderer": {
       "updatedFileCount_one": "S'ha actualitzat {{displayCount}} fitxer.",
@@ -2516,6 +2532,12 @@
       "startNewSession": "Inicia una nova sessió",
       "exitSession": "Finalitza la sessió",
       "clearSession": "Finalitza aquesta sessió i inicia'n una de nova",
+      "compactDescription": "compacta el context de la sessió actual",
+      "goalDescription": "Continua treballant cap a un objectiu de sessió. /goal <objective> o pause, resume, clear",
+      "initDescription": "configuració guiada d'AGENTS.md",
+      "resumeClaudeDescription": "importa una transcripció de sessió de Claude Code",
+      "resumeCodexDescription": "importa una transcripció de sessió d'OpenAI Codex",
+      "reviewDescription": "revisa els canvis [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Utilitza /{{command}}",
       "insert": "Insereix",
       "upgradeRequiredFallback": "Actualitza el CLI per utilitzar aquesta ordre.",
@@ -2634,6 +2656,7 @@
     "couldNotLoadActiveSessions": "No s'han pogut carregar les sessions actives.",
     "agentSessions": "En curs ara",
     "newCodingTask": "Nova tasca de programació",
+    "newTaskFromPicture": "Nova tasca a partir d'una imatge",
     "explore": "Explora",
     "seeAll": "Mostra-ho tot",
     "noLiveSessions": "Ara mateix no hi ha res en execució"
@@ -2855,7 +2878,8 @@
     "aiProvidersWhat": "Els teus missatges, l'historial de converses i els fitxers que adjuntis.",
     "aiProvidersWhy": "Per generar respostes d'IA.",
     "aiProvidersWho": "Anthropic, OpenAI, Google i altres proveïdors que selecciones per a cada sol·licitud.",
-    "gatewayWhat": "Identificador del compte, metadades de les sol·licituds i ús de tòkens.",
+    "gatewayWhat": "Identificador del compte, metadades de les sol·licituds, ús de tòkens i els prompts i enregistraments de veu que l'aplicació hi envia.",
+    "viaGateway": "A través de Kilo Gateway",
     "gatewayWhy": "Autenticació, encaminament de sol·licituds i conciliació de la facturació.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Informes d'errors i de fallades, amb el contingut de l'aplicació eliminat.",
@@ -2875,7 +2899,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "L'enregistrament de la teva veu mentre dictes.",
     "voiceTranscriptionWhy": "Per convertir la parla en text.",
-    "voiceTranscriptionWho": "Només al dispositiu, o a Apple o Google si el dispositiu no pot transcriure sense connexió.",
+    "voiceTranscriptionWho": "El teu dispositiu, Kilo Gateway amb el model de transcripció que triïs, o Apple o Google per al reconeixement en línia.",
     "installAttributionPromptTitle": "Vols permetre l'atribució de la instal·lació?",
     "installAttributionPromptMessage": "Kilo només utilitza el permís de seguiment d'Apple per saber per quin canal has arribat aquí. Mai no s'utilitzen els teus missatges ni les teves converses.",
     "what": "Què",

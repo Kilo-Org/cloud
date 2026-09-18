@@ -23,7 +23,13 @@ export type SessionTranscriptItem =
       parts?: Part[];
     }
   | { type: 'preparation'; attempt: PreparationAttempt }
-  | { type: 'tool-run'; id: string; parts: ToolPart[] }
+  | {
+      type: 'tool-run';
+      id: string;
+      /** The run's first part's message id, for resume-anchor matching. */
+      messageId: string;
+      parts: ToolPart[];
+    }
   | { type: 'time'; created: number; messageId: string; dayChanged: boolean };
 
 /**
@@ -68,6 +74,22 @@ export function getSessionTranscriptItemKey(item: SessionTranscriptItem): string
 
 export function getSessionTranscriptItemType(item: SessionTranscriptItem): string {
   return item.type;
+}
+
+/**
+ * The message id a resume anchor matches this item by: a message row's own id,
+ * a condensed run's first part's message, or a time marker's message (the
+ * marker renders above that message). A preparation attempt has no message row
+ * of its own, so it can never be an anchor target.
+ */
+export function getSessionTranscriptItemMessageId(item: SessionTranscriptItem): string | null {
+  if (item.type === 'message') {
+    return item.message.info.id;
+  }
+  if (item.type === 'preparation') {
+    return null;
+  }
+  return item.messageId;
 }
 
 export function mergeSessionTranscript(
@@ -207,9 +229,11 @@ export function condenseTranscriptToolRuns(
     }
     if (run.length >= 2) {
       flushFragment();
+      const first = run[0];
       condensed.push({
         type: 'tool-run',
-        id: `tool-run:${run[0]?.part.id ?? ''}`,
+        id: `tool-run:${first?.part.id ?? ''}`,
+        messageId: first?.message.info.id ?? '',
         parts: run.map(entry => entry.part),
       });
     } else {

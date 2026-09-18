@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Amarrada fog ee / ku bilaabma waxay u baahan yihiin nooc cusub oo Kilo CLI ah. Cusboonaysii Kilo CLI oo dib ugu xirmo."
     },
     "sessionConnection": {
+      "label": "Xiriir",
       "connecting": "Waa la xiriirinayaa…",
       "reconnecting": "Dib ayaa loo xiriirinayaa…",
       "connectionLost": "Xiriirku wuu go'ay",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Ka saar hadafka?",
       "removeConfirmMessage": "CLI wuxuu tirtiraa hadafka kulankan.",
       "updateFailed": "Hadafka lama cusboonaysiin karin.",
-      "sectionAccessibility": "{{status}}. Hadaf: {{text}}"
+      "sectionAccessibility": "{{status}}. Hadaf: {{text}}",
+      "collapse": "Isku laab hadafka",
+      "expand": "Ballaarso hadafka"
     },
     "newSession": {
       "recentlyUsed": "Dhawaan la isticmaalay",
@@ -2128,7 +2131,20 @@
       "continueFrom": "Waxaa la sii wadaa {{title}}.",
       "importingSession": "Kalfadhiga waa la soo gelinayaa",
       "cliCannotContinue": "CLI-kan ma sii wadi karo kalfadhi. Dooro Cloud Agent ama CLI kale.",
-      "importFailed": "Kalfadhigan lama soo gelin karin."
+      "importFailed": "Kalfadhigan lama soo gelin karin.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Caadi · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Yar",
+      "sandboxInstanceShared": "La wadaago",
+      "sandboxInstanceLarge": "Weyn",
+      "sandboxInstanceDevcontainer": "Weelka Dev",
+      "sandboxInstanceProviderDefault": "Caadiga bixiyaha",
+      "sandboxCouldNotLoad": "Lama soo dejin karin xulashooyinka sandbox-ka",
+      "sandboxUnavailable": "Sandbox-kan lama heli karo. Dooro sandbox kale ama Caadi.",
+      "sandboxUseDefault": "Isticmaal Caadi"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay.",
@@ -2494,6 +2510,12 @@
       "startNewSession": "Bilow kalfadhi cusub",
       "exitSession": "Ka bax kalfadhiga",
       "clearSession": "Soo afjar kalfadhigan oo bilow mid cusub",
+      "compactDescription": "soo koob macnaha kalfadhiga hadda",
+      "goalDescription": "Sii wad shaqada dhanka hadafka kalfadhiga. /goal <objective> ama pause, resume, clear",
+      "initDescription": "dejinta AGENTS.md oo la hagayo",
+      "resumeClaudeDescription": "soo geli qoraalka kalfadhiga Claude Code",
+      "resumeCodexDescription": "soo geli qoraalka kalfadhiga OpenAI Codex",
+      "reviewDescription": "dib u eeg isbeddellada [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Isticmaal /{{command}}",
       "insert": "Geli",
       "upgradeRequiredFallback": "Fadlan cusboonaysii CLI-gaaga si aad u isticmaasho amarkan.",
@@ -2611,6 +2633,7 @@
     "couldNotLoadActiveSessions": "Kalfadhiyada socda lama soo dejin karin.",
     "agentSessions": "Hadda socda",
     "newCodingTask": "Hawl cusub oo koodh qorista ah",
+    "newTaskFromPicture": "Hawl cusub oo sawir laga bilaabo",
     "explore": "Sahami",
     "seeAll": "Eeg dhammaan",
     "noLiveSessions": "Waxba ma socdaan hadda"
@@ -2832,7 +2855,8 @@
     "aiProvidersWhat": "Tilmaamahaaga, taariikhda wadahadalladaada iyo fayl kasta oo aad lifaaqdo.",
     "aiProvidersWhy": "Si loo soo saaro jawaabaha AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google iyo bixiyeyaasha kale ee aad codsi kasta u doorato.",
-    "gatewayWhat": "Aqoonsiga akoonka, xogta dheeraadka ah ee codsiga iyo isticmaalka halbeegyada qoraalka.",
+    "gatewayWhat": "Aqoonsiga akoonka, xogta dheeraadka ah ee codsiga, isticmaalka halbeegyada qoraalka, iyo sidoo kale tilmaamaha iyo duubista codka ee ay abka ku diraayo.",
+    "viaGateway": "Iyada oo la marayo Kilo Gateway",
     "gatewayWhy": "Xaqiijinta aqoonsiga, hagidda codsiyada iyo iswaafajinta xisaabaadka biilasha.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Warbixinnada burburka iyo ciladaha oo laga saaray nuxurka barnaamijka.",
@@ -2852,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Duubista codkaaga inta aad ku hadlayso.",
     "voiceTranscriptionWhy": "Si hadalka loo beddelo qoraal.",
-    "voiceTranscriptionWho": "Aaladda gudaheeda oo keliya, ama Apple ama Google marka aaladdan aysan codka qoraal u beddeli karin internet la'aan.",
+    "voiceTranscriptionWho": "Qalabkaaga, Kilo Gateway oo leh moodeelka qoraal-u-beddelka ee aad dooratay, ama Apple ama Google aqoonsiga online.",
     "installAttributionPromptTitle": "Ma oggolaanaysaa in la ogaado halka rakibaaddu ka timid?",
     "installAttributionPromptMessage": "Kilo wuxuu oggolaanshaha raadraaca Apple u isticmaalaa oo keliya inuu ogaado kanaalka ku keenay halkan. Tilmaamahaaga iyo wadahadalladaada marnaba lama isticmaalo.",
     "what": "Maxaa",

@@ -8,7 +8,7 @@ import {
   type CodingPlanQuotaWindow,
 } from '@/lib/coding-plans/usage-contract';
 
-const MINIMAX_USAGE_URL = 'https://api.minimax.io/v1/token_plan/remains';
+export const MINIMAX_USAGE_URL = 'https://api.minimax.io/v1/token_plan/remains';
 const MINIMAX_USAGE_TIMEOUT_MS = 5_000;
 
 const NativePercentSchema = z.number().finite().min(0).max(100);

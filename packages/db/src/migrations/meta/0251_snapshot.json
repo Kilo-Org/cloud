@@ -1,6 +1,6 @@
 {
-  "id": "41b7152c-e9d9-48d4-98c7-0a85e6f221d8",
-  "prevId": "cac2b534-a01b-4919-8a91-75a24d153bf6",
+  "id": "e22de6e8-7136-42c2-a412-b31a36442155",
+  "prevId": "f1e7ff2c-da0c-4475-848e-bc68bd2da137",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -18168,12 +18168,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "money_backfill_attempted_at": {
-          "name": "money_backfill_attempted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "raw_payload_json": {
           "name": "raw_payload_json",
           "type": "jsonb",
@@ -27444,6 +27438,152 @@
           "value": "\"native_attested_keys\".\"platform\" IN ('ios', 'android')"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.openai_chatgpt_connections": {
+      "name": "openai_chatgpt_connections",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "encrypted_connection": {
+          "name": "encrypted_connection",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_enabled": {
+          "name": "is_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "UQ_openai_chatgpt_connections_personal": {
+          "name": "UQ_openai_chatgpt_connections_personal",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"openai_chatgpt_connections\".\"organization_id\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_openai_chatgpt_connections_org_member": {
+          "name": "UQ_openai_chatgpt_connections_org_member",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"openai_chatgpt_connections\".\"organization_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_openai_chatgpt_connections_organization_id": {
+          "name": "IDX_openai_chatgpt_connections_organization_id",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "openai_chatgpt_connections_kilo_user_id_kilocode_users_id_fk": {
+          "name": "openai_chatgpt_connections_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "openai_chatgpt_connections",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "openai_chatgpt_connections_organization_id_organizations_id_fk": {
+          "name": "openai_chatgpt_connections_organization_id_organizations_id_fk",
+          "tableFrom": "openai_chatgpt_connections",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.operation_ledgers": {

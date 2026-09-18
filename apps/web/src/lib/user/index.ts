@@ -5,6 +5,7 @@ import PostHogClient from '@/lib/posthog';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
+import { clearOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
 import {
@@ -50,6 +51,7 @@ import {
   platform_oauth_credentials,
   platform_access_token_credentials,
   byok_api_keys,
+  openai_chatgpt_connections,
   agent_configs,
   agent_environment_profiles,
   security_findings,
@@ -1059,7 +1061,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   platform_integrations cascade below. Organization-owned Slack credentials are
  *   intentionally retained, since they belong to the organization, not the user)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
- *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
+ *   openai_chatgpt_connections, agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
  *   security_findings, security_analysis_owner_state, security_agent_commands,
  *   security_agent_repository_sync_state, security_remediations,
@@ -1471,6 +1473,9 @@ export async function anonymizeCloudUserData(
     );
   await tx.delete(user_github_app_tokens).where(eq(user_github_app_tokens.kilo_user_id, userId));
   await tx.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, userId));
+  await tx
+    .delete(openai_chatgpt_connections)
+    .where(eq(openai_chatgpt_connections.kilo_user_id, userId));
   await tx
     .delete(coding_plan_availability_intents)
     .where(eq(coding_plan_availability_intents.user_id, userId));
@@ -2166,6 +2171,8 @@ export function inferRowlessAuthProviders(
       return ['linkedin'];
     case hosted_domain_specials.discord:
       return ['discord'];
+    case hosted_domain_specials.openai:
+      return ['openai'];
     case hosted_domain_specials.email:
       return ['email'];
     default:
@@ -2238,9 +2245,18 @@ export async function linkAuthProviderToUser(
 
   // Check if user already has this provider linked
   const userProviders = await getUserAuthProviders(kiloUserId);
-  const hasProvider = userProviders.some(p => p.provider === authProviderData.provider);
+  const existingProvider = userProviders.find(p => p.provider === authProviderData.provider);
 
-  if (hasProvider) {
+  if (existingProvider) {
+    // An identical account id is the same verified external person, so linking
+    // again is a no-op success instead of an error. The ChatGPT issuer scopes
+    // its subject as `<issuer>#<sub>`, which is the stable external identity:
+    // reconnecting after an expiry - or after linking for sign-in only - must
+    // not fail on an already-present row. A different account id for the same
+    // provider stays PROVIDER-ALREADY-LINKED.
+    if (existingProvider.provider_account_id === authProviderData.provider_account_id) {
+      return successResult();
+    }
     return failureResult('PROVIDER-ALREADY-LINKED');
   }
 
@@ -2316,6 +2332,14 @@ export async function unlinkAuthProviderFromUser(
       .update(kilocode_users)
       .set({ discord_server_membership_verified_at: null })
       .where(eq(kilocode_users.id, kiloUserId));
+  }
+
+  // Unlinking OpenAI drops the personal delegated ChatGPT credential: it
+  // proves the same external identity. An organization connection is a separate
+  // account's BYOK setting and survives this unlink; the member disconnects it
+  // from the organization BYOK page.
+  if (provider === 'openai') {
+    await clearOpenAiChatGptConnection({ kiloUserId, organizationId: null });
   }
 
   return successResult();

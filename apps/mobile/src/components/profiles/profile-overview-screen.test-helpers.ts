@@ -71,7 +71,7 @@ export function findRow(root: ReactTestInstance, title: string): ReactTestInstan
   return row;
 }
 
-export function pressButton(root: ReactTestInstance, index: number): void {
+function pressButton(root: ReactTestInstance, index: number): void {
   const button = findAll(root, 'Button')[index];
   if (!button) {
     throw new Error(`button ${index} was not rendered`);
@@ -88,7 +88,7 @@ export function changeText(root: ReactTestInstance, label: string, value: string
 }
 
 /** Confirm the destructive Alert button the screen raised. */
-export function confirmAlert(alert: TestAlertMock): void {
+function confirmAlert(alert: TestAlertMock): void {
   const buttons = alert.mock.calls[0]?.[2] as TestAlertButton[] | undefined;
   const destructive = buttons?.find(button => button.style === 'destructive');
   if (!destructive?.onPress) {

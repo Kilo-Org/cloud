@@ -8,7 +8,7 @@
  */
 
 /** Server bound: `ProfileNameSchema`'s `z.string().min(1).max(100)`. */
-export const PROFILE_NAME_MAX_LENGTH = 100;
+const PROFILE_NAME_MAX_LENGTH = 100;
 
 /** Server bound: `VarSchema`'s `z.string().min(1).max(256)`. */
 export const VARIABLE_KEY_MAX_LENGTH = 256;

@@ -7,7 +7,7 @@
  * compact counts summary the row subtitle shows.
  */
 
-export type ProfileSectionKey = 'organization' | 'personal';
+type ProfileSectionKey = 'organization' | 'personal';
 
 /** The three summary counts the list row shows, mirroring the server's `ProfileSummarySchema`. */
 export type ProfileCounts = {

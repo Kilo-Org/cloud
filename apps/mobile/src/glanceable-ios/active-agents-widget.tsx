@@ -184,7 +184,11 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
         </Text>
         <Text
           modifiers={[
-            font({ textStyle }),
+            // The app's body text is `font-medium` (the `Text` default in
+            // components/ui/text), so a regular label reads lighter than every
+            // string the app draws. Keep the app's body weight on the label and
+            // leave the semibold count as the row's only emphasis.
+            font({ textStyle, weight: 'medium' }),
             // The label carries the meaning, so it shrinks and tightens
             // rather than truncating: a German or Albanian label wrapped to
             // two lines otherwise, which broke the row grid the three counts
@@ -203,7 +207,14 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
           <Text
             date={new Date(needsInputSince)}
             dateStyle="relative"
-            modifiers={[font({ textStyle }), monospacedDigit(), lineLimit(1), mutedForeground]}
+            modifiers={[
+              // Same body weight as the label it sits beside: the app draws
+              // every relative-time meta line at `font-medium` too.
+              font({ textStyle, weight: 'medium' }),
+              monospacedDigit(),
+              lineLimit(1),
+              mutedForeground,
+            ]}
           />
         ) : null}
       </HStack>
@@ -269,7 +280,9 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
             {counts.map(line => countRow(line, line.kind === primaryKind, true))}
           </VStack>
         ) : (
-          <Text modifiers={[font({ textStyle: 'subheadline' })]}>{statusLine}</Text>
+          <Text modifiers={[font({ textStyle: 'subheadline', weight: 'medium' })]}>
+            {statusLine}
+          </Text>
         )}
         <Spacer />
       </HStack>
@@ -281,7 +294,9 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
       {counts.map(line => countRow(line, line.kind === primaryKind, false))}
     </VStack>
   ) : (
-    <Text modifiers={[font({ textStyle: 'footnote' }), mutedForeground]}>{statusLine}</Text>
+    <Text modifiers={[font({ textStyle: 'footnote', weight: 'medium' }), mutedForeground]}>
+      {statusLine}
+    </Text>
   );
 
   // The newest-session slot and the action row are Home Screen families only:
@@ -316,7 +331,9 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
       {newestLine === null ? null : (
         <Text
           modifiers={[
-            font({ textStyle: 'caption' }),
+            // The newest-session line is the app's own row title, so it carries
+            // the app's body weight rather than a lighter regular.
+            font({ textStyle: 'caption', weight: 'medium' }),
             lineLimit(1),
             minimumScaleFactor(0.6),
             allowsTightening(true),

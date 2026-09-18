@@ -177,6 +177,8 @@ function countRow(
               style={{
                 color: isPrimary ? palette.foreground : palette.muted,
                 fontSize,
+                // The app's body text is `font-medium`; the count keeps its bold.
+                fontWeight: '500',
               }}
             />
           ) : null,
@@ -194,7 +196,8 @@ function statusText(props: AndroidWidgetProps, palette: Palette) {
       text={props.statusLine ?? ''}
       maxLines={2}
       truncate="END"
-      style={{ color: palette.muted, fontSize: 13 }}
+      // The app's own empty/status copy is body text at `font-medium`.
+      style={{ color: palette.muted, fontSize: 13, fontWeight: '500' }}
     />
   );
 }
@@ -228,11 +231,10 @@ function renderCounts(props: AndroidWidgetProps, palette: Palette, shape: Shape)
     return statusText(props, palette);
   }
   const { size, rowLabels, rtl } = shape;
-  const primaryLabel = props.primaryLabel;
   // Every state draws its own row, zeros included, so the rows hold still as
   // work moves between them and a narrow cell says as much as a wide one.
   const rows = props.countLines.map(line => {
-    const isPrimary = line.label === primaryLabel;
+    const isPrimary = line.label === props.primaryLabel;
     return countRow(line, isPrimary, {
       palette,
       fontSize: size === 'stack' ? 15 : 13,
@@ -277,7 +279,8 @@ function newestSlot(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
           text={props.newestLine}
           maxLines={1}
           truncate="END"
-          style={{ color: palette.muted, fontSize: NEWEST_FONT_DP[size] }}
+          // The app's own session-row text is `font-medium`.
+          style={{ color: palette.muted, fontSize: NEWEST_FONT_DP[size], fontWeight: '500' }}
         />
       )}
     </FlexWidget>

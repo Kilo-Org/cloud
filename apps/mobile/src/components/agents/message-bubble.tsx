@@ -17,7 +17,7 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { InMessageBubbleContext } from './bubble-text-selection-context';
 import { ChatMarkdownText } from './chat-markdown-text';
 import { CompactionSeparator } from './compaction-separator';
-import { hasCopyableText } from './collect-copyable-text';
+import { hasCopyableText, messageTextParts } from './collect-copyable-text';
 import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 import { MessageErrorBoundary } from './message-error-boundary';
@@ -94,7 +94,9 @@ function MessageBubbleImpl({
   const { copyMessage } = useMessageCopy();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const canCopy = hasCopyableText(message);
+  // Copy message offers only the message's own text, so a reasoning-only or
+  // tool-only row exposes no copy action.
+  const canCopy = hasCopyableText({ parts: messageTextParts(message.parts) });
   const a11y = buildAgentMessageBubbleAccessibilityProps({
     isUser,
     canCopy,

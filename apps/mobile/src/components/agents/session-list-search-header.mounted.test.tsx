@@ -61,6 +61,14 @@ function fieldRow(renderer: TestRenderer.ReactTestRenderer) {
   return row;
 }
 
+function searchInput(renderer: TestRenderer.ReactTestRenderer) {
+  const input = renderer.root.findAll(node => node.type === ('TextInput' as ElementType)).at(0);
+  if (!input) {
+    throw new Error('search input was not found');
+  }
+  return input;
+}
+
 describe('SessionListSearchHeader landscape sensor insets', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -94,5 +102,12 @@ describe('SessionListSearchHeader landscape sensor insets', () => {
       renderer.update(<SessionListSearchHeader {...baseProps} />);
     });
     expect(fieldRow(renderer).props.style).toEqual({ marginLeft: 69, marginRight: 81 });
+  });
+
+  it('sizes the single-line input with min-height, never vertical padding', async () => {
+    const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
+    const classes = searchInput(renderer).props.className as string;
+    expect(classes).toContain('min-h-');
+    expect(classes).not.toMatch(/(?:^|\s)py-/);
   });
 });

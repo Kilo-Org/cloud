@@ -51,7 +51,13 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
 
     expect(
       classifyCodeReviewActionRequiredFailure(
-        'Forbidden: [BYOK] Your API key does not have permission to access this resource. Please check your API key permissions.'
+        'Forbidden: [BYOK] Your API key does not have permission to access this model. Please check your API key permissions.'
+      )
+    ).toBe('byok_invalid_key');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'Forbidden: [BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.'
       )
     ).toBe('byok_invalid_key');
 

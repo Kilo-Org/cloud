@@ -50,6 +50,8 @@ import {
   baseGetSessionNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
+  baseGetPendingInteractionsNextSchema,
+  baseGetPendingInteractionsNextOutputSchema,
   baseWorktreeChangesNextSchema,
   baseWorktreeFileNextSchema,
   baseAnswerQuestionNextSchema,
@@ -207,6 +209,10 @@ const ReleasePendingUploadsInput = cloudAgentReleasePendingUploadsSchema.extend(
 });
 
 const GetSessionInput = baseGetSessionNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const GetPendingInteractionsInput = baseGetPendingInteractionsNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -892,6 +898,31 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     }),
 
   /**
+   * Read the interactions an organization session currently waits on.
+   * Ownership is checked first, so a foreign session fails instead of reading
+   * an empty set. The personal procedure cannot serve an organization session
+   * (its ownership check requires a null `organization_id`), so the in-place
+   * widget approve needs this organization-scoped twin beside `answerPermission`.
+   */
+  getPendingInteractions: organizationMemberProcedure
+    .input(GetPendingInteractionsInput)
+    .output(baseGetPendingInteractionsNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      return await client.getPendingInteractions(input.cloudAgentSessionId);
+    }),
+
+  /**
    * Get session state from cloud-agent-next DO (organization context).
    * Returns sanitized session info (no secrets).
    */
@@ -975,6 +1006,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
             defaultBranch: z.string().optional(),
             platformIntegrationId: z.string().uuid().optional(),
             platformAccountLogin: z.string().optional(),
+            githubAppType: z.enum(['standard', 'lite']).optional(),
           })
         ),
         integrationInstalled: z.boolean(),

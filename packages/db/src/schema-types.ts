@@ -1253,6 +1253,7 @@ export type AuthProviderId =
   | 'gitlab'
   | 'linkedin'
   | 'discord'
+  | 'openai'
   | 'fake-login'
   | 'workos';
 

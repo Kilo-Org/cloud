@@ -9,6 +9,7 @@ import {
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
+import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
 import { classifyAbuse } from '@/lib/ai-gateway/abuse-service';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
@@ -59,6 +60,14 @@ jest.mock('@sentry/nextjs', () => ({
 
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
+jest.mock('@/lib/autoTopUpInFlight');
+jest.mock('@/lib/creditTransactions', () => ({
+  ...(jest.requireActual('@/lib/creditTransactions') as Record<string, unknown>),
+  summarizeUserPayments: jest.fn(async () => ({
+    payments_count: 1,
+    payments_total_microdollars: 0,
+  })),
+}));
 jest.mock('@/lib/drizzle', () => ({ readDb: {} }));
 jest.mock('@/lib/free-model-rate-limiter');
 jest.mock('@/lib/organizations/organization-group-policy-context.server', () => ({
@@ -135,6 +144,7 @@ jest.mock('@/lib/ai-gateway/auto-model/resolution', () => {
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
+const mockedIsAutoTopUpInFlight = jest.mocked(isAutoTopUpInFlight);
 const mockedClassifyAbuse = jest.mocked(classifyAbuse);
 const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
@@ -481,6 +491,64 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       expectedAudience: KILO_GATEWAY_AUDIENCE,
     });
     expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('returns 402 for a zero balance without an in-flight auto top-up', async () => {
+    setUserAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 0,
+      settings: undefined,
+      plan: undefined,
+    });
+    mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(402);
+    expect(mockedIsAutoTopUpInFlight).toHaveBeenCalledWith({
+      userId: 'user-123',
+      organizationId: undefined,
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('returns a retryable response for a zero balance during an in-flight auto top-up', async () => {
+    setUserAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 0,
+      settings: undefined,
+      plan: undefined,
+    });
+    mockedIsAutoTopUpInFlight.mockResolvedValue(true);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('5');
+    const body = (await response.json()) as { error_type?: string; message?: string };
+    expect(body.error_type).toBe('top_up_in_progress');
+    expect(body.message).not.toMatch(/credit|payment|balance|quota/i);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('keeps the 402 when the block is a per-user allowance limit', async () => {
+    setUserAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 0,
+      settings: undefined,
+      plan: undefined,
+      balanceLimitedByUserAllowance: true,
+    });
+    mockedIsAutoTopUpInFlight.mockResolvedValue(true);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(402);
+    expect(mockedIsAutoTopUpInFlight).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 });
@@ -948,6 +1016,54 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     const response = await responsePromise;
 
     expect(response.status).toBe(404);
+    expect(mockedGetProvider).toHaveBeenCalledTimes(2);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('returns the reconnect error instead of serving another billing path when the ChatGPT connection is dead', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'chatgpt-reconnect',
+      message: 'Your ChatGPT connection has expired. Reconnect to continue.',
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+    const body = (await response.json()) as { error: string; error_type: string };
+
+    expect(response.status).toBe(400);
+    expect(body.error_type).toBe('byok_error');
+    expect(body.error).toContain('Your ChatGPT connection has expired. Reconnect to continue.');
+    expect(body.error).toContain('/byok');
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    expect(mockedClassifyAbuse).not.toHaveBeenCalled();
+  });
+
+  it('applies delay before returning the reconnect error when quarantine-3 re-resolution is dead', async () => {
+    jest.useFakeTimers();
+    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-3'));
+    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-3'));
+    mockedGetProvider
+      .mockResolvedValueOnce({
+        kind: 'provider',
+        provider,
+        userByok: null,
+        bypassAccessCheck: false,
+      })
+      .mockResolvedValueOnce({
+        kind: 'chatgpt-reconnect',
+        message: 'Your ChatGPT connection has expired. Reconnect to continue.',
+      });
+
+    const { POST } = await import('./route');
+    const responsePromise = POST(makeRequest(makeBody()) as never);
+
+    await jest.advanceTimersByTimeAsync(5999);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(1);
+    const response = await responsePromise;
+
+    expect(response.status).toBe(400);
     expect(mockedGetProvider).toHaveBeenCalledTimes(2);
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });

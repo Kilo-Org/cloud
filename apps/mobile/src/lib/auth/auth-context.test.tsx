@@ -233,12 +233,14 @@ const {
   clearReasoningPreference,
   clearPrReviewFooterPreference,
   clearCondenseToolCallsPreference,
+  clearCollapsedConnectCtasPreference,
 } = vi.hoisted(() => ({
   clearHideThinkingPreference: vi.fn(),
   clearKeepScreenOnPreference: vi.fn(),
   clearReasoningPreference: vi.fn(),
   clearPrReviewFooterPreference: vi.fn(),
   clearCondenseToolCallsPreference: vi.fn(),
+  clearCollapsedConnectCtasPreference: vi.fn(),
 }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({ clearKeepScreenOnPreference }));
 vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
@@ -302,6 +304,12 @@ vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({ clearPrReviewFoo
 
 vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
   clearCondenseToolCallsPreference,
+}));
+
+// Same reason as use-condense-tool-calls-preference above: the real module
+// pulls secure-store-preference -> sonner-native -> react-native.
+vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
+  clearCollapsedConnectCtasPreference,
 }));
 
 vi.mock('@/lib/last-active-instance', () => ({
@@ -671,6 +679,7 @@ describe('sign-out teardown ordering', () => {
     expect(clearHideThinkingPreference).toHaveBeenCalled();
     expect(clearPrReviewFooterPreference).toHaveBeenCalled();
     expect(clearCondenseToolCallsPreference).toHaveBeenCalled();
+    expect(clearCollapsedConnectCtasPreference).toHaveBeenCalled();
     const { clearRunOnDestinationPreference } =
       await import('@/lib/hooks/use-persisted-run-on-destination');
     expect(clearRunOnDestinationPreference).toHaveBeenCalled();

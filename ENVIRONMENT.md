@@ -98,6 +98,11 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 - `ANACONDA_CLIENT_ID` - Anaconda OAuth app client ID. `[PUBLIC]`
 - `ANACONDA_CLIENT_SECRET` - Anaconda OAuth app client secret. `[SECRET]`
+- `OPENAI_CLIENT_ID` - OpenAI (Sign in with ChatGPT) OAuth client ID. Read only from the environment; the literal must never appear in source. `[SECRET]`
+- `OPENAI_CLIENT_SECRET` - OpenAI (Sign in with ChatGPT) OAuth client secret; server-side only, sent only in the token endpoint's HTTP Basic authorization header. `[SECRET]`
+- `OPENAI_DISCOVERY_URL` - Optional override for the OpenAI OpenID Connect discovery document; defaults to the production issuer's document. [SERVER]
+- `OPENAI_TOKEN_ENDPOINT` - Optional override for the OpenAI token endpoint; defaults to the production issuer's endpoint. [SERVER]
+- `OPENAI_CHATGPT_API_URL` - Optional override for the base URL that token-sharing requests use with a "Sign in with ChatGPT" connection; defaults to `https://api.openai.com/v1`. Set it wherever `OPENAI_DISCOVERY_URL`/`OPENAI_TOKEN_ENDPOINT` are overridden, so delegated inference stays in the same environment as the token issuer. [SERVER]
 - `GITHUB_CLIENT_ID` - GitHub OAuth app client ID. `[PUBLIC]`
 - `GITHUB_CLIENT_SECRET` - GitHub OAuth app client secret. `[SECRET]`
 - `GITHUB_APP_ID` - GitHub App ID; used in integration adapter and tests. `[SECRET]`
@@ -107,7 +112,10 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `GITHUB_LITE_APP_PRIVATE_KEY` - Private key for the lite GitHub App. `[SECRET]`
 - `GITHUB_LITE_APP_CLIENT_ID` - OAuth Client ID for the lite GitHub App install/login flow. [PUBLIC]
 - `GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS` - Comma-separated Kilo organization UUIDs allowed to connect multiple GitHub App installations. Unset or empty disables multiple installations for all organizations. [SERVER]
+- `GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS` - Comma-separated destination Kilo organization UUIDs allowed to create an association to a GitHub App installation already associated elsewhere. Unset or empty disables new shared associations without revoking existing ones. [SERVER]
 - `GITHUB_CONNECTION_MANAGEMENT_ENABLED` - Set to exact `true` to admit new existing-installation connection management and local disconnect. Unset or any other value keeps new management admission disabled without changing incumbent GitHub integration workflows. [SERVER]
+  - Keep disabled for at least one OAuth state TTL (10 minutes) after deploying reservation-aware callbacks so purpose-less states issued by the previous version can complete.
+  - During the migration-to-app promotion window, old pending-install callbacks may fail against the replaced pending indexes. Keep the window brief, monitor deploy health, and retry the GitHub connection after promotion completes.
 - `PER_REPO_SETTINGS` - Set to exactly `true` to reveal the Repository Customizations UI (per-installation default AI model / PR review mode, plus per-repository overrides) on the GitHub integration settings pages, for both personal accounts and organizations. Defaults to disabled so the feature can ship dark. [SERVER]
 - `GITHUB_ADMIN_STATS_TOKEN` - Token for admin GitHub API stats lookups; used in `apps/web/src/scripts/backfill-pr-author-github-ids.ts`. `[SECRET]`
 - `GITHUB_CLI_PAT` - GitHub personal access token for `gh` CLI operations inside contractors; used in `services/gastown/container/src/process-manager.ts`. `[SECRET]`
@@ -218,7 +226,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `USER_DELETION_ENCRYPTION_KEY` - Base64 32-byte AES key for user-deletion effect checkpoints and provider credentials. `[SECRET]`
 - `BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID` - Server-only BytePlus access key ID for Coding Plan seat resolution and quota usage APIs. Optional at startup; install with `pnpm web:env set BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID`. `[SECRET]`
 - `BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY` - Server-only BytePlus secret access key for Coding Plan seat resolution and quota usage APIs. Optional at startup; install with `pnpm web:env set BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY`. `[SECRET]`
-- `CREDIT_CATEGORIES_ENCRYPTION_KEY` - Encryption key for credit category labels/values. `[SECRET]`
+- `CREDIT_CATEGORIES_ENCRYPTION_KEY` - Legacy encryption key for credit category labels/values, retained during key rotation for deployments running older source. `[SECRET]`
+- `CREDIT_CATEGORIES_ENCRYPTION_KEY_V2` - Active encryption key for credit category labels/values. Falls back to `CREDIT_CATEGORIES_ENCRYPTION_KEY` when unset. `[SECRET]`
 - `AGENT_ENV_VARS_PUBLIC_KEY` - RSA public key (base64) used to encrypt agent environment variables. [SERVER]
 - `AGENT_ENV_VARS_PRIVATE_KEY` - Legacy alias for the above — the actual private key used to decrypt agent env vars (kept server-side). `[SECRET]`
 
@@ -266,6 +275,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 - `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/definitions/openrouter.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
 - `OPENAI_API_KEY` - OpenAI API key supplied as a managed BYOK credential when managed inference requests route through the Vercel AI Gateway and permit the OpenAI provider. `[SECRET]`
+- `OPENAI_CHATGPT_API_KEY` - Partner project key for the delegated "Sign in with ChatGPT" route (`apps/web/src/lib/ai-gateway/openai-chatgpt/routing.ts`); sent as `Authorization: Bearer` alongside the user's `OpenAI-On-Behalf-Of-Token`. OpenAI requires this key to come from the project that owns the OAuth client (`oaiapp_Abz1xcqSQAvvIwtxyemZbXBJ`); a key from another project makes every delegated call fail with an opaque `400 Bad Request`. `[SECRET]`
 - `MISTRAL_API_KEY` - Mistral API key; used in `apps/web/src/lib/ai-gateway/embeddings/embedding-providers.ts` for `codestral-embed-2505` and `mistral-embed` embeddings, in the FIM completions proxy at `apps/web/src/app/api/fim/completions/route.ts` (routes Mistral Codestral vs. La Plateforme keys), and as a provider config in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `LONGCAT_API_KEY` - LongCat API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/definitions/longcat.ts`. `[SECRET]`
 - `STREAMLAKE_API_KEY` - StreamLake API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/definitions/streamlake.ts`. `[SECRET]`

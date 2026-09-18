@@ -1,6 +1,7 @@
 import { clearFilePartCache } from '@/components/agents/file-part-cache';
 import { clearMarkdownImageConfirmMemory } from '@/components/agents/markdown-image-confirm';
 import { clearSessionAutoApprove } from '@/components/agents/session-auto-approve';
+import { clearSessionGoalCollapseState } from '@/components/agents/session-goal-collapse';
 import { clearToolCardImageCache } from '@/components/agents/tool-card-image-cache';
 import { clearClipboardImages } from '@/lib/agent-attachments/clipboard-image';
 import { clearArtifactMirror } from '@/lib/artifacts/artifact-mirror';
@@ -12,9 +13,10 @@ import { reapTempFiles } from '@/lib/temp-file-registry';
 /**
  * Clear the session-scoped local state that must not leak across an account
  * boundary: trusted hosts, confirmed markdown images, media caches, per-session
- * auto-approve flags, the browsable artifact mirror, and app-owned temp copies.
- * Every member is synchronous and best-effort; one member's throw falls through
- * to the members after it, and to the caller's own sign-in/sign-out state reset.
+ * auto-approve and goal-disclosure flags, the browsable artifact mirror, and
+ * app-owned temp copies. Every member is synchronous and best-effort; one
+ * member's throw falls through to the members after it, and to the caller's own
+ * sign-in/sign-out state reset.
  */
 export function clearSessionScopedState(): void {
   runClear(clearTrustedHosts);
@@ -23,6 +25,7 @@ export function clearSessionScopedState(): void {
   runClear(clearFilePartCache);
   runClear(clearClipboardImages);
   runClear(clearSessionAutoApprove);
+  runClear(clearSessionGoalCollapseState);
   // Wiping the mirror is what makes "signed out shows nothing to browse" true;
   // dropping the engine memo keeps a completed run from repopulating it. The
   // wipe alone is invisible to an open Files app, which keeps the listing it

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  isSessionGoalCollapsed,
+  setSessionGoalCollapsed,
+} from '@/components/agents/session-goal-collapse';
 import { clearSessionScopedState } from '@/lib/auth/session-scoped-state';
 
 /** One tracked entry of the fake filesystem, keyed by the URI parts it was built from. */
@@ -91,7 +95,7 @@ vi.mock('@/lib/artifacts/artifact-mirror-sync', () => ({
   resetArtifactMirrorSyncState: mocks.resetArtifactMirrorSyncState,
 }));
 
-/** Every member except the real mirror module, in declaration order. */
+/** Every mocked member, in declaration order; the mirror and goal stores stay real. */
 const SESSION_MEMBERS = [
   mocks.clearTrustedHosts,
   mocks.clearMarkdownImageConfirmMemory,
@@ -166,5 +170,16 @@ describe('clearSessionScopedState', () => {
 
     expect(fakeFs.deleted).toEqual([MIRROR_ROOT_URI]);
     expect(mocks.reapTempFiles).toHaveBeenCalledWith({ all: true });
+  });
+
+  // The goal-disclosure store stays real, like the mirror: this asserts the
+  // wiring through the actual in-memory map rather than a spy on its clear.
+  it('drops the per-session goal disclosure flag on sign-out', () => {
+    setSessionGoalCollapsed('session-scoped-goal', true);
+    expect(isSessionGoalCollapsed('session-scoped-goal')).toBe(true);
+
+    clearSessionScopedState();
+
+    expect(isSessionGoalCollapsed('session-scoped-goal')).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
+  sessionOperationExpiresAt,
   sessionOperationResultHash,
   type ResponseFrame,
   type SessionOperationAuthorization,
@@ -9,13 +10,19 @@ import {
 import type { SandboxControlOutboundRequest } from '../sandbox-control/socket.js';
 import type { EventQueries } from '../session/queries/index.js';
 import type { StoredEvent } from '../websocket/types.js';
+import { logger } from '../logger.js';
 import {
   applySessionOperationResult,
   createSessionMessageRecord,
   recordSessionOperationDispatch,
   type SessionMessageRecord,
 } from './session-message-queue.js';
-import { commitSessionOperationResult, dispatchSessionOperation } from './session-operation.js';
+import {
+  commitSessionOperationResult,
+  dispatchSessionOperation,
+  reconcileSessionOperation,
+  type SessionOperationEffects,
+} from './session-operation.js';
 
 const authorization: SessionOperationAuthorization = {
   operation: 'session.prompt',
@@ -176,6 +183,49 @@ describe('dispatchSessionOperation', () => {
     expect(request.mock.calls.map(([input]) => input.operation)).toEqual(['session.operation.get']);
   });
 
+  it('resolves a running attach through the production deadline closure without persisting', async () => {
+    const attachAuthorization: SessionOperationAuthorization = {
+      operation: 'session.attach',
+      operationId: 'attempt_attach_1',
+      messageId: authorization.messageId,
+      session: authorization.session,
+      wrapperInstanceId: authorization.wrapperInstanceId,
+      dispatchDeadlineAt: Date.now() + 60_000,
+    };
+    const dispatched = recordSessionOperationDispatch(messages(), attachAuthorization);
+    if (!dispatched) throw new Error('Failed to create attach dispatch proof');
+    let stored = dispatched;
+    const commit = vi.fn((next: SessionMessageRecord[]) => {
+      stored = next;
+      return true;
+    });
+    const request = vi.fn(async (_input: SandboxControlOutboundRequest) =>
+      response({
+        state: 'running',
+        authorization: attachAuthorization,
+        executionDeadlineAt: Date.now() + 60_000,
+      })
+    );
+
+    await expect(
+      dispatchSessionOperation(
+        { authorization: attachAuthorization, payload: {} },
+        { read: () => stored, commit },
+        {
+          request,
+          persistResult: async () => undefined,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => false,
+        }
+      )
+    ).resolves.toMatchObject({ state: 'running' });
+    expect(request.mock.calls.map(([input]) => input.operation)).toEqual(['session.operation.get']);
+    expect(commit).not.toHaveBeenCalled();
+    expect(stored).toEqual(dispatched);
+  });
+
   it('does not replay a mutation when the retained operation is missing', async () => {
     const dispatched = recordSessionOperationDispatch(messages(), authorization);
     if (!dispatched) throw new Error('Failed to create dispatch proof');
@@ -198,6 +248,91 @@ describe('dispatchSessionOperation', () => {
       )
     ).resolves.toEqual({ state: 'uncertain', reason: 'missing' });
     expect(request.mock.calls.map(([input]) => input.operation)).toEqual(['session.operation.get']);
+  });
+
+  it('retires a dispatched attach the runtime has no record of and dispatches a fresh attach', async () => {
+    const attach: SessionOperationAuthorization = {
+      operation: 'session.attach',
+      operationId: 'attempt-attach',
+      messageId: 'msg_attach',
+      session: {
+        sessionId: 'workspace_attach',
+        kiloSessionId: 'kilo_attach',
+        directory: '/workspace/attach',
+      },
+      wrapperInstanceId: '22222222-2222-4222-8222-222222222222',
+      dispatchDeadlineAt: Date.now() + 60_000,
+    };
+    const attachResult = {
+      attached: true as const,
+      nativeRuntimeId: '33333333-3333-4333-8333-333333333333',
+    };
+    const seeded = recordSessionOperationDispatch(
+      [
+        {
+          ...messages()[0]!,
+          messageId: attach.messageId,
+          wrapperInstanceId: attach.wrapperInstanceId,
+        },
+      ],
+      attach
+    );
+    if (!seeded) throw new Error('Failed to create attach dispatch proof');
+    let stored = seeded;
+    const request = vi.fn(async (input: SandboxControlOutboundRequest) => {
+      if (input.operation === 'session.operation.get') return response({ state: 'missing' });
+      if (input.operation === 'session.attach') return response(attachResult);
+      throw new Error(`Unexpected operation ${input.operation}`);
+    });
+
+    await expect(
+      dispatchSessionOperation(
+        { authorization: attach, payload: {} },
+        { read: () => stored, commit: next => ((stored = next), true) },
+        {
+          request,
+          persistResult: async () => undefined,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => true,
+        }
+      )
+    ).resolves.toEqual({ state: 'response', result: attachResult });
+    expect(request.mock.calls.map(([input]) => input.operation)).toEqual([
+      'session.operation.get',
+      'session.attach',
+    ]);
+    expect(stored[0]?.operations?.attach?.dispatched).toBe(true);
+    expect(stored[0]?.operations?.retiredAttach).toMatchObject({ authorization: attach });
+  });
+
+  it('keeps a dispatched prompt when the runtime has no record of it', async () => {
+    const dispatched = recordSessionOperationDispatch(messages(), authorization);
+    if (!dispatched) throw new Error('Failed to create dispatch proof');
+    let stored = dispatched;
+    const request = vi.fn(async (input: SandboxControlOutboundRequest) => {
+      if (input.operation === 'session.operation.get') return response({ state: 'missing' });
+      throw new Error(`Unexpected operation ${input.operation}`);
+    });
+
+    await expect(
+      dispatchSessionOperation(
+        { authorization, payload },
+        { read: () => stored, commit: next => ((stored = next), true) },
+        {
+          request,
+          persistResult: async () => undefined,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => true,
+        }
+      )
+    ).resolves.toEqual({ state: 'uncertain', reason: 'missing' });
+    expect(request.mock.calls.map(([input]) => input.operation)).toEqual(['session.operation.get']);
+    expect(stored[0]?.operations?.prompt?.dispatched).toBe(true);
+    expect(stored[0]?.operations?.retiredAttach).toBeUndefined();
   });
 
   it('does not replay a prompt after its admission response is lost before application', async () => {
@@ -527,5 +662,121 @@ describe('dispatchSessionOperation', () => {
     });
     expect(acknowledgement).toMatchObject({ disposition: 'applied', resultHash: hash });
     expect(commitDepth).toBe(1);
+  });
+});
+
+describe('reconcileSessionOperation unconfirmed diagnostics', () => {
+  function effects(
+    request: SessionOperationEffects['request'],
+    overrides: Partial<SessionOperationEffects> = {}
+  ): SessionOperationEffects {
+    return {
+      request,
+      persistResult: async () => undefined,
+      assertAdmission: () => undefined,
+      assertScope: () => undefined,
+      defer: pending => void pending,
+      ...overrides,
+    };
+  }
+
+  async function capture<T>(
+    run: () => Promise<T>
+  ): Promise<{ result: T; events: Record<string, unknown>[] }> {
+    const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      const result = await run();
+      const events = withFields.mock.calls
+        .map(call => call[0] as Record<string, unknown>)
+        .filter(fields => fields.diagnosticEvent === 'session_operation_reconcile');
+      return { result, events };
+    } finally {
+      withFields.mockRestore();
+    }
+  }
+
+  it('reports a missing lookup and still resolves uncertain/missing', async () => {
+    const request = vi.fn(async () => response({ state: 'missing' }));
+
+    const { result, events } = await capture(() =>
+      reconcileSessionOperation(
+        authorization,
+        sessionOperationExpiresAt(authorization),
+        effects(request)
+      )
+    );
+
+    expect(result).toEqual({ state: 'uncertain', reason: 'missing' });
+    expect(events).toEqual([
+      expect.objectContaining({
+        diagnosticEvent: 'session_operation_reconcile',
+        sessionId: authorization.session.sessionId,
+        messageId: authorization.messageId,
+        operation: 'session.prompt',
+        operationId: authorization.operationId,
+        reason: 'missing',
+        lookupState: 'missing',
+      }),
+    ]);
+  });
+
+  it('reports an unpersistable running deadline and resolves uncertain/unverified', async () => {
+    const request = vi.fn(async () =>
+      response({ state: 'running', authorization, executionDeadlineAt: Date.now() + 30_000 })
+    );
+
+    const { result, events } = await capture(() =>
+      reconcileSessionOperation(
+        authorization,
+        sessionOperationExpiresAt(authorization),
+        effects(request, { recordExecutionDeadline: () => false })
+      )
+    );
+
+    expect(result).toEqual({ state: 'uncertain', reason: 'unverified' });
+    expect(events).toEqual([
+      expect.objectContaining({ reason: 'unverified', lookupState: 'running' }),
+    ]);
+  });
+
+  it('reports an unpersistable completed delivery and resolves uncertain/unverified', async () => {
+    const delivery: SessionOperationDelivery = {
+      version: 2,
+      authorization,
+      completedAt: Date.now(),
+      result: { ok: true, result: { messageId: authorization.messageId, status: 'accepted' } },
+      outcome: { messageId: authorization.messageId, status: 'completed' },
+      events: [],
+      preparing: [],
+    };
+    const request = vi.fn(async () => response({ state: 'completed', delivery }));
+
+    const { result, events } = await capture(() =>
+      reconcileSessionOperation(
+        authorization,
+        sessionOperationExpiresAt(authorization),
+        effects(request)
+      )
+    );
+
+    expect(result).toEqual({ state: 'uncertain', reason: 'unverified' });
+    expect(events).toEqual([
+      expect.objectContaining({ reason: 'unverified', lookupState: 'completed' }),
+    ]);
+  });
+
+  it('emits no diagnostic for a clean running reconcile', async () => {
+    const request = vi.fn(async () => response({ state: 'running', authorization }));
+
+    const { result, events } = await capture(() =>
+      reconcileSessionOperation(
+        authorization,
+        sessionOperationExpiresAt(authorization),
+        effects(request)
+      )
+    );
+
+    expect(result).toMatchObject({ state: 'running' });
+    expect(events).toEqual([]);
   });
 });

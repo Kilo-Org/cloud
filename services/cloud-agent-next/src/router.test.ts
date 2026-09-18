@@ -955,6 +955,53 @@ describe('router sessionId validation', () => {
           expect.objectContaining({ targets: [{ messageId: 'message_1' }] })
         );
       });
+
+      it('keeps the interrupt failure reason out of the log message field', async () => {
+        const sessionId: SessionId = 'workspace_12345678-1234-1234-1234-123456789abd';
+        const controlStub = {
+          ...mockSessionStub,
+          getControlState: vi.fn().mockResolvedValue({
+            version: 1,
+            scope: { sandboxId: 'sandbox_1' },
+            targets: [{ messageId: 'message_1' }],
+          }),
+          interruptExecution: vi.fn().mockImplementation(request =>
+            Promise.resolve({
+              ...request,
+              state: 'rejected',
+              message: 'Stop cleanup deadline is invalid',
+            })
+          ),
+        };
+        const sandboxSession = {
+          idFromName: vi.fn((id: string) => ({ id })),
+          get: vi.fn(() => controlStub),
+        };
+        mockContext.env.SANDBOX_SESSION =
+          sandboxSession as unknown as TRPCContext['env']['SANDBOX_SESSION'];
+        vi.mocked(fetchSessionMetadata).mockResolvedValue(
+          legacySessionMetadata({
+            version: 123456789,
+            sessionId,
+            orgId: 'org-123',
+            userId: 'test-user-123',
+            timestamp: 123456789,
+          })
+        );
+        const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+        const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+        try {
+          await caller.interruptSession({ sessionId });
+
+          expect(fields).toHaveBeenCalledWith({ reason: 'Stop cleanup deadline is invalid' });
+          expect(info).toHaveBeenCalledWith(
+            'No accepted current messages or pending queued messages to interrupt'
+          );
+        } finally {
+          fields.mockRestore();
+          info.mockRestore();
+        }
+      });
     });
 
     describe('getSession procedure', () => {

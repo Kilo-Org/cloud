@@ -1,10 +1,12 @@
+/* eslint-disable max-lines -- the collapsed-row, expand/collapse, view-on-provider, and loading/theme-token suites share one fixture and mock harness in this file. */
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only theme-token guard, runs in node, never bundled into the app
 import { readFileSync } from 'node:fs';
 
-import { createElement } from 'react';
+import { type ComponentProps, createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ExternalLink } from '@/components/ui/icons';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
 import { openExternalUrl } from '@/lib/external-link';
@@ -12,51 +14,46 @@ import { PrReviewChecksSection } from './pr-review-checks-section';
 
 const query = vi.hoisted(() => ({
   data: {
-    checkRuns: [
-      {
-        name: 'Running',
-        status: 'in_progress',
-        conclusion: null,
-        appName: null,
-        detailsUrl: null,
-      },
-      {
-        name: 'Queued',
-        status: 'queued',
-        conclusion: null,
-        appName: null,
-        detailsUrl: null,
-      },
-      {
-        name: 'Passed',
-        status: 'completed',
-        conclusion: 'success',
-        appName: null,
-        detailsUrl: null,
-      },
-      {
-        name: 'Failed',
-        status: 'completed',
-        conclusion: 'failure',
-        appName: null,
-        detailsUrl: null,
-      },
-    ],
-    rollup: { total: 4, success: 1, failure: 1, pending: 2, skipped: 0 },
+    checkRuns: [] as {
+      name: string;
+      status: string;
+      conclusion: string | null;
+      appName: string | null;
+      detailsUrl: string | null;
+    }[],
+    rollup: { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 },
   },
   isLoading: false,
   isError: false,
   isFetching: false,
+  error: undefined as unknown,
   refetch: vi.fn(),
 }));
 
 vi.mock('@tanstack/react-query', () => ({ useQuery: () => query }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    // Resolve a count-bearing key to `"<count> <word>"` so the collapsed row
+    // labels read the way the app renders them ("1 passed", "2 pending").
+    t: (key: string, options?: Record<string, unknown>) => {
+      const word = key.split('.').pop() ?? key;
+      return options && 'displayCount' in options ? `${String(options.displayCount)} ${word}` : key;
+    },
+  }),
+}));
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  FadeIn: { duration: (ms: number) => ({ __fadeIn: ms }) },
+  FadeOut: { duration: (ms: number) => ({ __fadeOut: ms }) },
+  LinearTransition: { duration: (ms: number) => ({ __linearTransition: ms }) },
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({
   AlertTriangle: 'AlertTriangle',
   CheckCircle2: 'CheckCircle2',
+  ChevronDown: 'ChevronDown',
+  ChevronUp: 'ChevronUp',
   Circle: 'Circle',
   ExternalLink: 'ExternalLink',
   Loader2: 'Loader2',
@@ -94,41 +91,194 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 
-describe('PrReviewChecksSection check status icons', () => {
-  it('rotates pending check icons but not finished check icons', () => {
-    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-    act(() => {
-      ref.current = TestRenderer.create(
-        createElement(PrReviewChecksSection, {
-          owner: 'org',
-          repo: 'repo',
-          number: 1,
-          headSha: 'head',
-        })
-      );
-    });
-    const renderer = ref.current;
-    if (!renderer) {
-      throw new Error('renderer was not created');
+// One run per status plus a second pending run: the collapsed rows must sum
+// to the five checks, and every status group must be present.
+function fixtureData() {
+  return {
+    checkRuns: [
+      {
+        name: 'Running',
+        status: 'in_progress',
+        conclusion: null,
+        appName: 'GitHub Actions',
+        detailsUrl: 'https://example.com/running',
+      },
+      {
+        name: 'Queued',
+        status: 'queued',
+        conclusion: null,
+        appName: 'GitHub Actions',
+        detailsUrl: null,
+      },
+      {
+        name: 'Passed',
+        status: 'completed',
+        conclusion: 'success',
+        appName: 'GitHub Actions',
+        detailsUrl: 'https://example.com/passed',
+      },
+      {
+        name: 'Failed',
+        status: 'completed',
+        conclusion: 'failure',
+        appName: 'GitHub Actions',
+        detailsUrl: null,
+      },
+      {
+        name: 'Skipped',
+        status: 'completed',
+        conclusion: 'skipped',
+        appName: null,
+        detailsUrl: null,
+      },
+    ],
+    rollup: { total: 5, success: 1, failure: 1, pending: 2, skipped: 1 },
+  };
+}
+
+let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;
+
+function mountSection(props?: Partial<ComponentProps<typeof PrReviewChecksSection>>) {
+  act(() => {
+    mounted = TestRenderer.create(
+      createElement(PrReviewChecksSection, {
+        owner: 'org',
+        repo: 'repo',
+        number: 1,
+        headSha: 'head',
+        ...props,
+      })
+    );
+  });
+  const renderer = mounted;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+function groupRows(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(
+    node => String(node.type) === 'Pressable' && node.props.accessibilityRole === 'button'
+  );
+}
+
+function groupRow(renderer: TestRenderer.ReactTestRenderer, label: string) {
+  const row = groupRows(renderer).find(node => node.props.accessibilityLabel === label);
+  if (!row) {
+    throw new Error(`no status row labelled ${label}`);
+  }
+  return row;
+}
+
+function pressGroupRow(renderer: TestRenderer.ReactTestRenderer, label: string) {
+  const row = groupRow(renderer, label);
+  act(() => {
+    (row.props.onPress as () => void)();
+  });
+}
+
+function texts(renderer: TestRenderer.ReactTestRenderer, children: string) {
+  return renderer.root.findAll(
+    node => String(node.type) === 'Text' && node.props.children === children
+  );
+}
+
+function spinningIcons(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAllByType(SpinningIcon);
+}
+
+function tokens(node: TestRenderer.ReactTestInstance) {
+  return String(node.props.className ?? '').split(/\s+/);
+}
+
+/** The row shell the loaded group rows use, shared with the placeholders. */
+function rowShells(card: TestRenderer.ReactTestInstance) {
+  return card.findAll(node => {
+    const classes = tokens(node);
+    return (
+      classes.includes('min-h-11') &&
+      classes.includes('flex-row') &&
+      classes.includes('items-center') &&
+      classes.includes('gap-3') &&
+      classes.includes('px-4') &&
+      classes.includes('py-3')
+    );
+  });
+}
+
+beforeEach(() => {
+  query.isLoading = false;
+  query.isError = false;
+  query.isFetching = false;
+  query.error = undefined;
+  query.refetch.mockClear();
+  query.data = fixtureData();
+});
+
+afterEach(() => {
+  act(() => {
+    mounted?.unmount();
+  });
+  mounted = undefined;
+});
+
+describe('PrReviewChecksSection collapsed status rows', () => {
+  it('renders every present status collapsed, hiding the check rows', () => {
+    const renderer = mountSection();
+
+    // One row per status, in rollup order, each reading its own count.
+    expect(groupRows(renderer).map(row => row.props.accessibilityLabel)).toEqual([
+      '1 passed',
+      '1 failed',
+      '2 pending',
+      '1 skipped',
+    ]);
+    // Collapsed: no check name renders, and no child detail (icons or links).
+    expect(texts(renderer, 'Running')).toHaveLength(0);
+    expect(texts(renderer, 'Passed')).toHaveLength(0);
+    expect(renderer.root.findAllByType(ExternalLink)).toHaveLength(0);
+    // One icon per collapsed group header, no child icon.
+    expect(spinningIcons(renderer)).toHaveLength(4);
+    for (const row of groupRows(renderer)) {
+      expect(row.props.accessibilityState).toEqual({ expanded: false });
     }
+  });
 
-    expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(4);
-    expect(renderer.root.findAllByType(SpinningIcon).map(node => node.props.icon)).toEqual([
-      'Loader2',
-      'Loader2',
-      'CheckCircle2',
-      'XCircle',
-    ]);
-    expect(renderer.root.findAllByType(SpinningIcon).map(node => node.props.spinning)).toEqual([
-      true,
-      true,
-      false,
-      false,
-    ]);
+  it('expands a row to exactly its checks, then collapses it again', () => {
+    const renderer = mountSection();
 
-    act(() => {
-      renderer.unmount();
-    });
+    pressGroupRow(renderer, '2 pending');
+
+    // Only the pending group's checks appear, with the unchanged detail.
+    expect(texts(renderer, 'Running')).toHaveLength(1);
+    expect(texts(renderer, 'Queued')).toHaveLength(1);
+    expect(texts(renderer, 'Passed')).toHaveLength(0);
+    // App-name subtitle and the external-link affordance are still there.
+    expect(texts(renderer, 'GitHub Actions')).toHaveLength(2);
+    expect(renderer.root.findAllByType(ExternalLink)).toHaveLength(1);
+    // The header icon plus one spinning icon per pending child.
+    const spinning = spinningIcons(renderer).filter(node => node.props.spinning);
+    expect(spinning).toHaveLength(3);
+    expect(groupRow(renderer, '2 pending').props.accessibilityState).toEqual({ expanded: true });
+
+    pressGroupRow(renderer, '2 pending');
+
+    expect(texts(renderer, 'Running')).toHaveLength(0);
+    expect(texts(renderer, 'Queued')).toHaveLength(0);
+    expect(spinningIcons(renderer)).toHaveLength(4);
+    expect(groupRow(renderer, '2 pending').props.accessibilityState).toEqual({ expanded: false });
+  });
+
+  it('renders no group rows when the head commit has no checks', () => {
+    query.data = {
+      checkRuns: [],
+      rollup: { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 },
+    };
+    const renderer = mountSection();
+
+    expect(groupRows(renderer)).toHaveLength(0);
+    expect(texts(renderer, 'prReview.checks.noChecksReported')).toHaveLength(1);
   });
 });
 
@@ -143,7 +293,7 @@ describe('PrReviewChecksSection view-on-provider link', () => {
     organizationId: null,
   };
 
-  function mountSection(scope?: { ref: typeof gitlabScope.ref; organizationId: string | null }) {
+  function mountEmpty(scope?: { ref: typeof gitlabScope.ref; organizationId: string | null }) {
     const previousData = query.data;
     query.data = {
       checkRuns: [],
@@ -187,7 +337,7 @@ describe('PrReviewChecksSection view-on-provider link', () => {
   }
 
   it('labels the opened link "pull request" on the GitHub arm', () => {
-    const { renderer, restore } = mountSection();
+    const { renderer, restore } = mountEmpty();
     pressViewButton(renderer);
 
     expect(openExternalUrl).toHaveBeenCalledWith('https://github.com/group/sub/repo/pull/12', {
@@ -200,7 +350,7 @@ describe('PrReviewChecksSection view-on-provider link', () => {
   });
 
   it('labels the same link "merge request" on a GitLab scope', () => {
-    const { renderer, restore } = mountSection(gitlabScope);
+    const { renderer, restore } = mountEmpty(gitlabScope);
     pressViewButton(renderer);
 
     expect(openExternalUrl).toHaveBeenCalledWith(
@@ -219,15 +369,16 @@ describe('PrReviewChecksSection view-on-provider link', () => {
 // was in the loading state, and the state was invisible: the skeleton bars
 // carried `bg-muted` inside a `bg-secondary` card, and `--muted` equals
 // `--secondary` in BOTH themes (apps/mobile/src/global.css), so the bars
-// painted the card's own colour. This test pins the fixed render path: the
-// card holds three shared Skeleton bars in `bg-muted-soft` — the one gray
-// that differs from the card in both themes — and no bar keeps the
-// collision token. The CSS guard below proves the collision is real
-// (`--muted` == `--secondary`) and that the token the bars now use is not
-// the collision token, so a future theme change that reintroduces the
-// collision fails here instead of shipping another empty gray block.
-describe('PrReviewChecksSection loading state is visible on the card', () => {
-  const previous = { isLoading: false, data: query.data };
+// painted the card's own colour. This suite pins the fixed render path: the
+// card reserves the loaded card's shape — a header strip plus one placeholder
+// row per status the card can show — and every bar keeps `bg-muted-soft`, the
+// one gray that differs from the card in both themes. The CSS guard below
+// proves the collision is real (`--muted` == `--secondary`) and that the token
+// the bars now use is not the collision token, so a future theme change that
+// reintroduces the collision fails here instead of shipping another empty gray
+// block.
+describe('PrReviewChecksSection loading state reserves the loaded card', () => {
+  const previous = { isLoading: false };
 
   beforeEach(() => {
     query.isLoading = true;
@@ -235,7 +386,6 @@ describe('PrReviewChecksSection loading state is visible on the card', () => {
 
   afterEach(() => {
     query.isLoading = previous.isLoading;
-    query.data = previous.data;
   });
 
   function mountLoading() {
@@ -274,17 +424,16 @@ describe('PrReviewChecksSection loading state is visible on the card', () => {
     return card;
   }
 
-  it('paints three animated skeleton bars in a colour distinct from the card', () => {
+  it('paints every skeleton bar in a colour distinct from the card', () => {
     const renderer = mountLoading();
     const card = findCard(renderer);
 
     // The shared Skeleton component — the app's loading indicator (pulse +
     // shimmer), not a static block.
     const bars = card.findAll(node => String(node.type) === 'Skeleton');
-    expect(bars).toHaveLength(3);
+    expect(bars.length).toBeGreaterThan(0);
     for (const bar of bars) {
-      const className = String(bar.props.className ?? '');
-      expect(className.split(/\s+/)).toContain('bg-muted-soft');
+      expect(tokens(bar)).toContain('bg-muted-soft');
     }
 
     // The defect itself: no node in the card may keep the bare `bg-muted`
@@ -305,6 +454,49 @@ describe('PrReviewChecksSection loading state is visible on the card', () => {
     });
   });
 
+  it('mirrors the loaded card: a header strip plus one row per status', () => {
+    const renderer = mountLoading();
+    const card = findCard(renderer);
+
+    const headerStrips = card.findAll(
+      node =>
+        tokens(node).includes('border-b-[0.5px]') &&
+        tokens(node).includes('px-4') &&
+        tokens(node).includes('py-2')
+    );
+    expect(headerStrips).toHaveLength(1);
+    const headerStrip = headerStrips[0];
+    if (!headerStrip) {
+      throw new Error('the header strip did not render');
+    }
+    expect(headerStrip.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(1);
+
+    expect(rowShells(card)).toHaveLength(4);
+
+    // The card hairline sits between rows, never after the last one: the
+    // header strip's own border plus one between each pair of four rows.
+    const hairlines = card.findAll(node => tokens(node).includes('border-b-[0.5px]'));
+    expect(hairlines).toHaveLength(4);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('reserves as many placeholder rows as the loaded card can show', () => {
+    const loadingRenderer = mountLoading();
+    const reserved = rowShells(findCard(loadingRenderer)).length;
+    act(() => {
+      loadingRenderer.unmount();
+    });
+
+    // The loaded card can never exceed one row per status; the fixture spans
+    // all four, so it settles into exactly the reserved rows.
+    query.isLoading = false;
+    const loaded = mountSection();
+    expect(groupRows(loaded)).toHaveLength(reserved);
+  });
+
   it('keeps the CHECKS heading rendered while loading, so the block is labelled', () => {
     const renderer = mountLoading();
     const headings = renderer.root.findAll(
@@ -314,6 +506,36 @@ describe('PrReviewChecksSection loading state is visible on the card', () => {
     act(() => {
       renderer.unmount();
     });
+  });
+
+  it('mounts a fresh card when the loading card is replaced by content', () => {
+    // The reported regression (e2): React Native on Android keeps a View's
+    // contentDescription when a later render drops its `accessibilityLabel`,
+    // so the loaded card kept the loading card's content-desc and a screen
+    // reader announced "Loading…" over the loaded rows. The reused native view
+    // is the defect, so a state switch must mount a new card; the distinct
+    // keys on the two cards are what makes React unmount one and mount the
+    // other, and an update that reuses the instance fails here.
+    const renderer = mountSection();
+    const loadingCard = findCard(renderer);
+    expect(loadingCard.props.accessibilityRole).toBe('progressbar');
+    expect(loadingCard.props.accessibilityLabel).toBe('common.loading');
+
+    query.isLoading = false;
+    act(() => {
+      renderer.update(
+        createElement(PrReviewChecksSection, {
+          owner: 'org',
+          repo: 'repo',
+          number: 1,
+          headSha: 'head',
+        })
+      );
+    });
+
+    const loadedCard = findCard(renderer);
+    expect(loadedCard.props.accessibilityLabel).toBeUndefined();
+    expect(loadedCard).not.toBe(loadingCard);
   });
 
   it('guards the theme tokens: bg-muted collides with the card, bg-muted-soft does not', () => {

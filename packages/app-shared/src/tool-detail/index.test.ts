@@ -65,6 +65,15 @@ describe('buildToolDetail name resolution', () => {
     expect(result.name).toBe('mcp');
   });
 
+  it('does not summarize the incomplete mcp envelope', () => {
+    // The envelope names the call; it is not the payload. An incomplete
+    // envelope must not surface as `server_name=github` in place of `mcp`.
+    const result = detail('mcp', pending({ server_name: 'github' }));
+
+    expect(result.name).toBe('mcp');
+    expect(result.summary).toBeUndefined();
+  });
+
   it('falls back to the raw input when mcp arguments is not a record', () => {
     const input = { server_name: 'other-server', tool_name: 'do_thing', arguments: 'nope' };
     const result = detail('mcp', pending(input));

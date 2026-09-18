@@ -94,6 +94,23 @@ function getArgumentSummary(args: Record<string, unknown>): string | undefined {
 }
 
 /**
+ * The object `getArgumentSummary` reads. An `mcp` part carries its payload in
+ * `arguments`; `server_name`/`tool_name` are the envelope that names the call.
+ * When `arguments` is missing or not a record, the raw input is the sheet's
+ * fallback, but its envelope must not become the row summary: an incomplete
+ * envelope would otherwise label the row `server_name=github` in place of the
+ * tool name `mcp`.
+ */
+function summaryArguments(
+  tool: string,
+  input: Record<string, unknown>,
+  args: Record<string, unknown>
+): Record<string, unknown> {
+  if (tool === 'mcp' && !isRecord(input.arguments)) return {};
+  return args;
+}
+
+/**
  * The name and collapsed summary `buildToolDetail` derives, shared by the full
  * detail and the cheap summary projection.
  */
@@ -102,7 +119,10 @@ function resolveNameAndSummary(
   input: Record<string, unknown>,
   args: Record<string, unknown>
 ): ToolDetailSummary {
-  const summary = tool === 'question' ? questionSummary(input) : getArgumentSummary(args);
+  const summary =
+    tool === 'question'
+      ? questionSummary(input)
+      : getArgumentSummary(summaryArguments(tool, input, args));
   const result: ToolDetailSummary = { name: resolveName(tool, input) };
   if (summary !== undefined) result.summary = collapseWhitespace(summary);
   return result;

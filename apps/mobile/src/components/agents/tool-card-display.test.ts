@@ -314,6 +314,13 @@ describe('getToolDisplay mapping', () => {
     ).toEqual({ title: 'mcp', subtitle: 'filesystem/read_file' });
   });
 
+  it('falls back to the tool name for an incomplete MCP envelope', () => {
+    expect(getDisplay(makeToolPart('mcp', completed({ server_name: 'github' })))).toEqual({
+      title: 'mcp',
+      subtitle: 'mcp',
+    });
+  });
+
   it('falls back to the tool name for unknown tools', () => {
     expect(getDisplay(makeToolPart('unknown-tool', completed()))).toEqual({
       title: 'unknown-tool',
@@ -593,6 +600,11 @@ describe('getToolDisplay translatable provenance', () => {
     // A summary-less generic tool falls back to its raw id.
     expect(
       getToolDisplay(makeToolPart('lookup', completed({ nested: { a: 1 } }))).translatable
+    ).toBe(false);
+    // An incomplete envelope has no summary, so its raw fields never reach the
+    // translation gateway.
+    expect(
+      getToolDisplay(makeToolPart('mcp', completed({ server_name: 'github' }))).translatable
     ).toBe(false);
   });
 

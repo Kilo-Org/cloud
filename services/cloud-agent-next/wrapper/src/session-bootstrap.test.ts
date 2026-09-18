@@ -3520,22 +3520,27 @@ describe('prepareWrapperBootstrapWorkspace', () => {
 
     const controller = new AbortController();
     let attempts = 0;
-    const result = materializePromptAttachments(prompt, {
-      fetch: asFetch(async () => {
-        attempts += 1;
-        if (attempts < 3) {
-          throw new Error('socket hang up');
-        }
-        controller.abort();
-        return new Response('png-bytes', {
-          status: 200,
-          headers: { 'content-length': '9' },
-        });
-      }),
-      signal: controller.signal,
-    });
+    let abortError: unknown;
+    try {
+      await materializePromptAttachments(prompt, {
+        fetch: asFetch(async () => {
+          attempts += 1;
+          if (attempts < 3) {
+            throw new Error('socket hang up');
+          }
+          controller.abort();
+          return new Response('png-bytes', {
+            status: 200,
+            headers: { 'content-length': '9' },
+          });
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      abortError = error;
+    }
 
-    await expect(result).rejects.toThrow();
+    expect(abortError).toBeInstanceOf(Error);
     expect(attempts).toBe(3);
     expect(fs.existsSync(localPath)).toBe(false);
   });

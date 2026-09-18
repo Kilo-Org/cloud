@@ -777,9 +777,7 @@ describe('createSessionManager', () => {
 
       it('keeps the skeleton when a stalled transport fails with nothing to show', async () => {
         const config = createMockConfig({
-          fetchSession: jest
-            .fn()
-            .mockRejectedValue(new Error('Request timed out after 15000ms')),
+          fetchSession: jest.fn().mockRejectedValue(new Error('Request timed out after 15000ms')),
           isStalledTransportError: err =>
             err instanceof Error && err.message.startsWith('Request timed out'),
         });

@@ -39,11 +39,7 @@ import {
   isRenderableSessionCost,
 } from './session-cost-breakdown';
 import { ConversationMessages } from './ConversationMessages';
-import {
-  planResumeAttempt,
-  resumeAnchorForTranscript,
-  sendTakesOverResume,
-} from './resume-anchor';
+import { planResumeAttempt, resumeAnchorForTranscript, sendTakesOverResume } from './resume-anchor';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';

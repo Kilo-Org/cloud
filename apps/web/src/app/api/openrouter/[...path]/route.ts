@@ -671,6 +671,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return temporarilyUnavailableResponse();
   }
   if (providerResult.kind === 'chatgpt-reconnect') {
+    // The person's enabled ChatGPT connection is terminally dead. Fail readably
+    // instead of silently serving the request through another billing path.
     return chatGptReconnectResponse(providerResult.message);
   }
   const effectiveProviderContext = providerResult;

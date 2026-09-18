@@ -148,7 +148,10 @@ const STATES: Array<{ label: string; html: string }> = [
 describe('OpenAiChatGptCard title', () => {
   it('names the ChatGPT connection so it never reads as the pasted OpenAI API key entry below it', () => {
     for (const state of STATES) {
-      expect(cardTitle(state.html)).toBe('OpenAI (ChatGPT subscription)');
+      expect(cardTitle(state.html)).toBe('OpenAI ChatGPT');
+      expect(state.html).toContain(
+        'Use your ChatGPT subscription for supported OpenAI models in Kilo.'
+      );
     }
   });
 });
@@ -175,8 +178,14 @@ describe('OpenAiChatGptCard connected state', () => {
     });
 
     expect(html).toContain('Connected');
-    expect(html).toContain('Connected as user@example.com');
-    expect(html).toContain(new Date(CONNECTED_AT).toLocaleDateString());
+    expect(html).toContain('Account: user@example.com');
+    expect(html).toContain(
+      new Date(CONNECTED_AT).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    );
     expect(html.match(/Disconnect/g)).toHaveLength(1);
     expect(html).not.toContain(CONNECT_LABEL);
   });
@@ -188,7 +197,7 @@ describe('OpenAiChatGptCard connected state', () => {
       connectedAt: CONNECTED_AT,
     });
 
-    expect(html).toContain('Connected as subject-1');
+    expect(html).toContain('Account: subject-1');
   });
 });
 
@@ -299,9 +308,9 @@ describe('OpenAiChatGptCard returned authorization errors', () => {
     });
 
     // A live connection has nothing to recover, and a failure alert beside
-    // 'Connected as ...' would contradict it: the card reports the connection.
+    // the connected account would contradict it: the card reports the connection.
     expect(html).not.toContain('data-slot="alert"');
-    expect(html).toContain('Connected as user@example.com');
+    expect(html).toContain('Account: user@example.com');
     expect(html.match(/>Disconnect</g)).toHaveLength(1);
   });
 });

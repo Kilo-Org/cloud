@@ -71,7 +71,6 @@ export function ProfileVariablesScreen({
 
   // `null` = closed, `''` = the add form, any other value = the key being edited.
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
 
   const rows = variableRows(vars);
   const isAdding = editingKey === '';
@@ -176,10 +175,6 @@ export function ProfileVariablesScreen({
             <VariableRowView
               key={row.key}
               row={row}
-              revealed={revealed[row.key] === true}
-              onToggleReveal={() => {
-                setRevealed(current => ({ ...current, [row.key]: current[row.key] !== true }));
-              }}
               onEdit={() => {
                 setEditingKey(row.key);
               }}

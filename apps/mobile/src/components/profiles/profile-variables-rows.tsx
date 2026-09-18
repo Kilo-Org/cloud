@@ -38,16 +38,26 @@ function variableInputErrorMessage(t: (key: string) => string, error: VariableIn
 
 type VariableRowViewProps = Readonly<{
   row: VariableRow;
-  revealed: boolean;
-  onToggleReveal: () => void;
+  /**
+   * Optional row-level reveal. The profile Variables screen omits it so a
+   * secret is only ever revealed from the edit form; the draft editors pass it
+   * so a value the user is still composing can be checked.
+   */
+  revealed?: boolean;
+  onToggleReveal?: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }>;
 
-/** One variable row: the key in mono, the masked/visible value, reveal and delete. */
+/**
+ * One variable row: the key in mono and the value. A secret never renders its
+ * stored value — the server sends `***`, and the row shows the dot run instead.
+ * When the caller passes `onToggleReveal`, the row offers a reveal control;
+ * otherwise a secret stays masked.
+ */
 export function VariableRowView({
   row,
-  revealed,
+  revealed = false,
   onToggleReveal,
   onEdit,
   onDelete,
@@ -65,11 +75,24 @@ export function VariableRowView({
         <Text className="flex-1 font-mono text-sm text-foreground" numberOfLines={1}>
           {row.key}
         </Text>
-        <Text className="max-w-[45%] text-xs text-muted-foreground" numberOfLines={1}>
-          {revealed ? row.value : row.maskedValue}
-        </Text>
+        {row.isSecret && onToggleReveal === undefined ? (
+          <View className="flex-row items-center gap-1">
+            <Lock size={12} color={colors.mutedForeground} />
+            <Text
+              className="max-w-[45%] text-xs text-muted-foreground"
+              numberOfLines={1}
+              accessibilityLabel={t('profiles.secrets.masked')}
+            >
+              {row.maskedValue}
+            </Text>
+          </View>
+        ) : (
+          <Text className="max-w-[45%] text-xs text-muted-foreground" numberOfLines={1}>
+            {revealed ? row.value : row.maskedValue}
+          </Text>
+        )}
       </Pressable>
-      {row.isSecret ? (
+      {row.isSecret && onToggleReveal !== undefined ? (
         <Pressable
           className="h-11 w-11 items-center justify-center active:opacity-70"
           accessibilityRole="button"
@@ -122,6 +145,7 @@ export function VariableEditForm({
   const keyRef = useRef(initial.key);
   const valueRef = useRef(initial.value);
   const [isSecret, setIsSecret] = useState(initial.isSecret);
+  const [revealed, setRevealed] = useState(false);
   const [hasValue, setHasValue] = useState(initial.value.trim().length > 0);
   const [error, setError] = useState<VariableInputError | null>(null);
 
@@ -164,7 +188,7 @@ export function VariableEditForm({
       <FormField
         label={t('profiles.valueLabel')}
         defaultValue={initial.value}
-        secureTextEntry={isSecret}
+        secureTextEntry={isSecret && !revealed}
         autoCapitalize="none"
         autoCorrect={false}
         onChangeText={value => {
@@ -172,14 +196,32 @@ export function VariableEditForm({
           setHasValue(value.trim().length > 0);
         }}
       />
+      {isSecret ? (
+        <Pressable
+          className="min-h-11 flex-row items-center gap-2 self-start px-1 active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel={t('profiles.secrets.reveal')}
+          accessibilityState={{ selected: revealed }}
+          onPress={() => {
+            setRevealed(current => !current);
+          }}
+        >
+          {revealed ? (
+            <EyeOff size={18} color={colors.mutedForeground} />
+          ) : (
+            <Eye size={18} color={colors.mutedForeground} />
+          )}
+          <Text className="text-sm text-muted-foreground">{t('profiles.secrets.reveal')}</Text>
+        </Pressable>
+      ) : null}
       <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
         <Lock size={18} color={colors.secondaryForeground} />
         <Text className="flex-1 text-sm font-medium text-foreground">
-          {t('profiles.secretLabel')}
+          {t('profiles.secrets.markSecret')}
         </Text>
         <Switch
           value={isSecret}
-          accessibilityLabel={t('profiles.secretLabel')}
+          accessibilityLabel={t('profiles.secrets.markSecret')}
           onValueChange={setIsSecret}
         />
       </View>

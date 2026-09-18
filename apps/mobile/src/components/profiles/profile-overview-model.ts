@@ -41,7 +41,13 @@ export function deleteErrorMessage(error: unknown): DeleteErrorKind {
   return code === 'PRECONDITION_FAILED' ? 'blocked' : 'failed';
 }
 
-export type OverviewSectionKey = 'variables' | 'commands' | 'skills';
+export type OverviewSectionKey =
+  | 'variables'
+  | 'commands'
+  | 'slashCommands'
+  | 'mcp'
+  | 'skills'
+  | 'agents';
 
 /** One navigable section row: its route key, catalog title, and item count. */
 export type OverviewSectionRow = Readonly<{
@@ -65,17 +71,27 @@ export function metadataFormKey(profile: { name: string; description: string | n
 export type ProfileOverviewSource = {
   vars: readonly unknown[];
   commands: readonly unknown[];
+  kiloCommands: readonly unknown[];
+  mcpServers: readonly unknown[];
   skills: readonly unknown[];
+  agents: readonly unknown[];
 };
 
 /**
- * The three Overview section rows, always in the same order so the screen's
- * layout never depends on the counts.
+ * The Overview section rows, always in the same order so the screen's layout
+ * never depends on the counts. The order mirrors the web editor's tabs.
  */
 export function overviewSectionRows(profile: ProfileOverviewSource): OverviewSectionRow[] {
   return [
     { key: 'variables', titleKey: 'profiles.variablesTitle', count: profile.vars.length },
     { key: 'commands', titleKey: 'profiles.commandsTitle', count: profile.commands.length },
+    {
+      key: 'slashCommands',
+      titleKey: 'profiles.slashCommands.title',
+      count: profile.kiloCommands.length,
+    },
+    { key: 'mcp', titleKey: 'profiles.mcp.title', count: profile.mcpServers.length },
     { key: 'skills', titleKey: 'profiles.skillsTitle', count: profile.skills.length },
+    { key: 'agents', titleKey: 'profiles.agents.title', count: profile.agents.length },
   ];
 }

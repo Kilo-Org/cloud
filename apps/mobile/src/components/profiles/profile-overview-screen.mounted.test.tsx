@@ -49,8 +49,13 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
     `/profiles/${id}/variables${org ? `?org=${org}` : ''}`,
   getProfileCommandsPath: (id: string, org?: string) =>
     `/profiles/${id}/commands${org ? `?org=${org}` : ''}`,
+  getProfileSlashCommandsPath: (id: string, org?: string) =>
+    `/profiles/${id}/slash-commands${org ? `?org=${org}` : ''}`,
+  getProfileMcpPath: (id: string, org?: string) => `/profiles/${id}/mcp${org ? `?org=${org}` : ''}`,
   getProfileSkillsPath: (id: string, org?: string) =>
     `/profiles/${id}/skills${org ? `?org=${org}` : ''}`,
+  getProfileAgentsPath: (id: string, org?: string) =>
+    `/profiles/${id}/agents${org ? `?org=${org}` : ''}`,
 }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -69,7 +74,10 @@ vi.mock('@/components/ui/preference-row', () => ({ PreferenceRow: 'PreferenceRow
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
+  Bot: 'Bot',
+  CornerDownLeft: 'CornerDownLeft',
   KeyRound: 'KeyRound',
+  Server: 'Server',
   Sparkles: 'Sparkles',
   Star: 'Star',
   Terminal: 'Terminal',
@@ -131,7 +139,10 @@ describe('ProfileOverviewScreen', () => {
     expect(findAll(renderer.root, 'ConfigureRow').map(row => row.props.subtitle)).toEqual([
       '1',
       '2',
+      '0',
+      '0',
       '1',
+      '0',
     ]);
 
     act(() => {
@@ -154,13 +165,16 @@ describe('ProfileOverviewScreen', () => {
     unmount();
   });
 
-  it('empty: an empty profile still renders all three rows with zero counts', async () => {
+  it('empty: an empty profile still renders all six rows with zero counts', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
 
     expect(findAll(renderer.root, 'ConfigureRow').map(row => row.props.subtitle)).toEqual([
+      '0',
+      '0',
+      '0',
       '0',
       '0',
       '0',

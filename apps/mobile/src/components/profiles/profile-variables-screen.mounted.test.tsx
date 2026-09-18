@@ -213,18 +213,41 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
-  it('happy: a secret row masks its value until revealed', async () => {
+  it('happy: a secret row masks its value and never echoes the stored value', async () => {
     h.query.data = testProfile([{ key: 'TOKEN', value: '***', isSecret: true }]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
 
-    const showsMask = () =>
-      findAll(renderer.root, 'Text').some(node => node.props.children === '••••••••');
-    expect(showsMask()).toBe(true);
+    expect(findAll(renderer.root, 'Text').some(node => node.props.children === '••••••••')).toBe(
+      true
+    );
+    expect(findAll(renderer.root, 'Text').some(node => node.props.children === '***')).toBe(false);
 
-    pressPressable(renderer.root, 'Secret');
-    expect(findAll(renderer.root, 'Text').some(node => node.props.children === '***')).toBe(true);
+    unmount();
+  });
+
+  it('happy: a secret value can be revealed only while editing', async () => {
+    h.query.data = testProfile([{ key: 'TOKEN', value: '***', isSecret: true }]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The row offers no reveal control.
+    expect(
+      findAll(renderer.root, 'Pressable').some(
+        node => node.props.accessibilityLabel === 'Reveal value'
+      )
+    ).toBe(false);
+
+    pressPressable(renderer.root, 'TOKEN');
+    const valueField = findField(renderer.root, 'Value');
+    expect(valueField.props.secureTextEntry).toBe(true);
+    // A stored secret is never seeded into the edit field.
+    expect(valueField.props.defaultValue).toBe('');
+
+    pressPressable(renderer.root, 'Reveal value');
+    expect(findField(renderer.root, 'Value').props.secureTextEntry).toBe(false);
 
     unmount();
   });

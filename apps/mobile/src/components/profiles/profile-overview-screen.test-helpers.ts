@@ -21,7 +21,10 @@ export type TestProfileDetail = {
   updatedAt: string;
   vars: unknown[];
   commands: unknown[];
+  kiloCommands: unknown[];
+  mcpServers: unknown[];
   skills: unknown[];
+  agents: unknown[];
 };
 
 type TestAlertButton = { style: string; onPress?: () => void };
@@ -38,7 +41,10 @@ export function testProfile(overrides: Partial<TestProfileDetail> = {}): TestPro
     updatedAt: '2026-01-01T00:00:00.000Z',
     vars: [],
     commands: [],
+    kiloCommands: [],
+    mcpServers: [],
     skills: [],
+    agents: [],
     ...overrides,
   };
 }

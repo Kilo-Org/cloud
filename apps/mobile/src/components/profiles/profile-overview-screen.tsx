@@ -17,7 +17,17 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { FormField } from '@/components/ui/form-field';
-import { KeyRound, type LucideIcon, Sparkles, Star, Terminal, Trash2 } from '@/components/ui/icons';
+import {
+  Bot,
+  CornerDownLeft,
+  KeyRound,
+  type LucideIcon,
+  Server,
+  Sparkles,
+  Star,
+  Terminal,
+  Trash2,
+} from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -29,8 +39,11 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
+  getProfileAgentsPath,
   getProfileCommandsPath,
+  getProfileMcpPath,
   getProfileSkillsPath,
+  getProfileSlashCommandsPath,
   getProfileVariablesPath,
 } from '@/lib/profile-agent-navigation';
 
@@ -38,14 +51,20 @@ import {
 const SECTION_ICONS = {
   variables: KeyRound,
   commands: Terminal,
+  slashCommands: CornerDownLeft,
+  mcp: Server,
   skills: Sparkles,
+  agents: Bot,
 } satisfies Record<OverviewSectionKey, LucideIcon>;
 
 /** Route builder per Overview section, carrying the profile's context. */
 const SECTION_PATHS = {
   variables: getProfileVariablesPath,
   commands: getProfileCommandsPath,
+  slashCommands: getProfileSlashCommandsPath,
+  mcp: getProfileMcpPath,
   skills: getProfileSkillsPath,
+  agents: getProfileAgentsPath,
 } satisfies Record<OverviewSectionKey, (profileId: string, organizationId?: string) => Href>;
 
 /**
@@ -122,7 +141,7 @@ function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
 
 /**
  * Content-shaped loading rows in the same slots as the loaded screen (two
- * fields, the default row, the three section rows, the delete button) so the
+ * fields, the default row, the six section rows, the delete button) so the
  * swap to real content does not move anything.
  */
 function ProfileOverviewSkeleton() {
@@ -142,6 +161,9 @@ function ProfileOverviewSkeleton() {
       <Skeleton className="h-16 w-full rounded-lg" />
       <View className="gap-1">
         <Skeleton className="h-4 w-28 rounded" />
+        <Skeleton className="h-[54px] w-full rounded-lg" />
+        <Skeleton className="h-[54px] w-full rounded-lg" />
+        <Skeleton className="h-[54px] w-full rounded-lg" />
         <Skeleton className="h-[54px] w-full rounded-lg" />
         <Skeleton className="h-[54px] w-full rounded-lg" />
         <Skeleton className="h-[54px] w-full rounded-lg" />

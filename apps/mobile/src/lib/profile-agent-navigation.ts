@@ -56,6 +56,21 @@ export function getProfileCommandsPath(profileId: string, organizationId?: strin
   return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/commands${profileContextQuery(organizationId)}` as Href;
 }
 
+/** The profile editor's Slash Commands tab. */
+export function getProfileSlashCommandsPath(profileId: string, organizationId?: string): Href {
+  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/slash-commands${profileContextQuery(organizationId)}` as Href;
+}
+
+/** The profile editor's MCP Servers tab. */
+export function getProfileMcpPath(profileId: string, organizationId?: string): Href {
+  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/mcp${profileContextQuery(organizationId)}` as Href;
+}
+
+/** The profile editor's Agents tab. */
+export function getProfileAgentsPath(profileId: string, organizationId?: string): Href {
+  return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/agents${profileContextQuery(organizationId)}` as Href;
+}
+
 /** The profile editor's Skills tab. */
 export function getProfileSkillsPath(profileId: string, organizationId?: string): Href {
   return `/(app)/(tabs)/(3_profile)/profiles/${profileId}/skills${profileContextQuery(organizationId)}` as Href;

@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   getCodeReviewerProfilePath,
   getProfileAgentScope,
+  getProfileAgentsPath,
   getProfileCommandsPath,
+  getProfileMcpPath,
   getProfileOverviewPath,
   getProfileSkillsPath,
+  getProfileSlashCommandsPath,
   getProfilesPath,
   getProfileVariablesPath,
 } from '@/lib/profile-agent-navigation';
@@ -65,6 +68,13 @@ describe('Profile management paths', () => {
     expect(getProfileCommandsPath('profile-1')).toBe(
       '/(app)/(tabs)/(3_profile)/profiles/profile-1/commands'
     );
+    expect(getProfileSlashCommandsPath('profile-1')).toBe(
+      '/(app)/(tabs)/(3_profile)/profiles/profile-1/slash-commands'
+    );
+    expect(getProfileMcpPath('profile-1')).toBe('/(app)/(tabs)/(3_profile)/profiles/profile-1/mcp');
+    expect(getProfileAgentsPath('profile-1')).toBe(
+      '/(app)/(tabs)/(3_profile)/profiles/profile-1/agents'
+    );
     expect(getProfileSkillsPath('profile-1')).toBe(
       '/(app)/(tabs)/(3_profile)/profiles/profile-1/skills'
     );
@@ -79,6 +89,15 @@ describe('Profile management paths', () => {
     );
     expect(getProfileCommandsPath('profile-1', 'org-1')).toBe(
       '/(app)/(tabs)/(3_profile)/profiles/profile-1/commands?organizationId=org-1'
+    );
+    expect(getProfileSlashCommandsPath('profile-1', 'org-1')).toBe(
+      '/(app)/(tabs)/(3_profile)/profiles/profile-1/slash-commands?organizationId=org-1'
+    );
+    expect(getProfileMcpPath('profile-1', 'org-1')).toBe(
+      '/(app)/(tabs)/(3_profile)/profiles/profile-1/mcp?organizationId=org-1'
+    );
+    expect(getProfileAgentsPath('profile-1', 'org-1')).toBe(
+      '/(app)/(tabs)/(3_profile)/profiles/profile-1/agents?organizationId=org-1'
     );
     expect(getProfileSkillsPath('profile-1', 'org-1')).toBe(
       '/(app)/(tabs)/(3_profile)/profiles/profile-1/skills?organizationId=org-1'

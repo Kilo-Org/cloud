@@ -1,3 +1,5 @@
+import { createCachedFetch } from '@/lib/cached-fetch';
+
 /**
  * Which models the partner project can actually serve.
  *
@@ -17,61 +19,45 @@ const CACHE_TTL_MS = 60 * 60 * 1000;
 /** A slow list must not hold up a request. */
 const REQUEST_TIMEOUT_MS = 2_000;
 
-let cachedModelIds: Set<string> | null = null;
-let cacheExpiresAt = 0;
-let inFlight: Promise<Set<string> | null> | null = null;
+const servedModelIdsFetchers = new Map<string, () => Promise<ReadonlySet<string> | null>>();
 
-async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> {
-  try {
-    const response = await fetch(MODELS_URL, {
-      headers: { authorization: `Bearer ${apiKey}` },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-    if (!response.ok) return null;
+async function fetchServedModelIds(apiKey: string): Promise<ReadonlySet<string>> {
+  const response = await fetch(MODELS_URL, {
+    headers: { authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`OpenAI models request failed with status ${response.status}`);
 
-    const body = (await response.json()) as { data?: Array<{ id?: unknown }> };
-    const ids = (body.data ?? [])
-      .map(model => (typeof model?.id === 'string' ? model.id : null))
-      .filter((id): id is string => id !== null);
-    return new Set(ids);
-  } catch {
-    return null;
+  const body = (await response.json()) as { data?: Array<{ id?: unknown }> };
+  const ids = (body.data ?? [])
+    .map(model => (typeof model?.id === 'string' ? model.id : null))
+    .filter((id): id is string => id !== null);
+  return new Set(ids);
+}
+
+function getServedModelIds(apiKey: string): Promise<ReadonlySet<string> | null> {
+  let getCachedModelIds = servedModelIdsFetchers.get(apiKey);
+  if (!getCachedModelIds) {
+    getCachedModelIds = createCachedFetch(() => fetchServedModelIds(apiKey), CACHE_TTL_MS, null);
+    servedModelIdsFetchers.set(apiKey, getCachedModelIds);
   }
+  return getCachedModelIds();
 }
 
 /**
  * True when the project behind `apiKey` can serve `modelId`.
  *
- * A missing key, a failed request, or an unreadable body returns true: a
- * transient problem must not hide the route, and the upstream then answers
- * exactly as it does today.
+ * A missing key or failed initial request returns true. After a successful
+ * request, transient failures reuse the last-known-good served list.
  */
 export async function isOpenAiModelServed(apiKey: string, modelId: string): Promise<boolean> {
   if (apiKey.trim().length === 0) return true;
 
-  if (!cachedModelIds || Date.now() >= cacheExpiresAt) {
-    inFlight ??= fetchServedModelIds(apiKey)
-      .then(ids => {
-        if (ids) {
-          cachedModelIds = ids;
-          cacheExpiresAt = Date.now() + CACHE_TTL_MS;
-        }
-        return ids;
-      })
-      .finally(() => {
-        inFlight = null;
-      });
-
-    const ids = await inFlight;
-    if (!ids) return true;
-  }
-
-  return cachedModelIds?.has(modelId) ?? true;
+  const modelIds = await getServedModelIds(apiKey);
+  return modelIds?.has(modelId) ?? true;
 }
 
 /** Drops the cached list. Tests call this between cases. */
 export function resetServedModelIdsCache(): void {
-  cachedModelIds = null;
-  cacheExpiresAt = 0;
-  inFlight = null;
+  servedModelIdsFetchers.clear();
 }

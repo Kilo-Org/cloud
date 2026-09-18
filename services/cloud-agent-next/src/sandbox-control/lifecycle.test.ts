@@ -1733,8 +1733,8 @@ describe('SandboxControl lifecycle boundaries', () => {
         },
       },
     });
-    // One pass mints both the diagnostic launch grant and the worktree-state
-    // grant, and must not pay for the lookup twice.
+    // The worktree-state grant shares one memoized lookup per readiness pass,
+    // and must not pay for it twice.
     expect((await h.create()).attachment?.worktreeState).toBeDefined();
     expect(lookups).toBe(1);
   });

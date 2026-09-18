@@ -3546,7 +3546,11 @@ export class SandboxControl extends DurableObject<Env> {
     credential: string,
     allocationId: string
   ): Promise<Record<string, string>> {
-    const signingSecret = await this.signingSecret();
+    const signingSecret = await withTimeout(
+      resolveSecret(this.env.NEXTAUTH_SECRET),
+      1_000,
+      'Diagnostic signing secret lookup timed out'
+    ).catch(() => null);
     const workloadCgroup = (this.env as { CONTROL_WORKLOAD_CGROUP?: unknown })
       .CONTROL_WORKLOAD_CGROUP;
     const launchEnv = buildControlWrapperLaunchEnv({

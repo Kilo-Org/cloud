@@ -153,6 +153,7 @@ export type {
   SessionPhase,
   SessionActivity,
   AgentStatus,
+  SdkStatusMessageCode,
   CloudStatus,
   QuestionState,
   PermissionState,

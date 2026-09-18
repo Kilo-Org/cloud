@@ -24,6 +24,10 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+vi.mock('@/components/agents/use-message-copy', () => ({
+  useMessageCopy: () => ({ copyMessage: vi.fn() }),
+  performCopy: vi.fn(),
+}));
 
 describe('ChildSessionSheet title layout', () => {
   it.each([
@@ -56,7 +60,7 @@ describe('ChildSessionSheet title layout', () => {
       hydrationState: errorState,
       messages: [],
       sessionError: null,
-      expectedText: 'Failed',
+      expectedText: i18n.t('agentChat.session.connectionTrouble'),
       retryCount: 1,
     },
     {
@@ -64,7 +68,7 @@ describe('ChildSessionSheet title layout', () => {
       hydrationState: readyState,
       messages: [],
       sessionError: 'Runtime failure',
-      expectedText: 'Runtime failure',
+      expectedText: i18n.t('agentChat.messageFailure.assistantFailed'),
       retryCount: 0,
     },
   ])('keeps the selected title wrapped during $state', async state => {
@@ -110,7 +114,7 @@ describe('ChildSessionSheet mounted', () => {
     expect(renderer.root.findAllByType(QueryError)).toHaveLength(1);
     expect(renderer.root.findAllByType(QueryError)[0]?.props.placement).toBe('top');
     expect(renderer.root.findAll(node => Object.is(node.type, 'CenteredState'))).toHaveLength(0);
-    expect(textValues(renderer.root)).toContain('Failed');
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.session.connectionTrouble'));
     expect(retryButton(renderer.root).props.accessibilityState).toEqual({
       disabled: false,
       busy: false,
@@ -121,7 +125,9 @@ describe('ChildSessionSheet mounted', () => {
 
     expect(host(renderer.root, 'SheetHeader')).toBe(header);
     expect(header.props).toMatchObject({ title: props.title });
-    expect(textValues(renderer.root)).toEqual(expect.arrayContaining(['child text', 'Failed']));
+    expect(textValues(renderer.root)).toEqual(
+      expect.arrayContaining(['child text', i18n.t('agentChat.session.connectionTrouble')])
+    );
     expect(retryButton(renderer.root).props.accessibilityState).toEqual({
       disabled: true,
       busy: true,

@@ -220,7 +220,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         terminated = true;
         disconnectedSource = null;
         completed = false;
-        status = { type: 'error', message: 'Session terminated' };
+        status = { type: 'error', message: 'Session terminated', code: 'session-terminated' };
         config.onError?.('Session terminated');
         break;
       case 'disconnected':
@@ -574,7 +574,12 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processAutocommitStarted(
     event: Extract<ServiceEvent, { type: 'autocommit_started' }>
   ): void {
-    status = { type: 'autocommit', step: 'started', message: event.message ?? 'Committing…' };
+    status = {
+      type: 'autocommit',
+      step: 'started',
+      message: event.message ?? 'Committing…',
+      ...(event.message === undefined ? { code: 'committing' } : {}),
+    };
     notify();
   }
 
@@ -604,9 +609,15 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         step: 'completed',
         message,
         ...(commitHash ? { commitHash } : {}),
+        ...(parts.length === 0 ? { code: 'committed' } : {}),
       };
     } else {
-      status = { type: 'autocommit', step: 'failed', message: event.message ?? 'Commit failed' };
+      status = {
+        type: 'autocommit',
+        step: 'failed',
+        message: event.message ?? 'Commit failed',
+        ...(event.message === undefined ? { code: 'commit-failed' } : {}),
+      };
     }
     notify();
   }

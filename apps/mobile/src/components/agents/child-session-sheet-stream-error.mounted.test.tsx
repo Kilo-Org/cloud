@@ -25,6 +25,10 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+vi.mock('@/components/agents/use-message-copy', () => ({
+  useMessageCopy: () => ({ copyMessage: vi.fn() }),
+  performCopy: vi.fn(),
+}));
 
 const CHILD_ID = 'child-1' as KiloSessionId;
 
@@ -40,7 +44,7 @@ async function mountFailingChildLoad(
   messages: StoredMessage[] = [makeAssistantMessage()],
   fetchPage = vi
     .fn<NonNullable<SessionManagerConfig['fetchSnapshotPage']>>()
-    .mockRejectedValue(new Error('Service is unavailable right now. Please try again.'))
+    .mockRejectedValue(new Error('Connection lost. Please retry in a moment.'))
 ) {
   const { manager, store, storage } = await createRecoverySource(fetchPage);
 
@@ -132,6 +136,15 @@ describe('ChildSessionSheet streamed session load error', () => {
     expect(textValues(sheet.renderer.root)).toContain(
       i18n.t('agentChat.childSessionSheet.couldNotLoad')
     );
+    // The transport's English detail is classified: the reader sees the
+    // translated line, and a transient failure keeps its Retry.
+    expect(textValues(sheet.renderer.root)).toContain(
+      i18n.t('agentChat.session.connectionTrouble')
+    );
+    expect(textValues(sheet.renderer.root)).not.toContain(
+      'Connection lost. Please retry in a moment.'
+    );
+    expect(retryButton(sheet.renderer.root).props.disabled).toBe(false);
     expect(sheet.fetchPage).toHaveBeenCalledTimes(1);
 
     await sheet.retry();
@@ -141,7 +154,28 @@ describe('ChildSessionSheet streamed session load error', () => {
     expect(textValues(sheet.renderer.root)).toContain(
       i18n.t('agentChat.childSessionSheet.couldNotLoad')
     );
+    expect(textValues(sheet.renderer.root)).toContain(
+      i18n.t('agentChat.session.connectionTrouble')
+    );
     expect(sheet.renderer.root.findAllByType(QueryError)).toHaveLength(1);
+  });
+
+  it('shows a gone child as not found with no Retry', async () => {
+    const renderer = await renderSheet(
+      buildProps({
+        getChildMessages: () => [],
+        hydrationState: { status: 'error', message: 'This session is no longer available.' },
+      })
+    );
+
+    expect(textValues(renderer.root)).toContain(i18n.t('queryError.notFoundDescription'));
+    expect(textValues(renderer.root)).not.toContain('This session is no longer available.');
+    expect(renderer.root.findAllByType(QueryError)).toHaveLength(1);
+    expect(
+      renderer.root.findAll(
+        node => (node.type as string) === 'Pressable' && node.props.accessibilityLabel === 'Retry'
+      )
+    ).toHaveLength(0);
   });
 
   it('holds the loading state instead of the full-screen load error while streaming', async () => {
@@ -174,7 +208,7 @@ describe('ChildSessionSheet streamed session load error', () => {
   it('re-issues the held load while streaming and shows the rows when they land', async () => {
     const fetchPage = vi
       .fn<NonNullable<SessionManagerConfig['fetchSnapshotPage']>>()
-      .mockRejectedValueOnce(new Error('Service is unavailable right now. Please try again.'))
+      .mockRejectedValueOnce(new Error('Connection lost. Please retry in a moment.'))
       .mockResolvedValueOnce(historyPage([makeAssistantMessage('m2', 'Restored row')]));
     const sheet = await mountFailingChildLoad([], fetchPage);
 

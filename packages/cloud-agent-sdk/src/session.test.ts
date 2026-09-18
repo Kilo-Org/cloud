@@ -174,7 +174,11 @@ describe('session pipeline integration', () => {
       feedEvent(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
       feedEvent(createEvent('error', { fatal: true }));
       expect(serviceState.getActivity()).toEqual({ type: 'idle' });
-      expect(serviceState.getStatus()).toEqual({ type: 'error', message: 'Session terminated' });
+      expect(serviceState.getStatus()).toEqual({
+        type: 'error',
+        message: 'Session terminated',
+        code: 'session-terminated',
+      });
     });
 
     it('non-fatal error (warning) does not stop activity', () => {

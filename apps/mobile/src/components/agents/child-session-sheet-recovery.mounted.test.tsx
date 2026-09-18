@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted harness pins first-page, older-page, and runtime-error recovery together. */
 import { createElement, Fragment } from 'react';
 import { act } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
@@ -25,12 +26,17 @@ import {
 import { type FlashListProps } from '@shopify/flash-list';
 import { type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { QueryError } from '@/components/query-error';
+import { performCopy } from '@/components/agents/use-message-copy';
 import { i18n } from '@/i18n';
 
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+vi.mock('@/components/agents/use-message-copy', () => ({
+  useMessageCopy: () => ({ copyMessage: vi.fn() }),
+  performCopy: vi.fn(),
+}));
 
 async function mountRecovery(messages = [makeAssistantMessage()]) {
   const fetchPage = vi
@@ -229,7 +235,7 @@ describe('ChildSessionSheet recovery', () => {
     await sheet.sync({ sessionError: 'Runtime failure' });
     expect(textValues(renderer.root)).toEqual(
       expect.arrayContaining([
-        'Connection failed. Please retry in a moment.',
+        i18n.t('agentChat.session.connectionTrouble'),
         i18n.t('agentChat.messageFailure.assistantFailed'),
       ])
     );
@@ -274,7 +280,7 @@ describe('ChildSessionSheet recovery', () => {
   it('preserves uncached Retry, loading, confirmed empty history, and later live content', async () => {
     const sheet = await mountRecovery([]);
     expect(textValues(sheet.renderer.root)).toContain(
-      'Connection failed. Please retry in a moment.'
+      i18n.t('agentChat.session.connectionTrouble')
     );
     expect(retryButton(sheet.renderer.root).props.disabled).toBe(false);
     const pending = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
@@ -302,9 +308,33 @@ describe('ChildSessionSheet recovery', () => {
       ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
       sessionError: 'Runtime failure',
     });
-    // The sheet's own failure screen (child-session-sheet.tsx:219-223) is not
-    // the transcript status slot, so it still names the child's runtime error.
-    expect(textValues(renderer.root)).toContain('Runtime failure');
+    // The sheet's own failure screen (child-session-sheet.tsx) is not the
+    // transcript status slot, so it resolves the runtime failure through
+    // `describeSessionRuntimeFailure`: an unrecognized failure is the
+    // assistant-failure line, never the page-load fallback.
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
+    expect(textValues(renderer.root)).not.toContain(
+      i18n.t('agentChat.session.failedToLoadDetails')
+    );
     expect(textValues(renderer.root)).not.toContain('Retry');
+  });
+
+  it('copies the untranslated runtime failure from the full-screen child error', async () => {
+    const renderer = await renderSheet({
+      ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
+      sessionError: 'Runtime failure',
+    });
+    const copy = renderer.root.find(
+      node =>
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.copyErrorDetails')
+    );
+    await act(async () => {
+      (copy.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(performCopy).toHaveBeenCalledWith(
+      'child-1\nSubagent session failed\nThe response failed.\nRuntime failure'
+    );
   });
 });

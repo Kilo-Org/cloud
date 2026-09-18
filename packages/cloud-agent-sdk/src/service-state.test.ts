@@ -206,7 +206,11 @@ describe('createServiceState', () => {
       state.process({ type: 'stopped', reason: 'error' });
 
       expect(state.getActivity()).toEqual({ type: 'idle' });
-      expect(state.getStatus()).toEqual({ type: 'error', message: 'Session terminated' });
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'Session terminated',
+        code: 'session-terminated',
+      });
       expect(onError).toHaveBeenCalledWith('Session terminated');
     });
 
@@ -1370,6 +1374,7 @@ describe('createServiceState', () => {
         type: 'autocommit',
         step: 'started',
         message: 'Committing…',
+        code: 'committing',
       });
     });
   });
@@ -1688,7 +1693,11 @@ describe('createServiceState', () => {
       // Turn 1: busy → error stopped
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
       state.process({ type: 'stopped', reason: 'error' });
-      expect(state.getStatus()).toEqual({ type: 'error', message: 'Session terminated' });
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'Session terminated',
+        code: 'session-terminated',
+      });
 
       // Turn 2: busy resets everything
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });

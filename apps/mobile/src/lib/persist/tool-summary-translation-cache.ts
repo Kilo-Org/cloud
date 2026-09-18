@@ -28,6 +28,18 @@ import { TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE } from '@/lib/storage-keys';
 /** At most this many translations are kept; the rest are evicted oldest-first. */
 export const TOOL_SUMMARY_TRANSLATION_CACHE_CAP = 200;
 
+/**
+ * Longest sign-out waits for the translation scope clear. The clear opens the
+ * native encrypted-KV database; a native `openDatabase`/`clearScope` that never
+ * settles must not hold sign-out teardown (the query-client clear and the token
+ * reset that follow this clear in the same batch). Past this the clear is
+ * abandoned and the caller continues: the scope is a refetchable cache, so a
+ * clear that did not run only costs a warm start.
+ */
+export const TOOL_SUMMARY_TRANSLATION_CLEAR_TIMEOUT_MS = 1000;
+
+const noopVoidResolution = () => undefined;
+
 const ITEM_KEY_PREFIX = 'tt:';
 
 export type CachedToolSummaryTranslation = {
@@ -150,14 +162,23 @@ export async function writeToolSummaryTranslation(
  * entry can never match the next account's row — and the map dies with the
  * process anyway.
  *
- * Best effort: a storage failure is swallowed so it can never abort sign-out.
- * A stale blob only costs a future cache hit; it is never a source of truth.
+ * Best effort and bounded: a storage failure is swallowed, and a clear that
+ * does not settle within {@link TOOL_SUMMARY_TRANSLATION_CLEAR_TIMEOUT_MS} is
+ * abandoned, so neither can abort or hold sign-out. A stale blob only costs a
+ * future cache hit; it is never a source of truth.
  */
 export async function clearToolSummaryTranslationsForSignOut(): Promise<void> {
+  let resolveTimeout: () => void = noopVoidResolution;
+  const timeout = new Promise<void>(resolve => {
+    resolveTimeout = resolve;
+  });
+  const timeoutId = setTimeout(resolveTimeout, TOOL_SUMMARY_TRANSLATION_CLEAR_TIMEOUT_MS);
   try {
-    await encryptedKv.clearScope(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE);
+    await Promise.race([encryptedKv.clearScope(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE), timeout]);
   } catch {
     // Best effort: sign-out continues; the orphaned blob is re-fetched away.
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

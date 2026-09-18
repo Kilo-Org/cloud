@@ -15,7 +15,11 @@ import type * as toolSummaryTranslationClient from './tool-summary-translation-c
 
 import { type CachedToolSummaryTranslation } from '@/lib/persist/tool-summary-translation-cache';
 
-import { persistTranslation, readStoredTranslations } from './tool-summary-translation-store';
+import {
+  clearStoredTranslations,
+  persistTranslation,
+  readStoredTranslations,
+} from './tool-summary-translation-store';
 
 /** The default translation model: matches the web `kilo-auto/small` entry. */
 export const DEFAULT_TOOL_SUMMARY_TRANSLATION_MODEL = {
@@ -147,28 +151,61 @@ let clientPromise: Promise<typeof toolSummaryTranslationClient> | null = null;
 
 /**
  * The store writes `remember` has dispatched that have not settled yet, each
- * with the time it was dispatched. A sign-out must drain them before it clears
- * the disk scope: a write that started under the signed-out account can
- * otherwise land after the clear and leave its entry behind.
+ * with the time it was dispatched and the account-reset epoch it was created
+ * under. A sign-out must drain them before it clears the disk scope: a write
+ * that started under the signed-out account can otherwise land after the clear
+ * and leave its entry behind.
  * `drainPendingPersists` bounds that wait, so a write that never settles cannot
  * hold sign-out teardown either; for the same reason a write is remembered only
  * for that bound, so a store that never answers cannot keep one tracked
  * promise — and the entry it captured — per resolved translation for the whole
  * session.
  */
-const pendingPersists = new Map<Promise<void>, number>();
+const pendingPersists = new Map<Promise<void>, { dispatchedAt: number; resetEpoch: number }>();
+
+/**
+ * True while a post-reset re-clear is running, and whether another settling
+ * pre-reset write asked for one meanwhile. Removing a write from
+ * `pendingPersists` is not cancellation: a write the drain abandoned can still
+ * commit after the reset's scope clear, so every pre-reset write that settles
+ * afterwards asks for another clear. This serializes and coalesces those asks,
+ * so the durable scope is empty once the last pre-reset write has settled.
+ */
+let reClearInFlight = false;
+let reClearRequested = false;
+
+async function clearScopeAfterLateWrite(): Promise<void> {
+  reClearRequested = true;
+  if (reClearInFlight) {
+    return;
+  }
+  reClearInFlight = true;
+  try {
+    while (reClearRequested) {
+      reClearRequested = false;
+      // eslint-disable-next-line no-await-in-loop -- the clears must run one after the other so the last one lands after the last settling write
+      await clearStoredTranslations();
+    }
+  } finally {
+    reClearInFlight = false;
+  }
+}
 
 /** Tracks one fire-and-forget store write until it settles or ages out. */
 function trackPersist(write: Promise<void>): void {
   const dispatchedAt = Date.now();
+  const resetEpoch = accountResetEpoch;
   // Drop the writes a sign-out would already have abandoned: a store whose
   // writes never settle would otherwise grow this map for the whole session.
   for (const [tracked, trackedAt] of pendingPersists) {
-    if (dispatchedAt - trackedAt >= TOOL_SUMMARY_TRANSLATION_SIGN_OUT_DRAIN_TIMEOUT_MS) {
+    if (
+      dispatchedAt - trackedAt.dispatchedAt >=
+      TOOL_SUMMARY_TRANSLATION_SIGN_OUT_DRAIN_TIMEOUT_MS
+    ) {
       pendingPersists.delete(tracked);
     }
   }
-  pendingPersists.set(write, dispatchedAt);
+  pendingPersists.set(write, { dispatchedAt, resetEpoch });
   void (async () => {
     try {
       await write;
@@ -178,6 +215,13 @@ function trackPersist(write: Promise<void>): void {
       // entry in `pendingPersists` nor escapes as an unhandled rejection.
     } finally {
       pendingPersists.delete(write);
+      // A reset ran while this write was in flight: the reset's scope clear may
+      // have happened before the write committed, so the entry it wrote can
+      // still be on disk. The write cannot be un-committed, so clear the scope
+      // again now that it has settled.
+      if (resetEpoch !== accountResetEpoch) {
+        void clearScopeAfterLateWrite();
+      }
     }
   })();
 }
@@ -255,11 +299,23 @@ function addSurfaceInterest(key: string): void {
 
 function removeSurfaceInterest(key: string): void {
   const count = surfaceInterest.get(key) ?? 0;
-  if (count <= 1) {
-    surfaceInterest.delete(key);
-  } else {
+  if (count > 1) {
     surfaceInterest.set(key, count - 1);
+    return;
   }
+  surfaceInterest.delete(key);
+  // The last mounted surface stopped asking for this key: drop its unresolved
+  // summary from the retry memory and any queued copy, so a reconnect edge or a
+  // delivered deep link cannot dispatch a request for a summary nothing renders
+  // any more. A key another surface still asks for keeps its interest, so only
+  // the interest that actually went away is dropped.
+  retryable.delete(key);
+  for (let index = queue.length - 1; index >= 0; index -= 1) {
+    if (queue[index]?.key === key) {
+      queue.splice(index, 1);
+    }
+  }
+  queued.delete(key);
 }
 
 /**
@@ -731,10 +787,11 @@ export function ensureTranslation(input: {
  * Records that one mounted surface stopped asking for a key's source text: the
  * hook effect's cleanup calls this when its row unmounts or its source text,
  * language or model changed. Once no surface asks for a part's text any more,
- * the next `ensureTranslation` for the same part drops that text from the
- * queue and the retry memory, so a superseded copy is neither dispatched by a
- * later flush nor re-sent by `retryUnresolvedTranslations`. A text another
- * surface still renders keeps its interest and stays served.
+ * that text is dropped from the queue and the retry memory, so a superseded
+ * copy is neither dispatched by a later flush nor re-sent by
+ * `retryUnresolvedTranslations` — including the copy of an unmounted row that
+ * failed. A text another surface still renders keeps its interest and stays
+ * served.
  */
 export function releaseTranslationInterest(input: {
   itemId: string;
@@ -807,10 +864,9 @@ export function clearToolSummaryTranslationMemory(): void {
  * allowed to hold sign-out teardown; the abandoned write is also forgotten, so
  * it cannot make a later sign-out wait the bound again. The scope clear that
  * follows still runs.
- * A write that settles late can only leave an orphaned blob, which never
- * renders under the next account — the in-memory cache is keyed by the
- * server-issued part id, and the reset already dropped it — and only costs a
- * warm start.
+ * A write that settles late may already have committed after the scope clear
+ * that follows: the tracker re-clears the scope once it settles (see
+ * {@link clearScopeAfterLateWrite}), so the durable store still ends empty.
  */
 async function drainPendingPersists(): Promise<void> {
   if (pendingPersists.size === 0) {

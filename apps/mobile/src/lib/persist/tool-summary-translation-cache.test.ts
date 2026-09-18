@@ -50,6 +50,7 @@ import {
   clearToolSummaryTranslationsForSignOut,
   readToolSummaryTranslations,
   TOOL_SUMMARY_TRANSLATION_CACHE_CAP,
+  TOOL_SUMMARY_TRANSLATION_CLEAR_TIMEOUT_MS,
   writeToolSummaryTranslation,
 } from './tool-summary-translation-cache';
 /* eslint-enable import/first */
@@ -214,5 +215,31 @@ describe('tool summary translation cache', () => {
     kvMock.clearScope.mockRejectedValueOnce(new Error('kv down'));
 
     await expect(clearToolSummaryTranslationsForSignOut()).resolves.toBeUndefined();
+  });
+
+  it('bounds the sign-out clear when the native clear never settles', async () => {
+    // A native `openDatabase`/`clearScope` that never settles must not hold
+    // sign-out teardown: the clear resolves its caller after the bound so the
+    // query-client clear and the token reset that follow it still run.
+    vi.useFakeTimers();
+    try {
+      const gate = Promise.withResolvers<undefined>();
+      kvMock.clearScope.mockReturnValueOnce(gate.promise);
+
+      let settled = false;
+      const clear = (async () => {
+        await clearToolSummaryTranslationsForSignOut();
+        settled = true;
+      })();
+      expect(settled).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(TOOL_SUMMARY_TRANSLATION_CLEAR_TIMEOUT_MS + 1);
+      await clear;
+      expect(settled).toBe(true);
+
+      gate.resolve(undefined);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

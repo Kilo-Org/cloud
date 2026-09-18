@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as runtimeModule from './tool-summary-translation-runtime';
 
-const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
+const { requestMock, readMock, writeMock, clearMock } = vi.hoisted(() => ({
   requestMock: vi.fn(),
   readMock: vi.fn(),
   writeMock: vi.fn(),
+  clearMock: vi.fn(),
 }));
 
 vi.mock('./tool-summary-translation-client', () => ({
@@ -15,6 +16,7 @@ vi.mock('./tool-summary-translation-client', () => ({
 vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
   readToolSummaryTranslations: readMock,
   writeToolSummaryTranslation: writeMock,
+  clearToolSummaryTranslationsForSignOut: clearMock,
 }));
 
 const MODEL = { id: 'kilo-auto/small', name: 'Auto Small' };
@@ -105,8 +107,10 @@ beforeEach(() => {
   requestMock.mockReset();
   readMock.mockReset();
   writeMock.mockReset();
+  clearMock.mockReset();
   readMock.mockResolvedValue([]);
   writeMock.mockResolvedValue(undefined);
+  clearMock.mockResolvedValue(undefined);
 });
 
 describe('tool summary translation runtime', () => {
@@ -760,6 +764,31 @@ describe('retry of unresolved summaries after a connection recovery', () => {
     await flushBatch();
 
     expect(requestCalls().at(-1)?.texts).toEqual(['final summary']);
+  });
+
+  it('drops a failed summary from the retry memory when its last surface unmounts', async () => {
+    const mod = await loadRuntime();
+    requestMock.mockRejectedValue(new Error('gateway down'));
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await flushBatch();
+    expect(mod.getTranslation('part-1', 'hello', 'de', MODEL.id)).toBeUndefined();
+
+    // The row unmounts: its effect cleanup releases the only interest in the
+    // failed summary. Nothing renders it any more.
+    mod.releaseTranslationInterest({
+      itemId: 'part-1',
+      text: 'hello',
+      language: 'de',
+      model: MODEL,
+    });
+
+    // A reconnect edge or a delivered deep link must not dispatch a request for
+    // a summary no surface shows.
+    mod.retryUnresolvedTranslations();
+    await flushBatch();
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
   });
 
   it('makes no request on a retry when every summary already resolved', async () => {

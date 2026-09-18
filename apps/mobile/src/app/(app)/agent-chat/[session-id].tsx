@@ -3,13 +3,15 @@ import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { hashKey, useQuery } from '@tanstack/react-query';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useRef, useSyncExternalStore } from 'react';
+import { useMemo, useRef, useSyncExternalStore } from 'react';
 
 import {
   getAuthenticatedOwner,
   isAuthenticatedOwner,
   subscribeAuthenticatedOwner,
 } from '@/lib/context-scope';
+import { useAuth } from '@/lib/auth/auth-context';
+import { readUserIdFromToken } from '@/lib/auth/token-user-id';
 
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
 import {
@@ -136,8 +138,25 @@ export default function SessionDetailScreen() {
   // authoritative `user.getMe` for the current credentials, and the cold-start
   // restore is fenced on the auth epoch, so it can never scope another
   // account's rows.
+  //
+  // The restored id may only scope the session when it agrees with the account
+  // the active credentials name. A direct credential switch bumps the epoch
+  // before the new `getMe` lands, so the hint still names the previous account
+  // until that `getMe` rewrites it; mounting on it would paint the previous
+  // account's cached transcript under the new session. The route stays in its
+  // pending state until the credentials' own `getMe` confirms. An undecodable
+  // token (a legacy credential before its exchange) leaves the restore behavior
+  // intact; a token that positively names a different account does not.
+  const { token: credentialToken, isSigningOut } = useAuth();
+  const credentialUserId = useMemo(
+    () => (credentialToken ? readUserIdFromToken(credentialToken) : null),
+    [credentialToken]
+  );
   const restoredUserId = useRestoredAccountId(owner.authEpoch);
-  const sessionScopeUserId = owner.userId ?? restoredUserId;
+  const credentialMatchesRestore =
+    !isSigningOut && (credentialUserId === null || credentialUserId === restoredUserId);
+  const scopedRestoredUserId = credentialMatchesRestore ? restoredUserId : null;
+  const sessionScopeUserId = owner.userId ?? scopedRestoredUserId;
   const identityPending = sessionScopeUserId === null;
   const identityFailed = identityPending && confirmation.isError;
 
@@ -302,7 +321,7 @@ export default function SessionDetailScreen() {
       // frame.
       key={`${owner.generation}:${sessionScopeUserId}:${sessionId}:${routeOrganizationId ?? 'personal'}`}
       organizationId={organizationId}
-      restoredUserId={restoredUserId ?? undefined}
+      restoredUserId={scopedRestoredUserId ?? undefined}
     >
       <SessionDetailContent
         sessionId={sessionId as KiloSessionId}

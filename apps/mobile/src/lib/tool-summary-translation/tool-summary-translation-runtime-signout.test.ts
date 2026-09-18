@@ -11,10 +11,11 @@ import type * as runtimeModule from './tool-summary-translation-runtime';
  * contract.
  */
 
-const { requestMock, readMock, persistMock } = vi.hoisted(() => ({
+const { requestMock, readMock, persistMock, clearMock } = vi.hoisted(() => ({
   requestMock: vi.fn(),
   readMock: vi.fn(),
   persistMock: vi.fn(),
+  clearMock: vi.fn(),
 }));
 
 vi.mock('./tool-summary-translation-client', () => ({
@@ -23,6 +24,7 @@ vi.mock('./tool-summary-translation-client', () => ({
 vi.mock('./tool-summary-translation-store', () => ({
   readStoredTranslations: readMock,
   persistTranslation: persistMock,
+  clearStoredTranslations: clearMock,
 }));
 
 const MODEL = { id: 'kilo-auto/small', name: 'Auto Small' };
@@ -47,8 +49,10 @@ beforeEach(() => {
   requestMock.mockReset();
   readMock.mockReset();
   persistMock.mockReset();
+  clearMock.mockReset();
   readMock.mockResolvedValue([]);
   persistMock.mockResolvedValue(undefined);
+  clearMock.mockResolvedValue(undefined);
   echoBatch();
 });
 
@@ -178,5 +182,36 @@ describe('tool summary translation sign-out teardown', () => {
     } finally {
       process.off('unhandledRejection', onUnhandledRejection);
     }
+  });
+
+  it('re-clears the durable scope when a pre-reset write settles after the drain', async () => {
+    const mod = await loadRuntime();
+    // A store write that outlives the drain bound, as a slow native write does.
+    const gate = Promise.withResolvers<undefined>();
+    persistMock.mockImplementation(
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- the mock hands back a promise the test resolves after the drain
+      () => gate.promise
+    );
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await vi.waitFor(() => {
+      expect(persistMock).toHaveBeenCalledTimes(1);
+    });
+
+    vi.useFakeTimers();
+    const signOut = mod.clearToolSummaryTranslationMemoryForSignOut();
+    await vi.advanceTimersByTimeAsync(mod.TOOL_SUMMARY_TRANSLATION_SIGN_OUT_DRAIN_TIMEOUT_MS + 1);
+    await signOut;
+
+    // The drain abandoned the write before it committed, so nothing has cleared
+    // the scope for it yet.
+    expect(clearMock).not.toHaveBeenCalled();
+
+    // The abandoned write now commits, after the reset already ran. Removing it
+    // from the tracker was not cancellation, so the durable scope must be
+    // cleared again to keep the signed-out account's tool text off disk.
+    gate.resolve(undefined);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(clearMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,5 +1,6 @@
 import {
   type CachedToolSummaryTranslation,
+  type clearToolSummaryTranslationsForSignOut,
   type readToolSummaryTranslations,
   type writeToolSummaryTranslation,
 } from '@/lib/persist/tool-summary-translation-cache';
@@ -16,6 +17,7 @@ import {
 type CacheStore = {
   readToolSummaryTranslations: typeof readToolSummaryTranslations;
   writeToolSummaryTranslation: typeof writeToolSummaryTranslation;
+  clearToolSummaryTranslationsForSignOut: typeof clearToolSummaryTranslationsForSignOut;
 };
 
 let storePromise: Promise<CacheStore> | null = null;
@@ -43,5 +45,19 @@ export async function persistTranslation(entry: CachedToolSummaryTranslation): P
     await write(entry);
   } catch {
     // A cache write failure is not a transcript failure.
+  }
+}
+
+/**
+ * Clears every stored translation; never throws. Used to re-clear the durable
+ * scope once a pre-reset write has settled, so a signed-out account's tool text
+ * cannot survive the sign-out that abandoned its write.
+ */
+export async function clearStoredTranslations(): Promise<void> {
+  try {
+    const { clearToolSummaryTranslationsForSignOut: clear } = await loadStore();
+    await clear();
+  } catch {
+    // A cache clear failure is a warm-start cost, not a transcript failure.
   }
 }

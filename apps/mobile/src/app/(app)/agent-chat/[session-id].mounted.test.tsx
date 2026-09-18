@@ -377,9 +377,18 @@ function beginReplacement() {
   clearActiveToken();
 }
 
+/** A Kilo JWT whose payload carries `kiloUserId` (same shape as `generateApiToken`). */
+function makeToken(userId: string): string {
+  const payload = btoa(JSON.stringify({ kiloUserId: userId }))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replaceAll('=', '');
+  return `header.${payload}.signature`;
+}
+
 function commitCredentials(account: 'A' | 'B') {
   requestAccount = account;
-  authState.token = account === 'A' ? 'account-a-token' : 'account-b-token';
+  authState.token = makeToken(`user-${account}`);
   setActiveToken(authState.token, null);
   authState.isSigningOut = false;
   setSignOutTeardownActive(false);
@@ -760,6 +769,34 @@ describe('SessionDetailScreen restored scope', () => {
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
     expect(managers).toHaveLength(2);
     expect(managers.at(-1)?.manager).not.toBe(restoredManager);
+  });
+
+  it('does not mount the previous account scope when the credentials switch directly', async () => {
+    const renderer = await mountRestoredScope();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    const managersBefore = managers.length;
+
+    // A direct credential switch: account B's credentials replace A's without a
+    // sign-out, but the persisted hint still names A until B's `getMe` rewrites
+    // it. The hint disagrees with the credentials, so the route must stay in its
+    // pending state instead of mounting A's cached transcript under B.
+    await act(async () => {
+      beginReplacement();
+      commitCredentials('B');
+      await Promise.resolve();
+    });
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+    expect(managers).toHaveLength(managersBefore);
+
+    // B's own `getMe` confirms: only then does the session mount, scoped to B.
+    act(() => {
+      commitAccount('B');
+    });
+    await updateRoute(renderer);
+    expect(transcriptText(renderer, 'RootText')).toBe('Account B root row');
   });
 });
 

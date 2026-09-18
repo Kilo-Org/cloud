@@ -50,6 +50,10 @@ describe('isOpenAiModelServed', () => {
     await isOpenAiModelServed('partner-key', 'gpt-5-nano');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.openai.com/v1/models',
+      expect.objectContaining({ cache: 'force-cache', next: { revalidate: 3600 } })
+    );
   });
 
   it('keeps the route when the list cannot be read', async () => {

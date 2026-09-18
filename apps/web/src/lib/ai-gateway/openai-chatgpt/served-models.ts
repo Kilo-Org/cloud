@@ -18,7 +18,8 @@ import { OPENAI_CHATGPT_API_URL } from './upstream';
 const MODELS_URL = `${OPENAI_CHATGPT_API_URL}/models`;
 
 /** How long a fetched list is reused. Model access changes slowly. */
-const CACHE_TTL_MS = 60 * 60 * 1000;
+const CACHE_TTL_SECONDS = 60 * 60;
+const CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
 
 /**
  * How long a failed lookup is remembered. Without this, an outage re-issues the
@@ -37,7 +38,9 @@ let inFlight: Promise<Set<string> | null> | null = null;
 async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> {
   try {
     const response = await fetch(MODELS_URL, {
+      cache: 'force-cache',
       headers: { authorization: `Bearer ${apiKey}` },
+      next: { revalidate: CACHE_TTL_SECONDS },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) return null;

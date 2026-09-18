@@ -1431,9 +1431,11 @@ export function SessionDetailContent({
   // composer's own content clears the landscape sensor insets.
   const isComposerMounted = !isReadOnly || messages.length === 0;
   const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
+  // Structural locks only. The live send capability is passed separately so a
+  // failed turn (or a session that has not resolved yet) keeps the input
+  // editable beside the error's Retry instead of locking the composer.
   const isComposerDisabled = resolveSessionComposerDisabled({
     isReadOnly,
-    canSend,
     shouldShowLoading,
     hasBlockingInteraction,
     requiresModel,
@@ -2033,6 +2035,7 @@ export function SessionDetailContent({
                 onExitSession={handleExitSession}
                 onStop={handleStop}
                 disabled={isComposerDisabled}
+                sendDisabled={!canSend}
                 isStreaming={isStreaming}
                 placeholder={composerPlaceholder}
                 mode={currentMode}

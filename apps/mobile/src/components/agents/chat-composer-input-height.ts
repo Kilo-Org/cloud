@@ -11,9 +11,11 @@ const COMPOSER_INPUT_BORDER_WIDTH = 1;
 
 /**
  * Screen chrome above the composer that the remaining-space cap must not eat:
- * the `ScreenHeader` (back-button row ~44 + padding ~20) and the
- * `SessionConnectionIndicator` (~28), excluding the safe-area top inset which
- * the cap subtracts separately.
+ * the `ScreenHeader` (back-button row ~44 + padding ~20) plus a deliberately
+ * conservative allowance shared with the new-session prompt. The allowance is
+ * generous on purpose: scrolling the input earlier can never push the composer
+ * off screen, so the shared value is kept at 92 and the top inset is subtracted
+ * separately by the cap.
  */
 export const SESSION_HEADER_HEIGHT = 92;
 

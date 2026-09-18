@@ -37,6 +37,10 @@ vi.mock('@/lib/temp-file-registry', () => ({ reapTempFiles: vi.fn() }));
 /* eslint-disable import/first */
 // vi.mock is hoisted by Vitest before the real import resolves.
 import {
+  isSessionGoalCollapsed,
+  setSessionGoalCollapsed,
+} from '@/components/agents/session-goal-collapse';
+import {
   clearSessionScopedState,
   clearSystemSearchIndexOnSignedOutLaunch,
 } from './session-scoped-state';
@@ -103,5 +107,18 @@ describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
         tags: { 'error.subsystem': 'system-search', 'error.operation': 'clear' },
       });
     });
+  });
+});
+
+// The two in-memory stores that hold per-session flags stay real, so the
+// wiring is what is under test.
+describe('clearSessionScopedState', () => {
+  it('drops the per-session goal disclosure flag on sign-out', () => {
+    setSessionGoalCollapsed('session-scoped-goal', true);
+    expect(isSessionGoalCollapsed('session-scoped-goal')).toBe(true);
+
+    clearSessionScopedState();
+
+    expect(isSessionGoalCollapsed('session-scoped-goal')).toBe(false);
   });
 });

@@ -17,8 +17,14 @@ import {
   getSelectedBranchOverride,
   type NewSessionRepository,
 } from '@/components/agents/new-session-repository-state';
+import {
+  type PrepareSessionRepositoryFields,
+  resolveRepoFingerprint,
+  setRepositoryField,
+} from '@/components/agents/prepare-session-repository';
 import { i18n } from '@/i18n';
 import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { type SandboxAllocation } from '@/lib/sandbox-allocation-label';
 import { trpcClient } from '@/lib/trpc';
 
 /**
@@ -41,6 +47,12 @@ export type PrepareAgentSessionInput =
       autoCommit?: boolean;
       attachments?: AgentAttachmentWire;
       organizationId?: string;
+      /**
+       * The sandbox allocation the new-session form picked (the picker row's
+       * shape). Omitted when nothing was picked, so the backend's own default
+       * applies.
+       */
+      sandboxAllocation?: SandboxAllocation;
     }
   | {
       kind: 'continue';
@@ -198,22 +210,28 @@ export async function prepareAgentSession(
 }
 
 /**
- * The `prepareSession` body fields both variants share. Exactly one repository
- * field matches the selected row; the schema refines that.
+ * The `prepareSession` body fields both variants share. The repository fields
+ * come from the shared module, so exactly one of them matches the selected row
+ * and the schema refines that; the create path may add `upstreamBranch`.
  */
-type PrepareSessionSharedFields = {
+type PrepareSessionSharedFields = PrepareSessionRepositoryFields & {
   mode: AgentMode;
   model: string;
   variant: string | undefined;
   autoCommit: boolean;
   autoInitiate: true;
   operationKey: string;
-  githubRepo?: string;
-  gitlabProject?: string;
-  bitbucketRepo?: { fullName: string; workspaceUuid: string; repositoryUuid: string };
   upstreamBranch?: string;
   profileId?: string;
   attachments?: AgentAttachmentWire;
+};
+
+/** The new-session create body: the shared fields plus the prompt turn. */
+type NewSessionPrepareBody = PrepareSessionSharedFields & {
+  prompt: string;
+  initialMessageId: string;
+  /** The picked allocation; omitted, the backend's own default applies. */
+  sandboxAllocation?: SandboxAllocation;
 };
 
 /**
@@ -222,7 +240,7 @@ type PrepareSessionSharedFields = {
  * union here too — a loose optional `prompt` would not be assignable.
  */
 type PrepareSessionBody =
-  | (PrepareSessionSharedFields & { prompt: string; initialMessageId: string })
+  | NewSessionPrepareBody
   | (PrepareSessionSharedFields & { cloneFromKiloSessionId: string });
 
 /**
@@ -247,13 +265,17 @@ function intentFingerprint(input: PrepareAgentSessionInput): string {
 /**
  * The pre-fix fingerprint of a new-session intent, which stored the bare
  * `fullName` as `repo`. Only GitHub intents have a legacy form; a GitLab or
- * Bitbucket intent never looks one up.
+ * Bitbucket intent never looks one up. A pre-fix row also predates sandbox
+ * picks, so a submit that carries one is a different intent: matching it would
+ * POST the pick under a pre-sandbox operation key (the server rejects it) and
+ * drop the only record of a session the server may already have admitted. Fall
+ * back only for a pick-less submit.
  */
 function legacyIntentFingerprint(
   input: Extract<PrepareAgentSessionInput, { kind: 'new' }>
 ): string | null {
   const repository = input.repository ?? null;
-  if (repository?.platform !== 'github') {
+  if (input.sandboxAllocation || repository?.platform !== 'github') {
     return null;
   }
   return newIntentFingerprint(input, repository.fullName);
@@ -274,32 +296,15 @@ function newIntentFingerprint(
     organizationId: input.organizationId ?? null,
     profileId: input.profileId ?? null,
     attachments: input.attachments ?? null,
+    // The pick joins the intent only when one was made. A changed pick is a
+    // fresh intent (a same-key retry would replay the previous pick's ledger
+    // result instead of creating with the newly picked allocation), while a
+    // pick-less submit keeps the exact bytes the previous app version
+    // persisted, so its safe-retry row is still found on relaunch instead of
+    // minting a duplicate session. A "no pick" marker key would change those
+    // bytes and hide an already-admitted session's row.
+    ...(input.sandboxAllocation ? { sandboxAllocation: input.sandboxAllocation } : {}),
   });
-}
-
-/**
- * The retry fingerprint's repository identity. Includes the platform so two
- * same-named repos on different providers mint distinct retry keys, and the
- * Bitbucket workspace/repository uuids so a workspace rename cannot collide.
- */
-function resolveRepoFingerprint(repository: NewSessionRepository | null): {
-  platform: string;
-  fullName: string;
-  workspaceUuid?: string | null;
-  repositoryUuid?: string | null;
-} | null {
-  if (repository === null) {
-    return null;
-  }
-  if (repository.platform === 'bitbucket') {
-    return {
-      platform: repository.platform,
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid ?? null,
-      repositoryUuid: repository.repositoryUuid ?? null,
-    };
-  }
-  return { platform: repository.platform, fullName: repository.fullName };
 }
 
 /** The model's selected effort, or undefined when the model has no variants. */
@@ -327,10 +332,12 @@ function prepareSessionBody(
       operationKey,
       cloneFromKiloSessionId: input.cloneFromKiloSessionId,
     };
-    setRepositoryField(body, input.repository ?? null, false);
+    // The clone variant has no branch: the Continue control clones a session,
+    // not a checkout, so no `upstreamBranch` is written.
+    setRepositoryField(body, input.repository ?? null);
     return body;
   }
-  const body: PrepareSessionBody = {
+  const body: NewSessionPrepareBody = {
     prompt: input.prompt,
     initialMessageId: input.initialMessageId ?? generateMessageId(),
     mode: input.mode,
@@ -340,48 +347,24 @@ function prepareSessionBody(
     autoInitiate: true,
     operationKey,
   };
-  setRepositoryField(body, input.repository ?? null, true);
+  // Carry the branch only when the shared writer actually wrote a repository
+  // field, so a Bitbucket row missing its uuids sends neither field nor branch.
+  if (setRepositoryField(body, input.repository ?? null)) {
+    setUpstreamBranch(body, input.repository ?? null);
+  }
   if (input.profileId) {
     body.profileId = input.profileId;
   }
   if (input.attachments) {
     body.attachments = input.attachments;
   }
+  // The pick rides the create body only when one was made, so a pick-less
+  // submit sends the exact request it always did and the backend's own default
+  // applies.
+  if (input.sandboxAllocation) {
+    body.sandboxAllocation = input.sandboxAllocation;
+  }
   return body;
-}
-
-/**
- * Write exactly one repository field into the create body, matching the
- * selected row's platform. Bitbucket requires workspace + repository uuids, so
- * it contributes nothing when those are missing (which cannot happen for a row
- * that came from `listBitbucketRepositories`).
- */
-function setRepositoryField(
-  body: PrepareSessionSharedFields,
-  repository: NewSessionRepository | null,
-  includeBranch: boolean
-): void {
-  if (repository === null) {
-    return;
-  }
-  if (repository.platform === 'github') {
-    body.githubRepo = repository.fullName;
-    setUpstreamBranch(body, repository, includeBranch);
-    return;
-  }
-  if (repository.platform === 'gitlab') {
-    body.gitlabProject = repository.fullName;
-    setUpstreamBranch(body, repository, includeBranch);
-    return;
-  }
-  if (repository.workspaceUuid && repository.repositoryUuid) {
-    body.bitbucketRepo = {
-      fullName: repository.fullName,
-      workspaceUuid: repository.workspaceUuid,
-      repositoryUuid: repository.repositoryUuid,
-    };
-    setUpstreamBranch(body, repository, includeBranch);
-  }
 }
 
 /**
@@ -392,10 +375,9 @@ function setRepositoryField(
  */
 function setUpstreamBranch(
   body: PrepareSessionSharedFields,
-  repository: NewSessionRepository,
-  includeBranch: boolean
+  repository: NewSessionRepository | null
 ): void {
-  if (!includeBranch) {
+  if (repository === null) {
     return;
   }
   const branch = getSelectedBranchOverride(repository);

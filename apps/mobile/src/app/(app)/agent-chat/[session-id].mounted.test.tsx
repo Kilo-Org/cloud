@@ -248,10 +248,6 @@ vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionComposerSkeleton: 'SessionComposerSkeleton',
 }));
 
-vi.mock('@/components/agents/session-connection-indicator', () => ({
-  SessionConnectionIndicator: 'SessionConnectionIndicator',
-}));
-
 vi.mock('@/components/agents/session-context-metrics', () => ({
   SessionContextMetrics: 'SessionContextMetrics',
 }));
@@ -1421,6 +1417,87 @@ describe('SessionDetailScreen malformed part transcript', () => {
     const transcript = transcriptText(renderer);
     expect(transcript).toContain('Question about the queue');
     expect(transcript).toContain('Answer visible after broken reasoning');
+    expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+  });
+});
+
+// KILO-APP-BZ: a patch part with no `files` on the wire crashed the whole agent
+// chat screen (`part.files.length` in partRendersContent). This repro mounts the
+// real route and renders the real transcript build and bubbles over the stored
+// messages, so the screen the reporter screenshotted — the root error boundary
+// with "Something went wrong" — is what the assertion rules out.
+describe('SessionDetailScreen malformed patch part transcript', () => {
+  it('renders the transcript without crashing when a patch part arrives with no files', async () => {
+    realTranscriptProbe.active = true;
+    onTestFinished(() => {
+      realTranscriptProbe.active = false;
+    });
+
+    // The wire omits `files` (per-event schemas are `.passthrough()`), so the
+    // cast is the fixture, not a smell. The patch part's id sorts before the
+    // answer part's id (storage orders parts by id), so the malformed part is
+    // the first one the transcript's `.some(partRendersContent)` visits.
+    const patchNoFiles = {
+      id: 'part-a-broken-patch',
+      sessionID: 'sess-1',
+      messageID: 'msg-assistant-broken-patch',
+      type: 'patch',
+      hash: 'abc',
+    } as unknown as Part;
+    const assistantInfo: AssistantMessage = {
+      id: 'msg-assistant-broken-patch',
+      sessionID: 'sess-1',
+      role: 'assistant',
+      time: { created: 2 },
+      parentID: 'msg-user-question',
+      modelID: 'claude',
+      providerID: 'anthropic',
+      mode: 'code',
+      agent: 'build',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+    rootPageMock.mockResolvedValueOnce({
+      kind: 'success',
+      info: { id: 'sess-1' },
+      messages: [
+        {
+          info: stubUserMessage({ id: 'msg-user-question', sessionID: 'sess-1' }),
+          parts: [
+            stubTextPart({
+              id: 'part-question',
+              sessionID: 'sess-1',
+              messageID: 'msg-user-question',
+              text: 'Question about the patch',
+            }),
+          ],
+        },
+        {
+          info: assistantInfo,
+          parts: [
+            patchNoFiles,
+            {
+              id: 'part-z-answer',
+              sessionID: 'sess-1',
+              messageID: 'msg-assistant-broken-patch',
+              type: 'text',
+              text: 'Answer visible after broken patch',
+            },
+          ],
+        },
+      ],
+      nextCursor: null,
+      omittedItemCount: 0,
+    } satisfies SessionSnapshotPageOutcome);
+
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', organizationId: 'org-a' });
+    const renderer = await mountRoute();
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    const transcript = transcriptText(renderer);
+    expect(transcript).toContain('Question about the patch');
+    expect(transcript).toContain('Answer visible after broken patch');
     expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
   });
 });

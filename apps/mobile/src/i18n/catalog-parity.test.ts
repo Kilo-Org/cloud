@@ -65,4 +65,14 @@ describe('catalog parity', () => {
     });
     expect(offenders, 'catalogs carry dead launcher.newAgent copy').toEqual([]);
   });
+
+  /**
+   * The per-language check passes whenever English and the catalog drift
+   * together, so a dead key re-added to the reference would slip through it.
+   * Pin the English launcher scope to the one key a call site reads.
+   */
+  it('en.json defines only the live launcher key', () => {
+    const launcher = [...english.keys()].filter(key => key.startsWith('launcher.'));
+    expect(launcher).toEqual(['launcher.openLastSession']);
+  });
 });

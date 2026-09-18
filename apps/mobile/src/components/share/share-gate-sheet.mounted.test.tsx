@@ -108,6 +108,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
     activeSessions: [],
     storedIsError: false,
     storedIsSuccess: true,
+    storedIsPaused: false,
     activeIsError: false,
     activeIsPaused: false,
     isLoading: false,

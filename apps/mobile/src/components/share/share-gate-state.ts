@@ -54,6 +54,8 @@ export type ShareGateStateInput = {
   validation: SharePayloadValidation | null;
   storedIsError: boolean;
   storedIsSuccess: boolean;
+  /** Stored-sessions query is paused (offline) — the list is unresolved. */
+  storedIsPaused: boolean;
   activeIsError: boolean;
   /** Live-sessions query is paused (offline) — liveness is unresolved. */
   activeIsPaused: boolean;
@@ -83,8 +85,8 @@ export function isShareCommitEnabled(input: {
  *   1. stale-share (missing/unknown/consumed shareId) — before any validation
  *   2. non-retryable-classification (all files rejected, no usable text)
  *   3. loading (validation or destination queries in flight)
- *   4. retryable (no live rows and the query that decides liveness is
- *      unresolved: errored or paused offline)
+ *   4. retryable (no live rows and a query that decides liveness or the
+ *      stored page is unresolved: errored or paused offline)
  *   5. empty (settled, zero live rows) — live-aware copy when stored sessions
  *      exist but none are live, `share.emptyMessage` only when there are none
  *   6. happy
@@ -112,7 +114,13 @@ export function selectShareGateState(input: ShareGateStateInput): ShareGateState
   }
 
   const validationPending = input.validation === null;
-  const destinationsPending = input.isLoading || (!input.storedIsSuccess && !input.storedIsError);
+  // A paused query is not loading (`isLoading` is `isPending && isFetching`),
+  // so a fresh open offline has no cached stored page and no fetch in flight.
+  // Counting that as pending would strand the gate on the skeleton: no Retry
+  // and no explanation while the network is down. Treat it as unresolved and
+  // let the retryable branch below decide.
+  const storedPending = !input.storedIsSuccess && !input.storedIsError && !input.storedIsPaused;
+  const destinationsPending = input.isLoading || storedPending;
 
   if (validationPending || destinationsPending) {
     return {
@@ -133,7 +141,8 @@ export function selectShareGateState(input: ShareGateStateInput): ShareGateState
   // this it would fall through to a "Nothing running right now" that liveness
   // never proved. Retry refetches both queries
   // (`useAgentSessions().refetch`), matching the Agents list.
-  const livenessUnknown = input.storedIsError || input.activeIsError || input.activeIsPaused;
+  const livenessUnknown =
+    input.storedIsError || input.storedIsPaused || input.activeIsError || input.activeIsPaused;
   if (input.liveRowCount === 0 && livenessUnknown) {
     return {
       kind: 'retryable',

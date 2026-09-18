@@ -381,6 +381,12 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // vs "keep showing stale data") should use these instead of `isError`.
     storedIsError: stored.isError,
     storedIsSuccess: stored.isSuccess,
+    // A paused stored query (offline, no cached page) is neither loading nor
+    // errored, but it has no rows and will not resolve until the network
+    // returns. Callers that gate on "nothing to show" must treat paused as
+    // unresolved rather than as a settled page, so they can offer a retry
+    // instead of a skeleton that never settles.
+    storedIsPaused: stored.isPaused,
     storedFetchedSinceMount,
     // React Query v5's `isLoading` is `isPending && isFetching`, so it is false
     // on the first render (the observer has not started the fetch yet) and

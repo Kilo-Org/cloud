@@ -32,6 +32,7 @@ function base(overrides: Partial<ShareGateStateInput> = {}): ShareGateStateInput
     validation: okValidation,
     storedIsError: false,
     storedIsSuccess: true,
+    storedIsPaused: false,
     activeIsError: false,
     activeIsPaused: false,
     liveRowCount: 3,
@@ -220,6 +221,45 @@ describe('selectShareGateState', () => {
     );
     expect(state.kind).toBe('happy');
     expect(state.showRetry).toBe(false);
+  });
+
+  it('retryable when the stored page is paused with no cache (fresh offline open)', () => {
+    // Offline fresh open: the stored infinite query is paused with no cached
+    // page, so it is neither loading nor errored and offers no rows. It must
+    // not settle on the skeleton; the user needs a Retry.
+    const state = selectShareGateState(
+      base({
+        storedIsError: false,
+        storedIsSuccess: false,
+        storedIsPaused: true,
+        activeIsError: false,
+        activeIsPaused: true,
+        liveRowCount: 0,
+        storedSessionCount: 0,
+        isLoading: false,
+      })
+    );
+    expect(state.kind).toBe('retryable');
+    if (state.kind === 'retryable') {
+      expect(state.message).toBe("Couldn't load your sessions.");
+      expect(state.showRetry).toBe(true);
+      expect(state.showNewSession).toBe(true);
+      expect(state.showList).toBe(false);
+    }
+  });
+
+  it('loading while the stored page is unresolved but not paused', () => {
+    const state = selectShareGateState(
+      base({
+        storedIsError: false,
+        storedIsSuccess: false,
+        storedIsPaused: false,
+        liveRowCount: 0,
+        storedSessionCount: 0,
+        isLoading: false,
+      })
+    );
+    expect(state.kind).toBe('loading');
   });
 
   it('empty when settled with zero live rows and no stored sessions', () => {

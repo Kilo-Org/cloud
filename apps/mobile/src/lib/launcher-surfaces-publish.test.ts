@@ -31,7 +31,7 @@ describe('buildLauncherSurfacesPayload', () => {
     );
     expect(payload).toEqual({
       newAgentUrl: 'kiloapp:///cloud/sessions/new',
-      newAgentLabel: 't:launcher.newAgent',
+      newAgentLabel: 't:glanceable.newAgent',
       needsInputUrl: 'kiloapp:///cloud/sessions/ses_wait',
       needsInputLabel: 't:glanceable.needsInput',
       openLastSessionUrl: 'kiloapp:///cloud/sessions/ses_last',
@@ -49,7 +49,7 @@ describe('buildLauncherSurfacesPayload', () => {
 
   it('translates through the supplied function, not a baked-in English label', () => {
     const payload = buildLauncherSurfacesPayload(targets(), otherLanguage);
-    expect(payload.newAgentLabel).toBe('<launcher.newAgent>');
+    expect(payload.newAgentLabel).toBe('<glanceable.newAgent>');
     expect(payload.needsInputLabel).toBe('<glanceable.needsInput>');
     expect(payload.openLastSessionLabel).toBe('<launcher.openLastSession>');
   });

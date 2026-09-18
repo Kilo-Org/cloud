@@ -3136,7 +3136,6 @@
     }
   },
   "launcher": {
-    "newAgent": "New agent",
     "openLastSession": "Open last session"
   }
 }

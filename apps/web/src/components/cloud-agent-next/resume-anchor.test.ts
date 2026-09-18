@@ -2,7 +2,12 @@ import type { PreparationAttempt, SessionCommit } from '@kilocode/cloud-agent-sd
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { StoredMessage } from './types';
 import { groupConversationMessages, commitsByMessageAnchor } from './message-presentation';
-import { planResumeAttempt, resumeAnchor, resumeAnchorForTranscript } from './resume-anchor';
+import {
+  planAcceptedSendPosition,
+  planResumeAttempt,
+  resumeAnchor,
+  resumeAnchorForTranscript,
+} from './resume-anchor';
 
 describe('resumeAnchor', () => {
   it('resolves the group that starts with the anchor', () => {
@@ -177,5 +182,34 @@ describe('planResumeAttempt', () => {
 
   it('loads one older page when the anchor may still be in it', () => {
     expect(planResumeAttempt(base)).toBe('load-older');
+  });
+});
+
+describe('planAcceptedSendPosition', () => {
+  it('re-arms the tail and ends the attempt live at send time', () => {
+    const resume = { done: false };
+    expect(planAcceptedSendPosition(resume, resume)).toBe('follow-tail');
+    expect(resume.done).toBe(true);
+  });
+
+  it('re-arms the tail when no resume was live', () => {
+    expect(planAcceptedSendPosition(null, null)).toBe('follow-tail');
+  });
+
+  it('yields to a `?at=` resume that landed while the send was in flight', () => {
+    // The send started under R1; R2 arrived before it was accepted. Taking the
+    // tail here would cancel R2's scroll and abandon the anchor the reader
+    // asked for, so the send leaves both attempts untouched.
+    const resumeAtSend = { done: false };
+    const newerResume = { done: false };
+    expect(planAcceptedSendPosition(resumeAtSend, newerResume)).toBe('yield-to-resume');
+    expect(resumeAtSend.done).toBe(false);
+    expect(newerResume.done).toBe(false);
+  });
+
+  it('yields when the newer resume landed over an anchor-less send', () => {
+    const newerResume = { done: false };
+    expect(planAcceptedSendPosition(null, newerResume)).toBe('yield-to-resume');
+    expect(newerResume.done).toBe(false);
   });
 });

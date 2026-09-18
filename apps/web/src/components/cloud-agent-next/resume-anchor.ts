@@ -140,3 +140,30 @@ export function planResumeAttempt({
   }
   return 'load-older';
 }
+
+/** The part of a resume attempt a send's take-over reads and ends. */
+export type ResumeAttemptState = { done: boolean };
+
+/**
+ * What an accepted send does to the transcript position. `follow-tail` re-arms
+ * auto-scroll for the output the send produces, ending the attempt that was
+ * live when the send started so its effect stops re-pausing follow.
+ *
+ * `yield-to-resume` leaves a newer `?at=` resume alone: a link that landed
+ * while the send was in flight owns the position now, and re-arming the tail
+ * here would snap the transcript to the bottom and abandon its anchor. Identity,
+ * not a key, is the test — the same attempt keeps the position it took at send
+ * time, and `null === null` keeps an ordinary anchor-less send following.
+ */
+export function planAcceptedSendPosition(
+  resumeAtSend: ResumeAttemptState | null,
+  currentResume: ResumeAttemptState | null
+): 'follow-tail' | 'yield-to-resume' {
+  if (currentResume !== resumeAtSend) {
+    return 'yield-to-resume';
+  }
+  if (resumeAtSend) {
+    resumeAtSend.done = true;
+  }
+  return 'follow-tail';
+}

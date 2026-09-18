@@ -39,7 +39,11 @@ import {
   isRenderableSessionCost,
 } from './session-cost-breakdown';
 import { ConversationMessages } from './ConversationMessages';
-import { planResumeAttempt, resumeAnchorForTranscript } from './resume-anchor';
+import {
+  planAcceptedSendPosition,
+  planResumeAttempt,
+  resumeAnchorForTranscript,
+} from './resume-anchor';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
@@ -697,11 +701,15 @@ export default function CloudChatPage({
       if (!accepted) {
         return false;
       }
-      // Take the position over for the output this send produces. Mark the
-      // attempt that was live at send time — a `?at=` link that arrived while
-      // the send was in flight owns the position now.
-      if (resumeStateAtSend && resumeStateRef.current === resumeStateAtSend) {
-        resumeStateAtSend.done = true;
+      // Take the position over for the output this send produces, ending the
+      // attempt that was live at send time. A `?at=` link that arrived while
+      // the send was in flight owns the position now: leave it alone, or
+      // re-arming the tail here snaps the transcript to the bottom and abandons
+      // its anchor.
+      if (
+        planAcceptedSendPosition(resumeStateAtSend, resumeStateRef.current) === 'yield-to-resume'
+      ) {
+        return true;
       }
       shouldAutoScrollRef.current = true;
       setChatUI({ shouldAutoScroll: true });
@@ -728,8 +736,12 @@ export default function CloudChatPage({
       if (!accepted) {
         return false;
       }
-      if (resumeStateAtSend && resumeStateRef.current === resumeStateAtSend) {
-        resumeStateAtSend.done = true;
+      // Same take-over as a message send: yield to a `?at=` resume that landed
+      // while this command was in flight instead of re-arming the tail.
+      if (
+        planAcceptedSendPosition(resumeStateAtSend, resumeStateRef.current) === 'yield-to-resume'
+      ) {
+        return true;
       }
       shouldAutoScrollRef.current = true;
       setChatUI({ shouldAutoScroll: true });

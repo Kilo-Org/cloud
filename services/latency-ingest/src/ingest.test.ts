@@ -1,3 +1,8 @@
+import { readFileSync } from 'node:fs';
+// The worker runtime's global `URL` is not the Node one `fileURLToPath` takes,
+// so import Node's explicitly to keep the two types identical.
+import { fileURLToPath, URL } from 'node:url';
+import { isVersionBelow } from '@kilocode/app-shared/app-version';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   handleLatencyIngest,
@@ -9,6 +14,30 @@ import worker from './index.js';
 
 const ENDPOINT = 'https://latency.kiloapps.io/v1/latency';
 const BEARER = 'session-bearer-token-abc123';
+
+/** The worker config that carries the deployed `MIN_APP_VERSION` var. */
+const WRANGLER_JSONC = fileURLToPath(new URL('../wrangler.jsonc', import.meta.url));
+/** The app config that carries the version the store build reports. */
+const APP_CONFIG_TS = fileURLToPath(new URL('../../../apps/mobile/app.config.ts', import.meta.url));
+
+/**
+ * Read the value a deploy would ship. The JSONC file has comments and trailing
+ * commas, so a targeted extraction is more robust than a JSON.parse of the raw
+ * source; the regex fails loudly if the key is ever renamed.
+ */
+function readMinAppVersion(): string {
+  const source = readFileSync(WRANGLER_JSONC, 'utf8');
+  const match = /"MIN_APP_VERSION"\s*:\s*"([^"]+)"/.exec(source);
+  if (!match) throw new Error(`MIN_APP_VERSION not found in ${WRANGLER_JSONC}`);
+  return match[1];
+}
+
+function readAppVersion(): string {
+  const source = readFileSync(APP_CONFIG_TS, 'utf8');
+  const match = /\bversion:\s*'([^']+)'/.exec(source);
+  if (!match) throw new Error(`version not found in ${APP_CONFIG_TS}`);
+  return match[1];
+}
 
 function sample(overrides: Record<string, unknown> = {}) {
   return {
@@ -271,5 +300,14 @@ describe('worker entrypoint', () => {
       client: 'mobile',
       requestId: 'req-1',
     });
+  });
+});
+
+describe('MIN_APP_VERSION contract with the mobile app', () => {
+  it('accepts the app version this tree builds', () => {
+    const minAppVersion = readMinAppVersion();
+    const appVersion = readAppVersion();
+
+    expect(isVersionBelow(appVersion, minAppVersion)).toBe(false);
   });
 });

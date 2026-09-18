@@ -23,7 +23,11 @@
     },
   ],
   "vars": {
-    "MIN_APP_VERSION": "1.0.12",
+    // Must never exceed the `version` in apps/mobile/app.config.ts, so the
+    // first release that carries the latency sampler is accepted; bump it in
+    // lockstep with the app version. A client without the sampler never POSTs,
+    // so this floor still rejects 1.0.10 and below.
+    "MIN_APP_VERSION": "1.0.11",
   },
   "ratelimits": [
     {

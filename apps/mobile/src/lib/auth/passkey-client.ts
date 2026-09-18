@@ -4,7 +4,7 @@ import { buildAuthHeaders } from '@/lib/auth/auth-header';
 import { postAuth } from '@/lib/auth/auth-fetch';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
 import { resolveAdmission } from '@/lib/auth/resolve-admission';
-import { getActiveToken } from '@/lib/auth/token-owner';
+import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 
 /** The one route that mints options and verifies the assertion, both server-side. */
 const AUTHENTICATE_ROUTE = '/api/auth/passkey/authenticate';
@@ -305,7 +305,7 @@ export async function registerPasskey(
     return { status: 'error', failure: 'unsupported' };
   }
 
-  const authHeaders = buildAuthHeaders(getActiveToken()?.token ?? null);
+  const authHeaders = buildAuthHeaders(await getAuthTokenForRequest());
   const optionsResult = await postAuth(REGISTER_ROUTE, { action: 'options' }, authHeaders);
   if (!optionsResult.ok) {
     return { status: 'error', failure: 'failed' };

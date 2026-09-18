@@ -5,12 +5,12 @@ import { type PasskeysApi } from '@/lib/auth/passkey-client';
 
 vi.mock('@/lib/auth/auth-fetch', () => ({ postAuth: vi.fn() }));
 
-vi.mock('@/lib/auth/token-owner', () => ({ getActiveToken: vi.fn() }));
+vi.mock('@/lib/auth/token-owner', () => ({ getAuthTokenForRequest: vi.fn() }));
 
 vi.mock('@/lib/auth/resolve-admission', () => ({ resolveAdmission: vi.fn() }));
 
 const { postAuth } = await import('@/lib/auth/auth-fetch');
-const { getActiveToken } = await import('@/lib/auth/token-owner');
+const { getAuthTokenForRequest } = await import('@/lib/auth/token-owner');
 const { resolveAdmission } = await import('@/lib/auth/resolve-admission');
 
 const {
@@ -53,7 +53,7 @@ const tokenResponse = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(getActiveToken).mockReturnValue({ token: 'session-token', expiresAtMs: null });
+  vi.mocked(getAuthTokenForRequest).mockResolvedValue('session-token');
   vi.mocked(resolveAdmission).mockResolvedValue({ admission: undefined });
 });
 
@@ -384,10 +384,31 @@ describe('registerPasskey', () => {
     expect(result).toEqual({ status: 'ok' });
   });
 
-  it('sends no bearer token when the session is not in memory', async () => {
+  it('reads the session token through the shared outgoing-request accessor', async () => {
     const api = fakeApi();
     api.create.mockResolvedValue(attestation);
-    vi.mocked(getActiveToken).mockReturnValue(null);
+    // The in-memory owner can be cold while the session lives only in
+    // SecureStore, so the request must go through the accessor that reads it.
+    vi.mocked(getAuthTokenForRequest).mockResolvedValue('stored-token');
+    mockPostAuth
+      .mockResolvedValueOnce(optionsResponse)
+      .mockResolvedValueOnce({ ok: true, data: { credentialId: 'cred-2' } });
+
+    await registerPasskey(api);
+
+    expect(getAuthTokenForRequest).toHaveBeenCalled();
+    expect(mockPostAuth).toHaveBeenNthCalledWith(
+      1,
+      '/api/auth/passkey/register',
+      { action: 'options' },
+      { Authorization: 'Bearer stored-token' }
+    );
+  });
+
+  it('sends no bearer token when the request accessor has none', async () => {
+    const api = fakeApi();
+    api.create.mockResolvedValue(attestation);
+    vi.mocked(getAuthTokenForRequest).mockResolvedValue(null);
     mockPostAuth
       .mockResolvedValueOnce(optionsResponse)
       .mockResolvedValueOnce({ ok: true, data: { credentialId: 'cred-2' } });

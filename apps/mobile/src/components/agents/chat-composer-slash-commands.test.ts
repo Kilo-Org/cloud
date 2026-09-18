@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+/* eslint-disable max-lines -- the suggestion, parse, and description suites share the composer-command fixtures in one file. */
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
@@ -9,9 +10,12 @@ import {
   getLocalExitSlashCommand,
   getLocalNewSlashCommand,
   getSlashCommandCandidate,
+  getSlashCommandDescription,
   getSlashCommandSuggestions,
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
+import { i18n } from '@/i18n';
+import en from '@/i18n/locales/en.json';
 
 const COMPACT: SlashCommandInfo = { name: 'compact', description: 'Compact', hints: [] };
 const REVIEW: SlashCommandInfo = { name: 'review', description: 'Review', hints: [] };
@@ -329,5 +333,104 @@ describe('catalogueDescription marker', () => {
       createMobileSlashCommandList('remote', SAMPLE_COMMANDS, remoteState())
     );
     expect(suggestions[0]?.catalogueDescription).toBe(true);
+  });
+});
+
+describe('getSlashCommandDescription', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('keeps the description a catalog entry reports when it reuses a built-in command name', () => {
+    // A repository command file or an MCP prompt can carry a built-in name,
+    // so the name alone must not pull the row into the catalogue.
+    for (const [name, description] of [
+      ['review', 'review my style guide'],
+      ['init', 'bootstrap this repository'],
+      ['compact', 'shrink my notes'],
+      ['resume-claude', 'continue my Claude transcript'],
+    ] as const) {
+      expect(getSlashCommandDescription({ name, description, hints: [] })).toBe(description);
+    }
+  });
+
+  it('keeps an external entry that reuses a built-in name in a non-English locale', async () => {
+    await i18n.changeLanguage('de');
+    expect(
+      getSlashCommandDescription({
+        name: 'review',
+        description: 'review my style guide',
+        hints: [],
+      })
+    ).toBe('review my style guide');
+  });
+
+  it('resolves a built-in entry that reports the catalog source string', () => {
+    expect(
+      getSlashCommandDescription({
+        name: 'goal',
+        description: en.agentChat.slashCommands.goalDescription,
+        hints: [],
+      })
+    ).toBe('Keep working toward a session goal. /goal <objective> or pause, resume, clear');
+  });
+
+  it('resolves every built-in command name that reports the catalog source string', () => {
+    const expected = {
+      compact: en.agentChat.slashCommands.compactDescription,
+      goal: en.agentChat.slashCommands.goalDescription,
+      init: en.agentChat.slashCommands.initDescription,
+      'resume-claude': en.agentChat.slashCommands.resumeClaudeDescription,
+      'resume-codex': en.agentChat.slashCommands.resumeCodexDescription,
+      review: en.agentChat.slashCommands.reviewDescription,
+    };
+    for (const [name, description] of Object.entries(expected)) {
+      expect(getSlashCommandDescription({ name, description, hints: [] })).toBe(description);
+    }
+  });
+
+  it('localizes a command this client registered, whichever language built it', async () => {
+    const command = getLocalNewSlashCommand();
+    await i18n.changeLanguage('de');
+    i18n.addResource(
+      'de',
+      'translation',
+      'agentChat.slashCommands.startNewSession',
+      'Neue Sitzung'
+    );
+    expect(getSlashCommandDescription(command)).toBe('Neue Sitzung');
+    i18n.removeResourceBundle('de', 'translation');
+  });
+
+  it('prefers the active language catalog over the built-in English source', async () => {
+    await i18n.changeLanguage('de');
+    i18n.addResource('de', 'translation', 'agentChat.slashCommands.goalDescription', 'Ziel');
+    expect(
+      getSlashCommandDescription({
+        name: 'goal',
+        description: en.agentChat.slashCommands.goalDescription,
+        hints: [],
+      })
+    ).toBe('Ziel');
+    i18n.removeResourceBundle('de', 'translation');
+  });
+
+  it('keeps the reported description for a command the catalog does not know', () => {
+    expect(getSlashCommandDescription({ name: 'help', description: 'Show help', hints: [] })).toBe(
+      'Show help'
+    );
+  });
+
+  it.each(['constructor', 'toString', 'hasOwnProperty', 'valueOf', '__proto__'])(
+    'keeps the reported description for the inherited Object.prototype name %s',
+    name => {
+      expect(getSlashCommandDescription({ name, description: 'Repo command', hints: [] })).toBe(
+        'Repo command'
+      );
+    }
+  );
+
+  it('returns undefined for an unknown command with no description', () => {
+    expect(getSlashCommandDescription({ name: 'help', hints: [] })).toBeUndefined();
   });
 });

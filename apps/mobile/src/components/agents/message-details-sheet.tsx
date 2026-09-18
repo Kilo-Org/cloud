@@ -164,19 +164,26 @@ export function MessageDetailsSheet({
 
           {content ? (
             <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
-              {content.copyText ? (
+              {/* The two actions are independent: Copy is scoped to the message
+                  text, while Select text also offers the thinking block and tool
+                  output, so a message with only those parts still renders the
+                  select affordance. Gate the block on either and each action on
+                  its own payload. */}
+              {content.copyText || content.canSelectText ? (
                 <View className="mb-6 gap-2">
-                  <Pressable
-                    onPress={handleCopy}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('agentChat.messageDetails.copyMessage')}
-                    className="rounded-md border border-border px-4 py-3 active:opacity-70"
-                    testID="message-details-copy"
-                  >
-                    <Text className="text-center text-base font-medium text-foreground">
-                      {t('agentChat.messageDetails.copyMessage')}
-                    </Text>
-                  </Pressable>
+                  {content.copyText ? (
+                    <Pressable
+                      onPress={handleCopy}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('agentChat.messageDetails.copyMessage')}
+                      className="rounded-md border border-border px-4 py-3 active:opacity-70"
+                      testID="message-details-copy"
+                    >
+                      <Text className="text-center text-base font-medium text-foreground">
+                        {t('agentChat.messageDetails.copyMessage')}
+                      </Text>
+                    </Pressable>
+                  ) : null}
 
                   {content.canSelectText ? (
                     <Pressable

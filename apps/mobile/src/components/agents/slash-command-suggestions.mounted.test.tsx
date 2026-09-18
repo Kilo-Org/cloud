@@ -39,6 +39,10 @@ vi.mock('@/components/ui/text', () => ({
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
+// The row localizes a command the catalogue accounts for through this instance,
+// so mock it like the sibling mounted suites instead of initializing the real
+// catalogue.
+vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: (key: string) => key } }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'de' } }),
 }));

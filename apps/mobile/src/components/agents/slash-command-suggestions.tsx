@@ -6,7 +6,10 @@ import { Text } from '@/components/ui/text';
 import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
 import { cn } from '@/lib/utils';
 
-import { type MobileSlashCommandInfo } from './chat-composer-slash-commands';
+import {
+  getSlashCommandDescription,
+  type MobileSlashCommandInfo,
+} from './chat-composer-slash-commands';
 
 /**
  * Runtime slash-command descriptions share the tool-summary translation
@@ -27,11 +30,12 @@ type SlashCommandSuggestionRowProps = {
 };
 
 /**
- * One command row. The description comes from outside the app's catalogue for
- * CLI-reported commands (MCP, skill, and other runtime commands), so it goes
- * through the same translation runtime as a transcript tool summary; the
- * reserved local commands carry `catalogueDescription` and are already in the
- * app language. The row is a fixed 44pt touch target with a single-line
+ * One command row. The app's catalogue localizes a description it accounts for
+ * (`getSlashCommandDescription`), and a description that comes from outside it
+ * — MCP, skill, and other runtime commands — goes through the same translation
+ * runtime as a transcript tool summary. The reserved local commands carry
+ * `catalogueDescription` and are already in the app language, so they never
+ * reach the gateway. The row is a fixed 44pt touch target with a single-line
  * description, so swapping the source text for its translation cannot move
  * layout.
  */
@@ -41,9 +45,15 @@ function SlashCommandSuggestionRow({
   onSelect,
 }: Readonly<SlashCommandSuggestionRowProps>) {
   const { t } = useTranslation();
+  const sourceDescription = getSlashCommandDescription(command);
+  // The catalogue resolves the commands it accounts for, so the text it returns
+  // then differs from the raw reported description. Everything it leaves
+  // untouched is runtime text the catalogue cannot know, so it translates.
+  const isRuntimeDescription =
+    command.catalogueDescription !== true && sourceDescription === command.description;
   const description = useTranslatedToolSummary(
-    command.description ?? '',
-    command.catalogueDescription !== true,
+    sourceDescription ?? '',
+    isRuntimeDescription,
     SLASH_COMMAND_ITEM_PREFIX + command.name
   );
 
@@ -54,7 +64,7 @@ function SlashCommandSuggestionRow({
       }}
       accessibilityRole="button"
       accessibilityLabel={t('agentChat.slashCommands.useCommand', { command: command.name })}
-      accessibilityHint={command.description ? description : undefined}
+      accessibilityHint={sourceDescription ? description : undefined}
       hitSlop={4}
       className={cn(
         'min-h-[44px] flex-row items-center justify-between gap-3 px-4 py-2 active:bg-muted',
@@ -63,7 +73,7 @@ function SlashCommandSuggestionRow({
     >
       <View className="flex-1">
         <Text className="text-sm font-semibold text-foreground">/{command.name}</Text>
-        {command.description ? (
+        {sourceDescription ? (
           <Text className="mt-0.5 text-xs text-muted-foreground" numberOfLines={1}>
             {description}
           </Text>

@@ -132,6 +132,14 @@ const queue: QueueItem[] = [];
 // so at most one text per part is remembered. Insertion order is oldest-first,
 // so eviction is `keys().next()`.
 const retryable = new Map<string, QueueItem>();
+// The keys the queue currently holds. A mounted row re-asks on its own cadence
+// while its summary is unresolved, and a summary parked behind the batch window
+// or the in-flight cap is neither cached nor in flight, so without this each
+// ask of every waiting row would stack another copy of it: the queue would grow
+// without bound during an outage, and the copies would replay as extra store
+// writes once a slot freed. `ensureTranslation` treats a queued key like an
+// in-flight one, and `takeBatch` resyncs the set to the queue it leaves behind.
+const queued = new Set<string>();
 // The client module loads through one memoized dynamic import, like the
 // store's: concurrent batches share the single in-flight load instead of each
 // re-importing, and a failed load is retried by the next batch.
@@ -255,6 +263,20 @@ function removeSurfaceInterest(key: string): void {
 }
 
 /**
+ * Re-derives {@link queued} from the queue a pass just rewrote. `takeBatch`
+ * rebuilds the queue (dropping resolved and stale items and keeping the copies
+ * a retry left queued), so the set must follow it exactly; otherwise a later
+ * `ensureTranslation` would miss a key that is still queued and stack a second
+ * copy of it.
+ */
+function syncQueuedKeys(): void {
+  queued.clear();
+  for (const item of queue) {
+    queued.add(item.key);
+  }
+}
+
+/**
  * Drops one part's superseded source text from the retry memory and from the
  * queue. A text is superseded only when no mounted surface asks for it any
  * more: a part renders one source string at a time, but two surfaces may
@@ -282,14 +304,15 @@ function forgetSupersededEntries(
     }
   }
   for (let index = queue.length - 1; index >= 0; index -= 1) {
-    const queued = queue[index];
+    const candidate = queue[index];
     if (
-      queued !== undefined &&
-      queued.key !== key &&
-      queued.key.startsWith(partPrefix) &&
-      !surfaceInterest.has(queued.key)
+      candidate !== undefined &&
+      candidate.key !== key &&
+      candidate.key.startsWith(partPrefix) &&
+      !surfaceInterest.has(candidate.key)
     ) {
       queue.splice(index, 1);
+      queued.delete(candidate.key);
     }
   }
 }
@@ -402,6 +425,16 @@ export function getVersion(): number {
   return version;
 }
 
+/**
+ * How many summaries are waiting for a concurrency slot. Exposed alongside
+ * `getVersion` for the runtime's tests: a row retries on its own cadence while
+ * its summary is unresolved, so a waiting summary that took two entries here
+ * would grow the queue with every tick of every mounted row.
+ */
+export function getQueueSize(): number {
+  return queue.length;
+}
+
 export function getConfig(): ToolSummaryTranslationConfig {
   return config;
 }
@@ -428,6 +461,7 @@ export function setConfig(next: ToolSummaryTranslationConfig): void {
   // user just invalidated.
   generation += 1;
   queue.length = 0;
+  queued.clear();
   inFlight.clear();
   retryable.clear();
   // The hook effect re-runs for every active row (its deps carry the config),
@@ -524,6 +558,7 @@ function takeBatch(): FlushBatch | null {
   if (head === undefined) {
     queue.length = 0;
     queue.push(...owned);
+    syncQueuedKeys();
     return null;
   }
   // The first eligible item decides the request's language and model: one
@@ -551,6 +586,7 @@ function takeBatch(): FlushBatch | null {
 
   queue.length = 0;
   queue.push(...remaining);
+  syncQueuedKeys();
   if (texts.length === 0) {
     return null;
   }
@@ -642,10 +678,12 @@ function scheduleFlush(): void {
 
 /**
  * Request a translation for one summary. No-op for blank text, keys whose
- * translation is cached and unexpired, and keys already in flight, so N rows
- * with the same summary make one call. A changed source resolves on its own key
- * rather than being dropped by the in-flight guard. The row does not send: the
- * batch window collects the commit's rows first.
+ * translation is cached and unexpired, and keys already in flight or queued, so
+ * N rows with the same summary make one call however often they retry. A
+ * changed source resolves on its own key rather than being dropped by the
+ * in-flight guard, and a summary parked behind the batch window or the in-flight
+ * cap is not stacked again. The row does not send: the batch window collects the
+ * commit's rows first.
  */
 export function ensureTranslation(input: {
   itemId: string;
@@ -667,14 +705,15 @@ export function ensureTranslation(input: {
   addSurfaceInterest(key);
   // This part now asks for `text`: any other source string remembered or
   // queued for the same part that no surface asks for any more is superseded,
-  // so drop it from the retry memory and the queue before the freshness and
-  // in-flight guards return.
+  // so drop it from the retry memory and the queue before the freshness,
+  // in-flight and queued guards return.
   forgetSupersededEntries(language, model.id, itemId, key);
-  if (isFreshCacheEntry(key, text, Date.now()) || inFlight.has(key)) {
+  if (isFreshCacheEntry(key, text, Date.now()) || inFlight.has(key) || queued.has(key)) {
     return;
   }
   const item: QueueItem = { key, itemId, text, language, model, generation };
   queue.push(item);
+  queued.add(key);
   // Remember the unresolved summary so `retryUnresolvedTranslations` can
   // re-queue it after a connection recovery. Resolution removes it (`remember`)
   // and the map is capped, so failures cannot grow without bound.
@@ -715,9 +754,10 @@ export function releaseTranslationInterest(input: {
  * gateway was unreachable left its items in `retryable`, and re-entering an
  * already-mounted transcript is a navigation no-op, so no remount would
  * re-request them and the rows would keep showing the source language.
- * Idempotent while a request is still in flight: `takeBatch` keeps keys
- * another batch already owns queued, so they are requested once that attempt
- * settles unresolved, and drops them if it resolves them. The opt-in lifecycle
+ * Idempotent while a request is still in flight or already waiting: `takeBatch`
+ * keeps keys another batch already owns queued, so they are requested once that
+ * attempt settles unresolved, and drops them if it resolves them, while a key
+ * the queue already holds is not stacked a second time. The opt-in lifecycle
  * needs no check here: `setConfig` clears this memory on any change, so what
  * remains was asked for under the current configuration.
  */
@@ -726,7 +766,10 @@ export function retryUnresolvedTranslations(): void {
     return;
   }
   for (const item of retryable.values()) {
-    queue.push(item);
+    if (!queued.has(item.key)) {
+      queue.push(item);
+      queued.add(item.key);
+    }
   }
   scheduleFlush();
 }
@@ -748,6 +791,7 @@ export function clearToolSummaryTranslationMemory(): void {
   generation += 1;
   accountResetEpoch += 1;
   queue.length = 0;
+  queued.clear();
   inFlight.clear();
   retryable.clear();
   cache.clear();

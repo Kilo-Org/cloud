@@ -325,7 +325,8 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
 
   /** Refresh each affected scope without notification preferences or viewer-presence gates. */
   async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams): Promise<void> {
-    const { userId, cliSessionIds } = refreshGlanceableSessionsInputSchema.parse(params);
+    const { userId, cliSessionIds, approvalChanged } =
+      refreshGlanceableSessionsInputSchema.parse(params);
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     // Read ownership too: an absent row is personal, but a foreign row is not authorized.
     const rows = await db
@@ -349,7 +350,9 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
       this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
     );
     const results = await Promise.allSettled(
-      [...scopes].map(organizationId => stub.refreshGlanceableSnapshot({ userId, organizationId }))
+      [...scopes].map(organizationId =>
+        stub.refreshGlanceableSnapshot({ userId, organizationId, approvalChanged })
+      )
     );
     for (const result of results) {
       if (result.status === 'rejected') {

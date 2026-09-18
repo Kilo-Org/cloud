@@ -14,8 +14,13 @@ import { z } from 'zod';
 export const GLANCEABLE_SNAPSHOT_SCHEMA_VERSION = 1;
 /** 8 hours: matches the usual Live Activity lifetime. */
 export const GLANCEABLE_SNAPSHOT_EXPIRY_MS = 28_800_000;
-/** Later happy updates are coalesced for at most this long. */
-export const GLANCEABLE_COALESCE_MS = 1000;
+/**
+ * Later happy updates are coalesced for at most this long. A tray with many
+ * running sessions heartbeats every few seconds, and each emit re-renders the
+ * native surfaces, so a counts-only change may lag by at most one window. An
+ * actionable needs-input change never waits (the publisher emits it at once).
+ */
+export const GLANCEABLE_COALESCE_MS = 10_000;
 /** Terminal empty lasts at most this long before the activity ends. */
 export const GLANCEABLE_TERMINAL_MS = 8000;
 /**

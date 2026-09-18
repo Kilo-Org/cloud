@@ -6,6 +6,7 @@ import {
 import { getWorkerDb } from '@kilocode/db/client';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import { NotificationChannelDO, NotificationsService } from '../../../notifications/src/index';
+import { GLANCEABLE_DELIVERY_MIN_INTERVAL_MS } from '../../../notifications/src/lib/glanceable-refresh';
 import {
   sendPushNotifications,
   type ExpoPushMessage,
@@ -165,6 +166,24 @@ async function flushAsync(): Promise<void> {
   await new Promise<void>(resolve => {
     setTimeout(resolve, 0);
   });
+}
+
+/**
+ * The aggregate delivery coordinator wakes a device at most once per account
+ * scope per `GLANCEABLE_DELIVERY_MIN_INTERVAL_MS`, deferring a change inside the
+ * window to the Durable Object alarm. The glanceable cases below assert the
+ * connection DO's own per-status-change trigger, so step the wall clock past
+ * the window between heartbeats. The window itself is covered by
+ * `services/notifications/src/lib/glanceable-refresh.test.ts`.
+ */
+function useDeliveryWindowClock(): { tick: () => void } {
+  let now = Date.now();
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
+  return {
+    tick: () => {
+      now += GLANCEABLE_DELIVERY_MIN_INTERVAL_MS + 1_000;
+    },
+  };
 }
 
 function makeSession(
@@ -575,7 +594,9 @@ describe('UserConnectionDO', () => {
     it('delivers rowless personal busy, retry, attention-clear, and idle heartbeats through the real coordinator', async () => {
       const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
       for (const status of ['busy', 'retry', 'question', 'busy', 'idle']) {
+        clock.tick();
         sendHeartbeat(doInstance, cliWs, [makeSession('s1', status)]);
         await flushAsync();
       }
@@ -613,18 +634,23 @@ describe('UserConnectionDO', () => {
     it('resends only when a reorder, rename, or child attention changes the roots', async () => {
       const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2', 'retry')]);
       await flushAsync();
       // A reorder and a rename leave every root status unchanged: no resend.
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [makeSession('s2', 'retry', 'Renamed'), makeSession('s1')]);
       await flushAsync();
       // A child raise hoists NEEDS INPUT onto its root, so the counts change.
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [
         makeSession('s1'),
         makeSession('s2', 'retry'),
         makeSession('child', 'question', 'Child', 's1'),
       ]);
       await flushAsync();
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [
         makeSession('s1'),
         makeSession('s2', 'retry'),
@@ -663,8 +689,11 @@ describe('UserConnectionDO', () => {
     it('delivers an empty aggregate when a root disappears from the heartbeat', async () => {
       const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       await flushAsync();
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, []);
       await flushAsync();
       expect(messages.map(message => message.data)).toMatchObject([
@@ -678,6 +707,8 @@ describe('UserConnectionDO', () => {
       async listed => {
         const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
         const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+        const clock = useDeliveryWindowClock();
+        clock.tick();
         sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
         await flushAsync();
         messages.length = 0;
@@ -686,6 +717,7 @@ describe('UserConnectionDO', () => {
           () => reset.promise
         );
         if (!listed) mockCtx.removeSocket(cliWs);
+        clock.tick();
         const disconnect = disconnectCli(doInstance, cliWs);
         await flushAsync();
         expect(messages).toEqual([]);

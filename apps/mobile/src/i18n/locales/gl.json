@@ -480,6 +480,8 @@
       "replyBadRequest": "Non se pode publicar esta resposta. Pode que o fío cambiase.",
       "replyForbidden": "Non tes permiso para responder a esta solicitude de integración.",
       "addCommentCta": "Comentar esta solicitude de integración",
+      "fixWithKilo": "Corrixir con Kilo",
+      "fixWithKiloPrompt": "Atende o seguinte comentario da solicitude de integración: {{link}}",
       "commentBadRequest": "Non se pode publicar este comentario. Pode que a solicitude de integración cambiase.",
       "commentForbidden": "Non tes permiso para comentar nesta solicitude de integración.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} pendentes",
       "skipped": "{{displayCount}} omitidas",
       "checksCount": "{{displayCount}} comprobacións",
+      "checksCount_one": "{{displayCount}} comprobación",
+      "checksCount_other": "{{displayCount}} comprobacións",
       "checkDetails": "detalles da comprobación"
     },
     "inbox": {
@@ -2051,6 +2055,7 @@
       "exitNeedsNewerCli": "Para usar comandos de barra de forma remota, necesitas unha versión máis recente de Kilo CLI. Actualiza Kilo CLI e volve conectarte."
     },
     "sessionConnection": {
+      "label": "Conexión",
       "connecting": "Conectando…",
       "reconnecting": "Reconectando…",
       "connectionLost": "Perdeuse a conexión",
@@ -2070,7 +2075,9 @@
       "removeConfirmTitle": "Eliminar o obxectivo?",
       "removeConfirmMessage": "O CLI borra o obxectivo desta sesión.",
       "updateFailed": "Non se puido actualizar o obxectivo.",
-      "sectionAccessibility": "{{status}}. Obxectivo: {{text}}"
+      "sectionAccessibility": "{{status}}. Obxectivo: {{text}}",
+      "collapse": "Contraer o obxectivo",
+      "expand": "Expandir o obxectivo"
     },
     "newSession": {
       "recentlyUsed": "Usados recentemente",
@@ -2124,7 +2131,20 @@
       "continueFrom": "Continúas a sesión {{title}}.",
       "importingSession": "Importando a sesión",
       "cliCannotContinue": "Este CLI non pode continuar unha sesión. Escolle Cloud Agent ou outro CLI.",
-      "importFailed": "Non se puido importar esta sesión."
+      "importFailed": "Non se puido importar esta sesión.",
+      "sandbox": "Contorno illado",
+      "sandboxAccessibility": "Contorno illado: {{label}}",
+      "sandboxDefaultWithDestination": "Predeterminado · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Pequeno",
+      "sandboxInstanceShared": "Compartido",
+      "sandboxInstanceLarge": "Grande",
+      "sandboxInstanceDevcontainer": "Contedor de desenvolvemento",
+      "sandboxInstanceProviderDefault": "Predeterminado do provedor",
+      "sandboxCouldNotLoad": "Non se puideron cargar as opcións do contorno illado",
+      "sandboxUnavailable": "Este contorno illado non está dispoñible. Escolla outro contorno illado ou Predeterminado.",
+      "sandboxUseDefault": "Usar Predeterminado"
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro.",
@@ -2490,6 +2510,12 @@
       "startNewSession": "Iniciar unha nova sesión",
       "exitSession": "Saír da sesión",
       "clearSession": "Rematar esta sesión e iniciar unha nova",
+      "compactDescription": "compacta o contexto da sesión actual",
+      "goalDescription": "Segue traballando cara a un obxectivo de sesión. /goal <objective> ou pause, resume, clear",
+      "initDescription": "configuración guiada de AGENTS.md",
+      "resumeClaudeDescription": "importa unha transcrición de sesión de Claude Code",
+      "resumeCodexDescription": "importa unha transcrición de sesión de OpenAI Codex",
+      "reviewDescription": "revisa os cambios [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Usar /{{command}}",
       "insert": "Inserir",
       "upgradeRequiredFallback": "Actualiza o teu CLI para usar este comando.",
@@ -2607,6 +2633,7 @@
     "couldNotLoadActiveSessions": "Non se puideron cargar as sesións activas.",
     "agentSessions": "En curso agora",
     "newCodingTask": "Nova tarefa de programación",
+    "newTaskFromPicture": "Nova tarefa a partir dunha imaxe",
     "explore": "Explorar",
     "seeAll": "Ver todo",
     "noLiveSessions": "Non hai nada en execución agora mesmo"
@@ -2828,7 +2855,8 @@
     "aiProvidersWhat": "As túas instrucións, o historial de conversas e os ficheiros que anexes.",
     "aiProvidersWhy": "Para xerar respostas de IA.",
     "aiProvidersWho": "Anthropic, OpenAI, Google e outros provedores que selecciones para cada solicitude.",
-    "gatewayWhat": "Identificador da conta, metadatos das solicitudes e uso de tokens.",
+    "gatewayWhat": "Identificador da conta, metadatos das solicitudes, uso de tokens e os prompts e gravacións de voz que a app envía a través del.",
+    "viaGateway": "A través de Kilo Gateway",
     "gatewayWhy": "Autenticación, encamiñamento de solicitudes e conciliación da facturación.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Informes de peches inesperados e erros, sen o contido da aplicación.",
@@ -2848,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "A túa gravación mentres ditas.",
     "voiceTranscriptionWhy": "Para converter a voz en texto.",
-    "voiceTranscriptionWho": "Só no dispositivo, ou nos servizos de Apple ou Google cando o dispositivo non pode transcribir sen conexión.",
+    "voiceTranscriptionWho": "O teu dispositivo, Kilo Gateway co modelo de transcrición que escollas, ou Apple ou Google para o recoñecemento en liña.",
     "installAttributionPromptTitle": "Permitir a atribución da instalación?",
     "installAttributionPromptMessage": "Kilo usa o permiso de seguimento de Apple só para saber por que canle chegaches á aplicación. As túas instrucións e conversas nunca se usan para isto.",
     "what": "Que se comparte",
@@ -3058,6 +3086,12 @@
     "privacy": "Abre Kilo para ver os axentes",
     "openAgents": "Abrir axentes",
     "needsInput": "Agardando resposta",
+    "newestSession": "A máis recente: {{title}}",
+    "noneWaiting": "Ningún axente en espera",
+    "newAgent": "Novo axente",
+    "approving": "Aprobando...",
+    "couldNotApprove": "Non se puido aprobar",
+    "couldNotStart": "Non se puido iniciar",
     "channelName": "Axentes activos",
     "activityKitDisabledBody": "Activa as actividades en directo nos axustes para ver os axentes activos na pantalla de bloqueo."
   },
@@ -3093,5 +3127,12 @@
     "remoteFound": "Computador conectado",
     "checkAgain": "Comprobar de novo",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Iniciar un axente necesita unha instrución. Engade unha instrución e execútao de novo.",
+      "repositoryUnknown": "Kilo non recoñece {{repository}} como un repositorio de GitHub ou GitLab. Escolle outro repositorio en Kilo.",
+      "repositoryUnsupported": "{{repository}} é un repositorio de Bitbucket — Iniciar un axente aínda non pode usalo. Escolle outro repositorio en Kilo."
+    }
   }
 }

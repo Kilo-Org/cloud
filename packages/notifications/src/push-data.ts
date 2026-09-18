@@ -91,6 +91,12 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     status: z.enum(['waiting', 'empty', 'happy', 'stale', 'expired', 'signed_out', 'privacy']),
     running: z.number().int().min(0),
     needsInput: z.number().int().min(0),
+    /**
+     * Needs-input rows waiting on a permission prompt: the ones the wrist can
+     * approve. Optional so a push from a server older than this release still
+     * parses; every mobile reader treats absent as 0.
+     */
+    needsApproval: z.number().int().min(0).optional(),
     idle: z.number().int().min(0),
     updatedAt: z.string(),
     expiresAt: z.string(),
@@ -109,5 +115,5 @@ export type PushData = z.infer<typeof pushDataSchema>;
  */
 export type GlanceableLiveActivityContentState = Pick<
   Extract<PushData, { type: 'active_agents_glanceable' }>,
-  'status' | 'running' | 'needsInput' | 'idle' | 'needsInputSince'
+  'status' | 'running' | 'needsInput' | 'needsApproval' | 'idle' | 'needsInputSince'
 >;

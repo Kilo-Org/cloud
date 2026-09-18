@@ -160,6 +160,9 @@ describe('combined and live refresh callers', () => {
     ];
     const other = { sessions: [makeCached({ id: 'other' })] };
     client.setQueryData(otherKey, other);
+    // Start from a live set that was never populated: the socket-window hold
+    // (useLiveSessionsHold) only keeps a prior non-empty set.
+    client.setQueryData(QUERY_KEY, { sessions: [] });
     attach(otherKey);
     state.active.mockResolvedValue({ sessions: [] });
     await render();

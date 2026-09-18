@@ -59,6 +59,7 @@ import type {
   UserMessage,
   OlderMessagesError,
   PreparationAttempt,
+  SessionCommit,
 } from './types';
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import { splitByContiguousPrefix } from './array-utils';
@@ -84,6 +85,7 @@ type SessionStatusIndicator = {
   type: 'error' | 'warning' | 'info' | 'progress';
   message: string;
   timestamp: number;
+  commitHash?: string;
 };
 type SessionConfig = {
   sessionId: CloudAgentSessionId | KiloSessionId;
@@ -229,6 +231,7 @@ function chatEventSessionId(event: NormalizedEvent): string | null {
       return event.part.sessionID;
     case 'message.part.delta':
     case 'message.part.removed':
+    case 'message.removed':
       return event.sessionId;
     default:
       return null;
@@ -377,6 +380,12 @@ type W<T> = WritableAtom<T, [T], void>;
 type SessionManagerAtoms = {
   isStreaming: W<boolean>;
   isLoading: W<boolean>;
+  /**
+   * True while cached transcript rows are on screen and the session's current
+   * transcript has not landed yet. False for callers without a cached-page
+   * reader.
+   */
+  isRefreshingCachedTranscript: W<boolean>;
   /** Session structurally cannot accept input (no transport send). */
   isReadOnly: W<boolean>;
   /** Active resolved transport can deliver canonical Cloud Agent attachments. */
@@ -407,6 +416,7 @@ type SessionManagerAtoms = {
   cloudStatus: W<CloudStatus | null>;
   setupLog: W<readonly string[]>;
   preparationAttempts: W<readonly PreparationAttempt[]>;
+  commits: W<readonly SessionCommit[]>;
   sessionConfig: W<SessionConfig | null>;
   sessionType: W<ActiveSessionType | null>;
   chatUI: W<{ shouldAutoScroll: boolean }>;
@@ -648,6 +658,13 @@ function buildOptimisticFileParts(
  * renders the prompt (and files) before the server or CLI echoes it back.
  * Mirrors `synthesizeQueuedUserMessage`'s shape so the authoritative
  * `message.updated` overwrites it by id.
+ *
+ * The row is marked `synthetic` (the same Kilo extension the optimistic text
+ * and file parts carry) until a server record replaces it: when the
+ * authoritative update never lands — the wrapper's publications can all be
+ * rejected (`event_batch_rejected`) — the transcript must treat the row as an
+ * unconfirmed submission (render once, typed failure footer on a recorded
+ * failed run), not as a confirmed user message.
  */
 function insertOptimisticUserMessage(input: {
   storage: JotaiSessionStorage;
@@ -665,6 +682,7 @@ function insertOptimisticUserMessage(input: {
     time: { created: Date.now() },
     agent: '',
     model: { providerID: '', modelID: '' },
+    synthetic: true,
   };
   storage.upsertMessage(syntheticMessage);
   const textPart: TextPart = {
@@ -703,7 +721,12 @@ function indicatorForStatus(s: AgentStatus): SessionStatusIndicator | null {
   const now = Date.now();
   if (s.type === 'autocommit') {
     const kind = s.step === 'failed' ? 'error' : s.step === 'completed' ? 'info' : 'progress';
-    return { type: kind, message: s.message, timestamp: now } satisfies SessionStatusIndicator;
+    return {
+      type: kind,
+      message: s.message,
+      timestamp: now,
+      ...(s.step === 'completed' && s.commitHash ? { commitHash: s.commitHash } : {}),
+    } satisfies SessionStatusIndicator;
   }
   if (s.type === 'disconnected')
     return { type: 'error', message: 'Agent connection lost', timestamp: now };
@@ -762,6 +785,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   // Public writable atoms
   const isStreamingAtom = atom(false);
   const isLoadingAtom = atom(false);
+  /**
+   * True while the transcript on screen is a cached page (`readCachedSnapshotPage`
+   * or a preserved transcript across a metadata-retry) that the live transport
+   * has not caught up with yet: the rows are readable, but the session's current
+   * transcript is still being fetched. Drives the inline refresh indicator.
+   * Callers without a cached-page reader (web, extension) never set it, so their
+   * behavior is unchanged. It clears when the live transcript lands — the page
+   * callback when one is configured, otherwise the replayed `session.created`
+   * — and on an error, a transcript clear, or a session reset.
+   */
+  const isRefreshingCachedTranscriptAtom = atom(false);
   const isReadOnlyAtom = atom(false);
   const supportsAttachmentsAtom = atom(false);
   const activeSessionTypeAtom = atom<ActiveSessionType | null>(null);
@@ -782,6 +816,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const cloudStatusAtom = atom<CloudStatus | null>(null);
   const setupLogAtom = atom<readonly string[]>([]);
   const preparationAttemptsAtom = atom<readonly PreparationAttempt[]>([]);
+  const commitsAtom = atom<readonly SessionCommit[]>([]);
   const sessionConfigAtom = atom<SessionConfig | null>(null);
   const sessionTypeAtom = atom<ActiveSessionType | null>(null);
   const chatUIAtom = atom<{ shouldAutoScroll: boolean }>({ shouldAutoScroll: true });
@@ -994,6 +1029,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
     store.set(isStreamingAtom, false);
     store.set(isLoadingAtom, false);
+    store.set(isRefreshingCachedTranscriptAtom, false);
     store.set(isReadOnlyAtom, false);
     store.set(supportsAttachmentsAtom, false);
     store.set(activeSessionTypeAtom, null);
@@ -1018,6 +1054,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(cloudStatusAtom, null);
     store.set(setupLogAtom, []);
     store.set(preparationAttemptsAtom, []);
+    store.set(commitsAtom, []);
     store.set(sessionConfigAtom, null);
     store.set(sessionTypeAtom, null);
     store.set(activeQuestionAtom, null);
@@ -1434,7 +1471,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     let prevSk = '';
     let prevCsk = '';
     let prevCloudStatusHadIndicator = false;
-    const sKey = (s: AgentStatus) => (s.type === 'autocommit' ? `${s.type}:${s.step}` : s.type);
+    const sKey = (s: AgentStatus) =>
+      s.type === 'autocommit' ? `${s.type}:${s.step}:${s.commitHash ?? ''}` : s.type;
     const csKey = (cs: CloudStatus | null) =>
       cs === null
         ? ''
@@ -1459,6 +1497,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         preparationAttemptsAtom,
         'getPreparationAttempts' in session.state ? session.state.getPreparationAttempts() : []
       );
+      store.set(commitsAtom, session.state.getCommits());
       store.set(isStreamingAtom, act.type === 'busy');
       store.set(questionAtom, session.state.getQuestion());
       store.set(permissionAtom, session.state.getPermission());
@@ -1530,7 +1569,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             ind !== null ||
             shouldClearCloudIndicator ||
             (st.type === 'idle' &&
-              (previousStatus.type === 'error' || previousStatus.type === 'interrupted'))
+              (previousStatus.type === 'error' ||
+                previousStatus.type === 'interrupted' ||
+                (previousStatus.type === 'autocommit' && previousStatus.step === 'started')))
           ) {
             setIndicator(ind);
           }
@@ -1747,6 +1788,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     remoteOptimisticIds.clear();
     store.set(rootSessionIdAtom, kiloSessionId);
     store.set(isLoadingAtom, true);
+    // A retry that keeps the transcript mounted must also keep advertising that
+    // the visible rows are being refetched: the rows stay, the refresh is the
+    // wait the user is in.
+    store.set(isRefreshingCachedTranscriptAtom, preserveTranscript);
 
     const jotaiStorage = store.get(sessionStorageAtom) ?? createJotaiStorage(store);
     store.set(sessionStorageAtom, jotaiStorage);
@@ -1769,6 +1814,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           if (cachedPage && cachedPage.messages.length > 0) {
             if (applyPage({ ...cachedPage, kind: 'success' }, initialPageGeneration, true)) {
               store.set(isLoadingAtom, false);
+              // Rows are on screen but they are the cached page: the live
+              // transcript is still being fetched, so the open is refreshing,
+              // not done.
+              store.set(isRefreshingCachedTranscriptAtom, true);
             }
           }
         })
@@ -1824,6 +1873,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           return;
         }
         store.set(isLoadingAtom, false);
+        store.set(isRefreshingCachedTranscriptAtom, false);
         setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
       };
       if (!cacheReadPending) {
@@ -1864,7 +1914,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // pass the generation check and clobber the active session's cursor
     // and omitted-item count.
     const recordInitialPage = (page: SessionSnapshotPage): void => {
-      applyPage({ ...page, kind: 'success' }, initialPageGeneration, true);
+      if (applyPage({ ...page, kind: 'success' }, initialPageGeneration, true)) {
+        // The live bounded page landed: what is on screen is no longer the
+        // cached page, so the refresh indicator is done. Guarded by the
+        // applied flag so a superseded page cannot clear a newer open's state.
+        store.set(isRefreshingCachedTranscriptAtom, false);
+      }
     };
 
     // Once live replay can start, a slower cache must not overwrite it. Do not
@@ -1895,6 +1950,17 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           // cast cloudAgentSessionId (the createAndStart path).
           store.set(rootSessionIdAtom, info.id);
           store.set(isLoadingAtom, false);
+          // The snapshot replay is the landing signal for a cached open that
+          // has no page-aware read: without `fetchSnapshotPage` the transport
+          // never calls `onInitialPageLoaded`, and the legacy `fetchSnapshot`
+          // fallback of the cloud-agent and read-only transports never emits
+          // `onReplayComplete` either, so a cached-page refresh that waited for
+          // those would stay advertised forever. With `fetchSnapshotPage` the
+          // live page already cleared it (and arrives before this replay), so
+          // the refresh keeps its page-scoped clear there.
+          if (!config.fetchSnapshotPage) {
+            store.set(isRefreshingCachedTranscriptAtom, false);
+          }
           // A fresh replay is starting (initial connect or a reconnect);
           // onReplayComplete flips this back off once it's done.
           remoteHistoryReplaying = true;
@@ -1995,6 +2061,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (expectedGeneration !== switchGeneration) return;
         remoteHistoryReplaying = false;
         store.set(isLoadingAtom, false);
+        store.set(isRefreshingCachedTranscriptAtom, false);
         // `/clear` with no successful post-clear send: drop the replayed
         // snapshot down to live post-clear ids only. No id/timestamp
         // comparison across hosts — survivors were local when replay started.
@@ -2030,6 +2097,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           return;
         }
         store.set(errorAtom, message);
+        // The live transcript will not replace the cached rows now: the error
+        // indicator owns the stale-rows state, so the refresh indicator stops.
+        store.set(isRefreshingCachedTranscriptAtom, false);
       },
       onChildSessionError: (childSessionId, message) => {
         const next = new Map(store.get(childSessionErrorsAtom));
@@ -2273,7 +2343,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     // echoes it back. Reconciliation differs by session type:
     //   - cloud-agent: the server honors `messageId`, so the later
     //     `cloud.message.queued` synthesize is a no-op (existing-id guard) and
-    //     the authoritative `message.updated` overwrites this row by id.
+    //     the authoritative `message.updated` overwrites this row by id. If
+    //     that update never lands (the wrapper's event publications can all be
+    //     rejected), the row keeps `info.synthetic` and the transcript renders
+    //     it as an unconfirmed submission — typed failure footer on a recorded
+    //     failed run.
     //   - remote: new CLIs echo `messageId` back; old CLIs assign their own,
     //     so we track the id in `remoteOptimisticIds` and retarget when the
     //     authoritative user message lands (see the onEvent handler).
@@ -2432,6 +2506,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function clearTranscript(): void {
     if (!currentSession) return;
     currentSession.storage.clear();
+    currentSession.state.clearCommits();
     olderMessagesCursor = null;
     store.set(hasOlderMessagesAtom, false);
     // Reset the retained-history stack so a later `trimRetainedHistory`
@@ -2444,6 +2519,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     olderMessagesInFlight = null;
     loadOlderGeneration += 1;
     store.set(transcriptClearedAtom, true);
+    // Nothing stale is on screen any more: the user asked for an empty view.
+    store.set(isRefreshingCachedTranscriptAtom, false);
     store.set(chatUIAtom, { shouldAutoScroll: true });
     setIndicator({
       type: 'info',
@@ -2602,6 +2679,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     atoms: {
       isStreaming: isStreamingAtom,
       isLoading: isLoadingAtom,
+      isRefreshingCachedTranscript: isRefreshingCachedTranscriptAtom,
       isReadOnly: isReadOnlyAtom,
       supportsAttachments: supportsAttachmentsAtom,
       activeSessionType: activeSessionTypeAtom,
@@ -2622,6 +2700,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       cloudStatus: cloudStatusAtom,
       setupLog: setupLogAtom,
       preparationAttempts: preparationAttemptsAtom,
+      commits: commitsAtom,
       sessionConfig: sessionConfigAtom,
       sessionType: sessionTypeAtom,
       chatUI: chatUIAtom,

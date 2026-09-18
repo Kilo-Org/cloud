@@ -931,6 +931,42 @@ describe('makeErrorReadable', () => {
     expect((await result.json()).error_type).toBe('byok_error');
   });
 
+  it('names the model in a generic BYOK permission error', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-5',
+      request,
+      response: Response.json({}, { status: 403 }),
+      userByokProviderIds: ['anthropic'],
+    });
+
+    await expect(result?.json()).resolves.toEqual({
+      error:
+        '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.',
+      error_type: 'byok_error',
+      message:
+        '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.',
+    });
+  });
+
+  it('mentions OpenCode Go opt-in requirements on a BYOK permission error', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'direct-byok',
+      requestedModel: 'opencode-go/mimo-v2.5',
+      request,
+      response: Response.json({ model: 'mimo-v2.5' }, { status: 403 }),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    await expect(result?.json()).resolves.toEqual({
+      error:
+        '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.',
+      error_type: 'byok_error',
+      message:
+        '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.',
+    });
+  });
+
   it('does not use generic BYOK errors for a null provider set', async () => {
     await expect(
       makeErrorReadable({

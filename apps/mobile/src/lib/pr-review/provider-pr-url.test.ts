@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseProviderPrUrl } from './provider-pr-url';
+import { findFirstProviderPrUrl, parseProviderPrUrl } from './provider-pr-url';
 
 describe('parseProviderPrUrl — GitHub', () => {
   it('parses a github.com pull request into the GitHub ref', () => {
@@ -176,5 +176,56 @@ describe('parseProviderPrUrl — garbage input', () => {
   it('never throws on credential-bearing or malformed authorities', () => {
     expect(parseProviderPrUrl('https://user:pass@gitlab.com/g/r/-/merge_requests/1')).toBeNull();
     expect(parseProviderPrUrl('https://')).toBeNull();
+  });
+});
+
+describe('findFirstProviderPrUrl', () => {
+  it('finds a GitHub pull request in free text', () => {
+    expect(
+      findFirstProviderPrUrl('See https://github.com/octocat/hello-world/pull/42 please')
+    ).toEqual({ platform: 'github', owner: 'octocat', repo: 'hello-world', number: 42 });
+  });
+
+  it('finds a gitlab.com merge request in free text', () => {
+    expect(
+      findFirstProviderPrUrl('Fix the thing\nhttps://gitlab.com/group/repo/-/merge_requests/7')
+    ).toEqual({
+      platform: 'gitlab',
+      projectPath: 'group/repo',
+      mrIid: 7,
+      instanceHint: 'https://gitlab.com',
+    });
+  });
+
+  it('finds a self-managed GitLab merge request in free text', () => {
+    expect(
+      findFirstProviderPrUrl('https://gitlab.example.com:8443/team/repo/-/merge_requests/9')
+    ).toEqual({
+      platform: 'gitlab',
+      projectPath: 'team/repo',
+      mrIid: 9,
+      instanceHint: 'https://gitlab.example.com:8443',
+    });
+  });
+
+  it('finds a Bitbucket pull request in free text', () => {
+    expect(
+      findFirstProviderPrUrl('https://bitbucket.org/acme/api/pull-requests/42/overview')
+    ).toEqual({ platform: 'bitbucket', workspace: 'acme', repoSlug: 'api', prId: 42 });
+  });
+
+  it('returns the first review URL when several are present', () => {
+    expect(
+      findFirstProviderPrUrl(
+        'https://github.com/octocat/hello-world/pull/42 https://gitlab.com/group/repo/-/merge_requests/7'
+      )
+    ).toEqual({ platform: 'github', owner: 'octocat', repo: 'hello-world', number: 42 });
+  });
+
+  it('returns null when nothing matches a provider', () => {
+    expect(findFirstProviderPrUrl('no url here at all')).toBeNull();
+    expect(findFirstProviderPrUrl('https://example.com/group/repo')).toBeNull();
+    expect(findFirstProviderPrUrl('https://github.com/octocat/hello-world/issues/42')).toBeNull();
+    expect(findFirstProviderPrUrl('')).toBeNull();
   });
 });

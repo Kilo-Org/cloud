@@ -15,10 +15,7 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  getProvider,
-  type GetProviderProviderResult,
-} from '@/lib/ai-gateway/providers/get-provider';
+import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
@@ -51,12 +48,13 @@ import {
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
   temporarilyUnavailableResponse,
-  usageLimitExceededResponse,
+  creditsBlockedResponse,
   unavailableModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
   checkExclusiveModelProviderAllowed,
   modelDoesNotExistOnOpenRouterResponse,
+  chatGptReconnectResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
@@ -65,7 +63,6 @@ import {
   rewriteModelResponse,
   logUnrewrittenResponse,
 } from '@/lib/ai-gateway/rewriteModelResponse';
-import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner/routing';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -112,7 +109,7 @@ import {
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@/lib/utils.server';
 import { readDb } from '@/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
 import {
@@ -608,7 +605,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   async function resolveAccessCheck(modelId: string) {
-    const { balance, settings, plan } = await balanceAndSettingsPromise;
+    const { balance, settings, plan, balanceLimitedByUserAllowance } =
+      await balanceAndSettingsPromise;
     const groupPolicy = await organizationGroupPolicyPromise;
     const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
       modelId,
@@ -618,6 +616,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (modelRestrictionError) {
       return {
         balance,
+        balanceLimitedByUserAllowance,
         effectiveProviderConfig: providerConfig,
         groupModelAllowed: true,
         groupProvidersAllowed: true,
@@ -642,6 +641,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
     return {
       balance,
+      balanceLimitedByUserAllowance,
       effectiveProviderConfig,
       groupModelAllowed,
       groupProvidersAllowed,
@@ -673,6 +673,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     taskId,
     getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
   });
+  if (initialProviderResultForAbuseService.kind === 'chatgpt-reconnect') {
+    // The person's enabled ChatGPT connection is terminally dead. Fail readably
+    // instead of silently serving the request through another billing path.
+    return chatGptReconnectResponse(initialProviderResultForAbuseService.message);
+  }
   let effectiveProviderContext = initialProviderResultForAbuseService;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
@@ -788,6 +793,13 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       taskId,
       getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
     });
+    if (quarantineProviderResult.kind === 'chatgpt-reconnect') {
+      if (rulesEngineDecision.delayMs > 0) {
+        await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
+      }
+      return chatGptReconnectResponse(quarantineProviderResult.message);
+    }
+
     effectiveProviderContext = quarantineProviderResult;
 
     console.warn('SECURITY: Abuse quarantine-3 model override applied', {
@@ -821,6 +833,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
     const {
       balance,
+      balanceLimitedByUserAllowance,
       effectiveProviderConfig,
       groupModelAllowed,
       groupProvidersAllowed,
@@ -832,7 +845,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       !(await isFreeModel(effectiveModelIdLowerCased)) &&
       !effectiveProviderContext.userByok
     ) {
-      return await usageLimitExceededResponse(user, balance);
+      return await creditsBlockedResponse({
+        user,
+        balance,
+        organizationId,
+        balanceLimitedByUserAllowance,
+      });
     }
 
     // Organization model/provider restrictions check
@@ -849,29 +867,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (effectiveProviderConfig) {
       requestBodyParsed.body.provider = effectiveProviderConfig;
     }
-  }
-
-  const partnerProvider = await getPercentageRoutedPartnerProvider({
-    requestedModel: effectiveModelIdLowerCased,
-    request: requestBodyParsed,
-    randomSeed: taskId || user.id,
-    sourceProviderId: effectiveProviderContext.provider.id,
-    hasUserByok: effectiveProviderContext.userByok !== null,
-  });
-  let partnerFallback:
-    | { providerContext: GetProviderProviderResult; request: GatewayRequest }
-    | undefined;
-  if (partnerProvider) {
-    partnerFallback = {
-      providerContext: effectiveProviderContext,
-      request: structuredClone(requestBodyParsed),
-    };
-    effectiveProviderContext = {
-      kind: 'provider',
-      provider: partnerProvider,
-      userByok: null,
-      bypassAccessCheck: false,
-    };
   }
 
   console.debug(`Routing request to ${effectiveProviderContext.provider.id}`);
@@ -946,7 +941,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     signal: request.signal,
     vercelRequestId,
   };
-  let attempt = await sendUpstreamAttempt({
+  const attempt = await sendUpstreamAttempt({
     ...upstreamAttemptOptions,
     providerContext: effectiveProviderContext,
     request: requestBodyParsed,

@@ -62,7 +62,9 @@ export function SessionListSearchHeader({
           key={inputKey}
           ref={inputRef}
           accessibilityLabel={t('agents.search.searchSessions')}
-          className="min-h-6 flex-1 py-1 text-[15px] leading-[normal] text-foreground"
+          // Height comes from `min-h`, never `py`: iOS insets the already-centered
+          // text rect by the padding and draws the placeholder low.
+          className="min-h-[26px] flex-1 text-[15px] leading-[normal] text-foreground"
           placeholder={t('agents.search.searchSessionsPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           onChangeText={onChangeText}

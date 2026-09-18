@@ -3,7 +3,15 @@
 import { useEffect, useMemo, useRef, type MouseEvent, type RefObject } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
-import { ChevronRight, FileDiff, GitBranch, List, ListTree, RefreshCw } from 'lucide-react';
+import {
+  ChevronRight,
+  FileDiff,
+  GitBranch,
+  List,
+  ListTree,
+  MessageSquareText,
+  RefreshCw,
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -200,6 +208,7 @@ export function WorktreeChangesDrawer({
   onSelectFile,
   onCloseAutoFocus,
   portalContainer,
+  commentCounts,
 }: {
   cloudAgentSessionId: string;
   organizationId?: string;
@@ -208,6 +217,7 @@ export function WorktreeChangesDrawer({
   onSelectFile: (path: string) => void;
   onCloseAutoFocus: (event: Event) => void;
   portalContainer: HTMLElement | null;
+  commentCounts?: ReadonlyMap<string, number>;
 }) {
   const [viewMode, setViewMode] = useLocalStorage<WorktreeChangesViewMode>(
     'cloud-agent:worktree-changes-view-mode',
@@ -249,6 +259,7 @@ export function WorktreeChangesDrawer({
           onViewModeChange={setViewMode}
           onSelectFile={onSelectFile}
           activeTabRef={activeTabRef}
+          commentCounts={commentCounts}
         />
       </SheetContent>
     </Sheet>
@@ -258,9 +269,11 @@ export function WorktreeChangesDrawer({
 function ChangedFile({
   file,
   onSelectFile,
+  commentCount = 0,
 }: {
   file: WorktreeChangesFile;
   onSelectFile: (path: string) => void;
+  commentCount?: number;
 }) {
   const status = fileStatusStyles[file.status];
   const name = file.path.slice(file.path.lastIndexOf('/') + 1);
@@ -284,6 +297,15 @@ function ChangedFile({
           {name}
         </span>
         <span className="sr-only">{file.path}</span>
+        {commentCount > 0 && (
+          <span
+            className="text-muted-foreground inline-flex shrink-0 items-center gap-1 font-mono text-xs tabular-nums"
+            aria-label={`${commentCount} ${commentCount === 1 ? 'comment' : 'comments'}`}
+          >
+            <MessageSquareText className="size-3" aria-hidden="true" />
+            {commentCount}
+          </span>
+        )}
         {file.binary ? (
           <span className="sr-only">Binary file; line counts unavailable.</span>
         ) : (
@@ -301,13 +323,20 @@ function ChangedFile({
 function ChangedFileTree({
   nodes,
   onSelectFile,
+  commentCounts,
 }: {
   nodes: WorktreeChangesTreeNode[];
   onSelectFile: (path: string) => void;
+  commentCounts?: ReadonlyMap<string, number>;
 }) {
   return nodes.map(node =>
     node.kind === 'file' ? (
-      <ChangedFile key={`file:${node.path}`} file={node.file} onSelectFile={onSelectFile} />
+      <ChangedFile
+        key={`file:${node.path}`}
+        file={node.file}
+        onSelectFile={onSelectFile}
+        commentCount={commentCounts?.get(node.path) ?? 0}
+      />
     ) : (
       <Collapsible key={`directory:${node.path}`} asChild defaultOpen>
         <li className="min-w-0">
@@ -328,7 +357,11 @@ function ChangedFileTree({
           </CollapsibleTrigger>
           <CollapsibleContent>
             <ul className="ml-4">
-              <ChangedFileTree nodes={node.children} onSelectFile={onSelectFile} />
+              <ChangedFileTree
+                nodes={node.children}
+                onSelectFile={onSelectFile}
+                commentCounts={commentCounts}
+              />
             </ul>
           </CollapsibleContent>
         </li>
@@ -345,6 +378,7 @@ function WorktreeChanges({
   onViewModeChange,
   onSelectFile,
   activeTabRef,
+  commentCounts,
 }: {
   cloudAgentSessionId: string;
   organizationId?: string;
@@ -353,6 +387,7 @@ function WorktreeChanges({
   onViewModeChange: (value: WorktreeChangesViewMode) => void;
   onSelectFile: (path: string) => void;
   activeTabRef: RefObject<HTMLButtonElement | null>;
+  commentCounts?: ReadonlyMap<string, number>;
 }) {
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
@@ -467,7 +502,12 @@ function WorktreeChanges({
                   </h3>
                   <ul aria-label={`Files in ${directory || 'repository root'}`}>
                     {files.map(file => (
-                      <ChangedFile key={file.path} file={file} onSelectFile={onSelectFile} />
+                      <ChangedFile
+                        key={file.path}
+                        file={file}
+                        onSelectFile={onSelectFile}
+                        commentCount={commentCounts?.get(file.path) ?? 0}
+                      />
                     ))}
                   </ul>
                 </li>
@@ -478,7 +518,11 @@ function WorktreeChanges({
         <TabsContent value="tree" className="m-0">
           {tree.length > 0 && (
             <ul aria-label="Changed files">
-              <ChangedFileTree nodes={tree} onSelectFile={onSelectFile} />
+              <ChangedFileTree
+                nodes={tree}
+                onSelectFile={onSelectFile}
+                commentCounts={commentCounts}
+              />
             </ul>
           )}
         </TabsContent>

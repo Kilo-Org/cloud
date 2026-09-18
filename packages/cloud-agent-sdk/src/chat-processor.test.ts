@@ -2,6 +2,7 @@ import type {
   FilePart,
   Message,
   Part,
+  PatchPart,
   ReasoningPart,
   TextPart,
   ToolPart,
@@ -506,6 +507,50 @@ describe('createChatProcessor', () => {
       expect(stored).toHaveLength(1);
       expect((stored[0] satisfies Part as ReasoningPart).text).toBe('streamed reasoning');
     });
+
+    // --- files-less patch part normalization (KILO-APP-BZ) ---
+    // The generated Part types declare `files: Array<string>`, but the wire can
+    // omit the field (per-event schemas are `.passthrough()`), so a files-less
+    // patch part used to be stored verbatim and crashed the mobile transcript
+    // reader on `part.files.length`.
+
+    it('stores a patch part whose files field is missing with files: []', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      // The cast is the fixture: the wire really omits `files`.
+      const part = {
+        id: 'part-patch',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'patch' as const,
+        hash: 'abc',
+      } as unknown as Part;
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as PatchPart).files).toEqual([]);
+    });
+
+    it('stores a patch part whose files were sent intact', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const part: Part = {
+        id: 'part-patch',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'patch',
+        hash: 'abc',
+        files: ['src/a.ts', 'src/b.ts'],
+      };
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as PatchPart).files).toEqual(['src/a.ts', 'src/b.ts']);
+    });
   });
 
   describe('message.part.delta', () => {
@@ -547,6 +592,37 @@ describe('createChatProcessor', () => {
       });
 
       expect(storage.getParts('msg-1')).toHaveLength(0);
+    });
+  });
+
+  describe('message.removed', () => {
+    it('deletes the message and its parts from storage', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const message = makeAssistantMsg('msg-1', 'msg-user-1');
+      const part = makeTextPart('part-1', 'msg-1', 'hello');
+
+      processor.process({ type: 'message.updated', info: message });
+      processor.process({ type: 'message.part.updated', part });
+      expect(storage.getMessageIds()).toEqual(['msg-1']);
+      expect(storage.getParts('msg-1')).toHaveLength(1);
+
+      processor.process({ type: 'message.removed', sessionId: 'ses-1', messageId: 'msg-1' });
+
+      expect(storage.getMessageIds()).toEqual([]);
+      expect(storage.getMessageInfo('msg-1')).toBeUndefined();
+      expect(storage.getParts('msg-1')).toHaveLength(0);
+    });
+
+    it('ignores a removal for a message the store never had', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const message = makeAssistantMsg('msg-1', 'msg-user-1');
+      processor.process({ type: 'message.updated', info: message });
+
+      processor.process({ type: 'message.removed', sessionId: 'ses-1', messageId: 'msg-other' });
+
+      expect(storage.getMessageIds()).toEqual(['msg-1']);
     });
   });
 

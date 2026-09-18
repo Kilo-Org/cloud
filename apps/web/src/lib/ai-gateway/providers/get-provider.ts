@@ -20,6 +20,7 @@ import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { tryGetProviderById } from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
 import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
+import { checkOpenAiChatGptByok } from '@/lib/ai-gateway/openai-chatgpt/routing';
 import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import { buildDirectProvider } from '@/lib/ai-gateway/providers/build-direct-provider';
 import { getGoogleServiceAccountAccessToken } from '@/lib/ai-gateway/custom-llm/google-service-account';
@@ -43,7 +44,9 @@ export type GetProviderProviderResult = {
   bypassAccessCheck: boolean;
 };
 
-export type GetProviderResult = GetProviderProviderResult;
+export type GetProviderResult =
+  | GetProviderProviderResult
+  | { kind: 'chatgpt-reconnect'; message: string };
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
@@ -195,6 +198,23 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {
     return directByokByok;
+  }
+
+  // An enabled "Sign in with ChatGPT" connection wins for an eligible OpenAI
+  // responses request, before the Vercel BYOK lookup. A connection whose
+  // credential is terminally dead must fail readably instead of resolving to
+  // another billing path. Every other resolution (including an ineligible
+  // request for the same model) stays as it is today.
+  const openAiChatGptByok = await checkOpenAiChatGptByok({
+    request,
+    requestedModel,
+    userId: isAnonymousContext(user) ? null : user.id,
+  });
+  if (openAiChatGptByok?.kind === 'reconnect') {
+    return { kind: 'chatgpt-reconnect', message: openAiChatGptByok.message };
+  }
+  if (openAiChatGptByok) {
+    return openAiChatGptByok;
   }
 
   const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);

@@ -39,8 +39,10 @@ type FixedPartRowProps = {
 /**
  * Shared fixed-height row chrome for non-message transcript parts. Stateless
  * and single-line: the row never expands inline and never changes height from
- * streaming state transitions. A completed row without an `icon` renders no
- * leading element (a valid no-op, never an undefined component).
+ * streaming state transitions. The loading spinner is pinned to the status
+ * icons' square, so the leading slot contributes the same height in every
+ * status. A completed row without an `icon` renders no leading element (a
+ * valid no-op, never an undefined component).
  *
  * A long press opens the message-details sheet through
  * `MessageLongPressContext`: the row's tap responder would otherwise swallow
@@ -90,7 +92,14 @@ export function FixedPartRow({
         accessibilityState={{ disabled: !onPress }}
       >
         {status === 'pending' || status === 'running' ? (
-          <ActivityIndicator size="small" color={colors.mutedForeground} />
+          // RN's small spinner is 20x20 while the status icons are 16x16, so
+          // the row grew ~2.5dp while a tool ran and snapped back when it
+          // resolved (iOS and Android alike). Pin the spinner to the icon's
+          // square: the leading slot is then identical in every status and the
+          // label, not the spinner, sizes the row.
+          <View className="size-[16px] items-center justify-center">
+            <ActivityIndicator size="small" color={colors.mutedForeground} />
+          </View>
         ) : null}
         {status === 'error' ? <XCircle size={16} color={colors.destructive} /> : null}
         {status === 'completed' && Icon ? <Icon size={16} color={colors.mutedForeground} /> : null}

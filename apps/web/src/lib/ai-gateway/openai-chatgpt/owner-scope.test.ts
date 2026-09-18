@@ -14,7 +14,7 @@ import { OPENAI_CHATGPT_PROVIDER_ID } from './provider-id';
 import { getOpenAiChatGptStoredConnection, saveOpenAiChatGptConnection } from './store';
 import { getOpenAiChatGptByokModelIds, isOpenAiChatGptEligible } from './routing';
 import type { OpenAiChatGptConnection } from './types';
-import type { GatewayResponsesRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 const REQUESTED_MODEL = 'openai/gpt-5-nano';
 const originalPartnerKey = process.env.OPENAI_CHATGPT_API_KEY;
@@ -35,7 +35,7 @@ function connection(email: string): OpenAiChatGptConnection {
   };
 }
 
-function responsesRequest(): GatewayResponsesRequest {
+function responsesRequest(): GatewayRequest {
   return { kind: 'responses', body: { model: REQUESTED_MODEL, input: 'hello' } };
 }
 
@@ -153,8 +153,9 @@ describe('openai-chatgpt owner scope (real database)', () => {
       })
     ).resolves.toBe(false);
 
-    await expect(getOpenAiChatGptByokModelIds({ type: 'org', id: orgB.id }, [REQUESTED_MODEL]))
-      .resolves.toBeNull();
+    await expect(
+      getOpenAiChatGptByokModelIds({ type: 'org', id: orgB.id }, [REQUESTED_MODEL])
+    ).resolves.toBeNull();
     // The same caller on a personal request, or for the connected organization,
     // still gets the BYOK set: the empty organization is the only one excluded.
     await expect(

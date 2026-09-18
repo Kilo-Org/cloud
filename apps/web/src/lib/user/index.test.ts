@@ -137,7 +137,7 @@ import {
   cloud_agent_worktrees,
 } from '@kilocode/db/schema';
 
-import { eq, count, inArray, and, sql } from 'drizzle-orm';
+import { eq, count, inArray, and, or, sql } from 'drizzle-orm';
 import {
   softDeleteUser,
   anonymizeCloudUserData,
@@ -6384,9 +6384,23 @@ describe('User', () => {
       });
     }
 
-    test('deletes the ChatGPT connection when unlinking openai', async () => {
+    async function seedOpenAiOrganizationConnection(organizationId: string, createdBy: string) {
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      await db.insert(byok_api_keys).values({
+        organization_id: organizationId,
+        provider_id: OPENAI_CHATGPT_PROVIDER_ID,
+        encrypted_api_key: encryptApiKey('{"access_token":"org-token"}', BYOK_ENCRYPTION_KEY),
+        management_source: 'user',
+        created_by: createdBy,
+      });
+    }
+
+    test('deletes the personal and organization ChatGPT connections the user created when unlinking openai', async () => {
       const user = await seedUserWithOpenAiProvider();
       await seedOpenAiConnection(user.id);
+      const organization = await createTestOrganization(`Unlink ${randomUUID()}`, user.id, 0);
+      await seedOpenAiOrganizationConnection(organization.id, user.id);
 
       const result = await unlinkAuthProviderFromUser(user.id, 'openai');
 
@@ -6396,11 +6410,34 @@ describe('User', () => {
         .from(byok_api_keys)
         .where(
           and(
-            eq(byok_api_keys.kilo_user_id, user.id),
-            eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+            eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID),
+            or(
+              eq(byok_api_keys.kilo_user_id, user.id),
+              eq(byok_api_keys.organization_id, organization.id)
+            )
           )
         );
       expect(rows).toHaveLength(0);
+    });
+
+    test('keeps an organization connection that another user created', async () => {
+      const user = await seedUserWithOpenAiProvider();
+      const other = await insertTestUser();
+      const organization = await createTestOrganization(
+        `Unlink other ${randomUUID()}`,
+        other.id,
+        0
+      );
+      await seedOpenAiOrganizationConnection(organization.id, other.id);
+
+      const result = await unlinkAuthProviderFromUser(user.id, 'openai');
+
+      expect(result.success).toBe(true);
+      const rows = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.organization_id, organization.id));
+      expect(rows).toHaveLength(1);
     });
 
     test('keeps the ChatGPT connection when unlinking another provider', async () => {

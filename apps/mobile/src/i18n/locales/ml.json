@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} ടൂൾ, {{status}}",
       "accessibilityLabel": "{{name}} ടൂൾ, {{status}}",
       "noTasks": "ജോലികളൊന്നുമില്ല.",
+      "noOutput": "ഔട്ട്പുട്ട് ഇല്ല.",
       "toolRead": "വായിക്കുക",
       "toolEdit": "തിരുത്തുക",
       "toolWrite": "എഴുതുക",

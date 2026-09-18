@@ -1705,6 +1705,7 @@
       "accessibility": "أداة {{label}}، {{status}}",
       "accessibilityLabel": "أداة {{name}}، {{status}}",
       "noTasks": "لا توجد مهام.",
+      "noOutput": "لا توجد مخرجات.",
       "toolRead": "قراءة",
       "toolEdit": "تعديل",
       "toolWrite": "كتابة",

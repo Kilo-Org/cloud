@@ -2155,6 +2155,7 @@
       "accessibility": "Meeshaa {{label}}, {{status}}",
       "accessibilityLabel": "Meeshaa {{name}}, {{status}}",
       "noTasks": "Hojii hin jiru.",
+      "noOutput": "Bu'aan hin jiru.",
       "toolRead": "dubbisi",
       "toolEdit": "gulaali",
       "toolWrite": "barreessi",

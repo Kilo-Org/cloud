@@ -1665,6 +1665,7 @@
       "accessibility": "{{label}}-Tool, {{status}}",
       "accessibilityLabel": "{{name}}-Tool, {{status}}",
       "noTasks": "Es gibt keine Aufgaben.",
+      "noOutput": "Keine Ausgabe.",
       "toolRead": "lesen",
       "toolEdit": "bearbeiten",
       "toolWrite": "schreiben",

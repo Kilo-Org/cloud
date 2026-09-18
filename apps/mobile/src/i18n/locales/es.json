@@ -1675,6 +1675,7 @@
       "accessibility": "Herramienta {{label}}, {{status}}",
       "accessibilityLabel": "Herramienta {{name}}, {{status}}",
       "noTasks": "No hay tareas.",
+      "noOutput": "No hay salida.",
       "toolRead": "leer",
       "toolEdit": "editar",
       "toolWrite": "escribir",

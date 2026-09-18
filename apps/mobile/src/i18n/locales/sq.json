@@ -2155,6 +2155,7 @@
       "accessibility": "Mjeti {{label}}, {{status}}",
       "accessibilityLabel": "Mjeti {{name}}, {{status}}",
       "noTasks": "Nuk ka detyra.",
+      "noOutput": "Nuk ka dalje.",
       "toolRead": "lexo",
       "toolEdit": "redakto",
       "toolWrite": "shkruaj",

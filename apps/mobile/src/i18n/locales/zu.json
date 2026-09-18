@@ -2155,6 +2155,7 @@
       "accessibility": "Ithuluzi le-{{label}}, {{status}}",
       "accessibilityLabel": "Ithuluzi le-{{name}}, {{status}}",
       "noTasks": "Ayikho imisebenzi.",
+      "noOutput": "Akukho mphumela.",
       "toolRead": "funda",
       "toolEdit": "hlela",
       "toolWrite": "bhala",

@@ -1639,6 +1639,7 @@
       "accessibility": "Strumento {{label}}, {{status}}",
       "accessibilityLabel": "Strumento {{name}}, {{status}}",
       "noTasks": "Nessuna attività.",
+      "noOutput": "Nessun output.",
       "toolRead": "leggi",
       "toolEdit": "modifica",
       "toolWrite": "scrivi",

@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} টুল, {{status}}",
       "accessibilityLabel": "{{name}} টুল, {{status}}",
       "noTasks": "কোনো কাজ নেই।",
+      "noOutput": "কোনো আউটপুট নেই।",
       "toolRead": "ফাইল পড়া",
       "toolEdit": "সম্পাদনা করুন",
       "toolWrite": "ফাইল লেখা",

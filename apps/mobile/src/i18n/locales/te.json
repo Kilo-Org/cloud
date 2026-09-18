@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} టూల్, {{status}}",
       "accessibilityLabel": "{{name}} టూల్, {{status}}",
       "noTasks": "పనులు లేవు.",
+      "noOutput": "అవుట్పుట్ లేదు.",
       "toolRead": "చదవండి",
       "toolEdit": "సవరించండి",
       "toolWrite": "రాయండి",

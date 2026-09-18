@@ -2155,6 +2155,7 @@
       "accessibility": "Ferramenta {{label}}, {{status}}",
       "accessibilityLabel": "Ferramenta {{name}}, {{status}}",
       "noTasks": "Non hai tarefas.",
+      "noOutput": "Non hai saída.",
       "toolRead": "ler",
       "toolEdit": "editar",
       "toolWrite": "escribir",

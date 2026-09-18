@@ -2155,6 +2155,7 @@
       "accessibility": "Verktyget {{label}}, {{status}}",
       "accessibilityLabel": "Verktyget {{name}}, {{status}}",
       "noTasks": "Det finns inga uppgifter.",
+      "noOutput": "Ingen utdata.",
       "toolRead": "läs",
       "toolEdit": "redigera",
       "toolWrite": "skriv",

@@ -2155,6 +2155,7 @@
       "accessibility": "ឧបករណ៍ {{label}}, {{status}}",
       "accessibilityLabel": "ឧបករណ៍ {{name}}, {{status}}",
       "noTasks": "គ្មានកិច្ចការ។",
+      "noOutput": "គ្មានលទ្ធផលទេ។",
       "toolRead": "អាន",
       "toolEdit": "កែសម្រួល",
       "toolWrite": "សរសេរ",

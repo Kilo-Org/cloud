@@ -1685,6 +1685,7 @@
       "accessibility": "Инструмент «{{label}}», {{status}}",
       "accessibilityLabel": "Инструмент «{{name}}», {{status}}",
       "noTasks": "Нет задач.",
+      "noOutput": "Нет вывода.",
       "toolRead": "чтение",
       "toolEdit": "редактировать",
       "toolWrite": "запись",

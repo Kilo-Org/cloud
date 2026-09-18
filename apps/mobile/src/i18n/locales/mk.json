@@ -2155,6 +2155,7 @@
       "accessibility": "Алатка {{label}}, {{status}}",
       "accessibilityLabel": "Алатка {{name}}, {{status}}",
       "noTasks": "Нема задачи.",
+      "noOutput": "Нема излез.",
       "toolRead": "читање",
       "toolEdit": "уреди",
       "toolWrite": "пишување",

@@ -2155,6 +2155,7 @@
       "accessibility": "Værktøj: {{label}}, {{status}}",
       "accessibilityLabel": "Værktøj: {{name}}, {{status}}",
       "noTasks": "Ingen opgaver.",
+      "noOutput": "Ingen output.",
       "toolRead": "læs",
       "toolEdit": "redigér",
       "toolWrite": "skriv",

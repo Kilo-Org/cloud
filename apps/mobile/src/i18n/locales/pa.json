@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} ਟੂਲ, {{status}}",
       "accessibilityLabel": "{{name}} ਟੂਲ, {{status}}",
       "noTasks": "ਕੋਈ ਕੰਮ ਨਹੀਂ ਹੈ।",
+      "noOutput": "ਕੋਈ ਆਉਟਪੁੱਟ ਨਹੀਂ ਹੈ।",
       "toolRead": "ਪੜ੍ਹੋ",
       "toolEdit": "ਸੋਧੋ",
       "toolWrite": "ਲਿਖੋ",

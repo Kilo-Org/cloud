@@ -142,7 +142,7 @@ describe('ChildSessionSheet recovery', () => {
     // The landed rows are the truth: the settled failure must not resurface as
     // "could not load" — the banner and Retry go away instead.
     expect(textValues(renderer.root)).not.toContain('Connection lost. Please retry in a moment.');
-    expect(textValues(renderer.root)).not.toContain('Connection failed. Please retry in a moment.');
+    expect(textValues(renderer.root)).not.toContain(i18n.t('agentChat.session.connectionTrouble'));
     expect(renderer.root.findAllByType(QueryError)).toHaveLength(0);
     expect(textValues(list)).toEqual(['Live arrival']);
     expect(host(renderer.root, 'FlashList')).toBe(list);
@@ -229,7 +229,7 @@ describe('ChildSessionSheet recovery', () => {
     await sheet.sync({ sessionError: 'Runtime failure' });
     expect(textValues(renderer.root)).toEqual(
       expect.arrayContaining([
-        'Connection failed. Please retry in a moment.',
+        i18n.t('agentChat.session.connectionTrouble'),
         i18n.t('agentChat.messageFailure.assistantFailed'),
       ])
     );
@@ -274,7 +274,7 @@ describe('ChildSessionSheet recovery', () => {
   it('preserves uncached Retry, loading, confirmed empty history, and later live content', async () => {
     const sheet = await mountRecovery([]);
     expect(textValues(sheet.renderer.root)).toContain(
-      'Connection failed. Please retry in a moment.'
+      i18n.t('agentChat.session.connectionTrouble')
     );
     expect(retryButton(sheet.renderer.root).props.disabled).toBe(false);
     const pending = Promise.withResolvers<SessionSnapshotPageOutcome | null>();

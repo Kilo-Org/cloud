@@ -28,6 +28,7 @@ import { getChildSessionSheetState } from './child-session-sheet-state';
 import { SessionMessageList } from './session-message-list';
 import { SessionPageSheet } from './session-page-sheet';
 import { SessionStatusIndicator } from './session-status-indicator';
+import { sessionStatusErrorMessage } from './session-terminal-error';
 import { WorkingIndicator } from './working-indicator';
 
 type ChildSessionSheetProps = {
@@ -168,7 +169,7 @@ export function ChildSessionSheet({
           // event; this guard covers the gap before that event arrives.
           <QueryError
             title={t('agentChat.childSessionSheet.couldNotLoad')}
-            message={hydrationError}
+            message={sessionStatusErrorMessage(hydrationError)}
             onRetry={onRetry}
             isRetrying={hydrationState.status === 'loading'}
             placement="top"
@@ -213,7 +214,7 @@ export function ChildSessionSheet({
       hydrationState.status === 'error' ? (
         <QueryError
           title={t('agentChat.childSessionSheet.couldNotLoad')}
-          message={hydrationState.message}
+          message={sessionStatusErrorMessage(hydrationState.message)}
           onRetry={onRetry}
         />
       ) : (

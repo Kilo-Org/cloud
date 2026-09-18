@@ -1,5 +1,5 @@
 import { act } from '@/test/renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildProps,
@@ -56,7 +56,7 @@ describe('ChildSessionSheet title layout', () => {
       hydrationState: errorState,
       messages: [],
       sessionError: null,
-      expectedText: 'Failed',
+      expectedText: i18n.t('agentChat.messageFailure.assistantFailed'),
       retryCount: 1,
     },
     {
@@ -110,7 +110,7 @@ describe('ChildSessionSheet mounted', () => {
     expect(renderer.root.findAllByType(QueryError)).toHaveLength(1);
     expect(renderer.root.findAllByType(QueryError)[0]?.props.placement).toBe('top');
     expect(renderer.root.findAll(node => Object.is(node.type, 'CenteredState'))).toHaveLength(0);
-    expect(textValues(renderer.root)).toContain('Failed');
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
     expect(retryButton(renderer.root).props.accessibilityState).toEqual({
       disabled: false,
       busy: false,
@@ -121,7 +121,9 @@ describe('ChildSessionSheet mounted', () => {
 
     expect(host(renderer.root, 'SheetHeader')).toBe(header);
     expect(header.props).toMatchObject({ title: props.title });
-    expect(textValues(renderer.root)).toEqual(expect.arrayContaining(['child text', 'Failed']));
+    expect(textValues(renderer.root)).toEqual(
+      expect.arrayContaining(['child text', i18n.t('agentChat.messageFailure.assistantFailed')])
+    );
     expect(retryButton(renderer.root).props.accessibilityState).toEqual({
       disabled: true,
       busy: true,
@@ -176,6 +178,47 @@ describe('ChildSessionSheet mounted', () => {
     expect(renderer.root.findAllByType(ChildSessionModelLabel)).toHaveLength(0);
     const errors = renderer.root.findAllByType(QueryError);
     expect(errors).toHaveLength(1);
+  });
+});
+
+describe('ChildSessionSheet localized hydration errors', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('renders the reader copy for an unrecognized SDK string in Spanish', async () => {
+    await i18n.changeLanguage('es');
+    const renderer = await renderSheet(
+      buildProps({ getChildMessages: () => [], hydrationState: errorState })
+    );
+
+    const errors = renderer.root.findAllByType(QueryError);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.message).toBe(i18n.t('agentChat.messageFailure.assistantFailed'));
+    expect(errors[0]?.props.message).not.toBe('Failed');
+    expect(errors[0]?.props.message).not.toBe(
+      i18n.t('agentChat.messageFailure.assistantFailed', { lng: 'en' })
+    );
+  });
+
+  it('renders the connection copy for a recognized SDK string in Spanish', async () => {
+    await i18n.changeLanguage('es');
+    const renderer = await renderSheet(
+      buildProps({
+        getChildMessages: () => [],
+        hydrationState: {
+          status: 'error',
+          message: 'Connection failed. Please retry in a moment.',
+        },
+      })
+    );
+
+    const errors = renderer.root.findAllByType(QueryError);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
+    expect(errors[0]?.props.message).not.toBe(
+      i18n.t('agentChat.session.connectionTrouble', { lng: 'en' })
+    );
   });
 });
 

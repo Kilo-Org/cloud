@@ -1186,6 +1186,32 @@ describe('credential issuance authentication guards', () => {
     );
     expect(mockGetServerSession).not.toHaveBeenCalled();
   });
+
+  test('keeps the request query in the callback-aware sign-in URL', async () => {
+    // A resume link (`/cloud/sessions/<id>?at=<anchor>`) must not lose its
+    // anchor on the way to sign-in: the cloud-agent layout redirects before the
+    // session page can supply its own callbackPath, so the query has to come
+    // from the request the proxy stamped.
+    mockHeaders.mockResolvedValue(
+      new Headers({ 'x-pathname': '/cloud/sessions/ses_1', 'x-search': '?at=msg_2' })
+    );
+    mockGetServerSession.mockResolvedValue(null);
+
+    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
+      'NEXT_REDIRECT:/users/sign_in?callbackPath=%2Fcloud%2Fsessions%2Fses_1%3Fat%3Dmsg_2'
+    );
+  });
+
+  test('appends no query when the request has none', async () => {
+    mockHeaders.mockResolvedValue(
+      new Headers({ 'x-pathname': '/cloud/sessions/ses_1', 'x-search': '' })
+    );
+    mockGetServerSession.mockResolvedValue(null);
+
+    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
+      'NEXT_REDIRECT:/users/sign_in?callbackPath=%2Fcloud%2Fsessions%2Fses_1'
+    );
+  });
 });
 
 describe('credential exchange bearer authentication guard', () => {

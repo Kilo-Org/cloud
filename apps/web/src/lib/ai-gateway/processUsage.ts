@@ -47,7 +47,6 @@ import {
 } from './usage-post-commit-work';
 import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
-import { reportAbuseCost } from '@/lib/ai-gateway/abuse-service';
 import type {
   BalanceUpdateResult,
   ChatCompletionChunk,
@@ -159,8 +158,8 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     mode: usageContext.mode,
     auto_model: usageContext.auto_model,
     ttfb_ms: usageContext.ttfb_ms,
-    abuse_delay: usageContext.abuse_delay ?? null,
-    abuse_downgraded_from: usageContext.abuse_downgraded_from ?? null,
+    abuse_delay: null,
+    abuse_downgraded_from: null,
   };
 }
 
@@ -243,8 +242,6 @@ export async function toInsertableDbUsageRecord(
     abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
 
-  // Legacy heuristic classification removed - abuse_classification is now handled
-  // by the external abuse detection service in src/lib/abuse-service.ts
   if (organization_id) {
     //never log any sensitive data for orgs
     metadata.user_prompt_prefix = null;
@@ -1309,12 +1306,6 @@ export async function processTokenData(
   }
 
   const customCost_mUsd = calculateCustomCost_mUsd(usageContext.requested_model, usageStats);
-
-  // Report upstream cost to abuse service BEFORE zeroing for free/BYOK
-  // (abuse service needs actual spend for heuristics like free_tier_exhausted)
-  reportAbuseCost(usageContext, usageStats).catch(error => {
-    console.error('[Abuse] Failed to report cost:', error);
-  });
 
   // Preserve the real cost before zeroing for free/BYOK
   usageStats.market_cost ??= usageStats.cost_mUsd;

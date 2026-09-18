@@ -20,6 +20,10 @@ const ASSOCIATED_DOMAIN = 'applinks:app.kilo.ai';
 // apps/web/src/lib/app-site-association.test.ts pins. Both halves name the one
 // relying-party host, app.kilo.ai.
 const PASSKEY_ASSOCIATED_DOMAIN = 'webcredentials:app.kilo.ai';
+// Expo Head's handoff origin (extra.router.headOrigin). It is the origin of
+// ASSOCIATED_DOMAIN above: the session link the app advertises and the
+// universal link the app claims have to be the same URL.
+const HEAD_ORIGIN = 'https://app.kilo.ai';
 // The app name (app.config.ts `name`). `$(PRODUCT_NAME)` resolves to this in
 // the base Info.plist, but `.lproj/InfoPlist.strings` is compiled verbatim, so
 // the localized copy has to spell it out.
@@ -93,6 +97,15 @@ check(
 check(
   associatedDomains.includes(PASSKEY_ASSOCIATED_DOMAIN),
   `ios.associatedDomains must contain "${PASSKEY_ASSOCIATED_DOMAIN}"`
+);
+
+// Session handoff: expo-router's Head builds the advertised NSUserActivity URL
+// from extra.router.headOrigin and throws in development when it is missing
+// (expo-router/build/head/url.js), so an empty `router` silently disables every
+// session handoff on iOS.
+check(
+  config.extra?.router?.headOrigin === HEAD_ORIGIN,
+  `extra.router.headOrigin must be "${HEAD_ORIGIN}"`
 );
 
 const blockedPermissions = config.android?.blockedPermissions ?? [];

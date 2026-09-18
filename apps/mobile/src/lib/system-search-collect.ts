@@ -10,7 +10,7 @@
  */
 
 import { PERSONAL_SECURITY_SCOPE } from '@kilocode/app-shared/security-agent';
-import { type QueryClient } from '@tanstack/react-query';
+import { type Query, type QueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 
 import { collectUnfilteredPages } from '@/lib/agent-session-pages';
@@ -19,11 +19,12 @@ import {
   activeSessionSearchDocument,
   findingSearchDocument,
   inboxPrSearchDocument,
+  PERSONAL_SOURCE_SCOPE,
   providerPrSearchDocument,
   recentPrSearchDocument,
   storedSessionSearchDocument,
   type SystemSearchDocument,
-  type SystemSearchFamily,
+  systemSearchSourceKey,
 } from '@/lib/system-search-entries';
 
 // ── cache decoding ─────────────────────────────────────────────────────────
@@ -114,87 +115,135 @@ type RowDecoder<TRow> = {
 /**
  * Every document the app can build from its current cache, plus its stored PR
  * recents, deduped by id (first occurrence wins), together with the source
- * families whose queries this run could actually enumerate.
+ * scopes whose queries this run could fully enumerate.
  *
- * The families are what lets the sync distinguish "the source says the user can
+ * The sources are what lets the sync distinguish "the source says the user can
  * no longer see this" from "the source's query is not in the cache this run"
  * (a cold start hydrates only a subset), so it never drops a still-valid entry
- * just because its query has not loaded yet.
+ * just because its query has not loaded yet. A scope is recorded only by a
+ * query that enumerated it completely: an unfiltered list whose page window
+ * `maxPages` has not trimmed.
  */
 export type SystemSearchCollection = {
   documents: SystemSearchDocument[];
-  observedFamilies: Set<SystemSearchFamily>;
+  observedSources: Set<string>;
 };
 
 export async function collectSystemSearchDocuments(
   queryClient: QueryClient
 ): Promise<SystemSearchCollection> {
   const documents: SystemSearchDocument[] = [];
-  const observedFamilies = new Set<SystemSearchFamily>();
+  const observedSources = new Set<string>();
   for (const query of queryClient.getQueryCache().getAll()) {
-    documents.push(...documentsFromQuery(query.queryKey, query.state.data));
-    // Only a successful query is authoritative: a pending or failed fetch has
-    // not produced the source's row set, so its absence is ignorance, not
-    // evidence that the user can no longer see the entries it once carried.
-    if (query.state.status === 'success') {
-      observeFamily(queryKeyPath(query.queryKey), observedFamilies);
+    const collected = documentsFromQuery(query);
+    documents.push(...collected.documents);
+    // Only a successful query that fully enumerated a source scope is
+    // authoritative. A query can hold the family path without enumerating it —
+    // the findings capacity probe fetches `limit: 1` under `listFindings`, a
+    // filtered list enumerates a subset, and a window trimmed by `maxPages`
+    // enumerates only the newest pages — so its success is not evidence that
+    // the rest of the source is gone, and it must not authorise removing that
+    // source's index entries.
+    if (query.state.status === 'success' && collected.observedSource !== null) {
+      observedSources.add(collected.observedSource);
     }
   }
   documents.push(...(await recentPrDocuments()));
-  return { documents: dedupeById(documents), observedFamilies };
+  return { documents: dedupeById(documents), observedSources };
 }
 
-/** Record the source family one successful source query speaks for. */
-function observeFamily(path: string | null, observed: Set<SystemSearchFamily>): void {
-  if (path === 'cliSessionsV2.list' || path === 'activeSessions.list') {
-    observed.add('sessions');
-    return;
-  }
-  if (path === 'githubPrReview.listInbox' || path === 'providerReview.listInbox') {
-    observed.add('pullRequests');
-    return;
-  }
-  if (
-    path === 'securityAgent.listFindings' ||
-    path === 'organizations.securityAgent.listFindings'
-  ) {
-    observed.add('findings');
-  }
-}
+/**
+ * What one cached query carries: the documents it enumerates, and the source
+ * scope key it fully enumerated, or null when it did not enumerate one. The
+ * observed source is non-null only when `data` decoded as that source's list
+ * payload, the key input carried no narrowing filter, and the page window was
+ * not trimmed, so a probe, a filtered list or a partial window never claims a
+ * source.
+ */
+type QueryDocuments = {
+  documents: SystemSearchDocument[];
+  observedSource: string | null;
+};
 
-function documentsFromQuery(queryKey: readonly unknown[], data: unknown): SystemSearchDocument[] {
+const NOT_ENUMERATED: QueryDocuments = { documents: [], observedSource: null };
+
+/** The keys whose presence narrows a source list to a subset of its scope. */
+const SESSION_NARROWING_KEYS = ['createdOnPlatform', 'gitUrl'] as const;
+const FINDING_NARROWING_KEYS = [
+  'status',
+  'severity',
+  'outcomeFilter',
+  'repoFullName',
+  'overdue',
+] as const;
+
+const sessionScopeInputSchema = z.object({ organizationId: z.string().min(1).nullish() });
+const providerInboxInputSchema = z
+  .object({
+    platform: z.enum(['gitlab', 'bitbucket']),
+    organizationId: z.string().optional(),
+  })
+  .strict();
+const queryInputSchema = z.record(z.string(), z.unknown());
+const maxPagesSchema = z.number();
+const pagesDataSchema = z.object({ pages: z.array(z.unknown()) });
+
+type QueryInput = z.infer<typeof queryInputSchema>;
+
+function documentsFromQuery(query: Query): QueryDocuments {
+  const queryKey = query.queryKey;
+  const data = query.state.data;
   const path = queryKeyPath(queryKey);
   if (path === 'cliSessionsV2.list') {
     const parsed = storedSessionsDataSchema.safeParse(data);
     if (!parsed.success) {
-      return [];
+      return NOT_ENUMERATED;
     }
     // The stored list is the cursor-paginated cliSessions shape the shared
     // page collector already flattens and dedupes by session id.
     const pages = parsed.data.pages.map(page => ({
       cliSessions: decodedRows(page.cliSessions, storedSessionRowSchema),
     }));
-    return collectUnfilteredPages(pages).flatMap(row =>
-      presentOrEmpty(storedSessionSearchDocument(row))
-    );
+    return {
+      documents: collectUnfilteredPages(pages).flatMap(row =>
+        presentOrEmpty(storedSessionSearchDocument(row))
+      ),
+      observedSource: sessionObservedSource(query),
+    };
   }
   if (path === 'activeSessions.list') {
     const parsed = activeSessionsDataSchema.safeParse(data);
     if (!parsed.success) {
-      return [];
+      return NOT_ENUMERATED;
     }
-    return decodedRows(parsed.data.sessions, activeSessionRowSchema).flatMap(row =>
-      presentOrEmpty(activeSessionSearchDocument(row))
-    );
+    // The live list enumerates only currently running sessions, a subset of
+    // the stored history that already carries every session, so it contributes
+    // documents but never authorises a removal.
+    return {
+      documents: decodedRows(parsed.data.sessions, activeSessionRowSchema).flatMap(row =>
+        presentOrEmpty(activeSessionSearchDocument(row))
+      ),
+      observedSource: null,
+    };
   }
   if (path === 'githubPrReview.listInbox') {
     const parsed = inboxDataSchema.safeParse(data);
     if (!parsed.success) {
-      return [];
+      return NOT_ENUMERATED;
     }
-    return parsed.data.pages
-      .flatMap(page => decodedRows(page.items, inboxItemRowSchema))
-      .map(row => inboxPrSearchDocument(row));
+    // The GitHub inbox is the whole GitHub provider list (`{}` is its only
+    // input); the stored recents are unioned in below, so a GitHub id absent
+    // from both is genuinely gone. A non-empty input is a filtered inbox.
+    const input = queryInput(queryKey);
+    const isDefaultInput = input !== null && Object.keys(input).length === 0;
+    return {
+      documents: parsed.data.pages
+        .flatMap(page => decodedRows(page.items, inboxItemRowSchema))
+        .map(row => inboxPrSearchDocument(row)),
+      observedSource: isDefaultInput
+        ? untrimmedSource(query, systemSearchSourceKey('pullRequests', 'github'))
+        : null,
+    };
   }
   if (path === 'providerReview.listInbox') {
     // GitLab and Bitbucket fetch their inbox under the provider query (the
@@ -203,20 +252,107 @@ function documentsFromQuery(queryKey: readonly unknown[], data: unknown): System
     // its ref, so the document routes through the row's own provider.
     const parsed = inboxDataSchema.safeParse(data);
     if (!parsed.success) {
-      return [];
+      return NOT_ENUMERATED;
     }
-    return parsed.data.pages
-      .flatMap(page => decodedRows(page.items, providerInboxItemRowSchema))
-      .map(row => providerPrSearchDocument(row.ref, row.title ?? ''));
+    const provider = providerInboxProvider(queryInput(queryKey));
+    return {
+      documents: parsed.data.pages
+        .flatMap(page => decodedRows(page.items, providerInboxItemRowSchema))
+        .map(row => providerPrSearchDocument(row.ref, row.title ?? '')),
+      observedSource:
+        provider === null
+          ? null
+          : untrimmedSource(query, systemSearchSourceKey('pullRequests', provider)),
+    };
   }
   if (path === 'securityAgent.listFindings') {
-    return findingDocuments(data, PERSONAL_SECURITY_SCOPE);
+    return findingsFromQuery(query, PERSONAL_SECURITY_SCOPE);
   }
   if (path === 'organizations.securityAgent.listFindings') {
     const organization = organizationScope(queryKey);
-    return organization === null ? [] : findingDocuments(data, organization);
+    return organization === null ? NOT_ENUMERATED : findingsFromQuery(query, organization);
   }
-  return [];
+  return NOT_ENUMERATED;
+}
+
+function findingsFromQuery(query: Query, scope: string): QueryDocuments {
+  const parsed = findingsDataSchema.safeParse(query.state.data);
+  if (!parsed.success) {
+    return NOT_ENUMERATED;
+  }
+  // The findings list is filtered by status/severity/outcome by default, so a
+  // query with any of those keys enumerates only a subset and must not speak
+  // for the whole scope. Only the unfiltered list (the "all" status) does.
+  const filtered = hasNarrowingFilter(findingsFilters(query.queryKey), FINDING_NARROWING_KEYS);
+  return {
+    documents: parsed.data.pages
+      .flatMap(page => decodedRows(page.findings, findingRowSchema))
+      .map(row => findingSearchDocument(row, scope)),
+    observedSource: filtered
+      ? null
+      : untrimmedSource(query, systemSearchSourceKey('findings', scope)),
+  };
+}
+
+/**
+ * The filters segment of a findings list key. The screen builds the list as
+ * `[...queryKey(), filters]`, so the filters ride in tRPC's third segment while
+ * the meta (carrying the organization input, if any) stays at index 1. A
+ * length-two key (the capacity probe's `queryOptions` shape) keeps its input in
+ * the meta instead.
+ */
+function findingsFilters(queryKey: readonly unknown[]): QueryInput | null {
+  const filters = queryInputSchema.safeParse(queryKey[2]);
+  return filters.success ? filters.data : queryInput(queryKey);
+}
+
+/**
+ * The source key a stored-sessions query fully enumerated, or null when its
+ * input narrows the list (a platform or repository filter) so it only carries
+ * a subset of its scope.
+ */
+function sessionObservedSource(query: Query): string | null {
+  const input = queryInput(query.queryKey);
+  if (hasNarrowingFilter(input, SESSION_NARROWING_KEYS)) {
+    return null;
+  }
+  const scope = sessionScopeInputSchema.safeParse(input);
+  const organizationId = scope.success ? scope.data.organizationId : undefined;
+  return untrimmedSource(
+    query,
+    systemSearchSourceKey('sessions', organizationId ?? PERSONAL_SOURCE_SCOPE)
+  );
+}
+
+/** The candidate source key, or null when `maxPages` may have evicted pages. */
+function untrimmedSource(query: Query, source: string): string | null {
+  const bound = maxPagesSchema.safeParse(query.options.maxPages);
+  if (!bound.success) {
+    return source;
+  }
+  const pages = pagesDataSchema.safeParse(query.state.data);
+  // A full window may already have evicted its oldest pages, so its rows are a
+  // subset of the source; only a window still shorter than the bound is a
+  // complete enumeration of what the query has loaded.
+  return pages.success && pages.data.pages.length >= bound.data ? null : source;
+}
+
+/** Whether the query's input carries any of the narrowing filter keys. */
+function hasNarrowingFilter(input: QueryInput | null, keys: readonly string[]): boolean {
+  // An input this module does not recognise is not evidence of a full read.
+  if (input === null) {
+    return true;
+  }
+  return keys.some(key => {
+    const value = input[key];
+    return value !== undefined && value !== null && value !== '';
+  });
+}
+
+/** The `platform` a provider inbox query enumerates, or null when filtered. */
+function providerInboxProvider(input: QueryInput | null): string | null {
+  const parsed = providerInboxInputSchema.safeParse(input);
+  return parsed.success ? parsed.data.platform : null;
 }
 
 /** Decode one page of rows, dropping a malformed row alone. */
@@ -231,16 +367,6 @@ function decodedRows<TRow>(rows: readonly unknown[], rowSchema: RowDecoder<TRow>
   return decoded;
 }
 
-function findingDocuments(data: unknown, scope: string): SystemSearchDocument[] {
-  const parsed = findingsDataSchema.safeParse(data);
-  if (!parsed.success) {
-    return [];
-  }
-  return parsed.data.pages
-    .flatMap(page => decodedRows(page.findings, findingRowSchema))
-    .map(row => findingSearchDocument(row, scope));
-}
-
 /** The `organizationId` of an organization-scoped query key, or null. */
 function organizationScope(queryKey: readonly unknown[]): string | null {
   const meta = queryKeyMetaSchema.safeParse(queryKey[1]);
@@ -249,6 +375,13 @@ function organizationScope(queryKey: readonly unknown[]): string | null {
   }
   const input = organizationScopeInputSchema.safeParse(meta.data.input);
   return input.success ? input.data.organizationId : null;
+}
+
+/** The query key's input payload as a plain object, or null when it has none. */
+function queryInput(queryKey: readonly unknown[]): QueryInput | null {
+  const meta = queryKeyMetaSchema.safeParse(queryKey[1]);
+  const parsed = queryInputSchema.safeParse(meta.success ? meta.data.input : undefined);
+  return parsed.success ? parsed.data : null;
 }
 
 function queryKeyPath(queryKey: readonly unknown[]): string | null {

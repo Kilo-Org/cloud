@@ -49,6 +49,11 @@ export type SystemSearchDocument = {
 /** The route families an indexed id can name, one per source the app indexes. */
 export type SystemSearchFamily = 'sessions' | 'pullRequests' | 'findings';
 
+/** The route prefix of each indexed family, in the order the id is matched. */
+const SESSION_HREF_PREFIX = '/(app)/agent-chat/';
+const PULL_REQUEST_HREF_PREFIX = '/(app)/pr-review/';
+const FINDING_HREF_PREFIX = '/(app)/(tabs)/(3_profile)/security-agent/';
+
 /**
  * The three route groups an indexed id is allowed to name, with the source
  * family each belongs to. The family lets the sync keep an indexed id whose
@@ -56,9 +61,9 @@ export type SystemSearchFamily = 'sessions' | 'pullRequests' | 'findings';
  * queries), so a valid entry is not dropped just because its query is absent.
  */
 const HREF_FAMILIES: readonly { prefix: string; family: SystemSearchFamily }[] = [
-  { prefix: '/(app)/agent-chat/', family: 'sessions' },
-  { prefix: '/(app)/pr-review/', family: 'pullRequests' },
-  { prefix: '/(app)/(tabs)/(3_profile)/security-agent/', family: 'findings' },
+  { prefix: SESSION_HREF_PREFIX, family: 'sessions' },
+  { prefix: PULL_REQUEST_HREF_PREFIX, family: 'pullRequests' },
+  { prefix: FINDING_HREF_PREFIX, family: 'findings' },
 ];
 
 /** The route groups an indexed id is allowed to name. */
@@ -272,22 +277,82 @@ export function systemSearchHrefFromId(id: string): string | null {
   return known ? id : null;
 }
 
+/** The personal scope name shared by the session and finding sources. */
+export const PERSONAL_SOURCE_SCOPE = 'personal';
+
 /**
- * The source family an indexed id belongs to, or null when the id is not one
- * this section issued. The sync removes an indexed entry only when its family
- * was enumerated this run, so an id from a source whose query is not in the
- * cache (a cold start hydrates only some queries) is left in place.
+ * The evidence key for one fully enumerated source: a family plus the scope
+ * within it — the personal scope, one organization, or one pull-request
+ * provider. Two queries that enumerate different scopes of a family (the
+ * personal findings list and an organization's, or the GitHub inbox and the
+ * GitLab one) must not authorise each other's removals, so the plan matches an
+ * indexed id against the key of the scope it actually belongs to rather than
+ * against a family-wide flag.
  */
-function systemSearchFamilyOfId(id: string): SystemSearchFamily | null {
+export function systemSearchSourceKey(family: SystemSearchFamily, scope: string): string {
+  return `${family}:${scope}`;
+}
+
+/**
+ * The source keys whose full enumeration authorises removing one indexed id,
+ * or an empty list when the id is not one this section issued. The scope is
+ * read back out of the id the app's route builders produced: a session's
+ * `organizationId` parameter, a pull request's provider segment, or a
+ * finding's scope segment. The sync removes an indexed entry only when its own
+ * source was enumerated this run, so an id whose query is not in the cache (a
+ * cold start hydrates only some queries) is left in place.
+ */
+export function systemSearchSourceKeysOfId(id: string): string[] {
   if (systemSearchHrefFromId(id) === null) {
+    return [];
+  }
+  if (id.startsWith(SESSION_HREF_PREFIX)) {
+    return [
+      systemSearchSourceKey('sessions', organizationIdOfSessionId(id) ?? PERSONAL_SOURCE_SCOPE),
+    ];
+  }
+  if (id.startsWith(PULL_REQUEST_HREF_PREFIX)) {
+    return [systemSearchSourceKey('pullRequests', providerOfPullRequestId(id))];
+  }
+  if (id.startsWith(FINDING_HREF_PREFIX)) {
+    const scope = findingScopeOfId(id);
+    return scope === null ? [] : [systemSearchSourceKey('findings', scope)];
+  }
+  return [];
+}
+
+const ORGANIZATION_ID_IN_ID = /[?&]organizationId=([^&#]*)/;
+
+/** The `organizationId` an indexed session id carries, or null for personal. */
+function organizationIdOfSessionId(id: string): string | null {
+  const encoded = ORGANIZATION_ID_IN_ID.exec(id)?.[1];
+  if (encoded === undefined) {
     return null;
   }
-  for (const entry of HREF_FAMILIES) {
-    if (id.startsWith(entry.prefix)) {
-      return entry.family;
-    }
+  try {
+    const decoded = decodeURIComponent(encoded);
+    return decoded.length > 0 ? decoded : null;
+  } catch {
+    // A malformed percent-escape means the id cannot name a real scope.
+    return null;
   }
-  return null;
+}
+
+/**
+ * The provider an indexed pull-request id belongs to. A GitHub id is
+ * `<owner>/<repo>/<number>` and carries no platform segment, so anything that
+ * is not the `gitlab`/`bitbucket` discriminator is GitHub; misreading a GitHub
+ * repo literally named `gitlab` only ever keeps an entry longer.
+ */
+function providerOfPullRequestId(id: string): string {
+  const first = id.slice(PULL_REQUEST_HREF_PREFIX.length).split(/[/?#]/, 1)[0] ?? '';
+  return first === 'gitlab' || first === 'bitbucket' ? first : 'github';
+}
+
+/** The `personal`/organization scope segment of an indexed finding id. */
+function findingScopeOfId(id: string): string | null {
+  const first = id.slice(FINDING_HREF_PREFIX.length).split('/', 1)[0] ?? '';
+  return first.length > 0 ? first : null;
 }
 
 /**
@@ -355,18 +420,18 @@ export type SystemSearchUpdatePlan = {
  * Documents are deduped by id (first occurrence wins, matching the app's own
  * row order). A document is added when its id is unknown or its fingerprint
  * changed. An indexed id is removed only when the documents no longer carry it
- * AND its source family was enumerated this run: the react-query cache is the
- * only evidence the app has, and a cold start hydrates a subset of the source
- * queries, so an id whose query is simply absent must stay rather than be
- * dropped as if the user could no longer see it. This is still how an item the
- * user can no longer see leaves the index — its family was enumerated, so its
- * absence is evidence, not ignorance.
+ * AND its own source scope was fully enumerated this run: the react-query cache
+ * is the only evidence the app has, and a cold start hydrates a subset of the
+ * source queries, so an id whose query is simply absent must stay rather than
+ * be dropped as if the user could no longer see it. This is still how an item
+ * the user can no longer see leaves the index — its source was enumerated, so
+ * its absence is evidence, not ignorance.
  */
 export function planSystemSearchUpdate(input: {
   indexed: readonly SystemSearchDocument[];
   documents: readonly SystemSearchDocument[];
-  /** The source families the current run could enumerate from the cache. */
-  observedFamilies: ReadonlySet<SystemSearchFamily>;
+  /** The source scopes the current run could fully enumerate from the cache. */
+  observedSources: ReadonlySet<string>;
 }): SystemSearchUpdatePlan {
   const indexedById = indexById(input.indexed);
   const documentsById = indexById(input.documents);
@@ -381,8 +446,7 @@ export function planSystemSearchUpdate(input: {
     if (documentsById.has(id)) {
       return false;
     }
-    const family = systemSearchFamilyOfId(id);
-    return family !== null && input.observedFamilies.has(family);
+    return systemSearchSourceKeysOfId(id).some(source => input.observedSources.has(source));
   });
   return { add, remove };
 }

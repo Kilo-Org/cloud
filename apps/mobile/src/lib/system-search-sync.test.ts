@@ -190,12 +190,37 @@ describe('SystemSearchIndexSync', () => {
     expect(bridge.index.has(finding.id)).toBe(true);
 
     // Once the findings query is in the cache and successful, its absence from
-    // the documents is evidence the user can no longer see the finding.
-    queryClient.setQueryData([['securityAgent', 'listFindings'], { type: 'infinite', input: {} }], {
+    // the documents is evidence the user can no longer see the finding. The
+    // screen builds the list key as `[...queryKey(), filters]`, so the
+    // unfiltered filters segment sits in the third position.
+    queryClient.setQueryData([['securityAgent', 'listFindings'], { type: 'query' }, {}], {
       pages: [{ findings: [] }],
     });
     await expect(sync.syncNow()).resolves.toBe('applied');
     expect(bridge.index.has(finding.id)).toBe(false);
+  });
+
+  it('keeps an indexed finding when only the bounded capacity probe is cached', async () => {
+    const bridge = createBridge();
+    const harness = await loadHarness(bridge);
+    const queryClient = new QueryClient();
+    const finding = findingSearchDocument({ id: 'f-1', title: 'SQL injection' }, 'personal');
+    bridge.index.set(finding.id, finding);
+    // The findings screen also mounts `useSecurityAnalysisCapacity`, which
+    // fetches `listFindings` with `{ status: 'open', limit: 1 }` under the same
+    // query path. Its success enumerates no findings, so it must not be taken
+    // as evidence that the indexed finding is gone.
+    queryClient.setQueryData(
+      [
+        ['securityAgent', 'listFindings'],
+        { type: 'query', input: { status: 'open', limit: 1, offset: 0 } },
+      ],
+      { findings: [], totalCount: 3, runningCount: 0, concurrencyLimit: 3 }
+    );
+    const { sync } = createSync(harness, bridge, queryClient);
+
+    await expect(sync.syncNow()).resolves.toBe('skipped');
+    expect(bridge.index.has(finding.id)).toBe(true);
   });
 
   it('reports a rejected apply once, keeps the index, and retries on the next trigger', async () => {
@@ -344,7 +369,11 @@ describe('SystemSearchIndexSync', () => {
         queryClient.setQueryData(SESSION_LIST_KEY, storedSessions(`Burst ${tick}`));
       }, tick * 300);
     }
-    await vi.advanceTimersByTimeAsync(18 * 300 + COALESCE_MS);
+    // Stop just past the 5000 ms maximum-wait deadline, before the trailing
+    // timer re-armed by the last write (5100 + 750 ms) and before the previous
+    // write's own trailing timer (4800 + 750 ms) could fire. Only the max-wait
+    // cap can have applied a sync by now, so this fails if the cap is removed.
+    await vi.advanceTimersByTimeAsync(18 * 300);
     await sync.getRunQueue();
 
     expect(bridge.applyUpdate).toHaveBeenCalled();
@@ -377,7 +406,7 @@ describe('SystemSearchIndexSync', () => {
     });
     const sync = new harness.SystemSearchIndexSync({
       queryClient,
-      collect: async () => ({ documents: [], observedFamilies: new Set() }),
+      collect: async () => ({ documents: [], observedSources: new Set() }),
       fingerprints: bridge.indexedSystemSearchFingerprints,
       apply: async () => undefined,
       report,

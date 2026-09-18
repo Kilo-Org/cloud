@@ -55,14 +55,23 @@ public final class KiloSystemSearchModule: Module {
   private let index = CSSearchableIndex.default()
   private var openObserver: NSObjectProtocol?
 
+  /// How long one index call may block the shared operation queue before its
+  /// promise is rejected. `CSSearchableIndex` does not call its completion
+  /// handler when the index is unavailable, and every apply and clear runs on
+  /// the one serial queue, so an unbounded wait would wedge the index for the
+  /// rest of the process. Mirrors the Android module's
+  /// `latch.await(TIMEOUT_SECONDS, …)`.
+  private static let indexTimeout: DispatchTimeInterval = .seconds(30)
+  private static let timeoutMessage = "The system search index did not respond."
+
   public func definition() -> ModuleDefinition {
     Name("KiloSystemSearch")
     Events("onSystemSearchOpen")
 
     // The apply and the clear run on one serial queue, and each blocks that
-    // queue until the index answers, so their index calls and their ledger
-    // updates cannot interleave. The promise is resolved from the queue later;
-    // the closure itself returns immediately.
+    // queue until the index answers or the wait above times out, so their index
+    // calls and their ledger updates cannot interleave. The promise is resolved
+    // from the queue later; the closure itself returns immediately.
     AsyncFunction("applyUpdate") { (add: [SystemSearchRecord], removeIds: [String], promise: Promise) in
       KiloSystemSearchStore.operationQueue.async {
         self.apply(add: add, removeIds: removeIds, promise: promise)
@@ -120,7 +129,10 @@ public final class KiloSystemSearchModule: Module {
       indexError = error
       wait.signal()
     }
-    wait.wait()
+    guard Self.waitForIndex(wait) else {
+      promise.reject(Self.indexTimeoutError())
+      return
+    }
     if let indexError {
       promise.reject(indexError)
       return
@@ -130,7 +142,10 @@ public final class KiloSystemSearchModule: Module {
       deleteError = error
       wait.signal()
     }
-    wait.wait()
+    guard Self.waitForIndex(wait) else {
+      promise.reject(Self.indexTimeoutError())
+      return
+    }
     if let deleteError {
       promise.reject(deleteError)
       return
@@ -151,13 +166,31 @@ public final class KiloSystemSearchModule: Module {
       clearError = error
       wait.signal()
     }
-    wait.wait()
+    guard Self.waitForIndex(wait) else {
+      promise.reject(Self.indexTimeoutError())
+      return
+    }
     if let clearError {
       promise.reject(clearError)
       return
     }
     UserDefaults.standard.removeObject(forKey: KiloSystemSearchStore.ledgerKey)
     promise.resolve()
+  }
+
+  /// Waits for one index call to answer, with the bound above. False means the
+  /// completion never ran within it, so the caller must fail the promise
+  /// instead of reading the error it never set.
+  private static func waitForIndex(_ wait: DispatchSemaphore) -> Bool {
+    wait.wait(timeout: .now() + indexTimeout) == .success
+  }
+
+  private static func indexTimeoutError() -> Exception {
+    Exception(
+      name: "ERR_SYSTEM_SEARCH_TIMEOUT",
+      description: timeoutMessage,
+      code: "ERR_SYSTEM_SEARCH_TIMEOUT"
+    )
   }
 
   private func indexItems(_ items: [CSSearchableItem], completion: @escaping (Error?) -> Void) {

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the collector suites for every source shape share one owned file */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the SecureStore mock and the unused query function settle without await because they resolve immediately */
 import { QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -236,7 +237,7 @@ describe('collectSystemSearchDocuments', () => {
   it('collects nothing from an empty cache', async () => {
     await expect(collectSystemSearchDocuments(new QueryClient())).resolves.toEqual({
       documents: [],
-      observedFamilies: new Set(),
+      observedSources: new Set(),
     });
   });
 
@@ -247,12 +248,163 @@ describe('collectSystemSearchDocuments', () => {
     client.setQueryData(PROVIDER_INBOX_KEY, { items: [] });
     client.setQueryData(ORG_FINDINGS_KEY, { pages: [{ findings: [] }] });
 
-    const { documents, observedFamilies } = await collectSystemSearchDocuments(client);
+    const { documents, observedSources } = await collectSystemSearchDocuments(client);
 
     expect(documents).toEqual([]);
-    // A successful query speaks for its family even when its payload is
-    // malformed or empty, so the diff may still remove that family's stale ids.
-    expect(observedFamilies).toEqual(new Set(['sessions', 'pullRequests', 'findings']));
+    // Only a payload that decodes as the family's list speaks for that family:
+    // the empty-but-valid findings page is authoritative, while a payload of
+    // the wrong shape is not evidence the family's entries are gone.
+    expect(observedSources).toEqual(new Set(['findings:org-1']));
+  });
+
+  it('does not claim a family from a bounded capacity probe', async () => {
+    const client = new QueryClient();
+    // The findings screen also mounts `useSecurityAnalysisCapacity`, which
+    // fetches `listFindings` with `{ status: 'open', limit: 1 }` under the same
+    // query path to read the concurrency counters. It is a successful
+    // `listFindings` entry, but its finite payload enumerates no findings, so
+    // it must not speak for the findings family.
+    client.setQueryData(
+      [
+        ['securityAgent', 'listFindings'],
+        { type: 'query', input: { status: 'open', limit: 1, offset: 0 } },
+      ],
+      {
+        findings: [
+          { id: 'finding-1', title: 'SQL injection', severity: 'critical', repo_full_name: 'a/b' },
+        ],
+        totalCount: 3,
+        runningCount: 1,
+        concurrencyLimit: 3,
+      }
+    );
+
+    const { documents, observedSources } = await collectSystemSearchDocuments(client);
+
+    expect(documents).toEqual([]);
+    expect(observedSources.has('findings:personal')).toBe(false);
+  });
+
+  it('does not claim the findings scope from a filtered list', async () => {
+    const client = new QueryClient();
+    // The findings screen's default view sends `status: 'open'`, and the
+    // screen builds the key as `[...queryKey(), filters]`, so the filters ride
+    // in the third segment. The query decodes as the list shape but enumerates
+    // only the open findings: indexing its rows is right, speaking for the
+    // whole personal scope would drop the fixed or dismissed entries it omits.
+    client.setQueryData(
+      [
+        ['securityAgent', 'listFindings'],
+        { type: 'query' },
+        { status: 'open', sortBy: 'severity_desc', limit: 50, offset: 0 },
+      ],
+      findings
+    );
+
+    const { documents, observedSources } = await collectSystemSearchDocuments(client);
+
+    expect(documents.map(document => document.id)).toEqual([
+      '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/finding-1',
+    ]);
+    expect(observedSources.has('findings:personal')).toBe(false);
+  });
+
+  it('claims the findings scope only from the unfiltered list', async () => {
+    const client = new QueryClient();
+    client.setQueryData(
+      [
+        ['securityAgent', 'listFindings'],
+        { type: 'query' },
+        { sortBy: 'severity_desc', limit: 50, offset: 0 },
+      ],
+      findings
+    );
+
+    const { observedSources } = await collectSystemSearchDocuments(client);
+
+    expect(observedSources.has('findings:personal')).toBe(true);
+  });
+
+  it('does not claim the sessions scope from a narrowed list', async () => {
+    const client = new QueryClient();
+    // `createdOnPlatform` narrows the stored list to one platform's sessions,
+    // so its success is not evidence that the other sessions are gone.
+    client.setQueryData(
+      [
+        ['cliSessionsV2', 'list'],
+        {
+          type: 'infinite',
+          input: {
+            organizationId: null,
+            limit: 30,
+            orderBy: 'updated_at',
+            createdOnPlatform: 'cli',
+          },
+        },
+      ],
+      storedSessions
+    );
+
+    const { documents, observedSources } = await collectSystemSearchDocuments(client);
+
+    expect(documents.map(document => document.id)).toEqual([
+      '/(app)/agent-chat/sess-1?organizationId=org-1',
+    ]);
+    expect(observedSources.has('sessions:personal')).toBe(false);
+  });
+
+  it('does not claim a scope whose page window was trimmed by maxPages', async () => {
+    const client = new QueryClient();
+    const queryFn = vi.fn(async () => storedSessions);
+    // The retained window is full (two pages against `maxPages: 2`), so the
+    // oldest pages may already have been evicted: the query enumerates only
+    // the pages it still holds.
+    client.getQueryCache().build(client, { queryKey: SESSION_LIST_KEY, queryFn, maxPages: 2 });
+    client.setQueryData(SESSION_LIST_KEY, storedSessions);
+
+    const { observedSources } = await collectSystemSearchDocuments(client);
+
+    expect(observedSources.has('sessions:personal')).toBe(false);
+  });
+
+  it('claims a source scope while its page window is below maxPages', async () => {
+    const client = new QueryClient();
+    const queryFn = vi.fn(async () => storedSessions);
+    client.getQueryCache().build(client, { queryKey: SESSION_LIST_KEY, queryFn, maxPages: 20 });
+    client.setQueryData(SESSION_LIST_KEY, storedSessions);
+
+    const { observedSources } = await collectSystemSearchDocuments(client);
+
+    expect(observedSources.has('sessions:personal')).toBe(true);
+  });
+
+  it('claims a pull-request provider only from its own inbox', async () => {
+    const client = new QueryClient();
+    client.setQueryData(INBOX_KEY, inbox);
+    client.setQueryData(PROVIDER_INBOX_KEY, providerInbox);
+
+    const { observedSources } = await collectSystemSearchDocuments(client);
+
+    expect(observedSources.has('pullRequests:github')).toBe(true);
+    expect(observedSources.has('pullRequests:gitlab')).toBe(true);
+    expect(observedSources.has('pullRequests:bitbucket')).toBe(false);
+  });
+
+  it('does not claim a provider whose inbox input is not its default', async () => {
+    const client = new QueryClient();
+    // An input beyond the provider discriminator (and the optional
+    // organization) is a filter, so the query enumerates a subset.
+    client.setQueryData(
+      [
+        ['providerReview', 'listInbox'],
+        { type: 'infinite', input: { platform: 'gitlab', state: 'open' } },
+      ],
+      providerInbox
+    );
+
+    const { observedSources } = await collectSystemSearchDocuments(client);
+
+    expect(observedSources.has('pullRequests:gitlab')).toBe(false);
   });
 
   it('does not claim a family whose source query never produced data', async () => {
@@ -263,9 +415,9 @@ describe('collectSystemSearchDocuments', () => {
     // are kept rather than dropped.
     client.getQueryCache().build(client, { queryKey: FINDINGS_KEY, queryFn });
 
-    const { observedFamilies } = await collectSystemSearchDocuments(client);
+    const { observedSources } = await collectSystemSearchDocuments(client);
 
-    expect(observedFamilies.has('findings')).toBe(false);
+    expect(observedSources.has('findings:personal')).toBe(false);
   });
 
   it('indexes the GitLab and Bitbucket rows the provider inbox cache holds', async () => {

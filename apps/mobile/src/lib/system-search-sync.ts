@@ -189,7 +189,7 @@ export class SystemSearchIndexSync {
       const plan = planSystemSearchUpdate({
         indexed: indexedDocuments(await this.deps.fingerprints()),
         documents: documents.documents,
-        observedFamilies: documents.observedFamilies,
+        observedSources: documents.observedSources,
       });
       if (plan.add.length === 0 && plan.remove.length === 0) {
         return 'skipped';

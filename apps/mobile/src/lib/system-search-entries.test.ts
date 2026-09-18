@@ -11,8 +11,9 @@ import {
   storedSessionSearchDocument,
   systemSearchDeeplinkFromId,
   type SystemSearchDocument,
-  type SystemSearchFamily,
   systemSearchHrefFromId,
+  systemSearchSourceKey,
+  systemSearchSourceKeysOfId,
 } from './system-search-entries';
 
 // `system-search-entries` reuses `providerRefFromRecentPr` from the recents
@@ -216,7 +217,7 @@ describe('fingerprints', () => {
       planSystemSearchUpdate({
         indexed: collected ? [collected] : [],
         documents: reCollected ? [reCollected] : [],
-        observedFamilies: new Set(['sessions']),
+        observedSources: new Set([systemSearchSourceKey('sessions', 'personal')]),
       })
     ).toEqual({ add: [], remove: [] });
   });
@@ -253,14 +254,20 @@ describe('fingerprints', () => {
 });
 
 describe('planSystemSearchUpdate', () => {
-  const ALL_FAMILIES = new Set<SystemSearchFamily>(['sessions', 'pullRequests', 'findings']);
+  // The source scopes the fixtures below belong to: the personal session and
+  // finding scopes, and the GitHub pull-request provider.
+  const ALL_SOURCES = new Set([
+    systemSearchSourceKey('sessions', 'personal'),
+    systemSearchSourceKey('pullRequests', 'github'),
+    systemSearchSourceKey('findings', 'personal'),
+  ]);
 
   it('adds an unknown id', () => {
     const next = sessionDocument('a', 'Alpha');
     const plan = planSystemSearchUpdate({
       indexed: [],
       documents: [next],
-      observedFamilies: ALL_FAMILIES,
+      observedSources: ALL_SOURCES,
     });
 
     expect(plan.add).toEqual([next]);
@@ -272,7 +279,7 @@ describe('planSystemSearchUpdate', () => {
     const plan = planSystemSearchUpdate({
       indexed: [current],
       documents: [sessionDocument('a', 'Alpha')],
-      observedFamilies: ALL_FAMILIES,
+      observedSources: ALL_SOURCES,
     });
 
     expect(plan.add).toEqual([]);
@@ -285,7 +292,7 @@ describe('planSystemSearchUpdate', () => {
     const plan = planSystemSearchUpdate({
       indexed: [current],
       documents: [renamed],
-      observedFamilies: ALL_FAMILIES,
+      observedSources: ALL_SOURCES,
     });
 
     expect(plan.add).toEqual([renamed]);
@@ -299,7 +306,7 @@ describe('planSystemSearchUpdate', () => {
     const plan = planSystemSearchUpdate({
       indexed: [kept, vanished],
       documents: [kept],
-      observedFamilies: ALL_FAMILIES,
+      observedSources: ALL_SOURCES,
     });
 
     expect(plan.add).toEqual([]);
@@ -314,7 +321,7 @@ describe('planSystemSearchUpdate', () => {
       documents: [kept],
       // The findings query was not in the cache this run: its absence from the
       // documents is ignorance, not evidence the user lost the finding.
-      observedFamilies: new Set<SystemSearchFamily>(['sessions']),
+      observedSources: new Set([systemSearchSourceKey('sessions', 'personal')]),
     });
 
     expect(plan.add).toEqual([]);
@@ -325,22 +332,79 @@ describe('planSystemSearchUpdate', () => {
     const plan = planSystemSearchUpdate({
       indexed: [sessionDocument('a', 'Alpha'), sessionDocument('b', 'Beta')],
       documents: [],
-      observedFamilies: ALL_FAMILIES,
+      observedSources: ALL_SOURCES,
     });
 
     expect(plan.add).toEqual([]);
     expect(plan.remove).toEqual(['/(app)/agent-chat/a', '/(app)/agent-chat/b']);
   });
 
+  it('keeps a finding whose own organization scope was not enumerated', () => {
+    const personal = findingSearchDocument({ id: 'f-1', title: 'SQL injection' }, 'personal');
+    const organization = findingSearchDocument({ id: 'f-2', title: 'XSS' }, 'org-1');
+    const plan = planSystemSearchUpdate({
+      indexed: [personal, organization],
+      documents: [],
+      // Only the personal list enumerated: the organization's absence from the
+      // documents is ignorance, so its entry stays.
+      observedSources: new Set([systemSearchSourceKey('findings', 'personal')]),
+    });
+
+    expect(plan.remove).toEqual([personal.id]);
+  });
+
+  it('keeps a GitLab pull request when only the GitHub provider was enumerated', () => {
+    const github = inboxPrSearchDocument({ owner: 'o', repo: 'r', number: 1, title: 'PR' });
+    const gitlab = recentPrSearchDocument({
+      owner: 'group/sub',
+      repo: 'repo',
+      number: 12,
+      title: 'Nested MR',
+      platform: 'gitlab',
+    });
+    const plan = planSystemSearchUpdate({
+      indexed: [github, gitlab],
+      documents: [],
+      observedSources: new Set([systemSearchSourceKey('pullRequests', 'github')]),
+    });
+
+    expect(plan.remove).toEqual([github.id]);
+  });
+
   it('dedupes documents by id, keeping the first occurrence', () => {
     const plan = planSystemSearchUpdate({
       indexed: [],
       documents: [sessionDocument('a', 'Alpha'), sessionDocument('a', 'Second')],
-      observedFamilies: ALL_FAMILIES,
+      observedSources: ALL_SOURCES,
     });
 
     expect(idsOf(plan.add)).toEqual(['/(app)/agent-chat/a']);
     expect(plan.add[0]?.title).toBe('Alpha');
+  });
+});
+
+describe('systemSearchSourceKeysOfId', () => {
+  it('reads the scope out of each indexed id shape', () => {
+    expect(systemSearchSourceKeysOfId('/(app)/agent-chat/sess-1?organizationId=org-1')).toEqual([
+      systemSearchSourceKey('sessions', 'org-1'),
+    ]);
+    expect(systemSearchSourceKeysOfId('/(app)/agent-chat/sess-1')).toEqual([
+      systemSearchSourceKey('sessions', 'personal'),
+    ]);
+    expect(systemSearchSourceKeysOfId('/(app)/pr-review/octocat/hello-world/42')).toEqual([
+      systemSearchSourceKey('pullRequests', 'github'),
+    ]);
+    expect(systemSearchSourceKeysOfId('/(app)/pr-review/gitlab/group/repo/12')).toEqual([
+      systemSearchSourceKey('pullRequests', 'gitlab'),
+    ]);
+    expect(
+      systemSearchSourceKeysOfId('/(app)/(tabs)/(3_profile)/security-agent/org-1/findings/f-2')
+    ).toEqual([systemSearchSourceKey('findings', 'org-1')]);
+  });
+
+  it('returns no source for an identifier this section did not issue', () => {
+    expect(systemSearchSourceKeysOfId('/(app)/settings')).toEqual([]);
+    expect(systemSearchSourceKeysOfId('kiloapp://agent-chat/sess-1')).toEqual([]);
   });
 });
 

@@ -12,6 +12,14 @@ const state = vi.hoisted(() => ({
   pathname: '/(app)/(tabs)/(0_home)',
 }));
 
+// The once-per-process cold-boot marker. Controllable so a case can start a
+// launch already spent (a warm entry) or assert the attempt was consumed.
+const boot = vi.hoisted(() => ({ spent: false }));
+
+// The account's gateway-usage read. `isLoaded` true means the server answered;
+// `hasUsage` is the account's answer once it did.
+const usage = vi.hoisted(() => ({ isLoaded: true, hasUsage: false }));
+
 // The account's consent-gate state, standing in for the SecureStore record the
 // bootstrap gate reads. `accepted` by default: the pre-existing cases assume
 // consent is already on file.
@@ -68,6 +76,17 @@ vi.mock('@/lib/tour/tour-completion', () => ({
   }),
 }));
 
+vi.mock('@/lib/tour/tour-auto-open-boot', () => ({
+  isTourAutoOpenAttemptSpent: () => boot.spent,
+  spendTourAutoOpenAttempt: () => {
+    boot.spent = true;
+  },
+}));
+
+vi.mock('@/lib/tour/use-tour-gate-usage', () => ({
+  useTourGatewayUsage: () => ({ isLoaded: usage.isLoaded, hasUsage: usage.hasUsage }),
+}));
+
 vi.mock('@/lib/consent-gate', () => ({
   checkConsentGate: () => consentGate.check(),
 }));
@@ -109,22 +128,74 @@ describe('TourAutoOpen', () => {
   beforeEach(() => {
     routerPush.mockReset();
     consentGate.reset();
+    boot.spent = false;
+    usage.isLoaded = true;
+    usage.hasUsage = false;
     state.userId = 'user-1';
     state.isLoaded = true;
     state.isCompleted = false;
     state.pathname = '/(app)/(tabs)/(0_home)';
   });
 
-  it('pushes the tour exactly once on a first sign-in that has not completed it', async () => {
+  it('pushes the tour exactly once on a cold boot with zero gateway usage', async () => {
     const renderer = mountAutoOpen();
     await flushConsentRead();
 
     expect(routerPush).toHaveBeenCalledTimes(1);
     expect(routerPush).toHaveBeenCalledWith('/(app)/tour');
+    expect(boot.spent).toBe(true);
 
     // A later render for the same account must not re-open the tour.
     rerender(renderer);
     expect(routerPush).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('never pushes for an account with gateway usage, and spends the attempt', async () => {
+    usage.hasUsage = true;
+    const renderer = mountAutoOpen();
+    await flushConsentRead();
+
+    expect(routerPush).not.toHaveBeenCalled();
+    // The launch attempt is consumed, so an account switch later in this
+    // process cannot auto-open for a zero-usage account either.
+    expect(boot.spent).toBe(true);
+
+    rerender(renderer);
+    expect(routerPush).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('never pushes on a warm entry after the attempt is spent', async () => {
+    boot.spent = true;
+    const renderer = mountAutoOpen();
+    await flushConsentRead();
+
+    expect(routerPush).not.toHaveBeenCalled();
+
+    rerender(renderer);
+    expect(routerPush).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('holds on an unanswered usage read, then opens when the read succeeds in the same launch', async () => {
+    usage.isLoaded = false;
+    const renderer = mountAutoOpen();
+    await flushConsentRead();
+
+    // The read has not answered: hold, and do not spend the launch attempt.
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(boot.spent).toBe(false);
+
+    // The read succeeds with zero usage later in the same launch.
+    usage.isLoaded = true;
+    rerender(renderer);
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledWith('/(app)/tour');
+    expect(boot.spent).toBe(true);
 
     renderer.unmount();
   });
@@ -163,15 +234,17 @@ describe('TourAutoOpen', () => {
     renderer.unmount();
   });
 
-  it('does not push when the tour route is already active and never pushes later', async () => {
+  it('does not push when the tour route is already active and never re-arms the automatic open', async () => {
+    // A manual replay (the Profile Tutorial row) put the tour on screen.
     state.pathname = '/(app)/tour';
     const renderer = mountAutoOpen();
     await flushConsentRead();
 
     expect(routerPush).not.toHaveBeenCalled();
+    // The explicit open consumed the launch attempt.
+    expect(boot.spent).toBe(true);
 
-    // The person dismissed the tour (or opened it from Profile); navigating
-    // away must not push it behind them.
+    // Navigating away must not push it behind them.
     state.pathname = '/(app)/(tabs)/(3_profile)';
     rerender(renderer);
     expect(routerPush).not.toHaveBeenCalled();

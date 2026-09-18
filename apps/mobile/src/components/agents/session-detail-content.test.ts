@@ -40,7 +40,6 @@ import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exi
 import { PermissionCard } from '@/components/agents/permission-card';
 import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
-import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
@@ -531,14 +530,13 @@ beforeEach(() => {
 type MountDetailsOptions = {
   metadataReady?: Promise<undefined>;
   displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
-  cachedRows?: StoredMessage[] | null;
 };
 
 async function mountDetails(
   rootMessages: StoredMessage[] | null = [taskMessage(ROOT_ID, CHILD_IDS)],
   options: MountDetailsOptions = {}
 ) {
-  const { metadataReady, displayScope = PERSONAL_DISPLAY_SCOPE, cachedRows = null } = options;
+  const { metadataReady, displayScope = PERSONAL_DISPLAY_SCOPE } = options;
   const store = createStore();
   // `null` stalls the root page: the request never resolves, so the open never
   // receives first content (the endless-skeleton case).
@@ -580,14 +578,6 @@ async function mountDetails(
       const outcome = await response.promise;
       return outcome;
     },
-    readCachedSnapshotPage: cachedRows
-      ? vi.fn().mockResolvedValue({
-          info: { id: ROOT_ID },
-          messages: cachedRows,
-          nextCursor: null,
-          omittedItemCount: 0,
-        })
-      : undefined,
     api: {
       send: vi.fn(),
       interrupt: vi.fn(),
@@ -917,16 +907,15 @@ describe('session detail slow load', () => {
   });
 });
 
-describe('session detail cached metadata refresh', () => {
-  it('paints cached rows and offers a refresh Retry when the metadata read fails', async () => {
+describe('session detail open', () => {
+  it('shows the loader while the open is pending, then the retryable error instead of stale rows', async () => {
     const metadata = Promise.withResolvers<undefined>();
-    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
-    const view = await mountDetails(cachedRows, { metadataReady: metadata.promise, cachedRows });
+    const view = await mountDetails(null, { metadataReady: metadata.promise });
 
-    // The persisted transcript paints before the metadata read settles: no
-    // skeleton, and the rows are on screen.
-    expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
-    expect(renderedText(view.renderer.root)).toContain('cached root row');
+    // The open shows its skeleton while the current transcript is fetched;
+    // no transcript from an earlier mount (or a persisted cache) is painted.
+    expect(view.renderer.root.findAllByType(SessionSkeletonMessages).length).toBeGreaterThan(0);
+    expect(view.store.get(view.manager.atoms.messagesList)).toHaveLength(0);
 
     await act(async () => {
       metadata.reject(new Error('offline'));
@@ -934,36 +923,14 @@ describe('session detail cached metadata refresh', () => {
       await Promise.resolve();
     });
 
-    // A retryable metadata failure keeps the rows mounted and repoints the
-    // connection banner at a metadata refresh Retry instead of blanking them.
-    expect(renderedText(view.renderer.root)).toContain('cached root row');
+    // A retryable metadata failure owns the screen with a working Retry: the
+    // loader must not outlive the failure, and no stale row appears.
     expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
-    const indicator = view.renderer.root.findAllByType(SessionConnectionIndicator)[0];
-    expect(indicator?.props.sessionRefresh).toMatchObject({ isLoading: false });
-  });
-});
-
-describe('session detail cached transcript refresh', () => {
-  function refreshFlag(renderer: ReactTestRenderer): unknown {
-    return renderer.root.findAllByType(SessionConnectionIndicator)[0]?.props.isRefreshingTranscript;
-  }
-
-  it('shows a loading indicator while the cached transcript is refreshed', async () => {
-    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
-    // The live page never resolves: the cached rows stay on screen, so the
-    // refresh indicator has to stay with them.
-    const view = await mountDetails(null, { cachedRows });
-
-    expect(renderedText(view.renderer.root)).toContain('cached root row');
-    expect(refreshFlag(view.renderer)).toBe(true);
-  });
-
-  it('clears the loading indicator once the live transcript lands', async () => {
-    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
-    const view = await mountDetails([childMessage(ROOT_ID, 'live root row')], { cachedRows });
-
-    expect(renderedText(view.renderer.root)).toContain('live root row');
-    expect(refreshFlag(view.renderer)).toBe(false);
+    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(error.title).toBe(i18n.t('agentChat.session.couldNotLoadThisSession'));
+    expect(typeof error.onRetry).toBe('function');
   });
 });
 

@@ -251,8 +251,8 @@ describe('SessionConnectionIndicator mounted', () => {
   });
 
   it('reads Connecting without a Retry while a cached-metadata refresh is in flight', async () => {
-    // The transport is healthy; the cached transcript is readable and only the
-    // session-metadata read is outstanding, so no retry is offered yet.
+    // The transport is healthy and only the session-metadata read is
+    // outstanding, so no retry is offered yet.
     const renderer = await mount({
       activeSessionType: 'remote',
       agentStatusType: 'idle',
@@ -289,45 +289,5 @@ describe('SessionConnectionIndicator mounted', () => {
 
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(connection.retryConnection).not.toHaveBeenCalled();
-  });
-
-  it('shows a spinner and label while a cached transcript is being refreshed', async () => {
-    // Stale rows are readable and the current transcript is still being
-    // fetched: the row reports the refresh in the same fixed h-6 slot, so the
-    // transcript below does not move when it appears or clears.
-    const renderer = await mount({
-      activeSessionType: 'cloud-agent',
-      agentStatusType: 'idle',
-      isRefreshingTranscript: true,
-    });
-
-    const view = findHost(renderer.root, 'View')[0];
-    expect(view?.props.className).toContain('h-6');
-    expect(view?.props.accessibilityLabel).toBe('Loading…');
-    expect(findHost(renderer.root, 'ActivityIndicator')).toHaveLength(1);
-    expect(findHost(renderer.root, 'Text').some(node => node.props.children === 'Loading…')).toBe(
-      true
-    );
-    // The refresh owns the row: no connection warning underneath it.
-    expect(findHost(renderer.root, 'WifiOff')).toHaveLength(0);
-  });
-
-  it('drops the refresh row once the transcript is current', async () => {
-    const renderer = await mount({
-      activeSessionType: 'cloud-agent',
-      agentStatusType: 'idle',
-      isRefreshingTranscript: true,
-    });
-
-    await update(renderer, {
-      activeSessionType: 'cloud-agent',
-      agentStatusType: 'idle',
-      isRefreshingTranscript: false,
-    });
-
-    expect(findHost(renderer.root, 'ActivityIndicator')).toHaveLength(0);
-    expect(findHost(renderer.root, 'Text').some(node => node.props.children === 'Loading…')).toBe(
-      false
-    );
   });
 });

@@ -6,7 +6,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 import { AgentSessionProvider } from './session-provider';
 
-type ManagerFactoryOptions = { store: unknown; userId: string; organizationId?: string };
+type ManagerFactoryOptions = { store: unknown; organizationId?: string };
 
 const mocks = vi.hoisted(() => {
   const manager = {

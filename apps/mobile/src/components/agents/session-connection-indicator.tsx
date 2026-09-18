@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
@@ -17,12 +16,6 @@ type SessionConnectionIndicatorProps = {
   agentStatusType?: AgentStatus['type'];
   /** Cached transcript is readable, but session metadata still needs a refresh. */
   sessionRefresh?: { isLoading: boolean; onRetry: () => void };
-  /**
-   * Cached transcript rows are on screen and the session's current transcript
-   * is still being fetched. Takes priority over the connection state: during an
-   * open the wait that matters is the refresh, not the socket.
-   */
-  isRefreshingTranscript?: boolean;
 };
 
 /** A pending metadata refresh reads as connecting; a failed one reads as lost. */
@@ -34,7 +27,6 @@ export function SessionConnectionIndicator({
   activeSessionType = null,
   agentStatusType = 'idle',
   sessionRefresh,
-  isRefreshingTranscript = false,
 }: Readonly<SessionConnectionIndicatorProps>) {
   const { isConnected: userWebConnected, reconnectExhausted } = useUserWebConnectionHealth();
   const connection = useUserWebConnection();
@@ -58,26 +50,6 @@ export function SessionConnectionIndicator({
       wasUpRef.current = true;
     }
   }, [state]);
-  // The stale transcript resolves in place; this row only reports that the
-  // refresh is still running. Same fixed h-6 slot as every other state, so
-  // nothing below it moves when it appears or clears.
-  if (isRefreshingTranscript) {
-    // The generic loading copy is reused rather than a transcript-specific key:
-    // every catalog already carries it, and no language translates this row
-    // differently from the app's other inline loads.
-    const refreshLabel = t('common.loading');
-    return (
-      <View
-        testID="session-transcript-refresh"
-        className="h-6 flex-row items-center justify-center gap-1.5"
-        accessible
-        accessibilityLabel={refreshLabel}
-      >
-        <ActivityIndicator size="small" color={colors.mutedForeground} />
-        <Text className="text-xs text-muted-foreground">{refreshLabel}</Text>
-      </View>
-    );
-  }
   let label: string | null = null;
   if (state === 'down') {
     label = wasUpRef.current

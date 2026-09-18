@@ -1171,18 +1171,28 @@ export function SessionDetailContent({
       if (item.type === 'preparation') {
         return <PreparationGroup attempt={item.attempt} />;
       }
-      if (item.type === 'time') {
-        return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
-      }
       if (item.type === 'tool-run') {
         // Match the inset and row rhythm of a message row so the condensed row
         // sits flush with its neighbours rather than full-bleed.
-        return (
+        const run = (
           <View className="px-4 py-1">
             <MessageErrorBoundary>
               <CondensedToolRunRow parts={item.parts} />
             </MessageErrorBoundary>
           </View>
+        );
+        // A condensed run can open a burst: its message's marker rides here so
+        // marker and row share one FlashList key and one measured height.
+        return item.timeMarker ? (
+          <View>
+            <TranscriptTimeMarker
+              created={item.timeMarker.created}
+              dayChanged={item.timeMarker.dayChanged}
+            />
+            {run}
+          </View>
+        ) : (
+          run
         );
       }
       // Delivery events can lag a successful drop. The retained row must expose Restore immediately.
@@ -1192,7 +1202,7 @@ export function SessionDetailContent({
           : undefined;
       // Suppress Retry on an assistant failure with no preceding user row.
       const retryPrompt = resolveRetryPrompt(item.message, messages);
-      return (
+      const bubble = (
         <MessageBubble
           message={item.message}
           {...(item.parts ? { partsOverride: item.parts } : {})}
@@ -1217,6 +1227,20 @@ export function SessionDetailContent({
           }
           condenseToolCalls={condenseToolCalls}
         />
+      );
+      // The burst marker rides on its message row so the row keeps one FlashList
+      // key and one measured height: a prepend that moves the marker to an older
+      // message changes no key that is already on screen.
+      return item.timeMarker ? (
+        <View>
+          <TranscriptTimeMarker
+            created={item.timeMarker.created}
+            dayChanged={item.timeMarker.dayChanged}
+          />
+          {bubble}
+        </View>
+      ) : (
+        bubble
       );
     },
     [

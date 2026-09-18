@@ -1814,6 +1814,31 @@ describe('session detail exit retry row', () => {
   });
 });
 
+describe('transcript time markers', () => {
+  it('renders the marker in the same row as the message that opens the burst', async () => {
+    const message: StoredMessage = {
+      info: { ...assistantMessage('msg-marker').info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-marker',
+          sessionID: ROOT_ID,
+          messageID: 'msg-marker',
+          text: 'Marked answer',
+        }),
+      ],
+    };
+
+    const view = await mountDetails([message]);
+
+    // The first message of the page opens the burst, so its row carries the
+    // marker above the bubble instead of the marker being an item of its own.
+    expect(
+      view.renderer.root.findAll(node => Object.is(node.type, 'TranscriptTimeMarker'))
+    ).toHaveLength(1);
+    expect(renderedText(view.renderer.root)).toContain('Marked answer');
+  });
+});
+
 describe('hide thinking preference', () => {
   function partMessage(id: string, parts: StoredMessage['parts']): StoredMessage {
     return { info: { ...assistantMessage(id).info, sessionID: ROOT_ID }, parts };

@@ -1076,7 +1076,7 @@ describe('NotificationChannelDO.dispatchPush — local push sink', () => {
       dataType: 'cloud_agent_session',
       sound: 'default',
       priority: 'high',
-      channelId: 'agent',
+      channelId: 'agent-progress',
       previews: 'generic',
     });
     expect(payload.to).toBe('<redacted>');

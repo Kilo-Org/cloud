@@ -2,8 +2,8 @@ import { createElement } from 'react';
 import { TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { type ModelPickerBridge, type SandboxPickerBridge } from './picker-bridge';
-import { modelPickerSlot, sandboxPickerSlot, useRouteRegistry } from './route-registry';
+import { type ModelPickerBridge } from './picker-bridge';
+import { modelPickerSlot, useRouteRegistry } from './route-registry';
 
 function makeBridge(sessionId: string): ModelPickerBridge {
   return {
@@ -17,16 +17,6 @@ function makeBridge(sessionId: string): ModelPickerBridge {
       catalogGenerationIdentity: null,
     },
     isSelectionCurrent: () => true,
-    onSelect: vi.fn<() => void>(),
-  };
-}
-
-function makeSandboxBridge(): SandboxPickerBridge {
-  return {
-    organizationId: undefined,
-    options: [],
-    defaultDestination: undefined,
-    currentValue: undefined,
     onSelect: vi.fn<() => void>(),
   };
 }
@@ -73,20 +63,5 @@ describe('route registry', () => {
     });
 
     expect(modelPickerSlot.get('session-a')).toBeUndefined();
-  });
-
-  it('stores the sandbox picker under its own route key and clears it on unmount', () => {
-    const bridge = makeSandboxBridge();
-    const renderer = mountRegistrar('session-a');
-    sandboxPickerSlot.set('session-a', bridge);
-
-    expect(sandboxPickerSlot.get('session-a')).toBe(bridge);
-    expect(modelPickerSlot.get('session-a')).toBeUndefined();
-
-    TestRenderer.act(() => {
-      renderer.unmount();
-    });
-
-    expect(sandboxPickerSlot.get('session-a')).toBeUndefined();
   });
 });

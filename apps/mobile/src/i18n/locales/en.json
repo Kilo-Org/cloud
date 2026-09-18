@@ -789,6 +789,15 @@
       "balance": "Balance alerts",
       "security": "Security findings"
     },
+    "action": {
+      "openSession": "Open session"
+    },
+    "needsInputAction": {
+      "approved": "Request approved",
+      "replied": "Reply sent",
+      "failed": "Couldn't answer. Tap again to retry.",
+      "unavailable": "This request is no longer waiting."
+    },
     "category": {
       "chatMessagesSubtitle": "replies in your conversations",
       "agentAttentionTitle": "Agent needs you",
@@ -2139,20 +2148,7 @@
       "continueFrom": "Continuing {{title}}",
       "importingSession": "Importing session",
       "cliCannotContinue": "This CLI cannot continue a session. Pick Cloud Agent or another CLI.",
-      "importFailed": "Couldn't import this session.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Default · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Small",
-      "sandboxInstanceShared": "Shared",
-      "sandboxInstanceLarge": "Large",
-      "sandboxInstanceDevcontainer": "Dev container",
-      "sandboxInstanceProviderDefault": "Provider default",
-      "sandboxCouldNotLoad": "Couldn't load sandbox options",
-      "sandboxUnavailable": "This sandbox is unavailable. Choose another sandbox or Default.",
-      "sandboxUseDefault": "Use Default"
+      "importFailed": "Couldn't import this session."
     },
     "partRenderer": {
       "updatedFileCount_one": "Updated {{displayCount}} file",

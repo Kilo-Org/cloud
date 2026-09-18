@@ -92,6 +92,7 @@ import {
   subscribeToPendingDeepLink,
 } from '@/lib/deep-link-launch';
 import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
+import { registerNeedsInputCategories } from '@/lib/notification-actions';
 import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
@@ -161,6 +162,9 @@ function preloadStartupFonts(): void {
 
 void SplashScreen.preventAutoHideAsync();
 void ensureAndroidNotificationChannels();
+// The Approve / Reply / Open PR / Open session buttons a needs-input
+// notification carries; idempotent, one pass per launch.
+void registerNeedsInputCategories();
 setupNotificationHandler();
 // Applies the aggregate glanceable push while backgrounded/killed via a
 // headless expo-notifications task; see setupNotificationBackgroundHandler.
@@ -379,6 +383,11 @@ function RootLayoutNav({
         await i18n.changeLanguage('en');
       }
       void renameAndroidNotificationChannels();
+      // The module-scope category registration ran under the English default
+      // while the stored preference was still loading; re-register the
+      // Approve / Reply / Open PR / Open session buttons in the applied
+      // language (same localization pass as the channel rename above).
+      void registerNeedsInputCategories();
       if (!cancelled) {
         if (reloadFailed) {
           setLanguageReloadFailed(true);

@@ -673,7 +673,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (providerResult.kind === 'chatgpt-reconnect') {
     return chatGptReconnectResponse(providerResult.message);
   }
-  let effectiveProviderContext = providerResult;
+  const effectiveProviderContext = providerResult;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
     try {

@@ -121,6 +121,9 @@ export async function dispatchRemoteSessionAttentionSignal(
     // enum would fail validation on a notifications worker deployed with the old schema.
     status: 'completed',
     category: params.signal.kind === 'needs_input' ? 'attention' : 'status',
+    // Which answer the waiting agent wants; absent when the signal did not name a kind, and
+    // the app falls back to its `unknown` action set.
+    attentionKind: signal.attentionKind,
     body: buildRemoteSessionAttentionPushBody(signal),
     suppressIfViewingSession: true,
   });

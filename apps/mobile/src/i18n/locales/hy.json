@@ -789,6 +789,15 @@
       "balance": "Մնացորդի մասին զգուշացումներ",
       "security": "Հայտնաբերված անվտանգության խնդիրներ"
     },
+    "action": {
+      "openSession": "Բացել նիստը"
+    },
+    "needsInputAction": {
+      "approved": "Հարցումը հաստատվեց",
+      "replied": "Պատասխանն ուղարկվեց",
+      "failed": "Չհաջողվեց պատասխանել: Կրկին փորձելու համար նորից հպեք:",
+      "unavailable": "Այս հարցումն այլևս չի սպասում:"
+    },
     "category": {
       "chatMessagesSubtitle": "պատասխաններ ձեր զրույցներում",
       "agentAttentionTitle": "Գործակալին ձեր մասնակցությունն է պետք",
@@ -2128,20 +2137,7 @@
       "continueFrom": "Շարունակվում է «{{title}}» նիստը։",
       "importingSession": "Նիստը ներմուծվում է",
       "cliCannotContinue": "Այս CLI-ն չի կարող շարունակել նիստը։ Ընտրեք Cloud Agent-ը կամ մեկ այլ CLI։",
-      "importFailed": "Չհաջողվեց ներմուծել այս նիստը։",
-      "sandbox": "Ավազարկղ",
-      "sandboxAccessibility": "Ավազարկղ՝ {{label}}",
-      "sandboxDefaultWithDestination": "Կանխադրված · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Փոքր",
-      "sandboxInstanceShared": "Համատեղ",
-      "sandboxInstanceLarge": "Մեծ",
-      "sandboxInstanceDevcontainer": "Մշակման կոնտեյներ",
-      "sandboxInstanceProviderDefault": "Մատակարարի կանխադրված",
-      "sandboxCouldNotLoad": "Չհաջողվեց բեռնել ավազարկղի տարբերակները",
-      "sandboxUnavailable": "Այս ավազարկղը հասանելի չէ: Ընտրեք այլ ավազարկղ կամ Կանխադրված:",
-      "sandboxUseDefault": "Օգտագործել Կանխադրվածը"
+      "importFailed": "Չհաջողվեց ներմուծել այս նիստը։"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ։",

@@ -816,6 +816,15 @@
       "balance": "Twissijiet tal-bilanċ",
       "security": "Sejbiet tas-sigurtà"
     },
+    "action": {
+      "openSession": "Iftaħ is-sessjoni"
+    },
+    "needsInputAction": {
+      "approved": "It-talba ġiet approvata",
+      "replied": "Ir-risposta ntbagħtet",
+      "failed": "Ma rnexxiex twieġeb. Miss biex terġa’ tipprova.",
+      "unavailable": "Din it-talba ma tistennix aktar."
+    },
     "category": {
       "chatMessagesSubtitle": "tweġibiet fil-konversazzjonijiet tiegħek",
       "agentAttentionTitle": "L-aġent għandu bżonnok",
@@ -2182,20 +2191,7 @@
       "continueFrom": "Qed tkompli s-sessjoni {{title}}.",
       "importingSession": "Qed tiġi importata s-sessjoni",
       "cliCannotContinue": "Dan il-CLI ma jistax ikompli sessjoni. Agħżel Cloud Agent jew CLI ieħor.",
-      "importFailed": "Ma setgħetx tiġi importata din is-sessjoni.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Default · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Żgħir",
-      "sandboxInstanceShared": "Kondiviż",
-      "sandboxInstanceLarge": "Kbir",
-      "sandboxInstanceDevcontainer": "Kontenitur tad-Dev",
-      "sandboxInstanceProviderDefault": "Default tal-fornitur",
-      "sandboxCouldNotLoad": "Ma setgħetx titgħabba l-għażliet tas-sandbox",
-      "sandboxUnavailable": "Dan is-sandbox mhuwiex disponibbli. Agħżel sandbox ieħor jew Default.",
-      "sandboxUseDefault": "Uża Default"
+      "importFailed": "Ma setgħetx tiġi importata din is-sessjoni."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ġie aġġornat {{displayCount}} fajl.",

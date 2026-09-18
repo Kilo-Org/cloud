@@ -235,6 +235,15 @@
       "balance": "Avvisi sul saldo",
       "security": "Problemi di sicurezza"
     },
+    "action": {
+      "openSession": "Apri la sessione"
+    },
+    "needsInputAction": {
+      "approved": "Richiesta approvata",
+      "replied": "Risposta inviata",
+      "failed": "Impossibile rispondere. Tocca di nuovo per riprovare.",
+      "unavailable": "Questa richiesta non è più in attesa."
+    },
     "category": {
       "chatMessagesSubtitle": "risposte nelle tue conversazioni",
       "agentAttentionTitle": "L'agente ha bisogno di te",
@@ -1611,20 +1620,7 @@
       "continueFrom": "Stai continuando la sessione {{title}}.",
       "importingSession": "Importazione in corso…",
       "cliCannotContinue": "Questa CLI non può continuare una sessione. Scegli Cloud Agent o un'altra CLI.",
-      "importFailed": "Impossibile importare questa sessione.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Predefinita · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Piccola",
-      "sandboxInstanceShared": "Condivisa",
-      "sandboxInstanceLarge": "Grande",
-      "sandboxInstanceDevcontainer": "Container di sviluppo",
-      "sandboxInstanceProviderDefault": "Predefinita del provider",
-      "sandboxCouldNotLoad": "Impossibile caricare le opzioni della sandbox",
-      "sandboxUnavailable": "Questa sandbox non è disponibile. Scegli un'altra sandbox o Predefinita.",
-      "sandboxUseDefault": "Usa Predefinita"
+      "importFailed": "Impossibile importare questa sessione."
     },
     "partRenderer": {
       "updatedFileCount_one": "È stato aggiornato {{displayCount}} file.",

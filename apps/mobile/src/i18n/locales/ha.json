@@ -789,6 +789,15 @@
       "balance": "Faɗakarwar ragowar kuɗi",
       "security": "Sakamakon binciken tsaro"
     },
+    "action": {
+      "openSession": "Buɗe zaman"
+    },
+    "needsInputAction": {
+      "approved": "An amince da buƙatar",
+      "replied": "An tura amsa",
+      "failed": "Ba a iya amsawa ba. Sake danna don sake gwadawa.",
+      "unavailable": "Wannan buƙatar ba ta jira ba."
+    },
     "category": {
       "chatMessagesSubtitle": "amsoshi a cikin tattaunawarka",
       "agentAttentionTitle": "Wakili yana buƙatar ka",
@@ -2128,20 +2137,7 @@
       "continueFrom": "Ana ci gaba da {{title}}.",
       "importingSession": "Ana shigo da zaman",
       "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zaman ba. Zaɓi Cloud Agent ko wani CLI.",
-      "importFailed": "An kasa shigo da wannan zaman.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Tsoho · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Ƙarami",
-      "sandboxInstanceShared": "Raba",
-      "sandboxInstanceLarge": "Babba",
-      "sandboxInstanceDevcontainer": "Kwantena Dev",
-      "sandboxInstanceProviderDefault": "Tsohowar mai bayarwa",
-      "sandboxCouldNotLoad": "Ba a iya lodin zaɓuɓɓukan sandbox ba",
-      "sandboxUnavailable": "Wannan sandbox ba ake samunsa ba. Zaɓi wani sandbox ko Tsoho.",
-      "sandboxUseDefault": "Yi amfani da Tsoho"
+      "importFailed": "An kasa shigo da wannan zaman."
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta fayil {{displayCount}}.",

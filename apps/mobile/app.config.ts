@@ -113,6 +113,9 @@ const config: ExpoConfig = {
       // production environment still attests, it just uses Apple's dev servers
       // when the app is signed with a development profile.
       'com.apple.developer.devicecheck.appattest-environment': 'production',
+      // Time Sensitive Notifications capability: what makes the needs-input
+      // raise's `interruptionLevel: 'timeSensitive'` break through Focus.
+      'com.apple.developer.usernotifications.time-sensitive': true,
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,

@@ -2137,20 +2137,7 @@
       "continueFrom": "Kikao {{title}} kinaendelea.",
       "importingSession": "Inaingiza kikao",
       "cliCannotContinue": "CLI hii haiwezi kuendelea na kikao. Chagua Cloud Agent au CLI nyingine.",
-      "importFailed": "Imeshindikana kuingiza kikao hiki.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Chaguo-msingi · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Ndogo",
-      "sandboxInstanceShared": "Shirikiwa",
-      "sandboxInstanceLarge": "Kubwa",
-      "sandboxInstanceDevcontainer": "Kontena la Dev",
-      "sandboxInstanceProviderDefault": "Chaguo-msingi cha mtoa huduma",
-      "sandboxCouldNotLoad": "Imeshindikana kupakia chaguo za sandbox",
-      "sandboxUnavailable": "Sandbox hii haipatikani. Chagua sandbox nyingine au Chaguo-msingi.",
-      "sandboxUseDefault": "Tumia Chaguo-msingi"
+      "importFailed": "Imeshindikana kuingiza kikao hiki."
     },
     "partRenderer": {
       "updatedFileCount_one": "Faili {{displayCount}} imesasishwa.",

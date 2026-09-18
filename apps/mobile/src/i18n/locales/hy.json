@@ -2137,20 +2137,7 @@
       "continueFrom": "Շարունակվում է «{{title}}» նիստը։",
       "importingSession": "Նիստը ներմուծվում է",
       "cliCannotContinue": "Այս CLI-ն չի կարող շարունակել նիստը։ Ընտրեք Cloud Agent-ը կամ մեկ այլ CLI։",
-      "importFailed": "Չհաջողվեց ներմուծել այս նիստը։",
-      "sandbox": "Ավազարկղ",
-      "sandboxAccessibility": "Ավազարկղ՝ {{label}}",
-      "sandboxDefaultWithDestination": "Կանխադրված · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Փոքր",
-      "sandboxInstanceShared": "Համատեղ",
-      "sandboxInstanceLarge": "Մեծ",
-      "sandboxInstanceDevcontainer": "Մշակման կոնտեյներ",
-      "sandboxInstanceProviderDefault": "Մատակարարի կանխադրված",
-      "sandboxCouldNotLoad": "Չհաջողվեց բեռնել ավազարկղի տարբերակները",
-      "sandboxUnavailable": "Այս ավազարկղը հասանելի չէ: Ընտրեք այլ ավազարկղ կամ Կանխադրված:",
-      "sandboxUseDefault": "Օգտագործել Կանխադրվածը"
+      "importFailed": "Չհաջողվեց ներմուծել այս նիստը։"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ։",

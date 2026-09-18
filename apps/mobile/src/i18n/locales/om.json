@@ -2137,20 +2137,7 @@
       "continueFrom": "{{title}} itti fufaa jira.",
       "importingSession": "Turtii galchaa jira",
       "cliCannotContinue": "CLI kun turtii itti fufuu hin danda'u. Cloud Agent yookaan CLI biraa filadhu.",
-      "importFailed": "Turtii kana galchuu hin danda'amne.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Default · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Xiqqaa",
-      "sandboxInstanceShared": "Qoodama",
-      "sandboxInstanceLarge": "Guddaa",
-      "sandboxInstanceDevcontainer": "Konteenara Dev",
-      "sandboxInstanceProviderDefault": "Kan dhiyeessaa Default",
-      "sandboxCouldNotLoad": "Filannoo sandbox fe'uuf jijjiirama hin qabu",
-      "sandboxUnavailable": "Sandbox kun hin argamu. Sandbox bira ykn Default filadhu.",
-      "sandboxUseDefault": "Default fayyadami"
+      "importFailed": "Turtii kana galchuu hin danda'amne."
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayiliin {{displayCount}} haaromfameera.",

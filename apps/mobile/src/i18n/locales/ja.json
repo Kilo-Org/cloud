@@ -1647,20 +1647,7 @@
       "continueFrom": "{{title}}を続行しています。",
       "importingSession": "セッションをインポート中",
       "cliCannotContinue": "このCLIではセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
-      "importFailed": "このセッションをインポートできませんでした。",
-      "sandbox": "サンドボックス",
-      "sandboxAccessibility": "サンドボックス：{{label}}",
-      "sandboxDefaultWithDestination": "デフォルト · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "小",
-      "sandboxInstanceShared": "共有",
-      "sandboxInstanceLarge": "大",
-      "sandboxInstanceDevcontainer": "開発コンテナ",
-      "sandboxInstanceProviderDefault": "プロバイダーのデフォルト",
-      "sandboxCouldNotLoad": "サンドボックスのオプションを読み込めませんでした",
-      "sandboxUnavailable": "このサンドボックスは利用できません。別のサンドボックスかデフォルトを選択してください。",
-      "sandboxUseDefault": "デフォルトを使用"
+      "importFailed": "このセッションをインポートできませんでした。"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました。",

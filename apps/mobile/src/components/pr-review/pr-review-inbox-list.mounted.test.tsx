@@ -221,3 +221,41 @@ describe('PrReviewInboxList side insets (landscape)', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(1);
   });
 });
+
+// The Conversation-only fixture row's ref (`kilo-stub/discussion-conversation-only#2`)
+// is long enough to fill the row. RN defaults a Text to flexShrink 0, so without a
+// shrinkable, single-line label the row's inner line grows past its container and
+// pushes the term chip through the px-6 padding to the screen edge (the explorer's
+// clipped "Pull request" badge). The label must give way, the chip must not.
+describe('PrReviewInboxList row overflow', () => {
+  beforeEach(() => {
+    insetsState.top = 0;
+    insetsState.bottom = 0;
+    insetsState.left = 0;
+    insetsState.right = 0;
+    inboxState.query.isPending = false;
+    inboxState.query.isFetching = false;
+    inboxState.query.hasNextPage = false;
+    inboxState.query.isFetchingNextPage = false;
+    inboxState.items = [
+      makeItem({ repo: 'discussion-conversation-only', number: 2, isDraft: false }),
+    ];
+    inboxState.firstPageErrorState = null;
+    inboxState.laterPageError = false;
+  });
+
+  it('truncates a long row label instead of pushing the term chip off the row', () => {
+    const renderer = mountInboxList();
+
+    const label = renderer.root.find(
+      node => String(node.type) === 'Text' && String(node.props.className).includes('text-xs')
+    );
+    expect(label.props.numberOfLines).toBe(1);
+    expect(String(label.props.className)).toContain('shrink');
+
+    const chip = renderer.root.find(
+      node => String(node.type) === 'View' && String(node.props.className).includes('rounded-full')
+    );
+    expect(String(chip.props.className)).toContain('shrink-0');
+  });
+});

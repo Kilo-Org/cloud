@@ -204,20 +204,27 @@ export function PasskeysScreen() {
     }
     setAddFailure(null);
     setIsAdding(true);
-    const result = await registerPasskey();
-    setIsAdding(false);
-
-    if (result.status === 'ok') {
-      toast.success(t('profile.passkeyAdded'));
-      void refetch();
-      return;
+    try {
+      const result = await registerPasskey();
+      if (result.status === 'ok') {
+        toast.success(t('profile.passkeyAdded'));
+        void refetch();
+        return;
+      }
+      if (result.failure === 'cancelled') {
+        // The sheet was dismissed: nothing was written, so the list is unchanged.
+        toast.error(t('profile.passkeyAddCancelled'));
+        return;
+      }
+      setAddFailure(result.failure === 'unsupported' ? 'unsupported' : 'failed');
+    } catch {
+      // A rejection — the request-token read behind the ceremony, say — wrote
+      // nothing, so the same control starts a fresh ceremony.
+      setAddFailure('failed');
+    } finally {
+      // Always: a rejection must not leave the control loading forever.
+      setIsAdding(false);
     }
-    if (result.failure === 'cancelled') {
-      // The sheet was dismissed: nothing was written, so the list is unchanged.
-      toast.error(t('profile.passkeyAddCancelled'));
-      return;
-    }
-    setAddFailure(result.failure === 'unsupported' ? 'unsupported' : 'failed');
   };
 
   // The control is full width in every state, in its own footer slot. Its

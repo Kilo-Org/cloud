@@ -91,4 +91,21 @@ describe('PasskeysScreen inline failures', () => {
     await waitFor(() => toastSuccess.mock.calls.length > 0);
     view.unmount();
   });
+
+  it('frees the Add control and names a rejected ceremony as retryable', async () => {
+    store.rows = [];
+    // `registerPasskey` can reject before its own handling: the request-token
+    // read behind the ceremony rejects when the keychain read fails.
+    list.register.mockRejectedValue(new Error('keychain read failed'));
+    const view = await mount();
+    await waitFor(() => nodes(view, 'EmptyState').length === 1);
+
+    await press(buttonByLabel(view, 'Add a passkey'));
+    await waitFor(() => texts(view).includes('Could not add a passkey. Try again.'));
+
+    // A rejection must not leave the control loading forever: it is free again
+    // and starts a fresh ceremony, exactly like any other retryable failure.
+    expect(buttonByLabel(view, 'Add a passkey').props.loading).toBe(false);
+    view.unmount();
+  });
 });

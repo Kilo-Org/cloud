@@ -10,10 +10,6 @@ import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import {
-  type NewSessionSandboxState,
-  renderSandboxSection,
-} from '@/components/agents/new-session-sandbox-section';
-import {
   type NewSessionRepository,
   type RepositoryGroup,
   type RepositoryPlatform,
@@ -95,8 +91,6 @@ type NewSessionConfigureFormProps = {
   selectedRepo: string;
   /** The route's organization scope; `undefined` is a personal session. */
   organizationId: string | undefined;
-  /** Sandbox section state (Cloud Agent only): status, options, pick, recovery. */
-  sandbox: NewSessionSandboxState;
   // Environment profile (Cloud Agent only).
   profile: EffectiveAgentProfile | null;
   isProfileLoading: boolean;
@@ -168,7 +162,6 @@ export function NewSessionConfigureForm({
   recents,
   selectedRepo,
   organizationId,
-  sandbox,
   profile,
   isProfileLoading,
   isProfileError,
@@ -286,10 +279,6 @@ export function NewSessionConfigureForm({
           isCloneEntry={isCloneEntry}
         />
       ) : null}
-
-      {!isRemote && !isCloneEntry
-        ? renderSandboxSection({ t, ...sandbox, disabled: isStarting })
-        : null}
 
       {!isRemote && !isCloneEntry ? (
         <View className="mt-5">

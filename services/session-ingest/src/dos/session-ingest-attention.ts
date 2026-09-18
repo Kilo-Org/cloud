@@ -8,6 +8,13 @@ export type AttentionSignal =
       kind: 'completed' | 'needs_input';
       /** Push-ready excerpt: whitespace-collapsed and capped to fit a notification body. */
       messageExcerpt: string;
+      /**
+       * Which answer the waiting agent wants — `question` for free text, `permission` for an
+       * approval. Drives the notification's action buttons. Absent on `completed` signals and
+       * on `needs_input` signals whose status did not name the kind; the app then falls back to
+       * its `unknown` action set.
+       */
+      attentionKind?: 'question' | 'permission';
     }
   | {
       kind: 'agent_notification';
@@ -22,6 +29,17 @@ const NEEDS_INPUT_STATUSES = new Set(['question', 'permission']);
 /** Statuses that mean the session is waiting for the user to answer a question or approve a permission. */
 export function isNeedsInputStatus(status: string | null | undefined): boolean {
   return status !== null && status !== undefined && NEEDS_INPUT_STATUSES.has(status);
+}
+
+/**
+ * The raise kind a needs-input status carries to the push: a `question` status asks for a typed
+ * answer, a `permission` status asks for an approval. Any other status falls back to
+ * `permission` so the push still validates against the kind enum.
+ */
+export function attentionKindForNeedsInputStatus(
+  status: string | null | undefined
+): 'question' | 'permission' {
+  return status === 'question' ? 'question' : 'permission';
 }
 
 /**

@@ -789,6 +789,15 @@
       "balance": "Saldoilmoitukset",
       "security": "Tietoturvahavainnot"
     },
+    "action": {
+      "openSession": "Avaa istunto"
+    },
+    "needsInputAction": {
+      "approved": "Pyyntö hyväksytty",
+      "replied": "Vastaus lähetetty",
+      "failed": "Vastaaminen ei onnistunut. Yritä uudelleen napauttamalla uudelleen.",
+      "unavailable": "Tämä pyyntö ei ole enää odottamassa."
+    },
     "category": {
       "chatMessagesSubtitle": "vastaukset keskusteluissasi",
       "agentAttentionTitle": "Agentti tarvitsee sinua",

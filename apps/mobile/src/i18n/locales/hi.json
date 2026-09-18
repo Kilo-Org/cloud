@@ -299,6 +299,15 @@
       "balance": "बैलेंस की चेतावनियाँ",
       "security": "सुरक्षा संबंधी समस्याएँ"
     },
+    "action": {
+      "openSession": "सत्र खोलें"
+    },
+    "needsInputAction": {
+      "approved": "अनुरोध स्वीकृत हुआ",
+      "replied": "जवाब भेज दिया गया",
+      "failed": "जवाब नहीं दिया जा सका. फिर से कोशिश करने के लिए दोबारा टैप करें.",
+      "unavailable": "यह अनुरोध अब इंतज़ार नहीं कर रहा।"
+    },
     "category": {
       "chatMessagesSubtitle": "आपकी बातचीत में उत्तर",
       "agentAttentionTitle": "एजेंट को आपकी ज़रूरत है",

@@ -807,6 +807,15 @@
       "balance": "Įspėjimai apie likutį",
       "security": "Saugos problemos"
     },
+    "action": {
+      "openSession": "Atidaryti sesiją"
+    },
+    "needsInputAction": {
+      "approved": "Užklausa patvirtinta",
+      "replied": "Atsakymas išsiųstas",
+      "failed": "Nepavyko atsakyti. Bakstelėkite dar kartą, kad pabandytumėte.",
+      "unavailable": "Šios užklausos nebelaukiama."
+    },
     "category": {
       "chatMessagesSubtitle": "atsakymai jūsų pokalbiuose",
       "agentAttentionTitle": "Agentui reikia jūsų atsakymo",

@@ -789,6 +789,15 @@
       "balance": "Inneignarviðvaranir",
       "security": "Öryggisniðurstöður"
     },
+    "action": {
+      "openSession": "Opna lotu"
+    },
+    "needsInputAction": {
+      "approved": "Beiðni samþykkt",
+      "replied": "Svar sent",
+      "failed": "Ekki tókst að svara. Ýttu aftur til að reyna aftur.",
+      "unavailable": "Þessi beiðni bíður ekki lengur."
+    },
     "category": {
       "chatMessagesSubtitle": "svör í samtölunum þínum",
       "agentAttentionTitle": "Fulltrúinn þarf aðstoð þína",

@@ -798,6 +798,15 @@
       "balance": "Alerte privind soldul",
       "security": "Probleme de securitate detectate"
     },
+    "action": {
+      "openSession": "Deschide sesiunea"
+    },
+    "needsInputAction": {
+      "approved": "Cerere aprobată",
+      "replied": "Răspuns trimis",
+      "failed": "Nu s-a putut răspunde. Atingeți din nou pentru a reîncerca.",
+      "unavailable": "Această cerere nu mai așteaptă."
+    },
     "category": {
       "chatMessagesSubtitle": "răspunsuri în conversațiile tale",
       "agentAttentionTitle": "Agentul are nevoie de tine",

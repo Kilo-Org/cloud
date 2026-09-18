@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
-import { useActiveSessions } from '@/lib/active-sessions-live-sync-mount';
+import { useActiveSessions } from '@/lib/active-sessions-query';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import {

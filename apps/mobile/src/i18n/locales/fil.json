@@ -789,6 +789,15 @@
       "balance": "Mga babala sa balanse",
       "security": "Mga natukoy na isyu sa seguridad"
     },
+    "action": {
+      "openSession": "Buksan ang sesyon"
+    },
+    "needsInputAction": {
+      "approved": "Aprubado ang kahilingan",
+      "replied": "Naipadala ang sagot",
+      "failed": "Hindi nasagot. I-tap muli para subukang muli.",
+      "unavailable": "Hindi na naghihintay ang kahilingang ito."
+    },
     "category": {
       "chatMessagesSubtitle": "mga tugon sa iyong mga pag-uusap",
       "agentAttentionTitle": "Kailangan ka ng ahente",

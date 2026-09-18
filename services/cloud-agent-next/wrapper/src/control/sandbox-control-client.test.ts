@@ -2578,6 +2578,10 @@ describe('event receipt tracking bounds and reporting', () => {
         void publication;
       };
       const preparedAt = Date.now();
+      // Freeze the clock before enqueueing: the outbox stamps `preparedAt` from its own
+      // Date.now() call, so an unfrozen clock can tick between the two reads and make the
+      // queueWaitMs observation one millisecond more than this test prepared.
+      setSystemTime(preparedAt);
       expect(
         client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, session)
       ).toBe(true);

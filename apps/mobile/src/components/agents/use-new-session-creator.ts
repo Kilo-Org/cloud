@@ -8,7 +8,6 @@ import { type AgentMode } from '@/components/agents/mode-selector';
 import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
-import { type SandboxAllocation } from '@/lib/sandbox-allocation-label';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
@@ -48,12 +47,6 @@ type UseNewSessionCreatorInput = {
   autoCommit: boolean;
   /** Effective environment profile id; omitted from the create body when unset. */
   profileId?: string | null;
-  /**
-   * The sandbox allocation picked on the new-session form (the s1 picker row's
-   * shape); omitted from the create body when unset, so the backend's own
-   * default applies.
-   */
-  sandboxAllocation?: SandboxAllocation;
 };
 
 type UseNewSessionCreatorResult = {
@@ -82,7 +75,6 @@ export function useNewSessionCreator({
   variant,
   autoCommit,
   profileId,
-  sandboxAllocation,
 }: UseNewSessionCreatorInput): UseNewSessionCreatorResult {
   const router = useStackSafeReplace();
   const queryClient = useQueryClient();
@@ -143,11 +135,6 @@ export function useNewSessionCreator({
           autoCommit,
           attachments: uploaded.wire,
           organizationId,
-          // The pick rides the intent only when one was made; the core folds it
-          // into the fingerprint and the create body, and omits it when unset,
-          // so a changed pick forks a fresh intent and the backend's own default
-          // still applies to a pick-less submit.
-          sandboxAllocation,
         },
         {
           getKey,
@@ -227,7 +214,6 @@ export function useNewSessionCreator({
     autoCommit,
     organizationId,
     profileId,
-    sandboxAllocation,
     queryClient,
     trpc,
     router,

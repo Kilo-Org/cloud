@@ -789,6 +789,15 @@
       "balance": "Njoftimet për gjendjen e llogarisë",
       "security": "Gjetjet e sigurisë"
     },
+    "action": {
+      "openSession": "Hap seancën"
+    },
+    "needsInputAction": {
+      "approved": "Kërkesa u miratua",
+      "replied": "Përgjigja u dërgua",
+      "failed": "Nuk mundi të përgjigjej. Prekni përsëri për të provuar përsëri.",
+      "unavailable": "Kjo kërkesë nuk pret më."
+    },
     "category": {
       "chatMessagesSubtitle": "përgjigje në bisedat e tua",
       "agentAttentionTitle": "Agjenti ka nevojë për ty",

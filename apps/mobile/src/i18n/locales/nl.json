@@ -271,6 +271,15 @@
       "balance": "Saldowaarschuwingen",
       "security": "Beveiligingsbevindingen"
     },
+    "action": {
+      "openSession": "Sessie openen"
+    },
+    "needsInputAction": {
+      "approved": "Verzoek goedgekeurd",
+      "replied": "Antwoord verzonden",
+      "failed": "Kon niet antwoorden. Tik nogmaals om het opnieuw te proberen.",
+      "unavailable": "Dit verzoek wacht niet langer."
+    },
     "category": {
       "chatMessagesSubtitle": "antwoorden in je gesprekken",
       "agentAttentionTitle": "De agent heeft je nodig",

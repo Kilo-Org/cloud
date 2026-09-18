@@ -789,6 +789,15 @@
       "balance": "Digniinaha haraaga",
       "security": "Natiijooyinka amniga"
     },
+    "action": {
+      "openSession": "Fur kalfadhi"
+    },
+    "needsInputAction": {
+      "approved": "Codsiga waa la oggolaaday",
+      "replied": "Jawaabta waa la diray",
+      "failed": "Ma jawaabin karo. Guji mar kale si aad isku daydo.",
+      "unavailable": "Codsigaan hadda ma sugayo."
+    },
     "category": {
       "chatMessagesSubtitle": "jawaabaha wadahadalladaada",
       "agentAttentionTitle": "Wakiilku wuu kuu baahan yahay",

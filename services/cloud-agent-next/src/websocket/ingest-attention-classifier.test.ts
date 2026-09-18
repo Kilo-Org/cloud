@@ -244,6 +244,7 @@ describe('dispatchCloudAgentAttentionPush', () => {
       executionId: 'attention:req_1',
       status: 'completed',
       category: 'attention',
+      attentionKind: 'question',
       body: 'Kilo needs your input.',
       suppressIfViewingSession: true,
     });
@@ -267,6 +268,7 @@ describe('dispatchCloudAgentAttentionPush', () => {
       executionId: 'attention:req_2',
       status: 'completed',
       category: 'attention',
+      attentionKind: 'permission',
       body: 'Kilo needs your input.',
       suppressIfViewingSession: true,
     });

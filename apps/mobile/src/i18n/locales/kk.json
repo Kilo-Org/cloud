@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} құралы, {{status}}",
       "accessibilityLabel": "{{name}} құралы, {{status}}",
       "noTasks": "Тапсырмалар жоқ.",
+      "noOutput": "Шығыс жоқ.",
       "toolRead": "оқу",
       "toolEdit": "өңдеу",
       "toolWrite": "жазу",

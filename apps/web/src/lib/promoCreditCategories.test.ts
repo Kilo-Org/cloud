@@ -1,5 +1,5 @@
 import { promoCategoriesOld } from '@/lib/promoCreditCategoriesOld';
-import { promoCreditCategories } from './promoCreditCategories';
+import { buildSelfServicePromos, promoCreditCategories } from './promoCreditCategories';
 
 import * as z from 'zod';
 
@@ -91,5 +91,68 @@ describe('promoCreditCategories', () => {
     for (const promo of promoCreditCategories) {
       expect(PromoCreditCategoryConfigSchema.safeParse(promo).success).toBe(true);
     }
+  });
+});
+
+describe('buildSelfServicePromos', () => {
+  const entries = [
+    {
+      encrypted_credit_category: 'decrypts-fine',
+      amount_usd: 5,
+      is_user_selfservicable: true,
+      is_idempotent: true,
+      total_redemptions_allowed: 1,
+      description: 'kept',
+    },
+    {
+      encrypted_credit_category: 'wrong-key',
+      amount_usd: 10,
+      is_user_selfservicable: true,
+      is_idempotent: true,
+      total_redemptions_allowed: 2,
+    },
+  ] as const;
+
+  it('decrypts each entry and drops the encrypted field', () => {
+    const promos = buildSelfServicePromos(entries, () => 'runtime-code');
+
+    expect(promos).toEqual([
+      {
+        amount_usd: 5,
+        is_user_selfservicable: true,
+        is_idempotent: true,
+        total_redemptions_allowed: 1,
+        description: 'kept',
+        credit_category: 'runtime-code',
+      },
+      {
+        amount_usd: 10,
+        is_user_selfservicable: true,
+        is_idempotent: true,
+        total_redemptions_allowed: 2,
+        credit_category: 'runtime-code',
+      },
+    ]);
+  });
+
+  it('skips only the entry whose ciphertext fails to decrypt', () => {
+    const promos = buildSelfServicePromos(entries, encrypted => {
+      if (encrypted === 'wrong-key') {
+        throw new Error('Unsupported state or unable to authenticate data');
+      }
+      return 'runtime-code';
+    });
+
+    expect(promos).toHaveLength(1);
+    expect(promos[0].credit_category).toBe('runtime-code');
+    expect(promos[0].amount_usd).toBe(5);
+  });
+
+  it('returns an empty list instead of throwing when every ciphertext fails', () => {
+    const promos = buildSelfServicePromos(entries, () => {
+      throw new Error('Unsupported state or unable to authenticate data');
+    });
+
+    expect(promos).toEqual([]);
   });
 });

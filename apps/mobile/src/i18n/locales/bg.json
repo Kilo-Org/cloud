@@ -2155,6 +2155,7 @@
       "accessibility": "Инструмент {{label}}, {{status}}",
       "accessibilityLabel": "Инструмент {{name}}, {{status}}",
       "noTasks": "Няма задачи.",
+      "noOutput": "Няма изход.",
       "toolRead": "четене",
       "toolEdit": "редактиране",
       "toolWrite": "запис",

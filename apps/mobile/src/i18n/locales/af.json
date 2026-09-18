@@ -2155,6 +2155,7 @@
       "accessibility": "Nutsmiddel {{label}}, {{status}}",
       "accessibilityLabel": "Nutsmiddel {{name}}, {{status}}",
       "noTasks": "Daar is geen take nie.",
+      "noOutput": "Geen uitset nie.",
       "toolRead": "lees",
       "toolEdit": "wysig",
       "toolWrite": "skryf",

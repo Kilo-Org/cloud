@@ -2193,6 +2193,7 @@
       "accessibility": "Nástroj {{label}}, {{status}}",
       "accessibilityLabel": "Nástroj {{name}}, {{status}}",
       "noTasks": "Žiadne úlohy.",
+      "noOutput": "Žiadny výstup.",
       "toolRead": "čítať súbor",
       "toolEdit": "upraviť",
       "toolWrite": "zapísať súbor",

@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} ಸಾಧನ, {{status}}",
       "accessibilityLabel": "{{name}} ಸಾಧನ, {{status}}",
       "noTasks": "ಯಾವುದೇ ಕಾರ್ಯಗಳಿಲ್ಲ.",
+      "noOutput": "ಯಾವುದೇ ಔಟ್ಪುಟ್ ಇಲ್ಲ.",
       "toolRead": "ಓದಿ",
       "toolEdit": "ಸಂಪಾದಿಸಿ",
       "toolWrite": "ಬರೆಯಿರಿ",

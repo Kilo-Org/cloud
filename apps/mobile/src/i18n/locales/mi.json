@@ -2155,6 +2155,7 @@
       "accessibility": "Te taputapu {{label}}, {{status}}",
       "accessibilityLabel": "Te taputapu {{name}}, {{status}}",
       "noTasks": "Kāore he mahi.",
+      "noOutput": "Kāore he putanga.",
       "toolRead": "pānuitia",
       "toolEdit": "whakatika",
       "toolWrite": "tuhia",

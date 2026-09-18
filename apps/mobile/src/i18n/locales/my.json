@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} ကိရိယာ၊ {{status}}",
       "accessibilityLabel": "{{name}} ကိရိယာ၊ {{status}}",
       "noTasks": "လုပ်ငန်းများ မရှိပါ။",
+      "noOutput": "အထွက် မရှိပါ။",
       "toolRead": "ဖတ်ခြင်း",
       "toolEdit": "တည်းဖြတ်ပါ",
       "toolWrite": "ရေးခြင်း",

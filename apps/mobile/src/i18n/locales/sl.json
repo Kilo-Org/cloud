@@ -2193,6 +2193,7 @@
       "accessibility": "Orodje {{label}}, {{status}}",
       "accessibilityLabel": "Orodje {{name}}, {{status}}",
       "noTasks": "Ni nalog.",
+      "noOutput": "Ni izhoda.",
       "toolRead": "preberi",
       "toolEdit": "uredi",
       "toolWrite": "zapiši",

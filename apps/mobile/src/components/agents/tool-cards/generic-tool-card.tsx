@@ -1,55 +1,72 @@
 import { View } from 'react-native';
 import { Plug } from '@/components/ui/icons';
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { buildToolDetail } from '@kilocode/app-shared/tool-detail';
 import { useTranslation } from 'react-i18next';
 
 import { SelectableText } from '@/components/ui/selectable-text';
+import { Text } from '@/components/ui/text';
 
 import { FixedPartRow } from '../fixed-part-row';
 import { MonoScrollBlock } from '../mono-scroll-block';
 import { useOpenPartDetail } from '../open-part-detail-context';
+import { getToolFileAttachments, getToolImageAttachments } from '../tool-card-attachments';
 import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
 
-function formatInput(input: Record<string, unknown>): string {
-  try {
-    return JSON.stringify(input, null, 2);
-  } catch {
-    return '[object]';
-  }
-}
-
 /**
- * Sheet body for a generic tool part (including unknown tools): the input JSON
- * block when input is non-empty, the output block, and the error. Renders only
- * inside the detail sheet — attachments and the pending/running status line
- * live in `ToolPartDetailBody`.
+ * Sheet body for a generic tool part (including unknown tools): one labelled
+ * row per projected argument (or question) field, the formatted output, and the
+ * error. A terminal part with none of those — an unknown tool that took no
+ * arguments and returned nothing — still shows a muted `No output.` line, so the
+ * sheet never opens as an empty region under its header. Renders only inside
+ * the detail sheet — attachments and the pending/running status line live in
+ * `ToolPartDetailBody`.
  *
- * `inputMaxLength` bounds the input JSON block; it is set by the patch card's
+ * `inputMaxLength` caps each field value; it is set by the patch card's
  * fallback so a giant unparseable `patchText` cannot hang the sheet. Every
- * other caller leaves it undefined and keeps today's uncapped behavior.
+ * other caller leaves it undefined and gets the shared default cap.
  */
 export function GenericToolCardBody({
   part,
   inputMaxLength,
 }: Readonly<{ part: ToolPart; inputMaxLength?: number }>) {
-  const input = part.state.input;
-
-  const output = part.state.status === 'completed' ? part.state.output : undefined;
-  const error = part.state.status === 'error' ? part.state.error : undefined;
-
-  const inputStr = Object.keys(input).length > 0 ? formatInput(input) : undefined;
+  const { t } = useTranslation();
+  const detail = buildToolDetail(part, { valueMaxLength: inputMaxLength });
+  // Attachments render above this body in the dispatcher and are themselves
+  // output, so their presence keeps the `No output.` line off. Pending and
+  // running parts already carry the dispatcher's status line, so only a
+  // terminal part with nothing else to show needs the empty state.
+  const hasAttachments =
+    getToolImageAttachments(part).length + getToolFileAttachments(part).length > 0;
+  const showEmptyState =
+    detail.fields.length === 0 &&
+    detail.output === undefined &&
+    !detail.error &&
+    !hasAttachments &&
+    detail.status !== 'pending' &&
+    detail.status !== 'running';
 
   return (
     <View className="gap-2">
-      {inputStr ? (
-        <MonoScrollBlock
-          content={inputStr}
-          textClassName="text-muted-foreground"
-          maxLength={inputMaxLength}
-        />
+      {detail.fields.map((field, index) => (
+        <View key={`${field.key}-${index}`} className="gap-1">
+          <Text className="text-xs text-muted-foreground">{field.key}</Text>
+          <SelectableText className="font-mono text-xs text-foreground">
+            {field.value}
+          </SelectableText>
+        </View>
+      ))}
+      {detail.output ? (
+        <MonoScrollBlock content={detail.output.text} textClassName="text-foreground" />
       ) : null}
-      {output ? <MonoScrollBlock content={output} textClassName="text-foreground" /> : null}
-      {error ? <SelectableText className="text-xs text-destructive">{error}</SelectableText> : null}
+      {detail.error ? (
+        <SelectableText className="text-xs text-destructive">{detail.error}</SelectableText>
+      ) : null}
+      {showEmptyState ? (
+        <SelectableText className="text-sm text-muted-foreground">
+          {t('agentChat.toolCard.noOutput')}
+        </SelectableText>
+      ) : null}
     </View>
   );
 }

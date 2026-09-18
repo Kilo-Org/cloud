@@ -2155,6 +2155,7 @@
       "accessibility": "ინსტრუმენტი {{label}}, {{status}}",
       "accessibilityLabel": "ინსტრუმენტი {{name}}, {{status}}",
       "noTasks": "დავალებები არ არის.",
+      "noOutput": "გამოსავალი არ არის.",
       "toolRead": "წაკითხვა",
       "toolEdit": "რედაქტირება",
       "toolWrite": "ჩაწერა",

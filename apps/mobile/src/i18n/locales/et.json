@@ -2155,6 +2155,7 @@
       "accessibility": "Tööriist {{label}}, {{status}}",
       "accessibilityLabel": "Tööriist {{name}}, {{status}}",
       "noTasks": "Ülesandeid pole.",
+      "noOutput": "Väljund puudub.",
       "toolRead": "loe",
       "toolEdit": "muuda",
       "toolWrite": "kirjuta",

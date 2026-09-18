@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} وسیله، {{status}}",
       "accessibilityLabel": "{{name}} وسیله، {{status}}",
       "noTasks": "هېڅ دنده نشته.",
+      "noOutput": "هېڅ پایلې نشته.",
       "toolRead": "لوستل",
       "toolEdit": "سمون ورکړئ",
       "toolWrite": "لیکل",

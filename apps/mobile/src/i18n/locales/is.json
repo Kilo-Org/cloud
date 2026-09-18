@@ -2155,6 +2155,7 @@
       "accessibility": "tól: {{label}}, {{status}}",
       "accessibilityLabel": "tól: {{name}}, {{status}}",
       "noTasks": "Engin verkefni eru á listanum.",
+      "noOutput": "Ekkert úttak.",
       "toolRead": "lesa",
       "toolEdit": "breyta",
       "toolWrite": "skrifa",

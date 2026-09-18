@@ -1,2 +1,0 @@
-CREATE INDEX "idx_passkey_challenges_kilo_user_id" ON "passkey_challenges" USING btree ("kilo_user_id");--> statement-breakpoint
-CREATE INDEX "idx_passkey_sign_in_tickets_kilo_user_id" ON "passkey_sign_in_tickets" USING btree ("kilo_user_id");

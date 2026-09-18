@@ -7024,6 +7024,48 @@ export const byok_api_keys = pgTable(
 
 export type BYOKApiKey = typeof byok_api_keys.$inferSelect;
 
+/**
+ * A "Sign in with ChatGPT" delegated connection. The integration is inherently
+ * personal: a connection belongs to one person and is scoped to one account,
+ * either that person's personal account (`organization_id` null) or one
+ * organization they belong to. The same person can connect the same ChatGPT
+ * subscription to several accounts by connecting each one separately, so the
+ * owner is the `(kilo_user_id, organization_id)` pair.
+ */
+export const openai_chatgpt_connections = pgTable(
+  'openai_chatgpt_connections',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, {
+        onDelete: 'cascade',
+      }),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    encrypted_connection: jsonb().$type<EncryptedData>().notNull(),
+    is_enabled: boolean().default(true).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    created_by: text().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_openai_chatgpt_connections_personal')
+      .on(table.kilo_user_id)
+      .where(sql`${table.organization_id} IS NULL`),
+    uniqueIndex('UQ_openai_chatgpt_connections_org_member')
+      .on(table.kilo_user_id, table.organization_id)
+      .where(sql`${table.organization_id} IS NOT NULL`),
+    index('IDX_openai_chatgpt_connections_organization_id').on(table.organization_id),
+  ]
+);
+
+export type OpenAiChatGptConnectionRow = typeof openai_chatgpt_connections.$inferSelect;
+
 // Security Reviews - Phase 1
 export const security_findings = pgTable(
   'security_findings',

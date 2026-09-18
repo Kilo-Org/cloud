@@ -1435,8 +1435,6 @@ async function ensureProvisionAccess(
   });
 }
 
-// ── Personal subscription management schemas ──────────────────────────
-
 const KiloclawInstanceInputSchema = z.object({ instanceId: z.string().uuid() });
 const KiloclawOptionalInstanceInputSchema = z.object({
   instanceId: z.string().uuid().optional(),
@@ -1527,8 +1525,6 @@ type CreditReprovisionRecoveryEligibility = CreditReprovisionRecoveryPreview & {
   eligible: false;
   reason: 'no_current_subscription' | 'subscription_not_current';
 };
-
-// ── Personal subscription helpers ──────────────────────────────────────
 
 const COMMIT_ADMISSION_ERROR_MESSAGE =
   'Commit is no longer available. Choose Standard for month-to-month KiloClaw hosting.';
@@ -3083,7 +3079,6 @@ export const kiloclawRouter = createTRPCRouter({
     const instances = await listAllActiveInstances(ctx.user.id);
     if (instances.length === 0) return [];
 
-    // Build org name map for instances that belong to organizations
     const orgIds = [
       ...new Set(instances.map(i => i.organizationId).filter((id): id is string => id !== null)),
     ];
@@ -3098,7 +3093,6 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }
 
-    // Fetch live status from each instance's worker in parallel
     const client = new KiloClawInternalClient();
     const results = await Promise.all(
       instances.map(async instance => {
@@ -3357,7 +3351,6 @@ export const kiloclawRouter = createTRPCRouter({
       return client.readMorningBriefing(ctx.user.id, input.day, workerInstanceId(instance));
     }),
 
-  // Instance lifecycle
   start: clawAccessProcedure.mutation(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawInternalClient();
@@ -3482,7 +3475,6 @@ export const kiloclawRouter = createTRPCRouter({
           )
         );
 
-      // Clean up webhook/scheduled triggers for the destroyed instance.
       // Delete from worker DOs first (best-effort), then from PostgreSQL.
       if (destroyedRow) {
         const orphanedTriggers = await db
@@ -3521,7 +3513,6 @@ export const kiloclawRouter = createTRPCRouter({
     return result;
   }),
 
-  // Explicit lifecycle APIs
   provision: baseProcedure.input(updateConfigSchema).mutation(async ({ ctx, input }) => {
     const { instanceId, bootstrapSubscription } = await ensureProvisionAccess(ctx.user.id);
     return await provisionInstance(ctx.user, input, {
@@ -3689,7 +3680,6 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }),
 
-  // User-facing (user client -- forwards user's short-lived JWT)
   getConfig: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     const client = new KiloClawUserClient(
@@ -4320,7 +4310,6 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
 
-      // Verify the version exists and is available
       // Note: There is a small TOCTOU window between this check and the insert below.
       // Worst case: a user pins to a version disabled milliseconds before. The FK constraint
       // on image_tag ensures referential integrity, and the status check is best-effort.

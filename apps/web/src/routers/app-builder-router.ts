@@ -166,10 +166,6 @@ export const appBuilderRouter = createTRPCRouter({
       });
     }),
 
-  // ============================================================================
-  // WebSocket-based streaming mutations
-  // ============================================================================
-
   /**
    * Start a Cloud Agent session for an existing project using WebSocket API.
    * Returns immediately with session info - client connects to WebSocket separately for events.
@@ -226,10 +222,6 @@ export const appBuilderRouter = createTRPCRouter({
       workerVersion: result.workerVersion,
     };
   }),
-
-  // ============================================================================
-  // GitHub Migration
-  // ============================================================================
 
   /**
    * Pre-flight check for GitHub migration.

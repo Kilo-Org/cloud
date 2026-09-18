@@ -100,7 +100,6 @@ const OrganizationListInputSchema = z.object({
   // paying = has ever had a seats purchase (active or churned customers)
   // trial  = has never had a seats purchase
   mode: z.enum(['paying', 'trial', 'all']).default('paying'),
-  // User-facing filters
   include_deleted: z.boolean().default(false),
   // Filter by latest subscription_status value. Values match the canonical
   // Stripe status registry; '' clears the filter.
@@ -341,7 +340,6 @@ export const organizationAdminRouter = createTRPCRouter({
   updateCreatedBy: adminProcedure.input(UpdateCreatedByInputSchema).mutation(async ({ input }) => {
     const { organizationId, userId } = input;
 
-    // Validate that the organization exists
     const organization = await db.query.organizations.findFirst({
       where: eq(organizations.id, organizationId),
     });
@@ -353,7 +351,6 @@ export const organizationAdminRouter = createTRPCRouter({
       });
     }
 
-    // If userId is provided, validate that the user exists
     if (userId !== null) {
       const user = await db.query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, userId),
@@ -380,7 +377,6 @@ export const organizationAdminRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { organizationId, free_trial_end_at } = input;
 
-      // Validate that the organization exists
       const organization = await db.query.organizations.findFirst({
         where: eq(organizations.id, organizationId),
       });
@@ -401,7 +397,6 @@ export const organizationAdminRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { organizationId, suppress_trial_messaging } = input;
 
-      // Validate that the organization exists
       const organization = await db.query.organizations.findFirst({
         where: eq(organizations.id, organizationId),
       });
@@ -409,7 +404,6 @@ export const organizationAdminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
       }
 
-      // Update the settings JSONB column
       const updatedSettings = {
         ...organization.settings,
         suppress_trial_messaging,

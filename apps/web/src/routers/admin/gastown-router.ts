@@ -14,8 +14,6 @@ import {
 import { generateApiToken } from '@/lib/tokens';
 import type { User } from '@kilocode/db/schema';
 
-// ── Zod schemas matching Gastown API response shapes ─────────────────────────
-
 const UserTownRecord = z.object({
   id: z.string(),
   name: z.string(),
@@ -225,8 +223,6 @@ const AdminAuditLogRecord = z.object({
   performed_at: z.string(),
 });
 
-// ── Gastown HTTP client ───────────────────────────────────────────────────────
-
 /**
  * Build auth headers for server-side calls to the Gastown worker.
  * Uses the admin user's Kilo JWT (isAdmin: true, gastownAccess: true)
@@ -382,11 +378,7 @@ async function gastownTrpcMutate<T>(
   return parsed.success ? parsed.data.result.data : null;
 }
 
-// ── Router ────────────────────────────────────────────────────────────────────
-
 export const adminGastownRouter = createTRPCRouter({
-  // ── User → Towns ─────────────────────────────────────────────────────────
-
   /**
    * List all towns owned by a given user.
    * Calls: GET /api/users/:userId/towns (kiloAuthMiddleware, no ownership check)
@@ -424,8 +416,6 @@ export const adminGastownRouter = createTRPCRouter({
 
       return rigLists.flat();
     }),
-
-  // ── Town inspection ───────────────────────────────────────────────────────
 
   /**
    * Get the alarm status snapshot for a town.
@@ -708,8 +698,6 @@ export const adminGastownRouter = createTRPCRouter({
       );
       return result ?? [];
     }),
-
-  // ── Admin interventions ───────────────────────────────────────────────────
 
   forceResetAgent: adminProcedure
     .input(z.object({ townId: z.string().uuid(), agentId: z.string().uuid() }))

@@ -390,7 +390,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get overview KPIs
   getOverviewStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
     const statusTable =

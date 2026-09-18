@@ -228,7 +228,6 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       })
     )
     .query(async ({ input }) => {
-      // Get deployment to verify ownership and get worker name
       const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
         type: 'org',
         id: input.organizationId,
@@ -246,7 +245,6 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      // Get deployment to verify ownership and get worker name
       const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
         type: 'org',
         id: input.organizationId,
@@ -263,7 +261,6 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      // Get deployment to verify ownership and get worker name
       const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
         type: 'org',
         id: input.organizationId,

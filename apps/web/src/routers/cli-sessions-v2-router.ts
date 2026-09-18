@@ -71,12 +71,10 @@ function isSessionNotFoundError(err: unknown): boolean {
   if (err instanceof TRPCClientError) {
     const data = err.data as { code?: string; httpStatus?: number } | undefined;
     const shape = err.shape as { data?: { code?: string; httpStatus?: number } } | undefined;
-    // Check TRPC error code
     const code = data?.code ?? shape?.data?.code;
     if (code === 'NOT_FOUND') {
       return true;
     }
-    // Also check HTTP status 404
     const httpStatus = data?.httpStatus ?? shape?.data?.httpStatus;
     if (httpStatus === 404) {
       return true;
@@ -1795,7 +1793,6 @@ export const cliSessionsV2Router = createTRPCRouter({
         }
       }
 
-      // Resolve the GitHub installation for this session's owner.
       let integration;
       if (session.organization_id) {
         integration = await getIntegrationForOwner(
@@ -1825,7 +1822,6 @@ export const cliSessionsV2Router = createTRPCRouter({
       }
       const appType = integration.github_app_type ?? 'standard';
 
-      // Fetch the PR by number from the stored link.
       let fetched;
       try {
         fetched = await fetchPullRequestByNumber({
@@ -1856,7 +1852,6 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-      // Fetch the rolled-up review decision when we have a PR.
       // Failures are swallowed so a GraphQL hiccup doesn't break the refresh.
       let reviewDecision: string | null = null;
       let reviewDecisionFetched = false;

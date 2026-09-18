@@ -4244,7 +4244,6 @@ describe('handleKiloClawSubscriptionCreated', () => {
 
   it('calls ensureAutoIntroSchedule for intro-price subscription', async () => {
     const instance = await createWebhookAnchor();
-    // Set up stripe.subscriptions.retrieve to return intro price
     stripeMock.subscriptions.retrieve.mockResolvedValue({
       schedule: null,
       items: { data: [{ price: { id: 'price_standard_intro' } }] },
@@ -5570,7 +5569,6 @@ describe('reactivateSubscription', () => {
     });
 
     stripeMock.subscriptions.update.mockResolvedValue({});
-    // Make ensureAutoIntroSchedule fail
     stripeMock.subscriptions.retrieve.mockRejectedValue(new Error('Stripe timeout'));
 
     const caller = await createCallerForUser(user.id);
@@ -7387,7 +7385,6 @@ describe('enrollWithCredits', () => {
     expect(sub.trial_started_at).not.toBeNull();
     expect(sub.trial_ends_at).not.toBeNull();
 
-    // Verify credit deduction at intro price ($4, not $9)
     const txns = await db
       .select()
       .from(credit_transactions)
@@ -7398,7 +7395,6 @@ describe('enrollWithCredits', () => {
     expect(deduction!.amount_microdollars).toBe(-4_000_000);
     expect(deduction!.credit_category).toContain('kiloclaw-subscription:');
 
-    // Verify credit spend recorded at intro amount
     const [updatedUser] = await db
       .select({
         acquired: kilocode_users.total_microdollars_acquired,

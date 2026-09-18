@@ -85,7 +85,6 @@ export const organizationAutoFixRouter = createTRPCRouter({
           await ensureBotUserForOrg(typedInput.organizationId, 'auto-fix');
         }
 
-        // Build config object with defaults for optional fields
         const config: AutoFixAgentConfig = {
           enabled_for_issues: input.enabled_for_issues,
           enabled_for_review_comments: input.enabled_for_review_comments ?? false,
@@ -144,7 +143,6 @@ export const organizationAutoFixRouter = createTRPCRouter({
         const existingConfig = await getAgentConfigForOwner(owner, 'auto_fix', 'github');
 
         if (!existingConfig) {
-          // Create default config if it doesn't exist
           const config = {
             ...DEFAULT_AUTO_FIX_CONFIG,
             enabled_for_issues: input.isEnabled,
@@ -158,7 +156,6 @@ export const organizationAutoFixRouter = createTRPCRouter({
             createdBy: ctx.user.id,
           });
         } else {
-          // Update existing config and sync enabled_for_issues with toggle state
           const updatedConfig = {
             ...(existingConfig.config as AutoFixAgentConfig),
             enabled_for_issues: input.isEnabled,

@@ -1565,6 +1565,7 @@
       "exitNeedsNewerCli": "Slash-Befehle in Remote-Sitzungen erfordern eine neuere Version von Kilo CLI. Aktualisiere Kilo CLI und stelle die Verbindung erneut her."
     },
     "sessionConnection": {
+      "label": "Verbindung",
       "connecting": "Verbindung wird hergestellt…",
       "reconnecting": "Verbindung wird wiederhergestellt…",
       "connectionLost": "Verbindung unterbrochen",
@@ -1584,7 +1585,9 @@
       "removeConfirmTitle": "Ziel entfernen?",
       "removeConfirmMessage": "Die CLI löscht das Ziel dieser Sitzung.",
       "updateFailed": "Das Ziel konnte nicht aktualisiert werden.",
-      "sectionAccessibility": "{{status}}. Ziel: {{text}}"
+      "sectionAccessibility": "{{status}}. Ziel: {{text}}",
+      "collapse": "Ziel einklappen",
+      "expand": "Ziel ausklappen"
     },
     "newSession": {
       "recentlyUsed": "Zuletzt verwendet",
@@ -1638,7 +1641,20 @@
       "continueFrom": "Die Sitzung „{{title}}“ wird fortgesetzt.",
       "importingSession": "Sitzung wird importiert",
       "cliCannotContinue": "Diese CLI kann keine Sitzung fortsetzen. Wähle Cloud Agent oder eine andere CLI.",
-      "importFailed": "Diese Sitzung konnte nicht importiert werden."
+      "importFailed": "Diese Sitzung konnte nicht importiert werden.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Standard · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Klein",
+      "sandboxInstanceShared": "Geteilt",
+      "sandboxInstanceLarge": "Groß",
+      "sandboxInstanceDevcontainer": "Dev-Container",
+      "sandboxInstanceProviderDefault": "Anbieter-Standard",
+      "sandboxCouldNotLoad": "Sandbox-Optionen konnten nicht geladen werden",
+      "sandboxUnavailable": "Diese Sandbox ist nicht verfügbar. Wähle eine andere Sandbox oder Standard.",
+      "sandboxUseDefault": "Standard verwenden"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} Datei wurde aktualisiert.",
@@ -2004,6 +2020,12 @@
       "startNewSession": "Neue Sitzung starten",
       "exitSession": "Sitzung beenden",
       "clearSession": "Diese Sitzung beenden und eine neue starten",
+      "compactDescription": "Kontext der aktuellen Sitzung komprimieren",
+      "goalDescription": "Arbeite weiter auf ein Sitzungsziel hin. /goal <objective> oder pause, resume, clear",
+      "initDescription": "geführte AGENTS.md-Einrichtung",
+      "resumeClaudeDescription": "Transkript einer Claude Code-Sitzung importieren",
+      "resumeCodexDescription": "Transkript einer OpenAI Codex-Sitzung importieren",
+      "reviewDescription": "Änderungen prüfen [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} verwenden",
       "insert": "Einfügen",
       "upgradeRequiredFallback": "Bitte aktualisiere deine CLI, um diesen Befehl zu verwenden.",
@@ -2121,6 +2143,7 @@
     "couldNotLoadActiveSessions": "Die aktiven Sitzungen konnten nicht geladen werden.",
     "agentSessions": "Jetzt aktiv",
     "newCodingTask": "Neue Programmieraufgabe",
+    "newTaskFromPicture": "Neue Aufgabe aus einem Bild",
     "explore": "Entdecken",
     "seeAll": "Alle ansehen",
     "noLiveSessions": "Zurzeit läuft nichts"
@@ -2342,7 +2365,8 @@
     "aiProvidersWhat": "Deine Prompts, dein Unterhaltungsverlauf und alle Dateien, die du anhängst.",
     "aiProvidersWhy": "Um KI-Antworten zu erstellen.",
     "aiProvidersWho": "Anthropic, OpenAI, Google und andere Anbieter, die du pro Anfrage auswählst.",
-    "gatewayWhat": "Konto-ID, Anfrage-Metadaten, Token-Nutzung.",
+    "gatewayWhat": "Konto-ID, Anfrage-Metadaten, Token-Nutzung sowie die Prompts und Sprachaufnahmen, die die App darüber sendet.",
+    "viaGateway": "Über Kilo Gateway",
     "gatewayWhy": "Authentifizierung, Weiterleitung von Anfragen, Abrechnungsabgleich.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Absturz- und Fehlerberichte ohne App-Inhalte.",
@@ -2362,7 +2386,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Deine Aufnahme, während du diktierst.",
     "voiceTranscriptionWhy": "Um Sprache in Text umzuwandeln.",
-    "voiceTranscriptionWho": "Die Verarbeitung erfolgt nur auf dem Gerät oder bei Apple oder Google, wenn dein Gerät nicht offline transkribieren kann.",
+    "voiceTranscriptionWho": "Dein Gerät, Kilo Gateway mit deinem gewählten Transkriptionsmodell oder Apple bzw. Google für die Online-Erkennung.",
     "what": "Was",
     "why": "Warum",
     "who": "Wer",

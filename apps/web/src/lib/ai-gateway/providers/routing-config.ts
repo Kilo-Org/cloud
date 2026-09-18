@@ -1,6 +1,5 @@
 import { createCachedFetch } from '@/lib/cached-fetch';
 import {
-  DEFAULT_PERPLEXITY_PERCENTAGE,
   DEFAULT_VERCEL_PERCENTAGE,
   DEFAULT_VERCEL_PERCENTAGE_FREE,
   GatewayRoutingConfigSchema,
@@ -13,14 +12,12 @@ export type RuntimeGatewayRoutingConfig = {
   vercelPaid: number;
   vercelFree: number;
   vercelOptOutModels: ReadonlySet<string>;
-  perplexity: number;
 };
 
 const DEFAULT_RUNTIME_GATEWAY_ROUTING_CONFIG: RuntimeGatewayRoutingConfig = {
   vercelPaid: DEFAULT_VERCEL_PERCENTAGE,
   vercelFree: DEFAULT_VERCEL_PERCENTAGE_FREE,
   vercelOptOutModels: new Set(),
-  perplexity: DEFAULT_PERPLEXITY_PERCENTAGE,
 };
 
 export const getRuntimeGatewayRoutingConfig = createCachedFetch<RuntimeGatewayRoutingConfig>(
@@ -37,7 +34,6 @@ export const getRuntimeGatewayRoutingConfig = createCachedFetch<RuntimeGatewayRo
       vercelPaid: config.vercel_routing_percentage ?? DEFAULT_VERCEL_PERCENTAGE,
       vercelFree: config.vercel_routing_percentage_free ?? DEFAULT_VERCEL_PERCENTAGE_FREE,
       vercelOptOutModels: new Set(config.vercel_routing_opt_out_models),
-      perplexity: config.perplexity_routing_percentage ?? DEFAULT_PERPLEXITY_PERCENTAGE,
     };
   },
   60_000,

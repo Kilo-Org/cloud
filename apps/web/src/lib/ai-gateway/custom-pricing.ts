@@ -2,7 +2,6 @@ import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@/lib/ai-gateway/processUsage.types';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
-import { partnerPricingByModelId } from '@/lib/ai-gateway/providers/partner/pricing';
 import {
   calculateCost_mUsd,
   type Pricing,
@@ -33,7 +32,6 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
       },
     ],
   },
-  ...partnerPricingByModelId,
 };
 
 export function getCustomPricing(modelId: string): CustomPricing | undefined {

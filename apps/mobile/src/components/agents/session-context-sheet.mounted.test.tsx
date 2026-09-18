@@ -113,6 +113,8 @@ function renderSheet(
         autoApproveState: state,
         onAutoApproveChange,
         onClose: vi.fn<() => void>(),
+        connectionDisplay: 'connected',
+        onRetryConnection: vi.fn<() => void>(),
         ...overrides,
       })
     );
@@ -208,22 +210,29 @@ describe('SessionContextSheet auto-approve row', () => {
     const root = renderer.root;
 
     const rowIndex = indexOfTestID(root, 'session-auto-approve-row');
+    const connectionIndex = indexOfTestID(root, 'session-context-sheet-connection');
     const ringIndex = indexOfTestID(root, 'session-context-sheet-ring');
     const headerIndex = indexOfType(root, 'SheetHeader');
 
     expect(rowIndex).toBeGreaterThanOrEqual(0);
+    expect(connectionIndex).toBeGreaterThanOrEqual(0);
     expect(ringIndex).toBeGreaterThanOrEqual(0);
     // The header title ("Context usage") is above the row; the row is the
-    // first body element and precedes the usage ring inside the ScrollView.
+    // first body element and precedes the connection row and the usage ring
+    // inside the ScrollView.
     expect(headerIndex).toBeGreaterThanOrEqual(0);
     expect(headerIndex).toBeLessThan(rowIndex);
-    expect(rowIndex).toBeLessThan(ringIndex);
+    expect(rowIndex).toBeLessThan(connectionIndex);
+    expect(connectionIndex).toBeLessThan(ringIndex);
 
-    // Outside the ScrollView, so it never scrolls away with the details.
+    // Outside the ScrollView, so they never scroll away with the details.
     const scrollView = findByType(root, 'ScrollView')[0];
     expect(scrollView).toBeDefined();
     expect(
       scrollView?.findAll(node => node.props.testID === 'session-auto-approve-row')
+    ).toHaveLength(0);
+    expect(
+      scrollView?.findAll(node => node.props.testID === 'session-context-sheet-connection')
     ).toHaveLength(0);
 
     renderer.unmount();
@@ -283,6 +292,8 @@ function sheetElement(
     autoApproveState: 'on',
     onAutoApproveChange: vi.fn<(enabled: boolean) => void>(),
     onClose: vi.fn<() => void>(),
+    connectionDisplay: 'connected',
+    onRetryConnection: vi.fn<() => void>(),
     ...overrides,
   });
 }
@@ -494,5 +505,58 @@ describe('SessionContextSheet session id and running on', () => {
     });
     expect(textValues(renderer)).not.toContain(i18n.t('agentChat.instancePicker.runOn'));
     await unmount(renderer);
+  });
+});
+
+describe('SessionContextSheet connection row', () => {
+  it.each([
+    { display: 'connected' as const, copy: 'common.connected' },
+    { display: 'connecting' as const, copy: 'agentChat.sessionConnection.connecting' },
+    { display: 'reconnecting' as const, copy: 'agentChat.sessionConnection.reconnecting' },
+    { display: 'lost' as const, copy: 'agentChat.sessionConnection.connectionLost' },
+  ])('renders the Connection label and the $display copy', async ({ display, copy }) => {
+    const renderer = await mountSheet({ connectionDisplay: display });
+    const values = textValues(renderer);
+    expect(values).toContain(i18n.t('agentChat.sessionConnection.label'));
+    expect(values).toContain(i18n.t(copy));
+    await unmount(renderer);
+  });
+
+  it('keeps the connection row outside the ScrollView, under the auto-approve row', async () => {
+    const renderer = await mountSheet();
+    const root = renderer.root;
+    const rowIndex = indexOfTestID(root, 'session-auto-approve-row');
+    const connectionIndex = indexOfTestID(root, 'session-context-sheet-connection');
+    const ringIndex = indexOfTestID(root, 'session-context-sheet-ring');
+
+    expect(rowIndex).toBeGreaterThanOrEqual(0);
+    expect(connectionIndex).toBeGreaterThanOrEqual(0);
+    expect(ringIndex).toBeGreaterThanOrEqual(0);
+    expect(rowIndex).toBeLessThan(connectionIndex);
+    expect(connectionIndex).toBeLessThan(ringIndex);
+
+    const scrollView = findByType(root, 'ScrollView')[0];
+    expect(scrollView).toBeDefined();
+    expect(
+      scrollView?.findAll(node => node.props.testID === 'session-context-sheet-connection')
+    ).toHaveLength(0);
+
+    await unmount(renderer);
+  });
+
+  it('offers Retry only for a lost connection and calls the handler once', async () => {
+    const onRetryConnection = vi.fn<() => void>();
+    const connected = await mountSheet({ connectionDisplay: 'connected' });
+    expect(findByTestID(connected.root, 'session-context-sheet-connection-retry')).toHaveLength(0);
+    await unmount(connected);
+
+    const lost = await mountSheet({ connectionDisplay: 'lost', onRetryConnection });
+    expect(findByTestID(lost.root, 'session-context-sheet-connection-retry')).toHaveLength(1);
+    await act(async () => {
+      pressByTestID(lost, 'session-context-sheet-connection-retry');
+      await Promise.resolve();
+    });
+    expect(onRetryConnection).toHaveBeenCalledTimes(1);
+    await unmount(lost);
   });
 });

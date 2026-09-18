@@ -27,6 +27,9 @@ jest.mock('@/lib/ai-gateway/providers/vercel', () => ({
 jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptStoredConnection: jest.fn().mockResolvedValue(null),
 }));
+jest.mock('@/lib/ai-gateway/openai-chatgpt/served-models', () => ({
+  isOpenAiModelServed: jest.fn().mockResolvedValue(true),
+}));
 jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
   resolveOpenAiChatGptAccessToken: jest.fn().mockResolvedValue({ kind: 'no_connection' }),
   OPENAI_CHATGPT_RECONNECT_MESSAGE: 'Your ChatGPT connection has expired. Reconnect to continue.',

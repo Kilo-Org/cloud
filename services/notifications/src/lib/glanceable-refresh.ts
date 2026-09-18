@@ -34,6 +34,11 @@ const pendingRefreshSchema = z.object({
   userId: z.string().min(1),
   organizationId: z.string().min(1).nullable(),
   dueAt: z.number(),
+  // When the deferral was written. A delivery can tell a record it superseded
+  // from one that landed while it was in flight only by write time: both carry
+  // the same `dueAt` when they defer inside the same window. Optional for
+  // records written before this field existed.
+  deferredAt: z.number().optional(),
 });
 type PendingGlanceableRefresh = z.infer<typeof pendingRefreshSchema>;
 
@@ -41,6 +46,20 @@ const PENDING_PREFIX = 'glanceable-pending:';
 
 function pendingKey(scope: { userId: string; organizationId: string | null }): string {
   return `${PENDING_PREFIX}${JSON.stringify([scope.userId, scope.organizationId])}`;
+}
+
+/**
+ * Whether a pending record read after a delivery is the same one that was
+ * already stored when the delivery started. A deferral written while the
+ * delivery was in flight carries a later `deferredAt`, so the delivery must not
+ * cancel it: its counts are not in the delivered snapshot.
+ */
+function isSameDeferral(
+  before: PendingGlanceableRefresh | undefined,
+  after: PendingGlanceableRefresh | undefined
+): boolean {
+  if (before === undefined || after === undefined) return before === after;
+  return before.dueAt === after.dueAt && before.deferredAt === after.deferredAt;
 }
 
 /** The user DO owns these records; no ordering or interval state lives in a Worker instance. */
@@ -65,22 +84,31 @@ export async function refreshGlanceableSnapshot(
     delivery !== undefined &&
     nowMs() - delivery.deliveredAt < GLANCEABLE_DELIVERY_MIN_INTERVAL_MS
   ) {
+    const now = nowMs();
     const dueAt = delivery.deliveredAt + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS;
     await storage.put<PendingGlanceableRefresh>(pendingKey(scope), {
       userId: scope.userId,
       organizationId: scope.organizationId,
       dueAt,
+      deferredAt: now,
     });
     const currentAlarm = await storage.getAlarm();
     // Only keep an alarm that will actually fire and reschedule before `dueAt`.
     // A past alarm is not a usable schedule — it may be a stale record left by a
     // restart — so a deferral must (re)arm at `dueAt` or the trailing delivery
     // that lands the final counts is never delivered.
-    if (currentAlarm === null || currentAlarm <= nowMs() || dueAt < currentAlarm) {
+    if (currentAlarm === null || currentAlarm <= now || dueAt < currentAlarm) {
       await storage.setAlarm(dueAt);
     }
     return;
   }
+  // The delivery that follows supersedes any deferral already stored: its
+  // snapshot is built after that change. A deferral written while it is in
+  // flight is not superseded, so remember the one that existed at the start and
+  // keep a newer one when the delivery completes.
+  const pendingBeforeDelivery = pendingRefreshSchema
+    .optional()
+    .parse(await storage.get(pendingKey(scope)));
   // Row renewal or temporary absence cannot prove that the native token is live.
   const iosEndPrefix = (token: string) => `glanceable-ios-end:${JSON.stringify(token)}:`;
   // A card raised by push-to-start carries no update token until the app runs
@@ -114,10 +142,12 @@ export async function refreshGlanceableSnapshot(
     // credentials fail, and the flush has already consumed the pending record,
     // so re-arm the next window instead of dropping the change with no alarm.
     if (options.trailing === true) {
+      const now = nowMs();
       await storage.put<PendingGlanceableRefresh>(pendingKey(scope), {
         userId: scope.userId,
         organizationId: scope.organizationId,
-        dueAt: nowMs() + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+        dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+        deferredAt: now,
       });
     }
     return;
@@ -231,9 +261,17 @@ export async function refreshGlanceableSnapshot(
   const current = refreshStateSchema.optional().parse(await storage.get(key));
   if (current?.revision !== request.revision) return;
 
-  // A delivered snapshot starts the next window and cancels any trailing refresh.
+  // A delivered snapshot starts the next window and cancels the trailing
+  // refresh it superseded. A deferral written while this delivery was in flight
+  // (an approval-exempt delivery can run inside an open window) is not in the
+  // snapshot, so keep it: its counts must still land on the trailing alarm.
   await storage.put(deliveryKey, { deliveredAt: nowMs() });
-  await storage.delete(pendingKey(scope));
+  const pendingAfterDelivery = pendingRefreshSchema
+    .optional()
+    .parse(await storage.get(pendingKey(scope)));
+  if (isSameDeferral(pendingBeforeDelivery, pendingAfterDelivery)) {
+    await storage.delete(pendingKey(scope));
+  }
   // One delivery event per window per scope; the trailing flush's line carries
   // the final counts so a deferred burst settles on them.
   console.log({

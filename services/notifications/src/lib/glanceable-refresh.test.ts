@@ -197,6 +197,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       userId: 'user-1',
       organizationId: null,
       dueAt: base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      deferredAt: base + 2_000,
     });
     expect(await h.storage.getAlarm()).toBe(base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS);
 
@@ -265,6 +266,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       userId: 'user-null-build',
       organizationId: null,
       dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      deferredAt: now,
     });
   });
 
@@ -325,6 +327,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       userId: 'user-failed-send',
       organizationId: null,
       dueAt: base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      deferredAt: base + 2_000,
     });
     expect(await h.storage.getAlarm()).toBe(base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS);
 
@@ -401,10 +404,12 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     h.setNext(snapshot({ running: 4 }));
     await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
     const dueAt = base + 2 * GLANCEABLE_DELIVERY_MIN_INTERVAL_MS + 500;
+    const deferredAt = base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS + 1_000;
     expect(await h.storage.get(pendingKey('user-superseded', null))).toEqual({
       userId: 'user-superseded',
       organizationId: null,
       dueAt,
+      deferredAt,
     });
 
     // The stalled, superseded delivery must neither drop the trailing refresh
@@ -415,9 +420,113 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       userId: 'user-superseded',
       organizationId: null,
       dueAt,
+      deferredAt,
     });
     expect(await h.storage.get(deliveryKey('user-superseded', null))).toEqual({
       deliveredAt: base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS + 500,
+    });
+  });
+
+  it('keeps a counts-only deferral written while an approval-exempt delivery is in flight', async () => {
+    const h = makeHarness();
+    const base = 50_000_000;
+    let now = base;
+    const scope = { userId: 'user-approval-race', organizationId: null };
+
+    // A first delivery opens the window.
+    h.setNext(snapshot({ running: 1, needsInput: 0 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+
+    // An approval change inside the window starts delivering (exempt) but
+    // stalls in transport.
+    now = base + 2_000;
+    h.setNext(snapshot({ running: 1, needsInput: 1, needsApproval: 1 }));
+    const gate = h.blockNextExpoPush();
+    const stalled = refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now, {
+      approvalChanged: true,
+    });
+    await gate.started;
+
+    // A counts-only change lands while the exempt delivery is in flight. The
+    // window is still open, so it defers to the alarm; the revision is not
+    // advanced by a deferral.
+    now = base + 2_500;
+    h.setNext(snapshot({ running: 2, needsInput: 1, needsApproval: 1 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+    const dueAt = base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS;
+    expect(await h.storage.get(pendingKey('user-approval-race', null))).toMatchObject({ dueAt });
+
+    // The exempt delivery completing must not discard the deferral that landed
+    // while it was in flight.
+    gate.release();
+    await stalled;
+    expect(await h.storage.get(pendingKey('user-approval-race', null))).toMatchObject({ dueAt });
+    // The deferral keeps the alarm that will deliver it.
+    expect(await h.storage.getAlarm()).toBe(dueAt);
+
+    // The trailing flush still delivers the final counts. The exempt delivery
+    // started the next window when it completed, so the deferred refresh waits
+    // out that window before it lands.
+    now = base + 2_500 + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS;
+    await flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now);
+    expect(h.expoSends).toHaveLength(3);
+    expect(h.expoSends[2][0].data).toMatchObject({
+      running: 2,
+      needsInput: 1,
+      needsApproval: 1,
+    });
+  });
+
+  it('keeps a newer deferral even when an older one in the same window shares its dueAt', async () => {
+    const h = makeHarness();
+    const base = 55_000_000;
+    let now = base;
+    const scope = { userId: 'user-approval-collision', organizationId: null };
+
+    // A first delivery opens the window.
+    h.setNext(snapshot({ running: 1, needsInput: 0 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+
+    // A counts-only change defers to the window end.
+    now = base + 1_000;
+    h.setNext(snapshot({ running: 2, needsInput: 0 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+    const dueAt = base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS;
+
+    // An approval change inside the window starts delivering (exempt) and
+    // stalls; its snapshot already covers the first deferral.
+    now = base + 2_000;
+    h.setNext(snapshot({ running: 2, needsInput: 1, needsApproval: 1 }));
+    const gate = h.blockNextExpoPush();
+    const stalled = refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now, {
+      approvalChanged: true,
+    });
+    await gate.started;
+
+    // A second counts-only change defers during the delivery. It carries the
+    // same `dueAt` as the first deferral, so only its write time tells them
+    // apart: the delivery superseded the first, not this one.
+    now = base + 2_500;
+    h.setNext(snapshot({ running: 3, needsInput: 1, needsApproval: 1 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+
+    gate.release();
+    await stalled;
+    expect(await h.storage.get(pendingKey('user-approval-collision', null))).toEqual({
+      userId: 'user-approval-collision',
+      organizationId: null,
+      dueAt,
+      deferredAt: base + 2_500,
+    });
+
+    // The trailing flush still delivers the final counts.
+    now = base + 2_500 + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS;
+    await flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now);
+    expect(h.expoSends).toHaveLength(3);
+    expect(h.expoSends[2][0].data).toMatchObject({
+      running: 3,
+      needsInput: 1,
+      needsApproval: 1,
     });
   });
 

@@ -27,6 +27,16 @@ describe('createCachedFetch', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  test('shares an in-flight fetch between concurrent invocations', async () => {
+    const fetcher = jest.fn<() => Promise<number>>().mockResolvedValue(42);
+    const get = createCachedFetch(fetcher, 10_000, 0);
+
+    const results = await Promise.all([get(), get()]);
+
+    expect(results).toEqual([42, 42]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   test('re-fetches after TTL expires', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(1000);
     const fetcher = jest

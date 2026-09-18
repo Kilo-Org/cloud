@@ -8,17 +8,24 @@
  */
 export function createCachedFetch<T>(fetcher: () => Promise<T>, ttlMs: number, defaultValue: T) {
   let cached: { value: T; at: number } | null = null;
+  let inFlight: Promise<T> | null = null;
 
   return async function get(): Promise<T> {
     if (cached && Date.now() - cached.at < ttlMs) {
       return cached.value;
     }
-    try {
-      const value = await fetcher();
-      cached = { value, at: Date.now() };
-      return value;
-    } catch {
-      return cached?.value ?? defaultValue;
-    }
+
+    inFlight ??= Promise.resolve()
+      .then(fetcher)
+      .then(value => {
+        cached = { value, at: Date.now() };
+        return value;
+      })
+      .catch(() => cached?.value ?? defaultValue)
+      .finally(() => {
+        inFlight = null;
+      });
+
+    return inFlight;
   };
 }

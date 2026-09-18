@@ -1838,8 +1838,13 @@ describe('api handler (props-based auth)', () => {
     expect(trpc?.headers[ORGANIZATION_ID_HEADER]).toBe('org-9');
   });
 
-  /** The bundled catalog's admin rows: `organizations.admin.getMetrics` takes no input. */
-  const REAL_ADMIN_PATH = 'organizations.admin.getMetrics';
+  /**
+   * A real admin-guarded row in the bundled catalog that takes no input.
+   * `organizations.admin.*` paths are excluded from the dump (the generator
+   * publishes admin-guarded procedures only under non-internal paths), so an
+   * actual catalog row is used to exercise the guard end to end.
+   */
+  const REAL_ADMIN_PATH = 'mcpGateway.listPersonal';
 
   it('refuses a bundled admin path for a grant without the admin opt-in, before any upstream request', async () => {
     const upstream = vi.fn();

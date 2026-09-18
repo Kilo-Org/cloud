@@ -12,8 +12,14 @@ import {
  * literals here are the pin, never a re-derivation of the values.
  */
 describe('session lifetime policy', () => {
-  it('ships exactly one year (365 * 24 * 60 * 60 seconds)', () => {
-    expect(SESSION_LIFETIME_SECONDS).toBe(365 * 24 * 60 * 60);
+  it('ships exactly one month (30 * 24 * 60 * 60 seconds)', () => {
+    expect(SESSION_LIFETIME_SECONDS).toBe(30 * 24 * 60 * 60);
+  });
+
+  it('is a month, not the year the owner rejected', () => {
+    // The owner asked for one month on top of the one-year PR; the year must
+    // not come back silently.
+    expect(SESSION_LIFETIME_SECONDS).toBeLessThan(365 * 24 * 60 * 60);
   });
 
   it('gives the refresh grant the whole session', () => {
@@ -24,6 +30,8 @@ describe('session lifetime policy', () => {
     // A record that expired with the grant would be looked up first and turn a
     // lapsed session into `invalid_client`, which no MCP client re-authorizes on.
     expect(CLIENT_REGISTRATION_TTL_SECONDS).toBeGreaterThan(SESSION_LIFETIME_SECONDS);
+    // The margin is one month, measured from the grant's own bound.
+    expect(CLIENT_REGISTRATION_TTL_SECONDS).toBe(SESSION_LIFETIME_SECONDS + 30 * 24 * 60 * 60);
   });
 
   it('keeps the replay guard memory covering the whole session', () => {

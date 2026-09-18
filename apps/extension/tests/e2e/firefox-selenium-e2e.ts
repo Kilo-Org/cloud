@@ -1,4 +1,4 @@
-/* eslint-disable id-length, import/no-nodejs-modules, max-lines, no-await-in-loop, promise/avoid-new, promise/no-callback-in-promise, promise/prefer-await-to-callbacks */
+/* eslint-disable id-length, import/max-dependencies, import/no-nodejs-modules, max-lines, no-await-in-loop, promise/avoid-new, promise/no-callback-in-promise, promise/prefer-await-to-callbacks -- the Firefox harness vendors the Selenium driver plus the browser-tool contract and its own fixture helpers */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -78,7 +78,7 @@ const workflowToolNames = [
 ] as const;
 
 // The model-facing browser tool set the extension exposes: the vendored Playwright MCP
-// contract under the kilo_ prefix. Safe mode sends only the read-only entries.
+// Contract under the kilo_ prefix. Safe mode sends only the read-only entries.
 const toKiloToolName = (name: string): string => `${KILO_BROWSER_TOOL_PREFIX}${name}`;
 const allKiloBrowserToolNames: readonly string[] = BROWSER_TOOL_CONTRACT.map(entry =>
   toKiloToolName(entry.name)

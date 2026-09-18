@@ -1,16 +1,16 @@
 import {
   buildGlanceableSnapshot,
   GLANCEABLE_COALESCE_MS,
-  GLANCEABLE_SNAPSHOT_EXPIRY_MS,
+  GLANCEABLE_STALE_MS,
   GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
-  type GlanceableAgentsSnapshotStatus,
   type GlanceableSessionRow,
   isEligibleGlanceableWork,
   shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { type NewestSessionRow, newestSessionTitle } from './newest-session';
+import { hasSameGlanceableContent, withStatus } from './snapshot-transforms';
 import {
   getGlanceableDelivery,
   type GlanceableSink,
@@ -18,6 +18,8 @@ import {
   guardSink,
 } from './sink-registry';
 import { getSurfaceExtras, setSurfaceExtras } from './surface-extras';
+
+export { hasSameGlanceableContent, withStatus };
 
 /**
  * Framework-agnostic publisher state machine. Derives one versioned snapshot
@@ -54,33 +56,15 @@ export type GlanceablePublisherOptions = {
 
 type TimerHandle = ReturnType<typeof setTimeout>;
 
-/** Advance the status and revision without renewing stale data's lifetime. */
-export function withStatus(
-  snapshot: GlanceableAgentsSnapshot,
-  status: GlanceableAgentsSnapshotStatus,
-  now: number
-): GlanceableAgentsSnapshot {
-  if (status === 'stale') {
-    if (snapshot.status === 'signed_out' || snapshot.status === 'privacy') {
-      return snapshot;
-    }
-    const expired = snapshot.status === 'expired' || now >= Date.parse(snapshot.expiresAt);
-    return {
-      ...snapshot,
-      revision: snapshot.revision + 1,
-      status: expired ? 'expired' : 'stale',
-      ...(expired ? { running: 0, needsInput: 0, idle: 0, needsInputSince: null } : {}),
-    };
-  }
-  const updatedAt = new Date(now).toISOString();
-  return {
-    ...snapshot,
-    revision: snapshot.revision + 1,
-    updatedAt,
-    expiresAt: new Date(now + GLANCEABLE_SNAPSHOT_EXPIRY_MS).toISOString(),
-    status,
-  };
-}
+/**
+ * Renew the published deadline once the surface is within this margin of its
+ * stale frame (`updatedAt + GLANCEABLE_STALE_MS`). The tray heartbeats every
+ * 10–30 s, so renewing at half the window leaves the heartbeat free to rewrite
+ * the native surface only once per half window, not once per heartbeat, while
+ * still refreshing well before the widget stale frame and the Live Activity
+ * stale date land.
+ */
+export const GLANCEABLE_RENEW_MARGIN_MS = GLANCEABLE_STALE_MS / 2;
 
 export class GlanceablePublisher {
   private readonly sinks: readonly GlanceableSink[];
@@ -92,6 +76,13 @@ export class GlanceablePublisher {
   private readonly orgLost: () => boolean;
   private current: GlanceableAgentsSnapshot | null;
   private activityStarted: boolean;
+  /**
+   * `updatedAt` of the snapshot last written to a sink, i.e. the frame the
+   * native stale deadline keys off. A heartbeat whose visible content did not
+   * change leaves it alone, so the renewal gate can tell how close that
+   * deadline is.
+   */
+  private lastPublishedAt: number | null = null;
   private coalesceTimer: TimerHandle | null = null;
   private terminalTimer: TimerHandle | null = null;
   private pendingCoalesced: {
@@ -121,10 +112,9 @@ export class GlanceablePublisher {
     }
     // The newest session's title never enters the snapshot (privacy contract):
     // it rides in the surface extras every widget reads on redraw.
-    setSurfaceExtras({
-      ...getSurfaceExtras(),
-      newestSessionTitle: newestSessionTitle(sessions),
-    });
+    const previousTitle = getSurfaceExtras().newestSessionTitle;
+    const nextTitle = newestSessionTitle(sessions);
+    setSurfaceExtras({ ...getSurfaceExtras(), newestSessionTitle: nextTitle });
     getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     const now = this.now();
     this.applyExpiry(now, ctx);
@@ -137,14 +127,56 @@ export class GlanceablePublisher {
       previousRevision: this.current?.revision ?? 0,
     });
 
+    // Every heartbeat writes the tray cache, so a write whose visible content
+    // did not change must not re-render the widget or update the ongoing
+    // notification / Live Activity. It must still renew the deadline before it
+    // lapses, because `updatedAt`/`expiresAt`, the widget stale frame, and the
+    // Live Activity stale date all key off the published write: skipping the
+    // renewal would falsely flag confirmed-current data as stale, while
+    // publishing every heartbeat would rewrite the native surface every few
+    // seconds. So renew only once the published frame approaches its stale
+    // window, and renew through `emit` rather than `publish`: the start/update
+    // call is what retries a Live Activity start the sink could not raise (a
+    // transient ActivityKit failure, or a start deferred behind a dismissal),
+    // and leaving it out of the renewal would strand that surface until the
+    // counts next changed. Keep the revision monotonic for the next real emit,
+    // and leave any pending coalesced emit alone. The first eligible emit
+    // (nothing started yet) is exempt: it is what raises the surface.
+    if (
+      this.current !== null &&
+      hasSameGlanceableContent(
+        { snapshot: this.current, newestSessionTitle: previousTitle },
+        { snapshot, newestSessionTitle: nextTitle }
+      ) &&
+      (this.activityStarted || !isEligibleGlanceableWork(snapshot))
+    ) {
+      if (
+        isEligibleGlanceableWork(snapshot) &&
+        (this.lastPublishedAt === null || now - this.lastPublishedAt >= GLANCEABLE_RENEW_MARGIN_MS)
+      ) {
+        this.emit(snapshot, ctx);
+      }
+      this.current = snapshot;
+      return;
+    }
+
+    // `needsApproval` is optional, so normalize it for the coalesce decision.
+    const previousNeedsApproval = this.current?.needsApproval ?? 0;
+
     if (isEligibleGlanceableWork(snapshot)) {
       this.cancelTerminal();
       if (!this.activityStarted) {
         // First eligible emit starts the activity immediately, no coalesce wait.
         this.emit(snapshot, ctx);
         this.activityStarted = true;
-      } else if (snapshot.needsInput !== this.current?.needsInput) {
-        // Badge changes are actionable and must reach the launcher immediately.
+      } else if (
+        snapshot.needsInput !== this.current?.needsInput ||
+        (snapshot.needsApproval ?? 0) !== previousNeedsApproval
+      ) {
+        // Actionable needs-input/approval changes must reach the launcher
+        // immediately: `needsApproval` gates the Approve control on every
+        // surface, and a question <-> permission move keeps `needsInput`
+        // constant while that control appears or disappears.
         this.cancelCoalesce();
         this.emit(snapshot, ctx);
       } else {
@@ -240,6 +272,7 @@ export class GlanceablePublisher {
   }
 
   private emit(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext): void {
+    this.lastPublishedAt = Date.parse(snapshot.updatedAt);
     for (const sink of this.sinks) {
       // Guarded separately: a failing widget timeline write must not skip the
       // Live Activity start that follows it.
@@ -253,6 +286,7 @@ export class GlanceablePublisher {
   }
 
   private publish(snapshot: GlanceableAgentsSnapshot): void {
+    this.lastPublishedAt = Date.parse(snapshot.updatedAt);
     for (const sink of this.sinks) {
       guardSink('publish', () => {
         sink.publish(snapshot);

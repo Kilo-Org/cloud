@@ -15,7 +15,11 @@ import { isPushSinkEnabled } from '../lib/push-sink';
 import type { ExpoPushMessage, SendResult, TicketTokenPair } from '../lib/expo-push';
 import { sendPushNotifications } from '../lib/expo-push';
 import { glanceableDeliveryDeps } from '../lib/glanceable-delivery-deps';
-import { refreshGlanceableSnapshot } from '../lib/glanceable-refresh';
+import {
+  foldPendingGlanceableRefreshDeadline,
+  flushDueGlanceableRefreshes,
+  refreshGlanceableSnapshot,
+} from '../lib/glanceable-refresh';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
@@ -65,8 +69,16 @@ export class NotificationChannelDO extends DurableObject<Env> {
   async refreshGlanceableSnapshot(params: {
     userId: string;
     organizationId: string | null;
+    approvalChanged?: boolean;
   }): Promise<void> {
-    await refreshGlanceableSnapshot(params, this.ctx.storage, glanceableDeliveryDeps(this.env));
+    const { userId, organizationId, approvalChanged } = params;
+    await refreshGlanceableSnapshot(
+      { userId, organizationId },
+      this.ctx.storage,
+      glanceableDeliveryDeps(this.env),
+      Date.now,
+      { approvalChanged }
+    );
   }
 
   async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
@@ -437,6 +449,13 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
   override async alarm(): Promise<void> {
     const now = Date.now();
+    // Deliver any glanceable refresh the rate-limit window deferred. Its
+    // remaining deadline folds into this sweep's alarm so the trailing
+    // delivery is not stranded when no idem/rl record outlives it.
+    const dueGlanceableRefreshAt = await flushDueGlanceableRefreshes(
+      this.ctx.storage,
+      glanceableDeliveryDeps(this.env)
+    );
     const idemEntries = await this.ctx.storage.list<IdemRecord>({ prefix: IDEM_PREFIX });
     const expiredIdem: string[] = [];
     let nextAlarmAt: number | undefined;
@@ -445,6 +464,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
         nextAlarmAt = deadline;
       }
     };
+    if (dueGlanceableRefreshAt !== null) requestAlarmAtOrBefore(dueGlanceableRefreshAt);
 
     for (const [key, rec] of idemEntries) {
       if (rec.stage === 'accepted') {
@@ -481,8 +501,12 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
     const toDelete = [...expiredIdem, ...expiredRl];
     if (toDelete.length > 0) await this.ctx.storage.delete(toDelete);
-    if (nextAlarmAt !== undefined) {
-      await this.ctx.storage.setAlarm(nextAlarmAt);
+    // A deferral can land during the awaits above. Fold the pending deadline in
+    // again rather than trusting the flush's earlier capture, so the final
+    // setAlarm cannot overwrite it and delay the trailing delivery.
+    const alarmAt = await foldPendingGlanceableRefreshDeadline(this.ctx.storage, nextAlarmAt);
+    if (alarmAt !== undefined) {
+      await this.ctx.storage.setAlarm(alarmAt);
     }
   }
 

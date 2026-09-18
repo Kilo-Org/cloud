@@ -24,12 +24,6 @@ export type FocusFilterCopy = Record<string, Partial<Record<FocusFilterStringNam
 /** One language's `Localizable.strings` entries: English literal → translation. */
 type FocusFilterStrings = Record<string, string>;
 
-/** The prebuild-time copy for one language, nested under `ios` for Expo. */
-type FocusFilterEntry = { ios: { 'Localizable.strings': FocusFilterStrings } };
-
-/** The Expo top-level `locales` fragment: one `ios` entry per supported language. */
-export type FocusFilterLocales = Record<SupportedLanguage, FocusFilterEntry>;
-
 /** One language's rendered `Localizable.strings` content, keyed by language tag. */
 export type FocusFilterStringsFiles = Record<SupportedLanguage, string>;
 
@@ -76,11 +70,11 @@ function stringsLine(key: string, value: string): string {
 
 /**
  * Renders one language's `Localizable.strings`. Every key is quoted and escaped
- * because the Swift literals carry spaces: Expo's built-in `withLocales` writes
- * a bare key (`Agent notifications = "…";`), which is not a parseable entry —
- * the Xcode CopyStringsFile step rejects the whole file, so no Focus-filter
- * string resolves and the control stays English on a localized device. This is
- * the content `plugins/withFocusFilterLocalizations.js` installs.
+ * because the Swift literals carry spaces: a bare key (`Agent notifications = "…";`)
+ * is not a parseable entry, and the Xcode CopyStringsFile step rejects the whole
+ * file, so no Focus-filter string resolves and the control stays English on a
+ * localized device. `withAppIntentLocalizations` appends this to the app
+ * target's single catalog.
  */
 function renderFocusFilterStrings(strings: FocusFilterStrings): string {
   const lines = Object.entries(strings).map(([key, value]) => stringsLine(key, value));
@@ -88,23 +82,11 @@ function renderFocusFilterStrings(strings: FocusFilterStrings): string {
 }
 
 /**
- * Builds the Expo `locales` fragment that Expo's `withLocales` plugin turns
- * into one `<tag>.lproj/Localizable.strings` in the app bundle — the same
- * mechanism that writes the permission-prompt `InfoPlist.strings`, driven by
- * the special `ios['Localizable.strings']` key and never by i18next. Expo
- * registers that file with the app target; `withFocusFilterLocalizations`
- * replaces its content with the quoted form so iOS can parse it.
+ * The rendered `Localizable.strings` body for every supported language, keyed by
+ * tag. `app.config.ts` hands this to `withAppIntentLocalizations`, which appends
+ * it to the app target's one catalog file so the Focus filter's literals resolve
+ * from the app bundle.
  */
-export function buildFocusFilterLocales(copy: FocusFilterCopy): FocusFilterLocales {
-  const strings = stringsByLanguage(copy);
-  const entries: [SupportedLanguage, FocusFilterEntry][] = SUPPORTED_LANGUAGES.map(tag => [
-    tag,
-    { ios: { 'Localizable.strings': strings[tag] } },
-  ]);
-  return Object.fromEntries(entries) as FocusFilterLocales;
-}
-
-/** The rendered `<tag>.lproj/Localizable.strings` for every supported language. */
 export function buildFocusFilterStringsFiles(copy: FocusFilterCopy): FocusFilterStringsFiles {
   const strings = stringsByLanguage(copy);
   const files: [SupportedLanguage, string][] = SUPPORTED_LANGUAGES.map(tag => [

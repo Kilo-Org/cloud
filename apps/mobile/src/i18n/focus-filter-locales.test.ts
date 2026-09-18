@@ -5,22 +5,37 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import copy from '../../plugins/focus-filter-copy.json';
+import APP_INTENT_COPY from '../../plugins/app-intent-copy.json';
+import { renderLocalizableStrings } from '../../plugins/app-intent-copy.js';
 import {
-  buildFocusFilterLocales,
   buildFocusFilterStringsFiles,
   FOCUS_FILTER_STRINGS,
   type FocusFilterCopy,
 } from './focus-filter-locales';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from './languages';
 
-const locales = buildFocusFilterLocales(copy);
 const files = buildFocusFilterStringsFiles(copy);
 const STRING_NAMES = Object.keys(FOCUS_FILTER_STRINGS) as (keyof typeof FOCUS_FILTER_STRINGS)[];
 
 const read = (relative: string) => readFileSync(join(__dirname, relative), 'utf8');
 
-const stringsFor = (tag: SupportedLanguage) => locales[tag].ios['Localizable.strings'];
 const linesFor = (tag: SupportedLanguage) => files[tag].trimEnd().split('\n');
+
+/** Reverses the `.strings` escaping the renderer applies. */
+const unescape = (text: string) => text.replaceAll(/\\(.)/g, '$1');
+
+/** The emitted entries of one language, key → value, read back from the file. */
+function stringsFor(tag: SupportedLanguage): Record<string, string> {
+  const entries: Record<string, string> = {};
+  for (const line of linesFor(tag)) {
+    const value = / = "(?<value>(?:[^"\\]|\\.)*)";$/.exec(line)?.groups?.value;
+    if (value === undefined) {
+      throw new Error(`No quoted value in the emitted entry: ${line}`);
+    }
+    entries[entryKey(line)] = unescape(value);
+  }
+  return entries;
+}
 
 /** The lookup key of one emitted `.strings` entry; it must be quoted. */
 function entryKey(line: string): string {
@@ -126,5 +141,29 @@ describe('buildFocusFilterStringsFiles', () => {
     expect(() => buildFocusFilterStringsFiles(incomplete)).toThrow(
       'Missing or empty Focus-filter copy for de.agentProgress'
     );
+  });
+});
+
+// The Focus filter and the App Intents read the same bundle file: the app
+// target's `<tag>.lproj/Localizable.strings`, which `withAppIntentLocalizations`
+// writes as the App Intent entries followed by the Focus-filter body. Two
+// writers for that file — this catalog through Expo's `withLocales` and the App
+// Intent plugin — is what failed the ios job with "Multiple commands produce".
+describe('the app-target Localizable.strings merge', () => {
+  const appTargetFor = (tag: SupportedLanguage) =>
+    `${renderLocalizableStrings(APP_INTENT_COPY, tag)}${files[tag]}`;
+
+  it.each(SUPPORTED_LANGUAGES)('carries every entry exactly once in %s', tag => {
+    const keys = appTargetFor(tag)
+      .trimEnd()
+      .split('\n')
+      .map(line => entryKey(line));
+    const intentKeys = Object.values(APP_INTENT_COPY.en as Record<string, string>);
+    const filterKeys = STRING_NAMES.map(name => FOCUS_FILTER_STRINGS[name]);
+    expect(keys).toHaveLength(intentKeys.length + filterKeys.length);
+    expect(new Set(keys).size, `${tag} repeats a key`).toBe(keys.length);
+    for (const key of [...intentKeys, ...filterKeys]) {
+      expect(keys).toContain(key);
+    }
   });
 });

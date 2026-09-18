@@ -31,7 +31,9 @@ const BLOCKED_PERMISSIONS = [
 const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
-const FOCUS_FILTER_LOCALIZATIONS_PLUGIN = './plugins/withFocusFilterLocalizations';
+// The one writer of the app target's `<tag>.lproj/Localizable.strings`: the App
+// Intent copy plus the appended Focus-filter catalog.
+const APP_INTENT_LOCALIZATIONS_PLUGIN = './plugins/withAppIntentLocalizations';
 const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSMicrophoneUsageDescription',
   'NSSpeechRecognitionUsageDescription',
@@ -125,6 +127,15 @@ for (const tag of localizations) {
     Boolean(locales[tag]?.ios) && typeof locales[tag].ios === 'object',
     `locales["${tag}"].ios must be an object`
   );
+  // The app target's `<tag>.lproj/Localizable.strings` has exactly one writer:
+  // `withAppIntentLocalizations`, which also carries the Focus-filter catalog.
+  // Expo's `withLocales` registers a second file at the same bundle path when
+  // this key is present, and Xcode fails the build with "Multiple commands
+  // produce …/Localizable.strings".
+  check(
+    !Object.hasOwn(locales[tag]?.ios ?? {}, 'Localizable.strings'),
+    `locales["${tag}"].ios must not declare Localizable.strings — Expo would register a second copy beside the App Intent catalog`
+  );
   for (const key of PERMISSION_PROMPT_PLIST_KEYS) {
     const value = locales[tag]?.ios?.[key];
     check(
@@ -156,12 +167,12 @@ check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
 );
-// Expo's `withLocales` writes the Focus-filter catalog with bare keys, which
-// iOS cannot parse; the plugin rewrites it with quoted ones. Without it the
-// Focus filter stays English on a localized device with no build error.
+// The app target's one `Localizable.strings` (the App Intent copy plus the
+// appended Focus-filter catalog) is written by this plugin; without it the
+// Shortcuts actions and the Focus filter stay English on a localized device.
 check(
-  pluginNames.includes(FOCUS_FILTER_LOCALIZATIONS_PLUGIN),
-  `plugins must include "${FOCUS_FILTER_LOCALIZATIONS_PLUGIN}"`
+  pluginNames.includes(APP_INTENT_LOCALIZATIONS_PLUGIN),
+  `plugins must include "${APP_INTENT_LOCALIZATIONS_PLUGIN}"`
 );
 
 const extra = config.extra ?? {};

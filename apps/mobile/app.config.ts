@@ -1,10 +1,7 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
 import { SUPPORTED_LANGUAGES } from './src/i18n/languages.ts';
-import {
-  buildFocusFilterLocales,
-  buildFocusFilterStringsFiles,
-} from './src/i18n/focus-filter-locales.ts';
+import { buildFocusFilterStringsFiles } from './src/i18n/focus-filter-locales.ts';
 import { buildPermissionPromptLocales } from './src/i18n/permission-prompt-locales.ts';
 // Prebuild-time native copy, not app copy — see the widget gallery precedent in
 // plugins/withWidgetLocalizations.js. Kept in plugins/ so the runtime i18next
@@ -76,22 +73,16 @@ const googleSignInPlugins: NonNullable<ExpoConfig['plugins']> = googleIosUrlSche
 
 // Prebuild-time native copy, one `ios` entry per supported language. Expo's
 // built-in `withLocales` plugin writes the usage-description keys into
-// `<tag>.lproj/InfoPlist.strings` and the special `Localizable.strings` entry
-// into `<tag>.lproj/Localizable.strings`, which is where the out-of-process
-// Focus filter resolves its title, description, and parameter label. The
-// prompt copy keys by plist key and the filter copy keys by the English literal
-// its Swift intent carries, so the two merge into one map per language. Expo
-// registers the Localizable.strings file but writes its keys bare, so
-// `withFocusFilterLocalizations` replaces the content with the quoted catalog
-// below.
+// `<tag>.lproj/InfoPlist.strings`. It is deliberately NOT given the Focus-filter
+// `Localizable.strings`: Expo would then register a second copy of the app
+// bundle's `<tag>.lproj/Localizable.strings` beside the App Intent catalog
+// `withAppIntentLocalizations` already writes, and Xcode fails the build with
+// "Multiple commands produce …/Localizable.strings". That catalog travels to the
+// single app-target writer instead (`additionalStrings` below).
 const permissionLocales = buildPermissionPromptLocales(PERMISSION_PROMPT_COPY);
-const focusFilterLocales = buildFocusFilterLocales(FOCUS_FILTER_COPY);
 const focusFilterCatalog = buildFocusFilterStringsFiles(FOCUS_FILTER_COPY);
 const nativeLocales: ExpoConfig['locales'] = Object.fromEntries(
-  SUPPORTED_LANGUAGES.map(tag => [
-    tag,
-    { ios: { ...permissionLocales[tag].ios, ...focusFilterLocales[tag].ios } },
-  ])
+  SUPPORTED_LANGUAGES.map(tag => [tag, { ios: permissionLocales[tag].ios }])
 );
 
 const config: ExpoConfig = {
@@ -112,12 +103,11 @@ const config: ExpoConfig = {
   // Per-locale native strings. Expo's built-in `withLocales` writes a
   // `<tag>.lproj/InfoPlist.strings` per tag at prebuild from the
   // usage-description keys (the plugin options below stay as the base Info.plist
-  // value) and a `<tag>.lproj/Localizable.strings` from the Focus-filter copy,
-  // whose content `withFocusFilterLocalizations` then rewrites.
-  // `ios`-nested so Android's `withLocales` resolves each tag to nothing. The
-  // location copy spells the app name out: `.lproj` strings are not
+  // value). `ios`-nested so Android's `withLocales` resolves each tag to
+  // nothing. The location copy spells the app name out: `.lproj` strings are not
   // build-expanded, so the upstream `$(PRODUCT_NAME)` would render literally
-  // there.
+  // there. The `Localizable.strings` the same bundle resolves is written by
+  // `withAppIntentLocalizations` below, not here.
   locales: nativeLocales,
   ios: {
     // iOS 18+ appearance variants. `light` is the existing icon unchanged; `dark` keeps the
@@ -354,13 +344,18 @@ const config: ExpoConfig = {
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
     './plugins/withAndroidExpoModuleRepos',
-    // Localizes the App Intents on the app target itself: the four actions and
-    // their parameters are `LocalizedStringResource`s resolved against
-    // `Localizable.strings` in the app bundle, which no other plugin writes.
-    // The app-target twin of the widget registration below.
+    // Writes the app target's single `Localizable.strings` per language: the
+    // four App Intent actions and their parameters resolve their
+    // `LocalizedStringResource` literals against it, and the Focus-filter copy
+    // is appended to the same file (`additionalStrings`), so the bundle has one
+    // producer. The app-target twin of the widget registration below.
     [
       './plugins/withAppIntentLocalizations',
-      { languages: [...SUPPORTED_LANGUAGES], copy: APP_INTENT_COPY },
+      {
+        languages: [...SUPPORTED_LANGUAGES],
+        copy: APP_INTENT_COPY,
+        additionalStrings: focusFilterCatalog,
+      },
     ],
     // Declares the app's languages on the widget extension, which expo-widgets
     // leaves English-only. This must be registered BEFORE 'expo-widgets':
@@ -408,14 +403,6 @@ const config: ExpoConfig = {
     // (iosMutableContentForPushData in @kilocode/notifications). Appears in
     // PlugIns as Kilo's extension, and reads the same app group as the widget.
     ['./plugins/withNotificationFocusFilter', { appGroupIdentifier: 'group.com.kilocode.kiloapp' }],
-    // Replaces the Focus-filter `Localizable.strings` `withLocales` registered
-    // with the quoted, escaped catalog iOS can parse. A finalized mod runs after
-    // every other iOS mod, so the replacement is the last write. See the plugin
-    // for why Expo's own writer cannot ship.
-    [
-      './plugins/withFocusFilterLocalizations',
-      { languages: [...SUPPORTED_LANGUAGES], files: focusFilterCatalog },
-    ],
     // Local Expo module for Android Live Updates (no-op until slice `and`).
     './plugins/withActiveAgentsLiveUpdate',
     // Translates the Android widget-picker entry, which the widget library

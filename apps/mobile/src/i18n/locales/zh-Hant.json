@@ -2121,6 +2121,7 @@
     "couldNotLoadActiveSessions": "無法載入進行中的工作階段。",
     "agentSessions": "目前執行中",
     "newCodingTask": "新增程式設計任務",
+    "newTaskFromPicture": "從圖片新增任務",
     "explore": "探索",
     "seeAll": "檢視全部",
     "noLiveSessions": "目前沒有執行中的工作階段"

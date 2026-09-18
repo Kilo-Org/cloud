@@ -2611,6 +2611,7 @@
     "couldNotLoadActiveSessions": "Kunde inte läsa in de aktiva sessionerna.",
     "agentSessions": "Pågår nu",
     "newCodingTask": "Ny programmeringsuppgift",
+    "newTaskFromPicture": "Ny uppgift från en bild",
     "explore": "Utforska",
     "seeAll": "Visa alla",
     "noLiveSessions": "Inget körs just nu"

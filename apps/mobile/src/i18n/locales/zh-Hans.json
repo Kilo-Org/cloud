@@ -2121,6 +2121,7 @@
     "couldNotLoadActiveSessions": "无法加载进行中的会话。",
     "agentSessions": "正在进行",
     "newCodingTask": "新建编程任务",
+    "newTaskFromPicture": "从图片新建任务",
     "explore": "探索",
     "seeAll": "查看全部",
     "noLiveSessions": "暂无正在运行的会话"

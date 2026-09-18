@@ -2611,6 +2611,7 @@
     "couldNotLoadActiveSessions": "ບໍ່ສາມາດໂຫຼດເຊສຊັນທີ່ກຳລັງໃຊ້ງານໄດ້.",
     "agentSessions": "ກຳລັງເຮັດວຽກ",
     "newCodingTask": "ວຽກຂຽນໂຄ້ດໃໝ່",
+    "newTaskFromPicture": "ວຽກໃໝ່ຈາກຮູບພາບ",
     "explore": "ສຳຫຼວດ",
     "seeAll": "ເບິ່ງທັງໝົດ",
     "noLiveSessions": "ຕອນນີ້ບໍ່ມີວຽກທີ່ກຳລັງດຳເນີນຢູ່"

@@ -2611,6 +2611,7 @@
     "couldNotLoadActiveSessions": "Nem sikerült betölteni az aktív munkameneteket.",
     "agentSessions": "Most fut",
     "newCodingTask": "Új kódolási feladat",
+    "newTaskFromPicture": "Új feladat képből",
     "explore": "Felfedezés",
     "seeAll": "Összes megtekintése",
     "noLiveSessions": "Jelenleg semmi sem fut"

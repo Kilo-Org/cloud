@@ -163,6 +163,15 @@ type ChatComposerProps = {
   ) => Promise<void>;
   onStop?: () => void | Promise<void>;
   disabled?: boolean;
+  /**
+   * Session-level send gate, separate from `disabled`. True while the active
+   * session cannot accept a message (a failed turn, a dropped remote owner, an
+   * unresolved open). It locks sending, the toolbar and the attachment picker
+   * exactly as `disabled` does, but keeps the text input editable, so a failed
+   * turn leaves the reader able to type the next message beside the error's
+   * Retry instead of only Retry.
+   */
+  sendDisabled?: boolean;
   isStreaming?: boolean;
   placeholder?: string;
   mode: AgentMode;
@@ -223,6 +232,7 @@ export function ChatComposer({
   onExitSession,
   onStop,
   disabled = false,
+  sendDisabled = false,
   isStreaming = false,
   placeholder = i18n.t('common.sendMessage'),
   mode,
@@ -530,7 +540,7 @@ export function ChatComposer({
   // `isStreaming` is intentionally NOT a composer gate (see
   // `chat-composer-input-state.ts`); the user must remain able to type and
   // send while the agent runs.
-  const toolbarDisabled = disabled || isSending;
+  const toolbarDisabled = disabled || sendDisabled || isSending;
   const voiceDisabled = toolbarDisabled;
 
   // One place text is written into the live input from an external caller
@@ -693,6 +703,7 @@ export function ChatComposer({
     ).length,
     attachmentMax: AGENT_ATTACHMENT_MAX_FILES,
     disabled,
+    sendDisabled,
     hasText,
     isFocused,
     isSending,
@@ -906,7 +917,12 @@ export function ChatComposer({
     const sendableAttachmentsCount = upload.attachments.filter(
       attachment => !(attachment.status === 'error' && attachment.terminal === true)
     ).length;
-    if ((trimmed.length === 0 && sendableAttachmentsCount === 0) || disabled || isSending) {
+    if (
+      (trimmed.length === 0 && sendableAttachmentsCount === 0) ||
+      disabled ||
+      sendDisabled ||
+      isSending
+    ) {
       return;
     }
     if (upload.hasFailedAttachments) {
@@ -1296,7 +1312,9 @@ export function ChatComposer({
               key={inputEpoch}
               attachmentsEnabled={attachmentsEnabled}
               canSend={control.canSend}
-              disabled={disabled}
+              // The row's `disabled` only gates the Stop control, which keeps
+              // the merged gate it had before the send gate was split out.
+              disabled={disabled || sendDisabled}
               hasSendableContent={control.hasSendableContent}
               inputAccessibilityDisabled={control.inputAccessibilityDisabled}
               inputEditable={control.inputEditable}

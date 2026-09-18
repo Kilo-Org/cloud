@@ -1,5 +1,6 @@
 import { View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -55,14 +56,18 @@ export function SessionSkeletonMessages({ sessionId }: Readonly<{ sessionId?: st
  * Holds the composer's place while the session loads. Without it the composer
  * pops in on resolve and shoves the transcript up by its own height.
  * Geometry follows ChatComposer: a BlurBar wrapping the input row's
- * `p-2.5 px-3`.
+ * `p-2.5 px-3`, plus the resolved screen's bottom safe-area spacer
+ * (`session-detail-content.tsx`), so the placeholder is exactly as tall as the
+ * composer it replaces.
  */
 export function SessionComposerSkeleton() {
+  const { bottom } = useSafeAreaInsets();
   return (
     <BlurBar>
       <View className="flex-row items-center p-2.5 px-3">
         <Skeleton className="h-9 flex-1 rounded-2xl" />
       </View>
+      <View style={{ height: bottom }} />
     </BlurBar>
   );
 }

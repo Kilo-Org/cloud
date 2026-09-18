@@ -17,9 +17,93 @@ import { cn } from '@/lib/utils';
 type CollapsibleSectionProps = {
   title: string;
   defaultExpanded?: boolean;
+  /** Controlled expanded state. When set, the parent owns it and `onToggle` is
+   *  the only way it changes; omit it to keep the internal (uncontrolled) state. */
+  expanded?: boolean;
+  /** Called on every header press, before the uncontrolled fallback toggles. */
+  onToggle?: () => void;
   className?: string;
+  titleClassName?: string;
+  contentClassName?: string;
   children: ReactNode;
 };
+
+/**
+ * The rotating disclosure carat, shared so the app animates a carat in one
+ * place. `targetAngle` is the angle the carat settles at (180 is up, 0 is
+ * down); each caller owns its own direction. Reanimated ships the same
+ * implementation on iOS and Android, so this animates both platforms with one
+ * implementation and is not a platform fork. Reduced motion jumps straight to
+ * the angle instead of a 200ms timing.
+ */
+function useDisclosureRotation(targetAngle: 0 | 180) {
+  const { reducedMotion } = useMotionPolicy();
+  const rotation = useSharedValue(targetAngle);
+
+  useEffect(() => {
+    rotation.value = reducedMotion ? targetAngle : withTiming(targetAngle, { duration: 200 });
+  }, [targetAngle, reducedMotion, rotation]);
+
+  return useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
+}
+
+/**
+ * Height transition for a block that grows or shrinks — the same Reanimated
+ * layout transition on iOS and Android, so one implementation covers both and
+ * the change animates instead of snapping. Reduced motion drops the transition.
+ */
+export function DisclosureLayout({
+  className,
+  children,
+}: Readonly<{ className?: string; children: ReactNode }>) {
+  const { reducedMotion } = useMotionPolicy();
+
+  return (
+    <Animated.View
+      layout={reducedMotion ? undefined : LinearTransition.duration(200)}
+      className={className}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/**
+ * The disclosure carat as its own pressable, for a row that already owns an
+ * action: the two stay siblings, because a nested pressable disappears from
+ * assistive technology inside an accessible parent. It points down when
+ * expanded and up when collapsed, the goal row's affordance; `label` names the
+ * action the carat performs and `expanded` is what the carat points at.
+ */
+export function DisclosureChevron({
+  expanded,
+  label,
+  onPress,
+}: Readonly<{
+  expanded: boolean;
+  label: string;
+  onPress: () => void;
+}>) {
+  const colors = useThemeColors();
+  const chevronStyle = useDisclosureRotation(expanded ? 0 : 180);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={12}
+      className="h-6 w-6 shrink-0 items-center justify-center active:opacity-70"
+      accessibilityRole="button"
+      accessibilityState={{ expanded }}
+      accessibilityLabel={label}
+    >
+      <Animated.View style={chevronStyle}>
+        <ChevronDown size={16} color={colors.mutedForeground} />
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 // Shared collapsible section for finding-details/-analysis/-remediation
 // panels (source record, technical report, attempt history) — the
@@ -29,53 +113,50 @@ type CollapsibleSectionProps = {
 export function CollapsibleSection({
   title,
   defaultExpanded = false,
+  expanded,
+  onToggle,
   className,
+  titleClassName,
+  contentClassName,
   children,
 }: Readonly<CollapsibleSectionProps>) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
+  // A controlled parent wins over the internal state so the persisted value
+  // (s3's connect card) is what the chevron, the body, and a11y report.
+  const resolvedExpanded = expanded ?? internalExpanded;
   const colors = useThemeColors();
   const { reducedMotion } = useMotionPolicy();
-  const rotation = useSharedValue(defaultExpanded ? 180 : 0);
-
-  useEffect(() => {
-    // Reduced motion jumps the chevron straight to its target angle instead of
-    // a 200ms timing; the layout transition and content fade are dropped below.
-    const target = expanded ? 180 : 0;
-    rotation.value = reducedMotion ? target : withTiming(target, { duration: 200 });
-  }, [expanded, reducedMotion, rotation]);
-
-  const chevronStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
+  // This section's carat points up while it is expanded ("collapse me").
+  const chevronStyle = useDisclosureRotation(resolvedExpanded ? 180 : 0);
 
   return (
-    <Animated.View
-      layout={reducedMotion ? undefined : LinearTransition.duration(200)}
-      className={cn('gap-2 rounded-lg bg-secondary p-3', className)}
-    >
+    <DisclosureLayout className={cn('gap-2 rounded-lg bg-secondary p-3', className)}>
       <Pressable
         className="flex-row items-center justify-between gap-2"
         hitSlop={12}
         onPress={() => {
-          setExpanded(current => !current);
+          onToggle?.();
+          if (expanded === undefined) {
+            setInternalExpanded(current => !current);
+          }
         }}
         accessibilityRole="button"
-        accessibilityState={{ expanded }}
+        accessibilityState={{ expanded: resolvedExpanded }}
         accessibilityLabel={title}
       >
-        <Text className="flex-1 text-sm font-medium">{title}</Text>
+        <Text className={cn('flex-1 text-sm font-medium', titleClassName)}>{title}</Text>
         <Animated.View style={chevronStyle}>
           <ChevronDown size={16} color={colors.mutedForeground} />
         </Animated.View>
       </Pressable>
-      {expanded && (
+      {resolvedExpanded && (
         <Animated.View
           entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-          className="gap-2"
+          className={cn('gap-2', contentClassName)}
         >
           {children}
         </Animated.View>
       )}
-    </Animated.View>
+    </DisclosureLayout>
   );
 }

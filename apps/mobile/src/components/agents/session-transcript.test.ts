@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   condenseTranscriptToolRuns,
   getSessionTranscriptItemKey,
+  getSessionTranscriptItemMessageId,
   mergeSessionTranscript,
   TRANSCRIPT_TIME_MARKER_GAP_MS,
 } from '@/components/agents/session-transcript';
@@ -114,6 +115,31 @@ function userMessageWithText(id: string, text: string) {
         messageID: id,
         type: 'text' as const,
         text,
+      },
+    ],
+  };
+}
+
+/**
+ * A client-materialised row for a submission the server has not confirmed:
+ * `info.synthetic` on the message row plus the `synthetic` placeholder text
+ * part, exactly as `insertOptimisticUserMessage` and
+ * `synthesizeQueuedUserMessage` write them.
+ */
+function syntheticUserMessageWithText(id: string, text: string) {
+  return {
+    info: {
+      ...message(id).info,
+      synthetic: true,
+    },
+    parts: [
+      {
+        id: `${id}-text`,
+        sessionID: 'ses_12345678901234567890123456',
+        messageID: id,
+        type: 'text' as const,
+        text,
+        synthetic: true,
       },
     ],
   };
@@ -282,6 +308,44 @@ function toolPartCount(items: ReturnType<typeof mergeSessionTranscript>): number
 function keysOf(items: ReturnType<typeof mergeSessionTranscript>): string[] {
   return items.map(item => getSessionTranscriptItemKey(item));
 }
+
+function messageIdsOf(items: ReturnType<typeof mergeSessionTranscript>): (string | null)[] {
+  return items.map(item => getSessionTranscriptItemMessageId(item));
+}
+
+describe('getSessionTranscriptItemMessageId', () => {
+  it('maps message and time rows to their message id', () => {
+    const transcript = mergeSessionTranscript([message('msg_001')], []);
+
+    expect(keysOf(transcript)).toEqual(['time:msg_001', 'msg_001']);
+    expect(messageIdsOf(transcript)).toEqual(['msg_001', 'msg_001']);
+  });
+
+  it('maps a preparation row to null — it renders no message row of its own', () => {
+    const transcript = mergeSessionTranscript(
+      [message('msg_001')],
+      [attempt('attempt_001', 'msg_001')]
+    );
+
+    expect(messageIdsOf(transcript)).toEqual(['msg_001', 'msg_001', null]);
+  });
+
+  it("maps a condensed tool run to its first part's message id", () => {
+    const base = 1_000_000_000;
+    const condensed = condenseTranscriptToolRuns(
+      mergeSessionTranscript(
+        [
+          assistantToolOnlyMessageAt('msg_tool_a', base, ['ta1', 'ta2']),
+          assistantToolOnlyMessageAt('msg_tool_b', base + 1000, ['tb1']),
+        ],
+        []
+      )
+    );
+
+    expect(keysOf(condensed)).toEqual(['time:msg_tool_a', 'tool-run:ta1']);
+    expect(messageIdsOf(condensed)).toEqual(['msg_tool_a', 'msg_tool_a']);
+  });
+});
 
 describe('session transcript', () => {
   it('places preparation attempts after their trigger message', () => {
@@ -531,6 +595,76 @@ describe('session transcript', () => {
     );
 
     expect(keysOf(transcript)).toEqual(['time:msg_user', 'msg_user', 'msg_asst']);
+  });
+
+  it('renders one unconfirmed submission as one message item', () => {
+    // Production (ses_f58dc0cebfffJoPUmXs05c76pv): the client materialises one
+    // row per prompt, keyed by the `messageId` the send carries, and the server
+    // honors that id (the run's id `msg_0a72cbf8f000Ab0W20uOzcDzjS` is the
+    // client format), so the submission renders once whether or not the
+    // authoritative `message.updated` — here rejected wholesale
+    // (`event_batch_rejected`) — ever lands.
+    const optimistic = syntheticUserMessageWithText('msg_opt', 'Continue');
+
+    const transcript = mergeSessionTranscript([optimistic], []);
+    expect(transcript.filter(item => item.type === 'message')).toHaveLength(1);
+    expect(keysOf(transcript)).toEqual(['time:msg_opt', 'msg_opt']);
+
+    // The recorded failed run keeps that one row, so the typed failure footer
+    // stays attached to the submission that failed.
+    const failed = mergeSessionTranscript(
+      [optimistic],
+      [],
+      new Map([
+        ['msg_opt', { status: 'failed', error: 'Unauthorized: Unauthorized', reason: 'exhausted' }],
+      ])
+    );
+    expect(keysOf(failed)).toEqual(['time:msg_opt', 'msg_opt']);
+  });
+
+  it('keeps two submissions that carry the same prompt as two rows', () => {
+    // The reported session submitted twice within 1.5 s (22:25:57.431Z and
+    // 22:25:59.068Z: two runs, two ids). Two rows with the same prompt are two
+    // submissions the user made; merging them by prompt text would drop one.
+    const first = syntheticUserMessageWithText('msg_first', 'Continue');
+    const second = syntheticUserMessageWithText('msg_second', 'Continue');
+
+    expect(
+      mergeSessionTranscript([first, second], []).filter(i => i.type === 'message')
+    ).toHaveLength(2);
+  });
+
+  it('keeps two confirmed rows with the same prompt as two submissions', () => {
+    const first = userMessageWithTextAt('msg_first', 1_000_000_000, 'Continue');
+    const second = userMessageWithTextAt('msg_second', 1_000_000_000 + 60_000, 'Continue');
+
+    const transcript = mergeSessionTranscript([first, second], []);
+    expect(transcript.filter(item => item.type === 'message')).toHaveLength(2);
+  });
+
+  it('drops an unconfirmed row with no renderable content instead of an empty stub', () => {
+    // The optimistic row materialised for a prompt whose text never became
+    // renderable: a confirmed row would wait for its parts to stream, but
+    // nothing will fill a client-materialised one — it must not leave an
+    // empty bubble.
+    const stub = {
+      info: { ...message('msg_stub').info, synthetic: true },
+      parts: [],
+    };
+    const transcript = mergeSessionTranscript([stub], []);
+    expect(transcript.filter(item => item.type === 'message')).toHaveLength(0);
+
+    // With the run recorded failed the row stays for the typed footer.
+    const failed = mergeSessionTranscript(
+      [stub],
+      [],
+      new Map([['msg_stub', { status: 'failed', error: 'boom', reason: 'execution' }]])
+    );
+    expect(keysOf(failed)).toEqual(['time:msg_stub', 'msg_stub']);
+
+    // A confirmed zero-part row keeps the transient rendering.
+    const transient = mergeSessionTranscript([message('msg_transient')], []);
+    expect(keysOf(transient)).toEqual(['time:msg_transient', 'msg_transient']);
   });
 });
 

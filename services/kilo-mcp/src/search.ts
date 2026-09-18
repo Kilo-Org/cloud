@@ -7,6 +7,15 @@ export const DEFAULT_SEARCH_LIMIT = 10;
 export const MAX_SEARCH_LIMIT = 50;
 
 /**
+ * A row is *guarded* when it is behind an admin guard (`admin`) or comes from
+ * the `debug` router (`debug`). A guarded row is never offered to a connection
+ * without the opt-in, and every guarded call it does reach is held for approval.
+ */
+export function isGuardedRow(row: CatalogRow): boolean {
+  return row.admin === true || row.debug === true;
+}
+
+/**
  * Hybrid-ready scoring weights. A single-token overlap contributes at most
  * OVERLAP_WEIGHT; a contiguous query-token sequence found in the endpoint's
  * own path scores above that; an exact full-path match scores above the
@@ -72,6 +81,33 @@ function lexicalScore(
 }
 
 /**
+ * Options for one catalog search pass.
+ */
+export type SearchCatalogOptions = {
+  catalog: Catalog;
+  limit?: number;
+  semanticCandidates?: SemanticCandidates;
+  /**
+   * Whether admin and debug rows may be offered. Fail-closed: only an explicit
+   * `true` (the grant's admin opt-in) opens them; absent or `false` hides every
+   * guarded (`admin` or `debug`) row from the ranking.
+   */
+  includeGuarded?: boolean;
+};
+
+/**
+ * The outcome of one catalog pass: the ranked rows plus what the guarded gate
+ * withheld. `hiddenGuardedMatches` is derived from this same pass — the lexical
+ * scores and the one semantic candidate list — so a caller explaining an empty
+ * search never repeats the query embedding or the Vectorize lookup. It is
+ * structurally `false` for an opted-in grant, which withholds nothing.
+ */
+export type CatalogSearchOutcome = {
+  results: SearchResult[];
+  hiddenGuardedMatches: boolean;
+};
+
+/**
  * Token-overlap search over the bundled catalog, deterministic: rows are
  * ordered by score descending, then by path ascending. Rows with a zero score
  * are dropped. The `semanticCandidates` hook is where s3 plugs in Vectorize
@@ -79,24 +115,42 @@ function lexicalScore(
  */
 export async function searchCatalog(
   query: string,
-  options: {
-    catalog: Catalog;
-    limit?: number;
-    semanticCandidates?: SemanticCandidates;
-  }
+  options: SearchCatalogOptions
 ): Promise<SearchResult[]> {
+  return (await searchCatalogDetailed(query, options)).results;
+}
+
+/**
+ * The single pass behind `searchCatalog`. It also reports whether the fail-closed
+ * guarded gate withheld rows the query matched, so the caller gets both the
+ * results and the hidden-guarded signal from one ranking pass (and one semantic
+ * candidate list) instead of re-running the search with `includeGuarded: true`.
+ */
+export async function searchCatalogDetailed(
+  query: string,
+  options: SearchCatalogOptions
+): Promise<CatalogSearchOutcome> {
   const { catalog, semanticCandidates = noSemanticCandidates } = options;
+  const includeGuarded = options.includeGuarded === true;
   const limit = Math.max(1, Math.floor(options.limit ?? DEFAULT_SEARCH_LIMIT));
   const queryTokens = tokenize(query);
   const normalizedQuery = query.trim().toLowerCase();
-  if (queryTokens.length === 0) return [];
+  if (queryTokens.length === 0) return { results: [], hiddenGuardedMatches: false };
 
   type ScoredRow = SearchResult & { blobTokens: Set<string> };
   const rows: ScoredRow[] = [];
   const byPath = new Map<string, ScoredRow>();
+  // A withheld guarded row the query matched still leaves a signal: the caller's
+  // empty-state answer names those rows. Score guarded rows on this pass too so
+  // that answer costs no second embedding or Vectorize query.
+  let hiddenGuardedMatches = false;
   for (const row of Object.values(catalog)) {
     const blobTokens = new Set(tokenize(row.searchBlob));
     const score = lexicalScore(queryTokens, normalizedQuery, row, blobTokens);
+    if (isGuardedRow(row) && !includeGuarded) {
+      if (score > 0) hiddenGuardedMatches = true;
+      continue;
+    }
     if (score <= 0) continue;
     const scored: ScoredRow = {
       path: row.path,
@@ -104,7 +158,9 @@ export async function searchCatalog(
       summary: row.summary,
       tags: row.tags,
       score,
+      inputSchema: row.inputSchema,
       blobTokens,
+      ...(isGuardedRow(row) ? { requiresApproval: true as const } : {}),
     };
     rows.push(scored);
     byPath.set(row.path, scored);
@@ -131,6 +187,13 @@ export async function searchCatalog(
   for (const candidate of candidates) {
     const row = catalog[candidate.path];
     if (!row) continue;
+    // A semantic candidate must not smuggle a guarded row past the same gate
+    // the lexical pass applies; the withheld candidate is the semantic form of
+    // a hidden match and feeds the same single-pass signal.
+    if (isGuardedRow(row) && !includeGuarded) {
+      if (candidate.score > 0) hiddenGuardedMatches = true;
+      continue;
+    }
     const existing = byPath.get(row.path);
     if (existing) {
       existing.score += candidate.score * SEMANTIC_WEIGHT;
@@ -141,7 +204,9 @@ export async function searchCatalog(
         summary: row.summary,
         tags: row.tags,
         score: candidate.score * minLexicalScore * 0.5,
+        inputSchema: row.inputSchema,
         blobTokens: new Set(),
+        ...(isGuardedRow(row) ? { requiresApproval: true as const } : {}),
       };
       if (admitted.score > 0) {
         rows.push(admitted);
@@ -151,5 +216,8 @@ export async function searchCatalog(
   }
 
   rows.sort((a, b) => (b.score !== a.score ? b.score - a.score : a.path.localeCompare(b.path)));
-  return rows.map(({ blobTokens: _blobTokens, ...result }) => result).slice(0, limit);
+  return {
+    results: rows.map(({ blobTokens: _blobTokens, ...result }) => result).slice(0, limit),
+    hiddenGuardedMatches,
+  };
 }

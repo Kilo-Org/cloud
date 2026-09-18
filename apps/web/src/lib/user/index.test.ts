@@ -107,6 +107,7 @@ import {
   coding_plan_key_inventory,
   coding_plan_subscriptions,
   byok_api_keys,
+  openai_chatgpt_connections,
   mcp_gateway_configs,
   mcp_gateway_authorization_codes,
   mcp_gateway_authorization_requests,
@@ -137,7 +138,7 @@ import {
   cloud_agent_worktrees,
 } from '@kilocode/db/schema';
 
-import { eq, count, inArray, sql } from 'drizzle-orm';
+import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
 import {
   softDeleteUser,
   anonymizeCloudUserData,
@@ -148,6 +149,9 @@ import {
   createOrUpdateUser,
   getAllUserProviders,
   getCrossAccountEmailConflicts,
+  getUserAuthProviders,
+  linkAuthProviderToUser,
+  unlinkAuthProviderFromUser,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
@@ -1506,6 +1510,43 @@ describe('User', () => {
         expect(await db.select().from(deleted_user_email_tombstones)).toEqual([]);
       }
     );
+
+    it('removes the ChatGPT connection rows for the deleted user', async () => {
+      const user = await insertTestUser({
+        google_user_email: `chatgpt-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `ChatGPT cleanup ${randomUUID()}`,
+        user.id,
+        0
+      );
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      const encrypted_connection = encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY);
+      await db.insert(openai_chatgpt_connections).values([
+        {
+          kilo_user_id: user.id,
+          organization_id: null,
+          encrypted_connection,
+          created_by: user.id,
+        },
+        {
+          kilo_user_id: user.id,
+          organization_id: organization.id,
+          encrypted_connection,
+          created_by: user.id,
+        },
+      ]);
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(openai_chatgpt_connections)
+          .where(eq(openai_chatgpt_connections.kilo_user_id, user.id))
+      ).toHaveLength(0);
+    });
   });
 
   describe('softDeleteUser', () => {
@@ -4971,6 +5012,61 @@ describe('User', () => {
       ).resolves.toHaveLength(0);
     });
 
+    it('deletes a personal association but preserves a canonical shared with an organization', async () => {
+      const user = await insertTestUser();
+      const organizationOwner = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Shared personal deletion organization',
+        organizationOwner.id,
+        0
+      );
+      const [canonical] = await db
+        .insert(github_app_installations)
+        .values({
+          github_app_type: 'standard',
+          installation_id: '9876510',
+          account_id: '110',
+          lifecycle_state: 'active',
+          sharing_mode: 'web_cloud_agent',
+        })
+        .returning();
+      await db.insert(platform_integrations).values([
+        {
+          owned_by_user_id: user.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: '9876510',
+          github_app_type: 'standard',
+          github_installation_id: canonical.id,
+          integration_status: 'active',
+        },
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: '9876510',
+          github_app_type: 'standard',
+          github_installation_id: canonical.id,
+          integration_status: 'active',
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      await expect(
+        db
+          .select()
+          .from(github_app_installations)
+          .where(eq(github_app_installations.id, canonical.id))
+      ).resolves.toHaveLength(1);
+      const retainedAssociations = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.github_installation_id, canonical.id));
+      expect(retainedAssociations).toHaveLength(1);
+      expect(retainedAssociations[0]?.owned_by_organization_id).toBe(organization.id);
+    });
+
     it('deletes migration-created personal canonical PII but preserves organizations', async () => {
       const user = await insertTestUser();
       await db.insert(user_github_app_tokens).values({
@@ -6286,6 +6382,172 @@ describe('User', () => {
 
       expect(result.size).toBe(0);
       expect(result).toEqual(new Map());
+    });
+  });
+
+  describe('unlinkAuthProviderFromUser ChatGPT connection', () => {
+    async function seedUserWithOpenAiProvider() {
+      const user = await insertTestUser();
+      await db.insert(user_auth_provider).values([
+        {
+          kilo_user_id: user.id,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+        {
+          kilo_user_id: user.id,
+          provider: 'openai',
+          provider_account_id: `openai-${user.id}`,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+      ]);
+      return user;
+    }
+
+    async function seedOpenAiConnection(userId: string) {
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      await db.insert(openai_chatgpt_connections).values({
+        kilo_user_id: userId,
+        organization_id: null,
+        encrypted_connection: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
+        created_by: userId,
+      });
+    }
+
+    async function seedOpenAiOrganizationConnection(organizationId: string, createdBy: string) {
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      await db.insert(openai_chatgpt_connections).values({
+        kilo_user_id: createdBy,
+        organization_id: organizationId,
+        encrypted_connection: encryptApiKey('{"access_token":"org-token"}', BYOK_ENCRYPTION_KEY),
+        created_by: createdBy,
+      });
+    }
+
+    test('deletes the personal ChatGPT connection when unlinking openai', async () => {
+      const user = await seedUserWithOpenAiProvider();
+      await seedOpenAiConnection(user.id);
+
+      const result = await unlinkAuthProviderFromUser(user.id, 'openai');
+
+      expect(result.success).toBe(true);
+      const rows = await db
+        .select()
+        .from(openai_chatgpt_connections)
+        .where(
+          and(
+            eq(openai_chatgpt_connections.kilo_user_id, user.id),
+            isNull(openai_chatgpt_connections.organization_id)
+          )
+        );
+      expect(rows).toHaveLength(0);
+    });
+
+    test('keeps an organization ChatGPT connection created by the same person when unlinking openai', async () => {
+      const user = await seedUserWithOpenAiProvider();
+      await seedOpenAiConnection(user.id);
+      const organization = await createTestOrganization(`Keep ${randomUUID()}`, user.id, 0);
+      await seedOpenAiOrganizationConnection(organization.id, user.id);
+
+      const result = await unlinkAuthProviderFromUser(user.id, 'openai');
+
+      expect(result.success).toBe(true);
+      const rows = await db
+        .select()
+        .from(openai_chatgpt_connections)
+        .where(eq(openai_chatgpt_connections.organization_id, organization.id));
+      expect(rows).toHaveLength(1);
+    });
+
+    test('keeps the ChatGPT connection when unlinking another provider', async () => {
+      const user = await seedUserWithOpenAiProvider();
+      await seedOpenAiConnection(user.id);
+
+      const result = await unlinkAuthProviderFromUser(user.id, 'google');
+
+      expect(result.success).toBe(true);
+      const rows = await db
+        .select()
+        .from(openai_chatgpt_connections)
+        .where(
+          and(
+            eq(openai_chatgpt_connections.kilo_user_id, user.id),
+            isNull(openai_chatgpt_connections.organization_id)
+          )
+        );
+      expect(rows).toHaveLength(1);
+    });
+  });
+
+  describe('linkAuthProviderToUser identical re-link', () => {
+    // The issuer-qualified subject the OpenAI flow stores (`<issuer>#<sub>`).
+    const OPENAI_ACCOUNT_ID = 'https://auth.openai.com#cb-openai-sub';
+
+    async function seedUserWithOpenAiProvider() {
+      const user = await insertTestUser();
+      await db.insert(user_auth_provider).values([
+        {
+          kilo_user_id: user.id,
+          provider: 'google',
+          provider_account_id: `google-${user.id}`,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+        {
+          kilo_user_id: user.id,
+          provider: 'openai',
+          provider_account_id: OPENAI_ACCOUNT_ID,
+          email: user.google_user_email,
+          avatar_url: '',
+          hosted_domain: null,
+        },
+      ]);
+      return user;
+    }
+
+    test('re-linking the identical account id succeeds and keeps one row', async () => {
+      const user = await seedUserWithOpenAiProvider();
+
+      const result = await linkAuthProviderToUser({
+        kilo_user_id: user.id,
+        provider: 'openai',
+        provider_account_id: OPENAI_ACCOUNT_ID,
+        email: user.google_user_email,
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: null,
+      });
+
+      expect(result.success).toBe(true);
+      const providers = await getUserAuthProviders(user.id);
+      expect(providers.filter(p => p.provider === 'openai')).toHaveLength(1);
+    });
+
+    test('re-linking a different account id for the same provider still fails', async () => {
+      const user = await seedUserWithOpenAiProvider();
+
+      const result = await linkAuthProviderToUser({
+        kilo_user_id: user.id,
+        provider: 'openai',
+        provider_account_id: 'https://auth.openai.com#other-sub',
+        email: user.google_user_email,
+        avatar_url: '',
+        display_name: null,
+        hosted_domain: null,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('PROVIDER-ALREADY-LINKED');
+      }
     });
   });
 });

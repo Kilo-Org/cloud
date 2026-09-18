@@ -7,7 +7,6 @@ import { logExceptInTest } from '@/lib/utils.server';
 
 export async function handleInstallationTargetRenamed(
   payload: InstallationTargetRenamedPayload,
-  integration: { id: string; github_disconnected_at: string | null },
   appType: GitHubAppType
 ) {
   const installationId = payload.installation.id.toString();
@@ -18,14 +17,14 @@ export async function handleInstallationTargetRenamed(
   }
 
   await updateGitHubInstallationAccountIdentity({
-    integrationId: integration.id,
+    installationId,
+    appType,
     accountId: details.account.id.toString(),
     accountLogin: details.account.login,
   });
 
   logExceptInTest('GitHub App installation target renamed:', {
     installation_id: installationId,
-    integration_id: integration.id,
     target_type: payload.target_type,
   });
 

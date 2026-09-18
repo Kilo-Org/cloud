@@ -1319,22 +1319,37 @@ export const cliSessionsV2Router = createTRPCRouter({
   get: baseProcedure.input(GetSessionInputSchema).query(async ({ ctx, input }) => {
     const { session_id } = input;
 
-    const [session] = await db
+    // Look the rows up without the owner filter first, so a session that exists
+    // but belongs to another account is distinguishable from one that does not
+    // exist. The session-resume gate (web) and the mobile session route render
+    // the two denials differently ("Not found" vs "Access denied"), which is
+    // only possible when the lookup says which one happened. Session ids are
+    // high-entropy, so the existence signal is not enumerable; the row itself
+    // is never returned to a non-owner.
+    //
+    // `session_id` alone is not unique — the primary key is
+    // `(session_id, kilo_user_id)` — so the lookup cannot take the first row:
+    // that could pick another account's row for the same id and deny the owner
+    // their own session. Read the rows for the id and prefer the caller's.
+    const sessions = await db
       .select()
       .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, session_id),
-          eq(cli_sessions_v2.kilo_user_id, ctx.user.id)
-        )
-      )
-      .limit(1);
+      .where(eq(cli_sessions_v2.session_id, session_id));
+
+    const session = sessions.find(row => row.kilo_user_id === ctx.user.id);
 
     if (!session) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Session not found',
-      });
+      throw new TRPCError(
+        sessions.length > 0
+          ? {
+              code: 'UNAUTHORIZED',
+              message: 'You do not have access to this session',
+            }
+          : {
+              code: 'NOT_FOUND',
+              message: 'Session not found',
+            }
+      );
     }
 
     if (session.organization_id) {

@@ -23,7 +23,13 @@ export type SessionTranscriptItem =
       parts?: Part[];
     }
   | { type: 'preparation'; attempt: PreparationAttempt }
-  | { type: 'tool-run'; id: string; parts: ToolPart[] }
+  | {
+      type: 'tool-run';
+      id: string;
+      /** The run's first part's message id, for resume-anchor matching. */
+      messageId: string;
+      parts: ToolPart[];
+    }
   | { type: 'time'; created: number; messageId: string; dayChanged: boolean };
 
 /**
@@ -34,6 +40,20 @@ export type SessionTranscriptItem =
  * live turn under one marker and still marks a real pause.
  */
 export const TRANSCRIPT_TIME_MARKER_GAP_MS = 10 * 60 * 1000;
+
+/**
+ * Whether this row is client-materialised for a prompt the server has not
+ * confirmed: the send-time optimistic insert and the `cloud.message.queued`
+ * synthesize both write `info.synthetic` (the same Kilo extension their
+ * placeholder parts carry). The authoritative `message.updated` replaces the
+ * info and clears the flag; when that update never lands — production has
+ * shown the wrapper's event publications rejected wholesale
+ * (`event_batch_rejected`) — the row stays unconfirmed for a submission the
+ * server may never have accepted.
+ */
+function isUnconfirmedSubmission(message: StoredMessage): boolean {
+  return message.info.role === 'user' && message.info.synthetic === true;
+}
 
 export function getSessionTranscriptItemKey(item: SessionTranscriptItem): string {
   if (item.type === 'message') {
@@ -54,6 +74,22 @@ export function getSessionTranscriptItemKey(item: SessionTranscriptItem): string
 
 export function getSessionTranscriptItemType(item: SessionTranscriptItem): string {
   return item.type;
+}
+
+/**
+ * The message id a resume anchor matches this item by: a message row's own id,
+ * a condensed run's first part's message, or a time marker's message (the
+ * marker renders above that message). A preparation attempt has no message row
+ * of its own, so it can never be an anchor target.
+ */
+export function getSessionTranscriptItemMessageId(item: SessionTranscriptItem): string | null {
+  if (item.type === 'message') {
+    return item.message.info.id;
+  }
+  if (item.type === 'preparation') {
+    return null;
+  }
+  return item.messageId;
 }
 
 export function mergeSessionTranscript(
@@ -80,10 +116,22 @@ export function mergeSessionTranscript(
   let previousCreated: number | undefined = undefined;
   for (const message of messages) {
     messageIds.add(message.info.id);
-    if (
-      messageRendersContent(message) ||
-      deliveryStates?.get(message.info.id)?.status === 'failed'
-    ) {
+    const failed = deliveryStates?.get(message.info.id)?.status === 'failed';
+    // An unconfirmed row with no parts at all stays invisible: unlike a
+    // confirmed user row (whose parts may still stream in, so a zero-part row
+    // stays transient), a client materialised row that never received its parts
+    // will not gain content on its own — it would otherwise leave the reported
+    // empty yellow stub above the submitted text. A synthetic row whose parts
+    // exist but render nothing is already dropped by `messageRendersContent`
+    // below, so this rule only has to name the zero-part case. The row is keyed
+    // by the id the client sent (the server honors `messageId`), so the run that
+    // failed it attaches here and a failed submission keeps its one row with the
+    // typed footer. Two rows with the same prompt are two submissions and stay
+    // two rows. If the server later confirms the id, the authoritative record
+    // replaces the info and the row re-renders through the normal path.
+    const unconfirmedWithoutParts =
+      isUnconfirmedSubmission(message) && !failed && message.parts.length === 0;
+    if (!unconfirmedWithoutParts && (messageRendersContent(message) || failed)) {
       const created = message.info.time.created;
       // One validity rule, shared with the marker component: a timestamp the label
       // cannot format must never produce a marker row.
@@ -181,9 +229,11 @@ export function condenseTranscriptToolRuns(
     }
     if (run.length >= 2) {
       flushFragment();
+      const first = run[0];
       condensed.push({
         type: 'tool-run',
-        id: `tool-run:${run[0]?.part.id ?? ''}`,
+        id: `tool-run:${first?.part.id ?? ''}`,
+        messageId: first?.message.info.id ?? '',
         parts: run.map(entry => entry.part),
       });
     } else {

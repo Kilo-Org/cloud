@@ -237,6 +237,73 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(mockEnsureVerifiedDomainOrganizationMembership).not.toHaveBeenCalled();
   });
 
+  it('skips ordinary SSO enforcement during provider-account linking', async () => {
+    mockResolveSsoAuthorityForDomain.mockResolvedValueOnce({
+      status: 'required',
+      domain: 'example.com',
+      sourceOrganizationId: 'sso-org',
+    });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'existing-user',
+      targetProvider: 'openai',
+    } as never);
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({
+      success: true,
+      user: { id: 'existing-user', blocked_reason: null },
+    } as never);
+
+    const result = await signIn({
+      user: { id: 'x', email: 'sso-link@example.com', name: 'SSO Link', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke',
+      },
+      profile: { sub: 'openai-sub', email: 'sso-link@example.com' },
+    } as never);
+
+    expect(result).toBe(true);
+    expect(mockResolveSsoAuthorityForDomain).not.toHaveBeenCalled();
+    expect(mockLinkAccountToExistingUser).toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('carries the linking session organization onto the profile for an OpenAI connection', async () => {
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'existing-user',
+      targetProvider: 'openai',
+      organizationId: '00000000-0000-4000-8000-000000000001',
+    } as never);
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({
+      success: true,
+      user: { id: 'existing-user', blocked_reason: null },
+    } as never);
+
+    const profile: Record<string, unknown> = {
+      sub: 'openai-org-sub',
+      email: 'org-link@example.com',
+    };
+
+    const result = await signIn({
+      user: { id: 'x', email: 'org-link@example.com', name: 'Org Link', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke',
+      },
+      profile,
+    } as never);
+
+    expect(result).toBe(true);
+    expect(profile.openAiChatGptOrganizationId).toBe('00000000-0000-4000-8000-000000000001');
+  });
+
   it('does not run verified-domain admission during provider-account linking', async () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: 'existing-user',

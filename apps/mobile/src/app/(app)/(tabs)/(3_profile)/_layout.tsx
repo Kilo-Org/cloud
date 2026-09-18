@@ -13,6 +13,7 @@ export default function ProfileLayout() {
     [['personalReviewAgent']],
     [['securityAgent']],
     [['kiloPass']],
+    [['agentProfiles']],
   ]);
   return <Stack screenOptions={{ headerShown: false }} />;
 }

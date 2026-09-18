@@ -21,6 +21,7 @@ const EXPECTED_PROFILES = {
   descriptionPlaceholder: 'Optional description',
   ownerLabel: 'Profile owner',
   nameRequired: 'Enter a profile name',
+  createAction: 'Create profile',
   createFailed: "Couldn't create profile",
   createdToast: 'Profile "{{name}}" created',
   settingsSectionTitle: 'Configuration',

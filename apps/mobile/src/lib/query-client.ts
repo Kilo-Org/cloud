@@ -137,6 +137,7 @@ const PERMANENT_CODES = new Set([
   'FORBIDDEN',
   'NOT_FOUND',
   'CONFLICT',
+  'UNPROCESSABLE_CONTENT',
 ]);
 
 type TrpcErrorData = {

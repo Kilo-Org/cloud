@@ -29,6 +29,13 @@ export function BYOKContent({
   // Check if user has permission to access BYOK (must be org owner or admin)
   const hasPermission = canManageOrganization(currentRole);
 
+  const chatGptCard =
+    chatGptEnabled === true ? (
+      <OpenAiChatGptCard organizationId={organizationId} />
+    ) : chatGptEnabled === undefined ? (
+      <OpenAiChatGptCardView status={undefined} isOrganization />
+    ) : null;
+
   return (
     <OrganizationContextProvider value={{ userRole: currentRole, isKiloAdmin }}>
       <div className="flex w-full flex-col gap-y-4">
@@ -39,26 +46,25 @@ export function BYOKContent({
         />
         {/*
           The ChatGPT connection is personal, so every member manages their own
-          for this organization. The pasted-key manager stays owner/admin only.
+          for this organization and sees only that card. The pasted-key manager
+          stays owner/admin only, so a member never sees the access-denied block.
         */}
-        <div className="space-y-4">
-          {chatGptEnabled === true ? (
-            <OpenAiChatGptCard organizationId={organizationId} />
-          ) : chatGptEnabled === undefined ? (
-            <OpenAiChatGptCardView status={undefined} />
-          ) : null}
-          {hasPermission ? (
+        {hasPermission ? (
+          <div className="space-y-4">
+            {chatGptCard}
             <BYOKKeysManager organizationId={organizationId} />
-          ) : (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Access Denied</AlertTitle>
-              <AlertDescription>
-                You must be an organization owner to manage organization API keys.
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
+          </div>
+        ) : chatGptEnabled !== false ? (
+          <div className="space-y-4">{chatGptCard}</div>
+        ) : (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Access Denied</AlertTitle>
+            <AlertDescription>
+              You must be an organization owner to manage organization API keys.
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
     </OrganizationContextProvider>
   );

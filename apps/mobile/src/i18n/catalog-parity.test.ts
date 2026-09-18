@@ -72,6 +72,7 @@ describe('launcher shortcuts reuse the shared new-agent copy', () => {
       glanceable?: Record<string, unknown>;
     };
     expect(translated.launcher?.newAgent).toBeUndefined();
+    expect(translated.launcher?.openLastSession).toBeDefined();
     expect(translated.glanceable?.newAgent).toBeDefined();
   });
 });

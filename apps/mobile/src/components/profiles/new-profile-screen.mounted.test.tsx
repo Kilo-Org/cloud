@@ -48,8 +48,8 @@ vi.mock('react-native', () => ({
 
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
+vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -66,12 +66,20 @@ function findField(root: ReactTestInstance, label: string): ReactTestInstance {
   return field;
 }
 
-function findChoice(root: ReactTestInstance, label: string): ReactTestInstance {
-  const choice = findAll(root, 'ChoiceRow').find(node => node.props.label === label);
-  if (!choice) {
-    throw new Error(`choice ${label} was not rendered`);
+function findOwnerControl(root: ReactTestInstance): ReactTestInstance {
+  const control = findAll(root, 'SegmentedControl')[0];
+  if (!control) {
+    throw new Error('owner control was not rendered');
   }
-  return choice;
+  return control;
+}
+
+function typeName(root: ReactTestInstance, name: string): void {
+  act(() => {
+    (findField(root, 'Profile name').props as { onChangeText: (v: string) => void }).onChangeText(
+      name
+    );
+  });
 }
 
 async function mount() {
@@ -117,11 +125,7 @@ describe('NewProfileScreen', () => {
   it('happy: a personal create toasts and replaces to the overview', async () => {
     const { renderer, unmount } = await mount();
 
-    act(() => {
-      (
-        findField(renderer.root, 'Profile name').props as { onChangeText: (v: string) => void }
-      ).onChangeText('Backend debugging');
-    });
+    typeName(renderer.root, 'Backend debugging');
     await pressCreate(renderer.root);
 
     await waitFor(() => createMutate.mock.calls.length > 0);
@@ -137,13 +141,11 @@ describe('NewProfileScreen', () => {
     const { renderer, unmount } = await mount();
 
     act(() => {
-      (findChoice(renderer.root, 'Organization').props as { onPress: () => void }).onPress();
+      (findOwnerControl(renderer.root).props as { onChange: (v: string) => void }).onChange(
+        'organization'
+      );
     });
-    act(() => {
-      (
-        findField(renderer.root, 'Profile name').props as { onChangeText: (v: string) => void }
-      ).onChangeText('Org profile');
-    });
+    typeName(renderer.root, 'Org profile');
     await pressCreate(renderer.root);
 
     await waitFor(() => createMutate.mock.calls.length > 0);
@@ -156,17 +158,42 @@ describe('NewProfileScreen', () => {
     unmount();
   });
 
+  it('personal context: renders no owner control', async () => {
+    organizationState.organizationId = null;
+    const { renderer, unmount } = await mount();
+
+    expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('layout stability: switching owner keeps the typed name', async () => {
+    const { renderer, unmount } = await mount();
+
+    typeName(renderer.root, 'Backend debugging');
+    act(() => {
+      (findOwnerControl(renderer.root).props as { onChange: (v: string) => void }).onChange(
+        'organization'
+      );
+    });
+    await pressCreate(renderer.root);
+
+    await waitFor(() => createMutate.mock.calls.length > 0);
+    expect(createMutate.mock.calls[0]?.[0]).toEqual({
+      name: 'Backend debugging',
+      organizationId: 'org-1',
+    });
+
+    unmount();
+  });
+
   it('retryable: a failed create falls back to createFailed when the error has no message', async () => {
     const errorWithoutMessage = new Error('placeholder');
     errorWithoutMessage.message = '';
     createMutate.mockRejectedValue(errorWithoutMessage);
     const { renderer, unmount } = await mount();
 
-    act(() => {
-      (
-        findField(renderer.root, 'Profile name').props as { onChangeText: (v: string) => void }
-      ).onChangeText('Backend debugging');
-    });
+    typeName(renderer.root, 'Backend debugging');
     await pressCreate(renderer.root);
 
     await waitFor(() => toastError.mock.calls.length > 0);
@@ -180,11 +207,7 @@ describe('NewProfileScreen', () => {
     createMutate.mockRejectedValue(new Error('A profile with that name already exists'));
     const { renderer, unmount } = await mount();
 
-    act(() => {
-      (
-        findField(renderer.root, 'Profile name').props as { onChangeText: (v: string) => void }
-      ).onChangeText('Backend debugging');
-    });
+    typeName(renderer.root, 'Backend debugging');
     await pressCreate(renderer.root);
 
     await waitFor(() => createMutate.mock.calls.length > 0);

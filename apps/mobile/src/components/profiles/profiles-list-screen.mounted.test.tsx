@@ -85,9 +85,11 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/icons', () => ({
+  Building2: 'Building2',
   Plus: 'Plus',
   SlidersHorizontal: 'SlidersHorizontal',
   Star: 'Star',
+  User: 'User',
 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -225,6 +227,9 @@ describe('ProfilesListScreen', () => {
       throw new Error('org row missing');
     }
     expect(orgRow.props.subtitle).toBe('1v');
+    // The row's leading icon names its owner.
+    expect(orgRow.props.icon).toBe('Building2');
+    expect(personalRow.props.icon).toBe('User');
     // Only the resolved effective default gets the filled star.
     expect(orgRow.props.trailing).toBeUndefined();
     act(() => {
@@ -261,6 +266,8 @@ describe('ProfilesListScreen', () => {
 
     expect(rowTitles(renderer.root)).toEqual(['Personal profile']);
     expect(textChildren(renderer.root)).not.toContain('Organization');
+    // `agentProfiles.list` does not tag owner, so every row is personal.
+    expect(findOne(renderer.root, 'ConfigureRow').props.icon).toBe('User');
 
     unmount();
   });

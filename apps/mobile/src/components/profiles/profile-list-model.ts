@@ -25,7 +25,8 @@ export type ProfileSection<TProfile> = {
   key: ProfileSectionKey;
   /**
    * Catalog key for the section header. Absent for the single untitled
-   * section a personal-context list renders.
+   * section a personal-context list renders; the screen renders it through
+   * `t()` with the reviewed English heading as the fallback.
    */
   titleKey?: string;
   profiles: TProfile[];
@@ -55,14 +56,14 @@ export function buildProfileSections<TProfile>({
   if (orgProfiles.length > 0) {
     sections.push({
       key: 'organization',
-      titleKey: 'common.organization',
+      titleKey: 'profiles.list.organizationHeading',
       profiles: [...orgProfiles],
     });
   }
   if (personalProfiles.length > 0) {
     sections.push({
       key: 'personal',
-      titleKey: 'common.personal',
+      titleKey: 'profiles.list.personalHeading',
       profiles: [...personalProfiles],
     });
   }

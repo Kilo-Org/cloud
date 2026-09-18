@@ -9,12 +9,20 @@ import {
   isEffectiveDefault,
   profileCounts,
 } from '@/components/profiles/profile-list-model';
+import { profileOrganizationId, profileOwnerType } from '@/components/profiles/profile-owner-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Plus, SlidersHorizontal, Star } from '@/components/ui/icons';
+import {
+  Building2,
+  type LucideIcon,
+  Plus,
+  SlidersHorizontal,
+  Star,
+  User,
+} from '@/components/ui/icons';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -24,6 +32,15 @@ import { useOrganization } from '@/lib/organization-context';
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
 
 const NEW_PROFILE_PATH = '/(app)/(tabs)/(3_profile)/profiles/new' as Href;
+
+/**
+ * The row's leading icon names its owner, the same split the web list row
+ * makes (`ProfilesListDialog.tsx:372-376`): a building for an organization
+ * profile, a person for a personal one.
+ */
+function ownerIcon(profile: AgentProfileListItem): LucideIcon {
+  return profileOwnerType(profile) === 'organization' ? Building2 : User;
+}
 
 /** Profile name plus the default marker, for the star's accessibility label. */
 function defaultStarLabel(name: string, defaultLabel: string): string {
@@ -95,12 +112,7 @@ export function ProfilesListScreen() {
   };
 
   const openProfile = (profile: AgentProfileListItem) => {
-    router.push(
-      getProfileOverviewPath(
-        profile.id,
-        profile.ownerType === 'organization' ? (organizationId ?? undefined) : undefined
-      )
-    );
+    router.push(getProfileOverviewPath(profile.id, profileOrganizationId(organizationId, profile)));
   };
 
   return (
@@ -148,13 +160,19 @@ export function ProfilesListScreen() {
               <View key={section.key} className="gap-3">
                 {section.titleKey ? (
                   <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-                    {t(section.titleKey)}
+                    {t(section.titleKey, {
+                      // Reviewed English heading until the `profiles.list.*`
+                      // copy lands with the translation slice.
+                      defaultValue: t(
+                        section.key === 'organization' ? 'common.organization' : 'common.personal'
+                      ),
+                    })}
                   </Text>
                 ) : null}
                 {section.profiles.map((profile, index) => (
                   <ConfigureRow
                     key={profile.id}
-                    icon={SlidersHorizontal}
+                    icon={ownerIcon(profile)}
                     title={profile.name}
                     subtitle={formatProfileCounts(profileCounts(profile))}
                     className="rounded-lg bg-secondary px-3"

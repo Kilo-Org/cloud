@@ -1,12 +1,15 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
+import { splitProfilesByOwner } from '@/components/profiles/profile-owner-model';
+import {
+  type AgentProfileDetail,
+  type AgentProfileListCombined,
+  type AgentProfileListItem,
+} from '@/lib/hooks/agent-profile-types';
 import { useTRPC } from '@/lib/trpc';
 
-export type {
-  AgentProfileDetail,
-  AgentProfileListCombined,
-  AgentProfileListItem,
-} from '@/lib/hooks/agent-profile-types';
+export type { AgentProfileDetail, AgentProfileListCombined, AgentProfileListItem };
 export { useAgentProfileMutations } from '@/lib/hooks/use-agent-profile-mutations';
 export { useAgentProfileSectionMutations } from '@/lib/hooks/use-agent-profile-section-mutations';
 
@@ -39,12 +42,23 @@ export function useAgentProfileList(organizationId?: string) {
   });
 
   const query = isOrganization ? combined : personal;
+  // The bucket split lives in the pure ownership model, so the org/personal
+  // rule has one source of truth (`ProfilesListDialog.tsx:95-100`). Memoized on
+  // the query data: consumers memoize on the bucket identity, so a render that
+  // did not change the data must not mint new arrays.
+  const { orgProfiles, personalProfiles } = useMemo(
+    () =>
+      splitProfilesByOwner<AgentProfileListItem>({
+        isOrgContext: isOrganization,
+        combined: combined.data,
+        personal: personal.data,
+      }),
+    [isOrganization, combined.data, personal.data]
+  );
 
   return {
-    orgProfiles: isOrganization ? (combined.data?.orgProfiles ?? []) : [],
-    personalProfiles: isOrganization
-      ? (combined.data?.personalProfiles ?? [])
-      : (personal.data ?? []),
+    orgProfiles,
+    personalProfiles,
     effectiveDefaultId: isOrganization
       ? (combined.data?.effectiveDefaultId ?? null)
       : (personal.data?.find(profile => profile.isDefault)?.id ?? null),

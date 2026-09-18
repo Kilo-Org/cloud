@@ -51,8 +51,8 @@ describe('buildProfileSections', () => {
 
     expect(sections.map(section => section.key)).toEqual(['organization', 'personal']);
     expect(sections.map(section => section.titleKey)).toEqual([
-      'common.organization',
-      'common.personal',
+      'profiles.list.organizationHeading',
+      'profiles.list.personalHeading',
     ]);
     expect(sections[0]?.profiles).toEqual([orgProfile]);
     expect(sections[1]?.profiles).toEqual([personalProfile]);
@@ -66,7 +66,7 @@ describe('buildProfileSections', () => {
     });
 
     expect(sections).toEqual([
-      { key: 'personal', titleKey: 'common.personal', profiles: [personalProfile] },
+      { key: 'personal', titleKey: 'profiles.list.personalHeading', profiles: [personalProfile] },
     ]);
   });
 

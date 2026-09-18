@@ -7,6 +7,7 @@
       "instanceLifecycle": "Mae gan eich achos ddiweddariad",
       "scheduledAction": "Mae gan weithred wedi'i hamserlennu ddiweddariad",
       "lowBalance": "Mae angen sylw ar eich balans",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Mae angen sylw ar ganfyddiad diogelwch",
       "activeAgentsGlanceable": "Mae gan asiantau gweithredol ddiweddariad"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Rhybudd balans isel",
       "body": "Syrthiodd balans {{organizationName}} o dan ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Canfyddiad diogelwch newydd ({{severity}})",

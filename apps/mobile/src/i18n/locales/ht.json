@@ -787,6 +787,7 @@
       "chat": "Mesaj diskisyon",
       "kiloclaw": "Aktivite KiloClaw",
       "balance": "Alèt balans",
+      "spend": "Alèt depans",
       "security": "Pwoblèm sekirite detekte"
     },
     "category": {
@@ -799,6 +800,8 @@
       "sessionStatusSubtitle": "fini / echwe / pare pou kontwole",
       "kiloclawActivitySubtitle": "enstans pare/echwe, aksyon pwograme",
       "balanceAlertsSubtitle": "avètisman lè balans òganizasyon an ba",
+      "spendAlertsSubtitle": "depasman papòt ak ogmantasyon chak èdtan",
+      "spendAlertsToggle": "Kategori alèt depans",
       "securityFindingsSubtitle": "nouvo rezilta ak rapèl SLA"
     }
   },
@@ -3134,5 +3137,28 @@
       "repositoryUnknown": "Kilo pa rekonèt {{repository}} kòm yon depo GitHub oswa GitLab. Chwazi yon lòt depo nan Kilo.",
       "repositoryUnsupported": "{{repository}} se yon depo Bitbucket — Kòmanse ajan poko ka itilize li. Chwazi yon lòt depo nan Kilo."
     }
+  },
+  "spendAlerts": {
+    "subtitle": "Voye yon alèt pa imèl oswa push bay kontak fakti yo lè depans sektè sa a depase yon limit oswa monte pi wo pase vitès èdtan abityèl li.",
+    "enable": "Aktive alèt depans yo",
+    "thresholdTitle": "Depasman papòt",
+    "thresholdSubtitle": "Depans aktyèl la depase limit ou",
+    "anomalyTitle": "Ogmantasyon chak èdtan",
+    "anomalySubtitle": "Yon èdtan byen pi wo pase vitès abityèl sektè sa a",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Fenèt",
+    "window24h": "24 èdtan",
+    "window7d": "7 jou",
+    "window30d": "30 jou",
+    "multiplierLabel": "Miltiplikatè ogmantasyon",
+    "saved": "Paramèt alèt depans yo anrejistre",
+    "loadError": "Pa t kapab chaje alèt depans yo.",
+    "saveError": "Pa t kapab anrejistre alèt depans yo.",
+    "empty": "Alèt depans yo fèmen. Limen yo pou avèti kontak fakti sektè sa a.",
+    "noSpend": "Poko gen depans ki anrejistre",
+    "spend24h": "Depans nan 24 èdtan ki sot pase yo",
+    "multiplierError": "Antre yon miltiplikatè 1 oswa plis",
+    "permissionDenied": "Ou pa gen pèmisyon pou jere alèt depans yo.",
+    "pushOffByCategory": "Fèmen nan Notifikasyon"
   }
 }

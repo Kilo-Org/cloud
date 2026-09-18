@@ -5,31 +5,35 @@ import type {
   InternalDispatchLowBalanceRequest,
   InternalDispatchSecurityFindingRequest,
   InternalDispatchSecurityLifecycleRequest,
+  InternalDispatchSpendAlertRequest,
 } from '@kilocode/notifications';
 import { INTERNAL_API_SECRET, NOTIFICATIONS_WORKER_URL } from '@/lib/config.server';
 
 type DispatchBody =
   | InternalDispatchLowBalanceRequest
   | InternalDispatchSecurityFindingRequest
-  | InternalDispatchSecurityLifecycleRequest;
+  | InternalDispatchSecurityLifecycleRequest
+  | InternalDispatchSpendAlertRequest;
 
 /**
  * Best-effort POST to the notifications worker internal dispatch endpoint.
  * Never rejects — missing config, network errors, and non-OK responses are
- * logged/captured and swallowed so email paths are never blocked by push.
+ * logged/captured and swallowed so email paths are never blocked by push — and
+ * returns whether the worker accepted the dispatch, which the spend-alert
+ * outbox uses to decide whether to retry.
  */
-async function dispatchInternal(body: DispatchBody): Promise<void> {
+async function dispatchInternal(body: DispatchBody): Promise<boolean> {
   if (!NOTIFICATIONS_WORKER_URL) {
     console.error(
       '[notifications-worker-client] NOTIFICATIONS_WORKER_URL is not configured; skipping push dispatch'
     );
-    return;
+    return false;
   }
   if (!INTERNAL_API_SECRET) {
     console.error(
       '[notifications-worker-client] INTERNAL_API_SECRET is not configured; skipping push dispatch'
     );
-    return;
+    return false;
   }
 
   try {
@@ -54,12 +58,15 @@ async function dispatchInternal(body: DispatchBody): Promise<void> {
         tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
         extra: { status: response.status, kind: body.kind },
       });
+      return false;
     }
+    return true;
   } catch (error) {
     captureException(error, {
       tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
       extra: { kind: body.kind },
     });
+    return false;
   }
 }
 
@@ -67,6 +74,18 @@ export async function dispatchLowBalancePush(
   input: Omit<InternalDispatchLowBalanceRequest, 'kind'>
 ): Promise<void> {
   await dispatchInternal({ kind: 'low_balance', ...input });
+}
+
+/**
+ * Dispatches a spend-alert push. Unlike the email-backed dispatchers above,
+ * this exposes the worker's acceptance so the spend-alert delivery drain can
+ * reschedule a dispatch the worker refused instead of marking it delivered.
+ * It still never rejects.
+ */
+export async function dispatchSpendAlertPush(
+  input: Omit<InternalDispatchSpendAlertRequest, 'kind'>
+): Promise<boolean> {
+  return dispatchInternal({ kind: 'spend_alert', ...input });
 }
 
 export async function dispatchSecurityFindingPush(

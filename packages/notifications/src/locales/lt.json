@@ -7,6 +7,7 @@
       "instanceLifecycle": "Jūsų egzempliorius turi atnaujinimą",
       "scheduledAction": "Suplanuotas veiksmas turi atnaujinimą",
       "lowBalance": "Jūsų balansui reikia dėmesio",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Saugumo radiniui reikia dėmesio",
       "activeAgentsGlanceable": "Aktyvūs agentai turi atnaujinimą"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Mažo balanso pranešimas",
       "body": "{{organizationName}} balansas nukrito žemiau ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Naujas saugumo radinys ({{severity}})",

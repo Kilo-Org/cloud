@@ -1553,6 +1553,7 @@
       "cancelQueuedUpgradeRequired": "कतार में लगे संदेशों को रद्द करने के लिए Kilo CLI का नया संस्करण आवश्यक है। Kilo CLI अपडेट करें और फिर से कनेक्ट करें।"
     },
     "sessionConnection": {
+      "label": "कनेक्शन",
       "connecting": "कनेक्ट हो रहा है…",
       "connectionLost": "कनेक्शन टूट गया",
       "reconnecting": "फिर से कनेक्ट हो रहा है…",
@@ -1572,7 +1573,9 @@
       "removeConfirmTitle": "लक्ष्य हटाएँ?",
       "removeConfirmMessage": "CLI इस सत्र का लक्ष्य साफ़ कर देता है।",
       "updateFailed": "लक्ष्य अपडेट नहीं किया जा सका।",
-      "sectionAccessibility": "{{status}}। लक्ष्य: {{text}}"
+      "sectionAccessibility": "{{status}}। लक्ष्य: {{text}}",
+      "collapse": "लक्ष्य समेटें",
+      "expand": "लक्ष्य फैलाएँ"
     },
     "remoteSession": {
       "failedToCreate": "रिमोट सत्र नहीं बन सका।",
@@ -1638,7 +1641,20 @@
       "continueFrom": "{{title}} जारी रखा जा रहा है।",
       "importingSession": "सत्र आयात किया जा रहा है",
       "cliCannotContinue": "यह CLI सत्र जारी नहीं रख सकता। Cloud Agent या कोई अन्य CLI चुनें।",
-      "importFailed": "यह सत्र आयात नहीं हो सका।"
+      "importFailed": "यह सत्र आयात नहीं हो सका।",
+      "sandbox": "सैंडबॉक्स",
+      "sandboxAccessibility": "सैंडबॉक्स: {{label}}",
+      "sandboxDefaultWithDestination": "डिफ़ॉल्ट · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "छोटा",
+      "sandboxInstanceShared": "साझा",
+      "sandboxInstanceLarge": "बड़ा",
+      "sandboxInstanceDevcontainer": "डेव कंटेनर",
+      "sandboxInstanceProviderDefault": "प्रदाता का डिफ़ॉल्ट",
+      "sandboxCouldNotLoad": "सैंडबॉक्स विकल्प लोड नहीं हो सके",
+      "sandboxUnavailable": "यह सैंडबॉक्स उपलब्ध नहीं है। कोई अन्य सैंडबॉक्स या डिफ़ॉल्ट चुनें।",
+      "sandboxUseDefault": "डिफ़ॉल्ट का उपयोग करें"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई।",
@@ -1978,6 +1994,12 @@
       "startNewSession": "नया सत्र शुरू करें",
       "exitSession": "सत्र से बाहर निकलें",
       "clearSession": "यह सत्र समाप्त करें और नया शुरू करें",
+      "compactDescription": "वर्तमान सत्र का संदर्भ संकुचित करें",
+      "goalDescription": "सत्र लक्ष्य की ओर काम जारी रखें। /goal <objective> या pause, resume, clear",
+      "initDescription": "निर्देशित AGENTS.md सेटअप",
+      "resumeClaudeDescription": "Claude Code सत्र का ट्रांसक्रिप्ट आयात करें",
+      "resumeCodexDescription": "OpenAI Codex सत्र का ट्रांसक्रिप्ट आयात करें",
+      "reviewDescription": "परिवर्तनों की समीक्षा करें [uncommitted|staged|unpushed|branch|commit|pr]",
       "upgradeRequiredFallback": "इस कमांड का उपयोग करने के लिए कृपया अपना CLI अपग्रेड करें।",
       "exitCapabilityUnavailable": "सत्र से बाहर निकलने के लिए अपना CLI अपडेट करें।",
       "clearCapabilityUnavailable": "सत्र फिर से शुरू करने के लिए अपना CLI अपडेट करें।",
@@ -2121,6 +2143,7 @@
     "couldNotLoadActiveSessions": "सक्रिय सत्र लोड नहीं हो सके।",
     "agentSessions": "अभी जारी",
     "newCodingTask": "नया कोडिंग कार्य",
+    "newTaskFromPicture": "तस्वीर से नया कार्य",
     "explore": "और जानें",
     "seeAll": "सभी देखें",
     "noLiveSessions": "अभी कुछ भी नहीं चल रहा है"
@@ -2342,7 +2365,8 @@
     "aiProvidersWhat": "आपके प्रॉम्प्ट, बातचीत का इतिहास और आपकी जोड़ी गई फ़ाइलें।",
     "aiProvidersWhy": "AI के उत्तर बनाने के लिए।",
     "aiProvidersWho": "Anthropic, OpenAI, Google और अन्य प्रदाता जिन्हें आप हर अनुरोध के लिए चुनते हैं।",
-    "gatewayWhat": "खाते की ID, अनुरोध का मेटाडेटा और टोकन का उपयोग।",
+    "gatewayWhat": "खाते की ID, अनुरोध का मेटाडेटा, टोकन का उपयोग, और ऐप इसके ज़रिए जो प्रॉम्प्ट और वॉइस रिकॉर्डिंग भेजता है।",
+    "viaGateway": "Kilo Gateway के ज़रिए",
     "gatewayWhy": "पहचान की पुष्टि करने, अनुरोध सही जगह भेजने और बिलिंग का मिलान करने के लिए।",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "क्रैश और त्रुटि की रिपोर्ट, जिनसे ऐप की सामग्री हटा दी गई है।",
@@ -2362,7 +2386,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "बोलकर टेक्स्ट लिखते समय आपकी आवाज़ की रिकॉर्डिंग।",
     "voiceTranscriptionWhy": "बोले गए शब्दों को टेक्स्ट में बदलने के लिए।",
-    "voiceTranscriptionWho": "केवल डिवाइस पर। अगर डिवाइस ऑफ़लाइन आवाज़ को टेक्स्ट में नहीं बदल सकता, तो Apple या Google के ज़रिए।",
+    "voiceTranscriptionWho": "आपका डिवाइस, आपके चुने हुए ट्रांसक्रिप्शन मॉडल के साथ Kilo Gateway, या ऑनलाइन पहचान के लिए Apple या Google।",
     "what": "क्या",
     "why": "क्यों",
     "who": "किसके साथ",

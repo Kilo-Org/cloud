@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "دستورهای اسلش از راه دور به نسخهٔ جدیدتری از Kilo CLI نیاز دارند. Kilo CLI را به‌روزرسانی کنید و دوباره متصل شوید."
     },
     "sessionConnection": {
+      "label": "اتصال",
       "connecting": "در حال اتصال…",
       "reconnecting": "در حال اتصال مجدد…",
       "connectionLost": "اتصال قطع شد",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "هدف حذف شود؟",
       "removeConfirmMessage": "CLI هدف این جلسه را پاک میکند.",
       "updateFailed": "هدف بهروزرسانی نشد.",
-      "sectionAccessibility": "{{status}}. هدف: {{text}}"
+      "sectionAccessibility": "{{status}}. هدف: {{text}}",
+      "collapse": "جمع کردن هدف",
+      "expand": "باز کردن هدف"
     },
     "newSession": {
       "recentlyUsed": "موارد استفاده‌شدهٔ اخیر",
@@ -2128,7 +2131,20 @@
       "continueFrom": "نشست {{title}} را ادامه می‌دهید.",
       "importingSession": "در حال وارد کردن نشست",
       "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
-      "importFailed": "وارد کردن این نشست ممکن نشد."
+      "importFailed": "وارد کردن این نشست ممکن نشد.",
+      "sandbox": "سندباکس",
+      "sandboxAccessibility": "سندباکس: {{label}}",
+      "sandboxDefaultWithDestination": "پیش‌فرض · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "کوچک",
+      "sandboxInstanceShared": "اشتراکی",
+      "sandboxInstanceLarge": "بزرگ",
+      "sandboxInstanceDevcontainer": "کانتینر توسعه",
+      "sandboxInstanceProviderDefault": "پیش‌فرض ارائه‌دهنده",
+      "sandboxCouldNotLoad": "بارگیری گزینه‌های سندباکس ممکن نشد",
+      "sandboxUnavailable": "این سندباکس در دسترس نیست. سندباکس دیگری یا پیش‌فرض را انتخاب کنید.",
+      "sandboxUseDefault": "استفاده از پیش‌فرض"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل به‌روزرسانی شد.",
@@ -2494,6 +2510,12 @@
       "startNewSession": "شروع یک نشست جدید",
       "exitSession": "خروج از نشست",
       "clearSession": "پایان این نشست و شروع نشستی جدید",
+      "compactDescription": "زمینهٔ نشست کنونی را فشرده کن",
+      "goalDescription": "به کار روی هدف نشست ادامه بده. /goal <objective> یا pause, resume, clear",
+      "initDescription": "راهاندازی هدایتشدهٔ AGENTS.md",
+      "resumeClaudeDescription": "رونوشت نشست Claude Code را درونریزی کن",
+      "resumeCodexDescription": "رونوشت نشست OpenAI Codex را درونریزی کن",
+      "reviewDescription": "تغییرات را بازبینی کن [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "استفاده از /{{command}}",
       "insert": "درج",
       "upgradeRequiredFallback": "برای استفاده از این دستور، CLI خود را ارتقا دهید.",
@@ -2611,6 +2633,7 @@
     "couldNotLoadActiveSessions": "بارگذاری نشست‌های فعال ممکن نشد.",
     "agentSessions": "در حال اجرا",
     "newCodingTask": "کار کدنویسی جدید",
+    "newTaskFromPicture": "کار جدید از یک تصویر",
     "explore": "کاوش",
     "seeAll": "مشاهده همه",
     "noLiveSessions": "در حال حاضر چیزی در حال اجرا نیست"
@@ -2832,7 +2855,8 @@
     "aiProvidersWhat": "پیام‌های شما، تاریخچهٔ گفت‌وگو و هر فایلی که پیوست می‌کنید.",
     "aiProvidersWhy": "برای تولید پاسخ‌های هوش مصنوعی.",
     "aiProvidersWho": "Anthropic، OpenAI، Google و سایر ارائه‌دهندگانی که در هر درخواست انتخاب می‌کنید.",
-    "gatewayWhat": "شناسهٔ حساب، فرادادهٔ درخواست‌ها و میزان مصرف توکن.",
+    "gatewayWhat": "شناسهٔ حساب، فرادادهٔ درخواست‌ها، مصرف توکن، و پرامپت‌ها و ضبط‌های صوتی که برنامه از طریق آن می‌فرستد.",
+    "viaGateway": "از طریق Kilo Gateway",
     "gatewayWhy": "احراز هویت، مسیریابی درخواست‌ها و تطبیق صورتحساب‌ها.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "گزارش‌های خرابی و خطا، پس از حذف محتوای برنامه.",
@@ -2852,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "صدای ضبط‌شدهٔ شما هنگام ورود صوتی متن.",
     "voiceTranscriptionWhy": "برای تبدیل گفتار به متن.",
-    "voiceTranscriptionWho": "فقط روی دستگاه؛ اگر تبدیل آفلاین گفتار به متن ممکن نباشد، Apple یا Google.",
+    "voiceTranscriptionWho": "دستگاه شما، Kilo Gateway با مدل تبدیل گفتار به متن انتخابی شما، یا Apple یا Google برای بازشناسی برخط.",
     "installAttributionPromptTitle": "اجازهٔ شناسایی منبع نصب را می‌دهید؟",
     "installAttributionPromptMessage": "Kilo از مجوز ردیابی Apple فقط برای شناسایی مسیر آشنایی شما با برنامه استفاده می‌کند. پیام‌ها و گفت‌وگوهای شما هرگز برای این کار استفاده نمی‌شوند.",
     "what": "چه داده‌هایی",

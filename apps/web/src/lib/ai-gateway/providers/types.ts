@@ -17,9 +17,9 @@ export type ProviderId =
   | 'longcat'
   | 'martian'
   | 'mistral'
-  | 'perplexity'
   | 'streamlake'
   | 'vercel'
+  | 'openai-chatgpt'
   | 'custom'
   | 'experiment'
   | 'dev-tools';

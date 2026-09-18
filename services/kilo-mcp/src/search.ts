@@ -104,6 +104,7 @@ export async function searchCatalog(
       summary: row.summary,
       tags: row.tags,
       score,
+      inputSchema: row.inputSchema,
       blobTokens,
     };
     rows.push(scored);
@@ -141,6 +142,7 @@ export async function searchCatalog(
         summary: row.summary,
         tags: row.tags,
         score: candidate.score * minLexicalScore * 0.5,
+        inputSchema: row.inputSchema,
         blobTokens: new Set(),
       };
       if (admitted.score > 0) {

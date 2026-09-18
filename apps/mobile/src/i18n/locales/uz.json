@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Masofadan / bilan boshlanuvchi buyruqlarni bajarish uchun Kilo CLI dasturining yangiroq versiyasi kerak. Kilo CLI dasturini yangilang va qayta ulaning."
     },
     "sessionConnection": {
+      "label": "Ulanish",
       "connecting": "Ulanmoqda…",
       "reconnecting": "Qayta ulanmoqda…",
       "connectionLost": "Ulanish uzildi",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Maqsad olib tashlansinmi?",
       "removeConfirmMessage": "CLI bu seansning maqsadini tozalaydi.",
       "updateFailed": "Maqsadni yangilab bo'lmadi.",
-      "sectionAccessibility": "{{status}}. Maqsad: {{text}}"
+      "sectionAccessibility": "{{status}}. Maqsad: {{text}}",
+      "collapse": "Maqsadni yig'ish",
+      "expand": "Maqsadni yoyish"
     },
     "newSession": {
       "recentlyUsed": "Yaqinda ishlatilgan",
@@ -2128,7 +2131,20 @@
       "continueFrom": "{{title}} sessiyasi davom ettirilmoqda.",
       "importingSession": "Sessiya import qilinmoqda",
       "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent xizmatini yoki boshqa CLI dasturini tanlang.",
-      "importFailed": "Bu sessiyani import qilib bo'lmadi."
+      "importFailed": "Bu sessiyani import qilib bo'lmadi.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Standart · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Kichik",
+      "sandboxInstanceShared": "Ulashilgan",
+      "sandboxInstanceLarge": "Katta",
+      "sandboxInstanceDevcontainer": "Dev konteyner",
+      "sandboxInstanceProviderDefault": "Provayder standarti",
+      "sandboxCouldNotLoad": "Sandbox sozlamalarini yuklash amalga oshmadi",
+      "sandboxUnavailable": "Bu sandbox mavjud emas. Boshqa sandbox yoki Standartni tanlang.",
+      "sandboxUseDefault": "Standartdan foydalaning"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi.",
@@ -2494,6 +2510,12 @@
       "startNewSession": "Yangi sessiya boshlash",
       "exitSession": "Sessiyadan chiqish",
       "clearSession": "Bu sessiyani yakunlash va yangisini boshlash",
+      "compactDescription": "joriy seans kontekstini siqish",
+      "goalDescription": "Seans maqsadi sari ishlashni davom ettir. /goal <objective> yoki pause, resume, clear",
+      "initDescription": "yo'naltirilgan AGENTS.md sozlamasi",
+      "resumeClaudeDescription": "Claude Code seansi transkriptini import qilish",
+      "resumeCodexDescription": "OpenAI Codex seansi transkriptini import qilish",
+      "reviewDescription": "o'zgarishlarni ko'rib chiqish [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} buyrug'idan foydalanish",
       "insert": "Qo'yish",
       "upgradeRequiredFallback": "Bu buyruqdan foydalanish uchun CLI dasturini yangilang.",
@@ -2611,6 +2633,7 @@
     "couldNotLoadActiveSessions": "Faol seanslarni yuklab bo'lmadi.",
     "agentSessions": "Hozir faol",
     "newCodingTask": "Yangi kodlash vazifasi",
+    "newTaskFromPicture": "Rasmdan yangi vazifa",
     "explore": "Imkoniyatlar",
     "seeAll": "Barchasini ko'rish",
     "noLiveSessions": "Hozir hech narsa ishlamayapti"
@@ -2832,7 +2855,8 @@
     "aiProvidersWhat": "So'rovlaringiz, suhbat tarixi va biriktirgan fayllaringiz.",
     "aiProvidersWhy": "AI javoblarini yaratish uchun.",
     "aiProvidersWho": "Anthropic, OpenAI, Google va har so'rovda siz tanlagan boshqa provayderlar.",
-    "gatewayWhat": "Hisob ID raqami, so'rov metama'lumotlari, ishlatilgan tokenlar soni.",
+    "gatewayWhat": "Hisob ID raqami, so'rov metama'lumotlari, ishlatilgan tokenlar soni, hamda ilova u orqali yuboradigan promptlar va ovoz yozuvlari.",
+    "viaGateway": "Kilo Gateway orqali",
     "gatewayWhy": "Shaxsni tasdiqlash, so'rovlarni yo'naltirish, to'lov hisoblarini solishtirish.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Ilova mazmuni olib tashlangan nosozlik va xato hisobotlari.",
@@ -2852,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Aytib yozdirayotganingizdagi ovoz yozuvi.",
     "voiceTranscriptionWhy": "Nutqni matnga aylantirish uchun.",
-    "voiceTranscriptionWho": "Faqat qurilmaning o'zida qayta ishlanadi. Qurilma nutqni oflayn matnga aylantira olmasa, Apple yoki Google xizmatiga yuboriladi.",
+    "voiceTranscriptionWho": "Qurilmangiz, siz tanlagan transkripsiya modeli bilan Kilo Gateway yoki onlayn tanib olish uchun Apple yoki Google.",
     "installAttributionPromptTitle": "O'rnatish manbasini aniqlashga ruxsat berilsinmi?",
     "installAttributionPromptMessage": "Kilo Apple tizimidagi kuzatish ruxsatidan faqat ilovani qaysi manba orqali topganingizni bilish uchun foydalanadi. Bunda so'rovlaringiz va suhbatlaringiz hech qachon ishlatilmaydi.",
     "what": "Qaysi ma'lumotlar",

@@ -96,11 +96,32 @@ describe('searchCatalog', () => {
     expect(a[1]?.path).toBe('organizations.members.listPublic');
   });
 
-  it('honors limit and returns the shape {path, kind, summary, tags, score}', async () => {
+  it('honors limit and returns the shape {path, kind, summary, tags, score, inputSchema}', async () => {
     const results = await searchCatalog('list', { catalog: testCatalog, limit: 1 });
     expect(results).toHaveLength(1);
-    expect(Object.keys(results[0]!).sort()).toEqual(['kind', 'path', 'score', 'summary', 'tags']);
+    expect(Object.keys(results[0]!).sort()).toEqual([
+      'inputSchema',
+      'kind',
+      'path',
+      'score',
+      'summary',
+      'tags',
+    ]);
     expect(results[0]).toMatchObject({ kind: 'query' });
+  });
+
+  it('returns each row its catalog input schema byte-for-byte', async () => {
+    const results = await searchCatalog('cliSessions search', { catalog: testCatalog });
+    const hit = results.find(row => row.path === 'cliSessions.search');
+    expect(hit).toBeDefined();
+    // toEqual locks byte-identity with the published catalog row (the schema
+    // `call` validates against), not just a structural subset.
+    expect(hit?.inputSchema).toEqual(testCatalog['cliSessions.search']!.inputSchema);
+    // The documented promise: the agent can read the required field list.
+    expect(hit?.inputSchema).toMatchObject({
+      type: 'object',
+      required: ['query'],
+    });
   });
 
   it('returns zero rows for a query that matches nothing (empty state, not an error)', async () => {
@@ -137,6 +158,8 @@ describe('searchCatalog', () => {
     });
     expect(results).toHaveLength(1);
     expect(results[0]?.path).toBe('usageAnalytics.getSummary');
+    // The semantic-only branch carries the published schema like a lexical hit.
+    expect(results[0]?.inputSchema).toEqual(testCatalog['usageAnalytics.getSummary']!.inputSchema);
   });
 
   it('ranks every token/exact hit above a semantic-only hit (requirement 1)', async () => {
@@ -168,6 +191,9 @@ describe('searchCatalog', () => {
       });
       expect(results.length).toBeGreaterThan(0);
       expect(results.map(row => row.path)).toContain('user.getBalance');
+      // The degraded (token-only) rows still carry their published schemas.
+      const hit = results.find(row => row.path === 'user.getBalance');
+      expect(hit?.inputSchema).toEqual(testCatalog['user.getBalance']!.inputSchema);
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('semantic search degraded to token-only results')
       );

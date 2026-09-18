@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "คำสั่งที่ขึ้นต้นด้วย / ในเซสชันระยะไกลต้องใช้ Kilo CLI เวอร์ชันใหม่กว่า อัปเดต Kilo CLI แล้วเชื่อมต่ออีกครั้ง"
     },
     "sessionConnection": {
+      "label": "การเชื่อมต่อ",
       "connecting": "กำลังเชื่อมต่อ…",
       "reconnecting": "กำลังเชื่อมต่อใหม่…",
       "connectionLost": "การเชื่อมต่อขาดหาย",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "ลบเป้าหมายหรือไม่",
       "removeConfirmMessage": "CLI จะล้างเป้าหมายของเซสชันนี้",
       "updateFailed": "ไม่สามารถอัปเดตเป้าหมายได้",
-      "sectionAccessibility": "{{status}} เป้าหมาย: {{text}}"
+      "sectionAccessibility": "{{status}} เป้าหมาย: {{text}}",
+      "collapse": "ย่อเป้าหมาย",
+      "expand": "ขยายเป้าหมาย"
     },
     "newSession": {
       "recentlyUsed": "ที่ใช้ล่าสุด",
@@ -2128,7 +2131,20 @@
       "continueFrom": "กำลังทำงานต่อจาก {{title}}",
       "importingSession": "กำลังนำเข้าเซสชัน",
       "cliCannotContinue": "CLI นี้ไม่สามารถทำงานต่อจากเซสชันเดิมได้ เลือก Cloud Agent หรือ CLI อื่น",
-      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้"
+      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้",
+      "sandbox": "แซนด์บ็อกซ์",
+      "sandboxAccessibility": "แซนด์บ็อกซ์: {{label}}",
+      "sandboxDefaultWithDestination": "ค่าเริ่มต้น · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "เล็ก",
+      "sandboxInstanceShared": "แชร์",
+      "sandboxInstanceLarge": "ใหญ่",
+      "sandboxInstanceDevcontainer": "คอนเทนเนอร์สำหรับพัฒนา",
+      "sandboxInstanceProviderDefault": "ค่าเริ่มต้นของผู้ให้บริการ",
+      "sandboxCouldNotLoad": "โหลดตัวเลือกแซนด์บ็อกซ์ไม่สำเร็จ",
+      "sandboxUnavailable": "แซนด์บ็อกซ์นี้ใช้งานไม่ได้ โปรดเลือกแซนด์บ็อกซ์อื่นหรือค่าเริ่มต้น",
+      "sandboxUseDefault": "ใช้ค่าเริ่มต้น"
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดตไฟล์แล้ว {{displayCount}} ไฟล์",
@@ -2494,6 +2510,12 @@
       "startNewSession": "เริ่มเซสชันใหม่",
       "exitSession": "ออกจากเซสชัน",
       "clearSession": "จบเซสชันนี้และเริ่มเซสชันใหม่",
+      "compactDescription": "บีบอัดบริบทของเซสชันปัจจุบัน",
+      "goalDescription": "ทำงานต่อสู่เป้าหมายของเซสชัน /goal <objective> หรือ pause, resume, clear",
+      "initDescription": "การตั้งค่า AGENTS.md แบบมีคำแนะนำ",
+      "resumeClaudeDescription": "นำเข้าบันทึกเซสชัน Claude Code",
+      "resumeCodexDescription": "นำเข้าบันทึกเซสชัน OpenAI Codex",
+      "reviewDescription": "ตรวจสอบการเปลี่ยนแปลง [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "ใช้ /{{command}}",
       "insert": "แทรก",
       "upgradeRequiredFallback": "กรุณาอัปเดต CLI เพื่อใช้คำสั่งนี้",
@@ -2611,6 +2633,7 @@
     "couldNotLoadActiveSessions": "โหลดเซสชันที่ใช้งานอยู่ไม่สำเร็จ",
     "agentSessions": "กำลังทำงานอยู่",
     "newCodingTask": "งานเขียนโค้ดใหม่",
+    "newTaskFromPicture": "งานใหม่จากรูปภาพ",
     "explore": "สำรวจ",
     "seeAll": "ดูทั้งหมด",
     "noLiveSessions": "ขณะนี้ไม่มีงานที่กำลังทำงานอยู่"
@@ -2832,7 +2855,8 @@
     "aiProvidersWhat": "พรอมต์ของคุณ ประวัติการสนทนา และไฟล์ใด ๆ ที่คุณแนบ",
     "aiProvidersWhy": "เพื่อสร้างคำตอบของ AI",
     "aiProvidersWho": "Anthropic, OpenAI, Google และผู้ให้บริการอื่น ๆ ที่คุณเลือกสำหรับแต่ละคำขอ",
-    "gatewayWhat": "รหัสบัญชี ข้อมูลเมตาของคำขอ การใช้โทเคน",
+    "gatewayWhat": "รหัสบัญชี ข้อมูลเมตาของคำขอ การใช้โทเคน รวมถึงพรอมป์ต์และไฟล์บันทึกเสียงที่แอปส่งผ่านระบบนี้",
+    "viaGateway": "ผ่าน Kilo Gateway",
     "gatewayWhy": "การยืนยันตัวตน การกำหนดเส้นทางคำขอ การกระทบยอดการเรียกเก็บเงิน",
     "gatewayWho": "Kilo (kilo.ai)",
     "crashReportingWhat": "รายงานการขัดข้องและข้อผิดพลาดที่ลบเนื้อหาภายในแอปออกแล้ว",
@@ -2852,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer",
     "voiceTranscriptionWhat": "เสียงที่บันทึกขณะคุณป้อนข้อความด้วยเสียง",
     "voiceTranscriptionWhy": "เพื่อแปลงเสียงพูดเป็นข้อความ",
-    "voiceTranscriptionWho": "ประมวลผลบนอุปกรณ์เท่านั้น หรือส่งให้ Apple หรือ Google หากอุปกรณ์นี้ถอดเสียงแบบออฟไลน์ไม่ได้",
+    "voiceTranscriptionWho": "อุปกรณ์ของคุณ, Kilo Gateway พร้อมโมเดลถอดเสียงที่คุณเลือก หรือ Apple หรือ Google สำหรับการรู้จำออนไลน์",
     "installAttributionPromptTitle": "อนุญาตการระบุแหล่งที่มาของการติดตั้งหรือไม่?",
     "installAttributionPromptMessage": "Kilo ใช้สิทธิ์การติดตามของ Apple เพื่อทราบว่าคุณมาจากช่องทางใดเท่านั้น เราจะไม่นำพรอมต์และการสนทนาของคุณมาใช้เพื่อการนี้",
     "what": "ข้อมูลที่แชร์",

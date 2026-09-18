@@ -2073,6 +2073,7 @@
       "exitNeedsNewerCli": "Udaljene naredbe s kosom crtom zahtijevaju noviju verziju Kilo CLI-ja. Ažuriraj Kilo CLI i ponovno se poveži."
     },
     "sessionConnection": {
+      "label": "Veza",
       "connecting": "Povezivanje…",
       "reconnecting": "Ponovno povezivanje…",
       "connectionLost": "Veza izgubljena",
@@ -2092,7 +2093,9 @@
       "removeConfirmTitle": "Ukloniti cilj?",
       "removeConfirmMessage": "CLI briše cilj ove sesije.",
       "updateFailed": "Cilj nije bilo moguće ažurirati.",
-      "sectionAccessibility": "{{status}}. Cilj: {{text}}"
+      "sectionAccessibility": "{{status}}. Cilj: {{text}}",
+      "collapse": "Sažmi cilj",
+      "expand": "Proširi cilj"
     },
     "newSession": {
       "recentlyUsed": "Nedavno korišteno",
@@ -2146,7 +2149,20 @@
       "continueFrom": "Nastavlja se sesija {{title}}.",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberi Cloud Agent ili drugi CLI.",
-      "importFailed": "Uvoz ove sesije nije uspio."
+      "importFailed": "Uvoz ove sesije nije uspio.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Zadano · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Malo",
+      "sandboxInstanceShared": "Dijeljeno",
+      "sandboxInstanceLarge": "Veliko",
+      "sandboxInstanceDevcontainer": "Dev kontejner",
+      "sandboxInstanceProviderDefault": "Zadano od pružatelja",
+      "sandboxCouldNotLoad": "Opcije sandboxa nije moguće učitati",
+      "sandboxUnavailable": "Ovaj sandbox nije dostupan. Odaberite drugi sandbox ili Zadano.",
+      "sandboxUseDefault": "Koristi Zadano"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirana je {{displayCount}} datoteka.",
@@ -2516,6 +2532,12 @@
       "startNewSession": "Započni novu sesiju",
       "exitSession": "Zatvori sesiju",
       "clearSession": "Završi ovu sesiju i započni novu",
+      "compactDescription": "sažmi kontekst trenutačne sesije",
+      "goalDescription": "Nastavi raditi prema cilju sesije. /goal <objective> ili pause, resume, clear",
+      "initDescription": "vođeno postavljanje AGENTS.md",
+      "resumeClaudeDescription": "uvezi transkript sesije Claude Code",
+      "resumeCodexDescription": "uvezi transkript sesije OpenAI Codex",
+      "reviewDescription": "pregledaj promjene [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Koristi /{{command}}",
       "insert": "Umetni",
       "upgradeRequiredFallback": "Ažuriraj CLI da možeš koristiti ovu naredbu.",
@@ -2634,6 +2656,7 @@
     "couldNotLoadActiveSessions": "Nije moguće učitati aktivne sesije.",
     "agentSessions": "Trenutačno aktivno",
     "newCodingTask": "Novi programski zadatak",
+    "newTaskFromPicture": "Novi zadatak iz slike",
     "explore": "Istraži",
     "seeAll": "Prikaži sve",
     "noLiveSessions": "Trenutačno ništa nije pokrenuto"
@@ -2855,7 +2878,8 @@
     "aiProvidersWhat": "Tvoji upiti, povijest razgovora i sve datoteke koje priložiš.",
     "aiProvidersWhy": "Za generiranje odgovora AI-ja.",
     "aiProvidersWho": "Anthropic, OpenAI, Google i drugi pružatelji koje odabereš za pojedini zahtjev.",
-    "gatewayWhat": "ID računa, metapodaci zahtjeva, potrošnja tokena.",
+    "gatewayWhat": "ID računa, metapodaci zahtjeva, potrošnja tokena te promptovi i glasovne snimke koje aplikacija šalje preko njega.",
+    "viaGateway": "Preko Kilo Gatewayja",
     "gatewayWhy": "Provjera identiteta, usmjeravanje zahtjeva, usklađivanje obračuna.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Izvješća o rušenjima i pogreškama, s uklonjenim sadržajem aplikacije.",
@@ -2875,7 +2899,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Tvoja snimka tijekom diktiranja.",
     "voiceTranscriptionWhy": "Za pretvaranje govora u tekst.",
-    "voiceTranscriptionWho": "Samo na uređaju ili putem tvrtki Apple ili Google ako uređaj ne može transkribirati bez internetske veze.",
+    "voiceTranscriptionWho": "Tvoj uređaj, Kilo Gateway s odabranim modelom transkripcije ili Apple ili Google za prepoznavanje na mreži.",
     "installAttributionPromptTitle": "Dopustiti praćenje izvora instalacije?",
     "installAttributionPromptMessage": "Kilo koristi Appleovo dopuštenje za praćenje samo radi utvrđivanja kanala putem kojeg dolaziš. Tvoji se upiti i razgovori nikada ne koriste u tu svrhu.",
     "what": "Što",

@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Amri za mbali zinazoanza kwa / zinahitaji toleo jipya zaidi la Kilo CLI. Sasisha Kilo CLI na uunganishe tena."
     },
     "sessionConnection": {
+      "label": "Muunganisho",
       "connecting": "Inaunganisha…",
       "reconnecting": "Inaunganisha tena…",
       "connectionLost": "Muunganisho umekatika",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Ondoa lengo?",
       "removeConfirmMessage": "CLI hufuta lengo la kikao hiki.",
       "updateFailed": "Lengo halikuweza kusasishwa.",
-      "sectionAccessibility": "{{status}}. Lengo: {{text}}"
+      "sectionAccessibility": "{{status}}. Lengo: {{text}}",
+      "collapse": "Kunja lengo",
+      "expand": "Panua lengo"
     },
     "newSession": {
       "recentlyUsed": "Zilizotumika hivi karibuni",
@@ -2128,7 +2131,20 @@
       "continueFrom": "Kikao {{title}} kinaendelea.",
       "importingSession": "Inaingiza kikao",
       "cliCannotContinue": "CLI hii haiwezi kuendelea na kikao. Chagua Cloud Agent au CLI nyingine.",
-      "importFailed": "Imeshindikana kuingiza kikao hiki."
+      "importFailed": "Imeshindikana kuingiza kikao hiki.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Chaguo-msingi · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Ndogo",
+      "sandboxInstanceShared": "Shirikiwa",
+      "sandboxInstanceLarge": "Kubwa",
+      "sandboxInstanceDevcontainer": "Kontena la Dev",
+      "sandboxInstanceProviderDefault": "Chaguo-msingi cha mtoa huduma",
+      "sandboxCouldNotLoad": "Imeshindikana kupakia chaguo za sandbox",
+      "sandboxUnavailable": "Sandbox hii haipatikani. Chagua sandbox nyingine au Chaguo-msingi.",
+      "sandboxUseDefault": "Tumia Chaguo-msingi"
     },
     "partRenderer": {
       "updatedFileCount_one": "Faili {{displayCount}} imesasishwa.",
@@ -2494,6 +2510,12 @@
       "startNewSession": "Anza kikao kipya",
       "exitSession": "Toka kwenye kikao",
       "clearSession": "Maliza kikao hiki na uanze kipya",
+      "compactDescription": "kandamiza muktadha wa kikao cha sasa",
+      "goalDescription": "Endelea kufanya kazi kuelekea lengo la kikao. /goal <objective> au pause, resume, clear",
+      "initDescription": "usanidi wa AGENTS.md unaoongozwa",
+      "resumeClaudeDescription": "ingiza nakala ya kikao cha Claude Code",
+      "resumeCodexDescription": "ingiza nakala ya kikao cha OpenAI Codex",
+      "reviewDescription": "kagua mabadiliko [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Tumia /{{command}}",
       "insert": "Ingiza",
       "upgradeRequiredFallback": "Tafadhali sasisha CLI yako ili utumie amri hii.",
@@ -2611,6 +2633,7 @@
     "couldNotLoadActiveSessions": "Imeshindikana kupakia vikao vinavyoendelea.",
     "agentSessions": "Vinavyoendelea sasa",
     "newCodingTask": "Kazi mpya ya kuandika msimbo",
+    "newTaskFromPicture": "Kazi mpya kutoka kwenye picha",
     "explore": "Chunguza",
     "seeAll": "Tazama vyote",
     "noLiveSessions": "Hakuna kinachoendelea kwa sasa"
@@ -2832,7 +2855,8 @@
     "aiProvidersWhat": "Maagizo yako, historia ya mazungumzo na faili zozote unazoambatisha.",
     "aiProvidersWhy": "Kutoa majibu ya AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google, na watoa huduma wengine unaowachagua kwa kila ombi.",
-    "gatewayWhat": "Kitambulisho cha akaunti, maelezo ya ziada ya maombi, matumizi ya tokeni.",
+    "gatewayWhat": "Kitambulisho cha akaunti, maelezo ya ziada ya maombi, matumizi ya tokeni, pamoja na maagizo na rekodi za sauti ambazo programu hutuma kupitia hiyo.",
+    "viaGateway": "Kupitia Kilo Gateway",
     "gatewayWhy": "Uthibitishaji wa utambulisho, uelekezaji wa maombi na ulinganishaji wa rekodi za bili.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Ripoti za programu kuacha kufanya kazi na za hitilafu, baada ya kuondoa maudhui ya programu.",
@@ -2852,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Rekodi ya sauti yako unapozungumza ili maneno yaandikwe.",
     "voiceTranscriptionWhy": "Kubadilisha sauti kuwa maandishi.",
-    "voiceTranscriptionWho": "Kwenye kifaa pekee, au Apple au Google ikiwa kifaa hiki hakiwezi kubadilisha sauti kuwa maandishi bila mtandao.",
+    "voiceTranscriptionWho": "Kifaa chako, Kilo Gateway na modeli ya unukuzi uliyochagua, au Apple au Google kwa utambuzi mtandaoni.",
     "installAttributionPromptTitle": "Ungependa kuruhusu utambuzi wa chanzo cha usakinishaji?",
     "installAttributionPromptMessage": "Kilo hutumia ruhusa ya ufuatiliaji ya Apple kujua tu njia iliyokuleta hapa. Maagizo na mazungumzo yako hayatumiwi kamwe kwa hili.",
     "what": "Nini",

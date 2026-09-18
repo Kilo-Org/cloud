@@ -37,7 +37,7 @@ describe('isOpenAiModelServed', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.openai.com/v1/models',
-      expect.objectContaining({ next: { revalidate: 3600 } })
+      expect.objectContaining({ cache: 'force-cache', next: { revalidate: 3600 } })
     );
   });
 

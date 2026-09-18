@@ -9,15 +9,14 @@
  * artifact, and authors edit its summaries by hand. See dump.ts for the CLI
  * entry point.
  *
- * Queries are published wholesale; mutations only when their exact path is in
- * `MCP_MUTATION_ALLOWLIST` (mutations.ts).
+ * Queries and mutations are published wholesale; the top-level denylist
+ * (`admin`, `debug`, `test`) and subscriptions stay internal.
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
-import { MCP_MUTATION_ALLOWLIST, isAllowedMutation } from './mutations';
 
 /** Repository root: five levels above apps/web/src/scripts/mcp-catalog. */
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..', '..');
@@ -39,9 +38,8 @@ export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-rou
 
 /**
  * Top-level router segments that stay internal-only. This is a denylist:
- * every other query procedure is exported, allowlisted mutations are exported
- * as well, and this filter applies on top of the mutation allowlist. Individual
- * procedures cannot opt back in, and subscriptions are never exported.
+ * every other query and mutation procedure is exported. Individual procedures
+ * cannot opt back in, and subscriptions are never exported.
  */
 export const DENYLISTED_TOP_LEVEL_SEGMENTS = ['admin', 'debug', 'test'] as const;
 
@@ -166,38 +164,28 @@ function shapeRow(leaf: CatalogLeaf, summary: string): CatalogRow {
 }
 
 /**
- * Filters the leaves down to the exported catalog: every query, plus a mutation
- * only when its exact path is in {@link MCP_MUTATION_ALLOWLIST}. The top-level
- * denylist drops both kinds and subscriptions stay excluded. Rows whose summary
- * is provided keep it byte-for-byte; the rest come back as `missing` for LLM
- * generation.
+ * Filters the leaves down to the exported catalog: every query and mutation,
+ * except the top-level denylist. Subscriptions are never exported. Rows whose
+ * summary is provided keep it byte-for-byte; the rest come back as `missing`
+ * for LLM generation.
  *
- * Rot guard: an allowlisted path that does not reach the catalog as a mutation
- * throws (naming the offending paths) instead of vanishing from the catalog —
- * whether it was renamed or deleted, its top-level segment is withheld by the
- * denylist, or its procedure was demoted to a query. The guard therefore
- * compares the allowlist against the paths that survived the denylist *and*
- * published with kind `mutation`. The comparison is unconditional: a query-only
- * enumeration (a wholesale router drift) has nothing to satisfy it, so it
- * throws too, rather than publishing a mutation-free catalog in silence.
+ * Drift guard: an enumeration that publishes no mutation row throws instead of
+ * emitting a query-only catalog in silence. A router refactor that stops
+ * exposing mutations, or a top-level segment renamed into the denylist, must
+ * fail the dump rather than quietly remove write support from every MCP client.
  */
 export function buildCatalogRows(
   leaves: CatalogLeaf[],
   summaries: Map<string, string> = new Map()
 ): { rows: CatalogRow[]; missing: CatalogLeaf[] } {
   const denylisted = new Set<string>(DENYLISTED_TOP_LEVEL_SEGMENTS);
-  /** Every allowlisted path the catalog will publish with kind `mutation`. */
-  const publishedMutationPaths = new Set<string>();
+  let publishedMutations = 0;
   const rows: CatalogRow[] = [];
   const missing: CatalogLeaf[] = [];
   for (const leaf of leaves) {
-    const kept =
-      leaf.type === 'query' || (leaf.type === 'mutation' && isAllowedMutation(leaf.path));
-    if (!kept) continue;
+    if (leaf.type !== 'query' && leaf.type !== 'mutation') continue;
     if (denylisted.has(leaf.path.split('.')[0] ?? '')) continue;
-    // Only a mutation leaf counts: a demoted query leaf must not satisfy the
-    // guard, or an allowlisted path could stop being a mutation unnoticed.
-    if (leaf.type === 'mutation') publishedMutationPaths.add(leaf.path);
+    if (leaf.type === 'mutation') publishedMutations += 1;
     const summary = summaries.get(leaf.path);
     if (typeof summary === 'string' && summary !== '') {
       rows.push(shapeRow(leaf, summary));
@@ -210,15 +198,11 @@ export function buildCatalogRows(
       'Catalog enumeration produced zero catalog rows — refusing to emit an empty catalog'
     );
   }
-  // Compare unconditionally: a leaf set with no mutation leaf at all has nothing
-  // to satisfy the allowlist, so deletion or wholesale router drift cannot
-  // silently publish a query-only catalog.
-  const stale = MCP_MUTATION_ALLOWLIST.filter(path => !publishedMutationPaths.has(path));
-  if (stale.length > 0) {
+  if (publishedMutations === 0) {
     throw new Error(
-      `MCP mutation allowlist entries are not published as mutations: ${stale.join(', ')}. ` +
-        'A renamed, deleted, denylisted, or demoted procedure must never silently vanish from the catalog — ' +
-        'update MCP_MUTATION_ALLOWLIST in apps/web/src/scripts/mcp-catalog/mutations.ts.'
+      'Catalog enumeration published zero mutation rows — refusing to emit a query-only catalog. ' +
+        'Every mutation is either missing from the router or withheld by its top-level segment; ' +
+        'check DENYLISTED_TOP_LEVEL_SEGMENTS in apps/web/src/scripts/mcp-catalog/catalog.ts.'
     );
   }
   return { rows, missing };

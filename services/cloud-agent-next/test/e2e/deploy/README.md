@@ -237,13 +237,17 @@ on by existing Durable Objects` is a symptom of a renumbered tag, so a rejected
 deploy can require `wrangler delete --name cloud-agent-e2e-test` before the next
 attempt.
 
-The supported shared scenarios (`cold-hot`, `unknown-model`,
-`auth-reject`) are normal sessions. With
+Every entry of `SHARED_SCENARIOS` (`cold-hot`, `unknown-model`, `auth-reject`
+and the public-surface `worktree-chat`, `worktree-multi-chat`,
+`long-conversation`, `leave-and-return`) is a normal session. With
 `PER_SESSION_SANDBOX_ORG_IDS='*'` they get a `ses-{hash}` sandbox ID
 (`src/sandbox-id.ts`), and with `CREDENTIAL_CONTAINMENT_ENABLED='false'` their
 metadata has no credential containment, so `getSandboxNamespace` reads
 `env.SandboxSmall` — a kept binding. Those scenarios cannot reach a removed
-binding.
+binding. The worktree/worktree-creation flags this needs are already rendered
+into the deployed e2e Worker config:
+`WORKTREE_CREATION_ENABLED_IDS`/`CONTROL_PLANE_IDS` default to `*`
+(`E2E_USER_ID`), so the four new scenarios need no additional render change.
 
 Paths outside this stack now read a missing binding and fail. They are
 documented limitations, not supported behaviour:
@@ -322,8 +326,8 @@ touched again.
 pnpm --filter cloud-agent-next run e2e:deployed
 ```
 
-`smoke-deployed.ts` runs every shared scenario (`cold-hot`, `unknown-model`,
-`auth-reject`) through the shared gate against the deployed Worker. A scenario
+`smoke-deployed.ts` runs every entry of `SHARED_SCENARIOS` through the shared
+gate against the deployed Worker. A scenario
 whose declared capability the deployed environment does not provide is reported
 `unsupported` with the missing capability names, never run with the assertion
 dropped. The summary separates passed / failed / unsupported, and the exit
@@ -334,6 +338,14 @@ Each scenario owns its cleanup; the runner only repeats `interruptSession` and
 (`.github/workflows/e2e-deployed.yml`). See
 [`../README.md`](../README.md#deployed-matrix-runner) for the scenario matrix
 and the env contract.
+
+Aggregate-runtime risk: the matrix now includes the four public-surface
+scenarios, whose own ceilings are 10 + 12 + 12 + 30 minutes, plus cleanup (up to
+about 2.5 minutes) and transport overhead. The workflow's `timeout-minutes: 120`
+is a reasonable operational ceiling, not a certified whole-matrix bound, and the
+existing scenarios use per-turn rather than overall budgets (`cold-hot` alone
+permits four 240 s turn waits). None of the four new scenarios uses a gate,
+`hang` or interrupt.
 
 ## After a run
 

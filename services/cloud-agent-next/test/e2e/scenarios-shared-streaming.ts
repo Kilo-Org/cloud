@@ -22,7 +22,8 @@ import {
   type StreamEvent,
 } from './client.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
-import type { ScenarioEnvironment, SessionSandboxObservation } from './scenario-capabilities.js';
+import type { ScenarioEnvironment } from './scenario-capabilities.js';
+import { requireContainer } from './scenarios-shared-runtime.js';
 import type { SharedScenario } from './scenarios-shared.js';
 
 /** Generous default per-turn budget for a real first container cold start. */
@@ -38,24 +39,6 @@ function deltaCount(events: readonly StreamEvent[]): number {
       event.streamEventType === 'kilocode' &&
       (event.data as { type?: string } | undefined)?.type === 'message.part.delta'
   ).length;
-}
-
-/**
- * Wait for the physical container behind `session` or report a clear failure.
- * `sessionSandbox` is guaranteed by the scenario's declared capability when it
- * runs through the shared gate; the guard keeps a direct call honest.
- */
-async function requireContainer(
-  sandbox: SessionSandboxObservation | undefined,
-  session: { cloudAgentSessionId: string; kiloSessionId: string },
-  timeoutMs: number
-): Promise<string | null> {
-  if (sandbox === undefined) return null;
-  return sandbox.waitForContainer({
-    cloudAgentSessionId: session.cloudAgentSessionId,
-    kiloSessionId: session.kiloSessionId,
-    timeoutMs,
-  });
 }
 
 /**

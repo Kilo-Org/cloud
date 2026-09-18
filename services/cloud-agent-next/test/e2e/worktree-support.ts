@@ -1,6 +1,5 @@
 import {
   fetchFakeScenarioStatus,
-  getSessionSnapshot,
   messageIdFromEvent,
   waitForGateEngaged,
   type DriverConfig,
@@ -12,50 +11,13 @@ import {
   type ControlPlaneKiloRuntime,
 } from './sandbox-control.js';
 
-export type WorktreeOwnershipRow = {
-  sessionId: string;
-  userId: string;
-  organizationId: string | null;
-  parentSessionId: string | null;
-  cloudAgentSessionId: string | null;
-  cloudAgentSessionScopeId: string | null;
-  worktreeId: string | null;
-};
-
-export async function readWorktreeOwnership(
-  config: DriverConfig,
-  cloudAgentSessionIds: string[]
-): Promise<WorktreeOwnershipRow[]> {
-  const rows: WorktreeOwnershipRow[] = [];
-  for (const cloudAgentSessionId of cloudAgentSessionIds) {
-    const snapshot = await getSessionSnapshot(config, cloudAgentSessionId);
-    if (!snapshot.kiloSessionId) {
-      throw new Error(`getSession(${cloudAgentSessionId}) returned no kiloSessionId`);
-    }
-    rows.push({
-      sessionId: snapshot.kiloSessionId,
-      userId: snapshot.userId,
-      organizationId: snapshot.orgId ?? null,
-      parentSessionId: snapshot.parentSessionId ?? null,
-      cloudAgentSessionId: snapshot.sessionId,
-      cloudAgentSessionScopeId: snapshot.cloudAgentSessionScopeId ?? null,
-      worktreeId: snapshot.worktreeId ?? null,
-    });
-  }
-  return rows;
-}
-
-export function requireWorktreeSessionIdentity(
-  session: WorktreeSessionResult,
-  label: string
-): void {
-  if (!/^workspace_[0-9a-f-]{36}$/i.test(session.cloudAgentSessionId)) {
-    throw new Error(`${label} did not receive a control-plane workspace_* identity`);
-  }
-  if (!/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/.test(session.kiloSessionId)) {
-    throw new Error(`${label} did not receive a valid root ses_* identity`);
-  }
-}
+/**
+ * Public-surface-only helpers re-exported for the import sites this module's
+ * callers already use. These two are not used by the Docker-dependent helpers
+ * below.
+ */
+export { readWorktreeOwnership, requireWorktreeSessionIdentity } from './public-surface-support.js';
+export type { WorktreeOwnershipRow } from './public-surface-support.js';
 
 export async function requireWorktreeGate(
   config: DriverConfig,

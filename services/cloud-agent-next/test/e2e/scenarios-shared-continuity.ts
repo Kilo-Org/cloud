@@ -26,7 +26,6 @@
 
 import { randomUUID } from 'node:crypto';
 import {
-  getMessageResult,
   getSessionSnapshot,
   interruptSession,
   isMessageCompleted,
@@ -39,7 +38,11 @@ import {
   type StreamConnection,
   type WorktreeSessionResult,
 } from './client.js';
-import { assertScenarioPreconditions, fakeDirective } from './lifecycle-file-state.js';
+import { fakeDirective } from './lifecycle-file-state.js';
+import {
+  assertScenarioPreconditions,
+  requireWorktreeSessionIdentity,
+} from './public-surface-support.js';
 import { assertMessageLifecycle } from './lifecycle-continuity.js';
 import { withOwnedGates } from './owned-gates.js';
 import {
@@ -47,105 +50,47 @@ import {
   echoPayloadMatches,
   type SharedScenario,
 } from './scenarios-shared.js';
-import { requireWorktreeGate, requireWorktreeSessionIdentity } from './worktree-support.js';
+import {
+  awaitDurableTerminal,
+  createScenarioDeadline,
+  sendTurn,
+  sessionSandboxObservation,
+  type ScenarioDeadline,
+} from './scenarios-shared-runtime.js';
+import { requireWorktreeGate } from './worktree-support.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
-import type { ScenarioEnvironment, SessionSandboxObservation } from './scenario-capabilities.js';
+import type { ScenarioEnvironment } from './scenario-capabilities.js';
 
 const CONTINUITY_TIMEOUT_MS = 6 * 60_000;
 const SANDBOX_TIMEOUT_MS = 120_000;
-const DURABLE_BUDGET_MS = 15_000;
 const CLEANUP_TIMEOUT_MS = 15_000;
-
-/**
- * Run one operation under the scenario deadline.
- *
- * `within` rejects the await when the budget expires and aborts the signal it
- * passes to the operation. It cancels an operation only where that operation
- * forwards the signal to its transport. After the deadline change these do:
- * the tRPC reads (`getSessionSnapshot`, `getMessageResult`), `releaseGate` and
- * the gate polls (`requireWorktreeGate` -> `waitForGateEngaged` /
- * `fetchFakeScenarioStatus`) all carry the signal into their fetch;
- * `prepareBrowserSession`, `sendMessage`, `interruptSession` and
- * `openConnectedStream` already did. The stream waits (`waitForTerminal` /
- * `waitFor`) are bounded by their own timeout instead of the signal, and the
- * injected `sessionSandbox` capability takes no signal, so for those `within`
- * only rejects the await; the underlying operation still runs to its own
- * timeout.
- */
-type Within = <T>(label: string, operation: (signal: AbortSignal) => Promise<T>) => Promise<T>;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function sessionSandboxObservation(env: ScenarioEnvironment): SessionSandboxObservation {
-  if (!env.sessionSandbox) throw new Error('sessionSandbox capability is required');
-  return env.sessionSandbox;
-}
-
-/**
- * Poll the durable message status until it is terminal or the budget elapses.
- * A single read can race the DO's terminal write, so this mirrors
- * `awaitDurableCompletion` in the continuity harness.
- */
-async function awaitDurableTerminal(
-  config: DriverConfig,
-  sessionId: string,
-  messageId: string,
-  timeoutMs: number,
-  signal?: AbortSignal
-): Promise<string> {
-  const deadline = Date.now() + Math.max(1, Math.min(DURABLE_BUDGET_MS, timeoutMs));
-  let status = 'unknown';
-  while (Date.now() < deadline) {
-    if (signal?.aborted) throw signal.reason ?? new Error('durable read aborted');
-    status = (await getMessageResult(config, sessionId, messageId, signal)).status;
-    if (status === 'completed' || status === 'failed' || status === 'interrupted') return status;
-    await new Promise(resolve => setTimeout(resolve, 200));
-  }
-  return status;
-}
-
 /**
  * Send one prompt on an existing session and require the ordered
- * `queued -> sent -> completed` stream lifecycle plus a durable `completed`.
- * The stream is closed on every failure path so a throwing helper never leaks
- * its socket. `remaining` is called before each wait so a budget captured
- * before the send is never reused for a later step.
+ * `queued -> sent -> completed` stream lifecycle plus a durable `completed`
+ * (owned by `sendTurn`). The stream is closed when the ordered-lifecycle
+ * assertion throws, because `sendTurn` owns the failure-path close only up to
+ * its own return.
  */
 async function sendAndAwaitCompletion(
-  within: Within,
+  deadline: ScenarioDeadline,
   config: DriverConfig,
   sessionId: string,
   prompt: string,
-  label: string,
-  remaining: (label: string) => number
+  label: string
 ): Promise<{ messageId: string; stream: StreamConnection }> {
-  const stream = await within(`${label} stream`, signal =>
-    openConnectedStream(config, sessionId, false, undefined, signal)
-  );
+  const { messageId, stream } = await sendTurn(deadline, config, sessionId, prompt, label);
   try {
-    const sent = await within(`${label} send`, signal =>
-      sendMessage(config, { cloudAgentSessionId: sessionId, prompt, signal }, 'unified')
-    );
-    const terminal = await stream.waitForTerminal(remaining(`${label} terminal`), sent.messageId);
-    if (!terminal) {
-      throw new Error(`${label} did not reach a terminal stream event`);
-    }
-    const status = await within(`${label} durable status`, signal =>
-      awaitDurableTerminal(config, sessionId, sent.messageId, remaining(`${label} durable`), signal)
-    );
-    if (status !== 'completed') {
-      throw new Error(
-        `${label} durable status=${status} (stream=${terminal.streamEventType} for ${sent.messageId})`
-      );
-    }
-    assertMessageLifecycle(stream, sent.messageId, label);
-    return { messageId: sent.messageId, stream };
+    assertMessageLifecycle(stream, messageId, label);
   } catch (error) {
     stream.close();
     throw error;
   }
+  return { messageId, stream };
 }
 
 /**
@@ -166,7 +111,7 @@ async function interruptThenContinueBody(
   const runId = randomUUID();
   const tag = `interrupt-${runId}`;
   const bootMarker = `boot-${runId}`;
-  const deadlineAt = startedAt + timeoutMs;
+  const deadline = createScenarioDeadline(startedAt, timeoutMs);
   let session: WorktreeSessionResult | undefined;
   let bootStream: StreamConnection | undefined;
   let gateStream: StreamConnection | undefined;
@@ -187,34 +132,11 @@ async function interruptThenContinueBody(
     durationMs: Date.now() - startedAt,
   });
 
-  const remaining = (label: string): number => {
-    const left = deadlineAt - Date.now();
-    if (left <= 0) throw new Error(`scenario deadline exceeded before ${label}`);
-    return left;
-  };
-
-  const within: Within = async (label, operation) => {
-    const budget = remaining(label);
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => {
-        controller.abort(new Error(`scenario deadline exceeded during ${label}`));
-        reject(new Error(`scenario deadline exceeded during ${label}`));
-      }, budget);
-    });
-    try {
-      return await Promise.race([operation(controller.signal), timeout]);
-    } finally {
-      if (timer !== undefined) clearTimeout(timer);
-    }
-  };
-
   try {
     assertScenarioPreconditions(config, args.api);
 
     // 1. Prepared browser session (direct tRPC prepare with the e2e secret), with an echo boot turn.
-    session = await within('prepare browser session', signal =>
+    session = await deadline.within('prepare browser session', signal =>
       prepareBrowserSession(
         config,
         {
@@ -232,7 +154,7 @@ async function interruptThenContinueBody(
     const bootContainer = await sandbox.waitForContainer({
       cloudAgentSessionId,
       kiloSessionId,
-      timeoutMs: Math.max(1, Math.min(SANDBOX_TIMEOUT_MS, remaining('boot container'))),
+      timeoutMs: Math.max(1, Math.min(SANDBOX_TIMEOUT_MS, deadline.remaining('boot container'))),
     });
     if (bootContainer === null) {
       throw new Error('boot session did not expose a physical container');
@@ -240,7 +162,7 @@ async function interruptThenContinueBody(
 
     // 3. The boot turn must complete with the boot marker before the gated turn
     //    is sent: a completed-but-wrong boot is not a valid baseline.
-    const bootSnapshot = await within('boot snapshot', signal =>
+    const bootSnapshot = await deadline.within('boot snapshot', signal =>
       getSessionSnapshot(config, cloudAgentSessionId, signal)
     );
     const bootMessageId = bootSnapshot.initialMessageId;
@@ -248,22 +170,22 @@ async function interruptThenContinueBody(
     if (!bootSnapshot.sandboxId) {
       throw new Error('boot session did not expose a durable sandbox id');
     }
-    bootStream = await within('boot stream', signal =>
+    bootStream = await deadline.within('boot stream', signal =>
       openConnectedStream(config, cloudAgentSessionId, true, undefined, signal)
     );
     const bootTerminal = await bootStream.waitForTerminal(
-      remaining('boot completion'),
+      deadline.remaining('boot completion'),
       bootMessageId
     );
     if (!isMessageCompleted(bootTerminal, bootMessageId)) {
       throw new Error(`boot turn ${bootMessageId} did not complete`);
     }
-    const bootStatus = await within('boot durable completion', signal =>
+    const bootStatus = await deadline.within('boot durable completion', signal =>
       awaitDurableTerminal(
         config,
         cloudAgentSessionId,
         bootMessageId,
-        remaining('boot durable completion'),
+        deadline.remaining('boot durable completion'),
         signal
       )
     );
@@ -278,11 +200,11 @@ async function interruptThenContinueBody(
     bootStream = undefined;
 
     // 4. Park a gated turn and wait for it to engage.
-    gateStream = await within('gate stream', signal =>
+    gateStream = await deadline.within('gate stream', signal =>
       openConnectedStream(config, cloudAgentSessionId, false, undefined, signal)
     );
     owned.add(tag);
-    const sent = await within(`send ${tag}`, signal =>
+    const sent = await deadline.within(`send ${tag}`, signal =>
       sendMessage(
         config,
         {
@@ -293,17 +215,26 @@ async function interruptThenContinueBody(
         'unified'
       )
     );
-    await within(`gate ${tag}`, signal =>
-      requireWorktreeGate(config, tag, remaining(`gate ${tag}`), gateStream, undefined, signal)
+    await deadline.within(`gate ${tag}`, signal =>
+      requireWorktreeGate(
+        config,
+        tag,
+        deadline.remaining(`gate ${tag}`),
+        gateStream,
+        undefined,
+        signal
+      )
     );
 
     // 5. Interrupt the actively-streaming turn.
-    await within('interrupt', signal => interruptSession(config, cloudAgentSessionId, signal));
+    await deadline.within('interrupt', signal =>
+      interruptSession(config, cloudAgentSessionId, signal)
+    );
     const failed = await gateStream.waitFor(
       event =>
         event.streamEventType === 'cloud.message.failed' &&
         messageIdFromEvent(event) === sent.messageId,
-      remaining('interrupted terminal')
+      deadline.remaining('interrupted terminal')
     );
     const data = failed?.data as { reason?: string; payload?: { reason?: string } } | undefined;
     const reason = data?.reason ?? data?.payload?.reason;
@@ -319,23 +250,24 @@ async function interruptThenContinueBody(
     //    wrapper retries after the body and fails the run when it is still
     //    parked.
     try {
-      await within(`release ${tag}`, signal => releaseGate(config.fakeLlmUrl, tag, signal));
+      await deadline.within(`release ${tag}`, signal =>
+        releaseGate(config.fakeLlmUrl, tag, signal)
+      );
       owned.delete(tag);
     } catch {
       // Ownership is deliberately retained for the wrapper's leak check.
     }
     const followup = await sendAndAwaitCompletion(
-      within,
+      deadline,
       config,
       cloudAgentSessionId,
       fakeDirective(`echo:continue-${runId}`),
-      'follow-up',
-      remaining
+      'follow-up'
     );
     followupStream = followup.stream;
 
     // 7. The same physical container as the boot turn across the interrupt.
-    const after = await within('post-interrupt container', () =>
+    const after = await deadline.within('post-interrupt container', () =>
       sandbox.currentContainer({ cloudAgentSessionId, kiloSessionId })
     );
     if (!after || after !== bootContainer) {

@@ -35,8 +35,8 @@ full contract | `PLANNED` not written | `BLOCKED` needs an enabler.
 
 | ID | Scenario (name) | Asserts | Status |
 |---|---|---|---|
-| A1 | `long-session-20` | 20+ turns, real writes/reads/edits, one sandbox the whole time | PARTIAL -- `long-session` does 11 turns and asserts checkpoint identity; extend the count |
-| A2 | `cold-resume-history` | auto idle-stop -> resume on a new container -> message history restored -> next turn completes | PARTIAL -- `cold-resume` asserts history first and a stable Git HEAD; dirty-file survival is observed only (not guaranteed across environment replacement) |
+| A1 | `long-session-20` | 20+ turns, real writes/reads/edits, one sandbox the whole time | PARTIAL -- `long-session` does 11 turns and asserts checkpoint identity; extend the count. Public-surface counterpart: `long-conversation` runs one cold plus ten hot turns with no re-preparation and a stable allocation reference; it does not do real file writes/reads, so the row stays PARTIAL |
+| A2 | `cold-resume-history` | auto idle-stop -> resume on a new container -> message history restored -> next turn completes | PARTIAL -- `cold-resume` asserts history first and a stable Git HEAD; dirty-file survival is observed only (not guaranteed across environment replacement). Public-surface counterpart: `leave-and-return` observes the allocation disappear unattended, resumes with a distinct non-null reference and a reported preparation, and preserves the boot marker on a fresh replay stream (removal-aware); it does not assert two-sided history or a stable Git HEAD, so the row stays PARTIAL |
 | A3 | `warm-cold-cycles` | work -> idle -> resume -> work -> idle -> resume in one session | PARTIAL -- `warm-cold-cycles` runs two full cycles with independent idle-stop evidence, old-primary absence, distinct replacement container, history, and a completed ordered-lifecycle follow-up; each cycle records its resumed message id and dirty-file survival (non-gating), and completed cycles are retained even if a later cycle fails |
 | A4 | `interrupt-then-continue` | interrupt mid-turn; the next message continues the same chat, in the SAME container while the idle timer has not fired | PASS -- `interrupt-then-continue` asserts `cloud.message.failed reason=interrupted`, a completed follow-up, and an unchanged container id |
 | A5 | `recover-same-session` | induce a transient failure (heartbeat lapse / wrapper crash / allocation loss); the next message on the SAME session completes | PARTIAL -- `recover-same-session` captures the target connection by `sandboxId` + connection/wrapper identity, requires a matched `deadline_fired deadlineId=heartbeatExpiry` followed by a matched `recovery_outcome cause=heartbeat_expired outcome=started` before any recovery send, and completes a new ordered-lifecycle message on the original session. Proven: heartbeat-expiry attribution for the captured connection. Not proven: disconnect-classified runs are generic same-session recovery, not heartbeat coverage; and the wrapper pre-pause last-send line is captured but not used for classification |
@@ -46,9 +46,9 @@ full contract | `PLANNED` not written | `BLOCKED` needs an enabler.
 
 | ID | Scenario (name) | Asserts | Status |
 |---|---|---|---|
-| B1 | `new-chat-after-completed` | a chat completes a turn, then a sibling chat is created and works | PASS -- `multi-session-collab`, fixed this cycle |
-| B2 | `three-chat-chain` | planner -> implementer -> reviewer artifacts across three chats | PASS -- `multi-session-collab` |
-| B3 | `many-siblings` | 3-5 chats interleaved; simultaneous gates; targeted cancel | PARTIAL -- `worktree-shared` covers 2 siblings + simultaneous gates + targeted cancel |
+| B1 | `new-chat-after-completed` | a chat completes a turn, then a sibling chat is created and works | PASS -- `multi-session-collab`, fixed this cycle. Public-surface counterpart: `worktree-multi-chat` creates a sibling after the root's initial turn and requires both chats to complete and coexist |
+| B2 | `three-chat-chain` | planner -> implementer -> reviewer artifacts across three chats | PASS -- `multi-session-collab`. The public-surface subset (`worktree-multi-chat`) covers two chats with shared worktree identity, not the three-chat chain |
+| B3 | `many-siblings` | 3-5 chats interleaved; simultaneous gates; targeted cancel | PARTIAL -- `worktree-shared` covers 2 siblings + simultaneous gates + targeted cancel. Public-surface counterpart: `worktree-multi-chat` covers two chats with lazy sibling create, coexistence and chat-content isolation, but has no simultaneous gates and no targeted cancel, so the full B3 contract stays PARTIAL |
 | B4 | `parallel-sessions` | two independent sessions running turns at the same time | PASS -- `concurrent-chats` runs three independent sessions behind simultaneous gates, proves overlapping `running`, and splits clean-load vs recovered-under-load |
 
 ### C. Interactive tools
@@ -57,7 +57,7 @@ full contract | `PLANNED` not written | `BLOCKED` needs an enabler.
 |---|---|---|---|
 | C1 | `question-isolation` | a question is answerable in its own chat only; sibling isolation; replay after refresh | PASS -- `worktree-shared` (`question=isolated; questionRefresh=replayed`) |
 | C2 | `unanswered-question-idle` | an unanswered question does not pin the environment; idle winds it down; restore then answer/continue | PARTIAL -- `question-idle-resume` requires a positive `inspectControlPlaneQuestions` observation scoped to the captured question while the primary is inspectable (inspection failure is INCONCLUSIVE), the parked turn to settle terminal (`failed`/`interrupted`) before continuing (the exact-match target heartbeat payload `reportedState`/allocation-wide `pendingMessages` plus payload-derived `sessionState`/`sessionWaitingOn` is the input-wait proof and may be absent once terminal), idle-stop within budget, and continued work on a replacement container. Sibling isolation is not claimed |
-| C3 | `targeted-cancel` | cancelling a sibling does not disturb the other root | PASS -- `worktree-shared` `targetedCancellation` |
+| C3 | `targeted-cancel` | cancelling a sibling does not disturb the other root | PASS -- `worktree-shared` `targetedCancellation`. Targeted cancel stays local-only: `worktree-multi-chat` deliberately does not cover it |
 
 ### D. Liveness under load
 
@@ -172,12 +172,17 @@ concurrent chats) on the run, and never treat "a fresh run passed" as recovery.
 scenarios: `recover-same-session`, `interrupt-then-continue`,
 `warm-cold-cycles`, `question-idle-resume`, `large-stream`, `concurrent-chats`,
 `feed-stale-recovery`, `wrapper-freeze-settled-reap`,
-`wrapper-freeze-inflight-reap`.
+`wrapper-freeze-inflight-reap`, plus the shared public-surface scenarios:
+`worktree-chat`, `worktree-multi-chat`, `long-conversation`,
+`leave-and-return`.
 
 Continuity scenario default timeouts (`CONTINUITY_SCENARIO_TIMEOUT_MS` in
 `lifecycle-continuity.ts`): 8, 6, 25, 20, 10, 15, 10, 12, and 12 minutes in the
 order above. All nine require the unified API, `kilo/fake-deterministic`, and
-control-plane + worktree enrollment, like the file-state scenarios.
+control-plane + worktree enrollment, like the file-state scenarios. The four
+shared public-surface scenarios require the same and default to 10, 12, 12 and
+30 minutes respectively; they are registered in `scenarios-shared.ts` and run
+under both the local Docker and the deployed HTTP profile.
 
 Status gaps: the nine continuity scenarios exercise the same-session recovery
 core (A3/A4/A5/C2/D1/D2/D4/D6/D7) plus the silent-feed recovery path (D5), but

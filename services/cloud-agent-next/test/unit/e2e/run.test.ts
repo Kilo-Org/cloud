@@ -6,9 +6,12 @@ import {
   exitCodeForResults,
   parseArgs,
   requireScenarioApi,
+  resolveLocalDefinition,
   resultOutcome,
 } from '../../e2e/run.js';
-import type { LifecycleResult } from '../../e2e/lifecycle.js';
+import type { LifecycleArgs, LifecycleResult } from '../../e2e/lifecycle.js';
+import type { ScenarioEnvironment } from '../../e2e/scenario-capabilities.js';
+import type { SharedScenario } from '../../e2e/scenarios-shared.js';
 
 describe('run timeout option', () => {
   afterEach(() => {
@@ -75,6 +78,61 @@ describe('requireScenarioApi (matrix fail-fast contract)', () => {
 
     expect(exit).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
+  });
+});
+
+describe('resolveLocalDefinition', () => {
+  const shared: SharedScenario = {
+    name: 'worktree-chat',
+    requires: ['sessionSandbox'],
+    defaultConversation: '_',
+    run: async () => scenarioResult({ name: 'worktree-chat' }),
+  };
+
+  it('resolves a shared-only name to its shared definition', () => {
+    expect(
+      resolveLocalDefinition({
+        lifecycle: 'worktree-chat',
+        localScenarios: {},
+        sharedScenarios: { 'worktree-chat': shared },
+      })
+    ).toBe(shared);
+  });
+
+  it('wraps a local-only name with no capability requirements', async () => {
+    const localRun = vi.fn(async () => scenarioResult({ name: 'cold-resume' }));
+    const definition = resolveLocalDefinition({
+      lifecycle: 'cold-resume',
+      localScenarios: { 'cold-resume': localRun },
+      sharedScenarios: {},
+    });
+
+    expect(definition).toMatchObject({
+      name: 'cold-resume',
+      requires: [],
+      defaultConversation: '_',
+    });
+    if (!definition) throw new Error('expected a wrapped local definition');
+    const result = await definition.run({} as LifecycleArgs, {} as ScenarioEnvironment);
+    expect(localRun).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ name: 'cold-resume' });
+  });
+
+  it('prefers the shared definition when a name exists in both', () => {
+    const localRun = vi.fn(async () => scenarioResult({ name: 'cold-hot' }));
+    expect(
+      resolveLocalDefinition({
+        lifecycle: 'worktree-chat',
+        localScenarios: { 'worktree-chat': localRun },
+        sharedScenarios: { 'worktree-chat': shared },
+      })
+    ).toBe(shared);
+  });
+
+  it('returns null for a name in neither registry', () => {
+    expect(
+      resolveLocalDefinition({ lifecycle: 'nope', localScenarios: {}, sharedScenarios: {} })
+    ).toBeNull();
   });
 });
 

@@ -70,6 +70,10 @@ const LONG_RUNNING_SCENARIO_TIMEOUT_MS: Record<string, number> = {
 const WORKTREE_ENROLLMENT_SCENARIOS: ReadonlySet<string> = new Set([
   'worktree-shared',
   'interrupt-then-continue',
+  'worktree-chat',
+  'worktree-multi-chat',
+  'long-conversation',
+  'leave-and-return',
   ...Object.keys(LONG_RUNNING_SCENARIO_TIMEOUT_MS),
 ]);
 
@@ -149,7 +153,9 @@ export function requireScenarioApi(
 }
 
 function printUsage(): void {
-  const scenarios = Object.keys(LIFECYCLE_SCENARIOS).join('|');
+  const scenarios = [
+    ...new Set([...Object.keys(LIFECYCLE_SCENARIOS), ...Object.keys(SHARED_SCENARIOS)]),
+  ].join('|');
   console.error(
     `Usage: tsx test/e2e/run.ts [--api=unified|legacy] [--verbose] [--timeout-ms=<n>] <${scenarios}> <conversation>`
   );
@@ -298,27 +304,45 @@ function resolveProfile(): 'local' | 'deployed' {
   process.exit(2);
 }
 
+/**
+ * Resolve the definition local dispatch should use. A shared definition wins,
+ * so a name in both registries keeps its shared gate; a local-only name is
+ * wrapped into the shared shape with no capability requirements; a name in
+ * neither is unknown (`null`).
+ */
+export function resolveLocalDefinition(input: {
+  lifecycle: string;
+  localScenarios: Record<string, SharedScenario['run']>;
+  sharedScenarios: Record<string, SharedScenario>;
+}): SharedScenario | null {
+  const shared = input.sharedScenarios[input.lifecycle];
+  if (shared) return shared;
+  const local = input.localScenarios[input.lifecycle];
+  if (!local) return null;
+  return {
+    name: input.lifecycle,
+    requires: [],
+    defaultConversation: '_',
+    run: local,
+  };
+}
+
 async function runLocal(parsed: ParsedArgs): Promise<void> {
   if (process.env.E2E_LOCAL_HTTP === '1') {
     await runLocalHttp(parsed);
     return;
   }
   const { lifecycle, conversation, verbose, timeoutMs: requestedTimeoutMs } = parsed;
-  const scenario = LIFECYCLE_SCENARIOS[lifecycle];
-  if (!scenario) {
+  const definition = resolveLocalDefinition({
+    lifecycle,
+    localScenarios: LIFECYCLE_SCENARIOS,
+    sharedScenarios: SHARED_SCENARIOS,
+  });
+  if (!definition) {
     console.error(`Unknown lifecycle: ${lifecycle}`);
     printUsage();
     process.exit(2);
   }
-
-  // Shared scenarios dispatch from their shared definition; every local-only
-  // scenario is wrapped into the same shape so it also passes the shared gate.
-  const definition: SharedScenario = SHARED_SCENARIOS[lifecycle] ?? {
-    name: lifecycle,
-    requires: [],
-    defaultConversation: '_',
-    run: scenario,
-  };
   const api = requireScenarioApi(definition, parsed.api);
 
   loadRepoEnvFiles(SERVICE_PACKAGE_DIR);

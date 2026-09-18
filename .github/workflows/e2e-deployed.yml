@@ -27,7 +27,7 @@ concurrency:
 jobs:
   e2e-deployed:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     env:
       WORKER_URL: ${{ inputs.worker_url }}
       FAKE_LLM_URL: ${{ inputs.fake_llm_url }}

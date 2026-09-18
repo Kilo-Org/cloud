@@ -67,6 +67,7 @@ import {
   collectChildMessageText,
   echoDirectivePayload,
   echoPayloadMatches,
+  hasCorrelatedStreamProgress,
   sendAuthProbe,
   SHARED_SCENARIOS,
   trailingNonEmptyLine,
@@ -192,6 +193,13 @@ function partRemovedEvent(messageID: string, partID: string): StreamEvent {
   return streamEvent('kilocode', {
     type: 'message.part.removed',
     properties: { messageID, partID },
+  });
+}
+
+function messageRemovedEvent(messageID: string): StreamEvent {
+  return streamEvent('kilocode', {
+    type: 'message.removed',
+    properties: { messageID },
   });
 }
 
@@ -810,6 +818,124 @@ describe('collectChildMessageText', () => {
     ];
 
     expect(collectChildMessageText(events, COLD_MESSAGE_ID)).toBe('');
+  });
+
+  it('drops a tracked part whose removal event follows its update', () => {
+    const events = [
+      assistantMessageEvent(COLD_MESSAGE_ID, COLD_ASSISTANT_MESSAGE_ID),
+      textPartEvent(COLD_TEXT_PART_ID, COLD_ASSISTANT_MESSAGE_ID, 'hello'),
+      partRemovedEvent(COLD_ASSISTANT_MESSAGE_ID, COLD_TEXT_PART_ID),
+    ];
+
+    expect(collectChildMessageText(events, COLD_MESSAGE_ID)).toBe('');
+  });
+
+  it('contributes a part again after a removal followed by a re-update', () => {
+    const events = [
+      assistantMessageEvent(COLD_MESSAGE_ID, COLD_ASSISTANT_MESSAGE_ID),
+      textPartEvent(COLD_TEXT_PART_ID, COLD_ASSISTANT_MESSAGE_ID, 'stale'),
+      partRemovedEvent(COLD_ASSISTANT_MESSAGE_ID, COLD_TEXT_PART_ID),
+      textPartEvent(COLD_TEXT_PART_ID, COLD_ASSISTANT_MESSAGE_ID, 'fresh'),
+    ];
+
+    expect(collectChildMessageText(events, COLD_MESSAGE_ID)).toBe('fresh');
+  });
+
+  it('is a no-op when the removal targets an untracked part or message', () => {
+    const events = [
+      assistantMessageEvent(COLD_MESSAGE_ID, COLD_ASSISTANT_MESSAGE_ID),
+      textPartEvent(COLD_TEXT_PART_ID, COLD_ASSISTANT_MESSAGE_ID, 'hello'),
+      partRemovedEvent(COLD_ASSISTANT_MESSAGE_ID, 'part_unknown'),
+      messageRemovedEvent('message_unknown'),
+    ];
+
+    expect(collectChildMessageText(events, COLD_MESSAGE_ID)).toBe('hello');
+  });
+
+  it('drops a child message whose message.removed event follows its update', () => {
+    const events = [
+      assistantMessageEvent(COLD_MESSAGE_ID, COLD_ASSISTANT_MESSAGE_ID),
+      textPartEvent(COLD_TEXT_PART_ID, COLD_ASSISTANT_MESSAGE_ID, 'hello'),
+      messageRemovedEvent(COLD_ASSISTANT_MESSAGE_ID),
+    ];
+
+    expect(collectChildMessageText(events, COLD_MESSAGE_ID)).toBe('');
+  });
+});
+
+describe('hasCorrelatedStreamProgress', () => {
+  it('counts a transient text part for the paced child', () => {
+    const events = [
+      assistantMessageEvent(COLD_MESSAGE_ID, COLD_ASSISTANT_MESSAGE_ID),
+      textPartEvent(COLD_TEXT_PART_ID, COLD_ASSISTANT_MESSAGE_ID, 'streaming', {
+        metadata: { 'kilocode.lifecycle': 'transient' },
+      }),
+    ];
+
+    expect(hasCorrelatedStreamProgress(events, COLD_MESSAGE_ID)).toBe(true);
+  });
+
+  it('counts the empty transient initialization part as liveness for the paced child', () => {
+    // Observed live: the paced child's only correlated part can be an empty
+    // transient init part, so the predicate is a liveness check only. Proof that
+    // the model was dialed comes from the request counter, not from content.
+    const events = [
+      assistantMessageEvent(COLD_MESSAGE_ID, COLD_ASSISTANT_MESSAGE_ID),
+      textPartEvent(COLD_TEXT_PART_ID, COLD_ASSISTANT_MESSAGE_ID, '', {
+        metadata: { 'kilocode.lifecycle': 'transient' },
+      }),
+    ];
+
+    expect(hasCorrelatedStreamProgress(events, COLD_MESSAGE_ID)).toBe(true);
+  });
+
+  it('counts any correlated part regardless of type', () => {
+    const events = [
+      assistantMessageEvent(COLD_MESSAGE_ID, COLD_ASSISTANT_MESSAGE_ID),
+      streamEvent('kilocode', {
+        type: 'message.part.updated',
+        properties: {
+          part: {
+            id: 'part_tool',
+            messageID: COLD_ASSISTANT_MESSAGE_ID,
+            type: 'tool',
+            text: 'not-content',
+          },
+        },
+      }),
+    ];
+
+    expect(hasCorrelatedStreamProgress(events, COLD_MESSAGE_ID)).toBe(true);
+  });
+
+  it('does not count a part for an unrelated message', () => {
+    const events = [
+      assistantMessageEvent(COLD_MESSAGE_ID, COLD_ASSISTANT_MESSAGE_ID),
+      textPartEvent('part_other', 'message_other_assistant', 'nope'),
+    ];
+
+    expect(hasCorrelatedStreamProgress(events, COLD_MESSAGE_ID)).toBe(false);
+  });
+
+  it('does not count lifecycle-only events', () => {
+    const events = [
+      kilocodeEvent(),
+      preparingEvent(COLD_MESSAGE_ID),
+      messageEvent('user', 'message_parent', 'message_user'),
+    ];
+
+    expect(hasCorrelatedStreamProgress(events, COLD_MESSAGE_ID)).toBe(false);
+  });
+
+  it('counts a correlated part seen before its child message.updated', () => {
+    const events = [
+      textPartEvent(COLD_TEXT_PART_ID, COLD_ASSISTANT_MESSAGE_ID, 'streaming', {
+        metadata: { 'kilocode.lifecycle': 'transient' },
+      }),
+      assistantMessageEvent(COLD_MESSAGE_ID, COLD_ASSISTANT_MESSAGE_ID),
+    ];
+
+    expect(hasCorrelatedStreamProgress(events, COLD_MESSAGE_ID)).toBe(true);
   });
 });
 
@@ -1629,6 +1755,35 @@ describe('moved queue, micro, and continuity scenarios', () => {
     expect(definition).toBeDefined();
     expect(definition?.name).toBe(name);
     expect(definition?.requires).toEqual(['sessionSandbox']);
+  });
+});
+
+describe('public-surface worktree and conversation scenarios', () => {
+  const names = ['worktree-chat', 'worktree-multi-chat', 'long-conversation', 'leave-and-return'];
+
+  it.each(names)('%s is registered as a long-running unified scenario', name => {
+    const definition = SHARED_SCENARIOS[name];
+    expect(definition).toBeDefined();
+    expect(definition?.name).toBe(name);
+    expect(definition?.requires).toEqual(['sessionSandbox']);
+    expect(definition?.defaultApi).toBe('unified');
+    expect(definition?.defaultConversation.length).toBeGreaterThan(0);
+    expect(typeof definition?.run).toBe('function');
+  });
+
+  it.each(names)('%s is unsupported when the profile has no sessionSandbox', async name => {
+    const definition = SHARED_SCENARIOS[name];
+    expect(definition).toBeDefined();
+    const result = await runSharedScenario(definition!, {
+      config,
+      conversation: definition!.defaultConversation,
+      api: definition!.defaultApi ?? 'unified',
+      env: deployedEnvironment(),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.unsupported).toBe(true);
+    expect(result.message).toContain('sessionSandbox');
   });
 });
 

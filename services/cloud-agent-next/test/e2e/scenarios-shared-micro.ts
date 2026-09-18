@@ -35,7 +35,8 @@ import {
   type StreamEvent,
 } from './client.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
-import type { ScenarioEnvironment, SessionSandboxObservation } from './scenario-capabilities.js';
+import type { ScenarioEnvironment } from './scenario-capabilities.js';
+import { requireContainer, sessionSandboxObservation } from './scenarios-shared-runtime.js';
 import type { SharedScenario } from './scenarios-shared.js';
 
 /** Cold-boot budget over a real first container start. */
@@ -45,28 +46,6 @@ const HOT_TIMEOUT_MS = 60_000;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function sessionSandboxObservation(env: ScenarioEnvironment): SessionSandboxObservation {
-  if (!env.sessionSandbox) throw new Error('sessionSandbox capability is required');
-  return env.sessionSandbox;
-}
-
-/**
- * Wait for the physical container behind `session`. `sessionSandbox` is
- * guaranteed by the scenario's declared capability when it runs through the
- * shared gate; the guard keeps a direct call honest.
- */
-async function requireContainer(
-  sandbox: SessionSandboxObservation,
-  session: { cloudAgentSessionId: string; kiloSessionId: string },
-  timeoutMs: number
-): Promise<string | null> {
-  return sandbox.waitForContainer({
-    cloudAgentSessionId: session.cloudAgentSessionId,
-    kiloSessionId: session.kiloSessionId,
-    timeoutMs,
-  });
 }
 
 /**

@@ -38,8 +38,11 @@ import {
   requireWorktreeGate,
   waitForOwnedCompletion,
 } from './worktree-support.js';
+import { assertScenarioPreconditions } from './public-surface-support.js';
 import { readIdleStopEvidence, CLOUD_AGENT_LOG_PATH } from './idle-stop-evidence.js';
 import { bestEffortExportDiagnostic } from './session-export-check.js';
+
+export { assertScenarioPreconditions };
 
 export const FILE_STATE_SCENARIO_TIMEOUT_MS = {
   'long-session': 20 * 60_000,
@@ -161,20 +164,6 @@ export function scenarioResult(
 
 export function fakeDirective(scenario: string, ...args: string[]): string {
   return `__fake__:${scenario}${args.length > 0 ? `:${args.join(':')}` : ''}`;
-}
-
-export function assertScenarioPreconditions(
-  config: DriverConfig,
-  api: ApiVersion | undefined
-): void {
-  if ((api ?? 'unified') !== 'unified') {
-    throw new Error('file-state lifecycle scenarios require the unified API');
-  }
-  if (config.model.replace(/^kilo\//, '') !== 'fake-deterministic') {
-    throw new Error(
-      `file-state lifecycle scenarios require kilo/fake-deterministic, got ${config.model}`
-    );
-  }
 }
 
 export function createScenarioResources(

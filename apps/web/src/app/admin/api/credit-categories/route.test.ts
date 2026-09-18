@@ -40,6 +40,37 @@ describe('GET /admin/api/credit-categories', () => {
     expect(Array.isArray(body.creditCategories)).toBe(true);
   });
 
+  it('excludes dynamic transaction categories from the list aggregation', async () => {
+    const user = await insertTestUser();
+    await db.insert(credit_transactions).values([
+      {
+        kilo_user_id: user.id,
+        credit_category: 'vibeday',
+        amount_microdollars: 1_000_000,
+        is_free: true,
+      },
+      {
+        kilo_user_id: user.id,
+        credit_category: `kiloclaw-settlement:${crypto.randomUUID()}:payment:test`,
+        amount_microdollars: 1_000_000,
+        is_free: false,
+      },
+    ]);
+
+    const response = await GET(createRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.creditCategories).toEqual(
+      expect.arrayContaining([expect.objectContaining({ credit_category: 'vibeday' })])
+    );
+    expect(
+      body.creditCategories.some((category: { credit_category: string }) =>
+        category.credit_category.startsWith('kiloclaw-settlement:')
+      )
+    ).toBe(false);
+  });
+
   it('rejects the request before touching the database when authorization fails', async () => {
     const user = await insertTestUser();
     await db.insert(credit_transactions).values({

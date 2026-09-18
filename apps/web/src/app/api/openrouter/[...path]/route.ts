@@ -868,7 +868,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (
       balance <= 0 &&
       !(await isFreeModel(effectiveModelIdLowerCased)) &&
-      !effectiveProviderContext.userByok
+      !effectiveProviderContext.userByok &&
+      !effectiveProviderContext.skipBalanceCheck
     ) {
       return await creditsBlockedResponse({
         user,

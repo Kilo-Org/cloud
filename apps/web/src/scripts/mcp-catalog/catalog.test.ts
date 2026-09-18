@@ -26,12 +26,33 @@ import {
   runKiloCompletion,
   type CatalogLeaf,
 } from './catalog';
+import { MCP_MUTATION_ALLOWLIST } from './mutations';
 
 const queryLeaf = (path: string, firstInput?: CatalogLeaf['firstInput']): CatalogLeaf => ({
   path,
   type: 'query',
   firstInput,
 });
+
+const mutationLeaf = (path: string, firstInput?: CatalogLeaf['firstInput']): CatalogLeaf => ({
+  path,
+  type: 'mutation',
+  firstInput,
+});
+
+/** The allowlist as the real rootRouter exposes it: every listed path exists. */
+const allowlistedMutationLeaves = (): CatalogLeaf[] =>
+  MCP_MUTATION_ALLOWLIST.map(path => mutationLeaf(path));
+
+/**
+ * A synthetic leaf set that satisfies the rot guard: the fixture's own leaves
+ * plus every allowlisted mutation. The guard now compares the allowlist even
+ * when no mutation leaf is enumerated, so a query-only fixture would throw.
+ */
+const withAllowlistedMutations = (leaves: CatalogLeaf[]): CatalogLeaf[] => [
+  ...leaves,
+  ...allowlistedMutationLeaves(),
+];
 
 describe('mcp-catalog catalog', () => {
   describe('collectCatalogLeaves', () => {
@@ -52,31 +73,63 @@ describe('mcp-catalog catalog', () => {
   });
 
   describe('buildCatalogRows', () => {
-    it('keeps only queries and drops denylisted top-level segments', () => {
-      const { rows, missing } = buildCatalogRows([
-        queryLeaf('admin.users.list'),
-        queryLeaf('debug.ping'),
-        queryLeaf('test.echo'),
-        { path: 'user.deleteAccount', type: 'mutation', firstInput: undefined },
-        { path: 'user.onEvent', type: 'subscription', firstInput: undefined },
-        queryLeaf('user.getProfile'),
+    it('keeps every query and only allowlisted mutations, dropping the denylist and subscriptions', () => {
+      const { rows, missing } = buildCatalogRows(
+        [
+          queryLeaf('admin.users.list'),
+          queryLeaf('debug.ping'),
+          queryLeaf('test.echo'),
+          mutationLeaf('admin.users.delete'),
+          mutationLeaf('organizations.subscription.cancel'),
+          mutationLeaf('user.deleteAccount'),
+          { path: 'user.onEvent', type: 'subscription', firstInput: undefined },
+          queryLeaf('user.getProfile'),
+          ...allowlistedMutationLeaves(),
+        ],
+        new Map([
+          ['user.getProfile', 'Returns the profile of a user.'],
+          ['agentProfiles.create', 'Create an agent profile.'],
+          ['organizations.subscription.cancel', 'Cancel the subscription.'],
+          ['user.deleteAccount', 'Delete the account.'],
+        ])
+      );
+      // Only the query and the allowlisted mutation with a summary are rows.
+      expect(rows.map(row => row.path)).toEqual(['user.getProfile', 'agentProfiles.create']);
+      expect(rows[0]?.kind).toBe('query');
+      expect(rows[1]?.kind).toBe('mutation');
+      // `debug` is published (the denylist is admin/test only), so the
+      // summary-less debug query is missing rather than dropped; non-allowlisted
+      // mutations are dropped even with a committed summary; allowlisted
+      // mutations without a summary wait for the LLM pass.
+      expect(missing.map(leaf => leaf.path)).toEqual([
+        'debug.ping',
+        ...MCP_MUTATION_ALLOWLIST.filter(path => path !== 'agentProfiles.create'),
       ]);
-      expect(rows.map(row => row.path)).toEqual([]);
-      expect(missing.map(leaf => leaf.path)).toEqual(['debug.ping', 'user.getProfile']);
     });
 
     it('locks the denylist constant to the internal-only segments', () => {
       expect([...DENYLISTED_TOP_LEVEL_SEGMENTS].sort()).toEqual(['admin', 'test']);
     });
 
-    it('fails on a zero-query catalog instead of emitting an empty one', () => {
-      expect(() => buildCatalogRows([queryLeaf('admin.nothing')])).toThrow(/zero query rows/);
-      expect(() => buildCatalogRows([])).toThrow(/zero query rows/);
+    it('fails on a zero-row catalog instead of emitting an empty one', () => {
+      expect(() => buildCatalogRows([queryLeaf('admin.nothing')])).toThrow(/zero catalog rows/);
+      expect(() => buildCatalogRows([])).toThrow(/zero catalog rows/);
+    });
+
+    it('throws naming the allowlisted paths that no longer match a mutation leaf', () => {
+      // The router still exposes mutations, so a missing allowlisted path is a
+      // rename or deletion: the dump must fail loudly instead of dropping it.
+      expect(() =>
+        buildCatalogRows([
+          queryLeaf('user.getProfile'),
+          mutationLeaf('agentProfiles.createRenamed'),
+        ])
+      ).toThrow(/agentProfiles\.create\b/);
     });
 
     it('shapes rows with derived tags, input schema and search blob', () => {
       const { rows } = buildCatalogRows(
-        [queryLeaf('user.getProfile', z.object({ userId: z.string() }))],
+        withAllowlistedMutations([queryLeaf('user.getProfile', z.object({ userId: z.string() }))]),
         new Map([['user.getProfile', 'Returns the profile of a user.']])
       );
       const row = rows[0];
@@ -96,7 +149,7 @@ describe('mcp-catalog catalog', () => {
 
     it('emits an empty input schema for procedures without input', () => {
       const { rows } = buildCatalogRows(
-        [queryLeaf('user.listSessions')],
+        withAllowlistedMutations([queryLeaf('user.listSessions')]),
         new Map([['user.listSessions', 'Lists active sessions.']])
       );
       expect(rows[0]?.inputSchema).toEqual({});
@@ -105,7 +158,7 @@ describe('mcp-catalog catalog', () => {
     it('keeps committed summaries byte-for-byte, including whitespace', () => {
       const summary = '  Returns the user profile.  ';
       const { rows } = buildCatalogRows(
-        [queryLeaf('user.getProfile')],
+        withAllowlistedMutations([queryLeaf('user.getProfile')]),
         new Map([['user.getProfile', summary]])
       );
       expect(rows[0]?.summary).toBe(summary);
@@ -113,7 +166,7 @@ describe('mcp-catalog catalog', () => {
 
     it('marks a real admin-guarded procedure with the trailing admin marker', () => {
       const { rows } = buildCatalogRows(
-        [queryLeaf('organizations.seatPurchases')],
+        withAllowlistedMutations([queryLeaf('organizations.seatPurchases')]),
         new Map([['organizations.seatPurchases', 'Lists seat purchases.']])
       );
       const row = rows[0];
@@ -132,7 +185,7 @@ describe('mcp-catalog catalog', () => {
 
     it('leaves the admin key off a real non-admin procedure', () => {
       const { rows } = buildCatalogRows(
-        [queryLeaf('user.getBalance')],
+        withAllowlistedMutations([queryLeaf('user.getBalance')]),
         new Map([['user.getBalance', 'Returns the credit balance.']])
       );
       expect(rows[0]).not.toHaveProperty('admin');
@@ -148,11 +201,13 @@ describe('mcp-catalog catalog', () => {
 
     it('keeps a debug leaf and marks it debug without an admin mark', () => {
       const { rows, missing } = buildCatalogRows(
-        [queryLeaf('debug.ping')],
+        withAllowlistedMutations([queryLeaf('debug.ping')]),
         new Map([['debug.ping', 'Pings the debug router.']])
       );
       const row = rows[0];
-      expect(missing).toEqual([]);
+      // The fixture's own leaves are published; the allowlisted mutations added
+      // to satisfy the rot guard carry no summary, so they wait for the LLM pass.
+      expect(missing.map(leaf => leaf.path)).toEqual([...MCP_MUTATION_ALLOWLIST]);
       expect(row?.debug).toBe(true);
       expect(row).not.toHaveProperty('admin');
       // Key order stays deterministic for the dump's byte-for-byte check.
@@ -169,7 +224,7 @@ describe('mcp-catalog catalog', () => {
 
     it('marks an admin-guarded debug procedure with both marks', () => {
       const { rows } = buildCatalogRows(
-        [queryLeaf('debug.badInputError')],
+        withAllowlistedMutations([queryLeaf('debug.badInputError')]),
         new Map([['debug.badInputError', 'Echoes a short string back from the debug router.']])
       );
       const row = rows[0];
@@ -190,26 +245,26 @@ describe('mcp-catalog catalog', () => {
 
     it('still drops an admin leaf', () => {
       const { rows, missing } = buildCatalogRows(
-        [queryLeaf('admin.users.list'), queryLeaf('user.getProfile')],
+        withAllowlistedMutations([queryLeaf('admin.users.list'), queryLeaf('user.getProfile')]),
         new Map([
           ['admin.users.list', 'Lists users.'],
           ['user.getProfile', 'Returns the profile of a user.'],
         ])
       );
       expect(rows.map(row => row.path)).toEqual(['user.getProfile']);
-      expect(missing).toEqual([]);
+      expect(missing.map(leaf => leaf.path)).toEqual([...MCP_MUTATION_ALLOWLIST]);
     });
 
     it('still drops a test leaf', () => {
       const { rows, missing } = buildCatalogRows(
-        [queryLeaf('test.echo'), queryLeaf('user.getProfile')],
+        withAllowlistedMutations([queryLeaf('test.echo'), queryLeaf('user.getProfile')]),
         new Map([
           ['test.echo', 'Echoes a payload.'],
           ['user.getProfile', 'Returns the profile of a user.'],
         ])
       );
       expect(rows.map(row => row.path)).toEqual(['user.getProfile']);
-      expect(missing).toEqual([]);
+      expect(missing.map(leaf => leaf.path)).toEqual([...MCP_MUTATION_ALLOWLIST]);
     });
   });
 
@@ -242,7 +297,7 @@ describe('mcp-catalog catalog', () => {
   describe('buildCatalogJson', () => {
     it('sorts rows by path and ends with a trailing newline', () => {
       const { rows } = buildCatalogRows(
-        [queryLeaf('b.b'), queryLeaf('a.a')],
+        withAllowlistedMutations([queryLeaf('b.b'), queryLeaf('a.a')]),
         new Map([
           ['a.a', 'A'],
           ['b.b', 'B'],
@@ -329,6 +384,17 @@ describe('mcp-catalog catalog', () => {
       const { rows, missing } = buildCatalogRows(collectCatalogLeaves(rootRouter), committed);
       expect(missing.map(leaf => leaf.path)).toEqual([]);
       expect(buildCatalogJson(rows)).toBe(onDisk);
+    });
+
+    it('publishes every allowlisted mutation with kind mutation and a searchable blob', () => {
+      const catalog = JSON.parse(readFileSync(CATALOG_JSON_PATH, 'utf8')) as Record<
+        string,
+        { kind?: string; searchBlob?: string } | undefined
+      >;
+      for (const path of MCP_MUTATION_ALLOWLIST) {
+        expect(catalog[path]?.kind).toBe('mutation');
+        expect(catalog[path]?.searchBlob).toContain(path);
+      }
     });
   });
 

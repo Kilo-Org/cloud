@@ -483,6 +483,8 @@
       "replyBadRequest": "Ovaj odgovor se ne može objaviti. Nit se možda promenila.",
       "replyForbidden": "Nemaš dozvolu da odgovoriš na ovaj zahtev za spajanje.",
       "addCommentCta": "Komentariši ovaj zahtev za spajanje",
+      "fixWithKilo": "Reši sa Kilo",
+      "fixWithKiloPrompt": "Molim te reši sledeći komentar na ovom zahtevu za spajanje: {{link}}",
       "commentBadRequest": "Ovaj komentar se ne može objaviti. Zahtev za spajanje se možda promenio.",
       "commentForbidden": "Nemaš dozvolu da komentarišeš ovaj zahtev za spajanje.",
       "moderation": {
@@ -2071,6 +2073,7 @@
       "exitNeedsNewerCli": "Komande koje počinju kosom crtom zahtevaju noviju verziju alata Kilo CLI za rad na daljinu. Ažuriraj Kilo CLI i ponovo se poveži."
     },
     "sessionConnection": {
+      "label": "Povezivanje",
       "connecting": "Povezivanje…",
       "reconnecting": "Ponovno povezivanje…",
       "connectionLost": "Veza je izgubljena",
@@ -2090,7 +2093,9 @@
       "removeConfirmTitle": "Ukloniti cilj?",
       "removeConfirmMessage": "CLI briše cilj ove sesije.",
       "updateFailed": "Cilj nije moguće ažurirati.",
-      "sectionAccessibility": "{{status}}. Cilj: {{text}}"
+      "sectionAccessibility": "{{status}}. Cilj: {{text}}",
+      "collapse": "Skupi cilj",
+      "expand": "Proširi cilj"
     },
     "newSession": {
       "recentlyUsed": "Nedavno korišćeno",
@@ -2144,7 +2149,20 @@
       "continueFrom": "Nastavlja se sesija {{title}}.",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može da nastavi sesiju. Izaberi Cloud Agent ili drugi CLI.",
-      "importFailed": "Uvoz ove sesije nije uspeo."
+      "importFailed": "Uvoz ove sesije nije uspeo.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Podrazumevano · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Malo",
+      "sandboxInstanceShared": "Deljeno",
+      "sandboxInstanceLarge": "Veliko",
+      "sandboxInstanceDevcontainer": "Dev kontejner",
+      "sandboxInstanceProviderDefault": "Podrazumevano od dobavljača",
+      "sandboxCouldNotLoad": "Opcije sandboxa nisu mogle da se učitaju",
+      "sandboxUnavailable": "Ovaj sandbox nije dostupan. Izaberite drugi sandbox ili Podrazumevano.",
+      "sandboxUseDefault": "Koristi Podrazumevano"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažuriran je {{displayCount}} fajl.",
@@ -2514,6 +2532,12 @@
       "startNewSession": "Pokreni novu sesiju",
       "exitSession": "Izađi iz sesije",
       "clearSession": "Završi ovu sesiju i pokreni novu",
+      "compactDescription": "sažmi kontekst trenutne sesije",
+      "goalDescription": "Nastavi da radiš na cilju sesije. /goal <objective> ili pause, resume, clear",
+      "initDescription": "vođeno podešavanje AGENTS.md",
+      "resumeClaudeDescription": "uvezi transkript sesije Claude Code",
+      "resumeCodexDescription": "uvezi transkript sesije OpenAI Codex",
+      "reviewDescription": "pregledaj izmene [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Koristi /{{command}}",
       "insert": "Umetni",
       "upgradeRequiredFallback": "Ažuriraj CLI da koristiš ovu komandu.",
@@ -2632,6 +2656,7 @@
     "couldNotLoadActiveSessions": "Nije moguće učitati aktivne sesije.",
     "agentSessions": "Trenutno aktivno",
     "newCodingTask": "Novi zadatak za programiranje",
+    "newTaskFromPicture": "Novi zadatak sa slike",
     "explore": "Istraži",
     "seeAll": "Prikaži sve",
     "noLiveSessions": "Trenutno ništa nije pokrenuto"
@@ -2853,7 +2878,8 @@
     "aiProvidersWhat": "Tvoji upiti, istorija razgovora i svi fajlovi koje priložiš.",
     "aiProvidersWhy": "Za generisanje AI odgovora.",
     "aiProvidersWho": "Anthropic, OpenAI, Google i drugi provajderi koje biraš za svaki zahtev.",
-    "gatewayWhat": "ID naloga, metapodaci zahteva i potrošnja tokena.",
+    "gatewayWhat": "ID naloga, metapodaci zahteva, potrošnja tokena, kao i promptovi i zvučni snimci koje aplikacija šalje preko njega.",
+    "viaGateway": "Preko Kilo Gateway-ja",
     "gatewayWhy": "Provera identiteta, usmeravanje zahteva i usklađivanje naplate.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Izveštaji o rušenjima i greškama iz kojih je uklonjen sadržaj aplikacije.",
@@ -2873,7 +2899,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Tvoj snimak tokom diktiranja.",
     "voiceTranscriptionWhy": "Da bi se govor pretvorio u tekst.",
-    "voiceTranscriptionWho": "Obrada se obavlja samo na uređaju ili putem usluga Apple ili Google kada uređaj ne može da pretvori govor u tekst bez interneta.",
+    "voiceTranscriptionWho": "Tvoj uređaj, Kilo Gateway sa izabranim modelom transkripcije ili Apple ili Google za prepoznavanje na mreži.",
     "installAttributionPromptTitle": "Dozvoliti praćenje izvora instalacije?",
     "installAttributionPromptMessage": "Kilo koristi dozvolu kompanije Apple za praćenje samo da sazna preko kog kanala dolaziš. Tvoji upiti i razgovori se nikada ne koriste za to.",
     "what": "Šta",
@@ -3084,6 +3110,12 @@
     "privacy": "Otvori Kilo da vidiš agente",
     "openAgents": "Otvori agente",
     "needsInput": "Čeka unos",
+    "newestSession": "Najnovija: {{title}}",
+    "noneWaiting": "Nema agenata koji čekaju",
+    "newAgent": "Novi agent",
+    "approving": "Odobrava se...",
+    "couldNotApprove": "Odobravanje nije uspelo",
+    "couldNotStart": "Pokretanje nije uspelo",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu."
   },
@@ -3119,5 +3151,12 @@
     "remoteFound": "Računar povezan",
     "checkAgain": "Proveri ponovo",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Za pokretanje agenta potreban je upit. Dodaj upit i pokreni ga ponovo.",
+      "repositoryUnknown": "Kilo ne prepoznaje {{repository}} kao GitHub ili GitLab repozitorijum. Izaberi drugi repozitorijum u Kilo.",
+      "repositoryUnsupported": "{{repository}} je Bitbucket repozitorijum — Pokreni agenta ga još ne može koristiti. Izaberi drugi repozitorijum u Kilo."
+    }
   }
 }

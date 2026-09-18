@@ -1583,6 +1583,7 @@
       "exitNeedsNewerCli": "Zdalne polecenia z ukośnikiem wymagają nowszej wersji Kilo CLI. Zaktualizuj Kilo CLI i połącz się ponownie."
     },
     "sessionConnection": {
+      "label": "Połączenie",
       "connecting": "Łączenie…",
       "reconnecting": "Ponowne łączenie…",
       "connectionLost": "Utracono połączenie",
@@ -1602,7 +1603,9 @@
       "removeConfirmTitle": "Usunąć cel?",
       "removeConfirmMessage": "CLI czyści cel tej sesji.",
       "updateFailed": "Nie udało się zaktualizować celu.",
-      "sectionAccessibility": "{{status}}. Cel: {{text}}"
+      "sectionAccessibility": "{{status}}. Cel: {{text}}",
+      "collapse": "Zwiń cel",
+      "expand": "Rozwiń cel"
     },
     "newSession": {
       "recentlyUsed": "Ostatnio używane",
@@ -1656,7 +1659,20 @@
       "continueFrom": "Kontynuujesz sesję {{title}}.",
       "importingSession": "Importowanie sesji",
       "cliCannotContinue": "Ta instancja CLI nie obsługuje kontynuowania sesji. Wybierz Cloud Agent lub inną instancję CLI.",
-      "importFailed": "Nie udało się zaimportować tej sesji."
+      "importFailed": "Nie udało się zaimportować tej sesji.",
+      "sandbox": "Środowisko izolowane",
+      "sandboxAccessibility": "Środowisko izolowane: {{label}}",
+      "sandboxDefaultWithDestination": "Domyślne · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Małe",
+      "sandboxInstanceShared": "Współdzielone",
+      "sandboxInstanceLarge": "Duże",
+      "sandboxInstanceDevcontainer": "Kontener deweloperski",
+      "sandboxInstanceProviderDefault": "Domyślne dostawcy",
+      "sandboxCouldNotLoad": "Nie udało się wczytać opcji środowiska izolowanego",
+      "sandboxUnavailable": "To środowisko izolowane jest niedostępne. Wybierz inne środowisko lub Domyślne.",
+      "sandboxUseDefault": "Użyj Domyślnego"
     },
     "partRenderer": {
       "updatedFileCount_one": "Zaktualizowano {{displayCount}} plik.",
@@ -2030,6 +2046,12 @@
       "startNewSession": "Rozpocznij nową sesję",
       "exitSession": "Zakończ sesję",
       "clearSession": "Zakończ tę sesję i rozpocznij nową",
+      "compactDescription": "skompaktuj kontekst bieżącej sesji",
+      "goalDescription": "Kontynuuj pracę nad celem sesji. /goal <objective> lub pause, resume, clear",
+      "initDescription": "prowadzona konfiguracja AGENTS.md",
+      "resumeClaudeDescription": "importuj transkrypcję sesji Claude Code",
+      "resumeCodexDescription": "importuj transkrypcję sesji OpenAI Codex",
+      "reviewDescription": "przejrzyj zmiany [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Użyj /{{command}}",
       "insert": "Wstaw",
       "upgradeRequiredFallback": "Zaktualizuj swoje CLI, aby użyć tego polecenia.",
@@ -2149,6 +2171,7 @@
     "couldNotLoadActiveSessions": "Nie udało się wczytać aktywnych sesji.",
     "agentSessions": "Teraz aktywne",
     "newCodingTask": "Nowe zadanie programistyczne",
+    "newTaskFromPicture": "Nowe zadanie ze zdjęcia",
     "explore": "Odkrywaj",
     "seeAll": "Zobacz wszystkie",
     "noLiveSessions": "Obecnie nic nie jest uruchomione"
@@ -2370,7 +2393,8 @@
     "aiProvidersWhat": "Twoje polecenia, historia rozmów i wszystkie dołączane pliki.",
     "aiProvidersWhy": "Aby generować odpowiedzi AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google i inni dostawcy wybierani przy każdym żądaniu.",
-    "gatewayWhat": "Identyfikator konta, metadane żądań, zużycie tokenów.",
+    "gatewayWhat": "Identyfikator konta, metadane żądań, zużycie tokenów oraz prompty i nagrania głosowe, które aplikacja wysyła za jego pośrednictwem.",
+    "viaGateway": "Przez Kilo Gateway",
     "gatewayWhy": "Uwierzytelnianie, kierowanie żądań, uzgadnianie rozliczeń.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Raporty o awariach i błędach, z których usunięto treści z aplikacji.",
@@ -2390,7 +2414,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Twoje nagranie podczas dyktowania.",
     "voiceTranscriptionWhy": "Aby zamienić mowę na tekst.",
-    "voiceTranscriptionWho": "Tylko na urządzeniu lub za pośrednictwem Apple albo Google, jeśli urządzenie nie obsługuje transkrypcji bez połączenia z internetem.",
+    "voiceTranscriptionWho": "Twoje urządzenie, Kilo Gateway z wybranym modelem transkrypcji albo Apple lub Google do rozpoznawania online.",
     "what": "Jakie dane",
     "why": "W jakim celu",
     "who": "Komu",
@@ -2505,6 +2529,8 @@
       "replyBody": "Treść odpowiedzi",
       "replyForbidden": "Nie masz uprawnień do odpowiadania w tym PR.",
       "addCommentCta": "Skomentuj ten PR",
+      "fixWithKilo": "Napraw z Kilo",
+      "fixWithKiloPrompt": "Rozwiąż następujący komentarz w tym PR: {{link}}",
       "commentBadRequest": "Tego komentarza nie można opublikować. PR mógł się zmienić.",
       "commentForbidden": "Nie masz uprawnień do komentowania w tym PR.",
       "replyPlaceholder": "Odpowiedź…",
@@ -3108,6 +3134,12 @@
     "privacy": "Otwórz Kilo, aby zobaczyć agentów",
     "openAgents": "Otwórz listę agentów",
     "needsInput": "Czeka na odpowiedź",
+    "newestSession": "Najnowsza: {{title}}",
+    "noneWaiting": "Żaden agent nie czeka",
+    "newAgent": "Nowy agent",
+    "approving": "Zatwierdzanie...",
+    "couldNotApprove": "Nie udało się zatwierdzić",
+    "couldNotStart": "Nie udało się uruchomić",
     "channelName": "Aktywni agenci",
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
   },
@@ -3143,5 +3175,12 @@
     "remoteFound": "Komputer połączony",
     "checkAgain": "Sprawdź ponownie",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Uruchomienie agenta wymaga polecenia. Dodaj polecenie i uruchom go ponownie.",
+      "repositoryUnknown": "Kilo nie rozpoznaje {{repository}} jako repozytorium GitHub lub GitLab. Wybierz inne repozytorium w Kilo.",
+      "repositoryUnsupported": "{{repository}} to repozytorium Bitbucket — Uruchom agenta nie może jeszcze go użyć. Wybierz inne repozytorium w Kilo."
+    }
   }
 }

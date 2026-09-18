@@ -644,7 +644,8 @@ export class SandboxSession extends DurableObject<Env> {
     if (input.payload.type === 'session.created' || input.payload.type === 'session.updated') {
       const info = input.payload.properties.info;
       if (typeof info === 'object' && info !== null) {
-        if ('id' in info && info.id !== eventKiloSessionId) return { applied: false };
+        if ('id' in info && info.id !== eventKiloSessionId)
+          return result(false, 'session_id_mismatch');
         if (eventKiloSessionId !== root && ('parentID' in info || 'directory' in info)) {
           const directory = this.directory(metadata);
           const child = childSessionLineage(info, directory);
@@ -653,7 +654,7 @@ export class SandboxSession extends DurableObject<Env> {
             child.sessionId !== eventKiloSessionId ||
             input.identity.directory !== directory
           )
-            return { applied: false };
+            return result(false, 'child_lineage_mismatch');
         }
       }
     }
@@ -949,12 +950,7 @@ export class SandboxSession extends DurableObject<Env> {
     wrapperInstanceId?: string;
   }): Promise<SandboxEventBatchResult> {
     const outcomes: SandboxEventBatchItemOutcome[] = [];
-    let halted = false;
-    for (const item of input.items) {
-      if (halted) {
-        outcomes.push({ receiptId: item.receiptId, status: 'unattempted' });
-        continue;
-      }
+    for (const [index, item] of input.items.entries()) {
       try {
         let applied = false;
         let retryable: boolean | undefined;
@@ -990,7 +986,28 @@ export class SandboxSession extends DurableObject<Env> {
         );
       } catch {
         outcomes.push({ receiptId: item.receiptId, status: 'unknown' });
-        halted = true;
+        try {
+          logControlDiagnostic(
+            'session_event_batch_item_failed',
+            {
+              sessionId: this.sessionId,
+              wrapperInstanceId: input.wrapperInstanceId,
+              receiptId: item.receiptId,
+              sequence: item.sequence,
+              eventFamily: item.event,
+              eventType:
+                item.event === 'session.event'
+                  ? diagnosticEventType(item.payload.type)
+                  : 'session.preparing',
+              eventIndex: index,
+              batchSize: input.items.length,
+              disposition: 'application_exception',
+            },
+            'warn'
+          );
+        } catch {
+          // Containment only: a diagnostic must never replace or alter the batch result.
+        }
       }
     }
     return { outcomes };
@@ -1585,6 +1602,10 @@ export class SandboxSession extends DurableObject<Env> {
     } catch {
       return { ...unknown, observedAt: Date.now(), detailCode: 'status_unavailable' };
     }
+  }
+
+  async getPendingInteractions(): Promise<{ questions: unknown[]; permissions: unknown[] }> {
+    return this.derivePendingInteractions() ?? { questions: [], permissions: [] };
   }
 
   async getWorktreeChanges(): Promise<GetWorktreeChangesOutput> {

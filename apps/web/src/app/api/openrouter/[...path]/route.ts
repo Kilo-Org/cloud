@@ -57,6 +57,7 @@ import {
   apiKindNotSupportedResponse,
   checkExclusiveModelProviderAllowed,
   modelDoesNotExistOnOpenRouterResponse,
+  chatGptReconnectResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
@@ -686,6 +687,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if (initialProviderResultForAbuseService.kind === 'unavailable') {
     return temporarilyUnavailableResponse();
   }
+  if (initialProviderResultForAbuseService.kind === 'chatgpt-reconnect') {
+    // The person's enabled ChatGPT connection is terminally dead. Fail readably
+    // instead of silently serving the request through another billing path.
+    return chatGptReconnectResponse(initialProviderResultForAbuseService.message);
+  }
   let effectiveProviderContext = initialProviderResultForAbuseService;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
@@ -814,6 +820,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
       }
       return temporarilyUnavailableResponse();
+    }
+    if (quarantineProviderResult.kind === 'chatgpt-reconnect') {
+      if (rulesEngineDecision.delayMs > 0) {
+        await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
+      }
+      return chatGptReconnectResponse(quarantineProviderResult.message);
     }
 
     effectiveProviderContext = quarantineProviderResult;

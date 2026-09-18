@@ -480,6 +480,8 @@
       "replyBadRequest": "دا ځواب نه شي خپرېدای. کېدای شي د بحث لړۍ بدله شوې وي.",
       "replyForbidden": "تاسو دې پل ریکویسټ ته د ځواب ورکولو اجازه نه لرئ.",
       "addCommentCta": "په دې پل ریکویسټ باندې تبصره وکړئ",
+      "fixWithKilo": "له Kilo سره حل کړئ",
+      "fixWithKiloPrompt": "مهرباني وکړئ لاندې پل ریکویسټ تبصره حل کړئ: {{link}}",
       "commentBadRequest": "دا تبصره نه شي خپرېدای. کېدای شي پل ریکویسټ بدل شوی وي.",
       "commentForbidden": "تاسو دې پل ریکویسټ ته د تبصرې کولو اجازه نه لرئ.",
       "moderation": {
@@ -2053,6 +2055,7 @@
       "exitNeedsNewerCli": "له لرې د سلیش کمانډونو کارول د Kilo CLI نوې نسخې ته اړتیا لري. Kilo CLI تازه کړئ او بیا ونښلئ."
     },
     "sessionConnection": {
+      "label": "اړیکه",
       "connecting": "نښلېږي…",
       "reconnecting": "بیا نښلېږي…",
       "connectionLost": "اړیکه پرې شوه",
@@ -2072,7 +2075,9 @@
       "removeConfirmTitle": "هدف لرې کړو؟",
       "removeConfirmMessage": "CLI د دې غونډې هدف پاکوي.",
       "updateFailed": "هدف نشو کولای تازه شي.",
-      "sectionAccessibility": "{{status}}. هدف: {{text}}"
+      "sectionAccessibility": "{{status}}. هدف: {{text}}",
+      "collapse": "هدف پټ کړئ",
+      "expand": "هدف ښکاره کړئ"
     },
     "newSession": {
       "recentlyUsed": "په دې وروستیو کې کارول شوي",
@@ -2126,7 +2131,20 @@
       "continueFrom": "د {{title}} ناستې دوام روان دی.",
       "importingSession": "ناسته واردېږي",
       "cliCannotContinue": "دا CLI ناستې ته دوام نه شي ورکولی. Cloud Agent یا بل CLI غوره کړئ.",
-      "importFailed": "دا ناسته وارده نه شوه."
+      "importFailed": "دا ناسته وارده نه شوه.",
+      "sandbox": "سینډباکس",
+      "sandboxAccessibility": "سینډباکس: {{label}}",
+      "sandboxDefaultWithDestination": "تلوالیز · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "کوچنی",
+      "sandboxInstanceShared": "شریک",
+      "sandboxInstanceLarge": "لوی",
+      "sandboxInstanceDevcontainer": "د Dev کانټینر",
+      "sandboxInstanceProviderDefault": "د چمتوکونکي تلوالیز",
+      "sandboxCouldNotLoad": "د سینډباکس ټاکنې بار نه شوې",
+      "sandboxUnavailable": "دا سینډباکس موجود نه دی. بل سینډباکس یا تلوالیز وټاکه.",
+      "sandboxUseDefault": "تلوالیز کارول"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل تازه شو.",
@@ -2492,6 +2510,12 @@
       "startNewSession": "نوې ناسته پیل کړئ",
       "exitSession": "له ناستې ووځئ",
       "clearSession": "دا ناسته پای ته ورسوئ او نوې پیل کړئ",
+      "compactDescription": "د اوسني سیشن متن لنډ کړه",
+      "goalDescription": "د سیشن هدف په لور کار ته دوام ورکړه. /goal <objective> یا pause, resume, clear",
+      "initDescription": "لارښود شوی AGENTS.md تنظیم",
+      "resumeClaudeDescription": "د Claude Code سیشن رونوشت وارد کړه",
+      "resumeCodexDescription": "د OpenAI Codex سیشن رونوشت وارد کړه",
+      "reviewDescription": "بدلونونه وګوره [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} وکاروئ",
       "insert": "دننه کړئ",
       "upgradeRequiredFallback": "د دې کمانډ کارولو لپاره مهرباني وکړئ خپل CLI تازه کړئ.",
@@ -2609,6 +2633,7 @@
     "couldNotLoadActiveSessions": "فعالې ناستې بار نه شوې.",
     "agentSessions": "اوس روانې",
     "newCodingTask": "د کوډ کولو نوې دنده",
+    "newTaskFromPicture": "له انځور څخه نوې دنده",
     "explore": "وپلټئ",
     "seeAll": "ټول وګورئ",
     "noLiveSessions": "اوس هېڅ شی نه چلېږي"
@@ -2830,7 +2855,8 @@
     "aiProvidersWhat": "ستاسو پرامپټونه، د خبرو اترو تاریخچه او ټول هغه فایلونه چې ضمیمه کوئ.",
     "aiProvidersWhy": "د AI ځوابونو رامنځته کولو لپاره.",
     "aiProvidersWho": "Anthropic، OpenAI، Google او نور چمتو کوونکي چې د هرې غوښتنې لپاره یې غوره کوئ.",
-    "gatewayWhat": "د حساب ID، د غوښتنې میټاډاټا او د ټوکنونو کارونه.",
+    "gatewayWhat": "د حساب ID، د غوښتنې میټاډاټا، د ټوکنونو کارونه، او همدارنګه هغه پرومپټونه او غږیز ثبتونه چې اپلیکیشن د دې له لارې لیږي.",
+    "viaGateway": "د Kilo Gateway له لارې",
     "gatewayWhy": "د هویت تایید، د غوښتنو سم ځای ته لېږل او د بلونو حسابي سمون.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "د ناڅاپي بندېدو او تېروتنو راپورونه چې د اپلیکیشن منځپانګه ترې لرې شوې وي.",
@@ -2850,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "ستاسو ثبت شوی غږ، کله چې د متن د لیکلو لپاره خبرې کوئ.",
     "voiceTranscriptionWhy": "متن ته د وینا د بدلولو لپاره.",
-    "voiceTranscriptionWho": "یوازې ستاسو وسیله؛ که وسیله له انټرنېټ پرته غږ په متن نه شي بدلولی، Apple یا Google.",
+    "voiceTranscriptionWho": "ستاسو وسیله، Kilo Gateway د هغه د متن د بدلون ماډل سره چې تاسو ټاکلی، یا Apple یا Google د آنلاین پېژندنې لپاره.",
     "installAttributionPromptTitle": "د نصب د سرچینې پېژندلو ته اجازه ورکړم؟",
     "installAttributionPromptMessage": "Kilo د Apple د تعقیب اجازه یوازې د دې معلومولو لپاره کاروي چې تاسو له کومې لارې دلته راغلي یاست. ستاسو پرامپټونه او خبرې اترې هېڅکله د دې لپاره نه کارول کېږي.",
     "what": "څه",
@@ -3060,6 +3086,12 @@
     "privacy": "د اجنټانو د لیدلو لپاره Kilo پرانیزئ",
     "openAgents": "اجنټان پرانیزئ",
     "needsInput": "ځواب ته اړتیا لري",
+    "newestSession": "تر ټولو نوې: {{title}}",
+    "noneWaiting": "هیڅ اجنټ انتظار نه کوي",
+    "newAgent": "نوی اجنټ",
+    "approving": "منظور کېږي...",
+    "couldNotApprove": "منظور نه شو",
+    "couldNotStart": "پیل نه شو",
     "channelName": "فعال اجنټان",
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ."
   },
@@ -3095,5 +3127,12 @@
     "remoteFound": "کمپیوټر وڌل شو",
     "checkAgain": "بیا وګورئ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "د اجنټ پیل کولو لپاره پرامپټ ته اړتیا ده. پرامپټ اضافه کړئ او بیا یې وچلوئ.",
+      "repositoryUnknown": "Kilo {{repository}} د GitHub یا GitLab زېرمتون په توګه نه پېژني. په Kilo کې بل زېرمتون وټاکئ.",
+      "repositoryUnsupported": "{{repository}} د Bitbucket زېرمتون دی — اجنټ پیل کړئ لاهم نشي کولی ترې وکار اخلي. په Kilo کې بل زېرمتون وټاکئ."
+    }
   }
 }

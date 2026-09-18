@@ -480,6 +480,8 @@
       "replyBadRequest": "یہ جواب پوسٹ نہیں ہو سکتا۔ شاید تھریڈ تبدیل ہو گیا ہے۔",
       "replyForbidden": "آپ کو اس پل ریکویسٹ پر جواب دینے کی اجازت نہیں ہے۔",
       "addCommentCta": "اس پل ریکویسٹ پر تبصرہ کریں",
+      "fixWithKilo": "Kilo کے ساتھ درست کریں",
+      "fixWithKiloPrompt": "براہ کرم درج ذیل پل ریکویسٹ تبصرے کو حل کریں: {{link}}",
       "commentBadRequest": "یہ تبصرہ پوسٹ نہیں ہو سکتا۔ شاید پل ریکویسٹ تبدیل ہو گیا ہے۔",
       "commentForbidden": "آپ کو اس پل ریکویسٹ پر تبصرہ کرنے کی اجازت نہیں ہے۔",
       "moderation": {
@@ -2053,6 +2055,7 @@
       "exitNeedsNewerCli": "ریموٹ سلیش کمانڈز کے لیے Kilo CLI کا نیا ورژن درکار ہے۔ Kilo CLI اپ ڈیٹ کریں اور دوبارہ کنکشن قائم کریں۔"
     },
     "sessionConnection": {
+      "label": "کنکشن",
       "connecting": "کنکشن قائم ہو رہا ہے…",
       "reconnecting": "کنکشن دوبارہ قائم ہو رہا ہے…",
       "connectionLost": "کنکشن ٹوٹ گیا",
@@ -2072,7 +2075,9 @@
       "removeConfirmTitle": "ہدف ہٹائیں؟",
       "removeConfirmMessage": "CLI اس سیشن کا ہدف صاف کر دیتا ہے۔",
       "updateFailed": "ہدف اپ ڈیٹ نہیں ہو سکا۔",
-      "sectionAccessibility": "{{status}}. ہدف: {{text}}"
+      "sectionAccessibility": "{{status}}. ہدف: {{text}}",
+      "collapse": "ہدف چھپائیں",
+      "expand": "ہدف دکھائیں"
     },
     "newSession": {
       "recentlyUsed": "حال ہی میں استعمال شدہ",
@@ -2126,7 +2131,20 @@
       "continueFrom": "{{title}} جاری رکھا جا رہا ہے۔",
       "importingSession": "سیشن درآمد ہو رہا ہے",
       "cliCannotContinue": "یہ CLI سیشن جاری نہیں رکھ سکتا۔ Cloud Agent یا کوئی اور CLI منتخب کریں۔",
-      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔"
+      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔",
+      "sandbox": "سینڈ باکس",
+      "sandboxAccessibility": "سینڈ باکس: {{label}}",
+      "sandboxDefaultWithDestination": "پہلے سے طے شدہ · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "چھوٹا",
+      "sandboxInstanceShared": "مشترکہ",
+      "sandboxInstanceLarge": "بڑا",
+      "sandboxInstanceDevcontainer": "ڈیو کنٹینر",
+      "sandboxInstanceProviderDefault": "فراہم کنندہ کا پہلے سے طے شدہ",
+      "sandboxCouldNotLoad": "سینڈ باکس کے اختیارات لوڈ نہیں ہو سکے",
+      "sandboxUnavailable": "یہ سینڈ باکس دستیاب نہیں ہے۔ کوئی اور سینڈ باکس یا پہلے سے طے شدہ منتخب کریں۔",
+      "sandboxUseDefault": "پہلے سے طے شدہ استعمال کریں"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہو گئی ہے۔",
@@ -2492,6 +2510,12 @@
       "startNewSession": "نیا سیشن شروع کریں",
       "exitSession": "سیشن سے باہر نکلیں",
       "clearSession": "یہ سیشن ختم کریں اور نیا شروع کریں",
+      "compactDescription": "موجودہ سیشن کا سیاق مختصر کریں",
+      "goalDescription": "سیشن کے ہدف کی طرف کام جاری رکھیں۔ /goal <objective> یا pause, resume, clear",
+      "initDescription": "رہنمائی شدہ AGENTS.md سیٹ اپ",
+      "resumeClaudeDescription": "Claude Code سیشن کی نقل درآمد کریں",
+      "resumeCodexDescription": "OpenAI Codex سیشن کی نقل درآمد کریں",
+      "reviewDescription": "تبدیلیوں کا جائزہ لیں [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} استعمال کریں",
       "insert": "داخل کریں",
       "upgradeRequiredFallback": "براہ کرم یہ کمانڈ استعمال کرنے کے لیے اپنا CLI اپ گریڈ کریں۔",
@@ -2609,6 +2633,7 @@
     "couldNotLoadActiveSessions": "فعال سیشنز لوڈ نہیں ہو سکے۔",
     "agentSessions": "ابھی جاری",
     "newCodingTask": "کوڈنگ کا نیا کام",
+    "newTaskFromPicture": "تصویر سے نیا کام",
     "explore": "دریافت کریں",
     "seeAll": "سب دیکھیں",
     "noLiveSessions": "اس وقت کچھ بھی نہیں چل رہا"
@@ -2830,7 +2855,8 @@
     "aiProvidersWhat": "آپ کے پرامپٹس، گفتگو کا ریکارڈ اور آپ کی منسلک کردہ فائلیں۔",
     "aiProvidersWhy": "AI کے جوابات تیار کرنے کے لیے۔",
     "aiProvidersWho": "Anthropic، OpenAI، Google اور وہ دیگر فراہم کنندگان جنہیں آپ ہر درخواست کے لیے منتخب کرتے ہیں۔",
-    "gatewayWhat": "اکاؤنٹ کی ID، درخواست کا میٹاڈیٹا اور ٹوکن کا استعمال۔",
+    "gatewayWhat": "اکاؤنٹ کی ID، درخواست کا میٹاڈیٹا، ٹوکن کا استعمال، اور وہ پرامپٹس اور صوتی ریکارڈنگز جو ایپ اس کے ذریعے بھیجتی ہے۔",
+    "viaGateway": "Kilo Gateway کے ذریعے",
     "gatewayWhy": "شناخت کی تصدیق، درخواستیں متعلقہ جگہ بھیجنا اور بلنگ کے حساب کا ملاپ۔",
     "gatewayWho": "Kilo (kilo.ai)۔",
     "crashReportingWhat": "کریش اور خرابی کی رپورٹس جن سے ایپ کا مواد ہٹا دیا گیا ہو۔",
@@ -2850,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer۔",
     "voiceTranscriptionWhat": "بول کر لکھواتے وقت آپ کی آواز کی ریکارڈنگ۔",
     "voiceTranscriptionWhy": "آواز کو متن میں بدلنے کے لیے۔",
-    "voiceTranscriptionWho": "صرف آپ کی ڈیوائس پر، یا اگر یہ ڈیوائس آواز کو آف لائن متن میں نہ بدل سکے تو Apple یا Google کے پاس۔",
+    "voiceTranscriptionWho": "آپ کی ڈیوائس، آپ کے منتخب کردہ ٹرانسکرپشن ماڈل کے ساتھ Kilo Gateway، یا آن لائن شناخت کے لیے Apple یا Google۔",
     "installAttributionPromptTitle": "انسٹالیشن کے ذریعے کی شناخت کی اجازت دیں؟",
     "installAttributionPromptMessage": "Kilo صرف یہ جاننے کے لیے Apple کی ٹریکنگ کی اجازت استعمال کرتا ہے کہ آپ کس ذریعے سے یہاں آئے۔ اس مقصد کے لیے آپ کے پرامپٹس اور گفتگو کبھی استعمال نہیں ہوتے۔",
     "what": "کیا",
@@ -3060,6 +3086,12 @@
     "privacy": "ایجنٹس دیکھنے کے لیے Kilo کھولیں",
     "openAgents": "ایجنٹس کھولیں",
     "needsInput": "ان پٹ درکار",
+    "newestSession": "تازہ ترین: {{title}}",
+    "noneWaiting": "کوئی ایجنٹ انتظار میں نہیں",
+    "newAgent": "نیا ایجنٹ",
+    "approving": "منظور کیا جا رہا ہے...",
+    "couldNotApprove": "منظور نہیں کیا جا سکا",
+    "couldNotStart": "شروع نہیں کیا جا سکا",
     "channelName": "فعال ایجنٹس",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔"
   },
@@ -3095,5 +3127,12 @@
     "remoteFound": "کمپیوٹر منسلک ہو گیا",
     "checkAgain": "دوبارہ جانچیں",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ایجنٹ شروع کرنے کے لیے پرامپٹ درکار ہے۔ ایک پرامپٹ شامل کریں اور اسے دوبارہ چلائیں۔",
+      "repositoryUnknown": "Kilo، {{repository}} کو GitHub یا GitLab ریپوزٹری کے طور پر نہیں پہچانتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔",
+      "repositoryUnsupported": "{{repository}} ایک Bitbucket ریپوزٹری ہے — ایجنٹ شروع کریں ابھی اسے استعمال نہیں کر سکتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔"
+    }
   }
 }

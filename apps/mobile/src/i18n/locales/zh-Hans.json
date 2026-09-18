@@ -1565,6 +1565,7 @@
       "exitNeedsNewerCli": "远程斜杠命令需要更高版本的 Kilo CLI。请更新 Kilo CLI 后重新连接。"
     },
     "sessionConnection": {
+      "label": "连接",
       "connecting": "正在连接……",
       "reconnecting": "正在重新连接……",
       "connectionLost": "连接已断开",
@@ -1584,7 +1585,9 @@
       "removeConfirmTitle": "移除目标？",
       "removeConfirmMessage": "CLI 会清除此会话的目标。",
       "updateFailed": "无法更新目标。",
-      "sectionAccessibility": "{{status}}。目标：{{text}}"
+      "sectionAccessibility": "{{status}}。目标：{{text}}",
+      "collapse": "折叠目标",
+      "expand": "展开目标"
     },
     "newSession": {
       "recentlyUsed": "最近使用",
@@ -1638,7 +1641,20 @@
       "continueFrom": "正在继续会话“{{title}}”。",
       "importingSession": "正在导入会话",
       "cliCannotContinue": "此 CLI 无法继续会话。请选择 Cloud Agent 或其他 CLI。",
-      "importFailed": "无法导入此会话。"
+      "importFailed": "无法导入此会话。",
+      "sandbox": "沙盒",
+      "sandboxAccessibility": "沙盒：{{label}}",
+      "sandboxDefaultWithDestination": "默认 · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "小型",
+      "sandboxInstanceShared": "共享",
+      "sandboxInstanceLarge": "大型",
+      "sandboxInstanceDevcontainer": "开发容器",
+      "sandboxInstanceProviderDefault": "提供商默认",
+      "sandboxCouldNotLoad": "无法加载沙盒选项",
+      "sandboxUnavailable": "此沙盒不可用。请选择其他沙盒或默认。",
+      "sandboxUseDefault": "使用默认"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件。",
@@ -2004,6 +2020,12 @@
       "startNewSession": "开始新会话",
       "exitSession": "退出会话",
       "clearSession": "结束当前会话并开始新会话",
+      "compactDescription": "压缩当前会话的上下文",
+      "goalDescription": "继续朝着会话目标推进。/goal <objective> 或 pause、resume、clear",
+      "initDescription": "引导式 AGENTS.md 设置",
+      "resumeClaudeDescription": "导入 Claude Code 会话记录",
+      "resumeCodexDescription": "导入 OpenAI Codex 会话记录",
+      "reviewDescription": "查看更改 [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "使用 /{{command}}",
       "insert": "插入",
       "upgradeRequiredFallback": "请升级 CLI 后再使用此命令。",
@@ -2121,6 +2143,7 @@
     "couldNotLoadActiveSessions": "无法加载进行中的会话。",
     "agentSessions": "正在进行",
     "newCodingTask": "新建编程任务",
+    "newTaskFromPicture": "从图片新建任务",
     "explore": "探索",
     "seeAll": "查看全部",
     "noLiveSessions": "暂无正在运行的会话"
@@ -2342,7 +2365,8 @@
     "aiProvidersWhat": "你的提示词、对话记录及添加的所有附件。",
     "aiProvidersWhy": "用于生成 AI 回复。",
     "aiProvidersWho": "Anthropic、OpenAI、Google，以及你在每次请求中选择的其他提供商。",
-    "gatewayWhat": "账户 ID、请求元数据、词元用量。",
+    "gatewayWhat": "账户 ID、请求元数据、词元用量，以及应用通过网关发送的提示词和语音录音。",
+    "viaGateway": "通过 Kilo Gateway",
     "gatewayWhy": "身份验证、请求路由、账单核对。",
     "gatewayWho": "Kilo（kilo.ai）。",
     "crashReportingWhat": "已移除应用内容的崩溃和错误报告。",
@@ -2362,7 +2386,7 @@
     "installAttributionWho": "AppsFlyer。",
     "voiceTranscriptionWhat": "你使用语音输入时的录音。",
     "voiceTranscriptionWhy": "用于将语音转换为文本。",
-    "voiceTranscriptionWho": "仅在本机处理；如果设备无法离线转写，则由 Apple 或 Google 处理。",
+    "voiceTranscriptionWho": "你的设备、使用你选择的转写模型的 Kilo Gateway，或用于在线识别的 Apple 或 Google。",
     "what": "共享内容",
     "why": "用途",
     "who": "接收方",
@@ -2475,6 +2499,8 @@
       "replyBody": "回复正文",
       "replyForbidden": "你无权回复此拉取请求。",
       "addCommentCta": "评论此拉取请求",
+      "fixWithKilo": "使用 Kilo 修复",
+      "fixWithKiloPrompt": "请处理以下 PR 评论：{{link}}",
       "commentBadRequest": "无法发布此评论。此拉取请求可能已发生变化。",
       "commentForbidden": "你无权评论此拉取请求。",
       "replyPlaceholder": "回复…",
@@ -3060,6 +3086,12 @@
     "privacy": "打开 Kilo 查看智能体",
     "openAgents": "打开智能体",
     "needsInput": "等待输入",
+    "newestSession": "最新: {{title}}",
+    "noneWaiting": "没有等待中的智能体",
+    "newAgent": "新建智能体",
+    "approving": "正在批准...",
+    "couldNotApprove": "无法批准",
+    "couldNotStart": "无法启动",
     "channelName": "运行中的智能体",
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。"
   },
@@ -3095,5 +3127,12 @@
     "remoteFound": "电脑已连接",
     "checkAgain": "重新检查",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "启动智能体需要提示词。请添加提示词后重新运行。",
+      "repositoryUnknown": "Kilo 无法将 {{repository}} 识别为 GitHub 或 GitLab 仓库。请在 Kilo 中选择其他仓库。",
+      "repositoryUnsupported": "{{repository}} 是 Bitbucket 仓库——启动智能体暂时无法使用它。请在 Kilo 中选择其他仓库。"
+    }
   }
 }

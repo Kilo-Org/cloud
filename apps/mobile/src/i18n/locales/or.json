@@ -480,6 +480,8 @@
       "replyBadRequest": "ଏହି ଉତ୍ତର ପୋଷ୍ଟ କରିହେବ ନାହିଁ। ଥ୍ରେଡ୍ ବଦଳିଥାଇପାରେ।",
       "replyForbidden": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟରେ ଉତ୍ତର ଦେବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "addCommentCta": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟରେ ମନ୍ତବ୍ୟ ଦିଅନ୍ତୁ",
+      "fixWithKilo": "Kilo ସହିତ ସମାଧାନ କରନ୍ତୁ",
+      "fixWithKiloPrompt": "ଦୟାକରି ନିମ୍ନଲିଖିତ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ମନ୍ତବ୍ୟ ସମାଧାନ କରନ୍ତୁ: {{link}}",
       "commentBadRequest": "ଏହି ମନ୍ତବ୍ୟ ପୋଷ୍ଟ କରିହେବ ନାହିଁ। ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ବଦଳିଥାଇପାରେ।",
       "commentForbidden": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟରେ ମନ୍ତବ୍ୟ ଦେବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "moderation": {
@@ -2053,6 +2055,7 @@
       "exitNeedsNewerCli": "ଦୂରରୁ ସ୍ଲାସ୍ କମାଣ୍ଡ ଚଲାଇବାକୁ Kilo CLI ର ନୂଆ ସଂସ୍କରଣ ଆବଶ୍ୟକ। Kilo CLI ଅଦ୍ୟତନ କରି ପୁଣି ସଂଯୋଗ କରନ୍ତୁ।"
     },
     "sessionConnection": {
+      "label": "ସଂଯୋଗ",
       "connecting": "ସଂଯୋଗ ହେଉଛି…",
       "reconnecting": "ପୁଣି ସଂଯୋଗ ହେଉଛି…",
       "connectionLost": "ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ",
@@ -2072,7 +2075,9 @@
       "removeConfirmTitle": "ଲକ୍ଷ୍ୟ ହଟାଇବେ?",
       "removeConfirmMessage": "CLI ଏହି ସେସନର ଲକ୍ଷ୍ୟ ଲିଭାଇଦିଏ।",
       "updateFailed": "ଲକ୍ଷ୍ୟ ଅପଡେଟ୍ କରାଯାଇପାରିଲା ନାହିଁ।",
-      "sectionAccessibility": "{{status}}। ଲକ୍ଷ୍ୟ: {{text}}"
+      "sectionAccessibility": "{{status}}। ଲକ୍ଷ୍ୟ: {{text}}",
+      "collapse": "ଲକ୍ଷ୍ୟ ଲୁଚାନ୍ତୁ",
+      "expand": "ଲକ୍ଷ୍ୟ ଦେଖାନ୍ତୁ"
     },
     "newSession": {
       "recentlyUsed": "ନିକଟରେ ବ୍ୟବହୃତ",
@@ -2126,7 +2131,20 @@
       "continueFrom": "{{title}} ଜାରି ରଖାଯାଉଛି।",
       "importingSession": "ସେସନ୍ ଆମଦାନି ହେଉଛି",
       "cliCannotContinue": "ଏହି CLI ସେସନ୍ ଜାରି ରଖିପାରିବ ନାହିଁ। Cloud Agent କିମ୍ବା ଅନ୍ୟ ଏକ CLI ବାଛନ୍ତୁ।",
-      "importFailed": "ଏହି ସେସନ୍ ଆମଦାନି ହୋଇପାରିଲା ନାହିଁ।"
+      "importFailed": "ଏହି ସେସନ୍ ଆମଦାନି ହୋଇପାରିଲା ନାହିଁ।",
+      "sandbox": "ସ୍ୟାଣ୍ଡବକ୍ସ",
+      "sandboxAccessibility": "ସ୍ୟାଣ୍ଡବକ୍ସ: {{label}}",
+      "sandboxDefaultWithDestination": "ଡିଫଲ୍ଟ · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "ଛୋଟ",
+      "sandboxInstanceShared": "ସହଭାଗୀ",
+      "sandboxInstanceLarge": "ବଡ଼",
+      "sandboxInstanceDevcontainer": "ଡେଭ୍ କଣ୍ଟେନର୍",
+      "sandboxInstanceProviderDefault": "ପ୍ରଦାତାଙ୍କ ଡିଫଲ୍ଟ",
+      "sandboxCouldNotLoad": "ସ୍ୟାଣ୍ଡବକ୍ସ ବିକଳ୍ପଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
+      "sandboxUnavailable": "ଏହି ସ୍ୟାଣ୍ଡବକ୍ସ ଉପଲବ୍ଧ ନାହିଁ। ଅନ୍ୟ ଏକ ସ୍ୟାଣ୍ଡବକ୍ସ କିମ୍ବା ଡିଫଲ୍ଟ ବାଛନ୍ତୁ।",
+      "sandboxUseDefault": "ଡିଫଲ୍ଟ ବ୍ୟବହାର କରନ୍ତୁ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି।",
@@ -2492,6 +2510,12 @@
       "startNewSession": "ନୂତନ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ",
       "exitSession": "ସେସନରୁ ବାହାରନ୍ତୁ",
       "clearSession": "ଏହି ସେସନ୍ ସମାପ୍ତ କରି ନୂତନ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ",
+      "compactDescription": "ବର୍ତ୍ତମାନ ସେସନ୍‌ର ପ୍ରସଙ୍ଗ ସଙ୍କୁଚିତ କରନ୍ତୁ",
+      "goalDescription": "ସେସନ୍ ଲକ୍ଷ୍ୟ ଆଡ଼କୁ କାମ ଜାରି ରଖନ୍ତୁ। /goal <objective> କିମ୍ବା pause, resume, clear",
+      "initDescription": "ନିର୍ଦ୍ଦେଶିତ AGENTS.md ସେଟଅପ୍",
+      "resumeClaudeDescription": "Claude Code ସେସନ୍‌ର ଟ୍ରାନ୍ସକ୍ରିପ୍ଟ ଆମଦାନି କରନ୍ତୁ",
+      "resumeCodexDescription": "OpenAI Codex ସେସନ୍‌ର ଟ୍ରାନ୍ସକ୍ରିପ୍ଟ ଆମଦାନି କରନ୍ତୁ",
+      "reviewDescription": "ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ସମୀକ୍ଷା କରନ୍ତୁ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ବ୍ୟବହାର କରନ୍ତୁ",
       "insert": "ଯୋଡ଼ନ୍ତୁ",
       "upgradeRequiredFallback": "ଏହି କମାଣ୍ଡ ବ୍ୟବହାର କରିବାକୁ ଆପଣଙ୍କ CLI ଅପଗ୍ରେଡ୍ କରନ୍ତୁ।",
@@ -2609,6 +2633,7 @@
     "couldNotLoadActiveSessions": "ସକ୍ରିୟ ସେସନ୍‌ଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "agentSessions": "ଏବେ ଚାଲିଛି",
     "newCodingTask": "ନୂଆ କୋଡିଂ କାର୍ଯ୍ୟ",
+    "newTaskFromPicture": "ଚିତ୍ରରୁ ନୂଆ କାର୍ଯ୍ୟ",
     "explore": "ଅନୁସନ୍ଧାନ",
     "seeAll": "ସବୁ ଦେଖନ୍ତୁ",
     "noLiveSessions": "ଏବେ କିଛି ଚାଲୁନାହିଁ"
@@ -2830,7 +2855,8 @@
     "aiProvidersWhat": "ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ, ବାର୍ତ୍ତାଳାପର ଇତିହାସ ଓ ଆପଣ ଯୋଡ଼ୁଥିବା ଫାଇଲ୍।",
     "aiProvidersWhy": "AI ଉତ୍ତର ତିଆରି କରିବାକୁ।",
     "aiProvidersWho": "Anthropic, OpenAI, Google ଏବଂ ପ୍ରତ୍ୟେକ ଅନୁରୋଧ ପାଇଁ ଆପଣ ବାଛୁଥିବା ଅନ୍ୟ ସେବା ପ୍ରଦାନକାରୀ।",
-    "gatewayWhat": "ଆକାଉଣ୍ଟ ID, ଅନୁରୋଧର ମେଟାଡାଟା ଓ ଟୋକନ୍ ବ୍ୟବହାର।",
+    "gatewayWhat": "ଆକାଉଣ୍ଟ ID, ଅନୁରୋଧର ମେଟାଡାଟା, ଟୋକନ୍ ବ୍ୟବହାର, ଏବଂ ଆପ୍ ଏହା ମାଧ୍ୟମରେ ପଠାଉଥିବା ପ୍ରମ୍ପ୍ଟ ଓ ଭଏସ୍ ରେକର୍ଡିଂ।",
+    "viaGateway": "Kilo Gateway ମାଧ୍ୟମରେ",
     "gatewayWhy": "ପରିଚୟ ଯାଞ୍ଚ, ଅନୁରୋଧକୁ ଠିକ୍ ସେବାକୁ ପଠାଇବା ଓ ବିଲିଂ ହିସାବ ମେଳାଇବା ପାଇଁ।",
     "gatewayWho": "Kilo (kilo.ai)।",
     "crashReportingWhat": "ଆପ୍‌ର ବିଷୟବସ୍ତୁ ହଟାଯାଇଥିବା କ୍ରାଶ୍ ଓ ତ୍ରୁଟି ରିପୋର୍ଟ।",
@@ -2850,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer।",
     "voiceTranscriptionWhat": "ଆପଣ କହି ଲେଖାଉଥିବା ସମୟର ସ୍ୱର ରେକର୍ଡିଂ।",
     "voiceTranscriptionWhy": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାକୁ।",
-    "voiceTranscriptionWho": "କେବଳ ଡିଭାଇସରେ ପ୍ରକ୍ରିୟାକରଣ ହୁଏ। ଡିଭାଇସ୍ ଅଫଲାଇନ୍‌ରେ କଥାକୁ ଲେଖାରେ ବଦଳାଇ ନପାରିଲେ Apple କିମ୍ବା Google କୁ ପଠାଯାଏ।",
+    "voiceTranscriptionWho": "ଆପଣଙ୍କ ଡିଭାଇସ, ଆପଣ ବାଛିଥିବା ଟ୍ରାନ୍ସକ୍ରିପ୍ସନ ମଡେଲ ସହିତ Kilo Gateway, କିମ୍ବା ଅନଲାଇନ୍ ଚିହ୍ନଟ ପାଇଁ Apple କିମ୍ବା Google।",
     "installAttributionPromptTitle": "ଇନଷ୍ଟଲ୍‌ର ଉତ୍ସ ଚିହ୍ନଟ କରିବାକୁ ଅନୁମତି ଦେବେ?",
     "installAttributionPromptMessage": "କେଉଁ ମାଧ୍ୟମରୁ ଆପଣ ଏଠାକୁ ଆସିଛନ୍ତି, କେବଳ ତାହା ଜାଣିବାକୁ Kilo, Apple ର ଟ୍ରାକିଂ ଅନୁମତି ବ୍ୟବହାର କରେ। ଏଥିପାଇଁ ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ ଓ ବାର୍ତ୍ତାଳାପ କେବେ ବି ବ୍ୟବହାର ହୁଏ ନାହିଁ।",
     "what": "କ'ଣ",
@@ -3060,6 +3086,12 @@
     "privacy": "ଏଜେଣ୍ଟ ଦେଖିବା ପାଇଁ Kilo ଖୋଲନ୍ତୁ",
     "openAgents": "ଏଜେଣ୍ଟ ତାଲିକା ଖୋଲନ୍ତୁ",
     "needsInput": "ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ",
+    "newestSession": "ସର୍ବନୂତନ: {{title}}",
+    "noneWaiting": "ଅପେକ୍ଷା କରୁଥିବା ଏଜେଣ୍ଟ ନାହିଁ",
+    "newAgent": "ନୂଆ ଏଜେଣ୍ଟ",
+    "approving": "ଅନୁମୋଦନ କରାଯାଉଛି...",
+    "couldNotApprove": "ଅନୁମୋଦନ କରାଯାଇପାରିଲା ନାହିଁ",
+    "couldNotStart": "ଆରମ୍ଭ କରାଯାଇପାରିଲା ନାହିଁ",
     "channelName": "ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ",
     "activityKitDisabledBody": "ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ ଦେଖିବାକୁ ସେଟିଂସ୍‌ରେ ଲାଇଭ୍ କାର୍ଯ୍ୟକଳାପ ଚାଲୁ କରନ୍ତୁ।"
   },
@@ -3095,5 +3127,12 @@
     "remoteFound": "କମ୍ପ୍ୟୁଟର ସଂଯୋଗ ହୋଇଛି",
     "checkAgain": "ପୁଣି ପରୀକ୍ଷା କରନ୍ତୁ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ଏଜେଣ୍ଟ ଆରମ୍ଭ କରିବାକୁ ଏକ ପ୍ରମ୍ପ୍ଟ ଆବଶ୍ୟକ। ଏକ ପ୍ରମ୍ପ୍ଟ ଯୋଡ଼ନ୍ତୁ ଏବଂ ଏହାକୁ ପୁଣି ଚଲାନ୍ତୁ।",
+      "repositoryUnknown": "Kilo, {{repository}} କୁ GitHub କିମ୍ବା GitLab ରିପୋଜିଟୋରୀ ଭାବରେ ଚିହ୍ନଟ କରେ ନାହିଁ। Kilo ରେ ଅନ୍ୟ ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।",
+      "repositoryUnsupported": "{{repository}} ଏକ Bitbucket ରିପୋଜିଟୋରୀ — ଏଜେଣ୍ଟ ଆରମ୍ଭ କରନ୍ତୁ ଏପର୍ଯ୍ୟନ୍ତ ଏହାକୁ ବ୍ୟବହାର କରିପାରିବ ନାହିଁ। Kilo ରେ ଅନ୍ୟ ଏକ ରିପୋଜିଟୋରୀ ବାଛନ୍ତୁ।"
+    }
   }
 }

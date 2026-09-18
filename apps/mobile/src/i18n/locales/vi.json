@@ -1565,6 +1565,7 @@
       "exitNeedsNewerCli": "Bạn cần phiên bản Kilo CLI mới hơn để dùng lệnh dấu gạch chéo từ xa. Hãy cập nhật Kilo CLI và kết nối lại."
     },
     "sessionConnection": {
+      "label": "Kết nối",
       "connecting": "Đang kết nối…",
       "reconnecting": "Đang kết nối lại…",
       "connectionLost": "Mất kết nối",
@@ -1584,7 +1585,9 @@
       "removeConfirmTitle": "Xóa mục tiêu?",
       "removeConfirmMessage": "CLI xóa mục tiêu của phiên này.",
       "updateFailed": "Không thể cập nhật mục tiêu.",
-      "sectionAccessibility": "{{status}}. Mục tiêu: {{text}}"
+      "sectionAccessibility": "{{status}}. Mục tiêu: {{text}}",
+      "collapse": "Thu gọn mục tiêu",
+      "expand": "Mở rộng mục tiêu"
     },
     "newSession": {
       "recentlyUsed": "Đã dùng gần đây",
@@ -1638,7 +1641,20 @@
       "continueFrom": "Đang tiếp tục phiên {{title}}.",
       "importingSession": "Đang nhập phiên",
       "cliCannotContinue": "CLI này không hỗ trợ tiếp tục phiên. Hãy chọn Cloud Agent hoặc CLI khác.",
-      "importFailed": "Không thể nhập phiên này."
+      "importFailed": "Không thể nhập phiên này.",
+      "sandbox": "Môi trường cô lập",
+      "sandboxAccessibility": "Môi trường cô lập: {{label}}",
+      "sandboxDefaultWithDestination": "Mặc định · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Nhỏ",
+      "sandboxInstanceShared": "Dùng chung",
+      "sandboxInstanceLarge": "Lớn",
+      "sandboxInstanceDevcontainer": "Container phát triển",
+      "sandboxInstanceProviderDefault": "Mặc định của nhà cung cấp",
+      "sandboxCouldNotLoad": "Không thể tải các tùy chọn sandbox",
+      "sandboxUnavailable": "Môi trường cô lập này không khả dụng. Hãy chọn môi trường cô lập khác hoặc Mặc định.",
+      "sandboxUseDefault": "Dùng Mặc định"
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp.",
@@ -2004,6 +2020,12 @@
       "startNewSession": "Bắt đầu phiên mới",
       "exitSession": "Thoát phiên",
       "clearSession": "Kết thúc phiên này và bắt đầu phiên mới",
+      "compactDescription": "nén ngữ cảnh của phiên hiện tại",
+      "goalDescription": "Tiếp tục làm việc hướng tới mục tiêu của phiên. /goal <objective> hoặc pause, resume, clear",
+      "initDescription": "thiết lập AGENTS.md có hướng dẫn",
+      "resumeClaudeDescription": "nhập bản ghi phiên Claude Code",
+      "resumeCodexDescription": "nhập bản ghi phiên OpenAI Codex",
+      "reviewDescription": "xem lại các thay đổi [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Dùng /{{command}}",
       "insert": "Chèn",
       "upgradeRequiredFallback": "Vui lòng nâng cấp CLI của bạn để sử dụng lệnh này.",
@@ -2121,6 +2143,7 @@
     "couldNotLoadActiveSessions": "Không thể tải các phiên đang hoạt động.",
     "agentSessions": "Đang hoạt động",
     "newCodingTask": "Tác vụ lập trình mới",
+    "newTaskFromPicture": "Tác vụ mới từ hình ảnh",
     "explore": "Khám phá",
     "seeAll": "Xem tất cả",
     "noLiveSessions": "Hiện không có phiên nào đang chạy"
@@ -2342,7 +2365,8 @@
     "aiProvidersWhat": "Yêu cầu, lịch sử trò chuyện và mọi tệp bạn đính kèm.",
     "aiProvidersWhy": "Để tạo phản hồi AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google và các nhà cung cấp khác mà bạn chọn cho từng yêu cầu.",
-    "gatewayWhat": "ID tài khoản, siêu dữ liệu yêu cầu, mức sử dụng token.",
+    "gatewayWhat": "ID tài khoản, siêu dữ liệu yêu cầu, mức sử dụng token, cùng các câu lệnh và bản ghi âm mà ứng dụng gửi qua đó.",
+    "viaGateway": "Qua Kilo Gateway",
     "gatewayWhy": "Xác thực, định tuyến yêu cầu, đối soát thanh toán.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Báo cáo sự cố và lỗi, đã loại bỏ nội dung ứng dụng.",
@@ -2362,7 +2386,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Bản ghi âm khi bạn nhập bằng giọng nói.",
     "voiceTranscriptionWhy": "Để chuyển giọng nói thành văn bản.",
-    "voiceTranscriptionWho": "Chỉ xử lý trên thiết bị; nếu thiết bị không thể chuyển giọng nói thành văn bản ngoại tuyến, dữ liệu sẽ được gửi đến Apple hoặc Google.",
+    "voiceTranscriptionWho": "Thiết bị của bạn, Kilo Gateway với mô hình phiên âm bạn chọn, hoặc Apple hoặc Google để nhận dạng trực tuyến.",
     "what": "Dữ liệu chia sẻ",
     "why": "Mục đích",
     "who": "Bên nhận dữ liệu",
@@ -2475,6 +2499,8 @@
       "replyBody": "Nội dung trả lời",
       "replyForbidden": "Bạn không có quyền trả lời trong PR này.",
       "addCommentCta": "Bình luận trong PR này",
+      "fixWithKilo": "Sửa bằng Kilo",
+      "fixWithKiloPrompt": "Vui lòng xử lý bình luận PR sau: {{link}}",
       "commentBadRequest": "Không thể đăng bình luận này. PR có thể đã thay đổi.",
       "commentForbidden": "Bạn không có quyền bình luận trong PR này.",
       "replyPlaceholder": "Trả lời…",
@@ -3060,6 +3086,12 @@
     "privacy": "Mở Kilo để xem tác nhân",
     "openAgents": "Mở danh sách tác nhân",
     "needsInput": "Cần phản hồi",
+    "newestSession": "Mới nhất: {{title}}",
+    "noneWaiting": "Không có tác nhân nào chờ",
+    "newAgent": "Tác nhân mới",
+    "approving": "Đang phê duyệt...",
+    "couldNotApprove": "Không thể phê duyệt",
+    "couldNotStart": "Không thể bắt đầu",
     "channelName": "Tác nhân đang hoạt động",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
   },
@@ -3095,5 +3127,12 @@
     "remoteFound": "Đã kết nối máy tính",
     "checkAgain": "Kiểm tra lại",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Bắt đầu trợ lý cần một lời nhắc. Thêm lời nhắc và chạy lại.",
+      "repositoryUnknown": "Kilo không nhận diện {{repository}} là kho mã nguồn GitHub hoặc GitLab. Chọn kho mã nguồn khác trong Kilo.",
+      "repositoryUnsupported": "{{repository}} là kho mã nguồn Bitbucket — Bắt đầu trợ lý chưa thể dùng nó. Chọn kho mã nguồn khác trong Kilo."
+    }
   }
 }

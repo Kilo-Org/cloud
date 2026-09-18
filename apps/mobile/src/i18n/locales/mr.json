@@ -480,6 +480,8 @@
       "replyBadRequest": "हे उत्तर पोस्ट करता येत नाही. चर्चेत बदल झाला असेल.",
       "replyForbidden": "तुम्हाला या पुल रिक्वेस्टला उत्तर देण्याची परवानगी नाही.",
       "addCommentCta": "या पुल रिक्वेस्टवर टिप्पणी करा",
+      "fixWithKilo": "Kilo सह दुरुस्त करा",
+      "fixWithKiloPrompt": "कृपया खालील पुल रिक्वेस्ट टिप्पणी सोडवा: {{link}}",
       "commentBadRequest": "ही टिप्पणी पोस्ट करता येत नाही. पुल रिक्वेस्टमध्ये बदल झाला असेल.",
       "commentForbidden": "तुम्हाला या पुल रिक्वेस्टवर टिप्पणी करण्याची परवानगी नाही.",
       "moderation": {
@@ -2053,6 +2055,7 @@
       "exitNeedsNewerCli": "दूरस्थ स्लॅश कमांडसाठी Kilo CLI ची नवीन आवृत्ती आवश्यक आहे. Kilo CLI अद्ययावत करा आणि पुन्हा कनेक्ट करा."
     },
     "sessionConnection": {
+      "label": "कनेक्शन",
       "connecting": "कनेक्ट होत आहे…",
       "reconnecting": "पुन्हा कनेक्ट होत आहे…",
       "connectionLost": "कनेक्शन तुटले",
@@ -2072,7 +2075,9 @@
       "removeConfirmTitle": "ध्येय काढायचे?",
       "removeConfirmMessage": "CLI या सत्राचे ध्येय साफ करते.",
       "updateFailed": "ध्येय अपडेट करता आले नाही.",
-      "sectionAccessibility": "{{status}}. ध्येय: {{text}}"
+      "sectionAccessibility": "{{status}}. ध्येय: {{text}}",
+      "collapse": "ध्येय लपवा",
+      "expand": "ध्येय दाखवा"
     },
     "newSession": {
       "recentlyUsed": "अलीकडे वापरलेले",
@@ -2126,7 +2131,20 @@
       "continueFrom": "{{title}} हे सत्र पुढे सुरू होत आहे.",
       "importingSession": "सत्र आयात होत आहे",
       "cliCannotContinue": "हे CLI सत्र सुरू ठेवू शकत नाही. Cloud Agent किंवा दुसरे CLI निवडा.",
-      "importFailed": "हे सत्र आयात करता आले नाही."
+      "importFailed": "हे सत्र आयात करता आले नाही.",
+      "sandbox": "सॅंडबॉक्स",
+      "sandboxAccessibility": "सॅंडबॉक्स: {{label}}",
+      "sandboxDefaultWithDestination": "डीफॉल्ट · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "लहान",
+      "sandboxInstanceShared": "सामायिक",
+      "sandboxInstanceLarge": "मोठा",
+      "sandboxInstanceDevcontainer": "डेव्ह कंटेनर",
+      "sandboxInstanceProviderDefault": "प्रदात्याचे डीफॉल्ट",
+      "sandboxCouldNotLoad": "सॅंडबॉक्स पर्याय लोड करता आले नाहीत",
+      "sandboxUnavailable": "हा सॅंडबॉक्स उपलब्ध नाही. दुसरा सॅंडबॉक्स किंवा डीफॉल्ट निवडा.",
+      "sandboxUseDefault": "डीफॉल्ट वापरा"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्ययावत केली.",
@@ -2492,6 +2510,12 @@
       "startNewSession": "नवीन सत्र सुरू करा",
       "exitSession": "सत्रातून बाहेर पडा",
       "clearSession": "हे सत्र संपवा आणि नवीन सुरू करा",
+      "compactDescription": "सध्याच्या सत्राचा संदर्भ संकुचित करा",
+      "goalDescription": "सत्र ध्येयाच्या दिशेने काम सुरू ठेवा. /goal <objective> किंवा pause, resume, clear",
+      "initDescription": "मार्गदर्शित AGENTS.md सेटअप",
+      "resumeClaudeDescription": "Claude Code सत्राचे ट्रान्स्क्रिप्ट आयात करा",
+      "resumeCodexDescription": "OpenAI Codex सत्राचे ट्रान्स्क्रिप्ट आयात करा",
+      "reviewDescription": "बदलांचे पुनरावलोकन करा [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} वापरा",
       "insert": "घाला",
       "upgradeRequiredFallback": "ही कमांड वापरण्यासाठी कृपया तुमचे CLI अद्ययावत करा.",
@@ -2609,6 +2633,7 @@
     "couldNotLoadActiveSessions": "सक्रिय सत्रे लोड करता आली नाहीत.",
     "agentSessions": "सध्या सुरू असलेली",
     "newCodingTask": "नवीन कोडिंग काम",
+    "newTaskFromPicture": "चित्रातून नवीन काम",
     "explore": "आणखी सुविधा",
     "seeAll": "सर्व पाहा",
     "noLiveSessions": "सध्या काहीही चालू नाही"
@@ -2830,7 +2855,8 @@
     "aiProvidersWhat": "तुमचे प्रॉम्प्ट, संभाषणाचा इतिहास आणि तुम्ही जोडलेल्या फाइल्स.",
     "aiProvidersWhy": "AI प्रतिसाद तयार करण्यासाठी.",
     "aiProvidersWho": "Anthropic, OpenAI, Google आणि प्रत्येक विनंतीसाठी तुम्ही निवडलेले इतर सेवा पुरवठादार.",
-    "gatewayWhat": "खात्याचा ID, विनंतीचा मेटाडेटा, टोकनचा वापर.",
+    "gatewayWhat": "खात्याचा ID, विनंतीचा मेटाडेटा, टोकनचा वापर, आणि अ‍ॅप यामार्फत पाठवत असलेले प्रॉम्प्ट व व्हॉइस रेकॉर्डिंग.",
+    "viaGateway": "Kilo Gateway द्वारे",
     "gatewayWhy": "ओळख पडताळणे, विनंत्या योग्य ठिकाणी पाठवणे आणि बिलिंगचा ताळमेळ घालणे.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "अ‍ॅपमधील मजकूर व इतर सामग्री काढून टाकलेले क्रॅश आणि त्रुटींचे अहवाल.",
@@ -2850,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "तुम्ही बोलून मजकूर लिहवताना केलेले आवाजाचे रेकॉर्डिंग.",
     "voiceTranscriptionWhy": "बोलण्याचे मजकुरात रूपांतर करण्यासाठी.",
-    "voiceTranscriptionWho": "फक्त डिव्हाइसवर प्रक्रिया होते. या डिव्हाइसवर ऑफलाइन लिप्यंतरण करता येत नसल्यास Apple किंवा Google कडे पाठवले जाते.",
+    "voiceTranscriptionWho": "तुमचे डिव्हाइस, तुम्ही निवडलेल्या ट्रान्सक्रिप्शन मॉडेलसह Kilo Gateway, किंवा ऑनलाइन ओळखीसाठी Apple किंवा Google.",
     "installAttributionPromptTitle": "इंस्टॉलचा स्रोत ओळखण्यास परवानगी द्यायची?",
     "installAttributionPromptMessage": "तुम्ही कोणत्या माध्यमातून येथे आलात हे जाणून घेण्यासाठीच Kilo Apple ची ट्रॅकिंग परवानगी वापरते. यासाठी तुमचे प्रॉम्प्ट आणि संभाषणे कधीही वापरली जात नाहीत.",
     "what": "काय",
@@ -3060,6 +3086,12 @@
     "privacy": "एजंट्स पाहण्यासाठी Kilo उघडा",
     "openAgents": "एजंट्स उघडा",
     "needsInput": "प्रतिसाद आवश्यक",
+    "newestSession": "सर्वात नवीन: {{title}}",
+    "noneWaiting": "प्रतीक्षा करणारा एजंट नाही",
+    "newAgent": "नवा एजंट",
+    "approving": "मंजूर केले जात आहे...",
+    "couldNotApprove": "मंजूर करता आले नाही",
+    "couldNotStart": "सुरू करता आले नाही",
     "channelName": "सक्रिय एजंट्स",
     "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये लाइव्ह अॅक्टिव्हिटी चालू करा."
   },
@@ -3095,5 +3127,12 @@
     "remoteFound": "संगणक जोडला",
     "checkAgain": "पुन्हा तपासा",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "एजंट सुरू करण्यासाठी प्रॉम्प्ट आवश्यक आहे. प्रॉम्प्ट जोडा आणि ते पुन्हा चालवा.",
+      "repositoryUnknown": "Kilo, {{repository}} ला GitHub किंवा GitLab रिपॉझिटरी म्हणून ओळखत नाही. Kilo मध्ये दुसरी रिपॉझिटरी निवडा.",
+      "repositoryUnsupported": "{{repository}} ही Bitbucket रिपॉझिटरी आहे — एजंट सुरू करा अजून ती वापरू शकत नाही. Kilo मध्ये दुसरी रिपॉझिटरी निवडा."
+    }
   }
 }

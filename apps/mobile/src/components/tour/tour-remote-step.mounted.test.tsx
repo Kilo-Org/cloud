@@ -36,6 +36,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   View: 'View',
   Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
 }));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -52,7 +53,15 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     good: '#24784A',
   }),
 }));
+// Load-bearing, not leftover: the error branch renders `QueryError`, whose
+// `EmptyState` imports `@/components/centered-state`. That real module pulls
+// `expo`/`@sentry/react-native` through the native surface-geometry hook, and
+// those externalized packages load the real `react-native` index, which the
+// node-env harness cannot parse. The step itself never renders `CenteredState`
+// — it centres the body with the scroll container's own classes — so the
+// zero-count assertion below stays honest.
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -149,6 +158,24 @@ describe('TourRemoteStep', () => {
     // The header sits above the slot, never inside it: a state swap inside the
     // slot cannot move the illustration and heading.
     layoutSlot(renderer);
+
+    unmount();
+  });
+
+  it('centres the step body in the band between the header and the action bar', async () => {
+    fetchInstances.mockResolvedValue({ instances: [] });
+    const { renderer, unmount } = await mountStep();
+
+    // One ScrollView owns the whole step body. Its content container grows to
+    // the viewport (`grow`) and distributes the header and the reserved slot in
+    // the middle (`justify-center`), so the block sits in the space between the
+    // header and the Skip bar instead of against the header. `grow` is a
+    // minimum, so taller content still scrolls rather than being clipped.
+    const scroller = renderer.root.findByType('ScrollView' as ElementType);
+    expect(scroller.props.contentContainerClassName).toBe(
+      'grow items-center justify-center gap-6 px-6 py-6'
+    );
+    expect(renderer.root.findAllByType('CenteredState' as ElementType)).toHaveLength(0);
 
     unmount();
   });

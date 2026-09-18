@@ -14,6 +14,7 @@ import {
 import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
+import { NewTaskFromPictureButton } from '@/components/home/new-task-from-picture-button';
 import { ProductChoices } from '@/components/home/product-choices';
 import { ScreenHeader } from '@/components/screen-header';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -80,8 +81,9 @@ export function HomeScreen() {
           <Animated.View layout={LinearTransition} className="gap-2">
             <AgentSessionsSection context={context} sessions={sessions} />
             {context.isReady && (
-              <View className="pt-4">
+              <View className="gap-2 pt-4">
                 <NewTaskButton organizationId={context.organizationId} />
+                <NewTaskFromPictureButton organizationId={context.organizationId} />
               </View>
             )}
             {context.accountReady && (

@@ -617,6 +617,15 @@ export const baseGetSandboxStatusNextSchema = z
   })
   .strict();
 
+export const baseGetPendingInteractionsNextSchema = z.object({
+  cloudAgentSessionId: z.string(),
+});
+
+export const baseGetPendingInteractionsNextOutputSchema = z.object({
+  questions: z.array(z.unknown()),
+  permissions: z.array(z.unknown()),
+});
+
 export const baseWorktreeChangesNextSchema = z
   .object({
     cloudAgentSessionId: z

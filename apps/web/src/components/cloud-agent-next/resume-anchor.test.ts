@@ -2,7 +2,12 @@ import type { PreparationAttempt, SessionCommit } from '@kilocode/cloud-agent-sd
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { StoredMessage } from './types';
 import { groupConversationMessages, commitsByMessageAnchor } from './message-presentation';
-import { planResumeAttempt, resumeAnchor, resumeAnchorForTranscript } from './resume-anchor';
+import {
+  planResumeAttempt,
+  resumeAnchor,
+  resumeAnchorForTranscript,
+  sendTakesOverResume,
+} from './resume-anchor';
 
 describe('resumeAnchor', () => {
   it('resolves the group that starts with the anchor', () => {
@@ -177,5 +182,27 @@ describe('planResumeAttempt', () => {
 
   it('loads one older page when the anchor may still be in it', () => {
     expect(planResumeAttempt(base)).toBe('load-older');
+  });
+});
+
+describe('sendTakesOverResume', () => {
+  it('lets the send take over the resume that was live when it was sent', () => {
+    const attempt = { done: false };
+    expect(sendTakesOverResume(attempt, attempt)).toBe(true);
+  });
+
+  it('lets a send with no resume re-arm follow', () => {
+    expect(sendTakesOverResume(null, null)).toBe(true);
+  });
+
+  it('yields to a newer `?at=` link that arrived while the send was in flight', () => {
+    // The link's layout effect has already landed its anchor and marked the
+    // attempt done, so it will not pause again: re-arming follow here would
+    // move the viewport to the bottom and abandon the anchor.
+    expect(sendTakesOverResume({ done: false }, { done: true })).toBe(false);
+  });
+
+  it('yields to a link that arrived while a send with no resume was in flight', () => {
+    expect(sendTakesOverResume(null, { done: true })).toBe(false);
   });
 });

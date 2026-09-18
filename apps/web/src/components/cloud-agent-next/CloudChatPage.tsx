@@ -39,7 +39,11 @@ import {
   isRenderableSessionCost,
 } from './session-cost-breakdown';
 import { ConversationMessages } from './ConversationMessages';
-import { planResumeAttempt, resumeAnchorForTranscript } from './resume-anchor';
+import {
+  planResumeAttempt,
+  resumeAnchorForTranscript,
+  sendTakesOverResume,
+} from './resume-anchor';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
@@ -697,10 +701,15 @@ export default function CloudChatPage({
       if (!accepted) {
         return false;
       }
-      // Take the position over for the output this send produces. Mark the
-      // attempt that was live at send time — a `?at=` link that arrived while
-      // the send was in flight owns the position now.
-      if (resumeStateAtSend && resumeStateRef.current === resumeStateAtSend) {
+      // Take the position over for the output this send produces — but only
+      // from the attempt that was live at send time. A `?at=` link that arrived
+      // while the send was in flight owns the position now: its layout effect
+      // already landed its anchor and marked that attempt done, so re-arming
+      // follow here would move the viewport to the bottom and abandon it.
+      if (!sendTakesOverResume(resumeStateAtSend, resumeStateRef.current)) {
+        return true;
+      }
+      if (resumeStateAtSend) {
         resumeStateAtSend.done = true;
       }
       shouldAutoScrollRef.current = true;
@@ -728,7 +737,13 @@ export default function CloudChatPage({
       if (!accepted) {
         return false;
       }
-      if (resumeStateAtSend && resumeStateRef.current === resumeStateAtSend) {
+      // As with a message send: the command takes the position over only from
+      // the resume that was live when it was sent. A newer `?at=` link owns the
+      // position and must not be abandoned at the bottom.
+      if (!sendTakesOverResume(resumeStateAtSend, resumeStateRef.current)) {
+        return true;
+      }
+      if (resumeStateAtSend) {
         resumeStateAtSend.done = true;
       }
       shouldAutoScrollRef.current = true;

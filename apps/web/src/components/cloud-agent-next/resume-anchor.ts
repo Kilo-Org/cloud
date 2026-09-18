@@ -140,3 +140,20 @@ export function planResumeAttempt({
   }
   return 'load-older';
 }
+
+/**
+ * Whether an accepted send may re-arm follow and take the position over. It may
+ * only from the resume attempt that was live when it was sent: when the live
+ * attempt is a different one, a `?at=` link arrived while the send was in
+ * flight, its layout effect has already landed the anchor (and marked the
+ * attempt done, so it will not pause again on a later render), and re-arming
+ * follow would move the viewport to the bottom and abandon that anchor.
+ *
+ * The attempts are compared by identity; `null` means no resume was live.
+ */
+export function sendTakesOverResume<T extends object>(
+  resumeAtSend: T | null,
+  resumeNow: T | null
+): boolean {
+  return resumeNow === resumeAtSend;
+}

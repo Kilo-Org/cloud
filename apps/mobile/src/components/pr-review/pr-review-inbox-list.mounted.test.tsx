@@ -224,9 +224,10 @@ describe('PrReviewInboxList side insets (landscape)', () => {
 
 // The Conversation-only fixture row's ref (`kilo-stub/discussion-conversation-only#2`)
 // is long enough to fill the row. RN defaults a Text to flexShrink 0, so without a
-// shrinkable, single-line label the row's inner line grows past its container and
+// single-line label that gives way, the row's inner line grows past its container and
 // pushes the term chip through the px-6 padding to the screen edge (the explorer's
-// clipped "Pull request" badge). The label must give way, the chip must not.
+// clipped "Pull request" badge). The label must flex into the space left over, so the
+// chip lands in the same trailing column on every row; the chip must not shrink.
 describe('PrReviewInboxList row overflow', () => {
   beforeEach(() => {
     insetsState.top = 0;
@@ -251,7 +252,9 @@ describe('PrReviewInboxList row overflow', () => {
       node => String(node.type) === 'Text' && String(node.props.className).includes('text-xs')
     );
     expect(label.props.numberOfLines).toBe(1);
-    expect(String(label.props.className)).toContain('shrink');
+    // flex-1 (not just shrink) reserves the badge column: the label takes the
+    // space left over so the chip's right edge is the same on every row.
+    expect(String(label.props.className)).toContain('flex-1');
 
     const chip = renderer.root.find(
       node => String(node.type) === 'View' && String(node.props.className).includes('rounded-full')

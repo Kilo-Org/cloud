@@ -166,7 +166,7 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
           {item.title}
         </Text>
         <View className="flex-row items-center gap-2">
-          <Text variant="muted" className="min-w-0 shrink text-xs" numberOfLines={1}>
+          <Text variant="muted" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
             {rowLabel} · {updatedLabel}
           </Text>
           <InboxChip label={t(providerPrTermKey(item.ref.platform))} />

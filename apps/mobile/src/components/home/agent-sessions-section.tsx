@@ -103,7 +103,17 @@ export function LiveSessionFeedback({
   const denied = context.isReady && sessions.terminalError?.kind === 'non-retryable';
   const unavailable = !context.isResolving && !context.isReady && !context.isError;
   let failure: ReactNode = null;
+  // A whole-surface load failure (no readable rows) is one outage: the block
+  // owns the surface and draws its own Retry for it, so the connection row
+  // stands down while the block is shown. Otherwise the exhausted connection
+  // row stacked a second "Connection lost / Retry" above the error card, two
+  // affordances for one failure (device defect uxs1). The row returns as soon
+  // as the block clears, so the socket's own recovery stays reachable. Rows
+  // that remain readable keep both: the list is still usable there, and the
+  // query retry and the socket retry are separate actions.
+  let failureOwnsRetry = false;
   if (context.isError) {
+    failureOwnsRetry = true;
     failure = (
       <QueryError
         placement="top"
@@ -158,6 +168,10 @@ export function LiveSessionFeedback({
     !statusLineOwnsFailure
   ) {
     const compact = content === 'rows';
+    // The compact form sits beside rows that are still readable, so the two
+    // retries stay separate there; the card form is the whole surface, so it
+    // is the single recovery action (see `failureOwnsRetry` above).
+    failureOwnsRetry = !compact;
     failure = (
       <View className="gap-1">
         {!compact && (
@@ -186,7 +200,11 @@ export function LiveSessionFeedback({
   let connectionLabel: string | null = null;
   if (context.isReady && !isConnected && internet !== 'offline') {
     if (reconnectExhausted) {
-      connectionLabel = t('agentChat.sessionConnection.connectionLost');
+      // The exhausted fact carries the surface's recovery action, so it yields
+      // while the load-failure block already owns one (see `failureOwnsRetry`).
+      // The passive Connecting…/Reconnecting… facts stay: they duplicate
+      // nothing.
+      connectionLabel = failureOwnsRetry ? null : t('agentChat.sessionConnection.connectionLost');
     } else if (!sessions.isPaused) {
       connectionLabel = wasConnected.current
         ? t('agentChat.sessionConnection.reconnecting')
@@ -210,7 +228,7 @@ export function LiveSessionFeedback({
             )}
           />
         )}
-        {context.isReady && !isConnected && reconnectExhausted && (
+        {context.isReady && !isConnected && reconnectExhausted && !failureOwnsRetry && (
           <Button
             variant="ghost"
             size="sm"

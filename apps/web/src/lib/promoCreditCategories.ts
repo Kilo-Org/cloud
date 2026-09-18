@@ -746,13 +746,37 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
   },
 ];
 
+/**
+ * Decrypts one encrypted self-service promo, or returns undefined when its
+ * ciphertext cannot be decrypted.
+ *
+ * `decryptPromoCode` throws when `CREDIT_CATEGORIES_ENCRYPTION_KEY_V2` /
+ * `CREDIT_CATEGORIES_ENCRYPTION_KEY` is set but does not match the ciphertext
+ * (a stale or misconfigured key). Because this module is imported by
+ * `lib/user`, a throw here happens during module evaluation and takes down
+ * every route that resolves a user — including native email sign-in. A single
+ * unreadable promo must not cost more than that promo: log it and skip it.
+ */
+function decryptSelfServicePromo(
+  config: EncryptedSelfServicePromoCreditCategoryConfig
+): SelfServicePromoCreditCategoryConfig | undefined {
+  const { encrypted_credit_category, ...rest } = config;
+  try {
+    return { ...rest, credit_category: decryptPromoCode(encrypted_credit_category) };
+  } catch (error) {
+    console.error(
+      '[promoCreditCategories] Skipping self-service promo: credit category could not be decrypted. ' +
+        'Check CREDIT_CATEGORIES_ENCRYPTION_KEY_V2 / CREDIT_CATEGORIES_ENCRYPTION_KEY.',
+      error instanceof Error ? error.message : error
+    );
+    return undefined;
+  }
+}
+
 const selfServicePromos: readonly SelfServicePromoCreditCategoryConfig[] =
-  encryptedSelfServicePromos.map(
-    ({ encrypted_credit_category, ...rest }): SelfServicePromoCreditCategoryConfig => ({
-      ...rest,
-      credit_category: decryptPromoCode(encrypted_credit_category),
-    })
-  );
+  encryptedSelfServicePromos
+    .map(decryptSelfServicePromo)
+    .filter((promo): promo is SelfServicePromoCreditCategoryConfig => promo !== undefined);
 
 export const promoCreditCategories: readonly PromoCreditCategoryConfig[] = [
   ...promoCategoriesOld,

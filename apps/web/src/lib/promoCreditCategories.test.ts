@@ -1,7 +1,13 @@
 import { promoCategoriesOld } from '@/lib/promoCreditCategoriesOld';
 import { promoCreditCategories } from './promoCreditCategories';
+import type { PromoCreditCategoryConfig } from './PromoCreditCategoryConfig';
 
 import * as z from 'zod';
+
+type PromoCreditCategoriesModule = {
+  promoCreditCategories: readonly PromoCreditCategoryConfig[];
+  promoCreditCategoriesByKey: Map<string, PromoCreditCategoryConfig>;
+};
 
 const GuiCreditCategorySchema = z.object({
   credit_category: z.string(),
@@ -91,5 +97,42 @@ describe('promoCreditCategories', () => {
     for (const promo of promoCreditCategories) {
       expect(PromoCreditCategoryConfigSchema.safeParse(promo).success).toBe(true);
     }
+  });
+});
+
+describe('promoCreditCategories with an undecryptable self-service promo', () => {
+  // A stale/misconfigured CREDIT_CATEGORIES_ENCRYPTION_KEY_* makes
+  // decryptPromoCode throw during module evaluation. This module is imported
+  // by lib/user, so a throw here 500s every route that resolves a user,
+  // including native email sign-in. The loader must survive it and drop only
+  // the unreadable entries.
+  it('loads the remaining categories and logs the skipped promo instead of throwing', () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.resetModules();
+    jest.doMock('./promoCreditEncryption', () => ({
+      decryptPromoCode: () => {
+        throw new Error('Unsupported state or unable to authenticate data');
+      },
+    }));
+
+    const loadWithBadKey = (): PromoCreditCategoriesModule => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+        return require('./promoCreditCategories');
+      } finally {
+        jest.dontMock('./promoCreditEncryption');
+        jest.resetModules();
+      }
+    };
+    const moduleWithBadKey = loadWithBadKey();
+
+    // Plaintext (admin/goodwill) categories survive the bad key.
+    expect(moduleWithBadKey.promoCreditCategoriesByKey.has('manual_decrement')).toBe(true);
+    // Every encrypted self-service promo is skipped, and each skip is logged.
+    const skipped = promoCreditCategories.length - moduleWithBadKey.promoCreditCategories.length;
+    const loggedSkips = errorSpy.mock.calls.length;
+    errorSpy.mockRestore();
+    expect(skipped).toBeGreaterThan(0);
+    expect(loggedSkips).toBe(skipped);
   });
 });

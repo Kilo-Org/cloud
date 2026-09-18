@@ -9,7 +9,6 @@ import {
 import { KILO_BROWSER_TOOL_NAMES, KILO_SAFE_BROWSER_TOOL_NAMES } from './browser-tool-definitions';
 import {
   createAssistantMessage,
-  createEvalToolCall,
   createRemoteMcpToolCall,
   createThinkingBlock,
   createToolCall,
@@ -104,9 +103,10 @@ describe('agent LLM harness', () => {
   it('maps conversation events to gateway messages with tool results', () => {
     const userMessage = createUserMessage('What is this page?');
     const assistantMessage = createAssistantMessage('I will inspect it.');
-    const toolCall = createEvalToolCall({
-      code: 'return document.title;',
-      providerToolCallId: 'call_eval_1',
+    const toolCall = createToolCall({
+      arguments: { function: 'return document.title;' },
+      name: 'kilo_browser_evaluate',
+      providerToolCallId: 'call_evaluate_1',
       tabId: 7,
     });
     const toolResult = createToolResult({
@@ -127,10 +127,10 @@ describe('agent LLM harness', () => {
         tool_calls: [
           {
             function: {
-              arguments: '{"code":"return document.title;"}',
-              name: 'eval',
+              arguments: '{"function":"return document.title;"}',
+              name: 'kilo_browser_evaluate',
             },
-            id: 'call_eval_1',
+            id: 'call_evaluate_1',
             type: 'function',
           },
         ],
@@ -138,7 +138,7 @@ describe('agent LLM harness', () => {
       {
         content: '{"ok":true,"value":"Kilo fixture"}',
         role: 'tool',
-        tool_call_id: 'call_eval_1',
+        tool_call_id: 'call_evaluate_1',
       },
     ]);
   });
@@ -200,15 +200,17 @@ describe('agent LLM harness', () => {
     ]);
   });
 
-  it('keeps consecutive eval tool calls in one assistant message', () => {
-    const firstToolCall = createEvalToolCall({
-      code: 'return document.title;',
-      providerToolCallId: 'call_eval_1',
+  it('keeps consecutive browser tool calls in one assistant message', () => {
+    const firstToolCall = createToolCall({
+      arguments: { function: 'return document.title;' },
+      name: 'kilo_browser_evaluate',
+      providerToolCallId: 'call_evaluate_1',
       tabId: 7,
     });
-    const secondToolCall = createEvalToolCall({
-      code: 'return location.href;',
-      providerToolCallId: 'call_eval_2',
+    const secondToolCall = createToolCall({
+      arguments: { function: 'return location.href;' },
+      name: 'kilo_browser_evaluate',
+      providerToolCallId: 'call_evaluate_2',
       tabId: 7,
     });
 
@@ -220,18 +222,18 @@ describe('agent LLM harness', () => {
         tool_calls: [
           {
             function: {
-              arguments: '{"code":"return document.title;"}',
-              name: 'eval',
+              arguments: '{"function":"return document.title;"}',
+              name: 'kilo_browser_evaluate',
             },
-            id: 'call_eval_1',
+            id: 'call_evaluate_1',
             type: 'function',
           },
           {
             function: {
-              arguments: '{"code":"return location.href;"}',
-              name: 'eval',
+              arguments: '{"function":"return location.href;"}',
+              name: 'kilo_browser_evaluate',
             },
-            id: 'call_eval_2',
+            id: 'call_evaluate_2',
             type: 'function',
           },
         ],
@@ -244,9 +246,10 @@ describe('agent LLM harness', () => {
       { index: 0, signature: 'sig-1', text: 'Think', type: 'reasoning.text' },
     ];
     const toolCall = {
-      ...createEvalToolCall({
-        code: 'return document.title;',
-        providerToolCallId: 'call_eval_1',
+      ...createToolCall({
+        arguments: { function: 'return document.title;' },
+        name: 'kilo_browser_evaluate',
+        providerToolCallId: 'call_evaluate_1',
         tabId: 7,
       }),
       reasoningDetails,
@@ -260,8 +263,11 @@ describe('agent LLM harness', () => {
         role: 'assistant',
         tool_calls: [
           {
-            function: { arguments: '{"code":"return document.title;"}', name: 'eval' },
-            id: 'call_eval_1',
+            function: {
+              arguments: '{"function":"return document.title;"}',
+              name: 'kilo_browser_evaluate',
+            },
+            id: 'call_evaluate_1',
             type: 'function',
           },
         ],

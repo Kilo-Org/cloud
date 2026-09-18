@@ -425,10 +425,7 @@ const getToolCallArguments = (toolCall: ToolCallEvent): string => {
     return JSON.stringify(toolCall.arguments);
   }
 
-  if (toolCall.name === 'eval') {
-    return JSON.stringify({ code: toolCall.code });
-  }
-
+  // What remains are the safe memory tools, whose input is the query or memory id.
   return JSON.stringify({
     ...(toolCall.elementId === undefined ? {} : { elementId: toolCall.elementId }),
     ...(toolCall.memoryId === undefined ? {} : { memoryId: toolCall.memoryId }),

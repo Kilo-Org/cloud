@@ -1,7 +1,6 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import {
   createAssistantMessage,
-  createEvalToolCall,
   createRemoteMcpToolCall,
   createThinkingBlock,
   createToolCall,
@@ -14,12 +13,13 @@ import {
 import type { GroupedConversationItem, KiloBrowserToolName } from './agent-conversation';
 
 describe('agent conversation events', () => {
-  it('creates stable conversation events for messages and eval tools', () => {
+  it('creates stable conversation events for messages and browser tools', () => {
     const userMessage = createUserMessage('Inspect the page');
     const assistantMessage = createAssistantMessage('I can do that.');
     const thinkingBlock = createThinkingBlock('I should inspect the title.');
-    const toolCall = createEvalToolCall({
-      code: 'return document.title;',
+    const toolCall = createToolCall({
+      arguments: { function: 'return document.title;' },
+      name: 'kilo_browser_evaluate',
       tabId: 7,
     });
     const toolResult = createToolResult({
@@ -59,8 +59,8 @@ describe('agent conversation events', () => {
       },
       toolCallIdType: 'string',
       toolCallPayload: {
-        code: 'return document.title;',
-        name: 'eval',
+        arguments: { function: 'return document.title;' },
+        name: 'kilo_browser_evaluate',
         tabId: 7,
         type: 'tool-call',
       },
@@ -80,10 +80,11 @@ describe('agent conversation events', () => {
     });
   });
 
-  it('groups matching eval tool calls and results into one transcript item', () => {
+  it('groups matching browser tool calls and results into one transcript item', () => {
     const userMessage = createUserMessage('Inspect');
-    const toolCall = createEvalToolCall({
-      code: 'return document.title;',
+    const toolCall = createToolCall({
+      arguments: { function: 'return document.title;' },
+      name: 'kilo_browser_evaluate',
       tabId: 7,
     });
     const toolResult = createToolResult({
@@ -91,7 +92,7 @@ describe('agent conversation events', () => {
       toolCallId: toolCall.id,
       value: 'Kilo',
     });
-    const assistantMessage = createAssistantMessage('Eval returned Kilo.');
+    const assistantMessage = createAssistantMessage('The browser tool returned Kilo.');
 
     expect(
       groupConversationEvents([userMessage, toolCall, toolResult, assistantMessage])

@@ -3,14 +3,7 @@ import type { KiloBrowserToolName } from './browser-tool-contract';
 export type { KiloBrowserToolName };
 
 export type AgentMode = 'dangerous' | 'safe';
-export type SafeToolName =
-  | 'find_in_page'
-  | 'get_element_details'
-  | 'get_memory'
-  | 'get_page_snapshot'
-  | 'get_viewport_screenshot'
-  | 'search_memories'
-  | 'web_search';
+export type SafeToolName = 'get_memory' | 'search_memories' | 'web_search';
 export type WorkflowToolName =
   | 'delete_workflow'
   | 'get_workflow'
@@ -20,7 +13,6 @@ export type WorkflowToolName =
   | 'search_workflows';
 export type RemoteMcpAgentToolName = `mcp_${string}`;
 export type AgentToolName =
-  | 'eval'
   | KiloBrowserToolName
   | RemoteMcpAgentToolName
   | SafeToolName
@@ -38,15 +30,6 @@ export type AgentConversationEvent =
       readonly id: string;
       readonly text: string;
       readonly type: 'thinking';
-    }
-  | {
-      readonly code: string;
-      readonly id: string;
-      readonly name: 'eval';
-      readonly providerToolCallId?: string;
-      readonly reasoningDetails?: readonly unknown[];
-      readonly tabId: number;
-      readonly type: 'tool-call';
     }
   | {
       readonly elementId?: string;
@@ -126,7 +109,6 @@ export type AgentConversationEvent =
     };
 
 type MessageEvent = Extract<AgentConversationEvent, { readonly type: 'message' }>;
-type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly name: 'eval' }>;
 export type RemoteMcpToolCallEvent = Extract<
   AgentConversationEvent,
   { readonly name: RemoteMcpAgentToolName }
@@ -156,12 +138,6 @@ export type GroupedConversationItem =
       readonly toolCall: Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
       readonly type: 'tool-exchange';
     };
-
-interface CreateEvalToolCallOptions {
-  readonly code: string;
-  readonly providerToolCallId?: string;
-  readonly tabId: number;
-}
 
 interface CreateSafeToolCallOptions {
   readonly elementId?: string;
@@ -245,19 +221,6 @@ export const createThinkingBlock = (
   id: createEventId(),
   text,
   type: 'thinking',
-});
-
-export const createEvalToolCall = ({
-  code,
-  providerToolCallId,
-  tabId,
-}: CreateEvalToolCallOptions): EvalToolCallEvent => ({
-  code,
-  id: createEventId(),
-  name: 'eval',
-  ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
-  tabId,
-  type: 'tool-call',
 });
 
 export const createSafeToolCall = ({

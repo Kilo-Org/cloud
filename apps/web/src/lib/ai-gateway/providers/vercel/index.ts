@@ -15,7 +15,7 @@ import type {
   VercelInferenceProviderConfig,
   VercelProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { resolveModelIdForVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
   getCachedVercelInferenceProviderIdsForModel,
@@ -95,7 +95,7 @@ export async function shouldRouteToVercel(
   }
 
   const vercelModels = await getVercelModelsFromDatabase();
-  const vercelModelId = await resolveModelIdForVercel(requestedModel);
+  const vercelModelId = await mapModelIdToVercel(requestedModel);
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
@@ -260,7 +260,7 @@ export async function applyVercelSettings(
   requestToMutate: GatewayRequest,
   userByok: BYOKResult[] | null
 ) {
-  const vercelModelId = await resolveModelIdForVercel(requestedModel);
+  const vercelModelId = await mapModelIdToVercel(requestedModel);
   requestToMutate.body.model = vercelModelId;
 
   if (userByok) {

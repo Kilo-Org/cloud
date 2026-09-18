@@ -39,7 +39,7 @@ import {
   type EmbeddingProxyRequest,
   validateEmbeddingDimensions,
 } from '@/lib/ai-gateway/embeddings/embedding-request';
-import { resolveModelIdForVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
@@ -277,7 +277,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const effectiveProvider = provider;
 
   if (userByok && userByok.length > 0 && provider.id === 'vercel') {
-    requestBodyParsed.model = await resolveModelIdForVercel(requestBodyParsed.model);
+    requestBodyParsed.model = await mapModelIdToVercel(requestBodyParsed.model);
   }
 
   const upstreamBody = buildUpstreamBody(requestBodyParsed, requestedModelLowerCased);

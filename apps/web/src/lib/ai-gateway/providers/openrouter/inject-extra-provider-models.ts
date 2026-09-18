@@ -9,7 +9,7 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 
-export function injectExtraProviderModels(
+export async function injectExtraProviderModels(
   vercelModels: Record<string, StoredModel>,
   providerModelData: Array<{ provider: OpenRouterProvider; models: OpenRouterModel[] }>
 ) {
@@ -20,7 +20,7 @@ export function injectExtraProviderModels(
     }
   }
   for (const model of openRouterModels.values()) {
-    const vercelModel = vercelModels[mapModelIdToVercel(model.slug)];
+    const vercelModel = vercelModels[await mapModelIdToVercel(model.slug)];
     if (!vercelModel) continue;
 
     const vercelInferenceProviders = new Set(

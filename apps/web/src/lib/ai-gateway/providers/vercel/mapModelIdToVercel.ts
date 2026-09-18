@@ -111,7 +111,7 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'glm-5.2': 'zai/glm-5.2',
 };
 
-export function mapModelIdToVercel(modelId: string) {
+function mapResolvedModelIdToVercel(modelId: string) {
   const hardcodedVercelId = vercelModelIdMapping[modelId];
   if (hardcodedVercelId) {
     return hardcodedVercelId;
@@ -134,11 +134,11 @@ export function mapModelIdToVercel(modelId: string) {
   return firstPartyProvider ? firstPartyProvider + internalId.slice(slashIndex) : internalId;
 }
 
-export async function resolveModelIdForVercel(modelId: string): Promise<string> {
+export async function mapModelIdToVercel(modelId: string): Promise<string> {
   if (!modelId.startsWith('~')) {
-    return mapModelIdToVercel(modelId);
+    return mapResolvedModelIdToVercel(modelId);
   }
 
   const resolvedModelId = await resolveOpenRouterModelAlias(modelId);
-  return mapModelIdToVercel(resolvedModelId);
+  return mapResolvedModelIdToVercel(resolvedModelId);
 }

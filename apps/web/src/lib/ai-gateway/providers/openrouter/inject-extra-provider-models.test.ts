@@ -46,7 +46,7 @@ function nvidiaModel(): OpenRouterModel {
 }
 
 describe('injectExtraProviderModels', () => {
-  test('does not copy the source provider data policy onto injected offerings', () => {
+  test('does not copy the source provider data policy onto injected offerings', async () => {
     const nvidia = nvidiaModel();
     const providerModelData = [
       {
@@ -84,7 +84,7 @@ describe('injectExtraProviderModels', () => {
       },
     };
 
-    injectExtraProviderModels(vercelModels, providerModelData);
+    await injectExtraProviderModels(vercelModels, providerModelData);
 
     const injected = providerModelData[1]?.models[0];
     expect(injected?.slug).toBe(MODEL_SLUG);
@@ -100,7 +100,7 @@ describe('injectExtraProviderModels', () => {
     expect(modelRetainsPrompts(nvidia, true)).toBe(true);
   });
 
-  test('injects offerings for providers outside the known provider registry', () => {
+  test('injects offerings for providers outside the known provider registry', async () => {
     const model = nvidiaModel();
     const providerModelData = [
       {
@@ -131,7 +131,7 @@ describe('injectExtraProviderModels', () => {
       },
     };
 
-    injectExtraProviderModels(vercelModels, providerModelData);
+    await injectExtraProviderModels(vercelModels, providerModelData);
 
     expect(providerModelData[1]?.models[0]?.slug).toBe(MODEL_SLUG);
     expect(providerModelData[1]?.models[0]?.context_length).toBe(128_000);

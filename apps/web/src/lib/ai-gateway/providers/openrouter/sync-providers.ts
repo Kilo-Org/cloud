@@ -161,7 +161,7 @@ async function syncProviders(
   );
   const openRouterFreeEndpoints = getOpenRouterFreeEndpoints(providerModelData);
 
-  injectExtraProviderModels(vercelModels, providerModelData);
+  await injectExtraProviderModels(vercelModels, providerModelData);
 
   const mappedExtraModels = kiloExclusiveModels
     .flatMap(kfm => {

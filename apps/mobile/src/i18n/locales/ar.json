@@ -293,7 +293,7 @@
     "previewFullDescription": "تعرض الإشعارات نص الرسالة على شاشة القفل.",
     "previewGenericDescription": "تُعلمك الإشعارات بوجود نشاط جديد دون عرض محتواه. افتح Kilo لقراءته.",
     "channel": {
-      "agent": "جلسات الوكيل",
+      "agentProgress": "تقدم الوكيل",
       "chat": "رسائل الدردشة",
       "kiloclaw": "نشاط KiloClaw",
       "balance": "تنبيهات الرصيد",

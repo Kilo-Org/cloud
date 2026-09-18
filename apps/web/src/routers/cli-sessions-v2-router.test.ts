@@ -6,6 +6,7 @@ import {
   cli_sessions_v2,
   github_branch_pull_requests,
   agent_environment_profiles,
+  kilocode_users,
   organizations,
   organization_memberships,
   platform_integrations,
@@ -1742,6 +1743,66 @@ describe('cli-sessions-v2-router', () => {
       await expect(
         caller.cliSessionsV2.get({ session_id: organizationSessionId })
       ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    it('get distinguishes a session owned by another account from one that does not exist', async () => {
+      // The session exists (created for regularUser in beforeEach) but the
+      // caller is a different signed-in account: an access denial, not a
+      // missing row. The session-resume gate and the mobile session route
+      // render these two denials with different copy, so the lookup must say
+      // which one happened.
+      const caller = await createCallerForUser(otherUser.id);
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: organizationSessionId })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: 'ses_never_ingested_unknown_id' })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
+    it('get returns the owner row when the same session_id exists for two accounts', async () => {
+      // `cli_sessions_v2`'s primary key is `(session_id, kilo_user_id)`, so a
+      // lookup on `session_id` alone can match more than one row. The owner's
+      // row must win even when the other account's row is the one the lookup
+      // reads first — a first-row lookup denied the owner their own session.
+      // The colliding account's id sorts before every other test user's, so it
+      // is the row a plain `limit(1)` returns, whichever plan the database
+      // picks.
+      const collidingUserId = '0000-cli-sessions-v2-collision';
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, collidingUserId));
+      await insertTestUser({
+        id: collidingUserId,
+        google_user_email: 'cli-sessions-v2-collision@example.com',
+        google_user_name: 'CLI Sessions V2 Collision User',
+      });
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: organizationSessionId,
+          kilo_user_id: collidingUserId,
+          created_on_platform: 'cloud-agent',
+        },
+        {
+          session_id: organizationSessionId,
+          kilo_user_id: regularUser.id,
+          organization_id: testOrganization.id,
+          created_on_platform: 'cloud-agent',
+        },
+      ]);
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const session = await caller.cliSessionsV2.get({ session_id: organizationSessionId });
+
+        expect(session.kilo_user_id).toBe(regularUser.id);
+      } finally {
+        await db
+          .delete(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+        await db.delete(kilocode_users).where(eq(kilocode_users.id, collidingUserId));
+      }
     });
 
     it('getByCloudAgentSessionId rejects an organization session after its creator loses membership', async () => {

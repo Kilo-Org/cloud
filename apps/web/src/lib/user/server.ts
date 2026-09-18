@@ -1529,8 +1529,12 @@ async function appendCallbackPath(url: string): Promise<string> {
   const headersList = await headers();
   const pathname = headersList.get('x-pathname');
   if (pathname && pathname !== '/') {
+    // Keep the request's query in the callback so a resume link does not lose
+    // its `?at=` anchor across sign-in (see the `/cloud/sessions/<id>` route,
+    // whose layout redirects before the page can build its own callbackPath).
+    const search = headersList.get('x-search') ?? '';
     const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}callbackPath=${encodeURIComponent(pathname)}`;
+    return `${url}${separator}callbackPath=${encodeURIComponent(`${pathname}${search}`)}`;
   }
   return url;
 }

@@ -143,6 +143,13 @@ describe('buildTimingLine', () => {
 });
 
 describe('withRestTiming', () => {
+  // The REST line is sampled like the tRPC line. These cases use requests with
+  // no client headers (or mobile headers) and assert unconditional logging, so
+  // pin the rate to 100% here; the sampling cases below set their own rate.
+  beforeEach(() => {
+    process.env.TRPC_TIMING_SAMPLE_RATE = '1';
+  });
+
   test('emits exactly one api_timing line with the exact pattern and client dimensions', async () => {
     const handler = jest.fn<(request: Request, ctx: unknown) => Promise<Response>>(
       async () => new Response('ok', { status: 200 })
@@ -258,5 +265,55 @@ describe('withRestTiming', () => {
 
     expect(logSpy).toHaveBeenCalledTimes(1);
     expect(parseLines(logSpy)[0]).toMatchObject({ ok: false, route: '/api/openrouter/[...path]' });
+  });
+});
+
+// The extension's model calls land on `/api/gateway/v1/chat/completions` at
+// high volume, so a non-mobile REST line is sampled like a tRPC line while
+// mobile stays at 100%.
+describe('withRestTiming sampling policy', () => {
+  const gatewayRequest = (headers?: Record<string, string>) =>
+    new Request('https://app.kilo.ai/api/gateway/v1/chat/completions', {
+      method: 'POST',
+      ...(headers === undefined ? {} : { headers }),
+    });
+
+  test('at rate 0, drops extension and no-client lines but logs the mobile line', async () => {
+    process.env.TRPC_TIMING_SAMPLE_RATE = '0';
+    const wrapped = withRestTiming(
+      '/api/gateway/[...path]',
+      jest.fn(async () => new Response('ok', { status: 200 }))
+    );
+
+    await wrapped(gatewayRequest({ 'x-kilo-client': 'extension' }), undefined);
+    expect(logSpy).not.toHaveBeenCalled();
+
+    await wrapped(gatewayRequest(), undefined);
+    expect(logSpy).not.toHaveBeenCalled();
+
+    await wrapped(gatewayRequest(MOBILE_HEADERS), undefined);
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(parseLines(logSpy)[0]).toMatchObject({
+      type: 'api_timing',
+      client: 'mobile',
+      route: '/api/gateway/[...path]',
+    });
+  });
+
+  test('at rate 1, logs both the extension line and the no-client line', async () => {
+    process.env.TRPC_TIMING_SAMPLE_RATE = '1';
+    const wrapped = withRestTiming(
+      '/api/gateway/[...path]',
+      jest.fn(async () => new Response('ok', { status: 200 }))
+    );
+
+    await wrapped(gatewayRequest({ 'x-kilo-client': 'extension' }), undefined);
+    await wrapped(gatewayRequest(), undefined);
+
+    expect(logSpy).toHaveBeenCalledTimes(2);
+    expect(parseLines(logSpy)).toEqual([
+      expect.objectContaining({ type: 'api_timing', client: 'extension' }),
+      expect.objectContaining({ type: 'api_timing', client: null }),
+    ]);
   });
 });

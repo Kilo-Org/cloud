@@ -180,6 +180,7 @@ function logRestTiming(
     } catch {
       dimensions = { client: null, platform: null, version: null, requestId: null };
     }
+    if (!shouldLogTiming({ client: dimensions.client })) return;
     console.log(
       JSON.stringify(
         buildTimingLine({

@@ -2060,6 +2060,13 @@
       "connectionLost": "ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದೆ",
       "retryConnection": "ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಪ್ರಯತ್ನಿಸಿ"
     },
+    "status": {
+      "committing": "ಕಮಿಟ್ ಮಾಡಲಾಗುತ್ತಿದೆ…",
+      "committed": "ಕಮಿಟ್ ಆಗಿದೆ",
+      "commitFailed": "ಕಮಿಟ್ ವಿಫಲವಾಗಿದೆ",
+      "sessionStopped": "ಸೆಶನ್ ನಿಂತಿದೆ",
+      "sessionTerminated": "ಸೆಶನ್ ಕೊನೆಗೊಂಡಿದೆ"
+    },
     "goal": {
       "title": "ಗುರಿ",
       "statusActive": "ಸಕ್ರಿಯ ಗುರಿ",

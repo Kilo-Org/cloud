@@ -2132,6 +2132,13 @@
       "connectionLost": "Cysylltiad wedi'i golli",
       "retryConnection": "Ceisio cysylltu eto"
     },
+    "status": {
+      "committing": "Yn ymrwymo…",
+      "committed": "Ymrwymwyd",
+      "commitFailed": "Methodd yr ymrwymiad",
+      "sessionStopped": "Sesiwn wedi stopio",
+      "sessionTerminated": "Sesiwn wedi dod i ben"
+    },
     "goal": {
       "title": "Nod",
       "statusActive": "Nod gweithredol",

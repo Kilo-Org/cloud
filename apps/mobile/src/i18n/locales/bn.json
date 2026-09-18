@@ -2060,6 +2060,13 @@
       "connectionLost": "সংযোগ বিচ্ছিন্ন",
       "retryConnection": "আবার সংযোগের চেষ্টা করুন"
     },
+    "status": {
+      "committing": "কমিট করা হচ্ছে…",
+      "committed": "কমিট হয়েছে",
+      "commitFailed": "কমিট ব্যর্থ হয়েছে",
+      "sessionStopped": "সেশন থেমে গেছে",
+      "sessionTerminated": "সেশন বন্ধ করা হয়েছে"
+    },
     "goal": {
       "title": "লক্ষ্য",
       "statusActive": "সক্রিয় লক্ষ্য",

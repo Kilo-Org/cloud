@@ -1606,6 +1606,13 @@
       "connectionLost": "انقطع الاتصال",
       "retryConnection": "إعادة محاولة الاتصال"
     },
+    "status": {
+      "committing": "جارٍ الإيداع…",
+      "committed": "تم الإيداع",
+      "commitFailed": "فشل الإيداع",
+      "sessionStopped": "تم إيقاف الجلسة",
+      "sessionTerminated": "تم إنهاء الجلسة"
+    },
     "goal": {
       "title": "الهدف",
       "statusActive": "هدف نشط",

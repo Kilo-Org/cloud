@@ -2060,6 +2060,13 @@
       "connectionLost": "კავშირი გაწყდა",
       "retryConnection": "ხელახლა დაკავშირება"
     },
+    "status": {
+      "committing": "მიმდინარეობს კომიტი…",
+      "committed": "კომიტი შესრულდა",
+      "commitFailed": "კომიტი ვერ შესრულდა",
+      "sessionStopped": "სესია შეჩერდა",
+      "sessionTerminated": "სესია დასრულდა"
+    },
     "goal": {
       "title": "მიზანი",
       "statusActive": "აქტიური მიზანი",

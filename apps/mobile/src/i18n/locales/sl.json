@@ -2096,6 +2096,13 @@
       "connectionLost": "Povezava prekinjena",
       "retryConnection": "Znova vzpostavi povezavo"
     },
+    "status": {
+      "committing": "Uveljavljanje…",
+      "committed": "Uveljavljeno",
+      "commitFailed": "Uveljavljanje ni uspelo",
+      "sessionStopped": "Seja ustavljena",
+      "sessionTerminated": "Seja zaključena"
+    },
     "goal": {
       "title": "Cilj",
       "statusActive": "Aktivni cilj",

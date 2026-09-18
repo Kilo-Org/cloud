@@ -2060,6 +2060,13 @@
       "connectionLost": "Холболт тасарсан",
       "retryConnection": "Дахин холбогдох"
     },
+    "status": {
+      "committing": "Коммит хийгдэж байна…",
+      "committed": "Коммит хийгдсэн",
+      "commitFailed": "Коммит амжилтгүй боллоо",
+      "sessionStopped": "Сесс зогссон",
+      "sessionTerminated": "Сесс дууссан"
+    },
     "goal": {
       "title": "Зорилго",
       "statusActive": "Идэвхтэй зорилго",

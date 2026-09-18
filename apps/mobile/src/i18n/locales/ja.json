@@ -1570,6 +1570,13 @@
       "connectionLost": "接続切断",
       "retryConnection": "接続を再試行"
     },
+    "status": {
+      "committing": "コミット中…",
+      "committed": "コミット済み",
+      "commitFailed": "コミットに失敗しました",
+      "sessionStopped": "セッション停止",
+      "sessionTerminated": "セッション終了"
+    },
     "goal": {
       "title": "ゴール",
       "statusActive": "アクティブなゴール",

@@ -2060,6 +2060,13 @@
       "connectionLost": "การเชื่อมต่อขาดหาย",
       "retryConnection": "ลองเชื่อมต่อใหม่"
     },
+    "status": {
+      "committing": "กำลังคอมมิต…",
+      "committed": "คอมมิตแล้ว",
+      "commitFailed": "คอมมิตล้มเหลว",
+      "sessionStopped": "เซสชันหยุดแล้ว",
+      "sessionTerminated": "เซสชันสิ้นสุดแล้ว"
+    },
     "goal": {
       "title": "เป้าหมาย",
       "statusActive": "เป้าหมายที่ใช้งานอยู่",

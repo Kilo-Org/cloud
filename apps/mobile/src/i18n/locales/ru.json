@@ -1588,6 +1588,13 @@
       "connectionLost": "Соединение прервано",
       "retryConnection": "Повторить подключение"
     },
+    "status": {
+      "committing": "Создание коммита…",
+      "committed": "Коммит создан",
+      "commitFailed": "Не удалось создать коммит",
+      "sessionStopped": "Сеанс остановлен",
+      "sessionTerminated": "Сеанс завершён"
+    },
     "goal": {
       "title": "Цель",
       "statusActive": "Активная цель",

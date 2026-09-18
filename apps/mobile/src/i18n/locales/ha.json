@@ -2060,6 +2060,13 @@
       "connectionLost": "Haɗi ya katse",
       "retryConnection": "Sake gwada haɗi"
     },
+    "status": {
+      "committing": "Ana yin rikodin canje-canje…",
+      "committed": "An yi rikodin canje-canje",
+      "commitFailed": "Rikodin canje-canje ya kasa",
+      "sessionStopped": "An dakatar da zama",
+      "sessionTerminated": "An kawo ƙarshen zama"
+    },
     "goal": {
       "title": "Manufa",
       "statusActive": "Manufa mai aiki",

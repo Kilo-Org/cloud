@@ -2078,6 +2078,13 @@
       "connectionLost": "Savienojums pārtrūcis",
       "retryConnection": "Izveidot savienojumu vēlreiz"
     },
+    "status": {
+      "committing": "Notiek komita izveide…",
+      "committed": "Komits izveidots",
+      "commitFailed": "Komita izveide neizdevās",
+      "sessionStopped": "Sesija apturēta",
+      "sessionTerminated": "Sesija pabeigta"
+    },
     "goal": {
       "title": "Mērķis",
       "statusActive": "Aktīvs mērķis",

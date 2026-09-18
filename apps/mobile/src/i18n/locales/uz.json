@@ -2060,6 +2060,13 @@
       "connectionLost": "Ulanish uzildi",
       "retryConnection": "Qayta ulanish"
     },
+    "status": {
+      "committing": "Kommit yaratilmoqda…",
+      "committed": "Kommit yaratildi",
+      "commitFailed": "Kommit yaratilmadi",
+      "sessionStopped": "Sessiya to'xtatildi",
+      "sessionTerminated": "Sessiya yakunlandi"
+    },
     "goal": {
       "title": "Maqsad",
       "statusActive": "Faol maqsad",

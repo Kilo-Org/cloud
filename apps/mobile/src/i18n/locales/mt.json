@@ -2114,6 +2114,13 @@
       "connectionLost": "Il-konnessjoni ntilfet",
       "retryConnection": "Erġa' pprova taqbad"
     },
+    "status": {
+      "committing": "Qed jiġi rreġistrat…",
+      "committed": "Irreġistrat",
+      "commitFailed": "Ir-reġistrazzjoni falliet",
+      "sessionStopped": "Is-sessjoni waqfet",
+      "sessionTerminated": "Is-sessjoni ntemmet"
+    },
     "goal": {
       "title": "Għan",
       "statusActive": "Għan attiv",

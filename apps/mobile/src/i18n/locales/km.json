@@ -2060,6 +2060,13 @@
       "connectionLost": "ដាច់ការតភ្ជាប់",
       "retryConnection": "ព្យាយាមភ្ជាប់ម្តងទៀត"
     },
+    "status": {
+      "committing": "កំពុងកត់ត្រាការកែប្រែ…",
+      "committed": "បានកត់ត្រាការកែប្រែ",
+      "commitFailed": "ការកត់ត្រាការកែប្រែបានបរាជ័យ",
+      "sessionStopped": "វគ្គបានឈប់",
+      "sessionTerminated": "វគ្គបានបញ្ចប់"
+    },
     "goal": {
       "title": "គោលដៅ",
       "statusActive": "គោលដៅសកម្ម",

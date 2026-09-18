@@ -2060,6 +2060,13 @@
       "connectionLost": "Χάθηκε η σύνδεση",
       "retryConnection": "Επανάληψη σύνδεσης"
     },
+    "status": {
+      "committing": "Γίνεται καταχώριση…",
+      "committed": "Καταχωρίστηκε",
+      "commitFailed": "Η καταχώριση απέτυχε",
+      "sessionStopped": "Η συνεδρία σταμάτησε",
+      "sessionTerminated": "Η συνεδρία τερματίστηκε"
+    },
     "goal": {
       "title": "Στόχος",
       "statusActive": "Ενεργός στόχος",

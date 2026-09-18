@@ -2060,6 +2060,13 @@
       "connectionLost": "پەیوەندییەکە پچڕا",
       "retryConnection": "دووبارە هەوڵدان بۆ پەیوەندیکردن"
     },
+    "status": {
+      "committing": "کۆمیت دەکرێت…",
+      "committed": "کۆمیت کرا",
+      "commitFailed": "کۆمیت سەرکەوتوو نەبوو",
+      "sessionStopped": "سێشن وەستێنرا",
+      "sessionTerminated": "سێشن کۆتایی پێهێنرا"
+    },
     "goal": {
       "title": "ئامانج",
       "statusActive": "ئامانجی چالاک",

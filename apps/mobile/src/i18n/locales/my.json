@@ -2060,6 +2060,13 @@
       "connectionLost": "ချိတ်ဆက်မှု ပျက်သွားသည်",
       "retryConnection": "ထပ်ချိတ်ဆက်ကြည့်ပါ"
     },
+    "status": {
+      "committing": "ကွန်မစ် လုပ်ဆောင်နေသည်…",
+      "committed": "ကွန်မစ် ပြီးစီးပါပြီ",
+      "commitFailed": "ကွန်မစ် မအောင်မြင်ပါ",
+      "sessionStopped": "စက်ရှင် ရပ်တန့်ပြီး",
+      "sessionTerminated": "စက်ရှင် ပြီးဆုံးပါပြီ"
+    },
     "goal": {
       "title": "ပန်းတိုင်",
       "statusActive": "အသုံးပြုနေသော ပန်းတိုင်",

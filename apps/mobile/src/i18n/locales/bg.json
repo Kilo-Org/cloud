@@ -2060,6 +2060,13 @@
       "connectionLost": "Прекъсната връзка",
       "retryConnection": "Опитай да се свържеш отново"
     },
+    "status": {
+      "committing": "Създава се комит…",
+      "committed": "Комитът е създаден",
+      "commitFailed": "Комитът не бе създаден",
+      "sessionStopped": "Сесията е спряна",
+      "sessionTerminated": "Сесията е прекратена"
+    },
     "goal": {
       "title": "Цел",
       "statusActive": "Активна цел",

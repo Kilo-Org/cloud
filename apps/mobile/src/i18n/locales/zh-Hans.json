@@ -1570,6 +1570,13 @@
       "connectionLost": "连接已断开",
       "retryConnection": "重新连接"
     },
+    "status": {
+      "committing": "正在提交…",
+      "committed": "已提交",
+      "commitFailed": "提交失败",
+      "sessionStopped": "会话已停止",
+      "sessionTerminated": "会话已终止"
+    },
     "goal": {
       "title": "目标",
       "statusActive": "进行中的目标",

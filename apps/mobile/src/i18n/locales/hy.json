@@ -2060,6 +2060,13 @@
       "connectionLost": "Կապը կորել է",
       "retryConnection": "Կրկին փորձել միանալ"
     },
+    "status": {
+      "committing": "Կոմիտ է արվում…",
+      "committed": "Կոմիտը արված է",
+      "commitFailed": "Կոմիտը ձախողվեց",
+      "sessionStopped": "Նիստը կանգնեցված է",
+      "sessionTerminated": "Նիստը ավարտված է"
+    },
     "goal": {
       "title": "Նպատակ",
       "statusActive": "Ակտիվ նպատակ",

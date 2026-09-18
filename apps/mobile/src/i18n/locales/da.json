@@ -2060,6 +2060,13 @@
       "connectionLost": "Forbindelsen er afbrudt",
       "retryConnection": "Prøv at oprette forbindelse igen"
     },
+    "status": {
+      "committing": "Committer…",
+      "committed": "Commit gennemført",
+      "commitFailed": "Commit mislykkedes",
+      "sessionStopped": "Sessionen stoppet",
+      "sessionTerminated": "Sessionen afsluttet"
+    },
     "goal": {
       "title": "Mål",
       "statusActive": "Aktivt mål",

@@ -1570,6 +1570,13 @@
       "connectionLost": "連線中斷",
       "retryConnection": "重新連線"
     },
+    "status": {
+      "committing": "正在提交…",
+      "committed": "已提交",
+      "commitFailed": "提交失敗",
+      "sessionStopped": "工作階段已停止",
+      "sessionTerminated": "工作階段已終止"
+    },
     "goal": {
       "title": "目標",
       "statusActive": "進行中的目標",

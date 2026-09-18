@@ -2078,6 +2078,13 @@
       "connectionLost": "Veza je izgubljena",
       "retryConnection": "Pokušaj ponovo da se povežeš"
     },
+    "status": {
+      "committing": "Komitovanje…",
+      "committed": "Komitovano",
+      "commitFailed": "Komitovanje nije uspelo",
+      "sessionStopped": "Sesija zaustavljena",
+      "sessionTerminated": "Sesija okončana"
+    },
     "goal": {
       "title": "Cilj",
       "statusActive": "Aktivan cilj",

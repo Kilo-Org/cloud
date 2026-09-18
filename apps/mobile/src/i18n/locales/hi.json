@@ -1558,6 +1558,13 @@
       "reconnecting": "फिर से कनेक्ट हो रहा है…",
       "retryConnection": "फिर से कनेक्ट करें"
     },
+    "status": {
+      "committing": "कमिट किया जा रहा है…",
+      "committed": "कमिट हो गया",
+      "commitFailed": "कमिट विफल रहा",
+      "sessionStopped": "सत्र रुक गया",
+      "sessionTerminated": "सत्र समाप्त हो गया"
+    },
     "goal": {
       "title": "लक्ष्य",
       "statusActive": "सक्रिय लक्ष्य",

@@ -1570,6 +1570,13 @@
       "connectionLost": "연결 끊김",
       "retryConnection": "연결 다시 시도"
     },
+    "status": {
+      "committing": "커밋 중…",
+      "committed": "커밋됨",
+      "commitFailed": "커밋 실패",
+      "sessionStopped": "세션 중지됨",
+      "sessionTerminated": "세션 종료됨"
+    },
     "goal": {
       "title": "목표",
       "statusActive": "활성 목표",

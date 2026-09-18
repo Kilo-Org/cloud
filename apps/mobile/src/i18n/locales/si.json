@@ -2060,6 +2060,13 @@
       "connectionLost": "සම්බන්ධතාව බිඳ වැටුණි",
       "retryConnection": "නැවත සම්බන්ධ වීමට උත්සාහ කරන්න"
     },
+    "status": {
+      "committing": "කමිට් කරමින්…",
+      "committed": "කමිට් කර ඇත",
+      "commitFailed": "කමිට් කිරීම අසාර්ථක විය",
+      "sessionStopped": "සැසිය නතර විය",
+      "sessionTerminated": "සැසිය අවසන් විය"
+    },
     "goal": {
       "title": "ඉලක්කය",
       "statusActive": "සක්‍රීය ඉලක්කය",

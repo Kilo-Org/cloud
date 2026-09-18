@@ -2060,6 +2060,13 @@
       "connectionLost": "Kua motu te hononga",
       "retryConnection": "Whakamātau ki te hono anō"
     },
+    "status": {
+      "committing": "Kei te whakapūmau…",
+      "committed": "Kua whakapūmautia",
+      "commitFailed": "I rahua te whakapūmau",
+      "sessionStopped": "Kua mutu te wātū",
+      "sessionTerminated": "Kua oti te wātū"
+    },
     "goal": {
       "title": "Whāinga",
       "statusActive": "Whāinga hohe",

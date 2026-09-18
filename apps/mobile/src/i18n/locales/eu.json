@@ -2060,6 +2060,13 @@
       "connectionLost": "Konexioa galdu da",
       "retryConnection": "Saiatu berriro konektatzen"
     },
+    "status": {
+      "committing": "Commita egiten…",
+      "committed": "Commita eginda",
+      "commitFailed": "Commitak huts egin du",
+      "sessionStopped": "Saioa geldituta",
+      "sessionTerminated": "Saioa amaituta"
+    },
     "goal": {
       "title": "Helburua",
       "statusActive": "Helburu aktiboa",

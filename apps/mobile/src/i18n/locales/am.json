@@ -2060,6 +2060,13 @@
       "connectionLost": "ግንኙነቱ ተቋርጧል",
       "retryConnection": "እንደገና ለመገናኘት ይሞክሩ"
     },
+    "status": {
+      "committing": "ኮሚት በማድረግ ላይ…",
+      "committed": "ኮሚት ተደርጓል",
+      "commitFailed": "ኮሚት አልተሳካም",
+      "sessionStopped": "ክፍለ ጊዜ ቆመ",
+      "sessionTerminated": "ክፍለ ጊዜ ተቋርጧል"
+    },
     "goal": {
       "title": "ግብ",
       "statusActive": "ንቁ ግብ",

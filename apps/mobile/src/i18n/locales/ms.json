@@ -2060,6 +2060,13 @@
       "connectionLost": "Sambungan terputus",
       "retryConnection": "Cuba sambung semula"
     },
+    "status": {
+      "committing": "Komit sedang dilakukan…",
+      "committed": "Komit selesai",
+      "commitFailed": "Komit gagal",
+      "sessionStopped": "Sesi dihentikan",
+      "sessionTerminated": "Sesi ditamatkan"
+    },
     "goal": {
       "title": "Matlamat",
       "statusActive": "Matlamat aktif",

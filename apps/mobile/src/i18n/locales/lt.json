@@ -2096,6 +2096,13 @@
       "connectionLost": "Ryšys nutrūko",
       "retryConnection": "Bandyti prisijungti iš naujo"
     },
+    "status": {
+      "committing": "Įrašoma…",
+      "committed": "Įrašyta",
+      "commitFailed": "Įrašyti nepavyko",
+      "sessionStopped": "Sesija sustabdyta",
+      "sessionTerminated": "Sesija baigta"
+    },
     "goal": {
       "title": "Tikslas",
       "statusActive": "Aktyvus tikslas",

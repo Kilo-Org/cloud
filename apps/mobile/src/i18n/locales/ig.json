@@ -2060,6 +2060,13 @@
       "connectionLost": "Njikọ akwụsịla",
       "retryConnection": "Nwaa njikọ ọzọ"
     },
+    "status": {
+      "committing": "Na-edekọ mgbanwe…",
+      "committed": "Edekọtara mgbanwe",
+      "commitFailed": "Ndekọ mgbanwe dara",
+      "sessionStopped": "A kwụsịrị nnọkọ",
+      "sessionTerminated": "E mechiri nnọkọ"
+    },
     "goal": {
       "title": "Ebumnuche",
       "statusActive": "Ebumnuche na-arụ ọrụ",

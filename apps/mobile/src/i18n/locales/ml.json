@@ -2060,6 +2060,13 @@
       "connectionLost": "കണക്ഷൻ നഷ്ടപ്പെട്ടു",
       "retryConnection": "വീണ്ടും കണക്റ്റ് ചെയ്യാൻ ശ്രമിക്കുക"
     },
+    "status": {
+      "committing": "കമ്മിറ്റ് ചെയ്യുന്നു…",
+      "committed": "കമ്മിറ്റ് ചെയ്തു",
+      "commitFailed": "കമ്മിറ്റ് പരാജയപ്പെട്ടു",
+      "sessionStopped": "സെഷൻ നിർത്തി",
+      "sessionTerminated": "സെഷൻ അവസാനിച്ചു"
+    },
     "goal": {
       "title": "ലക്ഷ്യം",
       "statusActive": "സജീവ ലക്ഷ്യം",

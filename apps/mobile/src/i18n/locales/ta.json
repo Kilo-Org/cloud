@@ -2060,6 +2060,13 @@
       "connectionLost": "இணைப்பு துண்டிக்கப்பட்டது",
       "retryConnection": "மீண்டும் இணைக்க முயற்சிக்கவும்"
     },
+    "status": {
+      "committing": "கமிட் செய்யப்படுகிறது…",
+      "committed": "கமிட் செய்யப்பட்டது",
+      "commitFailed": "கமிட் தோல்வியடைந்தது",
+      "sessionStopped": "அமர்வு நிறுத்தப்பட்டது",
+      "sessionTerminated": "அமர்வு முடிவடைந்தது"
+    },
     "goal": {
       "title": "இலக்கு",
       "statusActive": "செயலில் உள்ள இலக்கு",

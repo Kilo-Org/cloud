@@ -2060,6 +2060,13 @@
       "connectionLost": "Verbinding verloor",
       "retryConnection": "Probeer weer koppel"
     },
+    "status": {
+      "committing": "Besig om vas te lê…",
+      "committed": "Vasgelê",
+      "commitFailed": "Vaslegging het misluk",
+      "sessionStopped": "Sessie gestop",
+      "sessionTerminated": "Sessie beëindig"
+    },
     "goal": {
       "title": "Doel",
       "statusActive": "Aktiewe doel",

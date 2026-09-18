@@ -2078,6 +2078,13 @@
       "connectionLost": "Connexió perduda",
       "retryConnection": "Torna a provar la connexió"
     },
+    "status": {
+      "committing": "S'està consignant…",
+      "committed": "Consignat",
+      "commitFailed": "No s'ha pogut consignar",
+      "sessionStopped": "Sessió aturada",
+      "sessionTerminated": "Sessió finalitzada"
+    },
     "goal": {
       "title": "Objectiu",
       "statusActive": "Objectiu actiu",

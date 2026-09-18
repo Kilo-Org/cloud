@@ -1579,6 +1579,13 @@
       "connectionLost": "החיבור נותק",
       "retryConnection": "ניסיון התחברות נוסף"
     },
+    "status": {
+      "committing": "מבצע קומיט…",
+      "committed": "בוצע קומיט",
+      "commitFailed": "הקומיט נכשל",
+      "sessionStopped": "הסשן הופסק",
+      "sessionTerminated": "הסשן הסתיים"
+    },
     "goal": {
       "title": "מטרה",
       "statusActive": "מטרה פעילה",

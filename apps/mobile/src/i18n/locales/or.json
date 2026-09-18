@@ -2060,6 +2060,13 @@
       "connectionLost": "ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ",
       "retryConnection": "ପୁଣି ସଂଯୋଗ କରନ୍ତୁ"
     },
+    "status": {
+      "committing": "କମିଟ୍ ହେଉଛି…",
+      "committed": "କମିଟ୍ ହୋଇଛି",
+      "commitFailed": "କମିଟ୍ ବିଫଳ ହେଲା",
+      "sessionStopped": "ସେସନ୍ ବନ୍ଦ ହୋଇଛି",
+      "sessionTerminated": "ସେସନ୍ ସମାପ୍ତ ହୋଇଛି"
+    },
     "goal": {
       "title": "ଲକ୍ଷ୍ୟ",
       "statusActive": "ସକ୍ରିୟ ଲକ୍ଷ୍ୟ",

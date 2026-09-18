@@ -2060,6 +2060,13 @@
       "connectionLost": "కనెక్షన్ తెగిపోయింది",
       "retryConnection": "కనెక్ట్ చేయడానికి మళ్లీ ప్రయత్నించండి"
     },
+    "status": {
+      "committing": "కమిట్ చేస్తోంది…",
+      "committed": "కమిట్ పూర్తయింది",
+      "commitFailed": "కమిట్ విఫలమైంది",
+      "sessionStopped": "సెషన్ ఆగింది",
+      "sessionTerminated": "సెషన్ ముగిసింది"
+    },
     "goal": {
       "title": "లక్ష్యం",
       "statusActive": "క్రియాశీల లక్ష్యం",

@@ -1570,6 +1570,13 @@
       "connectionLost": "Koneksi terputus",
       "retryConnection": "Coba sambungkan kembali"
     },
+    "status": {
+      "committing": "Melakukan commit…",
+      "committed": "Commit selesai",
+      "commitFailed": "Commit gagal",
+      "sessionStopped": "Sesi dihentikan",
+      "sessionTerminated": "Sesi diakhiri"
+    },
     "goal": {
       "title": "Tujuan",
       "statusActive": "Tujuan aktif",

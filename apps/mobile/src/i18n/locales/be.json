@@ -2096,6 +2096,13 @@
       "connectionLost": "Сувязь страчана",
       "retryConnection": "Паўтарыць падключэнне"
     },
+    "status": {
+      "committing": "Каміт ствараецца…",
+      "committed": "Каміт створаны",
+      "commitFailed": "Каміт не ўдаўся",
+      "sessionStopped": "Сеанс спынены",
+      "sessionTerminated": "Сеанс завершаны"
+    },
     "goal": {
       "title": "Мэта",
       "statusActive": "Актыўная мэта",

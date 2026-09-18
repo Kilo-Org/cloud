@@ -2060,6 +2060,13 @@
       "connectionLost": "اړیکه پرې شوه",
       "retryConnection": "بیا د نښلېدو هڅه وکړئ"
     },
+    "status": {
+      "committing": "کمېټ کېږي…",
+      "committed": "کمېټ شو",
+      "commitFailed": "کمېټ ناکام شو",
+      "sessionStopped": "ناسته ودرېده",
+      "sessionTerminated": "ناسته پای ته ورسېده"
+    },
     "goal": {
       "title": "هدف",
       "statusActive": "فعال هدف",

@@ -1570,6 +1570,13 @@
       "connectionLost": "Mất kết nối",
       "retryConnection": "Thử kết nối lại"
     },
+    "status": {
+      "committing": "Đang ghi nhận…",
+      "committed": "Đã ghi nhận",
+      "commitFailed": "Ghi nhận thất bại",
+      "sessionStopped": "Phiên đã dừng",
+      "sessionTerminated": "Phiên đã kết thúc"
+    },
     "goal": {
       "title": "Mục tiêu",
       "statusActive": "Mục tiêu đang hoạt động",

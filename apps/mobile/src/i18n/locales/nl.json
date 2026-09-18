@@ -1570,6 +1570,13 @@
       "connectionLost": "Verbinding verbroken",
       "retryConnection": "Opnieuw verbinden"
     },
+    "status": {
+      "committing": "Committen…",
+      "committed": "Gecommit",
+      "commitFailed": "Committen mislukt",
+      "sessionStopped": "Sessie gestopt",
+      "sessionTerminated": "Sessie beëindigd"
+    },
     "goal": {
       "title": "Doel",
       "statusActive": "Actief doel",

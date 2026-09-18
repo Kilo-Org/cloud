@@ -2078,6 +2078,13 @@
       "connectionLost": "Conexiune pierdută",
       "retryConnection": "Încearcă din nou conectarea"
     },
+    "status": {
+      "committing": "Se creează commitul…",
+      "committed": "Commit creat",
+      "commitFailed": "Crearea commitului a eșuat",
+      "sessionStopped": "Sesiune oprită",
+      "sessionTerminated": "Sesiune încheiată"
+    },
     "goal": {
       "title": "Obiectiv",
       "statusActive": "Obiectiv activ",

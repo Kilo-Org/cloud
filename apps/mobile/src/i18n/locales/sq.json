@@ -2060,6 +2060,13 @@
       "connectionLost": "Lidhja u humb",
       "retryConnection": "Provo të lidhesh përsëri"
     },
+    "status": {
+      "committing": "Po regjistrohet…",
+      "committed": "U regjistrua",
+      "commitFailed": "Regjistrimi dështoi",
+      "sessionStopped": "Seanca u ndal",
+      "sessionTerminated": "Seanca përfundoi"
+    },
     "goal": {
       "title": "Qëllimi",
       "statusActive": "Qëllim aktiv",

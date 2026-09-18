@@ -1543,6 +1543,13 @@
       "connectionLost": "Connessione persa",
       "retryConnection": "Riprova a connetterti"
     },
+    "status": {
+      "committing": "Commit in corso…",
+      "committed": "Commit completato",
+      "commitFailed": "Commit non riuscito",
+      "sessionStopped": "Sessione arrestata",
+      "sessionTerminated": "Sessione terminata"
+    },
     "goal": {
       "title": "Obiettivo",
       "statusActive": "Obiettivo attivo",

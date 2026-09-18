@@ -2060,6 +2060,13 @@
       "connectionLost": "Ukuxhumana kunqamukile",
       "retryConnection": "Zama ukuxhuma futhi"
     },
+    "status": {
+      "committing": "Kuyaqoshwa…",
+      "committed": "Kuqoshiwe",
+      "commitFailed": "Ukugopha kwehlulekile",
+      "sessionStopped": "Iseshini imisiwe",
+      "sessionTerminated": "Iseshini iphelile"
+    },
     "goal": {
       "title": "Umgomo",
       "statusActive": "Umgomo osebenzayo",

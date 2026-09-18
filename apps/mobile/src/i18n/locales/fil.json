@@ -2060,6 +2060,13 @@
       "connectionLost": "Nawala ang koneksyon",
       "retryConnection": "Subukang kumonekta muli"
     },
+    "status": {
+      "committing": "Nagko-commit…",
+      "committed": "Na-commit",
+      "commitFailed": "Nabigo ang commit",
+      "sessionStopped": "Huminto ang sesyon",
+      "sessionTerminated": "Natapos ang sesyon"
+    },
     "goal": {
       "title": "Layunin",
       "statusActive": "Aktibong layunin",

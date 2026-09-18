@@ -2060,6 +2060,13 @@
       "connectionLost": "Àsopọ̀ ti já",
       "retryConnection": "Gbìyànjú láti tún sopọ̀"
     },
+    "status": {
+      "committing": "Ń ṣe àkọsílẹ̀…",
+      "committed": "A ti ṣe àkọsílẹ̀",
+      "commitFailed": "Àkọsílẹ̀ kùnà",
+      "sessionStopped": "A dá ìgbà iṣẹ́ dúró",
+      "sessionTerminated": "Ìgbà iṣẹ́ ti parí"
+    },
     "goal": {
       "title": "Àfojúsùn",
       "statusActive": "Àfojúsùn tí ń ṣiṣẹ́",

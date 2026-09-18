@@ -2060,6 +2060,13 @@
       "connectionLost": "Walqabannaan citeera",
       "retryConnection": "Deebi'ii walqabsiisuuf yaali"
     },
+    "status": {
+      "committing": "Galmeessaa jira…",
+      "committed": "Galmeessameera",
+      "commitFailed": "Galmeessuun hin milkoofne",
+      "sessionStopped": "Turtiin dhaabame",
+      "sessionTerminated": "Turtiin xumurame"
+    },
     "goal": {
       "title": "Kaayyoo",
       "statusActive": "Kaayyoo socho'aa",

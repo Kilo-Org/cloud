@@ -2114,6 +2114,13 @@
       "connectionLost": "Cailleadh an nasc",
       "retryConnection": "Bain triail eile as nascadh"
     },
+    "status": {
+      "committing": "Á thaifeadadh…",
+      "committed": "Taifeadta",
+      "commitFailed": "Theip ar an taifead",
+      "sessionStopped": "Seisiún stoptha",
+      "sessionTerminated": "Seisiún críochnaithe"
+    },
     "goal": {
       "title": "Sprioc",
       "statusActive": "Sprioc ghníomhach",

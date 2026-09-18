@@ -2060,6 +2060,13 @@
       "connectionLost": "Xiriirku wuu go'ay",
       "retryConnection": "Mar kale isku day inaad ku xirmato"
     },
+    "status": {
+      "committing": "Waa la diiwaangelinayaa…",
+      "committed": "La diiwaangeliyay",
+      "commitFailed": "Diiwaangelinta waa fashilantay",
+      "sessionStopped": "Kalfadhiga waa la joojiyay",
+      "sessionTerminated": "Kalfadhiga waa la soo afjaray"
+    },
     "goal": {
       "title": "Hadaf",
       "statusActive": "Hadaf firfircoon",

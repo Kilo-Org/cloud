@@ -1579,6 +1579,13 @@
       "connectionLost": "Conexión perdida",
       "retryConnection": "Reintentar la conexión"
     },
+    "status": {
+      "committing": "Confirmando…",
+      "committed": "Confirmado",
+      "commitFailed": "No se pudo confirmar",
+      "sessionStopped": "Sesión detenida",
+      "sessionTerminated": "Sesión finalizada"
+    },
     "goal": {
       "title": "Objetivo",
       "statusActive": "Objetivo activo",

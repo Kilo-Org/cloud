@@ -2060,6 +2060,13 @@
       "connectionLost": "जडान टुट्यो",
       "retryConnection": "जडान गर्न पुनः प्रयास गर्नुहोस्"
     },
+    "status": {
+      "committing": "कमिट हुँदैछ…",
+      "committed": "कमिट भयो",
+      "commitFailed": "कमिट असफल भयो",
+      "sessionStopped": "सत्र रोकियो",
+      "sessionTerminated": "सत्र समाप्त भयो"
+    },
     "goal": {
       "title": "लक्ष्य",
       "statusActive": "सक्रिय लक्ष्य",

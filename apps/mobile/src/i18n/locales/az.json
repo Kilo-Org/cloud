@@ -2060,6 +2060,13 @@
       "connectionLost": "Bağlantı kəsildi",
       "retryConnection": "Yenidən qoşul"
     },
+    "status": {
+      "committing": "Kommit edilir…",
+      "committed": "Kommit edildi",
+      "commitFailed": "Kommit alınmadı",
+      "sessionStopped": "Sessiya dayandırıldı",
+      "sessionTerminated": "Sessiya sonlandırıldı"
+    },
     "goal": {
       "title": "Məqsəd",
       "statusActive": "Aktiv məqsəd",

@@ -2060,6 +2060,13 @@
       "connectionLost": "Tilkoblingen er brutt",
       "retryConnection": "Prøv å koble til på nytt"
     },
+    "status": {
+      "committing": "Lagrer…",
+      "committed": "Lagret",
+      "commitFailed": "Lagring mislyktes",
+      "sessionStopped": "Økten stoppet",
+      "sessionTerminated": "Økten avsluttet"
+    },
     "goal": {
       "title": "Mål",
       "statusActive": "Aktivt mål",

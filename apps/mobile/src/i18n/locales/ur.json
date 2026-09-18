@@ -2060,6 +2060,13 @@
       "connectionLost": "کنکشن ٹوٹ گیا",
       "retryConnection": "کنکشن دوبارہ قائم کرنے کی کوشش کریں"
     },
+    "status": {
+      "committing": "کمیٹ کیا جا رہا ہے…",
+      "committed": "کمیٹ ہو گیا",
+      "commitFailed": "کمیٹ ناکام ہو گیا",
+      "sessionStopped": "سیشن رک گیا",
+      "sessionTerminated": "سیشن ختم ہو گیا"
+    },
     "goal": {
       "title": "ہدف",
       "statusActive": "فعال ہدف",

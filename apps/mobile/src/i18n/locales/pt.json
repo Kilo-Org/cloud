@@ -2078,6 +2078,13 @@
       "connectionLost": "Ligação perdida",
       "retryConnection": "Tentar ligar novamente"
     },
+    "status": {
+      "committing": "A confirmar…",
+      "committed": "Confirmado",
+      "commitFailed": "Falha ao confirmar",
+      "sessionStopped": "Sessão parada",
+      "sessionTerminated": "Sessão terminada"
+    },
     "goal": {
       "title": "Objetivo",
       "statusActive": "Objetivo ativo",

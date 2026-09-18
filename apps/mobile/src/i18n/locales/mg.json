@@ -2060,6 +2060,13 @@
       "connectionLost": "Tapaka ny fifandraisana",
       "retryConnection": "Andramo mifandray indray"
     },
+    "status": {
+      "committing": "Manoratra firaketana…",
+      "committed": "Voarakitra",
+      "commitFailed": "Tsy nahomby ny firaketana",
+      "sessionStopped": "Najanona ny fotoam-piasana",
+      "sessionTerminated": "Vita ny fotoam-piasana"
+    },
     "goal": {
       "title": "Tanjona",
       "statusActive": "Tanjona mavitrika",

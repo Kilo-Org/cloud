@@ -1588,6 +1588,13 @@
       "connectionLost": "З'єднання втрачено",
       "retryConnection": "Повторити підключення"
     },
+    "status": {
+      "committing": "Створення коміту…",
+      "committed": "Коміт створено",
+      "commitFailed": "Не вдалося створити коміт",
+      "sessionStopped": "Сеанс зупинено",
+      "sessionTerminated": "Сеанс завершено"
+    },
     "goal": {
       "title": "Ціль",
       "statusActive": "Активна ціль",

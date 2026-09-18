@@ -2060,6 +2060,13 @@
       "connectionLost": "Tenging rofnaði",
       "retryConnection": "Reyna að tengjast aftur"
     },
+    "status": {
+      "committing": "Verið að skrá…",
+      "committed": "Skráð",
+      "commitFailed": "Skráning mistókst",
+      "sessionStopped": "Lota stöðvuð",
+      "sessionTerminated": "Lotu lokið"
+    },
     "goal": {
       "title": "Markmið",
       "statusActive": "Virkt markmið",

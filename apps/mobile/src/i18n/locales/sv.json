@@ -2060,6 +2060,13 @@
       "connectionLost": "Anslutningen bröts",
       "retryConnection": "Försök ansluta igen"
     },
+    "status": {
+      "committing": "Checkar in…",
+      "committed": "Incheckad",
+      "commitFailed": "Incheckningen misslyckades",
+      "sessionStopped": "Sessionen stoppad",
+      "sessionTerminated": "Sessionen avslutad"
+    },
     "goal": {
       "title": "Mål",
       "statusActive": "Aktivt mål",

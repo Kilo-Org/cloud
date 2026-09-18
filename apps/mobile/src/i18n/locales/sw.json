@@ -2060,6 +2060,13 @@
       "connectionLost": "Muunganisho umekatika",
       "retryConnection": "Jaribu kuunganisha tena"
     },
+    "status": {
+      "committing": "Inahifadhi…",
+      "committed": "Imehifadhiwa",
+      "commitFailed": "Uhifadhi umeshindikana",
+      "sessionStopped": "Kikao kimesimama",
+      "sessionTerminated": "Kikao kimekamilika"
+    },
     "goal": {
       "title": "Lengo",
       "statusActive": "Lengo amilifu",

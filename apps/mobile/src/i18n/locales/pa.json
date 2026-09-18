@@ -2060,6 +2060,13 @@
       "connectionLost": "ਕਨੈਕਸ਼ਨ ਟੁੱਟ ਗਿਆ",
       "retryConnection": "ਮੁੜ ਕਨੈਕਟ ਕਰਨ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ"
     },
+    "status": {
+      "committing": "ਕਮਿਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ…",
+      "committed": "ਕਮਿਟ ਹੋ ਗਿਆ",
+      "commitFailed": "ਕਮਿਟ ਅਸਫਲ ਰਿਹਾ",
+      "sessionStopped": "ਸੈਸ਼ਨ ਰੁਕ ਗਿਆ",
+      "sessionTerminated": "ਸੈਸ਼ਨ ਖ਼ਤਮ ਹੋ ਗਿਆ"
+    },
     "goal": {
       "title": "ਟੀਚਾ",
       "statusActive": "ਸਰਗਰਮ ਟੀਚਾ",

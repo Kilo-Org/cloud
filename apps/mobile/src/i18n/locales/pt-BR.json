@@ -1543,6 +1543,13 @@
       "connectionLost": "Conexão perdida",
       "retryConnection": "Tentar reconectar"
     },
+    "status": {
+      "committing": "Registrando…",
+      "committed": "Registrado",
+      "commitFailed": "Falha ao registrar",
+      "sessionStopped": "Sessão interrompida",
+      "sessionTerminated": "Sessão encerrada"
+    },
     "goal": {
       "title": "Meta",
       "statusActive": "Meta ativa",

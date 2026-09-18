@@ -2096,6 +2096,13 @@
       "connectionLost": "Připojení přerušeno",
       "retryConnection": "Znovu se připojit"
     },
+    "status": {
+      "committing": "Vytváří se commit…",
+      "committed": "Commit vytvořen",
+      "commitFailed": "Vytvoření commitu selhalo",
+      "sessionStopped": "Relace zastavena",
+      "sessionTerminated": "Relace ukončena"
+    },
     "goal": {
       "title": "Cíl",
       "statusActive": "Aktivní cíl",

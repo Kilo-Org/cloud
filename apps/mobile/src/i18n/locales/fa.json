@@ -2060,6 +2060,13 @@
       "connectionLost": "اتصال قطع شد",
       "retryConnection": "تلاش دوباره برای اتصال"
     },
+    "status": {
+      "committing": "در حال کامیت…",
+      "committed": "کامیت شد",
+      "commitFailed": "کامیت ناموفق بود",
+      "sessionStopped": "نشست متوقف شد",
+      "sessionTerminated": "نشست پایان یافت"
+    },
     "goal": {
       "title": "هدف",
       "statusActive": "هدف فعال",

@@ -2060,6 +2060,13 @@
       "connectionLost": "Ühendus katkes",
       "retryConnection": "Proovi uuesti ühenduda"
     },
+    "status": {
+      "committing": "Kinnitatakse…",
+      "committed": "Kinnitatud",
+      "commitFailed": "Kinnitamine ebaõnnestus",
+      "sessionStopped": "Seanss peatatud",
+      "sessionTerminated": "Seanss lõpetatud"
+    },
     "goal": {
       "title": "Eesmärk",
       "statusActive": "Aktiivne eesmärk",

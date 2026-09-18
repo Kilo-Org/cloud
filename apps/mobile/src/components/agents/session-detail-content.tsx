@@ -1886,6 +1886,9 @@ export function SessionDetailContent({
               placeholder={t('agentChat.goal.editPlaceholder')}
               initialValue={sessionGoal.text}
               maxLength={500}
+              // Goal text is prose and can hold a long unbroken line; the dialog
+              // must wrap it instead of clipping its start.
+              multiline
               onSave={handleGoalEditSave}
               onClose={() => {
                 setIsGoalEditOpen(false);

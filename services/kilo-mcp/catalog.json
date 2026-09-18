@@ -9077,6 +9077,84 @@
     ],
     "searchBlob": "codingPlans.subscribe Start a subscription to a Kilo coding plan. Pay the plan cost in credits and get the managed provider credential installed. codingplans subscribe planid idempotencykey planId idempotencyKey"
   },
+  "debug.badInputError": {
+    "path": "debug.badInputError",
+    "kind": "query",
+    "summary": "Debug endpoint that echoes a short string back, used to exercise input validation errors.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 100
+    },
+    "tags": [
+      "debug",
+      "badinputerror"
+    ],
+    "searchBlob": "debug.badInputError Debug endpoint that echoes a short string back, used to exercise input validation errors. debug badinputerror",
+    "admin": true,
+    "debug": true
+  },
+  "debug.badInputObjectError": {
+    "path": "debug.badInputObjectError",
+    "kind": "query",
+    "summary": "Debug endpoint that takes a name and age object and echoes them back, used to exercise object input validation errors.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "age": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 150
+        }
+      },
+      "required": [
+        "name",
+        "age"
+      ]
+    },
+    "tags": [
+      "debug",
+      "badinputobjecterror",
+      "name",
+      "age"
+    ],
+    "searchBlob": "debug.badInputObjectError Debug endpoint that takes a name and age object and echoes them back, used to exercise object input validation errors. debug badinputobjecterror name age name age",
+    "admin": true,
+    "debug": true
+  },
+  "debug.handledTrpcError": {
+    "path": "debug.handledTrpcError",
+    "kind": "query",
+    "summary": "Debug endpoint that raises a handled tRPC conflict error, used to exercise structured error responses.",
+    "inputSchema": {},
+    "tags": [
+      "debug",
+      "handledtrpcerror"
+    ],
+    "searchBlob": "debug.handledTrpcError Debug endpoint that raises a handled tRPC conflict error, used to exercise structured error responses. debug handledtrpcerror",
+    "admin": true,
+    "debug": true
+  },
+  "debug.unhandledError": {
+    "path": "debug.unhandledError",
+    "kind": "query",
+    "summary": "Debug endpoint that throws an unexpected server error, used to exercise generic error handling.",
+    "inputSchema": {},
+    "tags": [
+      "debug",
+      "unhandlederror"
+    ],
+    "searchBlob": "debug.unhandledError Debug endpoint that throws an unexpected server error, used to exercise generic error handling. debug unhandlederror",
+    "admin": true,
+    "debug": true
+  },
   "deployments.cancelBuild": {
     "path": "deployments.cancelBuild",
     "kind": "mutation",
@@ -15092,7 +15170,8 @@
       "staticheaders",
       "pathpassthrough"
     ],
-    "searchBlob": "mcpGateway.createPersonal Create a personal MCP gateway connection that proxies a remote MCP server with the chosen auth mode. Returns the new connection config ID. mcpgateway createpersonal name remoteurl authmode providerissuer providerscopes staticproviderclientid staticproviderclientsecret staticheaders pathpassthrough name remoteUrl authMode providerIssuer providerScopes staticProviderClientId staticProviderClientSecret staticHeaders pathPassthrough"
+    "searchBlob": "mcpGateway.createPersonal Create a personal MCP gateway connection that proxies a remote MCP server with the chosen auth mode. Returns the new connection config ID. mcpgateway createpersonal name remoteurl authmode providerissuer providerscopes staticproviderclientid staticproviderclientsecret staticheaders pathpassthrough name remoteUrl authMode providerIssuer providerScopes staticProviderClientId staticProviderClientSecret staticHeaders pathPassthrough",
+    "admin": true
   },
   "mcpGateway.delete": {
     "path": "mcpGateway.delete",
@@ -15235,7 +15314,8 @@
       "getpersonal",
       "configid"
     ],
-    "searchBlob": "mcpGateway.getPersonal Fetches details of a single personal MCP gateway configuration owned by the current user by its config ID. mcpgateway getpersonal configid configId"
+    "searchBlob": "mcpGateway.getPersonal Fetches details of a single personal MCP gateway configuration owned by the current user by its config ID. mcpgateway getpersonal configid configId",
+    "admin": true
   },
   "mcpGateway.listOrganization": {
     "path": "mcpGateway.listOrganization",
@@ -15271,7 +15351,8 @@
       "mcpgateway",
       "listpersonal"
     ],
-    "searchBlob": "mcpGateway.listPersonal Lists MCP gateway configurations owned by the current user (personal scope), returning all servers the user has configured. mcpgateway listpersonal"
+    "searchBlob": "mcpGateway.listPersonal Lists MCP gateway configurations owned by the current user (personal scope), returning all servers the user has configured. mcpgateway listpersonal",
+    "admin": true
   },
   "mcpGateway.revokeAssignment": {
     "path": "mcpGateway.revokeAssignment",
@@ -27510,7 +27591,8 @@
       "seatpurchases",
       "organizationid"
     ],
-    "searchBlob": "organizations.seatPurchases Get the seat purchase records for an organization ordered newest first. organizations seatpurchases organizationid organizationId"
+    "searchBlob": "organizations.seatPurchases Get the seat purchase records for an organization ordered newest first. organizations seatpurchases organizationid organizationId",
+    "admin": true
   },
   "organizations.seats": {
     "path": "organizations.seats",
@@ -29094,7 +29176,8 @@
       "organizationid",
       "code_indexing_enabled"
     ],
-    "searchBlob": "organizations.settings.updateCodeIndexingFeatureFlag Enable or disable code indexing for an organization. Use as an admin to toggle the code indexing feature. organizations settings updatecodeindexingfeatureflag organizationid code_indexing_enabled organizationId code_indexing_enabled"
+    "searchBlob": "organizations.settings.updateCodeIndexingFeatureFlag Enable or disable code indexing for an organization. Use as an admin to toggle the code indexing feature. organizations settings updatecodeindexingfeatureflag organizationid code_indexing_enabled organizationId code_indexing_enabled",
+    "admin": true
   },
   "organizations.settings.updateDataCollection": {
     "path": "organizations.settings.updateDataCollection",
@@ -29307,7 +29390,8 @@
       "clearssodomain",
       "organizationid"
     ],
-    "searchBlob": "organizations.sso.clearSsoDomain Remove the SSO domain from an organization. Use to clear the single sign-on domain. organizations sso clearssodomain organizationid organizationId"
+    "searchBlob": "organizations.sso.clearSsoDomain Remove the SSO domain from an organization. Use to clear the single sign-on domain. organizations sso clearssodomain organizationid organizationId",
+    "admin": true
   },
   "organizations.sso.createConfig": {
     "path": "organizations.sso.createConfig",
@@ -29333,7 +29417,8 @@
       "createconfig",
       "organizationid"
     ],
-    "searchBlob": "organizations.sso.createConfig Set up SSO for an organization. Use to create the organization's single sign-on configuration. organizations sso createconfig organizationid organizationId"
+    "searchBlob": "organizations.sso.createConfig Set up SSO for an organization. Use to create the organization's single sign-on configuration. organizations sso createconfig organizationid organizationId",
+    "admin": true
   },
   "organizations.sso.deleteConfig": {
     "path": "organizations.sso.deleteConfig",
@@ -29359,7 +29444,8 @@
       "deleteconfig",
       "organizationid"
     ],
-    "searchBlob": "organizations.sso.deleteConfig Delete an organization's SSO configuration. Use to turn off single sign-on. organizations sso deleteconfig organizationid organizationId"
+    "searchBlob": "organizations.sso.deleteConfig Delete an organization's SSO configuration. Use to turn off single sign-on. organizations sso deleteconfig organizationid organizationId",
+    "admin": true
   },
   "organizations.sso.generateAdminPortalLink": {
     "path": "organizations.sso.generateAdminPortalLink",
@@ -29394,7 +29480,8 @@
       "organizationid",
       "linktype"
     ],
-    "searchBlob": "organizations.sso.generateAdminPortalLink Get a link to the SSO admin portal for configuring SSO or verifying a domain. Use to open the identity provider setup page. organizations sso generateadminportallink organizationid linktype organizationId linkType"
+    "searchBlob": "organizations.sso.generateAdminPortalLink Get a link to the SSO admin portal for configuring SSO or verifying a domain. Use to open the identity provider setup page. organizations sso generateadminportallink organizationid linktype organizationId linkType",
+    "admin": true
   },
   "organizations.sso.getConfig": {
     "path": "organizations.sso.getConfig",
@@ -29451,7 +29538,8 @@
       "organizationid",
       "ssodomain"
     ],
-    "searchBlob": "organizations.sso.updateSsoDomain Set the email domain that an organization's SSO applies to. Use to assign an SSO domain. organizations sso updatessodomain organizationid ssodomain organizationId ssoDomain"
+    "searchBlob": "organizations.sso.updateSsoDomain Set the email domain that an organization's SSO applies to. Use to assign an SSO domain. organizations sso updatessodomain organizationid ssodomain organizationId ssoDomain",
+    "admin": true
   },
   "organizations.subOrganizations.credits": {
     "path": "organizations.subOrganizations.credits",
@@ -30121,7 +30209,8 @@
       "organizationid",
       "plan"
     ],
-    "searchBlob": "organizations.updatePlan Change an organization's plan as a platform admin. Use to set the organization plan tier. organizations updateplan organizationid plan organizationId plan"
+    "searchBlob": "organizations.updatePlan Change an organization's plan as a platform admin. Use to set the organization plan tier. organizations updateplan organizationid plan organizationId plan",
+    "admin": true
   },
   "organizations.updateSeatsRequired": {
     "path": "organizations.updateSeatsRequired",
@@ -30151,7 +30240,8 @@
       "organizationid",
       "seatsrequired"
     ],
-    "searchBlob": "organizations.updateSeatsRequired Require seats for an organization as a platform admin. Use to toggle seat requirements. organizations updateseatsrequired organizationid seatsrequired organizationId seatsRequired"
+    "searchBlob": "organizations.updateSeatsRequired Require seats for an organization as a platform admin. Use to toggle seat requirements. organizations updateseatsrequired organizationid seatsrequired organizationId seatsRequired",
+    "admin": true
   },
   "organizations.usageDetails.dismissRecommendation": {
     "path": "organizations.usageDetails.dismissRecommendation",

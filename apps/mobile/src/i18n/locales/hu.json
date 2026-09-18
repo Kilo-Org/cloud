@@ -480,6 +480,8 @@
       "replyBadRequest": "Ez a válasz nem küldhető el. Lehet, hogy a szál megváltozott.",
       "replyForbidden": "Nincs jogosultságod válaszolni erre a módosítási kérelemre.",
       "addCommentCta": "Hozzászólás ehhez a módosítási kérelemhez",
+      "fixWithKilo": "Javítás Kiloval",
+      "fixWithKiloPrompt": "Kérlek, foglalkozz a következő módosítási kérelemhez írt hozzászólással: {{link}}",
       "commentBadRequest": "Ez a hozzászólás nem küldhető el. Lehet, hogy a módosítási kérelem megváltozott.",
       "commentForbidden": "Nincs jogosultságod hozzászólni ehhez a módosítási kérelemhez.",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "Ezt a munkamenetet folytatod: {{title}}.",
       "importingSession": "Munkamenet importálása…",
       "cliCannotContinue": "Ez a CLI nem támogatja a munkamenetek folytatását. Válaszd a Cloud Agentet vagy egy másik CLI-t.",
-      "importFailed": "Nem sikerült importálni ezt a munkamenetet."
+      "importFailed": "Nem sikerült importálni ezt a munkamenetet.",
+      "sandbox": "Homokozó",
+      "sandboxAccessibility": "Homokozó: {{label}}",
+      "sandboxDefaultWithDestination": "Alapértelmezett · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Kicsi",
+      "sandboxInstanceShared": "Megosztott",
+      "sandboxInstanceLarge": "Nagy",
+      "sandboxInstanceDevcontainer": "Dev konténer",
+      "sandboxInstanceProviderDefault": "Szolgáltatói alapértelmezés",
+      "sandboxCouldNotLoad": "A homokozó beállításai nem tölthetők be",
+      "sandboxUnavailable": "Ez a homokozó nem érhető el. Válassz másik homokozót vagy az Alapértelmezettet.",
+      "sandboxUseDefault": "Alapértelmezett használata"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissült.",
@@ -2492,6 +2507,12 @@
       "startNewSession": "Új munkamenet indítása",
       "exitSession": "Kilépés a munkamenetből",
       "clearSession": "Ennek a munkamenetnek a befejezése és új indítása",
+      "compactDescription": "tömörítsd az aktuális munkamenet kontextusát",
+      "goalDescription": "Folytasd a munkát egy munkamenetcél felé. /goal <objective> vagy pause, resume, clear",
+      "initDescription": "vezetett AGENTS.md-beállítás",
+      "resumeClaudeDescription": "importálj egy Claude Code munkamenet-átiratot",
+      "resumeCodexDescription": "importálj egy OpenAI Codex munkamenet-átiratot",
+      "reviewDescription": "tekintsd át a változásokat [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} használata",
       "insert": "Beszúrás",
       "upgradeRequiredFallback": "A parancs használatához frissítsd a CLI-t.",
@@ -2609,6 +2630,7 @@
     "couldNotLoadActiveSessions": "Nem sikerült betölteni az aktív munkameneteket.",
     "agentSessions": "Most fut",
     "newCodingTask": "Új kódolási feladat",
+    "newTaskFromPicture": "Új feladat képből",
     "explore": "Felfedezés",
     "seeAll": "Összes megtekintése",
     "noLiveSessions": "Jelenleg semmi sem fut"
@@ -2830,7 +2852,8 @@
     "aiProvidersWhat": "Az utasításaid, a beszélgetési előzményeid és minden csatolt fájlod.",
     "aiProvidersWhy": "Az AI-válaszok létrehozásához.",
     "aiProvidersWho": "Anthropic, OpenAI, Google és más szolgáltatók, amelyeket az egyes kérésekhez választasz.",
-    "gatewayWhat": "Fiókazonosító, a kérések metaadatai, tokenhasználat.",
+    "gatewayWhat": "Fiókazonosító, a kérések metaadatai, tokenhasználat, valamint az alkalmazás általa küldött promptjai és hangfelvételei.",
+    "viaGateway": "Kilo Gatewayen keresztül",
     "gatewayWhy": "Hitelesítés, kérések továbbítása, számlázási egyeztetés.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Összeomlási és hibajelentések, amelyekből eltávolítjuk az alkalmazás tartalmát.",
@@ -2850,7 +2873,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "A diktálás közben készült hangfelvételed.",
     "voiceTranscriptionWhy": "A beszéd szöveggé alakításához.",
-    "voiceTranscriptionWho": "Csak az eszközöd dolgozza fel, vagy az Apple vagy a Google, ha az eszköz nem tudja internetkapcsolat nélkül átírni a beszédet.",
+    "voiceTranscriptionWho": "Az eszközöd, a Kilo Gateway a választott átírási modelleddel, vagy az Apple vagy a Google az online felismeréshez.",
     "installAttributionPromptTitle": "Engedélyezed a telepítés forrásának azonosítását?",
     "installAttributionPromptMessage": "A Kilo az Apple követési engedélyét kizárólag arra használja, hogy megtudja, milyen csatornán jutottál el hozzánk. Az utasításaidat és beszélgetéseidet soha nem használjuk erre.",
     "what": "Mit",
@@ -3060,6 +3083,12 @@
     "privacy": "Nyisd meg a Kilo alkalmazást az ügynökök megtekintéséhez",
     "openAgents": "Ügynökök megnyitása",
     "needsInput": "Válaszra vár",
+    "newestSession": "Legújabb: {{title}}",
+    "noneWaiting": "Egyetlen ügynök sem vár",
+    "newAgent": "Új ügynök",
+    "approving": "Jóváhagyás folyamatban...",
+    "couldNotApprove": "Nem sikerült jóváhagyni",
+    "couldNotStart": "Nem sikerült elindítani",
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
   },
@@ -3095,5 +3124,12 @@
     "remoteFound": "Számítógép csatlakoztatva",
     "checkAgain": "Ellenőrzés újra",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Az ügynök indításához utasítás szükséges. Adj hozzá utasítást, és futtasd újra.",
+      "repositoryUnknown": "A Kilo nem ismeri fel a {{repository}} nevet GitHub- vagy GitLab-adattárként. Válassz másik adattárat a Kilóban.",
+      "repositoryUnsupported": "A {{repository}} egy Bitbucket-adattár — Az Ügynök indítása még nem tudja használni. Válassz másik adattárat a Kilóban."
+    }
   }
 }

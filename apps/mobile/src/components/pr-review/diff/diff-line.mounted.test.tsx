@@ -4,12 +4,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { DiffLine } from './diff-line';
+import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
 import { type ParsedDiffLine } from '@/lib/pr-review/diff/parse-patch';
+
+const { useColorSchemeMock } = vi.hoisted(() => ({
+  useColorSchemeMock: vi.fn<() => 'dark' | 'light'>(() => 'light'),
+}));
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   Text: 'RNText',
   View: 'View',
+  useColorScheme: useColorSchemeMock,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
@@ -49,6 +55,18 @@ function mountLine(props: {
   return created;
 }
 
+/** The children the shared highlight-run renderer produced for the code Text. */
+function codeRunChildren(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+  const [codeText] = renderer.root.findAll(
+    node => node.type === ('RNText' as never) && node.props.selectable === true
+  );
+  if (codeText === undefined) {
+    throw new Error('expected a selectable code Text');
+  }
+  const [runs] = codeText.props.children as unknown[];
+  return Array.isArray(runs) ? runs : [runs];
+}
+
 /** The row is the only `flex-row items-stretch` View in a DiffLine. */
 function findRow(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
   const rows = renderer.root.findAll(
@@ -63,6 +81,41 @@ function findRow(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTe
   }
   return row;
 }
+
+/** The style.color of every painted run: gutter, marker, and code runs. */
+function paintedColors(root: TestRenderer.ReactTestInstance): string[] {
+  return root
+    .findAll(node => {
+      const style = node.props.style as { color?: string } | undefined;
+      return typeof style?.color === 'string';
+    })
+    .map(node => (node.props.style as { color: string }).color);
+}
+
+describe('DiffLine syntax palette follows the color scheme', () => {
+  // The palette must come from the color scheme, not from comparing a theme
+  // token (e.g. `background`) to a hex literal: the generated palette is free
+  // to change and the tokens would silently flip against their surface.
+  it('paints the dark token and muted palette on a dark color scheme', () => {
+    useColorSchemeMock.mockReturnValue('dark');
+    const renderer = mountLine({ line: line(), language: 'typescript', keyId: 'line-12' });
+
+    const colors = paintedColors(renderer.root);
+    expect(colors).toContain(tokenColorFor('keyword', true));
+    expect(colors).toContain(MUTED_COLOR.dark);
+    expect(colors).not.toContain(tokenColorFor('keyword', false));
+  });
+
+  it('paints the light token and muted palette on a light color scheme', () => {
+    useColorSchemeMock.mockReturnValue('light');
+    const renderer = mountLine({ line: line(), language: 'typescript', keyId: 'line-12' });
+
+    const colors = paintedColors(renderer.root);
+    expect(colors).toContain(tokenColorFor('keyword', false));
+    expect(colors).toContain(MUTED_COLOR.light);
+    expect(colors).not.toContain(tokenColorFor('keyword', true));
+  });
+});
 
 describe('DiffLine gutter alignment', () => {
   // The row is `flex-row items-stretch`, so the gutter View stretches to the
@@ -102,6 +155,28 @@ describe('DiffLine gutter alignment', () => {
         TestRenderer.ReactTestInstance,
       ];
       expect(gutter.props.className).toContain('justify-start');
+    }
+  });
+});
+
+describe('DiffLine highlight runs', () => {
+  // The diff line shares the code block's run renderer: untagged tokens stay
+  // raw strings (React Native coalesces them into the code Text's own
+  // fragment), so a plain line adds no Android span beyond the Text itself.
+  it('renders an untagged line as one raw string', () => {
+    const renderer = mountLine({ line: line(), language: null, keyId: 'runs-plain' });
+    expect(codeRunChildren(renderer)).toEqual(['const value = computeSomething(x);']);
+  });
+
+  it('emits a nested run for the tagged tokens only', () => {
+    const renderer = mountLine({ line: line(), language: 'typescript', keyId: 'runs-ts' });
+    const runs = codeRunChildren(renderer);
+    const tagged = runs.filter(run => typeof run === 'object' && run !== null);
+    expect(tagged.length).toBeGreaterThan(0);
+    expect(tagged.length).toBeLessThan(runs.length);
+    for (const run of tagged) {
+      const style = (run as { props: { style: { color: string } } }).props.style;
+      expect(typeof style.color).toBe('string');
     }
   });
 });

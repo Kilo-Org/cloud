@@ -489,6 +489,8 @@
       "replyBadRequest": "Din ir-risposta ma tistax tiġi ppubblikata. Is-sensiela ta' kummenti setgħet inbidlet.",
       "replyForbidden": "M'għandekx permess biex tirrispondi għal din it-talba għall-għaqda.",
       "addCommentCta": "Ikkummenta fuq din it-talba għall-għaqda",
+      "fixWithKilo": "Solvi bil-Kilo",
+      "fixWithKiloPrompt": "Jekk jogħġbok indirizza l-kumment li ġej fuq it-talba għall-għaqda: {{link}}",
       "commentBadRequest": "Dan il-kumment ma jistax jiġi ppubblikat. Jista' jkun li t-talba għall-għaqda nbidlet.",
       "commentForbidden": "M'għandekx permess biex tikkummenta fuq din it-talba għall-għaqda.",
       "moderation": {
@@ -2180,7 +2182,20 @@
       "continueFrom": "Qed tkompli s-sessjoni {{title}}.",
       "importingSession": "Qed tiġi importata s-sessjoni",
       "cliCannotContinue": "Dan il-CLI ma jistax ikompli sessjoni. Agħżel Cloud Agent jew CLI ieħor.",
-      "importFailed": "Ma setgħetx tiġi importata din is-sessjoni."
+      "importFailed": "Ma setgħetx tiġi importata din is-sessjoni.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Default · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Żgħir",
+      "sandboxInstanceShared": "Kondiviż",
+      "sandboxInstanceLarge": "Kbir",
+      "sandboxInstanceDevcontainer": "Kontenitur tad-Dev",
+      "sandboxInstanceProviderDefault": "Default tal-fornitur",
+      "sandboxCouldNotLoad": "Ma setgħetx titgħabba l-għażliet tas-sandbox",
+      "sandboxUnavailable": "Dan is-sandbox mhuwiex disponibbli. Agħżel sandbox ieħor jew Default.",
+      "sandboxUseDefault": "Uża Default"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ġie aġġornat {{displayCount}} fajl.",
@@ -2558,6 +2573,12 @@
       "startNewSession": "Ibda sessjoni ġdida",
       "exitSession": "Oħroġ mis-sessjoni",
       "clearSession": "Temm din is-sessjoni u ibda waħda ġdida",
+      "compactDescription": "ikkomprimi l-kuntest tas-sessjoni attwali",
+      "goalDescription": "Kompli aħdem lejn mira ta' sessjoni. /goal <objective> jew pause, resume, clear",
+      "initDescription": "setup iggwidat ta' AGENTS.md",
+      "resumeClaudeDescription": "importa traskrizzjoni ta' sessjoni Claude Code",
+      "resumeCodexDescription": "importa traskrizzjoni ta' sessjoni OpenAI Codex",
+      "reviewDescription": "irrevedi l-bidliet [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Uża /{{command}}",
       "insert": "Daħħal",
       "upgradeRequiredFallback": "Aġġorna l-CLI tiegħek biex tuża dan il-kmand.",
@@ -2678,6 +2699,7 @@
     "couldNotLoadActiveSessions": "Ma setgħux jitgħabbew is-sessjonijiet attivi.",
     "agentSessions": "Attivi bħalissa",
     "newCodingTask": "Kompitu ġdid ta' programmazzjoni",
+    "newTaskFromPicture": "Kompitu ġdid minn ritratt",
     "explore": "Esplora",
     "seeAll": "Ara kollox",
     "noLiveSessions": "M'hemm xejn għaddej bħalissa"
@@ -2899,7 +2921,8 @@
     "aiProvidersWhat": "L-istruzzjonijiet tiegħek, l-istorja tal-konversazzjonijiet u kull fajl li tehmeż.",
     "aiProvidersWhy": "Biex jiġu ġġenerati tweġibiet tal-AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google, u fornituri oħra li tagħżel għal kull talba.",
-    "gatewayWhat": "ID tal-kont, metadata tat-talbiet, użu tal-unitajiet tat-test.",
+    "gatewayWhat": "ID tal-kont, metadata tat-talbiet, użu tal-unitajiet tat-test, kif ukoll il-prompts u r-reġistrazzjonijiet tal-vuċi li l-app tibgħat minnu.",
+    "viaGateway": "Permezz ta' Kilo Gateway",
     "gatewayWhy": "Awtentikazzjoni, direzzjoni tat-talbiet, rikonċiljazzjoni tal-ħlasijiet.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Rapporti ta' waqfien mhux mistenni u żbalji, mingħajr il-kontenut tal-applikazzjoni.",
@@ -2919,7 +2942,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Ir-reġistrazzjoni tiegħek waqt li tiddetta.",
     "voiceTranscriptionWhy": "Biex il-kliem mitkellem jinbidel f'test.",
-    "voiceTranscriptionWho": "Fuq l-apparat biss, jew Apple jew Google meta dan l-apparat ma jistax jittraskrivi mingħajr l-internet.",
+    "voiceTranscriptionWho": "L-apparat tiegħek, Kilo Gateway bil-mudell tat-traskrizzjoni li tagħżel, jew Apple jew Google għar-rikonoxximent online.",
     "installAttributionPromptTitle": "Tippermetti l-attribuzzjoni tal-installazzjoni?",
     "installAttributionPromptMessage": "Kilo juża l-permess tat-traċċar ta' Apple biss biex ikun jaf liema kanal ġabek hawn. L-istruzzjonijiet u l-konversazzjonijiet tiegħek qatt ma jintużaw.",
     "what": "Xiex",
@@ -3132,6 +3155,12 @@
     "privacy": "Iftaħ Kilo biex tara l-aġenti",
     "openAgents": "Iftaħ l-aġenti",
     "needsInput": "Jistenna tweġiba",
+    "newestSession": "L-aktar reċenti: {{title}}",
+    "noneWaiting": "L-ebda aġent qed jistenna",
+    "newAgent": "Aġent ġdid",
+    "approving": "Qed japprova...",
+    "couldNotApprove": "Ma setax japprova",
+    "couldNotStart": "Ma setax jibda",
     "channelName": "Aġenti attivi",
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar."
   },
@@ -3167,5 +3196,12 @@
     "remoteFound": "Kompjuter konness",
     "checkAgain": "Iċċekkja mill-ġdid",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Ibda aġent jeħtieġ istruzzjoni. Żid istruzzjoni u erġa' ħaddmu.",
+      "repositoryUnknown": "Kilo ma jagħrafx lil {{repository}} bħala repożitorju GitHub jew GitLab. Agħżel repożitorju ieħor fil-Kilo.",
+      "repositoryUnsupported": "{{repository}} huwa repożitorju Bitbucket — Ibda aġent għadu ma jistax jużah. Agħżel repożitorju ieħor fil-Kilo."
+    }
   }
 }

@@ -54,6 +54,189 @@
     ],
     "searchBlob": "activeSessions.listInstances List the currently active/connected agent instances or devices from the session ingest worker. activesessions listinstances"
   },
+  "agentProfiles.bindToRepo": {
+    "path": "agentProfiles.bindToRepo",
+    "kind": "mutation",
+    "summary": "Bind an agent profile to a repository so that repository uses the profile.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "repoFullName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "platform": {
+          "default": "github",
+          "type": "string",
+          "enum": [
+            "github",
+            "gitlab"
+          ]
+        }
+      },
+      "required": [
+        "profileId",
+        "repoFullName"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "bindtorepo",
+      "organizationid",
+      "profileid",
+      "repofullname",
+      "platform"
+    ],
+    "searchBlob": "agentProfiles.bindToRepo Bind an agent profile to a repository so that repository uses the profile. agentprofiles bindtorepo organizationid profileid repofullname platform organizationId profileId repoFullName platform"
+  },
+  "agentProfiles.clearDefault": {
+    "path": "agentProfiles.clearDefault",
+    "kind": "mutation",
+    "summary": "Clear the default status from an agent profile.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "cleardefault",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.clearDefault Clear the default status from an agent profile. agentprofiles cleardefault profileid organizationid profileId organizationId"
+  },
+  "agentProfiles.create": {
+    "path": "agentProfiles.create",
+    "kind": "mutation",
+    "summary": "Create a new agent profile with a name and optional description, owned by the current user or an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "create",
+      "name",
+      "description",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.create Create a new agent profile with a name and optional description, owned by the current user or an organization. agentprofiles create name description organizationid name description organizationId"
+  },
+  "agentProfiles.delete": {
+    "path": "agentProfiles.delete",
+    "kind": "mutation",
+    "summary": "Delete an agent profile. Fails if the profile is still referenced by webhook triggers.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "delete",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.delete Delete an agent profile. Fails if the profile is still referenced by webhook triggers. agentprofiles delete profileid organizationid profileId organizationId"
+  },
+  "agentProfiles.deleteVar": {
+    "path": "agentProfiles.deleteVar",
+    "kind": "mutation",
+    "summary": "Delete an environment variable from an agent profile by its key.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "profileId",
+        "key"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "deletevar",
+      "profileid",
+      "organizationid",
+      "key"
+    ],
+    "searchBlob": "agentProfiles.deleteVar Delete an environment variable from an agent profile by its key. agentprofiles deletevar profileid organizationid key profileId organizationId key"
+  },
   "agentProfiles.get": {
     "path": "agentProfiles.get",
     "kind": "query",
@@ -153,6 +336,209 @@
       "organizationid"
     ],
     "searchBlob": "agentProfiles.listRepoBindings List repository bindings that associate repos with agent profiles for the current user or an organization. agentprofiles listrepobindings organizationid organizationId"
+  },
+  "agentProfiles.setAsDefault": {
+    "path": "agentProfiles.setAsDefault",
+    "kind": "mutation",
+    "summary": "Set an agent profile as the default profile for the current user or organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "setasdefault",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.setAsDefault Set an agent profile as the default profile for the current user or organization. agentprofiles setasdefault profileid organizationid profileId organizationId"
+  },
+  "agentProfiles.setCommands": {
+    "path": "agentProfiles.setCommands",
+    "kind": "mutation",
+    "summary": "Set the commands of an agent profile, replacing all existing commands.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "commands": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "required": [
+        "profileId",
+        "commands"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "setcommands",
+      "profileid",
+      "organizationid",
+      "commands"
+    ],
+    "searchBlob": "agentProfiles.setCommands Set the commands of an agent profile, replacing all existing commands. agentprofiles setcommands profileid organizationid commands profileId organizationId commands"
+  },
+  "agentProfiles.setVar": {
+    "path": "agentProfiles.setVar",
+    "kind": "mutation",
+    "summary": "Set or update an environment variable on an agent profile. Mark a value as secret to have it stored encrypted.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "value": {
+          "type": "string",
+          "maxLength": 10000
+        },
+        "isSecret": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "profileId",
+        "key",
+        "value",
+        "isSecret"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "setvar",
+      "profileid",
+      "organizationid",
+      "key",
+      "value",
+      "issecret"
+    ],
+    "searchBlob": "agentProfiles.setVar Set or update an environment variable on an agent profile. Mark a value as secret to have it stored encrypted. agentprofiles setvar profileid organizationid key value issecret profileId organizationId key value isSecret"
+  },
+  "agentProfiles.unbindRepo": {
+    "path": "agentProfiles.unbindRepo",
+    "kind": "mutation",
+    "summary": "Remove the agent profile binding for a repository.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "repoFullName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "platform": {
+          "default": "github",
+          "type": "string",
+          "enum": [
+            "github",
+            "gitlab"
+          ]
+        }
+      },
+      "required": [
+        "repoFullName"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "unbindrepo",
+      "organizationid",
+      "repofullname",
+      "platform"
+    ],
+    "searchBlob": "agentProfiles.unbindRepo Remove the agent profile binding for a repository. agentprofiles unbindrepo organizationid repofullname platform organizationId repoFullName platform"
+  },
+  "agentProfiles.update": {
+    "path": "agentProfiles.update",
+    "kind": "mutation",
+    "summary": "Update an agent profile's name or description.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "update",
+      "profileid",
+      "organizationid",
+      "name",
+      "description"
+    ],
+    "searchBlob": "agentProfiles.update Update an agent profile's name or description. agentprofiles update profileid organizationid name description profileId organizationId name description"
   },
   "appBuilder.canMigrateToGitHub": {
     "path": "appBuilder.canMigrateToGitHub",
@@ -1348,6 +1734,29 @@
       "messageid"
     ],
     "searchBlob": "cloudAgentNext.getMessageResult Check the processing status and outcome of a specific message sent to a cloud agent session, such as whether it is queued, running, completed, failed, or interrupted. cloudagentnext getmessageresult cloudagentsessionid expectedworktreeid messageid cloudAgentSessionId expectedWorktreeId messageId"
+  },
+  "cloudAgentNext.getPendingInteractions": {
+    "path": "cloudAgentNext.getPendingInteractions",
+    "kind": "query",
+    "summary": "Fetch the pending interactions for a cloud agent session that are still waiting on a response, such as approvals or questions requiring user input. Use this to check whether a running agent session is blocked and needs the user to act.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cloudAgentSessionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cloudAgentSessionId"
+      ]
+    },
+    "tags": [
+      "cloudagentnext",
+      "getpendinginteractions",
+      "cloudagentsessionid"
+    ],
+    "searchBlob": "cloudAgentNext.getPendingInteractions Fetch the pending interactions for a cloud agent session that are still waiting on a response, such as approvals or questions requiring user input. Use this to check whether a running agent session is blocked and needs the user to act. cloudagentnext getpendinginteractions cloudagentsessionid cloudAgentSessionId"
   },
   "cloudAgentNext.getSandboxSelectionOptions": {
     "path": "cloudAgentNext.getSandboxSelectionOptions",
@@ -4395,6 +4804,17 @@
     ],
     "searchBlob": "moderation.listHiddenUsers List the GitHub logins of all users the current user has blocked and muted. moderation listhiddenusers"
   },
+  "openAiChatGpt.status": {
+    "path": "openAiChatGpt.status",
+    "kind": "query",
+    "summary": "Check whether the signed-in user's \"Sign in with ChatGPT\" (OpenAI ChatGPT BYOK) connection is connected, disconnected, or in an error state, including linked account email and connection time.",
+    "inputSchema": {},
+    "tags": [
+      "openaichatgpt",
+      "status"
+    ],
+    "searchBlob": "openAiChatGpt.status Check whether the signed-in user's \"Sign in with ChatGPT\" (OpenAI ChatGPT BYOK) connection is connected, disconnected, or in an error state, including linked account email and connection time. openaichatgpt status"
+  },
   "organizations.admin.creditTransactions": {
     "path": "organizations.admin.creditTransactions",
     "kind": "query",
@@ -5327,6 +5747,32 @@
       "organizationid"
     ],
     "searchBlob": "organizations.cloudAgentNext.getMessageResult Fetch the result and status of a specific message in an organization's cloud agent session, returning null if the result is not yet available. organizations cloudagentnext getmessageresult organizationid organizationId"
+  },
+  "organizations.cloudAgentNext.getPendingInteractions": {
+    "path": "organizations.cloudAgentNext.getPendingInteractions",
+    "kind": "query",
+    "summary": "Retrieves the interactions a Cloud Agent session is currently waiting on, such as questions or approval requests that need a response before the agent can continue.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "cloudagentnext",
+      "getpendinginteractions",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.cloudAgentNext.getPendingInteractions Retrieves the interactions a Cloud Agent session is currently waiting on, such as questions or approval requests that need a response before the agent can continue. organizations cloudagentnext getpendinginteractions organizationid organizationId"
   },
   "organizations.cloudAgentNext.getSandboxSelectionOptions": {
     "path": "organizations.cloudAgentNext.getSandboxSelectionOptions",

@@ -380,7 +380,7 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     const result = await aggregate(window);
     expect(legacy(result).totals.failureStages).toEqual([{ stage: 'unknown', count: 1 }]);
     expect(legacy(result).totals.failureStageCodes).toEqual([
-      { stage: 'unknown', code: 'unclassified', count: 1 },
+      { stage: 'unknown', code: 'unclassified', responsibility: 'unknown', count: 1 },
     ]);
   });
 

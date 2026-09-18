@@ -480,6 +480,8 @@
       "replyBadRequest": "A kò lè fi ìdáhùn yìí ránṣẹ́. Ọ̀wọ́ ìjíròrò náà lè ti yí padà.",
       "replyForbidden": "O kò ní àṣẹ láti dáhùn sí ìbéèrè ìṣọ̀kan yìí.",
       "addCommentCta": "Fi àsọyé sí ìbéèrè ìṣọ̀kan yìí",
+      "fixWithKilo": "Ṣàtúnṣe pẹ̀lú Kilo",
+      "fixWithKiloPrompt": "Jọ̀wọ́ yanjú àsọyé ìbéèrè ìṣọ̀kan yìí: {{link}}",
       "commentBadRequest": "A kò lè fi àsọyé yìí ránṣẹ́. Ìbéèrè ìṣọ̀kan náà lè ti yí padà.",
       "commentForbidden": "O kò ní àṣẹ láti fi àsọyé sí ìbéèrè ìṣọ̀kan yìí.",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "A ń tẹ̀síwájú pẹ̀lú {{title}}.",
       "importingSession": "Ń gbé ìgbà iṣẹ́ wọlé",
       "cliCannotContinue": "CLI yìí kò lè tẹ̀síwájú pẹ̀lú ìgbà iṣẹ́ kan. Yan Cloud Agent tàbí CLI mìíràn.",
-      "importFailed": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé."
+      "importFailed": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Ìpìlẹ̀ · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Kékeré",
+      "sandboxInstanceShared": "Tí a pín",
+      "sandboxInstanceLarge": "Ńlá",
+      "sandboxInstanceDevcontainer": "Àpò Dev",
+      "sandboxInstanceProviderDefault": "Ìpìlẹ̀ olùpèsè",
+      "sandboxCouldNotLoad": "Kò ṣe é gbé àwọn àṣàyàn sandbox wá",
+      "sandboxUnavailable": "Sandbox yìí kò wà. Yan sandbox míràn tàbí Ìpìlẹ̀.",
+      "sandboxUseDefault": "Lo Ìpìlẹ̀"
     },
     "partRenderer": {
       "updatedFileCount_one": "A ti ṣe ìmúdójúìwọ̀n fáìlì {{displayCount}}.",
@@ -2492,6 +2507,12 @@
       "startNewSession": "Bẹ̀rẹ̀ ìgbà iṣẹ́ tuntun",
       "exitSession": "Jáde kúrò nínú ìgbà iṣẹ́",
       "clearSession": "Parí ìgbà iṣẹ́ yìí kí o sì bẹ̀rẹ̀ tuntun",
+      "compactDescription": "kó àyíká ìgbà iṣẹ́ ìsinsìnyí pọ̀",
+      "goalDescription": "Tẹ̀síwájú iṣẹ́ sí àfojúsùn ìgbà iṣẹ́. /goal <objective> tàbí pause, resume, clear",
+      "initDescription": "ètò AGENTS.md tí a ṣe ìtọ́sọ́nà",
+      "resumeClaudeDescription": "kó àkọsílẹ̀ ìgbà iṣẹ́ Claude Code wọlé",
+      "resumeCodexDescription": "kó àkọsílẹ̀ ìgbà iṣẹ́ OpenAI Codex wọlé",
+      "reviewDescription": "ṣàyẹ̀wò àwọn ìyípadà [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Lo /{{command}}",
       "insert": "Fi sí i",
       "upgradeRequiredFallback": "Jọ̀wọ́ ṣe ìgbésókè CLI rẹ láti lo àṣẹ yìí.",
@@ -2609,6 +2630,7 @@
     "couldNotLoadActiveSessions": "A kò lè gbé àwọn ìgbà iṣẹ́ tó ń lọ lọ́wọ́ wọlé.",
     "agentSessions": "Tó ń ṣiṣẹ́ báyìí",
     "newCodingTask": "Iṣẹ́ kíkọ kóòdù tuntun",
+    "newTaskFromPicture": "Iṣẹ́ tuntun láti inú àwòrán",
     "explore": "Ṣàwárí",
     "seeAll": "Wo gbogbo rẹ̀",
     "noLiveSessions": "Kò sí ohun tó ń ṣiṣẹ́ lọ́wọ́lọ́wọ́"
@@ -2830,7 +2852,8 @@
     "aiProvidersWhat": "Àwọn ọ̀rọ̀ ìtọ́ni rẹ, ìtàn ìjíròrò àti fáìlì èyíkéyìí tí o so mọ́ ọn.",
     "aiProvidersWhy": "Láti ṣe àwọn ìdáhùn AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google àti àwọn olùpèsè mìíràn tí o yàn fún ìbéèrè kọ̀ọ̀kan.",
-    "gatewayWhat": "Ìdánimọ̀ àkọọ́lẹ̀, àlàyé àfikún ìbéèrè àti lílo ìpín ọ̀rọ̀.",
+    "gatewayWhat": "Ìdánimọ̀ àkọọ́lẹ̀, àlàyé àfikún ìbéèrè, lílo ìpín ọ̀rọ̀, àti àwọn ìtọ́ni àti gbígbà ohùn tí ápù náà ń fi ránṣẹ́ nípasẹ̀ rẹ̀.",
+    "viaGateway": "Nípasẹ̀ Kilo Gateway",
     "gatewayWhy": "Ìjẹ́rìí ìdánimọ̀, dídarí àwọn ìbéèrè sí ibi tí ó yẹ àti ṣíṣe àtúnyẹ̀wò ìbámu ìṣirò ìsanwó.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Àwọn ìròyìn ìdákú àti àṣìṣe tí a ti yọ àkóónú ohun èlò kúrò nínú wọn.",
@@ -2850,7 +2873,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Ìgbàsílẹ̀ ohùn rẹ bí o ṣe ń sọ̀rọ̀.",
     "voiceTranscriptionWhy": "Láti yí ohùn sí ọ̀rọ̀ kíkọ.",
-    "voiceTranscriptionWho": "Lórí ẹ̀rọ nìkan, tàbí Apple tàbí Google tí ẹ̀rọ yìí kò bá lè yí ohùn sí ọ̀rọ̀ láìsí ayélujára.",
+    "voiceTranscriptionWho": "Ẹ̀rọ rẹ, Kilo Gateway pẹ̀lú àwòṣe ìyípadà ọ̀rọ̀ tí o yàn, tàbí Apple tàbí Google fún ìdámọ̀ lórí ayélujára.",
     "installAttributionPromptTitle": "Yọ̀ǹda ìdánimọ̀ orísun fífi ohun èlò sórí ẹ̀rọ?",
     "installAttributionPromptMessage": "Kilo lo ìyọ̀ǹda ìtọpinpin Apple láti mọ ọ̀nà tí o gbà dé síbí nìkan. A kì í lo àwọn ọ̀rọ̀ ìtọ́ni àti ìjíròrò rẹ rárá.",
     "what": "Kí ni",
@@ -3060,6 +3083,12 @@
     "privacy": "Ṣí Kilo láti rí àwọn aṣojú",
     "openAgents": "Ṣí àwọn aṣojú",
     "needsInput": "Nílò èsì rẹ",
+    "newestSession": "Tuntun jù: {{title}}",
+    "noneWaiting": "Kò sí aṣojú tó ń dúró",
+    "newAgent": "Aṣojú tuntun",
+    "approving": "Ń fọwọ́ sí...",
+    "couldNotApprove": "Kò lè fọwọ́ sí",
+    "couldNotStart": "Kò lè bẹ̀rẹ̀",
     "channelName": "Àwọn aṣojú tó ń ṣiṣẹ́",
     "activityKitDisabledBody": "Tan àwọn ìgbòkègbodò ìsinsìnyí nínú àwọn ètò láti rí àwọn aṣojú tó ń ṣiṣẹ́ lórí ojú ìwé títìpa."
   },
@@ -3095,5 +3124,12 @@
     "remoteFound": "Kọ̀ǹpútà ti so pọ̀",
     "checkAgain": "Tún ṣe àyẹ̀wò",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Bẹ̀rẹ̀ aṣojú nílò ìtọ́ni. Fi ìtọ́ni kún un kí o sì tún gbìyànjú.",
+      "repositoryUnknown": "Kilo kò dá {{repository}} mọ̀ gẹ́gẹ́ bí ibi ìpamọ́ kóòdù GitHub tàbí GitLab. Yan ibi ìpamọ́ kóòdù mìíràn nínú Kilo.",
+      "repositoryUnsupported": "{{repository}} jẹ́ ibi ìpamọ́ kóòdù Bitbucket — Bẹ̀rẹ̀ aṣojú kò tíì lè lò ó. Yan ibi ìpamọ́ kóòdù mìíràn nínú Kilo."
+    }
   }
 }

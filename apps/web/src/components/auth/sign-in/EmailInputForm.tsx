@@ -14,6 +14,13 @@ type EmailInputFormProps = {
   autoFocus?: boolean;
   disabled?: boolean;
   isLoading?: boolean;
+  /**
+   * The submit label. Surfaces that show this form beside the OAuth provider
+   * buttons name the method ('Continue with Email') so the email action reads
+   * as a peer of 'Continue with Google' / 'Sign in with ChatGPT'; the plain
+   * 'Continue' stays the default everywhere else.
+   */
+  submitLabel?: string;
 };
 
 /**
@@ -29,6 +36,7 @@ export function EmailInputForm({
   autoFocus = false,
   disabled = false,
   isLoading = false,
+  submitLabel = 'Continue',
 }: EmailInputFormProps) {
   const [hasBlurred, setHasBlurred] = useState(false);
   const validationError =
@@ -72,7 +80,7 @@ export function EmailInputForm({
         className="min-h-11 w-full"
         disabled={disabled || isLoading || !email.trim() || !emailValidation.isValid}
       >
-        {isLoading ? 'Finding sign-in methods...' : 'Continue'}
+        {isLoading ? 'Finding sign-in methods...' : submitLabel}
       </Button>
     </form>
   );

@@ -471,6 +471,28 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('skips the zero-balance 402 when the request is billed outside Kilo credits', async () => {
+    setUserAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 0,
+      settings: undefined,
+      plan: undefined,
+    });
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      bypassAccessCheck: false,
+      skipBalanceCheck: true,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalled();
+  });
+
   it('returns a retryable response for a zero balance during an in-flight auto top-up', async () => {
     setUserAuth();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({

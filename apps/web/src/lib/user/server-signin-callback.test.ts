@@ -237,6 +237,40 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(mockEnsureVerifiedDomainOrganizationMembership).not.toHaveBeenCalled();
   });
 
+  it('skips ordinary SSO enforcement during provider-account linking', async () => {
+    mockResolveSsoAuthorityForDomain.mockResolvedValueOnce({
+      status: 'required',
+      domain: 'example.com',
+      sourceOrganizationId: 'sso-org',
+    });
+    mockGetAccountLinkingSession.mockResolvedValueOnce({
+      existingUserId: 'existing-user',
+      targetProvider: 'openai',
+    } as never);
+    mockLinkAccountToExistingUser.mockResolvedValueOnce({
+      success: true,
+      user: { id: 'existing-user', blocked_reason: null },
+    } as never);
+
+    const result = await signIn({
+      user: { id: 'x', email: 'sso-link@example.com', name: 'SSO Link', image: '' },
+      account: {
+        provider: 'openai',
+        providerAccountId: 'openai-account',
+        type: 'oauth',
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        scope: 'openid profile email offline_access resource.invoke',
+      },
+      profile: { sub: 'openai-sub', email: 'sso-link@example.com' },
+    } as never);
+
+    expect(result).toBe(true);
+    expect(mockResolveSsoAuthorityForDomain).not.toHaveBeenCalled();
+    expect(mockLinkAccountToExistingUser).toHaveBeenCalled();
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
   it('does not run verified-domain admission during provider-account linking', async () => {
     mockGetAccountLinkingSession.mockResolvedValueOnce({
       existingUserId: 'existing-user',

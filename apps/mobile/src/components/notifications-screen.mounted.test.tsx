@@ -149,6 +149,7 @@ function fullCapabilities(overrides: Record<string, unknown> = {}): Record<strin
     sessionStatus: { available: true, unavailableReason: null },
     kiloclawActivity: { available: true, unavailableReason: null },
     balanceAlerts: { available: true, unavailableReason: null },
+    spendAlerts: { available: true, unavailableReason: null },
     securityFindings: { available: true, unavailableReason: null },
     ...overrides,
   };
@@ -162,6 +163,7 @@ function fullPrefs(overrides: Record<string, unknown> = {}): Record<string, unkn
     sessionStatus: true,
     kiloclawActivity: true,
     balanceAlerts: true,
+    spendAlerts: true,
     securityFindings: true,
     agentPushEnabled: true,
     notificationPreviews: 'generic',
@@ -431,6 +433,83 @@ describe('NotificationsScreen mutation serialization (scope.id + generation guar
   });
 });
 
+describe('NotificationsScreen spend alerts row', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getNotificationPermissionStatus.mockResolvedValue('granted');
+    getDevicePushToken.mockResolvedValue('device-token');
+    pushTokensQueryFn.mockResolvedValue([{ token: 'device-token', platform: 'android' }]);
+    setPreferenceMutationFn.mockResolvedValue({});
+    registerTokenMutationFn.mockResolvedValue({ success: true });
+  });
+
+  it('happy: renders the row with its capability and flipping it sends exactly spendAlerts', async () => {
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Spend alerts category');
+
+    // The row renders beside balance alerts, enabled because the server
+    // reported the spend capability available.
+    expect(textWithChildren(renderer.root, 'Spend alerts').length).toBe(1);
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.value).toBe(true);
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(false);
+
+    // Exactly one category key per call: the payload is what the spend view's
+    // own column write must agree with.
+    prefsQueryFn.mockResolvedValue(fullPrefs({ spendAlerts: false }));
+    act(() => {
+      switchOnValueChange(renderer.root, 'Spend alerts category')?.(false);
+    });
+    await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
+    expect(setPreferenceMutationFn.mock.calls[0]?.[0]).toEqual({ spendAlerts: false });
+    await waitFor(
+      () => switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.value === false
+    );
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('non-retryable unhappy: an unavailable spend capability disables the row and shows the server reason', async () => {
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          spendAlerts: {
+            available: false,
+            unavailableReason: 'Spend alerts are unavailable.',
+          },
+        }),
+      })
+    );
+    const { renderer } = await renderScreen();
+
+    // Waiting on an available sibling proves the master gate settled, so the
+    // spend row's disabled state below is the server capability, not the gate.
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(true);
+    expect(textWithChildren(renderer.root, 'Spend alerts are unavailable.').length).toBe(1);
+  });
+
+  it('retryable unhappy: a spend toggle failure rolls back the optimistic flip', async () => {
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    setPreferenceMutationFn.mockRejectedValue({
+      data: { code: 'INTERNAL_SERVER_ERROR' },
+      message: 'boom',
+    });
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Spend alerts category');
+
+    act(() => {
+      switchOnValueChange(renderer.root, 'Spend alerts category')?.(false);
+    });
+    await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
+    await waitFor(() => activityIndicators(renderer.root).length === 0);
+
+    // The switch returns to the unchanged server value and the error surfaces.
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.value).toBe(true);
+    expect(toastError).toHaveBeenCalledWith('boom');
+  });
+});
+
 describe('NotificationsScreen category availability', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -512,6 +591,7 @@ describe('NotificationsScreen category availability', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
       agentPushEnabled: true,
       notificationPreviews: 'generic',
@@ -521,6 +601,7 @@ describe('NotificationsScreen category availability', () => {
 
     expect(switchesByLabel(renderer.root, 'Chat messages')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(false);
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'KiloClaw activity')[0]?.props.disabled).toBe(false);
   });
 

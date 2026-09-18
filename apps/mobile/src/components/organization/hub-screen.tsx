@@ -1,7 +1,7 @@
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Bell, FileText, Pencil, Receipt, Users } from '@/components/ui/icons';
+import { Bell, FileText, Pencil, Receipt, Users, Wallet } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -201,9 +201,18 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 icon={Bell}
                 title={t('organization.lowBalanceAlert.title')}
                 subtitle={lowBalanceSubtitle}
-                last
                 onPress={() => {
                   router.push('/(app)/(tabs)/(3_profile)/organization/low-balance-alert' as Href);
+                }}
+              />
+              <ConfigureRow
+                icon={Wallet}
+                title={t('notifications.channel.spend')}
+                last
+                onPress={() => {
+                  router.push(
+                    `/(app)/(tabs)/(3_profile)/spend-alerts?org=${organizationId}` as Href
+                  );
                 }}
               />
             </>

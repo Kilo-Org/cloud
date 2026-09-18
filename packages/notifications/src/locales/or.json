@@ -7,6 +7,7 @@
       "instanceLifecycle": "ଆପଣଙ୍କ ଇନସ୍ଟାନ୍ସରେ ଅପଡେଟ୍ ଅଛି",
       "scheduledAction": "ଏକ ନିର୍ଦ୍ଧାରିତ କାର୍ଯ୍ୟରେ ଅପଡେଟ୍ ଅଛି",
       "lowBalance": "ଆପଣଙ୍କ ବ୍ୟାଲାନ୍ସର ଧ୍ୟାନ ଦରକାର",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "ଏକ ସୁରକ୍ଷା ନିଷ୍କର୍ଷର ଧ୍ୟାନ ଦରକାର",
       "activeAgentsGlanceable": "ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକରେ ଅପଡେଟ୍ ଅଛି"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "କମ୍ ବ୍ୟାଲାନ୍ସ ସତର୍କ",
       "body": "{{organizationName}} ବ୍ୟାଲାନ୍ସ ${{minimumBalanceUsd}} ତଳେ ଖସିଲା"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "ନୂତନ ସୁରକ୍ଷା ନିଷ୍କର୍ଷ ({{severity}})",

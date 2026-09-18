@@ -83,6 +83,25 @@ describe('notificationPathForData', () => {
     ).toBe('/(app)/(tabs)/(3_profile)/organization/credit-activity?org=org-abc&via=push');
   });
 
+  it('routes spend_alert notifications for the personal scope to the spend view with via=push', () => {
+    expect(
+      notificationPathForData({
+        type: 'spend_alert',
+        scope: 'personal',
+      })
+    ).toBe('/(app)/(tabs)/(3_profile)/spend-alerts?via=push');
+  });
+
+  it('routes spend_alert notifications for an organization scope to its spend view', () => {
+    expect(
+      notificationPathForData({
+        type: 'spend_alert',
+        scope: 'organization',
+        organizationId: 'org-spend',
+      })
+    ).toBe('/(app)/(tabs)/(3_profile)/spend-alerts?org=org-spend&via=push');
+  });
+
   it('routes security_finding notifications for personal scope', () => {
     expect(
       notificationPathForData({

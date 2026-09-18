@@ -34,6 +34,11 @@ const pendingRefreshSchema = z.object({
   userId: z.string().min(1),
   organizationId: z.string().min(1).nullable(),
   dueAt: z.number(),
+  // The refreshState revision current when the change was deferred. A delivery
+  // only cancels a deferral it already covers (an older revision); a deferral
+  // recorded at the delivery's own revision landed while it was in flight, so
+  // its change is newer than the snapshot and must survive.
+  revision: z.number().int().nonnegative(),
 });
 type PendingGlanceableRefresh = z.infer<typeof pendingRefreshSchema>;
 
@@ -66,10 +71,14 @@ export async function refreshGlanceableSnapshot(
     nowMs() - delivery.deliveredAt < GLANCEABLE_DELIVERY_MIN_INTERVAL_MS
   ) {
     const dueAt = delivery.deliveredAt + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS;
+    // Stamp the deferral with the revision it observed so a delivery in flight
+    // does not cancel a change newer than its own snapshot.
+    const deferred = refreshStateSchema.optional().parse(await storage.get(key));
     await storage.put<PendingGlanceableRefresh>(pendingKey(scope), {
       userId: scope.userId,
       organizationId: scope.organizationId,
       dueAt,
+      revision: deferred?.revision ?? 0,
     });
     const currentAlarm = await storage.getAlarm();
     // Only keep an alarm that will actually fire and reschedule before `dueAt`.
@@ -118,6 +127,7 @@ export async function refreshGlanceableSnapshot(
         userId: scope.userId,
         organizationId: scope.organizationId,
         dueAt: nowMs() + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+        revision: request.revision,
       });
     }
     return;
@@ -231,9 +241,16 @@ export async function refreshGlanceableSnapshot(
   const current = refreshStateSchema.optional().parse(await storage.get(key));
   if (current?.revision !== request.revision) return;
 
-  // A delivered snapshot starts the next window and cancels any trailing refresh.
+  // A delivered snapshot starts the next window and cancels any trailing refresh
+  // it already covers. A deferral stamped with this delivery's own revision was
+  // written while it was in flight, so its change is newer than the snapshot
+  // this delivery sent; deleting it would drop the final counts until the next
+  // status change. Keep it for the trailing flush instead.
   await storage.put(deliveryKey, { deliveredAt: nowMs() });
-  await storage.delete(pendingKey(scope));
+  const pending = pendingRefreshSchema.optional().parse(await storage.get(pendingKey(scope)));
+  if (pending === undefined || pending.revision < request.revision) {
+    await storage.delete(pendingKey(scope));
+  }
   // One delivery event per window per scope; the trailing flush's line carries
   // the final counts so a deferred burst settles on them.
   console.log({

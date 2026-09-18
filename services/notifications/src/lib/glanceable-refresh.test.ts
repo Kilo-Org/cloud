@@ -197,6 +197,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       userId: 'user-1',
       organizationId: null,
       dueAt: base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      revision: 1,
     });
     expect(await h.storage.getAlarm()).toBe(base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS);
 
@@ -246,6 +247,53 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     });
   });
 
+  it('keeps a counts-only deferral written while an approval-exempt delivery is in flight', async () => {
+    const h = makeHarness();
+    const base = 50_000_000;
+    let now = base;
+    const scope = { userId: 'user-approval-inflight', organizationId: null };
+
+    // A first delivery opens the window.
+    h.setNext(snapshot({ running: 1, needsInput: 0, needsApproval: 0 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+
+    // An approval move 2s later bypasses the window and stalls in transport.
+    now = base + 2_000;
+    h.setNext(snapshot({ running: 1, needsInput: 1, needsApproval: 1 }));
+    const gate = h.blockNextExpoPush();
+    const stalled = refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now, {
+      approvalChanged: true,
+    });
+    await gate.started;
+
+    // A counts-only change lands while the approval delivery is in flight. It is
+    // inside the window, so it defers to the trailing alarm.
+    now = base + 2_500;
+    h.setNext(snapshot({ running: 2, needsInput: 1, needsApproval: 1 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+
+    gate.release();
+    await stalled;
+
+    // The approval delivery's snapshot predates the counts change, so it must
+    // not cancel the deferral that still owes the final counts to the surface.
+    expect(await h.storage.get(pendingKey('user-approval-inflight', null))).toMatchObject({
+      dueAt: base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      revision: 2,
+    });
+
+    // The trailing flush still lands those final counts (the approval delivery
+    // opened a new window at base + 2s, so the next wake is one window later).
+    now = base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS + 2_500;
+    h.setNext(snapshot({ running: 2, needsInput: 1, needsApproval: 1 }));
+    await flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now);
+    expect(h.expoSends[h.expoSends.length - 1][0].data).toMatchObject({
+      running: 2,
+      needsInput: 1,
+      needsApproval: 1,
+    });
+  });
+
   it('re-arms a trailing refresh whose build returns no snapshot', async () => {
     const h = makeHarness();
     const now = 70_000_000;
@@ -265,6 +313,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       userId: 'user-null-build',
       organizationId: null,
       dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      revision: 1,
     });
   });
 
@@ -325,6 +374,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       userId: 'user-failed-send',
       organizationId: null,
       dueAt: base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      revision: 1,
     });
     expect(await h.storage.getAlarm()).toBe(base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS);
 
@@ -405,6 +455,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       userId: 'user-superseded',
       organizationId: null,
       dueAt,
+      revision: 3,
     });
 
     // The stalled, superseded delivery must neither drop the trailing refresh
@@ -415,6 +466,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       userId: 'user-superseded',
       organizationId: null,
       dueAt,
+      revision: 3,
     });
     expect(await h.storage.get(deliveryKey('user-superseded', null))).toEqual({
       deliveredAt: base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS + 500,

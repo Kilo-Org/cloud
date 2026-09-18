@@ -1751,6 +1751,13 @@
       "when": 1789585450988,
       "tag": "0249_groovy_agent_zero",
       "breakpoints": true
+    },
+    {
+      "idx": 250,
+      "version": "7",
+      "when": 1789679558083,
+      "tag": "0250_drop_repository_customizations",
+      "breakpoints": true
     }
   ]
 }

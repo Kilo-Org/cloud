@@ -298,6 +298,93 @@ describe('workflow tool-call persistence round-trip', () => {
     expect(reloaded?.conversations).toHaveLength(1);
   });
 });
+describe('retired browser tool migration on load', () => {
+  it('loads a conversation persisted with the retired page tools and eval', () => {
+    const store = {
+      activeConversationId: 'conversation-1',
+      conversations: [
+        {
+          events: [
+            {
+              code: 'return document.title;',
+              id: 'ev-eval',
+              name: 'eval',
+              tabId: 7,
+              type: 'tool-call',
+            },
+            {
+              id: 'ev-snapshot',
+              name: 'get_page_snapshot',
+              tabId: 7,
+              textStart: 100,
+              type: 'tool-call',
+            },
+            { id: 'ev-shot', name: 'get_viewport_screenshot', tabId: 7, type: 'tool-call' },
+            {
+              id: 'ev-memory',
+              memoryId: 'memory-42',
+              name: 'get_memory',
+              tabId: 7,
+              type: 'tool-call',
+            },
+            {
+              id: 'ev-result',
+              ok: true,
+              toolCallId: 'ev-snapshot',
+              type: 'tool-result',
+              value: 'page text',
+            },
+          ],
+          id: 'conversation-1',
+          title: 'Legacy chat',
+          updatedAt: '2026-06-30T00:00:00.000Z',
+        },
+      ],
+      openConversationIds: ['conversation-1'],
+    };
+
+    const reloaded = normalizeStoredConversationStore(store);
+
+    expect(reloaded?.conversations[0]?.events).toStrictEqual([
+      {
+        arguments: { function: 'return document.title;' },
+        id: 'ev-eval',
+        name: 'kilo_browser_evaluate',
+        tabId: 7,
+        type: 'tool-call',
+      },
+      {
+        arguments: { textStart: 100 },
+        id: 'ev-snapshot',
+        name: 'kilo_browser_snapshot',
+        tabId: 7,
+        type: 'tool-call',
+      },
+      {
+        arguments: {},
+        id: 'ev-shot',
+        name: 'kilo_browser_take_screenshot',
+        tabId: 7,
+        type: 'tool-call',
+      },
+      {
+        id: 'ev-memory',
+        memoryId: 'memory-42',
+        name: 'get_memory',
+        tabId: 7,
+        type: 'tool-call',
+      },
+      {
+        id: 'ev-result',
+        ok: true,
+        toolCallId: 'ev-snapshot',
+        type: 'tool-result',
+        value: 'page text',
+      },
+    ]);
+  });
+});
+
 describe('schema rejection of unknown workflow-shaped tool', () => {
   it('rejects a tool-call with arguments and a name not in WorkflowToolName', () => {
     const result = conversationEventsSchema.safeParse([

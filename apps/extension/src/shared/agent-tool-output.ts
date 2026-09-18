@@ -18,6 +18,6 @@ export const getViewportScreenshotDataUrl = (
   toolName: AgentToolName,
   value: unknown
 ): string | undefined =>
-  toolName === 'get_viewport_screenshot' && isViewportScreenshotResult(value)
+  toolName === 'kilo_browser_take_screenshot' && isViewportScreenshotResult(value)
     ? value.dataUrl
     : undefined;

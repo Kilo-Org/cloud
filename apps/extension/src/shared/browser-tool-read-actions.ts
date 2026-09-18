@@ -812,7 +812,9 @@ const browserNetworkRequestsHandler: BrowserReadActionHandler = async (arguments
   }
 
   // The session bounds the list at the current page load (the last main-frame Document request).
-  const requests = deps.session.networkRequestsSinceLoad().filter(request => {
+  // Every request keeps its position in that full list, so the number printed here resolves in browser_network_request whichever filter was used.
+  const requests = deps.session.networkRequestsSinceLoad();
+  const shown = requests.filter(request => {
     if (
       parsed.data.static !== true &&
       isStaticRequest(request) &&
@@ -824,14 +826,14 @@ const browserNetworkRequestsHandler: BrowserReadActionHandler = async (arguments
     return filter === undefined || filter.test(request.url);
   });
 
-  if (requests.length === 0) {
+  if (shown.length === 0) {
     return done(`No network requests.${filenameNote(parsed.data.filename)}`);
   }
 
   return done(
     boundBrowserToolText(
-      `${requests
-        .map((request, index) => formatNetworkRequestLine(request, index + 1))
+      `${shown
+        .map(request => formatNetworkRequestLine(request, positionOf(request, requests)))
         .join('\n')}${filenameNote(parsed.data.filename)}`
     )
   );
@@ -844,10 +846,8 @@ const browserNetworkRequestHandler: BrowserReadActionHandler = async (arguments_
     return invalidArguments('browser_network_request', parsed.error);
   }
 
-  // Numbers match the default browser_network_requests view: since load, without static resources.
-  const requests = deps.session
-    .networkRequestsSinceLoad()
-    .filter(request => !(isStaticRequest(request) && isSuccessfulStatus(request.status)));
+  // Numbers match browser_network_requests: both index the full since-load list, so a static request is reachable too.
+  const requests = deps.session.networkRequestsSinceLoad();
   const { index, number, part, requestId } = parsed.data;
   const position = index ?? number;
 
@@ -861,7 +861,7 @@ const browserNetworkRequestHandler: BrowserReadActionHandler = async (arguments_
     return fail(
       position === undefined
         ? `Request "${String(requestId ?? '')}" is not in the current list.`
-        : `No request #${String(position)}. The list has ${String(requests.length)} request(s); call browser_network_requests with static: true to include static resources.`
+        : `No request #${String(position)}. The list has ${String(requests.length)} request(s).`
     );
   }
 

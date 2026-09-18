@@ -331,7 +331,40 @@ class FakeInputElement {
 
   focus(): void {}
 
+  getBoundingClientRect(): { height: number; left: number; top: number; width: number } {
+    return { height: 10, left: 0, top: 0, width: 10 };
+  }
+
   scrollIntoView(): void {}
+}
+
+/** Stands in for `DataTransfer`: records the MIME entries the drop script sets. */
+class FakeDataTransfer {
+  readonly entries: [string, string][] = [];
+
+  setData(mimeType: string, value: string): void {
+    this.entries.push([mimeType, value]);
+  }
+}
+
+class FakeDragEvent extends FakeEvent {
+  readonly dataTransfer: FakeDataTransfer;
+
+  constructor(type: string, init?: { readonly dataTransfer?: FakeDataTransfer }) {
+    super(type);
+    this.dataTransfer = init?.dataTransfer ?? new FakeDataTransfer();
+  }
+}
+
+/** Stands in for a checkbox: `click()` toggles `checked`, as a real input does. */
+class FakeCheckboxElement {
+  checked = true;
+  clicks = 0;
+
+  click(): void {
+    this.clicks += 1;
+    this.checked = !this.checked;
+  }
 }
 
 /** A fake `browser.scripting.executeScript` that actually evaluates the wrapped page code. */
@@ -362,12 +395,27 @@ const createExecutingScriptingSession = () => {
 
 const createFakePageGlobals = (): {
   globals: Record<string, unknown>;
+  checkbox: FakeCheckboxElement;
+  dataTransfers: FakeDataTransfer[];
   input: FakeInputElement;
 } => {
   const input = new FakeInputElement();
+  const checkbox = new FakeCheckboxElement();
+  const dataTransfers: FakeDataTransfer[] = [];
+
+  class RecordingDataTransfer extends FakeDataTransfer {
+    constructor() {
+      super();
+      dataTransfers.push(this);
+    }
+  }
 
   return {
+    checkbox,
+    dataTransfers,
     globals: {
+      DataTransfer: RecordingDataTransfer,
+      DragEvent: FakeDragEvent,
       Event: FakeEvent,
       HTMLInputElement: FakeInputElement,
       // eslint-disable-next-line typescript-eslint/no-extraneous-class -- instanceof identity only: the page script checks `el instanceof HTMLSelectElement`
@@ -376,8 +424,13 @@ const createFakePageGlobals = (): {
       HTMLTextAreaElement: class FakeTextAreaElement {},
       KeyboardEvent: FakeKeyboardEvent,
       document: {
-        querySelector: (selector: string): FakeInputElement | null =>
-          selector === '#name' ? input : null,
+        querySelector: (selector: string): FakeCheckboxElement | FakeInputElement | null => {
+          if (selector === '#name') {
+            return input;
+          }
+
+          return selector === '#agree' ? checkbox : null;
+        },
       },
     },
     input,
@@ -672,6 +725,24 @@ describe('browser tool session', () => {
     });
   });
 
+  it('keeps the previous refs when a targeted snapshot registers with merge', async () => {
+    const { session } = createSession();
+
+    session.registerRefs([{ backendNodeId: 1, ref: 'e1' }]);
+    session.registerRefs([{ ref: 'e2', selector: '.later' }], { merge: true });
+
+    await expect(session.resolveTarget('e1')).resolves.toStrictEqual({
+      backendNodeId: 1,
+      kind: 'ref',
+      ref: 'e1',
+    });
+    await expect(session.resolveTarget('e2')).resolves.toStrictEqual({
+      kind: 'selector',
+      nodeId: 42,
+      selector: '.later',
+    });
+  });
+
   it('clears state on Debugger.detach and attaches cleanly on the next call', async () => {
     const { debuggerApi, session } = createSession();
 
@@ -959,6 +1030,50 @@ describe('browser tool session scripting backend', () => {
     });
 
     expect(input.value).toBe('ada@example.com');
+  });
+
+  it('unchecks a checkbox when the contract value is the string "false"', async () => {
+    const { session } = createExecutingScriptingSession();
+    const { checkbox, globals } = createFakePageGlobals();
+
+    await withPageGlobals(globals, async () => {
+      await expect(
+        session.callTool('kilo_browser_fill_form', {
+          fields: [{ name: 'Agree', target: '#agree', type: 'checkbox', value: 'false' }],
+        })
+      ).resolves.toStrictEqual({ ok: true, value: 'Filled 1 field(s).\nAgree: unchecked' });
+    });
+
+    expect(checkbox.clicks).toBe(1);
+    expect(checkbox.checked).toBe(false);
+  });
+
+  it('sets the contract record shape for browser_drop data on the page DataTransfer', async () => {
+    const { session } = createExecutingScriptingSession();
+    const { dataTransfers, globals } = createFakePageGlobals();
+
+    await withPageGlobals(globals, async () => {
+      await expect(
+        session.callTool('kilo_browser_drop', {
+          data: { 'text/plain': 'hello' },
+          target: '#name',
+        })
+      ).resolves.toStrictEqual({ ok: true, value: 'Dropped 1 data item(s) onto #name.' });
+    });
+
+    expect(dataTransfers[0]?.entries).toStrictEqual([['text/plain', 'hello']]);
+  });
+
+  it('accepts the webp screenshot type the contract advertises', async () => {
+    const { session } = createScriptingSession();
+
+    const result = await session.callTool('kilo_browser_take_screenshot', {
+      scale: 'css',
+      type: 'webp',
+    });
+
+    // The fake tabs API has no captureVisibleTab; reaching that error proves the arguments schema accepted webp.
+    expect(result).toStrictEqual({ error: 'Viewport screenshot API is unavailable.', ok: false });
   });
 
   it('waits for a bounded time through the injected page code', async () => {

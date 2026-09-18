@@ -506,8 +506,39 @@ describe('browser_network_requests', () => {
     const text = String(result.ok ? result.value : '');
 
     expect(text).toContain('1. GET https://example.com/');
-    expect(text).toContain('2. POST https://example.com/api [XHR] 200');
+    expect(text).toContain('3. POST https://example.com/api [XHR] 200');
     expect(text).not.toContain('a.css');
+  });
+
+  it('numbers every request by its position in the full list, so browser_network_request can index a static request', async () => {
+    const { session } = createSession({
+      requestsSinceLoad: [
+        networkRequest('doc', { resourceType: 'Document', url: 'https://example.com/' }),
+        networkRequest('css', {
+          resourceType: 'Stylesheet',
+          status: 200,
+          url: 'https://example.com/a.css',
+        }),
+        networkRequest('api', {
+          resourceType: 'XHR',
+          status: 200,
+          url: 'https://example.com/api',
+        }),
+      ],
+    });
+
+    const listed = await runReadBrowserTool('browser_network_requests', { static: true }, session);
+    const text = String(listed.ok ? listed.value : '');
+
+    expect(text).toContain('1. GET https://example.com/');
+    expect(text).toContain('2. GET https://example.com/a.css');
+    expect(text).toContain('3. GET https://example.com/api');
+
+    const detail = await runReadBrowserTool('browser_network_request', { index: 2 }, session);
+
+    expect(String(detail.ok ? detail.value : '')).toContain(
+      'Request #2: GET https://example.com/a.css'
+    );
   });
 
   it('includes static resources when asked and filters by regex', async () => {

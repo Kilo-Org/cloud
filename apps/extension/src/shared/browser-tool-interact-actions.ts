@@ -124,6 +124,32 @@ const sendOrUndefined = async (
   }
 };
 
+const layoutMetricsResponseSchema = z.object({
+  cssLayoutViewport: z.object({ pageX: z.number(), pageY: z.number() }).optional(),
+  cssVisualViewport: z.object({ pageX: z.number(), pageY: z.number() }).optional(),
+});
+
+/**
+ * `DOM.getBoxModel` reports document coordinates, while
+ * `Input.dispatchMouseEvent` takes viewport coordinates, so the current scroll
+ * offset is subtracted — the same conversion `browser_snapshot` boxes use.
+ */
+const readScrollOffset = async (
+  session: BrowserToolInteractSession
+): Promise<{ readonly scrollX: number; readonly scrollY: number }> => {
+  const parsed = layoutMetricsResponseSchema.safeParse(
+    await sendOrUndefined(session, 'Page.getLayoutMetrics', {})
+  );
+
+  if (!parsed.success) {
+    return { scrollX: 0, scrollY: 0 };
+  }
+
+  const viewport = parsed.data.cssVisualViewport ?? parsed.data.cssLayoutViewport;
+
+  return { scrollX: viewport?.pageX ?? 0, scrollY: viewport?.pageY ?? 0 };
+};
+
 const NO_VISIBLE_BOX_ERROR =
   'The element has no visible box to interact with. Scroll it into view, wait for it to render, or target a visible element.';
 
@@ -154,8 +180,13 @@ const resolveCentre = async (
   }
 
   const [x1, y1, x2, y2, x3, y3, x4, y4] = parsed.data.model.content;
+  const { scrollX, scrollY } = await readScrollOffset(session);
 
-  return { centreX: (x1 + x2 + x3 + x4) / 4, centreY: (y1 + y2 + y3 + y4) / 4, ok: true };
+  return {
+    centreX: (x1 + x2 + x3 + x4) / 4 - scrollX,
+    centreY: (y1 + y2 + y3 + y4) / 4 - scrollY,
+    ok: true,
+  };
 };
 
 const MODIFIER_BITS = { Alt: 1, Control: 2, ControlOrMeta: 2, Meta: 4, Shift: 8 } as const;
@@ -384,7 +415,13 @@ const dispatchKeyStroke = async (
   await dispatchKeyUp(session, stroke, modifiers);
 };
 
-const pressKeyChord = async (
+/**
+ * Dispatches a key chord with the metadata the browser needs to type a
+ * printable character (`code`, `key`, `windowsVirtualKeyCode`, `text`), holding
+ * the chord's modifiers around the final key. Shared with the run-code
+ * `page.press` facade, which needs the same metadata.
+ */
+export const pressKeyChord = async (
   session: BrowserToolInteractSession,
   chord: string
 ): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }> => {
@@ -464,14 +501,23 @@ const nodeIsConnected = async (
     return false;
   }
 
-  const called = await sendOrUndefined(session, 'Runtime.callFunctionOn', {
-    functionDeclaration: 'function () { return this.isConnected === true; }',
-    objectId,
-    returnByValue: true,
-  });
-  const connected = callFunctionResponseSchema.safeParse(called);
+  try {
+    const called = await sendOrUndefined(session, 'Runtime.callFunctionOn', {
+      functionDeclaration: 'function () { return this.isConnected === true; }',
+      objectId,
+      returnByValue: true,
+    });
+    const connected = callFunctionResponseSchema.safeParse(called);
 
-  return connected.success && connected.data.result.value === true;
+    return connected.success && connected.data.result.value === true;
+  } finally {
+    try {
+      // Release the remote object the resolve created; a navigation may already have destroyed its context.
+      await session.send('Runtime.releaseObject', { objectId });
+    } catch {
+      // The object's context is gone; the handle went with it.
+    }
+  }
 };
 
 /**

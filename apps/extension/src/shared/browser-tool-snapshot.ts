@@ -747,7 +747,8 @@ export const captureBrowserAriaSnapshot = async (
         : { rootSelector: await resolveTargetSelector(session, options.target) }),
     }));
 
-  session.registerRefs(resolvedSnapshot.refs);
+  const targeted = options.target !== undefined && options.target !== '';
+  session.registerRefs(resolvedSnapshot.refs, { merge: targeted });
 
   const body =
     resolvedSnapshot.lines.length === 0

@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { createWebMcpToolCall } from './agent-conversation';
 import { KILO_BROWSER_TOOL_PREFIX } from './browser-tool-contract';
+import { pressKeyChord } from './browser-tool-interact-actions';
 import type { BrowserToolDialog, BrowserToolResolvedTarget } from './browser-tool-session';
 import { listInspectableTabsWithTabsApi } from './tab-debugger';
 import type {
@@ -466,8 +467,11 @@ const createRunCodePage = (
       return readPageIdentity(session);
     },
     async press(key: string): Promise<void> {
-      await session.send('Input.dispatchKeyEvent', { key, type: 'keyDown' });
-      await session.send('Input.dispatchKeyEvent', { key, type: 'keyUp' });
+      const pressed = await pressKeyChord(session, key);
+
+      if (!pressed.ok) {
+        throw new Error(pressed.error);
+      }
     },
     async screenshot(): Promise<z.infer<typeof pageScreenshotSchema>> {
       const response = await session.send('Page.captureScreenshot', { format: 'png' });

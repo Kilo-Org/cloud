@@ -40,18 +40,30 @@ type LegacyPageToolName = keyof typeof LEGACY_PAGE_TOOL_NAMES;
 const isLegacyPageToolName = (name: string): name is LegacyPageToolName =>
   Object.hasOwn(LEGACY_PAGE_TOOL_NAMES, name);
 
-// The retired call's fields survive verbatim as the migrated call's arguments.
-const toMigratedBrowserArguments = (event: {
-  readonly elementId?: string | undefined;
-  readonly query?: string | undefined;
-  readonly snapshotId?: string | undefined;
-  readonly textStart?: number | undefined;
-}) => ({
-  ...(event.elementId === undefined ? {} : { elementId: event.elementId }),
-  ...(event.query === undefined ? {} : { query: event.query }),
-  ...(event.snapshotId === undefined ? {} : { snapshotId: event.snapshotId }),
-  ...(event.textStart === undefined ? {} : { textStart: event.textStart }),
-});
+// The retired call's fields are renamed to the replacement tool's arguments, so the migrated call carries names the replacement accepts.
+const toMigratedBrowserArguments = (
+  legacyName: LegacyPageToolName,
+  event: {
+    readonly elementId?: string | undefined;
+    readonly query?: string | undefined;
+  }
+) => {
+  switch (legacyName) {
+    case 'find_in_page': {
+      return event.query === undefined ? {} : { text: event.query };
+    }
+    case 'get_element_details': {
+      return event.elementId === undefined ? {} : { target: event.elementId };
+    }
+    case 'get_page_snapshot': {
+      return {};
+    }
+    case 'get_viewport_screenshot': {
+      // `scale` is required by the vendored browser_take_screenshot contract; the retired viewport screenshot was CSS-scaled.
+      return { scale: 'css' };
+    }
+  }
+};
 
 const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] | undefined => {
   const parsed = conversationEventsSchema.safeParse(value);
@@ -136,19 +148,20 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
           });
           break;
         }
-        // Browser and workflow calls share one shape, so the parsed event is already the event to keep; only the optional field is normalized for the union's exact optional type.
+        // Browser and workflow calls share one shape, so the parsed event is already the event to keep; the optional fields are normalized for the union's exact optional type.
         if ('arguments' in event) {
-          const { providerToolCallId, ...call } = event;
+          const { providerToolCallId, reasoningDetails, ...call } = event;
           events.push({
             ...call,
             ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
+            ...(reasoningDetails === undefined ? {} : { reasoningDetails }),
           });
           break;
         }
         // A persisted retired page tool predates the Playwright tools; load it as its replacement.
         if (isLegacyPageToolName(event.name)) {
           events.push({
-            arguments: toMigratedBrowserArguments(event),
+            arguments: toMigratedBrowserArguments(event.name, event),
             id: event.id,
             name: LEGACY_PAGE_TOOL_NAMES[event.name],
             ...(event.providerToolCallId === undefined

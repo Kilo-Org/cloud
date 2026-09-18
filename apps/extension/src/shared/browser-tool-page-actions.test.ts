@@ -664,6 +664,27 @@ describe('browser-tool-page-actions', () => {
       expect(result).toStrictEqual({ ok: true, value: 'Example' });
     });
 
+    it('presses a printable key with the metadata the browser needs to type it', async () => {
+      const tabs = tabsWithOnePage();
+      const { session, sends } = createFakeSession();
+
+      const result = await runPageBrowserTool(
+        'kilo_browser_run_code_unsafe',
+        { code: 'async (page) => { await page.press("a"); return true; }' },
+        session,
+        { tabId: 1, tabsApi: tabs.tabsApi }
+      );
+
+      expect(result).toStrictEqual({ ok: true, value: true });
+      const keyDown = sends.find(entry => entry.method === 'Input.dispatchKeyEvent');
+      expect(keyDown?.params).toMatchObject({
+        code: 'KeyA',
+        key: 'a',
+        text: 'a',
+        type: 'keyDown',
+      });
+    });
+
     it('reports a navigation error from page.goto', async () => {
       const tabs = tabsWithOnePage();
       const { handlers, session } = createFakeSession();

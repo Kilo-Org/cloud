@@ -38,17 +38,20 @@ const createFakeSession = ({
 } = {}): {
   commands: RecordedCommand[];
   registeredRefs: BrowserToolRefEntry[][];
+  registerOptions: ({ readonly merge?: boolean } | undefined)[];
   session: BrowserToolPageSession;
 } => {
   const commands: RecordedCommand[] = [];
   const registeredRefs: BrowserToolRefEntry[][] = [];
+  const registerOptions: ({ readonly merge?: boolean } | undefined)[] = [];
 
   const session: BrowserToolPageSession = {
     attach: async () => undefined,
     consoleMessages: () => [],
     networkRequestsSinceLoad: () => [],
-    registerRefs: entries => {
+    registerRefs: (entries, options) => {
       registeredRefs.push([...entries]);
+      registerOptions.push(options);
     },
     resolveTarget: async (target: string) => {
       const backendNodeId = refs[target];
@@ -94,7 +97,7 @@ const createFakeSession = ({
     },
   };
 
-  return { commands, registeredRefs, session };
+  return { commands, registerOptions, registeredRefs, session };
 };
 
 const axNode = (node: {
@@ -204,13 +207,16 @@ describe('buildBrowserAriaSnapshot', () => {
 
 describe('captureBrowserAriaSnapshot', () => {
   it('registers the emitted refs and keeps a ref stable across snapshots', async () => {
-    const { registeredRefs, session } = createFakeSession({ axNodes: SAMPLE_TREE });
+    const { registerOptions, registeredRefs, session } = createFakeSession({
+      axNodes: SAMPLE_TREE,
+    });
 
     const first = await captureBrowserAriaSnapshot(session, {});
     const second = await captureBrowserAriaSnapshot(session, {});
 
     expect(first.text).toBe(second.text);
     expect(first.refs).toStrictEqual([{ backendNodeId: 12, ref: 'e12' }]);
+    expect(registerOptions).toStrictEqual([{ merge: false }, { merge: false }]);
     expect(registeredRefs).toStrictEqual([
       [{ backendNodeId: 12, ref: 'e12' }],
       [{ backendNodeId: 12, ref: 'e12' }],
@@ -230,7 +236,7 @@ describe('captureBrowserAriaSnapshot', () => {
   });
 
   it('renders a target subtree resolved from a snapshot ref', async () => {
-    const { commands, session } = createFakeSession({
+    const { commands, registerOptions, session } = createFakeSession({
       axNodes: [
         axNode({ childIds: ['2', '3'], nodeId: '1', role: 'generic' }),
         axNode({
@@ -249,6 +255,7 @@ describe('captureBrowserAriaSnapshot', () => {
     const capture = await captureBrowserAriaSnapshot(session, { target: 'e11' });
 
     expect(capture.text).toBe('- heading "Welcome"\n  - text: Hello');
+    expect(registerOptions).toStrictEqual([{ merge: true }]);
     expect(commands.some(command => command.method === 'Accessibility.getFullAXTree')).toBe(true);
   });
 

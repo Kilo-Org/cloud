@@ -234,6 +234,33 @@ describe('background browser tool branch', () => {
     });
   });
 
+  it('clears a browser_resize override when the tab leaves the extension reach', async () => {
+    const { api: debuggerApi, state } = createFakeDebuggerApi();
+    const tabs = new Map([[46, { id: 46, title: 'Example', url: 'https://example.com/' }]]);
+    const { api: tabsApi } = createFakeTabsApi(tabs);
+
+    await handleTabDebuggerRequest({
+      debuggerApi,
+      request: browserToolRequest(46, 'kilo_browser_resize', { height: 600, width: 800 }),
+      scriptingApi: undefined,
+      tabsApi,
+    });
+
+    tabs.set(46, { id: 46, title: 'Settings', url: 'chrome://settings' });
+
+    await handleTabDebuggerRequest({
+      debuggerApi,
+      request: browserToolRequest(46, 'kilo_browser_navigate', { url: 'https://example.com/' }),
+      scriptingApi: undefined,
+      tabsApi,
+    });
+
+    const methods = state.commands.map(command => command.method);
+
+    expect(methods).toContain('Emulation.setDeviceMetricsOverride');
+    expect(methods).toContain('Emulation.clearDeviceMetricsOverride');
+  });
+
   it('reports a missing tabs API instead of creating a session', async () => {
     const { api: debuggerApi } = createFakeDebuggerApi();
 

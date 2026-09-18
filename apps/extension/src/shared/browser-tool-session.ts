@@ -233,7 +233,10 @@ export interface BrowserToolSession {
    */
   readonly networkRequestsSinceLoad: () => BrowserNetworkRequest[];
   /** Replaces the registry, so a ref from an older snapshot cannot resolve. */
-  readonly registerRefs: (entries: readonly BrowserToolRefEntry[]) => void;
+  readonly registerRefs: (
+    entries: readonly BrowserToolRefEntry[],
+    options?: { readonly merge?: boolean }
+  ) => void;
   readonly resolveTarget: (target: string) => Promise<BrowserToolResolvedTarget | undefined>;
   readonly send: (
     method: string,
@@ -246,7 +249,10 @@ export interface BrowserToolSession {
 const jsonRecordSchema = z.record(z.string(), z.unknown());
 const headerValueSchema = z.string();
 const stringValueSchema = z.string();
-const booleanValueSchema = z.boolean();
+// The contract types a checkbox/radio value as the string "true"/"false", so both spellings map to a boolean before the page script decides to click.
+const booleanValueSchema = z
+  .union([z.boolean(), z.enum(['false', 'true'])])
+  .transform(value => value === true || value === 'true');
 const primitiveValueSchema = z.union([z.boolean(), z.null(), z.number(), z.string()]);
 const remoteObjectSchema = z.object({
   description: z.string().optional(),
@@ -794,7 +800,7 @@ const buildDropPageScript = ({
   paths,
   selector,
 }: {
-  readonly data: readonly { readonly mimeType: string; readonly value: string }[];
+  readonly data: Readonly<Record<string, string>>;
   readonly paths: readonly string[];
   readonly selector: string;
 }): string =>
@@ -802,10 +808,11 @@ const buildDropPageScript = ({
 const el = __element(${scriptJson(selector)});
 const data = ${scriptJson(data)};
 const paths = ${scriptJson(paths)};
-if (data.length === 0 && paths.length === 0) {
+const dataEntries = Object.entries(data);
+if (dataEntries.length === 0 && paths.length === 0) {
   throw new Error('At least one of "paths" or "data" must be provided.');
 }
-if (data.length === 0) {
+if (dataEntries.length === 0) {
   throw new Error('Browser drop with paths is not available in Firefox: the page cannot read local files. Pass data instead.');
 }
 el.scrollIntoView({ block: 'center', inline: 'center' });
@@ -813,7 +820,7 @@ const rect = el.getBoundingClientRect();
 const options = { bubbles: true, cancelable: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 };
 const transfer = typeof DataTransfer === 'function' ? new DataTransfer() : null;
 if (transfer !== null) {
-  for (const entry of data) { transfer.setData(entry.mimeType, entry.value); }
+  for (const entry of dataEntries) { transfer.setData(entry[0], entry[1]); }
 }
 if (transfer !== null && typeof DragEvent === 'function') {
   el.dispatchEvent(new DragEvent('dragenter', Object.assign({ dataTransfer: transfer }, options)));
@@ -824,7 +831,7 @@ if (transfer !== null && typeof DragEvent === 'function') {
   __mouse(el, 'dragover', options);
   __mouse(el, 'drop', options);
 }
-return __finish('Dropped ' + data.length + ' data item(s) onto ' + ${scriptJson(selector)} + '.');`;
+return __finish('Dropped ' + dataEntries.length + ' data item(s) onto ' + ${scriptJson(selector)} + '.');`;
 
 const buildFillFormPageScript = ({
   fields,
@@ -1061,7 +1068,7 @@ const browserToolDragArgsSchema = z.object({
   startTarget: z.string().min(1),
 });
 const browserToolDropArgsSchema = z.object({
-  data: z.array(z.object({ mimeType: z.string(), value: z.string() })).optional(),
+  data: z.record(z.string(), z.string()).optional(),
   paths: z.array(z.string()).optional(),
   target: z.string().min(1),
 });
@@ -1108,7 +1115,7 @@ const browserToolScreenshotArgsSchema = z.object({
   filename: z.string().optional(),
   fullPage: z.boolean().optional(),
   target: z.string().optional(),
-  type: z.enum(['jpeg', 'png']).optional(),
+  type: z.enum(['jpeg', 'png', 'webp']).optional(),
 });
 const browserToolSnapshotResultSchema = z.object({
   lines: z.array(z.string()),
@@ -1842,8 +1849,14 @@ export const createBrowserToolSession = ({
     return resolved;
   };
 
-  const registerRefs = (entries: readonly BrowserToolRefEntry[]): void => {
-    refs.clear();
+  const registerRefs = (
+    entries: readonly BrowserToolRefEntry[],
+    options?: { readonly merge?: boolean }
+  ): void => {
+    // A full snapshot replaces the registry; a targeted one adds its refs so the refs of the previous full snapshot keep resolving.
+    if (options?.merge !== true) {
+      refs.clear();
+    }
 
     for (const entry of entries) {
       refs.set(entry.ref, entry);
@@ -2125,7 +2138,7 @@ export const createBrowserToolSession = ({
 
         return runPageTool(
           buildDropPageScript({
-            data: parsed.data.data ?? [],
+            data: parsed.data.data ?? {},
             paths: parsed.data.paths ?? [],
             selector: resolved.selector,
           })
@@ -2374,7 +2387,7 @@ export const createBrowserToolSession = ({
         }
 
         scriptingRefCount = snapshot.data.nextRef;
-        registerRefs(snapshot.data.refs);
+        registerRefs(snapshot.data.refs, { merge: targetSelector !== undefined });
 
         const note =
           parsed.data.filename === undefined

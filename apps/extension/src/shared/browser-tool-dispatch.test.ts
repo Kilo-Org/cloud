@@ -280,6 +280,22 @@ describe('runKiloBrowserTool argument validation', () => {
     expect(session.resolveTarget).not.toHaveBeenCalled();
   });
 
+  it('rejects a prototype property name the contract schema does not declare', async () => {
+    const session = createFakeSession();
+
+    await expect(
+      runKiloBrowserTool({
+        arguments: { target: 'e1', toString: 'x' },
+        session,
+        toolName: 'kilo_browser_click',
+      })
+    ).resolves.toStrictEqual({
+      error: 'Invalid arguments for kilo_browser_click: unknown argument "toString".',
+      ok: false,
+    });
+    expect(session.resolveTarget).not.toHaveBeenCalled();
+  });
+
   it('rejects arguments that are not an object', async () => {
     const session = createFakeSession();
 

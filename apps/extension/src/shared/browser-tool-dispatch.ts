@@ -155,14 +155,14 @@ const validateBrowserToolArguments = (
   const problems: string[] = [];
 
   for (const field of entry.inputSchema.required ?? []) {
-    if (!(field in args)) {
+    if (!Object.hasOwn(args, field)) {
       problems.push(`missing required argument "${field}"`);
     }
   }
 
   if (!entry.inputSchema.additionalProperties) {
     for (const field of Object.keys(args)) {
-      if (!(field in entry.inputSchema.properties)) {
+      if (!Object.hasOwn(entry.inputSchema.properties, field)) {
         problems.push(`unknown argument "${field}"`);
       }
     }

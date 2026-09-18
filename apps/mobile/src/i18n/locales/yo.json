@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo kò dá {{repository}} mọ̀ gẹ́gẹ́ bí ibi ìpamọ́ kóòdù GitHub tàbí GitLab. Yan ibi ìpamọ́ kóòdù mìíràn nínú Kilo.",
       "repositoryUnsupported": "{{repository}} jẹ́ ibi ìpamọ́ kóòdù Bitbucket — Bẹ̀rẹ̀ aṣojú kò tíì lè lò ó. Yan ibi ìpamọ́ kóòdù mìíràn nínú Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "Aṣojú tuntun",
+    "openLastSession": "Ṣí ìgbà iṣẹ́ tó kẹ́yìn"
   }
 }

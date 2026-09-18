@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo 无法将 {{repository}} 识别为 GitHub 或 GitLab 仓库。请在 Kilo 中选择其他仓库。",
       "repositoryUnsupported": "{{repository}} 是 Bitbucket 仓库——启动智能体暂时无法使用它。请在 Kilo 中选择其他仓库。"
     }
+  },
+  "launcher": {
+    "newAgent": "新建智能体",
+    "openLastSession": "打开上次会话"
   }
 }

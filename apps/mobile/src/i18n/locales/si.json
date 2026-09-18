@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo, {{repository}} GitHub හෝ GitLab කේත ගබඩාවක් ලෙසවත් හඳුනා නොගනී. Kilo තුළ තවත් කේත ගබඩාවක් තෝරන්න.",
       "repositoryUnsupported": "{{repository}} යනු Bitbucket කේත ගබඩාවකි — නියෝජිතයා දියත් කරන්නට තවම එය භාවිත කළ නොහැක. Kilo තුළ තවත් කේත ගබඩාවක් තෝරන්න."
     }
+  },
+  "launcher": {
+    "newAgent": "නව නියෝජිතයෙක්",
+    "openLastSession": "අවසන් සැසිය විවෘත කරන්න"
   }
 }

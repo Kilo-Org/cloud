@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo haitambui {{repository}} kama hazina ya GitHub au GitLab. Chagua hazina nyingine katika Kilo.",
       "repositoryUnsupported": "{{repository}} ni hazina ya Bitbucket — Anzisha wakala bado haiwezi kuitumia. Chagua hazina nyingine katika Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "Wakala mpya",
+    "openLastSession": "Fungua kikao cha mwisho"
   }
 }

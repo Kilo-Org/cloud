@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo không nhận diện {{repository}} là kho mã nguồn GitHub hoặc GitLab. Chọn kho mã nguồn khác trong Kilo.",
       "repositoryUnsupported": "{{repository}} là kho mã nguồn Bitbucket — Bắt đầu trợ lý chưa thể dùng nó. Chọn kho mã nguồn khác trong Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "Tác nhân mới",
+    "openLastSession": "Mở phiên gần nhất"
   }
 }

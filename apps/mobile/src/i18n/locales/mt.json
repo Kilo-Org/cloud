@@ -3206,5 +3206,9 @@
       "repositoryUnknown": "Kilo ma jagħrafx lil {{repository}} bħala repożitorju GitHub jew GitLab. Agħżel repożitorju ieħor fil-Kilo.",
       "repositoryUnsupported": "{{repository}} huwa repożitorju Bitbucket — Ibda aġent għadu ma jistax jużah. Agħżel repożitorju ieħor fil-Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "Aġent ġdid",
+    "openLastSession": "Iftaħ l-aħħar sessjoni"
   }
 }

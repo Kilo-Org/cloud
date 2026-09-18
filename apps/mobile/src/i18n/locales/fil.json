@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Hindi kinikilala ng Kilo ang {{repository}} bilang GitHub o GitLab na repositoryo. Pumili ng ibang repositoryo sa Kilo.",
       "repositoryUnsupported": "Ang {{repository}} ay isang Bitbucket na repositoryo — Hindi pa ito magagamit ng Simulan ang agent. Pumili ng ibang repositoryo sa Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "Bagong agent",
+    "openLastSession": "Buksan ang huling sesyon"
   }
 }

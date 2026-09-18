@@ -3182,5 +3182,9 @@
       "repositoryUnknown": "Kilo не распазнае {{repository}} як рэпазіторый GitHub або GitLab. Выберыце іншы рэпазіторый у Kilo.",
       "repositoryUnsupported": "{{repository}} — гэта рэпазіторый Bitbucket, і Запусціць агента пакуль не можа яго выкарыстоўваць. Выберыце іншы рэпазіторый у Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "Новы агент",
+    "openLastSession": "Адкрыць апошні сеанс"
   }
 }

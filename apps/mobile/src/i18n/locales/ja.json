@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo は {{repository}} を GitHub または GitLab のリポジトリとして認識しません。Kilo で別のリポジトリを選択してください。",
       "repositoryUnsupported": "{{repository}} は Bitbucket のリポジトリです — エージェントを開始はまだこれを使用できません。Kilo で別のリポジトリを選択してください。"
     }
+  },
+  "launcher": {
+    "newAgent": "新しいエージェント",
+    "openLastSession": "最後のセッションを開く"
   }
 }

@@ -3182,5 +3182,9 @@
       "repositoryUnknown": "Kilo nerozpoznává {{repository}} jako repozitář na GitHubu nebo GitLabu. Vyber jiný repozitář v Kilu.",
       "repositoryUnsupported": "{{repository}} je repozitář na Bitbucketu — Spustit agenta ho zatím nemůže použít. Vyber jiný repozitář v Kilu."
     }
+  },
+  "launcher": {
+    "newAgent": "Nový agent",
+    "openLastSession": "Otevřít poslední relaci"
   }
 }

@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo-ն {{repository}}-ը չի ճանաչում որպես GitHub կամ GitLab պահոց։ Ընտրիր մեկ այլ պահոց Kilo-ում։",
       "repositoryUnsupported": "{{repository}}-ը Bitbucket պահոց է — Մեկնարկիր գործակալը դեռ չի կարող օգտագործել այն։ Ընտրիր մեկ այլ պահոց Kilo-ում։"
     }
+  },
+  "launcher": {
+    "newAgent": "Նոր գործակալ",
+    "openLastSession": "Բացել վերջին աշխատաշրջանը"
   }
 }

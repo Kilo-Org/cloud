@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo {{repository}} adını GitHub və ya GitLab repozitoriyası kimi tanımır. Kilo-da başqa repozitoriya seç.",
       "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasıdır — Agenti başlat hələ ondan istifadə edə bilmir. Kilo-da başqa repozitoriya seç."
     }
+  },
+  "launcher": {
+    "newAgent": "Yeni agent",
+    "openLastSession": "Son sessiyanı aç"
   }
 }

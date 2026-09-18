@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilok ez du {{repository}} GitHub edo GitLab biltegi gisa ezagutzen. Aukeratu beste biltegi bat Kilon.",
       "repositoryUnsupported": "{{repository}} Bitbucket biltegia da — Hasi agentea oraindik ezin du erabili. Aukeratu beste biltegi bat Kilon."
     }
+  },
+  "launcher": {
+    "newAgent": "Agente berria",
+    "openLastSession": "Ireki azken saioa"
   }
 }

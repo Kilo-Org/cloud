@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo gjenkjenner ikke {{repository}} som et GitHub- eller GitLab-kodelager. Velg et annet kodelager i Kilo.",
       "repositoryUnsupported": "{{repository}} er et Bitbucket-kodelager — Start agenten kan ennå ikke bruke det. Velg et annet kodelager i Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "Ny agent",
+    "openLastSession": "Åpne siste økt"
   }
 }

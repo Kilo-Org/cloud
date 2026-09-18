@@ -3134,5 +3134,9 @@
       "repositoryUnknown": "Kilo anaghị amata {{repository}} dị ka ebe nchekwa koodu GitHub ma ọ bụ GitLab. Họrọ ebe nchekwa koodu ọzọ na Kilo.",
       "repositoryUnsupported": "{{repository}} bụ ebe nchekwa koodu Bitbucket — Malite onye enyemaka enweghị ike iji ya ugbu a. Họrọ ebe nchekwa koodu ọzọ na Kilo."
     }
+  },
+  "launcher": {
+    "newAgent": "Onye nnọchi anya ọhụrụ",
+    "openLastSession": "Mepee nnọkọ ikpeazụ"
   }
 }

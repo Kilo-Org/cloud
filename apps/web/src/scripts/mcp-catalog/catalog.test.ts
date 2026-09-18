@@ -14,12 +14,12 @@ import { rootRouter } from '@/routers/root-router';
 import {
   CATALOG_JSON_DISPLAY_PATH,
   CATALOG_JSON_PATH,
-  DENYLISTED_TOP_LEVEL_SEGMENTS,
   SUMMARY_INSTRUCTION,
   buildCatalogJson,
   buildCatalogRows,
   collectCatalogLeaves,
   generateMissingSummaries,
+  isDenylistedPath,
   parseKiloCompletion,
   readCommittedSummaries,
   runKiloCompletion,
@@ -67,41 +67,65 @@ describe('mcp-catalog catalog', () => {
   });
 
   describe('buildCatalogRows', () => {
-    it('keeps every non-denylisted query and mutation, dropping the denylist and subscriptions', () => {
+    it('keeps every non-denylisted query and mutation, dropping internal paths and subscriptions', () => {
       const { rows, missing } = buildCatalogRows(
         [
           queryLeaf('admin.users.list'),
           queryLeaf('debug.ping'),
           queryLeaf('test.echo'),
+          queryLeaf('organizations.admin.list'),
           mutationLeaf('admin.users.delete'),
+          mutationLeaf('organizations.admin.grantCredit'),
+          mutationLeaf('codingPlans.adminMarkRevocationFailed'),
+          mutationLeaf('slack.devRemoveDbRowOnly'),
           mutationLeaf('organizations.subscription.cancel'),
           mutationLeaf('user.deleteAccount'),
           { path: 'user.onEvent', type: 'subscription', firstInput: undefined },
           queryLeaf('user.getProfile'),
           mutationLeaf('user.updateProfile'),
+          queryLeaf('slack.testConnection'),
         ],
         new Map([
           ['user.getProfile', 'Returns the profile of a user.'],
           ['organizations.subscription.cancel', 'Cancel the subscription.'],
           ['user.deleteAccount', 'Delete the account.'],
           ['user.updateProfile', 'Update the profile.'],
+          ['slack.testConnection', 'Test a Slack connection.'],
           ['admin.users.delete', 'Delete a user (internal).'],
+          ['organizations.admin.grantCredit', 'Grant credit (internal).'],
+          ['codingPlans.adminMarkRevocationFailed', 'Mark revocation failed (internal).'],
+          ['slack.devRemoveDbRowOnly', 'Remove a DB row (dev only).'],
         ])
       );
-      // Every non-denylisted query and mutation with a summary is a row;
-      // admin/debug/test and subscriptions are dropped, summary or not.
+      // Every non-internal query and mutation with a summary is a row; a
+      // denylisted segment anywhere in the path and subscriptions are dropped,
+      // summary or not. `testConnection` stays because `test` is exact-only.
       expect(rows.map(row => row.path)).toEqual([
         'organizations.subscription.cancel',
         'user.deleteAccount',
         'user.getProfile',
         'user.updateProfile',
+        'slack.testConnection',
       ]);
-      expect(rows.map(row => row.kind)).toEqual(['mutation', 'mutation', 'query', 'mutation']);
+      expect(rows.map(row => row.kind)).toEqual([
+        'mutation',
+        'mutation',
+        'query',
+        'mutation',
+        'query',
+      ]);
       expect(missing).toEqual([]);
     });
 
-    it('locks the denylist constant to the internal-only segments', () => {
-      expect([...DENYLISTED_TOP_LEVEL_SEGMENTS].sort()).toEqual(['admin', 'debug', 'test']);
+    it('treats an internal segment anywhere in the path as internal', () => {
+      expect(isDenylistedPath('admin.users.list')).toBe(true);
+      expect(isDenylistedPath('organizations.admin.grantCredit')).toBe(true);
+      expect(isDenylistedPath('codingPlans.adminInsights')).toBe(true);
+      expect(isDenylistedPath('debug.ping')).toBe(true);
+      expect(isDenylistedPath('test.echo')).toBe(true);
+      expect(isDenylistedPath('slack.devRemoveDbRowOnly')).toBe(true);
+      expect(isDenylistedPath('user.getProfile')).toBe(false);
+      expect(isDenylistedPath('slack.testConnection')).toBe(false);
     });
 
     it('fails on a zero-row catalog instead of emitting an empty one', () => {
@@ -109,10 +133,12 @@ describe('mcp-catalog catalog', () => {
       expect(() => buildCatalogRows([])).toThrow(/zero catalog rows/);
     });
 
-    it('throws when no mutation survives the denylist', () => {
+    it('throws when the enumeration exposes no mutation', () => {
       // A query-only enumeration (a wholesale router drift) must not publish a
       // mutation-free catalog in silence: write support would vanish.
-      expect(() => buildCatalogRows([queryLeaf('user.getProfile')])).toThrow(/zero mutation rows/);
+      expect(() => buildCatalogRows([queryLeaf('user.getProfile')])).toThrow(
+        /zero mutation procedures/
+      );
     });
 
     it('shapes rows with derived tags, input schema and search blob', () => {
@@ -257,9 +283,8 @@ describe('mcp-catalog catalog', () => {
         string,
         { kind?: string; searchBlob?: string } | undefined
       >;
-      const denylisted = new Set<string>(DENYLISTED_TOP_LEVEL_SEGMENTS);
       const expected = collectCatalogLeaves(rootRouter)
-        .filter(leaf => leaf.type === 'mutation' && !denylisted.has(leaf.path.split('.')[0] ?? ''))
+        .filter(leaf => leaf.type === 'mutation' && !isDenylistedPath(leaf.path))
         .map(leaf => leaf.path);
       expect(expected.length).toBeGreaterThan(0);
       for (const path of expected) {

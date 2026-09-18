@@ -9,8 +9,8 @@
  * artifact, and authors edit its summaries by hand. See dump.ts for the CLI
  * entry point.
  *
- * Queries and mutations are published wholesale; the top-level denylist
- * (`admin`, `debug`, `test`) and subscriptions stay internal.
+ * Queries and mutations are published wholesale; paths with an internal-only
+ * segment (`admin`, `debug`, `dev`, `test`) and subscriptions stay internal.
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
@@ -37,11 +37,25 @@ export const CATALOG_JSON_DISPLAY_PATH = relative(REPO_ROOT, CATALOG_JSON_PATH);
 export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-router.ts');
 
 /**
- * Top-level router segments that stay internal-only. This is a denylist:
- * every other query and mutation procedure is exported. Individual procedures
- * cannot opt back in, and subscriptions are never exported.
+ * Whether a procedure path is internal-only. A path is internal when any
+ * segment is `admin`, `debug`, `dev`, or `test`, or starts with `admin`,
+ * `debug`, or `dev` — the routers name admin and dev-only procedures `adminX`
+ * and `devX` (for example `organizations.admin.grantCredit` and
+ * `slack.devRemoveDbRowOnly`). `test` stays exact-only so user-facing calls
+ * such as `slack.testConnection` remain published. Subscriptions are never
+ * exported regardless of this check.
  */
-export const DENYLISTED_TOP_LEVEL_SEGMENTS = ['admin', 'debug', 'test'] as const;
+export function isDenylistedPath(path: string): boolean {
+  return path.split('.').some(segment => {
+    const lower = segment.toLowerCase();
+    return (
+      lower === 'test' ||
+      lower.startsWith('admin') ||
+      lower.startsWith('debug') ||
+      lower.startsWith('dev')
+    );
+  });
+}
 
 /** Instruction every generated summary must follow. */
 export const SUMMARY_INSTRUCTION =
@@ -164,28 +178,30 @@ function shapeRow(leaf: CatalogLeaf, summary: string): CatalogRow {
 }
 
 /**
- * Filters the leaves down to the exported catalog: every query and mutation,
- * except the top-level denylist. Subscriptions are never exported. Rows whose
- * summary is provided keep it byte-for-byte; the rest come back as `missing`
- * for LLM generation.
+ * Filters the leaves down to the exported catalog: every query and mutation
+ * whose path is not internal-only (see {@link isDenylistedPath}). Subscriptions
+ * are never exported. Rows whose summary is provided keep it byte-for-byte; the
+ * rest come back as `missing` for LLM generation.
  *
- * Drift guard: an enumeration that publishes no mutation row throws instead of
- * emitting a query-only catalog in silence. A router refactor that stops
- * exposing mutations, or a top-level segment renamed into the denylist, must
- * fail the dump rather than quietly remove write support from every MCP client.
+ * Drift guard: an enumeration that exposes no mutation procedure throws instead
+ * of emitting a query-only catalog in silence. Mutations without a committed
+ * summary are legitimate `missing` entries that the dump generates before it
+ * writes, so the guard counts exposed mutation leaves, not emitted rows. A
+ * router refactor that stops exposing mutations, or a top-level segment renamed
+ * into an internal prefix, must fail the dump rather than quietly remove write
+ * support from every MCP client.
  */
 export function buildCatalogRows(
   leaves: CatalogLeaf[],
   summaries: Map<string, string> = new Map()
 ): { rows: CatalogRow[]; missing: CatalogLeaf[] } {
-  const denylisted = new Set<string>(DENYLISTED_TOP_LEVEL_SEGMENTS);
-  let publishedMutations = 0;
+  let exposedMutations = 0;
   const rows: CatalogRow[] = [];
   const missing: CatalogLeaf[] = [];
   for (const leaf of leaves) {
     if (leaf.type !== 'query' && leaf.type !== 'mutation') continue;
-    if (denylisted.has(leaf.path.split('.')[0] ?? '')) continue;
-    if (leaf.type === 'mutation') publishedMutations += 1;
+    if (isDenylistedPath(leaf.path)) continue;
+    if (leaf.type === 'mutation') exposedMutations += 1;
     const summary = summaries.get(leaf.path);
     if (typeof summary === 'string' && summary !== '') {
       rows.push(shapeRow(leaf, summary));
@@ -198,11 +214,11 @@ export function buildCatalogRows(
       'Catalog enumeration produced zero catalog rows — refusing to emit an empty catalog'
     );
   }
-  if (publishedMutations === 0) {
+  if (exposedMutations === 0) {
     throw new Error(
-      'Catalog enumeration published zero mutation rows — refusing to emit a query-only catalog. ' +
-        'Every mutation is either missing from the router or withheld by its top-level segment; ' +
-        'check DENYLISTED_TOP_LEVEL_SEGMENTS in apps/web/src/scripts/mcp-catalog/catalog.ts.'
+      'Catalog enumeration exposed zero mutation procedures — refusing to emit a query-only catalog. ' +
+        'Every mutation is either missing from the router or withheld as internal; ' +
+        'check isDenylistedPath in apps/web/src/scripts/mcp-catalog/catalog.ts.'
     );
   }
   return { rows, missing };

@@ -2155,6 +2155,7 @@
       "accessibility": "qalabka {{label}}, {{status}}",
       "accessibilityLabel": "qalabka {{name}}, {{status}}",
       "noTasks": "Ma jiraan hawlo.",
+      "noOutput": "Wax soo saar ma jiro.",
       "toolRead": "akhri",
       "toolEdit": "tafatir",
       "toolWrite": "qor",

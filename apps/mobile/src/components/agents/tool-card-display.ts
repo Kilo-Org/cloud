@@ -1,15 +1,11 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { buildToolDetail } from '@kilocode/app-shared/tool-detail';
 import { z } from 'zod';
 
 import { i18n } from '@/i18n';
 import { formatList, formatNumber } from '@/lib/format';
 import { getToolFileAttachments, getToolImageAttachments } from './tool-card-attachments';
-import {
-  getDirectoryName,
-  getFilename,
-  getGenericToolTitle,
-  truncateText,
-} from './tool-card-utils';
+import { getDirectoryName, getFilename, truncateText } from './tool-card-utils';
 import { listPatchFilePaths } from './tool-patch-model';
 import { buildResultRowsModel } from './tool-list-model';
 import { suggestionToolMetadataSchema } from './suggestion-card-state';
@@ -259,9 +255,15 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
     default: {
       const stateTitle =
         status === 'running' || status === 'completed' ? part.state.title : undefined;
+      const detail = buildToolDetail(part);
       return {
         title: part.tool,
-        subtitle: getGenericToolTitle(part.tool, stateTitle, input),
+        subtitle:
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- a whitespace-only state title must fall through to the projected name; ?? would keep it
+          stateTitle?.trim() ||
+          (detail.name === part.tool && detail.summary
+            ? truncateText(detail.summary, 60)
+            : detail.name),
         translatable: Boolean(stateTitle?.trim()),
       };
     }

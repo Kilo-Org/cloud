@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} साधन, {{status}}",
       "accessibilityLabel": "{{name}} साधन, {{status}}",
       "noTasks": "कोणतीही कामे नाहीत.",
+      "noOutput": "कोणतेही आउटपुट नाही.",
       "toolRead": "वाचा",
       "toolEdit": "संपादित करा",
       "toolWrite": "लिहा",

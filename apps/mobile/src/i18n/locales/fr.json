@@ -1574,6 +1574,7 @@
       "accessibility": "Outil {{label}}, {{status}}",
       "accessibilityLabel": "Outil {{name}}, {{status}}",
       "noTasks": "Aucune tâche.",
+      "noOutput": "Aucune sortie.",
       "toolRead": "lire",
       "toolEdit": "modifier",
       "toolWrite": "écrire",

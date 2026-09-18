@@ -1665,6 +1665,7 @@
       "accessibility": "{{label}} 工具，{{status}}",
       "accessibilityLabel": "{{name}} 工具，{{status}}",
       "noTasks": "没有任务。",
+      "noOutput": "没有输出。",
       "toolRead": "读取",
       "toolEdit": "编辑",
       "toolWrite": "写入",

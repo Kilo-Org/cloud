@@ -2155,6 +2155,7 @@
       "accessibility": "Zana ya {{label}}, {{status}}",
       "accessibilityLabel": "Zana ya {{name}}, {{status}}",
       "noTasks": "Hakuna kazi.",
+      "noOutput": "Hakuna matokeo.",
       "toolRead": "soma",
       "toolEdit": "hariri",
       "toolWrite": "andika",

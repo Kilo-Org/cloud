@@ -2212,6 +2212,7 @@
       "accessibility": "Għodda {{label}}, {{status}}",
       "accessibilityLabel": "Għodda {{name}}, {{status}}",
       "noTasks": "M'hemm l-ebda kompitu.",
+      "noOutput": "M'hemm l-ebda ħruġ.",
       "toolRead": "aqra",
       "toolEdit": "editja",
       "toolWrite": "ikteb",

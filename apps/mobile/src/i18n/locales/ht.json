@@ -2155,6 +2155,7 @@
       "accessibility": "zouti {{label}}, {{status}}",
       "accessibilityLabel": "zouti {{name}}, {{status}}",
       "noTasks": "Pa gen travay.",
+      "noOutput": "Pa gen rezilta.",
       "toolRead": "li",
       "toolEdit": "modifye",
       "toolWrite": "ekri",

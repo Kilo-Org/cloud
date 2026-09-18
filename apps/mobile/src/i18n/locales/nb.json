@@ -2155,6 +2155,7 @@
       "accessibility": "Verktøyet {{label}}, {{status}}",
       "accessibilityLabel": "Verktøyet {{name}}, {{status}}",
       "noTasks": "Det er ingen oppgaver.",
+      "noOutput": "Ingen utdata.",
       "toolRead": "les",
       "toolEdit": "rediger",
       "toolWrite": "skriv",

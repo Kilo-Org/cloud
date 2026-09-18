@@ -2193,6 +2193,7 @@
       "accessibility": "Інструмент {{label}}, {{status}}",
       "accessibilityLabel": "Інструмент {{name}}, {{status}}",
       "noTasks": "Няма задач.",
+      "noOutput": "Няма вываду.",
       "toolRead": "чытанне",
       "toolEdit": "рэдагаваць",
       "toolWrite": "запіс",

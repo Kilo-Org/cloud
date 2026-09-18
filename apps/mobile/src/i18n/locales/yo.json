@@ -2155,6 +2155,7 @@
       "accessibility": "Ohun èlò {{label}}, {{status}}",
       "accessibilityLabel": "Ohun èlò {{name}}, {{status}}",
       "noTasks": "Kò sí iṣẹ́.",
+      "noOutput": "Kò sí ìjáde.",
       "toolRead": "kà",
       "toolEdit": "ṣàtúnṣe",
       "toolWrite": "kọ",

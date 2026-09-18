@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} கருவி, {{status}}",
       "accessibilityLabel": "{{name}} கருவி, {{status}}",
       "noTasks": "பணிகள் இல்லை.",
+      "noOutput": "வெளியீடு இல்லை.",
       "toolRead": "படித்தல்",
       "toolEdit": "திருத்தவும்",
       "toolWrite": "எழுதுதல்",

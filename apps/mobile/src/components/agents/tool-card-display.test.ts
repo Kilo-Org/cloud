@@ -321,6 +321,19 @@ describe('getToolDisplay mapping', () => {
     });
   });
 
+  it('summarizes a question row from its first question text', () => {
+    expect(
+      getDisplay(
+        makeToolPart(
+          'question',
+          completed({
+            questions: [{ header: 'E2E', question: 'Which fields should the sheet show?' }],
+          })
+        )
+      )
+    ).toEqual({ title: 'question', subtitle: 'Which fields should the sheet show?' });
+  });
+
   it('uses the running/completed state title for the generic subtitle', () => {
     expect(
       getDisplay(

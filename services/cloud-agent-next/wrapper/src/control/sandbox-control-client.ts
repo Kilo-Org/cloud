@@ -11,6 +11,7 @@ import { createControlEventTransport } from './control-event-transport.js';
 import type { LegacySendResult } from './control-event-transport.js';
 import {
   MAX_CONTROL_EVENT_OUTBOX_BYTES,
+  MAX_CONTROL_EVENT_OUTBOX_EVENTS,
   controlEventPublicationWireItem,
   type BatchControlEventPublication,
   type ControlEventOutboxFailure,
@@ -189,7 +190,6 @@ const HELLO_TIMEOUT_MS = 10_000;
 const KEEPALIVE_INTERVAL_MS = 20_000;
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
-const MAX_EVENT_RECEIPT_TRACKING = 256;
 const EVENT_RECEIPT_TIMEOUT_MS = 30_000;
 
 const preparedEventSchema = z.object({
@@ -417,7 +417,7 @@ export function createSandboxControlClient(
 
   const evictEventReceiptMetadata = (incomingBytes: number, incomingCount: number): void => {
     while (
-      eventReceiptMetadata.size + incomingCount > MAX_EVENT_RECEIPT_TRACKING ||
+      eventReceiptMetadata.size + incomingCount > MAX_CONTROL_EVENT_OUTBOX_EVENTS ||
       eventReceiptBytes + incomingBytes > MAX_CONTROL_EVENT_OUTBOX_BYTES
     ) {
       const oldest = eventReceiptMetadata.values().next().value;

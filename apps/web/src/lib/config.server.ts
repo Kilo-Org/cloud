@@ -504,6 +504,9 @@ export const SECURITY_AUTO_ANALYSIS_WORKER_URL =
 export const GOOGLE_WEB_RISK_API_KEY = getEnvVariable('GOOGLE_WEB_RISK_API_KEY');
 
 export const CREDIT_CATEGORIES_ENCRYPTION_KEY = getEnvVariable('CREDIT_CATEGORIES_ENCRYPTION_KEY');
+export const CREDIT_CATEGORIES_ENCRYPTION_KEY_V2 = getEnvVariable(
+  'CREDIT_CATEGORIES_ENCRYPTION_KEY_V2'
+);
 
 // Agent observability ingest service
 export const O11Y_SERVICE_URL = getEnvVariable('O11Y_SERVICE_URL') || '';

@@ -204,6 +204,26 @@ describe('mcp-catalog catalog', () => {
       expect(properties['id']).toEqual({ allOf: [{ type: 'string' }, expect.any(Object)] });
     });
 
+    it('falls back to a top-level allOf when a chained schema carries extra keywords', () => {
+      // A `.strict()` input rejects keys another input contributes, so the
+      // flattened union would advertise a more permissive schema than tRPC
+      // enforces. The intersection keeps `additionalProperties: false`.
+      const { rows } = buildCatalogRows(
+        withMutation([
+          mutationLeaf('repo.list', [
+            z.object({ organizationId: z.string() }),
+            z.object({ organizationId: z.string(), platform: z.string() }).strict(),
+          ]),
+        ]),
+        new Map([['repo.list', 'Lists repositories.']])
+      );
+      const schema = rows[0]?.inputSchema;
+      const allOf = schema?.['allOf'] as Record<string, unknown>[] | undefined;
+      expect(Array.isArray(allOf)).toBe(true);
+      expect(allOf?.some(sub => sub['additionalProperties'] === false)).toBe(true);
+      expect(rows[0]?.tags).toEqual(expect.arrayContaining(['organizationid', 'platform']));
+    });
+
     it('keeps the tags of every chained input schema field', () => {
       const { rows } = buildCatalogRows(
         withMutation([

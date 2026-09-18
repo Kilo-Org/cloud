@@ -149,16 +149,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * Keywords a merged object schema can carry without changing the runtime
+ * contract. `additionalProperties` is deliberately absent: a `.strict()`
+ * subschema rejects keys another subschema contributes, so flattening it into
+ * the union would advertise a more permissive schema than tRPC enforces.
+ */
+const MERGEABLE_OBJECT_KEYWORDS = new Set(['$schema', 'type', 'properties', 'required']);
+
+function isMergeableObjectSchema(schema: Record<string, unknown>): boolean {
+  return (
+    schema.type === 'object' &&
+    isRecord(schema.properties) &&
+    Object.keys(schema).every(key => MERGEABLE_OBJECT_KEYWORDS.has(key))
+  );
+}
+
+/**
  * Composes every chained `.input()` schema into one JSON Schema. tRPC runs each
  * `.input()` validator against the same raw input, so a caller must satisfy all
  * of them: using only the first schema (the old behavior) under-advertised
  * chained procedures such as `workspaceFolders.create`, whose second input
  * requires `name` and `color`.
  *
- * Object schemas merge into a single object: properties are unioned, required
- * keys are unioned, and a key declared by more than one schema keeps every
- * constraint through `allOf`. Any non-object chain falls back to a top-level
- * `allOf`, which is the faithful intersection for arbitrary schemas.
+ * Plain object schemas merge into a single object: properties are unioned,
+ * required keys are unioned, and a key declared by more than one schema keeps
+ * every constraint through `allOf`. Any other chain — a non-object schema, or
+ * an object carrying extra keywords such as `.strict()`'s
+ * `additionalProperties: false` — falls back to a top-level `allOf`, the
+ * faithful intersection that preserves each schema's own keywords.
  */
 function toInputSchema(inputs: unknown[]): Record<string, unknown> {
   const schemas = inputs.map(singleInputSchema);
@@ -166,11 +184,10 @@ function toInputSchema(inputs: unknown[]): Record<string, unknown> {
   if (first === undefined) return {};
   if (schemas.length === 1) return first;
 
-  const objects = schemas.filter(schema => schema.type === 'object' && isRecord(schema.properties));
-  if (objects.length === schemas.length) {
+  if (schemas.every(isMergeableObjectSchema)) {
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
-    for (const schema of objects) {
+    for (const schema of schemas) {
       for (const [key, value] of Object.entries(schema.properties as Record<string, unknown>)) {
         if (!(key in properties)) properties[key] = value;
         else if (JSON.stringify(properties[key]) !== JSON.stringify(value)) {

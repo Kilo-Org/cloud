@@ -38,6 +38,7 @@ describe('PersonalBYOKPage ChatGPT flag gate', () => {
     const html = renderToStaticMarkup(createElement(PersonalBYOKPage));
 
     expect(html).not.toContain('card');
+    expect(html).not.toContain('Connected Accounts');
     expect(html).toContain('BYOKKeysManager');
   });
 
@@ -46,6 +47,7 @@ describe('PersonalBYOKPage ChatGPT flag gate', () => {
     const html = renderToStaticMarkup(createElement(PersonalBYOKPage));
 
     expect(html).toContain('card-skeleton');
+    expect(html).toContain('Connected Accounts');
     expect(html).not.toMatch(/>card</);
   });
 
@@ -54,6 +56,10 @@ describe('PersonalBYOKPage ChatGPT flag gate', () => {
     const html = renderToStaticMarkup(createElement(PersonalBYOKPage));
 
     expect(html).toMatch(/>card</);
+    expect(html).toContain('<section aria-labelledby="connected-accounts"');
+    expect(html).toContain(
+      '<h2 id="connected-accounts" class="type-heading">Connected Accounts</h2>'
+    );
     expect(html).toContain('BYOKKeysManager');
   });
 });

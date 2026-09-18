@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,10 +33,9 @@ const AUTH_ERROR_PARAM = 'openai_error';
  * below this card offers a pasted 'OpenAI API key' entry, so a bare 'OpenAI'
  * here would read as the same thing twice on one page.
  */
-const CARD_TITLE = 'OpenAI (ChatGPT subscription)';
+const CARD_TITLE = 'OpenAI ChatGPT';
 
-const CONNECT_DESCRIPTION =
-  'Connect with your ChatGPT subscription to use OpenAI models in Kilo. No API key needed.';
+const CONNECT_DESCRIPTION = 'No API key needed.';
 const CONNECT_LABEL = 'Sign in with ChatGPT';
 const RECONNECT_LABEL = 'Reconnect with ChatGPT';
 const TRY_AGAIN_LABEL = 'Try again';
@@ -248,7 +247,7 @@ function CardBody({
     // offers its Reconnect and Disconnect controls.
     //
     // A live `connected` status is left out on purpose: there is nothing to
-    // recover, and a failure alert beside 'Connected as ...' would contradict
+    // recover, and a failure alert beside the connected account would contradict
     // the connection the card is reporting.
     return (
       <>
@@ -304,10 +303,15 @@ function CardBody({
     return (
       <>
         <div className="space-y-1">
-          <p className="type-body">Connected as {connectionIdentity(status)}</p>
+          <p className="type-body break-words">Account: {connectionIdentity(status)}</p>
           {status.connectedAt ? (
             <p className="type-body text-muted-foreground">
-              Connected on {new Date(status.connectedAt).toLocaleDateString()}
+              Connected on:{' '}
+              {new Date(status.connectedAt).toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
             </p>
           ) : null}
         </div>
@@ -353,6 +357,9 @@ export function OpenAiChatGptCardView(props: OpenAiChatGptCardViewProps) {
         <div className={CARD_STATUS_SLOT_CLASS}>
           <CardIndicator status={props.status} />
         </div>
+        <CardDescription className="col-span-2">
+          Use your ChatGPT subscription for supported OpenAI models in Kilo.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className={CARD_BODY_CLASS}>

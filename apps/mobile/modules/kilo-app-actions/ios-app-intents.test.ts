@@ -342,6 +342,11 @@ describe('app.config.ts', () => {
     // `additionalStrings`; declaring it for Expo's `withLocales` too (the
     // `ios['Localizable.strings']` key) registers a second copy of the same
     // bundle file and the ios job fails with "Multiple commands produce".
+    // The fork is the capability: `.lproj/Localizable.strings` is an Xcode
+    // bundle resource and the App Intent metadata that reads it is iOS-only.
+    // Android's action surface (exported entry points plus
+    // `res/xml/shortcuts.xml`) is held by `android-app-actions.test.ts`, so no
+    // part of the user-visible behaviour is missing there.
     expect(configSource).toContain('additionalStrings: focusFilterCatalog');
     expect(configSource, 'a second Localizable.strings producer').not.toContain(
       "'Localizable.strings'"

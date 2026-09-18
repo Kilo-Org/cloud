@@ -16,6 +16,12 @@ const { mergeIntoResourcesPhase } = require('./app-intent-resources.js');
 // target's own `Localizable.strings`, so the Shortcuts app would list every
 // action in English on a localized device.
 //
+// This fork follows the capability, not a scope: App Intents and their `.lproj`
+// `Localizable.strings` metadata are iOS-only, so no Android prebuild calls
+// this plugin. Android has no App Intents to localize — its action surface is
+// the exported entry points plus `res/xml/shortcuts.xml`, which
+// `platform-parity.test.ts` compares against the iOS tree.
+//
 // This is the app-target twin of `withWidgetLocalizations`: the App Intent copy
 // lives in `app-intent-copy.json` beside this file (bundle metadata, never
 // i18next), and pre-rendered `additionalStrings` — the Focus filter's catalog,

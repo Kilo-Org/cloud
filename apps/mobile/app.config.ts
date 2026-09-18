@@ -73,7 +73,11 @@ const googleSignInPlugins: NonNullable<ExpoConfig['plugins']> = googleIosUrlSche
 
 // Prebuild-time native copy, one `ios` entry per supported language. Expo's
 // built-in `withLocales` plugin writes the usage-description keys into
-// `<tag>.lproj/InfoPlist.strings`. It is deliberately NOT given the Focus-filter
+// `<tag>.lproj/InfoPlist.strings`. The `ios` key is the capability, not a
+// scope: an `.lproj/InfoPlist.strings` catalog is an Apple bundle format whose
+// keys here are iOS `NS*UsageDescription` keys, and Android has no per-locale
+// equivalent (the system draws its own permission prompts), so the Android
+// prebuild has nothing to write. It is deliberately NOT given the Focus-filter
 // `Localizable.strings`: Expo would then register a second copy of the app
 // bundle's `<tag>.lproj/Localizable.strings` beside the App Intent catalog
 // `withAppIntentLocalizations` already writes, and Xcode fails the build with
@@ -103,8 +107,10 @@ const config: ExpoConfig = {
   // Per-locale native strings. Expo's built-in `withLocales` writes a
   // `<tag>.lproj/InfoPlist.strings` per tag at prebuild from the
   // usage-description keys (the plugin options below stay as the base Info.plist
-  // value). `ios`-nested so Android's `withLocales` resolves each tag to
-  // nothing. The location copy spells the app name out: `.lproj` strings are not
+  // value). `ios`-nested because only iOS has this catalog: Android defines no
+  // per-locale native string file for permission prompts, so its `withLocales`
+  // resolves each tag to nothing by capability rather than by omission. The
+  // location copy spells the app name out: `.lproj` strings are not
   // build-expanded, so the upstream `$(PRODUCT_NAME)` would render literally
   // there. The `Localizable.strings` the same bundle resolves is written by
   // `withAppIntentLocalizations` below, not here.

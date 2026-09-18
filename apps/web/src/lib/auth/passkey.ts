@@ -387,10 +387,24 @@ export async function verifyAuthentication(
     throw new PasskeyVerificationError('VERIFICATION_FAILED');
   }
 
-  await db
+  // Advance the counter as a compare-and-set against the value that was
+  // verified. A concurrent assertion for the same credential read the same
+  // counter and reaches this write with a stale expectation, so it updates no
+  // row: only the assertion that won the row is allowed to mint a ticket.
+  const advanced = await db
     .update(passkey_credentials)
     .set({ sign_count: newCounter, last_used_at: sql`NOW()` })
-    .where(eq(passkey_credentials.id, credential.id));
+    .where(
+      and(
+        eq(passkey_credentials.id, credential.id),
+        eq(passkey_credentials.sign_count, credential.sign_count)
+      )
+    )
+    .returning({ id: passkey_credentials.id });
+
+  if (advanced.length !== 1) {
+    throw new PasskeyVerificationError('VERIFICATION_FAILED');
+  }
 
   const ticket = await createSignInTicket(credential.kilo_user_id);
   return { ticket };
@@ -449,6 +463,22 @@ export async function cleanupExpiredPasskeyChallenges(): Promise<number> {
     .delete(passkey_challenges)
     .where(lt(passkey_challenges.expires_at, new Date().toISOString()))
     .returning({ id: passkey_challenges.id });
+
+  return deleted.length;
+}
+
+/**
+ * Delete passkey sign-in tickets that can no longer authorize anything. A
+ * ticket is single-use and expires two minutes after it is minted, and
+ * redemption only marks it consumed, so without this every passkey sign-in
+ * would retain a user-linked row forever. Only rows past their expiry are
+ * removed, so a redemption in flight is never cut short.
+ */
+export async function cleanupExpiredPasskeySignInTickets(): Promise<number> {
+  const deleted = await db
+    .delete(passkey_sign_in_tickets)
+    .where(lt(passkey_sign_in_tickets.expires_at, new Date().toISOString()))
+    .returning({ id: passkey_sign_in_tickets.id });
 
   return deleted.length;
 }

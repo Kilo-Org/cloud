@@ -20,6 +20,7 @@ import { NEXTAUTH_URL } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 
 import {
+  cleanupExpiredPasskeySignInTickets,
   consumeSignInTicket,
   createAuthenticationOptions,
   createRegistrationOptions,
@@ -496,6 +497,44 @@ describe('passkey', () => {
       expect(ticketRow.consumed_at).toBeNull();
     });
 
+    it('mints only one ticket when concurrent assertions race with a nonzero counter', async () => {
+      const authenticator = createTestAuthenticator();
+      await insertCredential(authenticator, { signCount: 1 });
+
+      const ceremonies = await Promise.all(
+        Array.from({ length: 5 }, () => createAuthenticationOptions())
+      );
+
+      // Every assertion verifies against the stored counter of 1, so all of
+      // them pass the "counter advanced" check before any write lands. Only the
+      // compare-and-set that still matches the verified counter may mint.
+      const attempts = await Promise.allSettled(
+        ceremonies.map(ceremony =>
+          verifyAuthentication(
+            ceremony.challengeId,
+            buildAuthenticationResponse(authenticator, {
+              challenge: ceremony.options.challenge,
+              counter: 2,
+            })
+          )
+        )
+      );
+
+      expect(attempts.filter(attempt => attempt.status === 'fulfilled')).toHaveLength(1);
+
+      const tickets = await db
+        .select()
+        .from(passkey_sign_in_tickets)
+        .where(eq(passkey_sign_in_tickets.kilo_user_id, userId));
+      expect(tickets).toHaveLength(1);
+
+      const [credential] = await db
+        .select()
+        .from(passkey_credentials)
+        .where(eq(passkey_credentials.credential_id, authenticator.credentialId));
+      expect(credential.sign_count).toBe(2);
+    });
+
     it('refuses an unknown credential', async () => {
       const authenticator = createTestAuthenticator();
       const { challengeId, options } = await createAuthenticationOptions();
@@ -658,6 +697,31 @@ describe('passkey', () => {
 
     it('refuses an unknown ticket', async () => {
       expect(await consumeSignInTicket('a'.repeat(64))).toBeNull();
+    });
+
+    it('deletes expired tickets and keeps still-valid ones', async () => {
+      const live = await createSignInTicket(userId);
+      const expired = await createSignInTicket(otherUserId);
+      await db
+        .update(passkey_sign_in_tickets)
+        .set({ expires_at: new Date(Date.now() - 1000).toISOString() })
+        .where(eq(passkey_sign_in_tickets.ticket_hash, sha256Hex(expired)));
+
+      // The cleanup deletes every expired ticket in the table; other tickets
+      // this worker left behind must not make the count exact.
+      expect(await cleanupExpiredPasskeySignInTickets()).toBeGreaterThanOrEqual(1);
+
+      const expiredRows = await db
+        .select()
+        .from(passkey_sign_in_tickets)
+        .where(eq(passkey_sign_in_tickets.ticket_hash, sha256Hex(expired)));
+      expect(expiredRows).toHaveLength(0);
+
+      const liveRows = await db
+        .select()
+        .from(passkey_sign_in_tickets)
+        .where(eq(passkey_sign_in_tickets.ticket_hash, sha256Hex(live)));
+      expect(liveRows).toHaveLength(1);
     });
   });
 });

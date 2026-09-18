@@ -64,7 +64,7 @@ describe('ChildSessionSheet title layout', () => {
       hydrationState: readyState,
       messages: [],
       sessionError: 'Runtime failure',
-      expectedText: 'Runtime failure',
+      expectedText: i18n.t('agentChat.messageFailure.assistantFailed'),
       retryCount: 0,
     },
   ])('keeps the selected title wrapped during $state', async state => {
@@ -219,6 +219,19 @@ describe('ChildSessionSheet localized hydration errors', () => {
     expect(errors[0]?.props.message).not.toBe(
       i18n.t('agentChat.session.connectionTrouble', { lng: 'en' })
     );
+  });
+
+  it('renders the reader copy for a recognized SDK child error in Spanish', async () => {
+    await i18n.changeLanguage('es');
+    const renderer = await renderSheet({
+      ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
+      sessionError: 'Agent connection lost',
+    });
+
+    const errors = renderer.root.findAllByType(QueryError);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
+    expect(errors[0]?.props.message).not.toBe('Agent connection lost');
   });
 });
 

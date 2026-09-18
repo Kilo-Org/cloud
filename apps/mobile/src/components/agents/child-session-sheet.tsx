@@ -220,7 +220,7 @@ export function ChildSessionSheet({
       ) : (
         <QueryError
           title={t('agentChat.childSessionSheet.failed')}
-          message={sessionError ?? undefined}
+          message={sessionError === null ? undefined : sessionStatusErrorMessage(sessionError)}
         />
       );
   } else if (state === 'empty') {

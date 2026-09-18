@@ -297,14 +297,25 @@ describe('ChildSessionSheet recovery', () => {
     );
   });
 
+  it('localizes a recognized SDK child-session error in the terminal failure screen', async () => {
+    const renderer = await renderSheet({
+      ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
+      sessionError: 'Agent connection lost',
+    });
+    const errors = renderer.root.findAllByType(QueryError);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.props.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
+  });
+
   it('does not give an uncached runtime error a hydration Retry', async () => {
     const renderer = await renderSheet({
       ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
       sessionError: 'Runtime failure',
     });
-    // The sheet's own failure screen (child-session-sheet.tsx:219-223) is not
-    // the transcript status slot, so it still names the child's runtime error.
-    expect(textValues(renderer.root)).toContain('Runtime failure');
+    // The sheet's own failure screen (child-session-sheet.tsx:220-224) shows
+    // the reader's copy: an unrecognized child error becomes the generic
+    // assistant-failure line, never the raw SDK string.
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
     expect(textValues(renderer.root)).not.toContain('Retry');
   });
 });

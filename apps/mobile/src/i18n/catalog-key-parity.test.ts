@@ -68,6 +68,19 @@ describe('catalog key parity', () => {
     expect(missing).toEqual([]);
   });
 
+  it('names the live New agent label under one English key', () => {
+    // English is the source of truth the 86 catalogs mirror. The live launcher
+    // label is `glanceable.newAgent`, so English must not define a second
+    // `launcher.newAgent` copy: that would trip the duplicate-copy rule in
+    // tools/i18n/check-catalogs.mjs and put every catalog back in the drift
+    // this file guards against.
+    expect(englishKeys.has('glanceable.newAgent'), 'en.json lacks glanceable.newAgent').toBe(true);
+    const launcherKeys = [...englishKeys].filter(key => key.startsWith('launcher.'));
+    expect(launcherKeys, 'en.json launcher namespace drifted').toEqual([
+      'launcher.openLastSession',
+    ]);
+  });
+
   it('keeps the launcher New agent label under its live key', () => {
     // The launcher surface renders `glanceable.newAgent`; this pins the exact
     // leftover that broke `i18n-leftover`. A catalog that still carries

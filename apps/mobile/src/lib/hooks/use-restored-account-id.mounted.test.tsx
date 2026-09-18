@@ -18,18 +18,23 @@ vi.mock('expo-secure-store', () => ({ getItemAsync }));
 
 function Probe({
   fence,
+  restoredFromStorage,
   onValue,
 }: {
   fence: number;
+  restoredFromStorage: boolean;
   onValue: (value: string | null) => void;
 }): null {
-  onValue(useRestoredAccountId(fence));
+  onValue(useRestoredAccountId(fence, restoredFromStorage));
   return null;
 }
 
-function mount(fence = 7): {
+function mount(
+  fence = 7,
+  restoredFromStorage = true
+): {
   latest: () => string | null;
-  update: (nextFence: number) => Promise<void>;
+  update: (nextFence: number, nextRestored?: boolean) => Promise<void>;
   unmount: () => void;
 } {
   const current: { value: string | null } = { value: null };
@@ -38,6 +43,7 @@ function mount(fence = 7): {
     ref.renderer = TestRenderer.create(
       createElement(Probe, {
         fence,
+        restoredFromStorage,
         onValue: value => {
           current.value = value;
         },
@@ -55,11 +61,12 @@ function mount(fence = 7): {
   });
   return {
     latest: () => current.value,
-    update: async nextFence => {
+    update: async (nextFence, nextRestored = restoredFromStorage) => {
       await act(async () => {
         renderer.update(
           createElement(Probe, {
             fence: nextFence,
+            restoredFromStorage: nextRestored,
             onValue: value => {
               current.value = value;
             },
@@ -128,6 +135,33 @@ describe('useRestoredAccountId', () => {
     await settle();
 
     expect(probe.latest()).toBe('user-hint');
+  });
+
+  it('ignores the persisted hint for fresh credentials that are not a restore', async () => {
+    // A direct credential switch: the new session's credentials are committed
+    // but unconfirmed, while the hint still names the previous account. The
+    // hint must not scope local data until the new account is confirmed.
+    getItemAsync.mockResolvedValue('user-previous');
+    const probe = mount(7, false);
+
+    await settle();
+
+    expect(probe.latest()).toBeNull();
+    expect(getItemAsync).not.toHaveBeenCalled();
+  });
+
+  it('drops a restored hint when the session stops being a restore', async () => {
+    getItemAsync.mockResolvedValue('user-previous');
+    const probe = mount(1, true);
+    await settle();
+    expect(probe.latest()).toBe('user-previous');
+
+    // A sign-in over the restored session revokes ownership and clears the
+    // restored flag; the previous account's hint must not scope the new one.
+    await probe.update(2, false);
+    await settle();
+
+    expect(probe.latest()).toBeNull();
   });
 
   it('answers null when neither the query nor the hint names an account', async () => {

@@ -1,5 +1,5 @@
 /* eslint-disable require-await, @typescript-eslint/require-await -- the in-memory KV fake settles without await */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 // The translation cache stores through the encrypted-kv module; the mock below
 // is an in-memory per-scope store with the real map semantics, keeping the
@@ -44,12 +44,14 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
 }));
 
 /* eslint-disable import/first */
+import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE } from '@/lib/storage-keys';
 import {
   type CachedToolSummaryTranslation,
   clearToolSummaryTranslationsForSignOut,
   readToolSummaryTranslations,
   TOOL_SUMMARY_TRANSLATION_CACHE_CAP,
+  TOOL_SUMMARY_TRANSLATION_SCOPE_CLEAR_TIMEOUT_MS,
   writeToolSummaryTranslation,
 } from './tool-summary-translation-cache';
 /* eslint-enable import/first */
@@ -214,5 +216,69 @@ describe('tool summary translation cache', () => {
     kvMock.clearScope.mockRejectedValueOnce(new Error('kv down'));
 
     await expect(clearToolSummaryTranslationsForSignOut()).resolves.toBeUndefined();
+  });
+
+  it('resolves the sign-out clear when the KV clear never settles', async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    // A native clear that never answers, as a hung SQLCipher operation would.
+    kvMock.clearScope.mockImplementationOnce(
+      // eslint-disable-next-line @typescript-eslint/promise-function-async -- the mock hands back a promise that never settles
+      () => new Promise<void>(() => undefined)
+    );
+    await writeToolSummaryTranslation(makeEntry());
+
+    let settled = false;
+    const clear = (async () => {
+      await clearToolSummaryTranslationsForSignOut();
+      settled = true;
+    })();
+    await vi.advanceTimersByTimeAsync(TOOL_SUMMARY_TRANSLATION_SCOPE_CLEAR_TIMEOUT_MS + 1);
+    await clear;
+
+    expect(settled).toBe(true);
+  });
+
+  it('removes a write that lands after an auth transition cleared the scope', async () => {
+    // A store write the sign-out drain would have abandoned: it is still in
+    // flight when the scope is cleared, and lands afterwards.
+    const gate = Promise.withResolvers<undefined>();
+    kvMock.setItem.mockImplementationOnce(async (scope: string, k: string, v: string) => {
+      await gate.promise;
+      // The native write commits after the clear, as a slow SQLCipher write
+      // would; without the fence the entry survives the clear.
+      kvMock.scopes.set(scope, new Map([[k, { v, updatedAt: 1 }]]));
+    });
+
+    // `persistTranslation` captures the epoch at dispatch, before the store
+    // module can load.
+    const dispatchedEpoch = currentAuthEpoch();
+    const write = writeToolSummaryTranslation(makeEntry({ itemId: 'item-late' }), dispatchedEpoch);
+
+    // Sign-out (or a direct account switch) moves the epoch and clears the
+    // scope while the write is still in flight.
+    bumpAuthEpoch();
+    await clearToolSummaryTranslationsForSignOut();
+
+    gate.resolve(undefined);
+    await write;
+
+    // The late write must not have recreated the previous account's entry.
+    await expect(readToolSummaryTranslations()).resolves.toEqual([]);
+    expect(kvMock.removeItem).toHaveBeenCalledWith(
+      SCOPE,
+      'tt:de:kilo-auto/small:item-late:Ran the tests'
+    );
+  });
+
+  it('keeps a write made under the current auth epoch', async () => {
+    await writeToolSummaryTranslation(makeEntry({ itemId: 'item-current' }), currentAuthEpoch());
+
+    await expect(readToolSummaryTranslations()).resolves.toEqual([
+      makeEntry({ itemId: 'item-current' }),
+    ]);
+    expect(kvMock.removeItem).not.toHaveBeenCalled();
   });
 });

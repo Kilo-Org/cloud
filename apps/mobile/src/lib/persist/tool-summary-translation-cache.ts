@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
 import { TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE } from '@/lib/storage-keys';
 
@@ -27,6 +28,16 @@ import { TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE } from '@/lib/storage-keys';
 
 /** At most this many translations are kept; the rest are evicted oldest-first. */
 export const TOOL_SUMMARY_TRANSLATION_CACHE_CAP = 200;
+
+/**
+ * Longest sign-out waits for the scope clear. The clear is a native module
+ * call, and a clear that never answers must not hold sign-out teardown — the
+ * caller awaits this inside its `Promise.allSettled` batch, so a hanging
+ * operation would otherwise stop `queryClient.clear()` and `setToken`. Past
+ * this the clear is treated as hung and the caller continues; a late clear is
+ * harmless, so the operation itself is not cancelled.
+ */
+export const TOOL_SUMMARY_TRANSLATION_SCOPE_CLEAR_TIMEOUT_MS = 1000;
 
 const ITEM_KEY_PREFIX = 'tt:';
 
@@ -109,30 +120,67 @@ export async function readToolSummaryTranslations(): Promise<CachedToolSummaryTr
  * `tt:<language>:<modelId>:<itemId>:<text>`, then evicts the oldest entries
  * beyond {@link TOOL_SUMMARY_TRANSLATION_CACHE_CAP}. An entry that fails
  * validation is dropped instead of written. Never throws.
+ *
+ * `epoch` is the auth epoch captured when the write was dispatched (see
+ * `persistTranslation`). Sign-out and a direct account switch both advance the
+ * epoch and clear this scope, and a write the caller's bounded drain already
+ * abandoned can still land afterwards; the entry is therefore removed again
+ * once it settles when the epoch moved, so a late write can never recreate the
+ * previous account's tool text after the scope was cleared. A write that lands
+ * under a newer account's epoch is left alone: it belongs to that account.
  */
 export async function writeToolSummaryTranslation(
-  entry: CachedToolSummaryTranslation
+  entry: CachedToolSummaryTranslation,
+  epoch: number = currentAuthEpoch()
 ): Promise<void> {
   const parsed = cachedToolSummaryTranslationSchema.safeParse(entry);
   if (!parsed.success) {
     return;
   }
+  const itemKey = translationItemKey(
+    parsed.data.language,
+    parsed.data.modelId,
+    parsed.data.itemId,
+    parsed.data.text
+  );
   try {
+    // The transition already cleared the scope before this write could start:
+    // committing would recreate the entry the clear removed.
+    if (epoch !== currentAuthEpoch()) {
+      return;
+    }
     await encryptedKv.setItem(
       TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE,
-      translationItemKey(
-        parsed.data.language,
-        parsed.data.modelId,
-        parsed.data.itemId,
-        parsed.data.text
-      ),
+      itemKey,
       JSON.stringify(parsed.data)
     );
+    if (epoch !== currentAuthEpoch()) {
+      // The scope was cleared while this write was in flight. Remove the entry
+      // the clear could not have seen, so the durable scope stays empty.
+      await encryptedKv.removeItem(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE, itemKey);
+      return;
+    }
     await evictOldestBeyondCap();
   } catch {
     // Best effort: a cache write failure never affects the transcript path.
   }
 }
+
+/**
+ * A scope clear that never rejects: it is raced against the sign-out bound, so
+ * a late rejection of the losing clear must not escape as an unhandled
+ * rejection. The clear keeps running past the bound; a late clear is harmless.
+ */
+async function clearScopeBestEffort(): Promise<void> {
+  try {
+    await encryptedKv.clearScope(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE);
+  } catch {
+    // Best effort: sign-out continues; the orphaned blob is re-fetched away.
+  }
+}
+
+/** Initial value before the promise executor installs the real resolver. */
+const noopVoidResolution = (): void => undefined;
 
 /**
  * Sign-out cleanup: drop the whole translation scope.
@@ -152,12 +200,23 @@ export async function writeToolSummaryTranslation(
  *
  * Best effort: a storage failure is swallowed so it can never abort sign-out.
  * A stale blob only costs a future cache hit; it is never a source of truth.
+ * The clear is also bounded ({@link
+ * TOOL_SUMMARY_TRANSLATION_SCOPE_CLEAR_TIMEOUT_MS}): a native clear that never
+ * answers resolves the caller after the bound instead of holding sign-out
+ * teardown.
  */
 export async function clearToolSummaryTranslationsForSignOut(): Promise<void> {
+  let resolveTimeout: () => void = noopVoidResolution;
+  const timeout = new Promise<'timeout'>(resolve => {
+    resolveTimeout = () => {
+      resolve('timeout');
+    };
+  });
+  const timeoutId = setTimeout(resolveTimeout, TOOL_SUMMARY_TRANSLATION_SCOPE_CLEAR_TIMEOUT_MS);
   try {
-    await encryptedKv.clearScope(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE);
-  } catch {
-    // Best effort: sign-out continues; the orphaned blob is re-fetched away.
+    await Promise.race([clearScopeBestEffort(), timeout]);
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

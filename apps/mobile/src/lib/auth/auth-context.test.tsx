@@ -1546,6 +1546,9 @@ describe('reactive auth epoch', () => {
       await transition.promise;
     });
     expect(scope.getAuthenticatedOwner().userId).toBeNull();
+    // A fresh sign-in is not a restore: the previous account's persisted hint
+    // must not scope local data while these credentials are unconfirmed.
+    expect(scope.getAuthenticatedOwner().restored).toBe(false);
     const requestedTokens: (string | undefined)[] = [];
     ownerProducer.getMe.mockImplementationOnce(async () => {
       requestedTokens.push(tokens.getActiveToken()?.token);
@@ -1574,6 +1577,9 @@ describe('reactive auth epoch', () => {
     onTestFinished(() => act(unmount));
     const scope: typeof ContextScopeModule = await import('../context-scope');
     expect(scope.getAuthenticatedOwner().userId).toBeNull();
+    // Credentials restored from storage on bootstrap: the persisted identity
+    // hint may scope local data until getMe answers.
+    expect(scope.getAuthenticatedOwner().restored).toBe(true);
 
     await act(async () => {
       await requestOwnerTicket();

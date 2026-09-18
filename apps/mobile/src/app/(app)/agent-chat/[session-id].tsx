@@ -141,12 +141,14 @@ export default function SessionDetailScreen() {
 
   // The account that owns this device's persisted transcript. The live
   // confirmation wins; the id restored from the encrypted read cache keeps the
-  // cached transcript readable when the account cannot be confirmed at all —
-  // the API unreachable on a cold start. That id is written only after an
+  // cached transcript readable only when the account cannot be confirmed at all
+  // — the API unreachable on a cold start. That id is written only after an
   // authoritative `user.getMe` for the current credentials, and the cold-start
   // restore is fenced on the auth epoch, so it can never scope another
-  // account's rows.
-  const restoredUserId = useRestoredAccountId(owner.authEpoch);
+  // account's rows. A fresh sign-in's credentials are not a restore: while they
+  // are still unconfirmed the persisted hint names the previous account, so the
+  // route must stay pending (`identityPending`) until `user.getMe` answers.
+  const restoredUserId = useRestoredAccountId(owner.authEpoch, owner.restored);
   const sessionScopeUserId = owner.userId ?? restoredUserId;
   const identityPending = sessionScopeUserId === null;
   const identityFailed = identityPending && confirmation.isError;

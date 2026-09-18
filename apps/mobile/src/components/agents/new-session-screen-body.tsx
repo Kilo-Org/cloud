@@ -51,6 +51,7 @@ import {
   resolveNewSessionStartDisabled,
 } from '@/lib/new-session-submit';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
+import { getRepoBindingsPath } from '@/lib/profile-agent-navigation';
 import {
   clearDraft,
   NEW_SESSION_DRAFT_KEY,
@@ -316,7 +317,8 @@ export function NewSessionScreenBody() {
     profilePickerSlot.set(UNFENCED_ROUTE_KEY, {
       organizationId,
       selectedOverrideProfileId: overrideProfileId,
-      // Repo bindings are not on the mobile tRPC surface yet.
+      // The server resolves a repo's bound profile at session creation; the
+      // picker base layer stays empty here.
       repoBindingProfileId: null,
       onSelect: id => {
         setOverrideProfileId(id);
@@ -324,6 +326,10 @@ export function NewSessionScreenBody() {
     });
     router.push('/(app)/agent-chat/profile-picker' as Href);
   }, [organizationId, overrideProfileId, router]);
+
+  const handleOpenRepoDefaults = useCallback(() => {
+    router.push(getRepoBindingsPath(organizationId));
+  }, [organizationId, router]);
 
   // Keep the inline selector and picker list in sync.
   const {
@@ -834,6 +840,7 @@ export function NewSessionScreenBody() {
         profileOverrideNeedsAttention={profileOverrideNeedsAttention}
         onRetryProfile={() => void refetchProfile()}
         onOpenProfilePicker={handleOpenProfilePicker}
+        onOpenRepoDefaults={handleOpenRepoDefaults}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}

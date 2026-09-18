@@ -109,8 +109,9 @@ export function useEffectiveAgentProfile(
     () =>
       resolveSessionProfilePicker({
         profiles: allProfiles,
-        // Repo bindings are not exposed to the mobile tRPC surface yet, so the
-        // base layer stays empty until that query lands.
+        // The server resolves a repo's bound profile from the submitted
+        // repository at session creation (profile-session-config), so the
+        // mobile picker shows only the default and override layers.
         repoBindingProfileId: null,
         effectiveDefaultProfileId: effectiveDefaultId,
         selectedOverrideProfileId: overrideProfileId ?? null,

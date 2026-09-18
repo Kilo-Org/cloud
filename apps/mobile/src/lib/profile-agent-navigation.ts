@@ -41,6 +41,11 @@ export function getProfilesPath(): Href {
   return '/(app)/(tabs)/(3_profile)/profiles' as Href;
 }
 
+/** The repo-to-profile default bindings screen. */
+export function getRepoBindingsPath(organizationId?: string): Href {
+  return `/(app)/(tabs)/(3_profile)/profiles/repo-bindings${profileContextQuery(organizationId)}` as Href;
+}
+
 /** The profile editor's Overview tab (the profile's own route). */
 export function getProfileOverviewPath(profileId: string, organizationId?: string): Href {
   return `/(app)/(tabs)/(3_profile)/profiles/${profileId}${profileContextQuery(organizationId)}` as Href;

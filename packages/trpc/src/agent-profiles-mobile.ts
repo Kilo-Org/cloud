@@ -39,4 +39,7 @@ export const agentProfilesMobileRouter = createTRPCRouter({
   deleteKiloCommand: agentProfilesRouter.deleteKiloCommand,
   setKiloCommandEnabled: agentProfilesRouter.setKiloCommandEnabled,
   reorderKiloCommands: agentProfilesRouter.reorderKiloCommands,
+  bindToRepo: agentProfilesRouter.bindToRepo,
+  unbindRepo: agentProfilesRouter.unbindRepo,
+  listRepoBindings: agentProfilesRouter.listRepoBindings,
 });

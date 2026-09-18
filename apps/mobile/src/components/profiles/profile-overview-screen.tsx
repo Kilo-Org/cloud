@@ -12,6 +12,7 @@ import {
   type OverviewSectionKey,
   overviewSectionRows,
 } from '@/components/profiles/profile-overview-model';
+import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-section';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -159,6 +160,14 @@ function ProfileOverviewSkeleton() {
         <Skeleton className="h-[44px] w-full rounded-md" />
       </View>
       <Skeleton className="h-16 w-full rounded-lg" />
+      <View className="gap-3 rounded-lg border border-border p-3">
+        <View className="flex-row items-center justify-between gap-2">
+          <Skeleton className="h-4 w-40 rounded" />
+          <Skeleton className="h-9 w-28 rounded-md" />
+        </View>
+        <Skeleton className="h-4 w-full rounded" />
+        <Skeleton className="h-9 w-full rounded-md" />
+      </View>
       <View className="gap-1">
         <Skeleton className="h-4 w-28 rounded" />
         <Skeleton className="h-[54px] w-full rounded-lg" />
@@ -276,6 +285,8 @@ export function ProfileOverviewScreen({
                 }
               }}
             />
+
+            <ProfileRepoPinsSection profileId={profileId} organizationId={organizationId} />
 
             <View className="gap-1">
               <Text variant="small" className="uppercase tracking-wide text-muted-foreground">

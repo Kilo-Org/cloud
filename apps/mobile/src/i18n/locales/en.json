@@ -356,6 +356,29 @@
       "nameInvalid": "Name must start with a lowercase letter and use only lowercase letters, digits, and dashes",
       "templateRequired": "Enter a command template",
       "nameConflict": "That name is reserved by a built-in command"
+    },
+    "repoBindings": {
+      "title": "Default Profiles for Repos",
+      "add": "Add default",
+      "empty": "No defaults configured",
+      "emptyDescription": "Add a default to automatically apply a profile when starting sessions for a repo.",
+      "repo": "Select repository\u2026",
+      "profile": "Select profile",
+      "remove": "Unbind",
+      "private": "Private",
+      "search": "Search repositories\u2026",
+      "addedToast": "Default profile set for \"{{repo}}\"",
+      "addFailed": "Couldn't set default profile",
+      "removedToast": "Default profile removed for \"{{repo}}\"",
+      "removeFailed": "Couldn't remove default profile",
+      "pinnedTitle": "Pinned to repositories",
+      "pinRepo": "Pin a repo",
+      "pinnedEmpty": "Not pinned to any repositories.",
+      "pinnedDescription": "Auto-loaded whenever a session targets one of these repositories.",
+      "pinnedToast": "Pinned to \"{{repo}}\"",
+      "pinFailed": "Couldn't pin repo",
+      "unboundToast": "Repo unbound",
+      "unbindFailed": "Couldn't unbind repo"
     }
   },
   "preferences": {

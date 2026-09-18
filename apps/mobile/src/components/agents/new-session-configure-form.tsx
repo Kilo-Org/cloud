@@ -108,6 +108,8 @@ type NewSessionConfigureFormProps = {
   onRetryProfile: () => void;
   /** Opens the profile picker sheet. */
   onOpenProfilePicker: () => void;
+  /** Opens the repo default-profile bindings screen from the advanced config. */
+  onOpenRepoDefaults?: () => void;
   // Commit choice (Cloud Agent only).
   autoCommit: boolean;
   onAutoCommitChange: (next: boolean) => void;
@@ -181,6 +183,7 @@ export function NewSessionConfigureForm({
   profileOverrideNeedsAttention,
   onRetryProfile,
   onOpenProfilePicker,
+  onOpenRepoDefaults,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
@@ -335,7 +338,11 @@ export function NewSessionConfigureForm({
         // the panel owns its own profile pick and manual config state.
       }
       {!isRemote && !isCloneEntry ? (
-        <AdvancedConfigPanel organizationId={organizationId} disabled={isStarting} />
+        <AdvancedConfigPanel
+          organizationId={organizationId}
+          disabled={isStarting}
+          onRepoDefaults={onOpenRepoDefaults}
+        />
       ) : null}
 
       {

@@ -14,3 +14,6 @@ export type AgentProfileListItem = RouterOutputs['agentProfiles']['list'][number
 
 export type AgentProfileListCombined = RouterOutputs['agentProfiles']['listCombined'];
 export type AgentProfileDetail = RouterOutputs['agentProfiles']['get'];
+
+/** One repo-to-profile binding as `listRepoBindings` returns it. */
+export type AgentRepoBinding = RouterOutputs['agentProfiles']['listRepoBindings'][number];

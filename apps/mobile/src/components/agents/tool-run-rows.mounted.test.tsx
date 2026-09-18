@@ -20,7 +20,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
 }));
-vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }));
 // The Flow-sourced react-native runtime cannot parse under vitest, so the icon
 // module is stubbed with sentinels; the row only reads the mappings.
 vi.mock('@/components/ui/icons', () => ({
@@ -32,6 +32,7 @@ vi.mock('@/components/ui/icons', () => ({
   FolderOpen: 'FolderOpen',
   Globe: 'Globe',
   ListTodo: 'ListTodo',
+  Loader2: 'Loader2',
   Pencil: 'Pencil',
   Plug: 'Plug',
   Rows3: 'Rows3',

@@ -22,15 +22,15 @@ vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => 
   requestToolSummaryTranslation: requestMock,
 }));
 
-vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }));
 vi.mock('react-native', () => ({
-  ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   View: 'View',
 }));
 vi.mock('@/components/ui/icons', () => ({
   ChevronRight: 'ChevronRight',
+  Loader2: 'Loader2',
   XCircle: 'XCircle',
   Eye: 'Eye',
 }));
@@ -99,11 +99,11 @@ describe('FixedPartRow mounted', () => {
     });
 
     expect(findHost(renderer.root, 'XCircle')).toHaveLength(1);
-    expect(findHost(renderer.root, 'ActivityIndicator')).toHaveLength(0);
+    expect(findHost(renderer.root, 'SpinningIcon')).toHaveLength(0);
     expect(findHost(renderer.root, 'Eye')).toHaveLength(0);
   });
 
-  it('renders an activity indicator for the running status', async () => {
+  it('renders the loading spinner for the running status', async () => {
     const renderer = await renderRow({
       icon: Eye,
       label: 'bash',
@@ -111,12 +111,12 @@ describe('FixedPartRow mounted', () => {
       accessibilityLabel: 'bash tool, running',
     });
 
-    expect(findHost(renderer.root, 'ActivityIndicator')).toHaveLength(1);
+    expect(findHost(renderer.root, 'SpinningIcon')).toHaveLength(1);
     expect(findHost(renderer.root, 'XCircle')).toHaveLength(0);
     expect(findHost(renderer.root, 'Eye')).toHaveLength(0);
   });
 
-  it('renders an activity indicator for the pending status', async () => {
+  it('renders the loading spinner for the pending status', async () => {
     const renderer = await renderRow({
       icon: Eye,
       label: 'bash',
@@ -124,7 +124,7 @@ describe('FixedPartRow mounted', () => {
       accessibilityLabel: 'bash tool, pending',
     });
 
-    expect(findHost(renderer.root, 'ActivityIndicator')).toHaveLength(1);
+    expect(findHost(renderer.root, 'SpinningIcon')).toHaveLength(1);
   });
 
   it('renders the completed icon when status is completed and an icon is provided', async () => {
@@ -136,7 +136,7 @@ describe('FixedPartRow mounted', () => {
     });
 
     expect(findHost(renderer.root, 'Eye')).toHaveLength(1);
-    expect(findHost(renderer.root, 'ActivityIndicator')).toHaveLength(0);
+    expect(findHost(renderer.root, 'SpinningIcon')).toHaveLength(0);
     expect(findHost(renderer.root, 'XCircle')).toHaveLength(0);
   });
 
@@ -149,9 +149,49 @@ describe('FixedPartRow mounted', () => {
 
     expect(findHost(renderer.root, 'Eye')).toHaveLength(0);
     expect(findHost(renderer.root, 'XCircle')).toHaveLength(0);
-    expect(findHost(renderer.root, 'ActivityIndicator')).toHaveLength(0);
+    expect(findHost(renderer.root, 'SpinningIcon')).toHaveLength(0);
     const labels = findHost(renderer.root, 'Text');
     expect(labels.some(node => node.props.children === 'app.ts')).toBe(true);
+  });
+
+  it('gives every status the same leading slot, so the row cannot grow while loading', async () => {
+    // Regression: the loading branch used `ActivityIndicator size="small"`
+    // (20dp) while the completed/error branches render 16dp icons. The row is
+    // a single `items-center` line, so on iOS — where the `text-sm` label's
+    // line box is under 20dp — the loading row was taller than the resolved
+    // one. Every status must occupy the same 16dp leading slot.
+    const running = await renderRow({
+      icon: Eye,
+      label: 'bash',
+      status: 'running',
+      accessibilityLabel: 'bash tool, running',
+    });
+    const pending = await renderRow({
+      icon: Eye,
+      label: 'bash',
+      status: 'pending',
+      accessibilityLabel: 'bash tool, pending',
+    });
+    const completed = await renderRow({
+      icon: Eye,
+      label: 'app.ts',
+      status: 'completed',
+      accessibilityLabel: 'app.ts tool, completed',
+    });
+    const error = await renderRow({
+      icon: Eye,
+      label: 'bash',
+      status: 'error',
+      accessibilityLabel: 'bash tool, error',
+    });
+
+    const leadingSizes = [
+      findHost(running.root, 'SpinningIcon')[0]?.props.size,
+      findHost(pending.root, 'SpinningIcon')[0]?.props.size,
+      findHost(completed.root, 'Eye')[0]?.props.size,
+      findHost(error.root, 'XCircle')[0]?.props.size,
+    ];
+    expect(leadingSizes).toEqual([16, 16, 16, 16]);
   });
 
   it('forwards a long press to the message-details handler through the context', async () => {
@@ -206,7 +246,7 @@ describe('FixedPartRow mounted', () => {
       accessibilityLabel: 'Thought',
     });
 
-    expect(findHost(renderer.root, 'ActivityIndicator')).toHaveLength(0);
+    expect(findHost(renderer.root, 'SpinningIcon')).toHaveLength(0);
     expect(findHost(renderer.root, 'XCircle')).toHaveLength(0);
     expect(findHost(renderer.root, 'Eye')).toHaveLength(0);
   });

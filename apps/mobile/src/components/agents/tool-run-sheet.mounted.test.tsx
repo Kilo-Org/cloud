@@ -43,7 +43,7 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
@@ -59,6 +59,7 @@ vi.mock('@/components/ui/icons', () => ({
   FolderOpen: 'FolderOpen',
   Globe: 'Globe',
   ListTodo: 'ListTodo',
+  Loader2: 'Loader2',
   Pencil: 'Pencil',
   Plug: 'Plug',
   Rows3: 'Rows3',

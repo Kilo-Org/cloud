@@ -1,7 +1,7 @@
-import { type LucideIcon, XCircle } from '@/components/ui/icons';
+import { Loader2, type LucideIcon, XCircle } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Pressable, View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { useTranslation } from 'react-i18next';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
@@ -12,6 +12,16 @@ import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-tra
 import { useIsToolSummaryRow } from './tool-summary-translation-scope';
 
 import { useMessageLongPress } from './message-long-press-context';
+
+/**
+ * The leading slot every status renders at. The loading spinner must occupy
+ * exactly the completed/error icon's box: the row is single-line and
+ * `items-center`, so a larger loading indicator (`ActivityIndicator`'s 20dp
+ * "small" size) makes the loading row taller than the resolved one on iOS,
+ * where the label's line box is under 20dp. Kept as one constant so the
+ * spinner and the icons can never drift apart again.
+ */
+const LEADING_ICON_SIZE = 16;
 
 type FixedPartRowProps = {
   /** Tool icon, shown in the completed slot. Never passed for reasoning rows. */
@@ -90,10 +100,14 @@ export function FixedPartRow({
         accessibilityState={{ disabled: !onPress }}
       >
         {status === 'pending' || status === 'running' ? (
-          <ActivityIndicator size="small" color={colors.mutedForeground} />
+          <SpinningIcon icon={Loader2} size={LEADING_ICON_SIZE} color={colors.mutedForeground} />
         ) : null}
-        {status === 'error' ? <XCircle size={16} color={colors.destructive} /> : null}
-        {status === 'completed' && Icon ? <Icon size={16} color={colors.mutedForeground} /> : null}
+        {status === 'error' ? (
+          <XCircle size={LEADING_ICON_SIZE} color={colors.destructive} />
+        ) : null}
+        {status === 'completed' && Icon ? (
+          <Icon size={LEADING_ICON_SIZE} color={colors.mutedForeground} />
+        ) : null}
 
         {/* Baseline, not center: the label is text-sm and the badge text-xs, so
             centering the line boxes drops the badge below the label. */}

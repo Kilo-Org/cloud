@@ -622,6 +622,38 @@ describe('UserConnectionDO', () => {
       expect(messages.every(message => message.data?.organizationBound === false)).toBe(true);
     });
 
+    it('delivers a question -> permission move inside the delivery window', async () => {
+      const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
+      clock.tick();
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      await flushAsync();
+      expect(messages).toHaveLength(1);
+      // No clock tick: still inside the delivery window. The Approve control
+      // gates nothing here except this window, so the move must not wait it out.
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'permission')]);
+      await flushAsync();
+      expect(messages.map(message => message.data)).toMatchObject([
+        { needsInput: 1, needsApproval: 0 },
+        { needsInput: 1, needsApproval: 1 },
+      ]);
+    });
+
+    it('defers a counts-only move inside the delivery window', async () => {
+      const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
+      clock.tick();
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await flushAsync();
+      expect(messages).toHaveLength(1);
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'idle')]);
+      await flushAsync();
+      // Deferred to the trailing alarm, not delivered on the spot.
+      expect(messages).toHaveLength(1);
+    });
+
     it('does not authorize a foreign-owned row from a real authenticated heartbeat', async () => {
       const { doInstance, mockCtx, messages } = setupGlanceableDelivery(['foreign']);
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');

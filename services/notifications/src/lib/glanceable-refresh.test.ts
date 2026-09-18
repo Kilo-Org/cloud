@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ExpoPushMessage } from './expo-push';
 import type { ActiveAgentsGlanceable, GlanceableDeliveryDeps } from './glanceable-delivery';
 import {
+  foldPendingGlanceableRefreshDeadline,
   flushDueGlanceableRefreshes,
   GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
   refreshGlanceableSnapshot,
@@ -207,6 +208,64 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     expect(h.expoSends).toHaveLength(2);
     expect(h.expoSends[1][0].data).toMatchObject({ running: 2, needsInput: 1, idle: 0 });
     expect(await h.storage.get(pendingKey('user-1', null))).toBeUndefined();
+  });
+
+  it('delivers an approval change inside the window instead of deferring it', async () => {
+    const h = makeHarness();
+    const base = Date.parse('2026-09-18T01:00:00.000Z');
+    let now = base;
+    const scope = { userId: 'user-approval', organizationId: null };
+
+    h.setNext(snapshot({ running: 1, needsInput: 0, needsApproval: 0 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+    expect(h.expoSends).toHaveLength(1);
+
+    // A question -> permission move keeps needsInput constant but gates the
+    // Approve control, which must not wait out the shared window.
+    now = base + 2_000;
+    h.setNext(snapshot({ running: 1, needsInput: 1, needsApproval: 1 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now, {
+      approvalChanged: true,
+    });
+
+    expect(h.builds).toBe(2);
+    expect(h.expoSends).toHaveLength(2);
+    expect(h.expoSends[1][0].data).toMatchObject({ needsInput: 1, needsApproval: 1 });
+    expect(await h.storage.get(pendingKey('user-approval', null))).toBeUndefined();
+    // The approval delivery still spends the window, so counts-only churn right
+    // after it defers instead of waking the device again.
+    expect(await h.storage.get(deliveryKey('user-approval', null))).toEqual({ deliveredAt: now });
+
+    now = base + 3_000;
+    h.setNext(snapshot({ running: 2, needsInput: 1, needsApproval: 1 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+    expect(h.builds).toBe(2);
+    expect(h.expoSends).toHaveLength(2);
+    expect(await h.storage.get(pendingKey('user-approval', null))).toMatchObject({
+      dueAt: base + 2_000 + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+    });
+  });
+
+  it('re-arms a trailing refresh whose build returns no snapshot', async () => {
+    const h = makeHarness();
+    const now = 70_000_000;
+    const key = pendingKey('user-null-build', null);
+    await h.storage.put(key, { userId: 'user-null-build', organizationId: null, dueAt: now - 1 });
+    // Production buildSnapshot returns null (it never throws) when the route or
+    // its credentials fail. Consuming the record here would drop the final
+    // counts with no alarm left to retry them.
+    h.setNext(null);
+
+    await expect(
+      flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now)
+    ).resolves.toBe(now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS);
+    expect(h.builds).toBe(1);
+    expect(h.expoSends).toHaveLength(0);
+    expect(await h.storage.get(key)).toEqual({
+      userId: 'user-null-build',
+      organizationId: null,
+      dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+    });
   });
 
   it('re-arms a stale past alarm so the trailing delivery is not stranded', async () => {
@@ -554,7 +613,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
 });
 
 describe('NotificationChannelDO alarm glanceable flush', () => {
-  it('consumes a due pending record and keeps the later deadline scheduled', async () => {
+  it('re-arms a due record whose build returns no snapshot and keeps the later deadline', async () => {
     const id = env.NOTIFICATION_CHANNEL_DO.idFromName('user-glanceable-alarm');
     const stub = env.NOTIFICATION_CHANNEL_DO.get(id);
     const now = Date.now();
@@ -579,15 +638,47 @@ describe('NotificationChannelDO alarm glanceable flush', () => {
     });
 
     const result = await runInDurableObject(stub, async (_instance, state) => ({
-      due: await state.storage.get('glanceable-pending:["user-glanceable-alarm",null]'),
+      due: await state.storage.get<{ dueAt: number }>(
+        'glanceable-pending:["user-glanceable-alarm",null]'
+      ),
       later: await state.storage.get<{ dueAt: number }>(
         'glanceable-pending:["user-glanceable-alarm","org-1"]'
       ),
       alarm: await state.storage.getAlarm(),
     }));
 
-    expect(result.due).toBeUndefined();
+    // The test env has no internal secret, so the trailing build returns null
+    // and the record re-arms for the next window instead of being dropped.
+    const rearmedDueAt = result.due?.dueAt ?? 0;
+    expect(result.due).toMatchObject({ userId: 'user-glanceable-alarm', organizationId: null });
+    expect(rearmedDueAt).toBeGreaterThan(now);
+    expect(rearmedDueAt).toBeLessThan(laterDueAt);
     expect(result.later).toMatchObject({ dueAt: laterDueAt });
-    expect(result.alarm).toBe(laterDueAt);
+    // The alarm takes the earliest remaining deadline.
+    expect(result.alarm).toBe(rearmedDueAt);
+  });
+
+  it('folds a deferral that lands after the sweep chose its alarm', async () => {
+    // The sweep picks the alarm from its idem/rl records, then awaits before it
+    // sets it. A pending refresh written in that window owns the earlier
+    // deadline and must win, or the trailing delivery is delayed.
+    const storage = new FakeStorage();
+    await storage.put(pendingKey('user-fold', null), {
+      userId: 'user-fold',
+      organizationId: null,
+      dueAt: 5_000,
+    });
+
+    await expect(foldPendingGlanceableRefreshDeadline(asStorage(storage), 9_000)).resolves.toBe(
+      5_000
+    );
+    // An earlier sweep candidate still wins over the pending deadline.
+    await expect(foldPendingGlanceableRefreshDeadline(asStorage(storage), 3_000)).resolves.toBe(
+      3_000
+    );
+    // A sweep with no other deadline adopts the pending one.
+    await expect(foldPendingGlanceableRefreshDeadline(asStorage(storage), undefined)).resolves.toBe(
+      5_000
+    );
   });
 });

@@ -49,15 +49,19 @@ export async function refreshGlanceableSnapshot(
   storage: DurableObjectStorage,
   deps: GlanceableDeliveryDeps,
   nowMs: () => number = Date.now,
-  options: { trailing?: boolean } = {}
+  options: { trailing?: boolean; approvalChanged?: boolean } = {}
 ): Promise<void> {
   const scope = scopeSchema.parse(params);
   const key = `glanceable:${JSON.stringify([scope.userId, scope.organizationId])}`;
   const deliveryKey = `${key}:delivery`;
   // Rate-limit the device wake per scope. A change inside the window is
   // deferred to the alarm rather than dropping it, so the final counts land.
+  // `needsApproval` is exempt: it gates the Approve control, which must appear
+  // and clear at once on the locked/background surfaces, exactly as the
+  // in-app publisher emits a question <-> permission move without waiting.
   const delivery = deliveryStateSchema.optional().parse(await storage.get(deliveryKey));
   if (
+    options.approvalChanged !== true &&
     delivery !== undefined &&
     nowMs() - delivery.deliveredAt < GLANCEABLE_DELIVERY_MIN_INTERVAL_MS
   ) {
@@ -104,7 +108,20 @@ export async function refreshGlanceableSnapshot(
 
   const snapshot = await deps.buildSnapshot(scope.userId, scope.organizationId);
   // Only the authoritative happy/empty result can change an eligible interval.
-  if (snapshot === null || (snapshot.status !== 'happy' && snapshot.status !== 'empty')) return;
+  if (snapshot === null || (snapshot.status !== 'happy' && snapshot.status !== 'empty')) {
+    // A trailing refresh owes the deferred change its final counts. Production
+    // `buildSnapshot` returns null (it never throws) when the route or its
+    // credentials fail, and the flush has already consumed the pending record,
+    // so re-arm the next window instead of dropping the change with no alarm.
+    if (options.trailing === true) {
+      await storage.put<PendingGlanceableRefresh>(pendingKey(scope), {
+        userId: scope.userId,
+        organizationId: scope.organizationId,
+        dueAt: nowMs() + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      });
+    }
+    return;
+  }
   // The shared wire schema accepts strings; validate the dates before delivery.
   snapshotTimestampsSchema.parse(snapshot);
 
@@ -239,7 +256,9 @@ export async function refreshGlanceableSnapshot(
  * A scope that throws must not abort the sweep or the DO's idem GC, so each
  * refresh is isolated. The pending record is consumed before the refresh runs:
  * a failed build keeps its last state and is retried by the next change, and a
- * record written while the sweep runs is caught by the second list.
+ * record written while the sweep runs is caught by the second list. A build
+ * that returns no snapshot re-arms itself (see `refreshGlanceableSnapshot`), so
+ * the deferred change is not dropped without a deadline.
  */
 export async function flushDueGlanceableRefreshes(
   storage: DurableObjectStorage,
@@ -267,12 +286,37 @@ export async function flushDueGlanceableRefreshes(
   }
 
   // Re-list so a record written during the sweep is not stranded.
+  return earliestPendingGlanceableRefresh(storage);
+}
+
+/**
+ * Earliest `dueAt` among the pending refreshes still stored, or null when none
+ * remains. The alarm sweep re-reads this after its awaits so a deferral that
+ * landed mid-sweep is not overwritten by the alarm it schedules.
+ */
+export async function earliestPendingGlanceableRefresh(
+  storage: DurableObjectStorage
+): Promise<number | null> {
   const remaining = await storage.list<PendingGlanceableRefresh>({ prefix: PENDING_PREFIX });
   let earliest: number | null = null;
   for (const [, record] of remaining) {
     if (earliest === null || record.dueAt < earliest) earliest = record.dueAt;
   }
   return earliest;
+}
+
+/**
+ * Fold the earliest pending glanceable deadline into the alarm the sweep chose.
+ * The sweep awaits between choosing `candidate` and setting it, so a deferral
+ * that landed in between must not be overwritten by the later `candidate`.
+ */
+export async function foldPendingGlanceableRefreshDeadline(
+  storage: DurableObjectStorage,
+  candidate: number | undefined
+): Promise<number | undefined> {
+  const pending = await earliestPendingGlanceableRefresh(storage);
+  if (pending === null) return candidate;
+  return candidate === undefined || pending < candidate ? pending : candidate;
 }
 
 /**

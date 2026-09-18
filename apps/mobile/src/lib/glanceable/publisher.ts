@@ -134,10 +134,14 @@ export class GlanceablePublisher {
     // Live Activity stale date all key off the published write: skipping the
     // renewal would falsely flag confirmed-current data as stale, while
     // publishing every heartbeat would rewrite the native surface every few
-    // seconds. So renew a local write only once the published frame approaches
-    // its stale window. Keep the revision monotonic for the next real emit, and
-    // leave any pending coalesced emit alone. The first eligible emit (nothing
-    // started yet) is exempt: it is what raises the surface.
+    // seconds. So renew only once the published frame approaches its stale
+    // window, and renew through `emit` rather than `publish`: the start/update
+    // call is what retries a Live Activity start the sink could not raise (a
+    // transient ActivityKit failure, or a start deferred behind a dismissal),
+    // and leaving it out of the renewal would strand that surface until the
+    // counts next changed. Keep the revision monotonic for the next real emit,
+    // and leave any pending coalesced emit alone. The first eligible emit
+    // (nothing started yet) is exempt: it is what raises the surface.
     if (
       this.current !== null &&
       hasSameGlanceableContent(
@@ -150,7 +154,7 @@ export class GlanceablePublisher {
         isEligibleGlanceableWork(snapshot) &&
         (this.lastPublishedAt === null || now - this.lastPublishedAt >= GLANCEABLE_RENEW_MARGIN_MS)
       ) {
-        this.publish(snapshot);
+        this.emit(snapshot, ctx);
       }
       this.current = snapshot;
       return;

@@ -250,8 +250,28 @@ describe('GlanceablePublisher', () => {
     expect(Date.parse(renewed.updatedAt)).toBeLessThan(
       Date.parse(first.updatedAt) + GLANCEABLE_STALE_MS
     );
-    // The renewal is a local write only; it must not restart or update the card.
+    // The renewal still carries a start/update so a failed or deferred Live
+    // Activity start is retried while the counts stay stable; it happens at the
+    // renewal margin, never on every heartbeat.
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+    expect(lastSnapshot(calls, 'startOrUpdate').running).toBe(1);
+    publisher.dispose();
+  });
+
+  it('retries the Live Activity start on an unchanged heartbeat past the renewal margin', () => {
+    // A start the sink could not raise (transient ActivityKit failure, or a
+    // start deferred behind a dismissal) must not be stranded: the renewal
+    // re-emits it while the visible counts are unchanged.
+    vi.useFakeTimers();
+    let now = NOW;
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now, coalesceMs: 1000 });
+    publisher.handleSessions([{ status: 'permission' }], PUB_CTX);
     expect(count(calls, 'startOrUpdate')).toBe(1);
+
+    now += GLANCEABLE_RENEW_MARGIN_MS;
+    publisher.handleSessions([{ status: 'permission' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(2);
     publisher.dispose();
   });
 
@@ -268,7 +288,9 @@ describe('GlanceablePublisher', () => {
       publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
     }
     expect(count(calls, 'publish')).toBe(2);
-    expect(count(calls, 'startOrUpdate')).toBe(1);
+    // The single renewal re-emits the start so a failed start is retried; the
+    // other 89 heartbeats write nothing.
+    expect(count(calls, 'startOrUpdate')).toBe(2);
     publisher.dispose();
   });
 

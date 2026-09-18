@@ -353,6 +353,13 @@ export function SessionDetailContent({
     }
     setResumeAnchor(incoming);
     publishedAnchorRef.current = incoming;
+    // A newer link supersedes the live position this screen was about to
+    // publish. Drop it: the publish effect's cleanup then clears its pending
+    // debounce timer, so the pre-link position can never fire afterwards and
+    // write itself back over the position the reader just navigated to. The
+    // list reports the new top once it lands the incoming anchor, re-arming the
+    // publish from the real viewport.
+    setAnchor(null);
   }, [resumeAt]);
   useEffect(() => {
     if (anchor === null || anchor === publishedAnchorRef.current) {

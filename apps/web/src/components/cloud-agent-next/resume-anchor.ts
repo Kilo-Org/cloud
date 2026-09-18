@@ -99,7 +99,9 @@ export type ResumeAttemptStep = 'scroll' | 'load-older' | 'follow-tail' | 'wait'
  * nothing by design — and a failed older page ends the attempt too: the resume
  * is one-shot, so waiting on that failure would never complete or give up. A
  * page still in flight (a retry of a failed one included) is not a failure and
- * is waited for — see the check order below.
+ * is waited for, and the page bound is only consulted once it has landed: the
+ * bound would otherwise abandon the last allowed page the moment it was
+ * requested — see the check order below.
  */
 export function planResumeAttempt({
   anchorRendered,
@@ -124,16 +126,20 @@ export function planResumeAttempt({
   if (anchorResolved) {
     return 'follow-tail';
   }
-  if (attempts >= maxOlderPages || !hasOlderMessages) {
-    return 'follow-tail';
-  }
-  // The in-flight check wins over the error check: a retry (the header's Retry
-  // CTA) starts a page load without clearing the last error, so both are set
-  // for the whole retry. The page it is fetching may hold the anchor, and
-  // giving up here would strand the open at the bottom even though the retry
-  // lands the anchor.
+  // The in-flight check wins over both give-up checks below. The caller counts
+  // an attempt when it *requests* a page, so at the bound the last allowed page
+  // is still in flight: the bound check must not abandon it before its result
+  // is inspected. Waiting also wins over the error check, because a retry (the
+  // header's Retry CTA) starts a page load without clearing the last error, so
+  // both are set for the whole retry. Either way the page may hold the anchor,
+  // and giving up here would strand the open at the bottom even though the page
+  // lands the anchor. The bound still ends the run on the next pass, once the
+  // page has landed and resolved nothing.
   if (isLoadingOlderMessages) {
     return 'wait';
+  }
+  if (attempts >= maxOlderPages || !hasOlderMessages) {
+    return 'follow-tail';
   }
   if (hasOlderMessagesError) {
     return 'follow-tail';

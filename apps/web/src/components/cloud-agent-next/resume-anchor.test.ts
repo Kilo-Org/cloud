@@ -165,6 +165,16 @@ describe('planResumeAttempt', () => {
     expect(planResumeAttempt({ ...base, isLoadingOlderMessages: true })).toBe('wait');
   });
 
+  it('waits for the last allowed page instead of abandoning it at the bound', () => {
+    // The caller counts the attempt when it requests the page, so the 8th page
+    // arrives here as `attempts: 8` while still in flight. The bound must not
+    // return early: this page may hold the anchor, and the run is one-shot, so
+    // giving up now would strand the open at the bottom.
+    expect(planResumeAttempt({ ...base, attempts: 8, isLoadingOlderMessages: true })).toBe('wait');
+    // Once it lands and resolves nothing, the bound ends the run as before.
+    expect(planResumeAttempt({ ...base, attempts: 8 })).toBe('follow-tail');
+  });
+
   it('keeps waiting when a retry of the failed page is in flight', () => {
     // The header's Retry CTA starts a new page load without clearing the last
     // error, so both flags are set for the whole retry. The in-flight check

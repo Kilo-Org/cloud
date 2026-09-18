@@ -670,6 +670,22 @@ describe('SessionDetailScreen valid session-id', () => {
     const renderer = await mountRoute();
     expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'resumeAt')).toBeNull();
   });
+
+  it('keeps the route anchor on the loading header Copy-link action', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', at: 'msg_42' });
+    queryState.data = null;
+    queryState.isPending = true;
+    const renderer = await mountRoute();
+
+    // The transcript has not loaded, so the skeleton header is mounted...
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    // ...and its Copy-link action must copy the position the route already
+    // holds, not an anchor-less session link.
+    const copyActions = renderer.root.findByType(ScreenHeader).findAllByType(SessionCopyLinkAction);
+    expect(copyActions).toHaveLength(1);
+    expect(propOf(copyActions[0], 'anchorMessageId')).toBe('msg_42');
+  });
 });
 
 // The session header's Copy-link action copies the same universal link the OS
@@ -693,7 +709,13 @@ describe('SessionDetailScreen copy link action', () => {
     if (!ref.current) {
       throw new Error('copy action did not render');
     }
-    return ref.current;
+    const renderer = ref.current;
+    onTestFinished(() => {
+      act(() => {
+        renderer.unmount();
+      });
+    });
+    return renderer;
   }
 
   function copyControl(renderer: TestRenderer.ReactTestRenderer) {

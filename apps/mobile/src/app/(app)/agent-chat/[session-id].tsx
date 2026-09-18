@@ -156,8 +156,9 @@ export default function SessionDetailScreen() {
     // the query resolves. Route title hints are not bound to an account.
     // The right cluster reserves the loaded header's Copy-link action too, so
     // the 44pt control appearing at the swap cannot narrow and re-wrap the
-    // title. The route already knows `sessionId`, so the session-top link is
-    // copyable while the transcript loads; there is no anchor yet.
+    // title. The route already holds the `?at=` anchor, so copying the link
+    // while the transcript loads keeps the same position the loaded header
+    // falls back to; with no usable anchor it copies the session-top link.
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
@@ -172,7 +173,7 @@ export default function SessionDetailScreen() {
                 hasMessages={false}
                 loading
               />
-              <SessionCopyLinkAction sessionId={sessionId} anchorMessageId={null} />
+              <SessionCopyLinkAction sessionId={sessionId} anchorMessageId={resumeAt} />
             </View>
           }
         />

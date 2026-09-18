@@ -2313,6 +2313,33 @@ describe('SessionDetailContent resume link', () => {
     expect(resumeAnchorOf(view)).toBe('msg-b');
   });
 
+  it('cancels a pending position publish when a newer resume link is adopted', async () => {
+    routerSetParams.mockClear();
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {
+      resumeAt: 'msg-a',
+    });
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    const onAnchorChange = (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange;
+    // The viewport moves, arming the debounced publish...
+    act(() => {
+      onAnchorChange?.('msg-c');
+    });
+    // ...and a resume link lands before the debounce fires.
+    await view.updateResumeAt('msg-b');
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+
+    expect(resumeAnchorOf(view)).toBe('msg-b');
+    // The pre-link position must not overwrite the link's position on the route.
+    expect(routerSetParams).not.toHaveBeenCalledWith({ at: 'msg-c' });
+  });
+
   it('keeps the current position when the route echoes the anchor this screen published', async () => {
     routerSetParams.mockClear();
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {

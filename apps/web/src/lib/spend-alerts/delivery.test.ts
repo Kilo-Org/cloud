@@ -97,6 +97,29 @@ function databaseFailingOn(fragment: string): typeof db {
   }) as typeof db;
 }
 
+/** A database whose `execute` rejects the first `times` statements containing `fragment`. */
+function databaseFailingOnFirst(fragment: string, times: number): typeof db {
+  let remaining = times;
+  return new Proxy(db, {
+    get(target, prop, receiver) {
+      if (prop === 'execute') {
+        return (query: unknown, ...args: unknown[]) => {
+          if (remaining > 0 && sqlText(query).includes(fragment)) {
+            remaining -= 1;
+            return Promise.reject(new Error('database unavailable'));
+          }
+          const execute = Reflect.get(target, prop, receiver) as (...a: unknown[]) => unknown;
+          return Reflect.apply(execute, target, [query, ...args]);
+        };
+      }
+      const value = Reflect.get(target, prop, receiver);
+      return typeof value === 'function'
+        ? (value as (...a: unknown[]) => unknown).bind(target)
+        : value;
+    },
+  }) as typeof db;
+}
+
 function sqlText(value: unknown): string {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.map(sqlText).join('');
@@ -213,6 +236,64 @@ describe('drainPendingSpendAlertDeliveries', () => {
     expect(after?.status).toBe('pending');
     expect(after?.last_error_redacted).toBe('spend_alert_email_delivery_failed');
     expect(after?.recipients).toEqual({ userIds: [], emails: ['b@example.com'] });
+  });
+
+  it('does not requeue a row with recipients it already reached when the narrowing write fails', async () => {
+    const id = await insertDelivery({
+      channel: 'email',
+      recipients: { userIds: [], emails: ['a@example.com', 'b@example.com'] },
+    });
+    const sends: EmailInput[] = [];
+    const { deps } = recordingDeps({
+      sendEmail: async input => {
+        sends.push(input);
+        return { delivered: ['a@example.com'], retryable: ['b@example.com'], undeliverable: [] };
+      },
+    });
+    // The write that narrows the row to the recipients the attempt did not reach
+    // fails; a@example.com already received the alert.
+    const flakyDb = databaseFailingOn('jsonb_set');
+
+    const summary = await drainPendingSpendAlertDeliveries(flakyDb, deps, { limit: 10 });
+
+    expect(summary.delivered).toBe(0);
+    expect(summary.failed).toContainEqual({
+      deliveryId: id,
+      channel: 'email',
+      error: 'spend_alert_email_delivery_failed',
+    });
+
+    // The row must not stay pending with the full recipient list: a later drain
+    // would email a@example.com the same alert a second time.
+    const after = await readDelivery(id);
+    expect(after?.status).toBe('failed');
+    expect(after?.last_error_redacted).toBe('spend_alert_delivery_narrow_failed');
+
+    await drainPendingSpendAlertDeliveries(db, deps, { limit: 10 });
+    expect(sends.filter(input => input.scopeId === OWNER_USER_ID)).toHaveLength(1);
+  });
+
+  it('retries the narrowing write so a transient failure still narrows the retry', async () => {
+    const id = await insertDelivery({
+      channel: 'email',
+      recipients: { userIds: [], emails: ['a@example.com', 'b@example.com'] },
+    });
+    const sends: EmailInput[] = [];
+    const { deps } = recordingDeps({
+      sendEmail: async input => {
+        sends.push(input);
+        return { delivered: ['a@example.com'], retryable: ['b@example.com'], undeliverable: [] };
+      },
+    });
+    // The narrowing+reschedule write fails once, then succeeds.
+    const flakyDb = databaseFailingOnFirst('jsonb_set', 1);
+
+    await drainPendingSpendAlertDeliveries(flakyDb, deps, { limit: 10 });
+
+    const after = await readDelivery(id);
+    expect(after?.status).toBe('pending');
+    expect(after?.recipients).toEqual({ userIds: [], emails: ['b@example.com'] });
+    expect(sends.filter(input => input.scopeId === OWNER_USER_ID)).toHaveLength(1);
   });
 
   it('does not retry a permanently rejected recipient', async () => {

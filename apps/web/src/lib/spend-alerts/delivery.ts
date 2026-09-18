@@ -36,6 +36,9 @@ const DELIVERY_CLAIM_LEASE_MINUTES = 5;
 /** Retry backoff cap, in minutes. Mirrors the usage rollup repair drain. */
 const DELIVERY_MAX_BACKOFF_MINUTES = 60;
 
+/** Bounded retries of the narrowing+reschedule write; never a re-send. */
+const DELIVERY_NARROW_ATTEMPTS = 3;
+
 /** Human label for a rule kind in the email body and the push copy. */
 const KIND_LABELS: Record<SpendAlertRuleKind, string> = {
   threshold: 'Spend threshold',
@@ -254,19 +257,28 @@ async function markSpendAlertDeliverySent(
 
 /**
  * Returns a claimed row to the pending queue with a backoff keyed to its
- * attempt count, keeping the row for retry. Paired with the claim's
+ * attempt count, keeping the row for retry. When `remainingEmails` is given the
+ * same statement narrows the row to the addresses the failed attempt did not
+ * reach, so a bookkeeping failure cannot leave the row claimable with the
+ * recipients this attempt already delivered to. Paired with the claim's
  * `attempt_count` predicate for the same fencing guarantee as
  * {@link markSpendAlertDeliverySent}.
  */
 async function rescheduleSpendAlertDelivery(
   database: Db,
   row: ClaimedSpendAlertDelivery,
-  error: string
+  error: string,
+  remainingEmails?: string[]
 ): Promise<void> {
+  const narrowRecipients =
+    remainingEmails === undefined
+      ? sql``
+      : sql`, recipients = jsonb_set(COALESCE(recipients, '{}'::jsonb), '{emails}', ${JSON.stringify(remainingEmails)}::jsonb, true)`;
   await database.execute(sql`
     UPDATE spend_alert_deliveries
     SET
-      status = 'pending',
+      status = 'pending'
+      ${narrowRecipients},
       next_attempt_at = CURRENT_TIMESTAMP
         + make_interval(mins => LEAST(${DELIVERY_MAX_BACKOFF_MINUTES}, 5 * attempt_count)),
       last_error_redacted = ${safeDeliveryErrorCode(error, row.channel)},
@@ -301,25 +313,33 @@ async function markSpendAlertDeliveryFailed(
 }
 
 /**
- * Replaces a retryable row's email recipients with the addresses the failed
- * attempt did not reach, so the retry does not re-email a recipient who already
- * received the alert. The `attempt_count` fence keeps another drain's row
- * untouched.
+ * Reschedules a retryable email row, narrowing it in the same write to the
+ * addresses the failed attempt did not reach. The write is retried a bounded
+ * number of times: returning the row to the queue without the narrowing would
+ * email the recipients who already received the alert. If the narrowing cannot
+ * be recorded at all the row is made terminal, so the alert is at-most-once
+ * rather than re-sent to a recipient this attempt already reached.
  */
-async function narrowSpendAlertDeliveryEmailRecipients(
+async function rescheduleRetryableSpendAlertDelivery(
   database: Db,
   row: ClaimedSpendAlertDelivery,
-  emails: string[]
+  error: string,
+  remainingEmails: string[]
 ): Promise<void> {
-  await database.execute(sql`
-    UPDATE spend_alert_deliveries
-    SET
-      recipients = jsonb_set(COALESCE(recipients, '{}'::jsonb), '{emails}', ${JSON.stringify(emails)}::jsonb, true),
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ${row.id}::uuid
-      AND status = 'pending'
-      AND attempt_count = ${row.attempt_count}
-  `);
+  for (let attempt = 0; attempt < DELIVERY_NARROW_ATTEMPTS; attempt++) {
+    try {
+      await rescheduleSpendAlertDelivery(database, row, error, remainingEmails);
+      return;
+    } catch {
+      // Retry the write; a plain reschedule would keep the full recipient list.
+    }
+  }
+  try {
+    await markSpendAlertDeliveryFailed(database, row, 'spend_alert_delivery_narrow_failed');
+  } catch {
+    // No write can record the outcome while the database rejects updates. The
+    // row stays leased, and the run is reported as failed.
+  }
 }
 
 /**
@@ -471,11 +491,13 @@ export async function drainPendingSpendAlertDeliveries(
         continue;
       }
       if (error instanceof SpendAlertDeliveryRetryableError && error.remainingEmails) {
-        // Keep only the addresses this attempt did not reach, so the retry does
-        // not email the recipients who already received the alert.
-        await narrowSpendAlertDeliveryEmailRecipients(database, row, error.remainingEmails);
+        // Narrow the row to the addresses this attempt did not reach and
+        // reschedule it in one write, so a bookkeeping failure cannot return the
+        // row to the queue with the recipients who already received the alert.
+        await rescheduleRetryableSpendAlertDelivery(database, row, message, error.remainingEmails);
+      } else {
+        await rescheduleSpendAlertDelivery(database, row, message);
       }
-      await rescheduleSpendAlertDelivery(database, row, message);
       summary.failed.push({
         deliveryId: row.id,
         channel: row.channel,

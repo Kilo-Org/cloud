@@ -134,6 +134,10 @@ jest.mock('@/lib/ai-gateway/byok', () => {
   };
 });
 
+jest.mock('@/lib/ai-gateway/openai-chatgpt/routing', () => ({
+  tagOpenAiChatGptByokModels: jest.fn(async (_userId: string, models: unknown[]) => models),
+}));
+
 jest.mock('@/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getBenchmarkRoutingTable: jest.fn(async () => ({ status: 200, body: { table: null } })),
 }));

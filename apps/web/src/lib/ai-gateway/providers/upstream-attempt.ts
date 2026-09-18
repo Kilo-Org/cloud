@@ -1,7 +1,6 @@
 import type { NextResponse } from 'next/server';
 
 import { getToolsAvailable, getToolsUsed } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { sleepForRulesEngineAction } from '@/lib/ai-gateway/abuse-service';
 import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GetProviderProviderResult } from '@/lib/ai-gateway/providers/get-provider';
 import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-models-cache';
@@ -19,7 +18,6 @@ type SendUpstreamAttemptInput = {
   organizationId: string | null;
   sessionId: string | null;
   taskId: string | null;
-  delayMs: number;
   search: string;
   method: string;
   signal?: AbortSignal;
@@ -46,7 +44,6 @@ export async function sendUpstreamAttempt({
   organizationId,
   sessionId,
   taskId,
-  delayMs,
   search,
   method,
   signal,
@@ -71,10 +68,6 @@ export async function sendUpstreamAttempt({
     if (!transformedModel || !(await isValidOpenRouterModelId(transformedModel))) {
       return { type: 'invalid-openrouter-model' };
     }
-  }
-
-  if (delayMs > 0) {
-    await sleepForRulesEngineAction(delayMs);
   }
 
   const result = await upstreamRequest({

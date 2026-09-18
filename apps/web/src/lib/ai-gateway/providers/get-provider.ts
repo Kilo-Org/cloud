@@ -42,6 +42,10 @@ export type GetProviderProviderResult = {
    *  by direct-byok and custom_llm2 because both already require explicit
    *  admin opt-in. */
   bypassAccessCheck: boolean;
+  /** Skip only the zero-balance paid-model block. Set when a user credential
+   *  outside Kilo credits pays for the request, such as the ChatGPT
+   *  subscription, while abuse and organization policy checks still apply. */
+  skipBalanceCheck?: boolean;
 };
 
 export type GetProviderResult =

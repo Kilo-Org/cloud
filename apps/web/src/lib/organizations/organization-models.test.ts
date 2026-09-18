@@ -33,6 +33,7 @@ const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) =>
 const mockAvailability = jest.fn(async (models: OpenRouterModel[], _providers: string[]) =>
   models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
 );
+const mockTagChatGpt = jest.fn(async (_userId: string, models: OpenRouterModel[]) => models);
 
 jest.mock('@/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {
@@ -71,6 +72,9 @@ jest.mock('@/lib/organizations/organization-auto-model', () => ({
 jest.mock('@/lib/ai-gateway/byok', () => ({
   addUserByokAvailability: mockAvailability,
   getOrganizationByokProviderIds: mockProviderIds,
+}));
+jest.mock('@/lib/ai-gateway/openai-chatgpt/routing', () => ({
+  tagOpenAiChatGptByokModels: mockTagChatGpt,
 }));
 
 const checkedAt = '2026-09-01T00:00:00.000Z';
@@ -191,6 +195,7 @@ beforeEach(async () => {
   mockCustom
     .mockReset()
     .mockResolvedValue([catalogModel('kilo-internal/private', { mayTrainOnYourPrompts: true })]);
+  mockTagChatGpt.mockReset().mockImplementation(async (_userId, models) => models);
   [producer, cache, enkrypt] = await Promise.all([
     import('./organization-models'),
     import('@/lib/model-stats/model-stats-cache'),
@@ -388,5 +393,26 @@ describe('organization model producer publication', () => {
       freshness: 'stale',
     });
     expect(mockReadRows).toHaveBeenCalledTimes(2);
+  });
+
+  it('tags ChatGPT-served models for a member and skips the default-access subject', async () => {
+    mockTagChatGpt.mockImplementation(async (_userId: string, models: OpenRouterModel[]) =>
+      models.map(model =>
+        model.id === 'provider/training' ? { ...model, hasUserByokAvailable: true } : model
+      )
+    );
+
+    const memberResult = await resultFor();
+    expect(mockTagChatGpt).toHaveBeenCalledWith('fixture-user', expect.any(Array));
+    expect(
+      memberResult.data.find(model => model.id === 'provider/training')?.hasUserByokAvailable
+    ).toBe(true);
+
+    mockTagChatGpt.mockClear();
+    const defaultResult = await resultFor({ type: 'defaultAccess' });
+    expect(mockTagChatGpt).not.toHaveBeenCalled();
+    expect(
+      defaultResult.data.find(model => model.id === 'provider/training')?.hasUserByokAvailable
+    ).toBe(false);
   });
 });

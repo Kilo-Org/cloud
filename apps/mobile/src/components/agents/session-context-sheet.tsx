@@ -41,6 +41,7 @@ import {
 import { friendlyModelName, resolveModelProviderName } from './session-model-display';
 import { SessionPageSheet } from './session-page-sheet';
 import { copySessionId } from './session-row-actions';
+import { type SessionConnectionDisplay } from './session-connection-indicator-state';
 
 type SessionContextSheetProps = {
   visible: boolean;
@@ -58,6 +59,8 @@ type SessionContextSheetProps = {
   onClose: () => void;
   autoApproveState: SessionAutoApproveState;
   onAutoApproveChange: (enabled: boolean) => void;
+  connectionDisplay: SessionConnectionDisplay;
+  onRetryConnection: () => void;
 };
 
 const SHEET_RING_SIZE = 96;
@@ -104,6 +107,8 @@ export function SessionContextSheet({
   onClose,
   autoApproveState,
   onAutoApproveChange,
+  connectionDisplay,
+  onRetryConnection,
 }: Readonly<SessionContextSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
@@ -123,6 +128,14 @@ export function SessionContextSheet({
     };
   }, [visible]);
   const copyStatus = copyStatusLabel(copyState, t);
+  let connectionLabel = t('agentChat.sessionConnection.connecting');
+  if (connectionDisplay === 'connected') {
+    connectionLabel = t('common.connected');
+  } else if (connectionDisplay === 'lost') {
+    connectionLabel = t('agentChat.sessionConnection.connectionLost');
+  } else if (connectionDisplay === 'reconnecting') {
+    connectionLabel = t('agentChat.sessionConnection.reconnecting');
+  }
   const content = getContextSheetContent(info, totalCostMicrodollars);
   const tone = getContextTone(info?.percentage);
   const arcFraction = getArcFraction(info?.percentage);
@@ -154,6 +167,32 @@ export function SessionContextSheet({
           visible while the context details scroll. */}
       <View className="px-6 pb-2 pt-2">
         <SessionAutoApproveRow state={autoApproveState} onValueChange={onAutoApproveChange} />
+      </View>
+
+      {/* Always-visible, outside the ScrollView so the connection reading stays
+          on screen while the details scroll. */}
+      <View
+        className="flex-row items-center justify-between gap-3 px-6 pb-2 pt-1"
+        testID="session-context-sheet-connection"
+      >
+        <Text className="text-xs uppercase tracking-wide text-muted-foreground">
+          {t('agentChat.sessionConnection.label')}
+        </Text>
+        <View className="flex-row items-center gap-2">
+          <Text className="text-sm font-medium text-foreground">{connectionLabel}</Text>
+          {connectionDisplay === 'lost' ? (
+            <Pressable
+              onPress={onRetryConnection}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
+              className="active:opacity-70"
+              testID="session-context-sheet-connection-retry"
+            >
+              <Text className="text-sm font-medium text-primary">{t('common.retry')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       {/* Rows below are exposed individually to screen readers; collapsing

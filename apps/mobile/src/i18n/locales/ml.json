@@ -480,6 +480,8 @@
       "replyBadRequest": "ഈ മറുപടി പോസ്റ്റ് ചെയ്യാൻ കഴിയില്ല. ത്രെഡ് മാറിയിരിക്കാം.",
       "replyForbidden": "ഈ പുൾ റിക്വസ്റ്റിന് മറുപടി നൽകാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
       "addCommentCta": "ഈ പുൾ റിക്വസ്റ്റിൽ അഭിപ്രായം രേഖപ്പെടുത്തുക",
+      "fixWithKilo": "Kilo ഉപയോഗിച്ച് പരിഹരിക്കുക",
+      "fixWithKiloPrompt": "ദയവായി താഴെയുള്ള പുൾ റിക്വസ്റ്റ് അഭിപ്രായം പരിഹരിക്കുക: {{link}}",
       "commentBadRequest": "ഈ അഭിപ്രായം പോസ്റ്റ് ചെയ്യാൻ കഴിയില്ല. പുൾ റിക്വസ്റ്റ് മാറിയിരിക്കാം.",
       "commentForbidden": "ഈ പുൾ റിക്വസ്റ്റിൽ അഭിപ്രായം രേഖപ്പെടുത്താൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} പൂർത്തിയായിട്ടില്ല",
       "skipped": "{{displayCount}} ഒഴിവാക്കി",
       "checksCount": "{{displayCount}} പരിശോധനകൾ",
+      "checksCount_one": "{{displayCount}} പരിശോധന",
+      "checksCount_other": "{{displayCount}} പരിശോധനകൾ",
       "checkDetails": "പരിശോധനയുടെ വിശദാംശങ്ങൾ"
     },
     "inbox": {
@@ -2077,6 +2081,7 @@
       "exitNeedsNewerCli": "വിദൂര സ്ലാഷ് കമാൻഡുകൾക്ക് Kilo CLI-യുടെ പുതിയ പതിപ്പ് ആവശ്യമാണ്. Kilo CLI അപ്ഡേറ്റ് ചെയ്ത് വീണ്ടും കണക്റ്റ് ചെയ്യുക."
     },
     "sessionConnection": {
+      "label": "കണക്ഷൻ",
       "connecting": "കണക്റ്റ് ചെയ്യുന്നു…",
       "reconnecting": "വീണ്ടും കണക്റ്റ് ചെയ്യുന്നു…",
       "connectionLost": "കണക്ഷൻ നഷ്ടപ്പെട്ടു",
@@ -2096,7 +2101,9 @@
       "removeConfirmTitle": "ലക്ഷ്യം നീക്കണോ?",
       "removeConfirmMessage": "ഈ സെഷന്റെ ലക്ഷ്യം CLI മായ്ക്കുന്നു.",
       "updateFailed": "ലക്ഷ്യം അപ്ഡേറ്റ് ചെയ്യാനായില്ല.",
-      "sectionAccessibility": "{{status}}. ലക്ഷ്യം: {{text}}"
+      "sectionAccessibility": "{{status}}. ലക്ഷ്യം: {{text}}",
+      "collapse": "ലക്ഷ്യം ചുരുക്കുക",
+      "expand": "ലക്ഷ്യം വിരിക്കുക"
     },
     "newSession": {
       "recentlyUsed": "അടുത്തിടെ ഉപയോഗിച്ചവ",
@@ -2150,7 +2157,20 @@
       "continueFrom": "{{title}} തുടരുന്നു.",
       "importingSession": "സെഷൻ ഇംപോർട്ട് ചെയ്യുന്നു",
       "cliCannotContinue": "ഈ CLI-യ്ക്ക് ഒരു സെഷൻ തുടരാൻ കഴിയില്ല. Cloud Agent അല്ലെങ്കിൽ മറ്റൊരു CLI തിരഞ്ഞെടുക്കുക.",
-      "importFailed": "ഈ സെഷൻ ഇംപോർട്ട് ചെയ്യാൻ കഴിഞ്ഞില്ല."
+      "importFailed": "ഈ സെഷൻ ഇംപോർട്ട് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
+      "sandbox": "സാൻഡ്ബോക്സ്",
+      "sandboxAccessibility": "സാൻഡ്ബോക്സ്: {{label}}",
+      "sandboxDefaultWithDestination": "ഡീഫോൾട്ട് · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "ചെറുത്",
+      "sandboxInstanceShared": "പങ്കിട്ടത്",
+      "sandboxInstanceLarge": "വലുത്",
+      "sandboxInstanceDevcontainer": "ഡെവ് കണ്ടെയ്നർ",
+      "sandboxInstanceProviderDefault": "പ്രോവൈഡറുടെ ഡീഫോൾട്ട്",
+      "sandboxCouldNotLoad": "സാൻഡ്ബോക്സ് ഓപ്ഷനുകൾ ലോഡ് ചെയ്യാനായില്ല",
+      "sandboxUnavailable": "ഈ സാൻഡ്ബോക്സ് ലഭ്യമല്ല. മറ്റൊരു സാൻഡ്ബോക്സ് അല്ലെങ്കിൽ ഡീഫോൾട്ട് തിരഞ്ഞെടുക്കുക.",
+      "sandboxUseDefault": "ഡീഫോൾട്ട് ഉപയോഗിക്കുക"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ഫയൽ അപ്ഡേറ്റ് ചെയ്തു.",
@@ -2516,6 +2536,12 @@
       "startNewSession": "ഒരു പുതിയ സെഷൻ ആരംഭിക്കുക",
       "exitSession": "സെഷനിൽ നിന്ന് പുറത്തുകടക്കുക",
       "clearSession": "ഈ സെഷൻ അവസാനിപ്പിച്ച് പുതിയൊന്ന് ആരംഭിക്കുക",
+      "compactDescription": "നിലവിലെ സെഷന്റെ സന്ദർഭം ചുരുക്കുക",
+      "goalDescription": "സെഷൻ ലക്ഷ്യത്തിലേക്ക് പ്രവർത്തനം തുടരുക. /goal <objective> അല്ലെങ്കിൽ pause, resume, clear",
+      "initDescription": "നിർദ്ദേശിത AGENTS.md സജ്ജീകരണം",
+      "resumeClaudeDescription": "Claude Code സെഷന്റെ ട്രാൻസ്ക്രിപ്റ്റ് ഇറക്കുമതി ചെയ്യുക",
+      "resumeCodexDescription": "OpenAI Codex സെഷന്റെ ട്രാൻസ്ക്രിപ്റ്റ് ഇറക്കുമതി ചെയ്യുക",
+      "reviewDescription": "മാറ്റങ്ങൾ അവലോകനം ചെയ്യുക [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ഉപയോഗിക്കുക",
       "insert": "ചേർക്കുക",
       "upgradeRequiredFallback": "ഈ കമാൻഡ് ഉപയോഗിക്കാൻ നിങ്ങളുടെ CLI അപ്ഗ്രേഡ് ചെയ്യുക.",
@@ -2633,6 +2659,7 @@
     "couldNotLoadActiveSessions": "സജീവ സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
     "agentSessions": "ഇപ്പോൾ പ്രവർത്തിക്കുന്നവ",
     "newCodingTask": "പുതിയ കോഡിംഗ് ജോലി",
+    "newTaskFromPicture": "ചിത്രത്തിൽ നിന്ന് പുതിയ ജോലി",
     "explore": "കൂടുതൽ സൗകര്യങ്ങൾ",
     "seeAll": "എല്ലാം കാണുക",
     "noLiveSessions": "ഇപ്പോൾ ഒന്നും പ്രവർത്തിക്കുന്നില്ല"
@@ -2854,7 +2881,8 @@
     "aiProvidersWhat": "നിങ്ങളുടെ പ്രോംപ്റ്റുകൾ, സംഭാഷണ ചരിത്രം, നിങ്ങൾ അറ്റാച്ച് ചെയ്യുന്ന ഫയലുകൾ.",
     "aiProvidersWhy": "AI മറുപടികൾ സൃഷ്ടിക്കാൻ.",
     "aiProvidersWho": "ഓരോ അഭ്യർത്ഥനയ്ക്കും നിങ്ങൾ തിരഞ്ഞെടുക്കുന്ന Anthropic, OpenAI, Google തുടങ്ങിയ ദാതാക്കൾ.",
-    "gatewayWhat": "അക്കൗണ്ട് ID, അഭ്യർത്ഥന മെറ്റാഡാറ്റ, ടോക്കൺ ഉപയോഗം.",
+    "gatewayWhat": "അക്കൗണ്ട് ID, അഭ്യർത്ഥന മെറ്റാഡാറ്റ, ടോക്കൺ ഉപയോഗം, കൂടാതെ ആപ്പ് ഇതിലൂടെ അയയ്ക്കുന്ന പ്രോംപ്റ്റുകളും വോയ്സ് റെക്കോർഡിംഗുകളും.",
+    "viaGateway": "Kilo Gateway വഴി",
     "gatewayWhy": "തിരിച്ചറിയൽ സ്ഥിരീകരിക്കൽ, അഭ്യർത്ഥനകൾ അനുയോജ്യമായ ദാതാവിലേക്ക് അയയ്ക്കൽ, ബില്ലിംഗ് കണക്കുകൾ ഒത്തുനോക്കൽ.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "ആപ്പിലെ ഉള്ളടക്കം നീക്കം ചെയ്ത ക്രാഷ്, പിശക് റിപ്പോർട്ടുകൾ.",
@@ -2874,7 +2902,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "ടെക്സ്റ്റാക്കാൻ നിങ്ങൾ പറയുന്നതിന്റെ ശബ്ദ റെക്കോർഡിംഗ്.",
     "voiceTranscriptionWhy": "സംസാരം ടെക്സ്റ്റാക്കി മാറ്റാൻ.",
-    "voiceTranscriptionWho": "നിങ്ങളുടെ ഉപകരണത്തിൽ മാത്രം. ഉപകരണത്തിന് ഓഫ്‌ലൈനായി ശബ്ദം ടെക്സ്റ്റാക്കാൻ കഴിയാത്തപ്പോൾ Apple അല്ലെങ്കിൽ Google.",
+    "voiceTranscriptionWho": "നിങ്ങളുടെ ഉപകരണം, നിങ്ങൾ തിരഞ്ഞെടുത്ത ട്രാൻസ്ക്രിപ്ഷൻ മോഡലിനൊപ്പം Kilo Gateway, അല്ലെങ്കിൽ ഓൺലൈൻ തിരിച്ചറിയലിനായി Apple അല്ലെങ്കിൽ Google.",
     "installAttributionPromptTitle": "ഇൻസ്റ്റാളിന്റെ ഉറവിടം കണ്ടെത്താൻ അനുവദിക്കണോ?",
     "installAttributionPromptMessage": "നിങ്ങൾ ഏത് വഴിയിലൂടെയാണ് എത്തിയതെന്ന് അറിയാൻ മാത്രമാണ് Kilo Apple-ന്റെ ട്രാക്കിംഗ് അനുമതി ഉപയോഗിക്കുന്നത്. നിങ്ങളുടെ പ്രോംപ്റ്റുകളോ സംഭാഷണങ്ങളോ ഇതിനായി ഒരിക്കലും ഉപയോഗിക്കില്ല.",
     "what": "എന്ത്",
@@ -3084,6 +3112,12 @@
     "privacy": "ഏജന്റുകളെ കാണാൻ Kilo തുറക്കുക",
     "openAgents": "ഏജന്റുകൾ തുറക്കുക",
     "needsInput": "നിങ്ങളുടെ പ്രതികരണം വേണം",
+    "newestSession": "ഏറ്റവും പുതിയത്: {{title}}",
+    "noneWaiting": "കാത്തിരിക്കുന്ന ഏജന്റുകളില്ല",
+    "newAgent": "പുതിയ ഏജന്റ്",
+    "approving": "അംഗീകരിക്കുന്നു...",
+    "couldNotApprove": "അംഗീകരിക്കാനായില്ല",
+    "couldNotStart": "ആരംഭിക്കാനായില്ല",
     "channelName": "സജീവ ഏജന്റുകൾ",
     "activityKitDisabledBody": "ലോക്ക് സ്ക്രീനിൽ സജീവ ഏജന്റുകളെ കാണാൻ ക്രമീകരണങ്ങളിൽ തത്സമയ പ്രവർത്തനങ്ങൾ പ്രവർത്തനക്ഷമമാക്കുക."
   },
@@ -3119,5 +3153,12 @@
     "remoteFound": "കമ്പ്യൂട്ടർ കണക്റ്റ് ചെയ്തു",
     "checkAgain": "വീണ്ടും പരിശോധിക്കുക",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ഏജന്റ് ആരംഭിക്കാൻ ഒരു പ്രോംപ്റ്റ് ആവശ്യമാണ്. ഒരു പ്രോംപ്റ്റ് ചേർത്ത് വീണ്ടും പ്രവർത്തിപ്പിക്കുക.",
+      "repositoryUnknown": "{{repository}} GitHub അല്ലെങ്കിൽ GitLab റിപ്പോസിറ്ററിയായി Kilo തിരിച്ചറിയുന്നില്ല. Kilo-യിൽ മറ്റൊരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കുക.",
+      "repositoryUnsupported": "{{repository}} ഒരു Bitbucket റിപ്പോസിറ്ററിയാണ് — ഏജന്റ് ആരംഭിക്കുക ഇതുവരെ അത് ഉപയോഗിക്കാൻ കഴിയില്ല. Kilo-യിൽ മറ്റൊരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കുക."
+    }
   }
 }

@@ -480,6 +480,8 @@
       "replyBadRequest": "මෙම පිළිතුර පළ කළ නොහැක. සාකච්ඡා පෙළ වෙනස් වී තිබිය හැක.",
       "replyForbidden": "මෙම පුල් ඉල්ලීමට පිළිතුරු දීමට ඔබට අවසර නොමැත.",
       "addCommentCta": "මෙම පුල් ඉල්ලීම පිළිබඳ අදහස් දක්වන්න",
+      "fixWithKilo": "Kilo සමඟ විසඳන්න",
+      "fixWithKiloPrompt": "කරුණාකර පහත පුල් ඉල්ලීම් අදහස විසඳන්න: {{link}}",
       "commentBadRequest": "මෙම අදහස පළ කළ නොහැක. පුල් ඉල්ලීම වෙනස් වී තිබිය හැක.",
       "commentForbidden": "මෙම පුල් ඉල්ලීම පිළිබඳ අදහස් දැක්වීමට ඔබට අවසර නොමැත.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} ක් තවමත් අවසන් නැත",
       "skipped": "{{displayCount}} ක් මඟ හැර ඇත",
       "checksCount": "පරීක්ෂණ {{displayCount}} ක්",
+      "checksCount_one": "පරීක්ෂණය {{displayCount}} ක්",
+      "checksCount_other": "පරීක්ෂණ {{displayCount}} ක්",
       "checkDetails": "පරීක්ෂණ විස්තර"
     },
     "inbox": {
@@ -2077,6 +2081,7 @@
       "exitNeedsNewerCli": "දුරස්ථ ස්ලෑෂ් විධාන සඳහා වඩාත් නව Kilo CLI අනුවාදයක් අවශ්‍යයි. Kilo CLI යාවත්කාලීන කර නැවත සම්බන්ධ වන්න."
     },
     "sessionConnection": {
+      "label": "සම්බන්ධතාව",
       "connecting": "සම්බන්ධ වෙමින්…",
       "reconnecting": "නැවත සම්බන්ධ වෙමින්…",
       "connectionLost": "සම්බන්ධතාව බිඳ වැටුණි",
@@ -2096,7 +2101,9 @@
       "removeConfirmTitle": "ඉලක්කය ඉවත් කරන්නද?",
       "removeConfirmMessage": "CLI මෙම සැසියේ ඉලක්කය මකා දමයි.",
       "updateFailed": "ඉලක්කය යාවත්කාලීන කළ නොහැකි විය.",
-      "sectionAccessibility": "{{status}}. ඉලක්කය: {{text}}"
+      "sectionAccessibility": "{{status}}. ඉලක්කය: {{text}}",
+      "collapse": "ඉලක්කය හකුළන්න",
+      "expand": "ඉලක්කය පුළුල් කරන්න"
     },
     "newSession": {
       "recentlyUsed": "මෑතකදී භාවිතා කළ",
@@ -2150,7 +2157,20 @@
       "continueFrom": "{{title}} සැසිය දිගටම කරගෙන යමින් පවතී.",
       "importingSession": "සැසිය ආයාත කරමින්",
       "cliCannotContinue": "මෙම CLI අනුවාදයට සැසියක් දිගටම කරගෙන යා නොහැක. Cloud Agent හෝ වෙනත් CLI එකක් තෝරන්න.",
-      "importFailed": "මෙම සැසිය ආයාත කළ නොහැකි විය."
+      "importFailed": "මෙම සැසිය ආයාත කළ නොහැකි විය.",
+      "sandbox": "සෑන්ඩ්බොක්ස්",
+      "sandboxAccessibility": "සෑන්ඩ්බොක්ස්: {{label}}",
+      "sandboxDefaultWithDestination": "පෙරනිමිය · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "කුඩා",
+      "sandboxInstanceShared": "බෙදාහරින ලද",
+      "sandboxInstanceLarge": "විශාල",
+      "sandboxInstanceDevcontainer": "ඩෙව් කන්ටේනරය",
+      "sandboxInstanceProviderDefault": "සපයන්නාගේ පෙරනිමිය",
+      "sandboxCouldNotLoad": "සෑන්ඩ්බොක්ස් විකල්ප පූරණය කළ නොහැක",
+      "sandboxUnavailable": "මෙම සෑන්ඩ්බොක්ස් ලබා ගත නොහැක. වෙනත් සෑන්ඩ්බොක්ස් එකක් හෝ පෙරනිමිය තෝරන්න.",
+      "sandboxUseDefault": "පෙරනිමිය භාවිතා කරන්න"
     },
     "partRenderer": {
       "updatedFileCount_one": "ගොනු {{displayCount}} ක් යාවත්කාලීන කර ඇත.",
@@ -2516,6 +2536,12 @@
       "startNewSession": "නව සැසියක් ආරම්භ කරන්න",
       "exitSession": "සැසියෙන් ඉවත් වන්න",
       "clearSession": "මෙම සැසිය අවසන් කර නව සැසියක් ආරම්භ කරන්න",
+      "compactDescription": "වත්මන් සැසියේ සන්දර්භය සංක්ෂිප්ත කරන්න",
+      "goalDescription": "සැසි ඉලක්කයක් කරා වැඩ කරගෙන යන්න. /goal <objective> හෝ pause, resume, clear",
+      "initDescription": "මඟ පෙන්වන AGENTS.md සැකසුම",
+      "resumeClaudeDescription": "Claude Code සැසියේ පිටපත ආයාත කරන්න",
+      "resumeCodexDescription": "OpenAI Codex සැසියේ පිටපත ආයාත කරන්න",
+      "reviewDescription": "වෙනස්කම් සමාලෝචනය කරන්න [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} භාවිත කරන්න",
       "insert": "ඇතුළත් කරන්න",
       "upgradeRequiredFallback": "මෙම විධානය භාවිත කිරීමට ඔබේ CLI යාවත්කාලීන කරන්න.",
@@ -2633,6 +2659,7 @@
     "couldNotLoadActiveSessions": "සක්‍රීය සැසි පූරණය කළ නොහැකි විය.",
     "agentSessions": "දැන් ක්‍රියාත්මකයි",
     "newCodingTask": "නව කේතීකරණ කාර්යය",
+    "newTaskFromPicture": "පින්තූරයකින් නව කාර්යය",
     "explore": "ගවේෂණය",
     "seeAll": "සියල්ල බලන්න",
     "noLiveSessions": "මේ මොහොතේ කිසිවක් ක්‍රියාත්මක නොවේ"
@@ -2854,7 +2881,8 @@
     "aiProvidersWhat": "ඔබේ ඉල්ලීම්, සංවාද ඉතිහාසය සහ ඔබ අමුණන ගොනු.",
     "aiProvidersWhy": "AI ප්‍රතිචාර ජනනය කිරීමට.",
     "aiProvidersWho": "Anthropic, OpenAI, Google සහ ඔබ එක් එක් ඉල්ලීමකදී තෝරන අනෙකුත් සැපයුම්කරුවන්.",
-    "gatewayWhat": "ගිණුම් හැඳුනුම, ඉල්ලීම් පාරදත්ත, ටෝකන භාවිතය.",
+    "gatewayWhat": "ගිණුම් හැඳුනුම, ඉල්ලීම් පාරදත්ත, ටෝකන භාවිතය, මෙන්ම යෙදුම මෙය හරහා යවන විධාන සහ හඬ පටිගත කිරීම්.",
+    "viaGateway": "Kilo Gateway හරහා",
     "gatewayWhy": "සත්‍යාපනය, ඉල්ලීම් යොමු කිරීම සහ බිල්පත් ගණනයන් සැසඳීම.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "යෙදුමේ අන්තර්ගතය ඉවත් කළ බිඳවැටීම් සහ දෝෂ වාර්තා.",
@@ -2874,7 +2902,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "ඔබ කතා කරමින් පෙළ ඇතුළත් කරන විට පටිගත කරන ඔබේ හඬ.",
     "voiceTranscriptionWhy": "කථනය පෙළ බවට පත් කිරීමට.",
-    "voiceTranscriptionWho": "ඔබේ උපාංගය තුළ පමණි. උපාංගයට නොබැඳිව හඬ පෙළට හැරවිය නොහැකි විට Apple හෝ Google වෙත යවයි.",
+    "voiceTranscriptionWho": "ඔබේ උපාංගය, ඔබ තෝරාගත් පෙළට හැරවීමේ ආකෘතිය සහිත Kilo Gateway, හෝ මාර්ගගත හඳුනා ගැනීම සඳහා Apple හෝ Google.",
     "installAttributionPromptTitle": "ස්ථාපන මූලාශ්‍රය හඳුනාගැනීමට අවසර දෙන්නද?",
     "installAttributionPromptMessage": "ඔබ මෙහි පැමිණි මාර්ගය හඳුනාගැනීමට පමණක් Kilo විසින් Apple හි ලුහුබැඳීමේ අවසරය භාවිත කරයි. ඒ සඳහා ඔබේ ඉල්ලීම් සහ සංවාද කිසි විටෙක භාවිත නොකරයි.",
     "what": "කුමක්ද",
@@ -3084,6 +3112,12 @@
     "privacy": "නියෝජිතයන් බැලීමට Kilo විවෘත කරන්න",
     "openAgents": "නියෝජිතයන් විවෘත කරන්න",
     "needsInput": "ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
+    "newestSession": "නවතම: {{title}}",
+    "noneWaiting": "රැඳී සිටින නියෝජිතයෙක් නැත",
+    "newAgent": "නව නියෝජිතයෙක්",
+    "approving": "අනුමත කරමින්...",
+    "couldNotApprove": "අනුමත කළ නොහැකි විය",
+    "couldNotStart": "ආරම්භ කළ නොහැකි විය",
     "channelName": "සක්‍රීය නියෝජිතයන්",
     "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න."
   },
@@ -3119,5 +3153,12 @@
     "remoteFound": "පරිගණකය සම්බන්ධ විය",
     "checkAgain": "නැවත පරීක්ෂා කරන්න",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "නියෝජිතයා දියත් කිරීමට ඉල්ලීමක් අවශ්‍යයි. ඉල්ලීමක් එක් කර නැවත ධාවනය කරන්න.",
+      "repositoryUnknown": "Kilo, {{repository}} GitHub හෝ GitLab කේත ගබඩාවක් ලෙසවත් හඳුනා නොගනී. Kilo තුළ තවත් කේත ගබඩාවක් තෝරන්න.",
+      "repositoryUnsupported": "{{repository}} යනු Bitbucket කේත ගබඩාවකි — නියෝජිතයා දියත් කරන්නට තවම එය භාවිත කළ නොහැක. Kilo තුළ තවත් කේත ගබඩාවක් තෝරන්න."
+    }
   }
 }

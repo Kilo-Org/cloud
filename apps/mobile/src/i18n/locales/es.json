@@ -1600,6 +1600,7 @@
       "exitNeedsNewerCli": "Los comandos de barra remotos requieren una versión más reciente de Kilo CLI. Actualiza Kilo CLI y vuelve a conectarte."
     },
     "sessionConnection": {
+      "label": "Conexión",
       "connecting": "Conectando…",
       "reconnecting": "Reconectando…",
       "connectionLost": "Conexión perdida",
@@ -1619,7 +1620,9 @@
       "removeConfirmTitle": "¿Eliminar objetivo?",
       "removeConfirmMessage": "El CLI borra el objetivo de esta sesión.",
       "updateFailed": "No se pudo actualizar el objetivo.",
-      "sectionAccessibility": "{{status}}. Objetivo: {{text}}"
+      "sectionAccessibility": "{{status}}. Objetivo: {{text}}",
+      "collapse": "Contraer objetivo",
+      "expand": "Expandir objetivo"
     },
     "newSession": {
       "recentlyUsed": "Usados recientemente",
@@ -1673,7 +1676,20 @@
       "continueFrom": "Se está continuando la sesión {{title}}.",
       "importingSession": "Importando sesión",
       "cliCannotContinue": "Esta CLI no puede continuar una sesión. Elige Cloud Agent u otra CLI.",
-      "importFailed": "No se pudo importar esta sesión."
+      "importFailed": "No se pudo importar esta sesión.",
+      "sandbox": "Entorno aislado",
+      "sandboxAccessibility": "Entorno aislado: {{label}}",
+      "sandboxDefaultWithDestination": "Predeterminado · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Pequeño",
+      "sandboxInstanceShared": "Compartido",
+      "sandboxInstanceLarge": "Grande",
+      "sandboxInstanceDevcontainer": "Contenedor de desarrollo",
+      "sandboxInstanceProviderDefault": "Predeterminado del proveedor",
+      "sandboxCouldNotLoad": "No se pudieron cargar las opciones del entorno aislado",
+      "sandboxUnavailable": "Este entorno aislado no está disponible. Elige otro entorno aislado o Predeterminado.",
+      "sandboxUseDefault": "Usar Predeterminado"
     },
     "partRenderer": {
       "updatedFileCount_one": "Se ha actualizado {{displayCount}} archivo.",
@@ -2043,6 +2059,12 @@
       "startNewSession": "Empezar una nueva sesión",
       "exitSession": "Salir de la sesión",
       "clearSession": "Terminar esta sesión y empezar una nueva",
+      "compactDescription": "compacta el contexto de la sesión actual",
+      "goalDescription": "Sigue trabajando hacia un objetivo de sesión. /goal <objective> o pause, resume, clear",
+      "initDescription": "configuración guiada de AGENTS.md",
+      "resumeClaudeDescription": "importa una transcripción de sesión de Claude Code",
+      "resumeCodexDescription": "importa una transcripción de sesión de OpenAI Codex",
+      "reviewDescription": "revisa los cambios [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Usar /{{command}}",
       "insert": "Insertar",
       "upgradeRequiredFallback": "Actualiza tu CLI para usar este comando.",
@@ -2161,6 +2183,7 @@
     "couldNotLoadActiveSessions": "No se pudieron cargar las sesiones activas.",
     "agentSessions": "En curso ahora",
     "newCodingTask": "Nueva tarea de programación",
+    "newTaskFromPicture": "Nueva tarea a partir de una imagen",
     "explore": "Explorar",
     "seeAll": "Ver todo",
     "noLiveSessions": "No hay nada en ejecución ahora mismo"
@@ -2382,7 +2405,8 @@
     "aiProvidersWhat": "Tus instrucciones, tu historial de conversaciones y los archivos que adjuntes.",
     "aiProvidersWhy": "Para generar respuestas de IA.",
     "aiProvidersWho": "Anthropic, OpenAI, Google y los demás proveedores que elijas para cada solicitud.",
-    "gatewayWhat": "Identificador de la cuenta, metadatos de las solicitudes y uso de tokens.",
+    "gatewayWhat": "Identificador de la cuenta, metadatos de las solicitudes, uso de tokens, y los prompts y grabaciones de voz que la app envía a través de él.",
+    "viaGateway": "A través de Kilo Gateway",
     "gatewayWhy": "Autenticación, enrutamiento de solicitudes y conciliación de la facturación.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Informes de fallos y errores, sin contenido de la aplicación.",
@@ -2402,7 +2426,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Tu grabación mientras dictas.",
     "voiceTranscriptionWhy": "Para convertir la voz en texto.",
-    "voiceTranscriptionWho": "Solo tu dispositivo, o Apple o Google si el dispositivo no puede transcribir sin conexión.",
+    "voiceTranscriptionWho": "Tu dispositivo, Kilo Gateway con el modelo de transcripción que elijas, o Apple o Google para el reconocimiento en línea.",
     "what": "Qué se comparte",
     "why": "Para qué",
     "who": "Con quién",
@@ -2414,6 +2438,9 @@
     "checkConnection": "Comprobar conexión",
     "checks": {
       "checksCount": "{{displayCount}} verificaciones",
+      "checksCount_one": "{{displayCount}} verificación",
+      "checksCount_many": "{{displayCount}} verificaciones",
+      "checksCount_other": "{{displayCount}} verificaciones",
       "couldNotLoad": "No se pudieron cargar las verificaciones.",
       "failed": "{{displayCount}} fallidas",
       "noAccess": "No tienes acceso a las verificaciones de este repositorio.",
@@ -2513,6 +2540,8 @@
       "replyBody": "Texto de la respuesta",
       "replyForbidden": "No tienes permiso para responder a esta PR.",
       "addCommentCta": "Comentar en esta PR",
+      "fixWithKilo": "Solucionar con Kilo",
+      "fixWithKiloPrompt": "Por favor, atiende el siguiente comentario de la PR: {{link}}",
       "commentBadRequest": "No se puede publicar este comentario. Puede que la PR haya cambiado.",
       "commentForbidden": "No tienes permiso para comentar en esta PR.",
       "replyPlaceholder": "Tu respuesta…",
@@ -3107,6 +3136,12 @@
     "privacy": "Abre Kilo para ver los agentes",
     "openAgents": "Abrir agentes",
     "needsInput": "En espera de respuesta",
+    "newestSession": "La más reciente: {{title}}",
+    "noneWaiting": "Ningún agente en espera",
+    "newAgent": "Nuevo agente",
+    "approving": "Aprobando...",
+    "couldNotApprove": "No se pudo aprobar",
+    "couldNotStart": "No se pudo iniciar",
     "channelName": "Agentes activos",
     "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo."
   },
@@ -3142,5 +3177,12 @@
     "remoteFound": "Ordenador conectado",
     "checkAgain": "Volver a comprobar",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Iniciar agente necesita instrucciones. Añade unas instrucciones y vuelve a ejecutarlo.",
+      "repositoryUnknown": "Kilo no reconoce {{repository}} como un repositorio de GitHub o GitLab. Elige otro repositorio en Kilo.",
+      "repositoryUnsupported": "{{repository}} es un repositorio de Bitbucket — Iniciar agente aún no puede usarlo. Elige otro repositorio en Kilo."
+    }
   }
 }

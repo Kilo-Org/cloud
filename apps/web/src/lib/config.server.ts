@@ -13,6 +13,8 @@ export const GOOGLE_CLIENT_ID = getEnvVariable('GOOGLE_CLIENT_ID');
 export const GOOGLE_CLIENT_SECRET = getEnvVariable('GOOGLE_CLIENT_SECRET');
 export const ANACONDA_CLIENT_ID = getEnvVariable('ANACONDA_CLIENT_ID');
 export const ANACONDA_CLIENT_SECRET = getEnvVariable('ANACONDA_CLIENT_SECRET');
+export const OPENAI_CLIENT_ID = getEnvVariable('OPENAI_CLIENT_ID');
+export const OPENAI_CLIENT_SECRET = getEnvVariable('OPENAI_CLIENT_SECRET');
 export const GOOGLE_WORKSPACE_OAUTH_CLIENT_ID = getEnvVariable('GOOGLE_WORKSPACE_OAUTH_CLIENT_ID');
 export const GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET = getEnvVariable(
   'GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET'
@@ -504,6 +506,9 @@ export const SECURITY_AUTO_ANALYSIS_WORKER_URL =
 export const GOOGLE_WEB_RISK_API_KEY = getEnvVariable('GOOGLE_WEB_RISK_API_KEY');
 
 export const CREDIT_CATEGORIES_ENCRYPTION_KEY = getEnvVariable('CREDIT_CATEGORIES_ENCRYPTION_KEY');
+export const CREDIT_CATEGORIES_ENCRYPTION_KEY_V2 = getEnvVariable(
+  'CREDIT_CATEGORIES_ENCRYPTION_KEY_V2'
+);
 
 // Agent observability ingest service
 export const O11Y_SERVICE_URL = getEnvVariable('O11Y_SERVICE_URL') || '';

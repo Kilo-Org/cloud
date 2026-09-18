@@ -5,6 +5,7 @@ import PostHogClient from '@/lib/posthog';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
+import { clearOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
 import {
@@ -105,6 +106,7 @@ import {
   github_install_states,
   github_connection_attempts,
   github_app_installations,
+  provider_oauth_attempts,
   model_eval_ingestions,
   stripe_dispute_actions,
   stripe_dispute_cases,
@@ -125,7 +127,19 @@ import {
   quick_chat_threads,
   quick_chat_messages,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count, ne } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+  or,
+  gte,
+  count,
+  ne,
+  notExists,
+} from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
@@ -1086,6 +1100,14 @@ export async function anonymizeCloudUserData(
     .for('update')
     .limit(1);
   if (!user) return;
+  await tx
+    .delete(provider_oauth_attempts)
+    .where(
+      or(
+        eq(provider_oauth_attempts.initiated_by_user_id, userId),
+        eq(provider_oauth_attempts.owned_by_user_id, userId)
+      )
+    );
 
   const originalEmail = user.google_user_email;
   const deletedEmail = `deleted+${userId}@deleted.invalid`;
@@ -1380,18 +1402,15 @@ export async function anonymizeCloudUserData(
     .from(user_github_app_tokens)
     .where(eq(user_github_app_tokens.kilo_user_id, userId));
 
-  await tx.execute(sql`
-    DELETE FROM ${github_app_installations} canonical
-    USING ${platform_integrations} owned
-    WHERE owned.owned_by_user_id = ${userId}
-      AND owned.github_installation_id = canonical.id
-      AND NOT EXISTS (
-        SELECT 1
-        FROM ${platform_integrations} retained
-        WHERE retained.github_installation_id = canonical.id
-          AND retained.id <> owned.id
+  const personalCanonicalIds = await tx
+    .select({ id: platform_integrations.github_installation_id })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.owned_by_user_id, userId),
+        isNotNull(platform_integrations.github_installation_id)
       )
-  `);
+    );
   if (githubUserIds.length > 0) {
     await tx.execute(sql`
       DELETE FROM ${github_app_installations} canonical
@@ -1408,6 +1427,22 @@ export async function anonymizeCloudUserData(
   }
 
   await tx.delete(platform_integrations).where(eq(platform_integrations.owned_by_user_id, userId));
+  const removableCanonicalIds = personalCanonicalIds.flatMap(row => (row.id ? [row.id] : []));
+  if (removableCanonicalIds.length > 0) {
+    await tx
+      .delete(github_app_installations)
+      .where(
+        and(
+          inArray(github_app_installations.id, removableCanonicalIds),
+          notExists(
+            tx
+              .select({ id: platform_integrations.id })
+              .from(platform_integrations)
+              .where(eq(platform_integrations.github_installation_id, github_app_installations.id))
+          )
+        )
+      );
+  }
   await tx.execute(sql`
      UPDATE coding_plan_key_inventory
      SET status = 'revocation_pending',
@@ -2184,6 +2219,8 @@ export function inferRowlessAuthProviders(
       return ['linkedin'];
     case hosted_domain_specials.discord:
       return ['discord'];
+    case hosted_domain_specials.openai:
+      return ['openai'];
     case hosted_domain_specials.email:
       return ['email'];
     default:
@@ -2256,9 +2293,18 @@ export async function linkAuthProviderToUser(
 
   // Check if user already has this provider linked
   const userProviders = await getUserAuthProviders(kiloUserId);
-  const hasProvider = userProviders.some(p => p.provider === authProviderData.provider);
+  const existingProvider = userProviders.find(p => p.provider === authProviderData.provider);
 
-  if (hasProvider) {
+  if (existingProvider) {
+    // An identical account id is the same verified external person, so linking
+    // again is a no-op success instead of an error. The ChatGPT issuer scopes
+    // its subject as `<issuer>#<sub>`, which is the stable external identity:
+    // reconnecting after an expiry - or after linking for sign-in only - must
+    // not fail on an already-present row. A different account id for the same
+    // provider stays PROVIDER-ALREADY-LINKED.
+    if (existingProvider.provider_account_id === authProviderData.provider_account_id) {
+      return successResult();
+    }
     return failureResult('PROVIDER-ALREADY-LINKED');
   }
 
@@ -2334,6 +2380,13 @@ export async function unlinkAuthProviderFromUser(
       .update(kilocode_users)
       .set({ discord_server_membership_verified_at: null })
       .where(eq(kilocode_users.id, kiloUserId));
+  }
+
+  // Unlinking OpenAI also drops the delegated ChatGPT credential: it proves the
+  // same external identity, so keeping it would leave a usable key for an
+  // account the person just detached.
+  if (provider === 'openai') {
+    await clearOpenAiChatGptConnection(kiloUserId);
   }
 
   return successResult();

@@ -1240,6 +1240,15 @@ function sessionFixture(
   return createSessionFixture(fixtureDeps, overrides, sharedControl, callbackQueue);
 }
 
+function controlDiagnostics(
+  fields: { mock: { calls: Parameters<typeof logger.withFields>[] } },
+  diagnosticEvent: string
+): Record<string, unknown>[] {
+  return fields.mock.calls
+    .map(call => call[0] as Record<string, unknown>)
+    .filter(call => call.diagnosticEvent === diagnosticEvent);
+}
+
 function installModernRuntimeAuthorization(fixture: ReturnType<typeof sessionFixture>) {
   const authorizationId = '44444444-4444-4444-8444-444444444444';
   const token = jwt.sign(
@@ -2214,7 +2223,7 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.record('mixed')?.state).toBe('completed');
   });
 
-  it('marks the current item unknown and the remainder unattempted after an exception', async () => {
+  it('continues applying the remainder after an item exception', async () => {
     const fixture = sessionFixture();
     fixture.setStatus({
       physical: 'running',
@@ -2252,6 +2261,7 @@ describe('SandboxSession orchestration', () => {
     spy.mockImplementationOnce(async () => {
       throw new Error('forced application failure');
     });
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
     try {
       await expect(
         fixture.session.receiveSandboxControlEventBatch({ items, wrapperInstanceId: RUNTIME_ID })
@@ -2259,12 +2269,403 @@ describe('SandboxSession orchestration', () => {
         outcomes: [
           { receiptId: first.receiptId, status: 'applied' },
           { receiptId: failing.receiptId, status: 'unknown' },
-          { receiptId: remaining.receiptId, status: 'unattempted' },
+          { receiptId: remaining.receiptId, status: 'applied' },
         ],
       });
-      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy).toHaveBeenCalledTimes(3);
+      const failed = controlDiagnostics(fields, 'session_event_batch_item_failed');
+      expect(failed).toHaveLength(1);
+      expect(failed[0]).toMatchObject({
+        eventFamily: 'session.event',
+        eventType: 'session.updated',
+        receiptId: failing.receiptId,
+        sequence: failing.sequence,
+        eventIndex: 1,
+        batchSize: 3,
+        disposition: 'application_exception',
+      });
     } finally {
       spy.mockRestore();
+      fields.mockRestore();
+    }
+  });
+
+  it('attributes a session id mismatch without applying or storing the event', async () => {
+    const fixture = sessionFixture();
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      const event = receiptedEvent(1, {
+        type: 'session.updated',
+        properties: { info: { sessionID: 'kilo_root', id: 'kilo_other' } },
+      });
+      const before = structuredClone([...fixture.values]);
+      await expect(fixture.session.receiveSandboxControlEvent(event)).resolves.toEqual({
+        applied: false,
+      });
+      expect([...fixture.values]).toEqual(before);
+      expect(controlDiagnostics(fields, 'session_event_result')[0]).toMatchObject({
+        applied: false,
+        disposition: 'session_id_mismatch',
+        eventType: 'session.updated',
+      });
+    } finally {
+      fields.mockRestore();
+    }
+  });
+
+  it('attributes a child lineage mismatch without applying or storing the event', async () => {
+    const fixture = sessionFixture();
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      const receipted = receiptedEvent(1, {
+        type: 'session.created',
+        properties: { info: { id: 'kilo_child', parentID: 'kilo_child', directory: DIRECTORY } },
+      });
+      const event = {
+        ...receipted,
+        identity: { directory: DIRECTORY, rootKiloSessionId: 'kilo_root' },
+      };
+      const before = structuredClone([...fixture.values]);
+      await expect(fixture.session.receiveSandboxControlEvent(event)).resolves.toEqual({
+        applied: false,
+      });
+      expect([...fixture.values]).toEqual(before);
+      expect(controlDiagnostics(fields, 'session_event_result')[0]).toMatchObject({
+        applied: false,
+        disposition: 'child_lineage_mismatch',
+        eventType: 'session.created',
+      });
+    } finally {
+      fields.mockRestore();
+    }
+  });
+
+  it('attributes a failed delta with its event family and type', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('batch_delta');
+    await fixture.flush();
+    const first = receiptedEvent(1, {
+      type: 'session.status',
+      properties: { sessionID: 'kilo_root', status: { type: 'busy' } },
+    });
+    const delta = receiptedEvent(2, {
+      type: 'message.part.delta',
+      properties: { sessionID: 'kilo_root', messageID: 'msg_1', partID: 'part_1', delta: 'x' },
+    });
+    const remaining = receiptedEvent(3, {
+      type: 'session.updated',
+      properties: { info: { id: 'kilo_root' } },
+    });
+    const items = [first, delta, remaining].map(item => ({
+      event: 'session.event' as const,
+      session: item.identity,
+      payload: item.payload,
+      receiptId: item.receiptId,
+      sequence: item.sequence,
+    }));
+    const internal = fixture.session as unknown as {
+      applySandboxControlEvent: (input: unknown) => Promise<{ applied: boolean }>;
+    };
+    const original = internal.applySandboxControlEvent.bind(fixture.session);
+    const spy = vi.spyOn(internal, 'applySandboxControlEvent');
+    spy.mockImplementationOnce(original);
+    spy.mockImplementationOnce(async () => {
+      throw new Error('forced delta failure');
+    });
+    const emitted: Array<{ level: 'info' | 'warn'; fields: Record<string, unknown> }> = [];
+    let pendingFields: Record<string, unknown> = {};
+    const fields = vi.spyOn(logger, 'withFields').mockImplementation(next => {
+      pendingFields = next as Record<string, unknown>;
+      return logger;
+    });
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => {
+      emitted.push({ level: 'info', fields: pendingFields });
+    });
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {
+      emitted.push({ level: 'warn', fields: pendingFields });
+    });
+    try {
+      await expect(
+        fixture.session.receiveSandboxControlEventBatch({ items, wrapperInstanceId: RUNTIME_ID })
+      ).resolves.toEqual({
+        outcomes: [
+          { receiptId: first.receiptId, status: 'applied' },
+          { receiptId: delta.receiptId, status: 'unknown' },
+          { receiptId: remaining.receiptId, status: 'applied' },
+        ],
+      });
+      const failed = controlDiagnostics(fields, 'session_event_batch_item_failed');
+      expect(failed).toHaveLength(1);
+      expect(failed[0]).toMatchObject({
+        eventFamily: 'session.event',
+        eventType: 'message.part.delta',
+        eventIndex: 1,
+        batchSize: 3,
+        disposition: 'application_exception',
+      });
+      expect(
+        emitted
+          .filter(emission => emission.fields.diagnosticEvent === 'session_event_batch_item_failed')
+          .map(emission => emission.level)
+      ).toEqual(['warn']);
+    } finally {
+      spy.mockRestore();
+      fields.mockRestore();
+      info.mockRestore();
+      warn.mockRestore();
+    }
+  });
+
+  it('contains multiple item exceptions and keeps applying the rest', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('batch_remainder');
+    await fixture.flush();
+    const applied = receiptedEvent(1, {
+      type: 'session.status',
+      properties: { sessionID: 'kilo_root', status: { type: 'busy' } },
+    });
+    const failing = receiptedEvent(2, {
+      type: 'session.updated',
+      properties: { info: { id: 'kilo_root' } },
+    });
+    const delta = receiptedEvent(3, {
+      type: 'message.part.delta',
+      properties: { sessionID: 'kilo_root', messageID: 'msg_1', partID: 'part_1', delta: 'x' },
+    });
+    const trailing = receiptedEvent(4, {
+      type: 'session.updated',
+      properties: { info: { id: 'kilo_root' } },
+    });
+    const items = [applied, failing, delta, trailing].map(item => ({
+      event: 'session.event' as const,
+      session: item.identity,
+      payload: item.payload,
+      receiptId: item.receiptId,
+      sequence: item.sequence,
+    }));
+    const internal = fixture.session as unknown as {
+      applySandboxControlEvent: (input: unknown) => Promise<{ applied: boolean }>;
+    };
+    const original = internal.applySandboxControlEvent.bind(fixture.session);
+    const spy = vi.spyOn(internal, 'applySandboxControlEvent');
+    spy.mockImplementationOnce(original);
+    spy.mockImplementationOnce(async () => {
+      throw new Error('forced failing failure');
+    });
+    spy.mockImplementationOnce(async () => {
+      throw new Error('forced delta failure');
+    });
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      await expect(
+        fixture.session.receiveSandboxControlEventBatch({ items, wrapperInstanceId: RUNTIME_ID })
+      ).resolves.toEqual({
+        outcomes: [
+          { receiptId: applied.receiptId, status: 'applied' },
+          { receiptId: failing.receiptId, status: 'unknown' },
+          { receiptId: delta.receiptId, status: 'unknown' },
+          { receiptId: trailing.receiptId, status: 'applied' },
+        ],
+      });
+      const failed = controlDiagnostics(fields, 'session_event_batch_item_failed');
+      expect(failed).toHaveLength(2);
+      expect(failed).toMatchObject([
+        { eventIndex: 1, batchSize: 4, receiptId: failing.receiptId },
+        { eventIndex: 2, batchSize: 4, receiptId: delta.receiptId },
+      ]);
+    } finally {
+      spy.mockRestore();
+      fields.mockRestore();
+    }
+  });
+
+  it('contains a failure on the final item', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('batch_final');
+    await fixture.flush();
+    const applied = receiptedEvent(1, {
+      type: 'session.status',
+      properties: { sessionID: 'kilo_root', status: { type: 'busy' } },
+    });
+    const failing = receiptedEvent(2, {
+      type: 'session.updated',
+      properties: { info: { id: 'kilo_root' } },
+    });
+    const items = [applied, failing].map(item => ({
+      event: 'session.event' as const,
+      session: item.identity,
+      payload: item.payload,
+      receiptId: item.receiptId,
+      sequence: item.sequence,
+    }));
+    const internal = fixture.session as unknown as {
+      applySandboxControlEvent: (input: unknown) => Promise<{ applied: boolean }>;
+    };
+    const original = internal.applySandboxControlEvent.bind(fixture.session);
+    const spy = vi.spyOn(internal, 'applySandboxControlEvent');
+    spy.mockImplementationOnce(original);
+    spy.mockImplementationOnce(async () => {
+      throw new Error('forced final failure');
+    });
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      await expect(
+        fixture.session.receiveSandboxControlEventBatch({ items, wrapperInstanceId: RUNTIME_ID })
+      ).resolves.toEqual({
+        outcomes: [
+          { receiptId: applied.receiptId, status: 'applied' },
+          { receiptId: failing.receiptId, status: 'unknown' },
+        ],
+      });
+      const failed = controlDiagnostics(fields, 'session_event_batch_item_failed');
+      expect(failed).toHaveLength(1);
+      expect(failed[0]).toMatchObject({
+        eventIndex: 1,
+        batchSize: 2,
+        disposition: 'application_exception',
+      });
+      expect(failed[0]).not.toHaveProperty('unattemptedCount');
+      expect(failed[0]).not.toHaveProperty('unattemptedDeltaCount');
+      expect(failed[0]).not.toHaveProperty('firstUnattemptedSequence');
+    } finally {
+      spy.mockRestore();
+      fields.mockRestore();
+    }
+  });
+
+  it('never surfaces the thrown value in the item failure diagnostic', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('batch_secret');
+    await fixture.flush();
+    const applied = receiptedEvent(1, {
+      type: 'session.status',
+      properties: { sessionID: 'kilo_root', status: { type: 'busy' } },
+    });
+    const failing = receiptedEvent(2, {
+      type: 'session.updated',
+      properties: { info: { id: 'kilo_root' } },
+    });
+    const items = [applied, failing].map(item => ({
+      event: 'session.event' as const,
+      session: item.identity,
+      payload: item.payload,
+      receiptId: item.receiptId,
+      sequence: item.sequence,
+    }));
+    const internal = fixture.session as unknown as {
+      applySandboxControlEvent: (input: unknown) => Promise<{ applied: boolean }>;
+    };
+    const original = internal.applySandboxControlEvent.bind(fixture.session);
+    const spy = vi.spyOn(internal, 'applySandboxControlEvent');
+    spy.mockImplementationOnce(original);
+    spy.mockImplementationOnce(async () => {
+      const failure = new Error('sk-live-EXAMPLE-message');
+      failure.name = 'sk-live-EXAMPLE';
+      throw failure;
+    });
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      await expect(
+        fixture.session.receiveSandboxControlEventBatch({ items, wrapperInstanceId: RUNTIME_ID })
+      ).resolves.toEqual({
+        outcomes: [
+          { receiptId: applied.receiptId, status: 'applied' },
+          { receiptId: failing.receiptId, status: 'unknown' },
+        ],
+      });
+      const failed = controlDiagnostics(fields, 'session_event_batch_item_failed');
+      expect(failed).toHaveLength(1);
+      expect(failed[0]).toMatchObject({ disposition: 'application_exception' });
+      for (const emitted of fields.mock.calls) {
+        for (const value of Object.values(emitted[0] as Record<string, unknown>)) {
+          if (typeof value === 'string') expect(value).not.toContain('sk-live-EXAMPLE');
+        }
+      }
+    } finally {
+      spy.mockRestore();
+      fields.mockRestore();
+    }
+  });
+
+  it('resolves the batch result when the item failure diagnostic construction throws', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('batch_containment');
+    await fixture.flush();
+    const first = receiptedEvent(1, {
+      type: 'session.status',
+      properties: { sessionID: 'kilo_root', status: { type: 'busy' } },
+    });
+    const failing = receiptedEvent(2, {
+      type: 'session.updated',
+      properties: { info: { id: 'kilo_root' } },
+    });
+    const remaining = receiptedEvent(3, {
+      type: 'session.updated',
+      properties: { info: { id: 'kilo_root' } },
+    });
+    const items = [first, failing, remaining].map(item => ({
+      event: 'session.event' as const,
+      session: item.identity,
+      payload: item.payload,
+      receiptId: item.receiptId,
+      sequence: item.sequence,
+    }));
+    Object.defineProperty(items[1], 'sequence', {
+      get: () => {
+        throw new Error('forced diagnostic field failure');
+      },
+      enumerable: true,
+      configurable: true,
+    });
+    const internal = fixture.session as unknown as {
+      applySandboxControlEvent: (input: unknown) => Promise<{ applied: boolean }>;
+    };
+    const spy = vi.spyOn(internal, 'applySandboxControlEvent');
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      await expect(
+        fixture.session.receiveSandboxControlEventBatch({ items, wrapperInstanceId: RUNTIME_ID })
+      ).resolves.toEqual({
+        outcomes: [
+          { receiptId: first.receiptId, status: 'applied' },
+          { receiptId: failing.receiptId, status: 'unknown' },
+          { receiptId: remaining.receiptId, status: 'applied' },
+        ],
+      });
+      expect(controlDiagnostics(fields, 'session_event_batch_item_failed')).toHaveLength(0);
+    } finally {
+      spy.mockRestore();
+      fields.mockRestore();
     }
   });
 
@@ -5735,6 +6136,17 @@ describe('SandboxSession orchestration', () => {
     );
   });
 
+  it('does not block session deletion on a stalled reference-forget RPC', async () => {
+    const fixture = sessionFixture();
+    fixture.control.forgetSessionReference.mockImplementation(() => new Promise(() => {}));
+    const deletion = fixture.session.deleteSession();
+    await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
+    await deletion;
+    await fixture.flush();
+    expect(fixture.control.forgetSessionReference).toHaveBeenCalledTimes(1);
+    expect(await fixture.session.getMetadata()).toBeNull();
+  });
+
   it.each(['completed', 'failed', 'cancelled'] as const)(
     'settles an early %s outcome once without resurrecting work on acknowledgement',
     async status => {
@@ -7969,6 +8381,36 @@ describe('SandboxSession durable Stop wiring', () => {
     });
   });
 
+  it('saturates a future-skewed Stop deadline to the DO clock before dispatch', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    const state = await fixture.session.getControlState();
+    if (!state) throw new Error('Missing control state');
+    const request = createControlStopRequest(
+      state,
+      Date.now() + 500,
+      '33333333-3333-4333-8333-333333333337'
+    );
+
+    await expect(fixture.session.interruptExecution(request)).resolves.toMatchObject({
+      state: 'accepted',
+      cleanupDeadlineAt: 1_010_000,
+    });
+    await fixture.flush();
+
+    const abort = fixture.control.request.mock.calls
+      .map(([input]) => input)
+      .find(input => input.operation === 'session.abort');
+    expect(abort).toMatchObject({
+      payload: {
+        messageId: 'a',
+        operationId: request.operationId,
+        cleanupDeadlineAt: 1_010_000,
+      },
+    });
+  });
+
   it('retains the immutable pending Stop receipt after A leaves active recovery targets', async () => {
     const fixture = sessionFixture();
     await fixture.admit('a');
@@ -8444,7 +8886,7 @@ describe('recovery chunk 1: proof-based wait classification', () => {
       expect(fixture.record('a')?.operations?.prompt).toBeUndefined();
     });
 
-    it('reconciles an ambiguous attach through the existing operation receipt path', async () => {
+    it('reconciles an ambiguous running attach without failing or quarantining the runtime', async () => {
       const fixture = sessionFixture();
       fixture.setStatus({
         physical: 'running',
@@ -8456,11 +8898,12 @@ describe('recovery chunk 1: proof-based wait classification', () => {
         ...authorization('session.attach', 'a', 'attempt-ambiguous'),
         dispatchDeadlineAt: Date.now() + 60_000,
       };
+      const deadlineAt = attachAuthorization.dispatchDeadlineAt;
       fixture.values.set('session_messages', [
         queuedRecord('a', {
           wrapperInstanceId: wrapper,
           preparationAttemptId: attachAuthorization.operationId,
-          deliveryDeadlineAt: attachAuthorization.dispatchDeadlineAt,
+          deliveryDeadlineAt: deadlineAt,
           unresolvedDispatch: true,
           operations: { attach: { authorization: attachAuthorization, dispatched: true } },
         }),
@@ -8476,6 +8919,14 @@ describe('recovery chunk 1: proof-based wait classification', () => {
       await fixture.fireAlarm();
       await fixture.flush();
 
+      expect(fixture.record('a')).toMatchObject({ state: 'queued' });
+      expect(fixture.record('a')?.failedReason).toBeUndefined();
+      expect(fixture.terminalEvents()).toHaveLength(0);
+      expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+      const retryAt = fixture.alarmAt();
+      if (retryAt === null) throw new Error('Missing queue retry alarm');
+      expect(retryAt).toBeLessThanOrEqual(deadlineAt);
+
       // The durable attach proof is reconciled against its original
       // authorization; no second `session.attach` dispatch is attempted.
       expect(
@@ -8483,6 +8934,173 @@ describe('recovery chunk 1: proof-based wait classification', () => {
           ([input]) => input.operation === 'session.operation.get'
         )
       ).toHaveLength(1);
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
+      ).toHaveLength(0);
+    });
+
+    it('resolves a running attach once it completes and then dispatches the prompt', async () => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: wrapper,
+        operationResults: true,
+      });
+      const attachAuthorization: SessionOperationAuthorization = {
+        ...authorization('session.attach', 'a', 'attempt-continuation'),
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      fixture.values.set('session_messages', [
+        queuedRecord('a', {
+          wrapperInstanceId: wrapper,
+          preparationAttemptId: attachAuthorization.operationId,
+          deliveryDeadlineAt: attachAuthorization.dispatchDeadlineAt,
+          unresolvedDispatch: true,
+          operations: { attach: { authorization: attachAuthorization, dispatched: true } },
+        }),
+      ]);
+      let lookups = 0;
+      delegateRequest(fixture, 'session.operation.get', async () => {
+        lookups += 1;
+        if (lookups === 1)
+          return controlResponse({
+            state: 'running',
+            authorization: attachAuthorization,
+            executionDeadlineAt: Date.now() + 60_000,
+          });
+        return controlResponse({
+          state: 'completed',
+          delivery: {
+            version: 2,
+            authorization: attachAuthorization,
+            completedAt: Date.now(),
+            result: { ok: true, result: { attached: true } },
+            events: [],
+            preparing: [],
+          },
+        });
+      });
+
+      await fixture.fireAlarm();
+      await fixture.flush();
+      expect(fixture.record('a')?.state).toBe('queued');
+
+      const retryAt = fixture.alarmAt();
+      if (retryAt === null) throw new Error('Missing queue retry alarm');
+      vi.setSystemTime(retryAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')?.state).toBe('accepted');
+      expect(lookups).toBe(2);
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
+      ).toHaveLength(0);
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
+      ).toHaveLength(1);
+    });
+
+    it('bounds a persistently running attach by the original head deadline', async () => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: wrapper,
+        operationResults: true,
+      });
+      const attachAuthorization: SessionOperationAuthorization = {
+        ...authorization('session.attach', 'a', 'attempt-persistent'),
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      const deadlineAt = attachAuthorization.dispatchDeadlineAt;
+      fixture.values.set('session_messages', [
+        queuedRecord('a', {
+          wrapperInstanceId: wrapper,
+          preparationAttemptId: attachAuthorization.operationId,
+          deliveryDeadlineAt: deadlineAt,
+          unresolvedDispatch: true,
+          operations: { attach: { authorization: attachAuthorization, dispatched: true } },
+        }),
+      ]);
+      delegateRequest(fixture, 'session.operation.get', async () =>
+        controlResponse({
+          state: 'running',
+          authorization: attachAuthorization,
+          executionDeadlineAt: Date.now() + 60_000,
+        })
+      );
+
+      await fixture.fireAlarm();
+      await fixture.flush();
+      expect(fixture.record('a')?.state).toBe('queued');
+
+      let guard = 0;
+      while (fixture.record('a')?.state === 'queued') {
+        if (++guard > 100) throw new Error('Attach reconcile did not reach the head deadline');
+        const retryAt = fixture.alarmAt();
+        if (retryAt === null) throw new Error('Missing queue retry alarm');
+        expect(retryAt).toBeLessThanOrEqual(deadlineAt);
+        vi.setSystemTime(retryAt);
+        await fixture.fireAlarm();
+        await fixture.flush();
+      }
+
+      expect(fixture.record('a')).toMatchObject({
+        state: 'failed',
+        failedReason: 'preparation_timeout',
+        terminalAt: deadlineAt,
+      });
+      expect(fixture.terminalEvents()).toHaveLength(1);
+    });
+
+    it('keeps the existing terminal policy for a completed attach rejection', async () => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: wrapper,
+        operationResults: true,
+      });
+      const attachAuthorization: SessionOperationAuthorization = {
+        ...authorization('session.attach', 'a', 'attempt-rejected'),
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      fixture.values.set('session_messages', [
+        queuedRecord('a', {
+          wrapperInstanceId: wrapper,
+          preparationAttemptId: attachAuthorization.operationId,
+          deliveryDeadlineAt: attachAuthorization.dispatchDeadlineAt,
+          unresolvedDispatch: true,
+          operations: { attach: { authorization: attachAuthorization, dispatched: true } },
+        }),
+      ]);
+      delegateRequest(fixture, 'session.operation.get', async () =>
+        controlResponse({
+          state: 'completed',
+          delivery: {
+            version: 2,
+            authorization: attachAuthorization,
+            completedAt: Date.now(),
+            result: {
+              ok: false,
+              error: { code: 'not_ready', message: 'attach failed', retryable: false },
+            },
+            events: [],
+            preparing: [],
+          },
+        })
+      );
+
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')).toMatchObject({
+        state: 'failed',
+        failedReason: 'attach_exhausted',
+      });
+      expect(fixture.terminalEvents()).toHaveLength(1);
       expect(
         fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
       ).toHaveLength(0);

@@ -486,6 +486,8 @@
       "replyBadRequest": "Tuto odpověď nelze odeslat. Vlákno se možná změnilo.",
       "replyForbidden": "Nemáš oprávnění odpovídat v tomto PR.",
       "addCommentCta": "Okomentovat tento PR",
+      "fixWithKilo": "Opravit s Kilo",
+      "fixWithKiloPrompt": "Vyřeš prosím následující komentář k PR: {{link}}",
       "commentBadRequest": "Tento komentář nelze odeslat. PR se možná změnil.",
       "commentForbidden": "Nemáš oprávnění komentovat tento PR.",
       "moderation": {
@@ -582,6 +584,10 @@
       "pending": "čekající: {{displayCount}}",
       "skipped": "přeskočené: {{displayCount}}",
       "checksCount": "kontroly: {{displayCount}}",
+      "checksCount_one": "kontrola: {{displayCount}}",
+      "checksCount_few": "kontroly: {{displayCount}}",
+      "checksCount_many": "kontroly: {{displayCount}}",
+      "checksCount_other": "kontroly: {{displayCount}}",
       "checkDetails": "podrobnosti kontroly"
     },
     "inbox": {
@@ -2111,6 +2117,7 @@
       "exitNeedsNewerCli": "Vzdálené příkazy s lomítkem vyžadují novější verzi Kilo CLI. Aktualizujte Kilo CLI a připojte se znovu."
     },
     "sessionConnection": {
+      "label": "Připojení",
       "connecting": "Připojování…",
       "reconnecting": "Opětovné připojování…",
       "connectionLost": "Připojení přerušeno",
@@ -2130,7 +2137,9 @@
       "removeConfirmTitle": "Odebrat cíl?",
       "removeConfirmMessage": "CLI vymaže cíl této relace.",
       "updateFailed": "Cíl se nepodařilo aktualizovat.",
-      "sectionAccessibility": "{{status}}. Cíl: {{text}}"
+      "sectionAccessibility": "{{status}}. Cíl: {{text}}",
+      "collapse": "Sbalit cíl",
+      "expand": "Rozbalit cíl"
     },
     "newSession": {
       "recentlyUsed": "Nedávno použité",
@@ -2184,7 +2193,20 @@
       "continueFrom": "Pokračujete v relaci {{title}}.",
       "importingSession": "Import relace",
       "cliCannotContinue": "Toto CLI nepodporuje pokračování v relaci. Vyberte službu Cloud Agent nebo jiné CLI.",
-      "importFailed": "Tuto relaci se nepodařilo importovat."
+      "importFailed": "Tuto relaci se nepodařilo importovat.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Výchozí · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Malý",
+      "sandboxInstanceShared": "Sdílený",
+      "sandboxInstanceLarge": "Velký",
+      "sandboxInstanceDevcontainer": "Dev kontejner",
+      "sandboxInstanceProviderDefault": "Výchozí od poskytovatele",
+      "sandboxCouldNotLoad": "Možnosti sandboxu se nepodařilo načíst",
+      "sandboxUnavailable": "Tento sandbox není dostupný. Vyberte jiný sandbox nebo Výchozí.",
+      "sandboxUseDefault": "Použít Výchozí"
     },
     "partRenderer": {
       "updatedFileCount_one": "Byl aktualizován {{displayCount}} soubor.",
@@ -2558,6 +2580,12 @@
       "startNewSession": "Spustit novou relaci",
       "exitSession": "Ukončit relaci",
       "clearSession": "Ukončit tuto relaci a spustit novou",
+      "compactDescription": "zhušť kontext aktuální relace",
+      "goalDescription": "Pokračuj v práci na cíli relace. /goal <objective> nebo pause, resume, clear",
+      "initDescription": "řízené nastavení AGENTS.md",
+      "resumeClaudeDescription": "importuj transkript relace Claude Code",
+      "resumeCodexDescription": "importuj transkript relace OpenAI Codex",
+      "reviewDescription": "zkontroluj změny [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Použít /{{command}}",
       "insert": "Vložit",
       "upgradeRequiredFallback": "Pro použití tohoto příkazu aktualizujte své CLI.",
@@ -2677,6 +2705,7 @@
     "couldNotLoadActiveSessions": "Aktivní relace se nepodařilo načíst.",
     "agentSessions": "Právě běží",
     "newCodingTask": "Nový programovací úkol",
+    "newTaskFromPicture": "Nový úkol z obrázku",
     "explore": "Prozkoumat",
     "seeAll": "Zobrazit vše",
     "noLiveSessions": "Právě nic neběží"
@@ -2898,7 +2927,8 @@
     "aiProvidersWhat": "Vaše zadání, historie konverzací a všechny připojené soubory.",
     "aiProvidersWhy": "Pro generování odpovědí AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google a další poskytovatelé podle vašeho výběru u jednotlivých požadavků.",
-    "gatewayWhat": "ID účtu, metadata požadavků, využití tokenů.",
+    "gatewayWhat": "ID účtu, metadata požadavků, využití tokenů a také prompty a hlasové nahrávky, které aplikace posílá přes něj.",
+    "viaGateway": "Přes Kilo Gateway",
     "gatewayWhy": "Ověřování identity, směrování požadavků a kontrola vyúčtování.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Hlášení o pádech a chybách, ze kterých byl odstraněn obsah aplikace.",
@@ -2918,7 +2948,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Nahrávka vaší řeči při diktování.",
     "voiceTranscriptionWhy": "Pro převod řeči na text.",
-    "voiceTranscriptionWho": "Přepis probíhá pouze v zařízení. Pokud zařízení neumí přepisovat offline, provádí ho Apple nebo Google.",
+    "voiceTranscriptionWho": "Tvoje zařízení, Kilo Gateway s tebou zvoleným modelem přepisu, nebo Apple či Google pro online rozpoznávání.",
     "installAttributionPromptTitle": "Povolit zjištění zdroje instalace?",
     "installAttributionPromptMessage": "Kilo používá oprávnění ke sledování od Apple pouze ke zjištění, odkud k nám přicházíte. Vaše zadání ani konverzace k tomu nikdy nepoužívá.",
     "what": "Co",
@@ -3130,6 +3160,12 @@
     "privacy": "Otevři Kilo a zobraz agenty",
     "openAgents": "Otevřít agenty",
     "needsInput": "Čeká na reakci",
+    "newestSession": "Nejnovější: {{title}}",
+    "noneWaiting": "Žádný agent nečeká",
+    "newAgent": "Nový agent",
+    "approving": "Schvaluje se...",
+    "couldNotApprove": "Schválení se nezdařilo",
+    "couldNotStart": "Spuštění se nezdařilo",
     "channelName": "Aktivní agenti",
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce."
   },
@@ -3165,5 +3201,12 @@
     "remoteFound": "Počítač připojen",
     "checkAgain": "Zkontrolovat znovu",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Ke spuštění agenta je potřeba zadání. Přidej zadání a spusť ho znovu.",
+      "repositoryUnknown": "Kilo nerozpoznává {{repository}} jako repozitář na GitHubu nebo GitLabu. Vyber jiný repozitář v Kilu.",
+      "repositoryUnsupported": "{{repository}} je repozitář na Bitbucketu — Spustit agenta ho zatím nemůže použít. Vyber jiný repozitář v Kilu."
+    }
   }
 }

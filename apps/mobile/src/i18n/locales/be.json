@@ -486,6 +486,8 @@
       "replyBadRequest": "Немагчыма апублікаваць гэты адказ. Магчыма, абмеркаванне змянілася.",
       "replyForbidden": "У цябе няма дазволу адказваць у гэтым запыце на зліццё.",
       "addCommentCta": "Каментаваць гэты запыт на зліццё",
+      "fixWithKilo": "Выправіць з Kilo",
+      "fixWithKiloPrompt": "Калі ласка, апрацуй наступны каментарый да запыту на зліццё: {{link}}",
       "commentBadRequest": "Немагчыма апублікаваць гэты каментарый. Магчыма, запыт на зліццё змяніўся.",
       "commentForbidden": "У цябе няма дазволу каментаваць гэты запыт на зліццё.",
       "moderation": {
@@ -582,6 +584,10 @@
       "pending": "у чаканні: {{displayCount}}",
       "skipped": "прапушчана: {{displayCount}}",
       "checksCount": "праверак: {{displayCount}}",
+      "checksCount_one": "праверка: {{displayCount}}",
+      "checksCount_few": "праверкі: {{displayCount}}",
+      "checksCount_many": "праверак: {{displayCount}}",
+      "checksCount_other": "праверак: {{displayCount}}",
       "checkDetails": "падрабязнасці праверкі"
     },
     "inbox": {
@@ -2111,6 +2117,7 @@
       "exitNeedsNewerCli": "Для аддаленага выканання каманд з касой рыскай патрэбна навейшая версія Kilo CLI. Абнавіце Kilo CLI і падключыцеся яшчэ раз."
     },
     "sessionConnection": {
+      "label": "Злучэнне",
       "connecting": "Падключэнне…",
       "reconnecting": "Паўторнае падключэнне…",
       "connectionLost": "Сувязь страчана",
@@ -2130,7 +2137,9 @@
       "removeConfirmTitle": "Выдаліць мэту?",
       "removeConfirmMessage": "CLI ачышчае мэту гэтага сеансу.",
       "updateFailed": "Не ўдалося абнавіць мэту.",
-      "sectionAccessibility": "{{status}}. Мэта: {{text}}"
+      "sectionAccessibility": "{{status}}. Мэта: {{text}}",
+      "collapse": "Згарнуць мэту",
+      "expand": "Разгарнуць мэту"
     },
     "newSession": {
       "recentlyUsed": "Нядаўна выкарыстаныя",
@@ -2184,7 +2193,20 @@
       "continueFrom": "Працягваецца сеанс «{{title}}».",
       "importingSession": "Імпартаванне сеанса",
       "cliCannotContinue": "Гэты CLI не падтрымлівае працяг сеанса. Выберыце Cloud Agent або іншы CLI.",
-      "importFailed": "Не ўдалося імпартаваць гэты сеанс."
+      "importFailed": "Не ўдалося імпартаваць гэты сеанс.",
+      "sandbox": "Пясочница",
+      "sandboxAccessibility": "Пясочница: {{label}}",
+      "sandboxDefaultWithDestination": "Па змаўчанні · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Малы",
+      "sandboxInstanceShared": "Агульны",
+      "sandboxInstanceLarge": "Вялікі",
+      "sandboxInstanceDevcontainer": "Кантэйнер распрацоўкі",
+      "sandboxInstanceProviderDefault": "Па змаўчанні пастаўшчыка",
+      "sandboxCouldNotLoad": "Не ўдалося загрузіць варыянты пясочніцы",
+      "sandboxUnavailable": "Гэта пясочница недаступная. Выберыце іншую пясочницу або Па змаўчанні.",
+      "sandboxUseDefault": "Выкарыстоўваць па змаўчанні"
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл.",
@@ -2558,6 +2580,12 @@
       "startNewSession": "Пачаць новы сеанс",
       "exitSession": "Выйсці з сеанса",
       "clearSession": "Скончыць гэты сеанс і пачаць новы",
+      "compactDescription": "сціснуць кантэкст бягучага сеансу",
+      "goalDescription": "Працягвайце працу над мэтай сеансу. /goal <objective> або pause, resume, clear",
+      "initDescription": "кіраваная налада AGENTS.md",
+      "resumeClaudeDescription": "імпартаваць транскрыпт сеансу Claude Code",
+      "resumeCodexDescription": "імпартаваць транскрыпт сеансу OpenAI Codex",
+      "reviewDescription": "прагледзець змены [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Выкарыстаць /{{command}}",
       "insert": "Уставіць",
       "upgradeRequiredFallback": "Абнавіце CLI, каб выкарыстоўваць гэтую каманду.",
@@ -2677,6 +2705,7 @@
     "couldNotLoadActiveSessions": "Не атрымалася загрузіць актыўныя сеансы.",
     "agentSessions": "Зараз выконваюцца",
     "newCodingTask": "Новая задача па праграмаванні",
+    "newTaskFromPicture": "Новая задача з малюнка",
     "explore": "Магчымасці",
     "seeAll": "Паказаць усё",
     "noLiveSessions": "Зараз нічога не выконваецца"
@@ -2898,7 +2927,8 @@
     "aiProvidersWhat": "Вашы запыты, гісторыя размоў і любыя прымацаваныя файлы.",
     "aiProvidersWhy": "Для стварэння адказаў AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google і іншыя пастаўшчыкі, якіх вы выбіраеце для кожнага запыту.",
-    "gatewayWhat": "Ідэнтыфікатар уліковага запісу, метаданыя запытаў, звесткі пра выкарыстанне токенаў.",
+    "gatewayWhat": "Ідэнтыфікатар уліковага запісу, метаданыя запытаў, звесткі пра выкарыстанне токенаў, а таксама промпты і гуказапісы, якія праграма перадае праз яго.",
+    "viaGateway": "Праз Kilo Gateway",
     "gatewayWhy": "Для аўтэнтыфікацыі, маршрутызацыі запытаў і зверкі плацяжоў.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Справаздачы аб збоях і памылках без змесціва праграмы.",
@@ -2918,7 +2948,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Запіс вашага голасу падчас дыктоўкі.",
     "voiceTranscriptionWhy": "Каб пераўтварыць маўленне ў тэкст.",
-    "voiceTranscriptionWho": "Апрацоўваецца толькі на прыладзе або перадаецца Apple ці Google, калі прылада не можа распазнаваць маўленне без інтэрнэту.",
+    "voiceTranscriptionWho": "Ваша прылада, Kilo Gateway з абранай вамі мадэллю распазнавання або Apple ці Google для анлайн-распазнавання.",
     "installAttributionPromptTitle": "Дазволіць вызначаць крыніцу ўсталявання?",
     "installAttributionPromptMessage": "Kilo выкарыстоўвае дазвол Apple на адсочванне толькі для вызначэння канала, праз які вы прыйшлі. Вашы запыты і размовы для гэтага ніколі не выкарыстоўваюцца.",
     "what": "Якія даныя",
@@ -3130,6 +3160,12 @@
     "privacy": "Адкрый Kilo, каб убачыць агентаў",
     "openAgents": "Адкрыць агентаў",
     "needsInput": "Чакае адказу",
+    "newestSession": "Найноўшы: {{title}}",
+    "noneWaiting": "Няма агентаў, якія чакаюць",
+    "newAgent": "Новы агент",
+    "approving": "Ухваляецца...",
+    "couldNotApprove": "Не ўдалося ўхваліць",
+    "couldNotStart": "Не ўдалося запусціць",
     "channelName": "Актыўныя агенты",
     "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі."
   },
@@ -3165,5 +3201,12 @@
     "remoteFound": "Камп'ютар падключаны",
     "checkAgain": "Праверыць яшчэ раз",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Каб запусціць агента, патрэбен запыт. Дадайце запыт і запусціце зноў.",
+      "repositoryUnknown": "Kilo не распазнае {{repository}} як рэпазіторый GitHub або GitLab. Выберыце іншы рэпазіторый у Kilo.",
+      "repositoryUnsupported": "{{repository}} — гэта рэпазіторый Bitbucket, і Запусціць агента пакуль не можа яго выкарыстоўваць. Выберыце іншы рэпазіторый у Kilo."
+    }
   }
 }

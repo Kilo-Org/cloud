@@ -205,6 +205,23 @@ function statusText(props: AndroidWidgetProps, palette: Palette) {
 const MARK_SIZE_DP = { compact: 22, row: 28, stack: 26 } satisfies Record<Size, number>;
 /** A short cell runs its counts in a row, so the gap separates states, not lines. */
 const COUNT_GAP_DP = { compact: 3, row: 14, stack: 6 } satisfies Record<Size, number>;
+/**
+ * The newest-session line's reserved height, in every size bucket. The slot is
+ * laid out whether or not it carries text, so work arriving (or an action's
+ * progress line replacing the session line) never moves the count rows.
+ */
+const NEWEST_LINE_DP = { compact: 15, row: 16, stack: 18 } satisfies Record<Size, number>;
+/** Smaller than the count labels above it: it is context, not a fourth state. */
+const NEWEST_FONT_DP = { compact: 11, row: 12, stack: 12 } satisfies Record<Size, number>;
+/** One action-row size in every bucket, so the rows themselves never reflow. */
+const ACTION_FONT_DP = 12;
+/**
+ * The action chip's tap target, in dp. The chip is the widget's only in-place
+ * action, so it holds Android's 48 dp minimum target; a 12 dp label with 4 dp
+ * of vertical padding drew a ~25 dp chip and a hurried tap missed it. The
+ * label is centered in the taller chip.
+ */
+const ACTION_TARGET_DP = 48;
 
 function renderCounts(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
   if (props.countLines.length === 0) {
@@ -236,9 +253,107 @@ function renderCounts(props: AndroidWidgetProps, palette: Palette, shape: Shape)
   );
 }
 
+/**
+ * The newest-session slot: the reserved line under the counts. Drawn as an
+ * empty box when there is nothing to say, so the slot's height is reserved in
+ * every size bucket and a loading→content swap cannot move the count rows.
+ */
+function newestSlot(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
+  const { size, rtl } = shape;
+  return (
+    <FlexWidget
+      key="newest"
+      style={{
+        height: NEWEST_LINE_DP[size],
+        width: 'match_parent',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: startEdge(rtl),
+      }}
+    >
+      {props.newestLine === null ? null : (
+        <TextWidget
+          key="newest-text"
+          text={props.newestLine}
+          maxLines={1}
+          truncate="END"
+          style={{ color: palette.muted, fontSize: NEWEST_FONT_DP[size] }}
+        />
+      )}
+    </FlexWidget>
+  );
+}
+
+/**
+ * One in-place action. A custom `clickAction` string makes the library launch a
+ * headless task (`register.ts`) instead of opening the app, so the body keeps
+ * its own `OPEN_URI` deep link and a tap beside the rows still opens Kilo.
+ *
+ * The chip is `ACTION_TARGET_DP` tall with the label centered: the target is
+ * the whole chip, so the old padded-to-the-text height made taps miss.
+ */
+function actionRow(label: string, clickAction: 'approve' | 'new-agent', palette: Palette) {
+  return (
+    <FlexWidget
+      key={clickAction}
+      clickAction={clickAction}
+      accessibilityLabel={label}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        height: ACTION_TARGET_DP,
+        paddingHorizontal: 10,
+        borderWidth: 1,
+        borderColor: palette.muted,
+        borderRadius: 8,
+      }}
+    >
+      <TextWidget
+        key="label"
+        text={label}
+        maxLines={1}
+        style={{ color: palette.foreground, fontSize: ACTION_FONT_DP, fontWeight: 'bold' }}
+      />
+    </FlexWidget>
+  );
+}
+
+/** Only the actions the state offers draw; a state with neither draws no row. */
+function actionRows(props: AndroidWidgetProps, palette: Palette, rtl: boolean) {
+  const rows: React.ReactNode[] = [];
+  if (props.actions.approve) {
+    rows.push(actionRow(props.actions.approveLabel, 'approve', palette));
+  }
+  if (props.actions.newAgent) {
+    rows.push(actionRow(props.actions.newAgentLabel, 'new-agent', palette));
+  }
+  if (rows.length === 0) {
+    return null;
+  }
+  return (
+    <FlexWidget key="actions" style={{ flexDirection: 'row', alignItems: 'center', flexGap: 8 }}>
+      {inReadingOrder(rows, rtl)}
+    </FlexWidget>
+  );
+}
+
 function renderSurface(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
   const { size, rtl } = shape;
-  const body = renderCounts(props, palette, shape);
+  const body = (
+    <FlexWidget
+      key="body"
+      style={{
+        flexDirection: 'column',
+        alignItems: startEdge(rtl),
+        flexGap: 6,
+        ...(size === 'stack' ? { width: 'match_parent' as const } : {}),
+      }}
+    >
+      {renderCounts(props, palette, shape)}
+      {newestSlot(props, palette, shape)}
+      {actionRows(props, palette, rtl)}
+    </FlexWidget>
+  );
   // Short cells put the mark beside the counts; a tall cell stacks the mark on
   // top and lets the counts sit at the bottom, the same composition as the iOS
   // small family.

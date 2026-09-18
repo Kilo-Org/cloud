@@ -486,6 +486,8 @@
       "replyBadRequest": "Tega odgovora ni mogoče objaviti. Nit se je morda spremenila.",
       "replyForbidden": "Nimaš dovoljenja za odgovarjanje na ta zahtevek za združitev.",
       "addCommentCta": "Komentiraj ta zahtevek za združitev",
+      "fixWithKilo": "Popravi s Kilo",
+      "fixWithKiloPrompt": "Prosimo, reši naslednji komentar v tem zahtevku za združitev: {{link}}",
       "commentBadRequest": "Tega komentarja ni mogoče objaviti. Zahtevek za združitev se je morda spremenil.",
       "commentForbidden": "Nimaš dovoljenja za komentiranje tega zahtevka za združitev.",
       "moderation": {
@@ -582,6 +584,10 @@
       "pending": "na čakanju: {{displayCount}}",
       "skipped": "preskočeno: {{displayCount}}",
       "checksCount": "preverjanja: {{displayCount}}",
+      "checksCount_one": "preverjanje: {{displayCount}}",
+      "checksCount_two": "preverjanji: {{displayCount}}",
+      "checksCount_few": "preverjanja: {{displayCount}}",
+      "checksCount_other": "preverjanja: {{displayCount}}",
       "checkDetails": "podrobnosti preverjanja"
     },
     "inbox": {
@@ -2111,6 +2117,7 @@
       "exitNeedsNewerCli": "Za oddaljene ukaze s poševnico potrebuješ novejšo različico Kilo CLI. Posodobi Kilo CLI in se znova poveži."
     },
     "sessionConnection": {
+      "label": "Povezava",
       "connecting": "Povezovanje…",
       "reconnecting": "Ponovno povezovanje…",
       "connectionLost": "Povezava prekinjena",
@@ -2130,7 +2137,9 @@
       "removeConfirmTitle": "Odstranim cilj?",
       "removeConfirmMessage": "CLI izbriše cilj te seje.",
       "updateFailed": "Cilja ni bilo mogoče posodobiti.",
-      "sectionAccessibility": "{{status}}. Cilj: {{text}}"
+      "sectionAccessibility": "{{status}}. Cilj: {{text}}",
+      "collapse": "Strni cilj",
+      "expand": "Razširi cilj"
     },
     "newSession": {
       "recentlyUsed": "Nedavno uporabljeno",
@@ -2184,7 +2193,20 @@
       "continueFrom": "Nadaljuje se seja {{title}}.",
       "importingSession": "Uvažanje seje",
       "cliCannotContinue": "Ta CLI ne podpira nadaljevanja seje. Izberi Cloud Agent ali drug CLI.",
-      "importFailed": "Te seje ni bilo mogoče uvoziti."
+      "importFailed": "Te seje ni bilo mogoče uvoziti.",
+      "sandbox": "Peskovnik",
+      "sandboxAccessibility": "Peskovnik: {{label}}",
+      "sandboxDefaultWithDestination": "Privzeto · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Malo",
+      "sandboxInstanceShared": "V skupni rabi",
+      "sandboxInstanceLarge": "Veliko",
+      "sandboxInstanceDevcontainer": "Razvojni vsebnik",
+      "sandboxInstanceProviderDefault": "Privzeto ponudnika",
+      "sandboxCouldNotLoad": "Možnosti peskovnika ni bilo mogoče naložiti",
+      "sandboxUnavailable": "Ta peskovnik ni na voljo. Izberite drug peskovnik ali Privzeto.",
+      "sandboxUseDefault": "Uporabi Privzeto"
     },
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena je {{displayCount}} datoteka.",
@@ -2558,6 +2580,12 @@
       "startNewSession": "Začni novo sejo",
       "exitSession": "Zapusti sejo",
       "clearSession": "Končaj to sejo in začni novo",
+      "compactDescription": "stisni kontekst trenutne seje",
+      "goalDescription": "Nadaljuj z delom proti cilju seje. /goal <objective> ali pause, resume, clear",
+      "initDescription": "vodeno nastavljanje AGENTS.md",
+      "resumeClaudeDescription": "uvozi prepis seje Claude Code",
+      "resumeCodexDescription": "uvozi prepis seje OpenAI Codex",
+      "reviewDescription": "preglej spremembe [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Uporabi /{{command}}",
       "insert": "Vstavi",
       "upgradeRequiredFallback": "Nadgradi svoj CLI za uporabo tega ukaza.",
@@ -2677,6 +2705,7 @@
     "couldNotLoadActiveSessions": "Aktivnih sej ni bilo mogoče naložiti.",
     "agentSessions": "Trenutno aktivno",
     "newCodingTask": "Nova programska naloga",
+    "newTaskFromPicture": "Nova naloga iz slike",
     "explore": "Razišči",
     "seeAll": "Prikaži vse",
     "noLiveSessions": "Trenutno se nič ne izvaja"
@@ -2898,7 +2927,8 @@
     "aiProvidersWhat": "Tvoji pozivi, zgodovina pogovorov in vse datoteke, ki jih priložiš.",
     "aiProvidersWhy": "Za ustvarjanje odgovorov umetne inteligence.",
     "aiProvidersWho": "Anthropic, OpenAI, Google in drugi ponudniki, ki jih izbereš za posamezno zahtevo.",
-    "gatewayWhat": "ID računa, metapodatki zahtev, poraba žetonov.",
+    "gatewayWhat": "ID računa, metapodatki zahtev, poraba žetonov ter pozivi in glasovni posnetki, ki jih aplikacija pošilja prek njega.",
+    "viaGateway": "Prek Kilo Gateway",
     "gatewayWhy": "Preverjanje pristnosti, usmerjanje zahtev, usklajevanje obračunov.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Poročila o sesutjih in napakah z odstranjeno vsebino aplikacije.",
@@ -2918,7 +2948,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Tvoj posnetek med narekovanjem.",
     "voiceTranscriptionWhy": "Za pretvorbo govora v besedilo.",
-    "voiceTranscriptionWho": "Samo v napravi; če prepisovanje brez povezave ni mogoče, pri ponudniku Apple ali Google.",
+    "voiceTranscriptionWho": "Tvoja naprava, Kilo Gateway z izbranim modelom prepisovanja ali Apple ali Google za prepoznavanje v spletu.",
     "installAttributionPromptTitle": "Želiš dovoliti ugotavljanje vira namestitve?",
     "installAttributionPromptMessage": "Kilo uporablja dovoljenje za sledenje podjetja Apple le za ugotavljanje, prek katerega kanala si prišel do aplikacije. Tvojih pozivov in pogovorov za to nikoli ne uporabimo.",
     "what": "Kaj",
@@ -3130,6 +3160,12 @@
     "privacy": "Odpri Kilo za ogled agentov",
     "openAgents": "Odpri agente",
     "needsInput": "Čaka na vnos",
+    "newestSession": "Najnovejša: {{title}}",
+    "noneWaiting": "Noben agent ne čaka",
+    "newAgent": "Nov agent",
+    "approving": "Odobritev poteka...",
+    "couldNotApprove": "Odobritev ni uspela",
+    "couldNotStart": "Zagon ni uspel",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu."
   },
@@ -3165,5 +3201,12 @@
     "remoteFound": "Računalnik povezan",
     "checkAgain": "Preveri znova",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Za zagon agenta je potreben poziv. Dodaj poziv in ga znova zaženi.",
+      "repositoryUnknown": "Kilo ne prepozna {{repository}} kot repozitorij GitHub ali GitLab. Izberi drug repozitorij v Kilu.",
+      "repositoryUnsupported": "{{repository}} je repozitorij Bitbucket — Zaženi agenta ga še ne more uporabiti. Izberi drug repozitorij v Kilu."
+    }
   }
 }

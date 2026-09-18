@@ -480,6 +480,8 @@
       "replyBadRequest": "Pa ka pibliye repons sa a. Petèt fil diskisyon an chanje.",
       "replyForbidden": "Ou pa gen pèmisyon pou reponn demann fizyon sa a.",
       "addCommentCta": "Fè yon kòmantè sou demann fizyon sa a",
+      "fixWithKilo": "Korije ak Kilo",
+      "fixWithKiloPrompt": "Tanpri rezoud kòmantè sa a sou demann fizyon an: {{link}}",
       "commentBadRequest": "Pa ka pibliye kòmantè sa a. Petèt demann fizyon an chanje.",
       "commentForbidden": "Ou pa gen pèmisyon pou fè yon kòmantè sou demann fizyon sa a.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} ap tann",
       "skipped": "{{displayCount}} sote",
       "checksCount": "{{displayCount}} verifikasyon",
+      "checksCount_one": "{{displayCount}} verifikasyon",
+      "checksCount_other": "{{displayCount}} verifikasyon",
       "checkDetails": "detay verifikasyon an"
     },
     "inbox": {
@@ -2077,6 +2081,7 @@
       "exitNeedsNewerCli": "Pou itilize kòmandman ki kòmanse ak / adistans, ou bezwen yon vèsyon Kilo CLI ki pi resan. Mete Kilo CLI ajou epi rekonekte."
     },
     "sessionConnection": {
+      "label": "Koneksyon",
       "connecting": "Ap konekte…",
       "reconnecting": "Ap rekonekte…",
       "connectionLost": "Koneksyon an koupe",
@@ -2096,7 +2101,9 @@
       "removeConfirmTitle": "Retire objektif la?",
       "removeConfirmMessage": "CLI a efase objektif sesyon sa a.",
       "updateFailed": "Pa t kapab mete objektif la ajou.",
-      "sectionAccessibility": "{{status}}. Objektif: {{text}}"
+      "sectionAccessibility": "{{status}}. Objektif: {{text}}",
+      "collapse": "Kache objektif la",
+      "expand": "Montre objektif la"
     },
     "newSession": {
       "recentlyUsed": "Itilize dènyèman",
@@ -2150,7 +2157,20 @@
       "continueFrom": "Nou ap kontinye {{title}}.",
       "importingSession": "Ap enpòte sesyon an",
       "cliCannotContinue": "CLI sa a pa ka kontinye yon sesyon. Chwazi Cloud Agent oswa yon lòt CLI.",
-      "importFailed": "Nou pa t ka enpòte sesyon sa a."
+      "importFailed": "Nou pa t ka enpòte sesyon sa a.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Pa defo · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Piti",
+      "sandboxInstanceShared": "Pataje",
+      "sandboxInstanceLarge": "Gwo",
+      "sandboxInstanceDevcontainer": "Kontener Dev",
+      "sandboxInstanceProviderDefault": "Pa defo founisè a",
+      "sandboxCouldNotLoad": "Pa ka chaje opsyon sandbox yo",
+      "sandboxUnavailable": "Sandbox sa a pa disponib. Chwazi yon lòt sandbox oswa Pa defo.",
+      "sandboxUseDefault": "Sèvi ak Pa defo"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nou mete {{displayCount}} fichye ajou.",
@@ -2516,6 +2536,12 @@
       "startNewSession": "Kòmanse yon nouvo sesyon",
       "exitSession": "Soti nan sesyon an",
       "clearSession": "Fini sesyon sa a epi kòmanse yon nouvo sesyon",
+      "compactDescription": "konprese kontèks sesyon aktyèl la",
+      "goalDescription": "Kontinye travay pou rive nan yon objektif sesyon. /goal <objective> oswa pause, resume, clear",
+      "initDescription": "konfigirasyon AGENTS.md gide",
+      "resumeClaudeDescription": "enpòte yon transkripsyon sesyon Claude Code",
+      "resumeCodexDescription": "enpòte yon transkripsyon sesyon OpenAI Codex",
+      "reviewDescription": "revize chanjman yo [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Sèvi ak /{{command}}",
       "insert": "Antre",
       "upgradeRequiredFallback": "Tanpri mete CLI ou a ajou pou sèvi ak kòmandman sa a.",
@@ -2633,6 +2659,7 @@
     "couldNotLoadActiveSessions": "Nou pa t ka chaje sesyon aktif yo.",
     "agentSessions": "Aktif kounye a",
     "newCodingTask": "Nouvo travay pwogramasyon",
+    "newTaskFromPicture": "Nouvo travay soti nan yon foto",
     "explore": "Eksplore",
     "seeAll": "Gade tout",
     "noLiveSessions": "Pa gen anyen k ap mache kounye a"
@@ -2854,7 +2881,8 @@
     "aiProvidersWhat": "Enstriksyon ou yo, istorik konvèsasyon yo ak tout fichye ou atache.",
     "aiProvidersWhy": "Pou jenere repons AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google, ak lòt founisè ou chwazi pou chak demann.",
-    "gatewayWhat": "ID kont, metadone demann ak itilizasyon jeton.",
+    "gatewayWhat": "ID kont, metadone demann, itilizasyon jeton, ansanm ak prompt yo ak anrejistreman vwa ke app la voye atravè li.",
+    "viaGateway": "Atravè Kilo Gateway",
     "gatewayWhy": "Verifye idantite ou, dirije demann yo epi verifye korespondans done faktirasyon yo.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Rapò pann ak erè ki pa gen kontni aplikasyon an ladan yo.",
@@ -2874,7 +2902,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Anrejistreman ou pandan w ap dikte.",
     "voiceTranscriptionWhy": "Pou konvèti pawòl an tèks.",
-    "voiceTranscriptionWho": "Sou aparèy la sèlman, oswa atravè Apple oswa Google lè aparèy sa a pa ka transkri san entènèt.",
+    "voiceTranscriptionWho": "Aparèy ou, Kilo Gateway ak modèl transkripsyon ou chwazi a, oswa Apple oswa Google pou rekonesans sou entènèt.",
     "installAttributionPromptTitle": "Pèmèt idantifikasyon sous enstalasyon an?",
     "installAttributionPromptMessage": "Kilo itilize pèmisyon swivi Apple la sèlman pou konnen ki sous ki mennen ou isit la. Li pa janm itilize enstriksyon oswa konvèsasyon ou yo pou sa.",
     "what": "Kisa",
@@ -3084,6 +3112,12 @@
     "privacy": "Louvri Kilo pou wè ajan yo",
     "openAgents": "Louvri ajan yo",
     "needsInput": "Bezwen repons",
+    "newestSession": "Pi nouvo: {{title}}",
+    "noneWaiting": "Pa gen ajan k ap tann",
+    "newAgent": "Nouvo ajan",
+    "approving": "Ap apwouve...",
+    "couldNotApprove": "Pa t kapab apwouve",
+    "couldNotStart": "Pa t kapab kòmanse",
     "channelName": "Ajan aktif",
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an."
   },
@@ -3119,5 +3153,12 @@
     "remoteFound": "Òdinatè konekte",
     "checkAgain": "Tcheke ankò",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Kòmanse ajan bezwen yon enstriksyon. Ajoute yon enstriksyon epi kouri li ankò.",
+      "repositoryUnknown": "Kilo pa rekonèt {{repository}} kòm yon depo GitHub oswa GitLab. Chwazi yon lòt depo nan Kilo.",
+      "repositoryUnsupported": "{{repository}} se yon depo Bitbucket — Kòmanse ajan poko ka itilize li. Chwazi yon lòt depo nan Kilo."
+    }
   }
 }

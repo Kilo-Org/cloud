@@ -1,4 +1,4 @@
-import { AppState } from 'react-native';
+import { AppState, Linking } from 'react-native';
 import { type WidgetTaskHandlerProps } from 'react-native-android-widget';
 
 import { i18n } from '@/i18n';
@@ -8,6 +8,13 @@ import {
 } from '@/lib/glanceable/live-activity-switch';
 import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
+import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
+import {
+  failureFeedback,
+  runningFeedback,
+  runWidgetAction,
+  type WidgetAction,
+} from '@/lib/glanceable/widget-actions';
 import {
   getResolvedLanguage,
   whenLanguagePreferenceLoaded,
@@ -17,7 +24,11 @@ import { renderActiveAgentsWidget } from './active-agents-widget';
 import { androidSink, getCurrentWidgetProps, handleAppStateActive } from './android-sink';
 import { formatGlanceableCount, isWidgetRtl } from './count-format';
 import { getStoredWidgetSnapshot, setWidgetSnapshot } from './live-update';
-import { buildCurrentWidgetProps, buildGenericWidgetProps } from './widget-props';
+import {
+  type AndroidWidgetProps,
+  buildCurrentWidgetProps,
+  buildGenericWidgetProps,
+} from './widget-props';
 
 // Register the Android sink at import time. The main-app import of the local
 // live-update module loads this file, so the sink subscribes before any widget
@@ -53,13 +64,68 @@ function translate(key: string): string {
  *
  * A widget redraw runs as a headless JS task with no Activity, so the app's
  * root never mounts and nothing else applies the language — without this the
- * placed widget renders English whatever the user chose.
+ * placed widget renders English whatever the user chose. Exported because the
+ * headless approve task runs the same way and must speak one language with it.
  */
-async function applyWidgetLanguage(): Promise<void> {
+export async function applyWidgetLanguage(): Promise<void> {
   await whenLanguagePreferenceLoaded();
   const language = getResolvedLanguage();
   if (i18n.language !== language) {
     await i18n.changeLanguage(language);
+  }
+}
+
+/** The custom click actions the widget's own rows emit (never OPEN_APP/OPEN_URI). */
+function isWidgetAction(value: string | undefined): value is WidgetAction {
+  return value === 'approve' || value === 'new-agent';
+}
+
+/** Where an unfinished action lands: the same agents list the body tap opens. */
+const OPEN_AGENTS_URI = 'kiloapp:///cloud/sessions';
+/** Where a create with nothing to start from lands: the new-session screen. */
+const OPEN_NEW_AGENT_URI = 'kiloapp://agent-chat/new';
+
+/**
+ * Run one in-place action and redraw the widget the user is looking at. The
+ * action's request goes out with its progress line already drawn, and the
+ * redraw after it re-reads native storage: a successful action republishes the
+ * tray through the sink, which writes the new snapshot there (see
+ * `runWidgetAction`). A custom clickAction itself never opens the app — it
+ * launches a headless task — but an action that cannot complete in place hands
+ * the user to the app instead of dead-ending on the widget.
+ */
+async function handleWidgetAction(
+  action: WidgetAction,
+  task: Pick<WidgetTaskHandlerProps, 'renderWidget' | 'widgetInfo'>,
+  currentProps: () => AndroidWidgetProps
+): Promise<void> {
+  const { renderWidget, widgetInfo } = task;
+  const draw = () => {
+    renderWidget(renderActiveAgentsWidget(currentProps(), widgetInfo, isWidgetRtl()));
+  };
+  setSurfaceExtras({ ...getSurfaceExtras(), actionFeedback: runningFeedback(action) });
+  draw();
+  const result = await runWidgetAction(action);
+  setSurfaceExtras({
+    ...getSurfaceExtras(),
+    // The failure line is the action's own retry copy, and the row that was
+    // tapped stays offered; the body tap still opens Kilo.
+    actionFeedback: result.kind === 'failed' ? failureFeedback(action) : null,
+  });
+  draw();
+  // Nothing to act on, or the agent asked a free-form question the widget must
+  // never invent an answer to: the action hands the user to the app. The
+  // create action lands on the new-session screen when it had no draft or
+  // repository to start from; a failed call stays on the widget, whose retry
+  // row and body tap remain offered.
+  if (result.kind === 'none' || result.kind === 'no-permission') {
+    const uri = action === 'approve' ? OPEN_AGENTS_URI : OPEN_NEW_AGENT_URI;
+    try {
+      await Linking.openURL(uri);
+    } catch {
+      // A host that cannot start the Activity leaves the settled widget on
+      // screen; the task itself must not fail on the open.
+    }
   }
 }
 
@@ -69,13 +135,14 @@ async function applyWidgetLanguage(): Promise<void> {
  * else has loaded the Android sink by then.
  */
 export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<void> {
-  const { widgetInfo, renderWidget } = task;
+  const { widgetInfo, renderWidget, widgetAction, clickAction } = task;
 
   await applyWidgetLanguage();
 
   // Re-read native storage even in a live process. An old alarm can already have
   // queued this task when newer work or a privacy blank replaces its deadline.
   const stored = getStoredWidgetSnapshot();
+  let snapshot = stored;
   let props =
     stored === null
       ? getCurrentWidgetProps()
@@ -83,16 +150,41 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
   if (props === null) {
     // Migrate the existing mirror when this installation has no native snapshot yet.
     await restorePersistedGlanceable();
-    const snapshot = getLastGlanceableSnapshot();
-    if (snapshot !== null && getCurrentWidgetProps() === null) {
-      setWidgetSnapshot(snapshot);
+    const restored = getLastGlanceableSnapshot();
+    if (restored !== null && getCurrentWidgetProps() === null) {
+      setWidgetSnapshot(restored);
     }
-    props =
-      snapshot === null
-        ? buildGenericWidgetProps(translate)
-        : buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount);
-    // A live publish during restoration owns the widget.
-    props = getCurrentWidgetProps() ?? props;
+    const live = getCurrentWidgetProps();
+    if (live === null) {
+      snapshot = restored;
+      props =
+        restored === null
+          ? buildGenericWidgetProps(translate)
+          : buildCurrentWidgetProps(restored, translate, formatGlanceableCount);
+    } else {
+      // A live publish during restoration owns the widget.
+      snapshot = null;
+      props = live;
+    }
   }
-  renderWidget(renderActiveAgentsWidget(props, widgetInfo, isWidgetRtl()));
+
+  // Redraw from native storage, which is authoritative even when an obsolete
+  // task was already queued. An in-place action republishes the tray through
+  // the sink, which writes the new snapshot there, so the redraw after it shows
+  // the new counts instead of the snapshot this task started with. `snapshot`
+  // and `props` are the fallback when native storage holds nothing.
+  const currentProps = (): AndroidWidgetProps => {
+    const latest = getStoredWidgetSnapshot();
+    if (latest !== null) {
+      return buildCurrentWidgetProps(latest, translate, formatGlanceableCount);
+    }
+    return snapshot === null
+      ? props
+      : buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount);
+  };
+  if (widgetAction === 'WIDGET_CLICK' && isWidgetAction(clickAction)) {
+    await handleWidgetAction(clickAction, task, currentProps);
+    return;
+  }
+  renderWidget(renderActiveAgentsWidget(currentProps(), widgetInfo, isWidgetRtl()));
 }

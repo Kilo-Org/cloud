@@ -1609,6 +1609,7 @@
       "exitNeedsNewerCli": "Віддалені слеш-команди потребують новішої версії Kilo CLI. Оновіть Kilo CLI та підключіться знову."
     },
     "sessionConnection": {
+      "label": "З'єднання",
       "connecting": "Підключення…",
       "reconnecting": "Повторне підключення…",
       "connectionLost": "З'єднання втрачено",
@@ -1628,7 +1629,9 @@
       "removeConfirmTitle": "Видалити ціль?",
       "removeConfirmMessage": "CLI очищає ціль цього сеансу.",
       "updateFailed": "Не вдалося оновити ціль.",
-      "sectionAccessibility": "{{status}}. Ціль: {{text}}"
+      "sectionAccessibility": "{{status}}. Ціль: {{text}}",
+      "collapse": "Згорнути ціль",
+      "expand": "Розгорнути ціль"
     },
     "newSession": {
       "recentlyUsed": "Нещодавно використані",
@@ -1682,7 +1685,20 @@
       "continueFrom": "Продовжується сеанс «{{title}}».",
       "importingSession": "Імпортування сеансу",
       "cliCannotContinue": "Цей CLI не підтримує продовження сеансів. Виберіть Cloud Agent або інший CLI.",
-      "importFailed": "Не вдалося імпортувати цей сеанс."
+      "importFailed": "Не вдалося імпортувати цей сеанс.",
+      "sandbox": "Пісочниця",
+      "sandboxAccessibility": "Пісочниця: {{label}}",
+      "sandboxDefaultWithDestination": "За замовчуванням · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Мала",
+      "sandboxInstanceShared": "Спільна",
+      "sandboxInstanceLarge": "Велика",
+      "sandboxInstanceDevcontainer": "Контейнер розробки",
+      "sandboxInstanceProviderDefault": "За замовчуванням постачальника",
+      "sandboxCouldNotLoad": "Не вдалося завантажити параметри пісочниці",
+      "sandboxUnavailable": "Ця пісочниця недоступна. Виберіть іншу пісочницю або «За замовчуванням».",
+      "sandboxUseDefault": "Використати «За замовчуванням»"
     },
     "partRenderer": {
       "updatedFileCount_one": "Оновлено {{displayCount}} файл.",
@@ -2056,6 +2072,12 @@
       "startNewSession": "Розпочати новий сеанс",
       "exitSession": "Завершити сеанс",
       "clearSession": "Завершити цей сеанс і розпочати новий",
+      "compactDescription": "стиснути контекст поточного сеансу",
+      "goalDescription": "Продовжуй працювати над метою сеансу. /goal <objective> або pause, resume, clear",
+      "initDescription": "покрокове налаштування AGENTS.md",
+      "resumeClaudeDescription": "імпортувати транскрипт сеансу Claude Code",
+      "resumeCodexDescription": "імпортувати транскрипт сеансу OpenAI Codex",
+      "reviewDescription": "переглянути зміни [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Використати /{{command}}",
       "insert": "Вставити",
       "upgradeRequiredFallback": "Оновіть CLI, щоб скористатися цією командою.",
@@ -2175,6 +2197,7 @@
     "couldNotLoadActiveSessions": "Не вдалося завантажити активні сеанси.",
     "agentSessions": "Активні зараз",
     "newCodingTask": "Нове завдання з програмування",
+    "newTaskFromPicture": "Нове завдання із зображення",
     "explore": "Можливості",
     "seeAll": "Показати всі",
     "noLiveSessions": "Зараз нічого не запущено"
@@ -2396,7 +2419,8 @@
     "aiProvidersWhat": "Ваші запити, історія розмов і будь-які файли, які ви прикріплюєте.",
     "aiProvidersWhy": "Для створення відповідей ШІ.",
     "aiProvidersWho": "Anthropic, OpenAI, Google та інші постачальники, яких ви вибираєте для кожного запиту.",
-    "gatewayWhat": "Ідентифікатор облікового запису, метадані запитів, дані про використання токенів.",
+    "gatewayWhat": "Ідентифікатор облікового запису, метадані запитів, дані про використання токенів, а також промпти й голосові записи, які застосунок надсилає через нього.",
+    "viaGateway": "Через Kilo Gateway",
     "gatewayWhy": "Для автентифікації, маршрутизації запитів і звіряння платежів.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Звіти про збої та помилки, з яких видалено вміст застосунку.",
@@ -2416,7 +2440,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Запис вашого голосу під час диктування.",
     "voiceTranscriptionWhy": "Щоб перетворити мовлення на текст.",
-    "voiceTranscriptionWho": "Лише на пристрої або в Apple чи Google, якщо пристрій не може розпізнавати мовлення без інтернету.",
+    "voiceTranscriptionWho": "Ваш пристрій, Kilo Gateway із вибраною вами моделлю розпізнавання мовлення або Apple чи Google для розпізнавання онлайн.",
     "what": "Які дані",
     "why": "Навіщо",
     "who": "Хто отримує дані",
@@ -2428,6 +2452,10 @@
     "checkConnection": "Перевірити з’єднання",
     "checks": {
       "checksCount": "перевірок: {{displayCount}}",
+      "checksCount_one": "перевірка: {{displayCount}}",
+      "checksCount_few": "перевірки: {{displayCount}}",
+      "checksCount_many": "перевірок: {{displayCount}}",
+      "checksCount_other": "перевірок: {{displayCount}}",
       "couldNotLoad": "Не вдалося завантажити перевірки.",
       "failed": "з помилками: {{displayCount}}",
       "noAccess": "У вас немає доступу до перевірок цього репозиторію.",
@@ -2527,6 +2555,8 @@
       "replyBody": "Текст відповіді",
       "replyForbidden": "У вас немає дозволу відповідати в цьому запиті на злиття.",
       "addCommentCta": "Коментувати цей запит на злиття",
+      "fixWithKilo": "Виправити з Kilo",
+      "fixWithKiloPrompt": "Будь ласка, опрацюй наступний коментар у запиті на злиття: {{link}}",
       "commentBadRequest": "Цей коментар неможливо опублікувати. Можливо, запит на злиття змінився.",
       "commentForbidden": "У вас немає дозволу коментувати в цьому запиті на злиття.",
       "replyPlaceholder": "Ваша відповідь…",
@@ -3130,6 +3160,12 @@
     "privacy": "Відкрийте Kilo, щоб побачити агентів",
     "openAgents": "Відкрити агентів",
     "needsInput": "Очікує відповіді",
+    "newestSession": "Найновіший: {{title}}",
+    "noneWaiting": "Немає агентів в очікуванні",
+    "newAgent": "Новий агент",
+    "approving": "Схвалюється...",
+    "couldNotApprove": "Не вдалося схвалити",
+    "couldNotStart": "Не вдалося запустити",
     "channelName": "Активні агенти",
     "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані."
   },
@@ -3165,5 +3201,12 @@
     "remoteFound": "Комп'ютер підключено",
     "checkAgain": "Перевірити ще раз",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Для запуску агента потрібен запит. Додайте запит і запустіть знову.",
+      "repositoryUnknown": "Kilo не розпізнає {{repository}} як репозиторій GitHub або GitLab. Виберіть інший репозиторій у Kilo.",
+      "repositoryUnsupported": "{{repository}} — репозиторій Bitbucket, і Запустити агента поки не може його використовувати. Виберіть інший репозиторій у Kilo."
+    }
   }
 }

@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
+  effectiveAppTypeCondition,
+  lockGitHubInstallationIdentity,
   observeGitHubInstallationLifecycle,
 } from '@/lib/integrations/db/github-installations';
 import { db } from '@/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import {
   autoCompleteInstallation,
   deleteGitHubInstallationRecords,
-  findIntegrationByInstallationId,
+  findConnectedIntegrationByInstallationId,
   suspendIntegration,
   suspendIntegrationForOwner,
   unsuspendIntegration,
@@ -48,13 +50,7 @@ export async function handleInstallationCreated(
 
   // Build installation data using helper function
   const installationData = buildInstallationData(installation);
-  const appTypeCondition =
-    appType === 'standard'
-      ? or(
-          eq(platform_integrations.github_app_type, 'standard'),
-          isNull(platform_integrations.github_app_type)
-        )
-      : eq(platform_integrations.github_app_type, 'lite');
+  const appTypeCondition = effectiveAppTypeCondition(appType);
 
   logExceptInTest('GitHub App installation created:', {
     installation_id: installationData.installation_id,
@@ -124,16 +120,65 @@ export async function handleInstallationCreated(
     if (legacyMatches.length === 1) pending = legacyMatches[0];
   }
   if (pending) {
-    await autoCompleteInstallation({
-      integrationId: pending.id,
-      installationData,
-      existingMetadata: (pending.metadata as Record<string, unknown> | null) ?? {},
+    // The exclusivity decision, the pending-row completion, and the canonical
+    // binding must be one serialized unit. Otherwise a competing verified
+    // connection can commit between the check and the bind and leave two
+    // active tenant associations on one canonical installation while
+    // sharing_mode stays exclusive — i.e. the pending request bypasses
+    // sharing admission entirely. The advisory lock is the same one
+    // connectVerifiedGitHubInstallation/bindGitHubIntegrationToCanonicalInstallation
+    // take on the installation identity, so both paths serialize here.
+    const completed = await db.transaction(async tx => {
+      await lockGitHubInstallationIdentity(tx, appType, installationData.installation_id);
+      // Count every OTHER live association for this installation, not only
+      // those already bound to a canonical row. With connection management
+      // disabled the legacy callback commits an unbound association and binds
+      // it in a separate step, so a bound-only check would miss that peer and
+      // auto-attach a second tenant to the same installation.
+      const [competingAssociation] = await tx
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.GITHUB),
+            appTypeCondition,
+            eq(platform_integrations.platform_installation_id, installationData.installation_id),
+            ne(platform_integrations.id, pending.id),
+            isNull(platform_integrations.github_disconnected_at),
+            inArray(platform_integrations.integration_status, [
+              INTEGRATION_STATUS.PENDING,
+              INTEGRATION_STATUS.ACTIVE,
+            ])
+          )
+        );
+      if (competingAssociation) return false;
+      await autoCompleteInstallation(
+        {
+          integrationId: pending.id,
+          installationData,
+          existingMetadata: (pending.metadata as Record<string, unknown> | null) ?? {},
+        },
+        tx
+      );
+      await bindGitHubIntegrationToCanonicalInstallation(
+        {
+          integrationId: pending.id,
+          installationId: installationData.installation_id,
+          appType,
+        },
+        tx
+      );
+      return true;
     });
-    await bindGitHubIntegrationToCanonicalInstallation({
-      integrationId: pending.id,
-      installationId: installationData.installation_id,
-      appType,
-    });
+    if (!completed) {
+      // Another tenant already owns this installation: the pending request
+      // must not be auto-activated. Leave it pending so it goes through
+      // verified sharing admission on the connect-existing path.
+      return NextResponse.json(
+        { message: 'Installation association requires verified connection confirmation' },
+        { status: 200 }
+      );
+    }
     try {
       const repositories = await fetchGitHubRepositories(installationData.installation_id, appType);
       await updateRepositoriesForIntegration(pending.id, repositories);
@@ -158,6 +203,15 @@ export async function handleInstallationDeleted(
 ) {
   const installationIdStr = payload.installation.id.toString();
 
+  await observeGitHubInstallationLifecycle({
+    installationId: installationIdStr,
+    appType,
+    state: 'deleted',
+  });
+  if (!isGitHubConnectionManagementEnabled()) {
+    await deleteGitHubInstallationRecords(installationIdStr, appType);
+  }
+
   try {
     // The bot identity store has no app-type dimension and the lite app has no
     // bot-link flow, so only the standard app unlinks team bot identities.
@@ -172,15 +226,6 @@ export async function handleInstallationDeleted(
     });
   }
 
-  await observeGitHubInstallationLifecycle({
-    installationId: installationIdStr,
-    appType,
-    state: 'deleted',
-  });
-  if (!isGitHubConnectionManagementEnabled()) {
-    await deleteGitHubInstallationRecords(installationIdStr, appType);
-  }
-
   return NextResponse.json({ message: 'Installation removed' }, { status: 200 });
 }
 
@@ -189,7 +234,7 @@ export async function handleInstallationSuspend(
   appType: GitHubAppType
 ) {
   const installationIdStr = payload.installation.id.toString();
-  const integration = await findIntegrationByInstallationId(
+  const integration = await findConnectedIntegrationByInstallationId(
     PLATFORM.GITHUB,
     installationIdStr,
     appType
@@ -229,7 +274,7 @@ export async function handleInstallationUnsuspend(
   appType: GitHubAppType
 ) {
   const installationIdStr = payload.installation.id.toString();
-  const integration = await findIntegrationByInstallationId(
+  const integration = await findConnectedIntegrationByInstallationId(
     PLATFORM.GITHUB,
     installationIdStr,
     appType

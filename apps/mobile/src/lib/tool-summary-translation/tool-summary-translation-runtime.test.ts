@@ -178,6 +178,58 @@ describe('tool summary translation runtime', () => {
     expect(requestMock).not.toHaveBeenCalled();
   });
 
+  /**
+   * Every unresolved row owns a retry timer, and each tick asks the runtime for
+   * its summary again. A summary parked behind the concurrency limit is neither
+   * cached nor in flight, so a dedupe that knew only those two states would
+   * stack another copy of it on every tick: the queue would grow with the
+   * outage, and the copies would replay as extra gateway calls once a slot
+   * freed. The queue must hold one entry per summary however often a row asks.
+   */
+  it('keeps one queue entry per summary however often a waiting row retries', async () => {
+    const mod = await loadRuntime();
+    mod.setConfig({ enabled: true, model: MODEL });
+    // No request settles while the queue is inspected: the four slots stay busy
+    // and the other summaries must wait behind the concurrency limit.
+    const resolveRequest: ((value: string | null) => void)[] = [];
+    requestMock.mockImplementation(
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- the mock returns a promise the test resolves in its cleanup
+      () =>
+        new Promise<string | null>(resolve => {
+          resolveRequest.push(resolve);
+        })
+    );
+    const summaries = Array.from({ length: 12 }, (_, index) => `outage summary ${index}`);
+    const askAll = (): void => {
+      for (const text of summaries) {
+        mod.ensureTranslation({ text, language: 'de', model: MODEL });
+      }
+    };
+
+    askAll();
+    expect(mod.getQueueSize()).toBe(summaries.length - 4);
+
+    // Three retry cadences with the gateway still hanging: the waiting rows ask
+    // again each time and must not stack a second copy of themselves.
+    askAll();
+    askAll();
+    askAll();
+
+    expect(mod.getQueueSize()).toBe(summaries.length - 4);
+
+    // Stop the runtime and settle the four started requests: this mock is shared
+    // with every other case in the file, so no run may outlive the test and
+    // count its call there.
+    mod.setConfig({ enabled: false, model: MODEL });
+    for (let round = 0; round < 5; round += 1) {
+      // eslint-disable-next-line no-await-in-loop -- each round settles the lazy import and its request
+      await flush();
+      for (const resolve of resolveRequest.splice(0)) {
+        resolve(null);
+      }
+    }
+  });
+
   it('drops queued work when the opt-in is disabled before the first request completes', async () => {
     const mod = await loadRuntime();
     mod.setConfig({ enabled: true, model: MODEL });

@@ -480,6 +480,8 @@
       "replyBadRequest": "Kjo përgjigje nuk mund të postohet. Diskutimi mund të ketë ndryshuar.",
       "replyForbidden": "Nuk ke leje të përgjigjesh në këtë kërkesë për bashkim.",
       "addCommentCta": "Komento në këtë kërkesë për bashkim",
+      "fixWithKilo": "Rregullo me Kilo",
+      "fixWithKiloPrompt": "Ju lutem trajto komentin e mëposhtëm në këtë kërkesë për bashkim: {{link}}",
       "commentBadRequest": "Ky koment nuk mund të postohet. Kërkesa për bashkim mund të ketë ndryshuar.",
       "commentForbidden": "Nuk ke leje të komentosh në këtë kërkesë për bashkim.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} në pritje",
       "skipped": "të anashkaluara: {{displayCount}}",
       "checksCount": "{{displayCount}} kontrolle",
+      "checksCount_one": "{{displayCount}} kontroll",
+      "checksCount_other": "{{displayCount}} kontrolle",
       "checkDetails": "detajet e kontrollit"
     },
     "inbox": {
@@ -2077,6 +2081,7 @@
       "exitNeedsNewerCli": "Për të përdorur komandat me / në distancë, duhet një version më i ri i Kilo CLI. Përditëso Kilo CLI dhe lidhu përsëri."
     },
     "sessionConnection": {
+      "label": "Lidhja",
       "connecting": "Duke u lidhur…",
       "reconnecting": "Duke u rilidhur…",
       "connectionLost": "Lidhja u humb",
@@ -2096,7 +2101,9 @@
       "removeConfirmTitle": "Të hiqet qëllimi?",
       "removeConfirmMessage": "CLI fshin qëllimin e këtij sesioni.",
       "updateFailed": "Qëllimi nuk mund të përditësohej.",
-      "sectionAccessibility": "{{status}}. Qëllim: {{text}}"
+      "sectionAccessibility": "{{status}}. Qëllim: {{text}}",
+      "collapse": "Palos qëllimin",
+      "expand": "Shfaq qëllimin"
     },
     "newSession": {
       "recentlyUsed": "Të përdorura së fundmi",
@@ -2150,7 +2157,20 @@
       "continueFrom": "Po vazhdon seanca {{title}}.",
       "importingSession": "Duke importuar seancën",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidh Cloud Agent ose një CLI tjetër.",
-      "importFailed": "Nuk u arrit të importohej kjo seancë."
+      "importFailed": "Nuk u arrit të importohej kjo seancë.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Parazgjedhje · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "E vogël",
+      "sandboxInstanceShared": "E përbashkët",
+      "sandboxInstanceLarge": "E madhe",
+      "sandboxInstanceDevcontainer": "Kontejner zhvillimi",
+      "sandboxInstanceProviderDefault": "Parazgjedhje e ofruesit",
+      "sandboxCouldNotLoad": "Nuk mund të ngarkoheshin opsionet e sandbox-it",
+      "sandboxUnavailable": "Ky sandbox nuk është i disponueshëm. Zgjidhni një sandbox tjetër ose Parazgjedhjen.",
+      "sandboxUseDefault": "Përdor Parazgjedhjen"
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar.",
@@ -2516,6 +2536,12 @@
       "startNewSession": "Nis një seancë të re",
       "exitSession": "Mbyll seancën",
       "clearSession": "Përfundo këtë seancë dhe nis një të re",
+      "compactDescription": "kompakto kontekstin e sesionit aktual",
+      "goalDescription": "Vazhdo të punosh drejt një objektivi sesioni. /goal <objective> ose pause, resume, clear",
+      "initDescription": "konfigurim i udhëzuar i AGENTS.md",
+      "resumeClaudeDescription": "importo transkriptin e një sesioni Claude Code",
+      "resumeCodexDescription": "importo transkriptin e një sesioni OpenAI Codex",
+      "reviewDescription": "shqyrto ndryshimet [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Përdor /{{command}}",
       "insert": "Fut",
       "upgradeRequiredFallback": "Përditëso CLI për të përdorur këtë komandë.",
@@ -2633,6 +2659,7 @@
     "couldNotLoadActiveSessions": "Nuk u ngarkuan sesionet aktive.",
     "agentSessions": "Aktive tani",
     "newCodingTask": "Detyrë e re kodimi",
+    "newTaskFromPicture": "Detyrë e re nga një imazh",
     "explore": "Eksploro",
     "seeAll": "Shiko të gjitha",
     "noLiveSessions": "Asgjë nuk po ekzekutohet tani"
@@ -2854,7 +2881,8 @@
     "aiProvidersWhat": "Kërkesat e tua, historiku i bisedave dhe çdo skedar që bashkëngjit.",
     "aiProvidersWhy": "Për të gjeneruar përgjigje AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google dhe ofrues të tjerë që zgjedh për çdo kërkesë.",
-    "gatewayWhat": "ID-ja e llogarisë, metadatat e kërkesave, përdorimi i tokenëve.",
+    "gatewayWhat": "ID-ja e llogarisë, metadatat e kërkesave, përdorimi i tokenëve, si dhe promptet dhe regjistrimet zanore që aplikacioni dërgon përmes tij.",
+    "viaGateway": "Përmes Kilo Gateway",
     "gatewayWhy": "Autentikimi, drejtimi i kërkesave, rakordimi i faturimit.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Raportet e ndërprerjeve të papritura dhe të gabimeve, pa përmbajtjen e aplikacionit.",
@@ -2874,7 +2902,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Regjistrimi yt gjatë diktimit.",
     "voiceTranscriptionWhy": "Për ta kthyer të folurën në tekst.",
-    "voiceTranscriptionWho": "Vetëm në pajisje, ose Apple ose Google kur kjo pajisje nuk mund të transkriptojë jashtë linje.",
+    "voiceTranscriptionWho": "Pajisja jote, Kilo Gateway me modelin e transkriptimit që zgjidhni, ose Apple ose Google për njohje në internet.",
     "installAttributionPromptTitle": "Të lejohet identifikimi i burimit të instalimit?",
     "installAttributionPromptMessage": "Kilo përdor lejen e gjurmimit të Apple vetëm për të mësuar se cili kanal të solli këtu. Kërkesat dhe bisedat e tua nuk përdoren kurrë.",
     "what": "Çfarë",
@@ -3084,6 +3112,12 @@
     "privacy": "Hap Kilo për të parë agjentët",
     "openAgents": "Hap agjentët",
     "needsInput": "Pret përgjigje",
+    "newestSession": "Më i riu: {{title}}",
+    "noneWaiting": "Asnjë agjent në pritje",
+    "newAgent": "Agjent i ri",
+    "approving": "Po miratohet...",
+    "couldNotApprove": "Miratimi dështoi",
+    "couldNotStart": "Nisja dështoi",
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
   },
@@ -3119,5 +3153,12 @@
     "remoteFound": "Kompjuteri u lidh",
     "checkAgain": "Kontrollo përsëri",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Fillo agjentin kërkon një kërkesë. Shto një kërkesë dhe ekzekutoje përsëri.",
+      "repositoryUnknown": "Kilo nuk e njeh {{repository}} si depo GitHub ose GitLab. Zgjidh një depo tjetër në Kilo.",
+      "repositoryUnsupported": "{{repository}} është një depo Bitbucket — Fillo agjentin nuk mund ta përdorë ende. Zgjidh një depo tjetër në Kilo."
+    }
   }
 }

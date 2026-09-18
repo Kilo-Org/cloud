@@ -771,7 +771,7 @@ async function reconcileVolume(
   rctx: ReconcileContext
 ): Promise<void> {
   if (!state.flyVolumeId) {
-    const providerState = await ensureVolume(
+    const { providerState } = await ensureVolume(
       flyConfig,
       state,
       getFlyProviderState(state),
@@ -800,7 +800,7 @@ async function reconcileVolume(
       await ctx.storage.put(
         storageUpdate(syncProviderStateForStorage(state, { flyVolumeId: null }))
       );
-      const providerState = await ensureVolume(
+      const { providerState, adoptedVolumeId } = await ensureVolume(
         flyConfig,
         state,
         getFlyProviderState(state),
@@ -817,7 +817,7 @@ async function reconcileVolume(
         )
       );
       rctx.log('replace_lost_volume', {
-        data_loss: true,
+        data_loss: adoptedVolumeId === null,
         old_volume_id: oldVolumeId,
         new_volume_id: state.flyVolumeId,
         durationMs: performance.now() - repairStart,

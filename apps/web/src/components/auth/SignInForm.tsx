@@ -7,6 +7,7 @@ import { ProviderSelectView } from '@/components/auth/sign-in/ProviderSelectView
 import { EmailInputForm } from '@/components/auth/sign-in/EmailInputForm';
 import { AuthProviderButtons } from '@/components/auth/sign-in/AuthProviderButtons';
 import { SignInButton } from '@/components/auth/SigninButton';
+import { Separator } from '@/components/ui/separator';
 import { FakeLoginForm } from '@/components/auth/FakeLoginForm';
 import { AuthErrorNotification } from '@/components/auth/AuthErrorNotification';
 import { AnimatedLogoMark } from '@/components/AnimatedLogoMark';
@@ -14,8 +15,22 @@ import Link from 'next/link';
 import { SquareUserRound } from 'lucide-react';
 import React from 'react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
-import { OAuthProviderIds } from '@/lib/auth/provider-metadata';
+import { useChatGptSignInAccess } from '@/hooks/useChatGptSignInAccess';
+import { OAuthProviderIds, type AuthProviderId } from '@/lib/auth/provider-metadata';
 import { buildEnterpriseSsoHref, buildNormalSignInHref } from '@/lib/auth/sign-in-navigation';
+
+/**
+ * 'Sign in with ChatGPT' is restricted by the PostHog flag's email allow-list.
+ * A signed-out visitor is not known to PostHog, so the sign-in page evaluates
+ * the flag against the email the visitor typed and hides the ChatGPT button
+ * when the flag is off for that email.
+ */
+function withoutChatGptWhenUnavailable(
+  providers: readonly AuthProviderId[],
+  chatGptAllowed: boolean
+): AuthProviderId[] {
+  return chatGptAllowed ? [...providers] : providers.filter(id => id !== 'openai');
+}
 
 type SignInFormProps = {
   searchParams: Record<string, string>;
@@ -47,6 +62,18 @@ export function SignInForm({
     isSignUp,
     storybookInitialState,
   });
+  // The ChatGPT option is decided from the address the visitor submits, or from
+  // an address already known without typing. A `?email=` prefill wins over a
+  // stored returning-user hint: the flow auto-triggers Turnstile for the
+  // prefill and shows it on the provider screen, so the prefill is the address
+  // in use. Typing alone never evaluates, so one address costs one reload.
+  const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(null);
+  const knownEmail = (searchParams.email || flow.hint?.lastEmail || '').trim();
+  const chatGptAllowed = useChatGptSignInAccess(submittedEmail ?? (knownEmail || null));
+  const handleEmailSubmit = (event: React.FormEvent) => {
+    setSubmittedEmail(flow.email);
+    flow.handleEmailSubmit(event);
+  };
 
   // Show minimal loading state while checking localStorage for returning user hint
   // This prevents flash of "new user" UI before switching to "returning user" UI
@@ -119,7 +146,7 @@ export function SignInForm({
         {errorNotification}
         <ProviderSelectView
           email={flow.email}
-          providers={flow.availableProviders}
+          providers={withoutChatGptWhenUnavailable(flow.availableProviders, chatGptAllowed)}
           onProviderSelect={flow.handleProviderSelect}
           onBack={flow.handleBack}
           purpose={flow.isNewUser ? 'sign-up' : 'sign-in'}
@@ -194,11 +221,23 @@ export function SignInForm({
                     ? { email: 'Email me a magic link' }
                     : undefined;
 
+                // A returning ChatGPT user keeps the shortcut only while the
+                // flag allows it; otherwise the full, filtered group is offered
+                // so they are not left with a single hidden button.
+                const preferredProviders = withoutChatGptWhenUnavailable(
+                  [lastAuthMethod],
+                  chatGptAllowed
+                );
+                const displayedProviders =
+                  preferredProviders.length > 0
+                    ? preferredProviders
+                    : withoutChatGptWhenUnavailable(OAuthProviderIds, chatGptAllowed);
+
                 return (
                   <div className="mx-auto max-w-md space-y-4">
                     {/* Preferred provider button only */}
                     <AuthProviderButtons
-                      providers={[lastAuthMethod]}
+                      providers={displayedProviders}
                       onProviderClick={flow.handleOAuthClick}
                       customLabels={emailCustomLabel}
                     />
@@ -221,7 +260,7 @@ export function SignInForm({
               <EmailInputForm
                 email={flow.email}
                 emailValidation={flow.emailValidation}
-                onSubmit={flow.handleEmailSubmit}
+                onSubmit={handleEmailSubmit}
                 onEmailChange={flow.handleEmailChange}
                 placeholder="you@example.com"
                 autoFocus={true}
@@ -271,11 +310,14 @@ export function SignInForm({
                   <EmailInputForm
                     email={flow.email}
                     emailValidation={flow.emailValidation}
-                    onSubmit={flow.handleEmailSubmit}
+                    onSubmit={handleEmailSubmit}
                     onEmailChange={flow.handleEmailChange}
                     placeholder="you@example.com"
                     autoFocus={true}
                     isLoading={flow.showTurnstile || flow.isVerifying}
+                    submitLabel={
+                      !isSignUp && !emailOnly && !ssoMode ? 'Continue with Email' : undefined
+                    }
                   />
 
                   {ssoMode ? (
@@ -296,17 +338,36 @@ export function SignInForm({
                     </button>
                   ) : null}
                   {!isSignUp && !emailOnly && !ssoMode && (
-                    <p className="text-muted-foreground mt-4 text-xs leading-relaxed">
-                      By continuing, you are agreeing to the{' '}
-                      <a
-                        href="https://kilo.ai/terms"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-foreground underline underline-offset-4 transition-colors"
-                      >
-                        Terms &amp; Conditions
-                      </a>
-                    </p>
+                    <>
+                      {/* The sign-in page keeps the email prompt first, but the
+                          OAuth providers (including 'Sign in with ChatGPT') are
+                          offered beside it, as they are on sign-up. */}
+                      <div className="my-6 flex items-center gap-3">
+                        <Separator className="flex-1" />
+                        <span className="text-muted-foreground text-xs font-medium">or</span>
+                        <Separator className="flex-1" />
+                      </div>
+                      <div className="space-y-2">
+                        <AuthProviderButtons
+                          providers={withoutChatGptWhenUnavailable(
+                            OAuthProviderIds,
+                            chatGptAllowed
+                          )}
+                          onProviderClick={flow.handleOAuthClick}
+                        />
+                      </div>
+                      <p className="text-muted-foreground mt-4 text-xs leading-relaxed">
+                        By continuing, you are agreeing to the{' '}
+                        <a
+                          href="https://kilo.ai/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-foreground underline underline-offset-4 transition-colors"
+                        >
+                          Terms &amp; Conditions
+                        </a>
+                      </p>
+                    </>
                   )}
                 </>
               ) : (
@@ -315,7 +376,7 @@ export function SignInForm({
                   <div className="space-y-2">
                     {/* OAuth provider buttons - Google first */}
                     <AuthProviderButtons
-                      providers={OAuthProviderIds}
+                      providers={withoutChatGptWhenUnavailable(OAuthProviderIds, chatGptAllowed)}
                       onProviderClick={flow.handleOAuthClick}
                     />
                     <SignInButton onClick={flow.handleShowEmailInput}>

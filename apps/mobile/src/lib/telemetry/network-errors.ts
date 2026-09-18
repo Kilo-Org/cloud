@@ -74,6 +74,17 @@ export type TrpcResponseError = z.infer<typeof TrpcResponseErrorSchema>;
 // key on it so a structured error never needs an `instanceof` across bundles.
 const NamedErrorSchema = z.looseObject({ name: z.string() });
 
+// Expo SDK 57's fetch rejects a canceled request with a
+// `FetchRequestCanceledException`: a raw native error carries it as `name`, an
+// expo-modules-core `CodedError` as `code`, and the `FetchError` wrapper (whose
+// `name` is `Error`) embeds it in `message`.
+const ErrorCodeSchema = z.looseObject({ code: z.string() });
+const ErrorMessageSchema = z.looseObject({ message: z.string() });
+const ErrorCauseSchema = z.looseObject({ cause: z.unknown() });
+
+const EXPO_CANCEL_NAME = 'FetchRequestCanceledException';
+const ABORT_ERROR_NAME = 'AbortError';
+
 const TRPC_PATH = '/api/trpc/';
 const HTTP_URL_PATTERN = /^https?:\/\//iu;
 
@@ -162,9 +173,40 @@ function errorPropertyOf(value: unknown): TrpcResponseError | undefined {
   return parsed.success ? parsed.data.error : undefined;
 }
 
-/** True when the value is an abort (`AbortError` / `DOMException`). */
+/**
+ * True when the value is an abort: an `AbortError` / `DOMException` or an Expo
+ * `FetchRequestCanceledException`. The Expo cancellation is checked on the
+ * error itself and one level of `cause`, since the SDK wraps it. Total: an
+ * unrecognized value yields `false` and never throws.
+ */
 export function isAbortError(error: unknown): boolean {
-  return hasErrorName(error, 'AbortError');
+  try {
+    if (hasErrorName(error, ABORT_ERROR_NAME) || isExpoCanceledError(error)) {
+      return true;
+    }
+    const parsed = ErrorCauseSchema.safeParse(error);
+    return parsed.success && parsed.data.cause !== undefined
+      ? isExpoCanceledError(parsed.data.cause)
+      : false;
+  } catch {
+    return false;
+  }
+}
+
+function isExpoCanceledError(error: unknown): boolean {
+  try {
+    if (hasErrorName(error, EXPO_CANCEL_NAME)) {
+      return true;
+    }
+    const byCode = ErrorCodeSchema.safeParse(error);
+    if (byCode.success && byCode.data.code === EXPO_CANCEL_NAME) {
+      return true;
+    }
+    const byMessage = ErrorMessageSchema.safeParse(error);
+    return byMessage.success && byMessage.data.message.includes(EXPO_CANCEL_NAME);
+  } catch {
+    return false;
+  }
 }
 
 function hasErrorName(error: unknown, name: string): boolean {

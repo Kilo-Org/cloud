@@ -2,12 +2,15 @@
 import {
   type ComponentProps,
   createElement,
+  type ElementType,
   Fragment,
   type ReactElement,
   type ReactNode,
 } from 'react';
 import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
+import * as Clipboard from 'expo-clipboard';
+import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { type Pressable } from 'react-native';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
@@ -39,8 +42,11 @@ import {
 import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
+import {
+  isSessionGoalCollapsed,
+  setSessionGoalCollapsed,
+} from '@/components/agents/session-goal-collapse';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
-import { SessionConnectionIndicator } from '@/components/agents/session-connection-indicator';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
@@ -60,6 +66,11 @@ import { i18n } from '@/i18n';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
+const connectionHealth = vi.hoisted(() => ({
+  isConnected: true,
+  reconnectExhausted: false,
+  retryConnection: vi.fn(),
+}));
 const hideThinking = vi.hoisted(() => ({ current: false, loaded: true }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
@@ -71,10 +82,24 @@ vi.mock('@/components/agents/session-provider', () => ({
     return managerSlot.current;
   },
 }));
+vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
+  useUserWebConnectionState: () => connectionHealth.isConnected,
+  useUserWebConnectionHealth: () => ({
+    isConnected: connectionHealth.isConnected,
+    reconnectExhausted: connectionHealth.reconnectExhausted,
+  }),
+}));
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  useUserWebConnection: () => ({ retryConnection: connectionHealth.retryConnection }),
+}));
 
 // Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
 // rendering and unrelated composer, account, model-picker, and router dependencies.
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
+const routerSetParams = vi.hoisted(() => vi.fn());
+const handoffAdvertiserCalls = vi.hoisted(() => ({
+  props: [] as { anchorMessageId?: string | null }[],
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 // The header's offline-banner reservation reads the committed connectivity
 // hook; these states are online, and the hook module pulls NetInfo (unmocked
@@ -96,6 +121,19 @@ vi.mock('react-native-reanimated', () => ({
   FadeIn: { duration: () => ({}) },
   FadeOut: { duration: () => ({}) },
   LinearTransition: { duration: () => ({}) },
+  // The goal row's chevron rotation; the disclosure animation itself is
+  // covered by session-goal-section.mounted.test.tsx.
+  useSharedValue: (value: unknown) => ({ value }),
+  useAnimatedStyle: () => ({}),
+  withTiming: (value: number) => value,
+}));
+const motionPolicy = vi.hoisted(() => ({ reducedMotion: false }));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({
+    reducedMotion: motionPolicy.reducedMotion,
+    scrollAnimated: !motionPolicy.reducedMotion,
+  }),
+  selectReducedMotionEntrance: <T>(_reducedMotion: boolean, entrance: T) => entrance,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 16 }),
@@ -114,6 +152,7 @@ vi.mock('expo-router', () => ({
     push: (href: string) => {
       navigationRoutes.push(href);
     },
+    setParams: routerSetParams,
   }),
 }));
 // `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
@@ -137,12 +176,13 @@ vi.mock('expo-haptics', () => ({
 vi.mock('@/components/agents/mobile-session-manager', () => ({
   isCancelQueuedUpgradeRequired: vi.fn(),
 }));
-vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   ChevronDown: 'ChevronDown',
   CircleDot: 'CircleDot',
   Clock: 'Clock',
+  Link2: 'Link2',
   Loader2: 'Loader2',
   MessageSquare: 'MessageSquare',
 }));
@@ -184,17 +224,27 @@ vi.mock('@/components/agents/model-selector', () => ({
 vi.mock('@/components/agents/permission-card', () => ({ PermissionCard: 'PermissionCard' }));
 vi.mock('@/components/agents/question-card', () => ({ QuestionCard: 'QuestionCard' }));
 vi.mock('@/components/agents/preparation-group', () => ({ PreparationGroup: 'PreparationGroup' }));
-vi.mock('@/components/agents/session-connection-indicator', () => ({
-  SessionConnectionIndicator: 'SessionConnectionIndicator',
-}));
 vi.mock('@/components/agents/context-usage-ring', () => ({
   ContextUsageRing: 'ContextUsageRing',
 }));
 // The real context sheet (rendered so the auto-approve row can be asserted)
 // reaches `copySessionId`, which imports the native `expo-clipboard` module that
 // cannot load in this DOM-free node suite. Mock the boundary, as the mounted
-// context-sheet suite does.
+// context-sheet suite does. The session header's copy-link action reaches the
+// same native module through the real chat-link copy path.
+vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('@/components/agents/session-row-actions', () => ({ copySessionId: vi.fn() }));
+// The copy-link path reaches the browser helper; its native module cannot load here.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+// The handoff advertiser owns the OS entry point (Head plus Android's launcher
+// module) and has its own mounted suite; recording its props here proves the
+// screen hands it the live position.
+vi.mock('@/lib/session-handoff', () => ({
+  SessionHandoffAdvertiser: (props: { anchorMessageId?: string | null }) => {
+    handoffAdvertiserCalls.props.push(props);
+    return null;
+  },
+}));
 vi.mock('@/components/agents/session-pr-badge', () => ({ SessionPrBadge: 'SessionPrBadge' }));
 vi.mock('@/components/agents/session-status-indicator', () => ({
   SessionStatusIndicator: 'SessionStatusIndicator',
@@ -378,8 +428,12 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
+// Captured so the goal tests can open the action sheet and pick a control.
+const showActionSheetWithOptions = vi.hoisted(() =>
+  vi.fn<(options: Record<string, unknown>, callback: (index?: number) => void) => void>()
+);
 vi.mock('@expo/react-native-action-sheet', () => ({
-  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+  useActionSheet: () => ({ showActionSheetWithOptions }),
 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'token' }) }));
 const globalContext = vi.hoisted(() => ({
@@ -514,6 +568,7 @@ function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   openRenameModal.mockClear();
+  showActionSheetWithOptions.mockClear();
   hideThinking.current = false;
   hideThinking.loaded = true;
   goalMountOptions = {};
@@ -521,19 +576,29 @@ beforeEach(() => {
   globalContext.setOrganizationId.mockClear();
   rootPageNextCursor = null;
   condensePreference.value = false;
+  connectionHealth.isConnected = true;
+  connectionHealth.reconnectExhausted = false;
+  connectionHealth.retryConnection.mockClear();
 });
 
 type MountDetailsOptions = {
   metadataReady?: Promise<undefined>;
   displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
   cachedRows?: StoredMessage[] | null;
+  /** The route's `?at=` param the screen mounts with. */
+  resumeAt?: string | null;
 };
 
 async function mountDetails(
   rootMessages: StoredMessage[] | null = [taskMessage(ROOT_ID, CHILD_IDS)],
   options: MountDetailsOptions = {}
 ) {
-  const { metadataReady, displayScope = PERSONAL_DISPLAY_SCOPE, cachedRows = null } = options;
+  const {
+    metadataReady,
+    displayScope = PERSONAL_DISPLAY_SCOPE,
+    cachedRows = null,
+    resumeAt,
+  } = options;
   const store = createStore();
   // `null` stalls the root page: the request never resolves, so the open never
   // receives first content (the endless-skeleton case).
@@ -619,11 +684,17 @@ async function mountDetails(
     manager.destroy();
     connection.destroy();
   });
-  const element = (id: KiloSessionId) =>
+  let currentRootId: KiloSessionId = ROOT_ID;
+  const element = (id: KiloSessionId, at: string | null | undefined = resumeAt) =>
     createElement(
       Provider,
       { store },
-      createElement(SessionDetailContent, { key: id, sessionId: id, displayScope })
+      createElement(SessionDetailContent, {
+        key: id,
+        sessionId: id,
+        displayScope,
+        ...(at === undefined ? {} : { resumeAt: at }),
+      })
     );
   const view = await renderWithProviders(element(ROOT_ID));
   onTestFinished(view.unmount);
@@ -660,8 +731,25 @@ async function mountDetails(
     },
     switchRoot: async (id: KiloSessionId) => {
       await act(async () => {
+        currentRootId = id;
         view.renderer.update(
           createElement(QueryClientProvider, { client: view.queryClient }, element(id))
+        );
+        await Promise.resolve();
+      });
+    },
+    /**
+     * Deliver a new route `at` to the already-mounted screen (the `withAnchor`
+     * dedupe path updates params instead of remounting the route).
+     */
+    updateResumeAt: async (next: string | null) => {
+      await act(async () => {
+        view.renderer.update(
+          createElement(
+            QueryClientProvider,
+            { client: view.queryClient },
+            element(currentRootId, next)
+          )
         );
         await Promise.resolve();
       });
@@ -698,6 +786,22 @@ function renderedText(node: ReactTestInstance) {
   return node
     .findAll(child => typeof child.type === 'string' && (child.type as string) === 'Text')
     .flatMap(child => child.children.filter(value => typeof value === 'string'))
+    .join('\n');
+}
+
+/**
+ * Page text outside the context sheet. The sheet stays mounted (invisible) as
+ * soon as usage is known, so a "nothing renders on the page" assertion must not
+ * count the sheet's own rows.
+ */
+function renderedTextOutsideSheet(root: ReactTestInstance): string {
+  const sheetNodes = new Set<ReactTestInstance>(
+    root.findAllByType(SessionContextSheet).flatMap(sheet => sheet.findAll(() => true))
+  );
+  return root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+    .filter(node => !sheetNodes.has(node))
+    .flatMap(node => node.children.filter((value): value is string => typeof value === 'string'))
     .join('\n');
 }
 
@@ -930,11 +1034,140 @@ describe('session detail cached metadata refresh', () => {
     });
 
     // A retryable metadata failure keeps the rows mounted and repoints the
-    // connection banner at a metadata refresh Retry instead of blanking them.
+    // connection status at a metadata refresh Retry instead of blanking them.
     expect(renderedText(view.renderer.root)).toContain('cached root row');
     expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
-    const indicator = view.renderer.root.findAllByType(SessionConnectionIndicator)[0];
-    expect(indicator?.props.sessionRefresh).toMatchObject({ isLoading: false });
+    // The connection status has no row under the header any more: with the
+    // context sheet closed, no connection copy renders on the page.
+    const pageText = renderedTextOutsideSheet(view.renderer.root);
+    expect(pageText).not.toContain(i18n.t('agentChat.sessionConnection.connecting'));
+    expect(pageText).not.toContain(i18n.t('agentChat.sessionConnection.reconnecting'));
+    expect(pageText).not.toContain(i18n.t('agentChat.sessionConnection.connectionLost'));
+  });
+
+  it('shows Connection lost in the sheet and retries the socket when reconnects are exhausted', async () => {
+    connectionHealth.isConnected = false;
+    connectionHealth.reconnectExhausted = true;
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('lost');
+    expect(renderedText(view.renderer.root)).toContain(
+      i18n.t('agentChat.sessionConnection.connectionLost')
+    );
+
+    const retry = view.renderer.root.findByProps({
+      testID: 'session-context-sheet-connection-retry',
+    });
+    act(() => {
+      (retry.props.onPress as () => void)();
+    });
+    expect(connectionHealth.retryConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes the Connection lost Retry to the metadata refresh when the transcript is cached', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails(cachedRows, { metadataReady: metadata.promise, cachedRows });
+    const switchSession = vi.spyOn(view.manager, 'switchSession').mockResolvedValue(undefined);
+
+    await act(async () => {
+      metadata.reject(new Error('offline'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('lost');
+    const retry = view.renderer.root.findByProps({
+      testID: 'session-context-sheet-connection-retry',
+    });
+    act(() => {
+      (retry.props.onPress as () => void)();
+    });
+    expect(switchSession).toHaveBeenCalledTimes(1);
+    expect(connectionHealth.retryConnection).not.toHaveBeenCalled();
+  });
+});
+
+describe('session detail connection latch', () => {
+  it('reads Connecting, not Reconnecting, when the app-wide leg is up but the session transport never came up', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    connectionHealth.isConnected = false;
+    const view = await mountDetails([]);
+    // The app-wide user-web leg comes up while the remote agent reports
+    // disconnected: the session's own transport has still never been up, so the
+    // latch must not inherit the unrelated user-web leg and claim a reconnect.
+    act(() => {
+      connectionHealth.isConnected = true;
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.agentStatus, { type: 'disconnected' });
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('connecting');
+  });
+
+  it('reads Connecting, not Reconnecting, while a cached first load still refreshes its metadata', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails(cachedRows, { metadataReady: metadata.promise, cachedRows });
+
+    // The cached transcript paints while the session type and metadata are
+    // still resolving, and the app-wide user-web leg is already up. The leg is
+    // not this session's transport yet, so it must not latch the session as
+    // ever connected: the first load reads "Connecting…", not "Reconnecting…".
+    expect(renderedText(view.renderer.root)).toContain('cached root row');
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('connecting');
+  });
+
+  it('still reads Reconnecting after a live session transport drops', async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    const view = await mountDetails([]);
+    // The session's own transport comes up: the latch commits.
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+    });
+    // Then it drops. The committed latch is what separates this from a first
+    // load, so the sheet reads "Reconnecting…".
+    act(() => {
+      connectionHealth.isConnected = false;
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    act(() => {
+      (metrics.props.onPress as () => void)();
+    });
+
+    const sheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(sheet.props.connectionDisplay).toBe('reconnecting');
   });
 });
 
@@ -1040,6 +1273,64 @@ describe('session detail per-session auto-approve', () => {
     expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(1);
     expect(respondToPermission).toHaveBeenCalledTimes(1);
     expect(hapticsSelection).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens the header sheet while an answerable session is still loading', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      // No message has landed yet: the header control is the only way to the
+      // session's permission settings, so it must still register a tap.
+      view.store.set(view.manager.atoms.isLoading, true);
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as {
+      accessibilityRole?: string;
+      onPress?: () => void;
+    };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    act(() => {
+      metricsProps.onPress?.();
+    });
+    const contextSheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(contextSheet.props.visible).toBe(true);
+    expect(view.renderer.root.findByProps({ testID: 'session-auto-approve-switch' })).toBeDefined();
+  });
+
+  it('opens the header sheet with usable settings after a failed open left the transport unresolved', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      // A failed session open leaves the transport unresolved and puts the
+      // screen on its terminal error. The settings still live behind the
+      // header control, so it must open the sheet instead of going dead.
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.isLoading, false);
+      view.store.set<string | null, [string | null], unknown>(
+        view.manager.atoms.error,
+        'connect ECONNREFUSED 127.0.0.1:12000'
+      );
+    });
+
+    const metrics = view.renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const metricsProps = metrics.props as {
+      accessibilityRole?: string;
+      onPress?: () => void;
+    };
+    expect(metricsProps.accessibilityRole).toBe('button');
+    act(() => {
+      metricsProps.onPress?.();
+    });
+    const contextSheet = view.renderer.root.findByType(SessionContextSheet);
+    expect(contextSheet.props.visible).toBe(true);
+    const toggle = view.renderer.root.findByProps({ testID: 'session-auto-approve-switch' });
+    expect((toggle.props as { disabled?: boolean }).disabled).toBe(false);
   });
 
   it('keeps the composer mounted, visible, and enabled while the auto-reply is in flight', async () => {
@@ -1755,8 +2046,110 @@ describe('hide thinking preference', () => {
   );
 });
 
+describe('session detail composer after a failed turn', () => {
+  /**
+   * The Pylon 28248 record: a session open/turn failure lands as the SDK's
+   * generic transient status ("Something went wrong. Please retry in a
+   * moment."), the transcript is empty and the manager cannot send. The user
+   * must still be able to type the next message, with Retry kept beside it.
+   */
+  it('keeps the composer editable while the terminal error keeps its Retry', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, null);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.isLoading, false);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          timestamp: 0,
+        }
+      );
+    });
+
+    // Retry stays available in the error card.
+    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(error.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
+    expect(error.onRetry).toBeDefined();
+
+    // The composer stays mounted and editable; only sending waits on the
+    // session being able to accept a message again.
+    const node = view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer'));
+    expect(node.props.disabled).toBe(false);
+    expect(node.props.sendDisabled).toBe(true);
+  });
+
+  it('keeps the composer sendable after a non-retryable turn failure', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, 'cloud-agent');
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isReadOnly, false);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+
+    // The non-retryable class keeps no Retry: the reader continues in the
+    // session instead, so the composer must stay fully usable.
+    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
+      typeof QueryError
+    >;
+    expect(error.onRetry).toBeUndefined();
+    const node = view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer'));
+    expect(node.props.disabled).toBe(false);
+    expect(node.props.sendDisabled).toBe(false);
+  });
+});
+
 describe('SessionDetailContent goal visibility', () => {
   const pausedGoal: SessionGoal = { text: 'Ship p7 objective', status: 'paused' };
+
+  // The store is module-level and outlives every mount here, so each case
+  // starts from expanded (there is no test-only reset export).
+  beforeEach(() => {
+    setSessionGoalCollapsed(ROOT_ID, false);
+    motionPolicy.reducedMotion = false;
+  });
+
+  function goalSectionOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const section = view.renderer.root.findAllByType(SessionGoalSection)[0];
+    if (section === undefined) {
+      throw new Error('Missing SessionGoalSection');
+    }
+    return section;
+  }
+
+  /** The Animated.View the screen draws around the fixed goal row. */
+  function goalWrapperOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    let node: ReactTestInstance | null = goalSectionOf(view);
+    while (node != null && node.type !== ('AnimatedView' as ElementType)) {
+      node = node.parent;
+    }
+    if (node === null) {
+      throw new Error('Missing the goal wrapper');
+    }
+    return node;
+  }
 
   it('shows the fixed goal row for a live session whose snapshot carries a goal', async () => {
     goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
@@ -1770,5 +2163,265 @@ describe('SessionDetailContent goal visibility', () => {
     goalMountOptions = { goal: pausedGoal, resolvedType: 'read-only' };
     const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
     expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+  });
+
+  it('persists the goal disclosure through the per-session store', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalSectionOf(view).props.collapsed).toBe(false);
+
+    act(() => {
+      (goalSectionOf(view).props.onToggleCollapsed as () => void)();
+    });
+
+    expect(goalSectionOf(view).props.collapsed).toBe(true);
+    expect(isSessionGoalCollapsed(ROOT_ID)).toBe(true);
+  });
+
+  it('keeps the collapsed goal after leaving and reopening the session', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    const first = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    act(() => {
+      (goalSectionOf(first).props.onToggleCollapsed as () => void)();
+    });
+    expect(isSessionGoalCollapsed(ROOT_ID)).toBe(true);
+
+    // A fresh tree for the same session id reads the module store, which
+    // outlives the component tree.
+    const reopened = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalSectionOf(reopened).props.collapsed).toBe(true);
+  });
+
+  it('drops the goal wrapper height transition under reduced motion', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+
+    const animated = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalWrapperOf(animated).props.layout).toBeDefined();
+
+    motionPolicy.reducedMotion = true;
+    const reduced = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    expect(goalWrapperOf(reduced).props.layout).toBeUndefined();
+  });
+});
+
+describe('SessionDetailContent goal edit dialog', () => {
+  // The reported goal shape: one very long unbroken word plus a long sentence.
+  const longGoal: SessionGoal = {
+    text:
+      'the_number_of_consecutive_days_the_workflow_has_not_failed_for_the_first_time_due_to' +
+      '_workflow_issues_is_0_for_3_consecutive_days and the scheduled cleanup job keeps reporting',
+    status: 'active',
+  };
+
+  it('opens the goal text in a wrapping field', async () => {
+    goalMountOptions = { goal: longGoal, resolvedType: 'remote' };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const section = view.renderer.root.findAllByType(SessionGoalSection)[0];
+    if (!section) {
+      throw new Error('goal section did not render');
+    }
+    const { onPress } = section.props as { onPress: () => void };
+    act(onPress);
+
+    // Pick "Edit goal" out of the goal action sheet.
+    const sheetCall = showActionSheetWithOptions.mock.calls.at(-1);
+    expect(sheetCall).toBeDefined();
+    const sheet = sheetCall?.[0] as { options: string[] } | undefined;
+    const onSelect = sheetCall?.[1];
+    const editIndex = sheet?.options.indexOf(i18n.t('agentChat.goal.edit')) ?? -1;
+    expect(editIndex).toBeGreaterThanOrEqual(0);
+    act(() => {
+      onSelect?.(editIndex);
+    });
+
+    // The dialog must hand the goal text to the modal's wrapping field, not a
+    // single-line one that clips its start.
+    const modal = view.renderer.root.findAllByType('RenameModal')[0];
+    expect(modal?.props).toMatchObject({
+      multiline: true,
+      maxLength: 500,
+      initialValue: longGoal.text,
+    });
+  });
+});
+
+// The screen's live position: the transcript list reports the topmost visible
+// message, and the screen publishes it to the OS handoff, the copy-link action,
+// and the route's search params.
+describe('SessionDetailContent live position', () => {
+  it('publishes the transcript position to the handoff, the copy action, and the route', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+    routerSetParams.mockClear();
+    handoffAdvertiserCalls.props.length = 0;
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange?.('msg-77');
+    });
+
+    // The handoff advertises the position the transcript is showing.
+    expect(handoffAdvertiserCalls.props.at(-1)?.anchorMessageId).toBe('msg-77');
+
+    // The header's copy action copies that same position's universal link.
+    const copy = view.renderer.root.findByProps({
+      accessibilityLabel: i18n.t('common.copyLink'),
+    });
+    await act(async () => {
+      (copy.props as { onPress: () => void }).onPress();
+      await Promise.resolve();
+    });
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
+      sessionResumeUrl({ sessionId: ROOT_ID, anchorMessageId: 'msg-77' })
+    );
+
+    // The route's search params carry it after the publish debounce.
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+    expect(routerSetParams).toHaveBeenCalledWith({ at: 'msg-77' });
+  });
+});
+
+// A resume link delivered onto a screen that already shows the session arrives
+// as a new `resumeAt` param (dedupe updates params, it does not remount): the
+// screen must adopt the link's position, while the route echoing back what this
+// screen itself published must not re-scroll the viewport.
+describe('SessionDetailContent resume link', () => {
+  function resumeAnchorOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    return (list.props as ComponentProps<typeof SessionMessageList>).resumeAt;
+  }
+
+  it('adopts a resume link delivered to the already-mounted screen', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {
+      resumeAt: 'msg-a',
+    });
+    expect(resumeAnchorOf(view)).toBe('msg-a');
+
+    await view.updateResumeAt('msg-b');
+
+    expect(resumeAnchorOf(view)).toBe('msg-b');
+  });
+
+  it('cancels a pending position publish when a newer resume link is adopted', async () => {
+    routerSetParams.mockClear();
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {
+      resumeAt: 'msg-a',
+    });
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    const onAnchorChange = (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange;
+    // The viewport moves, arming the debounced publish...
+    act(() => {
+      onAnchorChange?.('msg-c');
+    });
+    // ...and a resume link lands before the debounce fires.
+    await view.updateResumeAt('msg-b');
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+
+    expect(resumeAnchorOf(view)).toBe('msg-b');
+    // The pre-link position must not overwrite the link's position on the route.
+    expect(routerSetParams).not.toHaveBeenCalledWith({ at: 'msg-c' });
+  });
+
+  it('keeps the current position when the route echoes the anchor this screen published', async () => {
+    routerSetParams.mockClear();
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {
+      resumeAt: 'msg-a',
+    });
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange?.('msg-c');
+    });
+
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+    expect(routerSetParams).toHaveBeenCalledWith({ at: 'msg-c' });
+
+    await view.updateResumeAt('msg-c');
+
+    expect(resumeAnchorOf(view)).toBe('msg-a');
+  });
+});
+
+// A send takes the transcript position over: both composer send paths must
+// tell the list to follow the output the send produces, so a transcript parked
+// on a `?at=` anchor with follow off never strands the sent message and its
+// reply off-screen (mobile-app e2e e1).
+describe('SessionDetailContent send transcript take-over', () => {
+  function makeSendable(view: Awaited<ReturnType<typeof mountDetails>>) {
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.canSend, true);
+    });
+  }
+
+  function followTailNonceOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    return (list.props as ComponentProps<typeof SessionMessageList>).followTailNonce;
+  }
+
+  it('takes the position over when a prompt is sent from a resumed anchor', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], { resumeAt: 'msg-a' });
+    makeSendable(view);
+    expect(followTailNonceOf(view)).toBe(0);
+
+    const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))[0];
+    if (!composer) {
+      throw new Error('composer did not render');
+    }
+    const onSend = composer.props.onSend as (text: string) => Promise<void>;
+    await act(async () => {
+      // The transport outcome does not gate the take-over: the viewport must
+      // follow the send as soon as the user commits it.
+      await onSend('follow-after-resume').catch(() => undefined);
+    });
+
+    expect(followTailNonceOf(view)).toBe(1);
+  });
+
+  it('takes the position over when a slash command is sent from a resumed anchor', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], { resumeAt: 'msg-a' });
+    makeSendable(view);
+
+    const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))[0];
+    if (!composer) {
+      throw new Error('composer did not render');
+    }
+    const onSendCommand = composer.props.onSendCommand as (
+      command: string,
+      argumentsText: string
+    ) => Promise<boolean>;
+    await act(async () => {
+      await onSendCommand('review', '').catch(() => undefined);
+    });
+
+    expect(followTailNonceOf(view)).toBe(1);
   });
 });

@@ -483,6 +483,8 @@
       "replyBadRequest": "Aquesta resposta no es pot publicar. Pot ser que el fil hagi canviat.",
       "replyForbidden": "No tens permís per respondre a aquesta sol·licitud d'integració.",
       "addCommentCta": "Comenta aquesta sol·licitud d'integració",
+      "fixWithKilo": "Resol-ho amb Kilo",
+      "fixWithKiloPrompt": "Si us plau, resol el següent comentari de la sol·licitud d'integració: {{link}}",
       "commentBadRequest": "Aquest comentari no es pot publicar. Pot ser que la sol·licitud d'integració hagi canviat.",
       "commentForbidden": "No tens permís per comentar aquesta sol·licitud d'integració.",
       "moderation": {
@@ -577,6 +579,9 @@
       "pending": "{{displayCount}} pendents",
       "skipped": "{{displayCount}} omeses",
       "checksCount": "{{displayCount}} comprovacions",
+      "checksCount_one": "{{displayCount}} comprovació",
+      "checksCount_many": "{{displayCount}} comprovacions",
+      "checksCount_other": "{{displayCount}} comprovacions",
       "checkDetails": "detalls de la comprovació"
     },
     "inbox": {
@@ -2068,6 +2073,7 @@
       "exitNeedsNewerCli": "Les ordres amb barra remotes requereixen una versió més nova de Kilo CLI. Actualitza Kilo CLI i torna't a connectar."
     },
     "sessionConnection": {
+      "label": "Connexió",
       "connecting": "Connectant…",
       "reconnecting": "Reconnectant…",
       "connectionLost": "Connexió perduda",
@@ -2087,7 +2093,9 @@
       "removeConfirmTitle": "Eliminar l'objectiu?",
       "removeConfirmMessage": "El CLI esborra l'objectiu d'aquesta sessió.",
       "updateFailed": "No s'ha pogut actualitzar l'objectiu.",
-      "sectionAccessibility": "{{status}}. Objectiu: {{text}}"
+      "sectionAccessibility": "{{status}}. Objectiu: {{text}}",
+      "collapse": "Plega l'objectiu",
+      "expand": "Desplega l'objectiu"
     },
     "newSession": {
       "recentlyUsed": "Utilitzats recentment",
@@ -2141,7 +2149,20 @@
       "continueFrom": "S'està continuant la sessió {{title}}.",
       "importingSession": "Important la sessió…",
       "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Tria Cloud Agent o un altre CLI.",
-      "importFailed": "No s'ha pogut importar aquesta sessió."
+      "importFailed": "No s'ha pogut importar aquesta sessió.",
+      "sandbox": "Entorn aïllat",
+      "sandboxAccessibility": "Entorn aïllat: {{label}}",
+      "sandboxDefaultWithDestination": "Per defecte · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Petit",
+      "sandboxInstanceShared": "Compartit",
+      "sandboxInstanceLarge": "Gran",
+      "sandboxInstanceDevcontainer": "Contenidor de desenvolupament",
+      "sandboxInstanceProviderDefault": "Per defecte del proveïdor",
+      "sandboxCouldNotLoad": "No s'han pogut carregar les opcions de l'entorn aïllat",
+      "sandboxUnavailable": "Aquest entorn aïllat no està disponible. Tria'n un altre o Per defecte.",
+      "sandboxUseDefault": "Utilitza Per defecte"
     },
     "partRenderer": {
       "updatedFileCount_one": "S'ha actualitzat {{displayCount}} fitxer.",
@@ -2511,6 +2532,12 @@
       "startNewSession": "Inicia una nova sessió",
       "exitSession": "Finalitza la sessió",
       "clearSession": "Finalitza aquesta sessió i inicia'n una de nova",
+      "compactDescription": "compacta el context de la sessió actual",
+      "goalDescription": "Continua treballant cap a un objectiu de sessió. /goal <objective> o pause, resume, clear",
+      "initDescription": "configuració guiada d'AGENTS.md",
+      "resumeClaudeDescription": "importa una transcripció de sessió de Claude Code",
+      "resumeCodexDescription": "importa una transcripció de sessió d'OpenAI Codex",
+      "reviewDescription": "revisa els canvis [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Utilitza /{{command}}",
       "insert": "Insereix",
       "upgradeRequiredFallback": "Actualitza el CLI per utilitzar aquesta ordre.",
@@ -2629,6 +2656,7 @@
     "couldNotLoadActiveSessions": "No s'han pogut carregar les sessions actives.",
     "agentSessions": "En curs ara",
     "newCodingTask": "Nova tasca de programació",
+    "newTaskFromPicture": "Nova tasca a partir d'una imatge",
     "explore": "Explora",
     "seeAll": "Mostra-ho tot",
     "noLiveSessions": "Ara mateix no hi ha res en execució"
@@ -2850,7 +2878,8 @@
     "aiProvidersWhat": "Els teus missatges, l'historial de converses i els fitxers que adjuntis.",
     "aiProvidersWhy": "Per generar respostes d'IA.",
     "aiProvidersWho": "Anthropic, OpenAI, Google i altres proveïdors que selecciones per a cada sol·licitud.",
-    "gatewayWhat": "Identificador del compte, metadades de les sol·licituds i ús de tòkens.",
+    "gatewayWhat": "Identificador del compte, metadades de les sol·licituds, ús de tòkens i els prompts i enregistraments de veu que l'aplicació hi envia.",
+    "viaGateway": "A través de Kilo Gateway",
     "gatewayWhy": "Autenticació, encaminament de sol·licituds i conciliació de la facturació.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Informes d'errors i de fallades, amb el contingut de l'aplicació eliminat.",
@@ -2870,7 +2899,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "L'enregistrament de la teva veu mentre dictes.",
     "voiceTranscriptionWhy": "Per convertir la parla en text.",
-    "voiceTranscriptionWho": "Només al dispositiu, o a Apple o Google si el dispositiu no pot transcriure sense connexió.",
+    "voiceTranscriptionWho": "El teu dispositiu, Kilo Gateway amb el model de transcripció que triïs, o Apple o Google per al reconeixement en línia.",
     "installAttributionPromptTitle": "Vols permetre l'atribució de la instal·lació?",
     "installAttributionPromptMessage": "Kilo només utilitza el permís de seguiment d'Apple per saber per quin canal has arribat aquí. Mai no s'utilitzen els teus missatges ni les teves converses.",
     "what": "Què",
@@ -3081,6 +3110,12 @@
     "privacy": "Obre Kilo per veure els agents",
     "openAgents": "Obre els agents",
     "needsInput": "Pendent de resposta",
+    "newestSession": "La més recent: {{title}}",
+    "noneWaiting": "Cap agent en espera",
+    "newAgent": "Agent nou",
+    "approving": "S'està aprovant...",
+    "couldNotApprove": "No s'ha pogut aprovar",
+    "couldNotStart": "No s'ha pogut iniciar",
     "channelName": "Agents actius",
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig."
   },
@@ -3116,5 +3151,12 @@
     "remoteFound": "Ordinador connectat",
     "checkAgain": "Torna-ho a comprovar",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Per iniciar un agent cal un missatge. Afegeix un missatge i torna-ho a executar.",
+      "repositoryUnknown": "Kilo no reconeix {{repository}} com a repositori de GitHub o GitLab. Tria un altre repositori a Kilo.",
+      "repositoryUnsupported": "{{repository}} és un repositori de Bitbucket — Inicia un agent encara no el pot utilitzar. Tria un altre repositori a Kilo."
+    }
   }
 }

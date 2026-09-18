@@ -17,8 +17,10 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { kiloId, stubTextPart, stubUserMessage } from '@kilocode/cloud-agent-sdk/test-helpers';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
+import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import { AgentSessionProvider, useSessionManager } from '@/components/agents/session-provider';
+import { SessionCopyLinkAction } from '@/components/agents/session-copy-link-action';
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { QueryError } from '@/components/query-error';
@@ -53,6 +55,12 @@ const authState = vi.hoisted(() => ({
 }));
 
 const CHILD_ID = kiloId('ses_child_scope_probe');
+// Copy-link action boundaries: the native clipboard/haptics modules and the
+// toast host cannot load in the node-mounted harness.
+const clipboardSetStringAsync = vi.hoisted(() => vi.fn());
+const hapticsSelection = vi.hoisted(() => vi.fn());
+const toastSuccess = vi.hoisted(() => vi.fn());
+const toastError = vi.hoisted(() => vi.fn());
 const childPageMock = vi.fn<NonNullable<SessionManagerConfig['fetchSnapshotPage']>>();
 // Root transcript override: the default implementation serves the standard
 // root page, so one test can replace it without disturbing siblings.
@@ -109,11 +117,16 @@ vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   ChevronDown: 'ChevronDown',
   Clock: 'Clock',
+  Link2: 'Link2',
   Lock: 'Lock',
   SearchX: 'SearchX',
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
 }));
+vi.mock('expo-clipboard', () => ({ setStringAsync: clipboardSetStringAsync }));
+vi.mock('expo-haptics', () => ({ selectionAsync: hapticsSelection }));
+vi.mock('sonner-native', () => ({ toast: { success: toastSuccess, error: toastError } }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 
 // Leaves of the real bubble pipeline that the KILO-APP-99 repro mode mounts:
 // their own render trees are irrelevant to the defect, only the visibility
@@ -246,10 +259,6 @@ vi.mock('@/components/agents/session-detail-content', async () => {
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionSkeletonMessages: 'SessionSkeletonMessages',
   SessionComposerSkeleton: 'SessionComposerSkeleton',
-}));
-
-vi.mock('@/components/agents/session-connection-indicator', () => ({
-  SessionConnectionIndicator: 'SessionConnectionIndicator',
 }));
 
 vi.mock('@/components/agents/session-context-metrics', () => ({
@@ -645,6 +654,121 @@ describe('SessionDetailScreen valid session-id', () => {
     expect(findByType(renderer.root, 'InvalidRouteState')).toHaveLength(0);
     expect(queryEnabled()).toBe(true);
     expect(queryInput()).toEqual({ session_id: 'sess-1' });
+  });
+
+  it('forwards the parsed `at` anchor to the session content', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', at: 'msg_42' });
+    const renderer = await mountRoute();
+
+    const content = findByType(renderer.root, 'SessionDetailContent');
+    expect(content).toHaveLength(1);
+    expect(propOf(content[0], 'resumeAt')).toBe('msg_42');
+  });
+
+  it('opens at the bottom with no anchor when `at` is missing or unusable', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    const renderer = await mountRoute();
+    expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'resumeAt')).toBeNull();
+  });
+
+  it('keeps the route anchor on the loading header Copy-link action', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', at: 'msg_42' });
+    queryState.data = null;
+    queryState.isPending = true;
+    const renderer = await mountRoute();
+
+    // The transcript has not loaded, so the skeleton header is mounted...
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    // ...and its Copy-link action must copy the position the route already
+    // holds, not an anchor-less session link.
+    const copyActions = renderer.root.findByType(ScreenHeader).findAllByType(SessionCopyLinkAction);
+    expect(copyActions).toHaveLength(1);
+    expect(propOf(copyActions[0], 'anchorMessageId')).toBe('msg_42');
+  });
+});
+
+// The session header's Copy-link action copies the same universal link the OS
+// handoff advertises, anchored at the position the transcript is showing.
+describe('SessionDetailScreen copy link action', () => {
+  beforeEach(() => {
+    clipboardSetStringAsync.mockReset();
+    hapticsSelection.mockReset();
+    toastSuccess.mockReset();
+    toastError.mockReset();
+  });
+
+  async function mountCopyAction(anchorMessageId: string | null) {
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    await act(async () => {
+      ref.current = TestRenderer.create(
+        createElement(SessionCopyLinkAction, { sessionId: 'sess-1', anchorMessageId })
+      );
+      await Promise.resolve();
+    });
+    if (!ref.current) {
+      throw new Error('copy action did not render');
+    }
+    const renderer = ref.current;
+    onTestFinished(() => {
+      act(() => {
+        renderer.unmount();
+      });
+    });
+    return renderer;
+  }
+
+  function copyControl(renderer: TestRenderer.ReactTestRenderer) {
+    return renderer.root.findByProps({ accessibilityLabel: i18n.t('common.copyLink') });
+  }
+
+  it('copies the resume URL of the shown position and confirms it', async () => {
+    clipboardSetStringAsync.mockResolvedValue(true);
+    const renderer = await mountCopyAction('msg_42');
+
+    await act(async () => {
+      pressControl(copyControl(renderer));
+      await Promise.resolve();
+    });
+
+    expect(clipboardSetStringAsync).toHaveBeenCalledWith(
+      sessionResumeUrl({ sessionId: 'sess-1', anchorMessageId: 'msg_42' })
+    );
+    expect(toastSuccess).toHaveBeenCalledWith(i18n.t('agentChat.chatLink.linkCopied'), {
+      // Longer than the Sonner default: on Android the system clipboard preview
+      // covers the bottom-center toast region for its whole default life.
+      duration: expect.any(Number),
+    });
+    expect(hapticsSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces a retryable failure when the clipboard rejects', async () => {
+    clipboardSetStringAsync.mockRejectedValueOnce(new Error('clipboard unavailable'));
+    const renderer = await mountCopyAction('msg_42');
+
+    await act(async () => {
+      pressControl(copyControl(renderer));
+      await Promise.resolve();
+    });
+
+    expect(toastError).toHaveBeenCalledWith(i18n.t('agentChat.chatLink.couldNotCopyLink'), {
+      action: { label: i18n.t('common.tryAgain'), onClick: expect.any(Function) },
+    });
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it('copies the session link without a position when the position is unknown', async () => {
+    clipboardSetStringAsync.mockResolvedValue(true);
+    const renderer = await mountCopyAction(null);
+
+    await act(async () => {
+      pressControl(copyControl(renderer));
+      await Promise.resolve();
+    });
+
+    expect(clipboardSetStringAsync).toHaveBeenCalledWith(
+      sessionResumeUrl({ sessionId: 'sess-1', anchorMessageId: null })
+    );
   });
 });
 
@@ -1302,6 +1426,20 @@ describe.each([
       expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
       expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
       expect(transcriptText(renderer, 'RootText')).toBe('');
+      // The loading header reserves the loaded header's Copy-link action, so the
+      // 44pt control appearing at the swap cannot narrow and re-wrap the title.
+      const loadingHeader = renderer.root.findByType(ScreenHeader);
+      const loadingCopyActions = loadingHeader.findAllByType(SessionCopyLinkAction);
+      expect(loadingCopyActions).toHaveLength(1);
+      const loadingCopyAction = loadingCopyActions[0];
+      if (!loadingCopyAction) {
+        throw new Error('loading header did not render the copy-link action');
+      }
+      expect(propOf(loadingCopyAction, 'sessionId')).toBe('sess-1');
+      expect(propOf(loadingCopyAction, 'anchorMessageId')).toBeNull();
+      const loadingCopyPressable = loadingCopyAction.findAllByType('Pressable');
+      expect(loadingCopyPressable).toHaveLength(1);
+      expect(propOf(loadingCopyPressable[0], 'className')).toContain('h-11 w-11');
       await act(async () => {
         identity.resolve({ id: 'user-B' });
         await vi.advanceTimersByTimeAsync(0);
@@ -1421,6 +1559,87 @@ describe('SessionDetailScreen malformed part transcript', () => {
     const transcript = transcriptText(renderer);
     expect(transcript).toContain('Question about the queue');
     expect(transcript).toContain('Answer visible after broken reasoning');
+    expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+  });
+});
+
+// KILO-APP-BZ: a patch part with no `files` on the wire crashed the whole agent
+// chat screen (`part.files.length` in partRendersContent). This repro mounts the
+// real route and renders the real transcript build and bubbles over the stored
+// messages, so the screen the reporter screenshotted — the root error boundary
+// with "Something went wrong" — is what the assertion rules out.
+describe('SessionDetailScreen malformed patch part transcript', () => {
+  it('renders the transcript without crashing when a patch part arrives with no files', async () => {
+    realTranscriptProbe.active = true;
+    onTestFinished(() => {
+      realTranscriptProbe.active = false;
+    });
+
+    // The wire omits `files` (per-event schemas are `.passthrough()`), so the
+    // cast is the fixture, not a smell. The patch part's id sorts before the
+    // answer part's id (storage orders parts by id), so the malformed part is
+    // the first one the transcript's `.some(partRendersContent)` visits.
+    const patchNoFiles = {
+      id: 'part-a-broken-patch',
+      sessionID: 'sess-1',
+      messageID: 'msg-assistant-broken-patch',
+      type: 'patch',
+      hash: 'abc',
+    } as unknown as Part;
+    const assistantInfo: AssistantMessage = {
+      id: 'msg-assistant-broken-patch',
+      sessionID: 'sess-1',
+      role: 'assistant',
+      time: { created: 2 },
+      parentID: 'msg-user-question',
+      modelID: 'claude',
+      providerID: 'anthropic',
+      mode: 'code',
+      agent: 'build',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+    rootPageMock.mockResolvedValueOnce({
+      kind: 'success',
+      info: { id: 'sess-1' },
+      messages: [
+        {
+          info: stubUserMessage({ id: 'msg-user-question', sessionID: 'sess-1' }),
+          parts: [
+            stubTextPart({
+              id: 'part-question',
+              sessionID: 'sess-1',
+              messageID: 'msg-user-question',
+              text: 'Question about the patch',
+            }),
+          ],
+        },
+        {
+          info: assistantInfo,
+          parts: [
+            patchNoFiles,
+            {
+              id: 'part-z-answer',
+              sessionID: 'sess-1',
+              messageID: 'msg-assistant-broken-patch',
+              type: 'text',
+              text: 'Answer visible after broken patch',
+            },
+          ],
+        },
+      ],
+      nextCursor: null,
+      omittedItemCount: 0,
+    } satisfies SessionSnapshotPageOutcome);
+
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', organizationId: 'org-a' });
+    const renderer = await mountRoute();
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    const transcript = transcriptText(renderer);
+    expect(transcript).toContain('Question about the patch');
+    expect(transcript).toContain('Answer visible after broken patch');
     expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
   });
 });

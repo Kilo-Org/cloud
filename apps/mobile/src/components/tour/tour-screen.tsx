@@ -1,10 +1,9 @@
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BackHandler, View } from 'react-native';
+import { BackHandler, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CenteredState } from '@/components/centered-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { TourRemoteStep } from '@/components/tour/tour-remote-step';
 import { TourStepHeader } from '@/components/tour/tour-step-header';
@@ -26,12 +25,14 @@ import { useTourCompletion } from '@/lib/tour/tour-completion';
  * new-session page with the Cloud Agent preselected; the computer card opens
  * the instructions page, whose detected-computer tap hands off the same way
  * with that connection preselected. Either hand-off records the per-account
- * decision and replaces the tour, so the tour never re-opens. Skip and Android
- * hardware Back are the one other decision — record it the instant the person
- * dismisses, then pop back to the screen that opened the tour (Home on
- * auto-open, Profile on the Tutorial replay); a tour with nothing beneath it
- * lands on Home instead (see `dismissTour`). Nothing here ever clears the
- * decision.
+ * decision and replaces the tour, so the tour never re-opens. The computer
+ * instructions page keeps a back control (and Android hardware Back agrees
+ * with it) that returns to the fork — going back is not a decision, so it
+ * records nothing. Skip and Android hardware Back on the fork are the one other
+ * decision — record it the instant the person dismisses, then pop back to the
+ * screen that opened the tour (Home on auto-open, Profile on the Tutorial
+ * replay); a tour with nothing beneath it lands on Home instead (see
+ * `dismissTour`). Nothing here ever clears the decision.
  */
 
 type TourPath = 'fork' | 'remote';
@@ -75,38 +76,45 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
   const colors = useThemeColors();
 
   return (
-    <CenteredState>
-      {/* Scrolls the fork body so a large system font or a short screen cannot
-          push the path cards over the header or the Skip action bar. */}
-      <View className="gap-8 px-6">
-        <View className="items-center gap-4">
-          <TourStepHeader
-            icon={<Sparkles size={36} color={colors.foreground} />}
-            title={t('tour.forkTitle')}
-            body={t('tour.forkSubtitle')}
-          />
-        </View>
-
-        <View className="gap-3">
-          <ForkOption
-            icon={Cloud}
-            title={t('tour.cloudOptionTitle')}
-            body={t('tour.cloudOptionBody')}
-            onPress={() => {
-              onChoose('cloud');
-            }}
-          />
-          <ForkOption
-            icon={Monitor}
-            title={t('tour.remoteOptionTitle')}
-            body={t('tour.remoteOptionBody')}
-            onPress={() => {
-              onChoose('remote');
-            }}
-          />
-        </View>
+    <ScrollView
+      className="flex-1"
+      contentContainerClassName="grow justify-center gap-8 px-6 py-6"
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Centred in the band between the header and the Skip bar: the content
+          container grows to the viewport (`grow`) and distributes its children
+          in the middle (`justify-center`), so the block sits where the eye
+          expects it instead of against the header. `grow` is a minimum, not a
+          fixed height, so the block still scrolls: a large system font or a
+          short screen starts at the top padding rather than being pushed over
+          the header or the action bar. */}
+      <View className="items-center gap-4">
+        <TourStepHeader
+          icon={<Sparkles size={36} color={colors.foreground} />}
+          title={t('tour.forkTitle')}
+          body={t('tour.forkSubtitle')}
+        />
       </View>
-    </CenteredState>
+
+      <View className="gap-3">
+        <ForkOption
+          icon={Cloud}
+          title={t('tour.cloudOptionTitle')}
+          body={t('tour.cloudOptionBody')}
+          onPress={() => {
+            onChoose('cloud');
+          }}
+        />
+        <ForkOption
+          icon={Monitor}
+          title={t('tour.remoteOptionTitle')}
+          body={t('tour.remoteOptionBody')}
+          onPress={() => {
+            onChoose('remote');
+          }}
+        />
+      </View>
+    </ScrollView>
   );
 }
 
@@ -162,26 +170,41 @@ export function TourScreen() {
     [handOff]
   );
 
-  // Android hardware Back must record the decision on the spot, exactly like
-  // Skip. Returning `true` stops the modal's default pop, which would dismiss
-  // without recording. The listener belongs to the route's focus, so leaving
-  // the tour — through the hand-off's replace or Skip's back — releases it
-  // with the route.
+  // Returning to the fork from the computer step. Going back is not a
+  // decision: it must not record the tour or navigate away.
+  const toFork = useCallback(() => {
+    setPath('fork');
+  }, []);
+
+  // Android hardware Back must agree with the visible control. On the computer
+  // step it returns to the fork, exactly like the header's back control; on the
+  // fork it records the decision and dismisses, exactly like Skip. Returning
+  // `true` stops the modal's default pop, which would dismiss without
+  // recording. The listener belongs to the route's focus, so leaving the tour —
+  // through the hand-off's replace or Skip's back — releases it with the route.
   useFocusEffect(
     useCallback(() => {
       const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (path === 'remote') {
+          toFork();
+          return true;
+        }
         dismiss();
         return true;
       });
       return () => {
         subscription.remove();
       };
-    }, [dismiss])
+    }, [dismiss, path, toFork])
   );
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader eyebrow={t('tour.eyebrow')} showBackButton={false} />
+      <ScreenHeader
+        eyebrow={t('tour.eyebrow')}
+        showBackButton={path === 'remote'}
+        onBack={toFork}
+      />
 
       <View className="flex-1">
         {path === 'fork' ? <ForkStep onChoose={choosePath} /> : null}

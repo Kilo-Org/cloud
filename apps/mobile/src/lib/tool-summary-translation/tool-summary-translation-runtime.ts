@@ -43,6 +43,14 @@ const cache = new Map<string, string>();
 // must not delete the entry its replacement just stored.
 const inFlight = new Map<string, symbol>();
 const queue: QueueItem[] = [];
+// The keys the queue currently holds. A row retries on its own cadence while
+// its summary is unresolved, and a summary parked behind the concurrency limit
+// is neither cached nor in flight, so without this each tick of every waiting
+// row would stack another copy of it: the queue would grow without bound during
+// an outage, and the copies would replay as extra gateway calls once a slot
+// freed. `ensureTranslation` treats a queued key like an in-flight one, and
+// `pump` clears it as it takes the entry up or drops it.
+const queued = new Set<string>();
 let active = 0;
 let version = 0;
 /**
@@ -76,6 +84,16 @@ export function getVersion(): number {
   return version;
 }
 
+/**
+ * How many summaries are waiting for a concurrency slot. Exposed alongside
+ * `getVersion` for the runtime's tests: a row retries on its own cadence while
+ * its summary is unresolved, so a waiting summary that took two entries here
+ * would grow the queue with every tick of every mounted row.
+ */
+export function getQueueSize(): number {
+  return queue.length;
+}
+
 export function getConfig(): ToolSummaryTranslationConfig {
   return config;
 }
@@ -98,6 +116,7 @@ export function setConfig(next: ToolSummaryTranslationConfig): void {
   // resolve, so the row would stay untranslated.
   generation += 1;
   queue.length = 0;
+  queued.clear();
   inFlight.clear();
   version += 1;
   emit();
@@ -154,6 +173,8 @@ function pump(): void {
     if (item === undefined) {
       return;
     }
+    // The entry has left the queue, whether it starts now or is dropped below.
+    queued.delete(item.key);
     // Work queued before the last configuration change (opt-in off or model
     // switch) is stale and must not be sent, same as a cached or in-flight key.
     const isStale = item.generation !== generation;
@@ -169,7 +190,8 @@ function pump(): void {
 
 /**
  * Request a translation for one summary. No-op for blank text, cached keys and
- * keys already in flight, so N rows with the same summary make one call.
+ * keys already in flight or queued, so N rows with the same summary make one
+ * call per cadence however often they retry.
  */
 export function ensureTranslation(input: {
   text: string;
@@ -181,9 +203,10 @@ export function ensureTranslation(input: {
     return;
   }
   const key = translationKey(language, model.id, text);
-  if (cache.has(key) || inFlight.has(key)) {
+  if (cache.has(key) || inFlight.has(key) || queued.has(key)) {
     return;
   }
+  queued.add(key);
   queue.push({ key, text, language, model, generation });
   pump();
 }

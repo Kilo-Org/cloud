@@ -5,11 +5,17 @@ import { GitHubLogo } from '@/components/auth/GitHubLogo';
 import { GitLabLogo } from '@/components/auth/GitLabLogo';
 import { GoogleLogo } from '@/components/auth/GoogleLogo';
 import { LinkedInLogo } from '@/components/auth/LinkedInLogo';
+import { OpenAILogo } from '@/components/auth/OpenAILogo';
 import { Mail, SquareUserRound } from 'lucide-react';
 import React, { type JSX } from 'react';
 import * as z from 'zod';
 
-type ProviderMetadata = Readonly<{ id: string; name: string; icon: JSX.Element }>;
+type ProviderMetadata = Readonly<{
+  id: string;
+  name: string;
+  icon: JSX.Element;
+  signInLabel?: string;
+}>;
 
 const fakeLoginIcon = (
   <span role="img" aria-label="Test account">
@@ -27,6 +33,12 @@ const AllAuthProviders = [
   { id: 'gitlab', name: 'GitLab', icon: <GitLabLogo className="size-5" /> },
   { id: 'linkedin', name: 'LinkedIn', icon: <LinkedInLogo /> },
   { id: 'discord', name: 'Discord', icon: <DiscordLogo /> },
+  {
+    id: 'openai',
+    name: 'ChatGPT',
+    signInLabel: 'Continue with ChatGPT',
+    icon: <OpenAILogo />,
+  },
   { id: 'fake-login', name: 'Test Account', icon: fakeLoginIcon },
   { id: 'workos', name: 'Enterprise SSO', icon: <SquareUserRound /> },
 ] as const satisfies readonly ProviderMetadata[];
@@ -51,4 +63,4 @@ export const AllAuthMethodIds = [...AllAuthProviders.filter(isAuthMethod).map(p 
 export type AuthMethod = (typeof AllAuthMethodIds)[number];
 
 const byId = Object.fromEntries(AllAuthProviders.map(p => [p.id, p]));
-export const getProviderById = (provider: AuthProviderId) => byId[provider];
+export const getProviderById = (provider: AuthProviderId): ProviderMetadata => byId[provider];

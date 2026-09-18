@@ -58,6 +58,12 @@ vi.mock('expo-secure-store', () => ({
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
+// The session header's copy-link action reaches the native clipboard and the
+// browser helper; neither native module loads in the DOM-free node suite. The
+// handoff advertiser is a platform boundary with its own mounted suites.
+vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/session-handoff', () => ({ SessionHandoffAdvertiser: () => null }));
 vi.mock('@kilocode/cloud-agent-sdk', () => ({
   createSessionManager: vi.fn(),
 }));
@@ -147,7 +153,7 @@ vi.mock('@/components/agents/message-text-select-sheet', () => ({
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), setParams: vi.fn() }),
 }));
 
 // `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
@@ -163,6 +169,7 @@ vi.mock('expo-keep-awake', () => ({
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(async () => undefined),
   notificationAsync: vi.fn(async () => undefined),
+  selectionAsync: vi.fn(async () => undefined),
   NotificationFeedbackType: { Error: 'error', Success: 'success' },
 }));
 vi.mock('react-native-reanimated', () => ({
@@ -170,6 +177,21 @@ vi.mock('react-native-reanimated', () => ({
   FadeIn: { duration: () => ({}) },
   FadeOut: { duration: () => ({}) },
   LinearTransition: { duration: () => ({}) },
+  // The goal row's chevron rotation; the disclosure animation itself is
+  // covered by session-goal-section.mounted.test.tsx.
+  useSharedValue: (value: unknown) => ({ value }),
+  useAnimatedStyle: () => ({}),
+  withTiming: (value: number) => value,
+}));
+// `session-detail-content` renders the goal row, which pulls the shared
+// disclosure primitive (`security-agent/collapsible-section`) and then the
+// motion policy; the policy reaches `expo-battery`, whose `expo-modules-core`
+// entry needs React Native's `__DEV__` global the pure node project does not
+// define. The same mock stands in for the sibling `session-detail-content`
+// pure harness.
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+  selectReducedMotionEntrance: <T>(_reducedMotion: boolean, entrance: T) => entrance,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
@@ -365,7 +387,7 @@ vi.mock('@/components/agents/use-message-copy', () => ({
 vi.mock('@/components/agents/session-detail-content-helpers', () => ({
   countInFlightMessages: () => 0,
   resolveRetryPrompt: () => null,
-  retryMessageAndClear: vi.fn(),
+  retryFailedMessage: vi.fn(),
 }));
 vi.mock('@/components/agents/create-and-navigate-agent-session', () => ({
   createAndNavigateAgentSession: vi.fn(),
@@ -408,8 +430,12 @@ vi.mock('@/components/agents/permission-card', () => ({
 vi.mock('@/components/agents/question-card', () => ({
   QuestionCard: 'QuestionCard',
 }));
-vi.mock('@/components/agents/session-connection-indicator', () => ({
-  SessionConnectionIndicator: 'SessionConnectionIndicator',
+vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
+  useUserWebConnectionState: () => true,
+  useUserWebConnectionHealth: () => ({ isConnected: true, reconnectExhausted: false }),
+}));
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  useUserWebConnection: () => ({ retryConnection: vi.fn() }),
 }));
 vi.mock('@/components/agents/session-context-metrics', () => ({
   SessionContextMetrics: 'SessionContextMetrics',
@@ -476,6 +502,7 @@ vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
 vi.mock('@/components/ui/icons', () => ({
+  Link2: 'Link2',
   MessageSquare: 'MessageSquare',
 }));
 
@@ -489,6 +516,7 @@ function makeManager() {
     atoms: {
       messagesList: { value: [] as StoredMessage[] },
       isLoading: { value: false },
+      isRefreshingCachedTranscript: { value: false },
       error: { value: null },
       fetchedSessionData: {
         value: {

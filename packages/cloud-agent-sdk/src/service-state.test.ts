@@ -2038,6 +2038,10 @@ describe('createServiceState', () => {
         reason: 'exhausted',
       });
 
+      // The status carries `event.error`, the Durable Object's safe projection
+      // of the failure, so the specific reason survives to the clients that
+      // render it; the failed row's typed footer and its Copy action keep the
+      // reader's copy.
       expect(state.getCloudStatus()).toEqual({
         type: 'error',
         message: 'Environment preparation failed',

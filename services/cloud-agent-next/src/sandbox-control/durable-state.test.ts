@@ -9,13 +9,24 @@ import {
   readSandboxControlState,
   loadRouteTable,
   loadSessionCredentialGrants,
+  loadSessionReferences,
   loadTransitionLog,
   saveDeadlines,
   savePhysicalRecord,
   saveRouteTable,
   saveSessionCredentialGrants,
+  saveSessionReferences,
   saveTransitionLog,
+  SESSION_REFERENCES_KEY,
 } from './durable-state.js';
+import {
+  MAX_REFERENCE_BYTES,
+  MAX_REFERENCE_ENTRIES,
+  addSessionReference,
+  emptySessionReferenceState,
+  markReferencesReconciled,
+  serializedReferenceBytes,
+} from './session-references.js';
 import { createControlPlaneCredential } from './managed-credential.js';
 import {
   claimCreate,
@@ -276,6 +287,17 @@ describe('sandbox control durable state', () => {
       grant.userId
     );
     await saveRouteTable(storage, table);
+    await saveSessionReferences(
+      storage,
+      markReferencesReconciled(
+        addSessionReference(emptySessionReferenceState(), {
+          sessionId: grant.scopeId,
+          kiloSessionId: ROOT_ID,
+          directory: grant.directory,
+          worktreeId: grant.scopeId,
+        }).state
+      )
+    );
     await saveDeadlines(storage, { heartbeatExpiry: 3000 });
     await saveTransitionLog(storage, [{ at: 1001, kind: 'physical', to: 'running' }]);
     await storage.put('owner', grant.userId);
@@ -285,8 +307,75 @@ describe('sandbox control durable state', () => {
     expect(await loadSessionCredentialGrants(storage)).toEqual([]);
     expect(await loadPhysicalRecord(storage)).toStrictEqual(initialPhysicalRecord(false));
     expect(await loadRouteTable(storage)).toEqual(emptyRouteTable());
+    expect(await loadSessionReferences(storage)).toEqual(emptySessionReferenceState());
     expect(await loadDeadlines(storage)).toEqual({});
     expect(await loadTransitionLog(storage)).toEqual([]);
     expect(await storage.get('owner')).toBe(grant.userId);
+  });
+
+  it('defaults absent session references to the empty state and round-trips a reconciled index', async () => {
+    const storage = memoryStorage();
+    expect(await loadSessionReferences(storage)).toEqual(emptySessionReferenceState());
+    const state = emptySessionReferenceState();
+    addSessionReference(state, {
+      sessionId: SESSION_ID,
+      kiloSessionId: ROOT_ID,
+      directory: '/workspace/paths/org/project/worktree_11111111-1111-4111-8111-111111111111',
+    });
+    addSessionReference(state, {
+      sessionId: 'workspace_other',
+      kiloSessionId: 'ses_other',
+      directory: '/workspace/paths/org/other',
+      worktreeId: 'worktree_22222222-2222-4222-8222-222222222222',
+    });
+    markReferencesReconciled(state);
+
+    await saveSessionReferences(storage, state);
+
+    expect(await loadSessionReferences(storage)).toEqual(state);
+  });
+
+  it('rejects malformed session references instead of defaulting to the empty state', async () => {
+    const storage = memoryStorage();
+    for (const value of [
+      { reconciled: 'yes', overflowed: false, entries: [] },
+      {
+        reconciled: true,
+        overflowed: false,
+        entries: [{ sessionId: SESSION_ID, kiloSessionId: ROOT_ID }],
+      },
+      {
+        reconciled: true,
+        overflowed: false,
+        entries: [{ sessionId: SESSION_ID, kiloSessionId: ROOT_ID, directory: '', extra: 'field' }],
+      },
+    ]) {
+      await storage.put(SESSION_REFERENCES_KEY, value);
+      await expect(loadSessionReferences(storage)).rejects.toThrow();
+    }
+  });
+
+  it('rejects a persisted session reference index over the entry or byte limit', async () => {
+    const storage = memoryStorage();
+    const entry = (index: number, directory: string) => ({
+      sessionId: `ses_${index}`,
+      kiloSessionId: `kilo_${index}`,
+      directory,
+    });
+    await storage.put(SESSION_REFERENCES_KEY, {
+      reconciled: false,
+      overflowed: false,
+      entries: Array.from({ length: MAX_REFERENCE_ENTRIES + 1 }, (_, index) => entry(index, 'd')),
+    });
+    await expect(loadSessionReferences(storage)).rejects.toThrow();
+
+    const oversized = Array.from({ length: 200 }, (_, index) => entry(index, 'd'.repeat(512)));
+    expect(serializedReferenceBytes(oversized)).toBeGreaterThan(MAX_REFERENCE_BYTES);
+    await storage.put(SESSION_REFERENCES_KEY, {
+      reconciled: false,
+      overflowed: false,
+      entries: oversized,
+    });
+    await expect(loadSessionReferences(storage)).rejects.toThrow();
   });
 });

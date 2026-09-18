@@ -185,3 +185,28 @@ export function parseProviderPrUrl(href: string): ProviderPrRef | null {
   }
   return parseGitLabMrUrl(url) ?? parseBitbucketPrUrl(url);
 }
+
+/**
+ * Find the first provider review URL in free text — a shared link, a title
+ * with the URL appended, or a message body. The whole trimmed string is tried
+ * first, then each whitespace-separated token, so surrounding words do not
+ * hide the URL. Returns `null` when nothing parses, so a URL that matches no
+ * provider keeps rendering as plain text.
+ */
+export function findFirstProviderPrUrl(text: string): ProviderPrRef | null {
+  if (text.length === 0) {
+    return null;
+  }
+  const trimmed = text.trim();
+  const whole = parseProviderPrUrl(trimmed);
+  if (whole) {
+    return whole;
+  }
+  for (const token of trimmed.split(/\s+/)) {
+    const parsed = parseProviderPrUrl(token);
+    if (parsed) {
+      return parsed;
+    }
+  }
+  return null;
+}

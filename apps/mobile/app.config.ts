@@ -9,6 +9,9 @@ import PERMISSION_PROMPT_COPY from './plugins/permission-prompt-copy.json';
 // The widget gallery's own copy. Native bundle metadata, not app copy — see
 // plugins/withWidgetLocalizations.js.
 import WIDGET_GALLERY_COPY from './plugins/widget-gallery-copy.json';
+// The App Intents' own copy, the twin of the widget gallery's. Native bundle
+// metadata, not app copy — see plugins/withAppIntentLocalizations.js.
+import APP_INTENT_COPY from './plugins/app-intent-copy.json';
 import { SENTRY_NATIVE_OPTIONS } from './src/lib/sentry-dsn';
 import { UNIVERSAL_LINK_PATH_PATTERNS } from './src/lib/universal-link-paths';
 import {
@@ -307,6 +310,14 @@ const config: ExpoConfig = {
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
     './plugins/withAndroidExpoModuleRepos',
+    // Localizes the App Intents on the app target itself: the four actions and
+    // their parameters are `LocalizedStringResource`s resolved against
+    // `Localizable.strings` in the app bundle, which no other plugin writes.
+    // The app-target twin of the widget registration below.
+    [
+      './plugins/withAppIntentLocalizations',
+      { languages: [...SUPPORTED_LANGUAGES], copy: APP_INTENT_COPY },
+    ],
     // Declares the app's languages on the widget extension, which expo-widgets
     // leaves English-only. This must be registered BEFORE 'expo-widgets':
     // dangerous mods run in reverse registration order, so the earlier entry
@@ -373,7 +384,16 @@ const config: ExpoConfig = {
     ...Object.fromEntries(
       Object.entries(OPTIONAL_ENV_KEYS).map(([key, env]) => [key, process.env[env]])
     ),
-    router: {},
+    // Expo Head reads this as the handoff origin before it registers the
+    // session's NSUserActivity, and it throws in development when the value is
+    // missing (expo-router/build/head/url.js). Handoff is an iOS capability:
+    // expo-router resolves an Android `Head` that renders nothing and reads no
+    // origin, so this value is inert there and the session-handoff advertiser
+    // needs no platform branch around it. It is the origin of the associated
+    // domain in `ios.associatedDomains`, asserted in
+    // scripts/assert-expo-config.mjs so the requirement is checked rather than
+    // remembered.
+    router: { headOrigin: 'https://app.kilo.ai' },
     isProductionBuild,
     eas: {
       projectId: '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4',

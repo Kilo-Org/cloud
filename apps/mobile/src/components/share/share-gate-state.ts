@@ -55,6 +55,8 @@ export type ShareGateStateInput = {
   storedIsError: boolean;
   storedIsSuccess: boolean;
   activeIsError: boolean;
+  /** Live lookup paused (offline), so liveness is unknown like a failure. */
+  activeIsPaused: boolean;
   /** Live destination rows the gate can offer (see `selectShareDestinations`). */
   liveRowCount: number;
   /** Stored sessions loaded for this context, live or not. */
@@ -81,7 +83,8 @@ export function isShareCommitEnabled(input: {
  *   1. stale-share (missing/unknown/consumed shareId) — before any validation
  *   2. non-retryable-classification (all files rejected, no usable text)
  *   3. loading (validation or destination queries in flight)
- *   4. retryable (no live rows and the query that decides liveness failed)
+ *   4. retryable (no live rows and the query that decides liveness failed or is
+ *      paused offline)
  *   5. empty (settled, zero live rows) — live-aware copy when stored sessions
  *      exist but none are live, `share.emptyMessage` only when there are none
  *   6. happy
@@ -124,9 +127,10 @@ export function selectShareGateState(input: ShareGateStateInput): ShareGateState
   // Retryable when nothing live can be offered and a query that decides
   // liveness failed. The stored list blocks the list on its own; a live-lookup
   // failure with no live rows is indistinguishable from "nothing live", so it
-  // must offer a retry instead of a settled empty state. Retry refetches both
+  // must offer a retry instead of a settled empty state. A paused (offline)
+  // live lookup is the same unknown, not a settled empty. Retry refetches both
   // queries (`useAgentSessions().refetch`), matching the Agents list.
-  const livenessUnknown = input.storedIsError || input.activeIsError;
+  const livenessUnknown = input.storedIsError || input.activeIsError || input.activeIsPaused;
   if (input.liveRowCount === 0 && livenessUnknown) {
     return {
       kind: 'retryable',

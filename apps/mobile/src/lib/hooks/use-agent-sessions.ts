@@ -399,6 +399,11 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // rendered row count, because active-set exclusion can hide whole pages.
     storedLoadedPageCount: stored.data?.pages.length ?? 0,
     activeIsError: active.isError,
+    // React Query pauses a fetch while offline (`networkMode: 'online'`), so the
+    // active query can be neither success nor error with no data. Callers that
+    // treat a live-lookup failure as unknown liveness (the Share gate) must
+    // treat a paused lookup the same way instead of a settled empty state.
+    activeIsPaused: active.canRead && active.isPaused,
     hasNextPage: stored.hasNextPage,
     isFetchingNextPage: stored.isFetchingNextPage,
     fetchNextPage,

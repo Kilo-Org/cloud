@@ -480,6 +480,8 @@
       "replyBadRequest": "Dette svaret kan ikke publiseres. Tråden kan ha endret seg.",
       "replyForbidden": "Du har ikke tillatelse til å svare på denne PR-en.",
       "addCommentCta": "Kommenter denne PR-en",
+      "fixWithKilo": "Løs med Kilo",
+      "fixWithKiloPrompt": "Vennligst håndter følgende kommentar på PR-en: {{link}}",
       "commentBadRequest": "Denne kommentaren kan ikke publiseres. PR-en kan ha endret seg.",
       "commentForbidden": "Du har ikke tillatelse til å kommentere denne PR-en.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} venter",
       "skipped": "{{displayCount}} hoppet over",
       "checksCount": "{{displayCount}} sjekker",
+      "checksCount_one": "{{displayCount}} sjekk",
+      "checksCount_other": "{{displayCount}} sjekker",
       "checkDetails": "detaljer om sjekken"
     },
     "inbox": {
@@ -2051,6 +2055,7 @@
       "exitNeedsNewerCli": "Eksterne skråstrekskommandoer krever en nyere versjon av Kilo CLI. Oppdater Kilo CLI og koble til på nytt."
     },
     "sessionConnection": {
+      "label": "Tilkobling",
       "connecting": "Kobler til…",
       "reconnecting": "Kobler til på nytt…",
       "connectionLost": "Tilkoblingen er brutt",
@@ -2070,7 +2075,9 @@
       "removeConfirmTitle": "Fjern mål?",
       "removeConfirmMessage": "CLI sletter målet for denne økten.",
       "updateFailed": "Målet kunne ikke oppdateres.",
-      "sectionAccessibility": "{{status}}. Mål: {{text}}"
+      "sectionAccessibility": "{{status}}. Mål: {{text}}",
+      "collapse": "Skjul målet",
+      "expand": "Vis målet"
     },
     "newSession": {
       "recentlyUsed": "Nylig brukt",
@@ -2124,7 +2131,20 @@
       "continueFrom": "Fortsetter økten {{title}}.",
       "importingSession": "Importerer økten",
       "cliCannotContinue": "Denne CLI-en kan ikke fortsette en økt. Velg Cloud Agent eller en annen CLI.",
-      "importFailed": "Kunne ikke importere denne økten."
+      "importFailed": "Kunne ikke importere denne økten.",
+      "sandbox": "Sandkasse",
+      "sandboxAccessibility": "Sandkasse: {{label}}",
+      "sandboxDefaultWithDestination": "Standard · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Liten",
+      "sandboxInstanceShared": "Delt",
+      "sandboxInstanceLarge": "Stor",
+      "sandboxInstanceDevcontainer": "Utviklingscontainer",
+      "sandboxInstanceProviderDefault": "Leverandørstandard",
+      "sandboxCouldNotLoad": "Kunne ikke laste inn sandkassevalg",
+      "sandboxUnavailable": "Denne sandkassen er utilgjengelig. Velg en annen sandkasse eller Standard.",
+      "sandboxUseDefault": "Bruk Standard"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er oppdatert.",
@@ -2490,6 +2510,12 @@
       "startNewSession": "Start en ny økt",
       "exitSession": "Avslutt økten",
       "clearSession": "Avslutt denne økten og start en ny",
+      "compactDescription": "komprimer konteksten til gjeldende økt",
+      "goalDescription": "Fortsett å jobbe mot et øktmål. /goal <objective> eller pause, resume, clear",
+      "initDescription": "veiledet AGENTS.md-oppsett",
+      "resumeClaudeDescription": "importer en Claude Code-øktutskrift",
+      "resumeCodexDescription": "importer en OpenAI Codex-øktutskrift",
+      "reviewDescription": "gjennomgå endringer [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Bruk /{{command}}",
       "insert": "Sett inn",
       "upgradeRequiredFallback": "Oppgrader CLI-en din for å bruke denne kommandoen.",
@@ -2607,6 +2633,7 @@
     "couldNotLoadActiveSessions": "Kunne ikke laste inn aktive økter.",
     "agentSessions": "Pågår nå",
     "newCodingTask": "Ny kodeoppgave",
+    "newTaskFromPicture": "Ny oppgave fra et bilde",
     "explore": "Utforsk",
     "seeAll": "Se alle",
     "noLiveSessions": "Ingenting kjører akkurat nå"
@@ -2828,7 +2855,8 @@
     "aiProvidersWhat": "Instruksjonene dine, samtaleloggen og eventuelle filer du legger ved.",
     "aiProvidersWhy": "For å generere AI-svar.",
     "aiProvidersWho": "Anthropic, OpenAI, Google og andre leverandører du velger for hver forespørsel.",
-    "gatewayWhat": "Konto-ID, metadata om forespørsler og tokenbruk.",
+    "gatewayWhat": "Konto-ID, metadata om forespørsler, tokenbruk samt ledetekstene og lydopptakene appen sender gjennom den.",
+    "viaGateway": "Via Kilo Gateway",
     "gatewayWhy": "Autentisering, ruting av forespørsler, fakturaavstemming.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Krasj- og feilrapporter der innhold fra appen er fjernet.",
@@ -2848,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Opptaket ditt mens du dikterer.",
     "voiceTranscriptionWhy": "For å gjøre tale om til tekst.",
-    "voiceTranscriptionWho": "Bare på enheten, eller hos Apple eller Google når enheten ikke kan transkribere uten nettilgang.",
+    "voiceTranscriptionWho": "Enheten din, Kilo Gateway med transkripsjonsmodellen du velger, eller Apple eller Google for gjenkjenning på nettet.",
     "installAttributionPromptTitle": "Tillate sporing av installasjonskilde?",
     "installAttributionPromptMessage": "Kilo bruker Apples sporingstillatelse bare for å finne ut hvilken kanal du kom fra. Instruksjonene og samtalene dine brukes aldri til dette.",
     "what": "Hva",
@@ -3058,6 +3086,12 @@
     "privacy": "Åpne Kilo for å se agenter",
     "openAgents": "Åpne agenter",
     "needsInput": "Venter på svar",
+    "newestSession": "Nyeste: {{title}}",
+    "noneWaiting": "Ingen agenter venter",
+    "newAgent": "Ny agent",
+    "approving": "Godkjenner...",
+    "couldNotApprove": "Kunne ikke godkjenne",
+    "couldNotStart": "Kunne ikke starte",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
   },
@@ -3093,5 +3127,12 @@
     "remoteFound": "Datamaskin tilkoblet",
     "checkAgain": "Sjekk igjen",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Start agenten krever en instruksjon. Legg til en instruksjon og kjør den på nytt.",
+      "repositoryUnknown": "Kilo gjenkjenner ikke {{repository}} som et GitHub- eller GitLab-kodelager. Velg et annet kodelager i Kilo.",
+      "repositoryUnsupported": "{{repository}} er et Bitbucket-kodelager — Start agenten kan ennå ikke bruke det. Velg et annet kodelager i Kilo."
+    }
   }
 }

@@ -1,12 +1,18 @@
 import 'server-only';
 import { encryptWithSymmetricKey, decryptWithSymmetricKey } from '@/lib/encryption';
-import { CREDIT_CATEGORIES_ENCRYPTION_KEY } from '@/lib/config.server';
+import {
+  CREDIT_CATEGORIES_ENCRYPTION_KEY,
+  CREDIT_CATEGORIES_ENCRYPTION_KEY_V2,
+} from '@/lib/config.server';
 
 const getEncryptionKey = () => {
-  if (!CREDIT_CATEGORIES_ENCRYPTION_KEY) {
-    throw new Error('CREDIT_CATEGORIES_ENCRYPTION_KEY environment variable is required');
+  const encryptionKey = CREDIT_CATEGORIES_ENCRYPTION_KEY_V2 || CREDIT_CATEGORIES_ENCRYPTION_KEY;
+  if (!encryptionKey) {
+    throw new Error(
+      'CREDIT_CATEGORIES_ENCRYPTION_KEY_V2 or CREDIT_CATEGORIES_ENCRYPTION_KEY environment variable is required'
+    );
   }
-  return CREDIT_CATEGORIES_ENCRYPTION_KEY;
+  return encryptionKey;
 };
 
 /**
@@ -28,7 +34,10 @@ export function encryptPromoCode(plaintext: string): string {
  * @returns The original plaintext promo code
  */
 export function decryptPromoCode(encrypted: string): string {
-  if (process.env.NODE_ENV === 'test' || CREDIT_CATEGORIES_ENCRYPTION_KEY === '') {
+  if (
+    process.env.NODE_ENV === 'test' ||
+    (!CREDIT_CATEGORIES_ENCRYPTION_KEY_V2 && !CREDIT_CATEGORIES_ENCRYPTION_KEY)
+  ) {
     return `TEST-PROMO-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
   }
 

@@ -93,6 +93,10 @@ const mockGenerateCloudAgentAttachmentUploadUrl = jest.fn<
 >(() => Promise.resolve({ signedUrl: 'signed', key: 'key', expiresAt: 'expires' }));
 
 const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
+const mockGetPendingInteractions =
+  jest.fn<
+    (cloudAgentSessionId: string) => Promise<{ questions: unknown[]; permissions: unknown[] }>
+  >();
 const mockGetMessageResult = jest.fn<CloudAgentNextClient['getMessageResult']>();
 const mockCreateWorktreeChat = jest.fn<typeof CreateWorktreeChat>();
 
@@ -118,6 +122,7 @@ const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
   getMessageResult: mockGetMessageResult,
+  getPendingInteractions: mockGetPendingInteractions,
   cancelQueuedMessage: mockCancelQueuedMessage,
   getSandboxStatus: mockGetSandboxStatus,
   getWorktreeChanges: mockGetWorktreeChanges,
@@ -325,6 +330,10 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     sessionId: string;
     messageId: string;
   }) => Promise<unknown>;
+  getPendingInteractions: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+  }) => Promise<{ questions: unknown[]; permissions: unknown[] }>;
   listBitbucketRepositories: (input: {
     organizationId: string;
     forceRefresh?: boolean;
@@ -1136,6 +1145,54 @@ describe('organizationCloudAgentNextRouter.cancelQueuedMessage', () => {
   });
 });
 
+describe('organizationCloudAgentNextRouter.getPendingInteractions', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    mockGetPendingInteractions.mockResolvedValue({
+      questions: [],
+      permissions: [{ id: 'perm-1' }],
+    });
+  });
+
+  it('reads a session the organization owns through the organization-scoped client', async () => {
+    const user = { id: 'org-approver', is_admin: false } as User;
+    const caller = createCaller({ user });
+
+    await expect(
+      caller.getPendingInteractions({ organizationId: ORGANIZATION_ID, cloudAgentSessionId })
+    ).resolves.toEqual({ questions: [], permissions: [{ id: 'perm-1' }] });
+
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ user }),
+      ORGANIZATION_ID
+    );
+    expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).toHaveBeenCalledWith(
+      expect.anything(),
+      ORGANIZATION_ID,
+      user.id,
+      cloudAgentSessionId
+    );
+    expect(mockGetPendingInteractions).toHaveBeenCalledWith(cloudAgentSessionId);
+  });
+
+  it('denies a session outside the organization before reading interactions', async () => {
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValueOnce(null);
+    const caller = createCaller({ user: { id: 'org-approver', is_admin: false } as User });
+
+    await expect(
+      caller.getPendingInteractions({ organizationId: ORGANIZATION_ID, cloudAgentSessionId })
+    ).rejects.toThrow('Organization does not own this session');
+
+    expect(mockGetPendingInteractions).not.toHaveBeenCalled();
+  });
+});
+
 describe('organizationCloudAgentNextRouter helper procedures', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -1228,6 +1285,39 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
     }
   );
 
+  it('preserves the GitHub app type in organization repository listings', async () => {
+    mockFetchGitHubRepositoriesForOrganization.mockResolvedValue({
+      repositories: [
+        {
+          id: 1,
+          name: 'repo',
+          fullName: 'acme/repo',
+          private: true,
+          platformIntegrationId: '11111111-1111-4111-8111-111111111111',
+          platformAccountLogin: 'acme',
+          githubAppType: 'lite',
+        },
+      ],
+      integrationInstalled: true,
+      syncedAt: null,
+    });
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+    await expect(
+      caller.listGitHubRepositories({ organizationId: ORGANIZATION_ID, forceRefresh: false })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        repositories: [
+          expect.objectContaining({
+            fullName: 'acme/repo',
+            platformIntegrationId: '11111111-1111-4111-8111-111111111111',
+            githubAppType: 'lite',
+          }),
+        ],
+      })
+    );
+  });
+
   it('rejects organization repository listing before ranking when membership is denied', async () => {
     mockEnsureOrganizationAccess.mockImplementation(() => {
       throw new TRPCError({
@@ -1291,6 +1381,41 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
       caller.listGitHubRepositories({ organizationId: ORGANIZATION_ID, forceRefresh: false })
     ).rejects.toThrow('provider down');
     expect(mockOrderRepositoriesByUsage).not.toHaveBeenCalled();
+  });
+
+  it('does not strip platformIntegrationId/githubAppType from organization GitHub repositories in the response', async () => {
+    // Regression test: the tRPC .output() schema previously omitted
+    // githubAppType, so Zod silently stripped it even though the picker's
+    // "Lite" badge depends on it, and platformIntegrationId is required for
+    // the "Select the GitHub repository again" guard to resolve correctly.
+    const repositories = [
+      {
+        id: 1,
+        name: 'repo',
+        fullName: 'acme/repo',
+        private: false,
+        platformIntegrationId: '11111111-1111-4111-8111-111111111111',
+        platformAccountLogin: 'acme',
+        githubAppType: 'lite' as const,
+      },
+    ];
+    mockFetchGitHubRepositoriesForOrganization.mockResolvedValue({
+      repositories,
+      integrationInstalled: true,
+      syncedAt: null,
+    });
+    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+    await expect(
+      caller.listGitHubRepositories({
+        organizationId: ORGANIZATION_ID,
+        forceRefresh: false,
+      })
+    ).resolves.toEqual({
+      repositories,
+      integrationInstalled: true,
+      syncedAt: null,
+    });
   });
 });
 

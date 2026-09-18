@@ -24,6 +24,7 @@ import {
   removeExpiredCloudAgentReportData,
 } from './telemetry/report-consumer.js';
 import { runCloudAgentOutcomeCollection } from './telemetry/outcome-aggregate.js';
+import { runCloudAgentOpenStockCollection } from './telemetry/open-stock.js';
 import { authMiddleware } from './middleware/auth.js';
 import { balanceMiddleware } from './middleware/balance.js';
 import { resolveTerminalWrapperClient } from './terminal/access.js';
@@ -1122,7 +1123,11 @@ export default {
       return;
     }
     if (controller.cron === OUTCOME_AGGREGATE_CRON) {
-      await runCloudAgentOutcomeCollection(env);
+      try {
+        await runCloudAgentOutcomeCollection(env);
+      } finally {
+        await runCloudAgentOpenStockCollection(env);
+      }
       return;
     }
     logger.warn('Cloud Agent scheduled handler received an unrecognized cron', {

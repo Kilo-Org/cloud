@@ -480,6 +480,8 @@
       "replyBadRequest": "Det här svaret kan inte publiceras. Tråden kan ha ändrats.",
       "replyForbidden": "Du har inte behörighet att svara på den här PR:en.",
       "addCommentCta": "Kommentera den här PR:en",
+      "fixWithKilo": "Åtgärda med Kilo",
+      "fixWithKiloPrompt": "Hantera följande kommentar på PR:en: {{link}}",
       "commentBadRequest": "Den här kommentaren kan inte publiceras. PR:en kan ha ändrats.",
       "commentForbidden": "Du har inte behörighet att kommentera den här PR:en.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} väntande",
       "skipped": "{{displayCount}} överhoppade",
       "checksCount": "{{displayCount}} kontroller",
+      "checksCount_one": "{{displayCount}} kontroll",
+      "checksCount_other": "{{displayCount}} kontroller",
       "checkDetails": "information om kontrollen"
     },
     "inbox": {
@@ -2051,6 +2055,7 @@
       "exitNeedsNewerCli": "Du behöver en nyare version av Kilo CLI för att använda snedstreckskommandon i fjärrsessioner. Uppdatera Kilo CLI och anslut igen."
     },
     "sessionConnection": {
+      "label": "Anslutning",
       "connecting": "Ansluter…",
       "reconnecting": "Återansluter…",
       "connectionLost": "Anslutningen bröts",
@@ -2070,7 +2075,9 @@
       "removeConfirmTitle": "Ta bort mål?",
       "removeConfirmMessage": "CLI rensar den här sessionens mål.",
       "updateFailed": "Målet kunde inte uppdateras.",
-      "sectionAccessibility": "{{status}}. Mål: {{text}}"
+      "sectionAccessibility": "{{status}}. Mål: {{text}}",
+      "collapse": "Fäll ihop målet",
+      "expand": "Fäll ut målet"
     },
     "newSession": {
       "recentlyUsed": "Nyligen använda",
@@ -2124,7 +2131,20 @@
       "continueFrom": "Sessionen {{title}} fortsätter.",
       "importingSession": "Importerar sessionen",
       "cliCannotContinue": "Den här CLI-versionen kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI-instans.",
-      "importFailed": "Det gick inte att importera den här sessionen."
+      "importFailed": "Det gick inte att importera den här sessionen.",
+      "sandbox": "Sandlåda",
+      "sandboxAccessibility": "Sandlåda: {{label}}",
+      "sandboxDefaultWithDestination": "Standard · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Liten",
+      "sandboxInstanceShared": "Delad",
+      "sandboxInstanceLarge": "Stor",
+      "sandboxInstanceDevcontainer": "Utvecklingscontainer",
+      "sandboxInstanceProviderDefault": "Leverantörsstandard",
+      "sandboxCouldNotLoad": "Det gick inte att läsa in sandlådealternativ",
+      "sandboxUnavailable": "Den här sandlådan är inte tillgänglig. Välj en annan sandlåda eller Standard.",
+      "sandboxUseDefault": "Använd Standard"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil har uppdaterats.",
@@ -2490,6 +2510,12 @@
       "startNewSession": "Starta en ny session",
       "exitSession": "Avsluta sessionen",
       "clearSession": "Avsluta den här sessionen och starta en ny",
+      "compactDescription": "komprimera den aktuella sessionens kontext",
+      "goalDescription": "Fortsätt arbeta mot ett sessionsmål. /goal <objective> eller pause, resume, clear",
+      "initDescription": "guidad AGENTS.md-konfiguration",
+      "resumeClaudeDescription": "importera en Claude Code-sessionstranskription",
+      "resumeCodexDescription": "importera en OpenAI Codex-sessionstranskription",
+      "reviewDescription": "granska ändringar [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Använd /{{command}}",
       "insert": "Infoga",
       "upgradeRequiredFallback": "Uppdatera din CLI-version för att använda det här kommandot.",
@@ -2607,6 +2633,7 @@
     "couldNotLoadActiveSessions": "Kunde inte läsa in de aktiva sessionerna.",
     "agentSessions": "Pågår nu",
     "newCodingTask": "Ny programmeringsuppgift",
+    "newTaskFromPicture": "Ny uppgift från en bild",
     "explore": "Utforska",
     "seeAll": "Visa alla",
     "noLiveSessions": "Inget körs just nu"
@@ -2828,7 +2855,8 @@
     "aiProvidersWhat": "Dina prompter, din konversationshistorik och de filer du bifogar.",
     "aiProvidersWhy": "För att generera AI-svar.",
     "aiProvidersWho": "Anthropic, OpenAI, Google och andra leverantörer som du väljer för varje begäran.",
-    "gatewayWhat": "Konto-ID, metadata om begäranden och tokenanvändning.",
+    "gatewayWhat": "Konto-ID, metadata om begäranden, tokenanvändning samt de prompter och ljudinspelningar som appen skickar genom den.",
+    "viaGateway": "Via Kilo Gateway",
     "gatewayWhy": "För att verifiera din identitet, dirigera begäranden och stämma av faktureringen.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Krasch- och felrapporter där appinnehållet har tagits bort.",
@@ -2848,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Din inspelning medan du dikterar.",
     "voiceTranscriptionWhy": "För att omvandla tal till text.",
-    "voiceTranscriptionWho": "Bara på enheten, eller hos Apple eller Google om enheten inte kan transkribera utan internetanslutning.",
+    "voiceTranscriptionWho": "Din enhet, Kilo Gateway med den transkriberingsmodell du väljer, eller Apple eller Google för identifiering online.",
     "installAttributionPromptTitle": "Tillåt spårning av installationskälla?",
     "installAttributionPromptMessage": "Kilo använder Apples spårningsbehörighet bara för att ta reda på vilken kanal du hittade appen genom. Dina prompter och konversationer används aldrig.",
     "what": "Vad",
@@ -3058,6 +3086,12 @@
     "privacy": "Öppna Kilo för att se agenter",
     "openAgents": "Öppna agenter",
     "needsInput": "Väntar på svar",
+    "newestSession": "Nyaste: {{title}}",
+    "noneWaiting": "Inga agenter väntar",
+    "newAgent": "Ny agent",
+    "approving": "Godkänner...",
+    "couldNotApprove": "Kunde inte godkänna",
+    "couldNotStart": "Kunde inte starta",
     "channelName": "Aktiva agenter",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen."
   },
@@ -3093,5 +3127,12 @@
     "remoteFound": "Dator ansluten",
     "checkAgain": "Kontrollera igen",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Starta agenten kräver en prompt. Lägg till en prompt och kör den igen.",
+      "repositoryUnknown": "Kilo känner inte igen {{repository}} som ett GitHub- eller GitLab-kodarkiv. Välj ett annat kodarkiv i Kilo.",
+      "repositoryUnsupported": "{{repository}} är ett Bitbucket-kodarkiv — Starta agenten kan ännu inte använda det. Välj ett annat kodarkiv i Kilo."
+    }
   }
 }

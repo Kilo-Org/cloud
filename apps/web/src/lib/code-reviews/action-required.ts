@@ -43,7 +43,7 @@ const REQUESTED_MODEL_NOT_ALLOWED_FOR_TEAM_MESSAGE =
 const BYOK_INVALID_KEY_MESSAGE =
   '[byok] your api key is invalid or has been revoked. please check your api key configuration.';
 const BYOK_PERMISSION_DENIED_MESSAGE =
-  '[byok] your api key does not have permission to access this resource. please check your api key permissions.';
+  '[byok] your api key does not have permission to access this ';
 const REPEATED_REPOSITORY_CLONE_TIMEOUT_REASON =
   'repeated_repository_clone_timeout' satisfies CodeReviewActionRequiredReason;
 const REPOSITORY_CLONE_TIMEOUT_MESSAGE_FRAGMENT = 'repository clone timed out';

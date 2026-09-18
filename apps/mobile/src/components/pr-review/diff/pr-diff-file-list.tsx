@@ -43,7 +43,7 @@ import {
 import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
 import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
-import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { providerPrRefKey, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
 import { EmptyFilesView, TabStateMessage } from '@/components/pr-review/diff/pr-diff-rows';
@@ -234,8 +234,10 @@ export function PrReviewFileList({
   // the next pages before the partial-load row (`prReview.hunkRows
   // .loadedOfTotalFiles`, "1 of 5 files loaded") and its Load all action could
   // be read. `usePrDiffPageGate` keeps the row the resting state until the
-  // user's own drag, and keeps the end report FlashList makes before it.
-  const { onScrollBeginDrag, onEndReached } = usePrDiffPageGate(query);
+  // user's own drag, and keeps the end report FlashList makes before it. The
+  // gate is keyed by the provider ref so a drag on one PR never opens the gate
+  // of a different PR rendered by the same mounted list.
+  const { onScrollBeginDrag, onEndReached } = usePrDiffPageGate(query, providerPrRefKey(scope.ref));
 
   const stickyHeaderIndices = useMemo(() => stickyFileHeaderIndices(items), [items]);
 

@@ -390,6 +390,25 @@ describe('PrReviewFileList pagination gate', () => {
     beginDrag(renderer);
     expect(listQueryState.query.fetchNextPage).not.toHaveBeenCalled();
   });
+
+  it('closes the gate again when the mounted list is handed another PR', () => {
+    const renderer = mountList();
+    reportEndReached(renderer);
+    beginDrag(renderer);
+    expect(listQueryState.query.fetchNextPage).toHaveBeenCalledOnce();
+
+    // The same component instance now renders PR B (a route param change, not
+    // a remount). The drag on PR A must not open B's gate: B's own end report
+    // has to rest on the partial-load row until the reader drags B.
+    listQueryState.query.fetchNextPage.mockClear();
+    act(() => {
+      renderer.update(createElement(PrReviewFileList, { ...BASE_PROPS, number: 8 }));
+    });
+    reportEndReached(renderer);
+    expect(listQueryState.query.fetchNextPage).not.toHaveBeenCalled();
+    beginDrag(renderer);
+    expect(listQueryState.query.fetchNextPage).toHaveBeenCalledOnce();
+  });
 });
 
 describe('PrReviewFileList content container side insets (landscape)', () => {

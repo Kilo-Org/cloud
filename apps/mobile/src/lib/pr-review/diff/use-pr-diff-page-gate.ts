@@ -4,6 +4,12 @@ import { type usePrReviewFileListQuery } from '@/lib/pr-review/diff/pr-review-fi
 
 type FileListQuery = ReturnType<typeof usePrReviewFileListQuery>['query'];
 
+type PageGate = { userDragged: boolean; heldEndReach: boolean };
+
+function freshPageGate(): PageGate {
+  return { userDragged: false, heldEndReach: false };
+}
+
 /**
  * The pagination gate for the diff file list. FlashList reports the end as
  * reached as soon as its content fits the viewport, so a first page shorter
@@ -17,9 +23,23 @@ type FileListQuery = ReturnType<typeof usePrReviewFileListQuery>['query'];
  * FlashList does not report it again until the data changes, so the drag that
  * opens the gate would have nothing left to let through: hold that report in
  * `heldEndReach` and load it on the drag.
+ *
+ * `identity` is the rendered PR's provider ref key. The list can be handed a
+ * different PR while it stays mounted, and a drag on the PR the reader left
+ * must not open the next PR's gate before its partial-load row can rest, so
+ * the gate is reset during render when the identity changes. Resetting here,
+ * not in an effect, means the new list's first end report — a child effect or
+ * layout callback that runs before the parent's effects — already sees a
+ * closed gate.
  */
-export function usePrDiffPageGate(query: FileListQuery) {
-  const gate = useRef({ userDragged: false, heldEndReach: false });
+export function usePrDiffPageGate(query: FileListQuery, identity: string) {
+  const gate = useRef<PageGate>(freshPageGate());
+
+  const identityRef = useRef(identity);
+  if (identityRef.current !== identity) {
+    identityRef.current = identity;
+    gate.current = freshPageGate();
+  }
 
   // Hold the query in a ref so the handlers stay stable across renders; React
   // Query hands back a fresh result object each render, and a handler closed

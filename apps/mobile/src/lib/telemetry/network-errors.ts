@@ -70,9 +70,14 @@ const ResponseErrorItemSchema = z.looseObject({ error: TrpcResponseErrorSchema }
 /** A parsed tRPC error object read from a response body. */
 export type TrpcResponseError = z.infer<typeof TrpcResponseErrorSchema>;
 
-// `Error` and `DOMException` both carry a string `name`; abort/deadline checks
-// key on it so a structured error never needs an `instanceof` across bundles.
-const NamedErrorSchema = z.looseObject({ name: z.string() });
+// `Error`, `DOMException` and Expo's error-like objects carry `name`/`message`;
+// abort and deadline checks key on those fields (and a wrapper's `cause`) so a
+// structured error never needs an `instanceof` across bundles.
+const NamedErrorSchema = z.looseObject({
+  name: z.string().optional(),
+  message: z.string().optional(),
+  cause: z.unknown().optional(),
+});
 
 const TRPC_PATH = '/api/trpc/';
 const HTTP_URL_PATTERN = /^https?:\/\//iu;
@@ -162,22 +167,55 @@ function errorPropertyOf(value: unknown): TrpcResponseError | undefined {
   return parsed.success ? parsed.data.error : undefined;
 }
 
-/** True when the value is an abort (`AbortError` / `DOMException`). */
-export function isAbortError(error: unknown): boolean {
-  return hasErrorName(error, 'AbortError');
-}
+// Abort/cancellation surfaces Expo and iOS produce. `AbortError` covers the
+// web/RN DOMException; the rest are the names Expo's fetch and native modules
+// reject with (e.g. `fetch failed: FetchRequestCanceledException: Fetch
+// request has been canceled`).
+const ABORT_ERROR_NAMES = new Set([
+  'AbortError',
+  'CanceledError',
+  'CancellationException',
+  'FetchRequestCanceledException',
+  'AbortException',
+]);
 
-function hasErrorName(error: unknown, name: string): boolean {
-  try {
-    const parsed = NamedErrorSchema.safeParse(error);
-    return parsed.success && parsed.data.name === name;
-  } catch {
-    return false;
+const ABORT_ERROR_MESSAGES = ['Fetch request has been canceled', 'The operation was aborted'];
+
+// A wrapper may carry the cancellation in `cause`; bound the walk so a
+// self-referential chain can never loop.
+const MAX_CAUSE_DEPTH = 5;
+
+/** True for an abort/cancellation, by name, Expo/iOS message, or `cause`. */
+export function isAbortError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth <= MAX_CAUSE_DEPTH; depth += 1) {
+    try {
+      const parsed = NamedErrorSchema.safeParse(current);
+      if (!parsed.success) {
+        return false;
+      }
+      const { name, message, cause } = parsed.data;
+      if (name !== undefined && ABORT_ERROR_NAMES.has(name)) {
+        return true;
+      }
+      if (message !== undefined && ABORT_ERROR_MESSAGES.some(token => message.includes(token))) {
+        return true;
+      }
+      current = cause;
+    } catch {
+      return false;
+    }
   }
+  return false;
 }
 
 function isRequestDeadlineError(error: unknown): boolean {
-  return hasErrorName(error, 'RequestDeadlineError');
+  try {
+    const parsed = NamedErrorSchema.safeParse(error);
+    return parsed.success && parsed.data.name === 'RequestDeadlineError';
+  } catch {
+    return false;
+  }
 }
 
 function statusClassFor(status: number | undefined): '4xx' | '5xx' | undefined {
@@ -205,6 +243,11 @@ function buildSyntheticError(context: NetworkErrorContext, pathOnly: string): Er
   return new Error(`${method} ${pathOnly} failed after ${context.durationMs}ms`);
 }
 
+/** True when the raw error is a body worth preserving alongside the report. */
+function hasErrorBody(value: unknown): boolean {
+  return value !== undefined && value !== null && !(value instanceof Error);
+}
+
 /**
  * Build and emit one warning-level telemetry event for a network error.
  * Never throws; never includes headers, bodies, or query strings.
@@ -216,7 +259,10 @@ export function reportNetworkError(context: NetworkErrorContext): void {
     const trpcCode = readTrpcErrorContext(context.error).code;
     const statusClass = statusClassFor(context.status);
     const outcome = networkOutcome(context);
-    const error = context.error ?? buildSyntheticError(context, pathOnly);
+    // Sentry needs an Error for a usable title and stack: a tRPC failure body
+    // is a plain object, so synthesize one naming the procedure and status.
+    const rawError = context.error;
+    const error = rawError instanceof Error ? rawError : buildSyntheticError(context, pathOnly);
 
     const tags = {
       'error.subsystem': 'network',
@@ -239,6 +285,9 @@ export function reportNetworkError(context: NetworkErrorContext): void {
       ...(procedure === undefined ? {} : { procedure }),
       ...(trpcCode === undefined ? {} : { trpcCode }),
       ...(context.timedOut === undefined ? {} : { timedOut: context.timedOut }),
+      // Keep the raw body (`{code, data, message}`) that the tags and title
+      // derive from, without letting it become the exception's title.
+      ...(hasErrorBody(rawError) ? { errorBody: rawError } : {}),
     };
 
     captureTelemetry({

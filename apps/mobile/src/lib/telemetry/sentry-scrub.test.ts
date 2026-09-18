@@ -194,6 +194,69 @@ describe('scrubEvent', () => {
     expect(result.contexts.trace.trace_id).toBe('abcdef0123456789abcdef0123456789');
   });
 
+  it('redacts a token-shaped run in contexts.network.errorBody', () => {
+    const event = {
+      contexts: {
+        network: {
+          procedure: 'activeSessions.list',
+          errorBody: {
+            message: 'unauthorized',
+            data: { code: 'UNAUTHORIZED', httpStatus: 401, token: 'abcdefghijklmnopqrst' },
+          },
+        },
+      },
+    };
+
+    const result = scrubEvent(event);
+    const network = result.contexts.network as Record<string, unknown>;
+    const body = network.errorBody as Record<string, unknown>;
+
+    expect((body.data as Record<string, unknown>).token).toBe('[redacted]');
+    // Non-token fields are preserved so the body stays diagnostic.
+    expect((body.data as Record<string, unknown>).code).toBe('UNAUTHORIZED');
+    expect(body.message).toBe('unauthorized');
+    expect(network.procedure).toBe('activeSessions.list');
+  });
+
+  it('redacts a token embedded in a contexts.network.errorBody message', () => {
+    const event = {
+      contexts: {
+        network: {
+          errorBody: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0',
+        },
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts.network.errorBody).toBe('[redacted]');
+  });
+
+  it('redacts a token nested in a contexts.network.errorBody stack', () => {
+    const event = {
+      contexts: {
+        network: {
+          errorBody: { data: { zodError: { received: ['abcdefghijklmnopqrst'] } } },
+        },
+      },
+    };
+
+    const result = scrubEvent(event);
+    const body = result.contexts.network.errorBody as Record<string, unknown>;
+    const data = body.data as Record<string, unknown>;
+    const zodError = data.zodError as Record<string, unknown>;
+
+    expect((zodError.received as string[])[0]).toBe('[redacted]');
+  });
+
+  it('handles a cyclic contexts.network.errorBody without throwing', () => {
+    const body: Record<string, unknown> = { message: 'x' };
+    body.self = body;
+    const event = { contexts: { network: { errorBody: body } } };
+
+    expect(() => scrubEvent(event)).not.toThrow();
+  });
+
   it('returns malformed event unchanged without throwing', () => {
     const event = null;
     expect(() => scrubEvent(event)).not.toThrow();

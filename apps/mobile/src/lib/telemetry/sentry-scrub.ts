@@ -170,12 +170,13 @@ function exceptionContextNames(event: Record<string, unknown>): string[] {
  * - Strips query strings from request URL and contexts.response URL.
  * - Deletes `user.email`, `user.username`, and `user.ip_address`.
  * - Redacts token-shaped runs (20+ base64url chars, or any `Bearer ` value) at
- *   any depth in `event.extra`, `event.tags`, and the exception-name context
- *   `extraErrorDataIntegration` attaches. A word-chain run stays only at an
- *   app-set identifier path (see {@link IDENTIFIER_PATHS}); anywhere else a
- *   word-chain secret is redacted on shape alone. Sentry's structured contexts
- *   are left intact: their identifiers trip the token heuristic without holding
- *   secrets.
+ *   any depth in `event.extra`, `event.tags`, the exception-name context
+ *   `extraErrorDataIntegration` attaches, and the one free-form field of the
+ *   `network` context (`contexts.network.errorBody`, a raw tRPC failure body).
+ *   A word-chain run stays only at an app-set identifier path (see
+ *   {@link IDENTIFIER_PATHS}); anywhere else a word-chain secret is redacted on
+ *   shape alone. Every other structured context is left intact: their
+ *   identifiers trip the token heuristic without holding secrets.
  */
 export function scrubEvent<T>(event: T): T {
   try {
@@ -200,6 +201,21 @@ export function scrubEvent<T>(event: T): T {
         const resp = ctx.response as Record<string, unknown>;
         if ('url' in resp) {
           resp.url = stripQuery(resp.url);
+        }
+      }
+      // `contexts.network.errorBody` is the raw tRPC failure body the app
+      // attaches for network-error reports — free-form server payload, unlike
+      // every other field of the structured `network` context. Scrub it like
+      // `extra` so a token-shaped run inside a message, stack, or zod issue
+      // never reaches Sentry unredacted.
+      if (ctx.network != null && typeof ctx.network === 'object') {
+        const network = ctx.network as Record<string, unknown>;
+        if ('errorBody' in network) {
+          network.errorBody = redactValue(network.errorBody, new WeakMap(), [
+            'contexts',
+            'network',
+            'errorBody',
+          ]);
         }
       }
       for (const name of exceptionContextNames(e)) {

@@ -52,6 +52,25 @@ describe('installErrorReporting', () => {
     expect(sentryMock.captureMessage).not.toHaveBeenCalled();
   });
 
+  it('coerces a non-Error value to an Error before captureException', async () => {
+    const install = await loadInstallErrorReporting();
+    install();
+    const { captureTelemetry } = await import('@/lib/telemetry/error-sink');
+
+    const body = { code: 'UNAUTHORIZED', data: { httpStatus: 401 } };
+    captureTelemetry({ level: 'warning', error: body });
+
+    expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+    const [captured, options] = sentryMock.captureException.mock.calls[0] as [
+      unknown,
+      { extra?: Record<string, unknown> },
+    ];
+    expect(captured).toBeInstanceOf(Error);
+    expect(captured).not.toBe(body);
+    expect(options.extra).toMatchObject({ error: body });
+    expect(sentryMock.captureMessage).not.toHaveBeenCalled();
+  });
+
   it('routes a message event to captureMessage', async () => {
     const install = await loadInstallErrorReporting();
     install();

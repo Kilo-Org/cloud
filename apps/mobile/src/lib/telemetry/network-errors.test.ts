@@ -177,9 +177,39 @@ describe('isAbortError', () => {
     expect(isAbortError(namedError('AbortError'))).toBe(true);
   });
 
+  it('is true for the other cancellation names Expo and iOS use', () => {
+    expect(isAbortError(namedError('CanceledError'))).toBe(true);
+    expect(isAbortError(namedError('CancellationException'))).toBe(true);
+    expect(isAbortError(namedError('FetchRequestCanceledException'))).toBe(true);
+    expect(isAbortError(namedError('AbortException'))).toBe(true);
+  });
+
+  it('is true for the Expo/iOS cancellation messages', () => {
+    expect(
+      isAbortError(
+        new Error('fetch failed: FetchRequestCanceledException: Fetch request has been canceled')
+      )
+    ).toBe(true);
+    expect(isAbortError(new Error('The operation was aborted.'))).toBe(true);
+  });
+
+  it('follows the cause chain to a cancellation', () => {
+    const cancellation = namedError(
+      'FetchRequestCanceledException',
+      'Fetch request has been canceled'
+    );
+    expect(isAbortError(new Error('fetch failed', { cause: cancellation }))).toBe(true);
+    expect(isAbortError({ cause: { cause: cancellation } })).toBe(true);
+  });
+
   it('is false for other errors and non-errors', () => {
     expect(isAbortError(new Error('nope'))).toBe(false);
+    expect(isAbortError(new Error('socket closed'))).toBe(false);
+    expect(isAbortError({ message: 'socket closed' })).toBe(false);
     expect(isAbortError(undefined)).toBe(false);
+    expect(isAbortError(null)).toBe(false);
+    expect(isAbortError('AbortError')).toBe(false);
+    expect(isAbortError(new Error('completed without a cancellation', { cause: 42 }))).toBe(false);
   });
 });
 
@@ -216,6 +246,19 @@ describe('createNetworkErrorFetch', () => {
     const wrapped = createNetworkErrorFetch(rejectingFetch(abort));
 
     await expect(wrapped('https://example.com/api/trpc/session.list')).rejects.toBe(abort);
+
+    expect(events).toHaveLength(0);
+  });
+
+  it('(b2) does not report an Expo/iOS cancellation and re-throws it', async () => {
+    const cancellation = new Error(
+      'fetch failed: FetchRequestCanceledException: Fetch request has been canceled'
+    );
+    const wrapped = createNetworkErrorFetch(rejectingFetch(cancellation), { source: 'fetch' });
+
+    await expect(wrapped('https://api.example.com/health', { method: 'HEAD' })).rejects.toBe(
+      cancellation
+    );
 
     expect(events).toHaveLength(0);
   });
@@ -370,7 +413,9 @@ describe('createNetworkErrorFetch', () => {
       readResponseError: readTrpcResponseError,
     });
 
-    const result = await wrapped('https://example.com/api/trpc/session.list?batch=1');
+    const result = await wrapped('https://example.com/api/trpc/session.list?batch=1', {
+      method: 'POST',
+    });
 
     expect(result).toBe(response);
     expect(events).toHaveLength(1);
@@ -391,7 +436,9 @@ describe('createNetworkErrorFetch', () => {
       outcome: 'http_error',
       trpcCode: 'FORBIDDEN',
     });
-    expect(event?.error).toEqual(batchError);
+    expect(event?.error).toBeInstanceOf(Error);
+    expect(errorMessageOf(event)).toBe('POST https://example.com/api/trpc/session.list -> 207');
+    expect(event?.contexts?.network?.errorBody).toEqual(batchError);
     expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http_error']);
   });
 
@@ -466,5 +513,45 @@ describe('reportNetworkError', () => {
       procedure: 'user.me',
       trpcCode: 'UNAUTHORIZED',
     });
+  });
+
+  it('reports a synthetic Error and preserves a non-Error body', () => {
+    const body = {
+      message: 'unauthorized',
+      code: -32_001,
+      data: { code: 'UNAUTHORIZED', httpStatus: 401, path: 'activeSessions.list' },
+    };
+
+    reportNetworkError({
+      source: 'trpc',
+      url: 'https://example.com/api/trpc/activeSessions.list?batch=1&input=secret',
+      method: 'POST',
+      status: 401,
+      durationMs: 12,
+      error: body,
+    });
+
+    const event = reportedEvent();
+    expect(event?.error).toBeInstanceOf(Error);
+    expect(errorMessageOf(event)).toBe(
+      'POST https://example.com/api/trpc/activeSessions.list -> 401'
+    );
+    expect(event?.contexts?.network?.errorBody).toEqual(body);
+    expect(JSON.stringify(event)).not.toContain('secret');
+  });
+
+  it('keeps a real Error as the reported error with no errorBody', () => {
+    const error = new Error('socket closed');
+
+    reportNetworkError({
+      source: 'fetch',
+      url: 'https://example.com/api/trpc/a.b',
+      durationMs: 3,
+      error,
+    });
+
+    const event = reportedEvent();
+    expect(event?.error).toBe(error);
+    expect(event?.contexts?.network?.errorBody).toBeUndefined();
   });
 });

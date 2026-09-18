@@ -10,6 +10,7 @@
  */
 
 import * as Sentry from '@sentry/react-native';
+import { z } from 'zod';
 
 import { setTelemetrySink } from '@/lib/telemetry/error-sink';
 import { createNetworkErrorFetch } from '@/lib/telemetry/network-errors';
@@ -49,6 +50,26 @@ function isReportableAppUrl(url: string): boolean {
   return !isTelemetryHost(url);
 }
 
+const MessageValueSchema = z.looseObject({ message: z.string().min(1) });
+const StringValueSchema = z.string().min(1);
+
+/**
+ * Sentry derives a title and stack from an `Error`; handing it a plain object
+ * produces "Object captured as exception with keys: ...". Coerce any non-Error
+ * value so every issue is actionable, keeping the original under `extra`.
+ */
+function asError(value: unknown): Error {
+  const text = StringValueSchema.safeParse(value);
+  if (text.success) {
+    return new Error(text.data);
+  }
+  const parsed = MessageValueSchema.safeParse(value);
+  if (parsed.success) {
+    return new Error(parsed.data.message);
+  }
+  return new Error('Telemetry error');
+}
+
 function installSentrySink(): void {
   setTelemetrySink(event => {
     const options = {
@@ -62,10 +83,15 @@ function installSentrySink(): void {
     };
     // The sink type returns void; call into Sentry without returning its id
     // (typescript-eslint/strict-void-return).
-    if (event.error !== undefined) {
+    if (event.error === undefined) {
+      Sentry.captureMessage(event.message ?? 'Telemetry event', options);
+    } else if (event.error instanceof Error) {
       Sentry.captureException(event.error, options);
     } else {
-      Sentry.captureMessage(event.message ?? 'Telemetry event', options);
+      Sentry.captureException(asError(event.error), {
+        ...options,
+        extra: { ...options.extra, error: event.error },
+      });
     }
   });
 }

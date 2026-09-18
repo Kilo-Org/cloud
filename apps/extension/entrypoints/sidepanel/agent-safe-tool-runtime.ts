@@ -1,4 +1,4 @@
-import { browser, storage } from '#imports';
+import { storage } from '#imports';
 import type {
   AgentConversationEvent,
   KiloBrowserToolName,
@@ -6,7 +6,7 @@ import type {
 } from '@/src/shared/agent-conversation';
 import { searchAgentMemories, toAgentMemorySnippet } from '@/src/shared/agent-memories';
 import { loadAgentMemories } from '@/src/shared/agent-memories-storage';
-import { BROWSER_TOOL_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
+import { executeKiloBrowserToolCall } from './browser-tool-runtime';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 
 type SafeToolCall = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
@@ -19,28 +19,8 @@ type DispatchableToolCall = SafeToolCall | BrowserToolCall;
  * current mode does not expose never reaches here (the turn runner turns it
  * into a refusal tool result).
  */
-const runBrowserToolCall = async (toolCall: BrowserToolCall): Promise<EvalTabResult> => {
-  const response: unknown = await browser.runtime.sendMessage({
-    arguments: toolCall.arguments,
-    tabId: toolCall.tabId,
-    tool: toolCall.name,
-    type: BROWSER_TOOL_MESSAGE,
-  });
-
-  if (!isTabDebuggerResponse(response)) {
-    return { error: 'Extension background returned an invalid response.', ok: false };
-  }
-
-  if (!response.ok) {
-    return { error: response.error, ok: false };
-  }
-
-  if (response.type !== BROWSER_TOOL_MESSAGE) {
-    return { error: 'Extension background returned the wrong response.', ok: false };
-  }
-
-  return response.result;
-};
+const runBrowserToolCall = (toolCall: BrowserToolCall): Promise<EvalTabResult> =>
+  executeKiloBrowserToolCall(toolCall);
 
 const isBrowserToolCall = (toolCall: DispatchableToolCall): toolCall is BrowserToolCall =>
   'arguments' in toolCall;

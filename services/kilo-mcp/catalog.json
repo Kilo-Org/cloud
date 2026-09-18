@@ -4715,6 +4715,17 @@
     ],
     "searchBlob": "moderation.listHiddenUsers List the GitHub logins of all users the current user has blocked and muted. moderation listhiddenusers"
   },
+  "openAiChatGpt.status": {
+    "path": "openAiChatGpt.status",
+    "kind": "query",
+    "summary": "Check whether the signed-in user's \"Sign in with ChatGPT\" (OpenAI ChatGPT BYOK) connection is connected, disconnected, or in an error state, including linked account email and connection time.",
+    "inputSchema": {},
+    "tags": [
+      "openaichatgpt",
+      "status"
+    ],
+    "searchBlob": "openAiChatGpt.status Check whether the signed-in user's \"Sign in with ChatGPT\" (OpenAI ChatGPT BYOK) connection is connected, disconnected, or in an error state, including linked account email and connection time. openaichatgpt status"
+  },
   "organizations.admin.creditTransactions": {
     "path": "organizations.admin.creditTransactions",
     "kind": "query",

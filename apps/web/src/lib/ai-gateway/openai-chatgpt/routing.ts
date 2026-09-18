@@ -91,6 +91,7 @@ export type OpenAiChatGptRoutingResult =
       provider: Provider;
       userByok: null;
       bypassAccessCheck: false;
+      skipBalanceCheck: true;
     }
   | {
       /**
@@ -138,6 +139,51 @@ export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput):
   // can also disable the row through the ordinary BYOK toggle, which leaves the
   // payload saying `connected`. Both must hold for the route to be eligible.
   return stored?.isEnabled === true && stored.connection.status === 'connected';
+}
+
+/**
+ * The catalog model ids an enabled ChatGPT connection can serve, for the models
+ * list's BYOK tag. Returns null when the person has no usable connection, so the
+ * caller leaves the list untouched. The served-model gate is the same one
+ * routing uses, so a model is tagged only when the delegated route can carry it.
+ */
+export async function getOpenAiChatGptByokModelIds(
+  userId: string,
+  candidateModelIds: readonly string[]
+): Promise<Set<string> | null> {
+  const stored = await getOpenAiChatGptStoredConnection(userId);
+  if (stored?.isEnabled !== true || stored.connection.status !== 'connected') return null;
+
+  const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
+  if (apiKey.trim().length === 0) return null;
+
+  const tagged = await Promise.all(
+    candidateModelIds.filter(isOpenAiChatGptModel).map(async modelId => {
+      const upstreamModel = modelId.trim().replace(OPENAI_MODEL_PREFIX, '');
+      return (await isOpenAiModelServed(apiKey, upstreamModel)) ? modelId : null;
+    })
+  );
+  return new Set(tagged.filter((id): id is string => id !== null));
+}
+
+/**
+ * Returns `models` with the ChatGPT-served ones marked BYOK-available, so the
+ * model picker and the extension show the BYOK badge like pasted BYOK keys. The
+ * list is returned unchanged when the person has no usable connection.
+ */
+export async function tagOpenAiChatGptByokModels<
+  T extends { id: string; hasUserByokAvailable?: boolean },
+>(userId: string, models: T[]): Promise<T[]> {
+  const byokModelIds = await getOpenAiChatGptByokModelIds(
+    userId,
+    models.map(model => model.id)
+  );
+  if (!byokModelIds) return models;
+  return models.map(model =>
+    model.hasUserByokAvailable === true || !byokModelIds.has(model.id)
+      ? model
+      : { ...model, hasUserByokAvailable: true }
+  );
 }
 
 /**
@@ -196,8 +242,9 @@ export function buildOpenAiChatGptProvider(apiKey: string, accessToken: string):
  * null when the request is not eligible or cannot be served. A `reconnect`
  * result is returned when the person's enabled credential is terminally dead:
  * the request must fail readably instead of silently running on another billing
- * path. Callers keep the standard balance and abuse checks
- * (`bypassAccessCheck: false`), exactly like the Vercel BYOK path.
+ * path. Callers keep the standard abuse and organization policy checks
+ * (`bypassAccessCheck: false`), but skip the zero-balance paid-model block:
+ * the ChatGPT plan pays for the request, not Kilo credits.
  */
 export async function checkOpenAiChatGptByok(
   input: OpenAiChatGptRoutingInput
@@ -222,5 +269,6 @@ export async function checkOpenAiChatGptByok(
     provider,
     userByok: null,
     bypassAccessCheck: false,
+    skipBalanceCheck: true,
   };
 }

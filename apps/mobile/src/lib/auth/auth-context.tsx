@@ -53,7 +53,10 @@ import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-prefe
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
-import { clearSessionScopedState } from '@/lib/auth/session-scoped-state';
+import {
+  clearSessionScopedState,
+  clearSystemSearchIndexOnSignedOutLaunch,
+} from '@/lib/auth/session-scoped-state';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
@@ -256,6 +259,18 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           setActiveToken(stored, expiresAtStr ? Number(expiresAtStr) : null);
           setToken(stored);
           setCurrentDeepLinkUserId(readUserIdFromToken(stored));
+        } else if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
+          // A launch that positively restored no session owns the index: the
+          // sign-out teardown's clear is fire-and-forget and the process can
+          // be killed before it lands, so a failure there would leave the
+          // previous account's titles searchable for the whole signed-out
+          // window with nothing to retry it. Re-run the idempotent clear; the
+          // index sync is gated off while signed out, and the next sign-in
+          // re-indexes its own account from its own cache. A sign-out or
+          // sign-in in flight owns the index instead and fires its own clear,
+          // so the epoch and sign-out fences hold here as for every other
+          // publish in this bootstrap.
+          clearSystemSearchIndexOnSignedOutLaunch();
         }
       } catch {
         // Every read exhausted its retries. The session is not known to be

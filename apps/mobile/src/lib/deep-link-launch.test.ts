@@ -99,6 +99,57 @@ describe('deep-link-launch', () => {
     });
   });
 
+  describe('system-search source precedence', () => {
+    it('beats a pending notification', () => {
+      setPendingDeepLink('/from-notification', 'notification');
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
+    });
+
+    it('loses to a universal link', () => {
+      setPendingDeepLink('/from-link', 'universal-link');
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      expect(getPendingDeepLink()).toBe('/from-link');
+    });
+
+    it('replaces an app-scheme launch link with the exact route for the same tap', () => {
+      // Android delivers a system-search tap as the document's `kiloapp://`
+      // route; the launch capture maps it through the lossy web table (which
+      // strips the query), and the search capture must then win with the exact
+      // route. An `https://` launch link is not flagged and keeps priority.
+      setPendingDeepLink('/(app)/pr-review/gitlab/group/sub/repo/12', 'universal-link', {
+        fromLaunchAppScheme: true,
+      });
+      setPendingDeepLink(
+        '/(app)/pr-review/gitlab/group/sub/repo/12?instance=https%3A%2F%2Fgitlab.example.com',
+        'system-search'
+      );
+      expect(getPendingDeepLink()).toBe(
+        '/(app)/pr-review/gitlab/group/sub/repo/12?instance=https%3A%2F%2Fgitlab.example.com'
+      );
+    });
+
+    it('is not overwritten by a later notification', () => {
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      setPendingDeepLink('/from-notification', 'notification');
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
+    });
+
+    it('round-trips through the persisted record', async () => {
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
+      });
+      const record = JSON.parse(store.get(PENDING_DEEP_LINK_KEY) ?? '') as { source: string };
+      expect(record.source).toBe('system-search');
+
+      _resetDeepLinkLaunchForTests();
+
+      await restorePersistedPendingDeepLink();
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
+    });
+  });
+
   describe('consume exactly once', () => {
     it('lets exactly one of two consumers read a single href', () => {
       setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
@@ -442,6 +493,33 @@ describe('deep-link-launch', () => {
       _setGetLinkingURLForTests(() => null);
       captureLaunchDeepLink();
       expect(getPendingDeepLink()).toBeNull();
+    });
+
+    it('flags an app-scheme launch URL so the exact search route can replace it', () => {
+      _setGetLinkingURLForTests(
+        () =>
+          'kiloapp://pr-review/gitlab/group/sub/repo/12?instance=https%3A%2F%2Fgitlab.example.com'
+      );
+      captureLaunchDeepLink();
+      // The web table drops the instance query, so the search capture's exact
+      // route for the same tap must replace this mapping.
+      expect(getPendingDeepLinkSnapshot()).toBe('/(app)/pr-review/gitlab/group/sub/repo/12');
+
+      setPendingDeepLink(
+        '/(app)/pr-review/gitlab/group/sub/repo/12?instance=https%3A%2F%2Fgitlab.example.com',
+        'system-search'
+      );
+      expect(getPendingDeepLink()).toBe(
+        '/(app)/pr-review/gitlab/group/sub/repo/12?instance=https%3A%2F%2Fgitlab.example.com'
+      );
+    });
+
+    it('leaves an https launch link unflaggeable by the search route', () => {
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/pr-review/octocat/hello-world/42');
+      captureLaunchDeepLink();
+
+      setPendingDeepLink('/(app)/agent-chat/other', 'system-search');
+      expect(getPendingDeepLinkSnapshot()).toBe('/(app)/pr-review/octocat/hello-world/42');
     });
 
     it('is a no-op for an unmapped/garbage URL', () => {

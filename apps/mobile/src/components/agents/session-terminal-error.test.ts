@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { i18n } from '@/i18n';
+import { CATALOG_LOADERS } from '@/i18n/catalogs';
+import es from '@/i18n/locales/es.json';
 
 import {
   buildTerminalErrorCopyText,
@@ -6,6 +10,17 @@ import {
   resolveSessionTerminalError,
   sessionStatusErrorMessage,
 } from './session-terminal-error';
+
+/**
+ * Put the singleton on Spanish with the real catalog loaded. The lazy backend
+ * only fetches a language once, so a catalog a previous test removed with
+ * `removeResourceBundle` is not re-fetched; loading the bundle directly keeps
+ * each test independent of that cache.
+ */
+async function useSpanish(): Promise<void> {
+  await i18n.changeLanguage('es');
+  i18n.addResourceBundle('es', 'translation', CATALOG_LOADERS.es(), true, true);
+}
 
 describe('classifyTerminalError', () => {
   it.each([
@@ -185,6 +200,10 @@ describe('buildTerminalErrorCopyText', () => {
 });
 
 describe('sessionStatusErrorMessage', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
   it.each([
     ['simulated error', 'The response failed.'],
     ['Unauthorized: Unauthorized', 'The response failed.'],
@@ -207,14 +226,28 @@ describe('sessionStatusErrorMessage', () => {
     expect(sessionStatusErrorMessage(raw)).toBe(expected);
   });
 
-  // The SDK writes these strings itself, so they are already the reader's copy
-  // and must not be replaced by the generic failure line.
-  it.each([
-    ['Agent connection lost'],
-    ['Session terminated'],
-    ['Failed to stop execution'],
-  ] as const)('shows the SDK fixed copy for %s', raw => {
-    expect(sessionStatusErrorMessage(raw)).toBe(raw);
+  // The SDK writes these strings itself. Each is pinned to a catalog key
+  // (`sdk-message-copy.ts`), so the reader gets their own language instead of
+  // the raw English literal, and it never collapses to the generic line.
+  it('maps the SDK fixed copy to the active language catalog', async () => {
+    await useSpanish();
+    i18n.addResource('es', 'translation', 'agentChat.status.sessionTerminated', 'Sesión terminada');
+    i18n.addResource(
+      'es',
+      'translation',
+      'agentChat.session.failedToStopExecution',
+      'No se pudo detener la ejecución'
+    );
+    i18n.addResource('es', 'translation', 'agentChat.status.commitFailed', 'Error al confirmar');
+    expect(sessionStatusErrorMessage('Agent connection lost')).toBe(
+      es.agentChat.session.connectionTrouble
+    );
+    expect(sessionStatusErrorMessage('Session terminated')).toBe('Sesión terminada');
+    expect(sessionStatusErrorMessage('Failed to stop execution')).toBe(
+      'No se pudo detener la ejecución'
+    );
+    expect(sessionStatusErrorMessage('Commit failed')).toBe('Error al confirmar');
+    i18n.removeResourceBundle('es', 'translation');
   });
 
   // The Durable Object's safe failure projection is the reader's copy too
@@ -234,7 +267,6 @@ describe('sessionStatusErrorMessage', () => {
     ['Assistant request failed: model not found'],
     ['Assistant request was rate limited'],
     ['Session metadata is unavailable'],
-    ['Commit failed'],
     // A bounded workspace failure appends its own detail to the projection.
     ['Workspace setup failed: Devcontainer workspace preparation failed'],
   ] as const)('shows the safe projection copy for %s', raw => {

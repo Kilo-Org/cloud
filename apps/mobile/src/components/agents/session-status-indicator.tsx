@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { localizeSdkMessage } from './sdk-message-copy';
 import { sessionStatusErrorMessage } from './session-terminal-error';
 
 type SessionStatusIndicatorProps = {
@@ -28,9 +29,9 @@ function IndicatorContent({ indicator }: Readonly<SessionStatusIndicatorProps>) 
   switch (indicator.type) {
     case 'error': {
       // The SDK message is usually the provider's or the transport's own
-      // English text. `sessionStatusErrorMessage` maps the known strings to
-      // translated copy and passes through the SDK's fixed lines and the
-      // Durable Object's safe failure projection unchanged.
+      // English text. `sessionStatusErrorMessage` maps the known SDK and
+      // delivery strings to translated copy and passes through the Durable
+      // Object's safe failure projection unchanged.
       return (
         <View className="flex-row items-center gap-2">
           <AlertCircle size={14} color={colors.destructive} />
@@ -51,18 +52,27 @@ function IndicatorContent({ indicator }: Readonly<SessionStatusIndicatorProps>) 
       );
     }
     case 'progress': {
+      // The SDK's own progress lines (`Setting up environment…`, `Wrapping
+      // up…`, the autocommit status) are pinned to catalog keys; anything the
+      // SDK merely forwards is shown unchanged.
       return (
         <View className="flex-row items-center gap-2">
           <ActivityIndicator size="small" color={colors.mutedForeground} />
-          <Text className="shrink text-sm text-muted-foreground">{indicator.message}</Text>
+          <Text className="shrink text-sm text-muted-foreground">
+            {localizeSdkMessage(indicator.message)}
+          </Text>
         </View>
       );
     }
     case 'info': {
+      // As with progress: an SDK-pinned line (`Session stopped`) is localized,
+      // an unrecognized one is shown as-is.
       return (
         <View className="flex-row items-center gap-2">
           <Check size={14} color={colors.mutedForeground} />
-          <Text className="shrink text-sm text-muted-foreground">{indicator.message}</Text>
+          <Text className="shrink text-sm text-muted-foreground">
+            {localizeSdkMessage(indicator.message)}
+          </Text>
         </View>
       );
     }

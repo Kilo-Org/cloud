@@ -1,6 +1,8 @@
 import { i18n } from '@/i18n';
 import { type QueryErrorVariant } from '@/components/query-error';
 
+import { sdkMessageCopy } from './sdk-message-copy';
+
 /**
  * Terminal error class for a session startup failure. The session manager's
  * fetch-fail path stores only a formatted message string on the status
@@ -130,19 +132,6 @@ const DELIVERY_FAILED_INDICATORS = new Set([
 ]);
 
 /**
- * The SDK's own fixed error copy. The SDK writes these strings itself
- * (service-state.ts, session-manager.ts) rather than forwarding a provider's or
- * the transport's text, so they are already the reader's copy: the indicator
- * shows them as-is, exactly as it shows the SDK's `progress` and `info`
- * messages. Only text the SDK merely forwards goes through the classifier.
- */
-const SDK_FIXED_ERROR_MESSAGES = new Set([
-  'Agent connection lost',
-  'Session terminated',
-  'Failed to stop execution',
-]);
-
-/**
  * The reader's copy the Durable Object writes through its safe failure
  * projection (services/cloud-agent-next/src/session/safe-failure-projection.ts
  * and the assistant failures it re-exports from src/shared/assistant-failure.ts)
@@ -201,8 +190,6 @@ const SAFE_FAILURE_MESSAGES = new Set([
   'GitHub repository authentication failed. Check that the GitHub App is installed and has access to this repository.',
   'GitHub credential service is unavailable. Please try again.',
   'GitHub credential resolution failed. Please try again.',
-  // The SDK's autocommit status.
-  'Commit failed',
 ]);
 
 function isSafeFailureMessage(message: string): boolean {
@@ -225,15 +212,18 @@ function isSafeFailureMessage(message: string): boolean {
  * unrecognized string is still a failed agent run, so it gets the
  * assistant-failure line rather than a generic one.
  *
- * The Durable Object's safe failure projection and the SDK's own fixed lines
- * are already the reader's copy, so the indicator shows them as-is.
+ * A string the SDK writes itself (`sdkMessageCopy`) resolves to its pinned
+ * catalog key, so the reader gets their own language. The Durable Object's safe
+ * failure projection is already the reader's copy and has no translated
+ * counterpart, so the indicator shows it as-is.
  */
 export function sessionStatusErrorMessage(raw: string): string {
   if (DELIVERY_FAILED_INDICATORS.has(raw)) {
     return i18n.t('agentChat.messageFailure.deliveryTitle');
   }
-  if (SDK_FIXED_ERROR_MESSAGES.has(raw)) {
-    return raw;
+  const mapped = sdkMessageCopy(raw);
+  if (mapped !== null) {
+    return mapped;
   }
   if (isSafeFailureMessage(raw)) {
     // The DO writes the credits failure as safe copy with a lowercase phrase;

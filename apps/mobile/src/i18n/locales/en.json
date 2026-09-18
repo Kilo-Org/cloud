@@ -2068,6 +2068,13 @@
       "connectionLost": "Connection lost",
       "retryConnection": "Retry connection"
     },
+    "status": {
+      "committing": "Committing…",
+      "committed": "Committed",
+      "commitFailed": "Commit failed",
+      "sessionStopped": "Session stopped",
+      "sessionTerminated": "Session terminated"
+    },
     "goal": {
       "title": "Goal",
       "statusActive": "Active goal",

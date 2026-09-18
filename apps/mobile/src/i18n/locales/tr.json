@@ -1638,7 +1638,20 @@
       "continueFrom": "{{title}} oturumuna devam ediliyor.",
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam etmeyi desteklemiyor. Cloud Agent veya başka bir CLI seç.",
-      "importFailed": "Bu oturum içe aktarılamadı."
+      "importFailed": "Bu oturum içe aktarılamadı.",
+      "sandbox": "Korumalı alan",
+      "sandboxAccessibility": "Korumalı alan: {{label}}",
+      "sandboxDefaultWithDestination": "Varsayılan · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Küçük",
+      "sandboxInstanceShared": "Paylaşımlı",
+      "sandboxInstanceLarge": "Büyük",
+      "sandboxInstanceDevcontainer": "Geliştirme kapsayıcısı",
+      "sandboxInstanceProviderDefault": "Sağlayıcı varsayılanı",
+      "sandboxCouldNotLoad": "Korumalı alan seçenekleri yüklenemedi",
+      "sandboxUnavailable": "Bu korumalı alan kullanılamıyor. Başka bir korumalı alan veya Varsayılan seçin.",
+      "sandboxUseDefault": "Varsayılanı kullan"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi.",
@@ -2121,6 +2134,7 @@
     "couldNotLoadActiveSessions": "Etkin oturumlar yüklenemedi.",
     "agentSessions": "Şu anda etkin",
     "newCodingTask": "Yeni kodlama görevi",
+    "newTaskFromPicture": "Resimden yeni görev",
     "explore": "Keşfet",
     "seeAll": "Tümünü gör",
     "noLiveSessions": "Şu anda çalışan oturum yok"
@@ -2342,7 +2356,8 @@
     "aiProvidersWhat": "İstemlerin, konuşma geçmişin ve eklediğin tüm dosyalar.",
     "aiProvidersWhy": "Yapay zekâ yanıtları üretmek için.",
     "aiProvidersWho": "Anthropic, OpenAI, Google ve her istek için seçtiğin diğer sağlayıcılar.",
-    "gatewayWhat": "Hesap kimliği, istek meta verileri, token kullanımı.",
+    "gatewayWhat": "Hesap kimliği, istek meta verileri, token kullanımı ile uygulamanın bunun üzerinden gönderdiği istemler ve ses kayıtları.",
+    "viaGateway": "Kilo Gateway üzerinden",
     "gatewayWhy": "Kimlik doğrulama, istek yönlendirme, faturalandırma mutabakatı.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Uygulama içeriğinden arındırılmış çökme ve hata raporları.",
@@ -2362,7 +2377,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Dikte sırasında alınan ses kaydın.",
     "voiceTranscriptionWhy": "Konuşmayı metne dönüştürmek için.",
-    "voiceTranscriptionWho": "Yalnızca cihazın; cihazın çevrimdışı olarak sesi metne dönüştüremiyorsa Apple veya Google.",
+    "voiceTranscriptionWho": "Cihazın, seçtiğin transkripsiyon modeliyle Kilo Gateway veya çevrimiçi tanıma için Apple ya da Google.",
     "what": "Paylaşılan veriler",
     "why": "Paylaşım amacı",
     "who": "Verileri alan taraf",
@@ -2475,6 +2490,8 @@
       "replyBody": "Yanıt metni",
       "replyForbidden": "Bu çekme isteğine yanıt verme iznin yok.",
       "addCommentCta": "Bu çekme isteğine yorum yap",
+      "fixWithKilo": "Kilo ile düzelt",
+      "fixWithKiloPrompt": "Lütfen aşağıdaki PR yorumunu ele al: {{link}}",
       "commentBadRequest": "Bu yorum gönderilemiyor. Çekme isteği değişmiş olabilir.",
       "commentForbidden": "Bu çekme isteğine yorum yapma iznin yok.",
       "replyPlaceholder": "Yanıtın…",
@@ -3060,6 +3077,12 @@
     "privacy": "Ajanları görmek için Kilo'yu aç",
     "openAgents": "Ajanları aç",
     "needsInput": "Yanıt bekliyor",
+    "newestSession": "En yeni: {{title}}",
+    "noneWaiting": "Bekleyen ajan yok",
+    "newAgent": "Yeni ajan",
+    "approving": "Onaylanıyor...",
+    "couldNotApprove": "Onaylanamadı",
+    "couldNotStart": "Başlatılamadı",
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç."
   },
@@ -3095,5 +3118,12 @@
     "remoteFound": "Bilgisayar bağlandı",
     "checkAgain": "Tekrar kontrol et",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Ajanı başlat için bir istem gerekir. Bir istem ekleyip yeniden çalıştır.",
+      "repositoryUnknown": "Kilo, {{repository}} adresini GitHub veya GitLab deposu olarak tanımıyor. Kilo'da başka bir depo seç.",
+      "repositoryUnsupported": "{{repository}} bir Bitbucket deposu — Ajanı başlat bunu henüz kullanamıyor. Kilo'da başka bir depo seç."
+    }
   }
 }

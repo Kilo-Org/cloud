@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type AttachmentSurface } from './picker-launch-context';
 import { useAndroidPendingPickerRecovery } from './use-android-pending-picker-recovery';
 
 const mocks = vi.hoisted(() => ({
@@ -47,7 +48,7 @@ vi.mock('react-native', () => ({
 
 type LaunchContext = {
   userId: string;
-  surface: 'agent-new' | 'agent-chat';
+  surface: AttachmentSurface;
   sessionId: string | null;
   launchedAt: number;
 };
@@ -62,19 +63,21 @@ function makeContext(overrides: Partial<LaunchContext> = {}) {
   };
 }
 
-function Harness() {
+function Harness({ surface }: { surface: AttachmentSurface }) {
   useAndroidPendingPickerRecovery({
-    surface: 'agent-new',
+    surface,
     sessionId: null,
     addCandidates: mocks.addCandidates,
   });
   return null;
 }
 
-async function mount(): Promise<TestRenderer.ReactTestRenderer> {
+async function mount(
+  surface: AttachmentSurface = 'agent-new'
+): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
-    ref.current = TestRenderer.create(createElement(Harness));
+    ref.current = TestRenderer.create(createElement(Harness, { surface }));
     await settle();
   });
   const renderer = ref.current;
@@ -133,6 +136,33 @@ describe('useAndroidPendingPickerRecovery', () => {
     expect(mocks.discardAndroidPendingPickerResult).not.toHaveBeenCalled();
     expect(mocks.clearPickerLaunchContext).not.toHaveBeenCalled();
     expect(mocks.consumeAndroidPendingPickerResult).not.toHaveBeenCalled();
+  });
+
+  it('consumes a stored agent-picture context on the matching picture surface', async () => {
+    mocks.userId = 'user-1';
+    mocks.readPickerLaunchContext.mockResolvedValue(makeContext({ surface: 'agent-picture' }));
+    mocks.consumeAndroidPendingPickerResult.mockResolvedValue([{ uri: 'file:///photo.jpg' }]);
+
+    await mount('agent-picture');
+
+    expect(mocks.consumeAndroidPendingPickerResult).toHaveBeenCalledTimes(1);
+    expect(mocks.clearPickerLaunchContext).toHaveBeenCalledTimes(1);
+    expect(mocks.addCandidates).toHaveBeenCalledWith([
+      { name: 'photo.jpg', uri: 'file:///photo.jpg' },
+    ]);
+    expect(mocks.discardAndroidPendingPickerResult).not.toHaveBeenCalled();
+  });
+
+  it('leaves a stored agent-picture context for the matching composer', async () => {
+    mocks.userId = 'user-1';
+    mocks.readPickerLaunchContext.mockResolvedValue(makeContext({ surface: 'agent-picture' }));
+
+    await mount('agent-new');
+
+    expect(mocks.consumeAndroidPendingPickerResult).not.toHaveBeenCalled();
+    expect(mocks.clearPickerLaunchContext).not.toHaveBeenCalled();
+    expect(mocks.discardAndroidPendingPickerResult).not.toHaveBeenCalled();
+    expect(mocks.addCandidates).not.toHaveBeenCalled();
   });
 
   it('discards and clears on an expired context', async () => {

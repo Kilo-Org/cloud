@@ -480,6 +480,8 @@
       "replyBadRequest": "Le mpendulo ayikwazi ukuthunyelwa. Kungenzeka uchungechunge lwengxoxo lushintshile.",
       "replyForbidden": "Awunayo imvume yokuphendula kulesi sicelo sokuhlanganisa.",
       "addCommentCta": "Phawula kulesi sicelo sokuhlanganisa",
+      "fixWithKilo": "Lungisa nge-Kilo",
+      "fixWithKiloPrompt": "Sicela ubhekane nokuphawula okulandelayo kwesicelo sokuhlanganisa: {{link}}",
       "commentBadRequest": "Le phawula ayikwazi ukuthunyelwa. Kungenzeka lesi sicelo sokuhlanganisa sishintshile.",
       "commentForbidden": "Awunayo imvume yokuphawula kulesi sicelo sokuhlanganisa.",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "Kuqhutshekwa neseshini ethi {{title}}.",
       "importingSession": "Iseshini iyangeniswa",
       "cliCannotContinue": "Le CLI ayikwazi ukuqhubeka neseshini. Khetha i-Cloud Agent noma enye i-CLI.",
-      "importFailed": "Asikwazanga ukungenisa le seshini."
+      "importFailed": "Asikwazanga ukungenisa le seshini.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Okuzenzakalelayo · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Okuncane",
+      "sandboxInstanceShared": "Okwabiwe",
+      "sandboxInstanceLarge": "Okukhulu",
+      "sandboxInstanceDevcontainer": "Isiqukathi se-Dev",
+      "sandboxInstanceProviderDefault": "Okuzenzakalelayo komsungeli",
+      "sandboxCouldNotLoad": "Ayikwazanga ukulayisha izinketho ze-sandbox",
+      "sandboxUnavailable": "Le sandbox ayitholakali. Khetha enye i-sandbox noma Okuzenzakalelayo.",
+      "sandboxUseDefault": "Sebenzisa Okuzenzakalelayo"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}.",
@@ -2609,6 +2624,7 @@
     "couldNotLoadActiveSessions": "Asikwazanga ukulayisha amaseshini asebenzayo.",
     "agentSessions": "Okusebenza manje",
     "newCodingTask": "Umsebenzi omusha wokubhala ikhodi",
+    "newTaskFromPicture": "Umsebenzi omusha ovela esithombeni",
     "explore": "Hlola",
     "seeAll": "Bona konke",
     "noLiveSessions": "Akukho okusebenzayo njengamanje"
@@ -2830,7 +2846,8 @@
     "aiProvidersWhat": "Izicelo zakho, umlando wengxoxo nanoma yimaphi amafayela owanamathiselayo.",
     "aiProvidersWhy": "Ukuze kukhiqizwe izimpendulo ze-AI.",
     "aiProvidersWho": "I-Anthropic, i-OpenAI, i-Google nabanye abahlinzeki obakhetha ngesicelo ngasinye.",
-    "gatewayWhat": "I-ID ye-akhawunti, imininingwane yezicelo nokusetshenziswa kwamathokheni.",
+    "gatewayWhat": "I-ID ye-akhawunti, imininingwane yezicelo, ukusetshenziswa kwamathokheni, kanye nama-prompt namarekhodi ezwi uhlelo lokusebenza eluwathumela ngalo.",
+    "viaGateway": "Ngokusebenzisa i-Kilo Gateway",
     "gatewayWhy": "Ukuqinisekisa ubuwena, ukuqondisa izicelo nokuvumelanisa amarekhodi ezinkokhelo.",
     "gatewayWho": "I-Kilo (kilo.ai).",
     "crashReportingWhat": "Imibiko yokuphahlazeka namaphutha, okususiwe kuyo okuqukethwe kohlelo lokusebenza.",
@@ -2850,7 +2867,7 @@
     "installAttributionWho": "I-AppsFlyer.",
     "voiceTranscriptionWhat": "Inkulumo yakho erekhodiwe ngenkathi uyisho ukuze ibhalwe.",
     "voiceTranscriptionWhy": "Ukuze kuguqulwe inkulumo ibe umbhalo.",
-    "voiceTranscriptionWho": "Edivayisini kuphela, noma ku-Apple noma ku-Google uma le divayisi ingakwazi ukuguqula inkulumo ibe umbhalo ngaphandle kwe-inthanethi.",
+    "voiceTranscriptionWho": "Idivayisi yakho, i-Kilo Gateway enemodeli yokuguqula umbhalo oyikhethile, noma i-Apple noma i-Google ukuze kuqashelwe ku-inthanethi.",
     "installAttributionPromptTitle": "Uyafuna ukuvumela ukuhlonzwa komthombo wokufakwa?",
     "installAttributionPromptMessage": "I-Kilo isebenzisa imvume yokulandelela ka-Apple ukuze ithole kuphela ukuthi iyiphi indlela ekulethile lapha. Izicelo zakho nezingxoxo azisetshenziswa nhlobo.",
     "what": "Ini",
@@ -3060,6 +3077,12 @@
     "privacy": "Vula i-Kilo ukuze ubone ama-ejenti",
     "openAgents": "Vula ama-ejenti",
     "needsInput": "Kudinga impendulo",
+    "newestSession": "Okusha kakhulu: {{title}}",
+    "noneWaiting": "Awekho ama-ejenti alindile",
+    "newAgent": "I-ejenti entsha",
+    "approving": "Kuyagunyaza...",
+    "couldNotApprove": "Akukwazi ukugunyaza",
+    "couldNotStart": "Akukwazi ukuqala",
     "channelName": "Ama-ejenti asebenzayo",
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe."
   },
@@ -3095,5 +3118,12 @@
     "remoteFound": "Ikhompyutha ixhunyiwe",
     "checkAgain": "Phinda uhlole",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Qala i-ejenti kudinga isicelo. Engeza isicelo bese uyiphinda.",
+      "repositoryUnknown": "I-Kilo ayiyiboni i-{{repository}} njengenqolobane yekhodi ye-GitHub noma ye-GitLab. Khetha enye inqolobane yekhodi ku-Kilo.",
+      "repositoryUnsupported": "I-{{repository}} iyinqolobane yekhodi ye-Bitbucket — Qala i-ejenti ayikakwazi ukuyisebenzisa. Khetha enye inqolobane yekhodi ku-Kilo."
+    }
   }
 }

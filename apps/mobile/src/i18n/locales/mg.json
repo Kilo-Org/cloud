@@ -480,6 +480,8 @@
       "replyBadRequest": "Tsy azo avoaka ity valiny ity. Mety niova ny loha-dresaka.",
       "replyForbidden": "Tsy manana alalana hamaly ity fangatahana fampiraisana ity ianao.",
       "addCommentCta": "Manao fanehoan-kevitra momba ity fangatahana fampiraisana ity",
+      "fixWithKilo": "Amboary miaraka amin'ny Kilo",
+      "fixWithKiloPrompt": "Azafady amboary ity fanehoan-kevitra momba ny fangatahana fampiraisana ity: {{link}}",
       "commentBadRequest": "Tsy azo avoaka ity fanehoan-kevitra ity. Mety niova ny fangatahana fampiraisana.",
       "commentForbidden": "Tsy manana alalana hanao fanehoan-kevitra momba ity fangatahana fampiraisana ity ianao.",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "Mitohy ny {{title}}.",
       "importingSession": "Manafatra fotoam-piasana",
       "cliCannotContinue": "Tsy afaka manohy fotoam-piasana ity CLI ity. Safidio ny Cloud Agent na CLI hafa.",
-      "importFailed": "Tsy nahomby ny fanafarana ity fotoam-piasana ity."
+      "importFailed": "Tsy nahomby ny fanafarana ity fotoam-piasana ity.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Default · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Kely",
+      "sandboxInstanceShared": "Zaraina",
+      "sandboxInstanceLarge": "Lehibe",
+      "sandboxInstanceDevcontainer": "Kaontener Dev",
+      "sandboxInstanceProviderDefault": "Default amin'ny mpamatsy",
+      "sandboxCouldNotLoad": "Tsy voataona ireo safidy sandbox",
+      "sandboxUnavailable": "Tsy misy ity sandbox ity. Fidio sandbox hafa na Default.",
+      "sandboxUseDefault": "Ampiasao ny Default"
     },
     "partRenderer": {
       "updatedFileCount_one": "Nohavaozina ny rakitra {{displayCount}}.",
@@ -2609,6 +2624,7 @@
     "couldNotLoadActiveSessions": "Tsy nety nampidirina ny fotoam-piasana mandeha.",
     "agentSessions": "Mandeha izao",
     "newCodingTask": "Asa fanoratana kaody vaovao",
+    "newTaskFromPicture": "Asa vaovao avy amin'ny sary",
     "explore": "Zavatra azo jerena",
     "seeAll": "Jereo daholo",
     "noLiveSessions": "Tsy misy mandeha amin'izao fotoana izao"
@@ -2830,7 +2846,8 @@
     "aiProvidersWhat": "Ny toromarikanao, ny tantaran'ny resaka ary ny rakitra ampiarahinao.",
     "aiProvidersWhy": "Mba hamoronana valin'ny AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google, ary mpamatsy hafa fidinao isaky ny fangatahana.",
-    "gatewayWhat": "Famantarana ny kaonty, angona mamaritra ny fangatahana, fampiasana sombin-tsoratra.",
+    "gatewayWhat": "Famantarana ny kaonty, angona mamaritra ny fangatahana, fampiasana sombin-tsoratra, ary koa ny prompts sy ny feo voarakitra izay alefan'ny fampiharana amin'ny alalany.",
+    "viaGateway": "Amin'ny Kilo Gateway",
     "gatewayWhy": "Fanamarinana ny maha-ianao anao, fitarihana ny fangatahana, fampifanarahana ny kaontim-pandoavana.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Tatitry ny fijanonana tampoka sy ny hadisoana, izay nesorina ny votoatin'ny rindranasa.",
@@ -2850,7 +2867,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Ny feonao voarakitra mandritra ny fitenenanao.",
     "voiceTranscriptionWhy": "Mba hanovana ny teny lazaina ho soratra.",
-    "voiceTranscriptionWho": "Ao amin'ny fitaovana ihany, na any amin'ny Apple na Google raha tsy afaka manova feo ho soratra tsy misy aterineto ity fitaovana ity.",
+    "voiceTranscriptionWho": "Ny fitaovanao, Kilo Gateway miaraka amin'ny maodely fanovana feo ho soratra nofidinao, na Apple na Google ho an'ny fanekena an-tsehatra.",
     "installAttributionPromptTitle": "Havela ve ny famantarana ny loharanon'ny fametrahana?",
     "installAttributionPromptMessage": "Ny hamantarana ny fantsona nahatongavanao teto ihany no ampiasan'ny Kilo ny alalana fanarahana omen'ny Apple. Tsy ampiasaina mihitsy ny toromarikanao sy ny resakao.",
     "what": "Inona",
@@ -3060,6 +3077,12 @@
     "privacy": "Sokafy ny Kilo hijery ny mpanatanteraka",
     "openAgents": "Sokafy ny mpanatanteraka",
     "needsInput": "Mila valiny",
+    "newestSession": "Vao farany: {{title}}",
+    "noneWaiting": "Tsy misy mpanatanteraka miandry",
+    "newAgent": "Mpanatanteraka vaovao",
+    "approving": "Eo am-panekena...",
+    "couldNotApprove": "Tsy nahomby ny fanekena",
+    "couldNotStart": "Tsy nahomby ny fanombohana",
     "channelName": "Mpanatanteraka mandeha",
     "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy."
   },
@@ -3095,5 +3118,12 @@
     "remoteFound": "Mifandray ny solosaina",
     "checkAgain": "Hamarino indray",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Ny Atombohy ny mpanampy dia mila toromarika. Manampia toromarika ary avereno indray izy.",
+      "repositoryUnknown": "Tsy fantatr'i Kilo ny {{repository}} ho tahirin-kaody GitHub na GitLab. Mifidiana tahirin-kaody hafa ao amin'ny Kilo.",
+      "repositoryUnsupported": "Tahirin-kaody Bitbucket ny {{repository}} — Tsy mbola afaka mampiasa azy ny Atombohy ny mpanampy. Mifidiana tahirin-kaody hafa ao amin'ny Kilo."
+    }
   }
 }

@@ -1546,7 +1546,20 @@
       "continueFrom": "La session {{title}} reprend.",
       "importingSession": "Importation de la session…",
       "cliCannotContinue": "Cette CLI ne permet pas de reprendre une session. Choisissez Cloud Agent ou une autre CLI.",
-      "importFailed": "Impossible d'importer cette session."
+      "importFailed": "Impossible d'importer cette session.",
+      "sandbox": "Bac à sable",
+      "sandboxAccessibility": "Bac à sable : {{label}}",
+      "sandboxDefaultWithDestination": "Par défaut · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Petit",
+      "sandboxInstanceShared": "Partagé",
+      "sandboxInstanceLarge": "Grand",
+      "sandboxInstanceDevcontainer": "Conteneur de développement",
+      "sandboxInstanceProviderDefault": "Par défaut du fournisseur",
+      "sandboxCouldNotLoad": "Impossible de charger les options de bac à sable",
+      "sandboxUnavailable": "Ce bac à sable est indisponible. Choisissez un autre bac à sable ou Par défaut.",
+      "sandboxUseDefault": "Utiliser Par défaut"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fichier mis à jour.",
@@ -2070,6 +2083,7 @@
     "couldNotLoadActiveSessions": "Impossible de charger les sessions actives.",
     "agentSessions": "En cours",
     "newCodingTask": "Nouvelle tâche de programmation",
+    "newTaskFromPicture": "Nouvelle tâche à partir d'une image",
     "explore": "Explorer",
     "seeAll": "Tout voir",
     "noLiveSessions": "Aucune session en cours"
@@ -2288,7 +2302,8 @@
     "aiProvidersWhat": "Vos consignes, l'historique de vos conversations et les fichiers que vous joignez.",
     "aiProvidersWhy": "Pour générer des réponses à l'aide de l'IA.",
     "aiProvidersWho": "Anthropic, OpenAI, Google et les autres fournisseurs que vous sélectionnez à chaque requête.",
-    "gatewayWhat": "Identifiant du compte, métadonnées des requêtes et utilisation des jetons.",
+    "gatewayWhat": "Identifiant du compte, métadonnées des requêtes, utilisation des jetons, ainsi que les prompts et les enregistrements vocaux que l'app envoie par son intermédiaire.",
+    "viaGateway": "Via le Kilo Gateway",
     "gatewayWhy": "Authentification, acheminement des requêtes et rapprochement des données de facturation.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Rapports de plantage et d'erreur, sans le contenu de l'application.",
@@ -2308,7 +2323,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Votre enregistrement pendant que vous dictez.",
     "voiceTranscriptionWhy": "Pour transformer la parole en texte.",
-    "voiceTranscriptionWho": "Uniquement sur l'appareil, ou par Apple ou Google si l'appareil ne permet pas la transcription hors ligne.",
+    "voiceTranscriptionWho": "Votre appareil, le Kilo gateway avec le modèle de transcription que vous avez choisi, ou Apple ou Google pour la reconnaissance en ligne.",
     "revokeConsent": "Retirer le consentement",
     "revokeConsentTitle": "Retirer le consentement au partage des données ?",
     "installAttributionPromptMessage": "Kilo utilise l'autorisation de suivi d'Apple uniquement pour savoir comment vous avez découvert l'application. Vos consignes et conversations ne sont jamais utilisées.",
@@ -2490,6 +2505,8 @@
       "replyBody": "Texte de la réponse",
       "replyForbidden": "Vous n'avez pas l'autorisation de répondre à cette demande de fusion.",
       "addCommentCta": "Commenter cette demande de fusion",
+      "fixWithKilo": "Corriger avec Kilo",
+      "fixWithKiloPrompt": "Veuillez traiter le commentaire suivant de la demande de fusion : {{link}}",
       "commentBadRequest": "Ce commentaire ne peut pas être publié. La demande de fusion a peut-être changé.",
       "commentForbidden": "Vous n'avez pas l'autorisation de commenter cette demande de fusion.",
       "replyPlaceholder": "Votre réponse…",
@@ -3084,6 +3101,12 @@
     "privacy": "Ouvrez Kilo pour voir les agents",
     "openAgents": "Ouvrir les agents",
     "needsInput": "Intervention requise",
+    "newestSession": "La plus récente: {{title}}",
+    "noneWaiting": "Aucun agent en attente",
+    "newAgent": "Nouvel agent",
+    "approving": "Approbation en cours...",
+    "couldNotApprove": "Échec de l'approbation",
+    "couldNotStart": "Échec du démarrage",
     "channelName": "Agents actifs",
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé."
   },
@@ -3119,5 +3142,12 @@
     "remoteFound": "Ordinateur connecté",
     "checkAgain": "Vérifier à nouveau",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Démarrer un agent nécessite une consigne. Ajoutez une consigne et relancez-le.",
+      "repositoryUnknown": "Kilo ne reconnaît pas {{repository}} comme un dépôt GitHub ou GitLab. Choisissez un autre dépôt dans Kilo.",
+      "repositoryUnsupported": "{{repository}} est un dépôt Bitbucket — Démarrer un agent ne peut pas encore l'utiliser. Choisissez un autre dépôt dans Kilo."
+    }
   }
 }

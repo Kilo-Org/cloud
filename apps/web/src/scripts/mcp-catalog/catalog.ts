@@ -1,5 +1,5 @@
 /**
- * Library for the Kilo MCP tRPC query catalog dump.
+ * Library for the Kilo MCP tRPC catalog dump.
  *
  * Enumerates every procedure from the live `rootRouter` (never a hand-written
  * list), shapes deterministic catalog rows, preserves author-edited summaries
@@ -8,12 +8,16 @@
  * are never generated at MCP runtime: the committed catalog is the only runtime
  * artifact, and authors edit its summaries by hand. See dump.ts for the CLI
  * entry point.
+ *
+ * Queries are published wholesale; mutations only when their exact path is in
+ * `MCP_MUTATION_ALLOWLIST` (mutations.ts).
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
+import { MCP_MUTATION_ALLOWLIST, isAllowedMutation } from './mutations';
 
 /** Repository root: five levels above apps/web/src/scripts/mcp-catalog. */
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..', '..');
@@ -35,10 +39,11 @@ export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-rou
 
 /**
  * Top-level router segments that stay internal-only. This is a denylist:
- * every other query procedure is exported, individual procedures cannot opt
- * back in, and mutations are never exported. `admin` and `test` stay
- * internal-only; `debug` is published, marked with `debug: true`, and guarded
- * wherever it is offered or called.
+ * every other query procedure is exported, allowlisted mutations are exported
+ * as well, and this filter applies on top of the mutation allowlist. Individual
+ * procedures cannot opt back in, and subscriptions are never exported. `admin`
+ * and `test` stay internal-only; `debug` is published, marked with
+ * `debug: true`, and guarded wherever it is offered or called.
  */
 export const DENYLISTED_TOP_LEVEL_SEGMENTS = ['admin', 'test'] as const;
 
@@ -79,7 +84,7 @@ export type CatalogLeaf = {
 
 export type CatalogRow = {
   path: string;
-  kind: 'query';
+  kind: 'query' | 'mutation';
   summary: string;
   inputSchema: Record<string, unknown>;
   tags: string[];
@@ -177,7 +182,7 @@ function shapeRow(leaf: CatalogLeaf, summary: string, admin: boolean, debug: boo
   const tags = deriveTags(segments, schemaKeys);
   return {
     path: leaf.path,
-    kind: 'query',
+    kind: leaf.type === 'mutation' ? 'mutation' : 'query',
     summary,
     inputSchema,
     tags,
@@ -190,9 +195,20 @@ function shapeRow(leaf: CatalogLeaf, summary: string, admin: boolean, debug: boo
 }
 
 /**
- * Filters the leaves down to the exported catalog: queries only, denylisted
- * top-level segments dropped. Rows whose summary is provided keep it
- * byte-for-byte; the rest come back as `missing` for LLM generation.
+ * Filters the leaves down to the exported catalog: every query, plus a mutation
+ * only when its exact path is in {@link MCP_MUTATION_ALLOWLIST}. The top-level
+ * denylist drops both kinds and subscriptions stay excluded. Rows whose summary
+ * is provided keep it byte-for-byte; the rest come back as `missing` for LLM
+ * generation.
+ *
+ * Rot guard: an allowlisted path that does not reach the catalog as a mutation
+ * throws (naming the offending paths) instead of vanishing from the catalog —
+ * whether it was renamed or deleted, its top-level segment is withheld by the
+ * denylist, or its procedure was demoted to a query. The guard therefore
+ * compares the allowlist against the paths that survived the denylist *and*
+ * published with kind `mutation`. The comparison is unconditional: a query-only
+ * enumeration (a wholesale router drift) has nothing to satisfy it, so it
+ * throws too, rather than publishing a mutation-free catalog in silence.
  */
 export function buildCatalogRows(
   leaves: CatalogLeaf[],
@@ -202,11 +218,18 @@ export function buildCatalogRows(
   // Resolved once for the whole catalog: the guard marker is decided from each
   // procedure's own extracted source, never the whole router file.
   const topLevelFiles = extractTopLevelRouterFiles();
+  /** Every allowlisted path the catalog will publish with kind `mutation`. */
+  const publishedMutationPaths = new Set<string>();
   const rows: CatalogRow[] = [];
   const missing: CatalogLeaf[] = [];
   for (const leaf of leaves) {
-    if (leaf.type !== 'query') continue;
+    const kept =
+      leaf.type === 'query' || (leaf.type === 'mutation' && isAllowedMutation(leaf.path));
+    if (!kept) continue;
     if (denylisted.has(leaf.path.split('.')[0] ?? '')) continue;
+    // Only a mutation leaf counts: a demoted query leaf must not satisfy the
+    // guard, or an allowlisted path could stop being a mutation unnoticed.
+    if (leaf.type === 'mutation') publishedMutationPaths.add(leaf.path);
     const summary = summaries.get(leaf.path);
     if (typeof summary === 'string' && summary !== '') {
       // An extraction miss counts as non-admin: never hide an endpoint by accident.
@@ -223,7 +246,18 @@ export function buildCatalogRows(
   }
   if (rows.length === 0 && missing.length === 0) {
     throw new Error(
-      'Catalog enumeration produced zero query rows — refusing to emit an empty catalog'
+      'Catalog enumeration produced zero catalog rows — refusing to emit an empty catalog'
+    );
+  }
+  // Compare unconditionally: a leaf set with no mutation leaf at all has nothing
+  // to satisfy the allowlist, so deletion or wholesale router drift cannot
+  // silently publish a query-only catalog.
+  const stale = MCP_MUTATION_ALLOWLIST.filter(path => !publishedMutationPaths.has(path));
+  if (stale.length > 0) {
+    throw new Error(
+      `MCP mutation allowlist entries are not published as mutations: ${stale.join(', ')}. ` +
+        'A renamed, deleted, denylisted, or demoted procedure must never silently vanish from the catalog — ' +
+        'update MCP_MUTATION_ALLOWLIST in apps/web/src/scripts/mcp-catalog/mutations.ts.'
     );
   }
   return { rows, missing };
@@ -675,7 +709,7 @@ function buildSummaryBatch(
 
 function buildSummaryPrompt(batch: SummaryBatch): string {
   const lines = [
-    "You are writing summaries for an MCP tool catalog built from a web app's tRPC query procedures.",
+    "You are writing summaries for an MCP tool catalog built from a web app's tRPC query and mutation procedures.",
     `For each procedure path below, ${SUMMARY_INSTRUCTION}`,
     'Respond with ONLY a JSON object mapping each procedure path to its summary string. Every listed path must appear exactly once.',
     '',

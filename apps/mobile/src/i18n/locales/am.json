@@ -480,6 +480,8 @@
       "replyBadRequest": "ይህን ምላሽ መለጠፍ አይቻልም። የውይይት ሰንሰለቱ ተለውጦ ሊሆን ይችላል።",
       "replyForbidden": "ለዚህ የማዋሃድ ጥያቄ ምላሽ ለመስጠት ፈቃድ የለህም።",
       "addCommentCta": "በዚህ የማዋሃድ ጥያቄ ላይ አስተያየት ስጥ",
+      "fixWithKilo": "በKilo አስተካክል",
+      "fixWithKiloPrompt": "እባክህ የሚከተለውን የማዋሃድ ጥያቄ አስተያየት አስተካክል፦ {{link}}",
       "commentBadRequest": "ይህ አስተያየት መለጠፍ አይቻልም። የማዋሃዱ ጥያቄ ተለውጦ ሊሆን ይችላል።",
       "commentForbidden": "በዚህ የማዋሃድ ጥያቄ ላይ አስተያየት ለመስጠት ፈቃድ የለህም።",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "{{title}} እየቀጠለ ነው።",
       "importingSession": "ክፍለ ጊዜውን በማስመጣት ላይ",
       "cliCannotContinue": "ይህ CLI ክፍለ ጊዜን መቀጠል አይችልም። Cloud Agent ወይም ሌላ CLI ይምረጡ።",
-      "importFailed": "ይህን ክፍለ ጊዜ ማስመጣት አልተቻለም።"
+      "importFailed": "ይህን ክፍለ ጊዜ ማስመጣት አልተቻለም።",
+      "sandbox": "ሳንድባክስ",
+      "sandboxAccessibility": "ሳንድባክስ፦ {{label}}",
+      "sandboxDefaultWithDestination": "ነባሪ · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "ትንሽ",
+      "sandboxInstanceShared": "የጋራ",
+      "sandboxInstanceLarge": "ትልቅ",
+      "sandboxInstanceDevcontainer": "የዴቭ ኮንቴይነር",
+      "sandboxInstanceProviderDefault": "የአቅራቢ ነባሪ",
+      "sandboxCouldNotLoad": "የሳንድባክስ አማራጮችን መጫን አልተቻለም",
+      "sandboxUnavailable": "ይህ ሳንድባክስ አይገኝም። ሌላ ሳንድባክስ ወይም ነባሪን ይምረጡ።",
+      "sandboxUseDefault": "ነባሪን ተጠቀም"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል።",
@@ -2609,6 +2624,7 @@
     "couldNotLoadActiveSessions": "ንቁ ክፍለ ጊዜዎችን መጫን አልተቻለም።",
     "agentSessions": "አሁን በሂደት ላይ",
     "newCodingTask": "አዲስ የኮድ ሥራ",
+    "newTaskFromPicture": "ከምስል አዲስ ሥራ",
     "explore": "ማሰስ",
     "seeAll": "ሁሉንም ይመልከቱ",
     "noLiveSessions": "አሁን እየሰራ ያለ ምንም የለም"
@@ -2830,7 +2846,8 @@
     "aiProvidersWhat": "ጥያቄዎችዎ፣ የውይይት ታሪክዎ እና የሚያያይዟቸው ፋይሎች።",
     "aiProvidersWhy": "የAI ምላሾችን ለማመንጨት።",
     "aiProvidersWho": "Anthropic፣ OpenAI፣ Google እና ለእያንዳንዱ ጥያቄ የሚመርጧቸው ሌሎች አቅራቢዎች።",
-    "gatewayWhat": "የመለያ ቁጥር፣ የጥያቄዎች ተጨማሪ መረጃ፣ የቶከን አጠቃቀም።",
+    "gatewayWhat": "የመለያ ቁጥር፣ የጥያቄዎች ተጨማሪ መረጃ፣ የቶከን አጠቃቀም፣ እንዲሁም መተግበሪያው በእሱ የሚልካቸው ፕሮምፕቶችና የድምጽ ቅጂዎች።",
+    "viaGateway": "በKilo Gateway በኩል",
     "gatewayWhy": "ማንነትን ማረጋገጥ፣ ጥያቄዎችን ወደ አቅራቢዎች መምራት፣ የክፍያ ሂሳቦችን ማመሳሰል።",
     "gatewayWho": "Kilo (kilo.ai)።",
     "crashReportingWhat": "የመተግበሪያው ይዘት የተወገደላቸው የብልሽትና የስህተት ሪፖርቶች።",
@@ -2850,7 +2867,7 @@
     "installAttributionWho": "AppsFlyer።",
     "voiceTranscriptionWhat": "ጽሑፍ ለማስገባት ሲናገሩ የሚቀዳው ድምጽዎ።",
     "voiceTranscriptionWhy": "ንግግርን ወደ ጽሑፍ ለመቀየር።",
-    "voiceTranscriptionWho": "በመሣሪያዎ ላይ ብቻ ይከናወናል። መሣሪያው ያለ በይነመረብ ድምጽን ወደ ጽሑፍ መቀየር ካልቻለ፣ ወደ Apple ወይም Google ይላካል።",
+    "voiceTranscriptionWho": "የእርስዎ መሣሪያ፣ Kilo Gateway ከመረጡት የጽሑፍ ቅየራ ሞዴል ጋር፣ ወይም Apple ወይም Google ለመስመር ላይ መለያ።",
     "installAttributionPromptTitle": "የመተግበሪያውን ምንጭ ለመለየት ይፈቅዳሉ?",
     "installAttributionPromptMessage": "Kilo የApple መከታተያ ፈቃድን የሚጠቀመው እዚህ በምን መንገድ እንደደረሱ ለማወቅ ብቻ ነው። ጥያቄዎችዎና ውይይቶችዎ በፍጹም ጥቅም ላይ አይውሉም።",
     "what": "ምን",
@@ -3060,6 +3077,12 @@
     "privacy": "ወኪሎችን ለማየት Kiloን ክፈት",
     "openAgents": "ወኪሎችን ክፈት",
     "needsInput": "ምላሽ ይፈልጋል",
+    "newestSession": "አዲሱ: {{title}}",
+    "noneWaiting": "የሚጠብቅ ወኪል የለም",
+    "newAgent": "አዲስ ወኪል",
+    "approving": "በማጽደቅ ላይ...",
+    "couldNotApprove": "ማጽደቅ አልተቻለም",
+    "couldNotStart": "መጀመር አልተቻለም",
     "channelName": "ንቁ ወኪሎች",
     "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።"
   },
@@ -3095,5 +3118,12 @@
     "remoteFound": "ኮምፒውተር ተገናኝቷል",
     "checkAgain": "እንደገና ይፈትሹ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ወኪል ለመጀመር ጥያቄ ያስፈልጋል። ጥያቄ ያክሉ እና እንደገና ያሂዱ።",
+      "repositoryUnknown": "Kilo {{repository}}ን እንደ GitHub ወይም GitLab ማከማቻ አያውቅም። በKilo ውስጥ ሌላ ማከማቻ ይምረጡ።",
+      "repositoryUnsupported": "{{repository}} የBitbucket ማከማቻ ነው — ወኪል ይጀምሩ ገና ሊጠቀምበት አይችልም። በKilo ውስጥ ሌላ ማከማቻ ይምረጡ።"
+    }
   }
 }

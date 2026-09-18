@@ -480,6 +480,8 @@
       "replyBadRequest": "Kāore e taea te tuku i tēnei whakautu. Kua rerekē pea te aho kōrero.",
       "replyForbidden": "Kāore koe e whakaaetia kia whakautu ki tēnei tono kume.",
       "addCommentCta": "Tāpiri kōrero ki tēnei tono kume",
+      "fixWithKilo": "Whakatika mā Kilo",
+      "fixWithKiloPrompt": "Tēnā koa, whakatika i te kōrero e whai ake nei mō te tono kume: {{link}}",
       "commentBadRequest": "Kāore e taea te tuku i tēnei kōrero. Kua rerekē pea te tono kume.",
       "commentForbidden": "Kāore koe e whakaaetia kia tāpiri kōrero ki tēnei tono kume.",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "Kei te haere tonu te wātū {{title}}.",
       "importingSession": "Kei te kawemai i te wātū",
       "cliCannotContinue": "Kāore e taea e tēnei CLI te haere tonu i tētahi wātū. Kōwhiria a Cloud Agent, tētahi atu CLI rānei.",
-      "importFailed": "Kāore i taea te kawemai i tēnei wātū."
+      "importFailed": "Kāore i taea te kawemai i tēnei wātū.",
+      "sandbox": "Pouaka kirikiri",
+      "sandboxAccessibility": "Pouaka kirikiri: {{label}}",
+      "sandboxDefaultWithDestination": "Taunoa · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Iti",
+      "sandboxInstanceShared": "Tohatoha",
+      "sandboxInstanceLarge": "Nui",
+      "sandboxInstanceDevcontainer": "Pouaka Dev",
+      "sandboxInstanceProviderDefault": "Taunoa a te kaiwhakarato",
+      "sandboxCouldNotLoad": "Kāhore i taea te uta i ngā kōwhiringa pouaka kirikiri",
+      "sandboxUnavailable": "Kāore tēnei pouaka kirikiri i te wātea. Tīpakohia tētahi atu pouaka kirikiri, ko Taunoa rānei.",
+      "sandboxUseDefault": "Whakamahia te Taunoa"
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae.",
@@ -2609,6 +2624,7 @@
     "couldNotLoadActiveSessions": "Kāore i taea te uta i ngā wātū e haere ana.",
     "agentSessions": "Kei te haere ināianei",
     "newCodingTask": "Mahi whakawaehere hou",
+    "newTaskFromPicture": "Mahi hou mai i te pikitia",
     "explore": "Torotoro",
     "seeAll": "Tirohia katoa",
     "noLiveSessions": "Kāore he mea e rere ana i tēnei wā"
@@ -2830,7 +2846,8 @@
     "aiProvidersWhat": "Ō tohutohu, tō hītori kōrerorero me ngā kōnae ka whakapiria e koe.",
     "aiProvidersWhy": "Hei whakaputa whakautu AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google me ētahi atu kaiwhakarato ka kōwhiria e koe mō ia tono.",
-    "gatewayWhat": "Te ID pūkete, ngā raraungameta o ngā tono, te whakamahinga tōkena.",
+    "gatewayWhat": "Te ID pūkete, ngā raraungameta o ngā tono, te whakamahinga tōkena, me ngā whakahau me ngā hopunga reo ka tukuna e te taupānga mā roto.",
+    "viaGateway": "Mā te Kilo Gateway",
     "gatewayWhy": "Te manatoko tuakiri, te arataki tono, te whakataurite nama.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Ngā pūrongo tukinga me ngā hapa, kua tangohia ngā ihirangi o te taupānga.",
@@ -2850,7 +2867,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Te hopunga o tō reo i a koe e kōrero ana.",
     "voiceTranscriptionWhy": "Hei huri i te kōrero hei kuputuhi.",
-    "voiceTranscriptionWho": "Ki tō pūrere anake, ki a Apple, ki a Google rānei mēnā kāore e taea e te pūrere te tuhi ā-reo tuimotu.",
+    "voiceTranscriptionWho": "Tō pūrere, te Kilo Gateway me tō kōwhiringa tauira whakawhiti reo, te Apple, te Google rānei mō te āhukahuka tuihono.",
     "installAttributionPromptTitle": "Whakaaetia te tautohu i te pūtake tāuta?",
     "installAttributionPromptMessage": "Ka whakamahia e Kilo te whakaaetanga aroturuki a Apple hei kimi anake i te ara i tae mai ai koe ki konei. E kore rawa ō tohutohu me ō kōrerorero e whakamahia mō tēnei.",
     "what": "He aha",
@@ -3060,6 +3077,12 @@
     "privacy": "Whakatuwheratia a Kilo kia kite ai i ngā māngai",
     "openAgents": "Whakatuwheratia ngā māngai",
     "needsInput": "Me whai urupare",
+    "newestSession": "Hōu rawa: {{title}}",
+    "noneWaiting": "Kāore he māngai e tatari ana",
+    "newAgent": "Māngai hōu",
+    "approving": "E whakaae ana...",
+    "couldNotApprove": "Kāore i taea te whakaae",
+    "couldNotStart": "Kāore i taea te tīmata",
     "channelName": "Ngā māngai e mahi ana",
     "activityKitDisabledBody": "Whakakāngia ngā mahi wā-tūturu i ngā tautuhinga kia kite ai i ngā māngai e mahi ana i te mata maukati."
   },
@@ -3095,5 +3118,12 @@
     "remoteFound": "Kua honoa te rorohiko",
     "checkAgain": "Tirohia anō",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Me whai tohutohu te Tīmata i te kaiāwhina. Tāpirihia he tohutohu ka whakahaere anō.",
+      "repositoryUnknown": "Kāore a Kilo e āhukahuka i a {{repository}} hei pūranga waehere GitHub, GitLab rānei. Kōwhiria tētahi atu pūranga waehere i roto i a Kilo.",
+      "repositoryUnsupported": "He pūranga waehere Bitbucket a {{repository}} — Kāore anō a Tīmata i te kaiāwhina e taea te whakamahi. Kōwhiria tētahi atu pūranga waehere i roto i a Kilo."
+    }
   }
 }

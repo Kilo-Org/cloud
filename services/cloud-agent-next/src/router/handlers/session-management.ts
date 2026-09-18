@@ -264,7 +264,7 @@ export function createSessionManagementHandlers() {
             if (!success) {
               logger
                 .withFields({
-                  message: message ?? 'No accepted current messages or pending queued messages',
+                  reason: message ?? 'No accepted current messages or pending queued messages',
                 })
                 .info('No accepted current messages or pending queued messages to interrupt');
             }

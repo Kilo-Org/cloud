@@ -480,6 +480,8 @@
       "replyBadRequest": "Enweghị ike ibipụta azịza a. O nwere ike ịbụ na usoro mkparịta ụka ahụ agbanweela.",
       "replyForbidden": "Ị nweghị ikike ịzaghachi arịrịọ njikọta a.",
       "addCommentCta": "Nye nkwupụta na arịrịọ njikọta a",
+      "fixWithKilo": "Dozie na Kilo",
+      "fixWithKiloPrompt": "Biko dozie nkwupụta a na arịrịọ njikọta: {{link}}",
       "commentBadRequest": "Enweghị ike ibipụta nkwupụta a. O nwere ike ịbụ na arịrịọ njikọta a agbanweela.",
       "commentForbidden": "Ị nweghị ikike inye nkwupụta na arịrịọ njikọta a.",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "A na-aga n'ihu na {{title}}.",
       "importingSession": "Na-ebubata nnọkọ",
       "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",
-      "importFailed": "Enweghị ike ibubata nnọkọ a."
+      "importFailed": "Enweghị ike ibubata nnọkọ a.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Ndabere · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Nta",
+      "sandboxInstanceShared": "Kejoro",
+      "sandboxInstanceLarge": "Ukwu",
+      "sandboxInstanceDevcontainer": "Dev konteita",
+      "sandboxInstanceProviderDefault": "Ndabere onye na-enye ọrụ",
+      "sandboxCouldNotLoad": "Enweghị ike ibudata nhọrọ sandbox",
+      "sandboxUnavailable": "Sandbox a adịghị. Họrọ sandbox ọzọ ma ọ bụ Ndabere.",
+      "sandboxUseDefault": "Jiri Ndabere"
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere faịlụ {{displayCount}}.",
@@ -2609,6 +2624,7 @@
     "couldNotLoadActiveSessions": "Enweghị ike ibudata nnọkọ na-aga n'ihu.",
     "agentSessions": "Na-aga n'ihu ugbu a",
     "newCodingTask": "Ọrụ ịde koodu ọhụrụ",
+    "newTaskFromPicture": "Ọrụ ọhụrụ site na foto",
     "explore": "Chọpụta",
     "seeAll": "Lee ha niile",
     "noLiveSessions": "Ọ dịghị ihe na-arụ ọrụ ugbu a"
@@ -2830,7 +2846,8 @@
     "aiProvidersWhat": "Ihe ị na-ede, ndekọ mkparịta ụka gị, na faịlụ ọ bụla ị na-etinye.",
     "aiProvidersWhy": "Iji mepụta nzaghachi AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google, na ndị na-enye ọrụ ndị ọzọ ị na-ahọrọ maka arịrịọ ọ bụla.",
-    "gatewayWhat": "ID akaụntụ, nkọwa data arịrịọ, ojiji tokin.",
+    "gatewayWhat": "ID akaụntụ, nkọwa data arịrịọ, ojiji tokin, yana prompts na ndekọ olu nke ngwa a na-eziga site na ya.",
+    "viaGateway": "Site na Kilo Gateway",
     "gatewayWhy": "Nyocha njirimara, iziga arịrịọ n'ebe kwesịrị ekwesị, ime ka ndekọ ịgba ụgwọ kwekọọ.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Akụkọ mmebi na njehie nke e wepụrụ ọdịnaya ngwa na ha.",
@@ -2850,7 +2867,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Ndekọ olu gị mgbe ị na-ekwu ihe a ga-ede.",
     "voiceTranscriptionWhy": "Iji gbanwee okwu ka ọ bụrụ ederede.",
-    "voiceTranscriptionWho": "Naanị na ngwaọrụ, ma ọ bụ Apple ma ọ bụ Google mgbe ngwaọrụ a enweghị ike ịtụgharị okwu ka ọ bụrụ ederede na-enweghị ịntanetị.",
+    "voiceTranscriptionWho": "Ngwaọrụ gị, Kilo Gateway na ụdị ntụgharị okwu ị họọrọ, ma ọ bụ Apple ma ọ bụ Google maka mmata n'ịntanetị.",
     "installAttributionPromptTitle": "Kwe ka a mata ebe ị si nweta ngwa?",
     "installAttributionPromptMessage": "Kilo na-eji ikike nsuso Apple naanị iji mata ụzọ wetara gị ebe a. A naghị eji ihe ị na-ede ma ọ bụ mkparịta ụka gị eme nke a.",
     "what": "Gịnị",
@@ -3060,6 +3077,12 @@
     "privacy": "Mepee Kilo ka ị hụ ndị nnọchi anya",
     "openAgents": "Mepee ndị nnọchi anya",
     "needsInput": "Chọrọ nzaghachi",
+    "newestSession": "Kacha ọhụrụ: {{title}}",
+    "noneWaiting": "Ọ dịghị onye nnọchi anya na-eche",
+    "newAgent": "Onye nnọchi anya ọhụrụ",
+    "approving": "Na-akwado...",
+    "couldNotApprove": "Enweghị ike ịkwado",
+    "couldNotStart": "Enweghị ike ịmalite",
     "channelName": "Ndị nnọchi anya na-arụ ọrụ",
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi."
   },
@@ -3095,5 +3118,12 @@
     "remoteFound": "Ejikọrọ kọmputa",
     "checkAgain": "Lelee ọzọ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Malite onye enyemaka chọrọ ntụziaka. Tinye ntụziaka wee mee ya ọzọ.",
+      "repositoryUnknown": "Kilo anaghị amata {{repository}} dị ka ebe nchekwa koodu GitHub ma ọ bụ GitLab. Họrọ ebe nchekwa koodu ọzọ na Kilo.",
+      "repositoryUnsupported": "{{repository}} bụ ebe nchekwa koodu Bitbucket — Malite onye enyemaka enweghị ike iji ya ugbu a. Họrọ ebe nchekwa koodu ọzọ na Kilo."
+    }
   }
 }

@@ -158,6 +158,7 @@ export async function searchCatalogDetailed(
       summary: row.summary,
       tags: row.tags,
       score,
+      inputSchema: row.inputSchema,
       blobTokens,
       ...(isGuardedRow(row) ? { requiresApproval: true as const } : {}),
     };
@@ -203,6 +204,7 @@ export async function searchCatalogDetailed(
         summary: row.summary,
         tags: row.tags,
         score: candidate.score * minLexicalScore * 0.5,
+        inputSchema: row.inputSchema,
         blobTokens: new Set(),
         ...(isGuardedRow(row) ? { requiresApproval: true as const } : {}),
       };

@@ -4,10 +4,14 @@
  * static artifact (`import catalog from '../catalog.json'`).
  */
 
-/** One published tRPC query, as recorded in services/kilo-mcp/catalog.json. */
+/**
+ * One published tRPC procedure, as recorded in services/kilo-mcp/catalog.json.
+ * `kind` is the procedure's own kind: a `query` reads data, a `mutation`
+ * changes it. The transport, and what a failure means, differ per kind.
+ */
 export type CatalogRow = {
   path: string;
-  kind: 'query';
+  kind: 'query' | 'mutation';
   summary: string;
   /** Published JSON Schema (draft 2020-12) of the procedure input, `{}` when it takes none. */
   inputSchema: Record<string, unknown>;
@@ -104,6 +108,11 @@ export type SearchResult = {
   summary: string;
   tags: string[];
   score: number;
+  /**
+   * The endpoint's published input schema, byte-identical to the catalog row —
+   * exactly what `call` validates an input against.
+   */
+  inputSchema: Record<string, unknown>;
   /**
    * Present on a guarded row (admin or debug) that the connection may see: the
    * model must get the user's approval before the call runs.

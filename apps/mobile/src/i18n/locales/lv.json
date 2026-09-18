@@ -483,6 +483,8 @@
       "replyBadRequest": "Šo atbildi nevar publicēt. Pavediens, iespējams, ir mainījies.",
       "replyForbidden": "Tev nav atļaujas atbildēt šajā izmaiņu pieprasījumā.",
       "addCommentCta": "Komentēt šo izmaiņu pieprasījumu",
+      "fixWithKilo": "Novērst ar Kilo",
+      "fixWithKiloPrompt": "Lūdzu, risini šo izmaiņu pieprasījuma komentāru: {{link}}",
       "commentBadRequest": "Šo komentāru nevar publicēt. Iespējams, izmaiņu pieprasījums ir mainījies.",
       "commentForbidden": "Tev nav atļaujas komentēt šajā izmaiņu pieprasījumā.",
       "moderation": {
@@ -2144,7 +2146,20 @@
       "continueFrom": "Tiek turpināta sesija: {{title}}.",
       "importingSession": "Importē sesiju…",
       "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlies Cloud Agent vai citu CLI.",
-      "importFailed": "Neizdevās importēt šo sesiju."
+      "importFailed": "Neizdevās importēt šo sesiju.",
+      "sandbox": "Smilškaste",
+      "sandboxAccessibility": "Smilškaste: {{label}}",
+      "sandboxDefaultWithDestination": "Noklusējums · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Maza",
+      "sandboxInstanceShared": "Kopīga",
+      "sandboxInstanceLarge": "Liela",
+      "sandboxInstanceDevcontainer": "Izstrādes konteiners",
+      "sandboxInstanceProviderDefault": "Piegādātāja noklusējums",
+      "sandboxCouldNotLoad": "Neizdevās ielādēt smilškastes opcijas",
+      "sandboxUnavailable": "Šī smilškaste nav pieejama. Izvēlieties citu smilškasti vai Noklusējumu.",
+      "sandboxUseDefault": "Izmantot Noklusējumu"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails.",
@@ -2632,6 +2647,7 @@
     "couldNotLoadActiveSessions": "Neizdevās ielādēt aktīvās sesijas.",
     "agentSessions": "Pašlaik aktīvs",
     "newCodingTask": "Jauns programmēšanas uzdevums",
+    "newTaskFromPicture": "Jauns uzdevums no attēla",
     "explore": "Iespējas",
     "seeAll": "Skatīt visus",
     "noLiveSessions": "Pašlaik nekas nedarbojas"
@@ -2853,7 +2869,8 @@
     "aiProvidersWhat": "Tavas uzvednes, sarunu vēsture un visi pievienotie faili.",
     "aiProvidersWhy": "Lai ģenerētu AI atbildes.",
     "aiProvidersWho": "Anthropic, OpenAI, Google un citi pakalpojumu sniedzēji, kurus izvēlies katram pieprasījumam.",
-    "gatewayWhat": "Konta ID, pieprasījumu metadati, tokenu izmantojums.",
+    "gatewayWhat": "Konta ID, pieprasījumu metadati, tokenu izmantojums, kā arī uzvednes un balss ieraksti, ko lietotne sūta caur to.",
+    "viaGateway": "Caur Kilo Gateway",
     "gatewayWhy": "Autentifikācija, pieprasījumu maršrutēšana, norēķinu saskaņošana.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Avāriju un kļūdu ziņojumi, no kuriem ir izņemts lietotnes saturs.",
@@ -2873,7 +2890,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Tavas balss ieraksts diktēšanas laikā.",
     "voiceTranscriptionWhy": "Lai pārvērstu runu tekstā.",
-    "voiceTranscriptionWho": "Apstrāde notiek tikai ierīcē vai pie Apple vai Google, ja ierīce nevar transkribēt bezsaistē.",
+    "voiceTranscriptionWho": "Jūsu ierīce, Kilo Gateway ar jūsu izvēlēto transkripcijas modeli, vai Apple vai Google tiešsaistes atpazīšanai.",
     "installAttributionPromptTitle": "Atļaut noteikt instalēšanas avotu?",
     "installAttributionPromptMessage": "Kilo izmanto Apple izsekošanas atļauju tikai tam, lai noteiktu, kurā kanālā uzzināji par lietotni. Tavas uzvednes un sarunas šim nolūkam nekad netiek izmantotas.",
     "what": "Kādi dati",
@@ -3084,6 +3101,12 @@
     "privacy": "Atver Kilo, lai redzētu aģentus",
     "openAgents": "Atvērt aģentus",
     "needsInput": "Gaida ievadi",
+    "newestSession": "Jaunākā: {{title}}",
+    "noneWaiting": "Neviens aģents negaida",
+    "newAgent": "Jauns aģents",
+    "approving": "Apstiprina...",
+    "couldNotApprove": "Neizdevās apstiprināt",
+    "couldNotStart": "Neizdevās palaist",
     "channelName": "Aktīvie aģenti",
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus."
   },
@@ -3119,5 +3142,12 @@
     "remoteFound": "Dators pievienots",
     "checkAgain": "Pārbaudīt vēlreiz",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Lai sāktu aģentu, nepieciešama uzvedne. Pievieno uzvedni un palaid to vēlreiz.",
+      "repositoryUnknown": "Kilo neatpazīst {{repository}} kā GitHub vai GitLab repozitoriju. Izvēlies citu repozitoriju Kilo.",
+      "repositoryUnsupported": "{{repository}} ir Bitbucket repozitorijs — Sākt aģentu to vēl nevar izmantot. Izvēlies citu repozitoriju Kilo."
+    }
   }
 }

@@ -480,6 +480,8 @@
       "replyBadRequest": "இந்தப் பதிலை இடுகையிட முடியாது. கருத்துத் தொடர் மாறியிருக்கலாம்.",
       "replyForbidden": "இந்த இணைப்புக் கோரிக்கைக்குப் பதிலளிக்க உங்களுக்கு அனுமதி இல்லை.",
       "addCommentCta": "இந்த இணைப்புக் கோரிக்கையில் கருத்துத் தெரிவிக்கவும்",
+      "fixWithKilo": "Kilo மூலம் சரிசெய்யவும்",
+      "fixWithKiloPrompt": "தயவுசெய்து பின்வரும் இணைப்புக் கோரிக்கை கருத்தைச் சரிசெய்யவும்: {{link}}",
       "commentBadRequest": "இந்தக் கருத்தை இடுகையிட முடியாது. இணைப்புக் கோரிக்கை மாறியிருக்கலாம்.",
       "commentForbidden": "இந்த இணைப்புக் கோரிக்கையில் கருத்துத் தெரிவிக்க உங்களுக்கு அனுமதி இல்லை.",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "{{title}} தொடரப்படுகிறது.",
       "importingSession": "அமர்வு இறக்குமதி செய்யப்படுகிறது",
       "cliCannotContinue": "இந்த CLI-இல் அமர்வைத் தொடர முடியாது. Cloud Agent அல்லது வேறொரு CLI-ஐத் தேர்ந்தெடுக்கவும்.",
-      "importFailed": "இந்த அமர்வை இறக்குமதி செய்ய முடியவில்லை."
+      "importFailed": "இந்த அமர்வை இறக்குமதி செய்ய முடியவில்லை.",
+      "sandbox": "சாண்ட்பாக்ஸ்",
+      "sandboxAccessibility": "சாண்ட்பாக்ஸ்: {{label}}",
+      "sandboxDefaultWithDestination": "இயல்புநிலை · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "சிறியது",
+      "sandboxInstanceShared": "பகிர்ந்தது",
+      "sandboxInstanceLarge": "பெரியது",
+      "sandboxInstanceDevcontainer": "தேவ் கண்டெய்னர்",
+      "sandboxInstanceProviderDefault": "வழங்குநரின் இயல்புநிலை",
+      "sandboxCouldNotLoad": "சாண்ட்பாக்ஸ் விருப்பங்களை ஏற்ற முடியவில்லை",
+      "sandboxUnavailable": "இந்த சாண்ட்பாக்ஸ் கிடைக்கவில்லை. வேறு சாண்ட்பாக்ஸ் அல்லது இயல்புநிலையைத் தேர்ந்தெடுக்கவும்.",
+      "sandboxUseDefault": "இயல்புநிலையைப் பயன்படுத்து"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} கோப்பு புதுப்பிக்கப்பட்டது.",
@@ -2609,6 +2624,7 @@
     "couldNotLoadActiveSessions": "செயலில் உள்ள அமர்வுகளை ஏற்ற முடியவில்லை.",
     "agentSessions": "இப்போது இயங்குபவை",
     "newCodingTask": "புதிய நிரலாக்கப் பணி",
+    "newTaskFromPicture": "படத்திலிருந்து புதிய பணி",
     "explore": "கண்டறிய வேண்டியவை",
     "seeAll": "அனைத்தையும் பார்க்கவும்",
     "noLiveSessions": "இப்போது எதுவும் இயங்கவில்லை"
@@ -2830,7 +2846,8 @@
     "aiProvidersWhat": "உங்கள் வினவல்கள், உரையாடல் வரலாறு மற்றும் நீங்கள் இணைக்கும் கோப்புகள்.",
     "aiProvidersWhy": "AI பதில்களை உருவாக்குவதற்காக.",
     "aiProvidersWho": "Anthropic, OpenAI, Google மற்றும் ஒவ்வொரு கோரிக்கைக்கும் நீங்கள் தேர்ந்தெடுக்கும் பிற வழங்குநர்கள்.",
-    "gatewayWhat": "கணக்கு அடையாள எண், கோரிக்கையின் மேனிலைத் தரவு, டோக்கன் பயன்பாடு.",
+    "gatewayWhat": "கணக்கு அடையாள எண், கோரிக்கையின் மேனிலைத் தரவு, டோக்கன் பயன்பாடு, மேலும் ஆப் இதன் வழியாக அனுப்பும் ப்ராம்ப்ட்கள் மற்றும் குரல் பதிவுகள்.",
+    "viaGateway": "Kilo Gateway வழியாக",
     "gatewayWhy": "அடையாளத்தை உறுதிப்படுத்துதல், கோரிக்கைகளை உரிய சேவைக்கு அனுப்புதல், கட்டணக் கணக்குகளைச் சரிபார்த்தல்.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "செயலியின் உள்ளடக்கம் அகற்றப்பட்ட செயலிழப்பு மற்றும் பிழை அறிக்கைகள்.",
@@ -2850,7 +2867,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "நீங்கள் பேசித் தட்டச்சு செய்யும்போது பதிவாகும் குரல்.",
     "voiceTranscriptionWhy": "பேச்சை உரையாக மாற்றுவதற்காக.",
-    "voiceTranscriptionWho": "உங்கள் சாதனத்தில் மட்டுமே. இணையமின்றிப் பேச்சை உரையாக்க முடியாவிட்டால், Apple அல்லது Google.",
+    "voiceTranscriptionWho": "உங்கள் சாதனம், நீங்கள் தேர்ந்தெடுத்த படியெடுப்பு மாதிரியுடன் Kilo Gateway, அல்லது ஆன்லைன் அங்கீகாரத்திற்கு Apple அல்லது Google.",
     "installAttributionPromptTitle": "நிறுவல் மூலத்தைக் கண்டறிய அனுமதிக்கவா?",
     "installAttributionPromptMessage": "நீங்கள் எந்த வழியாக Kilo-விற்கு வந்தீர்கள் என்பதை அறிய மட்டுமே Apple-இன் கண்காணிப்பு அனுமதியை Kilo பயன்படுத்துகிறது. உங்கள் வினவல்களும் உரையாடல்களும் இதற்காக ஒருபோதும் பயன்படுத்தப்படாது.",
     "what": "என்ன",
@@ -3060,6 +3077,12 @@
     "privacy": "ஏஜெண்டுகளைப் பார்க்க Kilo-ஐத் திறக்கவும்",
     "openAgents": "ஏஜெண்டுகளைத் திறக்கவும்",
     "needsInput": "உள்ளீடு தேவை",
+    "newestSession": "சமீபத்திய: {{title}}",
+    "noneWaiting": "காத்திருக்கும் ஏஜெண்ட் இல்லை",
+    "newAgent": "புதிய ஏஜெண்ட்",
+    "approving": "ஒப்புதல் அளிக்கப்படுகிறது...",
+    "couldNotApprove": "ஒப்புதல் அளிக்க முடியவில்லை",
+    "couldNotStart": "தொடங்க முடியவில்லை",
     "channelName": "செயலில் உள்ள ஏஜெண்டுகள்",
     "activityKitDisabledBody": "பூட்டுத் திரையில் செயலில் உள்ள ஏஜெண்டுகளைப் பார்க்க, அமைப்புகளில் நேரலைச் செயல்பாடுகளை இயக்கவும்."
   },
@@ -3095,5 +3118,12 @@
     "remoteFound": "கணினி இணைக்கப்பட்டது",
     "checkAgain": "மீண்டும் சரிபார்",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "முகவரியைத் தொடங்க வினவல் தேவை. ஒரு வினவலைச் சேர்த்து மீண்டும் இயக்கவும்.",
+      "repositoryUnknown": "Kilo, {{repository}}-ஐ GitHub அல்லது GitLab களஞ்சியமாக அடையாளம் காணவில்லை. Kilo-வில் வேறு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்.",
+      "repositoryUnsupported": "{{repository}} ஒரு Bitbucket களஞ்சியம் — முகவரியைத் தொடங்கு இதுவரை அதைப் பயன்படுத்த முடியாது. Kilo-வில் வேறு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்."
+    }
   }
 }

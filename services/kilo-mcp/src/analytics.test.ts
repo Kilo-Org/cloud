@@ -318,6 +318,18 @@ describe('classifyToolError', () => {
     ).toBe('upstream_unreachable');
   });
 
+  it('classifies an ambiguous mutation transport failure', () => {
+    expect(
+      classifyToolError(
+        new JsonRpcFailure(
+          -32000,
+          'Could not reach the Kilo API for "x". This mutation may or may not have been applied — check the current state before retrying.',
+          { path: 'x', ambiguous: true }
+        )
+      )
+    ).toBe('upstream_unreachable_ambiguous');
+  });
+
   it('classifies a tRPC upstream failure', () => {
     expect(
       classifyToolError(

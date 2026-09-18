@@ -71,6 +71,27 @@ describe('logControlDiagnostic', () => {
     });
     expect(withFields).toHaveBeenCalledTimes(1);
   });
+
+  it('suppresses applied delta progress but logs a rejected delta session event', () => {
+    logControlDiagnostic(
+      'session_event_result',
+      { eventType: 'message.part.delta', applied: true },
+      'info'
+    );
+    expect(withFields).not.toHaveBeenCalled();
+
+    logControlDiagnostic(
+      'session_event_result',
+      { eventType: 'message.part.delta', applied: false },
+      'info'
+    );
+    expect(withFields).toHaveBeenCalledTimes(1);
+    expect(withFields.mock.calls[0]?.[0]).toMatchObject({
+      diagnosticEvent: 'session_event_result',
+      eventType: 'message.part.delta',
+      applied: false,
+    });
+  });
 });
 
 describe('diagnosticCause', () => {

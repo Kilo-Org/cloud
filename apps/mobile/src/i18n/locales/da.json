@@ -480,6 +480,8 @@
       "replyBadRequest": "Dette svar kan ikke sendes. Tråden kan have ændret sig.",
       "replyForbidden": "Du har ikke tilladelse til at svare på denne pull request.",
       "addCommentCta": "Kommenter på denne pull request",
+      "fixWithKilo": "Ret med Kilo",
+      "fixWithKiloPrompt": "Håndter venligst følgende kommentar på pull requesten: {{link}}",
       "commentBadRequest": "Denne kommentar kan ikke sendes. Pull requesten kan have ændret sig.",
       "commentForbidden": "Du har ikke tilladelse til at kommentere på denne pull request.",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "Sessionen {{title}} fortsættes.",
       "importingSession": "Importerer session",
       "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
-      "importFailed": "Kunne ikke importere denne session."
+      "importFailed": "Kunne ikke importere denne session.",
+      "sandbox": "Sandkasse",
+      "sandboxAccessibility": "Sandkasse: {{label}}",
+      "sandboxDefaultWithDestination": "Standard · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Lille",
+      "sandboxInstanceShared": "Delt",
+      "sandboxInstanceLarge": "Stor",
+      "sandboxInstanceDevcontainer": "Dev-container",
+      "sandboxInstanceProviderDefault": "Leverandørstandard",
+      "sandboxCouldNotLoad": "Kunne ikke indlæse sandbox-valgmuligheder",
+      "sandboxUnavailable": "Denne sandkasse er ikke tilgængelig. Vælg en anden sandkasse eller Standard.",
+      "sandboxUseDefault": "Brug Standard"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er opdateret.",
@@ -2609,6 +2624,7 @@
     "couldNotLoadActiveSessions": "De aktive sessioner kunne ikke indlæses.",
     "agentSessions": "I gang nu",
     "newCodingTask": "Ny programmeringsopgave",
+    "newTaskFromPicture": "Ny opgave fra et billede",
     "explore": "Udforsk",
     "seeAll": "Se alle",
     "noLiveSessions": "Intet kører lige nu"
@@ -2830,7 +2846,8 @@
     "aiProvidersWhat": "Dine forespørgsler, din samtalehistorik og eventuelle filer, du vedhæfter.",
     "aiProvidersWhy": "For at generere AI-svar.",
     "aiProvidersWho": "Anthropic, OpenAI, Google og andre udbydere, som du vælger for hver anmodning.",
-    "gatewayWhat": "Konto-id, metadata om anmodninger og tokenforbrug.",
+    "gatewayWhat": "Konto-id, metadata om anmodninger, tokenforbrug samt de prompts og lydoptagelser, som appen sender gennem det.",
+    "viaGateway": "Via Kilo Gateway",
     "gatewayWhy": "Bekræftelse af din identitet, videresendelse af anmodninger og afstemning af fakturering.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Rapporter om nedbrud og fejl, hvor indhold fra appen er fjernet.",
@@ -2850,7 +2867,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Din optagelse, mens du dikterer.",
     "voiceTranscriptionWhy": "For at omdanne tale til tekst.",
-    "voiceTranscriptionWho": "Kun på enheden eller hos Apple eller Google, hvis enheden ikke kan transskribere offline.",
+    "voiceTranscriptionWho": "Din enhed, Kilo Gateway med den transskriptionsmodel, du har valgt, eller Apple eller Google til genkendelse online.",
     "installAttributionPromptTitle": "Tillad sporing af installationskilde?",
     "installAttributionPromptMessage": "Kilo bruger kun Apples sporingstilladelse til at se, hvilken kanal du fandt os gennem. Dine forespørgsler og samtaler bruges aldrig til dette.",
     "what": "Hvad",
@@ -3060,6 +3077,12 @@
     "privacy": "Åbn Kilo for at se agenter",
     "openAgents": "Åbn agenter",
     "needsInput": "Afventer svar",
+    "newestSession": "Nyeste: {{title}}",
+    "noneWaiting": "Ingen agenter venter",
+    "newAgent": "Ny agent",
+    "approving": "Godkender...",
+    "couldNotApprove": "Kunne ikke godkende",
+    "couldNotStart": "Kunne ikke starte",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen."
   },
@@ -3095,5 +3118,12 @@
     "remoteFound": "Computer tilsluttet",
     "checkAgain": "Tjek igen",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Start agenten kræver en forespørgsel. Tilføj en forespørgsel, og kør den igen.",
+      "repositoryUnknown": "Kilo genkender ikke {{repository}} som et GitHub- eller GitLab-kodelager. Vælg et andet kodelager i Kilo.",
+      "repositoryUnsupported": "{{repository}} er et Bitbucket-kodelager — Start agenten kan endnu ikke bruge det. Vælg et andet kodelager i Kilo."
+    }
   }
 }

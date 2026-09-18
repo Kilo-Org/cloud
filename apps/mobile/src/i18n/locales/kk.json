@@ -480,6 +480,8 @@
       "replyBadRequest": "Бұл жауапты жариялау мүмкін емес. Талқылау тармағы өзгерген болуы мүмкін.",
       "replyForbidden": "Бұл біріктіру сұрауына жауап беруге рұқсатыңыз жоқ.",
       "addCommentCta": "Бұл біріктіру сұрауына пікір жазу",
+      "fixWithKilo": "Kilo арқылы түзету",
+      "fixWithKiloPrompt": "Өтінеміз, келесі біріктіру сұрауының пікірін шешіңіз: {{link}}",
       "commentBadRequest": "Бұл пікірді жариялау мүмкін емес. Біріктіру сұрауы өзгерген болуы мүмкін.",
       "commentForbidden": "Бұл біріктіру сұрауына пікір жазуға рұқсатыңыз жоқ.",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "«{{title}}» сессиясы жалғасуда.",
       "importingSession": "Сессия импортталуда",
       "cliCannotContinue": "Бұл CLI сессияны жалғастыра алмайды. Cloud Agent қызметін немесе басқа CLI құралын таңдаңыз.",
-      "importFailed": "Бұл сессияны импорттау мүмкін болмады."
+      "importFailed": "Бұл сессияны импорттау мүмкін болмады.",
+      "sandbox": "Сандбокс",
+      "sandboxAccessibility": "Сандбокс: {{label}}",
+      "sandboxDefaultWithDestination": "Әдепкі · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Кішкене",
+      "sandboxInstanceShared": "Ортақ",
+      "sandboxInstanceLarge": "Үлкен",
+      "sandboxInstanceDevcontainer": "Dev контейнері",
+      "sandboxInstanceProviderDefault": "Жеткізушінің әдепкісі",
+      "sandboxCouldNotLoad": "Сандбокс параметрлерін жүктей алмады",
+      "sandboxUnavailable": "Бұл сандбокс қолжетімсіз. Басқа сандбоксты немесе Әдепкіні таңдаңыз.",
+      "sandboxUseDefault": "Әдепкіні пайдалану"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды.",
@@ -2609,6 +2624,7 @@
     "couldNotLoadActiveSessions": "Белсенді сессияларды жүктеу мүмкін болмады.",
     "agentSessions": "Қазір орындалып жатыр",
     "newCodingTask": "Жаңа бағдарламалау тапсырмасы",
+    "newTaskFromPicture": "Суреттен жаңа тапсырма",
     "explore": "Мүмкіндіктер",
     "seeAll": "Барлығын қарау",
     "noLiveSessions": "Қазір ештеңе орындалып жатқан жоқ"
@@ -2830,7 +2846,8 @@
     "aiProvidersWhat": "Сұрауларыңыз, сөйлесу тарихы және тіркеген файлдарыңыз.",
     "aiProvidersWhy": "AI жауаптарын жасау үшін.",
     "aiProvidersWho": "Әр сұрау үшін таңдайтын Anthropic, OpenAI, Google және басқа провайдерлер.",
-    "gatewayWhat": "Тіркелгі идентификаторы, сұрау метадеректері, токен қолданысы.",
+    "gatewayWhat": "Тіркелгі идентификаторы, сұрау метадеректері, токен қолданысы, сондай-ақ қолданба ол арқылы жіберетін промпттар мен дауыс жазбалары.",
+    "viaGateway": "Kilo Gateway арқылы",
     "gatewayWhy": "Жеке басты растау, сұрауларды бағыттау, төлем есебін салыстырып тексеру.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Қолданба мазмұны алынып тасталған істен шығу мен қателер туралы есептер.",
@@ -2850,7 +2867,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Мәтінді дауыстап айтқан кездегі дыбыс жазбаңыз.",
     "voiceTranscriptionWhy": "Сөйлеуді мәтінге айналдыру үшін.",
-    "voiceTranscriptionWho": "Тек құрылғыда өңделеді. Егер құрылғы дауысты офлайн мәтінге айналдыра алмаса, Apple немесе Google қызметіне жіберіледі.",
+    "voiceTranscriptionWho": "Сіздің құрылғыңыз, өзіңіз таңдаған транскрипция моделімен Kilo Gateway немесе онлайн тану үшін Apple немесе Google.",
     "installAttributionPromptTitle": "Орнату көзін анықтауға рұқсат бересіз бе?",
     "installAttributionPromptMessage": "Kilo Apple бақылау рұқсатын тек қай арна арқылы келгеніңізді білу үшін қолданады. Сұрауларыңыз бен сөйлесулеріңіз бұл мақсатта ешқашан қолданылмайды.",
     "what": "Қандай деректер",
@@ -3060,6 +3077,12 @@
     "privacy": "Агенттерді көру үшін Kilo қолданбасын ашыңыз",
     "openAgents": "Агенттерді ашу",
     "needsInput": "Жауап қажет",
+    "newestSession": "Ең жаңасы: {{title}}",
+    "noneWaiting": "Күтіп тұрған агент жоқ",
+    "newAgent": "Жаңа агент",
+    "approving": "Мақұлдануда...",
+    "couldNotApprove": "Мақұлдау сәтсіз аяқталды",
+    "couldNotStart": "Бастау сәтсіз аяқталды",
     "channelName": "Белсенді агенттер",
     "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз."
   },
@@ -3095,5 +3118,12 @@
     "remoteFound": "Компьютер қосылды",
     "checkAgain": "Қайта тексеру",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Агентті іске қосу үшін сұрау қажет. Сұрау қосып, қайта іске қосыңыз.",
+      "repositoryUnknown": "Kilo {{repository}} ны GitHub немесе GitLab репозиторийі ретінде танымайды. Kilo ішінен басқа репозиторий таңдаңыз.",
+      "repositoryUnsupported": "{{repository}} — Bitbucket репозиторийі. Агентті іске қосу оны әзірге пайдалана алмайды. Kilo ішінен басқа репозиторий таңдаңыз."
+    }
   }
 }

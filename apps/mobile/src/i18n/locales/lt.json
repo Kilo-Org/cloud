@@ -486,6 +486,8 @@
       "replyBadRequest": "Šio atsakymo negalima paskelbti. Gija galėjo pasikeisti.",
       "replyForbidden": "Neturi teisės atsakyti šios pakeitimų užklausos diskusijoje.",
       "addCommentCta": "Komentuoti šią pakeitimų užklausą",
+      "fixWithKilo": "Ištaisyti su Kilo",
+      "fixWithKiloPrompt": "Prašome išspręsti šį pakeitimų užklausos komentarą: {{link}}",
       "commentBadRequest": "Šio komentaro negalima paskelbti. Pakeitimų užklausa galėjo pasikeisti.",
       "commentForbidden": "Neturi teisės komentuoti šios pakeitimų užklausos.",
       "moderation": {
@@ -2162,7 +2164,20 @@
       "continueFrom": "Tęsiama sesija „{{title}}“.",
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šioje CLI sesijos tęsti negalima. Pasirinkite „Cloud Agent“ arba kitą CLI.",
-      "importFailed": "Nepavyko importuoti šios sesijos."
+      "importFailed": "Nepavyko importuoti šios sesijos.",
+      "sandbox": "Smėlio dėžė",
+      "sandboxAccessibility": "Smėlio dėžė: {{label}}",
+      "sandboxDefaultWithDestination": "Numatytasis · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Mažas",
+      "sandboxInstanceShared": "Bendras",
+      "sandboxInstanceLarge": "Didelis",
+      "sandboxInstanceDevcontainer": "Kūrimo konteineris",
+      "sandboxInstanceProviderDefault": "Tiekėjo numatytasis",
+      "sandboxCouldNotLoad": "Nepavyko įkelti smėlio dėžės parinkčių",
+      "sandboxUnavailable": "Ši smėlio dėžė neprieinama. Pasirinkite kitą smėlio dėžę arba Numatytąjį.",
+      "sandboxUseDefault": "Naudoti Numatytąjį"
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujintas {{displayCount}} failas.",
@@ -2655,6 +2670,7 @@
     "couldNotLoadActiveSessions": "Nepavyko įkelti aktyvių sesijų.",
     "agentSessions": "Vyksta dabar",
     "newCodingTask": "Nauja programavimo užduotis",
+    "newTaskFromPicture": "Nauja užduotis iš nuotraukos",
     "explore": "Naršyti",
     "seeAll": "Rodyti viską",
     "noLiveSessions": "Šiuo metu niekas nevykdoma"
@@ -2876,7 +2892,8 @@
     "aiProvidersWhat": "Jūsų užklausos, pokalbių istorija ir visi pridedami failai.",
     "aiProvidersWhy": "AI atsakymams generuoti.",
     "aiProvidersWho": "Anthropic, OpenAI, Google ir kiti teikėjai, kuriuos pasirenkate kiekvienai užklausai.",
-    "gatewayWhat": "Paskyros ID, užklausų metaduomenys, žetonų naudojimas.",
+    "gatewayWhat": "Paskyros ID, užklausų metaduomenys, žetonų naudojimas bei raginimai ir balso įrašai, kuriuos programėlė siunčia per jį.",
+    "viaGateway": "Per Kilo Gateway",
     "gatewayWhy": "Tapatybės patvirtinimas, užklausų nukreipimas ir atsiskaitymų suderinimas.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Strigčių ir klaidų ataskaitos, iš kurių pašalintas programėlės turinys.",
@@ -2896,7 +2913,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Jūsų balso įrašas diktuojant.",
     "voiceTranscriptionWhy": "Kalbai paversti tekstu.",
-    "voiceTranscriptionWho": "Tik jūsų įrenginys. Jei jis negali transkribuoti be interneto ryšio, įrašas siunčiamas Apple arba Google.",
+    "voiceTranscriptionWho": "Jūsų įrenginys, Kilo Gateway su pasirinktu transkripcijos modeliu arba Apple ar Google atpažinimui internete.",
     "installAttributionPromptTitle": "Leisti nustatyti įdiegimo šaltinį?",
     "installAttributionPromptMessage": "Kilo naudoja Apple sekimo leidimą tik tam, kad sužinotų, per kurį kanalą radote programėlę. Jūsų užklausos ir pokalbiai tam niekada nenaudojami.",
     "what": "Kokie duomenys",
@@ -3108,6 +3125,12 @@
     "privacy": "Atidaryk Kilo, kad matytum agentus",
     "openAgents": "Atidaryti agentus",
     "needsInput": "Laukia atsakymo",
+    "newestSession": "Naujausia: {{title}}",
+    "noneWaiting": "Nė vienas agentas nelaukia",
+    "newAgent": "Naujas agentas",
+    "approving": "Tvirtinama...",
+    "couldNotApprove": "Nepavyko patvirtinti",
+    "couldNotStart": "Nepavyko paleisti",
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus."
   },
@@ -3143,5 +3166,12 @@
     "remoteFound": "Kompiuteris prijungtas",
     "checkAgain": "Kartoti patikrinimą",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Norint paleisti agentą, reikia užklausos. Pridėk užklausą ir paleisk iš naujo.",
+      "repositoryUnknown": "Kilo neatpažįsta {{repository}} kaip GitHub ar GitLab saugyklos. Pasirink kitą saugyklą Kilo programoje.",
+      "repositoryUnsupported": "{{repository}} yra Bitbucket saugykla — Paleisti agentą jos dar negali naudoti. Pasirink kitą saugyklą Kilo programoje."
+    }
   }
 }

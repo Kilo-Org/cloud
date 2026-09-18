@@ -31,7 +31,14 @@
 
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
+import {
+  Pressable,
+  Text as RNText,
+  type TextStyle,
+  useColorScheme,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlight';
@@ -41,12 +48,13 @@ import {
   diffLineMarker,
   type ParsedDiffLine,
 } from '@/lib/pr-review/diff/parse-patch';
-import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
+import { MUTED_COLOR } from '@/lib/pr-review/diff/syntax-colors';
 import { cn } from '@/lib/utils';
 import {
   DIFF_MAX_FONT_SCALE,
   useDiffFontMetrics,
 } from '@/components/pr-review/diff/diff-font-metrics';
+import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs';
 
 const GUTTER_WIDTH = 56;
 const VERTICAL_PADDING = 2;
@@ -97,7 +105,8 @@ function markerColorFor(
 function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLineProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const isDark = colors.background === '#0E0E10';
+  // Same signal `useThemeColors` reads; never a background-token equality.
+  const isDark = useColorScheme() === 'dark';
   const metrics = useDiffFontMetrics();
 
   const tokens = useMemo<HighlightToken[]>(
@@ -186,15 +195,9 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
           selectable
           style={{ ...codeBaseStyle, color: colors.foreground }}
         >
-          {tokens.map((token, index) => {
-            const tokenColor = tokenColorFor(token.className, isDark);
-            return (
-              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- per-token syntax color
-              <RNText key={`tok-${index}`} style={{ color: tokenColor }}>
-                {token.text}
-              </RNText>
-            );
-          })}
+          {/* Untagged runs are raw strings inside this Text, so only the
+              highlighter's tagged runs cost an Android span. */}
+          {highlightRunChildren(tokens, isDark)}
           {line.noNewlineAtEndOfFile ? (
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color for no-newline marker
             <RNText style={{ ...noNewlineBase, color: noNewlineColor }}>{noNewlineLabel}</RNText>

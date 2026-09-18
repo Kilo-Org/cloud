@@ -480,6 +480,8 @@
       "replyBadRequest": "Энэ хариуг нийтлэх боломжгүй. Сэдэв өөрчлөгдсөн байж болзошгүй.",
       "replyForbidden": "Танд энэ нэгтгэх хүсэлтэд хариу бичих эрх байхгүй.",
       "addCommentCta": "Энэ нэгтгэх хүсэлтэд сэтгэгдэл бичих",
+      "fixWithKilo": "Kilo-оор засах",
+      "fixWithKiloPrompt": "Дараах нэгтгэх хүсэлтийн сэтгэгдлийг шийдвэрлэнэ үү: {{link}}",
       "commentBadRequest": "Энэ сэтгэгдлийг нийтлэх боломжгүй. Нэгтгэх хүсэлт өөрчлөгдсөн байж болзошгүй.",
       "commentForbidden": "Танд энэ нэгтгэх хүсэлтэд сэтгэгдэл бичих эрх байхгүй.",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "«{{title}}» сессийг үргэлжлүүлж байна.",
       "importingSession": "Сесс импортлож байна",
       "cliCannotContinue": "Энэ CLI сессийг үргэлжлүүлэх боломжгүй. Cloud Agent эсвэл өөр CLI сонгоно уу.",
-      "importFailed": "Энэ сессийг импортолж чадсангүй."
+      "importFailed": "Энэ сессийг импортолж чадсангүй.",
+      "sandbox": "Сэндбокс",
+      "sandboxAccessibility": "Сэндбокс: {{label}}",
+      "sandboxDefaultWithDestination": "Өгөгдмөл · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Жижиг",
+      "sandboxInstanceShared": "Түгээсэн",
+      "sandboxInstanceLarge": "Том",
+      "sandboxInstanceDevcontainer": "Dev контейнер",
+      "sandboxInstanceProviderDefault": "Нийлүүлэгчийн өгөгдмөл",
+      "sandboxCouldNotLoad": "Сэндбоксын сонголтыг ачаалж чадсангүй",
+      "sandboxUnavailable": "Энэ сэндбокс ашиглах боломжгүй. Өөр сэндбокс эсвэл Өгөгдмөлийг сонгоно уу.",
+      "sandboxUseDefault": "Өгөгдмөлийг ашиглах"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файлыг шинэчиллээ.",
@@ -2609,6 +2624,7 @@
     "couldNotLoadActiveSessions": "Идэвхтэй сессүүдийг ачаалж чадсангүй.",
     "agentSessions": "Одоо ажиллаж байгаа",
     "newCodingTask": "Код бичих шинэ даалгавар",
+    "newTaskFromPicture": "Зургаас шинэ даалгавар",
     "explore": "Судлах",
     "seeAll": "Бүгдийг үзэх",
     "noLiveSessions": "Одоогоор ажиллаж буй зүйл алга"
@@ -2830,7 +2846,8 @@
     "aiProvidersWhat": "Таны заавар, харилцан ярианы түүх болон хавсаргасан файлууд.",
     "aiProvidersWhy": "AI хариулт үүсгэхийн тулд.",
     "aiProvidersWho": "Anthropic, OpenAI, Google болон хүсэлт бүрт таны сонгосон бусад үйлчилгээ үзүүлэгч.",
-    "gatewayWhat": "Бүртгэлийн ID, хүсэлтийн мета өгөгдөл, токены ашиглалт.",
+    "gatewayWhat": "Бүртгэлийн ID, хүсэлтийн мета өгөгдөл, токены ашиглалт, мөн апп-ын үүгээр илгээдэг промпт болон дууны бичлэгүүд.",
+    "viaGateway": "Kilo Gateway-аар дамжуулан",
     "gatewayWhy": "Хэрэглэгчийг баталгаажуулах, хүсэлтийг чиглүүлэх, төлбөрийн тооцоог тулгах.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Аппын агуулгыг арилгасан гацалт, алдааны тайлан.",
@@ -2850,7 +2867,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Таныг ярьж байх үед авсан дууны бичлэг.",
     "voiceTranscriptionWhy": "Яриаг бичвэр болгох.",
-    "voiceTranscriptionWho": "Зөвхөн төхөөрөмж дээр боловсруулна. Хэрэв төхөөрөмж интернэтгүйгээр яриаг бичвэр болгож чадахгүй бол Apple эсвэл Google ашиглана.",
+    "voiceTranscriptionWho": "Таны төхөөрөмж, таны сонгосон транскрипцийн модельтай Kilo Gateway, эсвэл онлайн танихын тулд Apple эсвэл Google.",
     "installAttributionPromptTitle": "Суулгасан эх үүсвэрийг тодорхойлохыг зөвшөөрөх үү?",
     "installAttributionPromptMessage": "Kilo нь Apple-ийн мөрдөх зөвшөөрлийг зөвхөн таныг аль сувгаар ирснийг мэдэхэд ашигладаг. Таны заавар болон харилцан яриаг үүнд хэзээ ч ашиглахгүй.",
     "what": "Юу",
@@ -3060,6 +3077,12 @@
     "privacy": "Агентуудыг харахын тулд Kilo-г нээнэ үү",
     "openAgents": "Агентуудыг нээх",
     "needsInput": "Хариу хүлээж байна",
+    "newestSession": "Хамгийн шинэ: {{title}}",
+    "noneWaiting": "Хүлээж буй агент алга",
+    "newAgent": "Шинэ агент",
+    "approving": "Зөвшөөрч байна...",
+    "couldNotApprove": "Зөвшөөрч чадсангүй",
+    "couldNotStart": "Эхлүүлж чадсангүй",
     "channelName": "Идэвхтэй агентууд",
     "activityKitDisabledBody": "Түгжээтэй дэлгэц дээр идэвхтэй агентуудыг харахын тулд тохиргооноос шууд үйл ажиллагааг идэвхжүүлнэ үү."
   },
@@ -3095,5 +3118,12 @@
     "remoteFound": "Компьютер холбогдлоо",
     "checkAgain": "Дахин шалгах",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Агент эхлүүлэхэд заавар шаардлагатай. Заавар нэмээд дахин ажиллуулна уу.",
+      "repositoryUnknown": "Kilo {{repository}}-г GitHub эсвэл GitLab кодын сан гэж хүлээн зөвшөөрөхгүй. Kilo дотор өөр кодын сан сонгоно уу.",
+      "repositoryUnsupported": "{{repository}} нь Bitbucket кодын сан — Агент эхлүүлэх үүнийг одоохондоо ашиглаж чадахгүй. Kilo дотор өөр кодын сан сонгоно уу."
+    }
   }
 }

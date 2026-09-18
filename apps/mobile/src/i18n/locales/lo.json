@@ -480,6 +480,8 @@
       "replyBadRequest": "ບໍ່ສາມາດໂພດຄຳຕອບນີ້ໄດ້. ກະທູ້ອາດມີການປ່ຽນແປງແລ້ວ.",
       "replyForbidden": "ທ່ານບໍ່ມີສິດຕອບໃນຄຳຂໍລວມໂຄດນີ້.",
       "addCommentCta": "ສະແດງຄຳເຫັນໃນຄຳຂໍລວມໂຄດນີ້",
+      "fixWithKilo": "ແກ້ໄຂດ້ວຍ Kilo",
+      "fixWithKiloPrompt": "ກະລຸນາແກ້ໄຂຄຳເຫັນຕໍ່ໄປນີ້ໃນຄຳຂໍລວມໂຄດ: {{link}}",
       "commentBadRequest": "ບໍ່ສາມາດໂພດຄຳເຫັນນີ້ໄດ້. ຄຳຂໍລວມໂຄດອາດມີການປ່ຽນແປງແລ້ວ.",
       "commentForbidden": "ທ່ານບໍ່ມີສິດສະແດງຄຳເຫັນໃນຄຳຂໍລວມໂຄດນີ້.",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "ກຳລັງເຮັດວຽກຕໍ່ຈາກ {{title}}.",
       "importingSession": "ກຳລັງນຳເຂົ້າເຊດຊັນ",
       "cliCannotContinue": "CLI ນີ້ບໍ່ສາມາດເຮັດວຽກຕໍ່ຈາກເຊດຊັນໄດ້. ເລືອກ Cloud Agent ຫຼື CLI ອື່ນ.",
-      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້."
+      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "ຄ່າເລີ່ມຕົ້ນ · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "ນ້ອຍ",
+      "sandboxInstanceShared": "ແບ່ງປັນ",
+      "sandboxInstanceLarge": "ໃຫຍ່",
+      "sandboxInstanceDevcontainer": "ຄອນເທນເນີ Dev",
+      "sandboxInstanceProviderDefault": "ຄ່າເລີ່ມຕົ້ນຂອງຜູ້ໃຫ້ບໍລິການ",
+      "sandboxCouldNotLoad": "ໂຫຼດຕົວເລືອກ Sandbox ບໍ່ໄດ້",
+      "sandboxUnavailable": "Sandbox ນີ້ໃຊ້ບໍ່ໄດ້. ເລືອກ Sandbox ອື່ນ ຫຼື ຄ່າເລີ່ມຕົ້ນ.",
+      "sandboxUseDefault": "ໃຊ້ຄ່າເລີ່ມຕົ້ນ"
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດໄຟລ໌ແລ້ວ {{displayCount}} ໄຟລ໌.",
@@ -2609,6 +2624,7 @@
     "couldNotLoadActiveSessions": "ບໍ່ສາມາດໂຫຼດເຊສຊັນທີ່ກຳລັງໃຊ້ງານໄດ້.",
     "agentSessions": "ກຳລັງເຮັດວຽກ",
     "newCodingTask": "ວຽກຂຽນໂຄ້ດໃໝ່",
+    "newTaskFromPicture": "ວຽກໃໝ່ຈາກຮູບພາບ",
     "explore": "ສຳຫຼວດ",
     "seeAll": "ເບິ່ງທັງໝົດ",
     "noLiveSessions": "ຕອນນີ້ບໍ່ມີວຽກທີ່ກຳລັງດຳເນີນຢູ່"
@@ -2830,7 +2846,8 @@
     "aiProvidersWhat": "ຂໍ້ຄວາມສັ່ງງານ, ປະຫວັດການສົນທະນາ ແລະ ໄຟລ໌ທັງໝົດທີ່ທ່ານແນບ.",
     "aiProvidersWhy": "ເພື່ອໃຫ້ AI ສ້າງຄຳຕອບ.",
     "aiProvidersWho": "Anthropic, OpenAI, Google ແລະ ຜູ້ໃຫ້ບໍລິການອື່ນໆທີ່ທ່ານເລືອກສຳລັບແຕ່ລະຄຳຂໍ.",
-    "gatewayWhat": "ລະຫັດບັນຊີ, ຂໍ້ມູນປະກອບຄຳຂໍ ແລະ ປະລິມານການໃຊ້ໂທເຄັນ.",
+    "gatewayWhat": "ລະຫັດບັນຊີ, ຂໍ້ມູນປະກອບຄຳຂໍ, ປະລິມານການໃຊ້ໂທເຄັນ, ພ້ອມທັງ prompt ແລະ ການບັນທຶກສຽງທີ່ແອັບສົ່ງຜ່ານມັນ.",
+    "viaGateway": "ຜ່ານ Kilo Gateway",
     "gatewayWhy": "ເພື່ອຢັ້ງຢືນຕົວຕົນ, ສົ່ງຕໍ່ຄຳຂໍ ແລະ ກວດສອບຍອດການຮຽກເກັບເງິນໃຫ້ກົງກັນ.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "ລາຍງານແອັບຂັດຂ້ອງ ແລະ ຂໍ້ຜິດພາດທີ່ລຶບເນື້ອຫາໃນແອັບອອກແລ້ວ.",
@@ -2850,7 +2867,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "ສຽງທີ່ບັນທຶກໃນຂະນະທີ່ທ່ານປ້ອນຂໍ້ຄວາມດ້ວຍສຽງ.",
     "voiceTranscriptionWhy": "ເພື່ອປ່ຽນສຽງເວົ້າເປັນຂໍ້ຄວາມ.",
-    "voiceTranscriptionWho": "ປະມວນຜົນໃນອຸປະກອນເທົ່ານັ້ນ ຫຼື ໃຊ້ Apple ຫຼື Google ເມື່ອອຸປະກອນນີ້ຖອດສຽງເປັນຂໍ້ຄວາມໂດຍບໍ່ໃຊ້ອິນເຕີເນັດບໍ່ໄດ້.",
+    "voiceTranscriptionWho": "ອຸປະກອນຂອງທ່ານ, Kilo Gateway ພ້ອມກັບໂມເດລຖອດສຽງທີ່ທ່ານເລືອກ, ຫຼື Apple ຫຼື Google ສຳລັບການຮັບຮູ້ອອນລາຍ.",
     "installAttributionPromptTitle": "ອະນຸຍາດໃຫ້ລະບຸແຫຼ່ງທີ່ມາຂອງການຕິດຕັ້ງບໍ?",
     "installAttributionPromptMessage": "Kilo ໃຊ້ສິດການຕິດຕາມຂອງ Apple ພຽງເພື່ອຮູ້ວ່າທ່ານມາຈາກຊ່ອງທາງໃດ. ເຮົາບໍ່ເຄີຍນຳຂໍ້ຄວາມສັ່ງງານ ຫຼື ການສົນທະນາຂອງທ່ານມາໃຊ້ເພື່ອຈຸດປະສົງນີ້.",
     "what": "ຂໍ້ມູນທີ່ແບ່ງປັນ",
@@ -3060,6 +3077,12 @@
     "privacy": "ເປີດ Kilo ເພື່ອເບິ່ງເອເຈນ",
     "openAgents": "ເປີດເອເຈນ",
     "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ",
+    "newestSession": "ໃໝ່ສຸດ: {{title}}",
+    "noneWaiting": "ບໍ່ມີເອເຈນລໍຖ້າ",
+    "newAgent": "ເອເຈນໃໝ່",
+    "approving": "ກຳລັງອະນຸມັດ...",
+    "couldNotApprove": "ອະນຸມັດບໍ່ໄດ້",
+    "couldNotStart": "ເລີ່ມບໍ່ໄດ້",
     "channelName": "ເອເຈນທີ່ກຳລັງເຮັດວຽກ",
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ."
   },
@@ -3095,5 +3118,12 @@
     "remoteFound": "ຄອມພິວເຕີເຊື່ອມຕໍ່ແລ້ວ",
     "checkAgain": "ກວດສອບອີກຄັ້ງ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ການເລີ່ມເອເຈນຕ້ອງການຂໍ້ຄວາມ. ເພີ່ມຂໍ້ຄວາມແລ້ວລອງອີກຄັ້ງ.",
+      "repositoryUnknown": "Kilo ບໍ່ຮູ້ຈັກ {{repository}} ວ່າເປັນຄັງໂຄ້ດ GitHub ຫຼື GitLab. ເລືອກຄັງໂຄ້ດອື່ນໃນ Kilo.",
+      "repositoryUnsupported": "{{repository}} ເປັນຄັງໂຄ້ດ Bitbucket — ເລີ່ມເອເຈນຍັງໃຊ້ມັນບໍ່ໄດ້. ເລືອກຄັງໂຄ້ດອື່ນໃນ Kilo."
+    }
   }
 }

@@ -480,6 +480,8 @@
       "replyBadRequest": "ناتوانرێت ئەم وەڵامە بڵاو بکرێتەوە. ڕەنگە زنجیرەی گفتوگۆکە گۆڕابێت.",
       "replyForbidden": "مۆڵەتی وەڵامدانەوەی ئەم داواکارییەی ڕاکێشانت نییە.",
       "addCommentCta": "بۆچوون لەسەر ئەم داواکارییەی ڕاکێشان",
+      "fixWithKilo": "بە Kilo چاکی بکەوە",
+      "fixWithKiloPrompt": "تکایە ئەم بۆچوونەی داواکارییەی ڕاکێشان چارەسەر بکە: {{link}}",
       "commentBadRequest": "ناتوانرێت ئەم بۆچوونە بڵاو بکرێتەوە. ڕەنگە داواکارییە ڕاکێشراوەکە گۆڕابێت.",
       "commentForbidden": "مۆڵەتی بۆچوونکردن لەسەر ئەم داواکارییەی ڕاکێشانت نییە.",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "بەردەوام دەبین لە {{title}}.",
       "importingSession": "سێشنەکە هاوردە دەکرێت",
       "cliCannotContinue": "ئەم CLI ـیە ناتوانێت سێشنێک بەردەوام بکات. Cloud Agent یان CLI ـیەکی تر هەڵبژێرە.",
-      "importFailed": "نەتوانرا ئەم سێشنە هاوردە بکرێت."
+      "importFailed": "نەتوانرا ئەم سێشنە هاوردە بکرێت.",
+      "sandbox": "سەندبۆکس",
+      "sandboxAccessibility": "سەندبۆکس: {{label}}",
+      "sandboxDefaultWithDestination": "بنەڕەت · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "بچووک",
+      "sandboxInstanceShared": "هاوبەش",
+      "sandboxInstanceLarge": "گەورە",
+      "sandboxInstanceDevcontainer": "کۆنتەینەری Dev",
+      "sandboxInstanceProviderDefault": "بنەڕەتی دابینکەر",
+      "sandboxCouldNotLoad": "نەتوانرا هەڵبژاردەکانی سەندبۆکس بار بکرێن",
+      "sandboxUnavailable": "ئەم سەندبۆکسە بەردەست نییە. سەندبۆکسێکی تر یان بنەڕەت هەڵبژێرە.",
+      "sandboxUseDefault": "بەکارهێنانی بنەڕەت"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} پەڕگە نوێ کرایەوە.",
@@ -2609,6 +2624,7 @@
     "couldNotLoadActiveSessions": "نەتوانرا دانیشتنە چالاکەکان بار بکرێن.",
     "agentSessions": "ئێستا چالاکن",
     "newCodingTask": "ئەرکی نوێی کۆدنووسین",
+    "newTaskFromPicture": "ئەرکی نوێ لە وێنەوە",
     "explore": "گەڕان",
     "seeAll": "هەمووی ببینە",
     "noLiveSessions": "ئێستا هیچ شتێک کار ناکات"
@@ -2830,7 +2846,8 @@
     "aiProvidersWhat": "داواکارییەکانت، مێژووی گفتوگۆکانت و هەر پەڕگەیەک کە هاوپێچی دەکەیت.",
     "aiProvidersWhy": "بۆ دروستکردنی وەڵامی AI.",
     "aiProvidersWho": "Anthropic، OpenAI، Google و دابینکەرانی تر کە تۆ بۆ هەر داواکارییەک هەڵیاندەبژێریت.",
-    "gatewayWhat": "ناسێنەری هەژمار، مێتاداتای داواکاری، بەکارهێنانی تۆکن.",
+    "gatewayWhat": "ناسێنەری هەژمار، مێتاداتای داواکاری، بەکارهێنانی تۆکن، هەروەها پرۆمپتەکان و تۆمارە دەنگییەکان کە ئەپەکە بە ڕێگەی ئەو دەینێرێت.",
+    "viaGateway": "لە ڕێگەی Kilo Gateway ـەوە",
     "gatewayWhy": "پشتڕاستکردنەوەی ناسنامە، ڕەوانەکردنی داواکارییەکان و بەراوردکردنی تۆمارەکانی پارەدان.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "ڕاپۆرتەکانی تێکچوون و هەڵە کە ناوەڕۆکی ئەپ لێیان لابراوە.",
@@ -2850,7 +2867,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "تۆماری دەنگت لە کاتی قسەکردن بۆ نووسین.",
     "voiceTranscriptionWhy": "بۆ گۆڕینی قسە بۆ دەق.",
-    "voiceTranscriptionWho": "تەنها لەسەر ئامێرەکە؛ ئەگەر ئامێرەکە نەتوانێت بەبێ ئینتەرنێت دەنگ بۆ دەق بگۆڕێت، لە ڕێگەی Apple یان Google ـەوە.",
+    "voiceTranscriptionWho": "ئامێرەکەت، Kilo Gateway لەگەڵ مۆدێلی گۆڕینەوەی دەق کە هەڵتبژاردووە، یان Apple یان Google بۆ ناسینەوەی سەرهێڵ.",
     "installAttributionPromptTitle": "ڕێگەدان بە دیاریکردنی سەرچاوەی دامەزراندن؟",
     "installAttributionPromptMessage": "Kilo تەنها مۆڵەتی بەدواداچوونی Apple بەکار دەهێنێت بۆ زانینی ئەوەی لە چ ڕێگەیەکەوە هاتوویتە ئێرە. داواکاری و گفتوگۆکانت هەرگیز بۆ ئەمە بەکار ناهێنرێن.",
     "what": "چی",
@@ -3060,6 +3077,12 @@
     "privacy": "Kilo بکەرەوە بۆ بینینی ئەجێنتەکان",
     "openAgents": "ئەجێنتەکان بکەرەوە",
     "needsInput": "چاوەڕێی وەڵام",
+    "newestSession": "نوێترین: {{title}}",
+    "noneWaiting": "هیچ ئەجێنتێک چاوەڕێ ناکات",
+    "newAgent": "ئەجێنتی نوێ",
+    "approving": "لە پەسەندکردندایە...",
+    "couldNotApprove": "نەتوانرا پەسەند بکرێت",
+    "couldNotStart": "نەتوانرا دەست پێبکرێت",
     "channelName": "ئەجێنتە چالاکەکان",
     "activityKitDisabledBody": "بۆ بینینی ئەجێنتە چالاکەکان لە شاشەی قوفڵدا، چالاکییە ڕاستەوخۆکان لە ڕێکخستنەکاندا چالاک بکە."
   },
@@ -3095,5 +3118,12 @@
     "remoteFound": "کۆمپیوتەر پەیوەست بوو",
     "checkAgain": "دووبارە پشکنین بکە",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "بۆ دەستپێکردنی بریکار داواکاری پێویستە. داواکارییەک زیاد بکە و دووبارە بیخە کار.",
+      "repositoryUnknown": "Kilo {{repository}} وەک کۆگای GitHub یان GitLab ناناسێت. لە Kilo کۆگایەکی تر هەڵبژێرە.",
+      "repositoryUnsupported": "{{repository}} کۆگای Bitbucket ە — بریکار دەستپێبکە هێشتا ناتوانێت بەکاری بهێنێت. لە Kilo کۆگایەکی تر هەڵبژێرە."
+    }
   }
 }

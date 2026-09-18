@@ -480,6 +480,8 @@
       "replyBadRequest": "ამ პასუხის გამოქვეყნება შეუძლებელია. შესაძლოა, თემა შეიცვალა.",
       "replyForbidden": "ამ შერწყმის მოთხოვნაზე პასუხის გაცემის უფლება არ გაქვს.",
       "addCommentCta": "კომენტარი ამ შერწყმის მოთხოვნაზე",
+      "fixWithKilo": "შესწორება Kilo-ით",
+      "fixWithKiloPrompt": "გთხოვთ, მოაგვაროთ ამ შერწყმის მოთხოვნის შემდეგი კომენტარი: {{link}}",
       "commentBadRequest": "ამ კომენტარის გამოქვეყნება შეუძლებელია. შესაძლოა, შერწყმის მოთხოვნა შეიცვალა.",
       "commentForbidden": "ამ შერწყმის მოთხოვნაზე კომენტარის დამატების უფლება არ გაქვს.",
       "moderation": {
@@ -2126,7 +2128,20 @@
       "continueFrom": "გრძელდება სესია: {{title}}.",
       "importingSession": "სესიის იმპორტი მიმდინარეობს…",
       "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
-      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა."
+      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა.",
+      "sandbox": "სენდბოქსი",
+      "sandboxAccessibility": "სენდბოქსი: {{label}}",
+      "sandboxDefaultWithDestination": "ნაგულისხმევი · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "პატარა",
+      "sandboxInstanceShared": "საერთო",
+      "sandboxInstanceLarge": "დიდი",
+      "sandboxInstanceDevcontainer": "დევ კონტეინერი",
+      "sandboxInstanceProviderDefault": "მომწოდებლის ნაგულისხმევი",
+      "sandboxCouldNotLoad": "სენდბოქსის ვარიანტების ჩატვირთვა ვერ მოხერხდა",
+      "sandboxUnavailable": "ეს სენდბოქსი მიუწვდომელია. აირჩიეთ სხვა სენდბოქსი ან ნაგულისხმევი.",
+      "sandboxUseDefault": "ნაგულისხმევის გამოყენება"
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი.",
@@ -2609,6 +2624,7 @@
     "couldNotLoadActiveSessions": "აქტიური სესიების ჩატვირთვა ვერ მოხერხდა.",
     "agentSessions": "ახლა აქტიურია",
     "newCodingTask": "კოდის წერის ახალი ამოცანა",
+    "newTaskFromPicture": "ახალი ამოცანა სურათიდან",
     "explore": "აღმოაჩინე მეტი",
     "seeAll": "ყველას ნახვა",
     "noLiveSessions": "ამჟამად არაფერი მიმდინარეობს"
@@ -2830,7 +2846,8 @@
     "aiProvidersWhat": "თქვენი მოთხოვნები, საუბრის ისტორია და ნებისმიერი მიმაგრებული ფაილი.",
     "aiProvidersWhy": "AI-ის პასუხების შესაქმნელად.",
     "aiProvidersWho": "Anthropic, OpenAI, Google და სხვა პროვაიდერები, რომლებსაც თითოეული მოთხოვნისთვის ირჩევთ.",
-    "gatewayWhat": "ანგარიშის ID, მოთხოვნის მეტამონაცემები, ტოკენების გამოყენება.",
+    "gatewayWhat": "ანგარიშის ID, მოთხოვნის მეტამონაცემები, ტოკენების გამოყენება, ასევე აპის მიერ მისი მეშვეობით გაგზავნილი პრომპტები და ხმის ჩანაწერები.",
+    "viaGateway": "Kilo Gateway-ის მეშვეობით",
     "gatewayWhy": "ავთენტიფიკაცია, მოთხოვნების გადამისამართება, ანგარიშსწორების მონაცემების შეჯერება.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "ავარიული დახურვისა და შეცდომების ანგარიშები, რომლებიდანაც აპის შიგთავსი ამოღებულია.",
@@ -2850,7 +2867,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "თქვენი ჩანაწერი კარნახის დროს.",
     "voiceTranscriptionWhy": "მეტყველების ტექსტად გადასაყვანად.",
-    "voiceTranscriptionWho": "მხოლოდ მოწყობილობაზე მუშავდება. თუ მოწყობილობა მეტყველებას ტექსტად ინტერნეტის გარეშე ვერ გარდაქმნის, ჩანაწერი Apple-ს ან Google-ს ეგზავნება.",
+    "voiceTranscriptionWho": "თქვენი მოწყობილობა, Kilo Gateway თქვენ მიერ არჩეული ტრანსკრიფციის მოდელით, ან Apple ან Google ონლაინ ამოცნობისთვის.",
     "installAttributionPromptTitle": "დაშვებული იყოს ინსტალაციის წყაროს დადგენა?",
     "installAttributionPromptMessage": "Kilo Apple-ის თვალთვალის ნებართვას მხოლოდ იმის დასადგენად იყენებს, თუ რომელი არხიდან მოხვდით აქ. თქვენი მოთხოვნები და საუბრები ამ მიზნით არასდროს გამოიყენება.",
     "what": "რა",
@@ -3060,6 +3077,12 @@
     "privacy": "აგენტების სანახავად გახსენი Kilo",
     "openAgents": "აგენტების გახსნა",
     "needsInput": "პასუხს ელის",
+    "newestSession": "უახლესი: {{title}}",
+    "noneWaiting": "მოლოდინში მყოფი აგენტი არ არის",
+    "newAgent": "ახალი აგენტი",
+    "approving": "მტკიცდება...",
+    "couldNotApprove": "დამტკიცება ვერ მოხერხდა",
+    "couldNotStart": "დაწყება ვერ მოხერხდა",
     "channelName": "აქტიური აგენტები",
     "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები."
   },
@@ -3095,5 +3118,12 @@
     "remoteFound": "კომპიუტერი მიერთებულია",
     "checkAgain": "ხელახლა შემოწმება",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "აგენტის გაშვებას მოთხოვნა სჭირდება. დაამატე მოთხოვნა და კვლავ გაუშვი.",
+      "repositoryUnknown": "Kilo {{repository}}-ს GitHub-ის ან GitLab-ის რეპოზიტორიად არ ცნობს. აირჩიე სხვა რეპოზიტორია Kilo-ში.",
+      "repositoryUnsupported": "{{repository}} Bitbucket-ის რეპოზიტორიაა — აგენტის გაშვება ჯერ ვერ გამოიყენებს მას. აირჩიე სხვა რეპოზიტორია Kilo-ში."
+    }
   }
 }

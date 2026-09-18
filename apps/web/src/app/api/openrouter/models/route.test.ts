@@ -20,7 +20,7 @@ jest.mock('@/lib/ai-gateway/byok', () => ({
   getUserByokProviderIds: jest.fn(),
 }));
 jest.mock('@/lib/ai-gateway/openai-chatgpt/routing', () => ({
-  getOpenAiChatGptByokModelIds: jest.fn().mockResolvedValue(null),
+  tagOpenAiChatGptByokModels: jest.fn((_userId: string, models: unknown[]) => models),
 }));
 jest.mock('@/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
@@ -41,9 +41,7 @@ const { listAvailableExperimentModels } = jest.requireMock(
 );
 const { addUserByokAvailability, getUserByokProviderIds } =
   jest.requireMock('@/lib/ai-gateway/byok');
-const { getOpenAiChatGptByokModelIds } = jest.requireMock(
-  '@/lib/ai-gateway/openai-chatgpt/routing'
-);
+const { tagOpenAiChatGptByokModels } = jest.requireMock('@/lib/ai-gateway/openai-chatgpt/routing');
 const { getAvailableModelsForOrganization } = jest.requireMock(
   '@/lib/organizations/organization-models'
 );
@@ -56,7 +54,7 @@ const mockedGetDirectByokModelsForUser = jest.mocked(getDirectByokModelsForUser)
 const mockedListAvailableExperimentModels = jest.mocked(listAvailableExperimentModels);
 const mockedAddUserByokAvailability = jest.mocked(addUserByokAvailability);
 const mockedGetUserByokProviderIds = jest.mocked(getUserByokProviderIds);
-const mockedGetOpenAiChatGptByokModelIds = jest.mocked(getOpenAiChatGptByokModelIds);
+const mockedTagOpenAiChatGptByokModels = jest.mocked(tagOpenAiChatGptByokModels);
 const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
 const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
 const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
@@ -94,7 +92,9 @@ describe('GET /api/openrouter/models', () => {
     mockedGetDirectByokModelsForUser.mockResolvedValue([]);
     mockedListAvailableExperimentModels.mockResolvedValue([]);
     mockedGetUserByokProviderIds.mockResolvedValue([]);
-    mockedGetOpenAiChatGptByokModelIds.mockResolvedValue(null);
+    mockedTagOpenAiChatGptByokModels.mockImplementation(
+      (_userId: string, models: OpenRouterModel[]) => models
+    );
     mockedGetAvailableModelsForOrganization.mockResolvedValue(null);
     mockedGetCachedRoutingTable.mockResolvedValue(null);
     mockedGetAutoFreeCandidates.mockResolvedValue([]);
@@ -149,7 +149,12 @@ describe('GET /api/openrouter/models', () => {
     } as never);
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [openAiModel, otherModel] });
     mockedAddUserByokAvailability.mockResolvedValue([openAiModel, otherModel]);
-    mockedGetOpenAiChatGptByokModelIds.mockResolvedValue(new Set(['openai/gpt-5-nano']));
+    mockedTagOpenAiChatGptByokModels.mockImplementation(
+      (_userId: string, models: OpenRouterModel[]) =>
+        models.map(model =>
+          model.id === 'openai/gpt-5-nano' ? { ...model, hasUserByokAvailable: true } : model
+        )
+    );
 
     const response = await GET(request());
 
@@ -157,9 +162,9 @@ describe('GET /api/openrouter/models', () => {
     await expect(response.json()).resolves.toEqual({
       data: [{ ...openAiModel, hasUserByokAvailable: true }, otherModel],
     });
-    expect(mockedGetOpenAiChatGptByokModelIds).toHaveBeenCalledWith('user-id', [
-      'openai/gpt-5-nano',
-      'anthropic/claude',
+    expect(mockedTagOpenAiChatGptByokModels).toHaveBeenCalledWith('user-id', [
+      openAiModel,
+      otherModel,
     ]);
   });
 

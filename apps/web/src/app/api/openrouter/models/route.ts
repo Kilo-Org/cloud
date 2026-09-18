@@ -9,7 +9,7 @@ import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-by
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
-import { getOpenAiChatGptByokModelIds } from '@/lib/ai-gateway/openai-chatgpt/routing';
+import { tagOpenAiChatGptByokModels } from '@/lib/ai-gateway/openai-chatgpt/routing';
 import { readDb } from '@/lib/drizzle';
 import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
 import { appendLocalFakeDeterministicCatalogModels } from '@/lib/ai-gateway/local-fake-llm';
@@ -70,24 +70,15 @@ export async function GET(
       });
     }
 
-    const [byokModels, experimentModels, enabledByokProviderIds, chatGptByokModelIds] =
-      await Promise.all([
-        getDirectByokModelsForUser(auth.user.id),
-        listAvailableExperimentModels(),
-        getUserByokProviderIds(readDb, auth.user.id),
-        getOpenAiChatGptByokModelIds(
-          auth.user.id,
-          models.map(model => model.id)
-        ),
-      ]);
-    const baseByokModels = await addUserByokAvailability(models, enabledByokProviderIds);
-    const modelsWithByokAvailability = chatGptByokModelIds
-      ? baseByokModels.map(model =>
-          model.hasUserByokAvailable === true || !chatGptByokModelIds.has(model.id)
-            ? model
-            : { ...model, hasUserByokAvailable: true }
-        )
-      : baseByokModels;
+    const [byokModels, experimentModels, enabledByokProviderIds] = await Promise.all([
+      getDirectByokModelsForUser(auth.user.id),
+      listAvailableExperimentModels(),
+      getUserByokProviderIds(readDb, auth.user.id),
+    ]);
+    const modelsWithByokAvailability = await tagOpenAiChatGptByokModels(
+      auth.user.id,
+      await addUserByokAvailability(models, enabledByokProviderIds)
+    );
     return await modelResponse({
       data: appendLocalFakeDeterministicCatalogModels(
         modelsWithByokAvailability.concat(byokModels, experimentModels)

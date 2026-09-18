@@ -158,14 +158,32 @@ export async function getOpenAiChatGptByokModelIds(
   if (apiKey.trim().length === 0) return null;
 
   const tagged = await Promise.all(
-    candidateModelIds
-      .filter(isOpenAiChatGptModel)
-      .map(async modelId => {
-        const upstreamModel = modelId.trim().replace(OPENAI_MODEL_PREFIX, '');
-        return (await isOpenAiModelServed(apiKey, upstreamModel)) ? modelId : null;
-      })
+    candidateModelIds.filter(isOpenAiChatGptModel).map(async modelId => {
+      const upstreamModel = modelId.trim().replace(OPENAI_MODEL_PREFIX, '');
+      return (await isOpenAiModelServed(apiKey, upstreamModel)) ? modelId : null;
+    })
   );
   return new Set(tagged.filter((id): id is string => id !== null));
+}
+
+/**
+ * Returns `models` with the ChatGPT-served ones marked BYOK-available, so the
+ * model picker and the extension show the BYOK badge like pasted BYOK keys. The
+ * list is returned unchanged when the person has no usable connection.
+ */
+export async function tagOpenAiChatGptByokModels<
+  T extends { id: string; hasUserByokAvailable?: boolean },
+>(userId: string, models: T[]): Promise<T[]> {
+  const byokModelIds = await getOpenAiChatGptByokModelIds(
+    userId,
+    models.map(model => model.id)
+  );
+  if (!byokModelIds) return models;
+  return models.map(model =>
+    model.hasUserByokAvailable === true || !byokModelIds.has(model.id)
+      ? model
+      : { ...model, hasUserByokAvailable: true }
+  );
 }
 
 /**

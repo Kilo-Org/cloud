@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Mila kinova Kilo CLI vaovao kokoa ny baiko lavitra manomboka amin'ny /. Havaozy ny Kilo CLI ary mifandraisa indray."
     },
     "sessionConnection": {
+      "label": "Fifandraisana",
       "connecting": "Mampifandray…",
       "reconnecting": "Mampifandray indray…",
       "connectionLost": "Tapaka ny fifandraisana",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Esorina ny tanjona?",
       "removeConfirmMessage": "Mamafa ny tanjon'ity session ity ny CLI.",
       "updateFailed": "Tsy afaka nanavao ny tanjona.",
-      "sectionAccessibility": "{{status}}. Tanjona: {{text}}"
+      "sectionAccessibility": "{{status}}. Tanjona: {{text}}",
+      "collapse": "Aforeto ny tanjona",
+      "expand": "Avelaro ny tanjona"
     },
     "newSession": {
       "recentlyUsed": "Nampiasaina vao haingana",

@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Arahan garis miring dari jauh memerlukan Kilo CLI yang lebih baharu. Kemas kini Kilo CLI dan sambung semula."
     },
     "sessionConnection": {
+      "label": "Sambungan",
       "connecting": "Menyambung…",
       "reconnecting": "Menyambung semula…",
       "connectionLost": "Sambungan terputus",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Buang matlamat?",
       "removeConfirmMessage": "CLI menghapuskan matlamat sesi ini.",
       "updateFailed": "Matlamat tidak dapat dikemas kini.",
-      "sectionAccessibility": "{{status}}. Matlamat: {{text}}"
+      "sectionAccessibility": "{{status}}. Matlamat: {{text}}",
+      "collapse": "Sembunyikan matlamat",
+      "expand": "Paparkan matlamat"
     },
     "newSession": {
       "recentlyUsed": "Digunakan baru-baru ini",

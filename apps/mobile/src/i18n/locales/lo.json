@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "ການໃຊ້ຄຳສັ່ງທີ່ຂຶ້ນຕົ້ນດ້ວຍ / ຜ່ານທາງໄກຕ້ອງໃຊ້ Kilo CLI ລຸ້ນໃໝ່ກວ່າ. ອັບເດດ Kilo CLI ແລ້ວເຊື່ອມຕໍ່ໃໝ່."
     },
     "sessionConnection": {
+      "label": "ການເຊື່ອມຕໍ່",
       "connecting": "ກຳລັງເຊື່ອມຕໍ່…",
       "reconnecting": "ກຳລັງເຊື່ອມຕໍ່ໃໝ່…",
       "connectionLost": "ການເຊື່ອມຕໍ່ຂາດ",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "ລຶບເປົ້າໝາຍບໍ?",
       "removeConfirmMessage": "CLI ລຶບເປົ້າໝາຍຂອງເຊດຊັນນີ້.",
       "updateFailed": "ບໍ່ສາມາດອັບເດດເປົ້າໝາຍໄດ້.",
-      "sectionAccessibility": "{{status}}. ເປົ້າໝາຍ: {{text}}"
+      "sectionAccessibility": "{{status}}. ເປົ້າໝາຍ: {{text}}",
+      "collapse": "ຍຸບເປົ້າໝາຍ",
+      "expand": "ຂະຫຍາຍເປົ້າໝາຍ"
     },
     "newSession": {
       "recentlyUsed": "ໃຊ້ຫຼ້າສຸດ",

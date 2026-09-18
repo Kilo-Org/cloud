@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Հեռակա / հրամանների համար անհրաժեշտ է Kilo CLI-ի ավելի նոր տարբերակ։ Թարմացրեք Kilo CLI-ն և կրկին միացեք։"
     },
     "sessionConnection": {
+      "label": "Կապ",
       "connecting": "Միանում է…",
       "reconnecting": "Կրկին միանում է…",
       "connectionLost": "Կապը կորել է",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Հեռացնե՞լ նպատակը",
       "removeConfirmMessage": "CLI-ն մաքրում է այս նստաշրջանի նպատակը։",
       "updateFailed": "Չհաջողվեց թարմացնել նպատակը։",
-      "sectionAccessibility": "{{status}}։ Նպատակ՝ {{text}}"
+      "sectionAccessibility": "{{status}}։ Նպատակ՝ {{text}}",
+      "collapse": "Ծալել նպատակը",
+      "expand": "Բացել նպատակը"
     },
     "newSession": {
       "recentlyUsed": "Վերջերս օգտագործված",

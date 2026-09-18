@@ -1565,6 +1565,7 @@
       "exitNeedsNewerCli": "Je hebt een nieuwere versie van Kilo CLI nodig om slashopdrachten op afstand uit te voeren. Werk Kilo CLI bij en maak opnieuw verbinding."
     },
     "sessionConnection": {
+      "label": "Verbinding",
       "connecting": "Verbinden…",
       "reconnecting": "Opnieuw verbinden…",
       "connectionLost": "Verbinding verbroken",
@@ -1584,7 +1585,9 @@
       "removeConfirmTitle": "Doel verwijderen?",
       "removeConfirmMessage": "De CLI wist het doel van deze sessie.",
       "updateFailed": "Het doel kon niet worden bijgewerkt.",
-      "sectionAccessibility": "{{status}}. Doel: {{text}}"
+      "sectionAccessibility": "{{status}}. Doel: {{text}}",
+      "collapse": "Doel inklappen",
+      "expand": "Doel uitklappen"
     },
     "newSession": {
       "recentlyUsed": "Recent gebruikt",

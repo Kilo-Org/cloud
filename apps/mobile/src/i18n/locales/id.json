@@ -1565,6 +1565,7 @@
       "exitNeedsNewerCli": "Perintah garis miring jarak jauh memerlukan Kilo CLI yang lebih baru. Perbarui Kilo CLI dan sambungkan kembali."
     },
     "sessionConnection": {
+      "label": "Koneksi",
       "connecting": "Menyambungkan…",
       "reconnecting": "Menyambungkan kembali…",
       "connectionLost": "Koneksi terputus",
@@ -1584,7 +1585,9 @@
       "removeConfirmTitle": "Hapus tujuan?",
       "removeConfirmMessage": "CLI menghapus tujuan sesi ini.",
       "updateFailed": "Tujuan tidak dapat diperbarui.",
-      "sectionAccessibility": "{{status}}. Tujuan: {{text}}"
+      "sectionAccessibility": "{{status}}. Tujuan: {{text}}",
+      "collapse": "Ciutkan tujuan",
+      "expand": "Bentangkan tujuan"
     },
     "newSession": {
       "recentlyUsed": "Terakhir digunakan",

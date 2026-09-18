@@ -2073,6 +2073,7 @@
       "exitNeedsNewerCli": "Udaljene naredbe s kosom crtom zahtijevaju noviju verziju alata Kilo CLI. Ažuriraj Kilo CLI i ponovo se poveži."
     },
     "sessionConnection": {
+      "label": "Veza",
       "connecting": "Povezivanje…",
       "reconnecting": "Ponovno povezivanje…",
       "connectionLost": "Veza izgubljena",
@@ -2092,7 +2093,9 @@
       "removeConfirmTitle": "Ukloniti cilj?",
       "removeConfirmMessage": "CLI briše cilj ove sesije.",
       "updateFailed": "Nije bilo moguće ažurirati cilj.",
-      "sectionAccessibility": "{{status}}. Cilj: {{text}}"
+      "sectionAccessibility": "{{status}}. Cilj: {{text}}",
+      "collapse": "Sažmi cilj",
+      "expand": "Proširi cilj"
     },
     "newSession": {
       "recentlyUsed": "Nedavno korišteno",

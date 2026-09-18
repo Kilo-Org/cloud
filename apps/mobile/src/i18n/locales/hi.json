@@ -1553,6 +1553,7 @@
       "cancelQueuedUpgradeRequired": "कतार में लगे संदेशों को रद्द करने के लिए Kilo CLI का नया संस्करण आवश्यक है। Kilo CLI अपडेट करें और फिर से कनेक्ट करें।"
     },
     "sessionConnection": {
+      "label": "कनेक्शन",
       "connecting": "कनेक्ट हो रहा है…",
       "connectionLost": "कनेक्शन टूट गया",
       "reconnecting": "फिर से कनेक्ट हो रहा है…",
@@ -1572,7 +1573,9 @@
       "removeConfirmTitle": "लक्ष्य हटाएँ?",
       "removeConfirmMessage": "CLI इस सत्र का लक्ष्य साफ़ कर देता है।",
       "updateFailed": "लक्ष्य अपडेट नहीं किया जा सका।",
-      "sectionAccessibility": "{{status}}। लक्ष्य: {{text}}"
+      "sectionAccessibility": "{{status}}। लक्ष्य: {{text}}",
+      "collapse": "लक्ष्य समेटें",
+      "expand": "लक्ष्य फैलाएँ"
     },
     "remoteSession": {
       "failedToCreate": "रिमोट सत्र नहीं बन सका।",

@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Masofadan / bilan boshlanuvchi buyruqlarni bajarish uchun Kilo CLI dasturining yangiroq versiyasi kerak. Kilo CLI dasturini yangilang va qayta ulaning."
     },
     "sessionConnection": {
+      "label": "Ulanish",
       "connecting": "Ulanmoqda…",
       "reconnecting": "Qayta ulanmoqda…",
       "connectionLost": "Ulanish uzildi",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Maqsad olib tashlansinmi?",
       "removeConfirmMessage": "CLI bu seansning maqsadini tozalaydi.",
       "updateFailed": "Maqsadni yangilab bo'lmadi.",
-      "sectionAccessibility": "{{status}}. Maqsad: {{text}}"
+      "sectionAccessibility": "{{status}}. Maqsad: {{text}}",
+      "collapse": "Maqsadni yig'ish",
+      "expand": "Maqsadni yoyish"
     },
     "newSession": {
       "recentlyUsed": "Yaqinda ishlatilgan",

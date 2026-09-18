@@ -1565,6 +1565,7 @@
       "exitNeedsNewerCli": "Bạn cần phiên bản Kilo CLI mới hơn để dùng lệnh dấu gạch chéo từ xa. Hãy cập nhật Kilo CLI và kết nối lại."
     },
     "sessionConnection": {
+      "label": "Kết nối",
       "connecting": "Đang kết nối…",
       "reconnecting": "Đang kết nối lại…",
       "connectionLost": "Mất kết nối",
@@ -1584,7 +1585,9 @@
       "removeConfirmTitle": "Xóa mục tiêu?",
       "removeConfirmMessage": "CLI xóa mục tiêu của phiên này.",
       "updateFailed": "Không thể cập nhật mục tiêu.",
-      "sectionAccessibility": "{{status}}. Mục tiêu: {{text}}"
+      "sectionAccessibility": "{{status}}. Mục tiêu: {{text}}",
+      "collapse": "Thu gọn mục tiêu",
+      "expand": "Mở rộng mục tiêu"
     },
     "newSession": {
       "recentlyUsed": "Đã dùng gần đây",

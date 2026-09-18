@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "جێبەجێکردنی فەرمانەکانی سلاش لە دوورەوە پێویستی بە وەشانێکی نوێتری Kilo CLI هەیە. Kilo CLI نوێ بکەرەوە و دووبارە پەیوەندی بکەرەوە."
     },
     "sessionConnection": {
+      "label": "پەیوەندی",
       "connecting": "پەیوەندیکردن…",
       "reconnecting": "دووبارە پەیوەندیکردن…",
       "connectionLost": "پەیوەندییەکە پچڕا",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "ئامانج لاببرێت؟",
       "removeConfirmMessage": "CLI ئامانجی ئەم دانیشتنە دەسڕێتەوە.",
       "updateFailed": "نەتوانرا ئامانج نوێ بکرێتەوە.",
-      "sectionAccessibility": "{{status}}. ئامانج: {{text}}"
+      "sectionAccessibility": "{{status}}. ئامانج: {{text}}",
+      "collapse": "ئامانجەکە کۆ بکەرەوە",
+      "expand": "ئامانجەکە پیشان بدە"
     },
     "newSession": {
       "recentlyUsed": "تازە بەکارهاتووەکان",

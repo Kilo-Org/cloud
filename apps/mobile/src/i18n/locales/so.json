@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Amarrada fog ee / ku bilaabma waxay u baahan yihiin nooc cusub oo Kilo CLI ah. Cusboonaysii Kilo CLI oo dib ugu xirmo."
     },
     "sessionConnection": {
+      "label": "Xiriir",
       "connecting": "Waa la xiriirinayaa…",
       "reconnecting": "Dib ayaa loo xiriirinayaa…",
       "connectionLost": "Xiriirku wuu go'ay",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Ka saar hadafka?",
       "removeConfirmMessage": "CLI wuxuu tirtiraa hadafka kulankan.",
       "updateFailed": "Hadafka lama cusboonaysiin karin.",
-      "sectionAccessibility": "{{status}}. Hadaf: {{text}}"
+      "sectionAccessibility": "{{status}}. Hadaf: {{text}}",
+      "collapse": "Isku laab hadafka",
+      "expand": "Ballaarso hadafka"
     },
     "newSession": {
       "recentlyUsed": "Dhawaan la isticmaalay",

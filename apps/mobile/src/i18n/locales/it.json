@@ -1538,6 +1538,7 @@
       "exitNeedsNewerCli": "I comandi slash da remoto richiedono una versione più recente di Kilo CLI. Aggiorna Kilo CLI e riconnettiti."
     },
     "sessionConnection": {
+      "label": "Connessione",
       "connecting": "Connessione…",
       "reconnecting": "Riconnessione…",
       "connectionLost": "Connessione persa",
@@ -1557,7 +1558,9 @@
       "removeConfirmTitle": "Rimuovere l'obiettivo?",
       "removeConfirmMessage": "Il CLI cancella l'obiettivo di questa sessione.",
       "updateFailed": "Impossibile aggiornare l'obiettivo.",
-      "sectionAccessibility": "{{status}}. Obiettivo: {{text}}"
+      "sectionAccessibility": "{{status}}. Obiettivo: {{text}}",
+      "collapse": "Comprimi obiettivo",
+      "expand": "Espandi obiettivo"
     },
     "newSession": {
       "recentlyUsed": "Usati di recente",

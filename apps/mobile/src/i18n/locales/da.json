@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Du skal have en nyere version af Kilo CLI for at bruge skråstregskommandoer via fjernadgang. Opdatér Kilo CLI og opret forbindelse igen."
     },
     "sessionConnection": {
+      "label": "Forbindelse",
       "connecting": "Opretter forbindelse…",
       "reconnecting": "Genopretter forbindelsen…",
       "connectionLost": "Forbindelsen er afbrudt",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Fjern mål?",
       "removeConfirmMessage": "CLI rydder dette sessions mål.",
       "updateFailed": "Målet kunne ikke opdateres.",
-      "sectionAccessibility": "{{status}}. Mål: {{text}}"
+      "sectionAccessibility": "{{status}}. Mål: {{text}}",
+      "collapse": "Fold målet sammen",
+      "expand": "Fold målet ud"
     },
     "newSession": {
       "recentlyUsed": "Senest brugt",

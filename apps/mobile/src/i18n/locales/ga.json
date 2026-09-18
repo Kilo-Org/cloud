@@ -2109,6 +2109,7 @@
       "exitNeedsNewerCli": "Tá leagan níos nuaí de Kilo CLI ag teastáil chun orduithe slais a úsáid go cianda. Nuashonraigh Kilo CLI agus nasc arís."
     },
     "sessionConnection": {
+      "label": "Nasc",
       "connecting": "Ag nascadh…",
       "reconnecting": "Ag athnascadh…",
       "connectionLost": "Cailleadh an nasc",
@@ -2128,7 +2129,9 @@
       "removeConfirmTitle": "Bain an sprioc?",
       "removeConfirmMessage": "Glanann an CLI sprioc an tseisiúin seo.",
       "updateFailed": "Níorbh fhéidir an sprioc a nuashonrú.",
-      "sectionAccessibility": "{{status}}. Sprioc: {{text}}"
+      "sectionAccessibility": "{{status}}. Sprioc: {{text}}",
+      "collapse": "Fill an sprioc",
+      "expand": "Leathnaigh an sprioc"
     },
     "newSession": {
       "recentlyUsed": "A úsáideadh le déanaí",

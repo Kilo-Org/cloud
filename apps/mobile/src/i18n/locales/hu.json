@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "A távoli perjeles parancsokhoz újabb Kilo CLI szükséges. Frissítsd a Kilo CLI-t, és csatlakozz újra."
     },
     "sessionConnection": {
+      "label": "Kapcsolat",
       "connecting": "Csatlakozás…",
       "reconnecting": "Újracsatlakozás…",
       "connectionLost": "Megszakadt a kapcsolat",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Eltávolítja a célt?",
       "removeConfirmMessage": "A CLI törli a munkamenet célját.",
       "updateFailed": "A célt nem sikerült frissíteni.",
-      "sectionAccessibility": "{{status}}. Cél: {{text}}"
+      "sectionAccessibility": "{{status}}. Cél: {{text}}",
+      "collapse": "Cél összecsukása",
+      "expand": "Cél kibontása"
     },
     "newSession": {
       "recentlyUsed": "Legutóbb használt",

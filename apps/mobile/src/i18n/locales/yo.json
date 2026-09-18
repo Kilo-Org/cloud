@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "Àwọn àṣẹ tó bẹ̀rẹ̀ pẹ̀lú / láti ọ̀nà jíjìn nílò ẹ̀yà Kilo CLI tuntun. Ṣe ìmúdójúìwọ̀n Kilo CLI kí o sì tún sopọ̀."
     },
     "sessionConnection": {
+      "label": "Àsọpọ̀",
       "connecting": "Ń sopọ̀…",
       "reconnecting": "Ń tún sopọ̀…",
       "connectionLost": "Àsopọ̀ ti já",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "Yọ àfojúsùn kuro?",
       "removeConfirmMessage": "CLI ń pa àfojúsùn ìpàdé yìí rẹ́.",
       "updateFailed": "A kò lè ṣàtúnṣe àfojúsùn.",
-      "sectionAccessibility": "{{status}}. Àfojúsùn: {{text}}"
+      "sectionAccessibility": "{{status}}. Àfojúsùn: {{text}}",
+      "collapse": "Fi àfojúsùn pamọ́",
+      "expand": "Fi àfojúsùn hàn"
     },
     "newSession": {
       "recentlyUsed": "Tí a lò láìpẹ́",

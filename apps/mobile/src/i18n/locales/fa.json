@@ -2055,6 +2055,7 @@
       "exitNeedsNewerCli": "دستورهای اسلش از راه دور به نسخهٔ جدیدتری از Kilo CLI نیاز دارند. Kilo CLI را به‌روزرسانی کنید و دوباره متصل شوید."
     },
     "sessionConnection": {
+      "label": "اتصال",
       "connecting": "در حال اتصال…",
       "reconnecting": "در حال اتصال مجدد…",
       "connectionLost": "اتصال قطع شد",
@@ -2074,7 +2075,9 @@
       "removeConfirmTitle": "هدف حذف شود؟",
       "removeConfirmMessage": "CLI هدف این جلسه را پاک میکند.",
       "updateFailed": "هدف بهروزرسانی نشد.",
-      "sectionAccessibility": "{{status}}. هدف: {{text}}"
+      "sectionAccessibility": "{{status}}. هدف: {{text}}",
+      "collapse": "جمع کردن هدف",
+      "expand": "باز کردن هدف"
     },
     "newSession": {
       "recentlyUsed": "موارد استفاده‌شدهٔ اخیر",

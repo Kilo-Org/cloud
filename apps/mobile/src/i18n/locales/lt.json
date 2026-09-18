@@ -2091,6 +2091,7 @@
       "exitNeedsNewerCli": "Norint nuotoliniu būdu vykdyti komandas su pasviruoju brūkšniu, reikia naujesnės Kilo CLI versijos. Atnaujinkite Kilo CLI ir prisijunkite iš naujo."
     },
     "sessionConnection": {
+      "label": "Ryšys",
       "connecting": "Jungiama…",
       "reconnecting": "Jungiama iš naujo…",
       "connectionLost": "Ryšys nutrūko",
@@ -2110,7 +2111,9 @@
       "removeConfirmTitle": "Pašalinti tikslą?",
       "removeConfirmMessage": "CLI išvalo šios sesijos tikslą.",
       "updateFailed": "Nepavyko atnaujinti tikslo.",
-      "sectionAccessibility": "{{status}}. Tikslas: {{text}}"
+      "sectionAccessibility": "{{status}}. Tikslas: {{text}}",
+      "collapse": "Sutraukti tikslą",
+      "expand": "Išskleisti tikslą"
     },
     "newSession": {
       "recentlyUsed": "Neseniai naudota",

@@ -17,9 +17,25 @@ import expo.modules.kotlin.modules.ModuleDefinition
  *
  * The JS side owns the translated copy, the notification kind's channel (and
  * its creation), the alert decision, and the revision guard; this module owns
- * the fixed notification id, the API 36.1+ promotion gate, and the content
- * intent plus named actions: one that opens the Agents tab via a deep link, and
- * one that runs the headless approval when a permission waits.
+ * the fixed notification id, the posted-channel mirror, the API 36.1+ promotion
+ * gate, and the content intent plus named actions: one that opens the Agents tab
+ * via a deep link, and one that runs the headless approval when a permission
+ * waits.
+ *
+ * This is the Android mechanism for the one shared kind model, not a second
+ * behaviour: `@kilocode/notifications` maps each agent surface to `needs-input`
+ * or `progress`, the JS side passes the resulting channel and alert decision
+ * here, and `src/glanceable-ios/ios-sink.ts` renders the same ongoing card as an
+ * ActivityKit Live Activity on the same model. The forks are the capabilities
+ * Android has and iOS does not, each named where it is used: an ongoing
+ * notification in the shade, with its channel and per-channel Do Not Disturb
+ * override; the read of that posted notification behind `getPostedChannel`
+ * (iOS's card is not a notification, so its posted read is ActivityKit's
+ * `getInstances()`); and the API 36.1+ promoted-ongoing Live Update. The one
+ * user-visible difference that follows is the mechanism itself — the Android
+ * card alerts when it first becomes needs-input, while a Live Activity never
+ * alerts, so on iOS that breakthrough is the needs-input push's
+ * `time-sensitive` level plus the per-Focus filter.
  */
 class ActiveAgentsLiveUpdateModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -148,6 +164,13 @@ class ActiveAgentsLiveUpdateModule : Module() {
    * removes the notification without any further app call, and the marker
    * survives a process exit, so confirm the fixed id is still active before the
    * JS side adopts the kind on a restart.
+   *
+   * The fork here is the capability: the posted card is an Android
+   * notification, and only its own `NotificationManager` can report whether it
+   * is still in the shade. iOS's counterpart card is the ActivityKit Live
+   * Activity, whose posted read is `ActiveAgentsLiveActivity.getInstances()` in
+   * `src/glanceable-ios/ios-sink.ts`; the kind model both sides read is shared,
+   * so the restart adoption exists on both platforms.
    */
   private fun postedChannelOrNull(): String? {
     val posted = postedChannelId() ?: return null

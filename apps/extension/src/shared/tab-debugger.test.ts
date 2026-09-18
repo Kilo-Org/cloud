@@ -2,14 +2,18 @@
 /* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
 import {
+  BROWSER_TOOL_MESSAGE,
+  TAB_NOT_INSPECTABLE_ERROR,
   WEB_MCP_DISCOVER_MESSAGE,
   WEB_MCP_EXECUTE_MESSAGE,
   discoverWebMcpToolsInTab,
   evalInTab,
   evalInTabWithScripting,
   executeWebMcpToolInTab,
+  getInspectableTab,
   getPageSnapshotInTabWithScripting,
   getViewportScreenshotWithTabsApi,
+  isInspectablePageUrl,
   isTabDebuggerRequest,
   isTabDebuggerResponse,
   listInspectableTabs,
@@ -47,6 +51,8 @@ const createDebuggerApi = ({
         { tabId: 3, title: 'Local app', type: 'page', url: 'http://localhost:3001/' },
         { tabId: 4, title: 'Local image', type: 'page', url: 'file:///tmp/kilo-image.png' },
       ],
+    onDetach: { addListener: () => {}, removeListener: () => {} },
+    onEvent: { addListener: () => {}, removeListener: () => {} },
     sendCommand:
       sendCommand ??
       ((_target, _method, _params) => {
@@ -188,6 +194,8 @@ describe('tab debugger helpers', () => {
         throw new Error('Debugger is not attached to the tab with id: 7');
       },
       getTargets: () => [],
+      onDetach: { addListener: () => {}, removeListener: () => {} },
+      onEvent: { addListener: () => {}, removeListener: () => {} },
       sendCommand: () => ({ result: { type: 'number', value: 42 } }),
     };
 
@@ -815,6 +823,85 @@ describe('tab debugger helpers', () => {
         type: WEB_MCP_EXECUTE_MESSAGE,
       })
     ).toBe(true);
+  });
+
+  it('accepts the browser tool request and response shapes', () => {
+    expect(
+      isTabDebuggerRequest({
+        arguments: { element: 'e5' },
+        tabId: 7,
+        tool: 'kilo_browser_snapshot',
+        type: BROWSER_TOOL_MESSAGE,
+      })
+    ).toBe(true);
+    expect(
+      isTabDebuggerResponse({
+        ok: true,
+        result: { ok: true, value: { snapshot: 'page' } },
+        type: BROWSER_TOOL_MESSAGE,
+      })
+    ).toBe(true);
+    expect(isTabDebuggerResponse({ error: TAB_NOT_INSPECTABLE_ERROR, ok: false })).toBe(true);
+  });
+
+  it('rejects a browser tool request without a tool name or arguments', () => {
+    expect(
+      isTabDebuggerRequest({
+        arguments: {},
+        tabId: 7,
+        tool: 5,
+        type: BROWSER_TOOL_MESSAGE,
+      })
+    ).toBe(false);
+    expect(
+      isTabDebuggerRequest({
+        arguments: '{}',
+        tabId: 7,
+        tool: 'kilo_browser_snapshot',
+        type: BROWSER_TOOL_MESSAGE,
+      })
+    ).toBe(false);
+  });
+
+  it('reports a browser-internal tab as not inspectable', async () => {
+    const tabsApi: BrowserTabsApi = {
+      get: () => ({ id: 2, title: 'Settings', url: 'chrome://settings' }),
+      query: () => [],
+    };
+
+    await expect(getInspectableTab({ tabId: 2, tabsApi })).resolves.toStrictEqual({
+      error: TAB_NOT_INSPECTABLE_ERROR,
+      ok: false,
+    });
+    expect(isInspectablePageUrl('chrome://settings')).toBe(false);
+    expect(isInspectablePageUrl('moz-extension://id/panel.html')).toBe(false);
+  });
+
+  it('resolves an ordinary page tab as inspectable', async () => {
+    const tabsApi: BrowserTabsApi = {
+      get: () => ({ id: 7, title: 'Kilo', url: 'https://app.kilo.ai/' }),
+      query: () => [],
+    };
+
+    await expect(getInspectableTab({ tabId: 7, tabsApi })).resolves.toStrictEqual({
+      ok: true,
+      tab: { id: 7, title: 'Kilo', url: 'https://app.kilo.ai/' },
+    });
+    expect(isInspectablePageUrl('https://app.kilo.ai/')).toBe(true);
+  });
+
+  it('reports a missing tab as not inspectable', async () => {
+    const tabsApi: BrowserTabsApi = {
+      get: () => {
+        throw new Error('No tab with id: 9');
+      },
+      query: () => [],
+    };
+
+    await expect(getInspectableTab({ tabId: 9, tabsApi })).resolves.toStrictEqual({
+      error: TAB_NOT_INSPECTABLE_ERROR,
+      ok: false,
+    });
   });
 
   it('passes the definition signature into the injected execute function', async () => {

@@ -28,6 +28,31 @@ export type { StoredAgentConversation } from '@/src/shared/agent-conversation-ta
 const legacyConversationStorageKey = 'local:kiloAgentConversation';
 const conversationStorageKey = 'local:kiloAgentConversations';
 const conversationStoreQueryKey = ['side-panel', 'agent-conversations'] as const;
+
+// The retired page tools, mapped to the Playwright MCP tool that replaced each.
+const LEGACY_PAGE_TOOL_NAMES = {
+  find_in_page: 'kilo_browser_find',
+  get_element_details: 'kilo_browser_snapshot',
+  get_page_snapshot: 'kilo_browser_snapshot',
+  get_viewport_screenshot: 'kilo_browser_take_screenshot',
+} as const;
+type LegacyPageToolName = keyof typeof LEGACY_PAGE_TOOL_NAMES;
+const isLegacyPageToolName = (name: string): name is LegacyPageToolName =>
+  Object.hasOwn(LEGACY_PAGE_TOOL_NAMES, name);
+
+// The retired call's fields survive verbatim as the migrated call's arguments.
+const toMigratedBrowserArguments = (event: {
+  readonly elementId?: string | undefined;
+  readonly query?: string | undefined;
+  readonly snapshotId?: string | undefined;
+  readonly textStart?: number | undefined;
+}) => ({
+  ...(event.elementId === undefined ? {} : { elementId: event.elementId }),
+  ...(event.query === undefined ? {} : { query: event.query }),
+  ...(event.snapshotId === undefined ? {} : { snapshotId: event.snapshotId }),
+  ...(event.textStart === undefined ? {} : { textStart: event.textStart }),
+});
+
 const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] | undefined => {
   const parsed = conversationEventsSchema.safeParse(value);
   if (!parsed.success) {
@@ -64,7 +89,7 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
         break;
       }
       case 'tool-call': {
-        // WebMCP events carry a webMcpOrigin field; must precede the eval branch.
+        // WebMCP events carry a webMcpOrigin field; must precede the call-shape branches.
         if ('webMcpOrigin' in event) {
           events.push({
             arguments: event.arguments,
@@ -81,11 +106,12 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
           });
           break;
         }
-        if (event.name === 'eval') {
+        // A persisted eval call predates the Playwright tools; load it as the evaluate tool.
+        if ('code' in event) {
           events.push({
-            code: event.code,
+            arguments: { function: event.code },
             id: event.id,
-            name: event.name,
+            name: 'kilo_browser_evaluate',
             ...(event.providerToolCallId === undefined
               ? {}
               : { providerToolCallId: event.providerToolCallId }),
@@ -110,12 +136,21 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
           });
           break;
         }
-        // Workflow events have arguments but no remoteToolName; must precede the safe fallback.
+        // Browser and workflow calls share one shape, so the parsed event is already the event to keep; only the optional field is normalized for the union's exact optional type.
         if ('arguments' in event) {
+          const { providerToolCallId, ...call } = event;
           events.push({
-            arguments: event.arguments,
+            ...call,
+            ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
+          });
+          break;
+        }
+        // A persisted retired page tool predates the Playwright tools; load it as its replacement.
+        if (isLegacyPageToolName(event.name)) {
+          events.push({
+            arguments: toMigratedBrowserArguments(event),
             id: event.id,
-            name: event.name,
+            name: LEGACY_PAGE_TOOL_NAMES[event.name],
             ...(event.providerToolCallId === undefined
               ? {}
               : { providerToolCallId: event.providerToolCallId }),

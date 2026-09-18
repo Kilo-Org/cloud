@@ -8,12 +8,22 @@ import type {
   AgentConversationEvent,
   GroupedConversationItem,
 } from '@/src/shared/agent-conversation';
+import { BROWSER_TOOL_CONTRACT, toKiloBrowserToolName } from '@/src/shared/browser-tool-contract';
 import { getViewportScreenshotDataUrl } from '@/src/shared/agent-tool-output';
 // Explicit .tsx: collapsible-code-block.ts (pure helpers) shadows the default resolution.
 import { CollapsibleCodeBlock } from './collapsible-code-block.tsx';
 
 // Hoisted so the array reference is stable (react-perf) across renders.
 const remarkPlugins = [remarkGfm];
+
+/*
+ * A `kilo_browser_*` call renders under its Playwright MCP title, so the panel
+ * reads like a Playwright MCP client; every other tool keeps its own name.
+ */
+const browserToolTitleByKiloName = new Map(
+  BROWSER_TOOL_CONTRACT.map(entry => [toKiloBrowserToolName(entry.name), entry.title])
+);
+const getToolTitle = (name: string): string => browserToolTitleByKiloName.get(name) ?? name;
 
 const extractCodeText = (codeChildren: unknown): string | undefined => {
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Walks react-markdown's ReactNode children tree, not a parseable data contract.
@@ -168,7 +178,6 @@ const ThinkingEvent = ({
 
 const ToolExchangePanel = ({
   argumentsText,
-  codeText,
   imageDataUrl,
   imageAlt,
   resultText,
@@ -178,8 +187,6 @@ const ToolExchangePanel = ({
 }: {
   /** Rendered under "Arguments". Omit to hide the block. */
   argumentsText?: string | undefined;
-  /** Rendered under "Code". Omit to hide the block. */
-  codeText?: string | undefined;
   imageDataUrl?: string | undefined;
   imageAlt: string;
   /** Rendered under "Result" or "Error". Omit while the tool still runs. */
@@ -221,12 +228,6 @@ const ToolExchangePanel = ({
         <span className={tabClassName}>{subtitle}</span>
       </summary>
       <div className="mt-2 grid min-w-0 gap-2">
-        {codeText === undefined ? null : (
-          <div className="min-w-0">
-            <p className={codeLabelClassName}>Code</p>
-            <pre className={codeBlockClassName}>{codeText}</pre>
-          </div>
-        )}
         {argumentsText === undefined ? null : (
           <div className="min-w-0">
             <p className={codeLabelClassName}>Arguments</p>
@@ -315,13 +316,12 @@ const ToolExchangeEvent = ({
   return (
     <ToolExchangePanel
       argumentsText={'arguments' in toolCall ? formatToolValue(toolCall.arguments) : undefined}
-      codeText={'code' in toolCall ? toolCall.code : undefined}
-      imageAlt="Viewport screenshot captured by get_viewport_screenshot"
+      imageAlt={`Image produced by ${toolCall.name}`}
       imageDataUrl={screenshotDataUrl}
       resultText={getToolExchangeResultText(result, screenshotDataUrl !== undefined)}
       status={getToolExchangeStatus(result)}
       subtitle={'serverName' in toolCall ? toolCall.serverName : `tab ${toolCall.tabId}`}
-      title={toolCall.name}
+      title={getToolTitle(toolCall.name)}
     />
   );
 };
@@ -335,7 +335,7 @@ const StandaloneToolEvent = ({
   let body = event.type === 'tool-call' ? event.name : event.error;
 
   if (event.type === 'tool-call') {
-    title = event.name;
+    title = getToolTitle(event.name);
   } else if (event.ok) {
     title = 'tool result';
     body = formatToolValue(event.value);

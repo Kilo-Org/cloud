@@ -410,7 +410,7 @@ test('Case C — transcript recipes', async () => {
     expect(monoStyles.fontSize, 'mono font-size').toBe('14px');
 
     // Error panel shell
-    const errorSummary = pane.getByText('get_page_snapshot failed', { exact: true });
+    const errorSummary = pane.getByText('Page snapshot failed', { exact: true });
     await expect(errorSummary).toBeVisible();
     const errorPanel = errorSummary.locator('xpath=ancestor::details[1]');
     const errorStyles = await expectBackgroundRgb(
@@ -428,7 +428,7 @@ test('Case C — transcript recipes', async () => {
     expectRgb(errorLabelStyles.color, { blue: 165, green: 165, red: 252 }, 'Error label color');
 
     // Success well
-    const successSummary = pane.getByText('get_page_snapshot completed', { exact: true });
+    const successSummary = pane.getByText('Page snapshot completed', { exact: true });
     await expect(successSummary).toBeVisible();
     const successPanel = successSummary.locator('xpath=ancestor::details[1]');
     const successStyles = await expectBackgroundRgb(

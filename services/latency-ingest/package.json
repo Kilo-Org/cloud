@@ -1,0 +1,24 @@
+{
+  "name": "cloudflare-latency-ingest",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv worker-configuration.d.ts",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/latency-ingest/src"
+  },
+  "dependencies": {
+    "@kilocode/app-shared": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

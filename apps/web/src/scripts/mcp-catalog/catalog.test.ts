@@ -21,6 +21,7 @@ import {
   generateMissingSummaries,
   isDenylistedPath,
   parseKiloCompletion,
+  procedureRequiresAdmin,
   readCommittedSummaries,
   runKiloCompletion,
   type CatalogLeaf,
@@ -99,7 +100,9 @@ describe('mcp-catalog catalog', () => {
       );
       // Every non-internal query and mutation with a summary is a row; a
       // denylisted segment anywhere in the path and subscriptions are dropped,
-      // summary or not. `testConnection` stays because `test` is exact-only.
+      // summary or not. `testConnection` stays because `test` is exact-only,
+      // and the summary-less `debug.ping` is published and waits for the LLM
+      // pass because `debug` stays published and guarded.
       expect(rows.map(row => row.path)).toEqual([
         'organizations.subscription.cancel',
         'user.deleteAccount',
@@ -114,18 +117,19 @@ describe('mcp-catalog catalog', () => {
         'mutation',
         'query',
       ]);
-      expect(missing).toEqual([]);
+      expect(missing.map(leaf => leaf.path)).toEqual(['debug.ping']);
     });
 
     it('treats an internal segment anywhere in the path as internal', () => {
       expect(isDenylistedPath('admin.users.list')).toBe(true);
       expect(isDenylistedPath('organizations.admin.grantCredit')).toBe(true);
       expect(isDenylistedPath('codingPlans.adminInsights')).toBe(true);
-      expect(isDenylistedPath('debug.ping')).toBe(true);
       expect(isDenylistedPath('test.echo')).toBe(true);
       expect(isDenylistedPath('slack.devRemoveDbRowOnly')).toBe(true);
       expect(isDenylistedPath('user.getProfile')).toBe(false);
       expect(isDenylistedPath('slack.testConnection')).toBe(false);
+      // `debug` is published and carries the guard marker, so it is not internal.
+      expect(isDenylistedPath('debug.ping')).toBe(false);
     });
 
     it('fails on a zero-row catalog instead of emitting an empty one', () => {
@@ -244,6 +248,128 @@ describe('mcp-catalog catalog', () => {
         new Map([['user.getProfile', summary]])
       );
       expect(rows[0]?.summary).toBe(summary);
+    });
+
+    it('marks a real admin-guarded procedure with the trailing admin marker', () => {
+      const { rows } = buildCatalogRows(
+        withMutation([queryLeaf('organizations.seatPurchases')]),
+        new Map([['organizations.seatPurchases', 'Lists seat purchases.']])
+      );
+      const row = rows[0];
+      expect(row?.admin).toBe(true);
+      // Key order stays deterministic for the dump's byte-for-byte check.
+      expect(Object.keys(row ?? {})).toEqual([
+        'path',
+        'kind',
+        'summary',
+        'inputSchema',
+        'tags',
+        'searchBlob',
+        'admin',
+      ]);
+    });
+
+    it('leaves the admin key off a real non-admin procedure', () => {
+      const { rows } = buildCatalogRows(
+        withMutation([queryLeaf('user.getBalance')]),
+        new Map([['user.getBalance', 'Returns the credit balance.']])
+      );
+      expect(rows[0]).not.toHaveProperty('admin');
+      expect(Object.keys(rows[0] ?? {})).toEqual([
+        'path',
+        'kind',
+        'summary',
+        'inputSchema',
+        'tags',
+        'searchBlob',
+      ]);
+    });
+
+    it('keeps a debug leaf and marks it debug without an admin mark', () => {
+      const { rows, missing } = buildCatalogRows(
+        withMutation([queryLeaf('debug.ping')]),
+        new Map([['debug.ping', 'Pings the debug router.']])
+      );
+      const row = rows[0];
+      // The fixture's own leaves are published; the mutation added to satisfy
+      // the drift guard carries no summary, so it waits for the LLM pass.
+      expect(missing.map(leaf => leaf.path)).toEqual(['user.updateProfile']);
+      expect(row?.debug).toBe(true);
+      expect(row).not.toHaveProperty('admin');
+      // Key order stays deterministic for the dump's byte-for-byte check.
+      expect(Object.keys(row ?? {})).toEqual([
+        'path',
+        'kind',
+        'summary',
+        'inputSchema',
+        'tags',
+        'searchBlob',
+        'debug',
+      ]);
+    });
+
+    it('marks an admin-guarded debug procedure with both marks', () => {
+      const { rows } = buildCatalogRows(
+        withMutation([queryLeaf('debug.badInputError')]),
+        new Map([['debug.badInputError', 'Echoes a short string back from the debug router.']])
+      );
+      const row = rows[0];
+      expect(row?.debug).toBe(true);
+      expect(row?.admin).toBe(true);
+      // Both marks are emitted at the tail in a fixed order, admin first.
+      expect(Object.keys(row ?? {})).toEqual([
+        'path',
+        'kind',
+        'summary',
+        'inputSchema',
+        'tags',
+        'searchBlob',
+        'admin',
+        'debug',
+      ]);
+    });
+
+    it('still drops an admin leaf', () => {
+      const { rows, missing } = buildCatalogRows(
+        withMutation([queryLeaf('admin.users.list'), queryLeaf('user.getProfile')]),
+        new Map([
+          ['admin.users.list', 'Lists users.'],
+          ['user.getProfile', 'Returns the profile of a user.'],
+        ])
+      );
+      expect(rows.map(row => row.path)).toEqual(['user.getProfile']);
+      expect(missing.map(leaf => leaf.path)).toEqual(['user.updateProfile']);
+    });
+
+    it('still drops a test leaf', () => {
+      const { rows, missing } = buildCatalogRows(
+        withMutation([queryLeaf('test.echo'), queryLeaf('user.getProfile')]),
+        new Map([
+          ['test.echo', 'Echoes a payload.'],
+          ['user.getProfile', 'Returns the profile of a user.'],
+        ])
+      );
+      expect(rows.map(row => row.path)).toEqual(['user.getProfile']);
+      expect(missing.map(leaf => leaf.path)).toEqual(['user.updateProfile']);
+    });
+  });
+
+  describe('procedureRequiresAdmin', () => {
+    const cases: Array<[string | null, boolean]> = [
+      ['adminProcedure.input(z.object({})).query(async () => ({}))', true],
+      ['creditManagerProcedure.query(async () => ({}))', true],
+      ['superadminProcedure.query(async () => ({}))', true],
+      ['sessionViewerProcedure.query(async () => ({}))', true],
+      ['baseProcedure.query(async () => ({}))', false],
+      ['protectedProcedure.query(async () => ({}))', false],
+      // A guard elsewhere in the chain does not make the procedure admin-only.
+      ['baseProcedure.use(adminProcedure).query(async () => ({}))', false],
+      ['notAdminProcedure.query(async () => ({}))', false],
+      [null, false],
+    ];
+
+    it.each(cases)('treats %s as admin-guarded: %s', (source, expected) => {
+      expect(procedureRequiresAdmin(source)).toBe(expected);
     });
   });
 

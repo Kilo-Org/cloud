@@ -105,6 +105,10 @@ vi.mock('@/components/agents/new-session-cloud-create-error', () => ({
   NewSessionCloudCreateError: 'NewSessionCloudCreateError',
 }));
 
+vi.mock('@/components/agents/advanced-config-panel', () => ({
+  AdvancedConfigPanel: 'AdvancedConfigPanel',
+}));
+
 vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
@@ -800,6 +804,42 @@ describe('NewSessionConfigureForm', () => {
     }) as Node;
 
     expect(containsComponent(element, NewSessionProfileRow)).toBe(true);
+  });
+
+  // ── Case 10b: the advanced-config disclosure ──
+  it('mounts the collapsed advanced-config panel under Environment for a cloud target', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      organizationId: 'org-1',
+    }) as Node;
+
+    expect(findElementByType(element, 'AdvancedConfigPanel')).toMatchObject({
+      organizationId: 'org-1',
+      disabled: false,
+    });
+  });
+
+  it('hides the advanced-config panel for a remote target and for the clone entry', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const remote = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+    }) as Node;
+    expect(findElementByType(remote, 'AdvancedConfigPanel')).toBeNull();
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const clone = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      isCloneEntry: true,
+    }) as Node;
+    expect(findElementByType(clone, 'AdvancedConfigPanel')).toBeNull();
   });
 
   // ── Case 11: commit choice (cloud-only, default Leave) ──

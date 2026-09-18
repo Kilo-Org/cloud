@@ -1,9 +1,11 @@
+/* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
 import { type RefObject } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LaunchFolderField } from '@/components/agents/folder-selector';
+import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
 import { NewSessionProfileRow } from '@/components/agents/new-session-profile-row';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
@@ -325,6 +327,15 @@ export function NewSessionConfigureForm({
           onRetryProfile={onRetryProfile}
           onOpenProfilePicker={onOpenProfilePicker}
         />
+      ) : null}
+
+      {
+        // The advanced configuration disclosure sits under Environment. It is
+        // collapsed by default, so the screen is unchanged until it is tapped;
+        // the panel owns its own profile pick and manual config state.
+      }
+      {!isRemote && !isCloneEntry ? (
+        <AdvancedConfigPanel organizationId={organizationId} disabled={isStarting} />
       ) : null}
 
       {

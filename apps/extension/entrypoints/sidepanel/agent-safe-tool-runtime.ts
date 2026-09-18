@@ -74,7 +74,8 @@ const runSafeToolCall = async (toolCall: DispatchableToolCall): Promise<EvalTabR
       : { ok: true, value: memory };
   }
 
-  return { error: `Tool ${toolCall.name} is not available.`, ok: false };
+  // Every `SafeToolName` has a handler above; a name added without one lands here instead of reporting a false success.
+  return { error: 'This safe tool is not available.', ok: false };
 };
 
 export const createSafeToolExecutor = (): ((

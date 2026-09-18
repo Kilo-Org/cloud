@@ -57,3 +57,21 @@ describe('catalog parity', () => {
     }
   );
 });
+
+/**
+ * The launcher shortcuts name the one shared copy at `glanceable.newAgent`.
+ * A catalog that keeps its own `launcher.newAgent` renders dead copy that
+ * drifts from the quick-settings tile label, which reads the shared key.
+ * Pinned here by name, next to the generic extra-key rule above, so the
+ * regression cannot return silently.
+ */
+describe('launcher shortcuts reuse the shared new-agent copy', () => {
+  it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))('%s', tag => {
+    const translated = CATALOG_LOADERS[tag]() as {
+      launcher?: Record<string, unknown>;
+      glanceable?: Record<string, unknown>;
+    };
+    expect(translated.launcher?.newAgent).toBeUndefined();
+    expect(translated.glanceable?.newAgent).toBeDefined();
+  });
+});

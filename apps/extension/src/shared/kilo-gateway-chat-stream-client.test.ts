@@ -225,6 +225,34 @@ describe('kilo gateway chat stream client', () => {
     ).rejects.toThrow('Gateway stream tool call did not include a supported tool name.');
   });
 
+  it('accepts an unoffered kilo_browser_ call so the runner can answer it with a refusal', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_click_1","type":"function","function":{"name":"kilo_browser_click","arguments":"{\\"target\\":\\"#go\\"}"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Click it', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: [gatewayTool('kilo_browser_snapshot')],
+      })
+    ).resolves.toStrictEqual({
+      toolCalls: [
+        {
+          arguments: { target: '#go' },
+          id: 'call_click_1',
+          name: 'kilo_browser_click',
+        },
+      ],
+    });
+  });
+
   it('concatenates a fragmented offered page name across tool call deltas', async () => {
     const fetch: FetchLike = () =>
       streamResponse([

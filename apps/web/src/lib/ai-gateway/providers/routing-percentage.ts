@@ -1,9 +1,7 @@
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 
-export type RoutingCohort = 'vercel' | 'perplexity';
-
 export function passesRoutingPercentage(
-  cohort: RoutingCohort,
+  cohort: 'vercel',
   randomSeed: string,
   routingPercentage: number
 ) {

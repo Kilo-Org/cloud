@@ -16,6 +16,65 @@ function makePart(id: string, text = '', messageID = 'm'): Part {
   return { id, sessionID: 's', messageID, type: 'text', text } as Part;
 }
 
+function makeToolPart(
+  id: string,
+  status: 'pending' | 'running' | 'completed' | 'error',
+  time?: { start: number; end?: number },
+  messageID = 'm'
+): Part {
+  const base = { id, sessionID: 's', messageID, type: 'tool', callID: `call-${id}`, tool: 'task' };
+  if (status === 'pending') {
+    return { ...base, state: { status, input: {}, raw: '' } } as Part;
+  }
+  if (status === 'running') {
+    return { ...base, state: { status, input: {}, raw: '', time: time ?? { start: 1 } } } as Part;
+  }
+  return {
+    ...base,
+    state: {
+      status,
+      input: {},
+      raw: '',
+      ...(status === 'completed'
+        ? { output: 'done', title: 'task', metadata: {} }
+        : { error: 'boom' }),
+      time: time ?? { start: 1, end: 2 },
+    },
+  } as Part;
+}
+
+function toolStatus(parts: Part[], id: string): string {
+  const part = parts.find(p => p.id === id);
+  if (!part || part.type !== 'tool') throw new Error(`tool part ${id} missing`);
+  return part.state.status;
+}
+
+/**
+ * A part persisted through the ingest-frame compaction path: it keeps only
+ * `state.status`, so `state.time` is absent even for running/terminal states.
+ */
+function makeCompactedToolPart(
+  id: string,
+  status: 'pending' | 'running' | 'completed' | 'error',
+  messageID = 'm'
+): Part {
+  const base = { id, sessionID: 's', messageID, type: 'tool', callID: `call-${id}`, tool: 'task' };
+  return {
+    ...base,
+    state: {
+      status,
+      input: {},
+      ...(status === 'running'
+        ? {}
+        : status === 'completed'
+          ? { output: 'done', title: 'task', metadata: {} }
+          : status === 'error'
+            ? { error: 'boom' }
+            : { raw: '' }),
+    },
+  } as unknown as Part;
+}
+
 describe('insertSorted', () => {
   test('inserts into empty array', () => {
     expect(insertSorted([], 'b')).toEqual(['b']);
@@ -138,6 +197,252 @@ describe('upsertPartDroppingStaleSyntheticParts', () => {
     const result = upsertPartDroppingStaleSyntheticParts([syntheticFile], realFile);
 
     expect(result.map(part => part.id)).toEqual(['msg-1-file-0', 'prt-file']);
+  });
+});
+
+describe('tool part lifecycle ordering', () => {
+  test('drops a terminal update whose event time predates the stored running update', () => {
+    const arr = upsertPartDroppingStaleSyntheticParts([], makeToolPart('p-1', 'running'), 200);
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed'),
+      150
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+    expect(result).toBe(arr);
+  });
+
+  test('drops a terminal update that carries no ordering evidence over a live running task', () => {
+    const arr = [makeToolPart('p-1', 'running', { start: 1 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeCompactedToolPart('p-1', 'completed')
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('applies a terminal whose settle time postdates the running start with no event time', () => {
+    // The wire event time can be absent (schema `time` is optional); the
+    // terminal's own `state.time.end` is then the ordering evidence, exactly as
+    // in the terminal-vs-terminal branch.
+    const arr = [makeToolPart('p-1', 'running', { start: 1 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1, end: 2 })
+    );
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('drops a terminal whose settle time predates the running start with no event time', () => {
+    const arr = [makeToolPart('p-1', 'running', { start: 5 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1, end: 2 })
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('bounds the running guard by the run start when the stored event time is inherited', () => {
+    // A terminal settles at 100; a replayed running part (start 200, no event
+    // time) replaces it and inherits the older part's recorded update time. A
+    // terminal that settled at 150 — before the live run began — must still lose
+    // against the run's own start, not the inherited older evidence.
+    const terminal = upsertPartDroppingStaleSyntheticParts(
+      [],
+      makeToolPart('p-1', 'completed', { start: 1, end: 100 }),
+      100
+    );
+    const arr = upsertPartDroppingStaleSyntheticParts(
+      terminal,
+      makeToolPart('p-1', 'running', { start: 200 })
+    );
+    expect(toolStatus(arr, 'p-1')).toBe('running');
+
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1, end: 150 })
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+    expect(result).toBe(arr);
+  });
+
+  test('keeps the recorded event time across a no-time re-delivery so a stale terminal still loses', () => {
+    const arr = upsertPartDroppingStaleSyntheticParts([], makeToolPart('p-1', 'running'), 200);
+    const replayed = upsertPartDroppingStaleSyntheticParts(arr, makeToolPart('p-1', 'running'));
+    const result = upsertPartDroppingStaleSyntheticParts(
+      replayed,
+      makeToolPart('p-1', 'completed'),
+      150
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('applies a terminal that postdates the event time kept across a no-time re-delivery', () => {
+    const arr = upsertPartDroppingStaleSyntheticParts([], makeToolPart('p-1', 'running'), 200);
+    const replayed = upsertPartDroppingStaleSyntheticParts(arr, makeToolPart('p-1', 'running'));
+    const result = upsertPartDroppingStaleSyntheticParts(
+      replayed,
+      makeToolPart('p-1', 'completed'),
+      250
+    );
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('applies a terminal update whose event time postdates the stored running update', () => {
+    const arr = [makeToolPart('p-1', 'running')];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed'),
+      250
+    );
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('drops a stale running update that would downgrade a pending task', () => {
+    const arr = upsertPartDroppingStaleSyntheticParts([], makeToolPart('p-1', 'pending'), 300);
+    const result = upsertPartDroppingStaleSyntheticParts(arr, makeToolPart('p-1', 'running'), 100);
+    expect(toolStatus(result, 'p-1')).toBe('pending');
+  });
+
+  test('pending never overrides running', () => {
+    const arr = [makeToolPart('p-1', 'running')];
+    const result = upsertPartDroppingStaleSyntheticParts(arr, makeToolPart('p-1', 'pending'));
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('running never overrides a terminal state', () => {
+    const arr = [makeToolPart('p-1', 'completed')];
+    const result = upsertPartDroppingStaleSyntheticParts(arr, makeToolPart('p-1', 'running'), 500);
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('applies a newer running update over a stored terminal that settled before the run', () => {
+    // Mirror reopen replay: the cache still holds a stale stored terminal while
+    // the live run (started later) is the current state of the same part.
+    const arr = [makeToolPart('p-1', 'completed', { start: 1700100002000, end: 1700100006000 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'running', { start: 1789655865076 })
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+  });
+
+  test('drops a running update whose start predates the stored terminal', () => {
+    const arr = [makeToolPart('p-1', 'completed', { start: 1, end: 250 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'running', { start: 100 })
+    );
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('settles terminal vs terminal by the tool state time when no event time exists', () => {
+    const arr = [makeToolPart('p-1', 'completed', { start: 1, end: 5 })];
+    const older = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'error', { start: 1, end: 4 })
+    );
+    expect(toolStatus(older, 'p-1')).toBe('completed');
+
+    const newer = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'error', { start: 1, end: 6 })
+    );
+    expect(toolStatus(newer, 'p-1')).toBe('error');
+  });
+
+  test('drops a replayed terminal whose settle time predates the stored running start', () => {
+    // Reopen replay: the snapshotted running part carries the live run's start
+    // as its only ordering evidence, and the page replay delivers a terminal
+    // that settled before that run began. The stale terminal must not flip it.
+    const arr = [makeToolPart('p-1', 'running', { start: 1789655865076 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1700100002000, end: 1700100006000 }),
+      1700100006000
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+    expect(result).toBe(arr);
+  });
+
+  test('drops a replayed error whose settle time predates the stored running start', () => {
+    const arr = [makeToolPart('p-1', 'running', { start: 1789655865076 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'error', { start: 1700100002000, end: 1700100006000 }),
+      1700100006000
+    );
+    expect(toolStatus(result, 'p-1')).toBe('running');
+    expect(result).toBe(arr);
+  });
+
+  test('applies a replayed terminal whose settle time postdates the stored running start', () => {
+    const arr = [makeToolPart('p-1', 'running', { start: 1700100002000 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1700100002000, end: 1700100006000 }),
+      1700100006000
+    );
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('first settled terminal wins when no ordering evidence exists at all', () => {
+    const arr = [makeToolPart('p-1', 'completed', { start: 1, end: 5 })];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed', { start: 1, end: 5 })
+    );
+    expect(result).toBe(arr);
+  });
+
+  test('leaves non-tool parts unordered', () => {
+    const arr = [makePart('p-1', 'first')];
+    const result = upsertPartDroppingStaleSyntheticParts(arr, makePart('p-1', 'second'), 1);
+    expect((result[0] as Part & { text: string }).text).toBe('second');
+  });
+
+  test('does not throw on a stored compacted running part with no state time', () => {
+    const arr = [makeCompactedToolPart('p-1', 'running')];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'completed'),
+      250
+    );
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('does not throw on a stored compacted terminal part with no state time', () => {
+    const arr = [makeCompactedToolPart('p-1', 'completed')];
+    const result = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeCompactedToolPart('p-1', 'error')
+    );
+    // No ordering evidence on either side: the first settled terminal wins.
+    expect(toolStatus(result, 'p-1')).toBe('completed');
+  });
+
+  test('keeps a terminal accepted by its settle time against a later older terminal', () => {
+    // The stored terminal's recorded event time (100) is older than the settle
+    // time (200) of the terminal that replaces it. An out-of-order terminal
+    // that lands between the two must lose against the applied settle time.
+    const arr = upsertPartDroppingStaleSyntheticParts(
+      [],
+      makeToolPart('p-1', 'completed', { start: 1, end: 100 }),
+      100
+    );
+    const accepted = upsertPartDroppingStaleSyntheticParts(
+      arr,
+      makeToolPart('p-1', 'error', { start: 1, end: 200 })
+    );
+    expect(toolStatus(accepted, 'p-1')).toBe('error');
+
+    const result = upsertPartDroppingStaleSyntheticParts(
+      accepted,
+      makeToolPart('p-1', 'completed', { start: 1, end: 150 }),
+      150
+    );
+    expect(toolStatus(result, 'p-1')).toBe('error');
+    expect(result).toBe(accepted);
   });
 });
 

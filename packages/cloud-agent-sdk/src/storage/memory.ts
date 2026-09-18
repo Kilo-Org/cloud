@@ -43,9 +43,9 @@ function createMemoryStorage(): SessionStorage {
       return messages.get(messageId);
     },
 
-    upsertPart(messageId, part) {
+    upsertPart(messageId, part, eventTime) {
       const arr = parts.get(messageId) ?? [];
-      parts.set(messageId, upsertPartDroppingStaleSyntheticParts(arr, part));
+      parts.set(messageId, upsertPartDroppingStaleSyntheticParts(arr, part, eventTime));
       partsSnapshot.set(messageId, null);
       notify(subscribers, `parts:${messageId}`);
     },

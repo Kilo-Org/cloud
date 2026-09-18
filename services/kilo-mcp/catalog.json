@@ -16037,12 +16037,23 @@
     "path": "openAiChatGpt.disconnect",
     "kind": "mutation",
     "summary": "Disconnect the user's linked ChatGPT account and remove the stored OpenAI ChatGPT connection, returning the updated connection status.",
-    "inputSchema": {},
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
     "tags": [
       "openaichatgpt",
-      "disconnect"
+      "disconnect",
+      "organizationid"
     ],
-    "searchBlob": "openAiChatGpt.disconnect Disconnect the user's linked ChatGPT account and remove the stored OpenAI ChatGPT connection, returning the updated connection status. openaichatgpt disconnect"
+    "searchBlob": "openAiChatGpt.disconnect Disconnect the user's linked ChatGPT account and remove the stored OpenAI ChatGPT connection, returning the updated connection status. openaichatgpt disconnect organizationid organizationId"
   },
   "openAiChatGpt.status": {
     "path": "openAiChatGpt.status",
@@ -36455,6 +36466,11 @@
             "fake-login",
             "workos"
           ]
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -36464,9 +36480,10 @@
     "tags": [
       "user",
       "linkauthprovider",
-      "provider"
+      "provider",
+      "organizationid"
     ],
-    "searchBlob": "user.linkAuthProvider Connect a social login provider, such as GitHub, Google, or Discord, to the current account so the user can sign in with it. user linkauthprovider provider provider"
+    "searchBlob": "user.linkAuthProvider Connect a social login provider, such as GitHub, Google, or Discord, to the current account so the user can sign in with it. user linkauthprovider provider organizationid provider organizationId"
   },
   "user.listDeviceSessions": {
     "path": "user.listDeviceSessions",
@@ -36856,6 +36873,11 @@
             "fake-login",
             "workos"
           ]
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -36865,9 +36887,10 @@
     "tags": [
       "user",
       "unlinkauthprovider",
-      "provider"
+      "provider",
+      "organizationid"
     ],
-    "searchBlob": "user.unlinkAuthProvider Disconnect a linked social sign-in provider from the current account. user unlinkauthprovider provider provider"
+    "searchBlob": "user.unlinkAuthProvider Disconnect a linked social sign-in provider from the current account. user unlinkauthprovider provider organizationid provider organizationId"
   },
   "user.unregisterActivityToken": {
     "path": "user.unregisterActivityToken",

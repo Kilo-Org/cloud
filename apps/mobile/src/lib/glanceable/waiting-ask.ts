@@ -201,14 +201,20 @@ function parseStoredAsk(raw: string): WaitingAsk | null {
  * True when a mirrored ask belongs to the scope this process currently
  * publishes. The mirror outlives a sign-out or an org switch, and the ask names
  * both the session and the organization an action would answer, so an ask
- * recorded for another scope must never reach a surface or an approval. An
- * unknown local scope (nothing restored or published yet) cannot fence and
- * accepts the ask; the push handler re-checks the live user and org against the
- * snapshot's scope key before it renders anything.
+ * recorded for another scope must never reach a surface or an approval.
+ *
+ * Fails closed: a null local scope means no snapshot scope was restored (an
+ * absent mirror, a failed read, or a process that has not published yet), so
+ * this process cannot prove the ask belongs to the account it would answer for.
+ * Accepting it there let a stale session/org record reach Open and Approve on
+ * the strength of nothing. The live path is unaffected: `recordWaitingAsk`
+ * stores the ask with the publisher's own context, and hydration — the one
+ * boundary where the mirror enters the process — only fills a cold process that
+ * has recorded nothing.
  */
 function isAskInCurrentScope(ask: WaitingAsk): boolean {
   const localScopeKey = getLocalScopeKey();
-  return localScopeKey === null || ask.scopeKey === localScopeKey;
+  return localScopeKey !== null && ask.scopeKey === localScopeKey;
 }
 
 /**

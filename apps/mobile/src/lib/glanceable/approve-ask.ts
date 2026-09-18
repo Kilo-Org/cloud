@@ -134,6 +134,24 @@ const UNAUTHORIZED_CODE = 'UNAUTHORIZED';
  */
 const GONE_TICKET_STATUSES: ReadonlySet<number> = new Set([400, 403, 404, 410]);
 
+/**
+ * The stream-ticket status that means the tap's credential is expired or
+ * missing, not that the ask is gone: the route answers 401 before it can decide
+ * ownership. The background contexts have no foreground refresh timer, so a 401
+ * has to run the same credential refresh an `UNAUTHORIZED` tRPC answer does;
+ * without it the ask stays retryable but the next tap fails on the same dead
+ * token, which only a refresh can rotate.
+ */
+const UNAUTHORIZED_TICKET_STATUS = 401;
+
+/** True when the failure is a stale credential, whichever transport reported it. */
+function isUnauthorizedApproveError(error: unknown): boolean {
+  if (error instanceof StreamTicketHttpError && error.status === UNAUTHORIZED_TICKET_STATUS) {
+    return true;
+  }
+  return readTrpcErrorField(error, 'code') === UNAUTHORIZED_CODE;
+}
+
 function classifyApproveFailure(error: unknown): GlanceableApproveResult {
   if (error instanceof StreamTicketHttpError && GONE_TICKET_STATUSES.has(error.status)) {
     return { kind: 'gone' };
@@ -201,7 +219,7 @@ export async function runGlanceableApprove(
     recordWaitingAsk(null);
     return { kind: 'approved' };
   } catch (error) {
-    if (readTrpcErrorField(error, 'code') === UNAUTHORIZED_CODE) {
+    if (isUnauthorizedApproveError(error)) {
       return classifyUnauthorized();
     }
     return classifyApproveFailure(error);

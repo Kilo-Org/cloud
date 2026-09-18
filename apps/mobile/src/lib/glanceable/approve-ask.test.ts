@@ -391,6 +391,35 @@ describe('runGlanceableApprove', () => {
     }
   );
 
+  it('refreshes the credential and stays retryable when the stream ticket answers 401', async () => {
+    // The route answers 401 before it can decide ownership, so this is a stale
+    // background credential, not a gone ask. Without the refresh the ask would
+    // stay retryable on a token only a refresh can rotate, and every later tap
+    // would fail the same way.
+    readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+    fetchCloudAgentStreamTicket.mockRejectedValue(new StreamTicketHttpError(401, 'Unauthorized'));
+    performRefresh.mockResolvedValue({
+      ok: true,
+      token: 't',
+      refreshToken: 'r',
+      expiresIn: 60,
+      sessionVersion: 1,
+    });
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
+    expect(performRefresh).toHaveBeenCalledTimes(1);
+    expect(answerPermissionMutate).not.toHaveBeenCalled();
+    expect(recordWaitingAsk).not.toHaveBeenCalled();
+  });
+
+  it('stays retryable when the 401 ticket refresh itself rejects', async () => {
+    readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+    fetchCloudAgentStreamTicket.mockRejectedValue(new StreamTicketHttpError(401, 'Unauthorized'));
+    performRefresh.mockRejectedValue(new Error('network down'));
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
+    expect(performRefresh).toHaveBeenCalledTimes(1);
+    expect(recordWaitingAsk).not.toHaveBeenCalled();
+  });
+
   it('is retryable when a rotated token can be refreshed', async () => {
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     getSessionQuery.mockRejectedValue(withCode('UNAUTHORIZED'));

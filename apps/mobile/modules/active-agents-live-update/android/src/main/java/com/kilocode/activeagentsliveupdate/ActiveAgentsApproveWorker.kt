@@ -1,6 +1,8 @@
 package com.kilocode.activeagentsliveupdate
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.work.ListenableWorker
 import androidx.work.WorkerParameters
@@ -46,7 +48,9 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
 
   /** No task started by this worker yet; `HeadlessJsTaskContext` numbers from 1. */
   private var taskId = NO_TASK_ID
-  private var completer: CallbackToFutureAdapter.Completer<Result>? = null
+
+  /** Resolved from the task listener, a stop, or the ReactContext timeout. */
+  @Volatile private var completer: CallbackToFutureAdapter.Completer<Result>? = null
 
   /** Set on stop, which can land on another thread than the task start hop. */
   @Volatile private var stopped = false
@@ -58,6 +62,17 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
    */
   private var pendingReactHost: ReactHost? = null
   private var pendingListener: ReactInstanceEventListener? = null
+
+  /**
+   * Bound on the wait for the ReactContext. The shared host can be already
+   * running without ever delivering another init event, or a start can stall;
+   * with no bound this worker's future would never resolve, WorkManager would
+   * keep `UNIQUE_WORK_NAME` in flight, and `ExistingWorkPolicy.KEEP` would then
+   * drop every later Approve tap. Runs on the main thread, like the listener
+   * registration it guards.
+   */
+  private val mainHandler = Handler(Looper.getMainLooper())
+  private val reactHostTimeout = Runnable { onReactHostTimeout() }
 
   override fun startWork(): ListenableFuture<Result> =
     CallbackToFutureAdapter.getFuture(
@@ -83,17 +98,53 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
             invokeStartTask(context)
           }
         }
-      pendingReactHost = reactHost
-      pendingListener = listener
-      reactHost.addReactInstanceEventListener(listener)
-      reactHost.start()
+      // Registration and the timeout are set up together on the main thread, so
+      // no interleaving can leave the listener live without its bound. The
+      // timeout precedes the registration on purpose: a host that never delivers
+      // onReactContextInitialized must not hold the unique work name forever.
+      UiThreadUtil.runOnUiThread {
+        if (stopped || completer == null) {
+          return@runOnUiThread
+        }
+        pendingReactHost = reactHost
+        pendingListener = listener
+        mainHandler.postDelayed(reactHostTimeout, REACT_HOST_TIMEOUT_MS)
+        reactHost.addReactInstanceEventListener(listener)
+        val initialized = reactHost.currentReactContext
+        if (initialized == null) {
+          reactHost.start()
+        } else {
+          // The context came up between the worker-thread read and this
+          // registration, so no init event will be delivered to the listener.
+          // Detach it and start from the context that is already here.
+          detachReactInstanceListener()
+          invokeStartTask(initialized)
+        }
+      }
     } else {
       invokeStartTask(reactContext)
     }
   }
 
+  /**
+   * The ReactContext never arrived. Detach the pending listener so the shared
+   * host keeps no callback for a dead work order, then fail the future: that
+   * resolves the worker, releases `UNIQUE_WORK_NAME`, and lets the next Approve
+   * tap enqueue again.
+   */
+  private fun onReactHostTimeout() {
+    if (stopped || completer == null) {
+      return
+    }
+    detachReactInstanceListener()
+    completer?.set(Result.failure())
+    completer = null
+    cleanUpTask()
+  }
+
   /** Detach the listener still waiting for the ReactContext, exactly once. */
   private fun detachReactInstanceListener() {
+    mainHandler.removeCallbacks(reactHostTimeout)
     val host = pendingReactHost ?: return
     val listener = pendingListener ?: return
     pendingReactHost = null
@@ -103,8 +154,10 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
 
   private fun invokeStartTask(reactContext: ReactContext) {
     // A stop can land after the listener was detached but before this call runs:
-    // starting JS for a stopped worker would answer nothing.
-    if (stopped) {
+    // starting JS for a stopped worker would answer nothing. A worker whose
+    // future was already resolved — by the timeout or a stop — must not start a
+    // task either: nothing would ever complete it.
+    if (stopped || completer == null) {
       return
     }
     val taskContext = HeadlessJsTaskContext.getInstance(reactContext)
@@ -112,9 +165,11 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
     // startTask must run on the UI thread, like every other Activity/Task hop.
     UiThreadUtil.runOnUiThread {
       // The guard above runs on the worker's thread; WorkManager stops the worker
-      // on the main thread, so a stop can land between that check and this hop.
-      // Re-checking here is what keeps a late stop from starting JS anyway.
-      if (stopped) {
+      // on the main thread, so a stop (or the ReactContext timeout) can land
+      // between that check and this hop. Re-checking here is what keeps a late
+      // stop from starting JS anyway, and a resolved future from starting a task
+      // nothing would complete.
+      if (stopped || completer == null) {
         return@runOnUiThread
       }
       // Registering here, after the re-check, is what keeps the listener from
@@ -176,6 +231,13 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
 
     /** Bounded: an answer that cannot complete must not hold the worker. */
     const val TASK_TIMEOUT_MS = 60_000L
+
+    /**
+     * Bound on the wait for the shared ReactHost to hand over a ReactContext.
+     * On expiry the worker fails and `UNIQUE_WORK_NAME` is released, so a host
+     * that never delivers the init event cannot suppress later Approve taps.
+     */
+    const val REACT_HOST_TIMEOUT_MS = 60_000L
 
     /** No task started yet; every id `HeadlessJsTaskContext` returns is positive. */
     private const val NO_TASK_ID = -1

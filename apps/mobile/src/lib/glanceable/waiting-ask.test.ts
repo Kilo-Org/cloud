@@ -260,6 +260,9 @@ describe('waiting ask store', () => {
     // A JS restart drops every module-local value; only the mirror remains.
     _resetWaitingAskForTests();
     _setSecureStoreForTests(secureStoreMock);
+    // The restart restores the published snapshot scope alongside the ask; the
+    // hydration fences the ask against it.
+    setLocalScope(CTX);
     expect(getWaitingAsk()).toBeNull();
 
     await expect(readWaitingAsk()).resolves.toEqual(ask);
@@ -301,6 +304,33 @@ describe('waiting ask store', () => {
       scopeKey: buildOpaqueScopeKey({ userId: 'u1', organizationId: 'org-1' }),
     });
     store.set(ASK_KEY, JSON.stringify(foreign));
+
+    await expect(readWaitingAsk()).resolves.toBeNull();
+    expect(getWaitingAsk()).toBeNull();
+  });
+
+  it('drops a readable mirror when no snapshot scope could be restored', async () => {
+    // `restorePersistedGlanceable` found no scope (an absent snapshot, or a read
+    // that failed), so this process cannot prove the ask belongs to the account
+    // it is about to answer for. The stored session and organization must not
+    // reach the Open or Approve surfaces.
+    const unverified = askFor({ kiloSessionId: 'unverified', organizationId: 'org-1' });
+    store.set(ASK_KEY, JSON.stringify(unverified));
+
+    await expect(readWaitingAsk()).resolves.toBeNull();
+    expect(getWaitingAsk()).toBeNull();
+    expect(store.get(ASK_KEY)).toBe(JSON.stringify(unverified));
+  });
+
+  it('drops a readable mirror when the restored scope was cleared again', async () => {
+    setLocalScope(CTX);
+    const ask = askFor();
+    store.set(ASK_KEY, JSON.stringify(ask));
+
+    // A sign-out or a privacy blank clears the local scope while the ask mirror
+    // is still on disk; hydration must not accept the ask without a scope to
+    // fence it.
+    _resetGlanceablePersistForTests();
 
     await expect(readWaitingAsk()).resolves.toBeNull();
     expect(getWaitingAsk()).toBeNull();

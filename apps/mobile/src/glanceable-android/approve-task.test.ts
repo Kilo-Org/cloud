@@ -560,7 +560,7 @@ describe('the headless worker lifecycle', () => {
   it('re-checks the stop on the UI thread before it starts headless JS', () => {
     const invokeStartTask = workerMember('private fun invokeStartTask(reactContext: ReactContext)');
     const hop = invokeStartTask.slice(invokeStartTask.indexOf('UiThreadUtil.runOnUiThread'));
-    const stopCheck = hop.indexOf('if (stopped)');
+    const stopCheck = hop.indexOf('if (stopped || completer == null)');
     const start = hop.indexOf('taskContext.startTask');
 
     // The guard before the hop runs on the worker's thread while WorkManager
@@ -577,7 +577,7 @@ describe('the headless worker lifecycle', () => {
       invokeStartTask.indexOf('UiThreadUtil.runOnUiThread')
     );
     const hop = invokeStartTask.slice(invokeStartTask.indexOf('UiThreadUtil.runOnUiThread'));
-    const stopCheck = hop.indexOf('if (stopped)');
+    const stopCheck = hop.indexOf('if (stopped || completer == null)');
     const register = hop.indexOf('taskContext.addTaskEventListener');
     const start = hop.indexOf('taskContext.startTask');
 
@@ -592,5 +592,38 @@ describe('the headless worker lifecycle', () => {
     expect(beforeHop).not.toContain('addTaskEventListener');
     expect(register).toBeGreaterThan(stopCheck);
     expect(start).toBeGreaterThan(register);
+  });
+
+  it('arms the ReactContext timeout before it registers the listener', () => {
+    const startTask = workerMember('private fun startTask(reactHost: ReactHost)');
+    const arm = startTask.indexOf('postDelayed(reactHostTimeout');
+    const register = startTask.indexOf('reactHost.addReactInstanceEventListener(listener)');
+
+    // Registration and the timer are set up on the main thread, and the timer
+    // comes first: a shared host that never delivers onReactContextInitialized
+    // must not leave the worker pending, or `ExistingWorkPolicy.KEEP` would drop
+    // every later Approve tap.
+    expect(arm).toBeGreaterThanOrEqual(0);
+    expect(register).toBeGreaterThan(arm);
+    expect(WORKER_SOURCE).toContain('const val REACT_HOST_TIMEOUT_MS');
+  });
+
+  it('fails the worker and detaches the listener when the ReactContext never arrives', () => {
+    const onTimeout = workerMember('private fun onReactHostTimeout()');
+
+    // Detaching drops a dead work order's callback from the shared host; failing
+    // the future resolves the worker, which releases UNIQUE_WORK_NAME so a later
+    // Approve tap can enqueue new work.
+    expect(onTimeout).toContain('detachReactInstanceListener()');
+    expect(onTimeout).toContain('completer?.set(Result.failure())');
+    expect(onTimeout).toContain('completer = null');
+  });
+
+  it('cancels the ReactContext timeout when the listener is detached', () => {
+    const detach = workerMember('private fun detachReactInstanceListener()');
+
+    // The listener callback and a stop both detach, so a task that did start is
+    // never failed later by a stale timer.
+    expect(detach).toContain('mainHandler.removeCallbacks(reactHostTimeout)');
   });
 });

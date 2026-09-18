@@ -538,7 +538,7 @@ describe('latency wiring', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://latency.example.com');
+    expect(url).toBe('https://latency.example.com/v1/latency');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body as string)).toEqual({ samples });
     const headers = new Headers(init.headers);

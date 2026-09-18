@@ -5,6 +5,27 @@ import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { type LatencyBatch } from '@/lib/telemetry/request-latency';
 
 /**
+ * Path the latency-ingest worker answers on. The worker 404s every other
+ * pathname, so this must match `services/latency-ingest/src/ingest.ts:67`
+ * (`url.pathname !== '/v1/latency'`). The configured value stays the service
+ * base URL.
+ */
+const LATENCY_INGEST_PATH = '/v1/latency';
+
+/**
+ * Resolve the ingest worker URL from the configured service base URL. A base
+ * that already ends in `/v1/latency` is returned unchanged. An unparseable
+ * base is returned as-is so the caller posts to exactly what was configured.
+ */
+export function resolveLatencyIngestUrl(base: string): string {
+  try {
+    return new URL(LATENCY_INGEST_PATH, base).toString();
+  } catch {
+    return base;
+  }
+}
+
+/**
  * Deliver one buffered latency batch to the ingest endpoint. No-op when the
  * endpoint is unset or the batch is empty. Uses the global `fetch` — never the
  * measured/observed wrapper — so a telemetry POST is not itself sampled,
@@ -18,7 +39,7 @@ export async function postLatencyBatch(batch: LatencyBatch): Promise<void> {
   }
   try {
     const token = await getAuthTokenForRequest();
-    await fetch(LATENCY_INGEST_URL, {
+    await fetch(resolveLatencyIngestUrl(LATENCY_INGEST_URL), {
       method: 'POST',
       headers: {
         ...buildAuthHeaders(token),

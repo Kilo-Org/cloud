@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- every gateway tool-call family converts through one module so the runners share one routing table. */
 import { z } from 'zod';
 import {
   createRemoteMcpToolCall,
@@ -103,6 +104,10 @@ const KILO_BROWSER_TOOL_CALL_PREFIX = `${KILO_BROWSER_TOOL_PREFIX}browser_`;
 export const isKiloBrowserToolCallName = (name: string): name is KiloBrowserToolName =>
   name.startsWith(KILO_BROWSER_TOOL_CALL_PREFIX);
 
+export const isKiloBrowserToolCallEvent = (toolCall: {
+  readonly name: string;
+}): toolCall is KiloBrowserToolCallEvent => isKiloBrowserToolCallName(toolCall.name);
+
 /** The upstream Playwright MCP name (`kilo_browser_click` -> `browser_click`). */
 const toUpstreamToolName = (name: KiloBrowserToolName): string =>
   name.slice(KILO_BROWSER_TOOL_PREFIX.length);
@@ -151,6 +156,39 @@ export const toBrowserToolCallEvents = (
 
 export const isRemoteMcpToolName = (name: string): name is RemoteMcpAgentToolName =>
   name.startsWith('mcp_');
+
+/*
+ * The turn-runner view of browser calls: every kilo_browser_* call gets a
+ * tool-call event, and a safe-mode refusal arrives paired with the call it
+ * answers, keyed to the call event's id, so the exchange renders as one card
+ * and the model reads the refusal on the next request.
+ */
+export const toBrowserToolTurnEvents = (
+  toolCalls: KiloGatewayToolCallRequest[],
+  selectedTabId: number,
+  mode: AgentMode
+): (KiloBrowserToolCallEvent | ToolResultEvent)[] =>
+  toolCalls.flatMap(toolCall => {
+    const events = toBrowserToolCallEvents([toolCall], selectedTabId, mode);
+    const [event] = events;
+
+    if (event === undefined) {
+      return [];
+    }
+
+    if (event.type === 'tool-call' || !isKiloBrowserToolCallName(toolCall.name)) {
+      return [event];
+    }
+
+    const callEvent = createToolCall({
+      arguments: toolCall.arguments,
+      name: toolCall.name,
+      providerToolCallId: toolCall.id,
+      tabId: selectedTabId,
+    });
+
+    return [callEvent, { ...event, toolCallId: callEvent.id }];
+  });
 
 export const isRemoteMcpToolCallEvent = (toolCall: {
   readonly name: string;

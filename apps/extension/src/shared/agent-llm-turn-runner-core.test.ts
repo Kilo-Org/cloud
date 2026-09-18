@@ -1,7 +1,7 @@
 /* eslint-disable max-lines, sort-keys, no-promise-executor-return, promise/avoid-new, promise/prefer-await-to-then, jest/no-conditional-in-test, consistent-type-imports, jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- Retry fixtures need attempt-conditional fakes and raw promises; the typed stream-client mock needs importOriginal. */
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createToolCall, createUserMessage } from './agent-conversation';
+import { createToolCall, createToolResult, createUserMessage } from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
 import type { FetchLike } from './auth';
 import { maxAgentToolRounds } from './agent-tool-round-limit';
@@ -29,6 +29,7 @@ vi.mock('./kilo-api-client', async importOriginal => {
 });
 
 const stringBodySchema = z.string();
+const requestBodySchema = z.looseObject({ messages: z.array(z.unknown()) });
 
 // The stream gate validates streamed tool-call names against the offered `tools` set.
 // Fixtures stream a `kilo_browser_snapshot` call, so the offered set must include that name.
@@ -193,6 +194,71 @@ describe('agent LLM turn runner core', () => {
       { costUsd: 0.0007, promptTokens: 100 },
       { costUsd: 0.001, promptTokens: 200 },
     ]);
+  });
+
+  it('replays a pre-resolved refusal and never executes the refused call', async () => {
+    const appendedEvents: AgentConversationEvent[] = [];
+    const fetchCalls: { readonly messages: readonly unknown[] }[] = [];
+    const executeToolCall = vi.fn();
+    const responses = createGatewayResponses();
+    const fetch: FetchLike = (_input, init) => {
+      fetchCalls.push(requestBodySchema.parse(JSON.parse(stringBodySchema.parse(init?.body))));
+
+      return responses.next().value;
+    };
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: events => {
+        appendedEvents.push(...events);
+      },
+      conversationEvents: [createUserMessage('Click save')],
+      executeToolCall,
+      failureMessage: String,
+      fetch,
+      maxToolRounds: 4,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'The model did not return a response.',
+      signal: undefined,
+      toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) => {
+        const [toolCall] = toolCalls;
+
+        if (toolCall === undefined) {
+          return [];
+        }
+
+        const callEvent = createToolCall({
+          arguments: {},
+          name: 'kilo_browser_click',
+          providerToolCallId: toolCall.id,
+          tabId: 123,
+        });
+
+        return [
+          callEvent,
+          createToolResult({ error: 'Refused.', ok: false, toolCallId: callEvent.id }),
+        ];
+      },
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many tool rounds.',
+      tools: [getPageSnapshotTool],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    expect(executeToolCall).not.toHaveBeenCalled();
+    expect(appendedEvents.map(event => event.type)).toStrictEqual([
+      'message',
+      'tool-call',
+      'tool-result',
+      'message',
+    ]);
+    expect(fetchCalls).toHaveLength(2);
+    expect(fetchCalls[1]?.messages).toContainEqual({
+      content: '{"error":"Refused.","ok":false}',
+      role: 'tool',
+      tool_call_id: 'call_snapshot',
+    });
   });
 
   it('allows the shared maxAgentToolRounds tool rounds before asking the user to continue', async () => {

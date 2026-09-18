@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { KILO_BROWSER_TOOL_PREFIX } from './browser-tool-contract';
 import type { KiloGatewayToolDefinition, WebMcpGatewayToolName } from './kilo-gateway-chat-client';
 import type { WebMcpToolDescriptor } from './tab-debugger';
 
@@ -60,7 +61,10 @@ const normalizeInputSchema = (inputSchema: unknown): Record<string, unknown> | u
 };
 
 const isReservedName = (name: string): boolean =>
-  RESERVED_GATEWAY_TOOL_NAMES.has(name) || name.startsWith('mcp_');
+  RESERVED_GATEWAY_TOOL_NAMES.has(name) ||
+  name.startsWith('mcp_') ||
+  // A page must never offer a tool the browser set owns: the name would collide in the gateway request and shadow the real effect.
+  name.startsWith(`${KILO_BROWSER_TOOL_PREFIX}browser_`);
 
 const buildDescription = (title: string, description: string): string => {
   if (title !== '' && description !== '') {

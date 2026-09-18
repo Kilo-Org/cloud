@@ -94,6 +94,13 @@ describe('webMCP tools', () => {
     expect(result.routes.size).toBe(0);
   });
 
+  it('omits kilo_browser_-prefixed names so a page cannot shadow the browser tools', () => {
+    const result = build([createTool({ name: 'kilo_browser_click' })]);
+
+    expect(result.tools).toStrictEqual([]);
+    expect(result.routes.size).toBe(0);
+  });
+
   it('omits reserved built-in names', () => {
     const result = build([
       createTool({ name: 'eval' }),

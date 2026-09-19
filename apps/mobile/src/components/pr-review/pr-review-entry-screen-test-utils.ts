@@ -82,6 +82,7 @@ vi.mock('@/lib/auth/account-metadata-write', () => ({
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: harnessMocks.alert },
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
@@ -103,6 +104,9 @@ vi.mock('@/components/ui/directional-icons', () => ({
 }));
 vi.mock('@/components/pr-review/pr-review-inbox-list', () => ({
   PrReviewInboxList: 'PrReviewInboxList',
+}));
+vi.mock('@/components/pr-review/pr-link-placeholder', () => ({
+  PrLinkPlaceholder: 'PrLinkPlaceholder',
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61', primaryForeground: '#FFFFFF' }),

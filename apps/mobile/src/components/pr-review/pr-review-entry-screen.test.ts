@@ -34,6 +34,42 @@ describe('provider-neutral URL field', () => {
     expect(String(input.props?.placeholder)).not.toContain('github');
   });
 
+  it('draws the Android placeholder as one ellipsized line instead of the wrapping native hint', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'TextInput', () => true);
+    // pr-review-home finding: at font scale 2 the native EditText lays the long
+    // placeholder hint out on two lines while Yoga sizes the field to one line,
+    // so the second line is clipped. `numberOfLines` cannot stop that — RN
+    // never marks a single-line input as single-line, so the hint still wraps —
+    // hence the visible placeholder is the one-line overlay below. The native
+    // hint stays set (the device digest binds the field's text and hint to the
+    // placeholder copy) but is transparent so it cannot draw.
+    expect(input.props?.placeholder).toBe('Pull request or merge request URL');
+    expect(input.props?.placeholderTextColor).toBe('transparent');
+    expect(input.props?.numberOfLines).toBe(1);
+    const overlay = find(tree, 'PrLinkPlaceholder', () => true);
+    expect(overlay.props?.label).toBe('Pull request or merge request URL');
+  });
+
+  it('hides the Android placeholder overlay once the field has text', async () => {
+    const before = await renderLoaded();
+    expect(findAll(before, 'PrLinkPlaceholder')).toHaveLength(1);
+    const input = find(before, 'TextInput', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)('https://github.com/a/b/pull/1');
+    const after = render();
+    expect(findAll(after, 'PrLinkPlaceholder')).toHaveLength(0);
+  });
+
+  it('sizes the field with min-h and no vertical padding per the mobile input rules', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'TextInput', () => true);
+    const classes = String(input.props?.className).split(' ');
+    // apps/mobile/AGENTS.md: single-line inputs set their height with min-h-*,
+    // not py-*; vertical padding draws the placeholder off-centre.
+    expect(classes).toContain('min-h-14');
+    expect(classes.filter(name => name.startsWith('py-'))).toEqual([]);
+  });
+
   it('opens a GitHub PR URL on the GitHub route', async () => {
     const tree = await renderLoaded();
     const input = find(tree, 'TextInput', () => true);

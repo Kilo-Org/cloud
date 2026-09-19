@@ -1,4 +1,8 @@
-const { withAndroidManifest, withAppBuildGradle, withDangerousMod } = require('expo/config-plugins');
+const {
+  withAndroidManifest,
+  withAppBuildGradle,
+  withDangerousMod,
+} = require('expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
@@ -50,7 +54,8 @@ const ON_CREATE_PATCH = `  override fun onCreate() {
     super.onCreate()
 
     recoverUnopenableWorkManagerStore()`;
-const ON_CONFIGURATION_CHANGED_ANCHOR = '  override fun onConfigurationChanged(newConfig: Configuration) {';
+const ON_CONFIGURATION_CHANGED_ANCHOR =
+  '  override fun onConfigurationChanged(newConfig: Configuration) {';
 const RECOVERY_MEMBERS = `  // Fully qualified on purpose: \`Configuration\` would collide with
   // android.content.res.Configuration, which onConfigurationChanged uses.
   override fun getWorkManagerConfiguration(): androidx.work.Configuration =

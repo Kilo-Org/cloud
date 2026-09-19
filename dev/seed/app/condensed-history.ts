@@ -11,6 +11,7 @@ import { isValidEmail } from '../lib/users';
 import {
   buildAssistantMessageItem,
   buildSessionItem,
+  buildToolPartItem,
   buildUserMessageItem,
   parseSessionIngestServiceStatus,
   type SessionIngestItem,
@@ -18,40 +19,31 @@ import {
 
 export const usage = '<email>';
 
-export const SESSION_ID = 'ses_000000000005PagedHistory01';
-export const SESSION_TITLE = '60-message pagination fixture';
-export const SESSION_SLUG = 'paged-history-fixture';
+export const SESSION_ID = 'ses_000000000006CondensedHist1';
+export const SESSION_TITLE = 'Condensed history';
+export const SESSION_SLUG = 'condensed-history-fixture';
 export const MESSAGE_COUNT = 60;
-
-/**
- * The first message of the loaded page (the newest 50 are messages 11-60) and
- * the first loaded assistant message. It opens the burst whose marker moves
- * onto the prepended older page, so it carries an inline reasoning part: the e2
- * scenario expands that row's thinking and proves the prepend neither remounts
- * (and so collapses) it nor jumps the viewport.
- */
-export const REASONING_MESSAGE_INDEX = 11;
 
 const TOKEN_EXPIRES_SECONDS = 3600;
 const POLL_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 500;
-const BASE_CREATED_AT = 1_700_100_000_000;
+const BASE_CREATED_AT = 1_700_200_000_000;
 
 function printUsage(): void {
-  console.log(`Usage: pnpm dev:seed app:paged-history ${usage}`);
+  console.log(`Usage: pnpm dev:seed app:condensed-history ${usage}`);
   console.log('');
-  console.log('Seeds one read-only cloud-agent session with 60 tall transcript');
-  console.log('messages so the first page (50) overflows and older history stays');
-  console.log('behind a scroll-up. The first loaded assistant message (message 11)');
-  console.log('carries an inline reasoning part, so "Auto expand thinking" renders its');
-  console.log('expanded thinking on the burst-opening row that the prepend re-marks.');
-  console.log('Writes the cli_sessions_v2 row, then ingests through the local');
-  console.log('cloudflare-session-ingest worker.');
+  console.log('Seeds one read-only cloud-agent session titled "Condensed history"');
+  console.log('with 60 messages so the first page (50) overflows and older history');
+  console.log('stays behind a scroll-up. Messages 9-11 are consecutive assistant');
+  console.log('messages holding only completed read-tool calls, so the 50-message');
+  console.log('page boundary (between messages 10 and 11) splits one condensed');
+  console.log('tool run: before the prepend the run is message 11 alone, after the');
+  console.log('prepend messages 9-11 merge into one six-call condensed row.');
   console.log('No cloud-agent session ID is set, so the UI is historical/read-only.');
   console.log('');
   console.log('Examples:');
-  console.log('  pnpm dev:seed app:paged-history evgeny@kilocode.ai');
-  console.log('  pnpm -s dev:seed app:paged-history evgeny@kilocode.ai --json');
+  console.log('  pnpm dev:seed app:condensed-history evgeny@kilocode.ai');
+  console.log('  pnpm -s dev:seed app:condensed-history evgeny@kilocode.ai --json');
 }
 
 function sleep(ms: number): Promise<void> {
@@ -60,28 +52,6 @@ function sleep(ms: number): Promise<void> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** Whether the materialized history holds the fixture's inline reasoning part. */
-function historyHasReasoningPart(history: Record<string, unknown>): boolean {
-  if (!Array.isArray(history.messages)) {
-    return false;
-  }
-  for (const message of history.messages) {
-    if (!isRecord(message) || !Array.isArray(message.parts)) {
-      continue;
-    }
-    for (const part of message.parts) {
-      if (
-        isRecord(part) &&
-        part.id === reasoningPartIdFor(REASONING_MESSAGE_INDEX) &&
-        part.type === 'reasoning'
-      ) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 function parseArgs(args: string[]): string {
@@ -123,15 +93,15 @@ function paddedIndex(index: number): string {
 }
 
 function messageIdFor(index: number): string {
-  return `msgPaged${paddedIndex(index)}`;
+  return `msgCond${paddedIndex(index)}`;
 }
 
-function partIdFor(index: number): string {
-  return `prtPaged${paddedIndex(index)}`;
+function partIdFor(index: number, slot: number): string {
+  return `prtCond${paddedIndex(index)}${slot}`;
 }
 
-function reasoningPartIdFor(index: number): string {
-  return `prtPagedReason${paddedIndex(index)}`;
+function callIdFor(index: number, slot: number): string {
+  return `callCond${paddedIndex(index)}${slot}`;
 }
 
 function messageBody(role: 'User' | 'Assistant', index: number): string {
@@ -139,26 +109,12 @@ function messageBody(role: 'User' | 'Assistant', index: number): string {
     `${role} message ${index} of ${MESSAGE_COUNT}.`,
     '',
     'Padded so fifty messages overflow the chat viewport.',
-    'Short one-liners stay on-screen, and the near-top autoload then pulls the older page immediately.',
     `Marker line A for message ${index}.`,
     `Marker line B for message ${index}.`,
     `Marker line C for message ${index}.`,
     `Marker line D for message ${index}.`,
     `Marker line E for message ${index}.`,
-    `Marker line F for message ${index}.`,
-    `Marker line G for message ${index}.`,
     `End of ${role.toLowerCase()} message ${index}.`,
-  ].join('\n');
-}
-
-function reasoningBody(index: number): string {
-  return [
-    `Reasoning for message ${index} of ${MESSAGE_COUNT}.`,
-    '',
-    'Expanded thinking stays mounted when the older page prepends.',
-    'Reasoning marker line A.',
-    'Reasoning marker line B.',
-    `End of reasoning for message ${index}.`,
   ].join('\n');
 }
 
@@ -181,32 +137,40 @@ function buildTextPartItem(params: {
 }
 
 /**
- * A reasoning part must carry `time: { start, end }`: the read contract declares
- * it non-optional, so the read seam drops a reasoning part without it instead of
- * rendering the row (packages/session-ingest-contracts/src/rpc-contract.ts).
+ * One completed `read` call whose card subtitle is the file's basename, so the
+ * transcript rows and the condensed "N items; …" label carry stable, greppable
+ * text for the device scene to assert.
  */
-function buildReasoningPartItem(params: {
-  partId: string;
-  sessionId: string;
-  messageId: string;
-  text: string;
-  start: number;
-  end: number;
-}): SessionIngestItem {
-  return {
-    type: 'part',
-    data: {
-      id: params.partId,
-      sessionID: params.sessionId,
-      messageID: params.messageId,
-      type: 'reasoning',
-      text: params.text,
-      time: { start: params.start, end: params.end },
-    },
-  };
+function buildBoundaryToolPartItems(params: {
+  index: number;
+  createdAt: number;
+  slotCount: number;
+}): SessionIngestItem[] {
+  const items: SessionIngestItem[] = [];
+  for (let slot = 0; slot < params.slotCount; slot += 1) {
+    items.push(
+      buildToolPartItem({
+        partId: partIdFor(params.index, slot),
+        sessionId: SESSION_ID,
+        messageId: messageIdFor(params.index),
+        callId: callIdFor(params.index, slot),
+        tool: 'read',
+        status: 'completed',
+        input: {
+          filePath: `/repo/condensed-run-msg${params.index}-call${slot + 1}.txt`,
+        },
+        output: `fixture read output for message ${params.index} call ${slot + 1}`,
+        title: `Read condensed-run-msg${params.index}-call${slot + 1}.txt`,
+        metadata: {},
+        start: params.createdAt + slot * 100,
+        end: params.createdAt + slot * 100 + 50,
+      })
+    );
+  }
+  return items;
 }
 
-export function buildPagedHistoryIngestItems(): SessionIngestItem[] {
+export function buildCondensedHistoryIngestItems(): SessionIngestItem[] {
   const items: SessionIngestItem[] = [
     buildSessionItem({
       sessionId: SESSION_ID,
@@ -219,10 +183,11 @@ export function buildPagedHistoryIngestItems(): SessionIngestItem[] {
     const createdAt = BASE_CREATED_AT + index * 1_000;
     const messageId = messageIdFor(index);
 
-    // The burst opener is an assistant turn: the loaded page starts at message
-    // 11 and its marker moves to message 1 when the older page prepends. Its
-    // inline reasoning is what the e2 scenario expands before that prepend.
-    if (index === REASONING_MESSAGE_INDEX) {
+    // The page boundary sits between messages 10 and 11 (first page holds the
+    // newest 50, messages 11-60). Messages 9-11 are consecutive assistant
+    // messages whose only parts are completed tool calls, so the 50-message
+    // page splits one condensed tool run exactly at that boundary.
+    if (index >= 9 && index <= 11) {
       items.push(
         buildAssistantMessageItem({
           messageId,
@@ -235,30 +200,16 @@ export function buildPagedHistoryIngestItems(): SessionIngestItem[] {
             total: 40,
             input: 20,
             output: 16,
-            reasoning: 8,
+            reasoning: 0,
             cache: { read: 2, write: 2 },
           },
         }),
-        buildReasoningPartItem({
-          partId: reasoningPartIdFor(index),
-          sessionId: SESSION_ID,
-          messageId,
-          text: reasoningBody(index),
-          start: createdAt + 1,
-          end: createdAt + 100,
-        }),
-        buildTextPartItem({
-          partId: partIdFor(index),
-          sessionId: SESSION_ID,
-          messageId,
-          text: messageBody('Assistant', index),
-        })
+        ...buildBoundaryToolPartItems({ index, createdAt, slotCount: 2 })
       );
       continue;
     }
 
     const isUser = index % 2 === 1;
-
     if (isUser) {
       items.push(
         buildUserMessageItem({
@@ -267,7 +218,7 @@ export function buildPagedHistoryIngestItems(): SessionIngestItem[] {
           createdAt,
         }),
         buildTextPartItem({
-          partId: partIdFor(index),
+          partId: partIdFor(index, 0),
           sessionId: SESSION_ID,
           messageId,
           text: messageBody('User', index),
@@ -293,7 +244,7 @@ export function buildPagedHistoryIngestItems(): SessionIngestItem[] {
         },
       }),
       buildTextPartItem({
-        partId: partIdFor(index),
+        partId: partIdFor(index, 0),
         sessionId: SESSION_ID,
         messageId,
         text: messageBody('Assistant', index),
@@ -358,15 +309,12 @@ async function pollForMessages(baseUrl: string, sessionId: string, token: string
       throw new Error(`Messages read of ${sessionId} returned an unexpected history shape`);
     }
 
-    // The read seam drops a reasoning part whose `time` is absent, so a
-    // materialized reasoning part is the fixture's own proof that the e2 row
-    // will render. Poll for it rather than counting messages alone.
-    if (history.messages.length === MESSAGE_COUNT && historyHasReasoningPart(history)) {
+    if (history.messages.length === MESSAGE_COUNT) {
       return history.messages.length;
     }
     if (Date.now() >= deadline) {
       throw new Error(
-        `Timed out waiting for ${MESSAGE_COUNT} messages and the reasoning part in ${sessionId}; saw ${history.messages.length}`
+        `Timed out waiting for ${MESSAGE_COUNT} messages in ${sessionId}; saw ${history.messages.length}`
       );
     }
     await sleep(POLL_INTERVAL_MS);
@@ -450,25 +398,22 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     created_on_platform: 'cloud-agent-web',
   } satisfies typeof cli_sessions_v2.$inferInsert);
 
-  await ingestSession(sessionIngestUrl, SESSION_ID, token, buildPagedHistoryIngestItems());
+  await ingestSession(sessionIngestUrl, SESSION_ID, token, buildCondensedHistoryIngestItems());
   const messageCount = await pollForMessages(sessionIngestUrl, SESSION_ID, token);
 
   console.log('');
-  console.log('Seeded a read-only 60-message cloud-agent transcript.');
-  console.log('Message 11 (the first loaded assistant message) carries inline reasoning.');
-  console.log('Turn on "Auto expand thinking" to see it expanded.');
-  console.log('Hard-refresh /cloud/chat?sessionId=' + SESSION_ID + '.');
-  console.log('Newest 50 should be on screen; scroll up for the older 10.');
+  console.log('Seeded a read-only "Condensed history" cloud-agent transcript (60 messages).');
+  console.log('The 50-message page boundary splits a tool run between messages 10 and 11:');
+  console.log('after the older page prepends, messages 9-11 merge into one 6-item condensed row.');
+  console.log('Open kiloapp://agent-chat/' + SESSION_ID + ' with Condense tool calls enabled.');
 
   return {
     userId: user.userId,
     email: user.email,
     sessionId: SESSION_ID,
     messageCount,
-    reasoningMessageId: messageIdFor(REASONING_MESSAGE_INDEX),
-    reasoningPartId: reasoningPartIdFor(REASONING_MESSAGE_INDEX),
     sessionIngestPort: serviceStatus.port,
     sessionIngestUrl,
-    chatPath: `/cloud/chat?sessionId=${SESSION_ID}`,
+    deepLink: `kiloapp://agent-chat/${SESSION_ID}`,
   };
 }

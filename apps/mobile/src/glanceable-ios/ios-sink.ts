@@ -486,4 +486,6 @@ export async function renderStoredSnapshotWithNotice(): Promise<void> {
     return;
   }
   iosSink.publish(snapshot);
+  // Keep the background press alive until ActivityKit has applied its notice.
+  await inFlightUpdate;
 }

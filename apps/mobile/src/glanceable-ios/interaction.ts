@@ -11,6 +11,7 @@ import { restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
 import { readWaitingAsk, recordWaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { setPendingDeepLink } from '@/lib/deep-link-launch';
+import { launcherSessionUrl } from '@/lib/launcher-surfaces';
 
 import {
   ActiveAgentsLiveActivity,
@@ -39,9 +40,6 @@ import { renderStoredSnapshotWithNotice, setGlanceableActionNotice } from './ios
 export const GLANCEABLE_APPROVE_TARGET = 'approve';
 /** The Open target the layout's button carries. */
 export const GLANCEABLE_OPEN_TARGET = 'open';
-
-/** The session route the Open target adds the recorded id to. */
-const SESSION_URL_PREFIX = 'kiloapp:///cloud/sessions/';
 
 /** The one failure line the toast carries; the card keeps its Approve tap. */
 const APPROVE_FAILED_KEY = 'glanceable.approveFailed';
@@ -181,7 +179,7 @@ async function openRecordedSession(): Promise<GlanceableInteractionOutcome> {
   await restorePersistedGlanceable();
   const ask = await readWaitingAsk();
   const href = resolveIncomingUrl(
-    ask === null ? OPEN_AGENTS_URL : `${SESSION_URL_PREFIX}${ask.kiloSessionId}`
+    ask === null ? OPEN_AGENTS_URL : launcherSessionUrl(ask.kiloSessionId)
   );
   if (href === null) {
     return { kind: 'no_session' };

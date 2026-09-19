@@ -301,18 +301,20 @@ describe('handleGlanceableInteraction', () => {
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
   });
 
-  it('routes Open to the recorded session', async () => {
-    await expect(handleGlanceableInteraction(fromCard(GLANCEABLE_OPEN_TARGET))).resolves.toEqual({
-      kind: 'opened',
-      href: '/(app)/agent-chat/session-7',
-    });
+  it.each(['session-7', 'ses_1/2 3', 'ses_1?tab=2', 'ses_1#part', 'ses_%2F'])(
+    'routes Open to the entire recorded session id %s',
+    async kiloSessionId => {
+      mocks.readWaitingAsk.mockResolvedValue({ ...ASK, kiloSessionId });
+      const href = `/(app)/agent-chat/${encodeURIComponent(kiloSessionId)}`;
+      await expect(handleGlanceableInteraction(fromCard(GLANCEABLE_OPEN_TARGET))).resolves.toEqual({
+        kind: 'opened',
+        href,
+      });
 
-    expect(mocks.setPendingDeepLink).toHaveBeenCalledWith(
-      '/(app)/agent-chat/session-7',
-      'universal-link'
-    );
-    expect(mocks.runGlanceableApprove).not.toHaveBeenCalled();
-  });
+      expect(mocks.setPendingDeepLink).toHaveBeenCalledWith(href, 'universal-link');
+      expect(mocks.runGlanceableApprove).not.toHaveBeenCalled();
+    }
+  );
 
   it('restores the persisted scope before Approve reads the mirrored ask', async () => {
     await handleGlanceableInteraction(fromCard(GLANCEABLE_APPROVE_TARGET));

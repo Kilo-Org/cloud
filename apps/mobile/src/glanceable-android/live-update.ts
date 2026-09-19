@@ -7,6 +7,7 @@ import { type AndroidNotificationChannelId } from '@kilocode/notifications';
 import { requireOptionalNativeModule } from 'expo';
 
 import { type WaitingAsk } from '@/lib/glanceable/waiting-ask';
+import { launcherSessionUrl } from '@/lib/launcher-surfaces';
 
 /**
  * JS wrapper over the local `ActiveAgentsLiveUpdate` native module. The native
@@ -76,9 +77,6 @@ const APPROVE_LABEL_KEY = 'common.approve';
 /** No recorded ask: Open falls back to the Agents tab, never a guessed session. */
 const OPEN_AGENTS_URL = 'kiloapp:///cloud/sessions';
 
-/** The session route the deep link adds an id to. */
-const SESSION_URL_PREFIX = 'kiloapp:///cloud/sessions/';
-
 /** The two notification actions, both named by the one recorded waiting ask. */
 type NotificationActions = {
   openLabel: string;
@@ -98,7 +96,7 @@ export function buildNotificationActions(
   const canApprove = ask?.status === 'permission' && ask.isCloudAgent;
   return {
     openLabel: translate(OPEN_SESSION_LABEL_KEY),
-    openUrl: ask === null ? OPEN_AGENTS_URL : `${SESSION_URL_PREFIX}${ask.kiloSessionId}`,
+    openUrl: ask === null ? OPEN_AGENTS_URL : launcherSessionUrl(ask.kiloSessionId),
     approveLabel: canApprove ? translate(APPROVE_LABEL_KEY) : null,
   };
 }

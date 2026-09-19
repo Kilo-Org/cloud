@@ -105,11 +105,19 @@ describe('Active Agents Live Activity actions', () => {
     // The press can arrive with the app closed, so the failure line the app
     // puts in the content state has to be drawn on the card itself.
     expect(source).toContain('const notice = props.notice ?? null;');
-    expect(region(source, 'banner: (', 'compactLeading:')).toContain('{noticeLine}');
+    expect(region(source, 'banner: (', 'bannerSmall:')).toContain('{noticeLine}');
+    expect(region(source, 'bannerSmall: (', 'compactLeading:')).toContain('{noticeLine}');
     expect(region(source, 'expandedBottom: (', '\n  };\n};')).toContain('{noticeLine}');
     // The compact presentations carry the count alone: the notice goes where
     // the buttons and the labelled counts are.
     expect(region(source, 'compactLeading:', 'expandedBottom:')).not.toContain('{noticeLine}');
+  });
+
+  it('reserves the small banner notice row even before an Approve failure', () => {
+    const small = region(source, 'bannerSmall: (', 'compactLeading:');
+    expect(small).toMatch(
+      /<VStack modifiers=\{\[frame\(\{ height: 18 \}\)\]\}>\s*\{noticeLine\}\s*<\/VStack>/
+    );
   });
 
   it('keeps every compact presentation free of buttons', () => {

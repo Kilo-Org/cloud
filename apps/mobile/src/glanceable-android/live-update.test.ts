@@ -4,6 +4,9 @@ import {
   type GlanceableSessionRow,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
+
+import { type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 
 const mocks = vi.hoisted(() => ({
   native: {
@@ -21,6 +24,7 @@ vi.mock('expo', () => ({
 }));
 
 const {
+  buildNotificationActions,
   end: endLiveUpdate,
   getStoredWidgetSnapshot,
   setWidgetSnapshot,
@@ -58,6 +62,36 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe('notification Open destination', () => {
+  it.each(['ses_1', 'ses_1/2 3', 'ses_1?tab=2', 'ses_1#part', 'ses_%2F'])(
+    'preserves the entire recorded session id %s',
+    kiloSessionId => {
+      const ask: WaitingAsk = {
+        kiloSessionId,
+        status: 'permission',
+        isCloudAgent: true,
+        scopeKey: 'scope',
+        organizationId: null,
+        userId: 'u1',
+        recordedAt: NOW,
+      };
+      const actions = buildNotificationActions(ask, key => key);
+
+      expect(resolveIncomingUrl(actions.openUrl)).toBe(
+        `/(app)/agent-chat/${encodeURIComponent(kiloSessionId)}`
+      );
+      expect(actions.approveLabel).toBe('common.approve');
+    }
+  );
+
+  it('opens the Agents tab without offering Approve when no ask is recorded', () => {
+    const actions = buildNotificationActions(null, key => key);
+
+    expect(resolveIncomingUrl(actions.openUrl)).toBe('/(app)/(tabs)/(2_agents)');
+    expect(actions.approveLabel).toBeNull();
+  });
 });
 
 describe('live-update bridge argument shape', () => {

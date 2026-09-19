@@ -378,38 +378,42 @@ const layout: LiveActivityComponent<ContentState> = props => {
     // trailing Spacer pins the row to the leading edge, so the count keeps its
     // place when the control appears and disappears, the way the phone block is
     // spaced; the row draws unconditionally, and only the control is gated, by
-    // the same `canApprove` the phone block uses.
+    // the same `canApprove` the phone block uses. The notice has a reserved row
+    // below, so a failed press cannot move the count or its retry control.
     bannerSmall: (
-      <HStack alignment="center" spacing={10}>
-        <HStack
-          alignment="center"
-          spacing={7}
-          modifiers={[
-            // The combined label sits on the count row alone, so VoiceOver on
-            // the watch can still focus and activate the Approve button
-            // separately.
-            accessibilityElement('combine'),
-            accessibilityLabel(accessibility),
-          ]}
-        >
-          {hasCounts ? (
-            countRow(primary, true, false)
-          ) : (
-            <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>
-              {statusLine}
-            </Text>
-          )}
+      <VStack alignment="leading" spacing={6}>
+        <HStack alignment="center" spacing={10}>
+          <HStack
+            alignment="center"
+            spacing={7}
+            modifiers={[
+              // The combined label sits on the count row alone, so VoiceOver on
+              // the watch can still focus and activate the Approve button
+              // separately.
+              accessibilityElement('combine'),
+              accessibilityLabel(accessibility),
+            ]}
+          >
+            {hasCounts ? (
+              countRow(primary, true, false)
+            ) : (
+              <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>
+                {statusLine}
+              </Text>
+            )}
+          </HStack>
+          {canApprove ? (
+            // The target is the literal, not the imported `APPROVE_TARGET`: this
+            // function's source is stringified and re-evaluated in the widget
+            // process, where an imported binding is an undefined global.
+            // `layout-copy.test.ts` keeps it equal to the constant the interaction
+            // handler matches.
+            <Button label={COPY.approve} target="approve" />
+          ) : null}
+          <Spacer />
         </HStack>
-        {canApprove ? (
-          // The target is the literal, not the imported `APPROVE_TARGET`: this
-          // function's source is stringified and re-evaluated in the widget
-          // process, where an imported binding is an undefined global.
-          // `layout-copy.test.ts` keeps it equal to the constant the interaction
-          // handler matches.
-          <Button label={COPY.approve} target="approve" />
-        ) : null}
-        <Spacer />
-      </HStack>
+        <VStack modifiers={[frame({ height: 18 })]}>{noticeLine}</VStack>
+      </VStack>
     ),
     // The Dynamic Island's leading slot is the app-identity slot, so it holds
     // the Kilo mark; the trailing slot carries the ranked count.

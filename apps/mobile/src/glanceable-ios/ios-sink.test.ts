@@ -1096,6 +1096,34 @@ describe('iosSink approve-failed notice', () => {
     expect(mockState.updated).toEqual([]);
   });
 
+  it('does not finish a background notice render before ActivityKit applies it', async () => {
+    recordWaitingAsk(recordedAsk());
+    _setLastGlanceableSnapshotForTests(stored());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+    const update = Promise.withResolvers<undefined>();
+    mockState.updatePromise = update.promise;
+    setGlanceableActionNotice('failed');
+    let finished = false;
+    const render = (async () => {
+      await renderStoredSnapshotWithNotice();
+      finished = true;
+    })();
+
+    try {
+      await vi.waitFor(() => {
+        expect(mockState.updated).toHaveLength(1);
+      });
+      expect(finished).toBe(false);
+      expect(mockState.started[0]?.props).not.toHaveProperty('notice');
+    } finally {
+      update.resolve(undefined);
+      await render;
+    }
+
+    expect(finished).toBe(true);
+    expect(mockState.started[0]?.props).toMatchObject({ notice: 'failed', canApprove: true });
+  });
+
   it('drops the notice when a different ask is recorded', () => {
     recordWaitingAsk(recordedAsk());
     setGlanceableActionNotice('failed');
@@ -1105,6 +1133,38 @@ describe('iosSink approve-failed notice', () => {
 
     // A failure line must never describe the ask that replaced it.
     expect(mockState.started.at(-1)?.props).not.toHaveProperty('notice');
+  });
+
+  it('reports a rejected native notice update to the interaction error handler', async () => {
+    recordWaitingAsk(recordedAsk());
+    _setLastGlanceableSnapshotForTests(stored());
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 0), CTX);
+    const update = Promise.withResolvers<undefined>();
+    mockState.updatePromise = update.promise;
+    setGlanceableActionNotice('failed');
+    const render = renderStoredSnapshotWithNotice();
+
+    await vi.waitFor(() => {
+      expect(mockState.updated).toHaveLength(1);
+    });
+    const rejected = expect(render).rejects.toThrow('native notice update failed');
+    update.reject(new Error('native notice update failed'));
+    await rejected;
+
+    mockState.updatePromise = null;
+    await renderStoredSnapshotWithNotice();
+    expect(mockState.started[0]?.props).toMatchObject({ notice: 'failed', canApprove: true });
+  });
+
+  it('does not start a replacement card when the notice has no native activity to update', async () => {
+    recordWaitingAsk(recordedAsk());
+    _setLastGlanceableSnapshotForTests(stored());
+    setGlanceableActionNotice('failed');
+
+    await renderStoredSnapshotWithNotice();
+
+    expect(mockState.started).toEqual([]);
+    expect(mockState.updated).toEqual([]);
   });
 
   it('drops the notice once no work needs input', () => {

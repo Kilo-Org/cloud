@@ -747,12 +747,27 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
 ];
 
 const selfServicePromos: readonly SelfServicePromoCreditCategoryConfig[] =
-  encryptedSelfServicePromos.map(
-    ({ encrypted_credit_category, ...rest }): SelfServicePromoCreditCategoryConfig => ({
-      ...rest,
-      credit_category: decryptPromoCode(encrypted_credit_category),
-    })
-  );
+  encryptedSelfServicePromos.flatMap(({ encrypted_credit_category, ...rest }) => {
+    try {
+      return [
+        {
+          ...rest,
+          credit_category: decryptPromoCode(encrypted_credit_category),
+        },
+      ];
+    } catch (error) {
+      // Decrypting the whole catalogue happens at module scope, so an
+      // undecryptable entry (for example a missing or rotated
+      // CREDIT_CATEGORIES_ENCRYPTION_KEY_V2) would otherwise take down every
+      // route that imports this module, sign-in included. Report it and keep
+      // the entries that did decrypt.
+      console.error(
+        'Failed to decrypt a self-service promo credit category; skipping it. Check CREDIT_CATEGORIES_ENCRYPTION_KEY_V2 / CREDIT_CATEGORIES_ENCRYPTION_KEY.',
+        error
+      );
+      return [];
+    }
+  });
 
 export const promoCreditCategories: readonly PromoCreditCategoryConfig[] = [
   ...promoCategoriesOld,

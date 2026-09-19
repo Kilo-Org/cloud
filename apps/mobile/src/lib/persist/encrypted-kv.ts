@@ -9,6 +9,7 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
 import migrations from '../../../drizzle/migrations';
+import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { PERSIST_DB_KEY } from '@/lib/storage-keys';
 import { kv } from './schema';
 
@@ -92,7 +93,10 @@ async function generateHexKey(): Promise<string> {
 }
 
 async function readOrCreateKey(): Promise<string> {
-  const existing = await SecureStore.getItemAsync(PERSIST_DB_KEY);
+  // A transient keychain rejection must not be read as "no key": retrying it
+  // keeps one rejection from failing the open, which is memoized for the rest
+  // of the process.
+  const existing = await readStoredValueWithRetry(PERSIST_DB_KEY);
   if (existing) {
     return existing;
   }

@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- one suite covering every builder and the locked-copy matrix */
 /* eslint-disable max-lines -- one cohesive props-builder suite sharing the copy-map translator */
 import {
   buildGlanceableSnapshot,

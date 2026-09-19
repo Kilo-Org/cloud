@@ -11,7 +11,7 @@ import { type KiloMcpState } from '@/lib/chat/kilo-mcp';
  */
 
 /** The line under the switch, named by its key so the sheet draws it directly. */
-export type McpStatusKey =
+type McpStatusKey =
   | 'modelChat.mcp.available'
   | 'modelChat.mcp.connecting'
   | 'modelChat.mcp.none'
@@ -21,7 +21,7 @@ export type McpStatusKey =
   | 'modelChat.mcp.unreachable';
 
 /** The sentence that says what the status means, when one is needed. */
-export type McpDescriptionKey =
+type McpDescriptionKey =
   | 'modelChat.mcp.noneDescription'
   | 'modelChat.mcp.offDescription'
   | 'modelChat.mcp.unauthorizedDescription'
@@ -33,7 +33,7 @@ export type McpDescriptionKey =
  * when the tools are there, amber while a discovery runs or found nothing,
  * red when a server failed, and grey when the chat has the feature off.
  */
-export type McpTone = 'good' | 'warn' | 'danger' | 'muted';
+type McpTone = 'good' | 'warn' | 'danger' | 'muted';
 
 export type McpSettingsView = {
   /**

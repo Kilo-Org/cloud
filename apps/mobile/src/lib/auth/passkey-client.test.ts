@@ -115,6 +115,19 @@ describe('classifyPasskeyError', () => {
     expect(classifyPasskeyError({ message: 'nocredentials' })).toBe('no-passkey');
   });
 
+  it.each(['name', 'message', 'code'])(
+    'normalizes the native %s only for classification, leaving display copy to the catalog',
+    field => {
+      const error = { [field]: 'NOTCONFIGURED' };
+
+      const failure = classifyPasskeyError(error);
+
+      expect(failure).toBe('unsupported');
+      expect(passkeyFailureKey(failure)).toBe('login.passkeyUnsupported');
+      expect(error[field]).toBe('NOTCONFIGURED');
+    }
+  );
+
   it('falls back to the generic failure for anything else', () => {
     expect(classifyPasskeyError(new Error('socket closed'))).toBe('failed');
     expect(classifyPasskeyError(undefined)).toBe('failed');

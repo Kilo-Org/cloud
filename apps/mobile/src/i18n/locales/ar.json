@@ -336,6 +336,15 @@
       "kiloclawActivitySubtitle": "جاهزية المثيل أو فشله، وإجراءات مجدولة",
       "balanceAlertsSubtitle": "تحذيرات انخفاض رصيد المؤسسة",
       "securityFindingsSubtitle": "نتائج جديدة وتذكيرات SLA"
+    },
+    "action": {
+      "openSession": "فتح الجلسة"
+    },
+    "needsInputAction": {
+      "approved": "تمت الموافقة على الطلب",
+      "replied": "تم إرسال الرد",
+      "failed": "تعذّرت الإجابة. انقر مجددًا لإعادة المحاولة.",
+      "unavailable": "لم يعد هذا الطلب قيد الانتظار."
     }
   },
   "tabs": {
@@ -1721,20 +1730,7 @@
       "continueFrom": "تجري متابعة {{title}}.",
       "importingSession": "جارٍ استيراد الجلسة",
       "cliCannotContinue": "إصدار CLI هذا لا يدعم متابعة الجلسات. اختر Cloud Agent أو CLI آخر.",
-      "importFailed": "تعذر استيراد هذه الجلسة.",
-      "sandbox": "البيئة المعزولة",
-      "sandboxAccessibility": "البيئة المعزولة: {{label}}",
-      "sandboxDefaultWithDestination": "افتراضي · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "صغير",
-      "sandboxInstanceShared": "مشترك",
-      "sandboxInstanceLarge": "كبير",
-      "sandboxInstanceDevcontainer": "حاوية التطوير",
-      "sandboxInstanceProviderDefault": "الافتراضي للمزوّد",
-      "sandboxCouldNotLoad": "تعذّر تحميل خيارات البيئة المعزولة",
-      "sandboxUnavailable": "هذه البيئة المعزولة غير متاحة. اختر بيئة معزولة أخرى أو الافتراضي.",
-      "sandboxUseDefault": "استخدام الافتراضي"
+      "importFailed": "تعذر استيراد هذه الجلسة."
     },
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث ملف واحد ({{displayCount}}).",

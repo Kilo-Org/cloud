@@ -1,11 +1,7 @@
-// eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
-import { createRequire } from 'node:module';
-import tailwindcss from '@tailwindcss/postcss';
-import postcss from 'postcss';
 import { createElement, type ReactElement, useState } from 'react';
 import { Text as NativeText, Pressable } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import type * as NativeCSSCompiler from 'react-native-css/compiler';
+import { nativeDimensions } from '@/test/native-dimensions.test-helpers';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -30,9 +26,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 
-const { compile } = createRequire(import.meta.url)(
-  'react-native-css/compiler'
-) as typeof NativeCSSCompiler;
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 function render(element: ReactElement) {
@@ -56,21 +49,6 @@ function renderButton({
   return render(createElement(Button, { accessibilityLabel: 'Retry', ...props }, children));
 }
 
-async function nativeDimensions(button: TestRenderer.ReactTestInstance) {
-  const dimensions = (button.props.className as string)
-    .split(' ')
-    .filter(className => /^(?:min-h|h|w)-/.test(className))
-    .join(' ');
-  // Use the app's theme and installed compilers, not a hand-written utility-to-point map.
-  const { css } = await postcss([tailwindcss()]).process(
-    `@reference "../../global.css"; .target { @apply ${dimensions}; }`,
-    { from: import.meta.filename }
-  );
-  // Match metro.config.js. The compiler keeps its default 14-point inlineRem.
-  const rules = compile(css, { inlineVariables: false }).stylesheet().s;
-  return rules?.find(([name]) => name === 'target')?.[1].flatMap(rule => rule.d ?? []);
-}
-
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 });
@@ -86,20 +64,22 @@ describe('Button native target contract', () => {
     'keeps a 44-point minimum without fixing the height for size %s',
     async size => {
       const button = renderButton({ size, variant: 'outline' });
-      expect(await nativeDimensions(button)).toEqual([{ minHeight: 44 }]);
+      expect(await nativeDimensions(button.props.className as string)).toEqual([{ minHeight: 44 }]);
       expect(button.props.hitSlop).toBeUndefined();
     }
   );
 
   it('keeps a 36-point compact minimum plus four-point hitSlop on every edge', async () => {
     const button = renderButton({ size: 'sm' });
-    expect(await nativeDimensions(button)).toEqual([{ minHeight: 36 }]);
+    expect(await nativeDimensions(button.props.className as string)).toEqual([{ minHeight: 36 }]);
     expect(button.props.hitSlop).toEqual({ top: 4, bottom: 4, left: 4, right: 4 });
   });
 
   it('keeps an icon target 44 points wide and tall without requiring label content', async () => {
     const button = renderButton({ size: 'icon', children: null, accessibilityLabel: 'Close' });
-    expect(await nativeDimensions(button)).toEqual([{ height: 44, width: 44 }]);
+    expect(await nativeDimensions(button.props.className as string)).toEqual([
+      { height: 44, width: 44 },
+    ]);
     expect(button.props.role).toBe('button');
     expect(button.props.accessibilityLabel).toBe('Close');
   });

@@ -20,19 +20,20 @@ const SKILL_MUTATION_KEY = 'agentProfiles:skill';
 
 function withDefaultFlag<T extends { id: string; isDefault: boolean }>(
   profiles: readonly T[],
-  defaultId: string | null
+  profileId: string,
+  setDefault: boolean
 ): T[] {
-  return profiles.map(profile => {
-    const isDefault = profile.id === defaultId;
-    return profile.isDefault === isDefault ? profile : { ...profile, isDefault };
-  });
+  return profiles.map(profile => withDefaultDetail(profile, profileId, setDefault));
 }
 
-function withDefaultDetail(
-  profile: AgentProfileDetail,
-  defaultId: string | null
-): AgentProfileDetail {
-  const isDefault = profile.id === defaultId;
+function withDefaultDetail<T extends { id: string; isDefault: boolean }>(
+  profile: T,
+  profileId: string,
+  setDefault: boolean
+): T {
+  const isDefault = setDefault
+    ? profile.id === profileId
+    : profile.id !== profileId && profile.isDefault;
   return profile.isDefault === isDefault ? profile : { ...profile, isDefault };
 }
 
@@ -66,9 +67,13 @@ export function useAgentProfileMutations(organizationId?: string) {
   const queryClient = useQueryClient();
 
   const profilesFilter = trpc.agentProfiles.pathFilter();
-  const listFilter = trpc.agentProfiles.list.pathFilter();
   const combinedFilter = trpc.agentProfiles.listCombined.pathFilter();
   const detailFilter = trpc.agentProfiles.get.pathFilter();
+  const defaultListKey = trpc.agentProfiles.list.queryKey({ organizationId });
+  const defaultDetailKey = trpc.agentProfiles.get.queryKey({ organizationId });
+  const defaultCombinedKey = organizationId
+    ? trpc.agentProfiles.listCombined.queryKey({ organizationId })
+    : combinedFilter.queryKey;
 
   const invalidateProfiles = () => {
     void queryClient.invalidateQueries(profilesFilter);
@@ -83,36 +88,46 @@ export function useAgentProfileMutations(organizationId?: string) {
     },
   };
 
-  const applyDefault = (defaultId: string | null) => {
-    queryClient.setQueriesData<AgentProfileListItem[]>({ queryKey: listFilter.queryKey }, old =>
-      old ? withDefaultFlag(old, defaultId) : old
+  const applyDefault = (profileId: string, setDefault: boolean) => {
+    queryClient.setQueriesData<AgentProfileListItem[]>({ queryKey: defaultListKey }, old =>
+      old ? withDefaultFlag(old, profileId, setDefault) : old
     );
-    queryClient.setQueriesData<AgentProfileListCombined>(
-      { queryKey: combinedFilter.queryKey },
-      old =>
-        old
-          ? {
-              orgProfiles: withDefaultFlag(old.orgProfiles, defaultId),
-              personalProfiles: withDefaultFlag(old.personalProfiles, defaultId),
-              effectiveDefaultId: defaultId,
-            }
-          : old
-    );
-    queryClient.setQueriesData<AgentProfileDetail>({ queryKey: detailFilter.queryKey }, old =>
-      old ? withDefaultDetail(old, defaultId) : old
+    queryClient.setQueriesData<AgentProfileListCombined>({ queryKey: defaultCombinedKey }, old => {
+      if (!old) {
+        return old;
+      }
+      const orgProfiles = organizationId
+        ? withDefaultFlag(old.orgProfiles, profileId, setDefault)
+        : old.orgProfiles;
+      const personalProfiles = organizationId
+        ? old.personalProfiles
+        : withDefaultFlag(old.personalProfiles, profileId, setDefault);
+      return {
+        ...old,
+        orgProfiles,
+        personalProfiles,
+        effectiveDefaultId:
+          (
+            personalProfiles.find(profile => profile.isDefault) ??
+            orgProfiles.find(profile => profile.isDefault)
+          )?.id ?? null,
+      };
+    });
+    queryClient.setQueriesData<AgentProfileDetail>({ queryKey: defaultDetailKey }, old =>
+      old ? withDefaultDetail(old, profileId, setDefault) : old
     );
   };
 
   const snapshotProfiles = async () => {
-    await queryClient.cancelQueries({ queryKey: listFilter.queryKey });
-    await queryClient.cancelQueries({ queryKey: combinedFilter.queryKey });
-    await queryClient.cancelQueries({ queryKey: detailFilter.queryKey });
+    await queryClient.cancelQueries({ queryKey: defaultListKey });
+    await queryClient.cancelQueries({ queryKey: defaultCombinedKey });
+    await queryClient.cancelQueries({ queryKey: defaultDetailKey });
     const previous: [QueryKey, unknown][] = [
-      ...queryClient.getQueriesData<AgentProfileListItem[]>({ queryKey: listFilter.queryKey }),
+      ...queryClient.getQueriesData<AgentProfileListItem[]>({ queryKey: defaultListKey }),
       ...queryClient.getQueriesData<AgentProfileListCombined>({
-        queryKey: combinedFilter.queryKey,
+        queryKey: defaultCombinedKey,
       }),
-      ...queryClient.getQueriesData<AgentProfileDetail>({ queryKey: detailFilter.queryKey }),
+      ...queryClient.getQueriesData<AgentProfileDetail>({ queryKey: defaultDetailKey }),
     ];
     return { generation: nextMutationGeneration(DEFAULT_MUTATION_KEY), previous };
   };
@@ -165,7 +180,7 @@ export function useAgentProfileMutations(organizationId?: string) {
         ...callbacks,
         onMutate: async variables => {
           const context = await snapshotProfiles();
-          applyDefault(variables.profileId);
+          applyDefault(variables.profileId, true);
           return context;
         },
         onError: (error, _variables, context) => {
@@ -182,9 +197,9 @@ export function useAgentProfileMutations(organizationId?: string) {
     withOrganization(
       trpc.agentProfiles.clearDefault.mutationOptions({
         ...callbacks,
-        onMutate: async () => {
+        onMutate: async variables => {
           const context = await snapshotProfiles();
-          applyDefault(null);
+          applyDefault(variables.profileId, false);
           return context;
         },
         onError: (error, _variables, context) => {

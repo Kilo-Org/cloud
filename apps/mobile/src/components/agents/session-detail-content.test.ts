@@ -100,7 +100,14 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
 // The personal `agentProfiles.list` rows the header's active-profile chip
 // reads; tests set it before mounting to drive the chip's presence.
-const profileRowsState = vi.hoisted(() => ({ personal: [] as unknown[] }));
+const profileRowsState = vi.hoisted(() => ({
+  personal: [] as unknown[],
+  combined: {
+    orgProfiles: [] as unknown[],
+    personalProfiles: [] as unknown[],
+    effectiveDefaultId: null as string | null,
+  },
+}));
 const routerSetParams = vi.hoisted(() => vi.fn());
 const handoffAdvertiserCalls = vi.hoisted(() => ({
   props: [] as { anchorMessageId?: string | null }[],
@@ -440,8 +447,8 @@ vi.mock('@/lib/trpc', () => ({
       listCombined: {
         queryOptions: () => ({
           queryKey: ['agentProfiles', 'listCombined'],
-          queryFn: () => ({ orgProfiles: [], personalProfiles: [], effectiveDefaultId: null }),
-          initialData: { orgProfiles: [], personalProfiles: [], effectiveDefaultId: null },
+          queryFn: () => profileRowsState.combined,
+          initialData: profileRowsState.combined,
         }),
       },
     },
@@ -599,6 +606,7 @@ function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   profileRowsState.personal = [];
+  profileRowsState.combined = { orgProfiles: [], personalProfiles: [], effectiveDefaultId: null };
   openRenameModal.mockClear();
   showActionSheetWithOptions.mockClear();
   hideThinking.current = false;
@@ -620,6 +628,7 @@ type MountDetailsOptions = {
   cachedRows?: StoredMessage[] | null;
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
+  sessionOrganizationId?: string;
 };
 
 async function mountDetails(
@@ -696,7 +705,7 @@ async function mountDetails(
         kiloSessionId: id,
         cloudAgentSessionId: null,
         title: `Root ${id}`,
-        organizationId: null,
+        organizationId: options.sessionOrganizationId ?? null,
         gitUrl: null,
         gitBranch: null,
         mode: null,
@@ -928,6 +937,32 @@ describe('session detail active-profile indicator', () => {
     });
     expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p1');
   });
+
+  it.each(['user', 'organization'] as const)(
+    'opens a %s default from an organization session in its owner scope',
+    async ownerType => {
+      const profile = { ...PROFILE_ROW, ownerType };
+      profileRowsState.combined = {
+        personalProfiles: ownerType === 'user' ? [profile] : [],
+        orgProfiles: ownerType === 'organization' ? [profile] : [],
+        effectiveDefaultId: profile.id,
+      };
+      const { renderer } = await mountDetails([], {
+        sessionOrganizationId: 'org-a',
+        displayScope: { organizationId: 'org-a', isResolved: true },
+      });
+      const [chip] = findChip(renderer);
+      if (!chip) {
+        throw new Error('the active-profile chip did not render');
+      }
+      act(() => {
+        (chip.props.onPress as () => void)();
+      });
+      expect(navigationRoutes.at(-1)).toBe(
+        `/(app)/(tabs)/(3_profile)/profiles/p1${ownerType === 'organization' ? '?organizationId=org-a' : ''}`
+      );
+    }
+  );
 
   it('renders no chip when the context has no profiles', async () => {
     const { renderer } = await mountDetails();

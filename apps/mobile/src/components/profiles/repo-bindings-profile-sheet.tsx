@@ -3,6 +3,8 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import { EmptyState } from '@/components/empty-state';
+import { SlidersHorizontal } from '@/components/ui/icons';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -51,6 +53,15 @@ export function ProfilePickerSheet({
         title={t('profiles.loadFailed')}
         onRetry={onRetry}
         isRetrying={isRefetching}
+      />
+    );
+  } else if (profiles.length === 0) {
+    body = (
+      <EmptyState
+        icon={SlidersHorizontal}
+        title={t('profiles.emptyTitle')}
+        description={t('profiles.emptyDescription')}
+        placement="top"
       />
     );
   } else {

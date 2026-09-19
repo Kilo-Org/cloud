@@ -113,15 +113,17 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
-        <View className="gap-1.5">
-          <Text className="text-sm font-medium text-foreground">{t('profiles.mcp.type')}</Text>
-          <SegmentedControl
-            options={typeOptions}
-            value={type}
-            onChange={setType}
-            accessibilityLabel={t('profiles.mcp.type')}
-          />
-        </View>
+        {server === null ? (
+          <View className="gap-1.5">
+            <Text className="text-sm font-medium text-foreground">{t('profiles.mcp.type')}</Text>
+            <SegmentedControl
+              options={typeOptions}
+              value={type}
+              onChange={setType}
+              accessibilityLabel={t('profiles.mcp.type')}
+            />
+          </View>
+        ) : null}
 
         <FormField
           label={t('profiles.mcp.name')}

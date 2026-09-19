@@ -151,7 +151,7 @@ export function AdvancedConfigPanel({
 
   const selectedProfile = selectorState.selectedProfile;
   const manualCommands = commands.filter(command => command.trim().length > 0);
-  const hasManualConfig = draftVars.length > 0 || commands.length > 0;
+  const hasManualConfig = draftVars.length > 0 || manualCommands.length > 0;
   const effectiveVars = (selectedProfile?.varCount ?? 0) + draftVars.length;
   const effectiveCommands = (selectedProfile?.commandCount ?? 0) + manualCommands.length;
 

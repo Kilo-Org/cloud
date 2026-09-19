@@ -312,6 +312,27 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
+  it('disables delete and refuses another confirmation while deletion is pending', async () => {
+    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+    const { renderer, queryClient, unmount } = await mountScreen();
+    h.mutations.deleteVar.isPending = true;
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findPressable(renderer.root, 'Delete').props.disabled).toBe(true);
+    pressPressable(renderer.root, 'Delete');
+    expect(h.alert).not.toHaveBeenCalled();
+    h.mutations.deleteVar.isPending = false;
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findPressable(renderer.root, 'Delete').props.disabled).toBe(false);
+    pressPressable(renderer.root, 'Delete');
+    expect(h.alert).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
   it('keeps the rows while a refetch is in flight', async () => {
     h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;

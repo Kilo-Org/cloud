@@ -37,7 +37,7 @@ export async function PrefetchedOrganizations({ children }: { children: ReactNod
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <SeedUserQuery user={user} />
+      {user !== null ? <SeedUserQuery user={user} /> : null}
       {children}
     </HydrationBoundary>
   );

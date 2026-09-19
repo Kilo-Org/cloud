@@ -157,6 +157,7 @@ describe('ProfileMcpScreen', () => {
 
     expect(findField(renderer.root, 'Server name').props.defaultValue).toBe('docs');
     expect(findField(renderer.root, 'Command line').props.defaultValue).toBe('npx @example/mcp');
+    expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
 
     pressSheetDone(renderer.root);
     await waitFor(() => h.mutations.updateMcp.mutateAsync.mock.calls.length > 0);
@@ -174,6 +175,25 @@ describe('ProfileMcpScreen', () => {
       },
     });
 
+    unmount();
+  });
+
+  it('keeps remote type and masked headers unchanged when editing', async () => {
+    const config = {
+      url: 'https://example.com/mcp',
+      headers: { Authorization: '\u2022\u2022\u2022\u2022' },
+    };
+    h.query.data = testProfile([testServer({ type: 'remote', config })]);
+    h.query.isPending = false;
+    h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit MCP server');
+    expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
+    pressSheetDone(renderer.root);
+    await waitFor(() => h.mutations.updateMcp.mutateAsync.mock.calls.length > 0);
+    expect(h.mutations.updateMcp.mutateAsync.mock.calls[0]?.[0]).toMatchObject({
+      server: { type: 'remote', config },
+    });
     unmount();
   });
 

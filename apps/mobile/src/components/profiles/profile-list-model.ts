@@ -1,4 +1,5 @@
 import { type ProfileCountItem } from '@/lib/profile-count-labels';
+import { type AgentProfileListItem } from '@/lib/hooks/agent-profile-types';
 
 /**
  * Pure view-model helpers for the mobile profile manager.
@@ -12,11 +13,10 @@ import { type ProfileCountItem } from '@/lib/profile-count-labels';
 type ProfileSectionKey = 'organization' | 'personal';
 
 /** The three summary counts the list row shows, mirroring the server's `ProfileSummarySchema`. */
-export type ProfileCounts = {
-  varCount: number;
-  commandCount: number;
-  skillCount: number;
-};
+export type ProfileCounts = Pick<
+  AgentProfileListItem,
+  'varCount' | 'mcpServerCount' | 'skillCount'
+>;
 
 export type ProfileDefaultSource = {
   id: string;
@@ -92,13 +92,13 @@ export function isEffectiveDefault(
 export function profileCounts(profile: ProfileCounts): ProfileCounts {
   return {
     varCount: profile.varCount,
-    commandCount: profile.commandCount,
+    mcpServerCount: profile.mcpServerCount,
     skillCount: profile.skillCount,
   };
 }
 
 /**
- * The non-zero counts a row subtitle shows, in web order (vars, commands,
+ * The non-zero counts a row subtitle shows, in web order (vars, MCP,
  * skills). The caller localizes them with the compact unit suffixes and joins
  * them; empty when the profile has nothing configured, so the row renders
  * without a subtitle.
@@ -106,7 +106,7 @@ export function profileCounts(profile: ProfileCounts): ProfileCounts {
 export function profileListCountItems(counts: ProfileCounts): ProfileCountItem[] {
   const items: (ProfileCountItem | null)[] = [
     counts.varCount > 0 ? { kind: 'vars', count: counts.varCount } : null,
-    counts.commandCount > 0 ? { kind: 'commands', count: counts.commandCount } : null,
+    counts.mcpServerCount > 0 ? { kind: 'mcp', count: counts.mcpServerCount } : null,
     counts.skillCount > 0 ? { kind: 'skills', count: counts.skillCount } : null,
   ];
   return items.filter((item): item is ProfileCountItem => item !== null);

@@ -24,6 +24,7 @@ type ProfileSummary = {
   isDefault: boolean;
   varCount: number;
   commandCount: number;
+  mcpServerCount: number;
   skillCount: number;
   ownerType?: 'organization' | 'user';
 };
@@ -100,6 +101,7 @@ function profile(overrides: Partial<ProfileSummary> & { id: string }): ProfileSu
     isDefault: false,
     varCount: 0,
     commandCount: 0,
+    mcpServerCount: 0,
     skillCount: 0,
     ...overrides,
   };
@@ -196,7 +198,13 @@ describe('ProfilesListScreen', () => {
       profile({ id: 'org-1-profile', name: 'Org profile', varCount: 1, ownerType: 'organization' }),
     ];
     listState.personalProfiles = [
-      profile({ id: 'personal-1', name: 'Personal profile', commandCount: 2, isDefault: true }),
+      profile({
+        id: 'personal-1',
+        name: 'Personal profile',
+        commandCount: 9,
+        mcpServerCount: 2,
+        isDefault: true,
+      }),
     ];
     listState.effectiveDefaultId = 'personal-1';
 
@@ -212,7 +220,7 @@ describe('ProfilesListScreen', () => {
     if (!personalRow) {
       throw new Error('personal row missing');
     }
-    expect(personalRow.props.subtitle).toBe('2c');
+    expect(personalRow.props.subtitle).toBe('2 MCP');
     const star = personalRow.props.trailing as {
       type: string;
       props: { accessibilityLabel: string };

@@ -45,6 +45,7 @@ vi.mock('@/lib/trpc', () => {
   function queryProcedure(name: keyof typeof mocks.queries, path: string) {
     return {
       pathFilter: () => ({ queryKey: ['agentProfiles', path] }),
+      queryKey: (input: unknown) => ['agentProfiles', path, input],
       queryOptions: (input: unknown) => {
         mocks.queryInputs[name] = input;
         return {
@@ -337,6 +338,139 @@ describe('useAgentProfileMutations', () => {
     const rolledBack = queryClient.getQueryData<AgentProfileListItem[]>(listKey);
     expect(rolledBack?.map(profile => profile.isDefault)).toEqual([true, false]);
     expect(mocks.toastError).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it.each([
+    {
+      organizationId: 'org-1',
+      clear: false,
+      effective: 'personal',
+      personalDefault: true,
+      orgDefault: true,
+    },
+    {
+      organizationId: 'org-1',
+      clear: true,
+      effective: 'personal',
+      personalDefault: true,
+      orgDefault: false,
+    },
+    {
+      organizationId: undefined,
+      clear: true,
+      effective: 'org',
+      personalDefault: false,
+      orgDefault: true,
+    },
+    {
+      organizationId: undefined,
+      clear: false,
+      effective: 'personal',
+      personalDefault: true,
+      orgDefault: true,
+    },
+  ])(
+    'scopes optimistic defaults to their owner: $organizationId clear=$clear',
+    async ({ organizationId, clear, effective, personalDefault, orgDefault }) => {
+      const holder: { current: MutationsResult | null } = { current: null };
+      const { queryClient, unmount } = await renderWithProviders(
+        createElement(MutationsProbe, { holder, organizationId })
+      );
+      const personal = summary({ id: 'personal', isDefault: true, ownerType: 'user' });
+      const org = summary({ id: 'org', isDefault: true, ownerType: 'organization' });
+      const combinedKey = ['agentProfiles', 'listCombined', { organizationId: 'org-1' }];
+      const otherKey = ['agentProfiles', 'listCombined', { organizationId: 'org-2' }];
+      const combined = {
+        personalProfiles: [personal],
+        orgProfiles: [org],
+        effectiveDefaultId: 'personal',
+      };
+      queryClient.setQueryData(combinedKey, combined);
+      queryClient.setQueryData(otherKey, {
+        ...combined,
+        orgProfiles: [summary({ id: 'other', isDefault: true })],
+      });
+      const listKey = ['agentProfiles', 'list', { organizationId }];
+      const untouchedListKey = ['agentProfiles', 'list', { organizationId: 'org-2' }];
+      const detailKey = ['agentProfiles', 'get', { profileId: 'other', organizationId: 'org-2' }];
+      queryClient.setQueryData(listKey, [organizationId ? org : personal]);
+      queryClient.setQueryData(untouchedListKey, [summary({ id: 'other', isDefault: true })]);
+      queryClient.setQueryData(detailKey, summary({ id: 'other', isDefault: true }));
+      await act(async () => {
+        await (clear
+          ? current(holder).clearDefault.mutateAsync({
+              profileId: organizationId ? 'org' : 'personal',
+            })
+          : current(holder).setAsDefault.mutateAsync({
+              profileId: organizationId ? 'org' : 'personal',
+            }));
+      });
+      expect(queryClient.getQueryData(combinedKey)).toMatchObject({
+        effectiveDefaultId: effective,
+        personalProfiles: [{ isDefault: personalDefault }],
+        orgProfiles: [{ isDefault: orgDefault }],
+      });
+      expect(queryClient.getQueryData(untouchedListKey)).toMatchObject([{ isDefault: true }]);
+      expect(queryClient.getQueryData(detailKey)).toMatchObject({ isDefault: true });
+      expect(queryClient.getQueryData(otherKey)).toMatchObject({
+        orgProfiles: [{ isDefault: true }],
+        personalProfiles: [{ isDefault: organizationId ? true : personalDefault }],
+        effectiveDefaultId: !organizationId && clear ? 'other' : 'personal',
+      });
+      unmount();
+    }
+  );
+
+  it('clearing a non-default leaves the same owner current default intact', async () => {
+    const holder: { current: MutationsResult | null } = { current: null };
+    const { queryClient, unmount } = await renderWithProviders(
+      createElement(MutationsProbe, { holder })
+    );
+    const listKey = ['agentProfiles', 'list', {}];
+    const profiles = [summary({ id: 'default', isDefault: true }), summary({ id: 'other' })];
+    queryClient.setQueryData(listKey, profiles);
+    await act(async () => {
+      await current(holder).clearDefault.mutateAsync({ profileId: 'other' });
+    });
+    expect(queryClient.getQueryData(listKey)).toEqual(profiles);
+    unmount();
+  });
+
+  it('rolls back an organization default without touching another organization cache', async () => {
+    const pending = Promise.withResolvers<{ success: boolean }>();
+    mocks.mutations.setAsDefault.mockReturnValueOnce(pending.promise);
+    const holder: { current: MutationsResult | null } = { current: null };
+    const { queryClient, unmount } = await renderWithProviders(
+      createElement(MutationsProbe, { holder, organizationId: 'org-1' })
+    );
+    const key = ['agentProfiles', 'listCombined', { organizationId: 'org-1' }];
+    const otherKey = ['agentProfiles', 'listCombined', { organizationId: 'org-2' }];
+    const original = {
+      personalProfiles: [],
+      orgProfiles: [summary({ id: 'previous', isDefault: true }), summary({ id: 'next' })],
+      effectiveDefaultId: 'previous',
+    };
+    queryClient.setQueryData(key, original);
+    queryClient.setQueryData(otherKey, original);
+    let request: Promise<unknown> | undefined = undefined;
+    act(() => {
+      request = current(holder).setAsDefault.mutateAsync({ profileId: 'next' });
+    });
+    await waitFor(() => mocks.mutations.setAsDefault.mock.calls.length > 0);
+    expect(queryClient.getQueryData(key)).toMatchObject({
+      orgProfiles: [{ isDefault: false }, { isDefault: true }],
+      effectiveDefaultId: 'next',
+    });
+    const refreshed = { ...original, effectiveDefaultId: null, orgProfiles: [] };
+    queryClient.setQueryData(otherKey, refreshed);
+    await act(async () => {
+      pending.reject(new Error('Try again'));
+      await request?.catch(() => undefined);
+    });
+    expect(queryClient.getQueryData(key)).toEqual(original);
+    expect(queryClient.getQueryData(otherKey)).toEqual(refreshed);
+    expect(mocks.toastError).toHaveBeenCalledWith('Try again');
     unmount();
   });
 

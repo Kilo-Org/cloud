@@ -48,7 +48,23 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
+vi.mock('@/components/ui/form-field', async () => {
+  const { createElement, useRef } = await import('react');
+  return {
+    FormField: (props: { defaultValue?: string; onChangeText?: (value: string) => void }) => {
+      // Native uncontrolled text only accepts defaultValue when mounted.
+      const nativeText = useRef(props.defaultValue);
+      return createElement('FormField', {
+        ...props,
+        nativeText: nativeText.current,
+        onChangeText: (value: string) => {
+          nativeText.current = value;
+          props.onChangeText?.(value);
+        },
+      });
+    },
+  };
+});
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -219,6 +235,71 @@ describe('ProfileCommandsScreen', () => {
     expect(h.error).toHaveBeenCalledWith("Couldn't save setup commands");
     expect(findFields(renderer.root)[0]?.props.defaultValue).toBe('pnpm install');
 
+    unmount();
+  });
+
+  it('preserves edits typed while the saved list refetches', async () => {
+    h.query.data = testProfile(['a']);
+    h.query.isPending = false;
+    h.mutations.setCommands.mutateAsync.mockResolvedValue({ success: true });
+    const { renderer, queryClient, unmount } = await mountScreen();
+    changeRowText(renderer.root, 0, 'saved');
+    commitRow(renderer.root, 0);
+    changeRowText(renderer.root, 0, 'new draft');
+    h.query.data = testProfile(['saved']);
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findFields(renderer.root)[0]?.props.nativeText).toBe('new draft');
+    commitRow(renderer.root, 0);
+    expect(h.mutations.setCommands.mutateAsync).toHaveBeenLastCalledWith({
+      profileId: 'profile-1',
+      commands: ['new draft'],
+    });
+    unmount();
+  });
+
+  it('remounts clean uncontrolled fields when refreshed server values change', async () => {
+    h.query.data = testProfile(['old']);
+    h.query.isPending = false;
+    const { renderer, queryClient, unmount } = await mountScreen();
+    h.query.data = testProfile(['remote edit']);
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findFields(renderer.root)[0]?.props.nativeText).toBe('remote edit');
+    unmount();
+  });
+
+  it('ignores a stale refetch until a pending save settles without discarding newer text', async () => {
+    h.query.data = testProfile(['old']);
+    h.query.isPending = false;
+    const pending = Promise.withResolvers<{ success: boolean }>();
+    h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
+    const { renderer, queryClient, unmount } = await mountScreen();
+    changeRowText(renderer.root, 0, 'submitted');
+    commitRow(renderer.root, 0);
+    h.mutations.setCommands.isPending = true;
+    changeRowText(renderer.root, 0, 'newer draft');
+    h.query.data = testProfile(['old']);
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    expect(findFields(renderer.root)[0]?.props.nativeText).toBe('newer draft');
+    await act(async () => {
+      pending.resolve({ success: true });
+      await pending.promise;
+    });
+    h.mutations.setCommands.isPending = false;
+    h.query.data = testProfile(['submitted']);
+    act(() => {
+      rerenderScreen(renderer, queryClient);
+    });
+    commitRow(renderer.root, 0);
+    expect(h.mutations.setCommands.mutateAsync).toHaveBeenLastCalledWith({
+      profileId: 'profile-1',
+      commands: ['newer draft'],
+    });
     unmount();
   });
 

@@ -7,6 +7,7 @@ import {
   type SessionProfilePickerProfile,
 } from '@/components/agents/session-profile-picker-model';
 import { useTRPC } from '@/lib/trpc';
+import { type AgentProfileListItem } from '@/lib/hooks/agent-profile-types';
 
 type ProfileSummary = inferRouterOutputs<MobileRouter>['agentProfiles']['list'][number];
 type CombinedProfiles = inferRouterOutputs<MobileRouter>['agentProfiles']['listCombined'];
@@ -15,12 +16,14 @@ type CombinedProfiles = inferRouterOutputs<MobileRouter>['agentProfiles']['listC
 export type EffectiveAgentProfile = SessionProfilePickerProfile & {
   commandCount: number;
   agentCount: number;
+  ownerType?: AgentProfileListItem['ownerType'];
 };
 
-function toEffective(profile: ProfileSummary): EffectiveAgentProfile {
+function toEffective(profile: AgentProfileListItem): EffectiveAgentProfile {
   return {
     id: profile.id,
     name: profile.name,
+    ownerType: profile.ownerType,
     varCount: profile.varCount,
     mcpServerCount: profile.mcpServerCount,
     skillCount: profile.skillCount,

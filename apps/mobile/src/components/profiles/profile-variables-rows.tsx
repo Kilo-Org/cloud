@@ -60,6 +60,7 @@ type VariableRowViewProps = Readonly<{
    * so a value the user is still composing can be checked.
    */
   revealed?: boolean;
+  isDeleting?: boolean;
   onToggleReveal?: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -74,6 +75,7 @@ type VariableRowViewProps = Readonly<{
 export function VariableRowView({
   row,
   revealed = false,
+  isDeleting = false,
   onToggleReveal,
   onEdit,
   onDelete,
@@ -127,6 +129,8 @@ export function VariableRowView({
         className="h-11 w-11 items-center justify-center active:opacity-70"
         accessibilityRole="button"
         accessibilityLabel={t('common.delete')}
+        disabled={isDeleting}
+        accessibilityState={{ disabled: isDeleting }}
         onPress={onDelete}
       >
         <Trash2 size={18} color={colors.destructive} />

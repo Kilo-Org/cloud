@@ -11,6 +11,7 @@ import { and, eq, isNull, ne } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import { headers as nextHeaders } from 'next/headers';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import {
   AI_ATTRIBUTION_AUDIENCE,
   CLOUD_AGENT_NEXT_AUDIENCE,
@@ -147,13 +148,6 @@ export async function canIssueLegacyOrganizationToken(
   }
 }
 
-function tokenFromHeaders(requestHeaders: Headers): string | null {
-  const value = requestHeaders.get('authorization');
-  if (!value || !value.toLowerCase().startsWith('bearer ')) return null;
-  const token = value.slice(7).trim();
-  return token || null;
-}
-
 function hasUnsafeLegacyClaims(claimNames: readonly string[]): boolean {
   const allowed = new Set([
     'version',
@@ -243,7 +237,7 @@ export async function getResourceDelegationAuthority(
   options?: { headers?: Headers; organizationId?: string }
 ): Promise<ResourceDelegationAuthority> {
   const requestHeaders = options?.headers ?? (await nextHeaders());
-  const bearer = tokenFromHeaders(requestHeaders);
+  const bearer = extractBearerToken(requestHeaders.get('authorization'));
   const authorizationPresent = requestHeaders.has('authorization');
   const user = await currentUser(expectedUser);
   await assertCurrentOrganizationMembership(user.id, options?.organizationId);
@@ -340,7 +334,7 @@ export async function getResourceDelegationAuthority(
 }
 
 export async function isModernResourceDelegationRequest(requestHeaders: Headers): Promise<boolean> {
-  const bearer = tokenFromHeaders(requestHeaders);
+  const bearer = extractBearerToken(requestHeaders.get('authorization'));
   if (!bearer) return false;
   const verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
     audience: KILO_API_AUDIENCE,

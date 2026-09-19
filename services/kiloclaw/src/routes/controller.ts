@@ -13,6 +13,7 @@ import {
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
 } from '@kilocode/worker-utils/instance-id';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { waitUntil } from 'cloudflare:workers';
 import {
@@ -271,10 +272,7 @@ async function refreshGoogleAccessToken(input: {
 }
 
 async function authorizeGoogleControllerRequest(c: Context<AppEnv>, sandboxId: string) {
-  const authHeader = c.req.header('authorization');
-  const apiKey = authHeader?.toLowerCase().startsWith('bearer ')
-    ? authHeader.substring(7)
-    : undefined;
+  const apiKey = extractBearerToken(c.req.header('authorization')) ?? undefined;
 
   const gatewayToken = c.req.header('x-kiloclaw-gateway-token');
   if (!apiKey || !gatewayToken) {
@@ -322,10 +320,7 @@ async function authorizeGoogleControllerRequest(c: Context<AppEnv>, sandboxId: s
 }
 
 controller.post('/checkin', async (c: Context<AppEnv>) => {
-  const authHeader = c.req.header('authorization');
-  const apiKey = authHeader?.toLowerCase().startsWith('bearer ')
-    ? authHeader.substring(7)
-    : undefined;
+  const apiKey = extractBearerToken(c.req.header('authorization')) ?? undefined;
 
   const gatewayToken = c.req.header('x-kiloclaw-gateway-token');
   if (!apiKey || !gatewayToken) {

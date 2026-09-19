@@ -1,6 +1,7 @@
 import type { Context, Next } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { timingSafeEqual } from '@kilocode/encryption';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import type { AppEnv } from '../types';
 import { KILOCLAW_AUTH_COOKIE } from '../config';
 import { validateKiloToken } from './jwt';
@@ -25,9 +26,9 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
 
   // Extract token: Bearer header first, then cookie fallback
   let token: string | undefined;
-  const authHeader = c.req.header('authorization');
-  if (authHeader?.toLowerCase().startsWith('bearer ')) {
-    token = authHeader.substring(7);
+  const bearerToken = extractBearerToken(c.req.header('authorization'));
+  if (bearerToken) {
+    token = bearerToken;
   }
   if (!token) {
     token = getCookie(c, KILOCLAW_AUTH_COOKIE);

@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import {
   buildMCPID,
   buildScopedConnectCanonicalUrl,
@@ -33,12 +34,6 @@ import { loadStaticHeaders } from '../lib/credentials';
 import { proxyUpstream } from '../lib/upstream-proxy';
 import { challengeResponse, forbiddenResponse, insufficientScopeResponse } from '../lib/responses';
 import { validateIncomingOrigin } from '../lib/origin';
-
-function bearerToken(header: string | undefined): string | null {
-  if (!header?.toLowerCase().startsWith('bearer ')) return null;
-  const token = header.slice(7).trim();
-  return token.length > 0 ? token : null;
-}
 
 type RuntimePhase =
   | 'parse_route'
@@ -151,7 +146,7 @@ async function handleConnect(
       routeKey: route.routeKey,
     });
     validateIncomingOrigin({ request: c.req.raw, env: c.env });
-    const token = bearerToken(c.req.header('authorization'));
+    const token = extractBearerToken(c.req.header('authorization'));
     hasBearerToken = Boolean(token);
     if (!token) {
       phase = 'load_route';

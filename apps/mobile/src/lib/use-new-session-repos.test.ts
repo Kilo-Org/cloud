@@ -69,11 +69,7 @@ vi.mock('@/lib/integration-urls', () => ({
 }));
 
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
-  openAuthorizationAndWaitForReturn: vi.fn(async () => 'sheet-close'),
-}));
-
-vi.mock('@/lib/external-auth/use-external-auth-return', () => ({
-  useExternalAuthReturn: () => ({ markLaunched: vi.fn(), clearLaunch: vi.fn() }),
+  openAuthorizationAndWaitForReturn: vi.fn(async () => undefined),
 }));
 
 vi.mock('@/lib/use-github-repos-refresh', () => ({

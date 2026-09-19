@@ -24,6 +24,14 @@ const kvMock = vi.hoisted(() => {
     removeItem: vi.fn(async (scope: string, k: string) => {
       scopes.get(scope)?.delete(k);
     }),
+    removeItemIfValue: vi.fn(async (scope: string, k: string, v: string) => {
+      const bucket = scopes.get(scope);
+      if (bucket?.get(k)?.v !== v) {
+        return false;
+      }
+      bucket.delete(k);
+      return true;
+    }),
     clearScope: vi.fn(async (scope: string) => {
       scopes.delete(scope);
     }),
@@ -39,6 +47,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   getItem: kvMock.getItem,
   setItem: kvMock.setItem,
   removeItem: kvMock.removeItem,
+  removeItemIfValue: kvMock.removeItemIfValue,
   clearScope: kvMock.clearScope,
   listEntries: kvMock.listEntries,
 }));
@@ -267,9 +276,10 @@ describe('tool summary translation cache', () => {
 
     // The late write must not have recreated the previous account's entry.
     await expect(readToolSummaryTranslations()).resolves.toEqual([]);
-    expect(kvMock.removeItem).toHaveBeenCalledWith(
+    expect(kvMock.removeItemIfValue).toHaveBeenCalledWith(
       SCOPE,
-      'tt:de:kilo-auto/small:item-late:Ran the tests'
+      'tt:de:kilo-auto/small:item-late:Ran the tests',
+      JSON.stringify(makeEntry({ itemId: 'item-late' }))
     );
   });
 

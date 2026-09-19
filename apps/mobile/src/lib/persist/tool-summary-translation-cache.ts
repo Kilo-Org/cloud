@@ -160,11 +160,14 @@ export async function writeToolSummaryTranslation(
       // server-issued part id, so a later sign-in that reopens the same part
       // writes the same key; if such a write under the current epoch committed
       // while this one was unsettled, the stored value is the newer account's
-      // entry and removing it would delete valid data.
-      const stored = await encryptedKv.getItem(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE, itemKey);
-      if (stored === serialized) {
-        await encryptedKv.removeItem(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE, itemKey);
-      }
+      // entry and removing it would delete valid data. The compare happens
+      // inside one conditional delete, so a newer same-key write that lands
+      // between the epoch check and the removal is never deleted either.
+      await encryptedKv.removeItemIfValue(
+        TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE,
+        itemKey,
+        serialized
+      );
       return;
     }
     await evictOldestBeyondCap();

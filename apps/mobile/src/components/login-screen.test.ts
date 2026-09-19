@@ -1,7 +1,9 @@
 /* eslint-disable max-lines -- The mounted tests keep the refresh boundary, error mapping, globe, and draft-restore contracts together. */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { type AppStateStatus, Keyboard, type KeyboardEvent, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // login-screen.test.ts — narrow contract tests plus mounted globe tests.
 // The refresh boundary contract is verified through the useDeviceAuth hook's
@@ -32,6 +34,9 @@ const deviceAuth = vi.hoisted(() => ({
 }));
 const push = vi.hoisted(() => vi.fn());
 const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
+const addAppStateListener = vi.hoisted(() =>
+  vi.fn((_event: 'change', _listener: (state: AppStateStatus) => void) => ({ remove: vi.fn() }))
+);
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
@@ -40,7 +45,7 @@ vi.mock('expo-router', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  AppState: { addEventListener: addAppStateListener },
   I18nManager: { isRTL: false },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   KeyboardAvoidingView: 'KeyboardAvoidingView',
@@ -50,15 +55,11 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0, left: 0, right: 0 })),
 }));
 vi.mock('sonner-native', () => ({ toast: vi.fn() }));
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding-state', () => ({
-  resolveAppAwareKeyboardPadding: vi.fn(),
-  resolveKeyboardPaddingEventsForPlatform: () => null,
-}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/login/idle-auth', () => ({ IdleAuth: 'IdleAuth' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -406,6 +407,145 @@ describe('login-screen idle skeleton', () => {
     });
 
     expect(clearPersistedLoginDrafts).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+});
+
+describe('login-screen bottom-bar clearance', () => {
+  beforeEach(() => {
+    deviceAuth.status = 'idle';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    Platform.OS = 'android';
+    vi.mocked(Keyboard.addListener).mockClear();
+    addAppStateListener.mockClear();
+    vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 24, bottom: 28, left: 0, right: 0 });
+    vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
+  });
+
+  afterEach(() => {
+    Platform.OS = 'ios';
+    vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 0, bottom: 0, left: 0, right: 0 });
+  });
+
+  function scrollViewport(renderer: TestRenderer.ReactTestRenderer) {
+    const scroll = findByType(renderer.root, 'ScrollView')[0];
+    if (!scroll?.parent) {
+      throw new Error('login scroll viewport not found');
+    }
+    expect(scroll.props.className).toContain('flex-1');
+    expect(scroll.props.contentContainerClassName).toContain('flex-grow');
+    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+    return scroll.parent;
+  }
+
+  function emitKeyboard(eventName: 'keyboardDidShow' | 'keyboardDidHide', height = 0) {
+    const subscription = vi
+      .mocked(Keyboard.addListener)
+      .mock.calls.find(([name]) => name === eventName);
+    if (!subscription) {
+      throw new Error(`missing ${eventName} listener`);
+    }
+    const event: KeyboardEvent = {
+      duration: 0,
+      easing: 'keyboard',
+      endCoordinates: { height, width: 360, screenX: 0, screenY: 640 - height },
+    };
+    act(() => {
+      subscription[1](event);
+    });
+  }
+
+  it.each(['android', 'ios'] as const)(
+    'keeps the %s bottom bar outside the scroll viewport with a long email',
+    async platform => {
+      Platform.OS = platform;
+      const email = 'long.email.address@subdomain.example-very-long-domain-name.co.uk';
+      vi.mocked(restoreLoginDrafts).mockResolvedValue({ email, ssoRecovery: null });
+      const renderer = await mountLoginScreen();
+
+      expect(findByType(renderer.root, 'IdleAuth')[0]?.props.initialEmail).toBe(email);
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+      expect(findByType(renderer.root, 'KeyboardAvoidingView')[0]?.props.enabled).toBe(
+        platform === 'ios'
+      );
+
+      renderer.unmount();
+    }
+  );
+
+  it.each(['idle', 'pending', 'expired', 'error', 'denied'])(
+    'reserves the bottom bar for the %s auth state',
+    async status => {
+      deviceAuth.status = status;
+      const renderer = await mountLoginScreen();
+
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+      renderer.unmount();
+    }
+  );
+
+  it('reserves the bottom bar while the draft placeholder is visible', async () => {
+    const draft = Promise.withResolvers<Awaited<ReturnType<typeof restoreLoginDrafts>>>();
+    vi.mocked(restoreLoginDrafts).mockReturnValue(draft.promise);
+    const renderer = await mountLoginScreen();
+
+    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(2);
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+    await act(async () => {
+      draft.resolve({ email: '', ssoRecovery: null });
+      await draft.promise;
+    });
+    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+    renderer.unmount();
+  });
+
+  it('adds Android keyboard occlusion once and retains the bar after dismissal', async () => {
+    const renderer = await mountLoginScreen();
+
+    emitKeyboard('keyboardDidShow', 300);
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 328 });
+
+    emitKeyboard('keyboardDidHide');
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+    emitKeyboard('keyboardDidShow', 0);
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+    renderer.unmount();
+  });
+
+  it('clears stale keyboard occlusion on background without dropping the bottom bar', async () => {
+    const renderer = await mountLoginScreen();
+    emitKeyboard('keyboardDidShow', 300);
+    const subscription = addAppStateListener.mock.calls[0];
+    if (!subscription) {
+      throw new Error('missing app state listener');
+    }
+
+    act(() => {
+      subscription[1]('background');
+    });
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+    renderer.unmount();
+  });
+
+  it('tracks bottom inset changes, including devices without a bottom bar', async () => {
+    const renderer = await mountLoginScreen();
+
+    for (const bottom of [48, 0]) {
+      vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 24, bottom, left: 0, right: 0 });
+      act(() => {
+        renderer.update(createElement(LoginScreen));
+      });
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: bottom });
+    }
 
     renderer.unmount();
   });

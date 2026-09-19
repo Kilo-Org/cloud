@@ -204,9 +204,10 @@ export function LoginScreen() {
   // imeInsets.bottom − barInsets.bottom (excludes the nav bar). endCoordinates.screenY
   // is NOT the IME top under adjustResize, so full occlusion is
   // endCoordinates.height + useSafeAreaInsets().bottom (= WindowInsets.ime().bottom;
-  // verified 704px + 63px = 767px on pixel9). Pad only when the keyboard is up so
-  // the resting layout is untouched.
-  const androidKeyboardPad = androidKeyboardHeight > 0 ? androidKeyboardHeight + insets.bottom : 0;
+  // verified 704px + 63px = 767px on pixel9). Keep the bottom safe area reserved
+  // even with no keyboard height, so the scroll viewport never extends under
+  // the navigation bar. On iOS, KeyboardAvoidingView owns keyboard occlusion.
+  const bottomPadding = androidKeyboardHeight + insets.bottom;
   // The Globe stays enabled on idle, denied, expired, and error (those render
   // an interactive IdleAuth form); it is disabled while a device-auth flow
   // (pending/approved) or a busy auth action owns the screen.
@@ -227,9 +228,9 @@ export function LoginScreen() {
     // the padding wrapper below.
     <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === 'ios'} className="flex-1">
       <View
-        className="flex-1"
-        // eslint-disable-next-line react-native/no-inline-styles -- dynamic keyboard padding
-        style={{ paddingBottom: androidKeyboardPad }}
+        className="flex-1 bg-background"
+        // eslint-disable-next-line react-native/no-inline-styles -- dynamic keyboard and safe-area padding
+        style={{ paddingBottom: bottomPadding }}
       >
         <ScrollView
           className="flex-1 bg-background"

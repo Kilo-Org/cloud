@@ -191,7 +191,10 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
       for (const listener of keyboardShow) {
         listener({
           endCoordinates: {
-            height: platform === 'android' ? 300 : 324,
+            // The iOS height deliberately differs from screenHeight - screenY
+            // (900 - 576 = 324), so this fixture fails if the iOS branch
+            // regresses to endCoordinates.height (250).
+            height: platform === 'android' ? 300 : 250,
             screenY: platform === 'android' ? 876 : 576,
           },
         });
@@ -200,7 +203,8 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
 
     const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     // Nearest first: the footer drops its tab-bar clearance. Android restores
-    // the system-bar inset excluded from height; iOS uses the keyboard top.
+    // the system-bar inset excluded from height; iOS uses the keyboard top
+    // (900 - 576 = 324), not the reported height.
     expect(paddingBottomsAbove(action)).toEqual([0, 324]);
 
     const hide = platform === 'android' ? 'keyboardDidHide' : 'keyboardWillHide';
@@ -231,7 +235,9 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
       for (const listener of keyboardShow) {
         listener({
           endCoordinates: {
-            height: platform === 'android' ? 24 : 48,
+            // iOS height again differs from screenHeight - screenY
+            // (900 - 852 = 48), so a regression to height (32) fails.
+            height: platform === 'android' ? 24 : 32,
             screenY: platform === 'android' ? 876 : 852,
           },
         });

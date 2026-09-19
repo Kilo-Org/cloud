@@ -12,11 +12,7 @@ import {
 } from '@/lib/context-scope';
 
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
-import {
-  SessionComposerSkeleton,
-  SessionSkeletonMessages,
-} from '@/components/agents/session-detail-skeleton';
-import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
+import { SessionDetailLoadingScreen } from '@/components/agents/session-detail-loading-screen';
 import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { useIdentityConfirmation } from '@/components/agents/user-web-connection-provider';
 import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
@@ -153,30 +149,10 @@ export default function SessionDetailScreen() {
   ) {
     // The composer placeholder holds its own height: nothing may shift when
     // the query resolves. Route title hints are not bound to an account.
-    // The context pill is the loaded header's only right-cluster control, so
-    // the loading header renders the same one and the swap cannot re-wrap the
-    // title.
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader
-          title={t('agentChat.session.title')}
-          reserveTitleSpace
-          backFallback="/(app)/(tabs)/(2_agents)"
-          headerRight={
-            <View className="flex-row items-center gap-2">
-              <SessionContextMetrics
-                info={undefined}
-                totalCostMicrodollars={null}
-                hasMessages={false}
-                loading
-              />
-            </View>
-          }
-        />
-        <SessionSkeletonMessages sessionId={sessionId} />
-        <SessionComposerSkeleton />
-      </View>
-    );
+    // The context pill this screen renders is the loaded header's own control,
+    // kept pressable so the context sheet — and its Copy link row — stays
+    // reachable while the metadata resolves.
+    return <SessionDetailLoadingScreen sessionId={sessionId} anchorMessageId={resumeAt} />;
   }
 
   const metadataErrorCode = sessionQuery.error?.data?.code;

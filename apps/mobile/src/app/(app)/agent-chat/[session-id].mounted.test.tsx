@@ -262,6 +262,12 @@ vi.mock('@/components/agents/session-context-metrics', () => ({
   SessionContextMetrics: 'SessionContextMetrics',
 }));
 
+// The loading screen mounts the context sheet; its native surface has its own
+// mounted suite, so the route harness keeps the boundary as a string component.
+vi.mock('@/components/agents/session-context-sheet', () => ({
+  SessionContextSheet: 'SessionContextSheet',
+}));
+
 vi.mock('@/components/agents/mobile-session-manager', () => ({
   createMobileAgentSessionManager: createMobileManagerMock,
 }));
@@ -666,6 +672,35 @@ describe('SessionDetailScreen valid session-id', () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
     const renderer = await mountRoute();
     expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'resumeAt')).toBeNull();
+  });
+
+  it('keeps the session link copyable from the loading header context sheet', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', at: 'msg_42' });
+    queryState.data = null;
+    queryState.isPending = true;
+    const renderer = await mountRoute();
+
+    // The transcript has not loaded, so the skeleton header is mounted...
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SessionContextSheet')).toHaveLength(0);
+
+    // ...and its context pill opens the sheet rather than staying an inert
+    // placeholder, so the session's link is copyable before the load.
+    const metrics = findByType(renderer.root, 'SessionContextMetrics');
+    expect(metrics).toHaveLength(1);
+    await act(async () => {
+      pressControl(metrics[0]);
+      await Promise.resolve();
+    });
+
+    const sheet = findByType(renderer.root, 'SessionContextSheet');
+    expect(sheet).toHaveLength(1);
+    expect(propOf(sheet[0], 'sessionId')).toBe('sess-1');
+    // The route's `?at=` anchor reaches the Copy link row, so a link copied
+    // while the skeleton shows keeps the position the route holds.
+    expect(propOf(sheet[0], 'anchorMessageId')).toBe('msg_42');
+    expect(propOf(sheet[0], 'visible')).toBe(true);
   });
 });
 

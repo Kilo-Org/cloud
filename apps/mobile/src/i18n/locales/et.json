@@ -3093,7 +3093,8 @@
     "couldNotApprove": "Kinnitamine ebaõnnestus",
     "couldNotStart": "Käivitamine ebaõnnestus",
     "channelName": "Aktiivsed agendid",
-    "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente."
+    "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
+    "newestResult": "Uusim tulemus"
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",

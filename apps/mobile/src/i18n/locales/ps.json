@@ -3093,7 +3093,8 @@
     "couldNotApprove": "منظور نه شو",
     "couldNotStart": "پیل نه شو",
     "channelName": "فعال اجنټان",
-    "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ."
+    "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ.",
+    "newestResult": "تر ټولو نوې پایله"
   },
   "transcriptionModel": {
     "title": "د غږ د متن ته بدلولو ماډل",

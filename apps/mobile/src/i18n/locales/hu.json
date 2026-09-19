@@ -3093,7 +3093,8 @@
     "couldNotApprove": "Nem sikerült jóváhagyni",
     "couldNotStart": "Nem sikerült elindítani",
     "channelName": "Aktív ügynökök",
-    "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
+    "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn.",
+    "newestResult": "Legújabb eredmény"
   },
   "transcriptionModel": {
     "title": "Átírási modell",

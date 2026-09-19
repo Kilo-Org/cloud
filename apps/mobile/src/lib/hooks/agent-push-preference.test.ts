@@ -11,6 +11,7 @@ import {
   type NotificationPreferences,
   readAgentPushPreference,
   rollbackAgentPushOptimistic,
+  readAgentPushPreferenceIfLoaded,
 } from './agent-push-preference';
 
 const key = ['user', 'getNotificationPreferences'] as const;
@@ -191,5 +192,28 @@ describe('spendAlerts optimistic flip (agreement with the spend view column)', (
     // the screen disagreeing with the column the spend view writes.
     expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(true);
     expect(qc.getQueryData(key)).toEqual(fullRow({ spendAlerts: true, balanceAlerts: true }));
+  });
+});
+
+describe('readAgentPushPreferenceIfLoaded', () => {
+  it('reports the row as unknown while the cache is empty', () => {
+    const qc = makeQueryClient();
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentAttention')).toBeUndefined();
+  });
+
+  it('reports the stored value instead of defaulting to ON once the row is cached', () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, fullRow({ agentAttention: false, chatMessages: true }));
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentAttention')).toBe(false);
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'chatMessages')).toBe(true);
+  });
+
+  it('keeps the legacy `agentPushEnabled` mapping for a legacy snapshot', () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, { agentPushEnabled: false });
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentUpdates')).toBe(false);
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentAttention')).toBe(
+      DEFAULT_NOTIFICATION_PREFERENCE
+    );
   });
 });

@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "ịgafe oke na mmụba kwa awa",
       "spendAlertsToggle": "Otu ọkwa gbasara mmefu",
       "securityFindingsSubtitle": "nchọpụta ọhụrụ na ncheta SLA"
+    },
+    "action": {
+      "openSession": "Mepee nnọkọ"
+    },
+    "needsInputAction": {
+      "approved": "Arịrịọ ahụ ekwenyere",
+      "replied": "Eziterela azịza",
+      "failed": "Enweghị ike izaghachi. Pịa ọzọ ka ị nwaa ọzọ.",
+      "unavailable": "Arịrịọ a anaghịzi eche."
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "A na-aga n'ihu na {{title}}.",
       "importingSession": "Na-ebubata nnọkọ",
       "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",
-      "importFailed": "Enweghị ike ibubata nnọkọ a.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Ndabere · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Nta",
-      "sandboxInstanceShared": "Kejoro",
-      "sandboxInstanceLarge": "Ukwu",
-      "sandboxInstanceDevcontainer": "Dev konteita",
-      "sandboxInstanceProviderDefault": "Ndabere onye na-enye ọrụ",
-      "sandboxCouldNotLoad": "Enweghị ike ibudata nhọrọ sandbox",
-      "sandboxUnavailable": "Sandbox a adịghị. Họrọ sandbox ọzọ ma ọ bụ Ndabere.",
-      "sandboxUseDefault": "Jiri Ndabere"
+      "importFailed": "Enweghị ike ibubata nnọkọ a."
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere faịlụ {{displayCount}}.",

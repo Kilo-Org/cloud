@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "hədd aşmaları və saatlıq sıçrayışlar",
       "spendAlertsToggle": "Xərc bildirişləri kateqoriyası",
       "securityFindingsSubtitle": "yeni aşkarlamalar və SLA xatırlatmaları"
+    },
+    "action": {
+      "openSession": "Sessiyanı aç"
+    },
+    "needsInputAction": {
+      "approved": "Sorğu təsdiqləndi",
+      "replied": "Cavab göndərildi",
+      "failed": "Cavab vermək olmadı. Yenidən cəhd etmək üçün yenidən toxunun.",
+      "unavailable": "Bu sorğu artıq gözləmir."
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "{{title}} davam etdirilir.",
       "importingSession": "Sessiya idxal olunur",
       "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seç.",
-      "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Standart · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Kiçik",
-      "sandboxInstanceShared": "Paylaşılan",
-      "sandboxInstanceLarge": "Böyük",
-      "sandboxInstanceDevcontainer": "Dev konteyner",
-      "sandboxInstanceProviderDefault": "Provayder standartı",
-      "sandboxCouldNotLoad": "Sandbox seçimləri yüklənə bilmədi",
-      "sandboxUnavailable": "Bu sandbox əlçatmazdır. Başqa sandbox və ya Standart seçin.",
-      "sandboxUseDefault": "Standartdan istifadə et"
+      "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi.",

@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "تێپەڕینی سنوورەکان و بەرزبوونەوەکانی کاتژمێری",
       "spendAlertsToggle": "پۆلی ئاگادارکردنەوەکانی خەرجی",
       "securityFindingsSubtitle": "دۆزینەوە نوێکان و بیرخستنەوەکانی SLA"
+    },
+    "action": {
+      "openSession": "کردنەوەی سێشن"
+    },
+    "needsInputAction": {
+      "approved": "داواکاری پەسندکرا",
+      "replied": "وەڵام نێردرا",
+      "failed": "وەڵامدانەوە نەکرا. بۆ دووبارەکردنەوە دووبارە دەست لێبدە.",
+      "unavailable": "ئەم داواکارییە ئیتر چاوەڕێ ناکات."
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "بەردەوام دەبین لە {{title}}.",
       "importingSession": "سێشنەکە هاوردە دەکرێت",
       "cliCannotContinue": "ئەم CLI ـیە ناتوانێت سێشنێک بەردەوام بکات. Cloud Agent یان CLI ـیەکی تر هەڵبژێرە.",
-      "importFailed": "نەتوانرا ئەم سێشنە هاوردە بکرێت.",
-      "sandbox": "سەندبۆکس",
-      "sandboxAccessibility": "سەندبۆکس: {{label}}",
-      "sandboxDefaultWithDestination": "بنەڕەت · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "بچووک",
-      "sandboxInstanceShared": "هاوبەش",
-      "sandboxInstanceLarge": "گەورە",
-      "sandboxInstanceDevcontainer": "کۆنتەینەری Dev",
-      "sandboxInstanceProviderDefault": "بنەڕەتی دابینکەر",
-      "sandboxCouldNotLoad": "نەتوانرا هەڵبژاردەکانی سەندبۆکس بار بکرێن",
-      "sandboxUnavailable": "ئەم سەندبۆکسە بەردەست نییە. سەندبۆکسێکی تر یان بنەڕەت هەڵبژێرە.",
-      "sandboxUseDefault": "بەکارهێنانی بنەڕەت"
+      "importFailed": "نەتوانرا ئەم سێشنە هاوردە بکرێت."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} پەڕگە نوێ کرایەوە.",

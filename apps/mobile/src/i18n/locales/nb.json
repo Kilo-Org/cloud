@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "grenseoverskridelser og topper per time",
       "spendAlertsToggle": "Kategorien forbruksvarsler",
       "securityFindingsSubtitle": "nye funn og SLA-påminnelser"
+    },
+    "action": {
+      "openSession": "Åpne økt"
+    },
+    "needsInputAction": {
+      "approved": "Forespørsel godkjent",
+      "replied": "Svar sendt",
+      "failed": "Kunne ikke svare. Trykk på nytt for å prøve igjen.",
+      "unavailable": "Denne forespørselen venter ikke lenger."
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "Fortsetter økten {{title}}.",
       "importingSession": "Importerer økten",
       "cliCannotContinue": "Denne CLI-en kan ikke fortsette en økt. Velg Cloud Agent eller en annen CLI.",
-      "importFailed": "Kunne ikke importere denne økten.",
-      "sandbox": "Sandkasse",
-      "sandboxAccessibility": "Sandkasse: {{label}}",
-      "sandboxDefaultWithDestination": "Standard · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Liten",
-      "sandboxInstanceShared": "Delt",
-      "sandboxInstanceLarge": "Stor",
-      "sandboxInstanceDevcontainer": "Utviklingscontainer",
-      "sandboxInstanceProviderDefault": "Leverandørstandard",
-      "sandboxCouldNotLoad": "Kunne ikke laste inn sandkassevalg",
-      "sandboxUnavailable": "Denne sandkassen er utilgjengelig. Velg en annen sandkasse eller Standard.",
-      "sandboxUseDefault": "Bruk Standard"
+      "importFailed": "Kunne ikke importere denne økten."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er oppdatert.",

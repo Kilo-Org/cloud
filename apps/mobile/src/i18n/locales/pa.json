@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "ਸੀਮਾ ਟੱਪਣਾ ਅਤੇ ਹਰ ਘੰਟੇ ਵਾਧਾ",
       "spendAlertsToggle": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਦੀ ਸ਼੍ਰੇਣੀ",
       "securityFindingsSubtitle": "ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਅਤੇ SLA ਲਈ ਯਾਦ-ਦਹਾਨੀਆਂ"
+    },
+    "action": {
+      "openSession": "ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ"
+    },
+    "needsInputAction": {
+      "approved": "ਬੇਨਤੀ ਮਨਜ਼ੂਰ ਹੋ ਗਈ",
+      "replied": "ਜਵਾਬ ਭੇਜ ਦਿੱਤਾ ਗਿਆ",
+      "failed": "ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਦੁਬਾਰਾ ਟੈਪ ਕਰੋ।",
+      "unavailable": "ਇਹ ਬੇਨਤੀ ਹੁਣ ਉਡੀਕ ਨਹੀਂ ਕਰਦੀ।"
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "{{title}} ਨੂੰ ਜਾਰੀ ਰੱਖਿਆ ਜਾ ਰਿਹਾ ਹੈ।",
       "importingSession": "ਸੈਸ਼ਨ ਆਯਾਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
       "cliCannotContinue": "ਇਹ CLI ਸੈਸ਼ਨ ਜਾਰੀ ਨਹੀਂ ਰੱਖ ਸਕਦਾ। Cloud Agent ਜਾਂ ਕੋਈ ਹੋਰ CLI ਚੁਣੋ।",
-      "importFailed": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਆਯਾਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
-      "sandbox": "ਸੈਂਡਬਾਕਸ",
-      "sandboxAccessibility": "ਸੈਂਡਬਾਕਸ: {{label}}",
-      "sandboxDefaultWithDestination": "ਡਿਫ਼ੌਲਟ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "ਛੋਟਾ",
-      "sandboxInstanceShared": "ਸਾਂਝਾ",
-      "sandboxInstanceLarge": "ਵੱਡਾ",
-      "sandboxInstanceDevcontainer": "ਡੈਵ ਕੰਟੇਨਰ",
-      "sandboxInstanceProviderDefault": "ਪ੍ਰਦਾਤਾ ਦਾ ਡਿਫ਼ੌਲਟ",
-      "sandboxCouldNotLoad": "ਸੈਂਡਬਾਕਸ ਵਿਕਲਪ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
-      "sandboxUnavailable": "ਇਹ ਸੈਂਡਬਾਕਸ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕੋਈ ਹੋਰ ਸੈਂਡਬਾਕਸ ਜਾਂ ਡਿਫ਼ੌਲਟ ਚੁਣੋ।",
-      "sandboxUseDefault": "ਡਿਫ਼ੌਲਟ ਵਰਤੋ"
+      "importFailed": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਆਯਾਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ਫਾਈਲ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ ਹੈ।",

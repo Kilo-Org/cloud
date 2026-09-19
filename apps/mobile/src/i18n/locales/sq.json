@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "tejkalime pragjesh dhe rritje për orë",
       "spendAlertsToggle": "Kategoria e njoftimeve për shpenzimet",
       "securityFindingsSubtitle": "gjetje të reja dhe kujtesa për SLA"
+    },
+    "action": {
+      "openSession": "Hap seancën"
+    },
+    "needsInputAction": {
+      "approved": "Kërkesa u miratua",
+      "replied": "Përgjigja u dërgua",
+      "failed": "Nuk mundi të përgjigjej. Prekni përsëri për të provuar përsëri.",
+      "unavailable": "Kjo kërkesë nuk pret më."
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "Po vazhdon seanca {{title}}.",
       "importingSession": "Duke importuar seancën",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidh Cloud Agent ose një CLI tjetër.",
-      "importFailed": "Nuk u arrit të importohej kjo seancë.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Parazgjedhje · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "E vogël",
-      "sandboxInstanceShared": "E përbashkët",
-      "sandboxInstanceLarge": "E madhe",
-      "sandboxInstanceDevcontainer": "Kontejner zhvillimi",
-      "sandboxInstanceProviderDefault": "Parazgjedhje e ofruesit",
-      "sandboxCouldNotLoad": "Nuk mund të ngarkoheshin opsionet e sandbox-it",
-      "sandboxUnavailable": "Ky sandbox nuk është i disponueshëm. Zgjidhni një sandbox tjetër ose Parazgjedhjen.",
-      "sandboxUseDefault": "Përdor Parazgjedhjen"
+      "importFailed": "Nuk u arrit të importohej kjo seancë."
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar.",

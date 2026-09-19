@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "atalaseen gainditzeak eta orduko gorakadak",
       "spendAlertsToggle": "Gastu-alerten kategoria",
       "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak"
+    },
+    "action": {
+      "openSession": "Ireki saioa"
+    },
+    "needsInputAction": {
+      "approved": "Eskaera onartu da",
+      "replied": "Erantzuna bidali da",
+      "failed": "Ezin izan da erantzun. Ukitu berriro saiatzeko.",
+      "unavailable": "Eskaera honek jada ez du itxaroten."
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "Saio honekin jarraitzen ari zara: {{title}}.",
       "importingSession": "Saioa inportatzen",
       "cliCannotContinue": "CLI honek ezin dio saio bati jarraitu. Aukeratu Cloud Agent edo beste CLI bat.",
-      "importFailed": "Ezin izan da saio hau inportatu.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Lehenetsia · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Txikia",
-      "sandboxInstanceShared": "Partekatua",
-      "sandboxInstanceLarge": "Handia",
-      "sandboxInstanceDevcontainer": "Dev edukiontzia",
-      "sandboxInstanceProviderDefault": "Hornitzailearen lehenetsia",
-      "sandboxCouldNotLoad": "Ezin izan dira sandbox-aukerak kargatu",
-      "sandboxUnavailable": "Sandbox hau ez dago erabilgarri. Aukeratu beste sandbox bat edo Lehenetsia.",
-      "sandboxUseDefault": "Erabili Lehenetsia"
+      "importFailed": "Ezin izan da saio hau inportatu."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxategi eguneratu da.",

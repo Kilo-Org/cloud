@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "मर्यादा ओलांडणे आणि प्रति तास वाढ",
       "spendAlertsToggle": "खर्चाच्या सूचना श्रेणी",
       "securityFindingsSubtitle": "नवीन निष्कर्ष आणि SLA स्मरणपत्रे"
+    },
+    "action": {
+      "openSession": "सत्र उघडा"
+    },
+    "needsInputAction": {
+      "approved": "विनंती मंजूर झाली",
+      "replied": "उत्तर पाठवले",
+      "failed": "उत्तर देता आले नाही. पुन्हा प्रयत्न करण्यासाठी पुन्हा टॅप करा.",
+      "unavailable": "ही विनंती आता प्रतीक्षा करत नाही."
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "{{title}} हे सत्र पुढे सुरू होत आहे.",
       "importingSession": "सत्र आयात होत आहे",
       "cliCannotContinue": "हे CLI सत्र सुरू ठेवू शकत नाही. Cloud Agent किंवा दुसरे CLI निवडा.",
-      "importFailed": "हे सत्र आयात करता आले नाही.",
-      "sandbox": "सॅंडबॉक्स",
-      "sandboxAccessibility": "सॅंडबॉक्स: {{label}}",
-      "sandboxDefaultWithDestination": "डीफॉल्ट · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "लहान",
-      "sandboxInstanceShared": "सामायिक",
-      "sandboxInstanceLarge": "मोठा",
-      "sandboxInstanceDevcontainer": "डेव्ह कंटेनर",
-      "sandboxInstanceProviderDefault": "प्रदात्याचे डीफॉल्ट",
-      "sandboxCouldNotLoad": "सॅंडबॉक्स पर्याय लोड करता आले नाहीत",
-      "sandboxUnavailable": "हा सॅंडबॉक्स उपलब्ध नाही. दुसरा सॅंडबॉक्स किंवा डीफॉल्ट निवडा.",
-      "sandboxUseDefault": "डीफॉल्ट वापरा"
+      "importFailed": "हे सत्र आयात करता आले नाही."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्ययावत केली.",

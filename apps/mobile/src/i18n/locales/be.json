@@ -875,6 +875,15 @@
       "spendAlertsSubtitle": "перасячэнні парогаў і гадзінныя ўсплёскі",
       "spendAlertsToggle": "Катэгорыя апавяшчэнняў аб выдатаках",
       "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA"
+    },
+    "action": {
+      "openSession": "Адкрыць сеанс"
+    },
+    "needsInputAction": {
+      "approved": "Запыт ухвалены",
+      "replied": "Адказ дасланы",
+      "failed": "Не ўдалося адказаць. Націсніце яшчэ раз, каб паўтарыць.",
+      "unavailable": "Гэты запыт больш не чакае."
     }
   },
   "tabs": {
@@ -2236,20 +2245,7 @@
       "continueFrom": "Працягваецца сеанс «{{title}}».",
       "importingSession": "Імпартаванне сеанса",
       "cliCannotContinue": "Гэты CLI не падтрымлівае працяг сеанса. Выберыце Cloud Agent або іншы CLI.",
-      "importFailed": "Не ўдалося імпартаваць гэты сеанс.",
-      "sandbox": "Пясочница",
-      "sandboxAccessibility": "Пясочница: {{label}}",
-      "sandboxDefaultWithDestination": "Па змаўчанні · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Малы",
-      "sandboxInstanceShared": "Агульны",
-      "sandboxInstanceLarge": "Вялікі",
-      "sandboxInstanceDevcontainer": "Кантэйнер распрацоўкі",
-      "sandboxInstanceProviderDefault": "Па змаўчанні пастаўшчыка",
-      "sandboxCouldNotLoad": "Не ўдалося загрузіць варыянты пясочніцы",
-      "sandboxUnavailable": "Гэта пясочница недаступная. Выберыце іншую пясочницу або Па змаўчанні.",
-      "sandboxUseDefault": "Выкарыстоўваць па змаўчанні"
+      "importFailed": "Не ўдалося імпартаваць гэты сеанс."
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл.",

@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "የገደብ መሻገሪያዎች እና የሰዓት ጭማሪዎች",
       "spendAlertsToggle": "የወጪ ማስጠንቀቂያ ምድብ",
       "securityFindingsSubtitle": "አዳዲስ ግኝቶችና የSLA ማስታወሻዎች"
+    },
+    "action": {
+      "openSession": "ክፍለ ጊዜውን ክፈት"
+    },
+    "needsInputAction": {
+      "approved": "ጥያቄው ጸድቋል",
+      "replied": "መልስ ተልኳል",
+      "failed": "መልስ መስጠት አልተቻለም። እንደገና ለመሞከር እንደገና ይንኩ።",
+      "unavailable": "ይህ ጥያቄ ከእንግዲህ አይጠብቅም።"
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "{{title}} እየቀጠለ ነው።",
       "importingSession": "ክፍለ ጊዜውን በማስመጣት ላይ",
       "cliCannotContinue": "ይህ CLI ክፍለ ጊዜን መቀጠል አይችልም። Cloud Agent ወይም ሌላ CLI ይምረጡ።",
-      "importFailed": "ይህን ክፍለ ጊዜ ማስመጣት አልተቻለም።",
-      "sandbox": "ሳንድባክስ",
-      "sandboxAccessibility": "ሳንድባክስ፦ {{label}}",
-      "sandboxDefaultWithDestination": "ነባሪ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "ትንሽ",
-      "sandboxInstanceShared": "የጋራ",
-      "sandboxInstanceLarge": "ትልቅ",
-      "sandboxInstanceDevcontainer": "የዴቭ ኮንቴይነር",
-      "sandboxInstanceProviderDefault": "የአቅራቢ ነባሪ",
-      "sandboxCouldNotLoad": "የሳንድባክስ አማራጮችን መጫን አልተቻለም",
-      "sandboxUnavailable": "ይህ ሳንድባክስ አይገኝም። ሌላ ሳንድባክስ ወይም ነባሪን ይምረጡ።",
-      "sandboxUseDefault": "ነባሪን ተጠቀም"
+      "importFailed": "ይህን ክፍለ ጊዜ ማስመጣት አልተቻለም።"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል።",

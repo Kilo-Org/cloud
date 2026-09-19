@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "босго давсан болон цагийн огцом өсөлт",
       "spendAlertsToggle": "Зарцуулалтын анхааруулгын ангилал",
       "securityFindingsSubtitle": "шинээр илэрсэн эмзэг байдал болон SLA сануулга"
+    },
+    "action": {
+      "openSession": "Сесс нээх"
+    },
+    "needsInputAction": {
+      "approved": "Хүсэлтийг зөвшөөрлөө",
+      "replied": "Хариултыг илгээлээ",
+      "failed": "Хариу өгч чадсангүй. Дахин оролдохын тулд дахин товшино уу.",
+      "unavailable": "Энэ хүсэлт хүлээхээ больсон."
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "«{{title}}» сессийг үргэлжлүүлж байна.",
       "importingSession": "Сесс импортлож байна",
       "cliCannotContinue": "Энэ CLI сессийг үргэлжлүүлэх боломжгүй. Cloud Agent эсвэл өөр CLI сонгоно уу.",
-      "importFailed": "Энэ сессийг импортолж чадсангүй.",
-      "sandbox": "Сэндбокс",
-      "sandboxAccessibility": "Сэндбокс: {{label}}",
-      "sandboxDefaultWithDestination": "Өгөгдмөл · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Жижиг",
-      "sandboxInstanceShared": "Түгээсэн",
-      "sandboxInstanceLarge": "Том",
-      "sandboxInstanceDevcontainer": "Dev контейнер",
-      "sandboxInstanceProviderDefault": "Нийлүүлэгчийн өгөгдмөл",
-      "sandboxCouldNotLoad": "Сэндбоксын сонголтыг ачаалж чадсангүй",
-      "sandboxUnavailable": "Энэ сэндбокс ашиглах боломжгүй. Өөр сэндбокс эсвэл Өгөгдмөлийг сонгоно уу.",
-      "sandboxUseDefault": "Өгөгдмөлийг ашиглах"
+      "importFailed": "Энэ сессийг импортолж чадсангүй."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файлыг шинэчиллээ.",

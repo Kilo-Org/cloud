@@ -339,6 +339,15 @@
       "spendAlertsSubtitle": "превышения порогов и почасовые всплески",
       "spendAlertsToggle": "Категория «Оповещения о расходах»",
       "securityFindingsSubtitle": "новые уязвимости и напоминания о сроках SLA"
+    },
+    "action": {
+      "openSession": "Открыть сеанс"
+    },
+    "needsInputAction": {
+      "approved": "Запрос одобрен",
+      "replied": "Ответ отправлен",
+      "failed": "Не удалось ответить. Нажмите ещё раз, чтобы повторить.",
+      "unavailable": "Этот запрос больше не ждёт."
     }
   },
   "tabs": {
@@ -1700,20 +1709,7 @@
       "continueFrom": "Продолжаем сеанс «{{title}}».",
       "importingSession": "Импорт сеанса",
       "cliCannotContinue": "Этот CLI не поддерживает продолжение сеанса. Выберите Cloud Agent или другой CLI.",
-      "importFailed": "Не удалось импортировать этот сеанс.",
-      "sandbox": "Песочница",
-      "sandboxAccessibility": "Песочница: {{label}}",
-      "sandboxDefaultWithDestination": "По умолчанию · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Малая",
-      "sandboxInstanceShared": "Общая",
-      "sandboxInstanceLarge": "Большая",
-      "sandboxInstanceDevcontainer": "Контейнер разработки",
-      "sandboxInstanceProviderDefault": "По умолчанию от поставщика",
-      "sandboxCouldNotLoad": "Не удалось загрузить параметры песочницы",
-      "sandboxUnavailable": "Эта песочница недоступна. Выберите другую песочницу или вариант «По умолчанию».",
-      "sandboxUseDefault": "Использовать «По умолчанию»"
+      "importFailed": "Не удалось импортировать этот сеанс."
     },
     "partRenderer": {
       "updatedFileCount_one": "Обновлён {{displayCount}} файл.",

@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "melepasi ambang dan lonjakan setiap jam",
       "spendAlertsToggle": "Kategori amaran perbelanjaan",
       "securityFindingsSubtitle": "penemuan baharu dan peringatan SLA"
+    },
+    "action": {
+      "openSession": "Buka sesi"
+    },
+    "needsInputAction": {
+      "approved": "Permintaan diluluskan",
+      "replied": "Balasan dihantar",
+      "failed": "Tidak dapat menjawab. Ketik semula untuk mencuba lagi.",
+      "unavailable": "Permintaan ini tidak lagi menunggu."
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "Sesi {{title}} diteruskan.",
       "importingSession": "Mengimport sesi",
       "cliCannotContinue": "CLI ini tidak dapat meneruskan sesi. Pilih Cloud Agent atau CLI lain.",
-      "importFailed": "Tidak dapat mengimport sesi ini.",
-      "sandbox": "Kotak pasir",
-      "sandboxAccessibility": "Kotak pasir: {{label}}",
-      "sandboxDefaultWithDestination": "Lalai · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Kecil",
-      "sandboxInstanceShared": "Kongsi",
-      "sandboxInstanceLarge": "Besar",
-      "sandboxInstanceDevcontainer": "Bekas dev",
-      "sandboxInstanceProviderDefault": "Lalai pembekal",
-      "sandboxCouldNotLoad": "Tidak dapat memuatkan pilihan kotak pasir",
-      "sandboxUnavailable": "Kotak pasir ini tidak tersedia. Pilih kotak pasir lain atau Lalai.",
-      "sandboxUseDefault": "Guna Lalai"
+      "importFailed": "Tidak dapat mengimport sesi ini."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fail telah dikemas kini.",

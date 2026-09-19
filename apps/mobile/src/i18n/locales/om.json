@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "daarbii daangaa fi olka'iinsa sa'aatii",
       "spendAlertsToggle": "Ramaddii akeekkachiisa baasii",
       "securityFindingsSubtitle": "argannoowwan haaraa fi yaadachiisa SLA"
+    },
+    "action": {
+      "openSession": "Turtii bani"
+    },
+    "needsInputAction": {
+      "approved": "Gaaffiin mirkanaa’eera",
+      "replied": "Deebbiin ergameera",
+      "failed": "Deebuu kennuu hin dandeenye. Yaaluuf irra deebi’i cuqaasi.",
+      "unavailable": "Gaaffiin kun eegamaa hin oolu."
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "{{title}} itti fufaa jira.",
       "importingSession": "Turtii galchaa jira",
       "cliCannotContinue": "CLI kun turtii itti fufuu hin danda'u. Cloud Agent yookaan CLI biraa filadhu.",
-      "importFailed": "Turtii kana galchuu hin danda'amne.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Default · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Xiqqaa",
-      "sandboxInstanceShared": "Qoodama",
-      "sandboxInstanceLarge": "Guddaa",
-      "sandboxInstanceDevcontainer": "Konteenara Dev",
-      "sandboxInstanceProviderDefault": "Kan dhiyeessaa Default",
-      "sandboxCouldNotLoad": "Filannoo sandbox fe'uuf jijjiirama hin qabu",
-      "sandboxUnavailable": "Sandbox kun hin argamu. Sandbox bira ykn Default filadhu.",
-      "sandboxUseDefault": "Default fayyadami"
+      "importFailed": "Turtii kana galchuu hin danda'amne."
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayiliin {{displayCount}} haaromfameera.",

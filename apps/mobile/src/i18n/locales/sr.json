@@ -859,6 +859,15 @@
       "spendAlertsSubtitle": "prekoračenja pragova i skokovi po satu",
       "spendAlertsToggle": "Kategorija obaveštenja o potrošnji",
       "securityFindingsSubtitle": "novi nalazi i podsetnici za SLA"
+    },
+    "action": {
+      "openSession": "Otvori sesiju"
+    },
+    "needsInputAction": {
+      "approved": "Zahtev je odobren",
+      "replied": "Odgovor je poslat",
+      "failed": "Nije uspelo odgovoriti. Dodirnite ponovo da pokušate.",
+      "unavailable": "Ovaj zahtev više ne čeka."
     }
   },
   "tabs": {
@@ -2208,20 +2217,7 @@
       "continueFrom": "Nastavlja se sesija {{title}}.",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može da nastavi sesiju. Izaberi Cloud Agent ili drugi CLI.",
-      "importFailed": "Uvoz ove sesije nije uspeo.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Podrazumevano · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Malo",
-      "sandboxInstanceShared": "Deljeno",
-      "sandboxInstanceLarge": "Veliko",
-      "sandboxInstanceDevcontainer": "Dev kontejner",
-      "sandboxInstanceProviderDefault": "Podrazumevano od dobavljača",
-      "sandboxCouldNotLoad": "Opcije sandboxa nisu mogle da se učitaju",
-      "sandboxUnavailable": "Ovaj sandbox nije dostupan. Izaberite drugi sandbox ili Podrazumevano.",
-      "sandboxUseDefault": "Koristi Podrazumevano"
+      "importFailed": "Uvoz ove sesije nije uspeo."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažuriran je {{displayCount}} fajl.",

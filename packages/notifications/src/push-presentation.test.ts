@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { pushDataSchema } from './push-data';
 import {
+  AGENT_CHANNEL_SPLIT_APP_VERSION,
   AGENT_NOTIFICATION_KINDS,
   ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
   ANDROID_NOTIFICATION_CHANNELS,
@@ -10,39 +11,61 @@ import {
   agentNotificationKindForPushData,
   androidChannelIdForAgentKind,
   androidChannelIdForPushData,
+  androidChannelIdForPushDataToAppVersion,
+  LEGACY_AGENT_ANDROID_CHANNEL_ID,
   androidChannelIdForRegisteredClient,
   genericPushContentForPushData,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
 } from './push-presentation';
 
-// One representative payload per `pushDataSchema` variant. The exhaustive
-// channel mapping is asserted against these; the `never` guard in the switch
-// makes any new variant a compile error, so this list is complete by
-// construction.
-const variants = [
-  { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
-  { type: 'instance-lifecycle', event: 'ready', sandboxId: 'sb1' },
-  { type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sb1' },
-  { type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'attention' },
-  { type: 'low_balance', organizationId: 'org1' },
-  { type: 'spend_alert', scope: 'organization', organizationId: 'org1' },
-  { type: 'security_finding', findingId: 'f1', scope: 'org' },
-  { type: 'security_lifecycle', event: 'analysis_completed', findingId: 'f1', scope: 'org' },
-  {
-    type: 'active_agents_glanceable',
-    schemaVersion: 1,
-    revision: 1,
-    scopeKey: 'scope-1',
-    organizationBound: false,
-    status: 'happy',
-    running: 1,
-    needsInput: 0,
-    idle: 0,
-    updatedAt: '2026-01-01T00:00:00.000Z',
-    expiresAt: '2026-01-01T08:00:00.000Z',
-    needsInputSince: '2026-01-01T00:00:00.000Z',
-  },
+// One representative payload per `pushDataSchema` variant, plus both
+// `cloud_agent_session` categories (attention vs status vs absent). The
+// `never` guard in the channel switch makes a new variant a compile error, so
+// this list is complete by construction.
+const channelCases = [
+  [
+    { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
+    'needs-input',
+  ],
+  [{ type: 'instance-lifecycle', event: 'ready', sandboxId: 'sb1' }, 'kiloclaw'],
+  [{ type: 'scheduled-action', event: 'scheduled_restart_notice', sandboxId: 'sb1' }, 'kiloclaw'],
+  [
+    {
+      type: 'cloud_agent_session',
+      cliSessionId: 'cli1',
+      category: 'attention',
+      attentionKind: 'question',
+      prUrl: 'https://github.com/org/repo/pull/7',
+    },
+    'needs-input',
+  ],
+  [{ type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'status' }, 'agent-progress'],
+  [{ type: 'cloud_agent_session', cliSessionId: 'cli1' }, 'agent-progress'],
+  [{ type: 'low_balance', organizationId: 'org1' }, 'balance'],
+  [{ type: 'spend_alert', scope: 'organization', organizationId: 'org1' }, 'balance'],
+  [{ type: 'security_finding', findingId: 'f1', scope: 'org' }, 'security'],
+  [
+    { type: 'security_lifecycle', event: 'analysis_completed', findingId: 'f1', scope: 'org' },
+    'security',
+  ],
+  [
+    {
+      type: 'active_agents_glanceable',
+      schemaVersion: 1,
+      revision: 1,
+      scopeKey: 'scope-1',
+      organizationBound: false,
+      status: 'happy',
+      running: 1,
+      needsInput: 0,
+      idle: 0,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      expiresAt: '2026-01-01T08:00:00.000Z',
+      needsInputSince: '2026-01-01T00:00:00.000Z',
+    },
+    'agent-progress',
+  ],
 ] as const;
 
 function glanceable(needsInput: number) {
@@ -230,7 +253,7 @@ describe('iosInterruptionLevelForPushData', () => {
       )
     ).toBe('active');
     expect(iosInterruptionLevelForPushData(glanceable(0))).toBe('active');
-    for (const variant of variants) {
+    for (const [variant] of channelCases) {
       const parsed = pushDataSchema.parse(variant);
       if (agentNotificationKindForPushData(parsed) === 'needs-input') {
         continue;
@@ -277,7 +300,7 @@ describe('iosMutableContentForPushData', () => {
       )
     ).toBe(false);
     expect(iosMutableContentForPushData(glanceable(1))).toBe(false);
-    for (const variant of variants) {
+    for (const [variant] of channelCases) {
       const parsed = pushDataSchema.parse(variant);
       if (agentNotificationKindForPushData(parsed) === 'progress') {
         continue;
@@ -288,36 +311,98 @@ describe('iosMutableContentForPushData', () => {
 });
 
 describe('androidChannelIdForPushData', () => {
-  it('maps every pushDataSchema variant to a declared channel id', () => {
+  it('maps every pushDataSchema variant to its declared channel', () => {
     const declaredIds = new Set(ANDROID_NOTIFICATION_CHANNELS.map(c => c.id));
 
-    for (const variant of variants) {
+    for (const [variant, expectedChannelId] of channelCases) {
       const parsed = pushDataSchema.safeParse(variant);
       expect(parsed.success, `variant should parse: ${JSON.stringify(variant)}`).toBe(true);
       if (!parsed.success) continue;
 
-      const channelId = androidChannelIdForPushData(parsed.data);
-      expect(declaredIds.has(channelId)).toBe(true);
+      expect(declaredIds.has(expectedChannelId)).toBe(true);
+      expect(androidChannelIdForPushData(parsed.data)).toBe(expectedChannelId);
     }
   });
 
-  it('maps each type to its expected channel', () => {
-    const expected: Record<string, string> = {
-      cloud_agent_session: 'needs-input',
-      'chat.message': 'needs-input',
-      'instance-lifecycle': 'kiloclaw',
-      'scheduled-action': 'kiloclaw',
-      low_balance: 'balance',
-      spend_alert: 'balance',
-      security_finding: 'security',
-      security_lifecycle: 'security',
-      active_agents_glanceable: 'agent-progress',
-    };
+  it('puts needs-input raises on the high-importance channel and progress on the quiet one', () => {
+    const attention = ANDROID_NOTIFICATION_CHANNELS.find(c => c.id === 'needs-input');
+    const progress = ANDROID_NOTIFICATION_CHANNELS.find(c => c.id === 'agent-progress');
 
-    for (const variant of variants) {
-      const parsed = pushDataSchema.parse(variant);
-      expect(androidChannelIdForPushData(parsed)).toBe(expected[parsed.type]);
-    }
+    expect(attention?.importance).toBe('high');
+    expect(progress?.importance).toBe('default');
+    // The two channels must not be the same channel id.
+    expect(attention?.id).not.toBe(progress?.id);
+  });
+
+  it('never routes progress to a channel id an existing install created as high', () => {
+    // Android keeps the importance of a channel that already exists, so
+    // lowering a channel's importance is a no-op. Progress must therefore have
+    // an id of its own: reusing `agent` (created high before this contract)
+    // would keep ordinary progress breaking through on existing installs.
+    expect(androidChannelIdForPushData({ type: 'cloud_agent_session', cliSessionId: 'cli1' })).toBe(
+      'agent-progress'
+    );
+    expect(ANDROID_NOTIFICATION_CHANNELS.map(c => c.id)).not.toContain('agent');
+  });
+});
+
+describe('androidChannelIdForPushDataToAppVersion', () => {
+  const attention = {
+    type: 'cloud_agent_session',
+    cliSessionId: 'cli1',
+    category: 'attention',
+  } as const;
+  const progress = { type: 'cloud_agent_session', cliSessionId: 'cli1' } as const;
+
+  it('keeps an agent push on the legacy channel for a build that predates the split', () => {
+    // 1.0.11 shipped before the split channels existed: its tokens have no
+    // `needs-input`/`agent-progress`, so directing a push there would be
+    // dropped on Android 8+. Only the split build and later may be addressed.
+    expect(androidChannelIdForPushDataToAppVersion(attention, '1.0.11')).toBe(
+      LEGACY_AGENT_ANDROID_CHANNEL_ID
+    );
+    expect(androidChannelIdForPushDataToAppVersion(attention, '1.0.10')).toBe(
+      LEGACY_AGENT_ANDROID_CHANNEL_ID
+    );
+    expect(androidChannelIdForPushDataToAppVersion(progress, '1.0.11')).toBe(
+      LEGACY_AGENT_ANDROID_CHANNEL_ID
+    );
+    expect(androidChannelIdForPushDataToAppVersion(progress, '1.0.4')).toBe(
+      LEGACY_AGENT_ANDROID_CHANNEL_ID
+    );
+    expect(androidChannelIdForPushDataToAppVersion(progress, null)).toBeUndefined();
+    expect(androidChannelIdForPushDataToAppVersion(progress, 'nightly')).toBe(
+      LEGACY_AGENT_ANDROID_CHANNEL_ID
+    );
+  });
+
+  it('reaches the split channels from the first build that creates them', () => {
+    expect(
+      androidChannelIdForPushDataToAppVersion(attention, AGENT_CHANNEL_SPLIT_APP_VERSION)
+    ).toBe('needs-input');
+    expect(androidChannelIdForPushDataToAppVersion(progress, '1.0.12')).toBe('agent-progress');
+  });
+
+  it('preserves pre-split chat and feature channels for an older build', () => {
+    expect(
+      androidChannelIdForPushDataToAppVersion(
+        { type: 'chat.message', sandboxId: 'sb1', conversationId: 'conv1', messageId: 'm1' },
+        '1.0.4'
+      )
+    ).toBe('chat');
+    expect(
+      androidChannelIdForPushDataToAppVersion(
+        { type: 'low_balance', organizationId: 'org1' },
+        '1.0.0'
+      )
+    ).toBe('balance');
+  });
+
+  it('shares the channel gate and preserves the legacy glanceable route', () => {
+    expect(ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION).toBe(AGENT_CHANNEL_SPLIT_APP_VERSION);
+    expect(androidChannelIdForPushDataToAppVersion(glanceable(2), '1.0.11')).toBe('active-agents');
+    expect(androidChannelIdForPushDataToAppVersion(glanceable(2), '1.0.12')).toBe('needs-input');
+    expect(androidChannelIdForPushDataToAppVersion(glanceable(0), '1.0.12')).toBe('agent-progress');
   });
 
   it('routes an agent push through its kind', () => {
@@ -332,7 +417,7 @@ describe('androidChannelIdForPushData', () => {
 
 describe('genericPushContentForPushData', () => {
   it('never embeds any input field value in the generic copy', () => {
-    for (const variant of variants) {
+    for (const [variant] of channelCases) {
       const parsed = pushDataSchema.parse(variant);
       const { title, body } = genericPushContentForPushData(parsed);
 
@@ -349,7 +434,7 @@ describe('genericPushContentForPushData', () => {
   });
 
   it('returns non-empty title and body for every variant', () => {
-    for (const variant of variants) {
+    for (const [variant] of channelCases) {
       const parsed = pushDataSchema.parse(variant);
       const { title, body } = genericPushContentForPushData(parsed);
       expect(title.length).toBeGreaterThan(0);
@@ -423,6 +508,8 @@ describe('androidChannelIdForRegisteredClient', () => {
     // Both older clients know only the legacy channels, and this build deletes
     // those, so naming a channel would make Android drop the post.
     expect(androidChannelIdForRegisteredClient('needs-input', '1.0.10')).toBeUndefined();
+    expect(androidChannelIdForRegisteredClient('needs-input', '1.0.11')).toBeUndefined();
+    expect(androidChannelIdForRegisteredClient('agent-progress', '1.0.11')).toBeUndefined();
     expect(androidChannelIdForRegisteredClient('needs-input', null)).toBeUndefined();
     expect(androidChannelIdForRegisteredClient('needs-input', undefined)).toBeUndefined();
     expect(androidChannelIdForRegisteredClient('agent-progress', 'not-a-version')).toBeUndefined();

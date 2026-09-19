@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "ngā whitinga paepae me ngā pikinga ia hāora",
       "spendAlertsToggle": "Kāwai matohi whakapaunga",
       "securityFindingsSubtitle": "ngā kitenga hōu me ngā whakamaumahara SLA"
+    },
+    "action": {
+      "openSession": "Whakatuwheratia te wātū"
+    },
+    "needsInputAction": {
+      "approved": "Kua whakaaetia te tono",
+      "replied": "Kua tukuna te whakautu",
+      "failed": "Kāore i tutuki te whakautu. Pātia anō hei ngana anō.",
+      "unavailable": "Kāore te tono nei e tatari anō."
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "Kei te haere tonu te wātū {{title}}.",
       "importingSession": "Kei te kawemai i te wātū",
       "cliCannotContinue": "Kāore e taea e tēnei CLI te haere tonu i tētahi wātū. Kōwhiria a Cloud Agent, tētahi atu CLI rānei.",
-      "importFailed": "Kāore i taea te kawemai i tēnei wātū.",
-      "sandbox": "Pouaka kirikiri",
-      "sandboxAccessibility": "Pouaka kirikiri: {{label}}",
-      "sandboxDefaultWithDestination": "Taunoa · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Iti",
-      "sandboxInstanceShared": "Tohatoha",
-      "sandboxInstanceLarge": "Nui",
-      "sandboxInstanceDevcontainer": "Pouaka Dev",
-      "sandboxInstanceProviderDefault": "Taunoa a te kaiwhakarato",
-      "sandboxCouldNotLoad": "Kāhore i taea te uta i ngā kōwhiringa pouaka kirikiri",
-      "sandboxUnavailable": "Kāore tēnei pouaka kirikiri i te wātea. Tīpakohia tētahi atu pouaka kirikiri, ko Taunoa rānei.",
-      "sandboxUseDefault": "Whakamahia te Taunoa"
+      "importFailed": "Kāore i taea te kawemai i tēnei wātū."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae.",

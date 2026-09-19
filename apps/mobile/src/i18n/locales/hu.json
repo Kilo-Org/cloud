@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "küszöbátlépések és óránkénti kiugrások",
       "spendAlertsToggle": "Költésfigyelmeztetések kategória",
       "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők"
+    },
+    "action": {
+      "openSession": "Munkamenet megnyitása"
+    },
+    "needsInputAction": {
+      "approved": "Kérelem jóváhagyva",
+      "replied": "Válasz elküldve",
+      "failed": "Nem sikerült válaszolni. Koppintson újra az újrapróbálkozáshoz.",
+      "unavailable": "Ez a kérelem már nem várakozik."
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "Ezt a munkamenetet folytatod: {{title}}.",
       "importingSession": "Munkamenet importálása…",
       "cliCannotContinue": "Ez a CLI nem támogatja a munkamenetek folytatását. Válaszd a Cloud Agentet vagy egy másik CLI-t.",
-      "importFailed": "Nem sikerült importálni ezt a munkamenetet.",
-      "sandbox": "Homokozó",
-      "sandboxAccessibility": "Homokozó: {{label}}",
-      "sandboxDefaultWithDestination": "Alapértelmezett · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Kicsi",
-      "sandboxInstanceShared": "Megosztott",
-      "sandboxInstanceLarge": "Nagy",
-      "sandboxInstanceDevcontainer": "Dev konténer",
-      "sandboxInstanceProviderDefault": "Szolgáltatói alapértelmezés",
-      "sandboxCouldNotLoad": "A homokozó beállításai nem tölthetők be",
-      "sandboxUnavailable": "Ez a homokozó nem érhető el. Válassz másik homokozót vagy az Alapértelmezettet.",
-      "sandboxUseDefault": "Alapértelmezett használata"
+      "importFailed": "Nem sikerült importálni ezt a munkamenetet."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fájl frissült.",

@@ -875,6 +875,15 @@
       "spendAlertsSubtitle": "slenksčių viršijimai ir valandiniai šuoliai",
       "spendAlertsToggle": "Išlaidų įspėjimų kategorija",
       "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai"
+    },
+    "action": {
+      "openSession": "Atidaryti sesiją"
+    },
+    "needsInputAction": {
+      "approved": "Užklausa patvirtinta",
+      "replied": "Atsakymas išsiųstas",
+      "failed": "Nepavyko atsakyti. Bakstelėkite dar kartą, kad pabandytumėte.",
+      "unavailable": "Šios užklausos nebelaukiama."
     }
   },
   "tabs": {
@@ -2236,20 +2245,7 @@
       "continueFrom": "Tęsiama sesija „{{title}}“.",
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šioje CLI sesijos tęsti negalima. Pasirinkite „Cloud Agent“ arba kitą CLI.",
-      "importFailed": "Nepavyko importuoti šios sesijos.",
-      "sandbox": "Smėlio dėžė",
-      "sandboxAccessibility": "Smėlio dėžė: {{label}}",
-      "sandboxDefaultWithDestination": "Numatytasis · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Mažas",
-      "sandboxInstanceShared": "Bendras",
-      "sandboxInstanceLarge": "Didelis",
-      "sandboxInstanceDevcontainer": "Kūrimo konteineris",
-      "sandboxInstanceProviderDefault": "Tiekėjo numatytasis",
-      "sandboxCouldNotLoad": "Nepavyko įkelti smėlio dėžės parinkčių",
-      "sandboxUnavailable": "Ši smėlio dėžė neprieinama. Pasirinkite kitą smėlio dėžę arba Numatytąjį.",
-      "sandboxUseDefault": "Naudoti Numatytąjį"
+      "importFailed": "Nepavyko importuoti šios sesijos."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujintas {{displayCount}} failas.",

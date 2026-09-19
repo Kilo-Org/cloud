@@ -3,6 +3,7 @@ import {
   internalDispatchRequestSchema,
   internalDispatchSpendAlertRequestSchema,
   refreshGlanceableSessionsInputSchema,
+  sendCloudAgentSessionNotificationInputSchema,
 } from './rpc-schemas';
 
 describe('internalDispatchSpendAlertRequestSchema', () => {
@@ -53,6 +54,50 @@ describe('internalDispatchSpendAlertRequestSchema', () => {
     expect(internalDispatchSpendAlertRequestSchema.safeParse(withoutKey).success).toBe(false);
     expect(
       internalDispatchSpendAlertRequestSchema.safeParse({ ...personal, dedupeKey: '' }).success
+    ).toBe(false);
+  });
+});
+
+const cloudAgentSessionBase = {
+  userId: 'usr_1',
+  cliSessionId: 'cli_1',
+  executionId: 'exec_1',
+  status: 'completed',
+  body: 'Waiting for your input',
+} as const;
+
+describe('sendCloudAgentSessionNotificationInputSchema', () => {
+  it('accepts the optional attentionKind and prUrl of a needs-input raise', () => {
+    const input = {
+      ...cloudAgentSessionBase,
+      category: 'attention',
+      attentionKind: 'question',
+      prUrl: 'https://github.com/org/repo/pull/1',
+    };
+    expect(sendCloudAgentSessionNotificationInputSchema.parse(input)).toEqual(input);
+  });
+
+  it('keeps attentionKind and prUrl optional for old producers', () => {
+    expect(sendCloudAgentSessionNotificationInputSchema.parse(cloudAgentSessionBase)).toEqual(
+      cloudAgentSessionBase
+    );
+  });
+
+  it('rejects an attentionKind the app cannot render actions for', () => {
+    expect(
+      sendCloudAgentSessionNotificationInputSchema.safeParse({
+        ...cloudAgentSessionBase,
+        attentionKind: 'unknown',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a non-string prUrl', () => {
+    expect(
+      sendCloudAgentSessionNotificationInputSchema.safeParse({
+        ...cloudAgentSessionBase,
+        prUrl: 42,
+      }).success
     ).toBe(false);
   });
 });

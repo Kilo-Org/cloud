@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "àwọn ìkọjá ààlà àti ìgbésókè lójú wákàtí",
       "spendAlertsToggle": "Ẹ̀ka àwọn ìkìlọ̀ ìnáwó",
       "securityFindingsSubtitle": "àwọn àwárí tuntun àti ìránnilétí SLA"
+    },
+    "action": {
+      "openSession": "Ṣí ìgbà iṣẹ́"
+    },
+    "needsInputAction": {
+      "approved": "Ìbéèrè náà ti fọwọ́ sí",
+      "replied": "Ìfèsì ti ránṣẹ́",
+      "failed": "Kò lè fèsì. Tẹ lẹ́ẹ̀kansi láti gbìyànjú lẹ́ẹ̀kansi.",
+      "unavailable": "Ìbéèrè yìí kì í retí mọ́."
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "A ń tẹ̀síwájú pẹ̀lú {{title}}.",
       "importingSession": "Ń gbé ìgbà iṣẹ́ wọlé",
       "cliCannotContinue": "CLI yìí kò lè tẹ̀síwájú pẹ̀lú ìgbà iṣẹ́ kan. Yan Cloud Agent tàbí CLI mìíràn.",
-      "importFailed": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Ìpìlẹ̀ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Kékeré",
-      "sandboxInstanceShared": "Tí a pín",
-      "sandboxInstanceLarge": "Ńlá",
-      "sandboxInstanceDevcontainer": "Àpò Dev",
-      "sandboxInstanceProviderDefault": "Ìpìlẹ̀ olùpèsè",
-      "sandboxCouldNotLoad": "Kò ṣe é gbé àwọn àṣàyàn sandbox wá",
-      "sandboxUnavailable": "Sandbox yìí kò wà. Yan sandbox míràn tàbí Ìpìlẹ̀.",
-      "sandboxUseDefault": "Lo Ìpìlẹ̀"
+      "importFailed": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé."
     },
     "partRenderer": {
       "updatedFileCount_one": "A ti ṣe ìmúdójúìwọ̀n fáìlì {{displayCount}}.",

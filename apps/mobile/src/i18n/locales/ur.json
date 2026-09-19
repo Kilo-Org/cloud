@@ -843,6 +843,15 @@
       "spendAlertsSubtitle": "حدوں سے تجاوز اور فی گھنٹہ اضافہ",
       "spendAlertsToggle": "اخراجات کی تنبیہات کی قسم",
       "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں"
+    },
+    "action": {
+      "openSession": "سیشن کھولیں"
+    },
+    "needsInputAction": {
+      "approved": "درخواست منظور ہو گئی",
+      "replied": "جواب بھیج دیا گیا",
+      "failed": "جواب دینا ممکن نہیں ہو سکا۔ دوبارہ کوشش کے لیے دوبارہ ٹیپ کریں۔",
+      "unavailable": "یہ درخواست اب انتظار نہیں کر رہی۔"
     }
   },
   "tabs": {
@@ -2180,20 +2189,7 @@
       "continueFrom": "{{title}} جاری رکھا جا رہا ہے۔",
       "importingSession": "سیشن درآمد ہو رہا ہے",
       "cliCannotContinue": "یہ CLI سیشن جاری نہیں رکھ سکتا۔ Cloud Agent یا کوئی اور CLI منتخب کریں۔",
-      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔",
-      "sandbox": "سینڈ باکس",
-      "sandboxAccessibility": "سینڈ باکس: {{label}}",
-      "sandboxDefaultWithDestination": "پہلے سے طے شدہ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "چھوٹا",
-      "sandboxInstanceShared": "مشترکہ",
-      "sandboxInstanceLarge": "بڑا",
-      "sandboxInstanceDevcontainer": "ڈیو کنٹینر",
-      "sandboxInstanceProviderDefault": "فراہم کنندہ کا پہلے سے طے شدہ",
-      "sandboxCouldNotLoad": "سینڈ باکس کے اختیارات لوڈ نہیں ہو سکے",
-      "sandboxUnavailable": "یہ سینڈ باکس دستیاب نہیں ہے۔ کوئی اور سینڈ باکس یا پہلے سے طے شدہ منتخب کریں۔",
-      "sandboxUseDefault": "پہلے سے طے شدہ استعمال کریں"
+      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہو گئی ہے۔",

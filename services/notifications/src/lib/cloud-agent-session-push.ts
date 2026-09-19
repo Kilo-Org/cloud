@@ -15,6 +15,12 @@ import {
 type CloudAgentNotificationSession = {
   title: string | null;
   organizationId: string | null;
+  /**
+   * The session's pull request, if it has one. Rides on the attention push
+   * `data` so the notification's Open PR action knows where to land; `null`
+   * for a session with no PR (and for every status push).
+   */
+  prUrl: string | null;
 };
 
 /** Per-category preference columns, shared with the rest of the notification pipeline. */
@@ -73,6 +79,14 @@ type SessionPushContent = {
   title: string;
   body: string;
   category: CloudAgentSessionCategory;
+  /**
+   * Which answer the waiting agent wants. Only emitted on an attention push;
+   * absent when the producer did not classify the raise (the read site falls
+   * back to `unknown`).
+   */
+  attentionKind?: SendCloudAgentSessionNotificationParams['attentionKind'];
+  /** The session's PR. Only emitted on an attention push that has one. */
+  prUrl?: string;
   i18nKey?: string;
   i18nParams?: Record<string, string>;
 };
@@ -128,7 +142,19 @@ async function dispatchSessionPush(
       // mobile deep-link handler can dispatch on attention vs. status
       // without a second round-trip. The default covers the rolling-deploy
       // window in which old producers omit the `category` field.
-      data: { type: 'cloud_agent_session', cliSessionId, category: content.category },
+      data: {
+        type: 'cloud_agent_session',
+        cliSessionId,
+        category: content.category,
+        // Raise detail rides only on an attention push: an ordinary status
+        // push keeps the exact pre-existing `data` shape. An old producer
+        // that omits `attentionKind` still sends `category`, and the extras
+        // read site defaults the kind to `unknown`.
+        ...(content.category === 'attention' && {
+          ...(content.attentionKind !== undefined && { attentionKind: content.attentionKind }),
+          ...(content.prUrl != null && { prUrl: content.prUrl }),
+        }),
+      },
       sound: 'default',
       priority: 'high',
     },
@@ -170,6 +196,10 @@ export async function dispatchCloudAgentSessionPush(
             ? { ...(parsed.i18nParams ?? {}), sessionTitle: title }
             : undefined,
         category,
+        // Emitted into `data` only for an attention push (see
+        // `dispatchSessionPush`); inert on the status path.
+        attentionKind: parsed.attentionKind,
+        prUrl: session.prUrl ?? undefined,
       };
     },
     prefs => (category === 'attention' ? prefs.agentAttentionEnabled : prefs.sessionStatusEnabled),

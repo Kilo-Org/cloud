@@ -403,6 +403,89 @@ describe('useNativeAuth SSO recovery', () => {
   });
 });
 
+describe('useNativeAuth email validation feedback', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each(['INVALID_REQUEST', 'INVALID_EMAIL'])(
+    'keeps %s beside the email field instead of overlaying Continue with a toast',
+    async errorCode => {
+      mockPostAuth.mockResolvedValue({ ok: false, errorCode, ssoOrganizationId: undefined });
+      const resultRef = await mountNativeAuth();
+
+      await act(async () => {
+        await resultRef.current?.requestEmailCode('http://localhost:3000/device-auth?code=test');
+      });
+
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(resultRef.current?.emailError).toBe(mapError(errorCode));
+      expect(resultRef.current?.busy).toBeUndefined();
+    }
+  );
+
+  it('keeps an empty-email error inline without sending a request', async () => {
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.requestEmailCode('   ');
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(mockPostAuth).not.toHaveBeenCalled();
+    expect(resultRef.current?.emailError).toBe('Please enter your email address.');
+  });
+
+  it('clears validation on edit and allows a corrected address to request a code', async () => {
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.requestEmailCode('');
+    });
+    act(() => {
+      resultRef.current?.clearEmailError();
+    });
+    expect(resultRef.current?.emailError).toBeUndefined();
+
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode(' User@Example.com ')).toBe(true);
+    });
+    expect(mockPostAuth).toHaveBeenCalledWith('/api/auth/native/otp', {
+      email: 'user@example.com',
+    });
+    expect(resultRef.current?.emailError).toBeUndefined();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('clears old validation while a request is pending and preserves retryable delivery feedback', async () => {
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.requestEmailCode('');
+    });
+    let finish: ((result: Awaited<ReturnType<typeof postAuth>>) => void) | undefined = undefined;
+    mockPostAuth.mockReturnValueOnce(
+      new Promise(resolve => {
+        finish = resolve;
+      })
+    );
+    act(() => {
+      void resultRef.current?.requestEmailCode('user@example.com');
+    });
+    expect(resultRef.current?.busy).toBe('otp-send');
+    expect(resultRef.current?.emailError).toBeUndefined();
+    await act(async () => {
+      finish?.({ ok: false, errorCode: 'EMAIL_DELIVERY_FAILED', ssoOrganizationId: undefined });
+      await Promise.resolve();
+    });
+    expect(toast.error).toHaveBeenCalledWith(mapError('EMAIL_DELIVERY_FAILED'));
+    expect(resultRef.current?.busy).toBeUndefined();
+
+    mockPostAuth.mockResolvedValueOnce({ ok: true, data: { success: true } });
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode('user@example.com')).toBe(true);
+    });
+  });
+});
+
 // ── Created-account announcement ────────────────────────────────────────
 
 describe('useNativeAuth created-account announcement', () => {

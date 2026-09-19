@@ -4,7 +4,7 @@ import { type ReactNode } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
-import { agentColor, type Tint, toneColor, type ToneKey } from '@/lib/agent-color';
+import { toneColor, type ToneKey } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +14,17 @@ import { cn } from '@/lib/utils';
  * Matches the tab-label wrap threshold used elsewhere in the shell.
  */
 const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
+
+/**
+ * Every row without a semantic tone renders this one neutral tile. A settings
+ * list is not a list of agents: hashing each title into the agent hue ramp
+ * gave a single list (Language / Trusted hosts / Device sessions) three
+ * different accent tints. The neutral tile matches the sibling settings rows
+ * (PreferenceRow, notifications CategoryRow), which use the un-tinted
+ * secondary-foreground icon.
+ */
+const NEUTRAL_TILE_BG_CLASS = 'bg-hair-soft';
+const NEUTRAL_TILE_BORDER_CLASS = 'border-border';
 
 type ConfigureRowProps = {
   icon: LucideIcon;
@@ -26,9 +37,9 @@ type ConfigureRowProps = {
    */
   subtitleNumberOfLines?: number;
   /**
-   * Semantic tone override (good / warn / danger). When omitted the tile
-   * tint is hashed from `title` so consistent titles stay on the same hue
-   * without any explicit mapping.
+   * Semantic tone override (good / warn / danger). When omitted the row uses
+   * the shared neutral tile, so every row in a settings list carries the same
+   * accent instead of a hue hashed from its title.
    */
   tone?: ToneKey;
   onPress?: () => void;
@@ -39,7 +50,7 @@ type ConfigureRowProps = {
   className?: string;
 };
 
-/** Tinted icon tile + title + subtitle + trailing chevron row. */
+/** Neutral (or `tone`-tinted) icon tile + title + subtitle + trailing chevron row. */
 export function ConfigureRow({
   icon: Icon,
   title,
@@ -55,8 +66,8 @@ export function ConfigureRow({
   const colors = useThemeColors();
   const { fontScale } = useWindowDimensions();
   const stack = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE;
-  const tint: Tint = tone ? toneColor(tone) : agentColor(title);
-  const iconColor = colors[tint.hueThemeKey];
+  const tint = tone ? toneColor(tone) : undefined;
+  const iconColor = tint ? colors[tint.hueThemeKey] : colors.secondaryForeground;
   // Inert rows (no onPress) and disabled rows are not tappable — hide the
   // chevron so they don't look tappable, and never render pressed feedback.
   const showChevron = Boolean(onPress) && !disabled;
@@ -68,8 +79,8 @@ export function ConfigureRow({
     <View
       className={cn(
         'h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border',
-        tint.tileBgClass,
-        tint.tileBorderClass
+        tint ? tint.tileBgClass : NEUTRAL_TILE_BG_CLASS,
+        tint ? tint.tileBorderClass : NEUTRAL_TILE_BORDER_CLASS
       )}
     >
       <Icon size={16} color={iconColor} />

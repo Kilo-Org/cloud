@@ -36,6 +36,8 @@ export function IdleAuth({
   const colorScheme = useColorScheme();
   const {
     busy,
+    emailError,
+    clearEmailError,
     googleConfigured,
     signInWithApple,
     signInWithGoogle,
@@ -76,14 +78,13 @@ export function IdleAuth({
     };
   }, []);
 
-  // A verify-step SSO_ERROR sets ssoRecovery while the user is on the OTP view,
-  // which hides the recovery block. Return to the main view so the block (and
-  // its "Continue with SSO" control) becomes visible.
+  // Both SSO recovery and an address rejected during resend need controls on
+  // the main view, rather than leaving their feedback hidden behind OTP entry.
   useEffect(() => {
-    if (ssoRecovery) {
+    if (ssoRecovery || emailError) {
       setView('main');
     }
-  }, [ssoRecovery]);
+  }, [emailError, ssoRecovery]);
 
   // Restore an SSO-recovery banner that survived an RTL language reload.
   useEffect(() => {
@@ -288,13 +289,24 @@ export function IdleAuth({
 
       <FormField
         label={t('login.emailAddress')}
+        error={emailError}
+        reserveErrorMessages={[
+          t('login.pleaseEnterEmail'),
+          t('authErrors.invalidRequest'),
+          t('authErrors.invalidEmail'),
+        ]}
         placeholder={t('login.emailPlaceholder')}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
         autoComplete="email"
         textContentType="emailAddress"
-        defaultValue={initialEmail || undefined}
+        // Seed from the live ref, not the mount-time draft: the field remounts
+        // when an address error (or SSO recovery) returns the view from OTP, and
+        // an uncontrolled field reads `defaultValue` only on mount. Using the
+        // ref keeps the rejected address visible under its own error instead of
+        // blanking the field while `emailRef` still holds it.
+        defaultValue={emailRef.current || undefined}
         // Small-phone IME (Defect B / QB-A1): the IME's Go key must submit
         // the same way the "Continue" button does, instead of only
         // dismissing the keyboard as `actionDone` previously did.
@@ -306,6 +318,7 @@ export function IdleAuth({
         }}
         onChangeText={value => {
           emailRef.current = value;
+          clearEmailError();
           setLoginEmailDraft(value);
         }}
       />

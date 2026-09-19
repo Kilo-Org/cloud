@@ -14,8 +14,8 @@ export const ACTIVE_PROFILE_INDICATOR_KEYS = {
   repoProfile: 'agentChat.newSession.repoProfile',
   selectedProfile: 'agentChat.newSession.selectedProfile',
   manualOverrides: 'agentChat.newSession.manualOverrides',
-  manualEnvVars: 'agentChat.newSession.manualEnvVars',
-  manualSetupCommands: 'agentChat.newSession.manualSetupCommands',
+  manualEnvVars: 'profiles.variablesTitle',
+  manualSetupCommands: 'profiles.commandsTitle',
   openSettingsToReview: 'agentChat.newSession.openSettingsToReview',
   profileSelection: 'agentChat.newSession.profileSelection',
 } as const;

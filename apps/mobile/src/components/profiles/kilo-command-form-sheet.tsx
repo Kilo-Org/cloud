@@ -153,7 +153,7 @@ export function KiloCommandFormSheet({
           disabled={isSaving}
           autoCapitalize="none"
           autoCorrect={false}
-          placeholder={t('profiles.slashCommands.agentPlaceholder')}
+          placeholder={t('agentChat.modeOptions.code')}
           onChangeText={value => {
             agentRef.current = value;
           }}

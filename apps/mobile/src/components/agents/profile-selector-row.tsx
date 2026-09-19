@@ -213,11 +213,11 @@ export function ProfileSelectorRow({
                   onRepoDefaults();
                 }}
                 accessibilityRole="button"
-                accessibilityLabel={t('agentChat.newSession.defaultProfilesForRepos')}
+                accessibilityLabel={t('profiles.repoBindings.title')}
               >
                 <GitBranch size={18} color={colors.foreground} />
                 <Text className="text-base font-medium text-foreground">
-                  {t('agentChat.newSession.defaultProfilesForRepos')}
+                  {t('profiles.repoBindings.title')}
                 </Text>
               </Pressable>
             ) : null}

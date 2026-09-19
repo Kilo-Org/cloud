@@ -135,7 +135,6 @@ const EXPECTED_PROFILES = {
     namePlaceholder: 'explain',
     templatePlaceholder: 'Explain $ARGUMENTS',
     agent: 'Agent',
-    agentPlaceholder: 'code',
     subtask: 'Run as subtask',
     edit: 'Edit slash command',
     saveFailed: "Couldn't save command",

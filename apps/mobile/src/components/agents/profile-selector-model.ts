@@ -5,7 +5,7 @@
  * cloud-agent/ProfileSelector.tsx:84-102,173-222`) to the mobile selector
  * sheet: a `No profile` row, an Organization Profiles group and a Personal
  * Profiles group (owner icons, effective-default star, per-row var/command
- * counts), then the `Manage profiles...` and `Default profiles for repos...`
+ * counts), then the `Manage profiles...` and `Default Profiles for Repos`
  * entries.
  *
  * No React and no React Native imports: every function here is unit-tested
@@ -16,7 +16,7 @@
 export const PROFILE_SELECTOR_KEYS = {
   noProfile: 'agentChat.newSession.noProfile',
   manageProfiles: 'agentChat.newSession.manageProfiles',
-  repoDefaults: 'agentChat.newSession.defaultProfilesForRepos',
+  repoDefaults: 'profiles.repoBindings.title',
   organizationProfiles: 'agentChat.newSession.organizationProfiles',
   personalProfiles: 'agentChat.newSession.personalProfiles',
   yourProfiles: 'agentChat.newSession.yourProfiles',

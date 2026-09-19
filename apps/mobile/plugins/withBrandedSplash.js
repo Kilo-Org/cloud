@@ -1,15 +1,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const {
-  withAndroidStyles,
-  withDangerousMod,
-  withMainActivity,
-  withPlugins,
-} = require('expo/config-plugins');
+const { withAndroidStyles, withMainActivity, withPlugins } = require('expo/config-plugins');
 
 const {
   SPLASH_WINDOW_DRAWABLE_NAME,
+  THEME_NAME,
   applySplashWindowBackground,
   injectMainActivityLaunchSurface,
   splashWindowDrawable,
@@ -32,12 +28,12 @@ const {
  */
 const withBrandedSplash = (config, options) => {
   config = withAndroidStyles(config, config => {
+    if (!config.modResults.resources.style?.some(theme => theme.$?.name === THEME_NAME)) {
+      return config;
+    }
     config.modResults = applySplashWindowBackground(config.modResults);
-    return config;
-  });
-  config = withDangerousMod(config, [
-    'android',
-    config => {
+    // Wait for Expo's splash theme; dangerous mods run before styles are generated.
+    if (!config.modRequest.introspect) {
       const drawableDir = path.join(
         config.modRequest.platformProjectRoot,
         'app',
@@ -51,9 +47,9 @@ const withBrandedSplash = (config, options) => {
         path.join(drawableDir, `${SPLASH_WINDOW_DRAWABLE_NAME}.xml`),
         splashWindowDrawable()
       );
-      return config;
-    },
-  ]);
+    }
+    return config;
+  });
   config = withMainActivity(config, config => {
     config.modResults.contents = injectMainActivityLaunchSurface(
       config.modResults.contents,

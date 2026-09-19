@@ -12,6 +12,16 @@ const list = vi.hoisted(() => vi.fn());
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 const showPicker = vi.hoisted(() => vi.fn());
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
+const platform = vi.hoisted(() => ({ OS: 'android' }));
+const appearance = vi.hoisted(() => ({
+  colors: {
+    card: '#17171A',
+    foreground: '#F2F0EB',
+    mutedForeground: '#888',
+    destructive: '#F28B7A',
+  },
+  bottom: 18,
+}));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
@@ -32,21 +42,18 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  Platform: { OS: 'android' },
+  Platform: platform,
   Pressable: 'Pressable',
   View: 'View',
 }));
-vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 18 }) }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: appearance.bottom }),
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({
-    card: '#17171A',
-    foreground: '#F2F0EB',
-    mutedForeground: '#888',
-    destructive: '#F28B7A',
-  }),
+  useThemeColors: () => appearance.colors,
 }));
 
 const Text = 'Text' as ElementType;
@@ -132,7 +139,11 @@ afterEach(() => {
   }
 });
 
-describe('ContextControl', () => {
+describe.each(['ios', 'android'])('ContextControl on %s', os => {
+  beforeEach(() => {
+    platform.OS = os;
+    appearance.bottom = 18;
+  });
   it.each([
     { id: null, label: 'Personal', result: [] },
     { id: 'org-a', label: name, result: orgs },
@@ -180,7 +191,30 @@ describe('ContextControl', () => {
     }
   );
 
-  it('opens the account sheet with the current palette instead of the library defaults', async () => {
+  it.each([
+    {
+      theme: 'dark',
+      colors: {
+        card: '#17171A',
+        foreground: '#F2F0EB',
+        mutedForeground: '#888',
+        destructive: '#F28B7A',
+      },
+      bottom: 34,
+    },
+    {
+      theme: 'light',
+      colors: {
+        card: '#FFFFFF',
+        foreground: '#2F2D27',
+        mutedForeground: '#6B675E',
+        destructive: '#B83422',
+      },
+      bottom: 0,
+    },
+  ])('opens the account sheet with the $theme palette', async ({ colors, bottom }) => {
+    appearance.colors = colors;
+    appearance.bottom = bottom;
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
     await press(picker(ui));
@@ -188,12 +222,17 @@ describe('ContextControl', () => {
     expect(native.options.options).toEqual(['Personal', name, 'Cancel']);
     expect(native.options.title).toBe('Select account');
     expect(native.options.containerStyle).toEqual({
-      backgroundColor: '#17171A',
-      paddingBottom: 18,
+      backgroundColor: colors.card,
+      paddingBottom: bottom,
     });
-    expect(native.options.textStyle).toEqual({ color: '#F2F0EB' });
-    expect(native.options.titleTextStyle).toEqual({ color: '#888' });
-    expect(native.options.destructiveColor).toBe('#F28B7A');
+    expect(native.options.textStyle).toEqual({ color: colors.foreground });
+    expect(native.options.titleTextStyle).toEqual({ color: colors.mutedForeground });
+    expect(native.options).toMatchObject({
+      messageTextStyle: { color: colors.mutedForeground },
+      destructiveColor: colors.destructive,
+      autoFocus: true,
+      useModal: true,
+    });
   });
 
   it('recovers an unavailable organization through Personal after an empty membership result', async () => {
@@ -220,9 +259,10 @@ describe('ContextControl', () => {
     await waitFor(() => texts(ui).includes("Couldn't load your organizations"));
     expect(retry(ui).props.accessibilityHint).toBe("Couldn't load your organizations");
     const status = ui.renderer.root.find(
-      node => node.type === Text && node.props.accessibilityLiveRegion === 'polite'
+      node => node.type === Text && node.props.children === "Couldn't load your organizations"
     );
     expect(status.children).toContain("Couldn't load your organizations");
+    expect(status.props.accessibilityLiveRegion).toBe(os === 'android' ? 'polite' : undefined);
     await press(retry(ui));
     await waitFor(() => texts(ui).includes(name));
     expect(texts(ui)).not.toContain('Retry');

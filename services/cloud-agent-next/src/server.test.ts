@@ -22,6 +22,7 @@ const {
   consumeCloudAgentReportBatchMock,
   removeExpiredCloudAgentReportDataMock,
   runCloudAgentOutcomeCollectionMock,
+  runCloudAgentOpenStockCollectionMock,
   requireCurrentSessionAccessMock,
   getPgDbMock,
   loggerWarnMock,
@@ -30,6 +31,7 @@ const {
   consumeCloudAgentReportBatchMock: vi.fn().mockResolvedValue(undefined),
   removeExpiredCloudAgentReportDataMock: vi.fn().mockResolvedValue(undefined),
   runCloudAgentOutcomeCollectionMock: vi.fn().mockResolvedValue(undefined),
+  runCloudAgentOpenStockCollectionMock: vi.fn().mockResolvedValue(undefined),
   requireCurrentSessionAccessMock: vi.fn(),
   getPgDbMock: vi.fn(),
   loggerWarnMock: vi.fn(),
@@ -90,6 +92,10 @@ vi.mock('./telemetry/report-consumer.js', () => ({
 
 vi.mock('./telemetry/outcome-aggregate.js', () => ({
   runCloudAgentOutcomeCollection: runCloudAgentOutcomeCollectionMock,
+}));
+
+vi.mock('./telemetry/open-stock.js', () => ({
+  runCloudAgentOpenStockCollection: runCloudAgentOpenStockCollectionMock,
 }));
 
 vi.mock('./middleware/auth.js', () => ({
@@ -282,6 +288,7 @@ beforeEach(() => {
   consumeCloudAgentReportBatchMock.mockClear();
   removeExpiredCloudAgentReportDataMock.mockClear();
   runCloudAgentOutcomeCollectionMock.mockClear();
+  runCloudAgentOpenStockCollectionMock.mockClear();
   loggerWarnMock.mockClear();
   getPgDbMock.mockReset();
   requireCurrentSessionAccessMock.mockReset().mockResolvedValue({
@@ -394,9 +401,10 @@ describe('server background reporting', () => {
     expect(removeExpiredCloudAgentReportDataMock).toHaveBeenCalledTimes(1);
     expect(removeExpiredCloudAgentReportDataMock).toHaveBeenCalledWith(env);
     expect(runCloudAgentOutcomeCollectionMock).not.toHaveBeenCalled();
+    expect(runCloudAgentOpenStockCollectionMock).not.toHaveBeenCalled();
   });
 
-  it('runs only the outcome collection on the 3-minute cron', async () => {
+  it('runs the outcome and open-stock collections on the 3-minute cron', async () => {
     const env = createEnv();
 
     await worker.scheduled(
@@ -406,7 +414,25 @@ describe('server background reporting', () => {
 
     expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledTimes(1);
     expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledWith(env);
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledTimes(1);
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledWith(env);
     expect(removeExpiredCloudAgentReportDataMock).not.toHaveBeenCalled();
+  });
+
+  it('still runs the open-stock collection and preserves the outcome error when outcome collection rejects', async () => {
+    const env = createEnv();
+    const outcomeError = new Error('outcome collection failed');
+    runCloudAgentOutcomeCollectionMock.mockRejectedValueOnce(outcomeError);
+
+    await expect(
+      worker.scheduled(
+        { cron: OUTCOME_AGGREGATE_CRON } as ScheduledController,
+        env as unknown as Env
+      )
+    ).rejects.toBe(outcomeError);
+
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledTimes(1);
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledWith(env);
   });
 
   it('runs neither branch for an unrecognized cron and warns', async () => {
@@ -416,6 +442,7 @@ describe('server background reporting', () => {
 
     expect(removeExpiredCloudAgentReportDataMock).not.toHaveBeenCalled();
     expect(runCloudAgentOutcomeCollectionMock).not.toHaveBeenCalled();
+    expect(runCloudAgentOpenStockCollectionMock).not.toHaveBeenCalled();
     expect(loggerWarnMock).toHaveBeenCalledWith(
       'Cloud Agent scheduled handler received an unrecognized cron',
       { cron: '0 0 * * 0' }

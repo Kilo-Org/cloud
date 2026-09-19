@@ -107,6 +107,20 @@ describe('scrubEvent', () => {
     expect(result.tags.session).toBe('[redacted]');
   });
 
+  it('redacts token-shaped runs that mix cases or carry digits', () => {
+    const event = {
+      extra: {
+        upper: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+        hyphenated: 'sk-proj-abc123def456ghi789jkl',
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.upper).toBe('[redacted]');
+    expect(result.extra.hyphenated).toBe('[redacted]');
+  });
+
   it('redacts token values nested in extra', () => {
     const event = {
       extra: { cause: { token: 'abcdefghijklmnopqrst' } },

@@ -480,6 +480,8 @@
       "replyBadRequest": "ਇਹ ਜਵਾਬ ਪੋਸਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ। ਥ੍ਰੈਡ ਬਦਲਿਆ ਹੋ ਸਕਦਾ ਹੈ।",
       "replyForbidden": "ਤੁਹਾਨੂੰ ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "addCommentCta": "ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਟਿੱਪਣੀ ਕਰੋ",
+      "fixWithKilo": "Kilo ਨਾਲ ਠੀਕ ਕਰੋ",
+      "fixWithKiloPrompt": "ਕਿਰਪਾ ਕਰਕੇ ਹੇਠਾਂ ਦਿੱਤੀ ਪੁੱਲ ਰਿਕਵੈਸਟ ਟਿੱਪਣੀ ਨੂੰ ਹੱਲ ਕਰੋ: {{link}}",
       "commentBadRequest": "ਇਹ ਟਿੱਪਣੀ ਪੋਸਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ। ਪੁੱਲ ਰਿਕਵੈਸਟ ਬਦਲਿਆ ਹੋ ਸਕਦਾ ਹੈ।",
       "commentForbidden": "ਤੁਹਾਨੂੰ ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਟਿੱਪਣੀ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} ਬਾਕੀ",
       "skipped": "{{displayCount}} ਛੱਡੀਆਂ ਗਈਆਂ",
       "checksCount": "{{displayCount}} ਜਾਂਚਾਂ",
+      "checksCount_one": "{{displayCount}} ਜਾਂਚ",
+      "checksCount_other": "{{displayCount}} ਜਾਂਚਾਂ",
       "checkDetails": "ਜਾਂਚ ਦੇ ਵੇਰਵੇ"
     },
     "inbox": {
@@ -2051,6 +2055,7 @@
       "exitNeedsNewerCli": "ਰਿਮੋਟ ਸਲੈਸ਼ ਕਮਾਂਡਾਂ ਲਈ Kilo CLI ਦੇ ਨਵੇਂ ਸੰਸਕਰਣ ਦੀ ਲੋੜ ਹੈ। Kilo CLI ਅੱਪਡੇਟ ਕਰੋ ਅਤੇ ਮੁੜ ਕਨੈਕਟ ਕਰੋ।"
     },
     "sessionConnection": {
+      "label": "ਕਨੈਕਸ਼ਨ",
       "connecting": "ਕਨੈਕਟ ਹੋ ਰਿਹਾ ਹੈ…",
       "reconnecting": "ਮੁੜ ਕਨੈਕਟ ਹੋ ਰਿਹਾ ਹੈ…",
       "connectionLost": "ਕਨੈਕਸ਼ਨ ਟੁੱਟ ਗਿਆ",
@@ -2070,7 +2075,9 @@
       "removeConfirmTitle": "ਟੀਚਾ ਹਟਾਉਣਾ?",
       "removeConfirmMessage": "CLI ਇਸ ਸੈਸ਼ਨ ਦਾ ਟੀਚਾ ਮਿਟਾਉਂਦਾ ਹੈ।",
       "updateFailed": "ਟੀਚਾ ਅੱਪਡੇਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
-      "sectionAccessibility": "{{status}}। ਟੀਚਾ: {{text}}"
+      "sectionAccessibility": "{{status}}। ਟੀਚਾ: {{text}}",
+      "collapse": "ਟੀਚਾ ਸਮੇਟੋ",
+      "expand": "ਟੀਚਾ ਫੈਲਾਓ"
     },
     "newSession": {
       "recentlyUsed": "ਹਾਲ ਹੀ ਵਿੱਚ ਵਰਤੇ ਗਏ",
@@ -2124,7 +2131,20 @@
       "continueFrom": "{{title}} ਨੂੰ ਜਾਰੀ ਰੱਖਿਆ ਜਾ ਰਿਹਾ ਹੈ।",
       "importingSession": "ਸੈਸ਼ਨ ਆਯਾਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
       "cliCannotContinue": "ਇਹ CLI ਸੈਸ਼ਨ ਜਾਰੀ ਨਹੀਂ ਰੱਖ ਸਕਦਾ। Cloud Agent ਜਾਂ ਕੋਈ ਹੋਰ CLI ਚੁਣੋ।",
-      "importFailed": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਆਯਾਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।"
+      "importFailed": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਆਯਾਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
+      "sandbox": "ਸੈਂਡਬਾਕਸ",
+      "sandboxAccessibility": "ਸੈਂਡਬਾਕਸ: {{label}}",
+      "sandboxDefaultWithDestination": "ਡਿਫ਼ੌਲਟ · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "ਛੋਟਾ",
+      "sandboxInstanceShared": "ਸਾਂਝਾ",
+      "sandboxInstanceLarge": "ਵੱਡਾ",
+      "sandboxInstanceDevcontainer": "ਡੈਵ ਕੰਟੇਨਰ",
+      "sandboxInstanceProviderDefault": "ਪ੍ਰਦਾਤਾ ਦਾ ਡਿਫ਼ੌਲਟ",
+      "sandboxCouldNotLoad": "ਸੈਂਡਬਾਕਸ ਵਿਕਲਪ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
+      "sandboxUnavailable": "ਇਹ ਸੈਂਡਬਾਕਸ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕੋਈ ਹੋਰ ਸੈਂਡਬਾਕਸ ਜਾਂ ਡਿਫ਼ੌਲਟ ਚੁਣੋ।",
+      "sandboxUseDefault": "ਡਿਫ਼ੌਲਟ ਵਰਤੋ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ਫਾਈਲ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ ਹੈ।",
@@ -2490,6 +2510,12 @@
       "startNewSession": "ਨਵਾਂ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",
       "exitSession": "ਸੈਸ਼ਨ ਤੋਂ ਬਾਹਰ ਨਿਕਲੋ",
       "clearSession": "ਇਹ ਸੈਸ਼ਨ ਖ਼ਤਮ ਕਰੋ ਅਤੇ ਨਵਾਂ ਸ਼ੁਰੂ ਕਰੋ",
+      "compactDescription": "ਮੌਜੂਦਾ ਸੈਸ਼ਨ ਦੇ ਸੰਦਰਭ ਨੂੰ ਕੰਪੈਕਟ ਕਰੋ",
+      "goalDescription": "ਸੈਸ਼ਨ ਟੀਚੇ ਵੱਲ ਕੰਮ ਕਰਦੇ ਰਹੋ। /goal <objective> ਜਾਂ pause, resume, clear",
+      "initDescription": "ਸੇਧਿਤ AGENTS.md ਸੈਟਅੱਪ",
+      "resumeClaudeDescription": "Claude Code ਸੈਸ਼ਨ ਦੀ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਆਯਾਤ ਕਰੋ",
+      "resumeCodexDescription": "OpenAI Codex ਸੈਸ਼ਨ ਦੀ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਆਯਾਤ ਕਰੋ",
+      "reviewDescription": "ਬਦਲਾਵਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰੋ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ਵਰਤੋ",
       "insert": "ਸ਼ਾਮਲ ਕਰੋ",
       "upgradeRequiredFallback": "ਕਿਰਪਾ ਕਰਕੇ ਇਸ ਕਮਾਂਡ ਨੂੰ ਵਰਤਣ ਲਈ ਆਪਣਾ CLI ਅੱਪਗਰੇਡ ਕਰੋ।",
@@ -2607,6 +2633,7 @@
     "couldNotLoadActiveSessions": "ਸਰਗਰਮ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
     "agentSessions": "ਹੁਣ ਚੱਲ ਰਹੇ",
     "newCodingTask": "ਨਵਾਂ ਕੋਡਿੰਗ ਕੰਮ",
+    "newTaskFromPicture": "ਤਸਵੀਰ ਤੋਂ ਨਵਾਂ ਕੰਮ",
     "explore": "ਪੜਚੋਲ",
     "seeAll": "ਸਭ ਦੇਖੋ",
     "noLiveSessions": "ਇਸ ਵੇਲੇ ਕੁਝ ਵੀ ਨਹੀਂ ਚੱਲ ਰਿਹਾ"
@@ -2828,7 +2855,8 @@
     "aiProvidersWhat": "ਤੁਹਾਡੇ ਪ੍ਰੌਂਪਟ, ਗੱਲਬਾਤ ਦਾ ਇਤਿਹਾਸ ਅਤੇ ਤੁਹਾਡੇ ਵੱਲੋਂ ਅਟੈਚ ਕੀਤੀਆਂ ਫਾਈਲਾਂ।",
     "aiProvidersWhy": "AI ਦੇ ਜਵਾਬ ਤਿਆਰ ਕਰਨ ਲਈ।",
     "aiProvidersWho": "Anthropic, OpenAI, Google ਅਤੇ ਹੋਰ ਪ੍ਰਦਾਤਾ ਜੋ ਤੁਸੀਂ ਹਰ ਬੇਨਤੀ ਲਈ ਚੁਣਦੇ ਹੋ।",
-    "gatewayWhat": "ਖਾਤੇ ਦਾ ID, ਬੇਨਤੀ ਦਾ ਮੈਟਾਡੇਟਾ, ਟੋਕਨਾਂ ਦੀ ਵਰਤੋਂ।",
+    "gatewayWhat": "ਖਾਤੇ ਦਾ ID, ਬੇਨਤੀ ਦਾ ਮੈਟਾਡੇਟਾ, ਟੋਕਨਾਂ ਦੀ ਵਰਤੋਂ, ਅਤੇ ਐਪ ਇਸ ਰਾਹੀਂ ਭੇਜਦੀ ਪ੍ਰੋਂਪਟ ਅਤੇ ਵੌਇਸ ਰਿਕਾਰਡਿੰਗ।",
+    "viaGateway": "Kilo Gateway ਰਾਹੀਂ",
     "gatewayWhy": "ਪਛਾਣ ਦੀ ਪੁਸ਼ਟੀ, ਬੇਨਤੀਆਂ ਸਹੀ ਥਾਂ ਭੇਜਣਾ, ਬਿਲਿੰਗ ਦੇ ਹਿਸਾਬ ਦਾ ਮਿਲਾਨ।",
     "gatewayWho": "Kilo (kilo.ai)।",
     "crashReportingWhat": "ਕਰੈਸ਼ ਅਤੇ ਗਲਤੀਆਂ ਦੀਆਂ ਰਿਪੋਰਟਾਂ, ਜਿਨ੍ਹਾਂ ਵਿੱਚੋਂ ਐਪ ਦੀ ਸਮੱਗਰੀ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੈ।",
@@ -2848,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer।",
     "voiceTranscriptionWhat": "ਤੁਹਾਡੀ ਬੋਲ ਕੇ ਲਿਖਾਉਣ ਵੇਲੇ ਦੀ ਰਿਕਾਰਡਿੰਗ।",
     "voiceTranscriptionWhy": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਲਈ।",
-    "voiceTranscriptionWho": "ਸਿਰਫ਼ ਡਿਵਾਈਸ 'ਤੇ ਹੀ, ਜਾਂ Apple ਜਾਂ Google ਰਾਹੀਂ ਜੇ ਇਹ ਡਿਵਾਈਸ ਬੋਲੀ ਨੂੰ ਔਫਲਾਈਨ ਲਿਖਤ ਵਿੱਚ ਨਹੀਂ ਬਦਲ ਸਕਦੀ।",
+    "voiceTranscriptionWho": "ਤੁਹਾਡੀ ਡਿਵਾਈਸ, ਤੁਹਾਡੇ ਚੁਣੇ ਹੋਏ ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਮਾਡਲ ਨਾਲ Kilo Gateway, ਜਾਂ ਆਨਲਾਈਨ ਪਛਾਣ ਲਈ Apple ਜਾਂ Google।",
     "installAttributionPromptTitle": "ਕੀ ਇੰਸਟਾਲ ਕਰਨ ਦੇ ਸਰੋਤ ਦੀ ਪਛਾਣ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਦੇਣੀ ਹੈ?",
     "installAttributionPromptMessage": "Kilo ਸਿਰਫ਼ ਇਹ ਜਾਣਨ ਲਈ Apple ਦੀ ਟ੍ਰੈਕਿੰਗ ਇਜਾਜ਼ਤ ਵਰਤਦਾ ਹੈ ਕਿ ਤੁਸੀਂ ਕਿਸ ਸਰੋਤ ਰਾਹੀਂ ਇੱਥੇ ਆਏ ਹੋ। ਇਸ ਲਈ ਤੁਹਾਡੇ ਪ੍ਰੌਂਪਟ ਅਤੇ ਗੱਲਬਾਤਾਂ ਕਦੇ ਨਹੀਂ ਵਰਤੇ ਜਾਂਦੇ।",
     "what": "ਕੀ",
@@ -3058,6 +3086,12 @@
     "privacy": "ਏਜੰਟ ਵੇਖਣ ਲਈ Kilo ਖੋਲ੍ਹੋ",
     "openAgents": "ਏਜੰਟ ਖੋਲ੍ਹੋ",
     "needsInput": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
+    "newestSession": "ਸਭ ਤੋਂ ਨਵਾਂ: {{title}}",
+    "noneWaiting": "ਕੋਈ ਏਜੰਟ ਉਡੀਕ ਨਹੀਂ ਰਿਹਾ",
+    "newAgent": "ਨਵਾਂ ਏਜੰਟ",
+    "approving": "ਮਨਜ਼ੂਰ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
+    "couldNotApprove": "ਮਨਜ਼ੂਰ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "couldNotStart": "ਸ਼ੁਰੂ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "channelName": "ਸਰਗਰਮ ਏਜੰਟ",
     "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।",
     "newestResult": "ਸਭ ਤੋਂ ਨਵਾਂ ਨਤੀਜਾ"
@@ -3094,5 +3128,15 @@
     "remoteFound": "ਕੰਪਿਊਟਰ ਕਨੈਕਟ ਹੋਇਆ",
     "checkAgain": "ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ਏਜੰਟ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਪ੍ਰੌਂਪਟ ਲੋੜੀਂਦਾ ਹੈ। ਇੱਕ ਪ੍ਰੌਂਪਟ ਸ਼ਾਮਲ ਕਰੋ ਅਤੇ ਇਸਨੂੰ ਦੁਬਾਰਾ ਚਲਾਓ।",
+      "repositoryUnknown": "Kilo, {{repository}} ਨੂੰ GitHub ਜਾਂ GitLab ਰਿਪੋਜ਼ਿਟਰੀ ਵਜੋਂ ਨਹੀਂ ਪਛਾਣਦਾ। Kilo ਵਿੱਚ ਕੋਈ ਹੋਰ ਰਿਪੋਜ਼ਿਟਰੀ ਚੁਣੋ।",
+      "repositoryUnsupported": "{{repository}} ਇੱਕ Bitbucket ਰਿਪੋਜ਼ਿਟਰੀ ਹੈ — ਏਜੰਟ ਸ਼ੁਰੂ ਕਰੋ ਅਜੇ ਇਸਨੂੰ ਵਰਤ ਨਹੀਂ ਸਕਦਾ। Kilo ਵਿੱਚ ਕੋਈ ਹੋਰ ਰਿਪੋਜ਼ਿਟਰੀ ਚੁਣੋ।"
+    }
+  },
+  "launcher": {
+    "openLastSession": "ਆਖਰੀ ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ"
   }
 }

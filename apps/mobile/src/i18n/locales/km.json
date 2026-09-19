@@ -480,6 +480,8 @@
       "replyBadRequest": "មិនអាចបង្ហោះការឆ្លើយតបនេះបានទេ។ ការពិភាក្សាអាចបានផ្លាស់ប្តូរ។",
       "replyForbidden": "អ្នកគ្មានសិទ្ធិឆ្លើយតបលើសំណើបញ្ចូលកូដនេះទេ។",
       "addCommentCta": "បញ្ចេញមតិលើសំណើបញ្ចូលកូដនេះ",
+      "fixWithKilo": "ដោះស្រាយជាមួយ Kilo",
+      "fixWithKiloPrompt": "សូមដោះស្រាយមតិយោបល់ខាងក្រោមលើសំណើបញ្ចូលកូដនេះ៖ {{link}}",
       "commentBadRequest": "មិនអាចបង្ហោះមតិយោបល់នេះបានទេ។ សំណើបញ្ចូលកូដអាចបានផ្លាស់ប្តូរ។",
       "commentForbidden": "អ្នកគ្មានសិទ្ធិបញ្ចេញមតិលើសំណើបញ្ចូលកូដនេះទេ។",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "កំពុងរង់ចាំ {{displayCount}}",
       "skipped": "បានរំលង {{displayCount}}",
       "checksCount": "ការត្រួតពិនិត្យ {{displayCount}}",
+      "checksCount_one": "ការត្រួតពិនិត្យ {{displayCount}}",
+      "checksCount_other": "ការត្រួតពិនិត្យ {{displayCount}}",
       "checkDetails": "ព័ត៌មានលម្អិតអំពីការត្រួតពិនិត្យ"
     },
     "inbox": {
@@ -2051,6 +2055,7 @@
       "exitNeedsNewerCli": "ការប្រើពាក្យបញ្ជាដែលផ្តើមដោយ / ពីចម្ងាយត្រូវការ Kilo CLI កំណែថ្មីជាងនេះ។ ធ្វើបច្ចុប្បន្នភាព Kilo CLI ហើយភ្ជាប់ឡើងវិញ។"
     },
     "sessionConnection": {
+      "label": "ការតភ្ជាប់",
       "connecting": "កំពុងភ្ជាប់…",
       "reconnecting": "កំពុងភ្ជាប់ឡើងវិញ…",
       "connectionLost": "ដាច់ការតភ្ជាប់",
@@ -2070,7 +2075,9 @@
       "removeConfirmTitle": "ដកគោលដៅចេញ?",
       "removeConfirmMessage": "CLI សម្អាតគោលដៅរបស់វគ្គនេះ។",
       "updateFailed": "មិនអាចធ្វើបច្ចុប្បន្នភាពគោលដៅបានទេ។",
-      "sectionAccessibility": "{{status}}។ គោលដៅ៖ {{text}}"
+      "sectionAccessibility": "{{status}}។ គោលដៅ៖ {{text}}",
+      "collapse": "លាក់គោលដៅ",
+      "expand": "បង្ហាញគោលដៅ"
     },
     "newSession": {
       "recentlyUsed": "បានប្រើថ្មីៗនេះ",
@@ -2124,7 +2131,20 @@
       "continueFrom": "កំពុងបន្តវគ្គ {{title}}។",
       "importingSession": "កំពុងនាំចូលវគ្គ",
       "cliCannotContinue": "CLI នេះមិនអាចបន្តវគ្គបានទេ។ ជ្រើសរើស Cloud Agent ឬ CLI ផ្សេងទៀត។",
-      "importFailed": "មិនអាចនាំចូលវគ្គនេះបានទេ។"
+      "importFailed": "មិនអាចនាំចូលវគ្គនេះបានទេ។",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "លំនាំដើម · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "តូច",
+      "sandboxInstanceShared": "រួម",
+      "sandboxInstanceLarge": "ធំ",
+      "sandboxInstanceDevcontainer": "Dev container",
+      "sandboxInstanceProviderDefault": "លំនាំដើមរបស់អ្នកផ្ដល់សេវា",
+      "sandboxCouldNotLoad": "មិនអាចផ្ទុកជម្រើស Sandbox បានទេ",
+      "sandboxUnavailable": "Sandbox នេះមិនអាចប្រើបានទេ។ សូមជ្រើសរើស Sandbox ផ្សេងទៀត ឬលំនាំដើម។",
+      "sandboxUseDefault": "ប្រើលំនាំដើម"
     },
     "partRenderer": {
       "updatedFileCount_one": "បានធ្វើបច្ចុប្បន្នភាពឯកសារចំនួន {{displayCount}}។",
@@ -2490,6 +2510,12 @@
       "startNewSession": "ចាប់ផ្តើមវគ្គថ្មី",
       "exitSession": "ចាកចេញពីវគ្គ",
       "clearSession": "បញ្ចប់វគ្គនេះហើយចាប់ផ្តើមវគ្គថ្មី",
+      "compactDescription": "បង្រួមបរិបទវគ្គបច្ចុប្បន្ន",
+      "goalDescription": "បន្តធ្វើការឆ្ពោះទៅគោលដៅវគ្គ។ /goal <objective> ឬ pause, resume, clear",
+      "initDescription": "ការរៀបចំ AGENTS.md តាមការណែនាំ",
+      "resumeClaudeDescription": "នាំចូលប្រតិចារិកវគ្គ Claude Code",
+      "resumeCodexDescription": "នាំចូលប្រតិចារិកវគ្គ OpenAI Codex",
+      "reviewDescription": "ពិនិត្យការផ្លាស់ប្តូរ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "ប្រើ /{{command}}",
       "insert": "បញ្ចូល",
       "upgradeRequiredFallback": "សូមធ្វើបច្ចុប្បន្នភាព CLI របស់អ្នកដើម្បីប្រើពាក្យបញ្ជានេះ។",
@@ -2607,6 +2633,7 @@
     "couldNotLoadActiveSessions": "មិនអាចផ្ទុកវគ្គកំពុងដំណើរការបានទេ។",
     "agentSessions": "កំពុងដំណើរការ",
     "newCodingTask": "កិច្ចការសរសេរកូដថ្មី",
+    "newTaskFromPicture": "កិច្ចការថ្មីពីរូបភាព",
     "explore": "ស្វែងយល់",
     "seeAll": "មើលទាំងអស់",
     "noLiveSessions": "ឥឡូវនេះគ្មានអ្វីកំពុងដំណើរការទេ"
@@ -2828,7 +2855,8 @@
     "aiProvidersWhat": "សេចក្តីណែនាំ ប្រវត្តិការសន្ទនា និងឯកសារដែលអ្នកភ្ជាប់។",
     "aiProvidersWhy": "ដើម្បីបង្កើតចម្លើយដោយ AI។",
     "aiProvidersWho": "Anthropic, OpenAI, Google និងអ្នកផ្តល់សេវាផ្សេងទៀតដែលអ្នកជ្រើសរើសសម្រាប់សំណើនីមួយៗ។",
-    "gatewayWhat": "លេខសម្គាល់គណនី ទិន្នន័យមេតានៃសំណើ និងការប្រើប្រាស់តូខេន។",
+    "gatewayWhat": "លេខសម្គាល់គណនី ទិន្នន័យមេតានៃសំណើ ការប្រើប្រាស់តូខេន ព្រមទាំង prompt និងការថតសំឡេងដែលកម្មវិធីផ្ញើតាមរយៈវា។",
+    "viaGateway": "តាមរយៈ Kilo Gateway",
     "gatewayWhy": "ការផ្ទៀងផ្ទាត់អត្តសញ្ញាណ ការបញ្ជូនសំណើ និងការផ្ទៀងផ្ទាត់ទិន្នន័យគិតប្រាក់។",
     "gatewayWho": "Kilo (kilo.ai)។",
     "crashReportingWhat": "របាយការណ៍អំពីការគាំង និងកំហុស ដែលបានដកមាតិកាកម្មវិធីចេញ។",
@@ -2848,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer។",
     "voiceTranscriptionWhat": "សំឡេងដែលបានថតពេលអ្នកនិយាយដើម្បីបញ្ចូលអត្ថបទ។",
     "voiceTranscriptionWhy": "ដើម្បីបំប្លែងសំឡេងទៅជាអត្ថបទ។",
-    "voiceTranscriptionWho": "ដំណើរការតែនៅលើឧបករណ៍ ឬតាម Apple ឬ Google នៅពេលឧបករណ៍នេះមិនអាចបម្លែងសំឡេងជាអត្ថបទដោយគ្មានអ៊ីនធឺណិតបាន។",
+    "voiceTranscriptionWho": "ឧបករណ៍របស់អ្នក Kilo Gateway ជាមួយម៉ូដែលបម្លែងសំឡេងជាអត្ថបទដែលអ្នកបានជ្រើស ឬ Apple ឬ Google សម្រាប់ការស្គាល់តាមអ៊ីនធឺណិត។",
     "installAttributionPromptTitle": "អនុញ្ញាតការកំណត់ប្រភពដំឡើង?",
     "installAttributionPromptMessage": "Kilo ប្រើសិទ្ធិតាមដានរបស់ Apple តែដើម្បីដឹងថាអ្នកមកពីប្រភពណាប៉ុណ្ណោះ។ យើងមិនដែលប្រើសេចក្តីណែនាំ និងការសន្ទនារបស់អ្នកសម្រាប់គោលបំណងនេះទេ។",
     "what": "ទិន្នន័យអ្វីខ្លះ",
@@ -3058,6 +3086,12 @@
     "privacy": "បើក Kilo ដើម្បីមើលភ្នាក់ងារ",
     "openAgents": "បើកភ្នាក់ងារ",
     "needsInput": "ត្រូវការការឆ្លើយតប",
+    "newestSession": "ថ្មីបំផុត: {{title}}",
+    "noneWaiting": "គ្មានភ្នាក់ងារកំពុងរង់ចាំ",
+    "newAgent": "ភ្នាក់ងារថ្មី",
+    "approving": "កំពុងយល់ព្រម...",
+    "couldNotApprove": "មិនអាចយល់ព្រមបានទេ",
+    "couldNotStart": "មិនអាចចាប់ផ្ដើមបានទេ",
     "channelName": "ភ្នាក់ងារសកម្ម",
     "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។",
     "newestResult": "លទ្ធផលថ្មីបំផុត"
@@ -3094,5 +3128,15 @@
     "remoteFound": "បានភ្ជាប់កុំព្យូទ័រ",
     "checkAgain": "ពិនិត្យម្តងទៀត",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ការចាប់ផ្តើមភ្នាក់ងារត្រូវការសេចក្តីណែនាំ។ បន្ថែមសេចក្តីណែនាំ ហើយដំណើរការវាម្តងទៀត។",
+      "repositoryUnknown": "Kilo មិនស្គាល់ {{repository}} ជាឃ្លាំងកូដ GitHub ឬ GitLab ទេ។ ជ្រើសរើសឃ្លាំងកូដផ្សេងនៅក្នុង Kilo។",
+      "repositoryUnsupported": "{{repository}} គឺជាឃ្លាំងកូដ Bitbucket — ចាប់ផ្តើមភ្នាក់ងារមិនអាចប្រើវាបាននៅឡើយទេ។ ជ្រើសរើសឃ្លាំងកូដផ្សេងនៅក្នុង Kilo។"
+    }
+  },
+  "launcher": {
+    "openLastSession": "បើកវគ្គចុងក្រោយ"
   }
 }

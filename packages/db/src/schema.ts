@@ -2173,6 +2173,18 @@ export const kilo_pass_store_purchases = pgTable(
     environment: text().notNull(),
     purchased_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    amount_charged_minor_units: integer(),
+    currency: text(),
+    tax_minor_units: integer(),
+    /**
+     * When the money backfill finished with this row: it either wrote the money
+     * columns or found that Play has no money for the order. NULL means the
+     * backfill has not settled the row yet, including rows whose order lookup
+     * failed, which stay eligible so a later run retries them. Without this
+     * marker the rows Play has no money for would be selected by every bounded
+     * run and the backfill would never converge.
+     */
+    money_backfill_attempted_at: timestamp({ withTimezone: true, mode: 'string' }),
     raw_payload_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -2213,6 +2225,22 @@ export const kilo_pass_store_purchases = pgTable(
     check(
       'kilo_pass_store_purchases_store_provider_check',
       sql`${table.payment_provider} IN ('app_store', 'google_play')`
+    ),
+    check(
+      'kilo_pass_store_purchases_amount_charged_non_negative_check',
+      sql`${table.amount_charged_minor_units} IS NULL OR ${table.amount_charged_minor_units} >= 0`
+    ),
+    check(
+      'kilo_pass_store_purchases_tax_non_negative_check',
+      sql`${table.tax_minor_units} IS NULL OR ${table.tax_minor_units} >= 0`
+    ),
+    check(
+      'kilo_pass_store_purchases_currency_check',
+      sql`${table.currency} IS NULL OR ${table.currency} ~ '^[A-Z]{3}$'`
+    ),
+    check(
+      'kilo_pass_store_purchases_currency_required_check',
+      sql`${table.currency} IS NOT NULL OR (${table.amount_charged_minor_units} IS NULL AND ${table.tax_minor_units} IS NULL)`
     ),
     enumCheck(
       'kilo_pass_store_purchases_payment_provider_check',
@@ -4273,7 +4301,13 @@ export const platform_integrations = pgTable(
     // GitHub App type (for GitHub platform only)
     // 'standard' = full KiloConnect app, 'lite' = read-only KiloConnect-Lite app
     github_app_type: text().$type<'standard' | 'lite'>().default('standard'),
-    github_installation_id: uuid(),
+    // Canonical installations are soft-deleted (lifecycle_state/deleted_at), never hard-deleted,
+    // except by the account-anonymization path in `anonymizeCloudUserData`, which already guards
+    // with a `NOT EXISTS` check against remaining associations before deleting. `restrict` makes
+    // that invariant explicit at the database level instead of relying on the implicit default.
+    github_installation_id: uuid().references(() => github_app_installations.id, {
+      onDelete: 'restrict',
+    }),
     github_disconnected_at: timestamp({ withTimezone: true, mode: 'string' }),
     github_authorized_by_user_id: text(),
     github_authorized_user_id: text(),
@@ -4301,14 +4335,34 @@ export const platform_integrations = pgTable(
     uniqueIndex('UQ_platform_integrations_linear_platform_inst')
       .on(table.platform, table.platform_installation_id)
       .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
-    uniqueIndex('UQ_platform_integrations_github_platform_inst')
-      .on(table.platform, table.github_app_type, table.platform_installation_id)
+    uniqueIndex('UQ_platform_integrations_github_org_canonical')
+      .on(table.owned_by_organization_id, table.github_installation_id)
       .concurrently()
-      .where(sql`${table.platform} = 'github' AND ${table.platform_installation_id} IS NOT NULL`),
-    uniqueIndex('UQ_platform_integrations_github_pending_target')
-      .on(table.platform, table.github_app_type, table.platform_account_id)
       .where(
-        sql`${table.platform} = 'github' AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
+        sql`${table.platform} = 'github' AND ${table.owned_by_organization_id} IS NOT NULL AND ${table.github_installation_id} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_platform_integrations_github_user_canonical')
+      .on(table.owned_by_user_id, table.github_installation_id)
+      .concurrently()
+      .where(
+        sql`${table.platform} = 'github' AND ${table.owned_by_user_id} IS NOT NULL AND ${table.github_installation_id} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_platform_integrations_github_org_pending_target')
+      .on(
+        table.owned_by_organization_id,
+        table.platform,
+        table.github_app_type,
+        table.platform_account_id
+      )
+      .concurrently()
+      .where(
+        sql`${table.platform} = 'github' AND ${table.owned_by_organization_id} IS NOT NULL AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_platform_integrations_github_user_pending_target')
+      .on(table.owned_by_user_id, table.platform, table.github_app_type, table.platform_account_id)
+      .concurrently()
+      .where(
+        sql`${table.platform} = 'github' AND ${table.owned_by_user_id} IS NOT NULL AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
       ),
     uniqueIndex('UQ_platform_integrations_user_bitbucket')
       .on(table.owned_by_user_id)
@@ -4376,6 +4430,8 @@ export const github_app_installations = pgTable(
     deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
     auth_invalid_at: timestamp({ withTimezone: true, mode: 'string' }),
     auth_invalid_reason: text(),
+    sharing_mode: text().$type<'exclusive' | 'web_cloud_agent'>().notNull().default('exclusive'),
+    sharing_admission_checked_at: timestamp({ withTimezone: true, mode: 'string' }),
     revision: integer().notNull().default(0),
     observed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -4401,6 +4457,75 @@ export const github_app_installations = pgTable(
       'github_app_installations_lifecycle_state_check',
       sql`${table.lifecycle_state} IN ('unknown', 'active', 'suspended', 'deleted')`
     ),
+    check(
+      'github_app_installations_sharing_mode_check',
+      sql`${table.sharing_mode} IN ('exclusive', 'web_cloud_agent')`
+    ),
+  ]
+);
+
+export const github_installation_webhook_receipts = pgTable(
+  'github_installation_webhook_receipts',
+  {
+    id: idPrimaryKeyColumn,
+    github_installation_id: uuid()
+      .notNull()
+      .references(() => github_app_installations.id, { onDelete: 'cascade' }),
+    delivery_id: text().notNull(),
+    event_type: text().notNull(),
+    status: text().$type<'processing' | 'completed'>().notNull().default('completed'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_github_installation_webhook_receipts_delivery').on(
+      table.github_installation_id,
+      table.delivery_id
+    ),
+    check(
+      'github_installation_webhook_receipts_status_check',
+      sql`${table.status} IN ('processing', 'completed')`
+    ),
+  ]
+);
+
+export const provider_oauth_attempts = pgTable(
+  'provider_oauth_attempts',
+  {
+    id: idPrimaryKeyColumn,
+    provider: text().$type<'slack' | 'linear' | 'discord'>().notNull(),
+    purpose: text().$type<'provider_install'>().notNull().default('provider_install'),
+    state_hash: text().notNull().unique(),
+    initiated_by_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    status: text().$type<'pending' | 'consumed' | 'expired'>().notNull().default('pending'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    check(
+      'provider_oauth_attempts_provider_check',
+      sql`${table.provider} IN ('slack', 'linear', 'discord')`
+    ),
+    check(
+      'provider_oauth_attempts_status_check',
+      sql`${table.status} IN ('pending', 'consumed', 'expired')`
+    ),
+    check('provider_oauth_attempts_purpose_check', sql`${table.purpose} = 'provider_install'`),
+    check(
+      'provider_oauth_attempts_owner_check',
+      sql`num_nonnulls(${table.owned_by_user_id}, ${table.owned_by_organization_id}) = 1`
+    ),
+    uniqueIndex('UQ_provider_oauth_attempts_user_pending')
+      .on(table.owned_by_user_id, table.provider)
+      .where(sql`${table.status} = 'pending' AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_provider_oauth_attempts_org_pending')
+      .on(table.owned_by_organization_id, table.provider)
+      .where(sql`${table.status} = 'pending' AND ${table.owned_by_organization_id} IS NOT NULL`),
+    index('IDX_provider_oauth_attempts_expires_at').on(table.expires_at),
   ]
 );
 
@@ -6832,6 +6957,48 @@ export const byok_api_keys = pgTable(
 );
 
 export type BYOKApiKey = typeof byok_api_keys.$inferSelect;
+
+/**
+ * A "Sign in with ChatGPT" delegated connection. The integration is inherently
+ * personal: a connection belongs to one person and is scoped to one account,
+ * either that person's personal account (`organization_id` null) or one
+ * organization they belong to. The same person can connect the same ChatGPT
+ * subscription to several accounts by connecting each one separately, so the
+ * owner is the `(kilo_user_id, organization_id)` pair.
+ */
+export const openai_chatgpt_connections = pgTable(
+  'openai_chatgpt_connections',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, {
+        onDelete: 'cascade',
+      }),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+    }),
+    encrypted_connection: jsonb().$type<EncryptedData>().notNull(),
+    is_enabled: boolean().default(true).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    created_by: text().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_openai_chatgpt_connections_personal')
+      .on(table.kilo_user_id)
+      .where(sql`${table.organization_id} IS NULL`),
+    uniqueIndex('UQ_openai_chatgpt_connections_org_member')
+      .on(table.kilo_user_id, table.organization_id)
+      .where(sql`${table.organization_id} IS NOT NULL`),
+    index('IDX_openai_chatgpt_connections_organization_id').on(table.organization_id),
+  ]
+);
+
+export type OpenAiChatGptConnectionRow = typeof openai_chatgpt_connections.$inferSelect;
 
 // Security Reviews - Phase 1
 export const security_findings = pgTable(

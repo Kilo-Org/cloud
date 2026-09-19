@@ -13,6 +13,7 @@ import { refreshActiveAgentsLiveActivityCopy } from './active-agents-live-activi
 import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
 import { registerGlanceableApproveAction } from './approve-action';
 import { iosSink } from './ios-sink';
+import { registerWidgetActionHandling } from './widget-actions';
 import { ensureWidgetLogo } from './widget-logo';
 
 if (Platform.OS === 'ios') {
@@ -23,10 +24,19 @@ if (Platform.OS === 'ios') {
   // not through a mounted component tree.
   registerGlanceableSink(iosSink);
 
+  // Widget App Intent buttons: the live subscription answers a press while this
+  // process is up, and the launch sweep picks up a press that patched the
+  // timeline before JS subscribed.
+  registerWidgetActionHandling();
+
   // The Live Activity's Approve control mirrors to the Apple Watch, so a wrist
   // press arrives as a widget interaction in this process. It runs the same
   // front-approval service the phone's permission card uses; the caller is a
-  // thunk because the service reads its scope and attaches lazily.
+  // thunk because the service reads its scope and attaches lazily. This is a
+  // second interaction listener beside `registerWidgetActionHandling`: each
+  // handler filters on its own surface (this one on the `approve` target, the
+  // widget sweep on the Home Screen widget's press marker), so a press is
+  // answered by exactly one of them.
   registerGlanceableApproveAction(async () => {
     await approveFrontAgent();
   });

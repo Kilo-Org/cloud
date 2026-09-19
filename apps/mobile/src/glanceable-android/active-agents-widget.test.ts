@@ -1,10 +1,11 @@
-/* eslint-disable max-lines -- one suite covering every size bucket and the state matrix */
+/* eslint-disable max-lines -- one suite covering every size bucket and the state matrix through a shared mock-element tree harness */
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 
 import { renderActiveAgentsWidget } from './active-agents-widget';
@@ -28,7 +29,7 @@ type MockElement = {
     clickAction?: string;
     clickActionData?: { uri?: string };
     accessibilityLabel?: string;
-    style?: { backgroundColor?: string; justifyContent?: string };
+    style?: { backgroundColor?: string; justifyContent?: string; height?: number };
     children?: unknown;
   };
 };
@@ -45,7 +46,17 @@ const COPY: Record<string, string> = {
   'glanceable.stale': 'Updates delayed',
   'glanceable.openAgents': 'Open agents',
   'glanceable.newestResult': 'Newest result',
+  'glanceable.noneWaiting': 'No agents waiting',
+  'glanceable.newAgent': 'New agent',
+  'glanceable.approving': 'Approving…',
+  'glanceable.couldNotApprove': 'Could not approve',
+  'glanceable.newestSession': 'Newest: {{title}}',
+  'common.approve': 'Approve',
 };
+
+afterEach(() => {
+  setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
+});
 
 function translate(key: string): string {
   return COPY[key] ?? key;
@@ -89,6 +100,57 @@ function collectText(node: unknown): string[] {
     output.push(...collectText(element.props.children));
   }
   return output;
+}
+
+function findElement(
+  node: unknown,
+  match: (element: MockElement) => boolean
+): MockElement | undefined {
+  if (node == null) {
+    return undefined;
+  }
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findElement(item, match);
+      if (found !== undefined) {
+        return found;
+      }
+    }
+    return undefined;
+  }
+  if (typeof node !== 'object') {
+    return undefined;
+  }
+  const element = node as MockElement;
+  if (match(element)) {
+    return element;
+  }
+  return findElement(element.props.children, match);
+}
+
+function collectStyles(node: unknown): Record<string, unknown>[] {
+  const styles: Record<string, unknown>[] = [];
+  const visit = (current: unknown): void => {
+    if (current == null) {
+      return;
+    }
+    if (Array.isArray(current)) {
+      for (const item of current) {
+        visit(item);
+      }
+      return;
+    }
+    if (typeof current !== 'object') {
+      return;
+    }
+    const element = current as MockElement;
+    if (element.props.style !== undefined) {
+      styles.push(element.props.style as Record<string, unknown>);
+    }
+    visit(element.props.children);
+  };
+  visit(node);
+  return styles;
 }
 
 type Cell = { width: number; height?: number; rtl?: boolean };
@@ -145,7 +207,7 @@ describe('renderActiveAgentsWidget', () => {
   // row reverses its own children and every column flips its alignment.
   it('mirrors every row for a right-to-left language', () => {
     const props = buildAndroidWidgetProps(
-      snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
+      snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
       {},
       translate,
       String,
@@ -159,6 +221,7 @@ describe('renderActiveAgentsWidget', () => {
       '1',
       'Idle',
       '0',
+      'Approve',
     ]);
   });
 
@@ -166,7 +229,7 @@ describe('renderActiveAgentsWidget', () => {
   // stack beside the mark and each one keeps its word.
   it('stacks every state beside the mark in a short narrow cell', () => {
     const props = buildAndroidWidgetProps(
-      snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
+      snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
       {},
       translate,
       String,
@@ -180,12 +243,13 @@ describe('renderActiveAgentsWidget', () => {
       'Working',
       '0',
       'Idle',
+      'Approve',
     ]);
   });
 
   it('draws every state at a small width too, zeros included', () => {
     const props = buildAndroidWidgetProps(
-      snapshotFor([{ status: 'question' }, { status: 'busy' }, { status: 'busy' }], 0),
+      snapshotFor([{ status: 'permission' }, { status: 'busy' }, { status: 'busy' }], 0),
       {},
       translate,
       String,
@@ -194,12 +258,12 @@ describe('renderActiveAgentsWidget', () => {
     const rep = render(props, { width: 120 });
     const text = collectText(rep.light);
 
-    expect(text).toEqual(['1', 'Needs input', '2', 'Working', '0', 'Idle']);
+    expect(text).toEqual(['1', 'Needs input', '2', 'Working', '0', 'Idle', 'Approve']);
   });
 
   it('shows every count, zeros included, at a wide width', () => {
     const props = buildAndroidWidgetProps(
-      snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
+      snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
       {},
       translate,
       String,
@@ -209,19 +273,19 @@ describe('renderActiveAgentsWidget', () => {
     const text = collectText(rep.light);
 
     // The zero row draws so the rows hold still as work moves between states.
-    expect(text).toEqual(['1', 'Needs input', '1', 'Working', '0', 'Idle']);
+    expect(text).toEqual(['1', 'Needs input', '1', 'Working', '0', 'Idle', 'Approve']);
   });
 
   // One cell tall: the counts run in a row instead of stacking. A short row
   // keeps the word only on the ranked state, a wide one labels all three.
   it.each([
-    { width: 250, visibleText: ['1', 'Needs input', '1', '0'] },
-    { width: 340, visibleText: ['1', 'Needs input', '1', 'Working', '0', 'Idle'] },
+    { width: 250, visibleText: ['1', 'Needs input', '1', '0', 'Approve'] },
+    { width: 340, visibleText: ['1', 'Needs input', '1', 'Working', '0', 'Idle', 'Approve'] },
   ])(
     'runs the counts in a row at width $width and one cell of height',
     ({ width, visibleText }) => {
       const props = buildAndroidWidgetProps(
-        snapshotFor([{ status: 'question' }, { status: 'busy' }], 0),
+        snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
         {},
         translate,
         String,
@@ -237,8 +301,8 @@ describe('renderActiveAgentsWidget', () => {
   // spoken label still says the counts are delayed. The large cell is the one
   // that has a footer to carry the warning.
   it.each([
-    { width: 120, visibleText: ['2', 'Needs input', '4', 'Working', '3', 'Idle'] },
-    { width: 250, visibleText: ['2', 'Needs input', '4', 'Working', '3', 'Idle'] },
+    { width: 120, visibleText: ['2', 'Needs input', '4', 'Working', '3', 'Idle', 'Approve'] },
+    { width: 250, visibleText: ['2', 'Needs input', '4', 'Working', '3', 'Idle', 'Approve'] },
   ])(
     'speaks stale numeric counts and keeps the deep link at width $width',
     ({ width, visibleText }) => {
@@ -246,6 +310,9 @@ describe('renderActiveAgentsWidget', () => {
         {
           ...snapshotFor([], 0, 'stale'),
           needsInput: 2,
+          // The two waiting agents are permission waits: `needsApproval` is the
+          // count that draws the chip.
+          needsApproval: 2,
           idle: 3,
           running: 4,
         },
@@ -285,6 +352,120 @@ describe('renderActiveAgentsWidget', () => {
     const text = collectText(rep.light);
 
     expect(text).toEqual(['Status expired']);
+  });
+
+  it('draws the newest session line in its own reserved slot', () => {
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
+    const props = buildAndroidWidgetProps(snapshotFor([{ status: 'busy' }], 0), {}, translate);
+
+    const text = collectText(render(props, { width: 250 }).light);
+
+    expect(text).toEqual([
+      '0',
+      'Needs input',
+      '1',
+      'Working',
+      '0',
+      'Idle',
+      'Newest: Fix the flaky test',
+    ]);
+  });
+
+  it('reserves the newest slot whether or not it carries a line', () => {
+    // The reserved slot is the only box with a fixed height that spans the
+    // body: the count rows size themselves, so nothing else matches.
+    const reserved = (node: unknown) =>
+      collectStyles(node).filter(
+        style => typeof style.height === 'number' && style.width === 'match_parent'
+      ).length;
+    const props = buildAndroidWidgetProps(snapshotFor([{ status: 'busy' }], 0), {}, translate);
+    const emptySlot = reserved(render(props, { width: 250 }).light);
+
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
+    const filledSlot = reserved(render(props, { width: 250 }).light);
+
+    expect(emptySlot).toBe(1);
+    expect(filledSlot).toBe(1);
+  });
+
+  it('draws the Approve row with its own headless click action', () => {
+    const props = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
+      {},
+      translate
+    );
+
+    const approve = findElement(
+      render(props, { width: 250 }).light,
+      element => element.props.clickAction === 'approve'
+    );
+
+    expect(approve?.props.accessibilityLabel).toBe('Approve');
+    expect(collectText(approve)).toEqual(['Approve']);
+  });
+
+  // The chip follows the props gate, which only a permission wait raises: a
+  // retry (or a question) needs the app, so the tray must not draw an Approve
+  // whose press would only open it.
+  it('draws no Approve row for a wait the action cannot answer', () => {
+    const props = buildAndroidWidgetProps(snapshotFor([{ status: 'retry' }]), {}, translate);
+    const light = render(props, { width: 250 }).light;
+
+    expect(collectText(light)).toEqual(['1', 'Needs input', '0', 'Working', '0', 'Idle']);
+    expect(findElement(light, element => element.props.clickAction === 'approve')).toBeUndefined();
+  });
+
+  // The chip is the widget's only in-place action, and its whole box is the tap
+  // target, so it holds Android's 48 dp minimum instead of sizing to the label.
+  it('gives both action chips a full-height tap target', () => {
+    const approveProps = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'permission' }], 0),
+      {},
+      translate
+    );
+    const emptyProps = buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate);
+
+    const chips = [
+      findElement(
+        render(approveProps, { width: 250 }).light,
+        element => element.props.clickAction === 'approve'
+      ),
+      findElement(
+        render(emptyProps, { width: 250 }).light,
+        element => element.props.clickAction === 'new-agent'
+      ),
+    ];
+
+    for (const chip of chips) {
+      expect(chip?.props.style?.height).toBeGreaterThanOrEqual(44);
+      expect(chip?.props.style?.height).toBeLessThanOrEqual(48);
+    }
+  });
+
+  it('draws the New agent row for the empty state, and no Approve row', () => {
+    const props = buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate);
+    const light = render(props, { width: 250 }).light;
+
+    expect(collectText(light)).toEqual(['No agents waiting', 'New agent']);
+    expect(
+      findElement(light, element => element.props.clickAction === 'new-agent')?.props
+        .accessibilityLabel
+    ).toBe('New agent');
+    expect(findElement(light, element => element.props.clickAction === 'approve')).toBeUndefined();
+  });
+
+  it('offers no action rows for a state with nothing to act on', () => {
+    const props = buildAndroidWidgetProps(snapshotFor([], 0, 'waiting'), {}, translate);
+    const light = render(props, { width: 250 }).light;
+
+    expect(collectText(light)).toEqual(['Waiting for agents']);
+    expect(
+      findElement(
+        light,
+        element =>
+          element.props.clickAction !== undefined && element.props.clickAction !== 'OPEN_URI'
+      )
+    ).toBeUndefined();
   });
 
   it('labels the whole widget with the Open agents deep-link click action', () => {
@@ -403,7 +584,7 @@ describe('the large widget cell', () => {
   // footer to carry a third fact.
   it.each([
     ['waiting', 'Waiting for agents'],
-    ['empty', 'No work in progress'],
+    ['empty', 'No agents waiting'],
     ['expired', 'Status expired'],
     ['signed_out', 'Sign in to see agents'],
     ['privacy', 'Open Kilo to see agents'],

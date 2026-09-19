@@ -4,7 +4,7 @@ import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { dateTimeFormat } from '@/lib/intl-cache';
 
-import { collectCopyableText } from './collect-copyable-text';
+import { collectCopyableText, messageTextParts } from './collect-copyable-text';
 import { formatCost } from './context-usage-display';
 import { selectMessageFailure } from './message-failure-state';
 import { resolveMessageDisplayModel } from './message-model-label';
@@ -24,9 +24,10 @@ type MessageDetailsContent = {
   tokenRows: MessageDetailsTokenRow[] | null;
   copyableText: string | null;
   /**
-   * What the sheet's Copy action copies: the same text plus, on a failed
-   * delivery, the untranslated transport text. The select-text view renders
-   * `copyableText`, so the raw string stays behind the copy action only.
+   * What the sheet's Copy action copies: the message's own text plus, on a
+   * failed delivery, the untranslated transport text. The select-text view
+   * renders `copyableText`, so the raw string stays behind the copy action
+   * only.
    */
   copyText: string | null;
   canSelectText: boolean;
@@ -51,10 +52,17 @@ export function getMessageDetailsContent(
       ? i18n.t('agentChat.messageDetails.roleUser')
       : i18n.t('agentChat.messageDetails.roleAssistant');
   const sentTimeLabel = formatMessageSentTime(message.info.time.created);
-  const copyable = collectCopyableText(message);
+  // The select-text view renders every copyable part — the thinking block and
+  // the tool output included — so manual selection still sees the whole
+  // message. Only the Copy action (below) is scoped to the message's own text.
+  const selectable = collectCopyableText(message);
+  // Copy message copies the message's own text only. The details sheet shows
+  // the thinking block above an assistant reply as its own row; the clipboard
+  // must start with the reply, so reasoning and tool parts are not collected.
+  const copyable = collectCopyableText({ parts: messageTextParts(message.parts) });
   const failureCopyDetail =
     selectMessageFailure({ deliveryState, info: message.info })?.copyDetail ?? '';
-  const copyableText = copyable.length > 0 ? copyable : null;
+  const copyableText = selectable.length > 0 ? selectable : null;
   const fullCopy = [copyable, failureCopyDetail].filter(text => text.length > 0).join('\n\n');
   const copyText = fullCopy.length > 0 ? fullCopy : null;
   const canSelectText =

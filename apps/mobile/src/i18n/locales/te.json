@@ -480,6 +480,8 @@
       "replyBadRequest": "ఈ ప్రత్యుత్తరాన్ని పోస్ట్ చేయలేము. చర్చలో మార్పులు జరిగి ఉండవచ్చు.",
       "replyForbidden": "ఈ పుల్ రిక్వెస్ట్‌కు ప్రత్యుత్తరం ఇవ్వడానికి మీకు అనుమతి లేదు.",
       "addCommentCta": "ఈ పుల్ రిక్వెస్ట్‌పై వ్యాఖ్యానించండి",
+      "fixWithKilo": "Kilo తో పరిష్కరించండి",
+      "fixWithKiloPrompt": "దయచేసి కింది పుల్ రిక్వెస్ట్ వ్యాఖ్యను పరిష్కరించండి: {{link}}",
       "commentBadRequest": "ఈ వ్యాఖ్యను పోస్ట్ చేయలేము. పుల్ రిక్వెస్ట్ మారి ఉండవచ్చు.",
       "commentForbidden": "ఈ పుల్ రిక్వెస్ట్‌పై వ్యాఖ్యానించడానికి మీకు అనుమతి లేదు.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} ఇంకా పూర్తి కాలేదు",
       "skipped": "{{displayCount}} దాటవేయబడ్డాయి",
       "checksCount": "{{displayCount}} తనిఖీలు",
+      "checksCount_one": "{{displayCount}} తనిఖీ",
+      "checksCount_other": "{{displayCount}} తనిఖీలు",
       "checkDetails": "తనిఖీ వివరాలు"
     },
     "inbox": {
@@ -2051,6 +2055,7 @@
       "exitNeedsNewerCli": "రిమోట్ స్లాష్ కమాండ్‌లకు కొత్త Kilo CLI సంస్కరణ అవసరం. Kilo CLIను నవీకరించి మళ్లీ కనెక్ట్ చేయండి."
     },
     "sessionConnection": {
+      "label": "కనెక్షన్",
       "connecting": "కనెక్ట్ అవుతోంది…",
       "reconnecting": "మళ్లీ కనెక్ట్ అవుతోంది…",
       "connectionLost": "కనెక్షన్ తెగిపోయింది",
@@ -2070,7 +2075,9 @@
       "removeConfirmTitle": "లక్ష్యాన్ని తీసివేయాలా?",
       "removeConfirmMessage": "ఈ సెషన్ లక్ష్యాన్ని CLI క్లియర్ చేస్తుంది.",
       "updateFailed": "లక్ష్యాన్ని నవీకరించలేకపోయాము.",
-      "sectionAccessibility": "{{status}}. లక్ష్యం: {{text}}"
+      "sectionAccessibility": "{{status}}. లక్ష్యం: {{text}}",
+      "collapse": "లక్ష్యాన్ని కుదించండి",
+      "expand": "లక్ష్యాన్ని విస్తరించండి"
     },
     "newSession": {
       "recentlyUsed": "ఇటీవల ఉపయోగించినవి",
@@ -2124,7 +2131,20 @@
       "continueFrom": "{{title}}ను కొనసాగిస్తోంది.",
       "importingSession": "సెషన్‌ను దిగుమతి చేస్తోంది",
       "cliCannotContinue": "ఈ CLIతో సెషన్‌ను కొనసాగించడం సాధ్యం కాదు. Cloud Agent లేదా మరో CLIను ఎంచుకోండి.",
-      "importFailed": "ఈ సెషన్‌ను దిగుమతి చేయలేకపోయాము."
+      "importFailed": "ఈ సెషన్‌ను దిగుమతి చేయలేకపోయాము.",
+      "sandbox": "శాండ్బాక్స్",
+      "sandboxAccessibility": "శాండ్బాక్స్: {{label}}",
+      "sandboxDefaultWithDestination": "డిఫాల్ట్ · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "చిన్న",
+      "sandboxInstanceShared": "భాగస్వామ్య",
+      "sandboxInstanceLarge": "పెద్ద",
+      "sandboxInstanceDevcontainer": "డెవ్ కంటైనర్",
+      "sandboxInstanceProviderDefault": "ప్రొవైడర్ డిఫాల్ట్",
+      "sandboxCouldNotLoad": "శాండ్బాక్స్ ఎంపికలు లోడ్ కాలేదు",
+      "sandboxUnavailable": "ఈ శాండ్బాక్స్ అందుబాటులో లేదు. మరొక శాండ్బాక్స్ లేదా డిఫాల్ట్ ఎంచుకోండి.",
+      "sandboxUseDefault": "డిఫాల్ట్ ఉపయోగించండి"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్‌ను నవీకరించాము.",
@@ -2490,6 +2510,12 @@
       "startNewSession": "కొత్త సెషన్‌ను ప్రారంభించండి",
       "exitSession": "సెషన్ నుండి నిష్క్రమించండి",
       "clearSession": "ఈ సెషన్‌ను ముగించి కొత్తదాన్ని ప్రారంభించండి",
+      "compactDescription": "ప్రస్తుత సెషన్ సందర్భాన్ని కుదించండి",
+      "goalDescription": "సెషన్ లక్ష్యం వైపు పని కొనసాగించండి. /goal <objective> లేదా pause, resume, clear",
+      "initDescription": "మార్గదర్శిత AGENTS.md సెటప్",
+      "resumeClaudeDescription": "Claude Code సెషన్ ట్రాన్స్క్రిప్ట్ను దిగుమతి చేయండి",
+      "resumeCodexDescription": "OpenAI Codex సెషన్ ట్రాన్స్క్రిప్ట్ను దిగుమతి చేయండి",
+      "reviewDescription": "మార్పులను సమీక్షించండి [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ఉపయోగించండి",
       "insert": "చేర్చండి",
       "upgradeRequiredFallback": "ఈ కమాండ్‌ను ఉపయోగించడానికి మీ CLIను నవీకరించండి.",
@@ -2607,6 +2633,7 @@
     "couldNotLoadActiveSessions": "ప్రస్తుతం నడుస్తున్న సెషన్‌లను లోడ్ చేయలేకపోయాము.",
     "agentSessions": "ప్రస్తుతం నడుస్తున్నవి",
     "newCodingTask": "కొత్త కోడింగ్ పని",
+    "newTaskFromPicture": "చిత్రం నుండి కొత్త పని",
     "explore": "మరిన్ని ఫీచర్‌లు",
     "seeAll": "అన్నీ చూడండి",
     "noLiveSessions": "ప్రస్తుతం ఏదీ అమలులో లేదు"
@@ -2828,7 +2855,8 @@
     "aiProvidersWhat": "మీ ప్రాంప్ట్‌లు, సంభాషణ చరిత్ర, మీరు జోడించే ఫైళ్లు.",
     "aiProvidersWhy": "AI ప్రతిస్పందనలను రూపొందించడానికి.",
     "aiProvidersWho": "Anthropic, OpenAI, Google మరియు మీరు ప్రతి అభ్యర్థనకు ఎంచుకునే ఇతర ప్రొవైడర్లు.",
-    "gatewayWhat": "ఖాతా ID, అభ్యర్థన మెటాడేటా, టోకెన్ వినియోగం.",
+    "gatewayWhat": "ఖాతా ID, అభ్యర్థన మెటాడేటా, టోకెన్ వినియోగం, అలాగే యాప్ దీని ద్వారా పంపే ప్రాంప్ట్‌లు మరియు వాయిస్ రికార్డింగ్‌లు.",
+    "viaGateway": "Kilo Gateway ద్వారా",
     "gatewayWhy": "గుర్తింపు ధృవీకరణ, అభ్యర్థనలను సంబంధిత ప్రొవైడర్లకు పంపడం, బిల్లింగ్ లెక్కలను సరిపోల్చడం.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "యాప్ కంటెంట్‌ను తీసివేసిన క్రాష్, లోప నివేదికలు.",
@@ -2848,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "మీరు చెప్పిన మాటల రికార్డింగ్.",
     "voiceTranscriptionWhy": "మాటలను వచనంగా మార్చడానికి.",
-    "voiceTranscriptionWho": "మీ పరికరంలోనే ప్రాసెస్ చేస్తుంది. ఆఫ్‌లైన్‌లో మాటలను వచనంగా మార్చడం సాధ్యం కాకపోతే Apple లేదా Google ప్రాసెస్ చేస్తుంది.",
+    "voiceTranscriptionWho": "మీ పరికరం, మీరు ఎంచుకున్న ట్రాన్స్క్రిప్షన్ మోడల్‌తో Kilo Gateway, లేదా ఆన్‌లైన్ గుర్తింపు కోసం Apple లేదా Google.",
     "installAttributionPromptTitle": "ఇన్‌స్టాల్ మూలాన్ని గుర్తించడానికి అనుమతించాలా?",
     "installAttributionPromptMessage": "మీరు ఏ మార్గం ద్వారా వచ్చారో తెలుసుకోవడానికి మాత్రమే Kilo, Apple ట్రాకింగ్ అనుమతిని ఉపయోగిస్తుంది. మీ ప్రాంప్ట్‌లను, సంభాషణలను ఇందుకు ఎప్పుడూ ఉపయోగించదు.",
     "what": "ఏమి",
@@ -3058,6 +3086,12 @@
     "privacy": "ఏజెంట్లను చూడటానికి Kilo తెరవండి",
     "openAgents": "ఏజెంట్లను తెరవండి",
     "needsInput": "మీ స్పందన అవసరం",
+    "newestSession": "సరికొత్త: {{title}}",
+    "noneWaiting": "వేచి ఉన్న ఏజెంట్ లేదు",
+    "newAgent": "కొత్త ఏజెంట్",
+    "approving": "ఆమోదిస్తోంది...",
+    "couldNotApprove": "ఆమోదించలేకపోయింది",
+    "couldNotStart": "ప్రారంభించలేకపోయింది",
     "channelName": "పనిచేస్తున్న ఏజెంట్లు",
     "activityKitDisabledBody": "లాక్ స్క్రీన్‌పై పనిచేస్తున్న ఏజెంట్లను చూడటానికి సెట్టింగ్‌లలో లైవ్ యాక్టివిటీస్‌ను ఆన్ చేయండి.",
     "newestResult": "సరికొత్త ఫలితం"
@@ -3094,5 +3128,15 @@
     "remoteFound": "కంప్యూటర్ కనెక్ట్ అయింది",
     "checkAgain": "మళ్లీ తనిఖీ చేయండి",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ఏజెంట్‌ను ప్రారంభించడానికి ప్రాంప్ట్ అవసరం. ప్రాంప్ట్‌ను జోడించి మళ్లీ అమలు చేయండి.",
+      "repositoryUnknown": "Kilo, {{repository}}ను GitHub లేదా GitLab రిపోజిటరీగా గుర్తించదు. Kiloలో మరో రిపోజిటరీని ఎంచుకోండి.",
+      "repositoryUnsupported": "{{repository}} ఒక Bitbucket రిపోజిటరీ — ఏజెంట్‌ను ప్రారంభించండి ఇంకా దీన్ని ఉపయోగించడం సాధ్యం కాదు. Kiloలో మరో రిపోజిటరీని ఎంచుకోండి."
+    }
+  },
+  "launcher": {
+    "openLastSession": "చివరి సెషన్ను తెరవండి"
   }
 }

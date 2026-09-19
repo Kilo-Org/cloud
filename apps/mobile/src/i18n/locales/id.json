@@ -1565,6 +1565,7 @@
       "exitNeedsNewerCli": "Perintah garis miring jarak jauh memerlukan Kilo CLI yang lebih baru. Perbarui Kilo CLI dan sambungkan kembali."
     },
     "sessionConnection": {
+      "label": "Koneksi",
       "connecting": "Menyambungkan…",
       "reconnecting": "Menyambungkan kembali…",
       "connectionLost": "Koneksi terputus",
@@ -1584,7 +1585,9 @@
       "removeConfirmTitle": "Hapus tujuan?",
       "removeConfirmMessage": "CLI menghapus tujuan sesi ini.",
       "updateFailed": "Tujuan tidak dapat diperbarui.",
-      "sectionAccessibility": "{{status}}. Tujuan: {{text}}"
+      "sectionAccessibility": "{{status}}. Tujuan: {{text}}",
+      "collapse": "Ciutkan tujuan",
+      "expand": "Bentangkan tujuan"
     },
     "newSession": {
       "recentlyUsed": "Terakhir digunakan",
@@ -1638,7 +1641,20 @@
       "continueFrom": "Melanjutkan sesi {{title}}.",
       "importingSession": "Mengimpor sesi",
       "cliCannotContinue": "CLI ini tidak dapat melanjutkan sesi. Pilih Cloud Agent atau CLI lain.",
-      "importFailed": "Tidak dapat mengimpor sesi ini."
+      "importFailed": "Tidak dapat mengimpor sesi ini.",
+      "sandbox": "Lingkungan terisolasi",
+      "sandboxAccessibility": "Lingkungan terisolasi: {{label}}",
+      "sandboxDefaultWithDestination": "Bawaan · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Kecil",
+      "sandboxInstanceShared": "Berbagi",
+      "sandboxInstanceLarge": "Besar",
+      "sandboxInstanceDevcontainer": "Kontainer dev",
+      "sandboxInstanceProviderDefault": "Bawaan penyedia",
+      "sandboxCouldNotLoad": "Tidak dapat memuat opsi sandbox",
+      "sandboxUnavailable": "Lingkungan terisolasi ini tidak tersedia. Pilih lingkungan terisolasi lain atau Bawaan.",
+      "sandboxUseDefault": "Gunakan Bawaan"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} berkas telah diperbarui.",
@@ -2004,6 +2020,12 @@
       "startNewSession": "Mulai sesi baru",
       "exitSession": "Keluar dari sesi",
       "clearSession": "Akhiri sesi ini dan mulai sesi baru",
+      "compactDescription": "padatkan konteks sesi saat ini",
+      "goalDescription": "Lanjutkan bekerja menuju tujuan sesi. /goal <objective> atau pause, resume, clear",
+      "initDescription": "penyiapan AGENTS.md terpandu",
+      "resumeClaudeDescription": "impor transkrip sesi Claude Code",
+      "resumeCodexDescription": "impor transkrip sesi OpenAI Codex",
+      "reviewDescription": "tinjau perubahan [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Gunakan /{{command}}",
       "insert": "Sisipkan",
       "upgradeRequiredFallback": "Perbarui CLI untuk menggunakan perintah ini.",
@@ -2121,6 +2143,7 @@
     "couldNotLoadActiveSessions": "Tidak dapat memuat sesi aktif.",
     "agentSessions": "Sedang berjalan",
     "newCodingTask": "Tugas pemrograman baru",
+    "newTaskFromPicture": "Tugas baru dari gambar",
     "explore": "Jelajahi",
     "seeAll": "Lihat semua",
     "noLiveSessions": "Tidak ada yang berjalan saat ini"
@@ -2342,7 +2365,8 @@
     "aiProvidersWhat": "Instruksimu, riwayat percakapan, dan semua berkas yang kamu lampirkan.",
     "aiProvidersWhy": "Untuk menghasilkan respons AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google, dan penyedia lain yang kamu pilih untuk setiap permintaan.",
-    "gatewayWhat": "ID akun, metadata permintaan, penggunaan token.",
+    "gatewayWhat": "ID akun, metadata permintaan, penggunaan token, serta prompt dan rekaman suara yang dikirim aplikasi melaluinya.",
+    "viaGateway": "Melalui Kilo Gateway",
     "gatewayWhy": "Autentikasi, perutean permintaan, rekonsiliasi penagihan.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Laporan aplikasi berhenti mendadak dan kesalahan, tanpa konten aplikasi.",
@@ -2362,7 +2386,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Rekaman suaramu saat mendikte.",
     "voiceTranscriptionWhy": "Untuk mengubah ucapan menjadi teks.",
-    "voiceTranscriptionWho": "Hanya diproses di perangkat, atau oleh Apple atau Google jika perangkat ini tidak dapat melakukan transkripsi luring.",
+    "voiceTranscriptionWho": "Perangkatmu, Kilo Gateway dengan model transkripsi pilihanmu, atau Apple atau Google untuk pengenalan daring.",
     "what": "Data yang dibagikan",
     "why": "Tujuan",
     "who": "Penerima",
@@ -2374,6 +2398,8 @@
     "checkConnection": "Periksa koneksi",
     "checks": {
       "checksCount": "{{displayCount}} pemeriksaan",
+      "checksCount_one": "{{displayCount}} pemeriksaan",
+      "checksCount_other": "{{displayCount}} pemeriksaan",
       "couldNotLoad": "Tidak dapat memuat pemeriksaan.",
       "failed": "{{displayCount}} gagal",
       "noAccess": "Kamu tidak memiliki akses ke pemeriksaan repositori ini.",
@@ -2473,6 +2499,8 @@
       "replyBody": "Isi balasan",
       "replyForbidden": "Kamu tidak memiliki izin untuk membalas PR ini.",
       "addCommentCta": "Komentari PR ini",
+      "fixWithKilo": "Perbaiki dengan Kilo",
+      "fixWithKiloPrompt": "Mohon tangani komentar PR berikut: {{link}}",
       "commentBadRequest": "Komentar ini tidak dapat dikirim. PR mungkin sudah berubah.",
       "commentForbidden": "Kamu tidak memiliki izin untuk berkomentar di PR ini.",
       "replyPlaceholder": "Balasan…",
@@ -3058,6 +3086,12 @@
     "privacy": "Buka Kilo untuk melihat agen",
     "openAgents": "Buka agen",
     "needsInput": "Perlu masukan",
+    "newestSession": "Terbaru: {{title}}",
+    "noneWaiting": "Tidak ada agen yang menunggu",
+    "newAgent": "Agen baru",
+    "approving": "Menyetujui...",
+    "couldNotApprove": "Tidak dapat menyetujui",
+    "couldNotStart": "Tidak dapat memulai",
     "channelName": "Agen aktif",
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci.",
     "newestResult": "Hasil terbaru"
@@ -3094,5 +3128,15 @@
     "remoteFound": "Komputer terhubung",
     "checkAgain": "Periksa lagi",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Mulai agen memerlukan instruksi. Tambahkan instruksi lalu jalankan lagi.",
+      "repositoryUnknown": "Kilo tidak mengenali {{repository}} sebagai repositori GitHub atau GitLab. Pilih repositori lain di Kilo.",
+      "repositoryUnsupported": "{{repository}} adalah repositori Bitbucket — Mulai agen belum bisa menggunakannya. Pilih repositori lain di Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Buka sesi terakhir"
   }
 }

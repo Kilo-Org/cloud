@@ -480,6 +480,8 @@
       "replyBadRequest": "Овој одговор не може да се објави. Можеби нишката е променета.",
       "replyForbidden": "Немаш дозвола да одговориш на ова барање за спојување.",
       "addCommentCta": "Коментирај ова барање за спојување",
+      "fixWithKilo": "Поправи со Kilo",
+      "fixWithKiloPrompt": "Те молам реши го следниов коментар на барањето за спојување: {{link}}",
       "commentBadRequest": "Овој коментар не може да се објави. Можеби барањето за спојување е променето.",
       "commentForbidden": "Немаш дозвола да коментираш ова барање за спојување.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} на чекање",
       "skipped": "{{displayCount}} прескокнати",
       "checksCount": "{{displayCount}} проверки",
+      "checksCount_one": "{{displayCount}} проверка",
+      "checksCount_other": "{{displayCount}} проверки",
       "checkDetails": "детали за проверката"
     },
     "inbox": {
@@ -2051,6 +2055,7 @@
       "exitNeedsNewerCli": "За далечински команди со коса црта е потребна понова верзија на Kilo CLI. Ажурирај го Kilo CLI и поврзи се повторно."
     },
     "sessionConnection": {
+      "label": "Врска",
       "connecting": "Поврзување…",
       "reconnecting": "Повторно поврзување…",
       "connectionLost": "Прекината врска",
@@ -2070,7 +2075,9 @@
       "removeConfirmTitle": "Да се отстрани целта?",
       "removeConfirmMessage": "CLI ја брише целта на оваа сесија.",
       "updateFailed": "Целта не можеше да се ажурира.",
-      "sectionAccessibility": "{{status}}. Цел: {{text}}"
+      "sectionAccessibility": "{{status}}. Цел: {{text}}",
+      "collapse": "Собери ја целта",
+      "expand": "Прошири ја целта"
     },
     "newSession": {
       "recentlyUsed": "Неодамна користени",
@@ -2124,7 +2131,20 @@
       "continueFrom": "Се продолжува сесијата {{title}}.",
       "importingSession": "Увезување на сесијата",
       "cliCannotContinue": "Овој CLI не може да продолжи сесија. Избери Cloud Agent или друг CLI.",
-      "importFailed": "Не успеа увезувањето на оваа сесија."
+      "importFailed": "Не успеа увезувањето на оваа сесија.",
+      "sandbox": "Песочник",
+      "sandboxAccessibility": "Песочник: {{label}}",
+      "sandboxDefaultWithDestination": "Стандардно · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Мало",
+      "sandboxInstanceShared": "Споделено",
+      "sandboxInstanceLarge": "Големо",
+      "sandboxInstanceDevcontainer": "Дев контејнер",
+      "sandboxInstanceProviderDefault": "Стандардно од добавувачот",
+      "sandboxCouldNotLoad": "Опциите за песочникот не можеа да се вчитаат",
+      "sandboxUnavailable": "Овој песочник е недостапен. Изберете друг песочник или Стандардно.",
+      "sandboxUseDefault": "Користи Стандардно"
     },
     "partRenderer": {
       "updatedFileCount_one": "Ажурирана е {{displayCount}} датотека.",
@@ -2490,6 +2510,12 @@
       "startNewSession": "Започни нова сесија",
       "exitSession": "Излези од сесијата",
       "clearSession": "Заврши ја оваа сесија и започни нова",
+      "compactDescription": "збиј го контекстот на тековната сесија",
+      "goalDescription": "Продолжи да работиш кон целта на сесијата. /goal <objective> или pause, resume, clear",
+      "initDescription": "водено поставување на AGENTS.md",
+      "resumeClaudeDescription": "увези транскрипт од сесија на Claude Code",
+      "resumeCodexDescription": "увези транскрипт од сесија на OpenAI Codex",
+      "reviewDescription": "прегледај ги промените [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Користи /{{command}}",
       "insert": "Вметни",
       "upgradeRequiredFallback": "Ажурирај го CLI за да ја користиш оваа команда.",
@@ -2607,6 +2633,7 @@
     "couldNotLoadActiveSessions": "Не успеа вчитувањето на активните сесии.",
     "agentSessions": "Активни сега",
     "newCodingTask": "Нова задача за кодирање",
+    "newTaskFromPicture": "Нова задача од слика",
     "explore": "Истражување",
     "seeAll": "Види ги сите",
     "noLiveSessions": "Моментално ништо не се извршува"
@@ -2828,7 +2855,8 @@
     "aiProvidersWhat": "Твоите упатства, историјата на разговорите и сите датотеки што ги прикачуваш.",
     "aiProvidersWhy": "За создавање одговори со AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google и другите даватели што ги избираш за секое барање.",
-    "gatewayWhat": "Идентификатор на сметката, метаподатоци за барањата, потрошувачка на токени.",
+    "gatewayWhat": "Идентификатор на сметката, метаподатоци за барањата, потрошувачка на токени, како и промптовите и гласовните снимки што апликацијата ги испраќа преку него.",
+    "viaGateway": "Преку Kilo Gateway",
     "gatewayWhy": "Потврда на идентитетот, насочување на барањата и усогласување на наплатата.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Извештаи за падови и грешки, со отстранета содржина на апликацијата.",
@@ -2848,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Твојата аудиоснимка додека диктираш.",
     "voiceTranscriptionWhy": "За претворање на говорот во текст.",
-    "voiceTranscriptionWho": "Само на уредот или преку Apple или Google ако уредот не може да го претвори говорот во текст без интернет.",
+    "voiceTranscriptionWho": "Твојот уред, Kilo Gateway со избраниот модел за транскрипција или Apple или Google за онлајн препознавање.",
     "installAttributionPromptTitle": "Да се дозволи утврдување на изворот на инсталацијата?",
     "installAttributionPromptMessage": "Kilo ја користи дозволата за следење од Apple само за да дознае преку кој канал дојде тука. Твоите упатства и разговори никогаш не се користат за ова.",
     "what": "Што",
@@ -3058,6 +3086,12 @@
     "privacy": "Отвори Kilo за да ги видиш агентите",
     "openAgents": "Отвори ги агентите",
     "needsInput": "Чека внес",
+    "newestSession": "Најнова: {{title}}",
+    "noneWaiting": "Нема агенти што чекаат",
+    "newAgent": "Нов агент",
+    "approving": "Се одобрува...",
+    "couldNotApprove": "Одобрувањето не успеа",
+    "couldNotStart": "Стартувањето не успеа",
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран.",
     "newestResult": "Најнов резултат"
@@ -3094,5 +3128,15 @@
     "remoteFound": "Компјутерот е поврзан",
     "checkAgain": "Провери повторно",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "За да стартираш агент, потребно е упатство. Додај упатство и стартувај го повторно.",
+      "repositoryUnknown": "Kilo не го препознава {{repository}} како GitHub или GitLab репозиториум. Избери друг репозиториум во Kilo.",
+      "repositoryUnsupported": "{{repository}} е Bitbucket репозиториум — Стартирај агент сè уште не може да го користи. Избери друг репозиториум во Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Отвори ја последната сесија"
   }
 }

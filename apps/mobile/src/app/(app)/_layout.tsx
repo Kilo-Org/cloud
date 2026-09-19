@@ -6,6 +6,7 @@ import { AppState } from 'react-native';
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
+import { LauncherSurfacesMount } from '@/components/launcher-surfaces-mount';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { TourAutoOpen } from '@/components/tour/tour-auto-open';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
@@ -117,6 +118,7 @@ export default function AppLayout() {
     <UserWebConnectionProvider>
       <ActiveSessionsLiveSyncMount />
       <GlanceablePublisherMount />
+      <LauncherSurfacesMount />
       <CachePersistenceMount />
       <LogoutReconciliationMount />
       <PushRegistrationMount />
@@ -189,6 +191,15 @@ export default function AppLayout() {
             />
             <Stack.Screen
               name="agent-chat/folder-picker"
+              options={{
+                presentation: 'formSheet',
+                sheetAllowedDetents: [0.5, fullSheetDetent],
+                sheetGrabberVisible: true,
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="agent-chat/sandbox-picker"
               options={{
                 presentation: 'formSheet',
                 sheetAllowedDetents: [0.5, fullSheetDetent],

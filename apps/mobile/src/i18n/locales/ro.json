@@ -483,6 +483,8 @@
       "replyBadRequest": "Acest răspuns nu poate fi publicat. Este posibil ca firul de discuție să se fi modificat.",
       "replyForbidden": "Nu ai permisiunea să răspunzi la acest PR.",
       "addCommentCta": "Comentează acest PR",
+      "fixWithKilo": "Rezolvă cu Kilo",
+      "fixWithKiloPrompt": "Te rog rezolvă următorul comentariu din acest PR: {{link}}",
       "commentBadRequest": "Acest comentariu nu poate fi publicat. Este posibil ca PR-ul să se fi modificat.",
       "commentForbidden": "Nu ai permisiunea să comentezi acest PR.",
       "moderation": {
@@ -577,6 +579,9 @@
       "pending": "{{displayCount}} în așteptare",
       "skipped": "{{displayCount}} omise",
       "checksCount": "{{displayCount}} verificări",
+      "checksCount_one": "{{displayCount}} verificare",
+      "checksCount_few": "{{displayCount}} verificări",
+      "checksCount_other": "{{displayCount}} verificări",
       "checkDetails": "detaliile verificării"
     },
     "inbox": {
@@ -2068,6 +2073,7 @@
       "exitNeedsNewerCli": "Comenzile cu / executate de la distanță necesită o versiune mai nouă de Kilo CLI. Actualizează Kilo CLI și reconectează-te."
     },
     "sessionConnection": {
+      "label": "Conexiune",
       "connecting": "Se conectează…",
       "reconnecting": "Se reconectează…",
       "connectionLost": "Conexiune pierdută",
@@ -2087,7 +2093,9 @@
       "removeConfirmTitle": "Elimini obiectivul?",
       "removeConfirmMessage": "CLI șterge obiectivul acestei sesiuni.",
       "updateFailed": "Obiectivul nu a putut fi actualizat.",
-      "sectionAccessibility": "{{status}}. Obiectiv: {{text}}"
+      "sectionAccessibility": "{{status}}. Obiectiv: {{text}}",
+      "collapse": "Restrânge obiectivul",
+      "expand": "Extinde obiectivul"
     },
     "newSession": {
       "recentlyUsed": "Folosite recent",
@@ -2141,7 +2149,20 @@
       "continueFrom": "Se continuă sesiunea {{title}}.",
       "importingSession": "Se importă sesiunea",
       "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
-      "importFailed": "Nu s-a putut importa această sesiune."
+      "importFailed": "Nu s-a putut importa această sesiune.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Implicit · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Mic",
+      "sandboxInstanceShared": "Partajat",
+      "sandboxInstanceLarge": "Mare",
+      "sandboxInstanceDevcontainer": "Container de dezvoltare",
+      "sandboxInstanceProviderDefault": "Implicit al furnizorului",
+      "sandboxCouldNotLoad": "Nu s-au putut încărca opțiunile pentru sandbox",
+      "sandboxUnavailable": "Acest sandbox nu este disponibil. Alege un alt sandbox sau Implicit.",
+      "sandboxUseDefault": "Folosește Implicit"
     },
     "partRenderer": {
       "updatedFileCount_one": "S-a actualizat {{displayCount}} fișier.",
@@ -2511,6 +2532,12 @@
       "startNewSession": "Începe o sesiune nouă",
       "exitSession": "Închide sesiunea",
       "clearSession": "Încheie această sesiune și începe una nouă",
+      "compactDescription": "compactează contextul sesiunii curente",
+      "goalDescription": "Continuă să lucrezi la un obiectiv de sesiune. /goal <objective> sau pause, resume, clear",
+      "initDescription": "configurare ghidată AGENTS.md",
+      "resumeClaudeDescription": "importă transcrierea unei sesiuni Claude Code",
+      "resumeCodexDescription": "importă transcrierea unei sesiuni OpenAI Codex",
+      "reviewDescription": "revizuiește modificările [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Folosește /{{command}}",
       "insert": "Inserează",
       "upgradeRequiredFallback": "Actualizează CLI-ul pentru a folosi această comandă.",
@@ -2629,6 +2656,7 @@
     "couldNotLoadActiveSessions": "Nu s-au putut încărca sesiunile active.",
     "agentSessions": "În curs acum",
     "newCodingTask": "Sarcină nouă de programare",
+    "newTaskFromPicture": "Sarcină nouă dintr-o imagine",
     "explore": "Explorează",
     "seeAll": "Vezi toate",
     "noLiveSessions": "Nimic nu rulează în acest moment"
@@ -2850,7 +2878,8 @@
     "aiProvidersWhat": "Instrucțiunile tale, istoricul conversațiilor și fișierele pe care le atașezi.",
     "aiProvidersWhy": "Pentru a genera răspunsuri AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google și alți furnizori pe care îi selectezi pentru fiecare cerere.",
-    "gatewayWhat": "ID-ul contului, metadatele cererilor, utilizarea tokenurilor.",
+    "gatewayWhat": "ID-ul contului, metadatele cererilor, utilizarea tokenurilor, precum și prompturile și înregistrările vocale pe care aplicația le trimite prin el.",
+    "viaGateway": "Prin Kilo Gateway",
     "gatewayWhy": "Autentificare, direcționarea cererilor, reconcilierea datelor de facturare.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Rapoarte despre închideri neașteptate și erori, din care eliminăm conținutul aplicației.",
@@ -2870,7 +2899,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Înregistrarea ta în timp ce dictezi.",
     "voiceTranscriptionWhy": "Pentru a transforma vorbirea în text.",
-    "voiceTranscriptionWho": "Exclusiv pe dispozitiv sau prin Apple ori Google când dispozitivul nu poate transcrie fără conexiune la internet.",
+    "voiceTranscriptionWho": "Dispozitivul tău, Kilo Gateway cu modelul de transcriere ales, sau Apple ori Google pentru recunoaștere online.",
     "installAttributionPromptTitle": "Permiți identificarea sursei instalării?",
     "installAttributionPromptMessage": "Kilo folosește permisiunea de urmărire de la Apple doar pentru a afla prin ce canal ai ajuns aici. Instrucțiunile și conversațiile tale nu sunt niciodată folosite în acest scop.",
     "what": "Ce",
@@ -3081,6 +3110,12 @@
     "privacy": "Deschide Kilo pentru a vedea agenții",
     "openAgents": "Deschide agenții",
     "needsInput": "Așteaptă un răspuns",
+    "newestSession": "Cea mai recentă: {{title}}",
+    "noneWaiting": "Niciun agent în așteptare",
+    "newAgent": "Agent nou",
+    "approving": "Se aprobă...",
+    "couldNotApprove": "Aprobarea nu a reușit",
+    "couldNotStart": "Pornirea nu a reușit",
     "channelName": "Agenți activi",
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare.",
     "newestResult": "Cel mai recent rezultat"
@@ -3117,5 +3152,15 @@
     "remoteFound": "Computer conectat",
     "checkAgain": "Verifică din nou",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Pornește un agent necesită o instrucțiune. Adaugă o instrucțiune și rulează-l din nou.",
+      "repositoryUnknown": "Kilo nu recunoaște {{repository}} ca depozit GitHub sau GitLab. Alege alt depozit în Kilo.",
+      "repositoryUnsupported": "{{repository}} este un depozit Bitbucket — Pornește un agent nu îl poate folosi încă. Alege alt depozit în Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Deschide ultima sesiune"
   }
 }

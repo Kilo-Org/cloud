@@ -480,6 +480,8 @@
       "replyBadRequest": "ဒီအကြောင်းပြန်စာကို တင်၍မရပါ။ ဆွေးနွေးချက်တွဲ ပြောင်းလဲသွားခြင်း ဖြစ်နိုင်ပါသည်။",
       "replyForbidden": "ဒီ PR တွင် အကြောင်းပြန်ခွင့် မရှိပါ။",
       "addCommentCta": "ဒီ PR တွင် မှတ်ချက် ရေးသားပါ",
+      "fixWithKilo": "Kilo ဖြင့် ပြင်ဆင်ပါ",
+      "fixWithKiloPrompt": "အောက်ပါ PR မှတ်ချက်ကို ဖြေရှင်းပေးပါ: {{link}}",
       "commentBadRequest": "ဒီမှတ်ချက်ကို တင်၍မရပါ။ PR ပြောင်းလဲသွားခြင်း ဖြစ်နိုင်ပါသည်။",
       "commentForbidden": "ဒီ PR တွင် မှတ်ချက်ရေးသားခွင့် မရှိပါ။",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} ခု စောင့်ဆိုင်းဆဲ",
       "skipped": "{{displayCount}} ခု ကျော်ထား",
       "checksCount": "စစ်ဆေးမှု {{displayCount}} ခု",
+      "checksCount_one": "စစ်ဆေးမှု {{displayCount}} ခု",
+      "checksCount_other": "စစ်ဆေးမှု {{displayCount}} ခု",
       "checkDetails": "စစ်ဆေးမှုအသေးစိတ်များ"
     },
     "inbox": {
@@ -2051,6 +2055,7 @@
       "exitNeedsNewerCli": "အဝေးမှ မျဉ်းစောင်းအမိန့်များကို အသုံးပြုရန် ပိုသစ်သော Kilo CLI ဗားရှင်း လိုအပ်ပါသည်။ Kilo CLI ကို အဆင့်မြှင့်ပြီး ပြန်ချိတ်ဆက်ပါ။"
     },
     "sessionConnection": {
+      "label": "ချိတ်ဆက်မှု",
       "connecting": "ချိတ်ဆက်နေသည်…",
       "reconnecting": "ပြန်လည်ချိတ်ဆက်နေသည်…",
       "connectionLost": "ချိတ်ဆက်မှု ပျက်သွားသည်",
@@ -2070,7 +2075,9 @@
       "removeConfirmTitle": "ပန်းတိုင် ဖယ်ရှားမလား?",
       "removeConfirmMessage": "CLI သည် ဤစက်ရှင်၏ ပန်းတိုင်ကို ရှင်းလင်းသည်။",
       "updateFailed": "ပန်းတိုင်ကို အပ်ဒိတ်လုပ်နိုင်ခြင်း မရှိပါ။",
-      "sectionAccessibility": "{{status}}။ ပန်းတိုင်: {{text}}"
+      "sectionAccessibility": "{{status}}။ ပန်းတိုင်: {{text}}",
+      "collapse": "ပန်းတိုင် ခေါက်သိမ်းရန်",
+      "expand": "ပန်းတိုင် ဖြန့်ပြရန်"
     },
     "newSession": {
       "recentlyUsed": "မကြာသေးမီက အသုံးပြုထားသည့်အရာများ",
@@ -2124,7 +2131,20 @@
       "continueFrom": "{{title}} ကို ဆက်လုပ်နေပါသည်။",
       "importingSession": "စက်ရှင်ကို တင်သွင်းနေသည်",
       "cliCannotContinue": "ဤ CLI ဖြင့် စက်ရှင်ကို ဆက်လုပ်၍မရပါ။ Cloud Agent သို့မဟုတ် အခြား CLI တစ်ခုကို ရွေးပါ။",
-      "importFailed": "ဤစက်ရှင်ကို တင်သွင်း၍မရပါ။"
+      "importFailed": "ဤစက်ရှင်ကို တင်သွင်း၍မရပါ။",
+      "sandbox": "စန်းဒ်ဘောက်စ်",
+      "sandboxAccessibility": "စန်းဒ်ဘောက်စ်: {{label}}",
+      "sandboxDefaultWithDestination": "မူလ · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "သေး",
+      "sandboxInstanceShared": "မျှဝေ",
+      "sandboxInstanceLarge": "ကြီး",
+      "sandboxInstanceDevcontainer": "Dev ကွန်တိန်နာ",
+      "sandboxInstanceProviderDefault": "ပံ့ပိုးသူ၏ မူလ",
+      "sandboxCouldNotLoad": "စန်းဒ်ဘောက်စ် ရွေးချယ်စရာများ လုဒ်လုပ်မရပါ",
+      "sandboxUnavailable": "ဤစန်းဒ်ဘောက်စ်ကို သုံးမရပါ။ အခြားစန်းဒ်ဘောက်စ် သို့မဟုတ် မူလကို ရွေးပါ။",
+      "sandboxUseDefault": "မူလကို သုံးရန်"
     },
     "partRenderer": {
       "updatedFileCount_one": "ဖိုင် {{displayCount}} ခုကို ပြင်ဆင်ပြီးပါပြီ။",
@@ -2490,6 +2510,12 @@
       "startNewSession": "စက်ရှင်အသစ်တစ်ခု စတင်ပါ",
       "exitSession": "စက်ရှင်မှ ထွက်ပါ",
       "clearSession": "ဤစက်ရှင်ကို အဆုံးသတ်ပြီး အသစ်တစ်ခု စတင်ပါ",
+      "compactDescription": "လက်ရှိ ဆက်ရှင်၏ ဆက်စပ်အကြောင်းအရာကို ကျစ်လျစ်စေပါ",
+      "goalDescription": "ဆက်ရှင် ပန်းတိုင်ဆီသို့ ဆက်လက်လုပ်ဆောင်ပါ။ /goal <objective> သို့မဟုတ် pause, resume, clear",
+      "initDescription": "လမ်းညွှန်ချက်ဖြင့် AGENTS.md သတ်မှတ်ခြင်း",
+      "resumeClaudeDescription": "Claude Code ဆက်ရှင်၏ စာသားမှတ်တမ်းကို တင်သွင်းပါ",
+      "resumeCodexDescription": "OpenAI Codex ဆက်ရှင်၏ စာသားမှတ်တမ်းကို တင်သွင်းပါ",
+      "reviewDescription": "အပြောင်းအလဲများကို ပြန်လည်စစ်ဆေးပါ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ကို သုံးပါ",
       "insert": "ထည့်ပါ",
       "upgradeRequiredFallback": "ဤအမိန့်ကို အသုံးပြုရန် သင့် CLI ကို အဆင့်မြှင့်ပါ။",
@@ -2607,6 +2633,7 @@
     "couldNotLoadActiveSessions": "လက်ရှိလုပ်ဆောင်နေသော ဆက်ရှင်များကို ရယူ၍ မရပါ။",
     "agentSessions": "ယခု လုပ်ဆောင်နေ",
     "newCodingTask": "ကုဒ်ရေးသည့် အလုပ်အသစ်",
+    "newTaskFromPicture": "ပုံမှ အလုပ်အသစ်",
     "explore": "လေ့လာစရာများ",
     "seeAll": "အားလုံး ကြည့်ရန်",
     "noLiveSessions": "ယခု ဘာမှ လုပ်ဆောင်နေခြင်း မရှိပါ"
@@ -2828,7 +2855,8 @@
     "aiProvidersWhat": "သင့်ညွှန်ကြားချက်များ၊ စကားဝိုင်းမှတ်တမ်းနှင့် သင်ပူးတွဲထားသော ဖိုင်များ။",
     "aiProvidersWhy": "AI တုံ့ပြန်ချက်များ ဖန်တီးရန်။",
     "aiProvidersWho": "Anthropic၊ OpenAI၊ Google နှင့် တောင်းဆိုမှုတစ်ခုချင်းစီအတွက် သင်ရွေးထားသော အခြားဝန်ဆောင်မှုပေးသူများ။",
-    "gatewayWhat": "အကောင့် ID၊ တောင်းဆိုမှုဆိုင်ရာ နောက်ဆက်တွဲအချက်အလက်များ၊ တိုကင်အသုံးပြုမှု။",
+    "gatewayWhat": "အကောင့် ID၊ တောင်းဆိုမှုဆိုင်ရာ နောက်ဆက်တွဲအချက်အလက်များ၊ တိုကင်အသုံးပြုမှု၊ နှင့် အက်ပ်မှ ၎င်းမှတစ်ဆင့် ပေးပို့သော prompt များနှင့် အသံဖမ်းယူမှုများ။",
+    "viaGateway": "Kilo Gateway မှတစ်ဆင့်",
     "gatewayWhy": "အထောက်အထားအတည်ပြုရန်၊ တောင်းဆိုမှုများကို သက်ဆိုင်ရာနေရာသို့ ပို့ရန်နှင့် ငွေတောင်းခံစာရင်း ညှိနှိုင်းရန်။",
     "gatewayWho": "Kilo (kilo.ai)။",
     "crashReportingWhat": "အက်ပ်အကြောင်းအရာများကို ဖယ်ရှားထားသော အက်ပ်ပျက်သွားမှုနှင့် အမှားအစီရင်ခံစာများ။",
@@ -2848,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer။",
     "voiceTranscriptionWhat": "စာသားပြောင်းရန် သင်ပြောနေစဉ် ဖမ်းယူထားသော အသံ။",
     "voiceTranscriptionWhy": "စကားကို စာသားအဖြစ် ပြောင်းရန်။",
-    "voiceTranscriptionWho": "ဤစက်တွင်သာ လုပ်ဆောင်ပါသည်။ အင်တာနက်မရှိဘဲ အသံမှစာသားပြောင်း၍မရပါက Apple သို့မဟုတ် Google ထံ ပို့ပါသည်။",
+    "voiceTranscriptionWho": "သင့်စက်၊ သင်ရွေးချယ်ထားသော စာသားပြောင်းလဲမှုမော်ဒယ်နှင့်အတူ Kilo Gateway၊ သို့မဟုတ် အွန်လိုင်းအသိအမှတ်ပြုမှုအတွက် Apple သို့မဟုတ် Google။",
     "installAttributionPromptTitle": "အက်ပ်ထည့်သွင်းရာ ရင်းမြစ်ဖော်ထုတ်ခြင်းကို ခွင့်ပြုမလား။",
     "installAttributionPromptMessage": "Kilo သည် သင်မည်သည့်လမ်းကြောင်းမှ ရောက်လာကြောင်း သိရန်အတွက်သာ Apple ၏ ခြေရာခံခွင့်ပြုချက်ကို အသုံးပြုပါသည်။ သင့်ညွှန်ကြားချက်များနှင့် စကားဝိုင်းများကို မည်သည့်အခါမျှ အသုံးမပြုပါ။",
     "what": "မျှဝေသည့်ဒေတာ",
@@ -3058,6 +3086,12 @@
     "privacy": "အေးဂျင့်များကို ကြည့်ရန် Kilo ကို ဖွင့်ပါ",
     "openAgents": "အေးဂျင့်များကို ဖွင့်ပါ",
     "needsInput": "တုံ့ပြန်ချက် လိုအပ်",
+    "newestSession": "အသစ်ဆုံး: {{title}}",
+    "noneWaiting": "စောင့်ဆိုင်းနေသော အေးဂျင့် မရှိပါ",
+    "newAgent": "အေးဂျင့်အသစ်",
+    "approving": "အတည်ပြုနေသည်...",
+    "couldNotApprove": "အတည်ပြု၍ မရပါ",
+    "couldNotStart": "စတင်၍ မရပါ",
     "channelName": "လုပ်ဆောင်နေသော အေးဂျင့်များ",
     "activityKitDisabledBody": "သော့ခတ်မျက်နှာပြင်တွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ကြည့်ရန် ဆက်တင်များ၌ တိုက်ရိုက်လုပ်ဆောင်မှုများကို ဖွင့်ပါ။",
     "newestResult": "အသစ်ဆုံး ရလဒ်"
@@ -3094,5 +3128,15 @@
     "remoteFound": "ကွန်ပျူတာ ချိတ်ဆက်ပြီး",
     "checkAgain": "ထပ်စစ်ပါ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "အေးဂျင့်ကို စတင်ရန် ညွှန်ကြားချက် လိုအပ်ပါသည်။ ညွှန်ကြားချက် ထည့်ပြီး ထပ်မံ လုပ်ဆောင်ပါ။",
+      "repositoryUnknown": "Kilo သည် {{repository}} ကို GitHub သို့မဟုတ် GitLab ကုဒ်သိုလှောင်ရာအဖြစ် အသိအမှတ်မပြုပါ။ Kilo တွင် အခြားကုဒ်သိုလှောင်ရာ ရွေးချယ်ပါ။",
+      "repositoryUnsupported": "{{repository}} သည် Bitbucket ကုဒ်သိုလှောင်ရာ ဖြစ်သည် — အေးဂျင့်ကို စတင်ပါ ယင်းကို မသုံးနိုင်သေးပါ။ Kilo တွင် အခြားကုဒ်သိုလှောင်ရာ ရွေးချယ်ပါ။"
+    }
+  },
+  "launcher": {
+    "openLastSession": "နောက်ဆုံးဆက်ရှင်ကို ဖွင့်ပါ"
   }
 }

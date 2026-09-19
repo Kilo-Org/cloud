@@ -480,6 +480,8 @@
       "replyBadRequest": "Hierdie antwoord kan nie geplaas word nie. Die draad het dalk verander.",
       "replyForbidden": "Jy het nie toestemming om op hierdie trekversoek te antwoord nie.",
       "addCommentCta": "Kommenteer op hierdie trekversoek",
+      "fixWithKilo": "Maak reg met Kilo",
+      "fixWithKiloPrompt": "Hanteer asseblief die volgende kommentaar op die trekversoek: {{link}}",
       "commentBadRequest": "Hierdie kommentaar kan nie geplaas word nie. Die trekversoek het dalk verander.",
       "commentForbidden": "Jy het nie toestemming om op hierdie trekversoek kommentaar te lewer nie.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} uitstaande",
       "skipped": "{{displayCount}} oorgeslaan",
       "checksCount": "{{displayCount}} kontroles",
+      "checksCount_one": "{{displayCount}} kontrole",
+      "checksCount_other": "{{displayCount}} kontroles",
       "checkDetails": "kontrolebesonderhede"
     },
     "inbox": {
@@ -2051,6 +2055,7 @@
       "exitNeedsNewerCli": "Skuinsstreepopdragte op afstand vereis 'n nuwer weergawe van Kilo CLI. Werk Kilo CLI by en koppel weer."
     },
     "sessionConnection": {
+      "label": "Verbinding",
       "connecting": "Koppel…",
       "reconnecting": "Herkoppel…",
       "connectionLost": "Verbinding verloor",
@@ -2070,7 +2075,9 @@
       "removeConfirmTitle": "Doel verwyder?",
       "removeConfirmMessage": "Die CLI verwyder hierdie sessie se doel.",
       "updateFailed": "Kon nie die doel bywerk nie.",
-      "sectionAccessibility": "{{status}}. Doel: {{text}}"
+      "sectionAccessibility": "{{status}}. Doel: {{text}}",
+      "collapse": "Vou doel toe",
+      "expand": "Vou doel uit"
     },
     "newSession": {
       "recentlyUsed": "Onlangs gebruik",
@@ -2124,7 +2131,20 @@
       "continueFrom": "Die sessie {{title}} word voortgesit.",
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortsit nie. Kies Cloud Agent of 'n ander CLI.",
-      "importFailed": "Hierdie sessie kon nie ingevoer word nie."
+      "importFailed": "Hierdie sessie kon nie ingevoer word nie.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Standaard · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Klein",
+      "sandboxInstanceShared": "Gedeel",
+      "sandboxInstanceLarge": "Groot",
+      "sandboxInstanceDevcontainer": "Dev container",
+      "sandboxInstanceProviderDefault": "Verskaffer-standaard",
+      "sandboxCouldNotLoad": "Kon nie sandbox-opsies laai nie",
+      "sandboxUnavailable": "Hierdie sandbox is nie beskikbaar nie. Kies 'n ander sandbox of Standaard.",
+      "sandboxUseDefault": "Gebruik Standaard"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer is bygewerk.",
@@ -2490,6 +2510,12 @@
       "startNewSession": "Begin 'n nuwe sessie",
       "exitSession": "Sluit die sessie",
       "clearSession": "Beëindig hierdie sessie en begin 'n nuwe een",
+      "compactDescription": "kompakteer die huidige sessiekonteks",
+      "goalDescription": "Hou aan werk aan 'n sessiedoel. /goal <objective> of pause, resume, clear",
+      "initDescription": "geleide AGENTS.md-opstelling",
+      "resumeClaudeDescription": "voer 'n Claude Code-sessietranskripsie in",
+      "resumeCodexDescription": "voer 'n OpenAI Codex-sessietranskripsie in",
+      "reviewDescription": "hersien veranderinge [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Gebruik /{{command}}",
       "insert": "Voeg in",
       "upgradeRequiredFallback": "Werk asseblief jou CLI by om hierdie opdrag te gebruik.",
@@ -2607,6 +2633,7 @@
     "couldNotLoadActiveSessions": "Die aktiewe sessies kon nie gelaai word nie.",
     "agentSessions": "Tans aktief",
     "newCodingTask": "Nuwe koderingstaak",
+    "newTaskFromPicture": "Nuwe taak vanaf 'n prentjie",
     "explore": "Verken",
     "seeAll": "Bekyk alles",
     "noLiveSessions": "Niks loop tans nie"
@@ -2828,7 +2855,8 @@
     "aiProvidersWhat": "Jou opdragte, gespreksgeskiedenis en enige lêers wat jy aanheg.",
     "aiProvidersWhy": "Om AI-antwoorde te genereer.",
     "aiProvidersWho": "Anthropic, OpenAI, Google en ander verskaffers wat jy per versoek kies.",
-    "gatewayWhat": "Rekening-ID, versoekmetadata, tekengebruik.",
+    "gatewayWhat": "Rekening-ID, versoekmetadata, tekengebruik, en die prompts en stemopnames wat die app daardeur stuur.",
+    "viaGateway": "Deur die Kilo Gateway",
     "gatewayWhy": "Identiteitsverifikasie, roetering van versoeke, rekonsiliasie van fakturering.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Verslae oor ineenstortings en foute waaruit die toepinhoud verwyder is.",
@@ -2848,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Jou opname terwyl jy dikteer.",
     "voiceTranscriptionWhy": "Om spraak in teks te omskep.",
-    "voiceTranscriptionWho": "Slegs op die toestel, of Apple of Google wanneer hierdie toestel nie vanlyn kan transkribeer nie.",
+    "voiceTranscriptionWho": "Jou toestel, die Kilo Gateway met jou gekose transkripsiemodel, of Apple of Google vir aanlyn herkenning.",
     "installAttributionPromptTitle": "Installasietoeskrywing toelaat?",
     "installAttributionPromptMessage": "Kilo gebruik Apple se nasporingstoestemming net om vas te stel watter kanaal jou hierheen gebring het. Jou opdragte en gesprekke word nooit gebruik nie.",
     "what": "Wat",
@@ -3058,6 +3086,12 @@
     "privacy": "Maak Kilo oop om agente te sien",
     "openAgents": "Maak agente oop",
     "needsInput": "Wag op invoer",
+    "newestSession": "Nuutste: {{title}}",
+    "noneWaiting": "Geen agente wag nie",
+    "newAgent": "Nuwe agent",
+    "approving": "Besig om goed te keur...",
+    "couldNotApprove": "Kon nie goedkeur nie",
+    "couldNotStart": "Kon nie begin nie",
     "channelName": "Aktiewe agente",
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
     "newestResult": "Nuutste resultaat"
@@ -3094,5 +3128,15 @@
     "remoteFound": "Rekenaar gekoppel",
     "checkAgain": "Kontroleer weer",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Begin agent benodig 'n opdrag. Voeg 'n opdrag by en voer dit weer uit.",
+      "repositoryUnknown": "Kilo herken nie {{repository}} as 'n GitHub- of GitLab-bewaarplek nie. Kies 'n ander bewaarplek in Kilo.",
+      "repositoryUnsupported": "{{repository}} is 'n Bitbucket-bewaarplek — Begin agent kan dit nog nie gebruik nie. Kies 'n ander bewaarplek in Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Maak laaste sessie oop"
   }
 }

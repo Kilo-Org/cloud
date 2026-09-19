@@ -1565,6 +1565,7 @@
       "exitNeedsNewerCli": "Je hebt een nieuwere versie van Kilo CLI nodig om slashopdrachten op afstand uit te voeren. Werk Kilo CLI bij en maak opnieuw verbinding."
     },
     "sessionConnection": {
+      "label": "Verbinding",
       "connecting": "Verbinden…",
       "reconnecting": "Opnieuw verbinden…",
       "connectionLost": "Verbinding verbroken",
@@ -1584,7 +1585,9 @@
       "removeConfirmTitle": "Doel verwijderen?",
       "removeConfirmMessage": "De CLI wist het doel van deze sessie.",
       "updateFailed": "Het doel kon niet worden bijgewerkt.",
-      "sectionAccessibility": "{{status}}. Doel: {{text}}"
+      "sectionAccessibility": "{{status}}. Doel: {{text}}",
+      "collapse": "Doel inklappen",
+      "expand": "Doel uitklappen"
     },
     "newSession": {
       "recentlyUsed": "Recent gebruikt",
@@ -1638,7 +1641,20 @@
       "continueFrom": "Je gaat verder met {{title}}.",
       "importingSession": "Sessie importeren…",
       "cliCannotContinue": "Deze CLI kan geen sessie voortzetten. Kies Cloud Agent of een andere CLI.",
-      "importFailed": "Deze sessie kon niet worden geïmporteerd."
+      "importFailed": "Deze sessie kon niet worden geïmporteerd.",
+      "sandbox": "Sandbox",
+      "sandboxAccessibility": "Sandbox: {{label}}",
+      "sandboxDefaultWithDestination": "Standaard · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "Klein",
+      "sandboxInstanceShared": "Gedeeld",
+      "sandboxInstanceLarge": "Groot",
+      "sandboxInstanceDevcontainer": "Dev-container",
+      "sandboxInstanceProviderDefault": "Standaard van provider",
+      "sandboxCouldNotLoad": "Sandbox-opties kunnen niet worden geladen",
+      "sandboxUnavailable": "Deze sandbox is niet beschikbaar. Kies een andere sandbox of Standaard.",
+      "sandboxUseDefault": "Standaard gebruiken"
     },
     "partRenderer": {
       "updatedFileCount_one": "Er is {{displayCount}} bestand bijgewerkt.",
@@ -2004,6 +2020,12 @@
       "startNewSession": "Een nieuwe sessie starten",
       "exitSession": "De sessie afsluiten",
       "clearSession": "Deze sessie beëindigen en een nieuwe starten",
+      "compactDescription": "de context van de huidige sessie comprimeren",
+      "goalDescription": "Blijf werken aan een sessiedoel. /goal <objective> of pause, resume, clear",
+      "initDescription": "begeleide AGENTS.md-installatie",
+      "resumeClaudeDescription": "een Claude Code-sessietranscript importeren",
+      "resumeCodexDescription": "een OpenAI Codex-sessietranscript importeren",
+      "reviewDescription": "wijzigingen bekijken [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} gebruiken",
       "insert": "Invoegen",
       "upgradeRequiredFallback": "Werk je CLI bij om deze opdracht te gebruiken.",
@@ -2121,6 +2143,7 @@
     "couldNotLoadActiveSessions": "De actieve sessies konden niet worden geladen.",
     "agentSessions": "Nu actief",
     "newCodingTask": "Nieuwe programmeertaak",
+    "newTaskFromPicture": "Nieuwe taak vanaf een afbeelding",
     "explore": "Verkennen",
     "seeAll": "Alles bekijken",
     "noLiveSessions": "Er draait momenteel niets"
@@ -2342,7 +2365,8 @@
     "aiProvidersWhat": "Je prompts, gespreksgeschiedenis en alle bestanden die je bijvoegt.",
     "aiProvidersWhy": "Om AI-antwoorden te genereren.",
     "aiProvidersWho": "Anthropic, OpenAI, Google en andere aanbieders die je per verzoek selecteert.",
-    "gatewayWhat": "Account-ID, metadata van verzoeken en tokenverbruik.",
+    "gatewayWhat": "Account-ID, metadata van verzoeken, tokenverbruik en de prompts en spraakopnamen die de app erdoorheen stuurt.",
+    "viaGateway": "Via Kilo Gateway",
     "gatewayWhy": "Je identiteit controleren, verzoeken doorsturen en facturering afstemmen.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Crash- en foutrapporten, zonder app-inhoud.",
@@ -2362,7 +2386,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Je opname terwijl je dicteert.",
     "voiceTranscriptionWhy": "Om spraak om te zetten in tekst.",
-    "voiceTranscriptionWho": "Alleen je apparaat, of Apple of Google als je apparaat spraak niet offline in tekst kan omzetten.",
+    "voiceTranscriptionWho": "Je apparaat, Kilo Gateway met het transcriptiemodel dat je kiest, of Apple of Google voor online herkenning.",
     "what": "Wat",
     "why": "Waarom",
     "who": "Wie",
@@ -2374,6 +2398,8 @@
     "checkConnection": "Verbinding controleren",
     "checks": {
       "checksCount": "{{displayCount}} controles",
+      "checksCount_one": "{{displayCount}} controle",
+      "checksCount_other": "{{displayCount}} controles",
       "couldNotLoad": "De controles konden niet worden geladen.",
       "failed": "{{displayCount}} mislukt",
       "noAccess": "Je hebt geen toegang tot de controles voor deze repository.",
@@ -2473,6 +2499,8 @@
       "replyBody": "Antwoordtekst",
       "replyForbidden": "Je hebt geen toestemming om op deze PR te reageren.",
       "addCommentCta": "Een opmerking op deze PR plaatsen",
+      "fixWithKilo": "Oplossen met Kilo",
+      "fixWithKiloPrompt": "Los alsjeblieft de volgende opmerking op deze PR op: {{link}}",
       "commentBadRequest": "Deze opmerking kan niet worden geplaatst. De PR is mogelijk gewijzigd.",
       "commentForbidden": "Je hebt geen toestemming om een opmerking op deze PR te plaatsen.",
       "replyPlaceholder": "Je antwoord…",
@@ -3058,6 +3086,12 @@
     "privacy": "Open Kilo om agents te zien",
     "openAgents": "Agents openen",
     "needsInput": "Invoer nodig",
+    "newestSession": "Nieuwste: {{title}}",
+    "noneWaiting": "Geen agents in afwachting",
+    "newAgent": "Nieuwe agent",
+    "approving": "Bezig met goedkeuren...",
+    "couldNotApprove": "Goedkeuren mislukt",
+    "couldNotStart": "Starten mislukt",
     "channelName": "Actieve agents",
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
     "newestResult": "Nieuwste resultaat"
@@ -3094,5 +3128,15 @@
     "remoteFound": "Computer verbonden",
     "checkAgain": "Opnieuw controleren",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Agent starten vereist een prompt. Voeg een prompt toe en voer de actie opnieuw uit.",
+      "repositoryUnknown": "Kilo herkent {{repository}} niet als GitHub- of GitLab-repository. Kies een andere repository in Kilo.",
+      "repositoryUnsupported": "{{repository}} is een Bitbucket-repository — Agent starten kan die nog niet gebruiken. Kies een andere repository in Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Laatste sessie openen"
   }
 }

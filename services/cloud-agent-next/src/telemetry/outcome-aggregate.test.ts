@@ -174,11 +174,65 @@ describe('cloud agent outcome aggregate assembly', () => {
       { stage: 'pre_dispatch', count: 1 },
     ]);
     expect(legacy.initial.failureStageCodes).toEqual([
-      { stage: 'agent_activity', code: 'assistant_error', count: 1 },
-      { stage: 'pre_dispatch', code: 'sandbox_connect_failed', count: 1 },
+      { stage: 'agent_activity', code: 'assistant_error', responsibility: 'unknown', count: 1 },
+      {
+        stage: 'pre_dispatch',
+        code: 'sandbox_connect_failed',
+        responsibility: 'platform',
+        count: 1,
+      },
     ]);
     expect(legacy.distinctPlatformAffectedSessions).toBe(1);
     expect(legacy.distinctUnknownAffectedSessions).toBe(1);
+  });
+
+  it('keeps the same failure stage and code separate per responsibility bucket', () => {
+    const generations = assembleGenerationAggregates(
+      [
+        runRow({
+          generation: 'legacy',
+          role: 'initial',
+          status: 'failed',
+          responsibility: 'platform',
+          runCount: 2,
+          failureStage: 'agent_activity',
+          failureCode: 'assistant_error',
+        }),
+        runRow({
+          generation: 'legacy',
+          role: 'initial',
+          status: 'failed',
+          responsibility: 'user',
+          runCount: 3,
+          failureStage: 'agent_activity',
+          failureCode: 'assistant_error',
+        }),
+        runRow({
+          generation: 'legacy',
+          role: 'initial',
+          status: 'failed',
+          responsibility: 'unknown',
+          runCount: 1,
+          failureStage: 'agent_activity',
+          failureCode: 'assistant_error',
+        }),
+      ],
+      [],
+      []
+    );
+
+    const legacy = generations[0];
+    expect(legacy.initial.failureStageCodes).toEqual([
+      { stage: 'agent_activity', code: 'assistant_error', responsibility: 'platform', count: 2 },
+      { stage: 'agent_activity', code: 'assistant_error', responsibility: 'unknown', count: 1 },
+      { stage: 'agent_activity', code: 'assistant_error', responsibility: 'user', count: 3 },
+    ]);
+    expect(legacy.initial.platformFailed).toBe(2);
+    expect(legacy.initial.userFailed).toBe(3);
+    expect(legacy.initial.unknownFailed).toBe(1);
+    expect(legacy.initial.allFailed).toBe(
+      legacy.initial.failureStageCodes.reduce((sum, entry) => sum + entry.count, 0)
+    );
   });
 
   it('separates initial runs from follow-up runs and recomputes totals from summed counts', () => {

@@ -32,7 +32,12 @@ export type OutcomeGeneration = (typeof EXPECTED_GENERATIONS)[number];
 export type OutcomeRole = 'initial' | 'follow_up';
 
 export type FailureStageCount = { stage: string; count: number };
-export type FailureStageCodeCount = { stage: string; code: string; count: number };
+export type FailureStageCodeCount = {
+  stage: string;
+  code: string;
+  responsibility: string;
+  count: number;
+};
 export type SessionSetupFailureCount = { stage: string; code: string; count: number };
 
 export type RoleOutcome = {
@@ -90,7 +95,7 @@ type DatabaseTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0]
 
 const unknownResponsibilityCondition: SQL = sql`(${cloud_agent_session_runs.failure_responsibility} is null or ${cloud_agent_session_runs.failure_responsibility} not in ('platform', 'user'))`;
 
-function generationExpression(sessionId: AnyColumn): SQL<OutcomeGeneration> {
+export function generationExpression(sessionId: AnyColumn): SQL<OutcomeGeneration> {
   return sql<OutcomeGeneration>`case when left(${sessionId}, ${CONTROL_PLANE_SESSION_PREFIX.length}) = ${CONTROL_PLANE_SESSION_PREFIX} then 'control' else 'legacy' end`;
 }
 
@@ -204,6 +209,19 @@ function compareByStageCode(
   return left.code < right.code ? -1 : left.code > right.code ? 1 : 0;
 }
 
+function compareByStageCodeResponsibility(
+  left: FailureStageCodeCount,
+  right: FailureStageCodeCount
+): number {
+  const byStageCode = compareByStageCode(left, right);
+  if (byStageCode !== 0) return byStageCode;
+  return left.responsibility < right.responsibility
+    ? -1
+    : left.responsibility > right.responsibility
+      ? 1
+      : 0;
+}
+
 function roleOutcome(rows: RunCountRow[]): RoleOutcome {
   let completed = 0;
   let interrupted = 0;
@@ -229,13 +247,14 @@ function roleOutcome(rows: RunCountRow[]): RoleOutcome {
     else unknownFailed += row.runCount;
 
     stageTotals.set(row.failureStage, (stageTotals.get(row.failureStage) ?? 0) + row.runCount);
-    const key = `${row.failureStage}\u0000${row.failureCode}`;
+    const key = `${row.failureStage}\u0000${row.failureCode}\u0000${row.responsibility}`;
     const existing = stageCodes.get(key);
     if (existing) existing.count += row.runCount;
     else
       stageCodes.set(key, {
         stage: row.failureStage,
         code: row.failureCode,
+        responsibility: row.responsibility,
         count: row.runCount,
       });
   }
@@ -256,7 +275,7 @@ function roleOutcome(rows: RunCountRow[]): RoleOutcome {
     failureStages: [...stageTotals]
       .map(([stage, count]) => ({ stage, count }))
       .sort(compareByStage),
-    failureStageCodes: [...stageCodes.values()].sort(compareByStageCode),
+    failureStageCodes: [...stageCodes.values()].sort(compareByStageCodeResponsibility),
   };
 }
 

@@ -154,21 +154,24 @@ describe('withGlanceableCopy', () => {
     expect(glanceableLayoutCopy().locale).not.toContain('-');
   });
 
-  it('covers every status the layouts render, plus the language tag and Approve', () => {
+  it('covers every status the layouts render, the in-place actions, and the language tag', () => {
     expect(Object.keys(glanceableLayoutCopy()).toSorted()).toEqual([
       'approve',
+      'approving',
       'digits',
       'empty',
       'expired',
       'idle',
       'locale',
       'needsInput',
+      'newAgent',
       'newestResult',
       'openAgents',
       'privacy',
       'running',
       'signed_out',
       'stale',
+      'starting',
       'waiting',
     ]);
   });

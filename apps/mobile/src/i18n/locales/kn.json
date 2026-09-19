@@ -480,6 +480,8 @@
       "replyBadRequest": "ಈ ಉತ್ತರವನ್ನು ಪೋಸ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಚರ್ಚಾ ಸರಣಿ ಬದಲಾಗಿರಬಹುದು.",
       "replyForbidden": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗೆ ಉತ್ತರಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
       "addCommentCta": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗೆ ಟಿಪ್ಪಣಿ ಮಾಡಿ",
+      "fixWithKilo": "Kilo ನೊಂದಿಗೆ ಸರಿಪಡಿಸಿ",
+      "fixWithKiloPrompt": "ದಯವಿಟ್ಟು ಈ ಕೆಳಗಿನ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಟಿಪ್ಪಣಿಯನ್ನು ಪರಿಹರಿಸಿ: {{link}}",
       "commentBadRequest": "ಈ ಟಿಪ್ಪಣಿಯನ್ನು ಪೋಸ್ಟ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಬದಲಾಗಿರಬಹುದು.",
       "commentForbidden": "ಈ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗೆ ಟಿಪ್ಪಣಿ ಮಾಡಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
       "moderation": {
@@ -572,6 +574,8 @@
       "pending": "{{displayCount}} ಬಾಕಿ",
       "skipped": "{{displayCount}} ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ",
       "checksCount": "{{displayCount}} ತಪಾಸಣೆಗಳು",
+      "checksCount_one": "{{displayCount}} ತಪಾಸಣೆ",
+      "checksCount_other": "{{displayCount}} ತಪಾಸಣೆಗಳು",
       "checkDetails": "ತಪಾಸಣೆಯ ವಿವರಗಳು"
     },
     "inbox": {
@@ -2051,6 +2055,7 @@
       "exitNeedsNewerCli": "ರಿಮೋಟ್ ಸ್ಲ್ಯಾಶ್ ಆಜ್ಞೆಗಳಿಗೆ Kilo CLI ನ ಹೊಸ ಆವೃತ್ತಿ ಅಗತ್ಯವಿದೆ. Kilo CLI ಅನ್ನು ನವೀಕರಿಸಿ ಮತ್ತೆ ಸಂಪರ್ಕಿಸಿ."
     },
     "sessionConnection": {
+      "label": "ಸಂಪರ್ಕ",
       "connecting": "ಸಂಪರ್ಕಿಸುತ್ತಿದೆ…",
       "reconnecting": "ಮರುಸಂಪರ್ಕಿಸುತ್ತಿದೆ…",
       "connectionLost": "ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದೆ",
@@ -2070,7 +2075,9 @@
       "removeConfirmTitle": "ಗುರಿ ತೆಗೆದುಹಾಕಬೇಕೆ?",
       "removeConfirmMessage": "CLI ಈ ಅಧಿವೇಶನದ ಗುರಿಯನ್ನು ಅಳಿಸುತ್ತದೆ.",
       "updateFailed": "ಗುರಿಯನ್ನು ನವೀಕರಿಸಲಾಗಲಿಲ್ಲ.",
-      "sectionAccessibility": "{{status}}. ಗುರಿ: {{text}}"
+      "sectionAccessibility": "{{status}}. ಗುರಿ: {{text}}",
+      "collapse": "ಗುರಿ ಮಡಚಿ",
+      "expand": "ಗುರಿ ವಿಸ್ತರಿಸಿ"
     },
     "newSession": {
       "recentlyUsed": "ಇತ್ತೀಚೆಗೆ ಬಳಸಿದವು",
@@ -2124,7 +2131,20 @@
       "continueFrom": "{{title}} ಅನ್ನು ಮುಂದುವರಿಸಲಾಗುತ್ತಿದೆ.",
       "importingSession": "ಸೆಶನ್ ಆಮದು ಆಗುತ್ತಿದೆ",
       "cliCannotContinue": "ಈ CLI ಮೂಲಕ ಸೆಶನ್ ಅನ್ನು ಮುಂದುವರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. Cloud Agent ಅಥವಾ ಇನ್ನೊಂದು CLI ಅನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
-      "importFailed": "ಈ ಸೆಶನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
+      "importFailed": "ಈ ಸೆಶನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "sandbox": "ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್",
+      "sandboxAccessibility": "ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್: {{label}}",
+      "sandboxDefaultWithDestination": "ಡೀಫಾಲ್ಟ್ · {{destination}}",
+      "sandboxProviderCloudflare": "Cloudflare",
+      "sandboxProviderVercel": "Vercel",
+      "sandboxInstanceSmall": "ಸಣ್ಣ",
+      "sandboxInstanceShared": "ಹಂಚಿದ",
+      "sandboxInstanceLarge": "ದೊಡ್ಡದು",
+      "sandboxInstanceDevcontainer": "ಡೆವ್ ಕಂಟೇನರ್",
+      "sandboxInstanceProviderDefault": "ಪೂರೈಕೆದಾರರ ಡೀಫಾಲ್ಟ್",
+      "sandboxCouldNotLoad": "ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್ ಆಯ್ಕೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
+      "sandboxUnavailable": "ಈ ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್ ಲಭ್ಯವಿಲ್ಲ. ಬೇರೊಂದು ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್ ಅಥವಾ ಡೀಫಾಲ್ಟ್ ಆಯ್ಕೆ ಮಾಡಿ.",
+      "sandboxUseDefault": "ಡೀಫಾಲ್ಟ್ ಬಳಸಿ"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ಫೈಲ್ ಅನ್ನು ನವೀಕರಿಸಲಾಗಿದೆ.",
@@ -2490,6 +2510,12 @@
       "startNewSession": "ಹೊಸ ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ",
       "exitSession": "ಸೆಶನ್‌ನಿಂದ ನಿರ್ಗಮಿಸಿ",
       "clearSession": "ಈ ಸೆಶನ್ ಮುಗಿಸಿ ಹೊಸದನ್ನು ಪ್ರಾರಂಭಿಸಿ",
+      "compactDescription": "ಪ್ರಸ್ತುತ ಸೆಷನ್ ಸಂದರ್ಭವನ್ನು ಸಂಕುಚಿಸಿ",
+      "goalDescription": "ಸೆಷನ್ ಗುರಿಯತ್ತ ಕೆಲಸ ಮುಂದುವರಿಸಿ. /goal <objective> ಅಥವಾ pause, resume, clear",
+      "initDescription": "ಮಾರ್ಗದರ್ಶಿತ AGENTS.md ಸೆಟಪ್",
+      "resumeClaudeDescription": "Claude Code ಸೆಷನ್‌ನ ಪ್ರತಿಯನ್ನು ಆಮದು ಮಾಡಿ",
+      "resumeCodexDescription": "OpenAI Codex ಸೆಷನ್‌ನ ಪ್ರತಿಯನ್ನು ಆಮದು ಮಾಡಿ",
+      "reviewDescription": "ಬದಲಾವಣೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ಬಳಸಿ",
       "insert": "ಸೇರಿಸಿ",
       "upgradeRequiredFallback": "ಈ ಆಜ್ಞೆಯನ್ನು ಬಳಸಲು ನಿಮ್ಮ CLI ಅನ್ನು ನವೀಕರಿಸಿ.",
@@ -2607,6 +2633,7 @@
     "couldNotLoadActiveSessions": "ಸಕ್ರಿಯ ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "agentSessions": "ಈಗ ಚಾಲನೆಯಲ್ಲಿರುವವು",
     "newCodingTask": "ಹೊಸ ಕೋಡಿಂಗ್ ಕಾರ್ಯ",
+    "newTaskFromPicture": "ಚಿತ್ರದಿಂದ ಹೊಸ ಕಾರ್ಯ",
     "explore": "ಅನ್ವೇಷಿಸಿ",
     "seeAll": "ಎಲ್ಲವನ್ನೂ ನೋಡಿ",
     "noLiveSessions": "ಈಗ ಯಾವುದೂ ಚಾಲನೆಯಲ್ಲಿಲ್ಲ"
@@ -2828,7 +2855,8 @@
     "aiProvidersWhat": "ನಿಮ್ಮ ಪ್ರಾಂಪ್ಟ್‌ಗಳು, ಸಂಭಾಷಣೆಯ ಇತಿಹಾಸ ಮತ್ತು ನೀವು ಲಗತ್ತಿಸುವ ಫೈಲ್‌ಗಳು.",
     "aiProvidersWhy": "AI ಪ್ರತಿಕ್ರಿಯೆಗಳನ್ನು ರಚಿಸಲು.",
     "aiProvidersWho": "Anthropic, OpenAI, Google ಮತ್ತು ಪ್ರತಿ ವಿನಂತಿಗೆ ನೀವು ಆಯ್ಕೆಮಾಡುವ ಇತರ ಪೂರೈಕೆದಾರರು.",
-    "gatewayWhat": "ಖಾತೆ ID, ವಿನಂತಿ ಮೆಟಾಡೇಟಾ, ಟೋಕನ್ ಬಳಕೆ.",
+    "gatewayWhat": "ಖಾತೆ ID, ವಿನಂತಿ ಮೆಟಾಡೇಟಾ, ಟೋಕನ್ ಬಳಕೆ, ಮತ್ತು ಆ್ಯಪ್ ಇದರ ಮೂಲಕ ಕಳುಹಿಸುವ ಪ್ರಾಂಪ್ಟ್‌ಗಳು ಮತ್ತು ಧ್ವನಿ ರೆಕಾರ್ಡಿಂಗ್‌ಗಳು.",
+    "viaGateway": "Kilo Gateway ಮೂಲಕ",
     "gatewayWhy": "ಗುರುತು ದೃಢೀಕರಣ, ವಿನಂತಿಗಳನ್ನು ಸೂಕ್ತ ಪೂರೈಕೆದಾರರಿಗೆ ಕಳುಹಿಸುವುದು ಮತ್ತು ಬಿಲ್ಲಿಂಗ್ ಲೆಕ್ಕಗಳನ್ನು ಸರಿಹೊಂದಿಸುವುದು.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "ಅಪ್ಲಿಕೇಶನ್‌ನ ವಿಷಯವನ್ನು ತೆಗೆದುಹಾಕಿರುವ ಕ್ರ್ಯಾಶ್ ಮತ್ತು ದೋಷ ವರದಿಗಳು.",
@@ -2848,7 +2876,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "ನೀವು ಹೇಳಿ ಬರೆಸುವಾಗ ದಾಖಲಿಸಿದ ನಿಮ್ಮ ಧ್ವನಿ.",
     "voiceTranscriptionWhy": "ಮಾತನ್ನು ಪಠ್ಯವಾಗಿ ಪರಿವರ್ತಿಸಲು.",
-    "voiceTranscriptionWho": "ನಿಮ್ಮ ಸಾಧನದಲ್ಲಿ ಮಾತ್ರ. ಈ ಸಾಧನದಲ್ಲಿ ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಲು ಸಾಧ್ಯವಾಗದಿದ್ದರೆ Apple ಅಥವಾ Google.",
+    "voiceTranscriptionWho": "ನಿಮ್ಮ ಸಾಧನ, ನೀವು ಆಯ್ಕೆ ಮಾಡಿದ ಪ್ರತಿಲೇಖನ ಮಾದರಿಯೊಂದಿಗೆ Kilo Gateway, ಅಥವಾ ಆನ್‌ಲೈನ್ ಗುರುತಿಸುವಿಕೆಗಾಗಿ Apple ಅಥವಾ Google.",
     "installAttributionPromptTitle": "ಸ್ಥಾಪನೆಯ ಮೂಲವನ್ನು ಗುರುತಿಸಲು ಅನುಮತಿಸಬೇಕೆ?",
     "installAttributionPromptMessage": "ನೀವು ಯಾವ ಮಾಧ್ಯಮದ ಮೂಲಕ ಬಂದಿದ್ದೀರಿ ಎಂದು ತಿಳಿಯಲು ಮಾತ್ರ Kilo, Apple ನ ಟ್ರ್ಯಾಕಿಂಗ್ ಅನುಮತಿಯನ್ನು ಬಳಸುತ್ತದೆ. ಇದಕ್ಕಾಗಿ ನಿಮ್ಮ ಪ್ರಾಂಪ್ಟ್‌ಗಳು ಮತ್ತು ಸಂಭಾಷಣೆಗಳನ್ನು ಎಂದಿಗೂ ಬಳಸುವುದಿಲ್ಲ.",
     "what": "ಏನು",
@@ -3058,6 +3086,12 @@
     "privacy": "ಏಜೆಂಟ್‌ಗಳನ್ನು ನೋಡಲು Kilo ತೆರೆಯಿರಿ",
     "openAgents": "ಏಜೆಂಟ್‌ಗಳ ಪಟ್ಟಿಯನ್ನು ತೆರೆಯಿರಿ",
     "needsInput": "ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಅಗತ್ಯ",
+    "newestSession": "ಇತ್ತೀಚಿನ: {{title}}",
+    "noneWaiting": "ಕಾಯುತ್ತಿರುವ ಏಜೆಂಟ್ ಇಲ್ಲ",
+    "newAgent": "ಹೊಸ ಏಜೆಂಟ್",
+    "approving": "ಅನುಮೋದಿಸಲಾಗುತ್ತಿದೆ...",
+    "couldNotApprove": "ಅನುಮೋದಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+    "couldNotStart": "ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "channelName": "ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳು",
     "activityKitDisabledBody": "ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳನ್ನು ನೋಡಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಲೈವ್ ಚಟುವಟಿಕೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ.",
     "newestResult": "ಇತ್ತೀಚಿನ ಫಲಿತಾಂಶ"
@@ -3094,5 +3128,15 @@
     "remoteFound": "ಕಂಪ್ಯೂಟರ್ ಸಂಪರ್ಕಗೊಂಡಿದೆ",
     "checkAgain": "ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ",
     "networkError": "$t(authErrors.networkError)"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ಏಜೆಂಟ್ ಆರಂಭಿಸಲು ಪ್ರಾಂಪ್ಟ್ ಬೇಕು. ಪ್ರಾಂಪ್ಟ್ ಸೇರಿಸಿ ಮತ್ತು ಅದನ್ನು ಮತ್ತೆ ರನ್ ಮಾಡಿ.",
+      "repositoryUnknown": "Kilo, {{repository}} ಅನ್ನು GitHub ಅಥವಾ GitLab ರೆಪೊಸಿಟರಿ ಎಂದು ಗುರುತಿಸುವುದಿಲ್ಲ. Kilo ನಲ್ಲಿ ಬೇರೆ ರೆಪೊಸಿಟರಿ ಆಯ್ಕೆಮಾಡಿ.",
+      "repositoryUnsupported": "{{repository}} ಒಂದು Bitbucket ರೆಪೊಸಿಟರಿ — ಏಜೆಂಟ್ ಆರಂಭಿಸಿ ಇನ್ನೂ ಅದನ್ನು ಬಳಸಲಾಗದು. Kilo ನಲ್ಲಿ ಬೇರೆ ರೆಪೊಸಿಟರಿ ಆಯ್ಕೆಮಾಡಿ."
+    }
+  },
+  "launcher": {
+    "openLastSession": "ಕೊನೆಯ ಸೆಷನ್ ತೆರೆಯಿರಿ"
   }
 }

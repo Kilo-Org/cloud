@@ -107,6 +107,7 @@ import {
   coding_plan_key_inventory,
   coding_plan_subscriptions,
   byok_api_keys,
+  openai_chatgpt_connections,
   mcp_gateway_configs,
   mcp_gateway_authorization_codes,
   mcp_gateway_authorization_requests,
@@ -135,9 +136,12 @@ import {
   cloud_agent_pending_uploads,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  passkey_credentials,
+  passkey_challenges,
+  passkey_sign_in_tickets,
 } from '@kilocode/db/schema';
 
-import { eq, count, inArray, and, sql } from 'drizzle-orm';
+import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
 import {
   softDeleteUser,
   anonymizeCloudUserData,
@@ -159,7 +163,6 @@ import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/use
 import { hosted_domain_specials } from '@/lib/auth/constants';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
-import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
 import { randomUUID } from 'crypto';
 import {
   KiloPassCadence,
@@ -1469,6 +1472,24 @@ describe('User', () => {
           distinct_id: user.id,
           properties: { email: 'reintroduced@example.com' },
         });
+        await db.insert(passkey_credentials).values({
+          kilo_user_id: user.id,
+          credential_id: `credential-${randomUUID()}`,
+          public_key: 'public-key',
+          name: 'Reintroduced Device',
+        });
+        await db.insert(passkey_challenges).values({
+          id: randomUUID(),
+          challenge: `challenge-${randomUUID()}`,
+          kind: 'authentication',
+          kilo_user_id: user.id,
+          expires_at: new Date().toISOString(),
+        });
+        await db.insert(passkey_sign_in_tickets).values({
+          ticket_hash: `ticket-${randomUUID()}`,
+          kilo_user_id: user.id,
+          expires_at: new Date().toISOString(),
+        });
 
         await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
 
@@ -1507,9 +1528,69 @@ describe('User', () => {
             .from(analytics_event_outbox)
             .where(eq(analytics_event_outbox.distinct_id, user.id))
         ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(passkey_credentials)
+            .where(eq(passkey_credentials.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(passkey_challenges)
+            .where(
+              and(
+                eq(passkey_challenges.kilo_user_id, user.id),
+                isNull(passkey_challenges.consumed_at)
+              )
+            )
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(passkey_sign_in_tickets)
+            .where(eq(passkey_sign_in_tickets.kilo_user_id, user.id))
+        ).toHaveLength(0);
         expect(await db.select().from(deleted_user_email_tombstones)).toEqual([]);
       }
     );
+
+    it('removes the ChatGPT connection rows for the deleted user', async () => {
+      const user = await insertTestUser({
+        google_user_email: `chatgpt-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `ChatGPT cleanup ${randomUUID()}`,
+        user.id,
+        0
+      );
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      const encrypted_connection = encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY);
+      await db.insert(openai_chatgpt_connections).values([
+        {
+          kilo_user_id: user.id,
+          organization_id: null,
+          encrypted_connection,
+          created_by: user.id,
+        },
+        {
+          kilo_user_id: user.id,
+          organization_id: organization.id,
+          encrypted_connection,
+          created_by: user.id,
+        },
+      ]);
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(openai_chatgpt_connections)
+          .where(eq(openai_chatgpt_connections.kilo_user_id, user.id))
+      ).toHaveLength(0);
+    });
   });
 
   describe('softDeleteUser', () => {
@@ -3215,6 +3296,117 @@ describe('User', () => {
         .from(user_auth_provider)
         .where(eq(user_auth_provider.kilo_user_id, user.id));
       expect(providers).toHaveLength(0);
+    });
+
+    it('should delete passkey credentials, passkey challenges and sign-in tickets for the user', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const now = new Date().toISOString();
+
+      await db.insert(passkey_credentials).values([
+        {
+          kilo_user_id: user.id,
+          credential_id: `credential-${user.id}`,
+          public_key: 'public-key',
+          name: 'Test Laptop',
+        },
+        {
+          kilo_user_id: otherUser.id,
+          credential_id: `credential-${otherUser.id}`,
+          public_key: 'public-key',
+        },
+      ]);
+      await db.insert(passkey_challenges).values([
+        {
+          id: randomUUID(),
+          challenge: 'open-challenge',
+          kind: 'registration',
+          kilo_user_id: user.id,
+          expires_at: now,
+        },
+        {
+          id: randomUUID(),
+          challenge: 'consumed-challenge',
+          kind: 'registration',
+          kilo_user_id: user.id,
+          expires_at: now,
+          consumed_at: now,
+        },
+        {
+          id: randomUUID(),
+          challenge: 'other-open-challenge',
+          kind: 'authentication',
+          kilo_user_id: otherUser.id,
+          expires_at: now,
+        },
+      ]);
+      await db.insert(passkey_sign_in_tickets).values([
+        {
+          ticket_hash: `open-ticket-${user.id}`,
+          kilo_user_id: user.id,
+          expires_at: now,
+        },
+        {
+          ticket_hash: `consumed-ticket-${user.id}`,
+          kilo_user_id: user.id,
+          expires_at: now,
+          consumed_at: now,
+        },
+        {
+          ticket_hash: `other-ticket-${otherUser.id}`,
+          kilo_user_id: otherUser.id,
+          expires_at: now,
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(passkey_credentials)
+          .where(eq(passkey_credentials.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(passkey_credentials)
+          .where(eq(passkey_credentials.kilo_user_id, otherUser.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(passkey_challenges)
+          .where(
+            and(
+              eq(passkey_challenges.kilo_user_id, user.id),
+              isNull(passkey_challenges.consumed_at)
+            )
+          )
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(passkey_challenges)
+          .where(
+            and(
+              eq(passkey_challenges.kilo_user_id, otherUser.id),
+              isNull(passkey_challenges.consumed_at)
+            )
+          )
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(passkey_sign_in_tickets)
+          .where(eq(passkey_sign_in_tickets.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(passkey_sign_in_tickets)
+          .where(eq(passkey_sign_in_tickets.kilo_user_id, otherUser.id))
+      ).toHaveLength(1);
     });
 
     it('should delete affiliate attributions for the user', async () => {
@@ -6375,16 +6567,26 @@ describe('User', () => {
     async function seedOpenAiConnection(userId: string) {
       const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
       const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
-      await db.insert(byok_api_keys).values({
+      await db.insert(openai_chatgpt_connections).values({
         kilo_user_id: userId,
-        provider_id: OPENAI_CHATGPT_PROVIDER_ID,
-        encrypted_api_key: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
-        management_source: 'user',
+        organization_id: null,
+        encrypted_connection: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
         created_by: userId,
       });
     }
 
-    test('deletes the ChatGPT connection when unlinking openai', async () => {
+    async function seedOpenAiOrganizationConnection(organizationId: string, createdBy: string) {
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      await db.insert(openai_chatgpt_connections).values({
+        kilo_user_id: createdBy,
+        organization_id: organizationId,
+        encrypted_connection: encryptApiKey('{"access_token":"org-token"}', BYOK_ENCRYPTION_KEY),
+        created_by: createdBy,
+      });
+    }
+
+    test('deletes the personal ChatGPT connection when unlinking openai', async () => {
       const user = await seedUserWithOpenAiProvider();
       await seedOpenAiConnection(user.id);
 
@@ -6393,14 +6595,30 @@ describe('User', () => {
       expect(result.success).toBe(true);
       const rows = await db
         .select()
-        .from(byok_api_keys)
+        .from(openai_chatgpt_connections)
         .where(
           and(
-            eq(byok_api_keys.kilo_user_id, user.id),
-            eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+            eq(openai_chatgpt_connections.kilo_user_id, user.id),
+            isNull(openai_chatgpt_connections.organization_id)
           )
         );
       expect(rows).toHaveLength(0);
+    });
+
+    test('keeps an organization ChatGPT connection created by the same person when unlinking openai', async () => {
+      const user = await seedUserWithOpenAiProvider();
+      await seedOpenAiConnection(user.id);
+      const organization = await createTestOrganization(`Keep ${randomUUID()}`, user.id, 0);
+      await seedOpenAiOrganizationConnection(organization.id, user.id);
+
+      const result = await unlinkAuthProviderFromUser(user.id, 'openai');
+
+      expect(result.success).toBe(true);
+      const rows = await db
+        .select()
+        .from(openai_chatgpt_connections)
+        .where(eq(openai_chatgpt_connections.organization_id, organization.id));
+      expect(rows).toHaveLength(1);
     });
 
     test('keeps the ChatGPT connection when unlinking another provider', async () => {
@@ -6412,11 +6630,11 @@ describe('User', () => {
       expect(result.success).toBe(true);
       const rows = await db
         .select()
-        .from(byok_api_keys)
+        .from(openai_chatgpt_connections)
         .where(
           and(
-            eq(byok_api_keys.kilo_user_id, user.id),
-            eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+            eq(openai_chatgpt_connections.kilo_user_id, user.id),
+            isNull(openai_chatgpt_connections.organization_id)
           )
         );
       expect(rows).toHaveLength(1);

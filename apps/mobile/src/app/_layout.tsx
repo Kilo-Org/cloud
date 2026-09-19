@@ -68,6 +68,7 @@ import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
+import { useSystemSearchOpenListener } from '@/lib/hooks/use-system-search-open-listener';
 import { preloadHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
 import {
@@ -124,6 +125,7 @@ import {
   type SharePayload,
 } from '@/lib/share-payload';
 import { persistShareNavigationNow, restoreShareNavigation } from '@/lib/share-navigation';
+import { captureSystemSearchLaunch } from '@/lib/system-search-route';
 import {
   flushDraft,
   isStringDraft,
@@ -171,6 +173,11 @@ setupNotificationHandler();
 setupNotificationBackgroundHandler();
 checkInitialNotification();
 captureLaunchDeepLink();
+// A tap on a result in the phone's own search: capture the cold-launch payload
+// now, before any screen mounts. The warm `onSystemSearchOpen` wake-up is held
+// by the mounted layout (useSystemSearchOpenListener below). Both feed the
+// pending deep-link slot the layout already consumes.
+captureSystemSearchLaunch();
 prefetchCurrentUser();
 preloadThemePreference();
 preloadHideBalancePreference();
@@ -1048,6 +1055,12 @@ function RootLayout() {
       subscription.remove();
     };
   }, []);
+
+  // The warm half of a tap on one of the app's own search results: the native
+  // wake-up re-reads the pending slot, so registering it with this tree is
+  // enough. Held here rather than at module scope so unmounting releases the
+  // native listener instead of leaving it alive past the tree that uses it.
+  useSystemSearchOpenListener();
 
   // Reap expired temp files at cold start and whenever the app returns to the
   // foreground, deferred past the current interaction frame so a navigation

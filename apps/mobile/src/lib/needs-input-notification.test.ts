@@ -405,7 +405,7 @@ describe('applyNeedsInputNotifications', () => {
         categoryIdentifier: 'kilo-needs-input:question',
         interruptionLevel: 'timeSensitive',
       },
-      trigger: { channelId: 'agent-attention' },
+      trigger: { channelId: 'needs-input' },
     });
   });
 

@@ -257,6 +257,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     request,
     requestedModel,
     userId: isAnonymousContext(user) ? null : user.id,
+    organizationId,
   });
   if (openAiChatGptByok?.kind === 'reconnect') {
     return { kind: 'chatgpt-reconnect', message: openAiChatGptByok.message };

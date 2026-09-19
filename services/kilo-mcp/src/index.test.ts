@@ -1,8 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import worker, { apiHandler, clientRegistrationCallback, createMcpHandler } from './index';
-import { ANONYMOUS_DISTINCT_ID, createMcpAnalytics } from './analytics';
+import worker, {
+  apiHandler,
+  canUseProtectedActions,
+  clientRegistrationCallback,
+  createMcpHandler,
+} from './index';
+import { ANONYMOUS_DISTINCT_ID, createMcpAnalytics, type McpAnalytics } from './analytics';
 import { ORGANIZATION_ID_HEADER } from './auth';
-import type { Catalog, ForwardedAuth, GrantProps } from './types';
+import type {
+  Catalog,
+  ForwardedAuth,
+  GrantProps,
+  OtpSubmitOutcome,
+  ProtectedRequestsApi,
+} from './types';
 
 /** The default fetch handlers take the Worker ExecutionContext. */
 const TEST_CTX = {
@@ -34,6 +45,38 @@ const testCatalog: Catalog = {
     searchBlob:
       'cliSessions.search Search the user CLI sessions by keyword. clisessions search query',
   },
+  'admin.getMetrics': {
+    path: 'admin.getMetrics',
+    kind: 'query',
+    summary: 'Get admin-only platform metrics.',
+    inputSchema: {},
+    tags: ['admin'],
+    searchBlob: 'admin.getMetrics Get admin-only platform metrics. admin getmetrics metrics',
+    admin: true,
+  },
+  'debug.getState': {
+    path: 'debug.getState',
+    kind: 'query',
+    summary: 'Read the debug platform state.',
+    inputSchema: {},
+    tags: ['debug'],
+    searchBlob: 'debug.getState Read the debug platform state. debug getstate state',
+    debug: true,
+  },
+  'debug.echoText': {
+    path: 'debug.echoText',
+    kind: 'query',
+    summary: 'Echoes a short string back from the debug router.',
+    inputSchema: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'string',
+      minLength: 2,
+      maxLength: 100,
+    },
+    tags: ['debug'],
+    searchBlob: 'debug.echoText Echoes a short string back from the debug router. debug echotext',
+    debug: true,
+  },
   'cliSessions.revokeAll': {
     path: 'cliSessions.revokeAll',
     kind: 'mutation',
@@ -64,15 +107,96 @@ const AUTH: ForwardedAuth = {
   organizationId: 'org-1',
   kiloUserId: 'user-1',
   clientId: 'client-1',
+  adminEnabled: false,
+};
+
+/**
+ * The same grant, but opted into admin and debug endpoints at sign-in: enabled,
+ * eligible, with the per-connection sessionId a pending request binds to.
+ */
+const AUTH_ADMIN: ForwardedAuth = {
+  ...AUTH,
+  adminEnabled: true,
+  adminEligible: true,
+  sessionId: 'session-1',
 };
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+/** The recorded `createProtectedRequest` inputs, for assertions. */
+type CreatedProtectedRequest = Parameters<ProtectedRequestsApi['createProtectedRequest']>[0];
+
+/**
+ * A fake pending-request store. `created` captures what `call_protected`
+ * recorded; `peek`/`outcome` script what a `submit_otp` finds and claims.
+ */
+function fakeRequestsStore(options?: {
+  id?: string;
+  expiresAt?: string;
+  peek?: 'pending' | 'gone' | { status: 'locked'; retryAfterSeconds: number };
+  outcome?: OtpSubmitOutcome;
+}): ProtectedRequestsApi & { created: CreatedProtectedRequest[] } {
+  const created: CreatedProtectedRequest[] = [];
+  return {
+    created,
+    async createProtectedRequest(input) {
+      created.push(input);
+      return {
+        id: options?.id ?? 'req-1',
+        expiresAt: options?.expiresAt ?? '2026-09-16T00:05:00.000Z',
+      };
+    },
+    async peekProtectedRequest() {
+      if (typeof options?.peek === 'object') return options.peek;
+      return options?.peek === 'gone' ? { status: 'gone' } : { status: 'pending' };
+    },
+    async verifyOtpAndClaim() {
+      return options?.outcome ?? { status: 'not_pending' };
+    },
+  };
+}
+
+/** A fetch fake whose calls a test can inspect. */
+type FetchMock = typeof fetch & {
+  mock: { calls: Array<[string, RequestInit | undefined]> };
+};
+
+/** A fetch fake that answers the `user.getMe` admin re-check. */
+function adminCheckFetch(isAdmin: boolean): FetchMock {
+  return vi.fn(async () =>
+    Response.json({ result: { data: { isAdmin } } })
+  ) as unknown as FetchMock;
+}
+
+/** The URLs a fetch mock was called with. */
+function calledUrls(fetchImpl: FetchMock): string[] {
+  return fetchImpl.mock.calls.map(call => call[0]);
+}
 
 function makeHandler(fetchImpl?: typeof fetch) {
   return createMcpHandler({
     catalog: testCatalog,
     webBaseUrl: 'https://app.kilo.ai',
     ...(fetchImpl ? { fetchImpl } : {}),
+  });
+}
+
+/**
+ * A handler with the protected-request store (and optionally a fetch fake and a
+ * catalog). Omitting `requests` is the unbound-store case.
+ */
+function protectedHandler(options?: {
+  requests?: ProtectedRequestsApi;
+  fetchImpl?: typeof fetch;
+  catalog?: Catalog;
+  analytics?: McpAnalytics;
+}): ReturnType<typeof createMcpHandler> {
+  return createMcpHandler({
+    catalog: options?.catalog ?? testCatalog,
+    webBaseUrl: 'https://app.kilo.ai',
+    ...(options?.requests ? { protectedRequests: options.requests } : {}),
+    ...(options?.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+    ...(options?.analytics ? { analytics: options.analytics } : {}),
   });
 }
 
@@ -171,7 +295,7 @@ describe('JSON-RPC envelope validation (zod)', () => {
 });
 
 describe('initialize / ping / tools/list', () => {
-  it('initialize echoes the protocol version and advertises tools', async () => {
+  it('initialize echoes the protocol version and plain instructions for a non-admin grant', async () => {
     const { json } = await rpcResult({
       jsonrpc: '2.0',
       id: 1,
@@ -182,6 +306,30 @@ describe('initialize / ping / tools/list', () => {
     expect(result['protocolVersion']).toBe('2025-06-18');
     expect(result['serverInfo']).toMatchObject({ name: 'kilo-mcp' });
     expect(result['capabilities']).toMatchObject({ tools: {} });
+    // A connection without the opt-in must never see an admin or debug word.
+    const instructions = result['instructions'] as string;
+    expect(instructions).toContain('search (find catalog endpoints) and call (invoke one by path)');
+    expect(instructions.toLowerCase()).not.toContain('admin');
+    expect(instructions.toLowerCase()).not.toContain('debug');
+  });
+
+  it('initialize names call_protected and submit_otp for an opted-in admin grant', async () => {
+    const response = await rpc(
+      makeHandler(),
+      {
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'initialize',
+        params: { protocolVersion: '2025-06-18' },
+      },
+      AUTH_ADMIN
+    );
+    const instructions = ((await response.json()) as { result: { instructions: string } }).result
+      .instructions;
+    expect(instructions).toContain('call_protected');
+    expect(instructions).toContain('submit_otp');
+    expect(instructions).toContain('authenticator app');
+    expect(instructions).toContain('fixed once call_protected returns');
   });
 
   it('rejects malformed initialize params with -32602', async () => {
@@ -218,9 +366,97 @@ describe('initialize / ping / tools/list', () => {
     });
     expect(tools[1]!.inputSchema).toMatchObject({
       type: 'object',
-      properties: { path: { type: 'string' }, input: { type: 'object' } },
+      properties: { path: { type: 'string' } },
       required: ['path'],
     });
+    // The input value's shape belongs to the endpoint's published schema, so
+    // the tool must not constrain it to an object: debug.badInputError takes a
+    // string, and a record-only argument left that row uncallable.
+    const inputProperty = (
+      tools[1]!.inputSchema.properties as Record<string, Record<string, unknown>>
+    ).input;
+    expect(inputProperty).toBeDefined();
+    expect(inputProperty).not.toHaveProperty('type');
+  });
+
+  it('tools/list adds call_protected and submit_otp only for an opted-in admin grant', async () => {
+    const response = await rpc(
+      makeHandler(),
+      { jsonrpc: '2.0', id: 5, method: 'tools/list' },
+      AUTH_ADMIN
+    );
+    const tools = (
+      (await response.json()) as {
+        result: {
+          tools: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>;
+        };
+      }
+    ).result.tools;
+    expect(tools.map(tool => tool.name)).toEqual([
+      'search',
+      'call',
+      'call_protected',
+      'submit_otp',
+    ]);
+    const callProtected = tools[2]!;
+    expect(callProtected.description).toContain('authenticator app');
+    expect(callProtected.description).toContain('fixed once this returns');
+    expect(callProtected.inputSchema).toMatchObject({
+      type: 'object',
+      properties: { path: { type: 'string' } },
+      required: ['path'],
+    });
+    const submitOtp = tools[3]!;
+    expect(submitOtp.description).toContain('authenticator app');
+    expect(submitOtp.description).toContain('cannot change here');
+    expect(submitOtp.inputSchema).toMatchObject({
+      type: 'object',
+      properties: { request_id: { type: 'string' }, otp: { type: 'string' } },
+      required: ['request_id', 'otp'],
+    });
+  });
+
+  it('tools/list gates on the sessionId: an opted-in grant without one sees only search and call', async () => {
+    for (const auth of [
+      { ...AUTH, adminEnabled: true, adminEligible: true },
+      { ...AUTH_ADMIN, sessionId: '' },
+      { ...AUTH_ADMIN, adminEligible: false },
+      { ...AUTH_ADMIN, adminEnabled: false },
+    ]) {
+      const response = await rpc(
+        makeHandler(),
+        { jsonrpc: '2.0', id: 6, method: 'tools/list' },
+        auth
+      );
+      const tools = ((await response.json()) as { result: { tools: Array<{ name: string }> } })
+        .result.tools;
+      expect(tools.map(tool => tool.name)).toEqual(['search', 'call']);
+    }
+    expect(canUseProtectedActions(AUTH_ADMIN)).toBe(true);
+    expect(canUseProtectedActions(AUTH)).toBe(false);
+  });
+
+  it('a connection without the opt-in cannot discover or call the protected tools', async () => {
+    // Every other connection gets the ordinary unknown-tool answer for either
+    // name — the tools are unlisted and unreachable, so neither can leak.
+    for (const auth of [AUTH, { ...AUTH, adminEnabled: true, adminEligible: true }]) {
+      for (const name of ['call_protected', 'submit_otp']) {
+        const { json } = await rpcResult(
+          {
+            jsonrpc: '2.0',
+            id: 7,
+            method: 'tools/call',
+            params: { name, arguments: {} },
+          },
+          undefined,
+          auth
+        );
+        expect((json as { error: { code: number; message: string } }).error.code).toBe(-32602);
+        expect((json as { error: { code: number; message: string } }).error.message).toBe(
+          `Unknown tool "${name}". Available tools: search, call.`
+        );
+      }
+    }
   });
 });
 
@@ -270,20 +506,78 @@ describe('tools/call params and arguments validation (zod)', () => {
     expect((noPath.json as { error: { code: number } }).error.code).toBe(-32602);
   });
 
-  it('rejects a non-object call input', async () => {
-    const { json } = await rpcResult({
-      jsonrpc: '2.0',
-      id: 25,
-      method: 'tools/call',
-      params: { name: 'call', arguments: { path: 'organizations.list', input: 'nope' } },
+  it('call accepts the scalar input a published schema describes and forwards exactly it', async () => {
+    // A published schema may describe a scalar (not an object); the tool
+    // argument must accept it instead of demanding an object, or the row can
+    // never be called at all.
+    const scalarCatalog: Catalog = {
+      'reports.echo': {
+        path: 'reports.echo',
+        kind: 'query',
+        summary: 'Echoes a short string back.',
+        inputSchema: {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'string',
+          minLength: 2,
+          maxLength: 100,
+        },
+        tags: ['reports'],
+        searchBlob: 'reports.echo Echoes a short string back. reports echo',
+      },
+    };
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ result: { data: 'you sent: hello' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+    );
+    const response = await rpc(
+      protectedHandler({ catalog: scalarCatalog, fetchImpl }),
+      {
+        jsonrpc: '2.0',
+        id: 25,
+        method: 'tools/call',
+        params: { name: 'call', arguments: { path: 'reports.echo', input: 'hello' } },
+      },
+      AUTH
+    );
+    const json = (await response.json()) as { result: { content: Array<{ text: string }> } };
+    expect(json.result.content[0]!.text).toBe('"you sent: hello"');
+    const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+    expect(url).toBe('https://app.kilo.ai/api/trpc/reports.echo?input=%22hello%22');
+  });
+
+  it('call_protected accepts the scalar input a published schema describes and records exactly it', async () => {
+    const fetchImpl = vi.fn();
+    const requests = fakeRequestsStore({ id: 'req-scalar' });
+    const response = await rpc(
+      protectedHandler({ requests, fetchImpl }),
+      {
+        jsonrpc: '2.0',
+        id: 26,
+        method: 'tools/call',
+        params: { name: 'call_protected', arguments: { path: 'debug.echoText', input: 'hello' } },
+      },
+      AUTH_ADMIN
+    );
+    const json = (await response.json()) as { result: { content: Array<{ text: string }> } };
+    expect(JSON.parse(json.result.content[0]!.text)).toMatchObject({
+      status: 'otp_required',
+      request_id: 'req-scalar',
     });
-    expect((json as { error: { code: number } }).error.code).toBe(-32602);
+    expect(requests.created[0]).toMatchObject({
+      path: 'debug.echoText',
+      kind: 'debug',
+      inputJson: '"hello"',
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('unknown tool names are rejected', async () => {
     const { json } = await rpcResult({
       jsonrpc: '2.0',
-      id: 26,
+      id: 27,
       method: 'tools/call',
       params: { name: 'delete', arguments: {} },
     });
@@ -401,6 +695,137 @@ describe('tools/call search', () => {
       });
       expect('result' in (json as Record<string, unknown>)).toBe(true);
     }
+  });
+
+  it('omits admin rows for a grant without the admin opt-in and returns them when it opted in', async () => {
+    const body = {
+      jsonrpc: '2.0',
+      id: 27,
+      method: 'tools/call',
+      params: { name: 'search', arguments: { query: 'metrics' } },
+    };
+    const disabled = await rpcResult(body, undefined, AUTH);
+    const disabledText = (disabled.json as { result: { content: Array<{ text: string }> } }).result
+      .content[0]!.text;
+    expect(disabledText).not.toContain('admin.getMetrics');
+
+    const enabled = await rpcResult(body, undefined, AUTH_ADMIN);
+    const enabledText = (enabled.json as { result: { content: Array<{ text: string }> } }).result
+      .content[0]!.text;
+    expect(enabledText).toContain('admin.getMetrics');
+  });
+
+  it('empty: names the hidden admin and debug endpoints for an admin-eligible grant that did not opt in', async () => {
+    const hiddenMessage = async (query: string): Promise<string> => {
+      const { json } = await rpcResult(
+        {
+          jsonrpc: '2.0',
+          id: 30,
+          method: 'tools/call',
+          params: { name: 'search', arguments: { query } },
+        },
+        undefined,
+        { ...AUTH, adminEligible: true }
+      );
+      return (json as { result: { content: Array<{ text: string }> } }).result.content[0]!.text;
+    };
+    for (const query of ['metrics', 'debug']) {
+      const text = await hiddenMessage(query);
+      const payload = JSON.parse(text) as { results: unknown[]; message: string };
+      // The catalog does match; the rows are hidden, so the shape stays a
+      // zero-row result and the message names both hidden families and the
+      // checkbox to tick, with no approval-queue reference.
+      expect(payload.results).toEqual([]);
+      expect(payload.message).toContain(`No endpoints matched "${query}"`);
+      expect(payload.message).toContain(
+        'admin or debug endpoints and are hidden for this connection'
+      );
+      expect(payload.message).toContain('Enable admin and debug actions');
+      expect(payload.message).toContain('code from your authenticator app');
+      expect(payload.message).not.toContain('queue');
+    }
+  });
+
+  it('empty: a non-admin or pre-feature grant gets the plain message with no admin or debug trace', async () => {
+    const hiddenMessage = async (auth: ForwardedAuth, query: string): Promise<string> => {
+      const { json } = await rpcResult(
+        {
+          jsonrpc: '2.0',
+          id: 31,
+          method: 'tools/call',
+          params: { name: 'search', arguments: { query } },
+        },
+        undefined,
+        auth
+      );
+      return (json as { result: { content: Array<{ text: string }> } }).result.content[0]!.text;
+    };
+    // AUTH carries no adminEligible key (a pre-feature grant) and the explicit
+    // false both stay non-eligible: no hidden-endpoint sentence, no queue URL.
+    for (const auth of [AUTH, { ...AUTH, adminEligible: false }]) {
+      for (const query of ['metrics', 'debug', 'zzqqx nothing']) {
+        const text = await hiddenMessage(auth, query);
+        expect(text).toContain('No endpoints matched');
+        expect(text).not.toContain('hidden for this connection');
+        expect(text).not.toContain('queue');
+      }
+    }
+  });
+
+  it('returns guarded hits marked requiresApproval with no hint when the grant opted in', async () => {
+    const search = async (
+      query: string
+    ): Promise<{ text: string; results: Array<Record<string, unknown>> }> => {
+      const { json } = await rpcResult(
+        {
+          jsonrpc: '2.0',
+          id: 33,
+          method: 'tools/call',
+          params: { name: 'search', arguments: { query } },
+        },
+        undefined,
+        AUTH_ADMIN
+      );
+      const text = (json as { result: { content: Array<{ text: string }> } }).result.content[0]!
+        .text;
+      return {
+        text,
+        results: (JSON.parse(text) as { results: Array<Record<string, unknown>> }).results,
+      };
+    };
+    const admin = await search('metrics');
+    expect(admin.results).toContainEqual(
+      expect.objectContaining({ path: 'admin.getMetrics', requiresApproval: true })
+    );
+    expect(admin.text).not.toContain('hidden for this connection');
+
+    const debug = await search('debug');
+    expect(debug.results).toContainEqual(
+      expect.objectContaining({ path: 'debug.getState', requiresApproval: true })
+    );
+  });
+
+  it('runs the semantic hook once for an empty search on a grant without the admin opt-in', async () => {
+    const semanticCandidates = vi.fn(async () => []);
+    const handler = createMcpHandler({
+      catalog: testCatalog,
+      webBaseUrl: 'https://app.kilo.ai',
+      semanticCandidates,
+    });
+    const response = await rpc(
+      handler,
+      {
+        jsonrpc: '2.0',
+        id: 34,
+        method: 'tools/call',
+        params: { name: 'search', arguments: { query: 'metrics' } },
+      },
+      AUTH
+    );
+    expect(response.status).toBe(200);
+    // The embedding + Vectorize lookup happen once for the whole search, even
+    // though the admin gate hides the query's only match.
+    expect(semanticCandidates).toHaveBeenCalledTimes(1);
   });
 
   it('keeps an over-cap search payload parseable JSON instead of cutting it mid-token', async () => {
@@ -743,6 +1168,168 @@ describe('tools/call call', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it('non-retryable: a guarded path is refused locally for a grant that did not opt in, no upstream', async () => {
+    const fetchImpl = vi.fn();
+    for (const path of ['admin.getMetrics', 'debug.getState']) {
+      const { json } = await rpcResult(
+        {
+          jsonrpc: '2.0',
+          id: 28,
+          method: 'tools/call',
+          params: { name: 'call', arguments: { path } },
+        },
+        fetchImpl
+      );
+      const error = (json as { error: { code: number; message: string } }).error;
+      expect(error.code).toBe(-32602);
+      expect(error.message).toBe(
+        `"${path}" is an admin or debug endpoint. Reconnect the Kilo MCP server and tick "Enable admin and debug actions" at sign-in to allow admin and debug actions.`
+      );
+      expect(error.message).not.toContain('queue');
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('non-retryable: an opted-in grant is refused by call too, pointing at call_protected, no upstream', async () => {
+    const fetchImpl = vi.fn();
+    for (const path of ['admin.getMetrics', 'debug.getState']) {
+      const response = await rpc(
+        makeHandler(fetchImpl),
+        {
+          jsonrpc: '2.0',
+          id: 28,
+          method: 'tools/call',
+          params: { name: 'call', arguments: { path } },
+        },
+        AUTH_ADMIN
+      );
+      const error = ((await response.json()) as { error: { code: number; message: string } }).error;
+      expect(error.code).toBe(-32602);
+      expect(error.message).toBe(
+        `"${path}" is an admin or debug endpoint. Use the call_protected tool, then submit_otp with the code from your authenticator app, to run it.`
+      );
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('call_protected refuses an unknown path, an unguarded row and a schema-invalid input locally', async () => {
+    const fetchImpl = vi.fn();
+    const requests = fakeRequestsStore();
+    const handler = protectedHandler({ requests, fetchImpl });
+    const refusal = async (
+      path: string,
+      input?: unknown
+    ): Promise<{ code: number; message: string }> => {
+      const response = await rpc(
+        handler,
+        {
+          jsonrpc: '2.0',
+          id: 29,
+          method: 'tools/call',
+          params: {
+            name: 'call_protected',
+            arguments: input === undefined ? { path } : { path, input },
+          },
+        },
+        AUTH_ADMIN
+      );
+      return ((await response.json()) as { error: { code: number; message: string } }).error;
+    };
+
+    const unknown = await refusal('nope.goes.here');
+    expect(unknown.code).toBe(-32602);
+    expect(unknown.message).toMatch(/Unknown path/);
+
+    const unguarded = await refusal('organizations.list');
+    expect(unguarded.code).toBe(-32602);
+    expect(unguarded.message).toBe(
+      '"organizations.list" is not an admin or debug endpoint. Use the call tool for it.'
+    );
+
+    const invalid = await refusal('debug.echoText', 5);
+    expect(invalid.code).toBe(-32602);
+    expect(invalid.message).toContain('does not match the published schema');
+
+    expect(requests.created).toEqual([]);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('call_protected records an admin call and returns otp_required with zero fetches', async () => {
+    const fetchImpl = vi.fn();
+    const requests = fakeRequestsStore({
+      id: 'req-42',
+      expiresAt: '2026-09-16T00:05:00.000Z',
+    });
+    const response = await rpc(
+      protectedHandler({ requests, fetchImpl }),
+      {
+        jsonrpc: '2.0',
+        id: 30,
+        method: 'tools/call',
+        params: { name: 'call_protected', arguments: { path: 'admin.getMetrics' } },
+      },
+      AUTH_ADMIN
+    );
+    const text = ((await response.json()) as { result: { content: Array<{ text: string }> } })
+      .result.content[0]!.text;
+    expect(JSON.parse(text)).toEqual({
+      status: 'otp_required',
+      request_id: 'req-42',
+      expires_at: '2026-09-16T00:05:00.000Z',
+      message:
+        'Approval required: ask the user to read the current code from their authenticator app, then call submit_otp with this request_id and that code. The request expires at 2026-09-16T00:05:00.000Z.',
+    });
+    expect(requests.created[0]).toMatchObject({
+      sessionId: 'session-1',
+      path: 'admin.getMetrics',
+      kind: 'admin',
+      inputJson: null,
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('call_protected records a debug call as kind debug with the reviewed input and no upstream', async () => {
+    const fetchImpl = vi.fn();
+    const requests = fakeRequestsStore({ id: 'req-dbg' });
+    const response = await rpc(
+      protectedHandler({ requests, fetchImpl }),
+      {
+        jsonrpc: '2.0',
+        id: 31,
+        method: 'tools/call',
+        params: { name: 'call_protected', arguments: { path: 'debug.getState' } },
+      },
+      AUTH_ADMIN
+    );
+    const text = ((await response.json()) as { result: { content: Array<{ text: string }> } })
+      .result.content[0]!.text;
+    expect(JSON.parse(text)).toMatchObject({ status: 'otp_required', request_id: 'req-dbg' });
+    expect(requests.created[0]).toMatchObject({
+      path: 'debug.getState',
+      kind: 'debug',
+      inputJson: null,
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('non-retryable: an opted-in guarded call without the request store never fails open', async () => {
+    const fetchImpl = vi.fn();
+    const response = await rpc(
+      protectedHandler({ fetchImpl }),
+      {
+        jsonrpc: '2.0',
+        id: 32,
+        method: 'tools/call',
+        params: { name: 'call_protected', arguments: { path: 'admin.getMetrics' } },
+      },
+      AUTH_ADMIN
+    );
+    const json = (await response.json()) as { error: { code: number; data: unknown } };
+    expect(json.error.code).toBe(-32000);
+    expect(json.error.data).toMatchObject({ path: 'admin.getMetrics', retryable: true });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('retryable: an upstream tRPC error becomes a JSON-RPC error carrying code and httpStatus, and a corrected retry succeeds', async () => {
     const failing = vi.fn(
       async () =>
@@ -817,6 +1404,233 @@ describe('tools/call call', () => {
     expect(new TextEncoder().encode(result.content[0]!.text).byteLength).toBeLessThanOrEqual(
       16 * 1024
     );
+  });
+});
+
+describe('tools/call submit_otp', () => {
+  async function submit(
+    handler: ReturnType<typeof createMcpHandler>,
+    args: Record<string, unknown>,
+    auth: ForwardedAuth = AUTH_ADMIN
+  ): Promise<{ response: Response; json: Record<string, unknown> }> {
+    const response = await rpc(
+      handler,
+      {
+        jsonrpc: '2.0',
+        id: 50,
+        method: 'tools/call',
+        params: { name: 'submit_otp', arguments: args },
+      },
+      auth
+    );
+    return { response, json: (await response.json()) as Record<string, unknown> };
+  }
+
+  it('maps every OtpSubmitOutcome to its own refusal copy', async () => {
+    const cases: Array<[OtpSubmitOutcome, string]> = [
+      [
+        { status: 'not_pending' },
+        'This request is no longer pending. Start a new admin or debug call with call_protected.',
+      ],
+      [
+        { status: 'expired' },
+        'This request expired. Start a new admin or debug call with call_protected.',
+      ],
+      [
+        { status: 'invalidated' },
+        'This request was cancelled after too many incorrect codes. Start a new admin or debug call with call_protected.',
+      ],
+      [
+        { status: 'bad_code', attemptsRemaining: 4 },
+        'That code is not valid. Check your authenticator app and try again. 4 attempts remaining.',
+      ],
+      [
+        { status: 'reused_code' },
+        'That code was already used. Ask the user for the next code from their authenticator app, then submit it again.',
+      ],
+      [
+        { status: 'no_authenticator' },
+        'No authenticator is registered for this Kilo account. Reconnect the Kilo MCP server and add your authenticator at sign-in.',
+      ],
+      [
+        { status: 'locked', retryAfterSeconds: 900 },
+        'Too many incorrect codes were submitted for this Kilo account. Try again in 15 minutes, then start a new admin or debug call with call_protected.',
+      ],
+      [
+        { status: 'locked', retryAfterSeconds: 20 },
+        'Too many incorrect codes were submitted for this Kilo account. Try again in 1 minute, then start a new admin or debug call with call_protected.',
+      ],
+    ];
+    for (const [outcome, message] of cases) {
+      const requests = fakeRequestsStore({ outcome });
+      const fetchImpl = adminCheckFetch(true);
+      const { json } = await submit(protectedHandler({ requests, fetchImpl }), {
+        request_id: 'req-1',
+        otp: '123456',
+      });
+      const error = json['error'] as { code: number; message: string };
+      expect(error.code).toBe(-32602);
+      expect(error.message).toBe(message);
+      // The wrong-code refusal states the attempts without the code.
+      expect(JSON.stringify(json)).not.toContain('123456');
+      // No outcome other than `ok` runs the recorded call.
+      expect(calledUrls(fetchImpl).filter(url => url.includes('/api/trpc/debug'))).toHaveLength(0);
+      expect(calledUrls(fetchImpl).filter(url => url.includes('/api/trpc/admin'))).toHaveLength(0);
+    }
+  });
+
+  it('answers the uniform no-longer-pending refusal for a gone request and checks nothing else', async () => {
+    const requests = fakeRequestsStore({ peek: 'gone' });
+    const fetchImpl = adminCheckFetch(true);
+    const { json } = await submit(protectedHandler({ requests, fetchImpl }), {
+      request_id: 'never-issued',
+      otp: '123456',
+    });
+    expect((json['error'] as { message: string }).message).toBe(
+      'This request is no longer pending. Start a new admin or debug call with call_protected.'
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('refuses a locked account before spending an upstream admin re-check', async () => {
+    const requests = fakeRequestsStore({
+      peek: { status: 'locked', retryAfterSeconds: 900 },
+    });
+    const fetchImpl = adminCheckFetch(true);
+    const { json } = await submit(protectedHandler({ requests, fetchImpl }), {
+      request_id: 'req-1',
+      otp: '123456',
+    });
+    const error = json['error'] as { code: number; message: string };
+    expect(error.code).toBe(-32602);
+    expect(error.message).toBe(
+      'Too many incorrect codes were submitted for this Kilo account. Try again in 15 minutes, then start a new admin or debug call with call_protected.'
+    );
+    // The account-wide lock is consulted at peek, before the live admin check,
+    // so a locked account spends no upstream request on a guess.
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('non-retryable: an admin who lost the role cannot run an already-pending request', async () => {
+    const requests = fakeRequestsStore({
+      outcome: { status: 'ok', path: 'admin.getMetrics', inputJson: null },
+    });
+    const fetchImpl = adminCheckFetch(false);
+    const { json } = await submit(protectedHandler({ requests, fetchImpl }), {
+      request_id: 'req-1',
+      otp: '123456',
+    });
+    const error = json['error'] as { code: number; message: string };
+    expect(error.code).toBe(-32602);
+    expect(error.message).toBe(
+      'Your Kilo account does not have admin access, so this admin or debug call cannot run. Reconnect the Kilo MCP server if that is unexpected.'
+    );
+    expect(calledUrls(fetchImpl).filter(url => url.includes('/api/trpc/admin'))).toHaveLength(0);
+  });
+
+  it('retryable: a thrown admin check refuses without running the call', async () => {
+    const requests = fakeRequestsStore({
+      outcome: { status: 'ok', path: 'admin.getMetrics', inputJson: null },
+    });
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('user.getMe upstream unreachable');
+    }) as unknown as FetchMock;
+    const { json } = await submit(protectedHandler({ requests, fetchImpl }), {
+      request_id: 'req-1',
+      otp: '123456',
+    });
+    const error = json['error'] as { code: number; message: string };
+    expect(error.code).toBe(-32000);
+    expect(error.message).toBe(
+      'Could not check admin access for this admin or debug call. Retry; if it keeps failing, reconnect the Kilo MCP server.'
+    );
+    expect(calledUrls(fetchImpl).filter(url => url.includes('/api/trpc/admin'))).toHaveLength(0);
+  });
+
+  it('fails closed when the pending-request store is missing', async () => {
+    const fetchImpl = adminCheckFetch(true);
+    const { json } = await submit(protectedHandler({ fetchImpl }), {
+      request_id: 'req-1',
+      otp: '123456',
+    });
+    const error = json['error'] as { code: number; data: unknown };
+    expect(error.code).toBe(-32000);
+    expect(error.data).toMatchObject({ retryable: true });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('rejects a submit that tries to change the reviewed payload', async () => {
+    for (const args of [
+      { request_id: 'req-1', otp: '123456', path: 'admin.getMetrics' },
+      { request_id: 'req-1', otp: '123456', input: { verbose: true } },
+    ]) {
+      const { json } = await submit(protectedHandler({ requests: fakeRequestsStore() }), args);
+      const error = json['error'] as { code: number; message: string };
+      expect(error.code).toBe(-32602);
+      expect(error.message).toContain('Invalid submit_otp arguments');
+    }
+  });
+
+  it('on ok runs the recorded path exactly once and returns the upstream result', async () => {
+    const requests = fakeRequestsStore({
+      outcome: { status: 'ok', path: 'debug.getState', inputJson: null },
+    });
+    const fetchImpl = vi.fn(async (input: string | URL) => {
+      if (String(input).includes('/api/trpc/user.getMe')) {
+        return Response.json({ result: { data: { isAdmin: true } } });
+      }
+      return Response.json({ result: { data: { ok: true } } });
+    }) as unknown as FetchMock;
+    const { json } = await submit(protectedHandler({ requests, fetchImpl }), {
+      request_id: 'req-1',
+      otp: '123456',
+    });
+    const text = (json['result'] as { content: Array<{ text: string }> }).content[0]!.text;
+    expect(text).toBe('{"ok":true}');
+
+    const urls = calledUrls(fetchImpl);
+    expect(urls.filter(url => url.includes('/api/trpc/debug.getState'))).toHaveLength(1);
+    expect(urls.filter(url => url.includes('/api/trpc/user.getMe'))).toHaveLength(1);
+    // The admin re-check forwards the grant's Kilo bearer exactly once.
+    const meCall = fetchImpl.mock.calls.find(call => call[0].includes('user.getMe'));
+    const meHeaders = (meCall?.[1]?.headers ?? {}) as Record<string, string>;
+    expect(meHeaders['Authorization']).toBe('Bearer kilo-token');
+  });
+
+  it('never puts the submitted code in a response body, an analytics event or a log line', async () => {
+    const code = '919191';
+    const events: unknown[] = [];
+    const analytics: McpAnalytics = {
+      sessionStarted: () => {},
+      toolCalled: input => {
+        events.push(input);
+      },
+      searchPerformed: () => {},
+      callRejected: input => {
+        events.push(input);
+      },
+      oauthSignIn: () => {},
+    };
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const requests = fakeRequestsStore({ outcome: { status: 'bad_code', attemptsRemaining: 4 } });
+      const { json } = await submit(
+        protectedHandler({ requests, fetchImpl: adminCheckFetch(true), analytics }),
+        { request_id: 'req-1', otp: code }
+      );
+      expect(JSON.stringify(json)).not.toContain(code);
+      expect(events.length).toBeGreaterThan(0);
+      expect(JSON.stringify(events)).not.toContain(code);
+      for (const spy of [log, errorLog]) {
+        for (const call of spy.mock.calls) {
+          expect(JSON.stringify(call)).not.toContain(code);
+        }
+      }
+    } finally {
+      log.mockRestore();
+      errorLog.mockRestore();
+    }
   });
 });
 
@@ -963,6 +1777,34 @@ describe('api handler (props-based auth)', () => {
     };
   }
 
+  /**
+   * An env whose KILO_MCP_OAUTH_STORE namespace records created protected
+   * requests and scripts what `submit_otp` finds. `getByName` returns the DO
+   * stub the worker asks for.
+   */
+  function envWithProtectedStore(
+    created: Array<Record<string, unknown>>,
+    options?: { peek?: 'pending' | 'gone'; outcome?: OtpSubmitOutcome }
+  ): Env {
+    return {
+      WEB_BASE_URL: 'https://app.kilo.ai',
+      KILO_MCP_OAUTH_STORE: {
+        getByName: () => ({
+          async createProtectedRequest(input: Record<string, unknown>) {
+            created.push(input);
+            return { id: 'req-api', expiresAt: '2026-09-16T00:05:00.000Z' };
+          },
+          async peekProtectedRequest() {
+            return options?.peek === 'gone' ? { status: 'gone' } : { status: 'pending' };
+          },
+          async verifyOtpAndClaim() {
+            return options?.outcome ?? { status: 'not_pending' };
+          },
+        }),
+      },
+    } as unknown as Env;
+  }
+
   it('forwards the grant Kilo token and organization to apps/web', async () => {
     const calls: Array<{ url: string; headers: Record<string, string> }> = [];
     const upstream = vi.fn(async (input: string | URL, init?: RequestInit) => {
@@ -994,6 +1836,160 @@ describe('api handler (props-based auth)', () => {
     const trpc = calls.find(call => call.url.includes('/api/trpc/'));
     expect(trpc?.headers['Authorization']).toBe('Bearer kilo-9');
     expect(trpc?.headers[ORGANIZATION_ID_HEADER]).toBe('org-9');
+  });
+
+  /**
+   * A real admin-guarded row in the bundled catalog that takes no input.
+   * `organizations.admin.*` paths are excluded from the dump (the generator
+   * publishes admin-guarded procedures only under non-internal paths), so an
+   * actual catalog row is used to exercise the guard end to end.
+   */
+  const REAL_ADMIN_PATH = 'mcpGateway.listPersonal';
+
+  it('refuses a bundled admin path for a grant without the admin opt-in, before any upstream request', async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const { ctx } = apiContext({
+      kiloUserId: 'user-1',
+      organizationId: 'org-1',
+      kiloToken: 'kilo-1',
+      clientId: 'client-1',
+    });
+    const response = await apiHandler.fetch!(
+      new Request('https://kilo-mcp.test/mcp', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: 'call', arguments: { path: REAL_ADMIN_PATH } },
+        }),
+      }),
+      { WEB_BASE_URL: 'https://app.kilo.ai' } as Env,
+      ctx
+    );
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as { error: { code: number; message: string } };
+    expect(json.error.code).toBe(-32602);
+    expect(json.error.message).toContain('is an admin or debug endpoint');
+    expect(json.error.message).toContain('Enable admin and debug actions');
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('records an opted-in bundled admin path as a protected request through the DO stub, no upstream', async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const created: Array<Record<string, unknown>> = [];
+    const { ctx } = apiContext({
+      kiloUserId: 'user-1',
+      organizationId: 'org-1',
+      kiloToken: 'kilo-1',
+      clientId: 'client-1',
+      adminEnabled: true,
+      adminEligible: true,
+      sessionId: 'sess-1',
+    });
+    const response = await apiHandler.fetch!(
+      new Request('https://kilo-mcp.test/mcp', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: 'call_protected', arguments: { path: REAL_ADMIN_PATH } },
+        }),
+      }),
+      envWithProtectedStore(created),
+      ctx
+    );
+    expect(response.status).toBe(200);
+    const json = (await response.json()) as { result: { content: Array<{ text: string }> } };
+    expect(JSON.parse(json.result.content[0]!.text)).toMatchObject({
+      status: 'otp_required',
+      request_id: 'req-api',
+    });
+    expect(created[0]).toMatchObject({
+      sessionId: 'sess-1',
+      path: REAL_ADMIN_PATH,
+      kind: 'admin',
+    });
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('runs an opted-in bundled admin path exactly once through submit_otp', async () => {
+    const calls: string[] = [];
+    const upstream = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes('user.getMe')) return Response.json({ result: { data: { isAdmin: true } } });
+      return Response.json({ result: { data: { ok: true } } });
+    });
+    vi.stubGlobal('fetch', upstream);
+    const created: Array<Record<string, unknown>> = [];
+    const { ctx } = apiContext({
+      kiloUserId: 'user-1',
+      organizationId: 'org-1',
+      kiloToken: 'kilo-1',
+      clientId: 'client-1',
+      adminEnabled: true,
+      adminEligible: true,
+      sessionId: 'sess-1',
+    });
+    const response = await apiHandler.fetch!(
+      new Request('https://kilo-mcp.test/mcp', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: 'submit_otp', arguments: { request_id: 'req-api', otp: '123456' } },
+        }),
+      }),
+      envWithProtectedStore(created, {
+        outcome: { status: 'ok', path: REAL_ADMIN_PATH, inputJson: null },
+      }),
+      ctx
+    );
+    const json = (await response.json()) as { result: { content: Array<{ text: string }> } };
+    expect(json.result.content[0]!.text).toBe('{"ok":true}');
+    expect(calls.filter(url => url.includes(`/api/trpc/${REAL_ADMIN_PATH}`))).toHaveLength(1);
+  });
+
+  it('search omits bundled admin rows for a grant without the opt-in and returns them when it opted in', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({}))
+    );
+    const search = async (adminEnabled?: boolean): Promise<string> => {
+      const { ctx } = apiContext({
+        kiloUserId: 'user-1',
+        organizationId: 'org-1',
+        kiloToken: 'kilo-1',
+        clientId: 'client-1',
+        ...(adminEnabled ? { adminEnabled } : {}),
+      });
+      const response = await apiHandler.fetch!(
+        new Request('https://kilo-mcp.test/mcp', {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/call',
+            params: { name: 'search', arguments: { query: REAL_ADMIN_PATH } },
+          }),
+        }),
+        { WEB_BASE_URL: 'https://app.kilo.ai' } as Env,
+        ctx
+      );
+      return ((await response.json()) as { result: { content: Array<{ text: string }> } }).result
+        .content[0]!.text;
+    };
+    expect(await search()).not.toContain(REAL_ADMIN_PATH);
+    expect(await search(true)).toContain(REAL_ADMIN_PATH);
   });
 
   it('keeps the MCP CORS contract for a direct OPTIONS request', async () => {

@@ -9,6 +9,7 @@ import {
   magic_link_tokens,
   organization_memberships,
   organizations,
+  passkey_credentials,
   user_activity_tokens,
   user_notification_preferences,
   user_push_tokens,
@@ -81,6 +82,32 @@ const NO_GATES_CAPABILITIES = {
 let testUser: User;
 let surveyTestUser: User;
 let skipTestUser: User;
+
+describe('user router - getMe', () => {
+  it('getMe returns isAdmin: true for an admin user', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.user.getMe()).resolves.toEqual({
+      success: true,
+      id: admin.id,
+      email: admin.google_user_email,
+      isAdmin: true,
+    });
+  });
+
+  it('getMe returns isAdmin: false for a non-admin user', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+
+    await expect(caller.user.getMe()).resolves.toEqual({
+      success: true,
+      id: user.id,
+      email: user.google_user_email,
+      isAdmin: false,
+    });
+  });
+});
 
 describe('user router - updateProfile', () => {
   beforeAll(async () => {
@@ -1869,5 +1896,148 @@ describe('user router - account deletion', () => {
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
 
     expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+  });
+});
+
+describe('user router - passkeys', () => {
+  let owner: User;
+  let other: User;
+
+  beforeAll(async () => {
+    owner = await insertTestUser({ google_user_email: 'passkey-owner@example.com' });
+    other = await insertTestUser({ google_user_email: 'passkey-other@example.com' });
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(passkey_credentials)
+      .where(inArray(passkey_credentials.kilo_user_id, [owner.id, other.id]));
+  });
+
+  async function insertPasskey(kiloUserId: string, name: string | null = null) {
+    const [row] = await db
+      .insert(passkey_credentials)
+      .values({
+        kilo_user_id: kiloUserId,
+        credential_id: `credential-${crypto.randomUUID()}`,
+        public_key: 'cose-public-key-bytes',
+        name,
+      })
+      .returning();
+    return row;
+  }
+
+  it('lists the caller passkeys without the public key or the credential id', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const caller = await createCallerForUser(owner.id);
+
+    const result = await caller.user.getPasskeys();
+
+    expect(result.success).toBe(true);
+    expect(result.passkeys).toHaveLength(1);
+    expect(result.passkeys[0]).toMatchObject({
+      id: row.id,
+      name: 'Work laptop',
+      backed_up: false,
+    });
+    // The response is the list the UI renders and nothing else: no credential
+    // material can leak through it.
+    expect(Object.keys(result.passkeys[0]).sort()).toEqual([
+      'backed_up',
+      'created_at',
+      'device_type',
+      'id',
+      'last_used_at',
+      'name',
+    ]);
+  });
+
+  it('lists only the caller passkeys', async () => {
+    await insertPasskey(owner.id, 'Owner passkey');
+    await insertPasskey(other.id, 'Other passkey');
+    const caller = await createCallerForUser(owner.id);
+
+    const result = await caller.user.getPasskeys();
+
+    expect(result.passkeys.map(passkey => passkey.name)).toEqual(['Owner passkey']);
+  });
+
+  it('renames an owned passkey', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const caller = await createCallerForUser(owner.id);
+
+    const result = await caller.user.renamePasskey({ id: row.id, name: 'Home desktop' });
+
+    expect(result).toEqual({ success: true });
+    const [stored] = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe('Home desktop');
+  });
+
+  it('refuses to rename another user passkey', async () => {
+    const row = await insertPasskey(other.id, 'Other passkey');
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.user.renamePasskey({ id: row.id, name: 'Hijacked' })).rejects.toMatchObject(
+      { code: 'NOT_FOUND' }
+    );
+
+    const [stored] = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe('Other passkey');
+  });
+
+  it('deletes an owned passkey', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const caller = await createCallerForUser(owner.id);
+
+    const result = await caller.user.deletePasskey({ id: row.id });
+
+    expect(result).toEqual({ success: true });
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(0);
+  });
+
+  it('refuses to delete another user passkey and leaves it in place', async () => {
+    const row = await insertPasskey(other.id, 'Other passkey');
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.user.deletePasskey({ id: row.id })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  it('refuses an unknown passkey id', async () => {
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.user.deletePasskey({ id: '11111111-1111-4111-8111-111111111111' })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('refuses an empty passkey name', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.user.renamePasskey({ id: row.id, name: '   ' })).rejects.toThrow();
+
+    const [stored] = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe('Work laptop');
   });
 });

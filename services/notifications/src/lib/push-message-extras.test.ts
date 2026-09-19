@@ -110,14 +110,14 @@ describe('expoPushExtrasForPushData', () => {
 });
 
 describe('androidChannelIdForPushData (attention routing)', () => {
-  it('routes an attention raise to agent-attention and ordinary progress to the quiet channel', () => {
+  it('routes an attention raise to needs-input and ordinary progress to the quiet channel', () => {
     expect(
       androidChannelIdForPushData({
         type: 'cloud_agent_session',
         cliSessionId: 'ses_1',
         category: 'attention',
       })
-    ).toBe('agent-attention');
+    ).toBe('needs-input');
     expect(
       androidChannelIdForPushData({
         type: 'cloud_agent_session',

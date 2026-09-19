@@ -40,13 +40,15 @@ import {
   getUserFromSessionForCredentialIssuanceOrRedirect,
 } from './server';
 import { db } from '@/lib/drizzle';
+import { createSignInTicket } from '@/lib/auth/passkey';
 import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
 import {
-  byok_api_keys,
+  openai_chatgpt_connections,
   kilocode_users,
   organization_domain_claims,
   organization_seats_purchases,
   organizations,
+  passkey_sign_in_tickets,
   user_auth_provider,
 } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
@@ -55,7 +57,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import { generateApiToken, JWT_TOKEN_VERSION } from '@/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
 import jwt from 'jsonwebtoken';
 import type { Account, Profile } from 'next-auth';
@@ -74,7 +76,6 @@ import {
   OPENAI_TOKEN_SHARING_SCOPE,
 } from '@/lib/auth/openai/config';
 import { hosted_domain_specials } from '@/lib/auth/constants';
-import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 
 // Same namespace UUID used in user.server.ts
@@ -458,7 +459,9 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
     const token = await jwtCallback!(openAiSignInArgs(user.id, email, sub));
 
     expect(token.kiloUserId).toBe(user.id);
-    await expect(getOpenAiChatGptConnection(user.id)).resolves.toMatchObject({
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: null })
+    ).resolves.toMatchObject({
       access_token: 'signin-access-token',
       refresh_token: 'signin-refresh-token',
       issuer: OPENAI_ISSUER,
@@ -470,14 +473,40 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
 
     const [row] = await db
       .select()
-      .from(byok_api_keys)
+      .from(openai_chatgpt_connections)
       .where(
         and(
-          eq(byok_api_keys.kilo_user_id, user.id),
-          eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+          eq(openai_chatgpt_connections.kilo_user_id, user.id),
+          isNull(openai_chatgpt_connections.organization_id)
         )
       );
     expect(row?.is_enabled).toBe(true);
+  });
+
+  test('persists an organization connection when the profile carries the organization', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+    const organization = await createTestOrganization(
+      `ChatGPT BYOK ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+
+    const args = openAiSignInArgs(user.id, email, sub);
+    (args.profile as Record<string, unknown>).openAiChatGptOrganizationId = organization.id;
+
+    await jwtCallback!(args);
+
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: organization.id })
+    ).resolves.toMatchObject({
+      access_token: 'signin-access-token',
+      refresh_token: 'signin-refresh-token',
+      subject: sub,
+      status: 'connected',
+    });
+
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
   });
 
   test('does not store a connection for an identity-only sign-in', async () => {
@@ -491,7 +520,9 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
       })
     );
 
-    await expect(getOpenAiChatGptConnection(user.id)).resolves.toBeNull();
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: null })
+    ).resolves.toBeNull();
   });
 
   test('does not overwrite a working connection with an identity-only sign-in', async () => {
@@ -508,7 +539,9 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
       })
     );
 
-    await expect(getOpenAiChatGptConnection(user.id)).resolves.toMatchObject({
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: null })
+    ).resolves.toMatchObject({
       access_token: 'signin-access-token',
       refresh_token: 'signin-refresh-token',
     });
@@ -522,7 +555,9 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
     // requested scope; the refresh token is then the delegated grant's marker.
     await jwtCallback!(openAiSignInArgs(user.id, email, sub, { scope: undefined }));
 
-    await expect(getOpenAiChatGptConnection(user.id)).resolves.toMatchObject({
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: null })
+    ).resolves.toMatchObject({
       access_token: 'signin-access-token',
       refresh_token: 'signin-refresh-token',
     });
@@ -533,7 +568,7 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
     const { user, email } = await seedOpenAiUser(sub);
     const originalInsert = (db.insert as unknown as (table: unknown) => unknown).bind(db);
     const insertSpy = jest.spyOn(db, 'insert').mockImplementation(((table: unknown) => {
-      if (table === byok_api_keys) throw new Error('simulated storage failure');
+      if (table === openai_chatgpt_connections) throw new Error('simulated storage failure');
       return originalInsert(table);
     }) as unknown as typeof db.insert);
 
@@ -546,8 +581,8 @@ describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
 
     const rows = await db
       .select()
-      .from(byok_api_keys)
-      .where(eq(byok_api_keys.kilo_user_id, user.id));
+      .from(openai_chatgpt_connections)
+      .where(eq(openai_chatgpt_connections.kilo_user_id, user.id));
     expect(rows).toHaveLength(0);
   });
 });
@@ -1845,5 +1880,111 @@ describe('getProfileRedirectPath', () => {
 
       await expect(getProfileRedirectPath(orphanUser)).resolves.toBe('/connected-accounts');
     });
+  });
+});
+
+type PasskeyAuthorizeResult = {
+  id: string;
+  email: string;
+  name: string;
+  image: string;
+} | null;
+
+type PasskeyProviderConfig = {
+  id?: string;
+  name?: string;
+  credentials?: Record<string, unknown>;
+  authorize?: (credentials: { ticket: string } | undefined) => unknown;
+};
+
+/**
+ * next-auth v4 keeps a CredentialsProvider's user config under `options` until
+ * the request-scoped normalization merges it onto the provider, so the raw
+ * `authOptions.providers` entries for both `email` and `passkey` read
+ * `id: 'credentials'`. Resolve the user config the way next-auth does.
+ */
+function passkeyProviderConfigs(): PasskeyProviderConfig[] {
+  return authOptions.providers.map(candidate => ({
+    id: candidate.id,
+    ...((candidate as { options?: PasskeyProviderConfig }).options ?? {}),
+  }));
+}
+
+function getPasskeyAuthorize() {
+  const config = passkeyProviderConfigs().find(candidate => candidate.id === 'passkey');
+  if (!config || typeof config.authorize !== 'function') {
+    throw new Error('Passkey credentials provider is not registered');
+  }
+  return config.authorize as unknown as (
+    credentials: { ticket: string } | undefined
+  ) => Promise<PasskeyAuthorizeResult>;
+}
+
+describe('passkey provider', () => {
+  test('registers a passkey credentials provider that exchanges a ticket', () => {
+    expect(passkeyProviderConfigs().find(candidate => candidate.id === 'passkey')).toMatchObject({
+      name: 'Passkey',
+      credentials: { ticket: expect.anything() },
+    });
+  });
+
+  test('a ticket authorizes its owner and a replayed ticket mints no session', async () => {
+    const authorize = getPasskeyAuthorize();
+    const user = await insertTestUser({ google_user_name: 'Passkey Owner' });
+    const ticket = await createSignInTicket(user.id);
+
+    await expect(authorize({ ticket })).resolves.toEqual({
+      id: user.id,
+      email: user.google_user_email,
+      name: 'Passkey Owner',
+      image: user.google_user_image_url,
+    });
+
+    // A ticket is single-use: the atomic redemption consumed the row, so the
+    // replay resolves no user and NextAuth mints no session for it.
+    await expect(authorize({ ticket })).resolves.toBeNull();
+    await expect(authorize({ ticket: 'not-a-ticket' })).resolves.toBeNull();
+    await expect(authorize(undefined)).resolves.toBeNull();
+
+    // No `user_auth_provider` row is written for a passkey.
+    const providerRows = await db
+      .select({ provider: user_auth_provider.provider })
+      .from(user_auth_provider)
+      .where(eq(user_auth_provider.kilo_user_id, user.id));
+    expect(providerRows).toEqual([]);
+  });
+
+  test('an expired ticket is refused', async () => {
+    const authorize = getPasskeyAuthorize();
+    const user = await insertTestUser();
+    const ticket = await createSignInTicket(user.id);
+    await db
+      .update(passkey_sign_in_tickets)
+      .set({ expires_at: new Date(Date.now() - 60_000).toISOString() })
+      .where(eq(passkey_sign_in_tickets.kilo_user_id, user.id));
+
+    await expect(authorize({ ticket })).resolves.toBeNull();
+  });
+
+  test('the jwt callback resolves a passkey by user id and sets the session claims', async () => {
+    const user = await insertTestUser({
+      google_user_name: 'Passkey Jwt User',
+      web_session_pepper: 'passkey-web-session-pepper',
+    });
+    const jwtCallback = authOptions.callbacks!.jwt!;
+
+    const token = await jwtCallback({
+      token: {},
+      account: { provider: 'passkey', providerAccountId: user.id, type: 'credentials' },
+      user: { id: user.id, email: user.google_user_email },
+      trigger: 'signIn',
+      profile: undefined,
+      isNewUser: false,
+      session: undefined,
+    } as never);
+
+    expect(token.kiloUserId).toBe(user.id);
+    expect(token.authProvider).toBe('passkey');
+    expect(token.webSessionPepper).toBe('passkey-web-session-pepper');
   });
 });

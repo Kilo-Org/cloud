@@ -10,7 +10,7 @@
  *
  * Both carriers must land on one OS notification, so the app posts under the
  * shared contract: the same `kilo-needs-input:*` category id, the same
- * `agent-attention` Android channel, the same `cloud_agent_session` `data`
+ * `needs-input` Android channel, the same `cloud_agent_session` `data`
  * payload the push carries, and the same iOS interruption level. That is also
  * why the plan is keyed on a stable per-session identifier — a later plan for
  * the same session replaces the notification instead of stacking a second one.

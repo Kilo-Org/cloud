@@ -249,7 +249,7 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
         body: 'Request approved',
         data: raiseData(),
       },
-      trigger: { channelId: 'agent-attention' },
+      trigger: { channelId: 'needs-input' },
     });
     // Replacing under the acted-on identifier is a native replace, not a pair.
     expect(mocks.dismissNotificationAsync).not.toHaveBeenCalled();
@@ -294,7 +294,7 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
         categoryIdentifier: 'kilo-needs-input:permission',
         interruptionLevel: 'timeSensitive',
       },
-      trigger: { channelId: 'agent-attention' },
+      trigger: { channelId: 'needs-input' },
     });
   });
 
@@ -312,7 +312,7 @@ describe('handleNeedsInputNotificationResponse — approve and reply', () => {
         body: 'This request is no longer waiting.',
         data: raiseData(),
       },
-      trigger: { channelId: 'agent-attention' },
+      trigger: { channelId: 'needs-input' },
     });
   });
 

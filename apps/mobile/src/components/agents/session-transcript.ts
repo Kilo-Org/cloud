@@ -31,7 +31,14 @@ export type SessionTranscriptItem =
       timeMarker?: SessionTranscriptTimeMarker;
     }
   | { type: 'preparation'; attempt: PreparationAttempt }
-  | { type: 'tool-run'; id: string; parts: ToolPart[]; timeMarker?: SessionTranscriptTimeMarker };
+  | {
+      type: 'tool-run';
+      id: string;
+      /** The run's first part's message id, for resume-anchor matching. */
+      messageId: string;
+      parts: ToolPart[];
+      timeMarker?: SessionTranscriptTimeMarker;
+    };
 
 /**
  * A time marker opens a run of messages. Below this gap the messages belong to the
@@ -122,6 +129,22 @@ export function getSessionTranscriptItemType(item: SessionTranscriptItem): strin
     return info.role === 'user' ? 'message-user' : 'message-assistant';
   }
   return item.type;
+}
+
+/**
+ * The message id a resume anchor matches this item by: a message row's own id
+ * (the burst marker now rides on that row, so it adds no case of its own), or a
+ * condensed run's first part's message. A preparation attempt has no message row
+ * of its own, so it can never be an anchor target.
+ */
+export function getSessionTranscriptItemMessageId(item: SessionTranscriptItem): string | null {
+  if (item.type === 'message') {
+    return item.message.info.id;
+  }
+  if (item.type === 'preparation') {
+    return null;
+  }
+  return item.messageId;
 }
 
 export function mergeSessionTranscript(
@@ -318,9 +341,11 @@ export function condenseTranscriptToolRuns(
             .map(entry => carriedKeysByPart.get(entry.part.id))
             .find(key => key !== undefined && !emittedKeys.has(key))
         : undefined;
+      const first = run[0];
       emit({
         type: 'tool-run',
-        id: carriedKey ?? `tool-run:${run[0]?.part.id ?? ''}`,
+        id: carriedKey ?? `tool-run:${first?.part.id ?? ''}`,
+        messageId: first?.message.info.id ?? '',
         parts: run.map(entry => entry.part),
         ...(runMarker ? { timeMarker: runMarker } : {}),
       });

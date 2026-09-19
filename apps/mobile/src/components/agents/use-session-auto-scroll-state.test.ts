@@ -114,6 +114,16 @@ describe('getInitialSessionListAutoScrollVisibility', () => {
     expect(reset.isAtBottom).toBe(true);
     expect(reset.shouldAutoScroll).toBe(true);
   });
+
+  it('opens without following the tail when a resume anchor is set', () => {
+    // A `?at=` resume lands on an older row: the mount-time scroll to the
+    // newest message would discard the resume position. The button state is
+    // unchanged — the first real scroll event decides it.
+    expect(getInitialSessionListAutoScrollVisibility({ followTail: false })).toEqual({
+      shouldAutoScroll: false,
+      isAtBottom: true,
+    });
+  });
 });
 
 describe('shouldScheduleSessionAutoScroll', () => {

@@ -3182,5 +3182,8 @@
       "repositoryUnknown": "Kilo ne prepozna {{repository}} kot repozitorij GitHub ali GitLab. Izberi drug repozitorij v Kilu.",
       "repositoryUnsupported": "{{repository}} je repozitorij Bitbucket — Zaženi agenta ga še ne more uporabiti. Izberi drug repozitorij v Kilu."
     }
+  },
+  "launcher": {
+    "openLastSession": "Odpri zadnjo sejo"
   }
 }

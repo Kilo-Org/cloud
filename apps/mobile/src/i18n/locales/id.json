@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "Kilo tidak mengenali {{repository}} sebagai repositori GitHub atau GitLab. Pilih repositori lain di Kilo.",
       "repositoryUnsupported": "{{repository}} adalah repositori Bitbucket — Mulai agen belum bisa menggunakannya. Pilih repositori lain di Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Buka sesi terakhir"
   }
 }

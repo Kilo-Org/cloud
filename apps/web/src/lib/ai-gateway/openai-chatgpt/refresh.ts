@@ -1,17 +1,18 @@
 import 'server-only';
 
-import { and, eq } from 'drizzle-orm';
-import { byok_api_keys } from '@kilocode/db/schema';
+import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { OPENAI_CLIENT_ID, OPENAI_CLIENT_SECRET, BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { OPENAI_RESOURCE, OPENAI_TOKEN_ENDPOINT } from '@/lib/auth/openai/config';
-import { OPENAI_CHATGPT_PROVIDER_ID } from './provider-id';
 import {
   decryptOpenAiChatGptConnection,
   markOpenAiChatGptConnectionErrored,
+  openAiChatGptOwnerWhere,
+  openAiChatGptOwnerKey,
   readOpenAiChatGptConnectionRow,
   type OpenAiChatGptDatabase,
+  type OpenAiChatGptOwner,
 } from './store';
 import type { OpenAiChatGptConnection } from './types';
 
@@ -83,7 +84,7 @@ type RefreshDecision =
 type RefreshAttempt = RefreshDecision | { kind: 'retry' };
 
 /**
- * Single-flight per user within one process: concurrent callers share the same
+ * Single-flight per owner within one process: concurrent callers share the same
  * in-flight refresh instead of each issuing their own request.
  */
 const inFlightRefreshes = new Map<string, Promise<OpenAiChatGptAccessTokenOutcome>>();
@@ -161,11 +162,15 @@ function readExpiresIn(body: unknown): number | undefined {
 }
 
 /**
- * Logs only the OAuth error code and the user id. The message names no
- * credential and prints no value: a log line is written once and read forever.
+ * Logs only the OAuth error code and the owner. The message names no credential
+ * and prints no value: a log line is written once and read forever.
  */
-function logRefreshFailure(userId: string, errorCode: string): void {
-  console.error('[openai-chatgpt] refresh failed: %s (user %s)', errorCode, userId);
+function logRefreshFailure(owner: OpenAiChatGptOwner, errorCode: string): void {
+  console.error(
+    '[openai-chatgpt] refresh failed: %s (%s)',
+    errorCode,
+    openAiChatGptOwnerKey(owner)
+  );
 }
 
 function isRetryableRefreshFailure(response: Response, errorCode: string | undefined): boolean {
@@ -183,7 +188,7 @@ function isRetryableRefreshFailure(response: Response, errorCode: string | undef
  */
 async function attemptRefresh(
   tx: OpenAiChatGptDatabase,
-  userId: string,
+  owner: OpenAiChatGptOwner,
   connection: OpenAiChatGptConnection
 ): Promise<RefreshAttempt> {
   const refreshToken = connection.refresh_token;
@@ -213,24 +218,19 @@ async function attemptRefresh(
       };
 
       await tx
-        .update(byok_api_keys)
+        .update(openai_chatgpt_connections)
         .set({
-          encrypted_api_key: encryptApiKey(JSON.stringify(updated), BYOK_ENCRYPTION_KEY),
+          encrypted_connection: encryptApiKey(JSON.stringify(updated), BYOK_ENCRYPTION_KEY),
           is_enabled: true,
         })
-        .where(
-          and(
-            eq(byok_api_keys.kilo_user_id, userId),
-            eq(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
-          )
-        );
+        .where(openAiChatGptOwnerWhere(owner));
 
       return { kind: 'access_token', accessToken };
     }
   }
 
   const errorCode = readOAuthErrorCode(body) ?? `http_${response.status}`;
-  logRefreshFailure(userId, errorCode);
+  logRefreshFailure(owner, errorCode);
 
   if (TERMINAL_REFRESH_ERROR_CODES.has(errorCode)) {
     return { kind: 'terminal' };
@@ -252,23 +252,23 @@ async function attemptRefresh(
  */
 async function resolveInsideLock(
   tx: OpenAiChatGptDatabase,
-  userId: string
+  owner: OpenAiChatGptOwner
 ): Promise<RefreshAttempt> {
-  const row = await readOpenAiChatGptConnectionRow(tx, userId, { forUpdate: true });
+  const row = await readOpenAiChatGptConnectionRow(tx, owner, { forUpdate: true });
   if (!row || !row.is_enabled) return { kind: 'no_connection' };
 
-  const connection = decryptOpenAiChatGptConnection(row.encrypted_api_key);
+  const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
   if (!connection) return { kind: 'no_connection' };
 
   if (connection.expires_at - nowSeconds() > OPENAI_CHATGPT_REFRESH_WINDOW_SECONDS) {
     return { kind: 'access_token', accessToken: connection.access_token };
   }
 
-  const attempt = await attemptRefresh(tx, userId, connection);
+  const attempt = await attemptRefresh(tx, owner, connection);
   if (attempt.kind === 'terminal') {
     await markOpenAiChatGptConnectionErrored(
       tx,
-      userId,
+      owner,
       connection,
       OPENAI_CHATGPT_RECONNECT_MESSAGE
     );
@@ -277,22 +277,22 @@ async function resolveInsideLock(
 }
 
 async function resolveOpenAiChatGptAccessTokenUncached(
-  userId: string
+  owner: OpenAiChatGptOwner
 ): Promise<OpenAiChatGptAccessTokenOutcome> {
   try {
     if (!OPENAI_CLIENT_ID || !OPENAI_CLIENT_SECRET) {
       console.error(
-        '[openai-chatgpt] refresh failed: missing client configuration (user %s)',
-        userId
+        '[openai-chatgpt] refresh failed: missing client configuration (%s)',
+        openAiChatGptOwnerKey(owner)
       );
       return { kind: 'failed' };
     }
 
     // Fast path: no lock, no network call while the stored token is fresh. A
     // disabled row is skipped so it can never serve a request.
-    const row = await readOpenAiChatGptConnectionRow(db, userId);
+    const row = await readOpenAiChatGptConnectionRow(db, owner);
     const current =
-      row?.is_enabled === true ? decryptOpenAiChatGptConnection(row.encrypted_api_key) : null;
+      row?.is_enabled === true ? decryptOpenAiChatGptConnection(row.encrypted_connection) : null;
     if (
       current &&
       current.expires_at - nowSeconds() > OPENAI_CHATGPT_REFRESH_WINDOW_SECONDS &&
@@ -306,7 +306,7 @@ async function resolveOpenAiChatGptAccessTokenUncached(
       // attempts runs with it released, and each attempt re-reads the row, so a
       // sibling instance that refreshed meanwhile is adopted rather than
       // refreshed over.
-      const decision = await db.transaction(tx => resolveInsideLock(tx, userId));
+      const decision = await db.transaction(tx => resolveInsideLock(tx, owner));
 
       // A terminal decision has already disabled the row inside that transaction.
       if (decision.kind !== 'retry') return decision;
@@ -318,31 +318,32 @@ async function resolveOpenAiChatGptAccessTokenUncached(
 
     return { kind: 'failed' };
   } catch (error) {
-    // A thrown error must never carry a credential: log only its type and the user.
+    // A thrown error must never carry a credential: log only its type and the owner.
     console.error(
-      '[openai-chatgpt] refresh errored: %s (user %s)',
+      '[openai-chatgpt] refresh errored: %s (%s)',
       error instanceof Error ? error.name : 'UnknownError',
-      userId
+      openAiChatGptOwnerKey(owner)
     );
     return { kind: 'failed' };
   }
 }
 
 /**
- * Resolves the delegated credential for the user's ChatGPT connection.
+ * Resolves the delegated credential for the owner's ChatGPT connection.
  * Concurrent calls within one process share one refresh. `terminal` means the
  * stored credential can never work again: the connection has been cleared and
  * disabled, and the caller must not fall back to another billing path.
  */
 export function resolveOpenAiChatGptAccessToken(
-  userId: string
+  owner: OpenAiChatGptOwner
 ): Promise<OpenAiChatGptAccessTokenOutcome> {
-  const existing = inFlightRefreshes.get(userId);
+  const key = openAiChatGptOwnerKey(owner);
+  const existing = inFlightRefreshes.get(key);
   if (existing) return existing;
 
-  const pending = resolveOpenAiChatGptAccessTokenUncached(userId).finally(() => {
-    inFlightRefreshes.delete(userId);
+  const pending = resolveOpenAiChatGptAccessTokenUncached(owner).finally(() => {
+    inFlightRefreshes.delete(key);
   });
-  inFlightRefreshes.set(userId, pending);
+  inFlightRefreshes.set(key, pending);
   return pending;
 }

@@ -5,6 +5,7 @@ import {
   collectTranscriptItemKeysByPart,
   condenseTranscriptToolRuns,
   getSessionTranscriptItemKey,
+  getSessionTranscriptItemMessageId,
   mergeSessionTranscript,
   TRANSCRIPT_TIME_MARKER_GAP_MS,
 } from '@/components/agents/session-transcript';
@@ -317,6 +318,46 @@ function isContiguousSuffix(original: string[], next: string[]): boolean {
   const offset = next.length - original.length;
   return original.every((key, index) => next[offset + index] === key);
 }
+
+function messageIdsOf(items: ReturnType<typeof mergeSessionTranscript>): (string | null)[] {
+  return items.map(item => getSessionTranscriptItemMessageId(item));
+}
+
+describe('getSessionTranscriptItemMessageId', () => {
+  it('maps a message row to its message id', () => {
+    const transcript = mergeSessionTranscript([message('msg_001')], []);
+
+    // The burst marker rides on the message item, so the row count is one per
+    // message and the marker adds no row of its own.
+    expect(keysOf(transcript)).toEqual(['msg_001']);
+    expect(messageIdsOf(transcript)).toEqual(['msg_001']);
+  });
+
+  it('maps a preparation row to null — it renders no message row of its own', () => {
+    const transcript = mergeSessionTranscript(
+      [message('msg_001')],
+      [attempt('attempt_001', 'msg_001')]
+    );
+
+    expect(messageIdsOf(transcript)).toEqual(['msg_001', null]);
+  });
+
+  it("maps a condensed tool run to its first part's message id", () => {
+    const base = 1_000_000_000;
+    const condensed = condenseTranscriptToolRuns(
+      mergeSessionTranscript(
+        [
+          assistantToolOnlyMessageAt('msg_tool_a', base, ['ta1', 'ta2']),
+          assistantToolOnlyMessageAt('msg_tool_b', base + 1000, ['tb1']),
+        ],
+        []
+      )
+    );
+
+    expect(keysOf(condensed)).toEqual(['tool-run:ta1']);
+    expect(messageIdsOf(condensed)).toEqual(['msg_tool_a']);
+  });
+});
 
 describe('session transcript', () => {
   it('places preparation attempts after their trigger message', () => {

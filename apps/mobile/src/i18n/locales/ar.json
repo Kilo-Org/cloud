@@ -3230,5 +3230,8 @@
       "repositoryUnknown": "لا يتعرّف Kilo على {{repository}} كمستودع GitHub أو GitLab. اختر مستودعًا آخر في Kilo.",
       "repositoryUnsupported": "{{repository}} مستودع Bitbucket — لا يستطيع تشغيل وكيل استخدامه بعد. اختر مستودعًا آخر في Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "فتح آخر جلسة"
   }
 }

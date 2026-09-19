@@ -36,7 +36,7 @@ const AllAuthProviders = [
   {
     id: 'openai',
     name: 'ChatGPT',
-    signInLabel: 'Sign in with ChatGPT',
+    signInLabel: 'Continue with ChatGPT',
     icon: <OpenAILogo />,
   },
   { id: 'fake-login', name: 'Test Account', icon: fakeLoginIcon },

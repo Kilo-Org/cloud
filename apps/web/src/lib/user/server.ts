@@ -80,6 +80,7 @@ import {
   isOpenAiTokenSharingGrant,
 } from '@/lib/auth/openai/config';
 import { saveOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
+import type { OpenAiChatGptOwner } from '@/lib/ai-gateway/openai-chatgpt/store';
 import {
   GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET,
@@ -305,19 +306,28 @@ async function persistOpenAiChatGptConnection(
     if (!isOpenAiTokenSharingGrant(account)) return;
 
     const email = (profile as { email?: unknown } | undefined)?.email;
-    await saveOpenAiChatGptConnection(userId, {
-      access_token: accessToken,
-      ...(account.refresh_token ? { refresh_token: account.refresh_token } : {}),
-      expires_at: account.expires_at ?? Math.floor(Date.now() / 1000) + 3600,
-      ...(account.scope ? { scope: account.scope } : {}),
-      ...(account.token_type ? { token_type: account.token_type } : {}),
-      issuer: OPENAI_ISSUER,
-      client_id: OPENAI_CLIENT_ID,
-      subject,
-      ...(typeof email === 'string' && email ? { email } : {}),
-      connected_at: new Date().toISOString(),
-      status: 'connected',
-    });
+    const organizationId = (profile as ExtendedProfile | undefined)?.openAiChatGptOrganizationId;
+    const owner: OpenAiChatGptOwner = {
+      kiloUserId: userId,
+      organizationId: organizationId ?? null,
+    };
+    await saveOpenAiChatGptConnection(
+      owner,
+      {
+        access_token: accessToken,
+        ...(account.refresh_token ? { refresh_token: account.refresh_token } : {}),
+        expires_at: account.expires_at ?? Math.floor(Date.now() / 1000) + 3600,
+        ...(account.scope ? { scope: account.scope } : {}),
+        ...(account.token_type ? { token_type: account.token_type } : {}),
+        issuer: OPENAI_ISSUER,
+        client_id: OPENAI_CLIENT_ID,
+        subject,
+        ...(typeof email === 'string' && email ? { email } : {}),
+        connected_at: new Date().toISOString(),
+        status: 'connected',
+      },
+      userId
+    );
   } catch (error) {
     captureException(error, {
       tags: { operation: 'openai_chatgpt_connection_persist' },
@@ -675,6 +685,7 @@ async function getImpactTrackingContextFromAuthFlow(requestHeaders?: Headers): P
 
 type ExtendedProfile = Profile & {
   isNewUser?: boolean; // Add isNewUser to the user type
+  openAiChatGptOrganizationId?: string;
 };
 
 const posthogClient = PostHogClient();
@@ -924,6 +935,19 @@ export const authOptions: NextAuthOptions = {
 
         isAccountLinking = linkingSession && linkingSession.targetProvider === accountInfo.provider;
 
+        // The linking session is consumed here, so it carries the organization
+        // through to the jwt callback on the profile, the same way `isNewUser`
+        // travels. Only an OpenAI link stores an organization-scoped
+        // connection, so the session must have targeted OpenAI.
+        if (
+          account.provider === 'openai' &&
+          linkingSession?.targetProvider === 'openai' &&
+          linkingSession.organizationId &&
+          profile
+        ) {
+          (profile as ExtendedProfile).openAiChatGptOrganizationId = linkingSession.organizationId;
+        }
+
         // if a user's email domain matches any organization's SSO domain and they are not logging in with SSO, force them to use SSO immediately
         const domain = getLowerDomainFromEmail(accountInfo.google_user_email);
 
@@ -963,7 +987,13 @@ export const authOptions: NextAuthOptions = {
 
         // we don't need to check gmail domains for SSO for now.
         // This is mostly an optimization so we don't hit the DB on every gmail login since they defacto aren't using SSO
-        if (domainToCheck !== 'gmail.com') {
+        //
+        // Account linking is not a sign-in: the person is already
+        // authenticated and is only attaching another provider. Enforcing the
+        // domain SSO policy here would redirect them to the sign-in page and
+        // abort the link, so a BYOK connection (for example "Sign in with
+        // ChatGPT") would never be stored for an SSO-protected domain.
+        if (domainToCheck !== 'gmail.com' && !isAccountLinking) {
           // Fake login is intentionally exempt in supported non-production environments.
           if (accountInfo.provider !== 'workos' && accountInfo.provider !== 'fake-login') {
             const ssoAuthority = await resolveSsoAuthorityForDomain(domainToCheck);
@@ -1523,8 +1553,12 @@ async function appendCallbackPath(url: string): Promise<string> {
   const headersList = await headers();
   const pathname = headersList.get('x-pathname');
   if (pathname && pathname !== '/') {
+    // Keep the request's query in the callback so a resume link does not lose
+    // its `?at=` anchor across sign-in (see the `/cloud/sessions/<id>` route,
+    // whose layout redirects before the page can build its own callbackPath).
+    const search = headersList.get('x-search') ?? '';
     const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}callbackPath=${encodeURIComponent(pathname)}`;
+    return `${url}${separator}callbackPath=${encodeURIComponent(`${pathname}${search}`)}`;
   }
   return url;
 }

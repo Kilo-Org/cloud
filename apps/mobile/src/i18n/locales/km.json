@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "Kilo មិនស្គាល់ {{repository}} ជាឃ្លាំងកូដ GitHub ឬ GitLab ទេ។ ជ្រើសរើសឃ្លាំងកូដផ្សេងនៅក្នុង Kilo។",
       "repositoryUnsupported": "{{repository}} គឺជាឃ្លាំងកូដ Bitbucket — ចាប់ផ្តើមភ្នាក់ងារមិនអាចប្រើវាបាននៅឡើយទេ។ ជ្រើសរើសឃ្លាំងកូដផ្សេងនៅក្នុង Kilo។"
     }
+  },
+  "launcher": {
+    "openLastSession": "បើកវគ្គចុងក្រោយ"
   }
 }

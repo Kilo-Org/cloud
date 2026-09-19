@@ -445,6 +445,12 @@ export async function applyMetadataChanges(
       const delivery = refreshGlanceableSessions(env, {
         userId: kiloUserId,
         cliSessionIds: [sessionId],
+        // A permission wait appearing or clearing gates the Approve control on
+        // the locked/background surfaces, so it must not wait for the shared
+        // delivery window. This caller is the one that saw the previous status.
+        approvalChanged:
+          notification.previousStatus === 'permission' ||
+          notification.session.status === 'permission',
       });
       if (ctx) ctx.waitUntil(delivery);
       else await delivery;

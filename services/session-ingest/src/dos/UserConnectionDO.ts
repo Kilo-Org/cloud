@@ -762,16 +762,27 @@ export class UserConnectionDO extends DurableObject<Env> {
 
     if (attachment.kiloUserId) {
       const changedSessionIds = new Set<string>();
+      // `needsApproval` gates the Approve control on the locked surfaces, so a
+      // move into or out of `permission` must bypass the delivery window.
+      let approvalChanged = false;
       for (const session of this.aggregateSessions()) {
-        if (previousStatuses.get(session.id) !== session.status) changedSessionIds.add(session.id);
+        const previous = previousStatuses.get(session.id);
+        if (previous !== session.status) {
+          changedSessionIds.add(session.id);
+          if (previous === 'permission' || session.status === 'permission') approvalChanged = true;
+        }
         previousStatuses.delete(session.id);
       }
-      for (const sessionId of previousStatuses.keys()) changedSessionIds.add(sessionId);
+      for (const [sessionId, previous] of previousStatuses) {
+        changedSessionIds.add(sessionId);
+        if (previous === 'permission') approvalChanged = true;
+      }
       if (changedSessionIds.size > 0) {
         this.ctx.waitUntil(
           refreshGlanceableSessions(this.env, {
             userId: attachment.kiloUserId,
             cliSessionIds: [...changedSessionIds],
+            approvalChanged,
           })
         );
       }
@@ -1920,6 +1931,13 @@ export class UserConnectionDO extends DurableObject<Env> {
         refreshGlanceableSessions(this.env, {
           userId: attachment.kiloUserId,
           cliSessionIds: rootSessionIds,
+          // A disconnecting CLI drops a permission wait to `retry`, which
+          // clears the Approve control on the locked surfaces. The in-memory
+          // status is the last one the CLI reported; the attention reset above
+          // writes the DB but does not touch this list.
+          approvalChanged: sessions.some(
+            session => ownedSessions.has(session.id) && session.status === 'permission'
+          ),
         })
       );
     }

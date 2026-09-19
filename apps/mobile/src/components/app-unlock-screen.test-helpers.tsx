@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the five layouts reach. */
 import { createElement, type ElementType, type ReactElement, useState } from 'react';
-import { type AppStateStatus } from 'react-native';
+import { type AppStateStatus, type KeyboardEvent, type KeyboardEventName } from 'react-native';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { expect, vi } from 'vitest';
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
@@ -53,10 +53,26 @@ const storage = vi.hoisted(() => ({ getItemAsync: vi.fn(), setItemAsync: vi.fn()
 const catalogs = vi.hoisted(() => ({ fr: vi.fn() }));
 const announcements = vi.hoisted(() => vi.fn());
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
-const lifecycle = vi.hoisted(() => ({
-  change: undefined as ((state: AppStateStatus) => void) | undefined,
+const keyboard = vi.hoisted(() => ({
+  metrics: vi.fn(),
+  listeners: new Map<KeyboardEventName, (event: KeyboardEvent) => void>(),
 }));
-export { announcements, catalogs, lifecycle, native, platform, storage };
+// React Native's AppState supports any number of listeners, and real trees
+// register several (the unlock provider plus the toast keyboard offset). A
+// single slot would let the last registration shadow the earlier ones, so the
+// harness broadcasts to every subscriber and `change` is the emitter itself.
+const lifecycle = vi.hoisted(() => {
+  const listeners = new Set<(state: AppStateStatus) => void>();
+  return {
+    listeners,
+    change: (state: AppStateStatus) => {
+      for (const listener of listeners) {
+        listener(state);
+      }
+    },
+  };
+});
+export { announcements, catalogs, keyboard, lifecycle, native, platform, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
@@ -72,16 +88,23 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platform,
+  Keyboard: {
+    metrics: keyboard.metrics,
+    addListener: (event: KeyboardEventName, listener: (event: KeyboardEvent) => void) => {
+      keyboard.listeners.set(event, listener);
+      return { remove: () => keyboard.listeners.delete(event) };
+    },
+  },
   StatusBar: { currentHeight: 0 },
   I18nManager: { isRTL: false },
   AccessibilityInfo: { announceForAccessibility: announcements },
   AppState: {
     currentState: 'active',
     addEventListener: (_event: string, listener: (state: AppStateStatus) => void) => {
-      lifecycle.change = listener;
+      lifecycle.listeners.add(listener);
       return {
         remove: () => {
-          lifecycle.change = undefined;
+          lifecycle.listeners.delete(listener);
         },
       };
     },
@@ -287,6 +310,8 @@ export function resetUnlockMocks() {
   vi.stubGlobal('__DEV__', true);
   vi.resetAllMocks();
   platform.OS = 'ios';
+  keyboard.listeners.clear();
+  lifecycle.listeners.clear();
   storage.getItemAsync.mockResolvedValue('enabled');
   native.hasHardwareAsync.mockResolvedValue(true);
   native.isEnrolledAsync.mockResolvedValue(true);

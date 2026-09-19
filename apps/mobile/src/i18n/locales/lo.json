@@ -163,6 +163,7 @@
     "useDifferentEmail": "ໃຊ້ອີເມວອື່ນ",
     "signInWithApple": "ເຂົ້າສູ່ລະບົບດ້ວຍ Apple",
     "signInWithGoogle": "ເຂົ້າສູ່ລະບົບດ້ວຍ Google",
+    "signInWithPasskey": "ເຂົ້າສູ່ລະບົບດ້ວຍກະແຈເຂົ້າ",
     "emailAddress": "ທີ່ຢູ່ອີເມວ",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "ສືບຕໍ່ດ້ວຍອີເມວ",
@@ -175,6 +176,10 @@
     "termsConnector": " ແລະ ",
     "termsSuffix": ".",
     "moreSignInOptions": "ຕົວເລືອກເຂົ້າສູ່ລະບົບເພີ່ມເຕີມ",
+    "passkeyCancelled": "ການເຂົ້າສູ່ລະບົບດ້ວຍກະແຈເຂົ້າຖືກຍົກເລິກ. ກະລຸນາລອງອີກຄັ້ງ.",
+    "passkeyNotFound": "ບໍ່ມີກະແຈເຂົ້າທີ່ບັນທຶກໄວ້ສຳລັບອຸປະກອນນີ້. ໃຫ້ເຂົ້າດ້ວຍ Apple, Google ຫຼືອີເມວຂອງທ່ານແທນ.",
+    "passkeyUnsupported": "ກະແຈເຂົ້າບໍ່ມີໃນອຸປະກອນນີ້. ໃຫ້ເຂົ້າດ້ວຍ Apple, Google ຫຼືອີເມວຂອງທ່ານແທນ.",
+    "passkeyFailed": "ບໍ່ສາມາດເຂົ້າສູ່ລະບົບດ້ວຍກະແຈເຂົ້າໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
     "couldNotCompleteSignIn": "ບໍ່ສາມາດເຂົ້າສູ່ລະບົບໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
     "sessionEnded": "ເຊສຊັນຂອງທ່ານສິ້ນສຸດແລ້ວ. ກະລຸນາເຂົ້າສູ່ລະບົບອີກຄັ້ງ.",
     "signInCodeExpired": "ລະຫັດເຂົ້າສູ່ລະບົບຂອງທ່ານໝົດອາຍຸແລ້ວ. ກະລຸນາລອງອີກຄັ້ງ.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "ບັນຊີທົດສອບ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO ສຳລັບອົງກອນ"
+    "providerEnterpriseSso": "SSO ສຳລັບອົງກອນ",
+    "passkeysTitle": "ກະແຈເຂົ້າ",
+    "passkeysSubtitle": "ເຂົ້າສູ່ລະບົບໂດຍບໍ່ມີລະຫັດຜ່ານ",
+    "passkeysEmpty": "ຍັງບໍ່ມີກະແຈເຂົ້າ",
+    "passkeysEmptyHint": "$t(profile.addPasskey) ເພື່ອເຂົ້າສູ່ລະບົບໂດຍບໍ່ມີລະຫັດຜ່ານ.",
+    "passkeysCouldNotLoad": "ບໍ່ສາມາດໂຫຼດກະແຈເຂົ້າໄດ້",
+    "passkeysLoadFailed": "ກະແຈເຂົ້າບໍ່ມີຈົນກວ່າສິ່ງນີ້ຈະໂຫຼດ.",
+    "addPasskey": "ເພີ່ມກະແຈເຂົ້າ",
+    "passkeyDefaultName": "ກະແຈເຂົ້າ",
+    "passkeyAddedOn": "ເພີ່ມເມື່ອ {{date}}",
+    "passkeyAdded": "ເພີ່ມກະແຈເຂົ້າແລ້ວ.",
+    "passkeyAddFailed": "ບໍ່ສາມາດເພີ່ມກະແຈເຂົ້າໄດ້. ລອງອີກຄັ້ງ.",
+    "passkeyAddUnsupported": "ອຸປະກອນນີ້ສ້າງກະແຈເຂົ້າບໍ່ໄດ້.",
+    "passkeyAddCancelled": "ການສ້າງກະແຈເຂົ້າຖືກຍົກເລິກ.",
+    "passkeyRemoved": "ລຶບກະແຈເຂົ້າແລ້ວ.",
+    "passkeyRemoveFailed": "ບໍ່ສາມາດລຶບກະແຈເຂົ້ານັ້ນໄດ້. ລອງອີກຄັ້ງ.",
+    "passkeyRenamed": "ປ່ຽນຊື່ກະແຈເຂົ້າແລ້ວ.",
+    "passkeyName": "ຊື່ກະແຈເຂົ້າ",
+    "renamePasskey": "ປ່ຽນຊື່ກະແຈເຂົ້າ",
+    "removePasskey": "ລຶບກະແຈເຂົ້າ",
+    "removePasskeyTitle": "ລຶບກະແຈເຂົ້າ?",
+    "removePasskeyMessage": "ທ່ານຈະບໍ່ສາມາດເຂົ້າສູ່ລະບົບດ້ວຍກະແຈເຂົ້ານີ້ໄດ້ອີກ."
   },
   "preferences": {
     "general": "ທົ່ວໄປ",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "ໂຫຼດແລ້ວ {{displayCount}} ຈາກ {{total}} ໄຟລ໌",
       "filesStillLoading": "ໄຟລ໌ຍັງກຳລັງໂຫຼດ. ດຶງເພື່ອໂຫຼດໃໝ່.",
       "goToOverview": "ໄປທີ່ພາບລວມ",
-      "goToOverviewTab": "ໄປທີ່ແຖບພາບລວມ"
+      "goToOverviewTab": "ໄປທີ່ແຖບພາບລວມ",
+      "expandAllLines_one": "ຂະຫຍາຍທັງໝົດ {{displayCount}} ບັນທັດ",
+      "expandAllLines_other": "ຂະຫຍາຍທັງໝົດ {{displayCount}} ບັນທັດ",
+      "expandLines_one": "ສະແດງ {{displayCount}} ບັນທັດ ({{start}}–{{end}})",
+      "expandLines_other": "ສະແດງ {{displayCount}} ບັນທັດ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "ສະແດງໂຄດອ້ອມຂ້າງ {{displayCount}} ບັນທັດ",
+      "expandLinesOfContext_other": "ສະແດງໂຄດອ້ອມຂ້າງ {{displayCount}} ບັນທັດ",
+      "expandMoreLines_one": "ສະແດງອີກ {{displayCount}} ບັນທັດ ({{start}}–{{end}})",
+      "expandMoreLines_other": "ສະແດງອີກ {{displayCount}} ບັນທັດ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "ໂຫຼດ {{loaded}} ຈາກ {{total}} ໄຟລ໌ແລ້ວ",
+      "loadedOfTotalFiles_other": "ໂຫຼດ {{loaded}} ຈາກ {{total}} ໄຟລ໌ແລ້ວ"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "ບໍ່ມີການຂຶ້ນບັນທັດໃໝ່ຢູ່ທ້າຍໄຟລ໌.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "ອ້າງອີງໂຄດເກົ່າໃນ {{path}}"
       },
       "deletedUser": "ຜູ້ໃຊ້ທີ່ຖືກລຶບ",
-      "replyForbiddenTerm": "ທ່ານບໍ່ມີສິດຕອບໃນ{{term}}ນີ້."
+      "replyForbiddenTerm": "ທ່ານບໍ່ມີສິດຕອບໃນ{{term}}ນີ້.",
+      "moreLinesAbove_one": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ.",
+      "moreLinesAbove_other": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ."
     },
     "couldNotOpenGitHubAppSettings": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າແອັບ GitHub ໄດ້.",
     "installKiloGitHubApp": "ຕິດຕັ້ງແອັບ Kilo ສຳລັບ GitHub",
@@ -706,7 +744,9 @@
       "statusContext": "ໂຄດອ້ອມຂ້າງ",
       "lineLabel": "{{status}} ບັນທັດ {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(ວ່າງເປົ່າ)"
+      "emptyLine": "(ວ່າງເປົ່າ)",
+      "truncationBanner_one": "ສະແດງໄຟລ໌ທີ່ປ່ຽນແປງ {{limit}} ໄຟລ໌ທຳອິດຈາກທັງໝົດ {{total}} ໄຟລ໌ — ຕາມຂີດຈຳກັດຂອງ GitHub API.",
+      "truncationBanner_other": "ສະແດງໄຟລ໌ທີ່ປ່ຽນແປງ {{limit}} ໄຟລ໌ທຳອິດຈາກທັງໝົດ {{total}} ໄຟລ໌ — ຕາມຂີດຈຳກັດຂອງ GitHub API."
     },
     "linkPasteClipboardEmpty": "ຄລິບບອດວ່າງເປົ່າ.",
     "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
@@ -783,11 +823,11 @@
     "previewFullDescription": "ການແຈ້ງເຕືອນສະແດງເນື້ອຫາຂໍ້ຄວາມໃນໜ້າຈໍລັອກຂອງທ່ານ.",
     "previewGenericDescription": "ການແຈ້ງເຕືອນບອກພຽງວ່າມີເຫດການເກີດຂຶ້ນ. ເປີດ Kilo ເພື່ອອ່ານລາຍລະອຽດ.",
     "channel": {
+      "agentProgress": "ຄວາມຄືບໜ້າຂອງຕົວແທນ",
       "chat": "ຂໍ້ຄວາມສົນທະນາ",
       "kiloclaw": "ກິດຈະກຳ KiloClaw",
       "balance": "ການແຈ້ງເຕືອນຍອດເງິນ",
-      "security": "ບັນຫາດ້ານຄວາມປອດໄພທີ່ກວດພົບ",
-      "agent": "ເຊສຊັນຂອງຕົວແທນ"
+      "security": "ບັນຫາດ້ານຄວາມປອດໄພທີ່ກວດພົບ"
     },
     "category": {
       "chatMessagesSubtitle": "ຄຳຕອບໃນການສົນທະນາຂອງທ່ານ",
@@ -880,7 +920,9 @@
       "uploadFailed": "ອັບໂຫຼດບໍ່ສຳເລັດ.",
       "failedToUploadFile": "ບໍ່ສາມາດອັບໂຫຼດໄຟລ໌ໄດ້: {{reason}}",
       "nothingToPaste": "ບໍ່ມີຂໍ້ມູນໃຫ້ວາງ.",
-      "metadataStripFailed": "ບໍ່ສາມາດລຶບຂໍ້ມູນກຳກັບຮູບຖ່າຍໄດ້."
+      "metadataStripFailed": "ບໍ່ສາມາດລຶບຂໍ້ມູນກຳກັບຮູບຖ່າຍໄດ້.",
+      "limit_one": "ທ່ານສາມາດແນບໄດ້ສູງສຸດ {{displayCount}} ໄຟລ໌.",
+      "limit_other": "ທ່ານສາມາດແນບໄດ້ສູງສຸດ {{displayCount}} ໄຟລ໌."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1666,11 @@
       "syncFindings": "ຊິງຂໍ້ມູນບັນຫາທີ່ກວດພົບ",
       "syncNow": "ຊິງຂໍ້ມູນຕອນນີ້",
       "syncQueued": "ເພີ່ມການຊິງຂໍ້ມູນໃສ່ຄິວແລ້ວ",
-      "syncStatusUnavailable": "ບໍ່ສາມາດເບິ່ງສະຖານະການຊິງຂໍ້ມູນໄດ້."
+      "syncStatusUnavailable": "ບໍ່ສາມາດເບິ່ງສະຖານະການຊິງຂໍ້ມູນໄດ້.",
+      "daysOverdue_one": "ເກີນກຳນົດ {{displayCount}} ມື້",
+      "daysOverdue_other": "ເກີນກຳນົດ {{displayCount}} ມື້",
+      "findingsCount_one": "ບັນຫາທີ່ກວດພົບ {{displayCount}} ລາຍການ",
+      "findingsCount_other": "ບັນຫາທີ່ກວດພົບ {{displayCount}} ລາຍການ"
     },
     "dashboardMetrics": {
       "openFindings": "ບັນຫາທີ່ຍັງເປີດຢູ່",
@@ -2168,7 +2214,13 @@
       "updateTodos": "ອັບເດດລາຍການວຽກ",
       "linesBadge": "{{displayCount}} ບັນທັດ",
       "filesBadge": "{{displayCount}} ໄຟລ໌",
-      "matchesBadge": "ພົບ {{displayCount}} ລາຍການ"
+      "matchesBadge": "ພົບ {{displayCount}} ລາຍການ",
+      "filesBadge_one": "{{displayCount}} ໄຟລ໌",
+      "filesBadge_other": "{{displayCount}} ໄຟລ໌",
+      "linesBadge_one": "{{displayCount}} ບັນທັດ",
+      "linesBadge_other": "{{displayCount}} ບັນທັດ",
+      "matchesBadge_one": "ພົບ {{displayCount}} ລາຍການ",
+      "matchesBadge_other": "ພົບ {{displayCount}} ລາຍການ"
     },
     "readToolMarkdown": {
       "linesTruncated": "ບັນທັດ {{start}}–{{end}} (ຕັດບາງສ່ວນອອກ)",
@@ -2458,7 +2510,11 @@
       "files": "ໄຟລ໌",
       "couldNotOpenPhotoPicker": "ບໍ່ສາມາດເປີດໜ້າເລືອກຮູບພາບໄດ້. ປິດແລ້ວເປີດ Kilo ໃໝ່ ແລ້ວລອງອີກຄັ້ງ.",
       "maxFilesAllowed": "ແນບໄດ້ສູງສຸດ {{displayCount}} ໄຟລ໌.",
-      "onlyAddingFiles": "ເພີ່ມພຽງ {{accepted}} ຈາກທັງໝົດ {{total}} ໄຟລ໌ (ສູງສຸດ {{max}})"
+      "onlyAddingFiles": "ເພີ່ມພຽງ {{accepted}} ຈາກທັງໝົດ {{total}} ໄຟລ໌ (ສູງສຸດ {{max}})",
+      "maxFilesAllowed_one": "ແນບໄດ້ສູງສຸດ {{displayCount}} ໄຟລ໌.",
+      "maxFilesAllowed_other": "ແນບໄດ້ສູງສຸດ {{displayCount}} ໄຟລ໌.",
+      "onlyAddingFiles_one": "ເພີ່ມພຽງ {{accepted}} ຈາກທັງໝົດ {{total}} ໄຟລ໌ (ສູງສຸດ {{max}})",
+      "onlyAddingFiles_other": "ເພີ່ມພຽງ {{accepted}} ຈາກທັງໝົດ {{total}} ໄຟລ໌ (ສູງສຸດ {{max}})"
     },
     "composer": {
       "addAttachment": "ເພີ່ມໄຟລ໌ແນບ",
@@ -2476,7 +2532,9 @@
       "discardAttachmentsMessage": "ໄຟລ໌ທີ່ອັບໂຫຼດໄວ້ແຕ່ຍັງບໍ່ໄດ້ໃຊ້ຈະຖືກລຶບ.",
       "discardAttachmentsTitle": "ລຶບໄຟລ໌ແນບບໍ?",
       "charactersRemaining": "ເຫຼືອ {{count}} ຕົວອັກສອນ",
-      "insertNewline": "ຂຶ້ນບັນທັດໃໝ່"
+      "insertNewline": "ຂຶ້ນບັນທັດໃໝ່",
+      "charactersRemaining_one": "ເຫຼືອ {{count}} ຕົວອັກສອນ",
+      "charactersRemaining_other": "ເຫຼືອ {{count}} ຕົວອັກສອນ"
     },
     "chatLink": {
       "linkCopied": "ຄັດລອກລິ້ງແລ້ວ",
@@ -2548,7 +2606,9 @@
       "stepsCount_one": "{{steps}} ຂັ້ນຕອນ",
       "stepsCount": "{{steps}} ຂັ້ນຕອນ",
       "stepsCount_other": "{{steps}} ຂັ້ນຕອນ",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "ໂມເດວ ({{displayCount}})",
+      "modelsCount_other": "ໂມເດວ ({{displayCount}})"
     },
     "autoApprove": {
       "title": "ການອະນຸມັດອັດຕະໂນມັດ",
@@ -2588,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "ການເອີ້ນເຄື່ອງມື",
-      "condensedLabel": "{{itemCount}} ລາຍການ; {{last}}"
+      "condensedLabel": "{{itemCount}} ລາຍການ; {{last}}",
+      "condensedLabel_one": "{{itemCount}} ລາຍການ; {{last}}",
+      "condensedLabel_other": "{{itemCount}} ລາຍການ; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "ເຊດຊັນນີ້ຮັບໄຟລ໌ບໍ່ໄດ້",
     "cliCantReceiveFilesMessage": "Kilo CLI ທີ່ໃຊ້ເຮັດວຽກໃນເຊດຊັນນີ້ຮັບໄຟລ໌ບໍ່ໄດ້. ອັບເດດ CLI ໃນເຄື່ອງນັ້ນ ຫຼື ແບ່ງປັນໄປທີ່ເຊດຊັນໃໝ່ແທນ.",
     "contentlessMessage": "ບໍ່ມີຫຍັງໃຫ້ແບ່ງປັນ — ບໍ່ໄດ້ແນບຂໍ້ຄວາມ ຫຼື ໄຟລ໌ມາ.",
-    "couldNotReadContent": "ບໍ່ສາມາດອ່ານເນື້ອຫາທີ່ແບ່ງປັນໄດ້."
+    "couldNotReadContent": "ບໍ່ສາມາດອ່ານເນື້ອຫາທີ່ແບ່ງປັນໄດ້.",
+    "onlyFirstFilesAttached_one": "ຈະແນບສະເພາະໄຟລ໌ {{displayCount}} ໄຟລ໌ທຳອິດເທົ່ານັ້ນ.",
+    "onlyFirstFilesAttached_other": "ຈະແນບສະເພາະໄຟລ໌ {{displayCount}} ໄຟລ໌ທຳອິດເທົ່ານັ້ນ."
   },
   "kiloPass": {
     "title": "Kilo Pass",

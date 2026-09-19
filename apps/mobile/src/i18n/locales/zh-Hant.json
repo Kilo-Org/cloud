@@ -163,6 +163,7 @@
     "useDifferentEmail": "改用其他電子郵件地址",
     "signInWithApple": "使用 Apple 登入",
     "signInWithGoogle": "使用 Google 登入",
+    "signInWithPasskey": "使用通行密鑰登入",
     "emailAddress": "電子郵件地址",
     "emailPlaceholder": "例如：name@example.com",
     "continueWithEmail": "透過電子郵件繼續登入",
@@ -175,6 +176,10 @@
     "termsConnector": " 和 ",
     "termsSuffix": "。",
     "moreSignInOptions": "更多登入選項",
+    "passkeyCancelled": "通行密鑰登入已取消。請重試。",
+    "passkeyNotFound": "此裝置未儲存通行密鑰。請改用 Apple、Google 或電子郵件登入。",
+    "passkeyUnsupported": "此裝置無法使用通行密鑰。請改用 Apple、Google 或電子郵件登入。",
+    "passkeyFailed": "無法使用通行密鑰登入。請重試。",
     "couldNotCompleteSignIn": "無法完成登入。請再試一次。",
     "sessionEnded": "你的工作階段已結束。請重新登入。",
     "signInCodeExpired": "你的登入驗證碼已過期。請再試一次。",
@@ -225,7 +230,28 @@
     "providerTestAccount": "測試帳戶",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "企業 SSO"
+    "providerEnterpriseSso": "企業 SSO",
+    "passkeysTitle": "通行密鑰",
+    "passkeysSubtitle": "無需密碼即可登入",
+    "passkeysEmpty": "還沒有通行密鑰",
+    "passkeysEmptyHint": "$t(profile.addPasskey)以無需密碼登入。",
+    "passkeysCouldNotLoad": "無法載入通行密鑰",
+    "passkeysLoadFailed": "在此內容載入完成之前，通行密鑰無法使用。",
+    "addPasskey": "新增通行密鑰",
+    "passkeyDefaultName": "通行密鑰",
+    "passkeyAddedOn": "新增於 {{date}}",
+    "passkeyAdded": "已新增通行密鑰。",
+    "passkeyAddFailed": "無法新增通行密鑰。請重試。",
+    "passkeyAddUnsupported": "此裝置無法建立通行密鑰。",
+    "passkeyAddCancelled": "通行密鑰建立已取消。",
+    "passkeyRemoved": "已移除通行密鑰。",
+    "passkeyRemoveFailed": "無法移除該通行密鑰。請重試。",
+    "passkeyRenamed": "已重新命名通行密鑰。",
+    "passkeyName": "通行密鑰名稱",
+    "renamePasskey": "重新命名通行密鑰",
+    "removePasskey": "移除通行密鑰",
+    "removePasskeyTitle": "移除通行密鑰？",
+    "removePasskeyMessage": "您將無法再使用此通行密鑰登入。"
   },
   "preferences": {
     "general": "一般",
@@ -293,11 +319,11 @@
     "previewFullDescription": "通知會在鎖定畫面上顯示訊息文字。",
     "previewGenericDescription": "通知只會提示有新動態。開啟 Kilo 即可查看內容。",
     "channel": {
+      "agentProgress": "智慧代理進度",
       "chat": "聊天訊息",
       "kiloclaw": "KiloClaw 活動",
       "balance": "餘額提醒",
-      "security": "資安問題",
-      "agent": "智慧代理工作階段"
+      "security": "資安問題"
     },
     "category": {
       "chatMessagesSubtitle": "對話中的回覆",
@@ -390,7 +416,9 @@
       "uploadFailed": "上傳失敗。",
       "failedToUploadFile": "無法上傳檔案：{{reason}}。",
       "nothingToPaste": "沒有可貼上的內容。",
-      "metadataStripFailed": "無法移除相片中繼資料。"
+      "metadataStripFailed": "無法移除相片中繼資料。",
+      "limit_one": "最多可附加 {{displayCount}} 個檔案。",
+      "limit_other": "最多可附加 {{displayCount}} 個檔案。"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}，{{status}}",
@@ -1159,7 +1187,11 @@
       "syncNow": "立即同步",
       "syncQueued": "已排入同步佇列",
       "syncStatusUnavailable": "無法取得同步狀態。",
-      "withinDeadline": "期限內"
+      "withinDeadline": "期限內",
+      "daysOverdue_one": "逾期 {{displayCount}} 天",
+      "daysOverdue_other": "逾期 {{displayCount}} 天",
+      "findingsCount_one": "{{displayCount}} 項資安問題",
+      "findingsCount_other": "{{displayCount}} 項資安問題"
     },
     "dashboardMetrics": {
       "openFindings": "未解決的資安問題",
@@ -1678,7 +1710,13 @@
       "updateTodos": "更新待辦事項",
       "linesBadge": "{{displayCount}} 行",
       "filesBadge": "{{displayCount}} 個檔案",
-      "matchesBadge": "{{displayCount}} 筆相符結果"
+      "matchesBadge": "{{displayCount}} 筆相符結果",
+      "filesBadge_one": "{{displayCount}} 個檔案",
+      "filesBadge_other": "{{displayCount}} 個檔案",
+      "linesBadge_one": "{{displayCount}} 行",
+      "linesBadge_other": "{{displayCount}} 行",
+      "matchesBadge_one": "{{displayCount}} 筆相符結果",
+      "matchesBadge_other": "{{displayCount}} 筆相符結果"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截斷）",
@@ -1968,7 +2006,11 @@
       "files": "檔案",
       "couldNotOpenPhotoPicker": "無法開啟照片選擇器。請重新啟動 Kilo 並再試一次。",
       "maxFilesAllowed": "最多可附加 {{displayCount}} 個檔案。",
-      "onlyAddingFiles": "僅附加 {{total}} 個檔案中的 {{accepted}} 個（最多 {{max}} 個）"
+      "onlyAddingFiles": "僅附加 {{total}} 個檔案中的 {{accepted}} 個（最多 {{max}} 個）",
+      "maxFilesAllowed_one": "最多可附加 {{displayCount}} 個檔案。",
+      "maxFilesAllowed_other": "最多可附加 {{displayCount}} 個檔案。",
+      "onlyAddingFiles_one": "僅附加 {{total}} 個檔案中的 {{accepted}} 個（最多 {{max}} 個）",
+      "onlyAddingFiles_other": "僅附加 {{total}} 個檔案中的 {{accepted}} 個（最多 {{max}} 個）"
     },
     "composer": {
       "addAttachment": "新增附件",
@@ -1986,7 +2028,9 @@
       "discardAttachmentsMessage": "尚未附加至已傳送訊息的上傳檔案都會刪除。",
       "discardAttachmentsTitle": "捨棄附件？",
       "charactersRemaining": "剩餘 {{count}} 個字元",
-      "insertNewline": "插入換行"
+      "insertNewline": "插入換行",
+      "charactersRemaining_one": "剩餘 {{count}} 個字元",
+      "charactersRemaining_other": "剩餘 {{count}} 個字元"
     },
     "chatLink": {
       "linkCopied": "連結已複製",
@@ -2058,7 +2102,9 @@
       "stepsCount_one": "{{steps}} 個步驟",
       "stepsCount": "{{steps}} 個步驟",
       "stepsCount_other": "{{steps}} 個步驟",
-      "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}"
+      "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}",
+      "modelsCount_one": "模型（{{displayCount}}）",
+      "modelsCount_other": "模型（{{displayCount}}）"
     },
     "autoApprove": {
       "title": "自動核准",
@@ -2098,7 +2144,9 @@
     },
     "toolRun": {
       "sheetTitle": "工具呼叫",
-      "condensedLabel": "{{itemCount}} 個項目; {{last}}"
+      "condensedLabel": "{{itemCount}} 個項目; {{last}}",
+      "condensedLabel_one": "{{itemCount}} 個項目; {{last}}",
+      "condensedLabel_other": "{{itemCount}} 個項目; {{last}}"
     }
   },
   "bootstrap": {
@@ -2233,7 +2281,9 @@
     "cliCantReceiveFilesTitle": "此工作階段無法接收檔案",
     "cliCantReceiveFilesMessage": "執行此工作階段的 Kilo CLI 無法接收檔案。請更新該電腦上的 CLI，或改為分享到新工作階段。",
     "contentlessMessage": "沒有可分享的內容，未包含任何文字或檔案。",
-    "couldNotReadContent": "無法讀取分享的內容。"
+    "couldNotReadContent": "無法讀取分享的內容。",
+    "onlyFirstFilesAttached_one": "只會附加前 {{displayCount}} 個檔案。",
+    "onlyFirstFilesAttached_other": "只會附加前 {{displayCount}} 個檔案。"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2541,7 +2591,9 @@
         "outdatedOnPath": "{{path}} 的留言已過時"
       },
       "deletedUser": "已刪除的使用者",
-      "replyForbiddenTerm": "你沒有權限回覆此{{term}}。"
+      "replyForbiddenTerm": "你沒有權限回覆此{{term}}。",
+      "moreLinesAbove_one": "…上方還有 {{displayCount}} 行。",
+      "moreLinesAbove_other": "…上方還有 {{displayCount}} 行。"
     },
     "entry": {
       "eyebrow": "透過 URL 開啟提取請求或合併請求",
@@ -2639,7 +2691,17 @@
       "loadingLines": "正在載入 {{loaded}} / {{total}} 行…",
       "loadingMoreFiles": "正在載入更多檔案…",
       "retryLoadingContext": "重新載入前後文",
-      "retryLoadingNextPage": "重新載入下一頁"
+      "retryLoadingNextPage": "重新載入下一頁",
+      "expandAllLines_one": "展開全部 {{displayCount}} 行",
+      "expandAllLines_other": "展開全部 {{displayCount}} 行",
+      "expandLines_one": "展開 {{displayCount}} 行（第 {{start}}–{{end}} 行）",
+      "expandLines_other": "展開 {{displayCount}} 行（第 {{start}}–{{end}} 行）",
+      "expandLinesOfContext_one": "展開 {{displayCount}} 行前後文",
+      "expandLinesOfContext_other": "展開 {{displayCount}} 行前後文",
+      "expandMoreLines_one": "再展開 {{displayCount}} 行（第 {{start}}–{{end}} 行）",
+      "expandMoreLines_other": "再展開 {{displayCount}} 行（第 {{start}}–{{end}} 行）",
+      "loadedOfTotalFiles_one": "已載入 {{loaded}} / {{total}} 個檔案",
+      "loadedOfTotalFiles_other": "已載入 {{loaded}} / {{total}} 個檔案"
     },
     "inbox": {
       "couldNotLoad": "無法載入收件匣。",
@@ -2836,7 +2898,9 @@
       "statusContext": "前後文",
       "lineLabel": "{{status}}，第 {{line}} 行：{{text}}",
       "lineLabelNoNumber": "{{status}}：{{text}}",
-      "emptyLine": "（空白）"
+      "emptyLine": "（空白）",
+      "truncationBanner_one": "受 GitHub API 限制，僅顯示 {{total}} 個變更檔案中的前 {{limit}} 個。",
+      "truncationBanner_other": "受 GitHub API 限制，僅顯示 {{total}} 個變更檔案中的前 {{limit}} 個。"
     },
     "linkPasteClipboardEmpty": "剪貼簿沒有內容。",
     "linkPasteNotAPullRequest": "不是提取請求或合併請求連結",

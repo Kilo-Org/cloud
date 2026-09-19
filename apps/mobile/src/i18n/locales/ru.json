@@ -163,6 +163,7 @@
     "useDifferentEmail": "Указать другую почту",
     "signInWithApple": "Войти через Apple",
     "signInWithGoogle": "Войти через Google",
+    "signInWithPasskey": "Войти с ключом доступа",
     "emailAddress": "Адрес электронной почты",
     "emailPlaceholder": "имя@example.com",
     "continueWithEmail": "Продолжить по электронной почте",
@@ -175,6 +176,10 @@
     "termsConnector": " и ",
     "termsSuffix": ".",
     "moreSignInOptions": "Другие способы входа",
+    "passkeyCancelled": "Вход с ключом доступа отменён. Попробуйте ещё раз.",
+    "passkeyNotFound": "Для этого устройства не сохранён ни один ключ доступа. Войдите через Apple, Google или свою почту.",
+    "passkeyUnsupported": "Ключи доступа недоступны на этом устройстве. Войдите через Apple, Google или свою почту.",
+    "passkeyFailed": "Не удалось войти с ключом доступа. Попробуйте ещё раз.",
     "couldNotCompleteSignIn": "Не удалось завершить вход. Попробуйте снова.",
     "sessionEnded": "Ваш сеанс завершен. Войдите снова.",
     "signInCodeExpired": "Срок действия вашего кода входа истек. Попробуйте снова.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Тестовый аккаунт",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Корпоративный SSO"
+    "providerEnterpriseSso": "Корпоративный SSO",
+    "passkeysTitle": "Ключи доступа",
+    "passkeysSubtitle": "Войти без пароля",
+    "passkeysEmpty": "Ключей доступа пока нет",
+    "passkeysEmptyHint": "$t(profile.addPasskey), чтобы войти без пароля.",
+    "passkeysCouldNotLoad": "Не удалось загрузить ключи доступа",
+    "passkeysLoadFailed": "Ключи доступа недоступны, пока это не загрузится.",
+    "addPasskey": "Добавить ключ доступа",
+    "passkeyDefaultName": "Ключ доступа",
+    "passkeyAddedOn": "Добавлен {{date}}",
+    "passkeyAdded": "Ключ доступа добавлен.",
+    "passkeyAddFailed": "Не удалось добавить ключ доступа. Попробуйте ещё раз.",
+    "passkeyAddUnsupported": "Это устройство не может создавать ключи доступа.",
+    "passkeyAddCancelled": "Создание ключа доступа отменено.",
+    "passkeyRemoved": "Ключ доступа удалён.",
+    "passkeyRemoveFailed": "Не удалось удалить этот ключ доступа. Попробуйте ещё раз.",
+    "passkeyRenamed": "Ключ доступа переименован.",
+    "passkeyName": "Название ключа доступа",
+    "renamePasskey": "Переименовать ключ доступа",
+    "removePasskey": "Удалить ключ доступа",
+    "removePasskeyTitle": "Удалить ключ доступа?",
+    "removePasskeyMessage": "Вы больше не сможете войти с этим ключом доступа."
   },
   "preferences": {
     "general": "Общие",
@@ -293,11 +319,11 @@
     "previewFullDescription": "Текст сообщений отображается в уведомлениях на экране блокировки.",
     "previewGenericDescription": "Уведомления сообщают о событиях без подробностей. Откройте Kilo, чтобы прочитать сообщение.",
     "channel": {
+      "agentProgress": "Ход выполнения агента",
       "chat": "Сообщения чата",
       "kiloclaw": "Активность KiloClaw",
       "balance": "Оповещения о балансе",
-      "security": "Замечания по безопасности",
-      "agent": "Сеансы агента"
+      "security": "Замечания по безопасности"
     },
     "category": {
       "chatMessagesSubtitle": "ответы в вашей переписке",
@@ -390,7 +416,11 @@
       "uploadFailed": "Не удалось загрузить файл.",
       "failedToUploadFile": "Не удалось загрузить файл: {{reason}}.",
       "nothingToPaste": "Нечего вставить.",
-      "metadataStripFailed": "Не удалось удалить метаданные фотографии."
+      "metadataStripFailed": "Не удалось удалить метаданные фотографии.",
+      "limit_one": "Можно прикрепить до {{displayCount}} файл.",
+      "limit_other": "Можно прикрепить до {{displayCount}} файлов.",
+      "limit_few": "Можно прикрепить до {{displayCount}} файла.",
+      "limit_many": "Можно прикрепить до {{displayCount}} файлов."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, статус: {{status}}",
@@ -1165,7 +1195,15 @@
       "syncNow": "Синхронизировать сейчас",
       "syncQueued": "Синхронизация в очереди",
       "syncStatusUnavailable": "Статус синхронизации недоступен.",
-      "withinDeadline": "Срок не истёк"
+      "withinDeadline": "Срок не истёк",
+      "daysOverdue_one": "Просрочено на {{displayCount}} день",
+      "daysOverdue_other": "Просрочено на {{displayCount}} дн.",
+      "daysOverdue_few": "Просрочено на {{displayCount}} дня",
+      "daysOverdue_many": "Просрочено на {{displayCount}} дней",
+      "findingsCount_one": "Уязвимость: {{displayCount}}",
+      "findingsCount_other": "Уязвимости: {{displayCount}}",
+      "findingsCount_few": "Уязвимости: {{displayCount}}",
+      "findingsCount_many": "Уязвимостей: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Открытые уязвимости",
@@ -1698,7 +1736,19 @@
       "updateTodos": "Обновление списка задач",
       "linesBadge": "{{displayCount}} стр.",
       "filesBadge": "файлов: {{displayCount}}",
-      "matchesBadge": "совпадений: {{displayCount}}"
+      "matchesBadge": "совпадений: {{displayCount}}",
+      "filesBadge_one": "файл: {{displayCount}}",
+      "filesBadge_other": "файлов: {{displayCount}}",
+      "filesBadge_few": "файла: {{displayCount}}",
+      "filesBadge_many": "файлов: {{displayCount}}",
+      "linesBadge_one": "{{displayCount}} стр.",
+      "linesBadge_other": "{{displayCount}} стр.",
+      "linesBadge_few": "{{displayCount}} стр.",
+      "linesBadge_many": "{{displayCount}} стр.",
+      "matchesBadge_one": "совпадение: {{displayCount}}",
+      "matchesBadge_other": "совпадений: {{displayCount}}",
+      "matchesBadge_few": "совпадения: {{displayCount}}",
+      "matchesBadge_many": "совпадений: {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "строки {{start}}–{{end}} (вывод сокращён)",
@@ -1994,7 +2044,15 @@
       "files": "Файлы",
       "couldNotOpenPhotoPicker": "Не удалось открыть окно выбора фото. Перезапустите Kilo и попробуйте снова.",
       "maxFilesAllowed": "Лимит количества файлов: {{displayCount}}.",
-      "onlyAddingFiles": "Будут добавлены не все файлы: {{accepted}} из {{total}} (максимум {{max}})"
+      "onlyAddingFiles": "Будут добавлены не все файлы: {{accepted}} из {{total}} (максимум {{max}})",
+      "maxFilesAllowed_one": "Лимит количества файлов: {{displayCount}}.",
+      "maxFilesAllowed_other": "Лимит количества файлов: {{displayCount}}.",
+      "maxFilesAllowed_few": "Лимит количества файлов: {{displayCount}}.",
+      "maxFilesAllowed_many": "Лимит количества файлов: {{displayCount}}.",
+      "onlyAddingFiles_one": "Будут добавлены не все файлы: {{accepted}} из {{total}} (максимум {{max}})",
+      "onlyAddingFiles_other": "Будут добавлены не все файлы: {{accepted}} из {{total}} (максимум {{max}})",
+      "onlyAddingFiles_few": "Будут добавлены не все файлы: {{accepted}} из {{total}} (максимум {{max}})",
+      "onlyAddingFiles_many": "Будут добавлены не все файлы: {{accepted}} из {{total}} (максимум {{max}})"
     },
     "composer": {
       "addAttachment": "Добавить вложение",
@@ -2012,7 +2070,11 @@
       "discardAttachmentsMessage": "Загруженные файлы, не прикреплённые к отправленным сообщениям, будут удалены.",
       "discardAttachmentsTitle": "Удалить вложения?",
       "charactersRemaining": "Осталось символов: {{count}}",
-      "insertNewline": "Вставить перенос строки"
+      "insertNewline": "Вставить перенос строки",
+      "charactersRemaining_one": "Осталось символов: {{count}}",
+      "charactersRemaining_other": "Осталось символов: {{count}}",
+      "charactersRemaining_few": "Осталось символов: {{count}}",
+      "charactersRemaining_many": "Осталось символов: {{count}}"
     },
     "chatLink": {
       "linkCopied": "Ссылка скопирована",
@@ -2086,7 +2148,11 @@
       "stepsCount_other": "{{steps}} шага",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} шага",
-      "stepsCount_many": "{{steps}} шагов"
+      "stepsCount_many": "{{steps}} шагов",
+      "modelsCount_one": "Модель ({{displayCount}})",
+      "modelsCount_other": "Модели ({{displayCount}})",
+      "modelsCount_few": "Модели ({{displayCount}})",
+      "modelsCount_many": "Модели ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Автоодобрение",
@@ -2126,7 +2192,11 @@
     },
     "toolRun": {
       "sheetTitle": "Вызовы инструментов",
-      "condensedLabel": "{{itemCount}} элементов; {{last}}"
+      "condensedLabel": "{{itemCount}} элементов; {{last}}",
+      "condensedLabel_one": "{{itemCount}} элемент; {{last}}",
+      "condensedLabel_other": "{{itemCount}} элементов; {{last}}",
+      "condensedLabel_few": "{{itemCount}} элемента; {{last}}",
+      "condensedLabel_many": "{{itemCount}} элементов; {{last}}"
     }
   },
   "bootstrap": {
@@ -2261,7 +2331,11 @@
     "cliCantReceiveFilesTitle": "Этот сеанс не может принимать файлы",
     "cliCantReceiveFilesMessage": "Kilo CLI, в котором запущен этот сеанс, не может принимать файлы. Обновите CLI на том компьютере или отправьте файлы в новый сеанс.",
     "contentlessMessage": "Нечего отправлять — текст и файлы не добавлены.",
-    "couldNotReadContent": "Не удалось прочитать переданные материалы."
+    "couldNotReadContent": "Не удалось прочитать переданные материалы.",
+    "onlyFirstFilesAttached_one": "Будут прикреплены только файлы в начале списка: {{displayCount}}.",
+    "onlyFirstFilesAttached_other": "Будут прикреплены только файлы в начале списка: {{displayCount}}.",
+    "onlyFirstFilesAttached_few": "Будут прикреплены только файлы в начале списка: {{displayCount}}.",
+    "onlyFirstFilesAttached_many": "Будут прикреплены только файлы в начале списка: {{displayCount}}."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2575,7 +2649,11 @@
         "outdatedOnPath": "Устаревший комментарий: {{path}}"
       },
       "deletedUser": "удалённый пользователь",
-      "replyForbiddenTerm": "У вас нет прав для ответа в {{term}}."
+      "replyForbiddenTerm": "У вас нет прав для ответа в {{term}}.",
+      "moreLinesAbove_one": "… строк выше: {{displayCount}}",
+      "moreLinesAbove_other": "… строк выше: {{displayCount}}",
+      "moreLinesAbove_few": "… строк выше: {{displayCount}}",
+      "moreLinesAbove_many": "… строк выше: {{displayCount}}"
     },
     "entry": {
       "eyebrow": "Откройте пул-реквест или запрос на слияние по URL",
@@ -2677,7 +2755,27 @@
       "fileLoadedCount_few": "загружено {{displayCount}} файла",
       "fileLoadedCount_many": "загружено {{displayCount}} файлов",
       "fileLoadedOfTotalCount_few": "загружено {{displayCount}} файла из {{total}}",
-      "fileLoadedOfTotalCount_many": "загружено {{displayCount}} файлов из {{total}}"
+      "fileLoadedOfTotalCount_many": "загружено {{displayCount}} файлов из {{total}}",
+      "expandAllLines_one": "Развернуть все строки: {{displayCount}}",
+      "expandAllLines_other": "Развернуть все строки: {{displayCount}}",
+      "expandAllLines_few": "Развернуть все строки: {{displayCount}}",
+      "expandAllLines_many": "Развернуть все строки: {{displayCount}}",
+      "expandLines_one": "Развернуть строки {{start}}–{{end}} (всего: {{displayCount}})",
+      "expandLines_other": "Развернуть строки {{start}}–{{end}} (всего: {{displayCount}})",
+      "expandLines_few": "Развернуть строки {{start}}–{{end}} (всего: {{displayCount}})",
+      "expandLines_many": "Развернуть строки {{start}}–{{end}} (всего: {{displayCount}})",
+      "expandLinesOfContext_one": "Развернуть строки контекста: {{displayCount}}",
+      "expandLinesOfContext_other": "Развернуть строки контекста: {{displayCount}}",
+      "expandLinesOfContext_few": "Развернуть строки контекста: {{displayCount}}",
+      "expandLinesOfContext_many": "Развернуть строки контекста: {{displayCount}}",
+      "expandMoreLines_one": "Развернуть ещё строки {{start}}–{{end}} (всего: {{displayCount}})",
+      "expandMoreLines_other": "Развернуть ещё строки {{start}}–{{end}} (всего: {{displayCount}})",
+      "expandMoreLines_few": "Развернуть ещё строки {{start}}–{{end}} (всего: {{displayCount}})",
+      "expandMoreLines_many": "Развернуть ещё строки {{start}}–{{end}} (всего: {{displayCount}})",
+      "loadedOfTotalFiles_one": "загружено {{loaded}} из {{total}} файлов",
+      "loadedOfTotalFiles_other": "загружено {{loaded}} из {{total}} файлов",
+      "loadedOfTotalFiles_few": "загружено {{loaded}} из {{total}} файлов",
+      "loadedOfTotalFiles_many": "загружено {{loaded}} из {{total}} файлов"
     },
     "inbox": {
       "couldNotLoad": "Не удалось загрузить входящие.",
@@ -2882,7 +2980,11 @@
       "statusContext": "Контекст",
       "lineLabel": "Строка {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "Статус: {{status}}; текст: {{text}}",
-      "emptyLine": "(пусто)"
+      "emptyLine": "(пусто)",
+      "truncationBanner_one": "Из-за ограничения API GitHub показана только часть изменённых файлов: {{limit}} из {{total}}.",
+      "truncationBanner_other": "Из-за ограничения API GitHub показана только часть изменённых файлов: {{limit}} из {{total}}.",
+      "truncationBanner_few": "Из-за ограничения API GitHub показана только часть изменённых файлов: {{limit}} из {{total}}.",
+      "truncationBanner_many": "Из-за ограничения API GitHub показана только часть изменённых файлов: {{limit}} из {{total}}."
     },
     "linkPasteClipboardEmpty": "Буфер обмена пуст.",
     "linkPasteNotAPullRequest": "Это не ссылка на пул-реквест или запрос на слияние",

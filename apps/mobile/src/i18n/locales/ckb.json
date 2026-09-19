@@ -163,6 +163,7 @@
     "useDifferentEmail": "ئیمەیڵێکی جیاواز بەکاربهێنە",
     "signInWithApple": "بە Apple بچۆ ژوورەوە",
     "signInWithGoogle": "بە Google بچۆ ژوورەوە",
+    "signInWithPasskey": "بە کلیلی چوونەژوورەوە بچۆ ژوورەوە",
     "emailAddress": "ناونیشانی ئیمەیڵ",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "بە ئیمەیڵ بەردەوام بە",
@@ -175,6 +176,10 @@
     "termsConnector": " و ",
     "termsSuffix": ".",
     "moreSignInOptions": "بژاردەی زیاتری چوونە ژوورەوە",
+    "passkeyCancelled": "چوونەژوورەوە بە کلیلی چوونەژوورەوە هەڵوەشێنرایەوە. تکایە دووبارە هەوڵ بدەوە.",
+    "passkeyNotFound": "هیچ کلیلی چوونەژوورەوەیەک بۆ ئەم ئامێرە پاشەکەوت نەکراوە. لە جیاتی ئەوە بە Apple، Google یان ئیمەیڵەکەت بچۆ ژوورەوە.",
+    "passkeyUnsupported": "کلیلەکانی چوونەژوورەوە لەسەر ئەم ئامێرە بەردەست نین. لە جیاتی ئەوە بە Apple، Google یان ئیمەیڵەکەت بچۆ ژوورەوە.",
+    "passkeyFailed": "نەتوانرا بە کلیلی چوونەژوورەوە بچیتە ژوورەوە. تکایە دووبارە هەوڵ بدەوە.",
     "couldNotCompleteSignIn": "نەتوانرا چوونە ژوورەوە تەواو بکرێت. تکایە دووبارە هەوڵ بدە.",
     "sessionEnded": "دانیشتنەکەت کۆتایی هات. تکایە دووبارە بچۆ ژوورەوە.",
     "signInCodeExpired": "کۆدی چوونە ژوورەوەکەت بەسەر چووە. تکایە دووبارە هەوڵ بدە.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "هەژماری تاقیکردنەوە",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSOی کۆمپانیا"
+    "providerEnterpriseSso": "SSOی کۆمپانیا",
+    "passkeysTitle": "کلیلەکانی چوونەژوورەوە",
+    "passkeysSubtitle": "بەبێ وشەی نهێنی بچۆ ژوورەوە",
+    "passkeysEmpty": "هێشتا هیچ کلیلی چوونەژوورەوە نییە",
+    "passkeysEmptyHint": "$t(profile.addPasskey) بۆ چوونەژوورەوە بەبێ وشەی نهێنی.",
+    "passkeysCouldNotLoad": "نەتوانرا کلیلەکانی چوونەژوورەوە بار بکرێن",
+    "passkeysLoadFailed": "کلیلەکانی چوونەژوورەوە بەردەست نین هەتا ئەمە بار دەکرێت.",
+    "addPasskey": "کلیلی چوونەژوورەوە زیاد بکە",
+    "passkeyDefaultName": "کلیلی چوونەژوورەوە",
+    "passkeyAddedOn": "زیادکرا {{date}}",
+    "passkeyAdded": "کلیلی چوونەژوورەوە زیادکرا.",
+    "passkeyAddFailed": "نەتوانرا کلیلی چوونەژوورەوە زیاد بکرێت. دووبارە هەوڵ بدەوە.",
+    "passkeyAddUnsupported": "ئەم ئامێرە ناتوانێت کلیلەکانی چوونەژوورەوە دروست بکات.",
+    "passkeyAddCancelled": "دروستکردنی کلیلی چوونەژوورەوە هەڵوەشێنرایەوە.",
+    "passkeyRemoved": "کلیلی چوونەژوورەوە لابرا.",
+    "passkeyRemoveFailed": "نەتوانرا ئەو کلیلی چوونەژوورەوە لاببرێت. دووبارە هەوڵ بدەوە.",
+    "passkeyRenamed": "ناوی کلیلی چوونەژوورەوە گۆڕدرا.",
+    "passkeyName": "ناوی کلیلی چوونەژوورەوە",
+    "renamePasskey": "ناوی کلیلی چوونەژوورەوە بگۆڕە",
+    "removePasskey": "کلیلی چوونەژوورەوە لاببە",
+    "removePasskeyTitle": "کلیلی چوونەژوورەوە لاببرێت؟",
+    "removePasskeyMessage": "دیگر ناتوانیت بەم کلیلی چوونەژوورەوە بچیتە ژوورەوە."
   },
   "preferences": {
     "general": "گشتی",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} پەڕگە لە کۆی {{total}} بارکران",
       "filesStillLoading": "فایلەکان هێشتا بار دەکرێن. بۆ نوێکردنەوە ڕایبکێشە.",
       "goToOverview": "بڕۆ بۆ کورتەی گشتی",
-      "goToOverviewTab": "بڕۆ بۆ تابی کورتەی گشتی"
+      "goToOverviewTab": "بڕۆ بۆ تابی کورتەی گشتی",
+      "expandAllLines_one": "هەموو {{displayCount}} هێڵەکە پیشان بدە",
+      "expandAllLines_other": "هەموو {{displayCount}} هێڵەکە پیشان بدە",
+      "expandLines_one": "{{displayCount}} هێڵ پیشان بدە ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} هێڵ پیشان بدە ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "{{displayCount}} هێڵ لە دەوروبەر پیشان بدە",
+      "expandLinesOfContext_other": "{{displayCount}} هێڵ لە دەوروبەر پیشان بدە",
+      "expandMoreLines_one": "{{displayCount}} هێڵی زیاتر پیشان بدە ({{start}}–{{end}})",
+      "expandMoreLines_other": "{{displayCount}} هێڵی زیاتر پیشان بدە ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} لە {{total}} فایل بار کراوە",
+      "loadedOfTotalFiles_other": "{{loaded}} لە {{total}} فایل بار کراوە"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ هیچ هێڵێکی نوێ لە کۆتایی فایلدا نییە",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "کۆنبووەوە لە {{path}}"
       },
       "deletedUser": "بەکارهێنەری سڕاوە",
-      "replyForbiddenTerm": "مۆڵەتی وەڵامدانەوەی ئەم {{term}}ەت نییە."
+      "replyForbiddenTerm": "مۆڵەتی وەڵامدانەوەی ئەم {{term}}ەت نییە.",
+      "moreLinesAbove_one": "… {{displayCount}} هێڵی زیاتر لە سەرەوە هەیە.",
+      "moreLinesAbove_other": "… {{displayCount}} هێڵی زیاتر لە سەرەوە هەیە."
     },
     "couldNotOpenGitHubAppSettings": "نەتوانرا ڕێکخستنەکانی ئەپی GitHub بکرێنەوە.",
     "installKiloGitHubApp": "ئەپی Kilo بۆ GitHub دامەزرێنە",
@@ -706,7 +744,9 @@
       "statusContext": "دەوروبەر",
       "lineLabel": "هێڵی {{line}}، {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(بەتاڵ)"
+      "emptyLine": "(بەتاڵ)",
+      "truncationBanner_one": "یەکەم {{limit}} لە {{total}} فایلی گۆڕدراو پیشان دەدرێت — سنووری API ـی GitHub.",
+      "truncationBanner_other": "یەکەم {{limit}} لە {{total}} فایلی گۆڕدراو پیشان دەدرێت — سنووری API ـی GitHub."
     },
     "linkPasteClipboardEmpty": "کلیپبۆردەکە بەتاڵە.",
     "linkPasteNotAPullRequest": "ئەمە بەستەری داواکاری ڕاکێشان یان تێکەڵکردن نییە.",
@@ -783,11 +823,11 @@
     "previewFullDescription": "ئاگادارکردنەوەکان دەقی پەیامەکە لە شاشەی قوفڵەکەت نیشان دەدەن.",
     "previewGenericDescription": "ئاگادارکردنەوەکان تەنها نیشان دەدەن کە شتێک ڕوویداوە. بۆ خوێندنەوەی، Kilo بکەرەوە.",
     "channel": {
+      "agentProgress": "پێشکەوتنی ئەجێنت",
       "chat": "نامەکانی گفتوگۆ",
       "kiloclaw": "چالاکییەکانی KiloClaw",
       "balance": "ئاگادارکردنەوەکانی باڵانس",
-      "security": "دۆزینەوەکانی ئاسایش",
-      "agent": "سێشنەکانی ئەجێنت"
+      "security": "دۆزینەوەکانی ئاسایش"
     },
     "category": {
       "chatMessagesSubtitle": "وەڵامەکان لە گفتوگۆکانتدا",
@@ -880,7 +920,9 @@
       "uploadFailed": "بارکردن سەرکەوتوو نەبوو.",
       "failedToUploadFile": "نەتوانرا پەڕگەکە بار بکرێت: {{reason}}.",
       "nothingToPaste": "هیچ شتێک بۆ لکاندن نییە.",
-      "metadataStripFailed": "نەتوانرا مێتاداتای وێنەکە لاببرێت."
+      "metadataStripFailed": "نەتوانرا مێتاداتای وێنەکە لاببرێت.",
+      "limit_one": "دەتوانیت تا {{displayCount}} پەڕگە هاوپێچ بکەیت.",
+      "limit_other": "دەتوانیت تا {{displayCount}} پەڕگە هاوپێچ بکەیت."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1624,7 +1666,11 @@
       "syncFindings": "دۆزینەوەکان هاوکات بکە",
       "syncNow": "ئێستا هاوکات بکە",
       "syncQueued": "هاوکاتکردن خرایە ڕیزی چاوەڕوانی",
-      "syncStatusUnavailable": "دۆخی هاوکاتکردن بەردەست نییە."
+      "syncStatusUnavailable": "دۆخی هاوکاتکردن بەردەست نییە.",
+      "daysOverdue_one": "{{displayCount}} ڕۆژ دواکەوتوو",
+      "daysOverdue_other": "{{displayCount}} ڕۆژ دواکەوتوو",
+      "findingsCount_one": "{{displayCount}} دۆزینەوە",
+      "findingsCount_other": "{{displayCount}} دۆزینەوە"
     },
     "dashboardMetrics": {
       "openFindings": "دۆزینەوە کراوەکان",
@@ -2168,7 +2214,13 @@
       "updateTodos": "نوێکردنەوەی لیستی ئەرکەکان",
       "linesBadge": "{{displayCount}} دێڕ",
       "filesBadge": "{{displayCount}} پەڕگە",
-      "matchesBadge": "{{displayCount}} ئەنجام"
+      "matchesBadge": "{{displayCount}} ئەنجام",
+      "filesBadge_one": "{{displayCount}} پەڕگە",
+      "filesBadge_other": "{{displayCount}} پەڕگە",
+      "linesBadge_one": "{{displayCount}} دێڕ",
+      "linesBadge_other": "{{displayCount}} دێڕ",
+      "matchesBadge_one": "{{displayCount}} ئەنجام",
+      "matchesBadge_other": "{{displayCount}} ئەنجام"
     },
     "readToolMarkdown": {
       "linesTruncated": "دێڕەکانی {{start}}–{{end}} (کورتکراوە)",
@@ -2458,7 +2510,11 @@
       "files": "پەڕگە",
       "couldNotOpenPhotoPicker": "نەتوانرا هەڵبژێری وێنە بکرێتەوە. Kilo دابخە و دووبارە بیکەرەوە، پاشان دووبارە هەوڵ بدەرەوە.",
       "maxFilesAllowed": "زۆرترین ژمارەی ڕێگەپێدراو {{displayCount}} پەڕگەیە.",
-      "onlyAddingFiles": "تەنها {{accepted}} لە {{total}} پەڕگە زیاد دەکرێت (زۆرترین {{max}})"
+      "onlyAddingFiles": "تەنها {{accepted}} لە {{total}} پەڕگە زیاد دەکرێت (زۆرترین {{max}})",
+      "maxFilesAllowed_one": "زۆرترین ژمارەی ڕێگەپێدراو {{displayCount}} پەڕگەیە.",
+      "maxFilesAllowed_other": "زۆرترین ژمارەی ڕێگەپێدراو {{displayCount}} پەڕگەیە.",
+      "onlyAddingFiles_one": "تەنها {{accepted}} لە {{total}} پەڕگە زیاد دەکرێت (زۆرترین {{max}})",
+      "onlyAddingFiles_other": "تەنها {{accepted}} لە {{total}} پەڕگە زیاد دەکرێت (زۆرترین {{max}})"
     },
     "composer": {
       "addAttachment": "زیادکردنی هاوپێچ",
@@ -2476,7 +2532,9 @@
       "discardAttachmentsMessage": "ئەو پەڕگە بارکراوانەی هاوپێچی پەیامی نێردراو نەکراون دەسڕێنەوە.",
       "discardAttachmentsTitle": "سڕینەوەی هاوپێچەکان؟",
       "charactersRemaining": "{{count}} نووسە ماوە",
-      "insertNewline": "تێخستنی دێڕێکی نوێ"
+      "insertNewline": "تێخستنی دێڕێکی نوێ",
+      "charactersRemaining_one": "{{count}} نووسە ماوە",
+      "charactersRemaining_other": "{{count}} نووسە ماوە"
     },
     "chatLink": {
       "linkCopied": "بەستەرەکە کۆپی کرا",
@@ -2548,7 +2606,9 @@
       "stepsCount_one": "{{steps}} هەنگاو",
       "stepsCount": "{{steps}} هەنگاو",
       "stepsCount_other": "{{steps}} هەنگاو",
-      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
+      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
+      "modelsCount_one": "مۆدێلەکان ({{displayCount}})",
+      "modelsCount_other": "مۆدێلەکان ({{displayCount}})"
     },
     "autoApprove": {
       "title": "پەسەندکردنی خۆکار",
@@ -2588,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "بانگەکانی ئامراز",
-      "condensedLabel": "{{itemCount}} بڕگە؛ {{last}}"
+      "condensedLabel": "{{itemCount}} بڕگە؛ {{last}}",
+      "condensedLabel_one": "{{itemCount}} بڕگە؛ {{last}}",
+      "condensedLabel_other": "{{itemCount}} بڕگە؛ {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "ئەم سێشنە ناتوانێت فایل وەربگرێت",
     "cliCantReceiveFilesMessage": "ئەو Kilo CLI ـەی ئەم سێشنە بەڕێوە دەبات ناتوانێت فایل وەربگرێت. لەسەر ئەو ئامێرە CLI نوێ بکەرەوە، یان لە جیاتی ئەوە بۆ سێشنێکی نوێ هاوبەش بکە.",
     "contentlessMessage": "هیچ شتێک بۆ هاوبەشکردن نییە — هیچ دەق یان فایلێک زیاد نەکراوە.",
-    "couldNotReadContent": "نەتوانرا ناوەڕۆکی هاوبەشکراو بخوێنرێتەوە."
+    "couldNotReadContent": "نەتوانرا ناوەڕۆکی هاوبەشکراو بخوێنرێتەوە.",
+    "onlyFirstFilesAttached_one": "تەنها یەکەم {{displayCount}} فایل هاوپێچ دەکرێن.",
+    "onlyFirstFilesAttached_other": "تەنها یەکەم {{displayCount}} فایل هاوپێچ دەکرێن."
   },
   "kiloPass": {
     "title": "Kilo Pass",

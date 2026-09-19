@@ -163,6 +163,7 @@
     "useDifferentEmail": "Boshqa elektron pochta manzilidan foydalanish",
     "signInWithApple": "Apple bilan kirish",
     "signInWithGoogle": "Google bilan kirish",
+    "signInWithPasskey": "Kirish kaliti bilan kirish",
     "emailAddress": "Elektron pochta manzili",
     "emailPlaceholder": "siz@misol.com",
     "continueWithEmail": "Elektron pochta bilan davom etish",
@@ -175,6 +176,10 @@
     "termsConnector": " va ",
     "termsSuffix": ".",
     "moreSignInOptions": "Boshqa kirish usullari",
+    "passkeyCancelled": "Kirish kaliti bilan kirish bekor qilindi. Qayta urinib koʻring.",
+    "passkeyNotFound": "Bu qurilma uchun kirish kaliti saqlanmagan. Buning oʻrniga Apple, Google yoki elektron pochtangiz bilan kiring.",
+    "passkeyUnsupported": "Kirish kalitlari bu qurilmada mavjud emas. Buning oʻrniga Apple, Google yoki elektron pochtangiz bilan kiring.",
+    "passkeyFailed": "Kirish kaliti bilan kirib boʻlmadi. Qayta urinib koʻring.",
     "couldNotCompleteSignIn": "Kirishni yakunlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
     "sessionEnded": "Seansingiz tugadi. Iltimos, qayta kiring.",
     "signInCodeExpired": "Kirish kodingizning amal qilish muddati tugadi. Iltimos, qayta urinib ko'ring.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Sinov hisobi",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Korporativ SSO"
+    "providerEnterpriseSso": "Korporativ SSO",
+    "passkeysTitle": "Kirish kalitlari",
+    "passkeysSubtitle": "Parolsiz kiring",
+    "passkeysEmpty": "Hozircha kirish kalitlari yoʻq",
+    "passkeysEmptyHint": "$t(profile.addPasskey) parolsiz kirish uchun.",
+    "passkeysCouldNotLoad": "Kirish kalitlarini yuklab boʻlmadi",
+    "passkeysLoadFailed": "Bu yuklanmaguncha kirish kalitlari mavjud emas.",
+    "addPasskey": "Kirish kaliti qoʻshish",
+    "passkeyDefaultName": "Kirish kaliti",
+    "passkeyAddedOn": "{{date}} qoʻshildi",
+    "passkeyAdded": "Kirish kaliti qoʻshildi.",
+    "passkeyAddFailed": "Kirish kaliti qoʻshib boʻlmadi. Qayta urinib koʻring.",
+    "passkeyAddUnsupported": "Bu qurilma kirish kalitlarini yarata olmaydi.",
+    "passkeyAddCancelled": "Kirish kaliti yaratish bekor qilindi.",
+    "passkeyRemoved": "Kirish kaliti olib tashlandi.",
+    "passkeyRemoveFailed": "Oʻsha kirish kalitini olib tashlab boʻlmadi. Qayta urinib koʻring.",
+    "passkeyRenamed": "Kirish kaliti nomi oʻzgartirildi.",
+    "passkeyName": "Kirish kaliti nomi",
+    "renamePasskey": "Kirish kaliti nomini oʻzgartirish",
+    "removePasskey": "Kirish kalitini olib tashlash",
+    "removePasskeyTitle": "Kirish kaliti olib tashlansinmi?",
+    "removePasskeyMessage": "Endi bu kirish kaliti bilan kira olmaysiz."
   },
   "preferences": {
     "general": "Umumiy",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} ta fayldan {{displayCount}} tasi yuklandi",
       "filesStillLoading": "Fayllar hali yuklanmoqda. Yangilash uchun pastga torting.",
       "goToOverview": "Umumiy ko'rinishga o'tish",
-      "goToOverviewTab": "Umumiy ko'rinish varag'iga o'tish"
+      "goToOverviewTab": "Umumiy ko'rinish varag'iga o'tish",
+      "expandAllLines_one": "Barcha {{displayCount}} ta qatorni ko'rsatish",
+      "expandAllLines_other": "Barcha {{displayCount}} ta qatorni ko'rsatish",
+      "expandLines_one": "{{displayCount}} ta qatorni ko'rsatish ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} ta qatorni ko'rsatish ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Atrofdagi {{displayCount}} ta qatorni ko'rsatish",
+      "expandLinesOfContext_other": "Atrofdagi {{displayCount}} ta qatorni ko'rsatish",
+      "expandMoreLines_one": "Yana {{displayCount}} ta qatorni ko'rsatish ({{start}}–{{end}})",
+      "expandMoreLines_other": "Yana {{displayCount}} ta qatorni ko'rsatish ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}} ta fayldan {{loaded}} tasi yuklandi",
+      "loadedOfTotalFiles_other": "{{total}} ta fayldan {{loaded}} tasi yuklandi"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ fayl oxirida yangi qator yo'q",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Eskirgan: {{path}}"
       },
       "deletedUser": "o'chirilgan foydalanuvchi",
-      "replyForbiddenTerm": "Bu {{term}}ga javob yozishga ruxsatingiz yo‘q."
+      "replyForbiddenTerm": "Bu {{term}}ga javob yozishga ruxsatingiz yo‘q.",
+      "moreLinesAbove_one": "… yuqorida yana {{displayCount}} ta qator bor.",
+      "moreLinesAbove_other": "… yuqorida yana {{displayCount}} ta qator bor."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ilovasi sozlamalarini ochib bo‘lmadi.",
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",
@@ -706,7 +744,9 @@
       "statusContext": "Atrofdagi qator",
       "lineLabel": "{{line}}-qator, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(bo‘sh)"
+      "emptyLine": "(bo‘sh)",
+      "truncationBanner_one": "O'zgargan {{total}} ta fayldan dastlabki {{limit}} tasi ko'rsatilmoqda — bu GitHub API cheklovi.",
+      "truncationBanner_other": "O'zgargan {{total}} ta fayldan dastlabki {{limit}} tasi ko'rsatilmoqda — bu GitHub API cheklovi."
     },
     "linkPasteClipboardEmpty": "Nusxalash buferi bo'sh.",
     "linkPasteNotAPullRequest": "Bu PR yoki merge so‘rovi havolasi emas",
@@ -783,11 +823,11 @@
     "previewFullDescription": "Bildirishnomalar qulflangan ekranda xabar matnini ko'rsatadi.",
     "previewGenericDescription": "Bildirishnomalar faqat yangi hodisa haqida xabar beradi. Xabarni o'qish uchun Kilo ilovasini oching.",
     "channel": {
+      "agentProgress": "Agent jarayoni",
       "chat": "Suhbat xabarlari",
       "kiloclaw": "KiloClaw faoliyati",
       "balance": "Balans haqida ogohlantirishlar",
-      "security": "Aniqlangan xavfsizlik muammolari",
-      "agent": "Agent sessiyalari"
+      "security": "Aniqlangan xavfsizlik muammolari"
     },
     "category": {
       "chatMessagesSubtitle": "suhbatlaringizdagi javoblar",
@@ -880,7 +920,9 @@
       "uploadFailed": "Yuklash amalga oshmadi.",
       "failedToUploadFile": "Faylni yuklab bo'lmadi: {{reason}}.",
       "nothingToPaste": "Joylashtirish uchun hech narsa yo'q.",
-      "metadataStripFailed": "Surat metama'lumotlarini olib tashlab bo'lmadi."
+      "metadataStripFailed": "Surat metama'lumotlarini olib tashlab bo'lmadi.",
+      "limit_one": "Siz {{displayCount}} tagacha fayl biriktira olasiz.",
+      "limit_other": "Siz {{displayCount}} tagacha fayl biriktira olasiz."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1666,11 @@
       "syncFindings": "Muammolarni sinxronlash",
       "syncNow": "Hozir sinxronlash",
       "syncQueued": "Sinxronlash navbatga qo'yildi",
-      "syncStatusUnavailable": "Sinxronlash holatini aniqlab bo'lmadi."
+      "syncStatusUnavailable": "Sinxronlash holatini aniqlab bo'lmadi.",
+      "daysOverdue_one": "Muddati {{displayCount}} kun o'tgan",
+      "daysOverdue_other": "Muddati {{displayCount}} kun o'tgan",
+      "findingsCount_one": "{{displayCount}} ta muammo",
+      "findingsCount_other": "{{displayCount}} ta muammo"
     },
     "dashboardMetrics": {
       "openFindings": "Ochiq muammolar",
@@ -2168,7 +2214,13 @@
       "updateTodos": "Vazifalar ro'yxatini yangilash",
       "linesBadge": "{{displayCount}} qator",
       "filesBadge": "{{displayCount}} fayl",
-      "matchesBadge": "{{displayCount}} natija"
+      "matchesBadge": "{{displayCount}} natija",
+      "filesBadge_one": "{{displayCount}} fayl",
+      "filesBadge_other": "{{displayCount}} fayl",
+      "linesBadge_one": "{{displayCount}} qator",
+      "linesBadge_other": "{{displayCount}} qator",
+      "matchesBadge_one": "{{displayCount}} natija",
+      "matchesBadge_other": "{{displayCount}} natija"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}-qatorlar (qisqartirilgan)",
@@ -2458,7 +2510,11 @@
       "files": "Fayl",
       "couldNotOpenPhotoPicker": "Rasm tanlash oynasini ochib bo'lmadi. Kilo ilovasini qayta ishga tushiring va yana urinib ko'ring.",
       "maxFilesAllowed": "Ko'pi bilan {{displayCount}} ta fayl qo'shish mumkin.",
-      "onlyAddingFiles": "{{total}} ta fayldan faqat {{accepted}} tasi qo'shilmoqda (ko'pi bilan {{max}} ta)"
+      "onlyAddingFiles": "{{total}} ta fayldan faqat {{accepted}} tasi qo'shilmoqda (ko'pi bilan {{max}} ta)",
+      "maxFilesAllowed_one": "Ko'pi bilan {{displayCount}} ta fayl qo'shish mumkin.",
+      "maxFilesAllowed_other": "Ko'pi bilan {{displayCount}} ta fayl qo'shish mumkin.",
+      "onlyAddingFiles_one": "{{total}} ta fayldan faqat {{accepted}} tasi qo'shilmoqda (ko'pi bilan {{max}} ta)",
+      "onlyAddingFiles_other": "{{total}} ta fayldan faqat {{accepted}} tasi qo'shilmoqda (ko'pi bilan {{max}} ta)"
     },
     "composer": {
       "addAttachment": "Fayl biriktirish",
@@ -2476,7 +2532,9 @@
       "discardAttachmentsMessage": "Hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi.",
       "discardAttachmentsTitle": "Biriktirilgan fayllar bekor qilinsinmi?",
       "charactersRemaining": "{{count}} ta belgi qoldi",
-      "insertNewline": "Yangi qator kiritish"
+      "insertNewline": "Yangi qator kiritish",
+      "charactersRemaining_one": "{{count}} ta belgi qoldi",
+      "charactersRemaining_other": "{{count}} ta belgi qoldi"
     },
     "chatLink": {
       "linkCopied": "Havola nusxalandi",
@@ -2548,7 +2606,9 @@
       "stepsCount_one": "{{steps}} qadam",
       "stepsCount": "{{steps}} qadam",
       "stepsCount_other": "{{steps}} qadam",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modellar ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Avtomatik tasdiqlash",
@@ -2588,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "Vosita chaqiruvlari",
-      "condensedLabel": "{{itemCount}} element; {{last}}"
+      "condensedLabel": "{{itemCount}} element; {{last}}",
+      "condensedLabel_one": "{{itemCount}} element; {{last}}",
+      "condensedLabel_other": "{{itemCount}} element; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "Bu sessiya fayllarni qabul qila olmaydi",
     "cliCantReceiveFilesMessage": "Bu sessiyani ishga tushirgan Kilo CLI fayllarni qabul qila olmaydi. O'sha kompyuterda CLIni yangilang yoki fayllarni yangi sessiyaga yuboring.",
     "contentlessMessage": "Ulashish uchun hech narsa yo'q — matn yoki fayllar kiritilmagan.",
-    "couldNotReadContent": "Ulashilgan kontentni o'qib bo'lmadi."
+    "couldNotReadContent": "Ulashilgan kontentni o'qib bo'lmadi.",
+    "onlyFirstFilesAttached_one": "Faqat birinchi {{displayCount}} ta fayl biriktiriladi.",
+    "onlyFirstFilesAttached_other": "Faqat birinchi {{displayCount}} ta fayl biriktiriladi."
   },
   "kiloPass": {
     "title": "Kilo Pass",

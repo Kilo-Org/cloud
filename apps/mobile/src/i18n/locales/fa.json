@@ -163,6 +163,7 @@
     "useDifferentEmail": "استفاده از ایمیل دیگر",
     "signInWithApple": "ورود با Apple",
     "signInWithGoogle": "ورود با Google",
+    "signInWithPasskey": "ورود با کلید عبور",
     "emailAddress": "نشانی ایمیل",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "ادامه با ایمیل",
@@ -175,6 +176,10 @@
     "termsConnector": " و ",
     "termsSuffix": ".",
     "moreSignInOptions": "گزینه‌های بیشتر برای ورود",
+    "passkeyCancelled": "ورود با کلید عبور لغو شد. لطفاً دوباره تلاش کنید.",
+    "passkeyNotFound": "هیچ کلید عبوری برای این دستگاه ذخیره نشده است. به‌جای آن با Apple، Google یا ایمیل خود وارد شوید.",
+    "passkeyUnsupported": "کلیدهای عبور روی این دستگاه در دسترس نیستند. به‌جای آن با Apple، Google یا ایمیل خود وارد شوید.",
+    "passkeyFailed": "ورود با کلید عبور ممکن نشد. لطفاً دوباره تلاش کنید.",
     "couldNotCompleteSignIn": "تکمیل ورود ممکن نشد. لطفاً دوباره تلاش کنید.",
     "sessionEnded": "نشست شما به پایان رسید. لطفاً دوباره وارد شوید.",
     "signInCodeExpired": "کد ورود شما منقضی شده است. لطفاً دوباره تلاش کنید.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "حساب آزمایشی",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO سازمانی"
+    "providerEnterpriseSso": "SSO سازمانی",
+    "passkeysTitle": "کلیدهای عبور",
+    "passkeysSubtitle": "بدون گذرواژه وارد شوید",
+    "passkeysEmpty": "هنوز هیچ کلید عبوری وجود ندارد",
+    "passkeysEmptyHint": "$t(profile.addPasskey) تا بدون گذرواژه وارد شوید.",
+    "passkeysCouldNotLoad": "بارگذاری کلیدهای عبور ممکن نشد",
+    "passkeysLoadFailed": "کلیدهای عبور تا زمانی که این بارگذاری نشود در دسترس نیستند.",
+    "addPasskey": "افزودن کلید عبور",
+    "passkeyDefaultName": "کلید عبور",
+    "passkeyAddedOn": "افزوده‌شده در {{date}}",
+    "passkeyAdded": "کلید عبور افزوده شد.",
+    "passkeyAddFailed": "افزودن کلید عبور ممکن نشد. دوباره تلاش کنید.",
+    "passkeyAddUnsupported": "این دستگاه نمی‌تواند کلید عبور بسازد.",
+    "passkeyAddCancelled": "ساخت کلید عبور لغو شد.",
+    "passkeyRemoved": "کلید عبور حذف شد.",
+    "passkeyRemoveFailed": "حذف آن کلید عبور ممکن نشد. دوباره تلاش کنید.",
+    "passkeyRenamed": "کلید عبور تغییر نام یافت.",
+    "passkeyName": "نام کلید عبور",
+    "renamePasskey": "تغییر نام کلید عبور",
+    "removePasskey": "حذف کلید عبور",
+    "removePasskeyTitle": "کلید عبور حذف شود؟",
+    "removePasskeyMessage": "دیگر نمی‌توانید با این کلید عبور وارد شوید."
   },
   "preferences": {
     "general": "عمومی",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} فایل از {{total}} فایل بارگذاری شد",
       "filesStillLoading": "فایل‌ها هنوز در حال بارگذاری هستند. برای بازخوانی، صفحه را به پایین بکشید.",
       "goToOverview": "رفتن به مرور کلی",
-      "goToOverviewTab": "رفتن به برگهٔ مرور کلی"
+      "goToOverviewTab": "رفتن به برگهٔ مرور کلی",
+      "expandAllLines_one": "نمایش همهٔ {{displayCount}} خط",
+      "expandAllLines_other": "نمایش همهٔ {{displayCount}} خط",
+      "expandLines_one": "نمایش {{displayCount}} خط ({{start}}–{{end}})",
+      "expandLines_other": "نمایش {{displayCount}} خط ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "نمایش {{displayCount}} خط از اطراف",
+      "expandLinesOfContext_other": "نمایش {{displayCount}} خط از اطراف",
+      "expandMoreLines_one": "نمایش {{displayCount}} خط دیگر ({{start}}–{{end}})",
+      "expandMoreLines_other": "نمایش {{displayCount}} خط دیگر ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} از {{total}} فایل بارگذاری شد",
+      "loadedOfTotalFiles_other": "{{loaded}} از {{total}} فایل بارگذاری شد"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "فایل با نویسهٔ خط جدید پایان نمی‌یابد.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "مربوط به نسخهٔ قبلی: {{path}}"
       },
       "deletedUser": "کاربر حذف‌شده",
-      "replyForbiddenTerm": "اجازهٔ پاسخ دادن در این {{term}} را ندارید."
+      "replyForbiddenTerm": "اجازهٔ پاسخ دادن در این {{term}} را ندارید.",
+      "moreLinesAbove_one": "… {{displayCount}} خط دیگر در بالا",
+      "moreLinesAbove_other": "… {{displayCount}} خط دیگر در بالا"
     },
     "couldNotOpenGitHubAppSettings": "باز کردن تنظیمات برنامه GitHub ناموفق بود.",
     "installKiloGitHubApp": "نصب برنامهٔ Kilo در GitHub",
@@ -706,7 +744,9 @@
       "statusContext": "بدون تغییر",
       "lineLabel": "خط {{line}}، {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}} — {{text}}",
-      "emptyLine": "(خالی)"
+      "emptyLine": "(خالی)",
+      "truncationBanner_one": "به‌دلیل محدودیت API در GitHub، فقط {{limit}} فایل اول از {{total}} فایل تغییریافته نمایش داده می‌شود.",
+      "truncationBanner_other": "به‌دلیل محدودیت API در GitHub، فقط {{limit}} فایل اول از {{total}} فایل تغییریافته نمایش داده می‌شود."
     },
     "linkPasteClipboardEmpty": "کلیپ‌بورد خالی است.",
     "linkPasteNotAPullRequest": "این پیوند مربوط به پول ریکوئست یا درخواست ادغام نیست.",
@@ -783,11 +823,11 @@
     "previewFullDescription": "اعلان‌ها متن پیام را روی صفحهٔ قفل شما نشان می‌دهند.",
     "previewGenericDescription": "اعلان‌ها فقط وقوع یک رویداد را نشان می‌دهند. برای خواندن پیام، Kilo را باز کنید.",
     "channel": {
+      "agentProgress": "پیشرفت عامل",
       "chat": "پیام‌های گفت‌وگو",
       "kiloclaw": "فعالیت KiloClaw",
       "balance": "هشدارهای موجودی",
-      "security": "یافته‌های امنیتی",
-      "agent": "نشست‌های عامل"
+      "security": "یافته‌های امنیتی"
     },
     "category": {
       "chatMessagesSubtitle": "پاسخ‌های گفت‌وگوهای شما",
@@ -880,7 +920,9 @@
       "uploadFailed": "بارگذاری ناموفق بود.",
       "failedToUploadFile": "بارگذاری فایل ناموفق بود: {{reason}}.",
       "nothingToPaste": "چیزی برای جای‌گذاری وجود ندارد.",
-      "metadataStripFailed": "حذف فراداده عکس ممکن نشد."
+      "metadataStripFailed": "حذف فراداده عکس ممکن نشد.",
+      "limit_one": "می‌توانید حداکثر {{displayCount}} فایل پیوست کنید.",
+      "limit_other": "می‌توانید حداکثر {{displayCount}} فایل پیوست کنید."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1624,7 +1666,11 @@
       "syncFindings": "همگام‌سازی یافته‌ها",
       "syncNow": "همگام‌سازی فوری",
       "syncQueued": "همگام‌سازی در صف قرار گرفت",
-      "syncStatusUnavailable": "وضعیت همگام‌سازی در دسترس نیست."
+      "syncStatusUnavailable": "وضعیت همگام‌سازی در دسترس نیست.",
+      "daysOverdue_one": "{{displayCount}} روز تأخیر",
+      "daysOverdue_other": "{{displayCount}} روز تأخیر",
+      "findingsCount_one": "{{displayCount}} یافته",
+      "findingsCount_other": "{{displayCount}} یافته"
     },
     "dashboardMetrics": {
       "openFindings": "یافته‌های باز",
@@ -2168,7 +2214,13 @@
       "updateTodos": "به‌روزرسانی فهرست کارها",
       "linesBadge": "{{displayCount}} خط",
       "filesBadge": "{{displayCount}} فایل",
-      "matchesBadge": "{{displayCount}} تطابق"
+      "matchesBadge": "{{displayCount}} تطابق",
+      "filesBadge_one": "{{displayCount}} فایل",
+      "filesBadge_other": "{{displayCount}} فایل",
+      "linesBadge_one": "{{displayCount}} خط",
+      "linesBadge_other": "{{displayCount}} خط",
+      "matchesBadge_one": "{{displayCount}} تطابق",
+      "matchesBadge_other": "{{displayCount}} تطابق"
     },
     "readToolMarkdown": {
       "linesTruncated": "خطوط {{start}}–{{end}} (نمایش ناقص)",
@@ -2458,7 +2510,11 @@
       "files": "فایل",
       "couldNotOpenPhotoPicker": "انتخاب‌گر عکس باز نشد. Kilo را ببندید و دوباره باز کنید، سپس دوباره تلاش کنید.",
       "maxFilesAllowed": "حداکثر {{displayCount}} فایل مجاز است.",
-      "onlyAddingFiles": "فقط {{accepted}} فایل از {{total}} فایل اضافه می‌شود (سقف مجاز: {{max}})"
+      "onlyAddingFiles": "فقط {{accepted}} فایل از {{total}} فایل اضافه می‌شود (سقف مجاز: {{max}})",
+      "maxFilesAllowed_one": "حداکثر {{displayCount}} فایل مجاز است.",
+      "maxFilesAllowed_other": "حداکثر {{displayCount}} فایل مجاز است.",
+      "onlyAddingFiles_one": "فقط {{accepted}} فایل از {{total}} فایل اضافه می‌شود (سقف مجاز: {{max}})",
+      "onlyAddingFiles_other": "فقط {{accepted}} فایل از {{total}} فایل اضافه می‌شود (سقف مجاز: {{max}})"
     },
     "composer": {
       "addAttachment": "افزودن پیوست",
@@ -2476,7 +2532,9 @@
       "discardAttachmentsMessage": "فایل‌های آپلودشده‌ای که به هیچ پیام ارسالی پیوست نشده‌اند، حذف می‌شوند.",
       "discardAttachmentsTitle": "پیوست‌ها حذف شوند؟",
       "charactersRemaining": "{{count}} نویسه باقی‌مانده",
-      "insertNewline": "درج خط جدید"
+      "insertNewline": "درج خط جدید",
+      "charactersRemaining_one": "{{count}} نویسه باقی‌مانده",
+      "charactersRemaining_other": "{{count}} نویسه باقی‌مانده"
     },
     "chatLink": {
       "linkCopied": "پیوند کپی شد",
@@ -2548,7 +2606,9 @@
       "stepsCount_one": "{{steps}} گام",
       "stepsCount": "{{steps}} گام",
       "stepsCount_other": "{{steps}} گام",
-      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
+      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
+      "modelsCount_one": "مدل ({{displayCount}})",
+      "modelsCount_other": "مدل‌ها ({{displayCount}})"
     },
     "autoApprove": {
       "title": "تأیید خودکار",
@@ -2588,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "فراخوانی‌های ابزار",
-      "condensedLabel": "{{itemCount}} مورد؛ {{last}}"
+      "condensedLabel": "{{itemCount}} مورد؛ {{last}}",
+      "condensedLabel_one": "{{itemCount}} مورد؛ {{last}}",
+      "condensedLabel_other": "{{itemCount}} مورد؛ {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "این نشست نمی‌تواند فایل دریافت کند",
     "cliCantReceiveFilesMessage": "Kilo CLI که این نشست را اجرا می‌کند، نمی‌تواند فایل دریافت کند. CLI را روی آن دستگاه به‌روزرسانی کنید یا فایل‌ها را با نشست جدیدی به اشتراک بگذارید.",
     "contentlessMessage": "چیزی برای اشتراک‌گذاری وجود ندارد. هیچ متن یا فایلی اضافه نشده است.",
-    "couldNotReadContent": "خواندن محتوای اشتراک‌گذاری‌شده ممکن نشد."
+    "couldNotReadContent": "خواندن محتوای اشتراک‌گذاری‌شده ممکن نشد.",
+    "onlyFirstFilesAttached_one": "فقط {{displayCount}} فایل اول پیوست می‌شوند.",
+    "onlyFirstFilesAttached_other": "فقط {{displayCount}} فایل اول پیوست می‌شوند."
   },
   "kiloPass": {
     "title": "Kilo Pass",

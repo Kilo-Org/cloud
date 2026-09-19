@@ -1,95 +1,69 @@
-// Pure/hook selection for every external-auth flow's platform branch (PR
-// review connect gate, security-agent setup, provider connect card). Extracted
-// so the platform choice (which browser launcher + which refetch trigger) can
-// be unit-tested without pulling in the full React component tree.
-
 import * as WebBrowser from 'expo-web-browser';
-
-type AuthLauncher = 'openAuthSession' | 'openBrowser';
-
-type GateRefetchTrigger = 'sheet-close' | 'app-foreground';
-
-type ConnectGatePlatformPlan = {
-  launcher: AuthLauncher;
-  refetchTrigger: GateRefetchTrigger;
-};
+import { AppState, type AppStateStatus, Platform } from 'react-native';
 
 /**
- * Maps a React Native platform to the browser launcher and refetch trigger
- * the connect gate should use after the auth session ends.
- *
- *  - iOS: `openAuthSessionAsync` returns when the sheet closes, so we
- *    refetch on `sheet-close`. No foreground listener needed.
- *  - Android: `openBrowserAsync` is fire-and-forget (no callback when the
- *    user finishes), so we wait for the app to return to foreground and
- *    refetch then. Same pattern as `use-device-auth.ts` ~:34-42.
+ * Subscribes to the next foreground return. The subscription comes back too so
+ * a launch that fails before the app returns can drop the listener.
  */
-export function getConnectGatePlatformPlan(platform: string): ConnectGatePlatformPlan {
-  if (platform === 'ios') {
-    return { launcher: 'openAuthSession', refetchTrigger: 'sheet-close' };
-  }
-  return { launcher: 'openBrowser', refetchTrigger: 'app-foreground' };
+function waitForForeground() {
+  let resolveReturn: (() => void) | undefined = undefined;
+  const returned = new Promise<void>(resolve => {
+    resolveReturn = resolve;
+  });
+  const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
+    if (state !== 'active') {
+      return;
+    }
+    subscription.remove();
+    resolveReturn?.();
+  });
+  return { returned, subscription };
 }
 
 /**
- * Opens the authorization URL with the platform-appropriate launcher and
- * resolves with the trigger the caller should use to refetch the
- * authorization query. Kept as a single helper so the gate component
- * doesn't have to know which platform maps to which API.
+ * Opens the authorization URL and resolves once the user is back in the app.
+ *
+ * Android is the one platform branch: it has no native auth-session completion
+ * callback, and expo-web-browser's `openAuthSessionAsync` polyfill keeps
+ * module-level state that can get stuck and reject every later call
+ * (KILO-APP-22), so Android opens a plain browser and resolves when the app
+ * returns to the foreground instead. iOS keeps the native auth session, which
+ * resolves when the sheet closes. Callers await the same promise on both.
  */
-export async function openAuthorizationAndWaitForReturn(
-  platform: string,
-  authorizationUrl: string
-): Promise<GateRefetchTrigger> {
-  const plan = getConnectGatePlatformPlan(platform);
-  await (plan.launcher === 'openAuthSession'
-    ? WebBrowser.openAuthSessionAsync(authorizationUrl)
-    : WebBrowser.openBrowserAsync(authorizationUrl));
-  return plan.refetchTrigger;
+export async function openAuthorizationAndWaitForReturn(authorizationUrl: string): Promise<void> {
+  if (Platform.OS !== 'android') {
+    await WebBrowser.openAuthSessionAsync(authorizationUrl);
+    return;
+  }
+  const { returned, subscription } = waitForForeground();
+  try {
+    await WebBrowser.openBrowserAsync(authorizationUrl);
+  } catch (error) {
+    subscription.remove();
+    throw error;
+  }
+  await returned;
 }
 
 type ConnectGateLaunchHandlers = {
-  /** Arms the foreground-return sentinel before the browser opens (Android). */
-  markLaunched: () => void;
-  /** Disarms the sentinel once it is consumed, or the launch failed. */
-  clearLaunch: () => void;
-  /** Runs the caller's refetch on the iOS `sheet-close` trigger. */
-  onSheetClose: () => Promise<void>;
+  onReturn: () => Promise<void>;
   /** The browser failed to open: tell the user instead of leaving the CTA inert. */
   onOpenFailure: () => void;
 };
 
 /**
- * Runs one external-auth launch for a connect gate: arms the launch sentinel,
- * opens the URL with the platform launcher, and on iOS's `sheet-close` trigger
- * clears the sentinel and refetches. A browser that fails to open clears the
- * sentinel and calls `onOpenFailure`, so the Connect control never looks inert
- * (no browser, no progress, no error). The sentinel is cleared on every
- * terminal path, so a later unrelated foreground cannot stray-refetch.
- *
- * Never rejects on a launch failure; `onSheetClose` errors propagate to the
- * caller.
+ * Launch failures are reported separately from refetch failures. Cancellation
+ * still refetches: the server-driven connection may have completed before close.
  */
 export async function launchConnectGateBrowser(
-  platform: string,
   authorizationUrl: string,
   handlers: ConnectGateLaunchHandlers
 ): Promise<void> {
-  handlers.markLaunched();
-  // `null` is the launch-failure sentinel: `openAuthorizationAndWaitForReturn`
-  // only rejects when the browser itself could not be opened, so converting
-  // the rejection to a value keeps the failure branch explicit and lets the
-  // success path stay flat.
-  const trigger = await openAuthorizationAndWaitForReturn(platform, authorizationUrl).catch(
-    () => null
-  );
-  if (trigger === null) {
-    handlers.clearLaunch();
+  try {
+    await openAuthorizationAndWaitForReturn(authorizationUrl);
+  } catch {
     handlers.onOpenFailure();
     return;
   }
-  if (trigger === 'sheet-close') {
-    handlers.clearLaunch();
-    await handlers.onSheetClose();
-  }
+  await handlers.onReturn();
 }

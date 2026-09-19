@@ -1,25 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  resolveRefreshTrigger,
   shouldClearConnectCheckFailed,
   shouldSetConnectCheckFailed,
 } from './use-github-repos-refresh-helpers';
-
-describe('resolveRefreshTrigger', () => {
-  it('returns sheet-close for iOS', () => {
-    expect(resolveRefreshTrigger('ios')).toBe('sheet-close');
-  });
-
-  it('returns app-foreground for Android', () => {
-    expect(resolveRefreshTrigger('android')).toBe('app-foreground');
-  });
-
-  it('falls back to app-foreground for unknown platforms', () => {
-    expect(resolveRefreshTrigger('web')).toBe('app-foreground');
-    expect(resolveRefreshTrigger('')).toBe('app-foreground');
-  });
-});
 
 describe('shouldSetConnectCheckFailed', () => {
   it('sets when return-triggered AND integration not installed', () => {

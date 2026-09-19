@@ -67,6 +67,14 @@ const LAUNCH_SURFACE_HAND_BACK_DELAY_MS = 3000;
  * surfaces have painted, so the brand drawable only covers the launch and a
  * later rotation still paints the app background the rotation-surface plugin
  * pins to `AppTheme`.
+ *
+ * `ReactMarker` is a process-global registry, so the listener also has to be
+ * dropped when the activity dies. A launch that never reaches
+ * `CONTENT_APPEARED` — a bundle load failure, a crash before React mounts, or
+ * the activity being destroyed while still loading — would otherwise leave the
+ * listener registered and hold this activity and its whole view hierarchy for
+ * the rest of the process, one leaked activity per recreation. The lifecycle
+ * observer removes it on `ON_DESTROY`, which is the activity's own `onDestroy`.
  */
 const ON_CREATE_INJECTION = [
   'val splashMarkerListener = object : com.facebook.react.bridge.ReactMarker.MarkerListener {',
@@ -79,6 +87,11 @@ const ON_CREATE_INJECTION = [
   '  }',
   '}',
   'com.facebook.react.bridge.ReactMarker.addListener(splashMarkerListener)',
+  'lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {',
+  '  override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {',
+  '    com.facebook.react.bridge.ReactMarker.removeListener(splashMarkerListener)',
+  '  }',
+  '})',
 ]
   .map(line => `    ${line}`)
   .join('\n');

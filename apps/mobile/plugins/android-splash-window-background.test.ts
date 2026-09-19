@@ -164,6 +164,20 @@ describe('injectMainActivityLaunchSurface', () => {
     expect(twice).toBe(once);
   });
 
+  it('drops the marker listener when the activity is destroyed', () => {
+    const contents = injectMainActivityLaunchSurface(MAIN_ACTIVITY, 'kt');
+
+    // ReactMarker is a process-global registry: a launch that never reaches
+    // CONTENT_APPEARED — a bundle load failure, a crash before React mounts, or
+    // the activity being destroyed while loading — must not keep the activity
+    // and its whole view hierarchy alive, so removal is tied to the activity
+    // lifecycle and not only to the marker.
+    expect(contents).toContain('lifecycle.addObserver(');
+    expect(contents).toContain('override fun onDestroy(');
+    expect(contents).toContain('ReactMarker.removeListener(splashMarkerListener)');
+    expect(contents.match(/ReactMarker\.addListener\(/g)).toHaveLength(1);
+  });
+
   it('stays inert on a Java activity, where the Kotlin write would not compile', () => {
     expect(injectMainActivityLaunchSurface(MAIN_ACTIVITY, 'java')).toBe(MAIN_ACTIVITY);
   });

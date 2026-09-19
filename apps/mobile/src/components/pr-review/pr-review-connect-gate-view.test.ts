@@ -48,6 +48,7 @@ vi.mock('react', async () => {
   return {
     ...actual,
     useCallback: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => fn),
+    useMemo: vi.fn(<T>(factory: () => T) => factory()),
     useState: vi.fn(<T>(initial: T) => [initial, vi.fn() as () => void] as [T, (value: T) => void]),
     useRef: vi.fn(<T>(initial: T) => ({ current: initial })),
     useEffect: vi.fn(),
@@ -65,6 +66,15 @@ vi.mock('@/lib/trpc', () => ({
     githubApps: {
       getUserAuthorization: { queryOptions: () => ({}), queryKey: () => [] },
       connectUserAuthorization: { mutationOptions: () => ({}) },
+    },
+    organizations: {
+      reviewAgent: {
+        getGitLabStatus: { queryOptions: () => ({}) },
+        getBitbucketReadiness: { queryOptions: () => ({}) },
+      },
+    },
+    personalReviewAgent: {
+      getGitLabStatus: { queryOptions: () => ({}) },
     },
   }),
 }));
@@ -89,6 +99,7 @@ vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo-web-browser', () => ({
   openAuthSessionAsync: vi.fn(),
   openBrowserAsync: vi.fn(),
+  WebBrowserResultType: { DISMISS: 'dismiss' },
 }));
 
 vi.mock('@/components/ui/icons', () => ({
@@ -217,5 +228,50 @@ describe('PrReviewConnectGate wiring', () => {
     await vi.waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Could not open browser. Please try again.');
     });
+  });
+
+  it('swallows a rejected sheet-close refetch instead of an unhandled rejection', async () => {
+    authorizationQueryResult = {
+      data: { connected: false },
+      isPending: false,
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn().mockRejectedValue(new Error('status refetch failed')),
+    };
+    vi.mocked(WebBrowser.openAuthSessionAsync).mockResolvedValue({
+      type: WebBrowser.WebBrowserResultType.DISMISS,
+    });
+
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      // The provider arm (GitLab/Bitbucket) has no mutateAsync of its own, so
+      // a rejected `status.refetch()` is the only rejection that can reach
+      // `handleConnect`. It is invoked as `void handleConnect()`, so the catch
+      // has to be inside the helper caller.
+      // eslint-disable-next-line new-cap
+      const tree = PrReviewConnectGate({
+        children: null,
+        platform: 'gitlab',
+        organizationId: 'org-1',
+      });
+      const button = findElement(tree, 'Button');
+      if (!button) {
+        throw new Error('the connect action did not render a Button');
+      }
+
+      (button.props as { onPress: () => void }).onPress();
+      await new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
+
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
   });
 });

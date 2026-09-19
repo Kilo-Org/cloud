@@ -293,6 +293,12 @@ function ProviderConnectGate({
           await status.refetch();
         },
       });
+    } catch {
+      // The helper reports a failed launch itself, so a rejected `onSheetClose`
+      // refetch is the only error that reaches here. Clear the sentinel and
+      // keep the gate showing: the query's error state renders the retryable
+      // QueryError instead of letting `void handleConnect()` reject.
+      clearLaunch();
     } finally {
       setConnecting(false);
     }

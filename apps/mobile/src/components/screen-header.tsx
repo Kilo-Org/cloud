@@ -197,6 +197,8 @@ export function ScreenHeader({
       {eyebrow || reserveEyebrow ? (
         <Eyebrow
           className={cn('mb-0.5', centerTitle && 'text-center', !eyebrow && 'opacity-0')}
+          numberOfLines={1}
+          ellipsizeMode="tail"
           accessible={Boolean(eyebrow)}
           accessibilityElementsHidden={!eyebrow}
           importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}

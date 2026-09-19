@@ -67,11 +67,14 @@ export function PrDiffFloatingActions({
   const pending = usePendingReview();
   // The footer is an in-flow bar below the list, so no row is ever clipped
   // by it and nothing shows through around the opaque (`bg-background`)
-  // card. Its bottom padding must include the Android system inset. The
-  // landscape side insets (`insets.left` / `insets.right`) clear the sensor
-  // housing; like ScreenHeader they are spread only when nonzero, so the
-  // `px-4` gutter survives portrait (inline style wins over className), and
-  // they are horizontal-only, so the bottom padding stays untouched.
+  // card. Its bottom padding clears the Android system inset, floored at 8
+  // points for devices that report none. It used to add a redundant 24
+  // points on top of the inset, which left a blank band under the card
+  // (owner capture finish-review-space.png). The landscape side insets
+  // (`insets.left` / `insets.right`) clear the sensor housing; like
+  // ScreenHeader they are spread only when nonzero, so the `px-4` gutter
+  // survives portrait (inline style wins over className), and they are
+  // horizontal-only, so the bottom padding stays untouched.
   const insets = useSafeAreaInsets();
 
   const showSelectionAction = viewMode === 'unified' && selection !== null;
@@ -118,7 +121,7 @@ export function PrDiffFloatingActions({
     <View
       className="w-full items-center gap-2 bg-background px-4 pt-3"
       style={{
-        paddingBottom: 24 + insets.bottom,
+        paddingBottom: Math.max(insets.bottom, 8),
         ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
         ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
       }}

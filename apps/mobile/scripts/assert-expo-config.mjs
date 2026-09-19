@@ -24,6 +24,9 @@ const PASSKEY_ASSOCIATED_DOMAIN = 'webcredentials:app.kilo.ai';
 // ASSOCIATED_DOMAIN above: the session link the app advertises and the
 // universal link the app claims have to be the same URL.
 const HEAD_ORIGIN = 'https://app.kilo.ai';
+// Time Sensitive Notifications capability: the iOS half of the needs-input
+// raise's `interruptionLevel: 'timeSensitive'` break-through contract.
+const TIME_SENSITIVE_ENTITLEMENT = 'com.apple.developer.usernotifications.time-sensitive';
 // The app name (app.config.ts `name`). `$(PRODUCT_NAME)` resolves to this in
 // the base Info.plist, but `.lproj/InfoPlist.strings` is compiled verbatim, so
 // the localized copy has to spell it out.
@@ -116,6 +119,14 @@ check(
 check(
   config.extra?.router?.headOrigin === HEAD_ORIGIN,
   `extra.router.headOrigin must be "${HEAD_ORIGIN}"`
+);
+
+// iOS honors `UNNotificationInterruptionLevel.timeSensitive` only when the app
+// carries the Time Sensitive Notifications capability; without it the
+// needs-input raise is demoted to the platform default and stays quiet in Focus.
+check(
+  config.ios?.entitlements?.[TIME_SENSITIVE_ENTITLEMENT] === true,
+  `ios.entitlements must enable the Time Sensitive Notifications capability (${TIME_SENSITIVE_ENTITLEMENT})`
 );
 
 const blockedPermissions = config.android?.blockedPermissions ?? [];

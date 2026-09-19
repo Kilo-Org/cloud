@@ -176,7 +176,12 @@ export function PrRefsRow({
       <Text variant="muted" className="shrink-0 text-sm">
         ←
       </Text>
-      <Text variant="mono" className="shrink-0 text-[13px]" numberOfLines={1}>
+      <Text
+        variant="mono"
+        className="max-w-1/2 shrink-0 text-[13px]"
+        numberOfLines={1}
+        ellipsizeMode="middle"
+      >
         {baseRef}
       </Text>
     </View>

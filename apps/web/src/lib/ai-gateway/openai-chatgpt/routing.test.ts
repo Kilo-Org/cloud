@@ -21,7 +21,8 @@ jest.mock('next/server', () => ({
   }),
 }));
 
-import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { gpt_6_astra_flex_model } from '@/lib/ai-gateway/providers/openai-exclusive';
 import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import { isOpenAiModelServed } from '@/lib/ai-gateway/openai-chatgpt/served-models';
@@ -342,6 +343,44 @@ describe('tagOpenAiChatGptByokModels', () => {
     const models = [{ id: 'openai/gpt-5-nano' }];
 
     await expect(tagOpenAiChatGptByokModels(USER_OWNER, models)).resolves.toBe(models);
+  });
+});
+
+describe.each(['public', 'hidden', 'disabled'] as const)('%s Kilo-exclusive aliases', status => {
+  const modelId = gpt_6_astra_flex_model.public_id;
+
+  beforeEach(() => {
+    jest.replaceProperty(gpt_6_astra_flex_model, 'status', status);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('rejects eligibility before looking up the upstream model or connection', async () => {
+    await expect(
+      isOpenAiChatGptEligible(
+        routingInput({ request: responsesRequest(modelId), requestedModel: ` ${modelId} ` })
+      )
+    ).resolves.toBe(false);
+    expect(isOpenAiModelServed).not.toHaveBeenCalled();
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
+  });
+
+  it('does not mark the alias BYOK-available, even when the upstream lookup would accept it', async () => {
+    await expect(tagOpenAiChatGptByokModels(USER_OWNER, [{ id: modelId }])).resolves.toEqual([
+      { id: modelId },
+    ]);
+    expect(isOpenAiModelServed).not.toHaveBeenCalled();
+  });
+
+  it('does not resolve a delegated token or build a provider for the alias', async () => {
+    await expect(
+      checkOpenAiChatGptByok(
+        routingInput({ request: responsesRequest(modelId), requestedModel: modelId })
+      )
+    ).resolves.toBeNull();
+    expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
   });
 });
 

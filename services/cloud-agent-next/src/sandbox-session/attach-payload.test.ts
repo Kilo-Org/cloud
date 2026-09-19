@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
 import { envVarsSchema } from '../types.js';
+import { sessionAttachPayloadSchema } from '../shared/sandbox-control-protocol.js';
 import {
   adaptSessionAttachPayloadForWrapper,
   buildSessionAttachPayload,
@@ -90,6 +91,28 @@ describe('buildSessionAttachPayload', () => {
     expect(adaptSessionAttachPayloadForWrapper(payload, false)).toEqual({
       directory: '/workspace/a',
     });
+  });
+
+  it('drops worktreeState for a wrapper that has not advertised it', () => {
+    const payload = {
+      directory: '/workspace/a',
+      worktreeState: { url: 'https://worker.test/worktree-state/u/s', grant: 'g' },
+    };
+
+    expect(adaptSessionAttachPayloadForWrapper(payload, true, true)).toEqual(payload);
+    expect(adaptSessionAttachPayloadForWrapper(payload, true, false)).toEqual({
+      directory: '/workspace/a',
+    });
+    expect(adaptSessionAttachPayloadForWrapper(payload, true)).toEqual({
+      directory: '/workspace/a',
+    });
+  });
+
+  it('rejects unknown top-level attach fields', () => {
+    expect(sessionAttachPayloadSchema.safeParse({ directory: '/workspace/a' }).success).toBe(true);
+    expect(
+      sessionAttachPayloadSchema.safeParse({ directory: '/workspace/a', envs: {} }).success
+    ).toBe(false);
   });
 
   for (const key of CONTROL_RUNTIME_RESERVED_ENV_VARS) {

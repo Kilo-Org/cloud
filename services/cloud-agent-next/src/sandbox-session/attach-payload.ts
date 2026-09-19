@@ -84,10 +84,17 @@ export function buildSessionAttachPayload(
 
 export function adaptSessionAttachPayloadForWrapper(
   payload: SessionAttachPayload,
-  supportsWorkingBranches: boolean
+  supportsWorkingBranches: boolean,
+  supportsWorktreeState = false
 ): SessionAttachPayload {
-  if (supportsWorkingBranches || payload.branchMode !== 'working') return payload;
-
-  const { branch: _branch, branchMode: _branchMode, ...legacyPayload } = payload;
-  return legacyPayload;
+  let adapted = payload;
+  if (!supportsWorkingBranches && payload.branchMode === 'working') {
+    const { branch: _branch, branchMode: _branchMode, ...legacyPayload } = payload;
+    adapted = legacyPayload;
+  }
+  if (!supportsWorktreeState && adapted.worktreeState !== undefined) {
+    const { worktreeState: _worktreeState, ...legacyPayload } = adapted;
+    adapted = legacyPayload;
+  }
+  return adapted;
 }

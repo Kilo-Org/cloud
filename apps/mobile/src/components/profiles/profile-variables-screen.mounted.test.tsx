@@ -198,6 +198,8 @@ describe('ProfileVariablesScreen', () => {
     const keyField = findField(renderer.root, 'Key');
     expect(keyField.props.disabled).toBe(true);
     expect(keyField.props.defaultValue).toBe('API_KEY');
+    // A non-secret edit keeps the plain Value placeholder.
+    expect(findField(renderer.root, 'Value').props.placeholder).toBe('Value');
 
     changeText(renderer.root, 'Value', '2');
     pressButton(renderer.root, 'Save');
@@ -245,9 +247,30 @@ describe('ProfileVariablesScreen', () => {
     expect(valueField.props.secureTextEntry).toBe(true);
     // A stored secret is never seeded into the edit field.
     expect(valueField.props.defaultValue).toBe('');
+    // The empty field says what the user must do: type a new value to rotate.
+    expect(valueField.props.placeholder).toBe('Enter new secret value');
 
     pressPressable(renderer.root, 'Reveal value');
     expect(findField(renderer.root, 'Value').props.secureTextEntry).toBe(false);
+
+    unmount();
+  });
+
+  it('happy: a new variable marked secret says its value is encrypted', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    // Until it is marked secret, the value field keeps the plain placeholder.
+    expect(findField(renderer.root, 'Value').props.placeholder).toBe('Value');
+
+    act(() => {
+      (
+        findOne(renderer.root, 'Switch').props as { onValueChange: (value: boolean) => void }
+      ).onValueChange(true);
+    });
+    expect(findField(renderer.root, 'Value').props.placeholder).toBe('Secret value (encrypted)');
 
     unmount();
   });

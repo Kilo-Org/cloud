@@ -49,6 +49,8 @@ const EXPECTED_PROFILES = {
     markSecret: 'Mark as secret',
     masked: 'Hidden value',
     reveal: 'Reveal value',
+    newValuePlaceholder: 'Enter new secret value',
+    valuePlaceholder: 'Secret value (encrypted)',
   },
   variablesEmpty: 'No variables yet',
   variablesSaveFailed: "Couldn't save variable",

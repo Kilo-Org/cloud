@@ -36,6 +36,22 @@ function variableInputErrorMessage(t: (key: string) => string, error: VariableIn
   return error === 'empty' ? t('common.required') : t('profiles.variablesSaveFailed');
 }
 
+/**
+ * The empty value field's copy, mirroring the web editor: editing a stored
+ * secret asks for a new value to rotate it, a new variable marked secret says
+ * the value will be encrypted, and every non-secret value field reads "Value".
+ */
+function valueFieldPlaceholder(
+  t: (key: string) => string,
+  isSecret: boolean,
+  isNew: boolean
+): string {
+  if (!isSecret) {
+    return t('profiles.valueLabel');
+  }
+  return isNew ? t('profiles.secrets.valuePlaceholder') : t('profiles.secrets.newValuePlaceholder');
+}
+
 type VariableRowViewProps = Readonly<{
   row: VariableRow;
   /**
@@ -150,6 +166,7 @@ export function VariableEditForm({
   const [error, setError] = useState<VariableInputError | null>(null);
 
   const canSave = !isSecret || hasValue;
+  const valuePlaceholder = valueFieldPlaceholder(t, isSecret, isNew);
 
   const submit = async () => {
     const key = keyRef.current;
@@ -187,6 +204,7 @@ export function VariableEditForm({
       />
       <FormField
         label={t('profiles.valueLabel')}
+        placeholder={valuePlaceholder}
         defaultValue={initial.value}
         secureTextEntry={isSecret && !revealed}
         autoCapitalize="none"

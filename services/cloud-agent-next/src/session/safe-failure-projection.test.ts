@@ -613,6 +613,25 @@ describe('classifyAssistantFailure', () => {
     }
   });
 
+  // A per-minute rate limit can be phrased with the same "too many tokens"
+  // words as a context overflow. The explicit rate-limit wording must win, or
+  // the transcript blames the model's context window for a request the user can
+  // simply retry.
+  it.each([
+    'Rate limit reached: too many tokens per minute',
+    '429 Too Many Requests: too many tokens',
+    'rate limit exceeded: too many tokens per minute',
+  ])('classifies rate-limit wording containing "too many tokens" as rate_limited: %s', message => {
+    const source = { name: 'APIError', data: { message, statusCode: 429 } };
+
+    expect(classifyAssistantFailure(source)).toEqual({
+      reason: 'rate_limited',
+      safeMessage: 'Assistant request was rate limited',
+      providerOwnership: 'unknown',
+    });
+    expect(projectSafeAssistantError(source)).toBe('Assistant request was rate limited');
+  });
+
   // A 4xx that merely mentions "context_length" (a field-name validation error)
   // and a 413 payload-size rejection are not context-window overflows. They must
   // keep the invalid-request wording instead of claiming the model's context

@@ -153,8 +153,7 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
       message
     ) ||
     /\b(?:exceeds?|exceeded|overflow(?:ed)?|max(?:imum)?)\b[^.]{0,40}\bcontext\b/.test(message) ||
-    /\b(?:prompt|request|input|messages?)\b[^.]{0,40}\btoo long\b/.test(message) ||
-    /\btoo many tokens\b/.test(message)
+    /\b(?:prompt|request|input|messages?)\b[^.]{0,40}\btoo long\b/.test(message)
   ) {
     return 'context_limit';
   }
@@ -163,6 +162,12 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
   ) {
     return 'rate_limited';
   }
+  // "too many tokens" on its own is ambiguous: a provider uses it both for an
+  // over-long request and for a per-minute rate limit ("Rate limit reached: too
+  // many tokens per minute"). An explicit rate-limit wording is the stronger
+  // signal and is checked first, so the unqualified pattern is only consulted
+  // here, after it.
+  if (/\btoo many tokens\b/.test(message)) return 'context_limit';
   if (/\b(timed? out|timeout|deadline exceeded)\b/.test(message)) return 'timeout';
   if (/\b(unauthorized|forbidden|authorization|authentication|401|403)\b/.test(message)) {
     return 'provider_authentication';

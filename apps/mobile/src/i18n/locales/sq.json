@@ -3157,7 +3157,9 @@
     "couldNotApprove": "Miratimi dështoi",
     "couldNotStart": "Nisja dështoi",
     "channelName": "Agjentët aktivë",
-    "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
+    "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
+    "openSession": "Hap",
+    "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri."
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",

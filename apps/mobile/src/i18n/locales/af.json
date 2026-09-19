@@ -3157,7 +3157,9 @@
     "couldNotApprove": "Kon nie goedkeur nie",
     "couldNotStart": "Kon nie begin nie",
     "channelName": "Aktiewe agente",
-    "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien."
+    "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
+    "openSession": "Oop",
+    "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer."
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",

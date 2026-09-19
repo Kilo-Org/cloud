@@ -3157,7 +3157,9 @@
     "couldNotApprove": "Kunde inte godkänna",
     "couldNotStart": "Kunde inte starta",
     "channelName": "Aktiva agenter",
-    "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen."
+    "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen.",
+    "openSession": "Öppna",
+    "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen."
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",

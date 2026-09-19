@@ -3286,7 +3286,9 @@
     "couldNotApprove": "Níorbh fhéidir ceadú",
     "couldNotStart": "Níorbh fhéidir tosú",
     "channelName": "Gníomhairí gníomhacha",
-    "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála."
+    "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála.",
+    "openSession": "Oscail",
+    "approveFailed": "Níorbh fhéidir ceadú. Tapáil $t(common.approve) chun triail eile a bhaint as."
   },
   "transcriptionModel": {
     "title": "Samhail tras-scríobh",

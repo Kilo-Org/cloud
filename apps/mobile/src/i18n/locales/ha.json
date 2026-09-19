@@ -3157,7 +3157,9 @@
     "couldNotApprove": "Ba a iya amincewa ba",
     "couldNotStart": "Ba a iya farawa ba",
     "channelName": "Wakilai da ke aiki",
-    "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle."
+    "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle.",
+    "openSession": "Buɗe",
+    "approveFailed": "An kasa amincewa. Danna $t(common.approve) don sake gwadawa."
   },
   "transcriptionModel": {
     "title": "Samfurin mayar da magana zuwa rubutu",

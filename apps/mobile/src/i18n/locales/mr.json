@@ -3157,7 +3157,9 @@
     "couldNotApprove": "मंजूर करता आले नाही",
     "couldNotStart": "सुरू करता आले नाही",
     "channelName": "सक्रिय एजंट्स",
-    "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये लाइव्ह अॅक्टिव्हिटी चालू करा."
+    "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये लाइव्ह अॅक्टिव्हिटी चालू करा.",
+    "openSession": "उघडा",
+    "approveFailed": "मंजूर करता आले नाही. पुन्हा प्रयत्न करण्यासाठी $t(common.approve) वर टॅप करा."
   },
   "transcriptionModel": {
     "title": "लिप्यंतरण मॉडेल",

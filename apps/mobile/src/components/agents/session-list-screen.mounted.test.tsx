@@ -590,7 +590,19 @@ describe('AgentSessionListScreen live presentation', () => {
       expect(text()).toContain('Nothing running right now');
       state.live.terminalError = failure;
       await renderScreen();
-      expect(text()).toContain(expected);
+      if (mode === 'exhausted') {
+        // The whole-surface load-failure block draws its own Retry for the
+        // outage that also exhausted the connection, so the connection row
+        // yields instead of stacking a second "Connection lost / Retry" above
+        // it (device defect uxs1). One retry, one recovery.
+        expect(text()).not.toContain('Connection lost');
+        expect(action('Retry')).toBeDefined();
+        expect(
+          nodes('Pressable').some(node => node.props.accessibilityLabel === 'Retry connection')
+        ).toBe(false);
+      } else {
+        expect(text()).toContain(expected);
+      }
       expect(text()).toContain('Could not load active sessions');
       expect(text()).not.toContain('Nothing running right now');
       expect(text()).not.toContain('Internet connection restored');
@@ -636,9 +648,19 @@ describe('AgentSessionListScreen live presentation', () => {
         });
         expect(state.refetch).toHaveBeenCalledTimes(1);
       }
-      expect(action('Retry connection').props.disabled).toBe(false);
+      if (cached) {
+        expect(action('Retry connection').props.disabled).toBe(false);
+      } else {
+        // Without cached rows the whole-surface load-failure block owns
+        // recovery, so the connection row yields rather than stacking a second
+        // Retry above the card (device defect uxs1). It returns once the load
+        // lands again (asserted at the end of this case).
+        expect(
+          nodes('Pressable').some(node => node.props.accessibilityLabel === 'Retry connection')
+        ).toBe(false);
+      }
       const queryRetry = cached ? undefined : action('Retry');
-      const socketRetry = action('Retry connection');
+      const socketRetry = cached ? action('Retry connection') : undefined;
       expect(
         nodes('View').filter(
           view =>
@@ -955,7 +977,7 @@ describe('AgentSessionListScreen live presentation', () => {
       nodes('FlatList')[0]?.props.contentContainerStyle as Record<string, number>;
     expect(contentContainerStyle()).toEqual({
       paddingTop: 0,
-      paddingBottom: state.tabBarHeight + 64,
+      paddingBottom: 0,
       paddingLeft: 0,
       paddingRight: 0,
     });
@@ -966,10 +988,21 @@ describe('AgentSessionListScreen live presentation', () => {
     await renderScreen();
     expect(contentContainerStyle()).toEqual({
       paddingTop: 0,
-      paddingBottom: state.tabBarHeight + 64,
+      paddingBottom: 0,
       paddingLeft: 47,
       paddingRight: 59,
     });
+  });
+
+  it('insets the live list viewport by the FAB band so no row sits under the button', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    // The viewport must end above the band on both platforms: a frame margin
+    // shrinks the list, where a content or frame padding would let iOS rows
+    // park under the bar (and a content inset only cleared the row under the
+    // button once the user scrolled).
+    const listStyle = () => nodes('FlatList')[0]?.props.style as Record<string, number>;
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight + 64 });
   });
 
   it('renders no history list, animated wrappers, or active-now section and keeps one history label without a plus icon', async () => {

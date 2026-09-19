@@ -10,14 +10,9 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
 
-import {
-  getLastGlanceableSnapshot,
-  persistGlanceableSink,
-  restorePersistedGlanceable,
-} from './persist';
-import { getTerminalBlankEpoch, isGlanceableOrgLost } from './cleanup';
-import { GlanceablePublisher } from './publisher';
-import { getGlanceableSinks, registerGlanceableSink } from './sink-registry';
+import { createGlanceablePublisher } from './create-publisher';
+import { persistGlanceableSink, restorePersistedGlanceable } from './persist';
+import { registerGlanceableSink } from './sink-registry';
 
 // Register only the persist sink here; platform sinks register themselves from
 // files their slices own.
@@ -64,12 +59,7 @@ export function GlanceablePublisherMount(): null {
       return undefined;
     }
 
-    const publisher = new GlanceablePublisher({
-      sinks: getGlanceableSinks(),
-      initial: getLastGlanceableSnapshot(),
-      terminalBlankEpoch: getTerminalBlankEpoch,
-      orgLost: isGlanceableOrgLost,
-    });
+    const publisher = createGlanceablePublisher();
     const ctx = { userId, organizationId };
 
     // Initial state: derive from the existing cache, or mark waiting while the

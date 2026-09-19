@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/icons';
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
@@ -70,6 +71,8 @@ function providerLabel(provider: string) {
 }
 
 export function ProfileScreen() {
+  const insets = useSafeAreaInsets();
+  const scrollStyle = { marginLeft: insets.left, marginRight: insets.right };
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
@@ -150,7 +153,8 @@ export function ProfileScreen() {
       <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 pt-4"
+        style={scrollStyle}
+        contentContainerClassName="px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {/* Credits */}

@@ -934,9 +934,6 @@ importers:
       '@octokit/auth-app':
         specifier: 'catalog:'
         version: 8.2.0
-      '@octokit/oauth-methods':
-        specifier: 6.0.2
-        version: 6.0.2
       '@octokit/rest':
         specifier: 22.0.1
         version: 22.0.1

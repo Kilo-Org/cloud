@@ -1987,9 +1987,10 @@ replacing it by hand means rebuilding the shared catalog — the trap this
 function closes. One line here against twelve a caller would have copied. Every
 other plugin is still replaced by composing the layers instead.
 
-There are nine entry points: `@kilocode/harness-sdk`, `/core`,
-`/plugins/fetch`, `/plugins/gateway`, `/plugins/prompt`, `/plugins/tools`,
-`/plugins/store/node`, `/plugins/store/expo` and `/testing`. The two stores have
+There are ten entry points: `@kilocode/harness-sdk`, `/core`,
+`/plugins/fetch`, `/plugins/gateway`, `/plugins/prompt`, `/plugins/remote-mcp`,
+`/plugins/tools`, `/plugins/store/node`, `/plugins/store/expo` and `/testing`.
+The two stores have
 subpaths of their own because each names a platform: exporting them from the
 root would pull `node:sqlite` or `expo-sqlite` into every bundle. `/plugins/fetch`
 and `/testing` have theirs because an entry point is what a consumer bundles and
@@ -1999,8 +2000,8 @@ suite. The catalog, token and retry plugins have none — a consumer reaches the
 through the root barrel, which also pulls the gateway. Add a subpath when one of
 them is wanted on its own.
 
-`scripts/check-package.ts` reads `package.json` and the README's own table, so a
-tenth entry point that reaches neither this list nor that one fails the build.
+`scripts/check-package.ts` reads `package.json` and the README's own table, so an
+eleventh entry point that reaches neither this list nor that one fails the build.
 
 The root is narrower than `/core` on purpose. It re-exports whole only the
 modules a caller uses whole, and names what it takes from the ones that hold

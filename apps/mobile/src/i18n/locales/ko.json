@@ -3035,6 +3035,23 @@
       "openHint": "채팅을 엽니다. 길게 눌러 삭제합니다.",
       "deleteTitle": "이 채팅을 삭제할까요?"
     },
-    "beta": "베타"
+    "beta": "베타",
+    "mcp": {
+      "title": "Kilo 도구",
+      "use": "Kilo 도구 사용",
+      "useDescription": "이 채팅에서 Kilo 서버가 제공하는 도구를 사용하도록 허용합니다.",
+      "off": "Kilo 도구가 꺼져 있습니다",
+      "offDescription": "이 채팅은 모델에 Kilo 도구를 보내지 않습니다.",
+      "connecting": "Kilo 도구에 연결하는 중…",
+      "available": "사용 가능한 도구: {{count}}",
+      "none": "사용 가능한 도구 없음",
+      "noneDescription": "Kilo 서버가 도구를 반환하지 않았습니다.",
+      "unreachable": "Kilo 도구에 연결할 수 없습니다",
+      "unreachableDescription": "서버가 응답하지 않았습니다. 연결을 확인한 후 다시 시도하세요.",
+      "unauthorized": "Kilo 도구가 이 세션을 거부했습니다",
+      "unauthorizedDescription": "이 채팅에서 Kilo 도구를 사용하려면 다시 로그인하세요.",
+      "unavailable": "Kilo 도구를 사용할 수 없습니다",
+      "unavailableDescription": "이 계정에서는 Kilo 서버를 사용할 수 없습니다."
+    }
   }
 }

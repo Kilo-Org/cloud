@@ -3035,6 +3035,23 @@
       "openHint": "Söhbəti açır. Silmək üçün basıb saxlayın.",
       "deleteTitle": "Bu söhbət silinsin?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo alətləri",
+      "use": "Kilo alətlərindən istifadə et",
+      "useDescription": "Bu söhbətə Kilo serverinin təqdim etdiyi alətlərdən istifadə etməyə icazə ver.",
+      "off": "Kilo alətləri söndürülüb",
+      "offDescription": "Bu söhbət modelə heç bir Kilo aləti göndərmir.",
+      "connecting": "Kilo alətlərinə qoşulur…",
+      "available": "Mövcud alətlər: {{count}}",
+      "none": "Mövcud alət yoxdur",
+      "noneDescription": "Kilo serveri heç bir alət qaytarmadı.",
+      "unreachable": "Kilo alətlərinə çatmaq mümkün olmadı",
+      "unreachableDescription": "Server cavab vermədi. Bağlantını yoxla və yenidən cəhd et.",
+      "unauthorized": "Kilo alətləri bu sessiyanı rədd etdi",
+      "unauthorizedDescription": "Bu söhbətdə Kilo alətlərindən istifadə etmək üçün yenidən daxil ol.",
+      "unavailable": "Kilo alətləri əlçatan deyil",
+      "unavailableDescription": "Kilo serveri bu hesab üçün mövcud deyil."
+    }
   }
 }

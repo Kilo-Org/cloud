@@ -3035,6 +3035,23 @@
       "openHint": "Manokatra ny resaka. Tsindrio ela mba hamafana.",
       "deleteTitle": "Hamafa ity resaka ity?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Fitaovana Kilo",
+      "use": "Mampiasa fitaovana Kilo",
+      "useDescription": "Avelao ity resaka ity hampiasa ny fitaovana omen'ny mpizara Kilo.",
+      "off": "Mihidy ny fitaovana Kilo",
+      "offDescription": "Tsy mandefa fitaovana Kilo ho an'ny modely ity resaka ity.",
+      "connecting": "Mifandray amin'ny fitaovana Kilo…",
+      "available": "Fitaovana misy: {{count}}",
+      "none": "Tsy misy fitaovana",
+      "noneDescription": "Tsy nampodina fitaovana ny mpizara Kilo.",
+      "unreachable": "Tsy tratra ny fitaovana Kilo",
+      "unreachableDescription": "Tsy namaly ny mpizara. Hamarino ny fifandraisanao, dia andramo indray.",
+      "unauthorized": "Nandà ity sesiona ity ny fitaovana Kilo",
+      "unauthorizedDescription": "Hiditra indray ianao hampiasa ny fitaovana Kilo amin'ity resaka ity.",
+      "unavailable": "Tsy misy ny fitaovana Kilo",
+      "unavailableDescription": "Tsy misy ny mpizara Kilo ho an'ity kaonty ity."
+    }
   }
 }

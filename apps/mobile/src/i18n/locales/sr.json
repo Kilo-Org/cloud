@@ -3057,6 +3057,23 @@
       "openHint": "Otvara ćaskanje. Dugo pritisnite za brisanje.",
       "deleteTitle": "Izbrisati ovo ćaskanje?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo alati",
+      "use": "Koristi Kilo alate",
+      "useDescription": "Dozvoli ovom ćaskanju da koristi alate koje nudi Kilo server.",
+      "off": "Kilo alati su isključeni",
+      "offDescription": "Ovo ćaskanje ne šalje modelu nijedan Kilo alat.",
+      "connecting": "Povezivanje sa Kilo alatima…",
+      "available": "Dostupni alati: {{count}}",
+      "none": "Nema dostupnih alata",
+      "noneDescription": "Kilo server nije vratio nijedan alat.",
+      "unreachable": "Nije moguće doći do Kilo alata",
+      "unreachableDescription": "Server nije odgovorio. Proveri vezu i pokušaj ponovo.",
+      "unauthorized": "Kilo alati su odbili ovu sesiju",
+      "unauthorizedDescription": "Prijavi se ponovo da koristiš Kilo alate u ovom ćaskanju.",
+      "unavailable": "Kilo alati nisu dostupni",
+      "unavailableDescription": "Kilo server nije dostupan za ovaj nalog."
+    }
   }
 }

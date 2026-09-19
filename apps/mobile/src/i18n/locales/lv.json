@@ -3057,6 +3057,23 @@
       "openHint": "Atver tērzēšanu. Turiet nospiestu, lai dzēstu.",
       "deleteTitle": "Vai dzēst šo tērzēšanu?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo rīki",
+      "use": "Izmantot Kilo rīkus",
+      "useDescription": "Ļauj šai tērzēšanai izmantot rīkus, ko piedāvā Kilo serveris.",
+      "off": "Kilo rīki ir izslēgti",
+      "offDescription": "Šī tērzēšana modelim nenosūta nevienu Kilo rīku.",
+      "connecting": "Savienojas ar Kilo rīkiem…",
+      "available": "Pieejamie rīki: {{count}}",
+      "none": "Nav pieejamu rīku",
+      "noneDescription": "Kilo serveris neatgrieza nevienu rīku.",
+      "unreachable": "Neizdevās sasniegt Kilo rīkus",
+      "unreachableDescription": "Serveris neatbildēja. Pārbaudi savienojumu un mēģini vēlreiz.",
+      "unauthorized": "Kilo rīki atteica šo sesiju",
+      "unauthorizedDescription": "Piesakies vēlreiz, lai šajā tērzēšanā izmantotu Kilo rīkus.",
+      "unavailable": "Kilo rīki nav pieejami",
+      "unavailableDescription": "Kilo serveris nav pieejams šim kontam."
+    }
   }
 }

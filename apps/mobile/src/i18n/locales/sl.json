@@ -3079,6 +3079,23 @@
       "openHint": "Odpre klepet. Pridržite za brisanje.",
       "deleteTitle": "Izbrišem ta klepet?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Orodja Kilo",
+      "use": "Uporabi orodja Kilo",
+      "useDescription": "Dovoli temu klepetu uporabljati orodja, ki jih ponuja strežnik Kilo.",
+      "off": "Orodja Kilo so izklopljena",
+      "offDescription": "Ta klepet modelu ne pošlje nobenega orodja Kilo.",
+      "connecting": "Povezovanje z orodji Kilo…",
+      "available": "Razpoložljiva orodja: {{count}}",
+      "none": "Ni razpoložljivih orodij",
+      "noneDescription": "Strežnik Kilo ni vrnil nobenega orodja.",
+      "unreachable": "Ni bilo mogoče doseči orodij Kilo",
+      "unreachableDescription": "Strežnik ni odgovoril. Preveri povezavo in poskusi znova.",
+      "unauthorized": "Orodja Kilo so zavrnila to sejo",
+      "unauthorizedDescription": "Prijavi se znova, da boš lahko v tem klepetu uporabljal orodja Kilo.",
+      "unavailable": "Orodja Kilo niso na voljo",
+      "unavailableDescription": "Strežnik Kilo ni na voljo za ta račun."
+    }
   }
 }

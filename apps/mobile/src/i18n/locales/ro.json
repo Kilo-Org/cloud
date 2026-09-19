@@ -3057,6 +3057,23 @@
       "openHint": "Deschide chatul. Apasă lung pentru a șterge.",
       "deleteTitle": "Ștergi acest chat?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Instrumentele Kilo",
+      "use": "Folosește instrumentele Kilo",
+      "useDescription": "Permite acestui chat să folosească instrumentele oferite de serverul Kilo.",
+      "off": "Instrumentele Kilo sunt oprite",
+      "offDescription": "Acest chat nu trimite niciun instrument Kilo modelului.",
+      "connecting": "Se conectează la instrumentele Kilo…",
+      "available": "Instrumente disponibile: {{count}}",
+      "none": "Niciun instrument disponibil",
+      "noneDescription": "Serverul Kilo nu a returnat niciun instrument.",
+      "unreachable": "Nu s-a putut contacta instrumentele Kilo",
+      "unreachableDescription": "Serverul nu a răspuns. Verifică conexiunea și încearcă din nou.",
+      "unauthorized": "Instrumentele Kilo au refuzat această sesiune",
+      "unauthorizedDescription": "Autentifică-te din nou pentru a folosi instrumentele Kilo în acest chat.",
+      "unavailable": "Instrumentele Kilo nu sunt disponibile",
+      "unavailableDescription": "Serverul Kilo nu este disponibil pentru acest cont."
+    }
   }
 }

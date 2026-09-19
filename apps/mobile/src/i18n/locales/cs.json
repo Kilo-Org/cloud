@@ -3079,6 +3079,23 @@
       "openHint": "Otevře chat. Dlouhým stisknutím smažete.",
       "deleteTitle": "Smazat tento chat?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Nástroje Kilo",
+      "use": "Používat nástroje Kilo",
+      "useDescription": "Povolte této konverzaci používat nástroje, které nabízí server Kilo.",
+      "off": "Nástroje Kilo jsou vypnuté",
+      "offDescription": "Tato konverzace neposílá modelu žádný nástroj Kilo.",
+      "connecting": "Připojování k nástrojům Kilo…",
+      "available": "Dostupné nástroje: {{count}}",
+      "none": "Nejsou dostupné žádné nástroje",
+      "noneDescription": "Server Kilo nevrátil žádné nástroje.",
+      "unreachable": "Nepodařilo se připojit k nástrojům Kilo",
+      "unreachableDescription": "Server neodpověděl. Zkontrolujte připojení a zkuste to znovu.",
+      "unauthorized": "Nástroje Kilo odmítly tuto relaci",
+      "unauthorizedDescription": "Přihlaste se znovu, abyste mohli v této konverzaci používat nástroje Kilo.",
+      "unavailable": "Nástroje Kilo nejsou dostupné",
+      "unavailableDescription": "Server Kilo pro tento účet není k dispozici."
+    }
   }
 }

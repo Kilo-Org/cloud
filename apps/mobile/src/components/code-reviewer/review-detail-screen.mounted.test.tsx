@@ -415,13 +415,19 @@ describe('ReviewDetailScreen details metadata', () => {
 
     const texts = renderScreen();
 
-    // `timeAgo` is mocked to "now" in this suite, so the completion row is the
-    // only "Completed" immediately followed by "now": the status conclusion is
-    // followed by "Findings" and the Gate status row by "Details".
+    // `timeAgo` is mocked to "now" in this suite, so the Details completion row
+    // is the only "Completed" immediately followed by "now": the status
+    // conclusion is followed by "Findings" and the Gate status value by its
+    // "Threshold" row.
     const completionRowIndex = texts.findIndex(
       (text, index) => text === 'Completed' && texts[index + 1] === 'now'
     );
-    expect(completionRowIndex).toBeGreaterThan(texts.indexOf('Details'));
+    const detailsHeaderIndex = texts.indexOf('Details');
+    // Assert the header was found before comparing: `indexOf` returns -1 on a
+    // copy change, and `completionRowIndex >= 0` would then satisfy the
+    // placement check without proving the row sits inside the Details list.
+    expect(detailsHeaderIndex).toBeGreaterThanOrEqual(0);
+    expect(completionRowIndex).toBeGreaterThan(detailsHeaderIndex);
   });
 });
 

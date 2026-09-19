@@ -152,6 +152,10 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   suppressIfViewingSession: z.boolean().optional(),
   // Absent category is treated as 'status' at the enforcement read site.
   category: cloudAgentSessionCategorySchema.optional(),
+  // Needs-input raise detail: which answer the waiting agent wants, and the PR
+  // that can be opened from the notification. Absent on status pushes.
+  attentionKind: z.enum(['question', 'permission']).optional(),
+  prUrl: z.string().optional(),
   // Old producers omit these; remove the optionals when every producer sends keys.
   i18nKey: z.string().min(1).optional(),
   i18nParams: z.record(z.string(), z.string()).optional(),

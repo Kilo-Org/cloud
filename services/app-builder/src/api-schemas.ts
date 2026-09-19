@@ -1,10 +1,5 @@
 import { z } from 'zod';
 
-// ============================================
-// Init Endpoint Schemas
-// POST /apps/{app_id}/init
-// ============================================
-
 // Template names must be alphanumeric with dashes/underscores only (no path traversal)
 const templateNameRegex = /^[a-zA-Z0-9_-]+$/;
 
@@ -52,11 +47,6 @@ export type InitSuccessResponse = z.infer<typeof InitSuccessResponseSchema>;
 export type InitErrorResponse = z.infer<typeof InitErrorResponseSchema>;
 export type InitResponse = z.infer<typeof InitResponseSchema>;
 
-// ============================================
-// Preview Status Endpoint Schemas
-// GET /apps/{app_id}/preview
-// ============================================
-
 export const PreviewStateSchema = z.enum(['uninitialized', 'idle', 'building', 'running', 'error']);
 export type PreviewState = z.infer<typeof PreviewStateSchema>;
 
@@ -68,11 +58,6 @@ export const GetPreviewResponseSchema = z.object({
 
 export type GetPreviewResponse = z.infer<typeof GetPreviewResponseSchema>;
 
-// ============================================
-// Build Trigger Endpoint Schemas
-// POST /apps/{app_id}/build
-// ============================================
-
 // Returns 202 Accepted with empty body on success
 // Returns error response on failure
 export const BuildTriggerErrorResponseSchema = z.object({
@@ -82,11 +67,6 @@ export const BuildTriggerErrorResponseSchema = z.object({
 
 export type BuildTriggerErrorResponse = z.infer<typeof BuildTriggerErrorResponseSchema>;
 
-// ============================================
-// Build Logs Streaming Endpoint Schemas
-// GET /apps/{app_id}/build/logs
-// ============================================
-
 // Returns Server-Sent Events stream on success
 // Returns error response on failure
 export const BuildLogsErrorResponseSchema = z.object({
@@ -95,11 +75,6 @@ export const BuildLogsErrorResponseSchema = z.object({
 });
 
 export type BuildLogsErrorResponse = z.infer<typeof BuildLogsErrorResponseSchema>;
-
-// ============================================
-// Token Generation Endpoint Schemas
-// POST /apps/{app_id}/token
-// ============================================
 
 export const TokenRequestSchema = z.object({
   permission: z.enum(['full', 'ro']),
@@ -116,11 +91,6 @@ export const TokenSuccessResponseSchema = z.object({
 
 export type TokenSuccessResponse = z.infer<typeof TokenSuccessResponseSchema>;
 
-// ============================================
-// Delete Endpoint Schemas
-// DELETE /apps/{app_id}
-// ============================================
-
 export const DeleteSuccessResponseSchema = z.object({
   success: z.literal(true),
 });
@@ -132,12 +102,6 @@ export const DeleteErrorResponseSchema = z.object({
 
 export type DeleteSuccessResponse = z.infer<typeof DeleteSuccessResponseSchema>;
 export type DeleteErrorResponse = z.infer<typeof DeleteErrorResponseSchema>;
-
-// ============================================
-// Migrate to GitHub Endpoint Schemas
-// POST /apps/{app_id}/migrate-to-github
-// Sets GitHub source and schedules internal git repo deletion
-// ============================================
 
 export const MigrateToGithubRequestSchema = z.object({
   githubRepo: z.string().regex(/^[^/]+\/[^/]+$/, 'Must be in "owner/repo" format'),
@@ -165,10 +129,6 @@ export const MigrateToGithubResponseSchema = z.discriminatedUnion('success', [
 export type MigrateToGithubSuccessResponse = z.infer<typeof MigrateToGithubSuccessResponseSchema>;
 export type MigrateToGithubErrorResponse = z.infer<typeof MigrateToGithubErrorResponseSchema>;
 export type MigrateToGithubResponse = z.infer<typeof MigrateToGithubResponseSchema>;
-
-// ============================================
-// Common Error Response Schema
-// ============================================
 
 export const ApiErrorResponseSchema = z.object({
   error: z.string(),

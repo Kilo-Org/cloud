@@ -134,10 +134,8 @@ export class SqliteFS {
       throw new Error('Cannot write to root');
     }
 
-    // Convert to Uint8Array if string
     const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
 
-    // Check size limit
     if (bytes.length > MAX_OBJECT_SIZE) {
       const sizeKB = (bytes.length / 1024).toFixed(2);
       const maxKB = (MAX_OBJECT_SIZE / 1024).toFixed(2);
@@ -152,7 +150,6 @@ export class SqliteFS {
       throw new Error(`File too large: ${path} (${bytes.length} bytes, max ${MAX_OBJECT_SIZE})`);
     }
 
-    // Check if path exists as directory
     const existing = this.db
       .select({ is_dir: gitObjects.is_dir })
       .from(gitObjects)
@@ -192,7 +189,6 @@ export class SqliteFS {
       }
     }
 
-    // Encode to base64 for safe storage
     let base64Content = '';
     if (bytes.length > 0) {
       let binaryString = '';
@@ -283,7 +279,6 @@ export class SqliteFS {
 
     if (rows.length === 0) return [];
 
-    // Extract just the basename from each path
     return rows.map(row => {
       const parts = row.path.split('/');
       return parts[parts.length - 1];
@@ -422,13 +417,10 @@ export class SqliteFS {
     const row = result[0];
     const isDir = row.is_dir === 1;
 
-    // Calculate actual size for files (base64 is ~1.33x larger than binary)
     let size = 0;
     if (!isDir && row.data) {
-      // Approximate binary size from base64 length
       size = Math.floor(row.data.length * 0.75);
     }
-
     const type: 'file' | 'dir' = isDir ? 'dir' : 'file';
     const statResult = {
       type,
@@ -491,7 +483,6 @@ export class SqliteFS {
     const exported: Array<{ path: string; data: Uint8Array }> = [];
 
     for (const obj of objects) {
-      // Decode base64 to binary
       const binaryString = atob(obj.data);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {

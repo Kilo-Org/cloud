@@ -59,7 +59,6 @@ export async function handleMigrateToGithub(
 
     const { githubRepo, userId, orgId } = result.data;
 
-    // 1. Fetch a GitHub token via git-token-service
     const tokenResult = await env.GIT_TOKEN_SERVICE.getTokenForRepo({ githubRepo, userId, orgId });
     if (!tokenResult.success) {
       logger.error({ source: 'MigrateToGithubHandler', appId }, 'Failed to get GitHub token', {
@@ -79,7 +78,6 @@ export async function handleMigrateToGithub(
     remoteUrl.username = 'x-access-token';
     remoteUrl.password = tokenResult.token;
 
-    // 2. Push internal git repo to GitHub
     const gitId = env.GIT_REPOSITORY.idFromName(appId);
     const gitStub = env.GIT_REPOSITORY.get(gitId);
 
@@ -114,7 +112,6 @@ export async function handleMigrateToGithub(
       );
     }
 
-    // 3. Switch preview to GitHub source and schedule internal repo deletion
     logger.info({ source: 'MigrateToGithubHandler', appId }, 'Migrating preview to GitHub', {
       githubRepo,
       hasOrgId: !!orgId,

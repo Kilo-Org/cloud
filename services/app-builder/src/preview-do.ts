@@ -15,7 +15,6 @@ import { logger, withLogTags, formatError } from './utils/logger';
 import { signGitToken } from './utils/jwt';
 import { createDBProvisioner, DBProvisionResult } from './db-provisioner';
 
-/** Process ID prefix for dev server - combined with appId for unique identification */
 const DEV_SERVER_PROCESS_PREFIX = 'bun-dev-';
 
 export class PreviewDO extends DurableObject<Env> {
@@ -26,7 +25,6 @@ export class PreviewDO extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
-    // Initialize default persisted state - explicitly uninitialized
     this.persistedState = {
       appId: null,
       lastError: null,
@@ -34,7 +32,6 @@ export class PreviewDO extends DurableObject<Env> {
       githubSource: null,
     };
 
-    // Restore persisted state from storage if available
     void this.ctx.blockConcurrencyWhile(async () => {
       const stored = await this.ctx.storage.get<PreviewPersistedState>('state');
       if (stored) {
@@ -121,14 +118,12 @@ export class PreviewDO extends DurableObject<Env> {
    * Finds active process by prefix using listProcesses
    */
   private async getSandboxState(): Promise<PreviewState> {
-    // No appId = uninitialized
     if (!this.persistedState.appId) {
       return 'uninitialized';
     }
 
     const sandbox = getSandbox(this.env.SANDBOX, this.persistedState.appId);
 
-    // Try to find the dev server process
     const process = await this.getDevProcess(sandbox);
 
     if (process) {
@@ -160,7 +155,6 @@ export class PreviewDO extends DurableObject<Env> {
             const portOpen = await this.isPortOpen(sandbox);
             return portOpen ? 'running' : 'building';
           } catch {
-            // If port check fails, assume building
             return 'building';
           }
 
@@ -171,16 +165,13 @@ export class PreviewDO extends DurableObject<Env> {
       }
     }
 
-    // No process found - check for orphan process (something running on port)
     try {
       const portOpen = await this.isPortOpen(sandbox);
       if (portOpen) {
-        // There's something running but we can't access by processId
         logger.warn('Orphan process detected on port');
         return 'running';
       }
     } catch (error) {
-      // Port check failed - sandbox likely doesn't exist, return idle
       logger.debug('Port check failed, sandbox may not exist', {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
@@ -199,11 +190,9 @@ export class PreviewDO extends DurableObject<Env> {
    * access for the internal App Builder git server.
    */
   private async getRepoUrl(repoId: string): Promise<string> {
-    // Check if project is migrated to GitHub
     if (this.persistedState.githubSource) {
       const { githubRepo, userId, orgId } = this.persistedState.githubSource;
 
-      // Get fresh token from git-token-service
       const result: GetTokenForRepoResult = await this.env.GIT_TOKEN_SERVICE.getTokenForRepo({
         githubRepo,
         userId,
@@ -220,7 +209,6 @@ export class PreviewDO extends DurableObject<Env> {
       return url.toString();
     }
 
-    // Internal App Builder repository (not migrated)
     const authToken = signGitToken(repoId, 'ro', this.env.GIT_JWT_SECRET);
     const hostname = this.env.BUILDER_HOSTNAME;
     const baseUrl = `https://x-access-token:${authToken}@${hostname}`;
@@ -236,7 +224,6 @@ export class PreviewDO extends DurableObject<Env> {
     for await (const event of parseSSEStream<ExecEvent>(stream)) {
       const data = stripVTControlCharacters(event.data || '').trim();
 
-      // Log output for debugging (verbose, use debug level)
       if (data) {
         logger.debug('Sandbox output', { data });
       }
@@ -255,18 +242,12 @@ export class PreviewDO extends DurableObject<Env> {
    * Check if the default port is listening using ss (socket statistics)
    */
   private async isPortOpen(sandbox: ReturnType<typeof getSandbox>): Promise<boolean> {
-    // Use ss to check if something is listening on the port
     const portCheck = await sandbox.exec(`ss -tln | grep -q ':${DEFAULT_SANDBOX_PORT} '`);
 
-    // If grep found a match (exit code 0), the port is listening
     const isOpen = portCheck.exitCode === 0;
 
     return isOpen;
   }
-
-  // ============================================
-  // RPC Methods (Public API)
-  // ============================================
 
   async initWithAppId(appId: string): Promise<void> {
     return withLogTags({ source: 'PreviewDO', tags: { appId } }, async () => {
@@ -374,12 +355,10 @@ export class PreviewDO extends DurableObject<Env> {
             throw new Error('App ID not set');
           }
 
-          // Clear any previous error state
           await this.clearErrorState();
 
           const sandbox = getSandbox(this.env.SANDBOX, appId);
 
-          // Check if repository already exists
           const checkResult = await sandbox.exec('test -d /workspace/.git');
           const repoExists = checkResult.exitCode === 0;
 
@@ -430,7 +409,6 @@ export class PreviewDO extends DurableObject<Env> {
           });
           const dbResult = await dbProvisioner.provisionIfNeeded(sandbox, appId);
 
-          // Check if there's already a process running
           const activeProcess = await this.getDevProcess(sandbox);
           logger.debug('Checking if dev server is already running', {
             hasActiveProcess: !!activeProcess,
@@ -454,19 +432,16 @@ export class PreviewDO extends DurableObject<Env> {
                   stderr: pkillResult.stderr,
                 });
               }
-              // Continue to start a new dev server process below
             } else {
               return;
             }
           }
 
-          // Generate a new process ID with random suffix
           const processId = this.generateProcessId();
           if (!processId) {
             throw new Error('Failed to generate dev server process ID');
           }
 
-          // Build environment variables for dev server
           const env: Record<string, string> = { PORT: String(DEFAULT_SANDBOX_PORT) };
           if (this.persistedState.dbCredentials) {
             env.DB_URL = this.persistedState.dbCredentials.url;
@@ -509,7 +484,6 @@ export class PreviewDO extends DurableObject<Env> {
         try {
           const sandbox = getSandbox(this.env.SANDBOX, this.persistedState.appId);
 
-          // Find the active dev server process
           const process = await this.getDevProcess(sandbox);
           if (!process) {
             return null;
@@ -540,7 +514,6 @@ export class PreviewDO extends DurableObject<Env> {
           const sandbox = getSandbox(this.env.SANDBOX, this.persistedState.appId);
           await sandbox.destroy();
         } catch (error) {
-          // Log but don't fail if sandbox cleanup fails
           logger.error('Failed to destroy sandbox', formatError(error));
         }
       }
@@ -557,13 +530,10 @@ export class PreviewDO extends DurableObject<Env> {
       async () => {
         logger.info('Deleting all preview data');
 
-        // First destroy the sandbox container if it exists
         await this.destroy();
 
-        // Clear all persisted state
         await this.ctx.storage.deleteAll();
 
-        // Reset in-memory state
         this.persistedState = {
           appId: null,
           lastError: null,

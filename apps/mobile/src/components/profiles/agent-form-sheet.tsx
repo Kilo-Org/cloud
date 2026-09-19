@@ -4,6 +4,7 @@ import { Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import { AgentVariantPicker } from '@/components/profiles/agent-variant-picker';
 import {
   type AgentFormError,
   type AgentFormState,
@@ -17,6 +18,7 @@ import {
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { cn } from '@/lib/utils';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
@@ -35,6 +37,7 @@ const VISIBILITY_OPTIONS: readonly { value: AgentVisibility; labelKey: string }[
 
 type AgentFormSheetProps = Readonly<{
   agent: AgentSource | null;
+  organizationId?: string;
   isSaving: boolean;
   onClose: () => void;
   onSave: (payload: { slug: string; name: string; config: Record<string, unknown> }) => void;
@@ -48,9 +51,15 @@ type AgentFormSheetProps = Readonly<{
  * Save validates through `validateAgentForm`; a refused input shows the
  * matching `profiles.agents.*` message under the field at fault. Every tool is
  * allowed unless its switch is off, which writes `deny` for that tool only.
+ *
+ * Sampling (max steps, temperature, top_p) mirrors the web editor. The effort
+ * variant control appears only when the typed model's catalogue entry lists
+ * variants — the same `availableVariants` gate web uses — and never blocks a
+ * save: an unavailable model list only hides the control.
  */
 export function AgentFormSheet({
   agent,
+  organizationId,
   isSaving,
   onClose,
   onSave,
@@ -63,9 +72,21 @@ export function AgentFormSheet({
   const descriptionRef = useRef(initial.description);
   const promptRef = useRef(initial.prompt);
   const modelRef = useRef(initial.model);
+  const stepsRef = useRef(initial.steps);
+  const temperatureRef = useRef(initial.temperature);
+  const topPRef = useRef(initial.topP);
+  // The typed model is text in `modelRef`; this state exists only to derive the
+  // variant options the catalogue publishes for it.
+  const [modelValue, setModelValue] = useState(initial.model);
   const [visibility, setVisibility] = useState<AgentVisibility>(initial.visibility);
+  const [variant, setVariant] = useState(initial.variant);
   const [disabledTools, setDisabledTools] = useState<readonly string[]>(initial.disabledTools);
   const [error, setError] = useState<AgentFormError | null>(null);
+  const { models } = useAvailableModels(organizationId);
+
+  const variantsFor = (model: string): readonly string[] =>
+    models.find(option => option.id === model.trim())?.variants ?? [];
+  const variants = variantsFor(modelValue);
 
   const submit = () => {
     const state: AgentFormState = {
@@ -75,6 +96,10 @@ export function AgentFormSheet({
       prompt: promptRef.current,
       visibility,
       model: modelRef.current,
+      steps: stepsRef.current,
+      temperature: temperatureRef.current,
+      topP: topPRef.current,
+      variant,
       disabledTools,
     };
     const problem = validateAgentForm(state);
@@ -165,6 +190,50 @@ export function AgentFormSheet({
           placeholder={t('profiles.agents.modelPlaceholder')}
           onChangeText={value => {
             modelRef.current = value;
+            setModelValue(value);
+            // Drop a stale effort value whenever the new model does not offer it.
+            const next = variantsFor(value);
+            setVariant(current => (next.includes(current) ? current : ''));
+          }}
+        />
+
+        {variants.length > 0 ? (
+          <AgentVariantPicker
+            variants={variants}
+            value={variant}
+            disabled={isSaving}
+            onChange={setVariant}
+          />
+        ) : null}
+
+        <FormField
+          label={t('profiles.agents.steps')}
+          defaultValue={initial.steps}
+          disabled={isSaving}
+          keyboardType="number-pad"
+          placeholder={t('profiles.agents.stepsPlaceholder')}
+          onChangeText={value => {
+            stepsRef.current = value;
+          }}
+        />
+        <FormField
+          label={t('profiles.agents.temperature')}
+          defaultValue={initial.temperature}
+          disabled={isSaving}
+          keyboardType="decimal-pad"
+          placeholder={t('profiles.agents.temperaturePlaceholder')}
+          onChangeText={value => {
+            temperatureRef.current = value;
+          }}
+        />
+        <FormField
+          label={t('profiles.agents.topP')}
+          defaultValue={initial.topP}
+          disabled={isSaving}
+          keyboardType="decimal-pad"
+          placeholder={t('profiles.agents.topPPlaceholder')}
+          onChangeText={value => {
+            topPRef.current = value;
           }}
         />
 

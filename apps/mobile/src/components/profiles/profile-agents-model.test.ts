@@ -91,6 +91,10 @@ describe('initialAgentFormState', () => {
       prompt: '',
       visibility: 'primary',
       model: '',
+      steps: '',
+      temperature: '',
+      topP: '',
+      variant: '',
       disabledTools: [],
     });
   });
@@ -103,7 +107,32 @@ describe('initialAgentFormState', () => {
       prompt: 'You review',
       visibility: 'primary',
       model: 'anthropic/claude',
+      steps: '',
+      temperature: '',
+      topP: '',
+      variant: '',
       disabledTools: ['bash'],
+    });
+  });
+
+  it('seeds the sampling fields and variant from the agent config', () => {
+    expect(
+      initialAgentFormState(
+        agentSource({
+          config: {
+            model: 'anthropic/claude',
+            steps: 50,
+            temperature: 0.2,
+            top_p: 0.95,
+            variant: 'high',
+          },
+        })
+      )
+    ).toMatchObject({
+      steps: '50',
+      temperature: '0.2',
+      topP: '0.95',
+      variant: 'high',
     });
   });
 });
@@ -116,6 +145,10 @@ function formState(overrides: Partial<AgentFormState> = {}): AgentFormState {
     prompt: '',
     visibility: 'primary',
     model: '',
+    steps: '',
+    temperature: '',
+    topP: '',
+    variant: '',
     disabledTools: [],
     ...overrides,
   };
@@ -170,31 +203,70 @@ describe('buildAgentPayload', () => {
     });
   });
 
-  it('preserves fields the form does not surface', () => {
+  it('sends the sampling fields as numbers', () => {
+    const payload = buildAgentPayload(
+      formState({ model: 'x', steps: '50', temperature: '0.2', topP: '0.95' })
+    );
+    expect(payload.config.steps).toBe(50);
+    expect(payload.config.temperature).toBe(0.2);
+    expect(payload.config.top_p).toBe(0.95);
+  });
+
+  it('clears the sampling fields when the form is blank', () => {
     const existing = {
       ...agentSource().config,
-      temperature: 0.2,
       steps: 50,
-      hidden: true,
+      temperature: 0.2,
+      top_p: 0.95,
     };
-    const payload = buildAgentPayload(formState(), existing);
-    expect(payload.config.temperature).toBe(0.2);
-    expect(payload.config.steps).toBe(50);
+    const payload = buildAgentPayload(formState({ temperature: '   ' }), existing);
+    expect(payload.config.steps).toBeUndefined();
+    expect(payload.config.temperature).toBeUndefined();
+    expect(payload.config.top_p).toBeUndefined();
+  });
+
+  it('drops a zero, negative, or non-numeric step count', () => {
+    expect(buildAgentPayload(formState({ steps: '0' })).config.steps).toBeUndefined();
+    expect(buildAgentPayload(formState({ steps: '-5' })).config.steps).toBeUndefined();
+    expect(buildAgentPayload(formState({ steps: 'abc' })).config.steps).toBeUndefined();
+    expect(buildAgentPayload(formState({ steps: '25' })).config.steps).toBe(25);
+  });
+
+  it('drops a non-numeric temperature or top_p', () => {
+    expect(buildAgentPayload(formState({ temperature: 'hot' })).config.temperature).toBeUndefined();
+    expect(buildAgentPayload(formState({ topP: 'x' })).config.top_p).toBeUndefined();
+    expect(buildAgentPayload(formState({ temperature: '1.5' })).config.temperature).toBe(1.5);
+  });
+
+  it('preserves fields the form does not surface', () => {
+    const existing = { ...agentSource().config, hidden: true, color: '#112233' };
+    const payload = buildAgentPayload(formState({ steps: '50', temperature: '0.2' }), existing);
     expect(payload.config.hidden).toBe(true);
+    expect(payload.config.color).toBe('#112233');
   });
 
   it('keeps the effort variant when the model is unchanged', () => {
     const existing = { ...agentSource().config, variant: 'high' };
     expect(
-      buildAgentPayload(formState({ model: 'anthropic/claude' }), existing).config.variant
+      buildAgentPayload(formState({ model: 'anthropic/claude', variant: 'high' }), existing).config
+        .variant
     ).toBe('high');
+  });
+
+  it('sends a picked variant for a new agent once a model is typed', () => {
+    expect(
+      buildAgentPayload(formState({ model: 'anthropic/claude', variant: 'low' })).config.variant
+    ).toBe('low');
   });
 
   it('drops the effort variant when the model is cleared or changed', () => {
     const existing = { ...agentSource().config, variant: 'high' };
-    expect(buildAgentPayload(formState({ model: '' }), existing).config.variant).toBeUndefined();
     expect(
-      buildAgentPayload(formState({ model: 'openai/gpt' }), existing).config.variant
+      buildAgentPayload(formState({ model: '', variant: 'high' }), existing).config.variant
+    ).toBeUndefined();
+    expect(
+      buildAgentPayload(formState({ model: 'openai/gpt', variant: 'high' }), existing).config
+        .variant
     ).toBeUndefined();
   });
 

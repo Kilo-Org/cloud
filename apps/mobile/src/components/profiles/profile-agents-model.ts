@@ -144,7 +144,7 @@ export function mergePermissions(
   return base.size > 0 ? Object.fromEntries(base) : undefined;
 }
 
-/** The add/edit form fields. `slug` is text; the screen lowercases as it types. */
+/** The add/edit form fields. Every numeric field is text; blank means "inherit". */
 export type AgentFormState = Readonly<{
   slug: string;
   name: string;
@@ -152,8 +152,17 @@ export type AgentFormState = Readonly<{
   prompt: string;
   visibility: AgentVisibility;
   model: string;
+  steps: string;
+  temperature: string;
+  topP: string;
+  variant: string;
   disabledTools: readonly string[];
 }>;
+
+/** Render an optional config number as form text, so blank means "not set". */
+function numberToField(value: number | undefined): string {
+  return value === undefined ? '' : String(value);
+}
 
 /** Seed the form from the agent being edited, or blank defaults for an add. */
 export function initialAgentFormState(agent?: AgentSource): AgentFormState {
@@ -165,6 +174,10 @@ export function initialAgentFormState(agent?: AgentSource): AgentFormState {
       prompt: '',
       visibility: 'primary',
       model: '',
+      steps: '',
+      temperature: '',
+      topP: '',
+      variant: '',
       disabledTools: [],
     };
   }
@@ -175,6 +188,10 @@ export function initialAgentFormState(agent?: AgentSource): AgentFormState {
     prompt: agent.config.prompt ?? '',
     visibility: agent.config.mode ?? 'primary',
     model: agent.config.model ?? '',
+    steps: numberToField(agent.config.steps),
+    temperature: numberToField(agent.config.temperature),
+    topP: numberToField(agent.config.top_p),
+    variant: agent.config.variant ?? '',
     disabledTools: readDisabledTools(agent.config.permission),
   };
 }
@@ -216,31 +233,58 @@ export type AgentPayload = {
   config: AgentConfigPayload;
 };
 
+/** A trimmed blank string is "inherit"; otherwise the finite float it parses to. */
+function parseNumber(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+  const parsed = Number.parseFloat(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/** A blank, non-numeric, zero, or negative step count is "inherit". */
+function parseInt10(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
 /**
  * Build the mutation payload from a validated form. Only call after
  * `validateAgentForm` returns `null`.
  *
  * The agent's existing config is spread first, so fields the form does not
- * surface (sampling, hidden/disable flags, `color`) survive an edit. The effort
- * variant is dropped when the model it belongs to is cleared or changed — the
- * server rejects a variant without a matching model.
+ * surface (hidden/disable flags, `color`) survive an edit. Sampling fields
+ * mirror web: a blank string clears the override, `steps` only when it is a
+ * positive integer. The effort variant is dropped when the model it belongs to
+ * is cleared or changed — the server rejects a variant without a matching model.
  */
 export function buildAgentPayload(
   state: AgentFormState,
   existing?: AgentSource['config']
 ): AgentPayload {
   const model = state.model.trim();
+  const variant = state.variant.trim();
   const keepVariant =
-    existing?.variant !== undefined && model.length > 0 && existing.model === model;
+    variant.length > 0 && model.length > 0 && (existing === undefined || existing.model === model);
   const config = {
     ...existing,
     prompt: state.prompt.trim() || undefined,
     description: state.description.trim() || undefined,
     mode: state.visibility,
     model: model.length > 0 ? model : undefined,
+    temperature: parseNumber(state.temperature),
+    top_p: parseNumber(state.topP),
+    steps: parseInt10(state.steps),
     permission: mergePermissions(existing?.permission, state.disabledTools),
   } satisfies AgentConfigPayload;
-  if (!keepVariant) {
+  if (keepVariant) {
+    config.variant = variant;
+  } else {
     delete config.variant;
   }
   return { slug: state.slug.trim(), name: state.name.trim(), config };

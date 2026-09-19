@@ -242,6 +242,7 @@ export function ProfileAgentsScreen({
       {form !== null ? (
         <AgentFormSheet
           agent={form.source}
+          organizationId={organizationId}
           isSaving={createAgent.isPending || updateAgent.isPending}
           onClose={closeForm}
           onSave={payload => {

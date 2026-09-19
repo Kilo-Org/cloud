@@ -10,11 +10,16 @@ function keyboardPaddingFromEvent(event: KeyboardEvent): number {
   return event.endCoordinates.height;
 }
 
-export function AppAwareKeyboardPaddingView({
-  style,
-  keyboardOffset = 0,
-  ...props
-}: ComponentProps<typeof View> & { keyboardOffset?: number }) {
+/**
+ * Height of the software keyboard while it is up, `0` otherwise, resolved for
+ * the current platform (`keyboardWillShow` on iOS, `keyboardDidShow` on
+ * Android, where the window never resizes for the IME under API 35+).
+ *
+ * A screen that must react to the keyboard beyond reserving its height (e.g.
+ * revealing a call-to-action the IME covers) reads it from here instead of
+ * adding a second listener.
+ */
+export function useAppAwareKeyboardPadding(): number {
   const [keyboardPadding, setKeyboardPadding] = useState(0);
 
   useEffect(() => {
@@ -58,6 +63,16 @@ export function AppAwareKeyboardPaddingView({
       appStateSubscription.remove();
     };
   }, []);
+
+  return keyboardPadding;
+}
+
+export function AppAwareKeyboardPaddingView({
+  style,
+  keyboardOffset = 0,
+  ...props
+}: ComponentProps<typeof View> & { keyboardOffset?: number }) {
+  const keyboardPadding = useAppAwareKeyboardPadding();
 
   const resolvedKeyboardPadding = keyboardPadding > 0 ? keyboardPadding + keyboardOffset : 0;
 

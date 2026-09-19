@@ -1,13 +1,20 @@
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { PortalHost } from '@rn-primitives/portal';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { usePathname, useSegments } from 'expo-router';
 import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
+import { AppState, Keyboard, Platform, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppUnlockAnnouncements } from '@/components/app-unlock-screen';
+import {
+  resolveAppAwareKeyboardPadding,
+  resolveKeyboardPaddingEventsForPlatform,
+} from '@/components/kilo-chat/app-aware-keyboard-padding-state';
 import { OfflineBanner } from '@/components/offline-banner';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
 import { AuthProvider } from '@/lib/auth/auth-context';
@@ -16,6 +23,8 @@ import { OrganizationProvider } from '@/lib/organization-context';
 import { queryClient } from '@/lib/query-client';
 import { QueryClientNativeLifecycle } from '@/lib/query-client-lifecycle';
 import { ToolSummaryTranslationRuntimeBootstrap } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
+import { getEffectiveTabBarHeight, shouldHideTabBar } from '@/lib/tab-bar-layout';
+import { getToastBottomOffset } from '@/lib/toast-offset';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
 /**
@@ -44,7 +53,6 @@ export function AppRootProviders({
   readonly children: ReactNode;
   readonly languageReady: boolean;
 }) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
 
   return (
@@ -79,26 +87,7 @@ export function AppRootProviders({
                       lifetime (spot check e4-end). Bottom is the transient-message convention:
                       a toast may cover the composer briefly, never the navigation.
                     */}
-                    <Toaster
-                      position="bottom-center"
-                      positionerStyle={TOAST_POSITIONER_STYLE}
-                      icons={{
-                        success: <CheckCircle2 size={20} color={colors.good} />,
-                        error: <XCircle size={20} color={colors.destructive} />,
-                        warning: <TriangleAlert size={20} color={colors.warn} />,
-                        info: <Info size={20} color={colors.mutedForeground} />,
-                        loading: <Loader size={20} color={colors.mutedForeground} />,
-                      }}
-                      toastOptions={{
-                        style: {
-                          backgroundColor: colors.card,
-                          borderColor: colors.border,
-                          borderWidth: 1,
-                        },
-                        titleStyle: { color: colors.foreground },
-                        descriptionStyle: { color: colors.mutedForeground },
-                      }}
-                    />
+                    <AppToaster />
                   </>
                 </ActionSheetProvider>
               </OrganizationProvider>
@@ -107,5 +96,114 @@ export function AppRootProviders({
         </QueryClientProvider>
       </TRPCProvider>
     </GestureHandlerRootView>
+  );
+}
+
+/**
+ * Height of the software keyboard while it is up, `0` otherwise. Owned by a
+ * child of `AppRootProviders` so a keyboard show/hide re-renders only the
+ * Toaster, never the app tree the provider wraps.
+ *
+ * Android needs this even though the app is edge-to-edge: under API 35+ the
+ * window never resizes for the IME (`login-screen.tsx`), and
+ * `react-native-safe-area-context` does not report IME insets, so a
+ * bottom-anchored overlay has no other way to clear the keyboard and its
+ * navigation row.
+ */
+function useKeyboardHeight(): number {
+  const [height, setHeight] = useState(0);
+
+  useEffect(() => {
+    const events = resolveKeyboardPaddingEventsForPlatform(Platform.OS);
+    if (events === null) {
+      return undefined;
+    }
+
+    const show = Keyboard.addListener(events.show, event => {
+      setHeight(current =>
+        resolveAppAwareKeyboardPadding({
+          currentPadding: current,
+          event: { type: 'keyboard-visible', keyboardHeight: event.endCoordinates.height },
+        })
+      );
+    });
+    const hide = Keyboard.addListener(events.hide, () => {
+      setHeight(current =>
+        resolveAppAwareKeyboardPadding({
+          currentPadding: current,
+          event: { type: 'keyboard-hidden' },
+        })
+      );
+    });
+    const appState = AppState.addEventListener('change', state => {
+      setHeight(current =>
+        resolveAppAwareKeyboardPadding({
+          currentPadding: current,
+          event: { type: 'app-state-change', appState: state },
+        })
+      );
+    });
+
+    return () => {
+      show.remove();
+      hide.remove();
+      appState.remove();
+    };
+  }, []);
+
+  return height;
+}
+
+function AppToaster() {
+  const colors = useThemeColors();
+  const { bottom } = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
+  const keyboardHeight = useKeyboardHeight();
+  const segments = useSegments();
+  const pathname = usePathname();
+  // The floating tab bar is an absolute overlay over the screen bottom, so it
+  // never appears in the reported bottom inset and a toast anchored to the
+  // inset landed over the tab icons (2026-09-19 visual spot check, p1). It
+  // renders exactly when the focused route sits inside the tabs navigator and
+  // `shouldHideTabBar` does not hide it — the same predicate the bar's own
+  // layout uses — so the toast clears it only while it is actually on screen;
+  // a screen pushed over the tabs (agent-chat, pr-review) or the auth flow
+  // keeps the toast at its resting offset. See `lib/toast-offset.ts`.
+  const tabBarHeight =
+    (segments as readonly string[]).includes('(tabs)') && !shouldHideTabBar(pathname)
+      ? getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale })
+      : 0;
+
+  return (
+    <Toaster
+      position="bottom-center"
+      // Explicit offset, rather than sonner-native's `safe area inset + 8`:
+      // the reported inset does not cover Android's IME navigation row, which
+      // left the error toast's last line clipped under it, nor the floating
+      // tab bar, which the toast then covered. See `lib/toast-offset.ts`.
+      offset={getToastBottomOffset({
+        platform: Platform.OS,
+        safeAreaBottom: bottom,
+        keyboardHeight,
+        tabBarHeight,
+      })}
+      positionerStyle={TOAST_POSITIONER_STYLE}
+      icons={{
+        success: <CheckCircle2 size={20} color={colors.good} />,
+        error: <XCircle size={20} color={colors.destructive} />,
+        warning: <TriangleAlert size={20} color={colors.warn} />,
+        info: <Info size={20} color={colors.mutedForeground} />,
+        loading: <Loader size={20} color={colors.mutedForeground} />,
+      }}
+      toastOptions={{
+        style: {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+          borderWidth: 1,
+        },
+        titleStyle: { color: colors.foreground },
+        descriptionStyle: { color: colors.mutedForeground },
+      }}
+    />
   );
 }

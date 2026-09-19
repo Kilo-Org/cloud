@@ -8,6 +8,7 @@ import { AppRootProviders } from '@/components/app-root-providers';
 import KiloClawLayout from '@/app/(app)/(tabs)/(1_kiloclaw)/_layout';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { i18n } from '@/i18n';
+import type * as FormSheet from '@/lib/form-sheet';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
@@ -180,7 +181,10 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({ useCurrentUserId: () => ({ userId: null }) }));
-vi.mock('@/lib/form-sheet', () => ({ useFormSheetDetents: () => ({ fullSheetDetent: 1 }) }));
+vi.mock('@/lib/form-sheet', async importOriginal => ({
+  ...(await importOriginal<typeof FormSheet>()),
+  useFormSheetDetents: () => ({ fullSheetDetent: 1 }),
+}));
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 vi.mock('@/lib/hooks/use-security-lifecycle-invalidation', () => ({
   useSecurityLifecycleInvalidation: vi.fn(),

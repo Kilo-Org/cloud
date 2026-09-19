@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { Check, Server } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -12,10 +13,11 @@ import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useFormSheetStackLaidOut } from '@/lib/form-sheet';
 import { type ClawInstance, useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { kiloclawInstanceSwitcherTitle } from '@/lib/kiloclaw-display';
-import { chatSandboxPath } from '@/lib/kilo-chat-routes';
+import { chatInstancePickerPath, chatSandboxPath } from '@/lib/kilo-chat-routes';
 
 function InstanceRow({
   instance,
@@ -56,10 +58,28 @@ function InstanceRow({
 
 export default function InstancePickerScreen() {
   const router = useRouter();
-  const { currentId } = useLocalSearchParams<{ currentId: string }>();
+  const { currentId } = useLocalSearchParams<{ currentId?: string }>();
+  const stackLaidOut = useFormSheetStackLaidOut();
   const instancesQuery = useAllKiloClawInstances();
   const { data: instances } = instancesQuery;
   const { t } = useTranslation();
+
+  // Opened as the first screen of a cold KiloClaw stack (a deep link straight
+  // into the picker), the native formSheet fragment is created before this
+  // stack has been measured, so its collapsed detent freezes near zero and the
+  // open picker renders as nothing but the scrim (spot-check e1). Re-present
+  // the same route once the stack has laid out, so the replacement screen's
+  // fragment measures its detents against the real height. A picker opened from
+  // a chat inside an already-laid-out tab is left alone.
+  const presentedBeforeStackLayout = useRef(!stackLaidOut);
+  const rePresented = useRef(false);
+  useEffect(() => {
+    if (!presentedBeforeStackLayout.current || rePresented.current || !stackLaidOut) {
+      return;
+    }
+    rePresented.current = true;
+    router.replace(chatInstancePickerPath(currentId ?? ''));
+  }, [currentId, router, stackLaidOut]);
 
   const handleSelect = (sandboxId: string) => {
     void Haptics.selectionAsync();

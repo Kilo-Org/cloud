@@ -3160,7 +3160,6 @@
     }
   },
   "launcher": {
-    "newAgent": "Agent nou",
     "openLastSession": "Deschide ultima sesiune"
   }
 }

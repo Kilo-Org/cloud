@@ -3136,7 +3136,6 @@
     }
   },
   "launcher": {
-    "newAgent": "新增代理程式",
     "openLastSession": "開啟上次工作階段"
   }
 }

@@ -3184,7 +3184,6 @@
     }
   },
   "launcher": {
-    "newAgent": "Новий агент",
     "openLastSession": "Відкрити останній сеанс"
   }
 }

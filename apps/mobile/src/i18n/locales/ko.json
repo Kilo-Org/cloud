@@ -3136,7 +3136,6 @@
     }
   },
   "launcher": {
-    "newAgent": "새 에이전트",
     "openLastSession": "마지막 세션 열기"
   }
 }

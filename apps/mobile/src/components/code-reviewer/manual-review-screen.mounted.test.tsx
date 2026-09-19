@@ -16,7 +16,18 @@ import { ManualReviewScreen } from './manual-review-screen';
 const BOTTOM_INSET = 24;
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
-const keyboard = vi.hoisted(() => ({ listeners: new Map<string, ((event: unknown) => void)[]>() }));
+const keyboard = vi.hoisted(() => ({
+  platform: 'android',
+  listeners: new Map<string, ((event: unknown) => void)[]>(),
+}));
+const status = vi.hoisted(() => ({
+  connected: true,
+  loading: false,
+  errorCode: null as string | null,
+  pending: false,
+  refetch: vi.fn(),
+  push: vi.fn(),
+}));
 
 vi.mock('react-native', () => ({
   AppState: { addEventListener: () => ({ remove: () => undefined }) },
@@ -33,7 +44,12 @@ vi.mock('react-native', () => ({
       };
     },
   },
-  Platform: { OS: 'android' },
+  Platform: {
+    get OS() {
+      return keyboard.platform;
+    },
+  },
+  Dimensions: { get: () => ({ height: 900 }) },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
@@ -46,7 +62,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 vi.mock('expo-haptics', () => ({ notificationAsync: vi.fn(), selectionAsync: vi.fn() }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn() }) }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn(), push: status.push }) }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -71,23 +87,25 @@ vi.mock('@/lib/hooks/use-available-models', () => ({ useAvailableModels: () => (
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   PERSONAL_SCOPE: 'personal',
   useGitHubStatus: () => ({
-    data: { connected: true },
-    isLoading: false,
-    isError: false,
+    data: { connected: status.connected },
+    isLoading: status.loading,
+    isError: status.errorCode !== null,
+    error: { data: { code: status.errorCode } },
     isFetching: false,
-    refetch: vi.fn(),
+    refetch: status.refetch,
   }),
   useGitLabStatus: () => ({
     data: { connected: false },
-    isLoading: false,
-    isError: false,
+    isLoading: status.loading,
+    isError: status.errorCode !== null,
+    error: { data: { code: status.errorCode } },
     isFetching: false,
-    refetch: vi.fn(),
+    refetch: status.refetch,
   }),
   useReviewConfig: () => ({ data: { modelSlug: 'model-x', thinkingEffort: null } }),
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
-  useCreateManualReview: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateManualReview: () => ({ mutate: vi.fn(), isPending: status.pending }),
 }));
 
 function findAllOfType(root: TestRenderer.ReactTestInstance, type: string) {
@@ -124,9 +142,16 @@ function paddingBottomsAbove(node: TestRenderer.ReactTestInstance): number[] {
   return values;
 }
 
-describe('ManualReviewScreen primary action', () => {
+describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on %s', platform => {
   beforeEach(() => {
+    keyboard.platform = platform;
     keyboard.listeners.clear();
+    status.connected = true;
+    status.loading = false;
+    status.errorCode = null;
+    status.pending = false;
+    status.refetch.mockClear();
+    status.push.mockClear();
   });
 
   it('pins the start action outside the scroll viewport, clear of the tab bar', async () => {
@@ -146,7 +171,7 @@ describe('ManualReviewScreen primary action', () => {
     expect(footerClearance).toBe(
       getEffectiveTabBarHeight({
         bottomInset: BOTTOM_INSET,
-        platform: 'android',
+        platform,
         fontScale: 1,
       }) + TAB_SCREEN_BOTTOM_GAP
     );
@@ -159,19 +184,32 @@ describe('ManualReviewScreen primary action', () => {
       createElement(ManualReviewScreen, { scope: 'personal' })
     );
 
-    const keyboardShow = keyboard.listeners.get('keyboardDidShow') ?? [];
+    const event = platform === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
+    const keyboardShow = keyboard.listeners.get(event) ?? [];
     expect(keyboardShow.length).toBeGreaterThan(0);
     act(() => {
       for (const listener of keyboardShow) {
-        listener({ endCoordinates: { height: 300 } });
+        listener({ endCoordinates: { height: platform === 'android' ? 300 : 324, screenY: 576 } });
       }
     });
 
     const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     // Nearest first: the footer drops its tab-bar clearance, and the
-    // keyboard-lift view above it takes the IME's height plus the system
-    // bar inset Android subtracts from it (300 + 24).
-    expect(paddingBottomsAbove(action)).toEqual([0, 300 + BOTTOM_INSET]);
+    // Keyboard lift uses the visible top on both platforms, with no safe-area
+    // offset (which would double-count system bars when included in height).
+    expect(paddingBottomsAbove(action)).toEqual([0, 324]);
+
+    const hide = platform === 'android' ? 'keyboardDidHide' : 'keyboardWillHide';
+    act(() => {
+      for (const listener of keyboard.listeners.get(hide) ?? []) {
+        listener({});
+      }
+    });
+    expect(paddingBottomsAbove(action)).toEqual([
+      getEffectiveTabBarHeight({ bottomInset: BOTTOM_INSET, platform, fontScale: 1 }) +
+        TAB_SCREEN_BOTTOM_GAP,
+      0,
+    ]);
 
     unmount();
   });
@@ -181,19 +219,20 @@ describe('ManualReviewScreen primary action', () => {
       createElement(ManualReviewScreen, { scope: 'personal' })
     );
 
-    const keyboardShow = keyboard.listeners.get('keyboardDidShow') ?? [];
+    const event = platform === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
+    const keyboardShow = keyboard.listeners.get(event) ?? [];
     // The hardware-keyboard IME bar is one navigation bar tall; dropping the
     // whole clearance for it parked the action behind the tab bar (e1-fill).
     act(() => {
       for (const listener of keyboardShow) {
-        listener({ endCoordinates: { height: BOTTOM_INSET } });
+        listener({ endCoordinates: { height: platform === 'android' ? 24 : 48, screenY: 852 } });
       }
     });
 
     const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     const footerClearance = getEffectiveTabBarHeight({
       bottomInset: BOTTOM_INSET,
-      platform: 'android',
+      platform,
       fontScale: 1,
     });
     const keyboardLift = BOTTOM_INSET + BOTTOM_INSET;
@@ -202,6 +241,69 @@ describe('ManualReviewScreen primary action', () => {
       keyboardLift,
     ]);
 
+    unmount();
+  });
+
+  it('keeps the action pinned and disabled while provider status is loading', async () => {
+    status.loading = true;
+    status.connected = false;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ManualReviewScreen, { scope: 'personal' })
+    );
+    expect(findAllOfType(renderer.root, 'Skeleton')).toHaveLength(2);
+    const button = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    expect((button.props as { disabled: boolean }).disabled).toBe(true);
+    expect(paddingBottomsAbove(button)).toHaveLength(2);
+    unmount();
+  });
+
+  it('keeps the pending action in the same footer', async () => {
+    status.pending = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ManualReviewScreen, { scope: 'personal' })
+    );
+    const button = only(findAllOfType(renderer.root, 'Button'), 'primary action');
+    expect((button.props as { loading: boolean }).loading).toBe(true);
+    expect(paddingBottomsAbove(button)).toHaveLength(2);
+    unmount();
+  });
+
+  it.each([
+    ['INTERNAL_SERVER_ERROR', true],
+    ['FORBIDDEN', false],
+    ['NOT_FOUND', false],
+  ])('preserves the recovery action for %s', async (code, retryable) => {
+    status.connected = false;
+    status.errorCode = code;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ManualReviewScreen, { scope: 'personal' })
+    );
+    const error = only(findAllOfType(renderer.root, 'QueryError'), 'provider error');
+    const { onRetry } = error.props as { onRetry?: () => void };
+    expect(Boolean(onRetry)).toBe(retryable);
+    if (retryable) {
+      act(() => onRetry?.());
+      expect(status.refetch).toHaveBeenCalledTimes(2);
+    }
+    expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(0);
+    expect(findAllOfType(renderer.root, 'Button')).toHaveLength(0);
+    unmount();
+  });
+
+  it('offers provider connection instead of a start action when empty', async () => {
+    status.connected = false;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ManualReviewScreen, { scope: 'personal' })
+    );
+    const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+    const { action } = empty.props as { action: { props: { onPress: () => void } } };
+    act(() => {
+      action.props.onPress();
+    });
+    expect(status.push).toHaveBeenCalledWith(
+      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github'
+    );
+    expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(0);
     unmount();
   });
 });

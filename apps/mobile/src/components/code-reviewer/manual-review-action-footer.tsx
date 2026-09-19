@@ -20,12 +20,9 @@ import { useTabBarBottomPadding } from '@/components/tab-screen';
  * (the hardware-keyboard IME bar is one navigation bar tall) keeps the rest, so
  * the action never lands behind the tab bar (e1-fill, 2026-09-19).
  */
-export function ManualReviewActionFooter({
-  children,
-  keyboardOffset = 0,
-}: Readonly<{ children: ReactNode; keyboardOffset?: number }>) {
+export function ManualReviewActionFooter({ children }: Readonly<{ children: ReactNode }>) {
   const tabBarBottomPadding = useTabBarBottomPadding();
-  const keyboardLift = useAppAwareKeyboardPadding(keyboardOffset);
+  const keyboardLift = useAppAwareKeyboardPadding();
   const bottomPadding = Math.max(0, tabBarBottomPadding - keyboardLift);
   return (
     <View className="bg-background px-6 pt-3" style={{ paddingBottom: bottomPadding }}>

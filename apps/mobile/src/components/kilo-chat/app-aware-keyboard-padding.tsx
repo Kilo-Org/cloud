@@ -1,5 +1,5 @@
 import { type ComponentProps, useEffect, useState } from 'react';
-import { AppState, Keyboard, type KeyboardEvent, Platform, View } from 'react-native';
+import { AppState, Dimensions, Keyboard, type KeyboardEvent, Platform, View } from 'react-native';
 
 import {
   resolveAppAwareKeyboardPadding,
@@ -7,14 +7,16 @@ import {
 } from './app-aware-keyboard-padding-state';
 
 function keyboardPaddingFromEvent(event: KeyboardEvent): number {
-  return event.endCoordinates.height;
+  // Both platforms report the keyboard's top in screen coordinates. Measuring
+  // from that edge includes system bars without assuming they are in `height`.
+  return Dimensions.get('screen').height - event.endCoordinates.screenY;
 }
 
 /**
- * The bottom padding an AppAwareKeyboardPaddingView applies: the IME's height
+ * The bottom padding an AppAwareKeyboardPaddingView applies: the screen overlap
  * while the keyboard is open (plus the caller's offset), 0 while it is closed.
  * Exported so a pinned footer inside the padding view can measure its own
- * clearance against the same lift instead of re-listening to the keyboard.
+ * clearance using the same calculation.
  */
 export function useAppAwareKeyboardPadding(keyboardOffset = 0): number {
   const [keyboardPadding, setKeyboardPadding] = useState(0);

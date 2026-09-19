@@ -3,8 +3,7 @@ import { type Href, useRouter } from 'expo-router';
 import { Check, GitPullRequest } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, ScrollView, TextInput, View } from 'react-native';
 
 import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
@@ -64,13 +63,6 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { bottom: bottomInset } = useSafeAreaInsets();
-  // Android reports the IME's height with the system bars subtracted
-  // (ReactRootView emits imeInsets.bottom - barInsets.bottom), so the lift is a
-  // navigation bar short of the keyboard's visible top unless the bar's inset
-  // is added back (e3: the action sat 64 px behind the keyboard's suggestion
-  // strip, 2026-09-19). iOS reports the keyboard's height from the screen edge.
-  const keyboardOffset = Platform.OS === 'android' ? bottomInset : 0;
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
   const statusFor = { github: githubStatus, gitlab: gitlabStatus };
@@ -183,7 +175,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         title={t('codeReviewer.manualReview.title')}
         eyebrow={t('common.codeReviewer')}
       />
-      <AppAwareKeyboardPaddingView className="flex-1" keyboardOffset={keyboardOffset}>
+      <AppAwareKeyboardPaddingView className="flex-1">
         <ScrollView
           className="flex-1"
           contentContainerClassName="px-6 gap-6 pt-4 pb-4"
@@ -312,7 +304,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
         {/* The primary action is a pinned footer when the form is taller than
             the viewport, so it is never clipped at the scroll fold. */}
-        <ManualReviewActionFooter keyboardOffset={keyboardOffset}>
+        <ManualReviewActionFooter>
           <Button
             loading={createReview.isPending}
             disabled={!config.data || !isConnected(platform)}

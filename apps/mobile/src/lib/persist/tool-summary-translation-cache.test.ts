@@ -40,6 +40,11 @@ const kvMock = vi.hoisted(() => {
         .map(([k, entry]) => ({ k, updatedAt: entry.updatedAt }))
         .sort((a, b) => a.updatedAt - b.updatedAt)
     ),
+    listValues: vi.fn(async (scope: string) =>
+      [...(scopes.get(scope)?.values() ?? [])]
+        .toSorted((a, b) => a.updatedAt - b.updatedAt)
+        .map(entry => entry.v)
+    ),
   };
 });
 
@@ -50,6 +55,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   removeItemIfValue: kvMock.removeItemIfValue,
   clearScope: kvMock.clearScope,
   listEntries: kvMock.listEntries,
+  listValues: kvMock.listValues,
 }));
 
 /* eslint-disable import/first */
@@ -108,6 +114,30 @@ describe('tool summary translation cache', () => {
     await expect(readToolSummaryTranslations()).resolves.toEqual([]);
   });
 
+  it('hydrates a full cache without per-entry native reads', async () => {
+    const entries = Array.from({ length: TOOL_SUMMARY_TRANSLATION_CACHE_CAP }, (_, index) =>
+      makeEntry({ itemId: `item-${index}` })
+    );
+    seed(entries.map(entry => [entry.itemId, JSON.stringify(entry)]));
+
+    await expect(readToolSummaryTranslations()).resolves.toEqual(entries);
+    expect(kvMock.getItem).not.toHaveBeenCalled();
+    expect(kvMock.listValues).toHaveBeenCalledExactlyOnceWith(SCOPE);
+  });
+
+  it.each([{ language: 'fr' }, { modelId: 'other/model' }])(
+    'keeps same-item translations distinct for %j',
+    async variant => {
+      const original = makeEntry();
+      const changed = makeEntry(variant);
+      await writeToolSummaryTranslation(original);
+      await writeToolSummaryTranslation(changed);
+
+      expect(kvMock.scopes.get(SCOPE)?.size).toBe(2);
+      await expect(readToolSummaryTranslations()).resolves.toEqual([original, changed]);
+    }
+  );
+
   it('drops malformed values and keeps the valid ones', async () => {
     seed([
       [ITEM_KEY, JSON.stringify(makeEntry())],
@@ -124,13 +154,7 @@ describe('tool summary translation cache', () => {
 
   it('swallows a KV read failure', async () => {
     seed([[ITEM_KEY, JSON.stringify(makeEntry())]]);
-    kvMock.getItem.mockRejectedValueOnce(new Error('kv down'));
-
-    await expect(readToolSummaryTranslations()).resolves.toEqual([]);
-  });
-
-  it('swallows a KV list failure', async () => {
-    kvMock.listEntries.mockRejectedValueOnce(new Error('kv down'));
+    kvMock.listValues.mockRejectedValueOnce(new Error('kv down'));
 
     await expect(readToolSummaryTranslations()).resolves.toEqual([]);
   });

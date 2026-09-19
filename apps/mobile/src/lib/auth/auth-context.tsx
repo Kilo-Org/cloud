@@ -354,6 +354,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         setAuthEpoch(currentAuthEpoch());
         setToken(undefined);
         clearActiveToken();
+        // Clear behind any in-flight hint write before persisting new credentials.
+        // If this fails, fail sign-in closed: a restart must never restore B's
+        // token alongside A's cache identity, even before B's getMe can answer.
+        await deleteAccountMetadata(ACTIVE_USER_ID_KEY);
         // Bind the pending deep-link slot to the new user id at the same
         // place the auth epoch advances, so a destination captured while this
         // account is signed in restores only for this account.
@@ -527,8 +531,13 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // native clear that never answers still lets the batch settle.
             // Best effort: both helpers swallow a storage failure.
             (async () => {
-              await clearToolSummaryTranslationMemoryForSignOut();
-              await clearToolSummaryTranslationsForSignOut();
+              try {
+                await clearToolSummaryTranslationMemoryForSignOut();
+              } finally {
+                // The allSettled batch contains a reset rejection, but the
+                // independent disk clear must still run before it settles.
+                await clearToolSummaryTranslationsForSignOut();
+              }
             })(),
           ]);
           // Synchronous preference clears (best-effort) so nothing leaks to

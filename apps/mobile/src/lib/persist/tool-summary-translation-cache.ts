@@ -101,13 +101,8 @@ function parseEntry(raw: string | null): CachedToolSummaryTranslation | null {
  */
 export async function readToolSummaryTranslations(): Promise<CachedToolSummaryTranslation[]> {
   try {
-    const entries = await encryptedKv.listEntries(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE);
-    const parsed = await Promise.all(
-      entries.map(async entry => {
-        const raw = await encryptedKv.getItem(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE, entry.k);
-        return parseEntry(raw);
-      })
-    );
+    const values = await encryptedKv.listValues(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE);
+    const parsed = values.map(value => parseEntry(value));
     return parsed.filter((entry): entry is CachedToolSummaryTranslation => entry !== null);
   } catch {
     // Any failure (missing scope, KV unavailable, parse error) is a cache miss.

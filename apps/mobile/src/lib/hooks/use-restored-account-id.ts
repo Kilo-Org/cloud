@@ -18,12 +18,12 @@ import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
  * Without it an offline cold-start open has no account to read the persisted
  * transcript with, and the session paints nothing.
  *
- * During a credential transition (`signIn` over an existing session) the stored
- * credentials are new but unconfirmed, while the persisted hint still names the
- * previous account. The hint must not scope local data then — it would mount
- * the previous account's cached transcript under the new credentials — so
- * `restoredFromStorage` is false and this hook answers null. The route stays in
- * its pending state until `user.getMe` confirms the new account.
+ * A direct `signIn` deletes the hint through the serialized metadata queue
+ * before storing any new credentials. If deletion fails, sign-in fails closed:
+ * even a killed switch cannot restore new credentials beside the old hint.
+ * During the transition, `restoredFromStorage` is false so this hook cannot use
+ * the previous hint while its deletion is still in flight. The route stays
+ * pending until `user.getMe` confirms the new account.
  *
  * `fence` is the owner's auth epoch: the hint is re-read when the account
  * session moves, so an id read before a sign-out can never scope the next

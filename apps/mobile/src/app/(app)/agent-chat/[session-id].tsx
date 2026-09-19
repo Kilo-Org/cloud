@@ -145,13 +145,15 @@ export default function SessionDetailScreen() {
   // — the API unreachable on a cold start. That id is written only after an
   // authoritative `user.getMe` for the current credentials, and the cold-start
   // restore is fenced on the auth epoch, so it can never scope another
-  // account's rows. A fresh sign-in's credentials are not a restore: while they
-  // are still unconfirmed the persisted hint names the previous account, so the
-  // route must stay pending (`identityPending`) until `user.getMe` answers.
+  // account's rows. Sign-in clears the prior hint before storing new credentials;
+  // a fresh sign-in is not a restore, so the route must stay pending
+  // (`identityPending`) until `user.getMe` answers.
   const restoredUserId = useRestoredAccountId(owner.authEpoch, owner.restored);
   const sessionScopeUserId = owner.userId ?? restoredUserId;
   const identityPending = sessionScopeUserId === null;
   const identityFailed = identityPending && confirmation.isError;
+  const providerKey = `${owner.generation}:${sessionScopeUserId}:${sessionId}:${routeOrganizationId ?? 'personal'}`;
+  const displayedProviderKey = useRef<string | null>(null);
 
   const displayScope = {
     organizationId: routeOrganizationId ?? sessionQuery.data?.organization_id ?? null,
@@ -183,7 +185,11 @@ export default function SessionDetailScreen() {
     return <InvalidRouteState backTo={'/(app)' as Href} />;
   }
 
-  if (!identityFailed && (identityPending || metadataPhase === 'loading')) {
+  if (
+    !identityFailed &&
+    (identityPending ||
+      (metadataPhase === 'loading' && displayedProviderKey.current !== providerKey))
+  ) {
     // The composer placeholder holds its own height: nothing may shift when
     // the query resolves. Route title hints are not bound to an account.
     // The right cluster reserves the loaded header's Copy-link action too, so
@@ -233,6 +239,7 @@ export default function SessionDetailScreen() {
     // An identity failure stays retriable. An authoritative metadata denial
     // (NOT_FOUND / UNAUTHORIZED / FORBIDDEN) can't be recovered by retrying, so
     // it shows a permanent state with no Retry. Both get Back and Copy.
+    displayedProviderKey.current = null;
     const errorCode = identityFailed ? undefined : sessionQuery.error?.data?.code;
     const notFound = errorCode === 'NOT_FOUND';
     const unauthorized = errorCode === 'UNAUTHORIZED' || errorCode === 'FORBIDDEN';
@@ -302,6 +309,9 @@ export default function SessionDetailScreen() {
   }
 
   const organizationId = routeOrganizationId ?? sessionQuery.data?.organization_id ?? undefined;
+  // Same-scope metadata is background work once the transcript has mounted.
+  // Confirmation/reconnection must not replace it with the initial skeleton.
+  displayedProviderKey.current = providerKey;
 
   return (
     <AgentSessionProvider
@@ -320,7 +330,7 @@ export default function SessionDetailScreen() {
       // lost — for a scope the manager applies in place. An explicit route
       // organization still re-keys, because it is authoritative from the first
       // frame.
-      key={`${owner.generation}:${sessionScopeUserId}:${sessionId}:${routeOrganizationId ?? 'personal'}`}
+      key={providerKey}
       organizationId={organizationId}
       restoredUserId={restoredUserId ?? undefined}
     >

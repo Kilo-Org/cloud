@@ -810,6 +810,221 @@ describe('SessionDetailScreen restored scope', () => {
   });
 });
 
+describe('SessionDetailScreen metadata read that cannot settle', () => {
+  it('mounts the session when the offline metadata read is paused', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'paused';
+    const renderer = await mountRoute();
+
+    // The device is offline, so the read will not run until connectivity
+    // returns: the session must mount and paint the persisted transcript
+    // instead of holding a skeleton the person cannot use.
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(0);
+  });
+
+  it('keeps an offline session mounted while its metadata starts fetching on reconnect', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'paused';
+    const renderer = await mountRoute();
+    const manager = managers.at(-1)?.manager;
+
+    queryState.fetchStatus = 'fetching';
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(0);
+    expect(managers).toHaveLength(1);
+    expect(managers.at(-1)?.manager).toBe(manager);
+  });
+
+  it('does not reuse the mounted scope admission for a different session', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    const renderer = await mountRoute();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-2' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'fetching';
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+  });
+
+  it('mounts the session once an in-flight metadata read outlives the open grace', async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'fetching';
+    const renderer = await mountRoute();
+
+    expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+
+    // The same threshold the session body applies to a stalled transport.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SESSION_SLOW_LOAD_MS);
+    });
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(0);
+  });
+
+  it('keeps the mounted manager when the paused read later resolves an organization', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'paused';
+    const renderer = await mountRoute();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    const mountedManager = managers.at(-1)?.manager;
+    expect(mountedManager).toBeDefined();
+
+    // Connectivity returns and the read resolves the session's organization.
+    // The manager adopts that scope from its own metadata read, so the route
+    // must not re-key the provider for it: a re-key would remount the
+    // transcript and drop the composer text under it.
+    queryState.isPending = false;
+    queryState.fetchStatus = 'idle';
+    queryState.data = { organization_id: 'org-a' };
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(managers).toHaveLength(1);
+    expect(managers.at(-1)?.manager).toBe(mountedManager);
+    expect(propOf(renderer.root.findByType(AgentSessionProvider), 'organizationId')).toBe('org-a');
+  });
+});
+
+describe('SessionDetailScreen restored scope', () => {
+  /** Mounts the route on the restored identity: credentials committed, owner unconfirmed, hint persisted. */
+  async function mountRestoredScope(): Promise<TestRenderer.ReactTestRenderer> {
+    beginReplacement();
+    commitCredentials('A');
+    // Credentials restored from storage on a cold start, not freshly signed in:
+    // only this state may scope the session from the persisted hint.
+    markRestoredAuthenticatedOwner();
+    secureStoreMock.getItemAsync.mockResolvedValue('user-A');
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'paused';
+    const renderer = await mountRoute();
+    // Let the persisted-hint read settle so the route mounts the session.
+    await act(async () => {
+      for (let round = 0; round < 3; round += 1) {
+        // eslint-disable-next-line no-await-in-loop -- one macrotask per round lets the keystore read and its state update settle
+        await new Promise<void>(resolve => {
+          setTimeout(resolve, 0);
+        });
+      }
+    });
+    return renderer;
+  }
+
+  it.each(['paused', 'fetching'] as const)(
+    'keeps the session mounted when the live confirmation matches with metadata %s',
+    async fetchStatus => {
+      const renderer = await mountRestoredScope();
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+      const restoredManager = managers.at(-1)?.manager;
+      expect(restoredManager).toBeDefined();
+
+      // The live getMe confirms the same account the hint restored: the resolved
+      // scope id is unchanged, so the provider key must not remount the session
+      // subtree — the painted transcript, the manager and the composer text all
+      // live below this key.
+      queryState.fetchStatus = fetchStatus;
+      await act(async () => {
+        confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-A');
+        await Promise.resolve();
+      });
+
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+      expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(0);
+      expect(managers).toHaveLength(1);
+      expect(managers.at(-1)?.manager).toBe(restoredManager);
+    }
+  );
+
+  it('remounts the session when the confirmation names a different account than the hint', async () => {
+    const renderer = await mountRestoredScope();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    const restoredManager = managers.at(-1)?.manager;
+
+    // A stale hint restored another account's scope; the confirmed account
+    // changes the resolved scope id, so the provider must remount.
+    await act(async () => {
+      confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-B');
+      await Promise.resolve();
+    });
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(managers).toHaveLength(2);
+    expect(managers.at(-1)?.manager).not.toBe(restoredManager);
+  });
+
+  it.each(['NOT_FOUND', 'FORBIDDEN', 'UNAUTHORIZED'])(
+    'retires a restored session when metadata returns %s after confirmation',
+    async code => {
+      const renderer = await mountRestoredScope();
+      queryState.fetchStatus = 'fetching';
+      act(() => {
+        confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-A');
+      });
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+
+      queryState.isPending = false;
+      queryState.isError = true;
+      queryState.error = { data: { code } };
+      await updateRoute(renderer);
+
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+      expect(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry')).toBeUndefined();
+    }
+  );
+
+  it('does not mount the previous account restored scope during a direct credential switch', async () => {
+    const renderer = await mountRestoredScope();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    const managersBeforeSwitch = managers.length;
+
+    // A direct switch signs in as B: the new credentials are committed but not
+    // yet confirmed, while A's persisted hint and cached transcript are still
+    // on the device. The hint must not mount A's scope under B.
+    act(() => {
+      beginReplacement();
+      commitCredentials('B');
+    });
+    await updateRoute(renderer);
+
+    // B is unconfirmed, so the route holds its pending state: no session
+    // subtree (and no manager reading A's scope) is created for the switch.
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+    expect(managers).toHaveLength(managersBeforeSwitch);
+
+    // B's getMe confirms: the session mounts in B's own scope.
+    act(() => {
+      commitAccount('B');
+    });
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(transcriptText(renderer, 'RootText')).toBe('Account B root row');
+  });
+});
+
 describe('SessionDetailScreen valid session-id', () => {
   it('keeps the mounted transcript when a background metadata refresh fails', async () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });

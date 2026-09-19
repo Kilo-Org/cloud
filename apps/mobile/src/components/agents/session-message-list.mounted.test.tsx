@@ -1,4 +1,4 @@
-import { createElement, type Ref, useImperativeHandle } from 'react';
+import { createElement, type ReactElement, type Ref, useImperativeHandle } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -176,6 +176,37 @@ describe('SessionMessageList older-page auto-scroll', () => {
     rerenderList(renderer, { items: ['m1', 'm2', 'm3'], hasOlderMessages: true });
 
     expect(scrollMock.scrollToEnd).toHaveBeenCalled();
+  });
+});
+
+describe('SessionMessageList pagination header', () => {
+  it('keeps the header element when only the load-handler identity changes', () => {
+    const renderer = mountList();
+    const header = flashListProps.current?.ListHeaderComponent;
+    expect(header).toBeTruthy();
+
+    // The host passes a fresh inline arrow on every render; that alone must not
+    // hand FlashList a new header element (which would remount/reflow it).
+    rerenderList(renderer, { onLoadOlderMessages: () => undefined });
+
+    expect(flashListProps.current?.ListHeaderComponent).toBe(header);
+  });
+
+  it('retries through the newest load handler after the host re-renders', () => {
+    const first = vi.fn<() => void>();
+    const second = vi.fn<() => void>();
+    const renderer = mountList({ onLoadOlderMessages: first });
+    const header = flashListProps.current?.ListHeaderComponent as ReactElement<{
+      onRetry: () => void;
+    }>;
+
+    rerenderList(renderer, { onLoadOlderMessages: second });
+    act(() => {
+      header.props.onRetry();
+    });
+
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
   });
 });
 

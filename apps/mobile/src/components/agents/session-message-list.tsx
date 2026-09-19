@@ -230,20 +230,37 @@ export function SessionMessageList<T>({
     [contentBottomInset, left, right]
   );
 
+  // The host passes a fresh inline arrow for `onLoadOlderMessages` on every
+  // render, so the handler is held in a ref (the same pattern as
+  // `onReachedBottomRef` above) and exposed to the header through a stable
+  // callback. Without this the memo below would still produce a new element on
+  // every parent render, which is the remount/reflow it exists to prevent.
+  const onLoadOlderMessagesRef = useRef(onLoadOlderMessages);
+  onLoadOlderMessagesRef.current = onLoadOlderMessages;
+  const handleRetryOlderMessages = useCallback(() => {
+    onLoadOlderMessagesRef.current();
+  }, []);
+
   // The header element is memoized on the pagination props so a new element
   // identity is not handed to FlashList on every render (which would remount
   // and reflow the header while the transcript streams). The pagination
-  // prompts only change when their own props change.
+  // prompts only change when their own props change; the retry callback is
+  // stable and always calls the newest handler.
   const listHeaderComponent = useMemo(
     () => (
       <SessionPaginationHeader
         isLoadingOlderMessages={isLoadingOlderMessages}
         olderMessagesError={olderMessagesError}
         olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
-        onRetry={onLoadOlderMessages}
+        onRetry={handleRetryOlderMessages}
       />
     ),
-    [isLoadingOlderMessages, olderMessagesError, olderMessagesOmittedItemCount, onLoadOlderMessages]
+    [
+      isLoadingOlderMessages,
+      olderMessagesError,
+      olderMessagesOmittedItemCount,
+      handleRetryOlderMessages,
+    ]
   );
 
   return (

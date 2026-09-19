@@ -892,9 +892,16 @@ export function SessionDetailContent({
         : baseTranscript,
     [condenseToolCalls, baseTranscript]
   );
+  // Only the condensed build reads the map back, so while condensing is off the
+  // walk over every content-rendering part and its `Map` allocation would be
+  // dead work on every streaming update. The guard skips both; the map is
+  // refreshed again on the commit after condensing turns back on.
   useEffect(() => {
+    if (!condenseToolCalls) {
+      return;
+    }
     carriedTranscriptKeysByPartRef.current = collectTranscriptItemKeysByPart(transcript);
-  }, [transcript]);
+  }, [condenseToolCalls, transcript]);
 
   // The list branch must never mount with zero items: a zero-item FlashList
   // paints blank dead space with no loading and no empty state (mobile-app

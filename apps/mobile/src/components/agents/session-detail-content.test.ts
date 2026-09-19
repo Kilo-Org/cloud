@@ -50,6 +50,7 @@ import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
+import type * as SessionTranscript from '@/components/agents/session-transcript';
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import {
@@ -374,6 +375,21 @@ vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
     setCondenseToolCalls: vi.fn(),
   }),
 }));
+// The part→item-key map is only read back by the condensed build, so the
+// component must not walk the transcript for it while condensing is off.
+const transcriptKeyCollection = vi.hoisted(() => ({ calls: 0 }));
+vi.mock('@/components/agents/session-transcript', async importOriginal => {
+  const actual = await importOriginal<typeof SessionTranscript>();
+  return {
+    ...actual,
+    collectTranscriptItemKeysByPart: (
+      ...args: Parameters<typeof actual.collectTranscriptItemKeysByPart>
+    ) => {
+      transcriptKeyCollection.calls += 1;
+      return actual.collectTranscriptItemKeysByPart(...args);
+    },
+  };
+});
 vi.mock('@/lib/hooks/use-session-model-options', () => ({
   useSessionModelOptions: () => ({ options: [], selectedValue: '', selectedVariant: '' }),
 }));
@@ -1813,6 +1829,26 @@ describe('SessionDetailContent condensed tool runs', () => {
     await view.respond(ROOT_ID, [toolRunMessage(ROOT_ID, 'm1', ['t1'])]);
 
     expect(transcriptKeys(view.renderer)).toEqual(['m2']);
+  });
+});
+
+describe('SessionDetailContent transcript key collection', () => {
+  it('does not walk the transcript for part keys while condensing is off', async () => {
+    condensePreference.value = false;
+    transcriptKeyCollection.calls = 0;
+
+    await mountDetails([toolRunMessage(ROOT_ID, 'm-tool-run', ['t1', 't2'])]);
+
+    expect(transcriptKeyCollection.calls).toBe(0);
+  });
+
+  it('collects part keys once condensing is on', async () => {
+    condensePreference.value = true;
+    transcriptKeyCollection.calls = 0;
+
+    await mountDetails([toolRunMessage(ROOT_ID, 'm-tool-run', ['t1', 't2'])]);
+
+    expect(transcriptKeyCollection.calls).toBeGreaterThan(0);
   });
 });
 

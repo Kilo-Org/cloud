@@ -132,6 +132,31 @@ describe('PrReviewDiscussionTab full-body states', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
   });
 
+  it.each(['load-more', 'loading', 'retry'] as const)(
+    'keeps the %s footer reachable when normalization leaves no discussion rows',
+    state => {
+      discussionState.query.hasNextPage = state !== 'retry';
+      discussionState.query.isFetchingNextPage = state === 'loading';
+      discussionState.laterPageError = state === 'retry';
+      const renderer = mountTab();
+      const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+      expect(list.props.listItems).toEqual([]);
+      expect(list.props.hasNextPage).toBe(state !== 'retry');
+      expect(list.props.isFetchingNextPage).toBe(state === 'loading');
+      expect(list.props.laterPageError).toBe(state === 'retry');
+      expectCtaPresence(renderer, true);
+      if (state !== 'loading') {
+        act(() => {
+          (list.props[state === 'retry' ? 'onRetryLoadMore' : 'onLoadMore'] as () => void)();
+        });
+        expect(
+          state === 'retry' ? discussionState.query.refetch : discussionState.query.fetchNextPage
+        ).toHaveBeenCalledOnce();
+      }
+      renderer.unmount();
+    }
+  );
+
   it('keeps permission denial ahead of retained comments', () => {
     discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
     discussionState.firstPageErrorState = { kind: 'permission' };

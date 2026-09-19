@@ -30,6 +30,8 @@ vi.mock('@/lib/trpc', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus' }));
 vi.mock('@/components/pr-review/discussion/comment-row', () => ({ CommentRow: 'CommentRow' }));
 vi.mock('@/components/pr-review/discussion/discussion-thread', () => ({
   DiscussionThread: 'DiscussionThread',

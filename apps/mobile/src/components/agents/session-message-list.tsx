@@ -38,7 +38,7 @@ const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
 // otherwise spam the FlashList event log.
 const ON_START_REACHED_THRESHOLD = 2;
 
-const DRAW_DISTANCE = 1000;
+const DRAW_DISTANCE = 2000;
 
 type SessionMessageListProps<T> = {
   sessionId: string;
@@ -135,6 +135,12 @@ export function SessionMessageList<T>({
   // `startRenderingFromBottom` keeps the viewport anchored at the newest
   // message on first render and after prepended older pages, which is the
   // exact behavior we want for the agent session transcript.
+  //
+  // `newestItemKey` is the key of `items.at(-1)`. The auto-scroll hook only
+  // schedules a scroll when that key changes, so growing the list with an
+  // older page can never yank the viewport back to the newest message.
+  const newestItem = items.at(-1);
+  const newestItemKey = newestItem === undefined ? null : keyExtractor(newestItem);
   const {
     isAtBottom,
     listRef,
@@ -154,6 +160,7 @@ export function SessionMessageList<T>({
     handleMomentumScrollEnd,
   } = useSessionListAutoScroll<T>({
     itemCount: items.length,
+    newestItemKey,
     resetKey: sessionId,
     initialAutoScroll: followTailAtMount,
     resumeKey: resumeAnchor,
@@ -292,8 +299,6 @@ export function SessionMessageList<T>({
     olderArrivalNewestKeyRef.current = null;
   }, [sessionId]);
   useEffect(() => {
-    const newestItem = items.at(-1);
-    const nextNewestKey = newestItem === undefined ? null : keyExtractor(newestItem);
     const nextCount = items.length;
     if (
       shouldAnnounceOlderMessagesArrival({
@@ -301,15 +306,15 @@ export function SessionMessageList<T>({
         previousCount: olderArrivalCountRef.current,
         nextCount,
         previousNewestKey: olderArrivalNewestKeyRef.current,
-        nextNewestKey,
+        nextNewestKey: newestItemKey,
       })
     ) {
       AccessibilityInfo.announceForAccessibility(getOlderMessagesArrivedAnnouncement());
     }
     olderArrivalInitializedRef.current = true;
     olderArrivalCountRef.current = nextCount;
-    olderArrivalNewestKeyRef.current = nextNewestKey;
-  }, [items, keyExtractor]);
+    olderArrivalNewestKeyRef.current = newestItemKey;
+  }, [items, newestItemKey]);
 
   // When the optional `contentBottomInset` is omitted and the landscape side
   // insets are 0 (portrait) we return the original module-level
@@ -332,6 +337,39 @@ export function SessionMessageList<T>({
     [contentBottomInset, left, right]
   );
 
+  // The host passes a fresh inline arrow for `onLoadOlderMessages` on every
+  // render, so the handler is held in a ref (the same pattern as
+  // `onReachedBottomRef` above) and exposed to the header through a stable
+  // callback. Without this the memo below would still produce a new element on
+  // every parent render, which is the remount/reflow it exists to prevent.
+  const onLoadOlderMessagesRef = useRef(onLoadOlderMessages);
+  onLoadOlderMessagesRef.current = onLoadOlderMessages;
+  const handleRetryOlderMessages = useCallback(() => {
+    onLoadOlderMessagesRef.current();
+  }, []);
+
+  // The header element is memoized on the pagination props so a new element
+  // identity is not handed to FlashList on every render (which would remount
+  // and reflow the header while the transcript streams). The pagination
+  // prompts only change when their own props change; the retry callback is
+  // stable and always calls the newest handler.
+  const listHeaderComponent = useMemo(
+    () => (
+      <SessionPaginationHeader
+        isLoadingOlderMessages={isLoadingOlderMessages}
+        olderMessagesError={olderMessagesError}
+        olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+        onRetry={handleRetryOlderMessages}
+      />
+    ),
+    [
+      isLoadingOlderMessages,
+      olderMessagesError,
+      olderMessagesOmittedItemCount,
+      handleRetryOlderMessages,
+    ]
+  );
+
   return (
     <View className="flex-1">
       <FlashList<T>
@@ -344,7 +382,7 @@ export function SessionMessageList<T>({
         renderItem={renderItem}
         // Transcript rows are tall and parse markdown on mount. The 250 dp
         // default draws under half a screen ahead, so a fast fling shows blank
-        // space until the rows mount. Four screens of lookahead hides that.
+        // space until the rows mount. A 2000 dp lookahead hides that.
         drawDistance={DRAW_DISTANCE}
         // Android Fabric can race clipped-view reattachment with rapid transcript updates.
         // Kept explicit: flash-list ≥ 2.3.2 defaults this to false (PR #2202); the pin
@@ -371,14 +409,7 @@ export function SessionMessageList<T>({
           // streaming insertions at the bottom.
           startRenderingFromBottom: true,
         }}
-        ListHeaderComponent={
-          <SessionPaginationHeader
-            isLoadingOlderMessages={isLoadingOlderMessages}
-            olderMessagesError={olderMessagesError}
-            olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
-            onRetry={onLoadOlderMessages}
-          />
-        }
+        ListHeaderComponent={listHeaderComponent}
         ListFooterComponent={ListFooterComponent}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"

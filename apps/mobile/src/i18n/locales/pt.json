@@ -3162,6 +3162,9 @@
       "repositoryUnsupported": "{{repository}} é um repositório Bitbucket — Iniciar agente ainda não o pode usar. Escolhe outro repositório no Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Abrir última sessão"
+  },
   "spendAlerts": {
     "subtitle": "Envie um alerta por e-mail ou notificação push aos contactos de faturação quando os gastos deste âmbito ultrapassarem um limite ou subirem acima do seu ritmo horário habitual.",
     "enable": "Ativar os alertas de gastos",

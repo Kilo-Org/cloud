@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} ialah repositori Bitbucket — Mulakan ejen belum boleh menggunakannya. Pilih repositori lain dalam Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Buka sesi terakhir"
+  },
   "spendAlerts": {
     "subtitle": "Hantar amaran melalui e-mel atau push kepada kenalan pengebilan apabila perbelanjaan skop ini melepasi had atau melonjak melebihi kadar setiap jam biasanya.",
     "enable": "Dayakan amaran perbelanjaan",

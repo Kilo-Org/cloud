@@ -3186,6 +3186,9 @@
       "repositoryUnsupported": "{{repository}} je repozitorij Bitbucket — Zaženi agenta ga še ne more uporabiti. Izberi drug repozitorij v Kilu."
     }
   },
+  "launcher": {
+    "openLastSession": "Odpri zadnjo sejo"
+  },
   "spendAlerts": {
     "subtitle": "Pošlji opozorilo po e-pošti ali push sporočilu obračunskim stikom, ko poraba tega obsega preseže omejitev ali skoči nad običajno urno stopnjo.",
     "enable": "Omogoči opozorila o porabi",

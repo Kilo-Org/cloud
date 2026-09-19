@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "He pūranga waehere Bitbucket a {{repository}} — Kāore anō a Tīmata i te kaiāwhina e taea te whakamahi. Kōwhiria tētahi atu pūranga waehere i roto i a Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Whakatuwheratia te wātū whakamutunga"
+  },
   "spendAlerts": {
     "subtitle": "Tukuna he matohi mā te īmēra, mā te push rānei ki ngā hoapā nama ina whiti te whakapaunga o tēnei rohe i tētahi paepae, ina piki rānei ki runga ake i tōna tere ia hāora.",
     "enable": "Whakahohea ngā matohi whakapaunga",

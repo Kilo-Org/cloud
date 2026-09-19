@@ -3162,6 +3162,9 @@
       "repositoryUnsupported": "{{repository}} è un repository Bitbucket — Avvia agente non può ancora usarlo. Scegli un altro repository in Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Apri l'ultima sessione"
+  },
   "spendAlerts": {
     "subtitle": "Invia un avviso via email o push ai contatti di fatturazione quando la spesa di questo ambito supera un limite o schizza sopra il suo ritmo orario abituale.",
     "enable": "Attiva gli avvisi di spesa",

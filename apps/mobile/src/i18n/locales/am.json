@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} የBitbucket ማከማቻ ነው — ወኪል ይጀምሩ ገና ሊጠቀምበት አይችልም። በKilo ውስጥ ሌላ ማከማቻ ይምረጡ።"
     }
   },
+  "launcher": {
+    "openLastSession": "የመጨረሻውን ክፍለ ጊዜ ክፈት"
+  },
   "spendAlerts": {
     "subtitle": "የዚህ አካባቢ ወጪ ገደብ ሲያልፍ ወይም ከተለመደው የሰዓት መጠኑ በላይ ሲጨምር ለሂሳብ ተጠሪዎች በኢሜይል ወይም በግፋ ማስጠንቀቂያ ላክ።",
     "enable": "የወጪ ማስጠንቀቂያዎችን አንቃ",

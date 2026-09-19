@@ -3162,6 +3162,9 @@
       "repositoryUnsupported": "{{repository}} je Bitbucket repozitorijum — Pokreni agenta ga još ne može koristiti. Izaberi drugi repozitorijum u Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Otvori poslednju sesiju"
+  },
   "spendAlerts": {
     "subtitle": "Pošalji obaveštenje e-poštom ili push porukom kontaktima za naplatu kada potrošnja ovog opsega pređe limit ili skoči iznad uobičajene satne stope.",
     "enable": "Omogući obaveštenja o potrošnji",

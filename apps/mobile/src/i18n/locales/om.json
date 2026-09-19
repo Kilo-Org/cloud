@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} kuusaa koodii Bitbucket ti — Eejensa jalqabi ammallee isa fayyadamuu hin danda'u. Kilo keessatti kuusaa koodii bira filadhu."
     }
   },
+  "launcher": {
+    "openLastSession": "Turtii dhumaa bani"
+  },
   "spendAlerts": {
     "subtitle": "Yeroo baasiin naannoo kanaa daangaa darbu ykn sadarkaa sa'aatii baramaa isaa ol ka'u, qunnamtiiwwan kaffaltiitti imeelii ykn push ergaa.",
     "enable": "Akeekkachiisa baasii dandeessisi",

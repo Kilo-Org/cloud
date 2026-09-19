@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} er Bitbucket-kóðasafn — Ræsa fulltrúa getur ekki notað það enn. Veldu annað kóðasafn í Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Opna síðustu lotu"
+  },
   "spendAlerts": {
     "subtitle": "Sendu viðvörun í tölvupósti eða push til innheimtutengiliða þegar útgjöld þessa svæðis fara yfir mörk eða stökkva yfir venjulegan klukkustundarhraða þess.",
     "enable": "Virkja útgjaldaviðvaranir",

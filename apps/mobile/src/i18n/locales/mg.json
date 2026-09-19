@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "Tahirin-kaody Bitbucket ny {{repository}} — Tsy mbola afaka mampiasa azy ny Atombohy ny mpanampy. Mifidiana tahirin-kaody hafa ao amin'ny Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Sokafy ny fotoam-piasana farany"
+  },
   "spendAlerts": {
     "subtitle": "Alefaso fampitandremana amin'ny mailaka na push ho an'ny mpifandray amin'ny faktiora rehefa mihoatra fetra ny fandaniana amin'ity faritra ity na miakatra ambonin'ny taha isan'ora mahazatra.",
     "enable": "Velomy ny fampitandremana momba ny fandaniana",

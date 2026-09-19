@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} 是 Bitbucket 仓库——启动智能体暂时无法使用它。请在 Kilo 中选择其他仓库。"
     }
   },
+  "launcher": {
+    "openLastSession": "打开上次会话"
+  },
   "spendAlerts": {
     "subtitle": "当此范围的支出超过限额或高于其平时每小时速率时，通过邮件或推送向账单联系人发送提醒。",
     "enable": "启用支出提醒",

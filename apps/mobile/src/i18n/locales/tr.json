@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} bir Bitbucket deposu — Ajanı başlat bunu henüz kullanamıyor. Kilo'da başka bir depo seç."
     }
   },
+  "launcher": {
+    "openLastSession": "Son oturumu aç"
+  },
   "spendAlerts": {
     "subtitle": "Bu kapsamın harcaması bir sınırı aştığında veya olağan saatlik hızının üzerine çıktığında faturalandırma kişilerine e-posta veya push ile uyarı gönder.",
     "enable": "Harcama uyarılarını etkinleştir",

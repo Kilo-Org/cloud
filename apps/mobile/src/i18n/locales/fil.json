@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "Ang {{repository}} ay isang Bitbucket na repositoryo — Hindi pa ito magagamit ng Simulan ang agent. Pumili ng ibang repositoryo sa Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Buksan ang huling sesyon"
+  },
   "spendAlerts": {
     "subtitle": "Magpadala ng babala sa email o push sa mga contact sa pagsingil kapag ang gastos ng saklaw na ito ay lumampas sa limitasyon o tumaas nang higit sa karaniwang rate bawat oras.",
     "enable": "Paganahin ang mga babala sa gastos",

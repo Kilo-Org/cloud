@@ -3162,6 +3162,9 @@
       "repositoryUnsupported": "{{repository}} és un repositori de Bitbucket — Inicia un agent encara no el pot utilitzar. Tria un altre repositori a Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Obre l'última sessió"
+  },
   "spendAlerts": {
     "subtitle": "Envia una alerta per correu o notificació push als contactes de facturació quan la despesa d'aquest àmbit superi un límit o augmenti per sobre de la seva taxa horària habitual.",
     "enable": "Activa les alertes de despesa",

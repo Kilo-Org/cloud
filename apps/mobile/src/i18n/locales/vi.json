@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} là kho mã nguồn Bitbucket — Bắt đầu trợ lý chưa thể dùng nó. Chọn kho mã nguồn khác trong Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Mở phiên gần nhất"
+  },
   "spendAlerts": {
     "subtitle": "Gửi cảnh báo qua email hoặc push tới các liên hệ thanh toán khi chi tiêu của phạm vi này vượt một giới hạn hoặc tăng vọt trên mức thường lệ theo giờ.",
     "enable": "Bật cảnh báo chi tiêu",

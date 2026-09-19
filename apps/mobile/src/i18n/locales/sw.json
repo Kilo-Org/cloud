@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} ni hazina ya Bitbucket — Anzisha wakala bado haiwezi kuitumia. Chagua hazina nyingine katika Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Fungua kikao cha mwisho"
+  },
   "spendAlerts": {
     "subtitle": "Tuma tahadhari kwa barua pepe au push kwa anwani za bili wakati matumizi ya wigo huu yanapita kikomo au yanapanda juu ya kiwango chake cha kawaida cha saa.",
     "enable": "Washa tahadhari za matumizi",

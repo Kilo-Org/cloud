@@ -3234,6 +3234,9 @@
       "repositoryUnsupported": "Ystorfa Bitbucket yw {{repository}} — Nid yw Dechrau asiant yn gallu ei defnyddio eto. Dewiswch ystorfa arall yn Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Agor y sesiwn ddiwethaf"
+  },
   "spendAlerts": {
     "subtitle": "Anfon rhybudd drwy e-bost neu wthiad at y cysylltiadau bilio pan fo gwariant y cwmpas hwn yn croesi terfyn neu'n codi uwchlaw ei gyfradd awr arferol.",
     "enable": "Galluogi rhybuddion gwariant",

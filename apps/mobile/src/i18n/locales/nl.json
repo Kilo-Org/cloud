@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} is een Bitbucket-repository — Agent starten kan die nog niet gebruiken. Kies een andere repository in Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Laatste sessie openen"
+  },
   "spendAlerts": {
     "subtitle": "Stuur een e-mail- of pushmelding naar de factuurcontacten wanneer de besteding van dit bereik een limiet overschrijdt of boven het gebruikelijke uurtarief uitstijgt.",
     "enable": "Bestedingswaarschuwingen inschakelen",

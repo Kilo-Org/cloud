@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasi — Agentni ishga tushirish hali undan foydalana olmaydi. Kilo'da boshqa repozitoriy tanlang."
     }
   },
+  "launcher": {
+    "openLastSession": "Oxirgi seansni ochish"
+  },
   "spendAlerts": {
     "subtitle": "Bu sohaning xarajati chegaradan oshganda yoki odatdagi soatlik sur'atidan yuqoriga ko'tarilganda to'lov bo'yicha kontaktlarga email yoki push orqali bildirishnoma yubor.",
     "enable": "Xarajat bildirishnomalarini yoqish",

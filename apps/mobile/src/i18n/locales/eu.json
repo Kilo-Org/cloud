@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} Bitbucket biltegia da — Hasi agentea oraindik ezin du erabili. Aukeratu beste biltegi bat Kilon."
     }
   },
+  "launcher": {
+    "openLastSession": "Ireki azken saioa"
+  },
   "spendAlerts": {
     "subtitle": "Bidali alerta bat posta elektronikoz edo push bidez fakturatze-kontaktuei, eremu honen gastuak muga bat gainditzen duenean edo bere ohiko ordu-tasaren gainetik igotzen denean.",
     "enable": "Gaitu gastu-alertak",

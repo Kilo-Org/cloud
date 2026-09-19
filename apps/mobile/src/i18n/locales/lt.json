@@ -3186,6 +3186,9 @@
       "repositoryUnsupported": "{{repository}} yra Bitbucket saugykla — Paleisti agentą jos dar negali naudoti. Pasirink kitą saugyklą Kilo programoje."
     }
   },
+  "launcher": {
+    "openLastSession": "Atidaryti paskutinę sesiją"
+  },
   "spendAlerts": {
     "subtitle": "Siųsk įspėjimą el. paštu arba push pranešimu atsiskaitymo kontaktams, kai šios srities išlaidos viršija limitą arba pakyla virš įprasto valandinio tempo.",
     "enable": "Įjungti išlaidų įspėjimus",

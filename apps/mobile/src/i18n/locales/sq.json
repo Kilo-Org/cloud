@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} është një depo Bitbucket — Fillo agjentin nuk mund ta përdorë ende. Zgjidh një depo tjetër në Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Hap sesionin e fundit"
+  },
   "spendAlerts": {
     "subtitle": "Dërgo një njoftim me email ose push te kontaktet e faturimit kur shpenzimet e këtij fushëveprimi kalojnë një kufi ose hidhen mbi ritmin e zakonshëm për orë.",
     "enable": "Aktivizo njoftimet për shpenzimet",

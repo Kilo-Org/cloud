@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} は Bitbucket のリポジトリです — エージェントを開始はまだこれを使用できません。Kilo で別のリポジトリを選択してください。"
     }
   },
+  "launcher": {
+    "openLastSession": "最後のセッションを開く"
+  },
   "spendAlerts": {
     "subtitle": "このスコープの支出が上限を超えたとき、または通常の毎時のペースを大きく上回ったときに、請求担当者にメールまたはプッシュでアラートを送信します。",
     "enable": "支出アラートを有効にする",

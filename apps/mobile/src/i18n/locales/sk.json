@@ -3186,6 +3186,9 @@
       "repositoryUnsupported": "{{repository}} je repozitár na Bitbuckete — Spustiť agenta ho zatiaľ nemôže použiť. Vyber iný repozitár v Kile."
     }
   },
+  "launcher": {
+    "openLastSession": "Otvoriť poslednú reláciu"
+  },
   "spendAlerts": {
     "subtitle": "Pošli e-mailom alebo push oznámením upozornenie fakturačným kontaktom, keď výdavky tohto rozsahu prekročia limit alebo vyskočia nad obvyklú hodinovú sadzbu.",
     "enable": "Povoliť upozornenia na výdavky",

@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} on Bitbucketi hoidla — Käivita agent ei saa seda veel kasutada. Vali Kilos teine hoidla."
     }
   },
+  "launcher": {
+    "openLastSession": "Ava viimane seanss"
+  },
   "spendAlerts": {
     "subtitle": "Saada faktureerimiskontaktidele e-posti või push-teavitus, kui selle piirkonna kulutus ületab limiidi või tõuseb üle tavapärase tunnimäära.",
     "enable": "Luba kulutushoiatused",

@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} ist ein Bitbucket-Repository — Agent starten kann es noch nicht verwenden. Wähle ein anderes Repository in Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Letzte Sitzung öffnen"
+  },
   "spendAlerts": {
     "subtitle": "Sende den Abrechnungskontakten eine E-Mail- oder Push-Warnung, wenn die Ausgaben dieses Bereichs ein Limit überschreiten oder über ihre übliche Stundenrate steigen.",
     "enable": "Ausgaben-Warnungen aktivieren",

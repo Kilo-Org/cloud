@@ -3210,6 +3210,9 @@
       "repositoryUnsupported": "Is stór Bitbucket é {{repository}} — Ní féidir le Tosaigh gníomhaire é a úsáid fós. Roghnaigh stór eile i Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Oscail an seisiún deireanach"
+  },
   "spendAlerts": {
     "subtitle": "Seol foláireamh trí ríomhphost nó trí push chuig na teagmhálaithe billeála nuair a sháraíonn caiteachas an raoin seo teorainn nó nuair a ardaíonn sé os cionn a ghnáthráta uaire.",
     "enable": "Cumasaigh foláirimh chaiteachais",

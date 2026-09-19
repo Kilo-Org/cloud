@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}}은(는) Bitbucket 저장소입니다 — 에이전트 시작은 아직 이를 사용할 수 없습니다. Kilo에서 다른 저장소를 선택하세요."
     }
   },
+  "launcher": {
+    "openLastSession": "마지막 세션 열기"
+  },
   "spendAlerts": {
     "subtitle": "이 범위의 지출이 한도를 넘거나 평소 시간당 속도를 크게 웃돌면 청구 담당자에게 이메일 또는 푸시로 알림을 보냅니다.",
     "enable": "지출 알림 켜기",

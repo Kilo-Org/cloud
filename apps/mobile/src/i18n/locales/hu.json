@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "A {{repository}} egy Bitbucket-adattár — Az Ügynök indítása még nem tudja használni. Válassz másik adattárat a Kilóban."
     }
   },
+  "launcher": {
+    "openLastSession": "Utolsó munkamenet megnyitása"
+  },
   "spendAlerts": {
     "subtitle": "Küldj e-mailes vagy push értesítést a számlázási kapcsolatoknak, amikor ennek a hatókörnek a költése átlép egy limitet, vagy a szokásos óránkénti üteme fölé ugrik.",
     "enable": "Költésfigyelmeztetések engedélyezése",

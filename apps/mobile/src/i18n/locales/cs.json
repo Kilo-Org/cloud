@@ -3186,6 +3186,9 @@
       "repositoryUnsupported": "{{repository}} je repozitář na Bitbucketu — Spustit agenta ho zatím nemůže použít. Vyber jiný repozitář v Kilu."
     }
   },
+  "launcher": {
+    "openLastSession": "Otevřít poslední relaci"
+  },
   "spendAlerts": {
     "subtitle": "Pošli e-mailem nebo push oznámením upozornění fakturačním kontaktům, když útrata tohoto rozsahu překročí limit nebo vyskočí nad obvyklou hodinovou sazbu.",
     "enable": "Povolit upozornění na útratu",

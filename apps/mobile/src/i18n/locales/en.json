@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} is a Bitbucket repository — Start agent can't use it yet. Choose another repository in Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Open last session"
+  },
   "spendAlerts": {
     "subtitle": "Email or push an alert to the billing contacts when this scope's spend crosses a limit or spikes above its usual hourly rate.",
     "enable": "Enable spend alerts",

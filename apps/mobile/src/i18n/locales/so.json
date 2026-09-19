@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} waa kayd Bitbucket — Bilow wakiilka weli ma isticmaali karo. Dooro kayd kale gudaha Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Fur kalfadhigii ugu dambeeyay"
+  },
   "spendAlerts": {
     "subtitle": "U dir digniin iimayl ama push xiriirka biilasha marka kharashka goobtan uu dhaafo xad ama uu ka sarreeyo heerka saacadlaha caadiga ah.",
     "enable": "Daar digniinaha kharashka",

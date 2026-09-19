@@ -3186,6 +3186,9 @@
       "repositoryUnsupported": "{{repository}} to repozytorium Bitbucket — Uruchom agenta nie może jeszcze go użyć. Wybierz inne repozytorium w Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Otwórz ostatnią sesję"
+  },
   "spendAlerts": {
     "subtitle": "Wyślij alert e-mailem lub powiadomieniem push do kontaktów rozliczeniowych, gdy wydatki tego zakresu przekroczą limit lub wzrosną powyżej zwykłego tempa godzinowego.",
     "enable": "Włącz alerty o wydatkach",

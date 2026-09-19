@@ -3162,6 +3162,9 @@
       "repositoryUnsupported": "{{repository}} ir Bitbucket repozitorijs — Sākt aģentu to vēl nevar izmantot. Izvēlies citu repozitoriju Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Atvērt pēdējo sesiju"
+  },
   "spendAlerts": {
     "subtitle": "Sūti brīdinājumu pa e-pastu vai push ziņojumu norēķinu kontaktpersonām, kad šīs jomas izdevumi pārsniedz limitu vai pārlec virs ierastā stundas tempa.",
     "enable": "Iespējot izdevumu brīdinājumus",

@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} is 'n Bitbucket-bewaarplek — Begin agent kan dit nog nie gebruik nie. Kies 'n ander bewaarplek in Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Maak laaste sessie oop"
+  },
   "spendAlerts": {
     "subtitle": "E-pos of stoot 'n waarskuwing na die faktuurkontakte wanneer hierdie omvang se besteding 'n limiet oorskry of bo sy gewone uurlikse tempo styg.",
     "enable": "Aktiveer bestedingswaarskuwings",

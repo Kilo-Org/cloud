@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} ma'ajiyar Bitbucket ce — Fara wakili ba zai iya amfani da ita ba tukuna. Zaɓi wata ma'ajiya a cikin Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Buɗe zaman ƙarshe"
+  },
   "spendAlerts": {
     "subtitle": "Aika faɗakarwa ta imel ko turawa zuwa ga abokan hulɗar biyan kuɗi lokacin da kashe kuɗin wannan yanki ya wuce iyaka ko ya haura fiye da yawan sa'ar da ya saba.",
     "enable": "Kunna faɗakarwar kashe kuɗi",

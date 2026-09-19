@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} är ett Bitbucket-kodarkiv — Starta agenten kan ännu inte använda det. Välj ett annat kodarkiv i Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Öppna senaste sessionen"
+  },
   "spendAlerts": {
     "subtitle": "Skicka en varning via e-post eller push till faktureringskontakterna när detta områdes utgifter överskrider en gräns eller stiger över den vanliga timtakten.",
     "enable": "Aktivera utgiftsvarningar",

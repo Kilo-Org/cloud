@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} adalah repositori Bitbucket — Mulai agen belum bisa menggunakannya. Pilih repositori lain di Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Buka sesi terakhir"
+  },
   "spendAlerts": {
     "subtitle": "Kirim peringatan lewat email atau push ke kontak penagihan saat pengeluaran cakupan ini melewati batas atau melonjak di atas laju per jam biasanya.",
     "enable": "Aktifkan peringatan pengeluaran",

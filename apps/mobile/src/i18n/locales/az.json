@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasıdır — Agenti başlat hələ ondan istifadə edə bilmir. Kilo-da başqa repozitoriya seç."
     }
   },
+  "launcher": {
+    "openLastSession": "Son sessiyanı aç"
+  },
   "spendAlerts": {
     "subtitle": "Bu əhatənin xərci həddi aşdıqda və ya adi saatlıq sürətindən yuxarı sıçradıqda ödəniş əlaqələrinə e-poçt və ya push ilə bildiriş göndər.",
     "enable": "Xərc bildirişlərini aktivləşdir",

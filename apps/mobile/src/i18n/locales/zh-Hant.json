@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} 是 Bitbucket 存放庫——啟動代理程式暫時無法使用它。請在 Kilo 中選擇其他存放庫。"
     }
   },
+  "launcher": {
+    "openLastSession": "開啟上次工作階段"
+  },
   "spendAlerts": {
     "subtitle": "當此範圍的支出超過限額或高於其平時每小時速率時，透過電子郵件或推播向帳單聯絡人發送提醒。",
     "enable": "啟用支出提醒",

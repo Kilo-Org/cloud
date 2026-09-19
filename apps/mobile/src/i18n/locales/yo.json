@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} jẹ́ ibi ìpamọ́ kóòdù Bitbucket — Bẹ̀rẹ̀ aṣojú kò tíì lè lò ó. Yan ibi ìpamọ́ kóòdù mìíràn nínú Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Ṣí ìgbà iṣẹ́ tó kẹ́yìn"
+  },
   "spendAlerts": {
     "subtitle": "Fi ìkìlọ̀ ránṣẹ́ nípasẹ̀ ímeèlì tàbí push sí àwọn olùbáṣepọ̀ ìsanwó nígbà tí ìnáwó ẹ̀ka yìí bá kọjá ààlà tàbí gòkè ju ìwọ̀n wákàtí tó máa ń ṣe lọ.",
     "enable": "Tan àwọn ìkìlọ̀ ìnáwó",

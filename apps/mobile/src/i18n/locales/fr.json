@@ -3162,6 +3162,9 @@
       "repositoryUnsupported": "{{repository}} est un dépôt Bitbucket — Démarrer un agent ne peut pas encore l'utiliser. Choisissez un autre dépôt dans Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Ouvrir la dernière session"
+  },
   "spendAlerts": {
     "subtitle": "Envoyez une alerte par e-mail ou notification push aux contacts de facturation lorsque les dépenses de ce périmètre dépassent une limite ou s'envolent au-dessus de leur rythme horaire habituel.",
     "enable": "Activer les alertes de dépenses",

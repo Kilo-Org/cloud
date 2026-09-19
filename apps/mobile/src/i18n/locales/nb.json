@@ -3138,6 +3138,9 @@
       "repositoryUnsupported": "{{repository}} er et Bitbucket-kodelager — Start agenten kan ennå ikke bruke det. Velg et annet kodelager i Kilo."
     }
   },
+  "launcher": {
+    "openLastSession": "Åpne siste økt"
+  },
   "spendAlerts": {
     "subtitle": "Send et varsel på e-post eller push til faktureringskontaktene når forbruket i dette området overskrider en grense eller stiger over den vanlige timesraten.",
     "enable": "Aktiver forbruksvarsler",

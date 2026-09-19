@@ -856,6 +856,15 @@
       "kiloclawActivitySubtitle": "instance gatava / kļūda, ieplānotas darbības",
       "balanceAlertsSubtitle": "brīdinājumi par mazu organizācijas kredītu atlikumu",
       "securityFindingsSubtitle": "jaunas konstatētās problēmas un SLA atgādinājumi"
+    },
+    "action": {
+      "openSession": "Atvērt sesiju"
+    },
+    "needsInputAction": {
+      "approved": "Pieprasījums apstiprināts",
+      "replied": "Atbilde nosūtīta",
+      "failed": "Neizdevās atbildēt. Pieskarieties vēlreiz, lai mēģinātu vēlreiz.",
+      "unavailable": "Šis pieprasījums vairs negaida."
     }
   },
   "tabs": {
@@ -2205,20 +2214,7 @@
       "continueFrom": "Tiek turpināta sesija: {{title}}.",
       "importingSession": "Importē sesiju…",
       "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlies Cloud Agent vai citu CLI.",
-      "importFailed": "Neizdevās importēt šo sesiju.",
-      "sandbox": "Smilškaste",
-      "sandboxAccessibility": "Smilškaste: {{label}}",
-      "sandboxDefaultWithDestination": "Noklusējums · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Maza",
-      "sandboxInstanceShared": "Kopīga",
-      "sandboxInstanceLarge": "Liela",
-      "sandboxInstanceDevcontainer": "Izstrādes konteiners",
-      "sandboxInstanceProviderDefault": "Piegādātāja noklusējums",
-      "sandboxCouldNotLoad": "Neizdevās ielādēt smilškastes opcijas",
-      "sandboxUnavailable": "Šī smilškaste nav pieejama. Izvēlieties citu smilškasti vai Noklusējumu.",
-      "sandboxUseDefault": "Izmantot Noklusējumu"
+      "importFailed": "Neizdevās importēt šo sesiju."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atjaunināts {{displayCount}} fails.",

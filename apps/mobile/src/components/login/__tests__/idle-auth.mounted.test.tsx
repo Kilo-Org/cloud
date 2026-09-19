@@ -202,24 +202,31 @@ describe('IdleAuth email continue copy', () => {
     });
   });
 
-  it.each(['Terms', 'Privacy Policy'])('gives %s a standalone 44dp touch target', async label => {
-    const renderer = await mountIdleAuth(vi.fn<StartFn>());
-    const link = findText(renderer.root, label).parent;
+  it.each(['Terms', 'Privacy Policy'])(
+    'gives %s a standalone touch target of at least 44dp',
+    async label => {
+      const renderer = await mountIdleAuth(vi.fn<StartFn>());
+      const link = findText(renderer.root, label).parent;
+      const className = link?.props.className as string;
 
-    expect(link?.props.className).toContain('min-h-[44px]');
-    expect(link?.props.className).toContain('min-w-[44px]');
-    expect(link?.props.className).toContain('max-w-full');
-    expect(link?.props.className).toContain('active:opacity-70');
-    expect(link?.type).toBe('Pressable');
-    expect(link?.props.accessibilityRole).toBe('link');
-    expect(link?.props.accessibilityLabel).toBe(label);
-    expect(link?.parent?.type).toBe('View');
-    expect(link?.parent?.props.className).toContain('flex-wrap');
+      // NativeWind renders a `px` arbitrary value 1:1 as density-independent
+      // pixels and Android rounds the physical layout down, so a 44dp floor
+      // measured 115px = 43.81dp at density 420 (e1). Keep it above 44.
+      expect(Number(/min-h-\[(\d+)px\]/.exec(className)?.[1])).toBeGreaterThan(44);
+      expect(Number(/min-w-\[(\d+)px\]/.exec(className)?.[1])).toBeGreaterThan(44);
+      expect(className).toContain('max-w-full');
+      expect(className).toContain('active:opacity-70');
+      expect(link?.type).toBe('Pressable');
+      expect(link?.props.accessibilityRole).toBe('link');
+      expect(link?.props.accessibilityLabel).toBe(label);
+      expect(link?.parent?.type).toBe('View');
+      expect(link?.parent?.props.className).toContain('flex-wrap');
 
-    act(() => {
-      renderer.unmount();
-    });
-  });
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  );
 
   it('keeps legal targets unchanged and available while sign-in is busy', async () => {
     const start = vi.fn<StartFn>();

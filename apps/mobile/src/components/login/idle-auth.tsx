@@ -291,7 +291,11 @@ export function IdleAuth({
       <View className="flex-row flex-wrap items-center">
         <Text className="text-xs text-muted-foreground">{t('login.termsPrefix')} </Text>
         <Pressable
-          className="min-h-[44px] min-w-[44px] max-w-full items-center justify-center active:opacity-70"
+          // 48dp, not 44dp: Android lays the target out in whole physical
+          // pixels, so 44dp at density 420 rounds down to 115px = 43.81dp and
+          // misses the 44dp floor (e1 measured 116x115px). 48dp is the
+          // Material minimum and survives the rounding at every density.
+          className="min-h-[48px] min-w-[48px] max-w-full items-center justify-center active:opacity-70"
           accessibilityRole="link"
           accessibilityLabel={t('login.terms')}
           onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
@@ -300,7 +304,7 @@ export function IdleAuth({
         </Pressable>
         <Text className="text-xs text-muted-foreground">{t('login.termsConnector')}</Text>
         <Pressable
-          className="min-h-[44px] min-w-[44px] max-w-full items-center justify-center active:opacity-70"
+          className="min-h-[48px] min-w-[48px] max-w-full items-center justify-center active:opacity-70"
           accessibilityRole="link"
           accessibilityLabel={t('common.privacyPolicy')}
           onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}

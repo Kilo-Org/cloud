@@ -260,8 +260,15 @@ function fakeHelpers(config: {
   redirectTo?: string;
   /** Injected provider-completion failure (the library owns that call). */
   completeError?: unknown;
-}): { helpers: OAuthHelpers; completes: CompleteAuthorizationOptions[] } {
+  /** Injected client-record renewal failure (the consent completion owns that call). */
+  updateError?: unknown;
+}): {
+  helpers: OAuthHelpers;
+  completes: CompleteAuthorizationOptions[];
+  updates: string[];
+} {
   const completes: CompleteAuthorizationOptions[] = [];
+  const updates: string[] = [];
   const helpers = {
     async parseAuthRequest() {
       if (config.parseError !== undefined) throw config.parseError;
@@ -271,13 +278,18 @@ function fakeHelpers(config: {
     async lookupClient() {
       return config.client ?? null;
     },
+    async updateClient(clientId: string) {
+      if (config.updateError !== undefined) throw config.updateError;
+      updates.push(clientId);
+      return null;
+    },
     async completeAuthorization(options: CompleteAuthorizationOptions) {
       if (config.completeError !== undefined) throw config.completeError;
       completes.push(options);
       return { redirectTo: config.redirectTo ?? `${REDIRECT}?code=lib-code` };
     },
   } as unknown as OAuthHelpers;
-  return { helpers, completes };
+  return { helpers, completes, updates };
 }
 
 function envWith(helpers: OAuthHelpers): Env {
@@ -753,6 +765,48 @@ describe('GET/POST /authorize/org', () => {
       props: { kiloUserId: 'u-1', organizationId: 'org-2', kiloToken: 'kilo-tok-1' },
     });
     expect(store.pending.get(id)?.status).toBe('completed');
+  });
+
+  it('re-anchors the DCR client record to the grant it completes', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const { helpers, completes, updates } = fakeHelpers({ client: clientInfo() });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch())),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'personal' }).toString(),
+      }),
+      envWith(helpers)
+    );
+    expect(response.status).toBe(302);
+    // The record's TTL is anchored at registration; re-putting it here anchors
+    // the session+margin lifetime to the grant this completion mints.
+    expect(updates).toEqual([CLIENT_ID]);
+    expect(completes).toHaveLength(1);
+    expect(store.pending.get(id)?.status).toBe('completed');
+  });
+
+  it('keeps a failed client-record renewal retryable instead of promising the year', async () => {
+    const store = createFakeStore();
+    const id = await seedPaired(store);
+    const failing = fakeHelpers({ client: clientInfo(), updateError: new Error('kv down') });
+    const response = await run(
+      createDefaultHandler(deps(store, flowFetch())),
+      new Request(`${ISSUER}/authorize/org?id=${id}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ organization_id: 'personal' }).toString(),
+      }),
+      envWith(failing.helpers)
+    );
+    // Nothing was minted and the record is released, so the same user can retry
+    // rather than being stranded on a terminal 'approved'.
+    expect(failing.completes).toHaveLength(0);
+    expect(store.pending.get(id)?.status).toBe('pending');
+    expect(response.status).toBe(200);
+    expect(await response.text()).toMatch(/Could not finish connecting/);
   });
 
   it('emits exactly one succeeded event bound to the chosen member organization', async () => {

@@ -843,7 +843,8 @@
       "chat": "Poruke u ćaskanju",
       "kiloclaw": "Aktivnosti u KiloClaw-u",
       "balance": "Upozorenja o stanju kredita",
-      "security": "Bezbednosni nalazi"
+      "security": "Bezbednosni nalazi",
+      "spend": "Obaveštenja o potrošnji"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",
@@ -855,6 +856,8 @@
       "sessionStatusSubtitle": "završeno / neuspešno / spremno za upravljanje",
       "kiloclawActivitySubtitle": "spremnost ili greška instance, zakazane radnje",
       "balanceAlertsSubtitle": "upozorenja o niskom saldu organizacije",
+      "spendAlertsSubtitle": "prekoračenja pragova i skokovi po satu",
+      "spendAlertsToggle": "Kategorija obaveštenja o potrošnji",
       "securityFindingsSubtitle": "novi nalazi i podsetnici za SLA"
     }
   },
@@ -3244,5 +3247,28 @@
   },
   "launcher": {
     "openLastSession": "Otvori poslednju sesiju"
+  },
+  "spendAlerts": {
+    "subtitle": "Pošalji obaveštenje e-poštom ili push porukom kontaktima za naplatu kada potrošnja ovog opsega pređe limit ili skoči iznad uobičajene satne stope.",
+    "enable": "Omogući obaveštenja o potrošnji",
+    "thresholdTitle": "Prekoračenje praga",
+    "thresholdSubtitle": "Tekuća potrošnja prelazi tvoj limit",
+    "anomalyTitle": "Satni skok",
+    "anomalySubtitle": "Jedan sat je daleko iznad uobičajene stope ovog opsega",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Prozor",
+    "window24h": "24 sata",
+    "window7d": "7 dana",
+    "window30d": "30 dana",
+    "multiplierLabel": "Množilac skoka",
+    "saved": "Podešavanja obaveštenja o potrošnji su sačuvana",
+    "loadError": "Obaveštenja o potrošnji nisu učitana.",
+    "saveError": "Obaveštenja o potrošnji nisu sačuvana.",
+    "empty": "Obaveštenja o potrošnji su isključena. Uključi ih da upozoriš kontakte za naplatu ovog opsega.",
+    "noSpend": "Još nema zabeležene potrošnje",
+    "spend24h": "Potrošnja u poslednja 24 sata",
+    "multiplierError": "Unesi množilac 1 ili veći",
+    "permissionDenied": "Nemaš dozvolu da upravljaš obaveštenjima o potrošnji.",
+    "pushOffByCategory": "Isključeno u Obaveštenjima"
   }
 }

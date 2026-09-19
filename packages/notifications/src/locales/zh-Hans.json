@@ -7,6 +7,7 @@
       "instanceLifecycle": "您的实例有更新",
       "scheduledAction": "计划的操作有更新",
       "lowBalance": "您的余额需要关注",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "安全发现需要关注",
       "activeAgentsGlanceable": "活动代理有更新"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "余额不足提醒",
       "body": "{{organizationName}} 的余额已低于 ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "新的安全发现 ({{severity}})",

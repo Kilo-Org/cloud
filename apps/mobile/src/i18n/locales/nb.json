@@ -827,7 +827,8 @@
       "chat": "Samtalemeldinger",
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarsler",
-      "security": "Sikkerhetsfunn"
+      "security": "Sikkerhetsfunn",
+      "spend": "Forbruksvarsler"
     },
     "category": {
       "chatMessagesSubtitle": "svar i samtalene dine",
@@ -839,6 +840,8 @@
       "sessionStatusSubtitle": "fullført / mislykket / klar for fjernstyring",
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
       "balanceAlertsSubtitle": "advarsler om lav organisasjonssaldo",
+      "spendAlertsSubtitle": "grenseoverskridelser og topper per time",
+      "spendAlertsToggle": "Kategorien forbruksvarsler",
       "securityFindingsSubtitle": "nye funn og SLA-påminnelser"
     }
   },
@@ -3201,5 +3204,28 @@
   },
   "launcher": {
     "openLastSession": "Åpne siste økt"
+  },
+  "spendAlerts": {
+    "subtitle": "Send et varsel på e-post eller push til faktureringskontaktene når forbruket i dette området overskrider en grense eller stiger over den vanlige timesraten.",
+    "enable": "Aktiver forbruksvarsler",
+    "thresholdTitle": "Grenseoverskridelse",
+    "thresholdSubtitle": "Løpende forbruk overskrider grensen din",
+    "anomalyTitle": "Topp per time",
+    "anomalySubtitle": "Én time er langt over dette områdets vanlige rate",
+    "limitLabel": "Grense (USD)",
+    "windowLabel": "Vindu",
+    "window24h": "24 timer",
+    "window7d": "7 dager",
+    "window30d": "30 dager",
+    "multiplierLabel": "Topp-multiplikator",
+    "saved": "Innstillingene for forbruksvarsler er lagret",
+    "loadError": "Forbruksvarslene kunne ikke lastes.",
+    "saveError": "Forbruksvarslene kunne ikke lagres.",
+    "empty": "Forbruksvarsler er av. Slå dem på for å varsle faktureringskontaktene i dette området.",
+    "noSpend": "Ingen forbruk registrert ennå",
+    "spend24h": "Forbruk de siste 24 timene",
+    "multiplierError": "Angi en multiplikator på 1 eller mer",
+    "permissionDenied": "Du har ikke tillatelse til å administrere forbruksvarsler.",
+    "pushOffByCategory": "Av i Varsler"
   }
 }

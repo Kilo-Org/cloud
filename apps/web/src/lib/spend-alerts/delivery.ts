@@ -59,6 +59,7 @@ type SpendAlertDeliveryPayload = {
 /** One claimed outbox row, as the drain reads it. */
 type ClaimedSpendAlertDelivery = {
   id: string;
+  dedupe_key: string;
   scope_key: string;
   rule_id: string | null;
   kind: SpendAlertRuleKind | null;
@@ -182,7 +183,7 @@ async function claimPendingSpendAlertDeliveries(
       FROM spend_alert_deliveries delivery
       WHERE delivery.status = 'pending'
         AND delivery.next_attempt_at <= CURRENT_TIMESTAMP
-      ORDER BY delivery.attempt_count, delivery.next_attempt_at, delivery.id
+      ORDER BY delivery.next_attempt_at, delivery.attempt_count, delivery.id
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
     )
@@ -196,6 +197,7 @@ async function claimPendingSpendAlertDeliveries(
     WHERE delivery.id = candidate.id
     RETURNING
       delivery.id,
+      delivery.dedupe_key,
       delivery.scope_key,
       delivery.rule_id,
       delivery.kind,
@@ -355,9 +357,17 @@ async function deliverClaimedSpendAlertDelivery(
   row: ClaimedSpendAlertDelivery
 ): Promise<void> {
   const scope = parseSpendAlertScopeKey(row.scope_key);
-  if (scope === null) throw new Error('spend_alert_delivery_unknown_scope');
-  if (row.kind === null) throw new Error('spend_alert_delivery_unknown_kind');
-  if (!isDeliveryPayload(row.payload)) throw new Error('spend_alert_delivery_missing_payload');
+  // A row whose shape cannot be interpreted is as undeliverable as one with no
+  // recipient: the drain must end it, not reschedule it on every cron.
+  if (scope === null) {
+    throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_unknown_scope');
+  }
+  if (row.kind === null) {
+    throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_unknown_kind');
+  }
+  if (!isDeliveryPayload(row.payload)) {
+    throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_missing_payload');
+  }
 
   const recipients = recipientsOf(row.recipients);
   const scopeName = await resolveSpendAlertScopeName(database, scope);
@@ -407,13 +417,14 @@ async function deliverClaimedSpendAlertDelivery(
       scopeName,
       amountUsd,
       thresholdUsd,
+      dedupeKey: row.dedupe_key,
     });
     // The dispatch client never rejects; its boolean is the only failure signal.
     if (!dispatched) throw new SpendAlertDeliveryRetryableError('spend_alert_push_delivery_failed');
     return;
   }
 
-  throw new Error('spend_alert_delivery_unknown_channel');
+  throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_unknown_channel');
 }
 
 /** Bounded retries of the `sent` write; never a re-send. */

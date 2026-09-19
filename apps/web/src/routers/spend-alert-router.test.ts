@@ -202,6 +202,15 @@ describe('spendAlertRouter', () => {
         rules: [{ ...VALID_RULES[0], threshold: 0 }, VALID_RULES[1]],
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    // A positive value below the floor rounds to a zero-microdollar threshold,
+    // which fires on any spend and never clears.
+    await expect(
+      caller.spendAlerts.save({
+        enabled: true,
+        rules: [{ ...VALID_RULES[0], threshold: 0.000_000_1 }, VALID_RULES[1]],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
   it('reports the push channel blocked until the viewer registers a device', async () => {

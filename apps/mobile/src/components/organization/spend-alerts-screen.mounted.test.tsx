@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { SpendAlertsScreen } from '@/components/organization/spend-alerts-screen';
 import { thresholdError } from '@/components/organization/spend-alert-validators';
+import { formatList } from '@/lib/format';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const getQueryFn = vi.hoisted(() => vi.fn());
@@ -91,6 +92,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/format', () => ({
   formatMoney: (amount: number) => `$${amount}`,
   formatNumber: String,
+  formatList: (values: readonly string[]) => values.join(' and '),
   parseLocalizedNumber: (value: string) => {
     const normalized = value.trim().replaceAll(',', '');
     if (normalized === '') {
@@ -195,12 +197,13 @@ function switchByLabel(renderer: ReactTestRenderer, label: string): ReactTestIns
 
 /**
  * The Email or Push switches of both cards, in render order. Their label is the
- * channel's own catalog string, so the lookup works before and after the copy
- * lands in the catalog.
+ * channel composed with the card's alert kind, so the lookup matches the
+ * channel substring and keeps the cards distinguishable.
  */
 function channelSwitches(renderer: ReactTestRenderer, channelKey: string): ReactTestInstance[] {
-  return byType(renderer, 'Switch').filter(
-    node => node.props.accessibilityLabel === i18n.t(channelKey)
+  const channelLabel = i18n.t(channelKey);
+  return byType(renderer, 'Switch').filter(node =>
+    String(node.props.accessibilityLabel).includes(channelLabel)
   );
 }
 
@@ -323,6 +326,30 @@ describe('SpendAlertsScreen happy state', () => {
     // A draft edit clears it: the message never describes superseded values.
     type(renderer, LIMIT, '30');
     expect(byType(renderer, 'AccessibleStatus')[0]?.props.message).toBeNull();
+  });
+
+  it('labels each channel switch with its alert kind so the two cards stay distinct', async () => {
+    const { renderer } = await mountLoaded();
+
+    const labels = byType(renderer, 'Switch').map(node => String(node.props.accessibilityLabel));
+    expect(labels).toContain(
+      formatList([i18n.t('spendAlerts.thresholdTitle'), i18n.t('common.email')], i18n.language)
+    );
+    expect(labels).toContain(
+      formatList(
+        [i18n.t('spendAlerts.thresholdTitle'), i18n.t('notifications.push')],
+        i18n.language
+      )
+    );
+    expect(labels).toContain(
+      formatList([i18n.t('spendAlerts.anomalyTitle'), i18n.t('common.email')], i18n.language)
+    );
+    expect(labels).toContain(
+      formatList([i18n.t('spendAlerts.anomalyTitle'), i18n.t('notifications.push')], i18n.language)
+    );
+    // The OS hierarchy does not group a switch with its card, so no two controls
+    // may share a label.
+    expect(new Set(labels).size).toBe(labels.length);
   });
 
   it('shows no confirmation before the first save', async () => {

@@ -292,9 +292,10 @@ export type InternalDispatchLowBalanceRequest = z.infer<
 /**
  * Spend-alert dispatch. `organizationId` is present only for an
  * `organization` scope; a `personal` scope carries the user's own spend and
- * nothing else. `thresholdUsd` joins the idempotency key alongside the alert
- * kind, so crossing two distinct thresholds fires two alerts rather than one
- * collapsed alert.
+ * nothing else. `dedupeKey` is the outbox row's identity, which carries the
+ * firing episode: it joins the idempotency key alongside the alert kind and
+ * threshold, so a condition that clears and crosses again inside the channel's
+ * idempotency window is a new alert rather than a collapsed duplicate.
  */
 export const internalDispatchSpendAlertRequestSchema = z.object({
   kind: z.literal('spend_alert'),
@@ -305,6 +306,7 @@ export const internalDispatchSpendAlertRequestSchema = z.object({
   scopeName: z.string().min(1),
   amountUsd: z.number().nonnegative(),
   thresholdUsd: z.number().nonnegative(),
+  dedupeKey: z.string().min(1),
 });
 export type InternalDispatchSpendAlertRequest = z.infer<
   typeof internalDispatchSpendAlertRequestSchema

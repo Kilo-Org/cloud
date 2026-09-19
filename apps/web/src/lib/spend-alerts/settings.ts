@@ -20,6 +20,14 @@ import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
 export const MICRODOLLARS_PER_USD = 1_000_000;
 
 /**
+ * Smallest USD threshold the wire accepts. `toStoredRule` rounds the USD value
+ * to microdollars, so a smaller positive value would be stored as `0`: the rule
+ * would then fire on any spend and its 95% hysteresis band would be zero, so it
+ * could never clear. The web and mobile validators enforce the same floor.
+ */
+export const MIN_THRESHOLD_USD = 0.000_001;
+
+/**
  * Minimum number of complete hourly buckets before the p95 anomaly baseline is
  * trusted. Below this the baseline is `null` (the anomaly rule cannot fire).
  * This is the prior-art floor; a scope needs a full day of history first.

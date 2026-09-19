@@ -35,7 +35,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { formatList, formatMoney, formatNumber } from '@/lib/format';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -570,6 +570,13 @@ function RuleCard({
   const { t } = useTranslation();
   const colors = useThemeColors();
 
+  // The OS accessibility hierarchy does not group a switch with the card above
+  // it, and both cards render an Email and a Push switch. Naming the kind
+  // alongside the channel keeps each control addressable on its own, like the
+  // Notifications screen's dedicated `spendAlertsToggle` label.
+  const emailLabel = formatList([title, t('common.email')], i18n.language);
+  const pushLabel = formatList([title, t('notifications.push')], i18n.language);
+
   return (
     <View className="gap-3">
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
@@ -587,10 +594,10 @@ function RuleCard({
       <View className="rounded-lg bg-secondary px-3">
         <View className="min-h-11 flex-row items-center justify-between border-b-[0.5px] border-hair-soft">
           <Text className="text-sm">{t('common.email')}</Text>
-          {/* The row's own label names the channel; the card's switch directly
-              above announces the kind, so the two Email rows stay ordered. */}
+          {/* The row's own label names the channel; the card's kind is composed
+              into the switch label, so the two Email rows stay distinct. */}
           <Switch
-            accessibilityLabel={t('common.email')}
+            accessibilityLabel={emailLabel}
             value={emailEnabled}
             onValueChange={onEmailChange}
           />
@@ -613,7 +620,7 @@ function RuleCard({
           <View className="min-h-11 flex-row items-center justify-between">
             <Text className="text-sm">{t('notifications.push')}</Text>
             <Switch
-              accessibilityLabel={t('notifications.push')}
+              accessibilityLabel={pushLabel}
               value={pushEnabled}
               onValueChange={onPushChange}
             />

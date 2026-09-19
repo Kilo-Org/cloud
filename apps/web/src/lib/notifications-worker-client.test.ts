@@ -27,6 +27,7 @@ const spendAlertInput: Omit<InternalDispatchSpendAlertRequest, 'kind'> = {
   scopeName: 'Acme',
   amountUsd: 5,
   thresholdUsd: 5,
+  dedupeKey: 'org:org-1:threshold:push:2026-01-01T00:00:00.000Z:armed',
 };
 
 describe('notifications-worker-client internal dispatch', () => {

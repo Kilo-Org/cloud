@@ -120,6 +120,25 @@ function databaseFailingOnFirst(fragment: string, times: number): typeof db {
   }) as typeof db;
 }
 
+/** A database that records the SQL text of every statement it executes. */
+function databaseRecordingQueries(queries: string[]): typeof db {
+  return new Proxy(db, {
+    get(target, prop, receiver) {
+      if (prop === 'execute') {
+        return (query: unknown, ...args: unknown[]) => {
+          queries.push(sqlText(query));
+          const execute = Reflect.get(target, prop, receiver) as (...a: unknown[]) => unknown;
+          return Reflect.apply(execute, target, [query, ...args]);
+        };
+      }
+      const value = Reflect.get(target, prop, receiver);
+      return typeof value === 'function'
+        ? (value as (...a: unknown[]) => unknown).bind(target)
+        : value;
+    },
+  }) as typeof db;
+}
+
 function sqlText(value: unknown): string {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.map(sqlText).join('');
@@ -145,6 +164,7 @@ describe('drainPendingSpendAlertDeliveries', () => {
     const emailId = await insertDelivery({ channel: 'email' });
     const pushId = await insertDelivery({
       channel: 'push',
+      dedupe_key: 's5-push-episode-1',
       recipients: { userIds: [OWNER_USER_ID], emails: [] },
     });
     const { deps, emails, pushes } = recordingDeps();
@@ -172,6 +192,9 @@ describe('drainPendingSpendAlertDeliveries', () => {
       scopeName: 'Your account',
       amountUsd: 5,
       thresholdUsd: 5,
+      // The outbox row's own key carries the firing episode to the push
+      // idempotency key, so a later crossing is not collapsed into this one.
+      dedupeKey: 's5-push-episode-1',
     } satisfies Omit<InternalDispatchSpendAlertRequest, 'kind'>);
 
     for (const id of [emailId, pushId]) {
@@ -360,6 +383,60 @@ describe('drainPendingSpendAlertDeliveries', () => {
     const after = await readDelivery(id);
     expect(after?.status).toBe('failed');
     expect(after?.last_error_redacted).toBe('spend_alert_delivery_no_recipients');
+  });
+
+  it('ends a row whose shape can never be delivered instead of rescheduling it forever', async () => {
+    const unknownScopeId = await insertDelivery({ scope_key: 'not-a-scope' });
+    const unknownKindId = await insertDelivery({ kind: null });
+    const missingPayloadId = await insertDelivery({ payload: null });
+    const unknownChannelId = await insertDelivery({
+      // The column is a plain `text` with a TypeScript-only union, so a legacy
+      // or out-of-band row can hold a channel the drain does not know.
+      channel: 'sms' as 'email',
+    });
+    const { deps, emails, pushes } = recordingDeps();
+
+    const summary = await drainPendingSpendAlertDeliveries(db, deps, { limit: 20 });
+
+    expect(emails).toHaveLength(0);
+    expect(pushes).toHaveLength(0);
+    const errors = summary.failed.map(failure => failure.error);
+    expect(errors).toContain('spend_alert_delivery_unknown_scope');
+    expect(errors).toContain('spend_alert_delivery_unknown_kind');
+    expect(errors).toContain('spend_alert_delivery_missing_payload');
+    expect(errors).toContain('spend_alert_delivery_unknown_channel');
+
+    // A malformed row leaves the queue: only a transient failure is rescheduled,
+    // so the drain does not retry an undeliverable row on every cron.
+    const cases = [
+      [unknownScopeId, 'spend_alert_delivery_unknown_scope'],
+      [unknownKindId, 'spend_alert_delivery_unknown_kind'],
+      [missingPayloadId, 'spend_alert_delivery_missing_payload'],
+      [unknownChannelId, 'spend_alert_delivery_unknown_channel'],
+    ] as const;
+    for (const [id, token] of cases) {
+      const row = await readDelivery(id);
+      expect(row?.status).toBe('failed');
+      expect(row?.last_error_redacted).toBe(token);
+    }
+  });
+
+  it('claims due rows in the pending index order so the claim needs no sort', async () => {
+    await insertDelivery({ channel: 'email' });
+    const { deps } = recordingDeps();
+    const queries: string[] = [];
+
+    await drainPendingSpendAlertDeliveries(databaseRecordingQueries(queries), deps, { limit: 10 });
+
+    const claim = queries.find(text => text.includes('FOR UPDATE SKIP LOCKED'));
+    expect(claim).toBeDefined();
+    // The order matches IDX_spend_alert_deliveries_pending
+    // (status, next_attempt_at, attempt_count, id) after the status equality, so
+    // Postgres reads the due rows in index order instead of sorting the whole
+    // due set before LIMIT.
+    expect(claim).toContain(
+      'ORDER BY delivery.next_attempt_at, delivery.attempt_count, delivery.id'
+    );
   });
 
   it('never leaves a delivered row claimable when recording the send fails', async () => {

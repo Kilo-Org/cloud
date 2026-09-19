@@ -81,6 +81,7 @@ function spendAlert(
     scopeName: 'Acme Corp',
     amountUsd: 42.5,
     thresholdUsd: 40,
+    dedupeKey: 'org:org-1:threshold:push:2026-01-01T00:00:00.000Z:armed',
     ...overrides,
   };
 }
@@ -89,7 +90,8 @@ function expectedSpendAlertInput(userId: string): DispatchPushInput {
   return {
     userId,
     presenceContext: null,
-    idempotencyKey: 'spend-alert:organization:org-1:threshold:40',
+    idempotencyKey:
+      'spend-alert:organization:org-1:threshold:40:org:org-1:threshold:push:2026-01-01T00:00:00.000Z:armed',
     badge: null,
     push: {
       title: 'Spend alert',
@@ -583,7 +585,7 @@ describe('dispatchInternalPushCore', () => {
 
     expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
     expect(calls.dispatchPushInputs[0]!.idempotencyKey).toBe(
-      'spend-alert:personal:personal:anomaly:40'
+      'spend-alert:personal:personal:anomaly:40:org:org-1:threshold:push:2026-01-01T00:00:00.000Z:armed'
     );
     expect(calls.dispatchPushInputs[0]!.push.data).toEqual({
       type: 'spend_alert',
@@ -615,6 +617,32 @@ describe('dispatchInternalPushCore', () => {
     );
     await dispatchInternalPushCore(
       spendAlert({ recipientUserIds: ['user-a'], thresholdUsd: 80 }),
+      deps
+    );
+
+    expect(calls.dispatchPushInputs).toHaveLength(2);
+    expect(calls.dispatchPushInputs[0]!.idempotencyKey).not.toBe(
+      calls.dispatchPushInputs[1]!.idempotencyKey
+    );
+  });
+
+  it('a new firing episode at the same threshold is a distinct alert', async () => {
+    const { deps, calls } = fakeDeps();
+    await dispatchInternalPushCore(
+      spendAlert({
+        recipientUserIds: ['user-a'],
+        dedupeKey: 'org:org-1:threshold:push:hour-1:armed',
+      }),
+      deps
+    );
+    // The condition cleared and crossed again inside the DO's one-hour
+    // idempotency window: the outbox row (and its episode key) is new, so the
+    // push must send instead of being dropped as a duplicate of the first.
+    await dispatchInternalPushCore(
+      spendAlert({
+        recipientUserIds: ['user-a'],
+        dedupeKey: 'org:org-1:threshold:push:hour-1:2026-01-01T00:00:00.000Z',
+      }),
       deps
     );
 

@@ -12,6 +12,7 @@ import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
   MICRODOLLARS_PER_USD,
+  MIN_THRESHOLD_USD,
   readSpendAlertSettings,
   saveSpendAlertSettings,
   type SpendAlertRuleConfig,
@@ -26,12 +27,16 @@ import {
 const SpendAlertRuleKindSchema = z.enum(['threshold', 'anomaly']);
 const SpendAlertWindowHoursSchema = z.union([z.literal(24), z.literal(168), z.literal(720)]);
 
-const SpendAlertRuleInputSchema = z
+export const SpendAlertRuleInputSchema = z
   .object({
     kind: SpendAlertRuleKindSchema,
     enabled: z.boolean(),
-    /** Rolling-window threshold in USD. Required for the threshold kind. */
-    threshold: z.number().positive().max(1_000_000).nullish(),
+    /**
+     * Rolling-window threshold in USD. Required for the threshold kind. The
+     * lower bound matches the UI validators: a smaller positive value rounds to
+     * a zero-microdollar threshold that fires on any spend and never clears.
+     */
+    threshold: z.number().min(MIN_THRESHOLD_USD).max(1_000_000).nullish(),
     windowHours: SpendAlertWindowHoursSchema.nullish(),
     /** Anomaly multiplier in basis points (100 = 1x). Required for the anomaly kind. */
     multiplierBasisPoints: z.number().int().min(100).max(5000).nullish(),

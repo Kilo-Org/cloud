@@ -14,6 +14,7 @@ describe('internalDispatchSpendAlertRequestSchema', () => {
     scopeName: 'you',
     amountUsd: 42.5,
     thresholdUsd: 40,
+    dedupeKey: 'user:user-a:threshold:push:2026-01-01T00:00:00.000Z:armed',
   };
 
   it('parses a personal-scope request without an organizationId', () => {
@@ -44,6 +45,15 @@ describe('internalDispatchSpendAlertRequestSchema', () => {
 
   it('is accepted by the internal dispatch union', () => {
     expect(internalDispatchRequestSchema.safeParse(personal).success).toBe(true);
+  });
+
+  it('requires the outbox dedupe key that carries the firing episode', () => {
+    const withoutKey: Record<string, unknown> = { ...personal };
+    delete withoutKey.dedupeKey;
+    expect(internalDispatchSpendAlertRequestSchema.safeParse(withoutKey).success).toBe(false);
+    expect(
+      internalDispatchSpendAlertRequestSchema.safeParse({ ...personal, dedupeKey: '' }).success
+    ).toBe(false);
   });
 });
 

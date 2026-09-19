@@ -36,6 +36,7 @@ export const EVENT_SERVICE_URL: string = required('eventServiceUrl');
 export const NOTIFICATIONS_URL: string = required('notificationsUrl');
 export const POSTHOG_API_KEY: string = required('posthogApiKey');
 
+export const KILO_MCP_URL: string | undefined = optional('kiloMcpUrl');
 export const GOOGLE_WEB_CLIENT_ID: string | undefined = optional('googleWebClientId');
 export const GOOGLE_IOS_CLIENT_ID: string | undefined = optional('googleIosClientId');
 export const PLAY_INTEGRITY_PROJECT_NUMBER: string | undefined = optional(

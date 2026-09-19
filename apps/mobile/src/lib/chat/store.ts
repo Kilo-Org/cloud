@@ -157,8 +157,12 @@ export function deleteChat(db: ChatDatabase, sessionId: string): void {
  *
  * An unknown account wipes the lot, because privacy wins over keeping someone
  * else's chats through a sign-out that could not name them.
+ *
+ * The identifiers are answered back so the settings kept beside each chat — the
+ * per-chat MCP preference — go with the rows rather than being left behind for
+ * a session that no longer exists.
  */
-export function wipeChats(db: ChatDatabase, userId: string | null): void {
+export function wipeChats(db: ChatDatabase, userId: string | null): readonly string[] {
   const rows =
     userId === null
       ? db.getAllSync<{ session_id: string }>('select session_id from chats', [])
@@ -168,4 +172,5 @@ export function wipeChats(db: ChatDatabase, userId: string | null): void {
   for (const { session_id: sessionId } of rows) {
     deleteChat(db, sessionId);
   }
+  return rows.map(row => row.session_id);
 }

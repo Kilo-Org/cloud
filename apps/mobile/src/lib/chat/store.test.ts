@@ -176,4 +176,13 @@ describe('wipeChats', () => {
 
     expect(listChats(db, 'mendel:personal')).toHaveLength(1);
   });
+
+  it('answers with the chats it removed, so their settings go with them', async () => {
+    await write(conversation('mine', 'kilo/one', 'hello'));
+    await write(conversation('theirs', 'kilo/one', 'hello'));
+    rememberChat(db, { sessionId: 'mine', scope: 'me:personal', at: 100 });
+    rememberChat(db, { sessionId: 'theirs', scope: 'you:personal', at: 100 });
+
+    expect(wipeChats(db, 'me')).toEqual(['mine']);
+  });
 });

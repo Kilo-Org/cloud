@@ -336,7 +336,16 @@
     "previewAlways": "Altijd",
     "previewWhenUnlocked": "Als ontgrendeld",
     "previewFullDescription": "Meldingen tonen de berichttekst op je toegangsscherm.",
-    "previewGenericDescription": "Meldingen geven alleen aan dat er iets is gebeurd. Open Kilo om het bericht te lezen."
+    "previewGenericDescription": "Meldingen geven alleen aan dat er iets is gebeurd. Open Kilo om het bericht te lezen.",
+    "action": {
+      "openSession": "Sessie openen"
+    },
+    "needsInputAction": {
+      "approved": "Verzoek goedgekeurd",
+      "replied": "Antwoord verzonden",
+      "failed": "Kon niet antwoorden. Tik nogmaals om het opnieuw te proberen.",
+      "unavailable": "Dit verzoek wacht niet langer."
+    }
   },
   "tabs": {
     "home": "Startpagina",
@@ -1673,20 +1682,7 @@
       "continueFrom": "Je gaat verder met {{title}}.",
       "importingSession": "Sessie importeren…",
       "cliCannotContinue": "Deze CLI kan geen sessie voortzetten. Kies Cloud Agent of een andere CLI.",
-      "importFailed": "Deze sessie kon niet worden geïmporteerd.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Standaard · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Klein",
-      "sandboxInstanceShared": "Gedeeld",
-      "sandboxInstanceLarge": "Groot",
-      "sandboxInstanceDevcontainer": "Dev-container",
-      "sandboxInstanceProviderDefault": "Standaard van provider",
-      "sandboxCouldNotLoad": "Sandbox-opties kunnen niet worden geladen",
-      "sandboxUnavailable": "Deze sandbox is niet beschikbaar. Kies een andere sandbox of Standaard.",
-      "sandboxUseDefault": "Standaard gebruiken"
+      "importFailed": "Deze sessie kon niet worden geïmporteerd."
     },
     "partRenderer": {
       "updatedFileCount_one": "Er is {{displayCount}} bestand bijgewerkt.",

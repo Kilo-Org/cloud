@@ -22,6 +22,7 @@ import { parseTimestamp } from '@/lib/utils';
 
 import { getTerminalBlankEpoch, isGlanceableOrgLost } from './cleanup';
 import { pickFrontApprovableSession } from './front-approval';
+import { resolveAnsweredRaises } from './attention-rows';
 import { newestSessionTitle } from './newest-session';
 import { getLastGlanceableSnapshot } from './persist';
 import { forEachSink } from './sink-registry';
@@ -395,7 +396,9 @@ async function republishTray(scope: WidgetScope, blankEpochAtStart: number): Pro
     return;
   }
   const snapshot: GlanceableAgentsSnapshot = buildGlanceableSnapshot({
-    sessions,
+    // A raise the user answered from the needs-input notification is no longer
+    // waiting: count it the way the in-app list does.
+    sessions: resolveAnsweredRaises(sessions),
     userId: scope.userId,
     organizationId: scope.organizationId,
     now: Date.now(),

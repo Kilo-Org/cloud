@@ -19,20 +19,32 @@ export const ANDROID_NOTIFICATION_CHANNELS = [
 export type AndroidNotificationChannelId = (typeof ANDROID_NOTIFICATION_CHANNELS)[number]['id'];
 
 /**
- * The first app version that creates the named agent channels. `needs-input`
- * and `agent-progress` are new here, and the build that creates them also
- * deletes the legacy `agent` / `chat` / `active-agents` channels, so a token
- * registered by an older build knows neither: Android 8+ drops a post
- * addressed to a channel the app never created. The push route therefore omits
- * `channelId` for those tokens and the post falls back to the app's default
- * channel. Keep this at the mobile release that first ships the split
- * (`apps/mobile/app.config.ts` `version` at that release).
- *
- * The app refreshes `user_push_tokens.app_version` on the first launch under a
- * new version, so this classification follows the installed build instead of
- * the version the token first registered under.
+ * The channel every Android build before the agent-channel split creates for
+ * agent pushes. It is not in `ANDROID_NOTIFICATION_CHANNELS`: current builds
+ * only create the split channels, and this id exists solely so a server push
+ * can still reach a token registered by an older build (see
+ * `androidChannelIdForPushDataToAppVersion`). Android 8+ drops a notification
+ * addressed to a channel the app never created, so an old install must never
+ * be sent `needs-input`/`agent-progress`.
  */
-export const ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION = '1.0.11';
+export const LEGACY_AGENT_ANDROID_CHANNEL_ID = 'agent';
+
+/**
+ * The first mobile version that creates both split agent channels. `app_version`
+ * on a push token is the build that created that device's channels, so a lower
+ * version only has `LEGACY_AGENT_ANDROID_CHANNEL_ID`.
+ *
+ * This must stay the version in `apps/mobile/app.config.ts` — the build this
+ * branch ships. It cannot be a version that already reached users without the
+ * split: `1.0.11` was released before the split channels existed, so a token
+ * recorded there has no `needs-input`/`agent-progress` channel and Android 8+
+ * would drop the push. Only the build configured here creates both channels, so
+ * only that build and later may be addressed with them.
+ */
+export const AGENT_CHANNEL_SPLIT_APP_VERSION = '1.0.12';
+
+/** Both channel resolvers gate on the same first split-channel release. */
+export const ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION = AGENT_CHANNEL_SPLIT_APP_VERSION;
 
 /** The agent channels that only a build at or above the split's release creates. */
 const AGENT_KIND_ANDROID_CHANNELS: readonly AndroidNotificationChannelId[] = [
@@ -46,7 +58,7 @@ const AGENT_KIND_ANDROID_CHANNELS: readonly AndroidNotificationChannelId[] = [
  * client that cannot prove its age never receives a channel id it may not have
  * created.
  */
-function compareAppVersions(a: string, b: string): number {
+export function comparePushAppVersions(a: string, b: string): number {
   const left = a.split('.').map(segment => Number.parseInt(segment, 10) || 0);
   const right = b.split('.').map(segment => Number.parseInt(segment, 10) || 0);
   const length = Math.max(left.length, right.length);
@@ -57,6 +69,51 @@ function compareAppVersions(a: string, b: string): number {
     }
   }
   return 0;
+}
+
+/**
+ * True when `current` is at or above `min`. An unknown version never clears the
+ * gate, so a token without a recorded version is treated as an older build.
+ */
+export function isPushAppVersionAtLeast(current: string | null | undefined, min: string): boolean {
+  if (!current) {
+    return false;
+  }
+  return comparePushAppVersions(current, min) >= 0;
+}
+
+/** A channel a server push may address, including pre-split channel ids. */
+export type AndroidPushChannelId =
+  | AndroidNotificationChannelId
+  | typeof LEGACY_AGENT_ANDROID_CHANNEL_ID
+  | 'chat'
+  | 'active-agents';
+
+/**
+ * Resolve the channel a *server push* addresses for a token registered by
+ * `appVersion`. Unlike the channel-only resolver, the payload identifies the
+ * legacy channel a pre-split client created. An unversioned token still omits
+ * the id because it may predate channel creation entirely.
+ */
+export function androidChannelIdForPushDataToAppVersion(
+  data: PushData,
+  appVersion: string | null | undefined
+): AndroidPushChannelId | undefined {
+  const channelId = androidChannelIdForPushData(data);
+  const registeredChannel = androidChannelIdForRegisteredClient(channelId, appVersion);
+  if (registeredChannel !== undefined || appVersion == null) {
+    return registeredChannel;
+  }
+  switch (data.type) {
+    case 'cloud_agent_session':
+      return LEGACY_AGENT_ANDROID_CHANNEL_ID;
+    case 'chat.message':
+      return 'chat';
+    case 'active_agents_glanceable':
+      return 'active-agents';
+    default:
+      return undefined;
+  }
 }
 
 /**
@@ -75,7 +132,7 @@ export function androidChannelIdForRegisteredClient(
   if (!AGENT_KIND_ANDROID_CHANNELS.includes(channelId)) {
     return channelId;
   }
-  return compareAppVersions(appVersion, ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION) >= 0
+  return isPushAppVersionAtLeast(appVersion, ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION)
     ? channelId
     : undefined;
 }

@@ -206,28 +206,6 @@ function mountCreator(input: CreatorInput) {
   return resultRef;
 }
 
-// Mounts the creator and keeps the renderer so a test can re-render with a
-// changed input — the way the screen supplies a new sandbox pick — and the
-// hook's dependency-refreshed callback can be observed between submits.
-function mountUpdatableCreator(input: CreatorInput): {
-  update: (next: CreatorInput) => void;
-  resultRef: { current: CreatorResult | null };
-} {
-  const resultRef: { current: CreatorResult | null } = { current: null };
-  let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
-  act(() => {
-    renderer = TestRenderer.create(React.createElement(Harness, { input, resultRef }));
-  });
-  return {
-    update(next: CreatorInput) {
-      act(() => {
-        renderer?.update(React.createElement(Harness, { input: next, resultRef }));
-      });
-    },
-    resultRef,
-  };
-}
-
 function requireResult(resultRef: { current: CreatorResult | null }): CreatorResult {
   const result = resultRef.current;
   if (result === null) {
@@ -324,7 +302,6 @@ function runCreator(args: {
   selectedRepository?: NewSessionRepository | null;
   autoCommit?: boolean;
   profileId?: string | null;
-  sandboxAllocation?: CreatorInput['sandboxAllocation'];
 }): CreatorResult {
   const reactInternals = React as typeof React & ReactInternals;
   const refs: { current: unknown }[] = [];
@@ -373,7 +350,6 @@ function runCreator(args: {
       variant: args.variant ?? 'v1',
       autoCommit: args.autoCommit ?? false,
       profileId: args.profileId,
-      sandboxAllocation: args.sandboxAllocation,
     });
   } finally {
     reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -740,190 +716,6 @@ describe('useNewSessionCreator profileId', () => {
     await creator.createSessionFromDraft();
 
     expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('profileId');
-  });
-});
-
-// The picker rows' allocation shapes (the s1 label module's `SandboxAllocation`,
-// derived from the tRPC capabilities result).
-const CLOUDFLARE_SINGLE: NonNullable<CreatorInput['sandboxAllocation']> = {
-  provider: { id: 'cloudflare', account: 'kilo' },
-  instanceType: 'single',
-};
-const VERCEL_LARGE: NonNullable<CreatorInput['sandboxAllocation']> = {
-  provider: { id: 'vercel', account: 'kilo' },
-  instanceType: 'large',
-};
-
-describe('useNewSessionCreator sandboxAllocation', () => {
-  it('passes the picked allocation into the ordinary (personal) prepareSession body', async () => {
-    prepareSessionMutate.mockResolvedValue(sessionResult());
-    const creator = runCreator({ sandboxAllocation: CLOUDFLARE_SINGLE });
-
-    creator.promptRef.current = 'hello';
-    await creator.createSessionFromDraft();
-
-    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
-      sandboxAllocation: CLOUDFLARE_SINGLE,
-    });
-  });
-
-  it('omits sandboxAllocation from the prepareSession body when nothing was picked', async () => {
-    prepareSessionMutate.mockResolvedValue(sessionResult());
-    const creator = runCreator({});
-
-    creator.promptRef.current = 'hello';
-    await creator.createSessionFromDraft();
-
-    expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('sandboxAllocation');
-  });
-
-  it('keeps the same operationKey across retryable failures when the pick is unchanged', async () => {
-    prepareSessionMutate
-      .mockRejectedValueOnce(creationInProgressError())
-      .mockRejectedValueOnce(creationInProgressError());
-    const creator = runCreator({ sandboxAllocation: CLOUDFLARE_SINGLE });
-
-    creator.promptRef.current = 'hello';
-    await creator.createSessionFromDraft();
-    await creator.createSessionFromDraft();
-
-    const keys = usedOperationKeys();
-    expect(keys[0]).toBeDefined();
-    expect(keys[1]).toBe(keys[0]);
-    // Both submits carry the pick the fingerprint was minted from.
-    expect(prepareSessionMutate.mock.calls[1]?.[0]).toMatchObject({
-      sandboxAllocation: CLOUDFLARE_SINGLE,
-    });
-  });
-
-  it('treats a changed sandbox pick as a new intent with a fresh key', async () => {
-    prepareSessionMutate
-      .mockRejectedValueOnce(creationInProgressError())
-      .mockRejectedValueOnce(creationInProgressError());
-    const { resultRef, update } = mountUpdatableCreator(
-      createInput({ sandboxAllocation: CLOUDFLARE_SINGLE })
-    );
-    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
-    promptRef.current = 'hello';
-    await act(async () => {
-      await createSessionFromDraft();
-    });
-
-    // The screen supplies the newly picked allocation; the same-key retry
-    // would replay the previous pick's ledger result instead of creating with
-    // the new allocation, so the changed pick must fork the intent.
-    update(createInput({ sandboxAllocation: VERCEL_LARGE }));
-    const { createSessionFromDraft: resubmit, promptRef: resubmitPromptRef } =
-      requireResult(resultRef);
-    resubmitPromptRef.current = 'hello';
-    await act(async () => {
-      await resubmit();
-    });
-
-    const keys = usedOperationKeys();
-    expect(keys[0]).toBeDefined();
-    expect(keys[1]).not.toBe(keys[0]);
-    expect(prepareSessionMutate.mock.calls[1]?.[0]).toMatchObject({
-      sandboxAllocation: VERCEL_LARGE,
-    });
-  });
-
-  it('mints a fresh intent when a picked allocation is cleared back to the default', async () => {
-    prepareSessionMutate
-      .mockRejectedValueOnce(creationInProgressError())
-      .mockRejectedValueOnce(creationInProgressError());
-    const { resultRef, update } = mountUpdatableCreator(
-      createInput({ sandboxAllocation: CLOUDFLARE_SINGLE })
-    );
-    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
-    promptRef.current = 'hello';
-    await act(async () => {
-      await createSessionFromDraft();
-    });
-
-    update(createInput({ sandboxAllocation: undefined }));
-    const { createSessionFromDraft: resubmit, promptRef: resubmitPromptRef } =
-      requireResult(resultRef);
-    resubmitPromptRef.current = 'hello';
-    await act(async () => {
-      await resubmit();
-    });
-
-    const keys = usedOperationKeys();
-    expect(keys[1]).not.toBe(keys[0]);
-    expect(prepareSessionMutate.mock.calls[1]?.[0]).not.toHaveProperty('sandboxAllocation');
-  });
-
-  // A pre-fix safe-retry row (bare `fullName` repo) cannot represent a sandbox
-  // pick, so a submit that carries one must not fall back to it: reusing its
-  // key would POST the pick under a pre-sandbox operation key (a terminal
-  // rejection) and drop the only record of a session the server may already
-  // have admitted.
-  it('never reuses a pre-sandbox legacy key when a pick is submitted', async () => {
-    outboxMock.getStoredOperationKey.mockImplementation((fingerprint: string) => {
-      const parsed = JSON.parse(fingerprint) as { repo: unknown };
-      return typeof parsed.repo === 'string' && parsed.repo === 'owner/repo'
-        ? 'legacy-stored-key'
-        : null;
-    });
-
-    const creator = runCreator({ sandboxAllocation: CLOUDFLARE_SINGLE });
-
-    creator.promptRef.current = 'hello';
-    await creator.createSessionFromDraft();
-
-    expect(prepareSessionMutate).toHaveBeenCalledTimes(1);
-    const payload = prepareSessionMutate.mock.calls[0]?.[0] as {
-      operationKey: string;
-      sandboxAllocation: unknown;
-    };
-    expect(payload.operationKey).not.toBe('legacy-stored-key');
-    expect(payload.sandboxAllocation).toEqual(CLOUDFLARE_SINGLE);
-    // Only the scoped fingerprint (repo is an object) was consulted, and the
-    // legacy raw-name row was neither read nor dropped.
-    const lookedUpRepos = outboxMock.getStoredOperationKey.mock.calls.map(
-      call => (JSON.parse(call[0]) as { repo: unknown }).repo
-    );
-    expect(lookedUpRepos.every(repo => typeof repo === 'object')).toBe(true);
-    const removedRepos = outboxMock.remove.mock.calls.map(call => {
-      const parsed = JSON.parse(call[0]) as { repo: unknown };
-      return parsed.repo;
-    });
-    expect(removedRepos).not.toContain('owner/repo');
-  });
-
-  // The previous app version persisted the pick-less scoped fingerprint (the
-  // object repo, no `sandboxAllocation` property). A pick-less submit must
-  // marshal those exact bytes so the relaunch retry finds that row and reuses
-  // its key instead of minting a duplicate of a session the server may already
-  // have admitted.
-  it('reuses a previous-version safe-retry key for a pick-less submit', async () => {
-    const PREVIOUS_VERSION_FINGERPRINT = JSON.stringify({
-      prompt: 'hello',
-      mode: 'code',
-      model: 'model-1',
-      variant: 'v1',
-      repo: { platform: 'github', fullName: 'owner/repo' },
-      autoCommit: false,
-      organizationId: null,
-      profileId: null,
-      attachments: null,
-    });
-    outboxMock.getStoredOperationKey.mockImplementation((fingerprint: string) =>
-      fingerprint === PREVIOUS_VERSION_FINGERPRINT ? 'previous-version-key' : null
-    );
-
-    const creator = runCreator({});
-
-    creator.promptRef.current = 'hello';
-    await creator.createSessionFromDraft();
-
-    expect(outboxMock.writeSafeRetry.mock.calls[0]?.[0].fingerprint).toBe(
-      PREVIOUS_VERSION_FINGERPRINT
-    );
-    expect(prepareSessionMutate).toHaveBeenCalledWith(
-      expect.objectContaining({ operationKey: 'previous-version-key' })
-    );
   });
 });
 

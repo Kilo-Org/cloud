@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "eksemplar valmis/ebaõnnestunud, ajastatud toimingud",
       "balanceAlertsSubtitle": "organisatsiooni madala saldo hoiatused",
       "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused"
+    },
+    "action": {
+      "openSession": "Ava seanss"
+    },
+    "needsInputAction": {
+      "approved": "Taotlus kiideti heaks",
+      "replied": "Vastus on saadetud",
+      "failed": "Vastamine ei õnnestunud. Uuesti proovimiseks puuduta uuesti.",
+      "unavailable": "See taotlus ei ole enam ootel."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Jätkub seanss „{{title}}“.",
       "importingSession": "Imporditakse seanssi",
       "cliCannotContinue": "See CLI ei saa seanssi jätkata. Vali Cloud Agent või mõni muu CLI.",
-      "importFailed": "Seda seanssi ei õnnestunud importida.",
-      "sandbox": "Liivakast",
-      "sandboxAccessibility": "Liivakast: {{label}}",
-      "sandboxDefaultWithDestination": "Vaikimisi · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Väike",
-      "sandboxInstanceShared": "Jagatud",
-      "sandboxInstanceLarge": "Suur",
-      "sandboxInstanceDevcontainer": "Arenduskonteiner",
-      "sandboxInstanceProviderDefault": "Pakkuja vaikeseade",
-      "sandboxCouldNotLoad": "Liivakasti valikuid ei õnnestunud laadida",
-      "sandboxUnavailable": "See liivakast ei ole saadaval. Valige teine liivakast või Vaikimisi.",
-      "sandboxUseDefault": "Kasuta Vaikimisi"
+      "importFailed": "Seda seanssi ei õnnestunud importida."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendati {{displayCount}} fail.",

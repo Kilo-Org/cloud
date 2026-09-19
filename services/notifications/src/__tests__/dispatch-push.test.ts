@@ -1251,11 +1251,59 @@ describe('NotificationChannelDO preview mode and channel', () => {
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
   });
 
-  it('adds channelId and time-sensitive level to every message for an attention push', async () => {
+  it.each([
+    { attentionKind: 'permission', prUrl: undefined, categoryId: 'kilo-needs-input:permission' },
+    {
+      attentionKind: 'question',
+      prUrl: 'https://github.com/org/repo/pull/7',
+      categoryId: 'kilo-needs-input:question-pr',
+    },
+    { attentionKind: undefined, prUrl: undefined, categoryId: 'kilo-needs-input:unknown' },
+  ] as const)(
+    'preserves $categoryId actions alongside needs-input routing and Focus metadata',
+    async ({ attentionKind, prUrl, categoryId }) => {
+      installDbMock({
+        tokens: [
+          { user_id: 'user-actions', token: 'tok-unknown', app_version: null },
+          { user_id: 'user-actions', token: 'tok-legacy', app_version: '1.0.11' },
+          { user_id: 'user-actions', token: 'tok-current', app_version: '1.0.12' },
+        ],
+      });
+      const data = {
+        type: 'cloud_agent_session',
+        cliSessionId: 'ses_actions',
+        category: 'attention',
+        ...(attentionKind && { attentionKind }),
+        ...(prUrl && { prUrl }),
+      } as const;
+      const result = await getDO(`user-actions-${categoryId}`).dispatchPush(
+        baseInput({
+          userId: 'user-actions',
+          idempotencyKey: `k-actions-${categoryId}`,
+          push: { title: 'T', body: 'B', data },
+        })
+      );
+
+      expect(result.kind).toBe('delivered');
+      const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+      expect(messages).toHaveLength(3);
+      for (const message of messages) {
+        expect(message).toMatchObject({ categoryId, interruptionLevel: 'time-sensitive', data });
+        expect(message.mutableContent).toBeUndefined();
+      }
+      expect(messages.find(message => message.to === 'tok-unknown')).not.toHaveProperty(
+        'channelId'
+      );
+      expect(messages.find(message => message.to === 'tok-legacy')?.channelId).toBe('agent');
+      expect(messages.find(message => message.to === 'tok-current')?.channelId).toBe('needs-input');
+    }
+  );
+
+  it('adds channelId and time-sensitive level to every chat message', async () => {
     installDbMock({
       tokens: [
-        { user_id: 'user-chan', token: 'tok1', app_version: '1.0.11' },
-        { user_id: 'user-chan', token: 'tok2', app_version: '1.0.11' },
+        { user_id: 'user-chan', token: 'tok1', app_version: '1.0.12' },
+        { user_id: 'user-chan', token: 'tok2', app_version: '1.0.12' },
       ],
     });
     const stub = getDO('user-chan');
@@ -1273,12 +1321,13 @@ describe('NotificationChannelDO preview mode and channel', () => {
       // A needs-input push is never dropped by the per-Focus filter, so it
       // skips the notification service extension entirely.
       expect(message.mutableContent).toBeUndefined();
+      expect(message.categoryId).toBeUndefined();
     }
   });
 
   it('routes a status push to the agent-progress channel with an active level', async () => {
     installDbMock({
-      tokens: [{ user_id: 'user-status', token: 'tok-status', app_version: '1.0.11' }],
+      tokens: [{ user_id: 'user-status', token: 'tok-status', app_version: '1.0.12' }],
     });
     const stub = getDO('user-status');
     const result = await stub.dispatchPush(
@@ -1302,6 +1351,7 @@ describe('NotificationChannelDO preview mode and channel', () => {
     // Progress is the only kind the per-Focus filter can drop, so only it
     // carries mutable-content for the notification service extension.
     expect(messages[0]?.mutableContent).toBe(true);
+    expect(messages[0]?.categoryId).toBeUndefined();
   });
 
   it('leaves a non-agent push active while keeping its own channel', async () => {
@@ -1337,7 +1387,7 @@ describe('NotificationChannelDO preview mode and channel', () => {
       tokens: [
         { user_id: 'user-chan-old', token: 'tok-old', app_version: null },
         { user_id: 'user-chan-old', token: 'tok-split', app_version: '1.0.10' },
-        { user_id: 'user-chan-old', token: 'tok-new', app_version: '1.0.11' },
+        { user_id: 'user-chan-old', token: 'tok-new', app_version: '1.0.12' },
       ],
     });
     const stub = getDO('user-chan-old');
@@ -1350,11 +1400,10 @@ describe('NotificationChannelDO preview mode and channel', () => {
     const oldMessage = messages.find(m => m.to === 'tok-old');
     const splitMessage = messages.find(m => m.to === 'tok-split');
     const newMessage = messages.find(m => m.to === 'tok-new');
-    // The named agent channels are new in 1.0.11 and that build deletes the
-    // legacy ids, so both older clients get no channelId (Android falls back
-    // to the default channel instead of dropping the post).
+    // Unknown clients omit the id; known pre-split clients retain the chat
+    // channel they created. Only the split build creates needs-input.
     expect(oldMessage?.channelId).toBeUndefined();
-    expect(splitMessage?.channelId).toBeUndefined();
+    expect(splitMessage?.channelId).toBe('chat');
     expect(newMessage?.channelId).toBe('needs-input');
     // The interruption level has no older-client failure mode (unlike the
     // Android channel), so it is attached to every message.
@@ -1386,6 +1435,55 @@ describe('NotificationChannelDO preview mode and channel', () => {
     // `balance` predates the split: an older client created it, so the post
     // still carries the channel id.
     expect(messages[0]?.channelId).toBe('balance');
+  });
+
+  it('keeps an agent push on the legacy channel for a token registered before the split', async () => {
+    installDbMock({
+      tokens: [
+        { user_id: 'user-agent-old', token: 'tok-old', app_version: '1.0.10' },
+        // 1.0.11 shipped before the split channels existed; its tokens must
+        // keep the legacy channel too.
+        { user_id: 'user-agent-old', token: 'tok-released', app_version: '1.0.11' },
+        { user_id: 'user-agent-old', token: 'tok-split', app_version: '1.0.12' },
+      ],
+    });
+    const stub = getDO('user-agent-old');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-agent-old',
+        idempotencyKey: 'k-agent-old',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'attention' },
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages.find(m => m.to === 'tok-old')?.channelId).toBe('agent');
+    expect(messages.find(m => m.to === 'tok-released')?.channelId).toBe('agent');
+    expect(messages.find(m => m.to === 'tok-split')?.channelId).toBe('needs-input');
+  });
+
+  it('keeps ordinary progress on the legacy channel for a token registered before the split', async () => {
+    installDbMock({
+      tokens: [{ user_id: 'user-agent-progress', token: 'tok-old', app_version: '1.0.10' }],
+    });
+    const stub = getDO('user-agent-progress');
+    await stub.dispatchPush(
+      baseInput({
+        userId: 'user-agent-progress',
+        idempotencyKey: 'k-agent-progress',
+        push: {
+          title: 'T',
+          body: 'B',
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1', category: 'status' },
+        },
+      })
+    );
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].channelId).toBe('agent');
   });
 
   it('substitutes generic content when previews is generic', async () => {

@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one cohesive widget-layout suite sharing the mock-element tree harness */
+/* eslint-disable max-lines -- one suite covering every size bucket and the state matrix through a shared mock-element tree harness */
 import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
@@ -9,7 +9,7 @@ import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 
 import { renderActiveAgentsWidget } from './active-agents-widget';
-import { buildAndroidWidgetProps } from './widget-props';
+import { buildAndroidWidgetProps, buildCurrentWidgetProps } from './widget-props';
 
 // Stub the widget primitives so the layout functions return inspectable trees
 // without loading react-native. The real components are exercised by prebuild.
@@ -22,6 +22,9 @@ vi.mock('react-native-android-widget', () => ({
 
 const NOW = 1_750_000_000_000;
 
+/** The newest result's timestamp, forwarded to the age formatter below. */
+const NEWEST_AT = new Date(NOW - 180_000).toISOString();
+
 type MockElement = {
   kind: string;
   props: {
@@ -29,7 +32,7 @@ type MockElement = {
     clickAction?: string;
     clickActionData?: { uri?: string };
     accessibilityLabel?: string;
-    style?: { backgroundColor?: string; height?: number };
+    style?: { backgroundColor?: string; justifyContent?: string; height?: number };
     children?: unknown;
   };
 };
@@ -38,11 +41,14 @@ const COPY: Record<string, string> = {
   'glanceable.needsInput': 'Needs input',
   'common.idle': 'Idle',
   'common.working': 'Working',
-  'glanceable.empty': 'No work in progress',
   'glanceable.waiting': 'Waiting for agents',
+  'glanceable.empty': 'No work in progress',
   'glanceable.expired': 'Status expired',
+  'glanceable.signedOut': 'Sign in to see agents',
+  'glanceable.privacy': 'Open Kilo to see agents',
   'glanceable.stale': 'Updates delayed',
   'glanceable.openAgents': 'Open agents',
+  'glanceable.newestResult': 'Newest result',
   'glanceable.noneWaiting': 'No agents waiting',
   'glanceable.newAgent': 'New agent',
   'glanceable.approving': 'Approving…',
@@ -59,8 +65,13 @@ function translate(key: string): string {
   return COPY[key] ?? key;
 }
 
+/** The two formatters the app injects, stubbed deterministically. `formatAgo`
+ * echoes its argument, so the rendered age proves the forwarded timestamp. */
+const formatAgo = (at: string): string => `ago:${at}`;
+const AGO = formatAgo(NEWEST_AT);
+
 function snapshotFor(
-  sessions: { status: string }[],
+  sessions: { status: string; statusUpdatedAt?: string }[],
   revision = 0,
   status?: GlanceableAgentsSnapshot['status']
 ): GlanceableAgentsSnapshot {
@@ -163,9 +174,28 @@ function render(props: ReturnType<typeof buildAndroidWidgetProps>, cell: Cell) {
   ) as unknown as { light: MockElement; dark: MockElement };
 }
 
+/** The three count rows as text, in rank order, with every state labelled. */
+const COUNT_ROWS = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
+
+function propsWithNewest(): ReturnType<typeof buildAndroidWidgetProps> {
+  return buildAndroidWidgetProps(
+    snapshotFor([{ status: 'busy', statusUpdatedAt: NEWEST_AT }], 0),
+    {},
+    translate,
+    String,
+    formatAgo
+  );
+}
+
 describe('renderActiveAgentsWidget', () => {
   it('returns distinct light and dark layouts through the theme callback', () => {
-    const props = buildAndroidWidgetProps(snapshotFor([{ status: 'busy' }], 0), {}, translate);
+    const props = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'busy' }], 0),
+      {},
+      translate,
+      String,
+      formatAgo
+    );
     const rep = render(props, { width: 250 });
 
     expect(rep.light).toBeDefined();
@@ -183,7 +213,9 @@ describe('renderActiveAgentsWidget', () => {
     const props = buildAndroidWidgetProps(
       snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
       {},
-      translate
+      translate,
+      String,
+      formatAgo
     );
 
     expect(collectText(render(props, { width: 250, rtl: true }).light)).toEqual([
@@ -203,7 +235,9 @@ describe('renderActiveAgentsWidget', () => {
     const props = buildAndroidWidgetProps(
       snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
       {},
-      translate
+      translate,
+      String,
+      formatAgo
     );
 
     expect(collectText(render(props, { width: 150, height: 100 }).light)).toEqual([
@@ -221,7 +255,9 @@ describe('renderActiveAgentsWidget', () => {
     const props = buildAndroidWidgetProps(
       snapshotFor([{ status: 'permission' }, { status: 'busy' }, { status: 'busy' }], 0),
       {},
-      translate
+      translate,
+      String,
+      formatAgo
     );
     const rep = render(props, { width: 120 });
     const text = collectText(rep.light);
@@ -233,7 +269,9 @@ describe('renderActiveAgentsWidget', () => {
     const props = buildAndroidWidgetProps(
       snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
       {},
-      translate
+      translate,
+      String,
+      formatAgo
     );
     const rep = render(props, { width: 250 });
     const text = collectText(rep.light);
@@ -253,16 +291,19 @@ describe('renderActiveAgentsWidget', () => {
       const props = buildAndroidWidgetProps(
         snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
         {},
-        translate
+        translate,
+        String,
+        formatAgo
       );
 
       expect(collectText(render(props, { width, height: 100 }).light)).toEqual(visibleText);
     }
   );
 
-  // Stale draws its counts and no warning, the same as the iOS card: a fourth
-  // line under three counts read as a fourth state. Only the spoken label
-  // still says the counts are delayed.
+  // Stale draws its counts and no warning on the short sizes, the same as the
+  // iOS card: a fourth line under three counts read as a fourth state. Only the
+  // spoken label still says the counts are delayed. The large cell is the one
+  // that has a footer to carry the warning.
   it.each([
     { width: 120, visibleText: ['2', 'Needs input', '4', 'Working', '3', 'Idle', 'Approve'] },
     { width: 250, visibleText: ['2', 'Needs input', '4', 'Working', '3', 'Idle', 'Approve'] },
@@ -280,7 +321,9 @@ describe('renderActiveAgentsWidget', () => {
           running: 4,
         },
         {},
-        translate
+        translate,
+        String,
+        formatAgo
       );
       const rep = render(props, { width });
 
@@ -305,7 +348,9 @@ describe('renderActiveAgentsWidget', () => {
         idle: 0,
       },
       {},
-      translate
+      translate,
+      String,
+      formatAgo
     );
     const rep = render(props, { width: 250 });
     const text = collectText(rep.light);
@@ -428,12 +473,189 @@ describe('renderActiveAgentsWidget', () => {
   });
 
   it('labels the whole widget with the Open agents deep-link click action', () => {
-    const props = buildAndroidWidgetProps(snapshotFor([{ status: 'busy' }], 0), {}, translate);
+    const props = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'busy' }], 0),
+      {},
+      translate,
+      String,
+      formatAgo
+    );
     const rep = render(props, { width: 250 });
 
     expect(rep.light.props.clickAction).toBe('OPEN_URI');
     expect(rep.light.props.clickActionData).toEqual({ uri: 'kiloapp:///cloud/sessions' });
     expect(rep.dark.props.clickAction).toBe('OPEN_URI');
     expect(rep.dark.props.clickActionData).toEqual({ uri: 'kiloapp:///cloud/sessions' });
+  });
+});
+
+// The nightstand cell: the mark on top, the three counts in the middle, and the
+// newest result on the bottom edge. Four cells tall, which reports roughly
+// 240–300 dp on Android's launcher grid.
+describe('the large widget cell', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('composes the counts and the newest-result footer from real props', () => {
+    const rep = render(propsWithNewest(), { width: 250, height: 260 });
+
+    expect(collectText(rep.light)).toEqual([...COUNT_ROWS, 'Newest result', 'Working', AGO]);
+    expect(collectText(rep.dark)).toEqual([...COUNT_ROWS, 'Newest result', 'Working', AGO]);
+    expect(rep.light.props.clickAction).toBe('OPEN_URI');
+    expect(rep.light.props.clickActionData).toEqual({ uri: 'kiloapp:///cloud/sessions' });
+  });
+
+  // The stale cell keeps its rows: the last known counts are still the counts,
+  // and only the third fact is in doubt, so the footer keeps its caption and
+  // swaps the result for the warning — the iOS large card's composition.
+  it('keeps the rows and swaps the footer result for the stale copy', () => {
+    const props = buildAndroidWidgetProps(
+      {
+        ...snapshotFor([{ status: 'busy', statusUpdatedAt: NEWEST_AT }], 0, 'stale'),
+        needsInput: 2,
+        idle: 3,
+        running: 4,
+      },
+      {},
+      translate,
+      String,
+      formatAgo
+    );
+    const rep = render(props, { width: 250, height: 260 });
+
+    expect(collectText(rep.light)).toEqual([
+      '2',
+      'Needs input',
+      '4',
+      'Working',
+      '3',
+      'Idle',
+      'Newest result',
+      'Updates delayed',
+    ]);
+  });
+
+  // The lapsed frame is the happy frame with its age retracted: a redraw past
+  // the stale window draws the delayed copy in the footer the happy frame
+  // reserved, so the mark and the counts do not move and nothing blanks.
+  it('draws the delayed copy in the happy frame footer once the data lapses', () => {
+    const happy = render(propsWithNewest(), { width: 250, height: 260 });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW + 31 * 60_000);
+    const props = buildCurrentWidgetProps(
+      {
+        ...snapshotFor([{ status: 'busy', statusUpdatedAt: NEWEST_AT }], 0),
+        needsInput: 2,
+        idle: 3,
+        running: 4,
+      },
+      translate,
+      String,
+      formatAgo
+    );
+    vi.useRealTimers();
+    const lapsed = render(props, { width: 250, height: 260 });
+
+    expect(collectText(lapsed.light)).toEqual([
+      '2',
+      'Needs input',
+      '4',
+      'Working',
+      '3',
+      'Idle',
+      'Newest result',
+      'Updates delayed',
+    ]);
+    expect(lapsed.light.props.accessibilityLabel).toBe(
+      'Updates delayed, 2 Needs input, 4 Working, 3 Idle, Open agents'
+    );
+    // The footer box is the one the happy frame reserved, so the column keeps
+    // its space-between composition and the counts stay put.
+    expect(lapsed.light.props.style?.justifyContent).toBe('space-between');
+    expect(happy.light.props.style?.justifyContent).toBe(lapsed.light.props.style?.justifyContent);
+  });
+
+  // No counts means one fact only: the status text is the body and there is no
+  // footer to carry a third fact.
+  it.each([
+    ['waiting', 'Waiting for agents'],
+    ['empty', 'No agents waiting'],
+    ['expired', 'Status expired'],
+    ['signed_out', 'Sign in to see agents'],
+    ['privacy', 'Open Kilo to see agents'],
+  ] as const)('draws %s with no footer', (status, copy) => {
+    const props = buildAndroidWidgetProps(
+      snapshotFor([], 0, status),
+      {},
+      translate,
+      String,
+      formatAgo
+    );
+    const rep = render(props, { width: 250, height: 260 });
+
+    expect(collectText(rep.light)).toEqual([copy]);
+    expect(collectText(rep.dark)).toEqual([copy]);
+  });
+
+  it('has no footer for happy work with no row timestamp', () => {
+    const props = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'busy' }], 0),
+      {},
+      translate,
+      String,
+      formatAgo
+    );
+
+    expect(collectText(render(props, { width: 250, height: 260 }).light)).toEqual(COUNT_ROWS);
+  });
+
+  // Stale always has something to say, timestamp or not: the footer keeps the
+  // caption and states that the counts are the last known ones.
+  it('states the stale copy under the caption with no row timestamp', () => {
+    const props = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'busy' }], 0, 'stale'),
+      {},
+      translate,
+      String,
+      formatAgo
+    );
+
+    expect(collectText(render(props, { width: 250, height: 260 }).light)).toEqual([
+      ...COUNT_ROWS,
+      'Newest result',
+      'Updates delayed',
+    ]);
+  });
+
+  // A cell one dp short keeps the stack composition: the large bucket is what
+  // earns the footer, and below it nothing new is added.
+  it('adds the footer only from the large-height bound up', () => {
+    const props = propsWithNewest();
+
+    expect(collectText(render(props, { width: 250, height: 219 }).light)).toEqual(COUNT_ROWS);
+    expect(collectText(render(props, { width: 250, height: 220 }).light)).toEqual([
+      ...COUNT_ROWS,
+      'Newest result',
+      'Working',
+      AGO,
+    ]);
+  });
+
+  it('mirrors the newest-result row for a right-to-left language', () => {
+    const rep = render(propsWithNewest(), { width: 250, height: 260, rtl: true });
+
+    expect(collectText(rep.light)).toEqual([
+      'Needs input',
+      '0',
+      'Working',
+      '1',
+      'Idle',
+      '0',
+      'Newest result',
+      AGO,
+      'Working',
+    ]);
   });
 });

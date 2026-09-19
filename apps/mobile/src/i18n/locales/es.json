@@ -3117,7 +3117,8 @@
     "couldNotApprove": "No se pudo aprobar",
     "couldNotStart": "No se pudo iniciar",
     "channelName": "Agentes activos",
-    "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo."
+    "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo.",
+    "newestResult": "Resultado más reciente"
   },
   "transcriptionModel": {
     "title": "Modelo de transcripción",

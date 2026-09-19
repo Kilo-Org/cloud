@@ -3141,7 +3141,8 @@
     "couldNotApprove": "Schválenie zlyhalo",
     "couldNotStart": "Spustenie zlyhalo",
     "channelName": "Aktívne agenty",
-    "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke."
+    "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke.",
+    "newestResult": "Najnovší výsledok"
   },
   "transcriptionModel": {
     "title": "Model prepisu",

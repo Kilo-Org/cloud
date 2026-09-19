@@ -3093,7 +3093,8 @@
     "couldNotApprove": "Tidak dapat menyetujui",
     "couldNotStart": "Tidak dapat memulai",
     "channelName": "Agen aktif",
-    "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci."
+    "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci.",
+    "newestResult": "Hasil terbaru"
   },
   "transcriptionModel": {
     "title": "Model transkripsi",

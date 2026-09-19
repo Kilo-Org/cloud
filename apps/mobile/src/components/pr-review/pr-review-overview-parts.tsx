@@ -160,14 +160,24 @@ export function PrRefsRow({
   return (
     <View className="flex-row items-center gap-2">
       <GitBranch size={14} color={colors.mutedForeground} />
-      <Text variant="mono" className="text-[13px]" numberOfLines={1} ellipsizeMode="middle">
+      <Text
+        variant="mono"
+        className="min-w-0 shrink text-[13px]"
+        numberOfLines={1}
+        ellipsizeMode="middle"
+      >
         {headRepoFullName && isCrossRepo ? `${headRepoFullName}:` : ''}
         {headRef}
       </Text>
       <Text variant="muted" className="text-sm">
         ←
       </Text>
-      <Text variant="mono" className="text-[13px]" numberOfLines={1} ellipsizeMode="middle">
+      <Text
+        variant="mono"
+        className="max-w-1/2 text-[13px]"
+        numberOfLines={1}
+        ellipsizeMode="middle"
+      >
         {baseRef}
       </Text>
     </View>

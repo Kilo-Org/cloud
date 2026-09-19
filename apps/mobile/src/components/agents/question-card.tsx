@@ -360,35 +360,35 @@ export function QuestionCard({
       </ScrollView>
 
       {presentation.hasPrimaryCta || presentation.hasRetryCta || presentation.hasRejectCta ? (
-        <View className="flex-row gap-2 border-t border-border p-3">
+        <View className="flex-col gap-2 border-t border-border p-3">
           {presentation.hasRejectCta ? (
             <Button
               variant="outline"
-              className="flex-1"
+              className="w-full"
               onPress={handleReject}
               disabled={interactionDisabled}
             >
-              <Text className="text-sm">{t('agentChat.questionCard.skip')}</Text>
+              <Text className="shrink text-center text-sm">{t('agentChat.questionCard.skip')}</Text>
             </Button>
           ) : null}
           {presentation.hasRetryCta && presentation.retryAction === 'answer' ? (
-            <Button className="flex-1" onPress={handleSubmit} disabled={submitDisabled}>
+            <Button className="w-full" onPress={handleSubmit} disabled={submitDisabled}>
               {submittingSpinner}
-              <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>{t('common.retry')}</Text>
+              <Text className="shrink text-center text-sm">{t('common.retry')}</Text>
             </Button>
           ) : null}
           {presentation.hasRetryCta && presentation.retryAction === 'reject' ? (
-            <Button className="flex-1" onPress={handleRetrySkip} disabled={interactionDisabled}>
+            <Button className="w-full" onPress={handleRetrySkip} disabled={interactionDisabled}>
               {submittingSpinner}
-              <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>
+              <Text className="shrink text-center text-sm">
                 {t('agentChat.questionCard.retrySkip')}
               </Text>
             </Button>
           ) : null}
           {presentation.hasPrimaryCta ? (
-            <Button className="flex-1" onPress={handleSubmit} disabled={submitDisabled}>
+            <Button className="w-full" onPress={handleSubmit} disabled={submitDisabled}>
               {submittingSpinner}
-              <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>
+              <Text className="shrink text-center text-sm">
                 {isSubmitting
                   ? t('agentChat.questionCard.submitting')
                   : t('agentChat.questionCard.sendAnswers')}

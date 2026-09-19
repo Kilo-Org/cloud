@@ -22,6 +22,7 @@ import { encryptApiKey, decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY, OPENAI_CLIENT_ID, OPENAI_CLIENT_SECRET } from '@/lib/config.server';
 import { OPENAI_TOKEN_ENDPOINT, OPENAI_RESOURCE } from '@/lib/auth/openai/config';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
+import type { OpenAiChatGptOwner } from './store';
 import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './types';
 
 type MockDb = {
@@ -30,9 +31,10 @@ type MockDb = {
   update: jest.Mock;
 };
 
-type StoredRow = { encrypted_api_key: ReturnType<typeof encryptApiKey>; is_enabled: boolean };
+type StoredRow = { encrypted_connection: ReturnType<typeof encryptApiKey>; is_enabled: boolean };
 
 const TEST_USER_ID = 'user-1';
+const USER_OWNER: OpenAiChatGptOwner = { kiloUserId: TEST_USER_ID, organizationId: null };
 
 function nowSeconds(): number {
   return Math.floor(Date.now() / 1000);
@@ -59,7 +61,7 @@ function buildConnection(
 
 function encryptedRow(connection: OpenAiChatGptConnection): StoredRow {
   return {
-    encrypted_api_key: encryptApiKey(JSON.stringify(connection), BYOK_ENCRYPTION_KEY),
+    encrypted_connection: encryptApiKey(JSON.stringify(connection), BYOK_ENCRYPTION_KEY),
     is_enabled: true,
   };
 }
@@ -73,7 +75,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function decodeStored(setCall: Record<string, unknown>): OpenAiChatGptConnection {
-  const encrypted = setCall.encrypted_api_key as ReturnType<typeof encryptApiKey>;
+  const encrypted = setCall.encrypted_connection as ReturnType<typeof encryptApiKey>;
   return OpenAiChatGptConnectionSchema.parse(
     JSON.parse(decryptApiKey(encrypted, BYOK_ENCRYPTION_KEY))
   );
@@ -151,7 +153,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
   it('returns a fresh access token without any network call', async () => {
     storedRow = encryptedRow(buildConnection({ expires_at: nowSeconds() + 3600 }));
 
-    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'stored-access-token',
     });
@@ -162,7 +164,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
   it('reports no connection when no row is stored', async () => {
     storedRow = null;
 
-    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'no_connection',
     });
     expect(fetchMock).not.toHaveBeenCalled();
@@ -180,7 +182,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       })
     );
 
-    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'new-access-token',
     });
@@ -213,7 +215,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     storedRow = encryptedRow(buildConnection());
     fetchMock.mockResolvedValue(jsonResponse({ access_token: 'new-access-token', expires_in: 60 }));
 
-    await resolveOpenAiChatGptAccessToken(TEST_USER_ID);
+    await resolveOpenAiChatGptAccessToken(USER_OWNER);
 
     const persisted = decodeStored(txUpdateSetCalls[0]);
     expect(persisted.refresh_token).toBe('stored-refresh-token');
@@ -225,7 +227,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       .mockResolvedValueOnce(jsonResponse({ error: 'refresh_token_conflict' }, 409))
       .mockResolvedValueOnce(jsonResponse({ access_token: 'new-access-token', expires_in: 3600 }));
 
-    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'new-access-token',
     });
@@ -238,7 +240,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     storedRow = encryptedRow(buildConnection());
     fetchMock.mockResolvedValue(jsonResponse({ error: 'refresh_token_conflict' }, 409));
 
-    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'failed',
     });
 
@@ -271,7 +273,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       return jsonResponse({ error: 'refresh_token_conflict' }, 409);
     });
 
-    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'failed',
     });
 
@@ -305,7 +307,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       return jsonResponse({ error: 'refresh_token_conflict' }, 409);
     });
 
-    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'access_token',
       accessToken: 'sibling-access-token',
     });
@@ -318,7 +320,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     storedRow = encryptedRow(buildConnection());
     fetchMock.mockResolvedValue(jsonResponse({ error: 'invalid_grant' }, 400));
 
-    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'terminal',
     });
 
@@ -360,7 +362,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       }
     });
 
-    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'terminal',
     });
 
@@ -376,7 +378,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       is_enabled: false,
     };
 
-    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'no_connection',
     });
     expect(fetchMock).not.toHaveBeenCalled();
@@ -392,7 +394,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
       })
     );
 
-    await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
       kind: 'terminal',
     });
 
@@ -407,8 +409,8 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     });
     fetchMock.mockImplementation(() => deferred);
 
-    const first = resolveOpenAiChatGptAccessToken(TEST_USER_ID);
-    const second = resolveOpenAiChatGptAccessToken(TEST_USER_ID);
+    const first = resolveOpenAiChatGptAccessToken(USER_OWNER);
+    const second = resolveOpenAiChatGptAccessToken(USER_OWNER);
     expect(second).toBe(first);
 
     resolveFetch(jsonResponse({ access_token: 'new-access-token', expires_in: 3600 }));
@@ -430,7 +432,7 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     try {
-      await expect(resolveOpenAiChatGptAccessToken(TEST_USER_ID)).resolves.toEqual({
+      await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
         kind: 'terminal',
       });
     } finally {

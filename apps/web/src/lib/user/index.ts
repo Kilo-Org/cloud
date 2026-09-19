@@ -43,6 +43,9 @@ import {
   organization_audit_logs,
   organization_recommendation_dismissals,
   magic_link_tokens,
+  passkey_credentials,
+  passkey_challenges,
+  passkey_sign_in_tickets,
   device_auth_requests,
   device_sessions,
   native_attested_keys,
@@ -51,6 +54,7 @@ import {
   platform_oauth_credentials,
   platform_access_token_credentials,
   byok_api_keys,
+  openai_chatgpt_connections,
   agent_configs,
   agent_environment_profiles,
   security_findings,
@@ -323,6 +327,16 @@ export type DeferredSignInEvent = {
 
 export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
   const timer = createTimer();
+
+  // A passkey never owns a `user_auth_provider` row: the credential is bound to
+  // the Kilo user id in `passkey_credentials`, and the redeemed sign-in ticket
+  // already proved that id, so the provider account id *is* the user id.
+  // Resolve it directly and leave the account's hosted domain and display name
+  // untouched — the passkey path settles no user-account changes.
+  if (args.provider === 'passkey') {
+    return (await findUserById(args.provider_account_id)) ?? null;
+  }
+
   const existing_kilo_user_id = await findUserIdByAuthProvider(
     args.provider,
     args.provider_account_id
@@ -1060,7 +1074,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   platform_integrations cascade below. Organization-owned Slack credentials are
  *   intentionally retained, since they belong to the organization, not the user)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
- *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
+ *   openai_chatgpt_connections, agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
  *   security_findings, security_analysis_owner_state, security_agent_commands,
  *   security_agent_repository_sync_state, security_remediations,
@@ -1258,6 +1272,23 @@ export async function anonymizeCloudUserData(
     );
   await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
   await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
+  // Passkey credentials are PII: the credential id, public key and user-facing
+  // label identify the user's device. Drop any challenge still open for a
+  // ceremony so a deleted account cannot complete a pending registration or
+  // authentication. Usernameless challenges (kilo_user_id IS NULL) are not
+  // attributable to this user; the device-auth cleanup cron removes them once
+  // they expire.
+  await tx.delete(passkey_credentials).where(eq(passkey_credentials.kilo_user_id, userId));
+  await tx
+    .delete(passkey_challenges)
+    .where(
+      and(eq(passkey_challenges.kilo_user_id, userId), isNull(passkey_challenges.consumed_at))
+    );
+  // A sign-in ticket is a live proof that a passkey assertion verified, so it
+  // is deleted with the credentials it was minted for rather than left to
+  // expire. Consumed tickets are removed too: their `kilo_user_id` still names
+  // the deleted account.
+  await tx.delete(passkey_sign_in_tickets).where(eq(passkey_sign_in_tickets.kilo_user_id, userId));
 
   // Remove from organizations
   await tx
@@ -1472,6 +1503,9 @@ export async function anonymizeCloudUserData(
     );
   await tx.delete(user_github_app_tokens).where(eq(user_github_app_tokens.kilo_user_id, userId));
   await tx.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, userId));
+  await tx
+    .delete(openai_chatgpt_connections)
+    .where(eq(openai_chatgpt_connections.kilo_user_id, userId));
   await tx
     .delete(coding_plan_availability_intents)
     .where(eq(coding_plan_availability_intents.user_id, userId));
@@ -2330,11 +2364,12 @@ export async function unlinkAuthProviderFromUser(
       .where(eq(kilocode_users.id, kiloUserId));
   }
 
-  // Unlinking OpenAI also drops the delegated ChatGPT credential: it proves the
-  // same external identity, so keeping it would leave a usable key for an
-  // account the person just detached.
+  // Unlinking OpenAI drops the personal delegated ChatGPT credential: it
+  // proves the same external identity. An organization connection is a separate
+  // account's BYOK setting and survives this unlink; the member disconnects it
+  // from the organization BYOK page.
   if (provider === 'openai') {
-    await clearOpenAiChatGptConnection(kiloUserId);
+    await clearOpenAiChatGptConnection({ kiloUserId, organizationId: null });
   }
 
   return successResult();

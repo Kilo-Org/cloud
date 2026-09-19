@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires -- Jest node-environment mocks must be registered before loading the component. */
 // The sign-in landing keeps the email prompt but must also offer the OAuth
-// providers (including 'Sign in with ChatGPT'), the same group the sign-up page
+// providers (including 'Continue with ChatGPT'), the same group the sign-up page
 // renders. The ChatGPT option is behind the PostHog flag, which for a
 // signed-out visitor is evaluated against the email the visitor typed; the hook
 // is stubbed here and the filter is asserted. The provider buttons and the
@@ -13,6 +13,7 @@ import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 let mockFlowEmail = '';
+let mockHintEmail = '';
 let mockChatGptAllowed = false;
 let mockHookEmail: string | null = null;
 
@@ -35,7 +36,7 @@ jest.mock('@/hooks/useSignInFlow', () => ({
     showTurnstile: false,
     flowState: 'landing',
     tier: 'new',
-    hint: null,
+    hint: mockHintEmail ? { lastEmail: mockHintEmail, lastAuthMethod: 'openai' } : null,
     showEmailInput: !isSignUp,
     email: mockFlowEmail,
     isVerifying: false,
@@ -97,6 +98,7 @@ const { SignInForm } = require('./SignInForm') as {
 
 beforeEach(() => {
   mockFlowEmail = '';
+  mockHintEmail = '';
   mockChatGptAllowed = false;
   mockHookEmail = null;
 });
@@ -107,10 +109,10 @@ describe('SignInForm sign-in options', () => {
       createElement(SignInForm, { searchParams: {}, title: 'Welcome.' })
     );
 
-    expect(html).not.toContain('Sign in with ChatGPT');
+    expect(html).not.toContain('Continue with ChatGPT');
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
-    // Nothing is submitted in a static render, so the hook gets no address.
+    // Nothing is known before a submit, so the hook gets no address.
     expect(mockHookEmail).toBe(null);
   });
 
@@ -121,11 +123,46 @@ describe('SignInForm sign-in options', () => {
       createElement(SignInForm, { searchParams: {}, title: 'Welcome.' })
     );
 
-    expect(html.match(/Sign in with ChatGPT/g)).toHaveLength(1);
+    expect(html.match(/Continue with ChatGPT/g)).toHaveLength(1);
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
-    // The typed address is not evaluated; the hook waits for the submit.
+    // Typing alone is not evaluated; the hook waits for the submit.
     expect(mockHookEmail).toBe(null);
+  });
+
+  it('evaluates a prefilled ?email= address before the providers render', () => {
+    mockChatGptAllowed = true;
+    renderToStaticMarkup(
+      createElement(SignInForm, {
+        searchParams: { email: 'prefill@kilo.ai' },
+        title: 'Welcome.',
+      })
+    );
+
+    expect(mockHookEmail).toBe('prefill@kilo.ai');
+  });
+
+  it('evaluates a stored returning-user address', () => {
+    mockFlowEmail = 'returning@kilo.ai';
+    mockHintEmail = 'returning@kilo.ai';
+    mockChatGptAllowed = true;
+    renderToStaticMarkup(createElement(SignInForm, { searchParams: {}, title: 'Welcome.' }));
+
+    expect(mockHookEmail).toBe('returning@kilo.ai');
+  });
+
+  it('evaluates the query prefill over a stored returning-user address', () => {
+    mockFlowEmail = 'prefill@kilo.ai';
+    mockHintEmail = 'hint@kilo.ai';
+    mockChatGptAllowed = true;
+    renderToStaticMarkup(
+      createElement(SignInForm, {
+        searchParams: { email: 'prefill@kilo.ai' },
+        title: 'Welcome.',
+      })
+    );
+
+    expect(mockHookEmail).toBe('prefill@kilo.ai');
   });
 
   it('hides ChatGPT on sign-up when the flag is off for the typed email', () => {
@@ -133,7 +170,7 @@ describe('SignInForm sign-in options', () => {
       createElement(SignInForm, { searchParams: {}, isSignUp: true, title: 'Create your account' })
     );
 
-    expect(html).not.toContain('Sign in with ChatGPT');
+    expect(html).not.toContain('Continue with ChatGPT');
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
   });
@@ -145,6 +182,6 @@ describe('SignInForm sign-in options', () => {
       createElement(SignInForm, { searchParams: {}, isSignUp: true, title: 'Create your account' })
     );
 
-    expect(html.match(/Sign in with ChatGPT/g)).toHaveLength(1);
+    expect(html.match(/Continue with ChatGPT/g)).toHaveLength(1);
   });
 });

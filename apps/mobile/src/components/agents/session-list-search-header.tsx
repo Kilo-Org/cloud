@@ -78,8 +78,10 @@ export function SessionListSearchHeader({
             onPress={onClearSearch}
             accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
-            hitSlop={12}
-            className="active:opacity-70"
+            // The glyph is 16pt, so the box itself carries the 44pt target:
+            // `hitSlop` widens the touch area but not the accessibility node
+            // bounds a tap-target audit measures (WCAG 2.5.8 AA).
+            className="min-h-[44px] min-w-[44px] items-center justify-center active:opacity-70"
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>

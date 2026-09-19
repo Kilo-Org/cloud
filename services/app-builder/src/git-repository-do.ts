@@ -44,13 +44,11 @@ export class GitRepositoryDO extends DurableObject<Env> {
       throw error;
     }
 
-    // Check if .git directory exists
     try {
       await this.fs.stat('.git');
       this._initialized = true;
       logger.debug('Repository already initialized');
     } catch (_err) {
-      // .git doesn't exist, repo not initialized yet
       this._initialized = false;
       logger.debug('Repository not yet initialized');
     }
@@ -108,7 +106,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
 
         logger.debug('Creating initial commit', { fileCount: Object.keys(files).length });
 
-        // Write files (decode base64 to binary)
         for (const [path, base64Content] of Object.entries(files)) {
           const bytes = Buffer.from(base64Content, 'base64');
           await this.fs.writeFile(path, bytes);
@@ -332,7 +329,6 @@ export class GitRepositoryDO extends DurableObject<Env> {
             return { success: false, error: 'No git objects to push' };
           }
 
-          // Build in-memory FS for isomorphic-git push operation
           const memFs = new MemFS();
           await git.init({ fs: memFs, dir: '/', defaultBranch: 'main' });
 

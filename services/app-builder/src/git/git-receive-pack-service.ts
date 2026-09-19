@@ -27,10 +27,8 @@ export class GitReceivePackService {
    */
   static async handleInfoRefs(fs: MemFS): Promise<string> {
     try {
-      // Build response with receive-pack service header
       let response = '001f# service=git-receive-pack\n0000';
 
-      // Try to get HEAD ref
       let head: string | null = null;
       try {
         head = await git.resolveRef({ fs, dir: '/', ref: 'HEAD' });
@@ -38,7 +36,6 @@ export class GitReceivePackService {
         logger.warn('Failed to resolve HEAD (empty repo?)', formatError(err));
       }
 
-      // Get branches from .git/refs/heads/
       let branches: string[] = [];
       try {
         const headsDir = await fs.readdir('.git/refs/heads');
@@ -47,7 +44,6 @@ export class GitReceivePackService {
         logger.warn('Failed to list branches', formatError(err));
       }
 
-      // Determine symref target for HEAD
       const symrefTarget = await resolveHeadSymref(fs, branches);
 
       // Capabilities for receive-pack (symref first per convention)
@@ -64,11 +60,9 @@ export class GitReceivePackService {
       ].join(' ');
 
       if (head && branches.length > 0) {
-        // Existing repo with refs
         const headLine = `${head} HEAD\0${capabilities}\n`;
         response += formatPacketLine(headLine);
 
-        // Add branch refs
         for (const branch of branches) {
           try {
             const oid = await git.resolveRef({
@@ -88,7 +82,6 @@ export class GitReceivePackService {
         response += formatPacketLine(emptyLine);
       }
 
-      // Flush packet
       response += '0000';
 
       return response;
@@ -128,20 +121,16 @@ export class GitReceivePackService {
         break;
       }
 
-      // Read packet content
       const packetData = data.slice(offset + 4, offset + length);
       const packetText = textDecoder.decode(packetData).trim();
 
-      // Skip capabilities line (contains NUL byte)
       if (packetText.includes('\0')) {
-        // Parse command before capabilities
         const commandPart = packetText.split('\0')[0];
         const command = this.parseRefUpdateCommand(commandPart);
         if (command) {
           commands.push(command);
         }
       } else {
-        // Regular ref update command
         const command = this.parseRefUpdateCommand(packetText);
         if (command) {
           commands.push(command);
@@ -168,7 +157,6 @@ export class GitReceivePackService {
 
     if (!oldOid || !newOid || !refName) return null;
 
-    // Validate OID format (40 hex chars)
     if (oldOid.length !== 40 || newOid.length !== 40) return null;
 
     return { oldOid, newOid, refName };
@@ -191,12 +179,10 @@ export class GitReceivePackService {
     const reportErrors: ReceivePackError[] = [];
 
     try {
-      // Parse pkt-line commands and find packfile
       const { commands, packfileStart } = this.parsePktLines(requestData);
       result.refUpdates = commands;
       let indexedOids: Set<string> | undefined;
 
-      // Extract packfile data (skip PACK header check, pass all remaining data)
       if (packfileStart < requestData.length) {
         const packfileData = requestData.slice(packfileStart);
 
@@ -204,12 +190,11 @@ export class GitReceivePackService {
         let packStart = 0;
         for (let i = 0; i < Math.min(packfileData.length - 4, 100); i++) {
           if (
-            packfileData[i] === 0x50 && // P
-            packfileData[i + 1] === 0x41 && // A
-            packfileData[i + 2] === 0x43 && // C
+            packfileData[i] === 0x50 &&
+            packfileData[i + 1] === 0x41 &&
+            packfileData[i + 2] === 0x43 &&
             packfileData[i + 3] === 0x4b
           ) {
-            // K
             packStart = i;
             break;
           }
@@ -238,20 +223,15 @@ export class GitReceivePackService {
             result.errors.push(errorMsg);
             result.success = false;
 
-            // Return error response immediately - DO NOT index or update refs
             const response = this.generateReportStatus(commands, [
               { kind: 'global', message: errorMsg },
             ]);
             return { response, result };
           }
 
-          // IMPORTANT: Write the packfile to the filesystem BEFORE calling indexPack
-          // indexPack reads from this path, so it must exist first!
-          // Use a unique name for each pack file to avoid overwriting previous packs
           const packId = `pack-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
           const packPath = `.git/objects/pack/${packId}.pack`;
 
-          // Ensure the pack directory exists
           try {
             await fs.mkdir('.git/objects/pack', { recursive: true });
           } catch (_err) {
@@ -260,7 +240,6 @@ export class GitReceivePackService {
 
           await fs.writeFile(packPath, actualPackfile);
 
-          // Use isomorphic-git to index the packfile
           try {
             const indexResult = await git.indexPack({
               fs,
@@ -298,12 +277,9 @@ export class GitReceivePackService {
               }
             }
 
-            // Don't silently continue - this is a critical error
-            // Mark as failed and DON'T proceed with ref updates
             const indexErrorMsg = `Failed to index packfile: ${errorMessage}`;
             result.errors.push(indexErrorMsg);
 
-            // Return error response immediately - DO NOT apply refs with corrupt objects
             result.success = false;
             const response = this.generateReportStatus(commands, [
               { kind: 'global', message: indexErrorMsg },
@@ -319,12 +295,10 @@ export class GitReceivePackService {
       for (const cmd of commands) {
         try {
           if (cmd.newOid === zeroOid) {
-            // Delete ref
             await git.deleteRef({ fs, dir: '/', ref: cmd.refName });
             continue;
           }
 
-          // Validate the target object exists somewhere in the repo
           if (indexedOids && !indexedOids.has(cmd.newOid)) {
             let objectExists = false;
             try {
@@ -346,7 +320,6 @@ export class GitReceivePackService {
             }
           }
 
-          // Create or update ref
           await git.writeRef({
             fs,
             dir: '/',
@@ -424,11 +397,9 @@ export class GitReceivePackService {
     const unpackStatus = globalError ? 'unpack error\n' : 'unpack ok\n';
     chunks.push(this.createSidebandPacket(1, encoder.encode(formatPacketLine(unpackStatus))));
 
-    // Ref statuses
     for (const cmd of commands) {
       let status: string;
       if (globalError) {
-        // Global failure applies to all refs
         status = `ng ${cmd.refName} ${sanitizeStatusMessage(globalError.message)}\n`;
       } else {
         const refError = errors.find(e => e.kind === 'ref' && e.refName === cmd.refName);
@@ -442,10 +413,8 @@ export class GitReceivePackService {
     // Flush packet for sideband
     chunks.push(this.createSidebandPacket(1, encoder.encode('0000')));
 
-    // Final flush packet
     chunks.push(encoder.encode('0000'));
 
-    // Concatenate all chunks
     const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
     const result = new Uint8Array(totalLength);
     let offset = 0;
@@ -461,19 +430,16 @@ export class GitReceivePackService {
    * Create a sideband packet
    */
   private static createSidebandPacket(band: number, data: Uint8Array): Uint8Array {
-    const length = 4 + 1 + data.length; // length header + band byte + data
+    const length = 4 + 1 + data.length;
     const lengthHex = length.toString(16).padStart(4, '0');
     const packet = new Uint8Array(length);
 
-    // Write length
     for (let i = 0; i < 4; i++) {
       packet[i] = lengthHex.charCodeAt(i);
     }
 
-    // Write band number
     packet[4] = band;
 
-    // Write data
     packet.set(data, 5);
 
     return packet;

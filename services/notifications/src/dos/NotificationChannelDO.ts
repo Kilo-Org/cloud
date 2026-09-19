@@ -3,7 +3,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { user_notification_preferences, user_push_tokens } from '@kilocode/db/schema';
 import {
   androidChannelIdForPushData,
-  androidChannelIdForRegisteredClient,
+  androidChannelIdForPushDataToAppVersion,
   genericPushContentForPushData,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
@@ -19,6 +19,7 @@ import type { ExpoPushMessage, SendResult, TicketTokenPair } from '../lib/expo-p
 import { sendPushNotifications } from '../lib/expo-push';
 import { glanceableDeliveryDeps } from '../lib/glanceable-delivery-deps';
 import { refreshGlanceableSnapshot } from '../lib/glanceable-refresh';
+import { expoPushExtrasForPushData } from '../lib/push-message-extras';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
@@ -196,6 +197,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
     // below routes a progress push through the extension that reads the same
     // choice when the app is not in the foreground.
     const channelId = androidChannelIdForPushData(input.push.data);
+    // Attention extras keep the action category; the shared kind model below
+    // owns interruption levels and Focus filtering for every push.
+    const pushExtras = expoPushExtrasForPushData(input.push.data);
     const interruptionLevel = iosInterruptionLevelForPushData(input.push.data);
     const mutableContent = iosMutableContentForPushData(input.push.data);
     let previews: 'generic' | 'full' = 'generic';
@@ -286,17 +290,19 @@ export class NotificationChannelDO extends DurableObject<Env> {
         body = input.push.body;
       }
 
-      const clientChannelId = androidChannelIdForRegisteredClient(channelId, app_version);
+      // Android 8+ drops a notification addressed to a channel that does not
+      // exist. Only clients that create channels (a non-null app version at
+      // registration) get a channelId; older clients fall back to the default
+      // channel. The split agent channels are newer than the rest, so a token
+      // registered before they shipped only has the legacy `agent` channel and
+      // keeps routing there. iOS ignores channelId either way.
+      const clientChannelId = androidChannelIdForPushDataToAppVersion(input.push.data, app_version);
       return {
         to: token,
         title,
         body,
         data: input.push.data,
-        // Android 8+ drops a notification addressed to a channel that does
-        // not exist, and the channel list is created client-side. A token
-        // registered before channel creation, or before the named agent
-        // channels existed, gets no channelId and the post falls back to the
-        // app's default channel. iOS ignores channelId either way.
+        ...pushExtras,
         ...(clientChannelId !== undefined && { channelId: clientChannelId }),
         // iOS has no per-kind channel; the interruption level is its
         // equivalent and it is what lets a needs-input push break through a

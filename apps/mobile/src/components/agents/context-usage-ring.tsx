@@ -63,17 +63,24 @@ export function ContextUsageRing({
         strokeWidth={strokeWidth}
         fill="none"
       />
-      <Circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke={arcColor}
-        strokeWidth={strokeWidth}
-        strokeLinecap="round"
-        strokeDasharray={`${dashLength} ${dashGap}`}
-        fill="none"
-        transform={`rotate(${rotation} ${size / 2} ${size / 2})`}
-      />
+      {/* A zero-length dash with a round cap still paints a dot at 12 o'clock.
+          In the session header that dot sits in the otherwise empty
+          loading pill and reads as a top spinner — the very loader the
+          full-page skeleton replaced. `arcFraction: 0` means "no usage
+          asserted", so no arc segment must be drawn at all. */}
+      {dashLength > 0 ? (
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={arcColor}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={`${dashLength} ${dashGap}`}
+          fill="none"
+          transform={`rotate(${rotation} ${size / 2} ${size / 2})`}
+        />
+      ) : null}
     </Svg>
   );
 }

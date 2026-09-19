@@ -23,6 +23,7 @@ import { useSessionDetailRename } from '@/components/agents/use-session-detail-r
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { i18n } from '@/i18n';
 import { clearActiveToken, setActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
@@ -666,6 +667,34 @@ describe('SessionDetailScreen valid session-id', () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
     const renderer = await mountRoute();
     expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'resumeAt')).toBeNull();
+  });
+
+  // Owner request item 4 moved the Copy link action off the conversation header
+  // and into the context details sheet. The loading header therefore reserves
+  // the loaded header's context pill only: it carries no copy control, because
+  // the sheet — the copy affordance's home — mounts with SessionDetailContent
+  // below. Rendering one here would resurrect the control the request removed
+  // and shift the pill at the loading -> loaded swap.
+  it('reserves the context pill without a copy control on the loading header', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', at: 'msg_42' });
+    queryState.data = null;
+    queryState.isPending = true;
+    const renderer = await mountRoute();
+
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    const header = renderer.root.findByType(ScreenHeader);
+    const metrics = findByType(header, 'SessionContextMetrics');
+    expect(metrics).toHaveLength(1);
+    expect(propOf(metrics[0], 'loading')).toBe(true);
+    // No `onPress`: the context sheet, which owns both copy rows, is not
+    // mounted until SessionDetailContent takes over.
+    expect(propOf(metrics[0], 'onPress')).toBeUndefined();
+    expect(
+      findByType(header, 'Pressable').filter(
+        node => propOf(node, 'accessibilityLabel') === i18n.t('common.copyLink')
+      )
+    ).toHaveLength(0);
   });
 });
 

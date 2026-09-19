@@ -3,18 +3,15 @@ import { PortalHost } from '@rn-primitives/portal';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { usePathname, useSegments } from 'expo-router';
 import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
-import { type ReactNode, useEffect, useState } from 'react';
-import { AppState, Keyboard, Platform, useWindowDimensions } from 'react-native';
+import { type ReactNode } from 'react';
+import { Platform, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppUnlockAnnouncements } from '@/components/app-unlock-screen';
-import {
-  resolveAppAwareKeyboardPadding,
-  resolveKeyboardPaddingEventsForPlatform,
-} from '@/components/kilo-chat/app-aware-keyboard-padding-state';
+import { useAppAwareKeyboardPadding } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { OfflineBanner } from '@/components/offline-banner';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
 import { AuthProvider } from '@/lib/auth/auth-context';
@@ -99,66 +96,21 @@ export function AppRootProviders({
   );
 }
 
-/**
- * Height of the software keyboard while it is up, `0` otherwise. Owned by a
- * child of `AppRootProviders` so a keyboard show/hide re-renders only the
- * Toaster, never the app tree the provider wraps.
- *
- * Android needs this even though the app is edge-to-edge: under API 35+ the
- * window never resizes for the IME (`login-screen.tsx`), and
- * `react-native-safe-area-context` does not report IME insets, so a
- * bottom-anchored overlay has no other way to clear the keyboard and its
- * navigation row.
- */
-function useKeyboardHeight(): number {
-  const [height, setHeight] = useState(0);
-
-  useEffect(() => {
-    const events = resolveKeyboardPaddingEventsForPlatform(Platform.OS);
-    if (events === null) {
-      return undefined;
-    }
-
-    const show = Keyboard.addListener(events.show, event => {
-      setHeight(current =>
-        resolveAppAwareKeyboardPadding({
-          currentPadding: current,
-          event: { type: 'keyboard-visible', keyboardHeight: event.endCoordinates.height },
-        })
-      );
-    });
-    const hide = Keyboard.addListener(events.hide, () => {
-      setHeight(current =>
-        resolveAppAwareKeyboardPadding({
-          currentPadding: current,
-          event: { type: 'keyboard-hidden' },
-        })
-      );
-    });
-    const appState = AppState.addEventListener('change', state => {
-      setHeight(current =>
-        resolveAppAwareKeyboardPadding({
-          currentPadding: current,
-          event: { type: 'app-state-change', appState: state },
-        })
-      );
-    });
-
-    return () => {
-      show.remove();
-      hide.remove();
-      appState.remove();
-    };
-  }, []);
-
-  return height;
-}
-
 function AppToaster() {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
-  const keyboardHeight = useKeyboardHeight();
+  // Same keyboard read the padding view and the reveal hook use, so the root
+  // toast's height cannot drift from the screens' value. It is owned by a child
+  // of `AppRootProviders` so a keyboard show/hide re-renders only the Toaster,
+  // never the app tree the provider wraps.
+  //
+  // Android needs it even though the app is edge-to-edge: under API 35+ the
+  // window never resizes for the IME (`login-screen.tsx`), and
+  // `react-native-safe-area-context` does not report IME insets, so a
+  // bottom-anchored overlay has no other way to clear the keyboard and its
+  // navigation row.
+  const keyboardHeight = useAppAwareKeyboardPadding();
   const segments = useSegments();
   const pathname = usePathname();
   // The floating tab bar is an absolute overlay over the screen bottom, so it

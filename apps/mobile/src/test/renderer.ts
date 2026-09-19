@@ -50,35 +50,126 @@ type FiberTree = {
   clear: () => void;
 };
 
+/** A fiber and the alternate tree's twin, the pair the slow path walks. */
+type FiberPair = { a: Fiber; b: Fiber };
+
+/** Which of the pair a child list holds, if either. */
+function childSide(child: Fiber | null, a: Fiber, b: Fiber): 'a' | 'b' | null {
+  for (let node = child; node; node = node.sibling) {
+    if (node === a) {
+      return 'a';
+    }
+    if (node === b) {
+      return 'b';
+    }
+  }
+  return null;
+}
+
+function containsChild(child: Fiber | null, target: Fiber): boolean {
+  for (let node = child; node; node = node.sibling) {
+    if (node === target) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The pair order after both `return` chains converge: the child list holding the
+ * fiber decides, and `parentB`'s list swaps the pair. `null` means neither list
+ * holds either fiber.
+ */
+function alignFiberSides(
+  pair: FiberPair,
+  parentA: Fiber,
+  parentB: Fiber
+): 'same' | 'swapped' | null {
+  if (containsChild(parentA.child, pair.a) || containsChild(parentB.child, pair.b)) {
+    return 'same';
+  }
+  if (containsChild(parentA.child, pair.b) || containsChild(parentB.child, pair.a)) {
+    return 'swapped';
+  }
+  return null;
+}
+
+/** The tree whose root `stateNode.current` names is the current one. */
+function rootSide(root: Fiber, fiber: Fiber, alternate: Fiber): Fiber {
+  if (root.tag !== 3) {
+    return fiber;
+  }
+  const state = root.stateNode as { current?: Fiber } | null;
+  return state?.current === root ? fiber : alternate;
+}
+
+type WalkStep = { next: FiberPair } | { resolved: Fiber };
+
+/** One step of the slow path: the pair to walk next, or the resolved fiber. */
+function walkStep(pair: FiberPair, fiber: Fiber, alternate: Fiber): WalkStep {
+  const parentA = pair.a.return;
+  if (parentA === null) {
+    return { resolved: rootSide(pair.a, fiber, alternate) };
+  }
+  const parentB = parentA.alternate;
+  if (parentB === null) {
+    const next = parentA.return;
+    return next === null
+      ? { resolved: rootSide(pair.a, fiber, alternate) }
+      : { next: { a: next, b: next } };
+  }
+  if (parentA.child === parentB.child) {
+    return { resolved: childSide(parentA.child, pair.a, pair.b) === 'b' ? alternate : fiber };
+  }
+  if (pair.a.return !== pair.b.return) {
+    return { next: { a: parentA, b: parentB } };
+  }
+  const side = alignFiberSides(pair, parentA, parentB);
+  if (side === null) {
+    return { resolved: fiber };
+  }
+  return { next: side === 'same' ? { a: parentA, b: parentB } : { a: parentB, b: parentA } };
+}
+
+/**
+ * Resolve a cached fiber to its partner in the current tree.
+ *
+ * Every `Instance` getter reads through the fiber captured when the instance was
+ * wrapped, but React alternates two fiber trees across commits, so after a commit
+ * the captured fiber may belong to the previous tree. The renderer used to walk
+ * the whole tree into a `Set` on every property read to answer this, which made
+ * `findAll` quadratic: the 400-line fence suites spent seconds walking thousands
+ * of fibers and timed out on a loaded host. React's own slow path
+ * (`findCurrentFiberUsingSlowPath` in `react-reconciler`) answers the same
+ * question by walking only the two `return` chains until they converge; the tree
+ * whose root `stateNode.current` names is the current one. Ported here so reading
+ * a deep tree costs a walk per fiber, not a tree scan per property.
+ */
+function findCurrentFiber(fiber: Fiber): Fiber {
+  const alternate = fiber.alternate;
+  if (!alternate) {
+    return fiber;
+  }
+  let pair: FiberPair = { a: fiber, b: alternate };
+  for (;;) {
+    const step = walkStep(pair, fiber, alternate);
+    if ('resolved' in step) {
+      return step.resolved;
+    }
+    pair = step.next;
+  }
+}
+
 function createTree(root: Root): FiberTree {
   const cache = new WeakMap<Fiber, Instance>();
-  let currentFibers = new Set<Fiber>();
   let rootState: { current: Fiber } | undefined = undefined;
-
-  function refresh(): void {
-    const tree = rootState?.current;
-    if (!tree) {
-      return;
-    }
-    currentFibers = new Set<Fiber>();
-    function visit(node: Fiber | null): void {
-      for (let item = node; item; item = item.sibling) {
-        currentFibers.add(item);
-        visit(item.child);
-      }
-    }
-    visit(tree);
-  }
 
   function wrap(fiber: Fiber): Instance {
     const cached = cache.get(fiber) ?? (fiber.alternate && cache.get(fiber.alternate));
     if (cached) {
       return cached;
     }
-    const current = () => {
-      refresh();
-      return currentFibers.has(fiber) || !fiber.alternate ? fiber : fiber.alternate;
-    };
+    const current = () => findCurrentFiber(fiber);
     const node: Instance = {
       get type() {
         return current().type as ElementType;
@@ -148,7 +239,6 @@ function createTree(root: Root): FiberTree {
         fiber = fiber.return;
       }
       rootState = fiber.stateNode as { current: Fiber };
-      refresh();
       const tree = rootState.current;
       const nodes = children(tree.child?.child ?? null);
       const first = nodes[0];
@@ -157,10 +247,9 @@ function createTree(root: Root): FiberTree {
       }
       return wrap(tree);
     },
-    // Release the fibers captured by the last refresh. Without this the
-    // renderer, while still held, keeps the whole unmounted tree alive.
+    // Release the root fiber the renderer held. Without this the renderer,
+    // while still held, keeps the whole unmounted tree alive.
     clear: () => {
-      currentFibers.clear();
       rootState = undefined;
     },
   };

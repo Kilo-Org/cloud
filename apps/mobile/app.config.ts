@@ -20,14 +20,6 @@ import {
 
 const isProductionBuild = process.env.EAS_BUILD_PROFILE === 'production';
 
-// The Kilo MCP server a production build reaches with the signed-in session's
-// own token (src/lib/chat/kilo-mcp.ts). It is a public build-time constant, so
-// it lives here beside the other hard-coded production hosts rather than in the
-// committed apps/mobile/.env: the release gate rejects any change to a .env
-// path. KILO_MCP_URL still overrides it, and a development build without one
-// leaves the key absent, which hides the whole feature.
-const KILO_MCP_URL_PRODUCTION = 'https://mcp.kiloapps.io';
-
 // Required env is fatal by build intent: a production build must never ship
 // with a missing value, so throw under EAS_BUILD_PROFILE === 'production'.
 // Otherwise keep the old behavior: warn under GITHUB_ACTIONS, throw locally.
@@ -73,22 +65,6 @@ const googleIosUrlScheme = googleIosClientId
 const googleSignInPlugins: NonNullable<ExpoConfig['plugins']> = googleIosUrlScheme
   ? [['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }]]
   : [];
-
-/**
- * One optional config value for `extra`.
- *
- * `kiloMcpUrl` is the one optional key a production build always carries — the
- * public Kilo MCP server, so the signed-in app reaches it without anyone typing
- * a URL. Every other optional key is exactly what the environment supplies, and
- * an absent value hides the feature that needs it.
- */
-function optionalValue(key: keyof typeof OPTIONAL_ENV_KEYS): string | undefined {
-  const value = process.env[OPTIONAL_ENV_KEYS[key]];
-  if (value !== undefined) {
-    return value;
-  }
-  return key === 'kiloMcpUrl' && isProductionBuild ? KILO_MCP_URL_PRODUCTION : undefined;
-}
 
 const config: ExpoConfig = {
   name: 'Kilo',
@@ -384,10 +360,7 @@ const config: ExpoConfig = {
   extra: {
     ...Object.fromEntries(Object.entries(ENV_KEYS).map(([key, env]) => [key, process.env[env]])),
     ...Object.fromEntries(
-      Object.keys(OPTIONAL_ENV_KEYS).map(key => [
-        key,
-        optionalValue(key as keyof typeof OPTIONAL_ENV_KEYS),
-      ])
+      Object.entries(OPTIONAL_ENV_KEYS).map(([key, env]) => [key, process.env[env]])
     ),
     router: {},
     isProductionBuild,

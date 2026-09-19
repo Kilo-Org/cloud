@@ -139,11 +139,35 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
   if (/\btool calls (?:cutoff|cut off) by max_tokens\b/.test(message)) {
     return 'output_limit';
   }
+  // A provider rejects an over-long request with a 4xx that would otherwise
+  // fall through to the APIError status mapping and be reported as an invalid
+  // request. Match the wording providers use (Kilo/Nex AGI "exceeds this
+  // model's context length", OpenAI "maximum context length", Anthropic
+  // "prompt is too long") plus the provider_code token, so the transcript
+  // names the real cause instead of "Assistant request was invalid". Every
+  // branch requires an over-limit qualifier: a field-name validation error like
+  // "Invalid value for 'context_length'" or a payload-size 413 ("Request Entity
+  // Too Large") must stay an invalid request, not claim the context window.
+  if (
+    /\bcontext[_ ]?(?:length|window|limit|size)[_ ]?(?:exceeds?|exceeded|overflow(?:ed)?|too (?:long|large)|max(?:imum)?)\b/.test(
+      message
+    ) ||
+    /\b(?:exceeds?|exceeded|overflow(?:ed)?|max(?:imum)?)\b[^.]{0,40}\bcontext\b/.test(message) ||
+    /\b(?:prompt|request|input|messages?)\b[^.]{0,40}\btoo long\b/.test(message)
+  ) {
+    return 'context_limit';
+  }
   if (
     /\b(rate limit|rate_limit|usage[_ -]?limit[_ -]?exceeded|too many requests|429)\b/.test(message)
   ) {
     return 'rate_limited';
   }
+  // "too many tokens" on its own is ambiguous: a provider uses it both for an
+  // over-long request and for a per-minute rate limit ("Rate limit reached: too
+  // many tokens per minute"). An explicit rate-limit wording is the stronger
+  // signal and is checked first, so the unqualified pattern is only consulted
+  // here, after it.
+  if (/\btoo many tokens\b/.test(message)) return 'context_limit';
   if (/\b(timed? out|timeout|deadline exceeded)\b/.test(message)) return 'timeout';
   if (/\b(unauthorized|forbidden|authorization|authentication|401|403)\b/.test(message)) {
     return 'provider_authentication';

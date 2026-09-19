@@ -1,6 +1,7 @@
 import { type ElementType } from 'react';
+import type * as AppAwareKeyboardPadding from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { act } from '@/test/renderer';
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import {
   keyboard,
@@ -13,6 +14,22 @@ import {
 } from '@/components/app-unlock-screen.test-helpers';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 import { ANDROID_NAVIGATION_BAR_HEIGHT, TOAST_BOTTOM_GAP } from '@/lib/toast-offset';
+
+// One keyboard read for the whole app: the Toaster must import the hook the
+// screens reserve padding with, not run its own listener pair, or the toast's
+// height can drift from theirs. The counter is a plain object so
+// `resetUnlockMocks` (which resets every `vi.fn`) cannot clear it.
+const sharedKeyboardHook = vi.hoisted(() => ({ calls: 0 }));
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', async importOriginal => {
+  const actual = await importOriginal<typeof AppAwareKeyboardPadding>();
+  return {
+    ...actual,
+    useAppAwareKeyboardPadding: () => {
+      sharedKeyboardHook.calls += 1;
+      return actual.useAppAwareKeyboardPadding();
+    },
+  };
+});
 
 beforeEach(resetUnlockMocks);
 afterEach(unmountUnlock);
@@ -95,6 +112,20 @@ it('keeps the resting offset when the route hides the tab bar', async () => {
   const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
 
   expect(toasters[0]?.props.offset).toBe(ANDROID_NAVIGATION_BAR_HEIGHT + TOAST_BOTTOM_GAP);
+});
+
+/**
+ * The keyboard read lives in one hook (`useAppAwareKeyboardPadding`) so the
+ * padding view and the reveal hook cannot disagree with the toast. The Toaster
+ * imports that hook instead of running its own `Keyboard`/`AppState` listener
+ * pair; this test fails if a second implementation grows back here.
+ */
+it('reads the keyboard height through the shared app-aware hook', async () => {
+  sharedKeyboardHook.calls = 0;
+
+  await mount();
+
+  expect(sharedKeyboardHook.calls).toBeGreaterThan(0);
 });
 
 it('keeps the toast above the software keyboard while it is up', async () => {

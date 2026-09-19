@@ -7,7 +7,7 @@ import {
 } from 'expo-apple-authentication';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, useColorScheme, View } from 'react-native';
+import { Platform, Pressable, useColorScheme, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -319,23 +319,31 @@ export function IdleAuth({
         {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
         <Text>{t('common.continue')}</Text>
       </Button>
-      <Text className="text-xs text-muted-foreground">
-        {t('login.termsPrefix')}{' '}
-        <Text
-          className="text-xs text-primary underline"
+      <View className="flex-row flex-wrap items-center">
+        <Text className="text-xs text-muted-foreground">{t('login.termsPrefix')} </Text>
+        <Pressable
+          // 48dp, not 44dp: Android lays the target out in whole physical
+          // pixels, so 44dp at density 420 rounds down to 115px = 43.81dp and
+          // misses the 44dp floor (e1 measured 116x115px). 48dp is the
+          // Material minimum and survives the rounding at every density.
+          className="min-h-[48px] min-w-[48px] max-w-full items-center justify-center active:opacity-70"
+          accessibilityRole="link"
+          accessibilityLabel={t('login.terms')}
           onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
         >
-          {t('login.terms')}
-        </Text>
-        {t('login.termsConnector')}
-        <Text
-          className="text-xs text-primary underline"
+          <Text className="text-xs text-primary underline">{t('login.terms')}</Text>
+        </Pressable>
+        <Text className="text-xs text-muted-foreground">{t('login.termsConnector')}</Text>
+        <Pressable
+          className="min-h-[48px] min-w-[48px] max-w-full items-center justify-center active:opacity-70"
+          accessibilityRole="link"
+          accessibilityLabel={t('common.privacyPolicy')}
           onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
         >
-          {t('common.privacyPolicy')}
-        </Text>
-        {t('login.termsSuffix')}
-      </Text>
+          <Text className="text-xs text-primary underline">{t('common.privacyPolicy')}</Text>
+        </Pressable>
+        <Text className="text-xs text-muted-foreground">{t('login.termsSuffix')}</Text>
+      </View>
       <Button
         variant="ghost"
         disabled={authBusy}

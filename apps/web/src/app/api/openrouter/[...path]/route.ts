@@ -682,18 +682,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     user,
     organizationId,
     taskId,
-    clientIp: ipAddress ?? null,
-    machineId: machineIdHeader,
     getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
   });
-  if (providerResult.kind === 'not-found') {
-    // Paused experiment for this public id — return a local model-unavailable
-    // response instead of silently falling through to default routing.
-    return modelDoesNotExistResponse();
-  }
-  if (providerResult.kind === 'unavailable') {
-    return temporarilyUnavailableResponse();
-  }
   if (providerResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
     // instead of silently serving the request through another billing path.
@@ -750,7 +740,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       groupModelAllowed,
       groupProvidersAllowed,
       modelRestrictionError,
-      settings,
     } = await accessCheckResolver.get();
 
     if (
@@ -778,29 +767,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
     if (!groupProvidersAllowed) return modelNotAllowedResponse();
 
-    // Experiment traffic captures prompts to R2 for partner evaluation, which
-    // is a form of data collection that the gateway-pinned `data_collection`
-    // setting cannot enforce on a direct partner upstream. If the org has
-    // explicitly disabled data collection, refuse the experimented public id
-    // here rather than routing through and silently capturing prompts.
-    if (effectiveProviderContext.experiment && settings?.data_collection === 'deny') {
-      return dataCollectionRequiredResponse();
-    }
-
-    // OpenRouter's `body.provider.only` does not reach a direct experiment
-    // partner, so enforce any effective provider routes locally instead.
-    if (
-      effectiveProviderContext.experiment &&
-      effectiveProviderConfig?.only &&
-      !effectiveProviderConfig.only.includes(effectiveProviderContext.provider.id)
-    ) {
-      return modelNotAllowedResponse();
-    }
-
-    // Direct experiment upstreams must not have a Vercel/OpenRouter
-    // provider config pinned onto them — the partner endpoint is selected
-    // by the variant version.
-    if (effectiveProviderConfig && !effectiveProviderContext.experiment) {
+    if (effectiveProviderConfig) {
       requestBodyParsed.body.provider = effectiveProviderConfig;
     }
   }
@@ -853,15 +820,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
   if (providerNotAllowedError) return providerNotAllowedError;
 
-  if (effectiveProviderContext.experiment) {
-    usageContext.modelExperimentVariantVersionId =
-      effectiveProviderContext.experiment.variantVersionId;
-    usageContext.modelExperimentAllocationSubject =
-      effectiveProviderContext.experiment.allocationSubject;
-    // Cost zeroing for experiment traffic is handled by `isFreeModel`, which
-    // returns true for experimented public ids.
-  }
-
   sentryRootSpan()?.setAttribute(
     'openrouter.time_to_request_start_ms',
     performance.now() - requestStartedAt
@@ -894,8 +852,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
   if (attempt.type === 'error') return attempt.response;
 
-  const { response, toolsAvailable, toolsUsed, experimentPromptCapture } = attempt;
-  if (experimentPromptCapture) usageContext.experimentPromptCapture = experimentPromptCapture;
+  const { response, toolsAvailable, toolsUsed } = attempt;
   const finalUpstreamModel = requestBodyParsed.body.model ?? effectiveModelIdLowerCased;
   logExceptInTest(
     'upstream response status: %s, x-vercel-id: %s, session_id: %s',

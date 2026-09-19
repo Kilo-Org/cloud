@@ -18,9 +18,6 @@ jest.mock('@/lib/ai-gateway/byok', () => ({
   getBYOKforUser: jest.fn(),
   getBYOKforOrganization: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/experiments/membership', () => ({
-  isPublicIdExperimented: jest.fn().mockResolvedValue(false),
-}));
 jest.mock('@/lib/ai-gateway/providers/vercel', () => ({
   shouldRouteToVercel: jest.fn().mockResolvedValue(false),
 }));
@@ -48,8 +45,6 @@ function providerInput(requestedModel: string) {
     user,
     organizationId: undefined,
     taskId: undefined,
-    clientIp: null,
-    machineId: null,
   };
 }
 

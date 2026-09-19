@@ -130,7 +130,7 @@ const errorFieldsSchema = z.object({
 export function classifyPasskeyError(error: unknown): PasskeyFailure {
   const fields = errorFieldsSchema.safeParse(error);
   const text = fields.success
-    ? [fields.data.name, fields.data.message, fields.data.code].join(' ').toLowerCase()
+    ? [fields.data.name, fields.data.message, fields.data.code].join(' ').toLocaleLowerCase()
     : '';
   if (text.includes('cancel')) {
     return 'cancelled';

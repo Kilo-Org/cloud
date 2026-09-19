@@ -202,7 +202,6 @@ jest.mock('@/lib/r2/client', () => ({
   r2Client: { send: (command: { input: { Key?: string } }) => mockR2Send(command) },
   r2CliSessionsBucketName: 'cli-sessions-bucket',
   r2CloudAgentAttachmentsBucketName: 'attachment-bucket',
-  r2ExperimentPromptsBucketName: 'experiment-prompts-bucket',
 }));
 
 const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(

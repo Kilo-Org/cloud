@@ -11,9 +11,6 @@ import {
 jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/experiments/list-available-experiment-models', () => ({
-  listAvailableExperimentModels: jest.fn(),
-}));
 jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
   getDirectByokModelsForOrganization: jest.fn(),
@@ -35,9 +32,6 @@ jest.mock('@/lib/ai-gateway/models', () => ({
 }));
 
 const { getEnhancedOpenRouterModels } = jest.requireMock('@/lib/ai-gateway/providers/openrouter');
-const { listAvailableExperimentModels } = jest.requireMock(
-  '@/lib/ai-gateway/experiments/list-available-experiment-models'
-);
 const { getDirectByokModelsForUser, getDirectByokModelsForOrganization } = jest.requireMock(
   '@/lib/ai-gateway/providers/direct-byok'
 );
@@ -46,7 +40,6 @@ const { getAvailableModelsForOrganization } = jest.requireMock(
 );
 
 const mockedGetEnhanced = jest.mocked(getEnhancedOpenRouterModels);
-const mockedListExperiments = jest.mocked(listAvailableExperimentModels);
 const mockedGetByokUser = jest.mocked(getDirectByokModelsForUser);
 const mockedGetByokOrg = jest.mocked(getDirectByokModelsForOrganization);
 const mockedGetOrgModels = jest.mocked(getAvailableModelsForOrganization);
@@ -75,7 +68,6 @@ function model(id: string, variants?: Record<string, { reasoning?: { enabled: bo
 describe('auto-routing-pool-validation', () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    mockedListExperiments.mockResolvedValue([]);
     mockedGetByokUser.mockResolvedValue([]);
     mockedGetByokOrg.mockResolvedValue([]);
   });
@@ -158,25 +150,6 @@ describe('auto-routing-pool-validation', () => {
         error: expect.objectContaining({
           reason: 'virtual_model',
           message: poolValidationMessage('virtual_model'),
-        }),
-      });
-    });
-
-    test('rejects active experiment model ids', async () => {
-      mockedGetEnhanced.mockResolvedValue({ data: [model('openrouter/base')] });
-      mockedListExperiments.mockResolvedValue([model('experiment/active-model')]);
-
-      const result = await validatePoolEntries({
-        user: { id: 'user-1' },
-        organizationId: null,
-        entries: [{ model: 'experiment/active-model', variant: null }],
-      });
-
-      expect(result).toEqual({
-        ok: false,
-        error: expect.objectContaining({
-          reason: 'experiment_model',
-          message: poolValidationMessage('experiment_model'),
         }),
       });
     });
@@ -408,7 +381,6 @@ describe('auto-routing-pool-validation', () => {
           },
         ],
       ]),
-      experimentIds: new Set(),
       byokOnlyIds: new Set(),
       managedIds: new Set(['anthropic/claude-sonnet-4', 'google/gemini-2.5-flash']),
       ownerCatalogIds: new Set(['anthropic/claude-sonnet-4', 'google/gemini-2.5-flash']),

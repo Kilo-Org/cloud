@@ -1,13 +1,13 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, Share, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { cn, parseTimestamp } from '@/lib/utils';
 
 import {
@@ -41,9 +41,9 @@ export function InvitedMemberRow({
   organizationId,
   last,
 }: Readonly<InvitedMemberRowProps>) {
-  const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
   const { showActionSheetWithOptions } = useActionSheet();
+  const themedSheet = useThemedActionSheetOptions();
   const mutations = useOrganizationMutations(organizationId);
   const resendInvite = useResendInvite(organizationId);
   const dateLabel = inviteDateLabel(invite.inviteDate);
@@ -77,7 +77,7 @@ export function InvitedMemberRow({
         options,
         cancelButtonIndex: options.length - 1,
         destructiveButtonIndex: options.length - 2,
-        containerStyle: { paddingBottom: bottom },
+        ...themedSheet,
       },
       index => {
         const label = index !== undefined ? options[index] : undefined;

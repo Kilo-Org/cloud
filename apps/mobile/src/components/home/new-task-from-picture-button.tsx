@@ -13,6 +13,7 @@ import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-and
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 
 type NewTaskFromPictureButtonProps = {
   organizationId: string | null;
@@ -30,6 +31,7 @@ export function NewTaskFromPictureButton({
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const { userId } = useCurrentUserId();
 
@@ -65,11 +67,15 @@ export function NewTaskFromPictureButton({
   const handlePress = useCallback(() => {
     void (async () => {
       try {
-        const candidates = await pickAgentPicture(showActionSheetWithOptions, {
-          userId,
-          surface: 'agent-picture',
-          sessionId: null,
-        });
+        const candidates = await pickAgentPicture(
+          showActionSheetWithOptions,
+          {
+            userId,
+            surface: 'agent-picture',
+            sessionId: null,
+          },
+          themedSheet
+        );
         openComposerWithPicture(candidates);
       } catch {
         // `pickAgentPicture` resolves with no candidates on a cancel, a denied
@@ -78,7 +84,7 @@ export function NewTaskFromPictureButton({
         // staged, able to tap again.
       }
     })();
-  }, [openComposerWithPicture, showActionSheetWithOptions, userId]);
+  }, [openComposerWithPicture, showActionSheetWithOptions, userId, themedSheet]);
 
   return (
     <View className="mx-4">

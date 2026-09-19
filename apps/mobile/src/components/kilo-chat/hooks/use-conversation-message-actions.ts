@@ -19,10 +19,10 @@ import {
 } from '@kilocode/kilo-chat';
 import { useCallback, useRef, useState } from 'react';
 import { Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 
 import { executeActionWithMobileFeedback } from '../execute-action-feedback';
 import { formatMobileKiloChatError } from '../kilo-chat-error';
@@ -47,7 +47,7 @@ export function useConversationMessageActions({
   onRetrySend,
 }: Params) {
   const { showActionSheetWithOptions } = useActionSheet();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const [reactionPickerMessage, setReactionPickerMessage] = useState<Message | null>(null);
   const [recentReactions, setRecentReactions] = useState<string[]>([]);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
@@ -143,7 +143,7 @@ export function useConversationMessageActions({
           cancelButtonIndex: actionSheet.cancelButtonIndex,
           destructiveButtonIndex: actionSheet.destructiveButtonIndex,
           title: i18n.t('chat.messageActions.title'),
-          containerStyle: { paddingBottom: bottom },
+          ...themedSheet,
         },
         index => {
           const selectedAction = getSelectedMessageAction(actionSheet, index);
@@ -203,7 +203,6 @@ export function useConversationMessageActions({
       );
     },
     [
-      bottom,
       conversationId,
       currentUserId,
       deleteMessage,
@@ -213,6 +212,7 @@ export function useConversationMessageActions({
       onReplyToMessage,
       onRetrySend,
       showActionSheetWithOptions,
+      themedSheet,
     ]
   );
 

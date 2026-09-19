@@ -1,10 +1,10 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useCallback, useRef } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { type AddFileInput, useAttachmentQueue } from '@kilocode/kilo-chat-hooks';
 
 import { i18n } from '@/i18n';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import {
   buildAttachmentSizeRejectionToast,
   buildAttachmentUnreadableToast,
@@ -51,7 +51,7 @@ export function MessageInputWithAttachmentQueue({
     onSizeRejected,
   });
   const { showActionSheetWithOptions } = useActionSheet();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
 
   const addSelectedAttachments = useCallback(
     async (selected: readonly MessageAttachment[]) => {
@@ -111,7 +111,7 @@ export function MessageInputWithAttachmentQueue({
       {
         ...actionSheet,
         options: [...actionSheet.options],
-        containerStyle: { paddingBottom: bottom },
+        ...themedSheet,
       },
       index => {
         if (index === 0) {
@@ -123,7 +123,7 @@ export function MessageInputWithAttachmentQueue({
         }
       }
     );
-  }, [bottom, pickFromSource, showActionSheetWithOptions]);
+  }, [themedSheet, pickFromSource, showActionSheetWithOptions]);
 
   const addClipboardImage = useCallback(
     async (file: ClipboardImageFile) => {

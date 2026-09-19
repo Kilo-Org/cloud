@@ -23,7 +23,7 @@ const passkeySupport = vi.hoisted(() => ({ supported: true }));
 // What the screen reads from the hook: a fixed result object plus the one piece
 // of state the busy treatment depends on.
 const nativeAuth = vi.hoisted(() => ({
-  busy: undefined as 'passkey' | undefined,
+  busy: undefined as 'otp-send' | 'passkey' | undefined,
   signInWithPasskey: vi.fn(),
 }));
 
@@ -62,6 +62,7 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
   useColorScheme: () => 'light',
   View: 'View',
 }));
@@ -132,11 +133,17 @@ function findText(root: I, text: string): I {
   return node;
 }
 
+beforeEach(() => {
+  ssoRecovery.value = null;
+  nativeAuth.busy = undefined;
+  nativeAuth.signInWithPasskey.mockClear();
+  passkeySupport.supported = true;
+  vi.mocked(openBrowserAsync).mockClear();
+});
+
 describe('IdleAuth SSO recovery', () => {
   beforeEach(() => {
     ssoRecovery.value = { email: 'user@example.com', ssoOrganizationId: 'org_1' };
-    nativeAuth.busy = undefined;
-    passkeySupport.supported = true;
   });
 
   it('shows the recovery copy and forwards the SSO start', async () => {
@@ -160,13 +167,6 @@ describe('IdleAuth SSO recovery', () => {
 });
 
 describe('IdleAuth passkey control', () => {
-  beforeEach(() => {
-    ssoRecovery.value = null;
-    passkeySupport.supported = true;
-    nativeAuth.busy = undefined;
-    nativeAuth.signInWithPasskey.mockClear();
-  });
-
   it('offers the passkey button above the email field', async () => {
     const renderer = await mountIdleAuth(vi.fn<StartFn>());
 
@@ -269,17 +269,77 @@ describe('IdleAuth email continue copy', () => {
     const start = vi.fn<StartFn>();
     const renderer = await mountIdleAuth(start);
 
-    const terms = findText(renderer.root, 'Terms');
+    const terms = renderer.root.findByProps({
+      accessibilityRole: 'link',
+      accessibilityLabel: 'Terms',
+    });
     act(() => {
       (terms.props.onPress as () => void)();
     });
     expect(openBrowserAsync).toHaveBeenCalledWith(TERMS_URL);
 
-    const privacy = findText(renderer.root, 'Privacy Policy');
+    const privacy = renderer.root.findByProps({
+      accessibilityRole: 'link',
+      accessibilityLabel: 'Privacy Policy',
+    });
     act(() => {
       (privacy.props.onPress as () => void)();
     });
     expect(openBrowserAsync).toHaveBeenCalledWith(PRIVACY_URL);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it.each(['Terms', 'Privacy Policy'])(
+    'gives %s a standalone touch target of at least 44dp',
+    async label => {
+      const renderer = await mountIdleAuth(vi.fn<StartFn>());
+      const link = findText(renderer.root, label).parent;
+      const className = link?.props.className as string;
+
+      // NativeWind renders a `px` arbitrary value 1:1 as density-independent
+      // pixels and Android rounds the physical layout down, so a 44dp floor
+      // measured 115px = 43.81dp at density 420 (e1). Keep it above 44.
+      expect(Number(/min-h-\[(\d+)px\]/.exec(className)?.[1])).toBeGreaterThan(44);
+      expect(Number(/min-w-\[(\d+)px\]/.exec(className)?.[1])).toBeGreaterThan(44);
+      expect(className).toContain('max-w-full');
+      expect(className).toContain('active:opacity-70');
+      expect(link?.type).toBe('Pressable');
+      expect(link?.props.accessibilityRole).toBe('link');
+      expect(link?.props.accessibilityLabel).toBe(label);
+      expect(link?.parent?.type).toBe('View');
+      expect(link?.parent?.props.className).toContain('flex-wrap');
+
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  );
+
+  it('keeps legal targets unchanged and available while sign-in is busy', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+    const originalLinks = renderer.root.findAllByProps({ accessibilityRole: 'link' });
+    const originalClasses = originalLinks.map(link => link.props.className);
+
+    act(() => {
+      nativeAuth.busy = 'otp-send';
+      renderer.update(createElement(IdleAuth, { start }));
+    });
+
+    const busyLinks = renderer.root.findAllByProps({ accessibilityRole: 'link' });
+    expect(busyLinks).toHaveLength(2);
+    expect(busyLinks.map(link => link.props.className)).toEqual(originalClasses);
+    for (const link of busyLinks) {
+      expect(link.props.disabled).not.toBe(true);
+      act(() => {
+        (link.props.onPress as () => void)();
+      });
+    }
+    expect(openBrowserAsync).toHaveBeenNthCalledWith(1, TERMS_URL);
+    expect(openBrowserAsync).toHaveBeenNthCalledWith(2, PRIVACY_URL);
 
     act(() => {
       renderer.unmount();

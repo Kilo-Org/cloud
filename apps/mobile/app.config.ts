@@ -254,6 +254,13 @@ const config: ExpoConfig = {
         options: SENTRY_NATIVE_OPTIONS,
       },
     ],
+    // Pins the launch theme's window background to the splash color: the splash
+    // plugin never sets `android:windowBackground`, so a frame drawn before the
+    // splash window (or between it and React's first frame) fell back to the
+    // AppCompat DayNight default — a bare white cold-start screen. Registered
+    // BEFORE 'expo-splash-screen': mods run in reverse registration order, so
+    // this entry runs last and sees the launch theme the splash plugin writes.
+    './plugins/withAndroidSplashWindowBackground',
     [
       'expo-splash-screen',
       {

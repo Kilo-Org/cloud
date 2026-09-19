@@ -28,6 +28,14 @@ const BLOCKED_PERMISSIONS = [
 ];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+// Pins the Android launch surface to the brand splash: the brand drawable
+// (splash color + dark Kilo mark) on the launch and post-splash themes'
+// `android:windowBackground`, and `MainActivity` keeping the native splash on
+// screen until the app's JavaScript hides it. Without it a cold start paints the
+// platform's default window surface (plain white in day mode) and dismisses the
+// splash as soon as the development launcher's React content appears — before
+// the app bundle has actually loaded.
+const SPLASH_WINDOW_BACKGROUND_PLUGIN = './plugins/withAndroidSplashWindowBackground';
 const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSMicrophoneUsageDescription',
   'NSSpeechRecognitionUsageDescription',
@@ -151,6 +159,19 @@ check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGI
 check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
+);
+// The splash plugin registers after this one on purpose: mods run in reverse
+// registration order, so the later entry runs first, and this plugin has to run
+// last to see the launch theme the splash plugin writes.
+check(
+  pluginNames.includes(SPLASH_WINDOW_BACKGROUND_PLUGIN),
+  `plugins must include "${SPLASH_WINDOW_BACKGROUND_PLUGIN}"`
+);
+const splashPluginIndex = pluginNames.indexOf('expo-splash-screen');
+const splashWindowBackgroundIndex = pluginNames.indexOf(SPLASH_WINDOW_BACKGROUND_PLUGIN);
+check(
+  splashWindowBackgroundIndex !== -1 && splashPluginIndex > splashWindowBackgroundIndex,
+  `"${SPLASH_WINDOW_BACKGROUND_PLUGIN}" must be registered before "expo-splash-screen"`
 );
 
 const extra = config.extra ?? {};

@@ -3157,7 +3157,8 @@
     "couldNotApprove": "Miratimi dështoi",
     "couldNotStart": "Nisja dështoi",
     "channelName": "Agjentët aktivë",
-    "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
+    "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
+    "newestResult": "Rezultati më i ri"
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",

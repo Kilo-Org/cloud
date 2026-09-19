@@ -3157,7 +3157,8 @@
     "couldNotApprove": "Genehmigung fehlgeschlagen",
     "couldNotStart": "Start fehlgeschlagen",
     "channelName": "Aktive Agenten",
-    "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
+    "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen.",
+    "newestResult": "Neuestes Ergebnis"
   },
   "transcriptionModel": {
     "title": "Transkriptionsmodell",

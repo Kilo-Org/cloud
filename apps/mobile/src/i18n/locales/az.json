@@ -3157,7 +3157,8 @@
     "couldNotApprove": "Təsdiqlənmədi",
     "couldNotStart": "Başladılmadı",
     "channelName": "Aktiv agentlər",
-    "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir."
+    "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir.",
+    "newestResult": "Ən yeni nəticə"
   },
   "transcriptionModel": {
     "title": "Səsin mətnə çevrilməsi modeli",

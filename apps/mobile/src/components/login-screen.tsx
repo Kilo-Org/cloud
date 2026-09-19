@@ -8,7 +8,6 @@ import {
   AppState,
   I18nManager,
   Keyboard,
-  KeyboardAvoidingView,
   type KeyboardEvent,
   Platform,
   Pressable,
@@ -68,7 +67,7 @@ export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const [persistError, setPersistError] = useState<string | undefined>(undefined);
-  const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [authFormBusy, setAuthFormBusy] = useState(false);
   const [draft, setDraft] = useState<{
     email: string;
@@ -123,23 +122,22 @@ export function LoginScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- persistToken is stable except for signIn identity; only re-run on a newly approved token
   }, [status, token]);
 
-  // Android shell keyboard pad: under API 35+ EDGE_TO_EDGE_ENFORCED the window
-  // never resizes for the IME, so KeyboardAvoidingView is inert. keyboardDidShow
-  // still fires with real heights; consume them here (r0b: zero layout shift for
-  // the email IME when only KAV was present).
+  // The login screen owns keyboard occlusion on both platforms, so the layout is
+  // one implementation: KeyboardAvoidingView used to handle iOS alone and left
+  // Android — whose window never resizes for the IME under API 35+
+  // EDGE_TO_EDGE_ENFORCED — to this listener. The only platform difference left
+  // is which keyboard events exist: Android fires no `keyboardWillShow`/
+  // `keyboardWillHide`, so `resolveKeyboardPaddingEventsForPlatform` names the
+  // pair each platform reports.
   useEffect(() => {
-    if (Platform.OS !== 'android') {
-      return undefined;
-    }
-
     const keyboardEvents = resolveKeyboardPaddingEventsForPlatform(Platform.OS);
     if (keyboardEvents === null) {
-      setAndroidKeyboardHeight(0);
+      setKeyboardHeight(0);
       return undefined;
     }
 
     const keyboardShowSubscription = Keyboard.addListener(keyboardEvents.show, event => {
-      setAndroidKeyboardHeight(current =>
+      setKeyboardHeight(current =>
         resolveAppAwareKeyboardPadding({
           currentPadding: current,
           event: {
@@ -150,7 +148,7 @@ export function LoginScreen() {
       );
     });
     const keyboardHideSubscription = Keyboard.addListener(keyboardEvents.hide, () => {
-      setAndroidKeyboardHeight(current =>
+      setKeyboardHeight(current =>
         resolveAppAwareKeyboardPadding({
           currentPadding: current,
           event: { type: 'keyboard-hidden' },
@@ -158,7 +156,7 @@ export function LoginScreen() {
       );
     });
     const appStateSubscription = AppState.addEventListener('change', appState => {
-      setAndroidKeyboardHeight(current =>
+      setKeyboardHeight(current =>
         resolveAppAwareKeyboardPadding({
           currentPadding: current,
           event: { type: 'app-state-change', appState },
@@ -204,10 +202,10 @@ export function LoginScreen() {
   // imeInsets.bottom − barInsets.bottom (excludes the nav bar). endCoordinates.screenY
   // is NOT the IME top under adjustResize, so full occlusion is
   // endCoordinates.height + useSafeAreaInsets().bottom (= WindowInsets.ime().bottom;
-  // verified 704px + 63px = 767px on pixel9). Keep the bottom safe area reserved
-  // even with no keyboard height, so the scroll viewport never extends under
-  // the navigation bar. On iOS, KeyboardAvoidingView owns keyboard occlusion.
-  const bottomPadding = androidKeyboardHeight + insets.bottom;
+  // verified 704px + 63px = 767px on pixel9). The bottom inset is reserved at
+  // rest as well, so the scroll viewport never extends under the navigation bar
+  // or the home indicator; both platforms take this same branch.
+  const bottomPadding = keyboardHeight + insets.bottom;
   // The Globe stays enabled on idle, denied, expired, and error (those render
   // an interactive IdleAuth form); it is disabled while a device-auth flow
   // (pending/approved) or a busy auth action owns the screen.
@@ -215,163 +213,147 @@ export function LoginScreen() {
   const globeTrailing = I18nManager.isRTL ? { left: 16 } : { right: 16 };
 
   return (
-    // iOS: automaticallyAdjustKeyboardInsets only made the ScrollView scrollable,
-    // it never scrolls, and iOS only auto-reveals the focused field — so the
-    // centered form kept "Send code" under the keyboard on shorter devices
-    // (verified: iPhone 17 Pro, button centre 568pt vs keyboard window top 566pt,
-    // taps swallowed by UIRemoteKeyboardWindow). "padding" shrinks the ScrollView
-    // so the whole form re-centres in the space above the keyboard.
-    //
-    // Android: on API 35+ EDGE_TO_EDGE_ENFORCED the window never resizes for the
-    // IME, so KeyboardAvoidingView is inert (r0b: zero layout shift for the email
-    // IME). keyboardDidShow fires with real heights; the shell consumes them via
-    // the padding wrapper below.
-    <KeyboardAvoidingView behavior="padding" enabled={Platform.OS === 'ios'} className="flex-1">
-      <View
+    // One wrapper owns the vertical space on both platforms: the bottom inset is
+    // reserved at rest and the listener above adds the keyboard height on top
+    // while the IME is up. The ScrollView's centered form then re-centres in the
+    // space that stays above the keyboard, so "Continue" is never left under the
+    // keyboard, the navigation bar, or the home indicator.
+    <View
+      className="flex-1 bg-background"
+      // eslint-disable-next-line react-native/no-inline-styles -- dynamic keyboard and safe-area padding
+      style={{ paddingBottom: bottomPadding }}
+    >
+      <ScrollView
         className="flex-1 bg-background"
-        // eslint-disable-next-line react-native/no-inline-styles -- dynamic keyboard and safe-area padding
-        style={{ paddingBottom: bottomPadding }}
+        contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView
-          className="flex-1 bg-background"
-          contentContainerClassName="flex-grow items-center justify-center gap-6 px-6 py-8"
-          keyboardShouldPersistTaps="handled"
-        >
-          <View className="w-full max-w-sm items-center gap-2">
-            <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel={t('login.logo')} />
-            <Text className="text-center text-lg">{t('login.welcome')}</Text>
-          </View>
+        <View className="w-full max-w-sm items-center gap-2">
+          <Image source={logo} className="mb-1 h-16 w-16" accessibilityLabel={t('login.logo')} />
+          <Text className="text-center text-lg">{t('login.welcome')}</Text>
+        </View>
 
-          {/* Branch fade animations parked mid-flight on remount — e1 measured 2/2
-              iOS logout→login remounts washed out at ~50% alpha for 3+ minutes,
-              recovering only on relaunch — so these branches render without
-              animation; status swaps are instant. */}
-          <View className="w-full max-w-sm gap-3">
-            {status === 'idle' && draft === null && (
-              <>
-                {/* Form-sized placeholder until the SecureStore draft restore finishes. */}
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-11 w-full" />
-              </>
-            )}
+        {/* Branch fade animations parked mid-flight on remount — e1 measured 2/2
+            iOS logout→login remounts washed out at ~50% alpha for 3+ minutes,
+            recovering only on relaunch — so these branches render without
+            animation; status swaps are instant. */}
+        <View className="w-full max-w-sm gap-3">
+          {status === 'idle' && draft === null && (
+            <>
+              {/* Form-sized placeholder until the SecureStore draft restore finishes. */}
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-11 w-full" />
+            </>
+          )}
 
-            {status === 'idle' && draft !== null && (
+          {status === 'idle' && draft !== null && (
+            <IdleAuth
+              start={start}
+              initialEmail={draft.email}
+              initialSsoRecovery={draft.ssoRecovery}
+              onBusyChange={setAuthFormBusy}
+            />
+          )}
+
+          {status === 'pending' && code && (
+            <View className="w-full items-center gap-4">
+              {resumed && (
+                <Text variant="muted" className="text-center">
+                  {t('login.continuingSignIn')}
+                </Text>
+              )}
+              <Text variant="muted" className="text-center">
+                {t('login.signInCode')}
+              </Text>
+              <Text
+                variant="h2"
+                className="border-b-0 pb-0 text-center tracking-widest"
+                accessibilityLabel={t('login.signInCodeAccessibility', {
+                  // eslint-disable-next-line @typescript-eslint/no-misused-spread -- code is always ASCII
+                  code: [...code].join(' '),
+                })}
+                selectable
+              >
+                {code}
+              </Text>
+              {/* Stack actions full-width so labels never clip side-by-side at max text */}
+              <View className="w-full gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full flex-row flex-wrap gap-1"
+                  onPress={() => {
+                    void openBrowser();
+                  }}
+                  accessibilityLabel={t('login.openSignInPageInBrowser')}
+                >
+                  <ExternalLink size={14} color={colors.foreground} />
+                  <Text className="text-center">{t('common.openInBrowser')}</Text>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onPress={() => {
+                    if (verificationUrl) {
+                      void Clipboard.setStringAsync(verificationUrl);
+                      toast(t('common.copiedToClipboard'));
+                    }
+                  }}
+                  accessibilityLabel={t('login.copySignInLink')}
+                >
+                  <Text className="text-center">{t('common.copyLink')}</Text>
+                </Button>
+              </View>
+              <Button variant="ghost" onPress={cancel} accessibilityLabel={t('login.cancelSignIn')}>
+                <Text>{t('common.cancel')}</Text>
+              </Button>
+            </View>
+          )}
+
+          {status === 'pending' && !code && (
+            <View className="w-full items-center gap-3">
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+              <Text variant="muted" className="text-center">
+                {t('login.startingSignIn')}
+              </Text>
+              <Button variant="ghost" onPress={cancel} accessibilityLabel={t('login.cancelSignIn')}>
+                <Text>{t('common.cancel')}</Text>
+              </Button>
+            </View>
+          )}
+
+          {(status === 'denied' || status === 'expired' || status === 'error') && (
+            <View className="w-full gap-3">
+              <Text className="text-center text-sm text-destructive">
+                {errorMessage(status, error)}
+              </Text>
               <IdleAuth
                 start={start}
-                initialEmail={draft.email}
-                initialSsoRecovery={draft.ssoRecovery}
+                initialEmail={draft?.email ?? ''}
+                initialSsoRecovery={draft?.ssoRecovery ?? null}
                 onBusyChange={setAuthFormBusy}
               />
-            )}
-
-            {status === 'pending' && code && (
-              <View className="w-full items-center gap-4">
-                {resumed && (
-                  <Text variant="muted" className="text-center">
-                    {t('login.continuingSignIn')}
-                  </Text>
-                )}
-                <Text variant="muted" className="text-center">
-                  {t('login.signInCode')}
-                </Text>
-                <Text
-                  variant="h2"
-                  className="border-b-0 pb-0 text-center tracking-widest"
-                  accessibilityLabel={t('login.signInCodeAccessibility', {
-                    // eslint-disable-next-line @typescript-eslint/no-misused-spread -- code is always ASCII
-                    code: [...code].join(' '),
-                  })}
-                  selectable
-                >
-                  {code}
-                </Text>
-                {/* Stack actions full-width so labels never clip side-by-side at max text */}
-                <View className="w-full gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full flex-row flex-wrap gap-1"
-                    onPress={() => {
-                      void openBrowser();
-                    }}
-                    accessibilityLabel={t('login.openSignInPageInBrowser')}
-                  >
-                    <ExternalLink size={14} color={colors.foreground} />
-                    <Text className="text-center">{t('common.openInBrowser')}</Text>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onPress={() => {
-                      if (verificationUrl) {
-                        void Clipboard.setStringAsync(verificationUrl);
-                        toast(t('common.copiedToClipboard'));
-                      }
-                    }}
-                    accessibilityLabel={t('login.copySignInLink')}
-                  >
-                    <Text className="text-center">{t('common.copyLink')}</Text>
-                  </Button>
-                </View>
-                <Button
-                  variant="ghost"
-                  onPress={cancel}
-                  accessibilityLabel={t('login.cancelSignIn')}
-                >
-                  <Text>{t('common.cancel')}</Text>
-                </Button>
-              </View>
-            )}
-
-            {status === 'pending' && !code && (
-              <View className="w-full items-center gap-3">
-                <ActivityIndicator size="small" color={colors.mutedForeground} />
-                <Text variant="muted" className="text-center">
-                  {t('login.startingSignIn')}
-                </Text>
-                <Button
-                  variant="ghost"
-                  onPress={cancel}
-                  accessibilityLabel={t('login.cancelSignIn')}
-                >
-                  <Text>{t('common.cancel')}</Text>
-                </Button>
-              </View>
-            )}
-
-            {(status === 'denied' || status === 'expired' || status === 'error') && (
-              <View className="w-full gap-3">
-                <Text className="text-center text-sm text-destructive">
-                  {errorMessage(status, error)}
-                </Text>
-                <IdleAuth
-                  start={start}
-                  initialEmail={draft?.email ?? ''}
-                  initialSsoRecovery={draft?.ssoRecovery ?? null}
-                  onBusyChange={setAuthFormBusy}
-                />
-              </View>
-            )}
-          </View>
-        </ScrollView>
-        <Pressable
-          onPress={() => {
-            setLanguagePickerBridge({ beforeReload: persistLoginDrafts });
-            router.push('/(auth)/language-picker' as Href);
-          }}
-          disabled={globeDisabled}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={t('common.language')}
-          accessibilityState={{ disabled: globeDisabled }}
-          className="absolute h-11 w-11 items-center justify-center rounded-full active:opacity-70 disabled:opacity-50"
-          // eslint-disable-next-line react-native/no-inline-styles -- safe-area + RTL-aware trailing edge
-          style={{ top: insets.top + 8, ...globeTrailing }}
-        >
-          <Globe size={22} color={colors.foreground} />
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+      <Pressable
+        onPress={() => {
+          setLanguagePickerBridge({ beforeReload: persistLoginDrafts });
+          router.push('/(auth)/language-picker' as Href);
+        }}
+        disabled={globeDisabled}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={t('common.language')}
+        accessibilityState={{ disabled: globeDisabled }}
+        className="absolute h-11 w-11 items-center justify-center rounded-full active:opacity-70 disabled:opacity-50"
+        // eslint-disable-next-line react-native/no-inline-styles -- safe-area + RTL-aware trailing edge
+        style={{ top: insets.top + 8, ...globeTrailing }}
+      >
+        <Globe size={22} color={colors.foreground} />
+      </Pressable>
+    </View>
   );
 }

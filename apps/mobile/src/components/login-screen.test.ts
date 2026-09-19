@@ -48,7 +48,6 @@ vi.mock('react-native', () => ({
   AppState: { addEventListener: addAppStateListener },
   I18nManager: { isRTL: false },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
-  KeyboardAvoidingView: 'KeyboardAvoidingView',
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
@@ -117,6 +116,12 @@ function findByType(
   type: string
 ): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
+}
+
+function keyboardEventsFor(platform: 'android' | 'ios') {
+  return platform === 'ios'
+    ? ({ show: 'keyboardWillShow', hide: 'keyboardWillHide' } as const)
+    : ({ show: 'keyboardDidShow', hide: 'keyboardDidHide' } as const);
 }
 
 async function mountLoginScreen(): Promise<TestRenderer.ReactTestRenderer> {
@@ -440,7 +445,10 @@ describe('login-screen bottom-bar clearance', () => {
     return scroll.parent;
   }
 
-  function emitKeyboard(eventName: 'keyboardDidShow' | 'keyboardDidHide', height = 0) {
+  function emitKeyboard(
+    eventName: 'keyboardDidShow' | 'keyboardDidHide' | 'keyboardWillShow' | 'keyboardWillHide',
+    height = 0
+  ) {
     const subscription = vi
       .mocked(Keyboard.addListener)
       .mock.calls.find(([name]) => name === eventName);
@@ -467,9 +475,9 @@ describe('login-screen bottom-bar clearance', () => {
 
       expect(findByType(renderer.root, 'IdleAuth')[0]?.props.initialEmail).toBe(email);
       expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
-      expect(findByType(renderer.root, 'KeyboardAvoidingView')[0]?.props.enabled).toBe(
-        platform === 'ios'
-      );
+      // One padded wrapper for both platforms; the platform-gated
+      // KeyboardAvoidingView is gone.
+      expect(findByType(renderer.root, 'KeyboardAvoidingView')).toHaveLength(0);
 
       renderer.unmount();
     }
@@ -505,36 +513,53 @@ describe('login-screen bottom-bar clearance', () => {
     renderer.unmount();
   });
 
-  it('adds Android keyboard occlusion once and retains the bar after dismissal', async () => {
-    const renderer = await mountLoginScreen();
+  it.each(['android', 'ios'] as const)(
+    'adds the %s keyboard height on top of the reserved inset through the same listener pair',
+    async platform => {
+      const events = keyboardEventsFor(platform);
+      Platform.OS = platform;
+      const renderer = await mountLoginScreen();
 
-    emitKeyboard('keyboardDidShow', 300);
-    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 328 });
+      // Same wrapper, same rule, one listener pair per platform: the only
+      // platform difference is which keyboard events that platform fires.
+      expect(vi.mocked(Keyboard.addListener).mock.calls.map(([name]) => name)).toEqual([
+        events.show,
+        events.hide,
+      ]);
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
 
-    emitKeyboard('keyboardDidHide');
-    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+      emitKeyboard(events.show, 300);
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 328 });
 
-    emitKeyboard('keyboardDidShow', 0);
-    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+      emitKeyboard(events.hide);
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
 
-    renderer.unmount();
-  });
+      emitKeyboard(events.show, 0);
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
 
-  it('clears stale keyboard occlusion on background without dropping the bottom bar', async () => {
-    const renderer = await mountLoginScreen();
-    emitKeyboard('keyboardDidShow', 300);
-    const subscription = addAppStateListener.mock.calls[0];
-    if (!subscription) {
-      throw new Error('missing app state listener');
+      renderer.unmount();
     }
+  );
 
-    act(() => {
-      subscription[1]('background');
-    });
-    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+  it.each(['android', 'ios'] as const)(
+    'clears stale %s keyboard occlusion on background without dropping the bottom bar',
+    async platform => {
+      Platform.OS = platform;
+      const renderer = await mountLoginScreen();
+      emitKeyboard(keyboardEventsFor(platform).show, 300);
+      const subscription = addAppStateListener.mock.calls[0];
+      if (!subscription) {
+        throw new Error('missing app state listener');
+      }
 
-    renderer.unmount();
-  });
+      act(() => {
+        subscription[1]('background');
+      });
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+
+      renderer.unmount();
+    }
+  );
 
   it('tracks bottom inset changes, including devices without a bottom bar', async () => {
     const renderer = await mountLoginScreen();

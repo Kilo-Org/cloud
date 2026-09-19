@@ -5,7 +5,7 @@ jest.mock('@/lib/ai-gateway/openai-chatgpt/served-models', () => ({
   isOpenAiModelServed: jest.fn().mockResolvedValue(true),
 }));
 jest.mock('@/lib/ai-gateway/models', () => ({
-  ...jest.requireActual<typeof import('@/lib/ai-gateway/models')>('@/lib/ai-gateway/models'),
+  ...jest.requireActual<typeof GatewayModels>('@/lib/ai-gateway/models'),
   findKiloExclusiveModel: (model: string) =>
     model === 'openai/test-exclusive-model' ? { public_id: model } : null,
 }));
@@ -27,6 +27,7 @@ jest.mock('next/server', () => ({
 }));
 
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
+import type * as GatewayModels from '@/lib/ai-gateway/models';
 import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import { isOpenAiModelServed } from '@/lib/ai-gateway/openai-chatgpt/served-models';

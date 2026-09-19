@@ -15,7 +15,7 @@ export type { SuccessResponse, ErrorResponse, ApiResponse } from './res.js';
 
 export { zodJsonValidator } from './zod-json-validator.js';
 
-export { formatError } from './format-error.js';
+export { formatError, getErrorMessage } from './format-error.js';
 
 export { extractBearerToken } from './extract-bearer-token.js';
 

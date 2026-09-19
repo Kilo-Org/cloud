@@ -1,4 +1,4 @@
-import { withDORetry } from '@kilocode/worker-utils';
+import { getErrorMessage as errorMessage, withDORetry } from '@kilocode/worker-utils';
 import { and, eq } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
@@ -620,8 +620,4 @@ function logEvent(level: 'info' | 'warn', event: CommonEvent & Record<string, un
 
 function elapsed(startedAt: number): number {
   return Math.round(performance.now() - startedAt);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

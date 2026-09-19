@@ -33,6 +33,7 @@ import type {
   KiloclawStartReason,
   KiloclawStopReason,
 } from '@kilocode/worker-utils';
+import { getErrorMessage as errorMessage } from '@kilocode/worker-utils';
 import {
   BILLING_FLOW,
   createBillingCorrelationHeaders,
@@ -692,10 +693,6 @@ function workerInstanceId(
   const sandboxId = instance.sandboxId ?? instance.sandbox_id;
   if (!sandboxId) return undefined;
   return sandboxId.startsWith('ki_') ? instance.id : undefined;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 // Defence-in-depth check. The trial inactivity SQL queries already restrict to

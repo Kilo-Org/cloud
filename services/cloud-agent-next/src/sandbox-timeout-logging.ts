@@ -1,4 +1,5 @@
 import type { ExecResult, ExecOptions } from '@cloudflare/sandbox';
+import { getErrorMessage } from '@kilocode/worker-utils';
 import { logger, type CloudAgentTags } from './logger.js';
 
 /** Timeout for lightweight sandbox commands (mkdir, stat, git config, etc.) */
@@ -24,10 +25,6 @@ export type SandboxOperationTimeoutLogContext = {
 
 const SANDBOX_TIMEOUT_LOG_TAG = 'sandbox-operation-timeout';
 const SANDBOX_TIMEOUT_LOG_MESSAGE = 'Sandbox operation timed out';
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 export function isSandboxOperationTimeoutError(error: unknown): boolean {
   if (!(error instanceof Error)) {

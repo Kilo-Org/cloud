@@ -163,7 +163,6 @@
     "useDifferentEmail": "Użyj innego adresu e-mail",
     "signInWithApple": "Zaloguj się przez Apple",
     "signInWithGoogle": "Zaloguj się przez Google",
-    "signInWithPasskey": "Zaloguj się kluczem dostępu",
     "emailAddress": "Adres e-mail",
     "emailPlaceholder": "ty@przyklad.pl",
     "continueWithEmail": "Kontynuuj przez e-mail",
@@ -176,10 +175,6 @@
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Więcej opcji logowania",
-    "passkeyCancelled": "Logowanie kluczem dostępu zostało anulowane. Spróbuj ponownie.",
-    "passkeyNotFound": "Dla tego urządzenia nie zapisano żadnego klucza dostępu. Zaloguj się zamiast tego przez Apple, Google lub swój adres e-mail.",
-    "passkeyUnsupported": "Klucze dostępu nie są dostępne na tym urządzeniu. Zaloguj się zamiast tego przez Apple, Google lub swój adres e-mail.",
-    "passkeyFailed": "Nie udało się zalogować kluczem dostępu. Spróbuj ponownie.",
     "couldNotCompleteSignIn": "Nie udało się dokończyć logowania. Spróbuj ponownie.",
     "sessionEnded": "Twoja sesja wygasła. Zaloguj się ponownie.",
     "signInCodeExpired": "Twój kod logowania wygasł. Spróbuj ponownie.",
@@ -230,28 +225,7 @@
     "providerTestAccount": "Konto testowe",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO dla firm",
-    "passkeysTitle": "Klucze dostępu",
-    "passkeysSubtitle": "Zaloguj się bez hasła",
-    "passkeysEmpty": "Nie ma jeszcze kluczy dostępu",
-    "passkeysEmptyHint": "$t(profile.addPasskey), aby zalogować się bez hasła.",
-    "passkeysCouldNotLoad": "Nie udało się wczytać kluczy dostępu",
-    "passkeysLoadFailed": "Klucze dostępu są niedostępne, dopóki to się nie wczyta.",
-    "addPasskey": "Dodaj klucz dostępu",
-    "passkeyDefaultName": "Klucz dostępu",
-    "passkeyAddedOn": "Dodano {{date}}",
-    "passkeyAdded": "Dodano klucz dostępu.",
-    "passkeyAddFailed": "Nie udało się dodać klucza dostępu. Spróbuj ponownie.",
-    "passkeyAddUnsupported": "To urządzenie nie może tworzyć kluczy dostępu.",
-    "passkeyAddCancelled": "Tworzenie klucza dostępu zostało anulowane.",
-    "passkeyRemoved": "Usunięto klucz dostępu.",
-    "passkeyRemoveFailed": "Nie udało się usunąć tego klucza dostępu. Spróbuj ponownie.",
-    "passkeyRenamed": "Zmieniono nazwę klucza dostępu.",
-    "passkeyName": "Nazwa klucza dostępu",
-    "renamePasskey": "Zmień nazwę klucza dostępu",
-    "removePasskey": "Usuń klucz dostępu",
-    "removePasskeyTitle": "Usunąć klucz dostępu?",
-    "removePasskeyMessage": "Nie będziesz już mógł zalogować się tym kluczem dostępu."
+    "providerEnterpriseSso": "SSO dla firm"
   },
   "preferences": {
     "general": "Ogólne",
@@ -319,11 +293,11 @@
     "previewFullDescription": "Powiadomienia pokazują treść wiadomości na ekranie blokady.",
     "previewGenericDescription": "Powiadomienia informują o zdarzeniach bez wyświetlania treści wiadomości. Otwórz Kilo, aby ją przeczytać.",
     "channel": {
-      "agentProgress": "Postęp agenta",
       "chat": "Wiadomości na czacie",
       "kiloclaw": "Aktywność KiloClaw",
       "balance": "Powiadomienia o saldzie",
-      "security": "Wykryte problemy z bezpieczeństwem"
+      "security": "Wykryte problemy z bezpieczeństwem",
+      "agent": "Sesje agenta"
     },
     "category": {
       "chatMessagesSubtitle": "odpowiedzi w twoich rozmowach",
@@ -416,11 +390,7 @@
       "uploadFailed": "Przesyłanie nie powiodło się.",
       "failedToUploadFile": "Nie udało się przesłać pliku: {{reason}}.",
       "nothingToPaste": "Nie ma nic do wklejenia.",
-      "metadataStripFailed": "Nie udało się usunąć metadanych zdjęcia.",
-      "limit_one": "Maksymalna liczba załącznik: {{displayCount}}.",
-      "limit_other": "Maksymalna liczba załączników: {{displayCount}}.",
-      "limit_few": "Maksymalna liczba załączniki: {{displayCount}}.",
-      "limit_many": "Maksymalna liczba załączników: {{displayCount}}."
+      "metadataStripFailed": "Nie udało się usunąć metadanych zdjęcia."
     },
     "attachmentPreview": {
       "accessibility": "Plik {{filename}}, {{status}}",
@@ -1195,15 +1165,7 @@
       "syncNow": "Synchronizuj teraz",
       "syncQueued": "Dodano synchronizację do kolejki",
       "syncStatusUnavailable": "Status synchronizacji jest niedostępny.",
-      "withinDeadline": "W terminie",
-      "daysOverdue_one": "{{displayCount}} dzień po terminie",
-      "daysOverdue_other": "{{displayCount}} dni po terminie",
-      "daysOverdue_few": "{{displayCount}} dni po terminie",
-      "daysOverdue_many": "{{displayCount}} dni po terminie",
-      "findingsCount_one": "Liczba problemów: {{displayCount}}",
-      "findingsCount_other": "Liczba problemów: {{displayCount}}",
-      "findingsCount_few": "Liczba problemów: {{displayCount}}",
-      "findingsCount_many": "Liczba problemów: {{displayCount}}"
+      "withinDeadline": "W terminie"
     },
     "dashboardMetrics": {
       "openFindings": "Otwarte problemy",
@@ -1736,19 +1698,7 @@
       "updateTodos": "Zaktualizuj zadania",
       "linesBadge": "wiersze: {{displayCount}}",
       "filesBadge": "pliki: {{displayCount}}",
-      "matchesBadge": "dopasowania: {{displayCount}}",
-      "filesBadge_one": "plik: {{displayCount}}",
-      "filesBadge_other": "pliki: {{displayCount}}",
-      "filesBadge_few": "pliki: {{displayCount}}",
-      "filesBadge_many": "plików: {{displayCount}}",
-      "linesBadge_one": "wiersz: {{displayCount}}",
-      "linesBadge_other": "wiersze: {{displayCount}}",
-      "linesBadge_few": "wiersze: {{displayCount}}",
-      "linesBadge_many": "wierszy: {{displayCount}}",
-      "matchesBadge_one": "dopasowanie: {{displayCount}}",
-      "matchesBadge_other": "dopasowania: {{displayCount}}",
-      "matchesBadge_few": "dopasowania: {{displayCount}}",
-      "matchesBadge_many": "dopasowań: {{displayCount}}"
+      "matchesBadge": "dopasowania: {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "wiersze {{start}}–{{end}} (skrócono)",
@@ -2044,15 +1994,7 @@
       "files": "Pliki",
       "couldNotOpenPhotoPicker": "Nie udało się otworzyć okna wyboru zdjęć. Uruchom ponownie Kilo i spróbuj ponownie.",
       "maxFilesAllowed": "Limit liczby plików wynosi {{displayCount}}.",
-      "onlyAddingFiles": "Dodawane pliki: {{accepted}} z {{total}} (maks. {{max}})",
-      "maxFilesAllowed_one": "Limit liczby plików wynosi {{displayCount}}.",
-      "maxFilesAllowed_other": "Limit liczby plików wynosi {{displayCount}}.",
-      "maxFilesAllowed_few": "Limit liczby plików wynosi {{displayCount}}.",
-      "maxFilesAllowed_many": "Limit liczby plików wynosi {{displayCount}}.",
-      "onlyAddingFiles_one": "Dodawane pliki: {{accepted}} z {{total}} (maks. {{max}})",
-      "onlyAddingFiles_other": "Dodawane pliki: {{accepted}} z {{total}} (maks. {{max}})",
-      "onlyAddingFiles_few": "Dodawane pliki: {{accepted}} z {{total}} (maks. {{max}})",
-      "onlyAddingFiles_many": "Dodawane pliki: {{accepted}} z {{total}} (maks. {{max}})"
+      "onlyAddingFiles": "Dodawane pliki: {{accepted}} z {{total}} (maks. {{max}})"
     },
     "composer": {
       "addAttachment": "Dodaj załącznik",
@@ -2070,11 +2012,7 @@
       "discardAttachmentsMessage": "Przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte.",
       "discardAttachmentsTitle": "Odrzucić załączniki?",
       "charactersRemaining": "Pozostała liczba znaków: {{count}}",
-      "insertNewline": "Wstaw nowy wiersz",
-      "charactersRemaining_one": "Pozostała liczba znaków: {{count}}",
-      "charactersRemaining_other": "Pozostała liczba znaków: {{count}}",
-      "charactersRemaining_few": "Pozostała liczba znaków: {{count}}",
-      "charactersRemaining_many": "Pozostała liczba znaków: {{count}}"
+      "insertNewline": "Wstaw nowy wiersz"
     },
     "chatLink": {
       "linkCopied": "Skopiowano link",
@@ -2148,11 +2086,7 @@
       "stepsCount_other": "{{steps}} kroku",
       "modelAccessibilityLabel": "Model {{name}}, dostawca {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} kroki",
-      "stepsCount_many": "{{steps}} kroków",
-      "modelsCount_one": "Model ({{displayCount}})",
-      "modelsCount_other": "Modele ({{displayCount}})",
-      "modelsCount_few": "Modele ({{displayCount}})",
-      "modelsCount_many": "Modele ({{displayCount}})"
+      "stepsCount_many": "{{steps}} kroków"
     },
     "autoApprove": {
       "title": "Automatyczne zatwierdzanie",
@@ -2192,11 +2126,7 @@
     },
     "toolRun": {
       "sheetTitle": "Wywołania narzędzi",
-      "condensedLabel": "{{itemCount}} elementów; {{last}}",
-      "condensedLabel_one": "{{itemCount}} element; {{last}}",
-      "condensedLabel_other": "{{itemCount}} elementów; {{last}}",
-      "condensedLabel_few": "{{itemCount}} elementy; {{last}}",
-      "condensedLabel_many": "{{itemCount}} elementów; {{last}}"
+      "condensedLabel": "{{itemCount}} elementów; {{last}}"
     }
   },
   "bootstrap": {
@@ -2331,11 +2261,7 @@
     "cliCantReceiveFilesTitle": "Ta sesja nie może odbierać plików",
     "cliCantReceiveFilesMessage": "Kilo CLI obsługujące tę sesję nie może odbierać plików. Zaktualizuj CLI na tym komputerze lub wyślij pliki do nowej sesji.",
     "contentlessMessage": "Nie ma nic do udostępnienia — nie dołączono tekstu ani plików.",
-    "couldNotReadContent": "Nie udało się odczytać udostępnionej treści.",
-    "onlyFirstFilesAttached_one": "Zostaną dołączone tylko początkowe pliki. Ich liczba: {{displayCount}}.",
-    "onlyFirstFilesAttached_other": "Zostaną dołączone tylko początkowe pliki. Ich liczba: {{displayCount}}.",
-    "onlyFirstFilesAttached_few": "Zostaną dołączone tylko początkowe pliki. Ich liczba: {{displayCount}}.",
-    "onlyFirstFilesAttached_many": "Zostaną dołączone tylko początkowe pliki. Ich liczba: {{displayCount}}."
+    "couldNotReadContent": "Nie udało się odczytać udostępnionej treści."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2502,7 +2428,7 @@
       "checksCount": "kontrole: {{displayCount}}",
       "checksCount_one": "kontrola: {{displayCount}}",
       "checksCount_few": "kontrole: {{displayCount}}",
-      "checksCount_many": "kontrole: {{displayCount}}",
+      "checksCount_many": "kontroli: {{displayCount}}",
       "checksCount_other": "kontrole: {{displayCount}}",
       "couldNotLoad": "Nie udało się wczytać kontroli.",
       "failed": "nieudane: {{displayCount}}",
@@ -2649,11 +2575,7 @@
         "outdatedOnPath": "Nieaktualny: {{path}}"
       },
       "deletedUser": "usunięty użytkownik",
-      "replyForbiddenTerm": "Nie masz uprawnień do odpowiadania w tym {{term}}.",
-      "moreLinesAbove_one": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
-      "moreLinesAbove_other": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
-      "moreLinesAbove_few": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
-      "moreLinesAbove_many": "… liczba dodatkowych wierszy powyżej: {{displayCount}}"
+      "replyForbiddenTerm": "Nie masz uprawnień do odpowiadania w tym {{term}}."
     },
     "entry": {
       "eyebrow": "Otwórz PR lub merge request za pomocą adresu URL",
@@ -2755,27 +2677,7 @@
       "fileLoadedCount_few": "Wczytano {{displayCount}} pliki",
       "fileLoadedCount_many": "Wczytano {{displayCount}} plików",
       "fileLoadedOfTotalCount_few": "Wczytano {{displayCount}} pliki z {{total}}",
-      "fileLoadedOfTotalCount_many": "Wczytano {{displayCount}} plików z {{total}}",
-      "expandAllLines_one": "Rozwiń wszystkie wiersze: {{displayCount}}",
-      "expandAllLines_other": "Rozwiń wszystkie wiersze: {{displayCount}}",
-      "expandAllLines_few": "Rozwiń wszystkie wiersze: {{displayCount}}",
-      "expandAllLines_many": "Rozwiń wszystkie wiersze: {{displayCount}}",
-      "expandLines_one": "Rozwiń wiersze: {{displayCount}} ({{start}}–{{end}})",
-      "expandLines_other": "Rozwiń wiersze: {{displayCount}} ({{start}}–{{end}})",
-      "expandLines_few": "Rozwiń wiersze: {{displayCount}} ({{start}}–{{end}})",
-      "expandLines_many": "Rozwiń wiersze: {{displayCount}} ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "Rozwiń wiersze kontekstu: {{displayCount}}",
-      "expandLinesOfContext_other": "Rozwiń wiersze kontekstu: {{displayCount}}",
-      "expandLinesOfContext_few": "Rozwiń wiersze kontekstu: {{displayCount}}",
-      "expandLinesOfContext_many": "Rozwiń wiersze kontekstu: {{displayCount}}",
-      "expandMoreLines_one": "Rozwiń kolejne wiersze: {{displayCount}} ({{start}}–{{end}})",
-      "expandMoreLines_other": "Rozwiń kolejne wiersze: {{displayCount}} ({{start}}–{{end}})",
-      "expandMoreLines_few": "Rozwiń kolejne wiersze: {{displayCount}} ({{start}}–{{end}})",
-      "expandMoreLines_many": "Rozwiń kolejne wiersze: {{displayCount}} ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "wczytano {{loaded}} z {{total}} plików",
-      "loadedOfTotalFiles_other": "wczytano {{loaded}} z {{total}} plików",
-      "loadedOfTotalFiles_few": "wczytano {{loaded}} z {{total}} plików",
-      "loadedOfTotalFiles_many": "wczytano {{loaded}} z {{total}} plików"
+      "fileLoadedOfTotalCount_many": "Wczytano {{displayCount}} plików z {{total}}"
     },
     "inbox": {
       "couldNotLoad": "Nie udało się wczytać skrzynki.",
@@ -2980,11 +2882,7 @@
       "statusContext": "Kontekst",
       "lineLabel": "wiersz {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(brak treści)",
-      "truncationBanner_one": "Widoczne są tylko pierwsze pliki spośród {{total}} zmienionych plików. Ich liczbę ogranicza limit API GitHub: {{limit}}.",
-      "truncationBanner_other": "Widoczne są tylko pierwsze pliki spośród {{total}} zmienionych plików. Ich liczbę ogranicza limit API GitHub: {{limit}}.",
-      "truncationBanner_few": "Widoczne są tylko pierwsze pliki spośród {{total}} zmienionych plików. Ich liczbę ogranicza limit API GitHub: {{limit}}.",
-      "truncationBanner_many": "Widoczne są tylko pierwsze pliki spośród {{total}} zmienionych plików. Ich liczbę ogranicza limit API GitHub: {{limit}}."
+      "emptyLine": "(brak treści)"
     },
     "linkPasteClipboardEmpty": "Schowek jest pusty.",
     "linkPasteNotAPullRequest": "To nie jest odnośnik do PR ani merge requestu",

@@ -163,7 +163,6 @@
     "useDifferentEmail": "Usar otro correo electrónico",
     "signInWithApple": "Iniciar sesión con Apple",
     "signInWithGoogle": "Iniciar sesión con Google",
-    "signInWithPasskey": "Iniciar sesión con una clave de acceso",
     "emailAddress": "Correo electrónico",
     "emailPlaceholder": "tu@ejemplo.com",
     "continueWithEmail": "Continuar con correo electrónico",
@@ -176,10 +175,6 @@
     "termsConnector": " y ",
     "termsSuffix": ".",
     "moreSignInOptions": "Más opciones de inicio de sesión",
-    "passkeyCancelled": "Se canceló el inicio de sesión con clave de acceso. Inténtalo de nuevo.",
-    "passkeyNotFound": "No hay ninguna clave de acceso guardada para este dispositivo. Inicia sesión con Apple, Google o tu correo electrónico.",
-    "passkeyUnsupported": "Las claves de acceso no están disponibles en este dispositivo. Inicia sesión con Apple, Google o tu correo electrónico.",
-    "passkeyFailed": "No se pudo iniciar sesión con una clave de acceso. Inténtalo de nuevo.",
     "couldNotCompleteSignIn": "No se pudo completar el inicio de sesión. Inténtalo de nuevo.",
     "sessionEnded": "Tu sesión terminó. Inicia sesión de nuevo.",
     "signInCodeExpired": "Tu código de inicio de sesión ha caducado. Inténtalo de nuevo.",
@@ -230,28 +225,7 @@
     "providerTestAccount": "Cuenta de prueba",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO empresarial",
-    "passkeysTitle": "Claves de acceso",
-    "passkeysSubtitle": "Inicia sesión sin contraseña",
-    "passkeysEmpty": "Aún no hay claves de acceso",
-    "passkeysEmptyHint": "$t(profile.addPasskey) para iniciar sesión sin contraseña.",
-    "passkeysCouldNotLoad": "No se pudieron cargar las claves de acceso",
-    "passkeysLoadFailed": "Las claves de acceso no estarán disponibles hasta que esto se cargue.",
-    "addPasskey": "Añadir una clave de acceso",
-    "passkeyDefaultName": "Clave de acceso",
-    "passkeyAddedOn": "Añadida {{date}}",
-    "passkeyAdded": "Clave de acceso añadida.",
-    "passkeyAddFailed": "No se pudo añadir una clave de acceso. Inténtalo de nuevo.",
-    "passkeyAddUnsupported": "Este dispositivo no puede crear claves de acceso.",
-    "passkeyAddCancelled": "Se canceló la creación de la clave de acceso.",
-    "passkeyRemoved": "Clave de acceso eliminada.",
-    "passkeyRemoveFailed": "No se pudo eliminar esa clave de acceso. Inténtalo de nuevo.",
-    "passkeyRenamed": "Clave de acceso renombrada.",
-    "passkeyName": "Nombre de la clave de acceso",
-    "renamePasskey": "Cambiar el nombre de la clave de acceso",
-    "removePasskey": "Eliminar la clave de acceso",
-    "removePasskeyTitle": "¿Eliminar la clave de acceso?",
-    "removePasskeyMessage": "Ya no podrás iniciar sesión con esta clave de acceso."
+    "providerEnterpriseSso": "SSO empresarial"
   },
   "preferences": {
     "general": "General",
@@ -291,11 +265,11 @@
   },
   "notifications": {
     "channel": {
-      "agentProgress": "Progreso de los agentes",
       "chat": "Mensajes de chat",
       "kiloclaw": "Actividad de KiloClaw",
       "balance": "Alertas de saldo",
-      "security": "Hallazgos de seguridad"
+      "security": "Hallazgos de seguridad",
+      "agent": "Sesiones de agentes"
     },
     "category": {
       "chatMessagesSubtitle": "respuestas en tus conversaciones",
@@ -416,10 +390,7 @@
       "uploadFailed": "No se pudo subir el archivo.",
       "failedToUploadFile": "No se pudo subir el archivo: {{reason}}.",
       "nothingToPaste": "No hay nada que pegar.",
-      "metadataStripFailed": "No se pudieron eliminar los metadatos de la foto.",
-      "limit_one": "Puedes adjuntar hasta {{displayCount}} archivo.",
-      "limit_other": "Puedes adjuntar hasta {{displayCount}} archivos.",
-      "limit_many": "Puedes adjuntar hasta {{displayCount}} archivos."
+      "metadataStripFailed": "No se pudieron eliminar los metadatos de la foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, estado: {{status}}",
@@ -1191,13 +1162,7 @@
       "syncNow": "Sincronizar ahora",
       "syncQueued": "Sincronización en cola",
       "syncStatusUnavailable": "El estado de sincronización no está disponible.",
-      "withinDeadline": "Dentro del plazo",
-      "daysOverdue_one": "{{displayCount}} día de retraso",
-      "daysOverdue_other": "{{displayCount}} días de retraso",
-      "daysOverdue_many": "{{displayCount}} días de retraso",
-      "findingsCount_one": "{{displayCount}} hallazgo",
-      "findingsCount_other": "{{displayCount}} hallazgos",
-      "findingsCount_many": "{{displayCount}} hallazgos"
+      "withinDeadline": "Dentro del plazo"
     },
     "dashboardMetrics": {
       "openFindings": "Hallazgos abiertos",
@@ -1723,16 +1688,7 @@
       "updateTodos": "Actualizar tareas",
       "linesBadge": "{{displayCount}} líneas",
       "filesBadge": "{{displayCount}} archivos",
-      "matchesBadge": "{{displayCount}} coincidencias",
-      "filesBadge_one": "{{displayCount}} archivo",
-      "filesBadge_other": "{{displayCount}} archivos",
-      "filesBadge_many": "{{displayCount}} archivos",
-      "linesBadge_one": "{{displayCount}} línea",
-      "linesBadge_other": "{{displayCount}} líneas",
-      "linesBadge_many": "{{displayCount}} líneas",
-      "matchesBadge_one": "{{displayCount}} coincidencia",
-      "matchesBadge_other": "{{displayCount}} coincidencias",
-      "matchesBadge_many": "{{displayCount}} coincidencias"
+      "matchesBadge": "{{displayCount}} coincidencias"
     },
     "readToolMarkdown": {
       "linesTruncated": "líneas {{start}}–{{end}} (truncadas)",
@@ -2025,13 +1981,7 @@
       "files": "Archivos",
       "couldNotOpenPhotoPicker": "No se pudo abrir el selector de fotos. Reinicia Kilo e inténtalo de nuevo.",
       "maxFilesAllowed": "Se permite un máximo de {{displayCount}} archivos.",
-      "onlyAddingFiles": "Solo se añaden {{accepted}} de {{total}} archivos (máx. {{max}})",
-      "maxFilesAllowed_one": "Se permite un máximo de {{displayCount}} archivo.",
-      "maxFilesAllowed_other": "Se permite un máximo de {{displayCount}} archivos.",
-      "maxFilesAllowed_many": "Se permite un máximo de {{displayCount}} archivos.",
-      "onlyAddingFiles_one": "Solo se añaden {{accepted}} de {{total}} archivos (máx. {{max}})",
-      "onlyAddingFiles_other": "Solo se añaden {{accepted}} de {{total}} archivos (máx. {{max}})",
-      "onlyAddingFiles_many": "Solo se añaden {{accepted}} de {{total}} archivos (máx. {{max}})"
+      "onlyAddingFiles": "Solo se añaden {{accepted}} de {{total}} archivos (máx. {{max}})"
     },
     "composer": {
       "addAttachment": "Añadir adjunto",
@@ -2049,10 +1999,7 @@
       "discardAttachmentsMessage": "Se eliminarán los archivos subidos que no estén adjuntos a mensajes enviados.",
       "discardAttachmentsTitle": "¿Descartar adjuntos?",
       "charactersRemaining": "Quedan {{count}} caracteres",
-      "insertNewline": "Insertar salto de línea",
-      "charactersRemaining_one": "Queda {{count}} carácter",
-      "charactersRemaining_other": "Quedan {{count}} caracteres",
-      "charactersRemaining_many": "Quedan {{count}} caracteres"
+      "insertNewline": "Insertar salto de línea"
     },
     "chatLink": {
       "linkCopied": "Enlace copiado",
@@ -2125,10 +2072,7 @@
       "stepsCount": "{{steps}} pasos",
       "stepsCount_other": "{{steps}} pasos",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "stepsCount_many": "{{steps}} pasos",
-      "modelsCount_one": "Modelo ({{displayCount}})",
-      "modelsCount_other": "Modelos ({{displayCount}})",
-      "modelsCount_many": "Modelos ({{displayCount}})"
+      "stepsCount_many": "{{steps}} pasos"
     },
     "autoApprove": {
       "title": "Aprobación automática",
@@ -2168,10 +2112,7 @@
     },
     "toolRun": {
       "sheetTitle": "Llamadas de herramientas",
-      "condensedLabel": "{{itemCount}} elementos; {{last}}",
-      "condensedLabel_one": "{{itemCount}} elemento; {{last}}",
-      "condensedLabel_other": "{{itemCount}} elementos; {{last}}",
-      "condensedLabel_many": "{{itemCount}} elementos; {{last}}"
+      "condensedLabel": "{{itemCount}} elementos; {{last}}"
     }
   },
   "bootstrap": {
@@ -2306,10 +2247,7 @@
     "cliCantReceiveFilesTitle": "Esta sesión no puede recibir archivos",
     "cliCantReceiveFilesMessage": "La CLI de Kilo que ejecuta esta sesión no puede recibir archivos. Actualiza la CLI en esa máquina o comparte el contenido en una sesión nueva.",
     "contentlessMessage": "No hay nada que compartir: no se ha incluido texto ni archivos.",
-    "couldNotReadContent": "No se pudo leer el contenido compartido.",
-    "onlyFirstFilesAttached_one": "Solo se adjuntarán los primeros {{displayCount}} archivo.",
-    "onlyFirstFilesAttached_other": "Solo se adjuntarán los primeros {{displayCount}} archivos.",
-    "onlyFirstFilesAttached_many": "Solo se adjuntarán los primeros {{displayCount}} archivos."
+    "couldNotReadContent": "No se pudo leer el contenido compartido."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2620,10 +2558,7 @@
         "outdatedOnPath": "Desactualizado en {{path}}"
       },
       "deletedUser": "usuario eliminado",
-      "replyForbiddenTerm": "No tienes permiso para responder a {{term}}.",
-      "moreLinesAbove_one": "… {{displayCount}} línea más arriba",
-      "moreLinesAbove_other": "… {{displayCount}} líneas más arriba",
-      "moreLinesAbove_many": "… {{displayCount}} líneas más arriba"
+      "replyForbiddenTerm": "No tienes permiso para responder a {{term}}."
     },
     "entry": {
       "eyebrow": "Abre una PR o una merge request mediante su URL",
@@ -2694,7 +2629,7 @@
     "hunkRows": {
       "contextUnavailable": "El contexto no está disponible en esta referencia.",
       "expandAll": "Expandir todo",
-      "expandAllLines": "Mostrar todas las líneas ({{displayCount}})",
+      "expandAllLines": "Mostrar las {{displayCount}} líneas",
       "expandContext": "Mostrar contexto",
       "expandLines": "Mostrar {{displayCount}} líneas ({{start}}–{{end}})",
       "expandLinesOfContext": "Mostrar {{displayCount}} líneas de contexto",
@@ -2723,22 +2658,7 @@
       "retryLoadingContext": "Volver a cargar el contexto",
       "retryLoadingNextPage": "Volver a cargar la página siguiente",
       "fileLoadedCount_many": "{{displayCount}} archivos cargados",
-      "fileLoadedOfTotalCount_many": "{{displayCount}} archivos cargados de {{total}}",
-      "expandAllLines_one": "Mostrar todas las líneas ({{displayCount}})",
-      "expandAllLines_other": "Mostrar todas las líneas ({{displayCount}})",
-      "expandAllLines_many": "Mostrar todas las líneas ({{displayCount}})",
-      "expandLines_one": "Mostrar {{displayCount}} línea ({{start}}–{{end}})",
-      "expandLines_other": "Mostrar {{displayCount}} líneas ({{start}}–{{end}})",
-      "expandLines_many": "Mostrar {{displayCount}} líneas ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "Mostrar {{displayCount}} línea de contexto",
-      "expandLinesOfContext_other": "Mostrar {{displayCount}} líneas de contexto",
-      "expandLinesOfContext_many": "Mostrar {{displayCount}} líneas de contexto",
-      "expandMoreLines_one": "Mostrar {{displayCount}} línea más ({{start}}–{{end}})",
-      "expandMoreLines_other": "Mostrar {{displayCount}} líneas más ({{start}}–{{end}})",
-      "expandMoreLines_many": "Mostrar {{displayCount}} líneas más ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} de {{total}} archivos cargados",
-      "loadedOfTotalFiles_other": "{{loaded}} de {{total}} archivos cargados",
-      "loadedOfTotalFiles_many": "{{loaded}} de {{total}} archivos cargados"
+      "fileLoadedOfTotalCount_many": "{{displayCount}} archivos cargados de {{total}}"
     },
     "inbox": {
       "couldNotLoad": "No se pudo cargar la bandeja de entrada.",
@@ -2939,10 +2859,7 @@
       "statusContext": "Contexto",
       "lineLabel": "Línea {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "Línea ({{status}}): {{text}}",
-      "emptyLine": "(vacío)",
-      "truncationBanner_one": "Se muestran los primeros {{limit}} de {{total}} archivos modificados debido al límite de la API de GitHub.",
-      "truncationBanner_other": "Se muestran los primeros {{limit}} de {{total}} archivos modificados debido al límite de la API de GitHub.",
-      "truncationBanner_many": "Se muestran los primeros {{limit}} de {{total}} archivos modificados debido al límite de la API de GitHub."
+      "emptyLine": "(vacío)"
     },
     "linkPasteClipboardEmpty": "El portapapeles está vacío.",
     "linkPasteNotAPullRequest": "No es un enlace a una PR o una merge request",

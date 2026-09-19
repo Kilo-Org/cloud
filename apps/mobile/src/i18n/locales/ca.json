@@ -163,7 +163,6 @@
     "useDifferentEmail": "Utilitza una altra adreça de correu",
     "signInWithApple": "Inicia la sessió amb Apple",
     "signInWithGoogle": "Inicia la sessió amb Google",
-    "signInWithPasskey": "Inicia la sessió amb una clau d'accés",
     "emailAddress": "Adreça de correu electrònic",
     "emailPlaceholder": "nom@example.com",
     "continueWithEmail": "Continua amb el correu electrònic",
@@ -176,10 +175,6 @@
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Més opcions d'inici de sessió",
-    "passkeyCancelled": "S'ha cancel·lat l'inici de sessió amb clau d'accés. Torna-ho a provar.",
-    "passkeyNotFound": "No hi ha cap clau d'accés desada per a aquest dispositiu. Inicia la sessió amb Apple, Google o el teu correu electrònic.",
-    "passkeyUnsupported": "Les claus d'accés no estan disponibles en aquest dispositiu. Inicia la sessió amb Apple, Google o el teu correu electrònic.",
-    "passkeyFailed": "No s'ha pogut iniciar la sessió amb una clau d'accés. Torna-ho a provar.",
     "couldNotCompleteSignIn": "No s'ha pogut completar l'inici de sessió. Torna-ho a provar.",
     "sessionEnded": "La teva sessió ha acabat. Torna a iniciar la sessió.",
     "signInCodeExpired": "El teu codi d'inici de sessió ha caducat. Torna-ho a provar.",
@@ -230,28 +225,7 @@
     "providerTestAccount": "Compte de prova",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO d'empresa",
-    "passkeysTitle": "Claus d'accés",
-    "passkeysSubtitle": "Inicia la sessió sense contrasenya",
-    "passkeysEmpty": "Encara no hi ha claus d'accés",
-    "passkeysEmptyHint": "$t(profile.addPasskey) per iniciar la sessió sense contrasenya.",
-    "passkeysCouldNotLoad": "No s'han pogut carregar les claus d'accés",
-    "passkeysLoadFailed": "Les claus d'accés no estaran disponibles fins que això es carregui.",
-    "addPasskey": "Afegeix una clau d'accés",
-    "passkeyDefaultName": "Clau d'accés",
-    "passkeyAddedOn": "Afegida {{date}}",
-    "passkeyAdded": "Clau d'accés afegida.",
-    "passkeyAddFailed": "No s'ha pogut afegir una clau d'accés. Torna-ho a provar.",
-    "passkeyAddUnsupported": "Aquest dispositiu no pot crear claus d'accés.",
-    "passkeyAddCancelled": "S'ha cancel·lat la creació de la clau d'accés.",
-    "passkeyRemoved": "Clau d'accés eliminada.",
-    "passkeyRemoveFailed": "No s'ha pogut eliminar aquesta clau d'accés. Torna-ho a provar.",
-    "passkeyRenamed": "Clau d'accés reanomenada.",
-    "passkeyName": "Nom de la clau d'accés",
-    "renamePasskey": "Canvia el nom de la clau d'accés",
-    "removePasskey": "Elimina la clau d'accés",
-    "removePasskeyTitle": "Eliminar la clau d'accés?",
-    "removePasskeyMessage": "Ja no podràs iniciar la sessió amb aquesta clau d'accés."
+    "providerEnterpriseSso": "SSO d'empresa"
   },
   "preferences": {
     "general": "General",
@@ -352,7 +326,7 @@
       "expandMoreLines": "Mostra {{displayCount}} línies més ({{start}}–{{end}})",
       "expandLinesOfContext": "Mostra {{displayCount}} línies de context",
       "expandAll": "Mostra-ho tot",
-      "expandAllLines": "Mostra totes les línies ({{displayCount}})",
+      "expandAllLines": "Mostra totes les {{displayCount}} línies",
       "loadingMoreFiles": "S'estan carregant més fitxers…",
       "retryLoadingNextPage": "Torna a carregar la pàgina següent",
       "failedToLoadMoreFiles": "No s'han pogut carregar més fitxers. Toca per tornar-ho a provar",
@@ -371,22 +345,7 @@
       "goToOverview": "Vés a la visió general",
       "goToOverviewTab": "Vés a la pestanya de visió general",
       "fileLoadedCount_many": "S'han carregat {{displayCount}} fitxers",
-      "fileLoadedOfTotalCount_many": "S'han carregat {{displayCount}} fitxers de {{total}}",
-      "expandAllLines_one": "Mostra totes les línies ({{displayCount}})",
-      "expandAllLines_other": "Mostra totes les línies ({{displayCount}})",
-      "expandAllLines_many": "Mostra totes les línies ({{displayCount}})",
-      "expandLines_one": "Mostra {{displayCount}} línia ({{start}}–{{end}})",
-      "expandLines_other": "Mostra {{displayCount}} línies ({{start}}–{{end}})",
-      "expandLines_many": "Mostra {{displayCount}} línies ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "Mostra {{displayCount}} línia de context",
-      "expandLinesOfContext_other": "Mostra {{displayCount}} línies de context",
-      "expandLinesOfContext_many": "Mostra {{displayCount}} línies de context",
-      "expandMoreLines_one": "Mostra {{displayCount}} línia més ({{start}}–{{end}})",
-      "expandMoreLines_other": "Mostra {{displayCount}} línies més ({{start}}–{{end}})",
-      "expandMoreLines_many": "Mostra {{displayCount}} línies més ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} de {{total}} fitxers carregats",
-      "loadedOfTotalFiles_other": "{{loaded}} de {{total}} fitxers carregats",
-      "loadedOfTotalFiles_many": "{{loaded}} de {{total}} fitxers carregats"
+      "fileLoadedOfTotalCount_many": "S'han carregat {{displayCount}} fitxers de {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ sense salt de línia al final del fitxer",
@@ -579,10 +538,7 @@
         "outdatedOnPath": "Desactualitzat a {{path}}"
       },
       "deletedUser": "usuari eliminat",
-      "replyForbiddenTerm": "No tens permís per respondre a aquesta {{term}}.",
-      "moreLinesAbove_one": "… {{displayCount}} línia més amunt",
-      "moreLinesAbove_other": "… {{displayCount}} línies més amunt",
-      "moreLinesAbove_many": "… {{displayCount}} línies més amunt"
+      "replyForbiddenTerm": "No tens permís per respondre a aquesta {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "No s'ha pogut obrir la configuració de l'aplicació de GitHub.",
     "installKiloGitHubApp": "Instal·la l'aplicació de Kilo per a GitHub",
@@ -759,10 +715,7 @@
       "statusContext": "Línia de context",
       "lineLabel": "línia {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(buit)",
-      "truncationBanner_one": "A causa del límit de l'API de GitHub, només es mostren els primers {{limit}} de {{total}} fitxers modificats.",
-      "truncationBanner_other": "A causa del límit de l'API de GitHub, només es mostren els primers {{limit}} de {{total}} fitxers modificats.",
-      "truncationBanner_many": "A causa del límit de l'API de GitHub, només es mostren els primers {{limit}} de {{total}} fitxers modificats."
+      "emptyLine": "(buit)"
     },
     "linkPasteClipboardEmpty": "El porta-retalls és buit.",
     "linkPasteNotAPullRequest": "No és un enllaç a una sol·licitud d'integració o de fusió",
@@ -839,11 +792,11 @@
     "previewFullDescription": "Les notificacions mostren el text del missatge a la pantalla de bloqueig.",
     "previewGenericDescription": "Les notificacions mostren que ha passat alguna cosa. Obre Kilo per llegir-ho.",
     "channel": {
-      "agentProgress": "Progrés de l'agent",
       "chat": "Missatges de xat",
       "kiloclaw": "Activitat de KiloClaw",
       "balance": "Alertes de saldo",
-      "security": "Problemes de seguretat"
+      "security": "Problemes de seguretat",
+      "agent": "Sessions d'agent"
     },
     "category": {
       "chatMessagesSubtitle": "respostes a les teves converses",
@@ -936,10 +889,7 @@
       "uploadFailed": "No s'ha pogut penjar l'adjunt.",
       "failedToUploadFile": "No s'ha pogut penjar el fitxer: {{reason}}.",
       "nothingToPaste": "No hi ha res per enganxar.",
-      "metadataStripFailed": "No s'han pogut eliminar les metadades de la foto.",
-      "limit_one": "Pots adjuntar fins a {{displayCount}} fitxer.",
-      "limit_other": "Pots adjuntar fins a {{displayCount}} fitxers.",
-      "limit_many": "Pots adjuntar fins a {{displayCount}} fitxers."
+      "metadataStripFailed": "No s'han pogut eliminar les metadades de la foto."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1686,13 +1636,7 @@
       "syncFindings": "Sincronitza les incidències",
       "syncNow": "Sincronitza ara",
       "syncQueued": "Sincronització en cua",
-      "syncStatusUnavailable": "L'estat de la sincronització no està disponible.",
-      "daysOverdue_one": "{{displayCount}} dia de retard",
-      "daysOverdue_other": "{{displayCount}} dies de retard",
-      "daysOverdue_many": "{{displayCount}} dies de retard",
-      "findingsCount_one": "{{displayCount}} incidència",
-      "findingsCount_other": "{{displayCount}} incidències",
-      "findingsCount_many": "{{displayCount}} incidències"
+      "syncStatusUnavailable": "L'estat de la sincronització no està disponible."
     },
     "dashboardMetrics": {
       "openFindings": "Incidències obertes",
@@ -2243,16 +2187,7 @@
       "updateTodos": "Actualitza les tasques pendents",
       "linesBadge": "{{displayCount}} línies",
       "filesBadge": "{{displayCount}} fitxers",
-      "matchesBadge": "{{displayCount}} coincidències",
-      "filesBadge_one": "{{displayCount}} fitxer",
-      "filesBadge_other": "{{displayCount}} fitxers",
-      "filesBadge_many": "{{displayCount}} fitxers",
-      "linesBadge_one": "{{displayCount}} línia",
-      "linesBadge_other": "{{displayCount}} línies",
-      "linesBadge_many": "{{displayCount}} línies",
-      "matchesBadge_one": "{{displayCount}} coincidència",
-      "matchesBadge_other": "{{displayCount}} coincidències",
-      "matchesBadge_many": "{{displayCount}} coincidències"
+      "matchesBadge": "{{displayCount}} coincidències"
     },
     "readToolMarkdown": {
       "linesTruncated": "línies {{start}}–{{end}} (truncades)",
@@ -2545,13 +2480,7 @@
       "files": "Fitxers",
       "couldNotOpenPhotoPicker": "No s'ha pogut obrir el selector de fotos. Reinicia Kilo i torna-ho a provar.",
       "maxFilesAllowed": "Es permeten com a màxim {{displayCount}} fitxers.",
-      "onlyAddingFiles": "Només s'afegeixen {{accepted}} de {{total}} fitxers (màx. {{max}})",
-      "maxFilesAllowed_one": "Es permeten com a màxim {{displayCount}} fitxer.",
-      "maxFilesAllowed_other": "Es permeten com a màxim {{displayCount}} fitxers.",
-      "maxFilesAllowed_many": "Es permeten com a màxim {{displayCount}} fitxers.",
-      "onlyAddingFiles_one": "Només s'afegeixen {{accepted}} de {{total}} fitxers (màx. {{max}})",
-      "onlyAddingFiles_other": "Només s'afegeixen {{accepted}} de {{total}} fitxers (màx. {{max}})",
-      "onlyAddingFiles_many": "Només s'afegeixen {{accepted}} de {{total}} fitxers (màx. {{max}})"
+      "onlyAddingFiles": "Només s'afegeixen {{accepted}} de {{total}} fitxers (màx. {{max}})"
     },
     "composer": {
       "addAttachment": "Afegeix un fitxer adjunt",
@@ -2569,10 +2498,7 @@
       "discardAttachmentsMessage": "S'eliminaran els fitxers penjats que no s'hagin adjuntat a missatges enviats.",
       "discardAttachmentsTitle": "Vols descartar els fitxers adjunts?",
       "charactersRemaining": "Queden {{count}} caràcters",
-      "insertNewline": "Insereix un salt de línia",
-      "charactersRemaining_one": "Queda {{count}} caràcter",
-      "charactersRemaining_other": "Queden {{count}} caràcters",
-      "charactersRemaining_many": "Queden {{count}} caràcters"
+      "insertNewline": "Insereix un salt de línia"
     },
     "chatLink": {
       "linkCopied": "Enllaç copiat",
@@ -2645,10 +2571,7 @@
       "stepsCount": "{{steps}} passos",
       "stepsCount_other": "{{steps}} passos",
       "modelAccessibilityLabel": "Model {{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "stepsCount_many": "{{steps}} passos",
-      "modelsCount_one": "Model utilitzat ({{displayCount}})",
-      "modelsCount_other": "Models utilitzats ({{displayCount}})",
-      "modelsCount_many": "Models utilitzats ({{displayCount}})"
+      "stepsCount_many": "{{steps}} passos"
     },
     "autoApprove": {
       "title": "Aprovació automàtica",
@@ -2688,10 +2611,7 @@
     },
     "toolRun": {
       "sheetTitle": "Crides d'eines",
-      "condensedLabel": "{{itemCount}} elements; {{last}}",
-      "condensedLabel_one": "{{itemCount}} element; {{last}}",
-      "condensedLabel_other": "{{itemCount}} elements; {{last}}",
-      "condensedLabel_many": "{{itemCount}} elements; {{last}}"
+      "condensedLabel": "{{itemCount}} elements; {{last}}"
     }
   },
   "bootstrap": {
@@ -2826,10 +2746,7 @@
     "cliCantReceiveFilesTitle": "Aquesta sessió no pot rebre fitxers",
     "cliCantReceiveFilesMessage": "La CLI de Kilo que executa aquesta sessió no pot rebre fitxers. Actualitza la CLI en aquella màquina o comparteix-ho amb una sessió nova.",
     "contentlessMessage": "No hi ha res per compartir: no s'hi ha inclòs cap text ni cap fitxer.",
-    "couldNotReadContent": "No s'ha pogut llegir el contingut compartit.",
-    "onlyFirstFilesAttached_one": "Només s'adjuntaran els primers {{displayCount}} fitxer.",
-    "onlyFirstFilesAttached_other": "Només s'adjuntaran els primers {{displayCount}} fitxers.",
-    "onlyFirstFilesAttached_many": "Només s'adjuntaran els primers {{displayCount}} fitxers."
+    "couldNotReadContent": "No s'ha pogut llegir el contingut compartit."
   },
   "kiloPass": {
     "title": "Kilo Pass",

@@ -163,7 +163,6 @@
     "useDifferentEmail": "Whakamahia tētahi wāhitau īmēra kē",
     "signInWithApple": "Takiuru mā Apple",
     "signInWithGoogle": "Takiuru mā Google",
-    "signInWithPasskey": "Takiuru mā te kī whakauru",
     "emailAddress": "Wāhitau īmēra",
     "emailPlaceholder": "koe@example.com",
     "continueWithEmail": "Haere tonu mā te īmēra",
@@ -176,10 +175,6 @@
     "termsConnector": " me ",
     "termsSuffix": ".",
     "moreSignInOptions": "Ētahi atu kōwhiringa takiuru",
-    "passkeyCancelled": "Kua whakakorengia te takiuru mā te kī whakauru. Whakamātau anō.",
-    "passkeyNotFound": "Kāore he kī whakauru kua tiakina mō tēnei pūrere. Takiuru mā Apple, Google, mā tō īmēra rānei.",
-    "passkeyUnsupported": "Kāore ngā kī whakauru i te wātea i tēnei pūrere. Takiuru mā Apple, Google, mā tō īmēra rānei.",
-    "passkeyFailed": "Kāore i taea te takiuru mā te kī whakauru. Whakamātau anō.",
     "couldNotCompleteSignIn": "Kāore i taea te whakaoti i te takiuru. Whakamātau anō.",
     "sessionEnded": "Kua mutu tō wātū. Takiuru anō.",
     "signInCodeExpired": "Kua pau te wā o tō waehere takiuru. Whakamātau anō.",
@@ -230,28 +225,7 @@
     "providerTestAccount": "Pūkete whakamātau",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO umanga",
-    "passkeysTitle": "Ngā kī whakauru",
-    "passkeysSubtitle": "Takiuru me te kore kupuhipa",
-    "passkeysEmpty": "Kāore anō he kī whakauru",
-    "passkeysEmptyHint": "$t(profile.addPasskey) kia takiuru ai me te kore kupuhipa.",
-    "passkeysCouldNotLoad": "Kāore i taea ngā kī whakauru te uta",
-    "passkeysLoadFailed": "Kāore ngā kī whakauru i te wātea kia utaina tēnei.",
-    "addPasskey": "Tāpiri he kī whakauru",
-    "passkeyDefaultName": "Kī whakauru",
-    "passkeyAddedOn": "I tāpirihia {{date}}",
-    "passkeyAdded": "Kua tāpirihia te kī whakauru.",
-    "passkeyAddFailed": "Kāore i taea te tāpiri he kī whakauru. Whakamātau anō.",
-    "passkeyAddUnsupported": "Kāore e taea e tēnei pūrere ngā kī whakauru te hanga.",
-    "passkeyAddCancelled": "Kua whakakorengia te hanga kī whakauru.",
-    "passkeyRemoved": "Kua tangohia te kī whakauru.",
-    "passkeyRemoveFailed": "Kāore i taea taua kī whakauru te tango. Whakamātau anō.",
-    "passkeyRenamed": "Kua whakaingoatia anō te kī whakauru.",
-    "passkeyName": "Ingoa o te kī whakauru",
-    "renamePasskey": "Whakaingoa anō i te kī whakauru",
-    "removePasskey": "Tango i te kī whakauru",
-    "removePasskeyTitle": "Tango i te kī whakauru?",
-    "removePasskeyMessage": "Kāore e taea e koe te takiuru mā tēnei kī whakauru ā muri ake."
+    "providerEnterpriseSso": "SSO umanga"
   },
   "preferences": {
     "general": "Whānui",
@@ -369,17 +343,7 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} o ngā kōnae {{total}} kua utaina",
       "filesStillLoading": "Kei te utaina tonu ngā kōnae. Tōia whakararo hei whakahou.",
       "goToOverview": "Haere ki te tirohanga whānui",
-      "goToOverviewTab": "Haere ki te ripa tirohanga whānui",
-      "expandAllLines_one": "Whakaaturia ngā rārangi {{displayCount}} katoa",
-      "expandAllLines_other": "Whakaaturia ngā rārangi {{displayCount}} katoa",
-      "expandLines_one": "Whakaaturia ngā rārangi {{displayCount}} ({{start}}–{{end}})",
-      "expandLines_other": "Whakaaturia ngā rārangi {{displayCount}} ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "Whakaaturia ngā rārangi horopaki {{displayCount}}",
-      "expandLinesOfContext_other": "Whakaaturia ngā rārangi horopaki {{displayCount}}",
-      "expandMoreLines_one": "Whakaaturia ētahi atu rārangi {{displayCount}} ({{start}}–{{end}})",
-      "expandMoreLines_other": "Whakaaturia ētahi atu rārangi {{displayCount}} ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} o ngā kōnae {{total}} kua utaina",
-      "loadedOfTotalFiles_other": "{{loaded}} o ngā kōnae {{total}} kua utaina"
+      "goToOverviewTab": "Haere ki te ripa tirohanga whānui"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ kāore he tohu rārangi hou i te mutunga o te kōnae.",
@@ -569,9 +533,7 @@
         "outdatedOnPath": "Kua tawhito i {{path}}"
       },
       "deletedUser": "kaiwhakamahi kua mukua",
-      "replyForbiddenTerm": "Kāore koe e whakaaetia kia whakautu ki tēnei {{term}}.",
-      "moreLinesAbove_one": "… he {{displayCount}} anō ngā rārangi kei runga.",
-      "moreLinesAbove_other": "… he {{displayCount}} anō ngā rārangi kei runga."
+      "replyForbiddenTerm": "Kāore koe e whakaaetia kia whakautu ki tēnei {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Kāore i taea te whakatuwhera i ngā tautuhinga o te taupānga GitHub.",
     "installKiloGitHubApp": "Tāutatia te taupānga Kilo GitHub",
@@ -744,9 +706,7 @@
       "statusContext": "Horopaki",
       "lineLabel": "Rārangi {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(pātea)",
-      "truncationBanner_one": "E whakaaturia ana ngā kōnae {{limit}} tuatahi o ngā kōnae {{total}} kua whakarerekētia — koinei te tepenga o te API GitHub.",
-      "truncationBanner_other": "E whakaaturia ana ngā kōnae {{limit}} tuatahi o ngā kōnae {{total}} kua whakarerekētia — koinei te tepenga o te API GitHub."
+      "emptyLine": "(pātea)"
     },
     "linkPasteClipboardEmpty": "Kei te pātea te papa tārua.",
     "linkPasteNotAPullRequest": "Ehara tēnei i te hono tono kume, tono whakakotahi rānei",
@@ -823,11 +783,11 @@
     "previewFullDescription": "Ka whakaatu ngā pānui i te kuputuhi o te karere ki tō mata maukati.",
     "previewGenericDescription": "Ka whakaatu ngā pānui kua puta tētahi takahanga. Whakatuwheratia a Kilo hei pānui i ngā kōrero.",
     "channel": {
-      "agentProgress": "Te ahunga whakamua o te māngai",
       "chat": "Ngā karere kōrerorero",
       "kiloclaw": "Ngā mahi KiloClaw",
       "balance": "Ngā matohi mō te toenga pūtea",
-      "security": "Ngā kitenga haumarutanga"
+      "security": "Ngā kitenga haumarutanga",
+      "agent": "Ngā wātū māngai"
     },
     "category": {
       "chatMessagesSubtitle": "ngā whakautu i ō kōrerorero",
@@ -920,9 +880,7 @@
       "uploadFailed": "I rahua te tuku ake.",
       "failedToUploadFile": "I rahua te tuku ake i te kōnae: {{reason}}",
       "nothingToPaste": "Kāore he mea hei whakapiri.",
-      "metadataStripFailed": "Kāore i taea te tango i ngā raraungameta o te whakaahua.",
-      "limit_one": "Ka taea e koe te āpiti i ngā kōnae, kia {{displayCount}} te mōrahi.",
-      "limit_other": "Ka taea e koe te āpiti i ngā kōnae, kia {{displayCount}} te mōrahi."
+      "metadataStripFailed": "Kāore i taea te tango i ngā raraungameta o te whakaahua."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1666,11 +1624,7 @@
       "syncFindings": "Tukutahitia ngā kitenga",
       "syncNow": "Tukutahitia ināianei",
       "syncQueued": "Kua tāpirihia te tukutahi ki te tūtira.",
-      "syncStatusUnavailable": "Kāore e wātea ana te tūnga tukutahi.",
-      "daysOverdue_one": "{{displayCount}} rā kua tōmuri",
-      "daysOverdue_other": "{{displayCount}} rā kua tōmuri",
-      "findingsCount_one": "{{displayCount}} kitenga",
-      "findingsCount_other": "{{displayCount}} kitenga"
+      "syncStatusUnavailable": "Kāore e wātea ana te tūnga tukutahi."
     },
     "dashboardMetrics": {
       "openFindings": "Ngā kitenga tūwhera",
@@ -2214,13 +2168,7 @@
       "updateTodos": "Whakahoutia te rārangi mahi",
       "linesBadge": "{{displayCount}} rārangi",
       "filesBadge": "{{displayCount}} kōnae",
-      "matchesBadge": "{{displayCount}} kitenga",
-      "filesBadge_one": "{{displayCount}} kōnae",
-      "filesBadge_other": "{{displayCount}} kōnae",
-      "linesBadge_one": "{{displayCount}} rārangi",
-      "linesBadge_other": "{{displayCount}} rārangi",
-      "matchesBadge_one": "{{displayCount}} kitenga",
-      "matchesBadge_other": "{{displayCount}} kitenga"
+      "matchesBadge": "{{displayCount}} kitenga"
     },
     "readToolMarkdown": {
       "linesTruncated": "ngā rārangi {{start}}–{{end}} (kua poroa)",
@@ -2510,11 +2458,7 @@
       "files": "Kōnae",
       "couldNotOpenPhotoPicker": "Kāore i taea te whakatuwhera i te pūkōwhiri whakaahua. Tīmataria anō a Kilo, kātahi ka whakamātau anō.",
       "maxFilesAllowed": "Ko te mōrahi o ngā kōnae e whakaaetia ana ko {{displayCount}}.",
-      "onlyAddingFiles": "Kei te tāpiri i ngā kōnae {{accepted}} anake o te {{total}} (mōrahi {{max}})",
-      "maxFilesAllowed_one": "Ko te mōrahi o ngā kōnae e whakaaetia ana ko {{displayCount}}.",
-      "maxFilesAllowed_other": "Ko te mōrahi o ngā kōnae e whakaaetia ana ko {{displayCount}}.",
-      "onlyAddingFiles_one": "Kei te tāpiri i ngā kōnae {{accepted}} anake o te {{total}} (mōrahi {{max}})",
-      "onlyAddingFiles_other": "Kei te tāpiri i ngā kōnae {{accepted}} anake o te {{total}} (mōrahi {{max}})"
+      "onlyAddingFiles": "Kei te tāpiri i ngā kōnae {{accepted}} anake o te {{total}} (mōrahi {{max}})"
     },
     "composer": {
       "addAttachment": "Tāpirihia he tāpiritanga",
@@ -2532,9 +2476,7 @@
       "discardAttachmentsMessage": "Ka mukua ngā kōnae kua tukuna ake kāore anō kia hono ki tētahi karere.",
       "discardAttachmentsTitle": "Mukua ngā whakapirihanga?",
       "charactersRemaining": "E {{count}} ngā pū e toe ana",
-      "insertNewline": "Whakaurua he rārangi hōu",
-      "charactersRemaining_one": "E {{count}} ngā pū e toe ana",
-      "charactersRemaining_other": "E {{count}} ngā pū e toe ana"
+      "insertNewline": "Whakaurua he rārangi hōu"
     },
     "chatLink": {
       "linkCopied": "Kua tāruatia te hononga",
@@ -2606,9 +2548,7 @@
       "stepsCount_one": "{{steps}} hipanga",
       "stepsCount": "{{steps}} hipanga",
       "stepsCount_other": "{{steps}} hipanga",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "modelsCount_one": "Ngā tauira ({{displayCount}})",
-      "modelsCount_other": "Ngā tauira ({{displayCount}})"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "autoApprove": {
       "title": "Whakaae aunoa",
@@ -2648,9 +2588,7 @@
     },
     "toolRun": {
       "sheetTitle": "Ngā karanga taputapu",
-      "condensedLabel": "{{itemCount}} tūemi; {{last}}",
-      "condensedLabel_one": "{{itemCount}} tūemi; {{last}}",
-      "condensedLabel_other": "{{itemCount}} tūemi; {{last}}"
+      "condensedLabel": "{{itemCount}} tūemi; {{last}}"
     }
   },
   "bootstrap": {
@@ -2785,9 +2723,7 @@
     "cliCantReceiveFilesTitle": "Kāore tēnei wātū e āhei ki te whiwhi kōnae",
     "cliCantReceiveFilesMessage": "Kāore te Kilo CLI e whakahaere ana i tēnei wātū e āhei ki te whiwhi kōnae. Whakahoutia te CLI i taua mīhini, tohaina rānei ki tētahi wātū hou.",
     "contentlessMessage": "Kāore he mea hei tohatoha — kāore he kuputuhi, he kōnae rānei i whakaurua.",
-    "couldNotReadContent": "Kāore i taea te pānui i te ihirangi kua tohaina.",
-    "onlyFirstFilesAttached_one": "Ka whakapirihia ngā kōnae {{displayCount}} tuatahi anake.",
-    "onlyFirstFilesAttached_other": "Ka whakapirihia ngā kōnae {{displayCount}} tuatahi anake."
+    "couldNotReadContent": "Kāore i taea te pānui i te ihirangi kua tohaina."
   },
   "kiloPass": {
     "title": "Kilo Pass",

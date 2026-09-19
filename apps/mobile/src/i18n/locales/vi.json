@@ -163,7 +163,6 @@
     "useDifferentEmail": "Sử dụng email khác",
     "signInWithApple": "Đăng nhập bằng Apple",
     "signInWithGoogle": "Đăng nhập bằng Google",
-    "signInWithPasskey": "Đăng nhập bằng khóa truy cập",
     "emailAddress": "Địa chỉ email",
     "emailPlaceholder": "ban@example.com",
     "continueWithEmail": "Tiếp tục với email",
@@ -176,10 +175,6 @@
     "termsConnector": " và ",
     "termsSuffix": ".",
     "moreSignInOptions": "Thêm tùy chọn đăng nhập",
-    "passkeyCancelled": "Đăng nhập bằng khóa truy cập đã bị hủy. Vui lòng thử lại.",
-    "passkeyNotFound": "Không có khóa truy cập nào được lưu cho thiết bị này. Hãy đăng nhập bằng Apple, Google hoặc email của bạn.",
-    "passkeyUnsupported": "Khóa truy cập không khả dụng trên thiết bị này. Hãy đăng nhập bằng Apple, Google hoặc email của bạn.",
-    "passkeyFailed": "Không thể đăng nhập bằng khóa truy cập. Vui lòng thử lại.",
     "couldNotCompleteSignIn": "Không thể hoàn tất đăng nhập. Vui lòng thử lại.",
     "sessionEnded": "Phiên của bạn đã kết thúc. Vui lòng đăng nhập lại.",
     "signInCodeExpired": "Mã đăng nhập của bạn đã hết hạn. Vui lòng thử lại.",
@@ -230,28 +225,7 @@
     "providerTestAccount": "Tài khoản thử nghiệm",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO doanh nghiệp",
-    "passkeysTitle": "Khóa truy cập",
-    "passkeysSubtitle": "Đăng nhập không cần mật khẩu",
-    "passkeysEmpty": "Chưa có khóa truy cập nào",
-    "passkeysEmptyHint": "$t(profile.addPasskey) để đăng nhập không cần mật khẩu.",
-    "passkeysCouldNotLoad": "Không thể tải khóa truy cập",
-    "passkeysLoadFailed": "Khóa truy cập không khả dụng cho đến khi nội dung này tải xong.",
-    "addPasskey": "Thêm khóa truy cập",
-    "passkeyDefaultName": "Khóa truy cập",
-    "passkeyAddedOn": "Đã thêm {{date}}",
-    "passkeyAdded": "Đã thêm khóa truy cập.",
-    "passkeyAddFailed": "Không thể thêm khóa truy cập. Hãy thử lại.",
-    "passkeyAddUnsupported": "Thiết bị này không thể tạo khóa truy cập.",
-    "passkeyAddCancelled": "Việc tạo khóa truy cập đã bị hủy.",
-    "passkeyRemoved": "Đã xóa khóa truy cập.",
-    "passkeyRemoveFailed": "Không thể xóa khóa truy cập đó. Hãy thử lại.",
-    "passkeyRenamed": "Đã đổi tên khóa truy cập.",
-    "passkeyName": "Tên khóa truy cập",
-    "renamePasskey": "Đổi tên khóa truy cập",
-    "removePasskey": "Xóa khóa truy cập",
-    "removePasskeyTitle": "Xóa khóa truy cập?",
-    "removePasskeyMessage": "Bạn sẽ không thể đăng nhập bằng khóa truy cập này nữa."
+    "providerEnterpriseSso": "SSO doanh nghiệp"
   },
   "preferences": {
     "general": "Chung",
@@ -319,11 +293,11 @@
     "previewFullDescription": "Thông báo hiển thị nội dung tin nhắn trên màn hình khóa của bạn.",
     "previewGenericDescription": "Thông báo chỉ cho biết có hoạt động mới. Mở Kilo để xem nội dung.",
     "channel": {
-      "agentProgress": "Tiến độ tác nhân",
       "chat": "Tin nhắn trò chuyện",
       "kiloclaw": "Hoạt động KiloClaw",
       "balance": "Cảnh báo số dư",
-      "security": "Vấn đề bảo mật"
+      "security": "Vấn đề bảo mật",
+      "agent": "Phiên tác nhân"
     },
     "category": {
       "chatMessagesSubtitle": "câu trả lời trong các cuộc trò chuyện của bạn",
@@ -416,9 +390,7 @@
       "uploadFailed": "Không thể tải lên.",
       "failedToUploadFile": "Không thể tải tệp lên: {{reason}}.",
       "nothingToPaste": "Không có nội dung để dán.",
-      "metadataStripFailed": "Không thể xóa siêu dữ liệu ảnh.",
-      "limit_one": "Bạn có thể đính kèm tối đa {{displayCount}} tệp.",
-      "limit_other": "Bạn có thể đính kèm tối đa {{displayCount}} tệp."
+      "metadataStripFailed": "Không thể xóa siêu dữ liệu ảnh."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1187,11 +1159,7 @@
       "syncNow": "Đồng bộ ngay",
       "syncQueued": "Đã đưa yêu cầu đồng bộ vào hàng đợi",
       "syncStatusUnavailable": "Không thể lấy trạng thái đồng bộ.",
-      "withinDeadline": "Trong hạn",
-      "daysOverdue_one": "Quá hạn {{displayCount}} ngày",
-      "daysOverdue_other": "Quá hạn {{displayCount}} ngày",
-      "findingsCount_one": "{{displayCount}} vấn đề",
-      "findingsCount_other": "{{displayCount}} vấn đề"
+      "withinDeadline": "Trong hạn"
     },
     "dashboardMetrics": {
       "openFindings": "Vấn đề chưa xử lý",
@@ -1710,13 +1678,7 @@
       "updateTodos": "Cập nhật danh sách việc cần làm",
       "linesBadge": "{{displayCount}} dòng",
       "filesBadge": "{{displayCount}} tệp",
-      "matchesBadge": "{{displayCount}} kết quả khớp",
-      "filesBadge_one": "{{displayCount}} tệp",
-      "filesBadge_other": "{{displayCount}} tệp",
-      "linesBadge_one": "{{displayCount}} dòng",
-      "linesBadge_other": "{{displayCount}} dòng",
-      "matchesBadge_one": "{{displayCount}} kết quả khớp",
-      "matchesBadge_other": "{{displayCount}} kết quả khớp"
+      "matchesBadge": "{{displayCount}} kết quả khớp"
     },
     "readToolMarkdown": {
       "linesTruncated": "dòng {{start}}–{{end}} (đã cắt bớt)",
@@ -2006,11 +1968,7 @@
       "files": "Tệp",
       "couldNotOpenPhotoPicker": "Không thể mở trình chọn ảnh. Khởi động lại Kilo và thử lại.",
       "maxFilesAllowed": "Chỉ được thêm tối đa {{displayCount}} tệp.",
-      "onlyAddingFiles": "Chỉ thêm {{accepted}} trong {{total}} tệp (tối đa {{max}})",
-      "maxFilesAllowed_one": "Chỉ được thêm tối đa {{displayCount}} tệp.",
-      "maxFilesAllowed_other": "Chỉ được thêm tối đa {{displayCount}} tệp.",
-      "onlyAddingFiles_one": "Chỉ thêm {{accepted}} trong {{total}} tệp (tối đa {{max}})",
-      "onlyAddingFiles_other": "Chỉ thêm {{accepted}} trong {{total}} tệp (tối đa {{max}})"
+      "onlyAddingFiles": "Chỉ thêm {{accepted}} trong {{total}} tệp (tối đa {{max}})"
     },
     "composer": {
       "addAttachment": "Thêm tệp đính kèm",
@@ -2028,9 +1986,7 @@
       "discardAttachmentsMessage": "Các tệp đã tải lên nhưng chưa gắn với tin nhắn đã gửi sẽ bị xóa.",
       "discardAttachmentsTitle": "Hủy tệp đính kèm?",
       "charactersRemaining": "Còn {{count}} ký tự",
-      "insertNewline": "Chèn dòng mới",
-      "charactersRemaining_one": "Còn {{count}} ký tự",
-      "charactersRemaining_other": "Còn {{count}} ký tự"
+      "insertNewline": "Chèn dòng mới"
     },
     "chatLink": {
       "linkCopied": "Đã sao chép liên kết",
@@ -2102,9 +2058,7 @@
       "stepsCount_one": "{{steps}} bước",
       "stepsCount": "{{steps}} bước",
       "stepsCount_other": "{{steps}} bước",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "modelsCount_one": "Mô hình ({{displayCount}})",
-      "modelsCount_other": "Mô hình ({{displayCount}})"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "autoApprove": {
       "title": "Tự động phê duyệt",
@@ -2144,9 +2098,7 @@
     },
     "toolRun": {
       "sheetTitle": "Lệnh gọi công cụ",
-      "condensedLabel": "{{itemCount}} mục; {{last}}",
-      "condensedLabel_one": "{{itemCount}} mục; {{last}}",
-      "condensedLabel_other": "{{itemCount}} mục; {{last}}"
+      "condensedLabel": "{{itemCount}} mục; {{last}}"
     }
   },
   "bootstrap": {
@@ -2281,9 +2233,7 @@
     "cliCantReceiveFilesTitle": "Phiên này không thể nhận tệp",
     "cliCantReceiveFilesMessage": "Kilo CLI đang chạy phiên này không thể nhận tệp. Cập nhật CLI trên máy đó hoặc chia sẻ đến phiên mới.",
     "contentlessMessage": "Không có gì để chia sẻ — không có văn bản hoặc tệp nào được đính kèm.",
-    "couldNotReadContent": "Không thể đọc nội dung được chia sẻ.",
-    "onlyFirstFilesAttached_one": "Chỉ {{displayCount}} tệp đầu tiên sẽ được đính kèm.",
-    "onlyFirstFilesAttached_other": "Chỉ {{displayCount}} tệp đầu tiên sẽ được đính kèm."
+    "couldNotReadContent": "Không thể đọc nội dung được chia sẻ."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2591,9 +2541,7 @@
         "outdatedOnPath": "Không còn cập nhật tại {{path}}"
       },
       "deletedUser": "người dùng đã bị xóa",
-      "replyForbiddenTerm": "Bạn không có quyền trả lời trong {{term}} này.",
-      "moreLinesAbove_one": "… Còn {{displayCount}} dòng ở trên.",
-      "moreLinesAbove_other": "… Còn {{displayCount}} dòng ở trên."
+      "replyForbiddenTerm": "Bạn không có quyền trả lời trong {{term}} này."
     },
     "entry": {
       "eyebrow": "Mở PR hoặc merge request bằng URL",
@@ -2691,17 +2639,7 @@
       "loadingLines": "Đang tải {{loaded}}/{{total}} dòng…",
       "loadingMoreFiles": "Đang tải thêm tệp…",
       "retryLoadingContext": "Thử tải lại các dòng ngữ cảnh",
-      "retryLoadingNextPage": "Thử tải lại trang tiếp theo",
-      "expandAllLines_one": "Hiện tất cả {{displayCount}} dòng",
-      "expandAllLines_other": "Hiện tất cả {{displayCount}} dòng",
-      "expandLines_one": "Hiện {{displayCount}} dòng ({{start}}–{{end}})",
-      "expandLines_other": "Hiện {{displayCount}} dòng ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "Hiện {{displayCount}} dòng ngữ cảnh",
-      "expandLinesOfContext_other": "Hiện {{displayCount}} dòng ngữ cảnh",
-      "expandMoreLines_one": "Hiện thêm {{displayCount}} dòng ({{start}}–{{end}})",
-      "expandMoreLines_other": "Hiện thêm {{displayCount}} dòng ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "Đã tải {{loaded}}/{{total}} tệp",
-      "loadedOfTotalFiles_other": "Đã tải {{loaded}}/{{total}} tệp"
+      "retryLoadingNextPage": "Thử tải lại trang tiếp theo"
     },
     "inbox": {
       "couldNotLoad": "Không thể tải hộp thư đến.",
@@ -2898,9 +2836,7 @@
       "statusContext": "Ngữ cảnh",
       "lineLabel": "Dòng {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "Dòng {{status}}: {{text}}",
-      "emptyLine": "(trống)",
-      "truncationBanner_one": "Đang hiển thị {{limit}} tệp đầu tiên trong số {{total}} tệp đã thay đổi do giới hạn API của GitHub.",
-      "truncationBanner_other": "Đang hiển thị {{limit}} tệp đầu tiên trong số {{total}} tệp đã thay đổi do giới hạn API của GitHub."
+      "emptyLine": "(trống)"
     },
     "linkPasteClipboardEmpty": "Bộ nhớ tạm trống.",
     "linkPasteNotAPullRequest": "Đây không phải là liên kết PR hoặc merge request",

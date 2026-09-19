@@ -163,7 +163,6 @@
     "useDifferentEmail": "Başqa e-poçt ünvanından istifadə et",
     "signInWithApple": "Apple ilə daxil ol",
     "signInWithGoogle": "Google ilə daxil ol",
-    "signInWithPasskey": "Giriş açarı ilə daxil ol",
     "emailAddress": "E-poçt ünvanı",
     "emailPlaceholder": "sen@example.com",
     "continueWithEmail": "E-poçtla davam et",
@@ -176,10 +175,6 @@
     "termsConnector": " və ",
     "termsSuffix": ".",
     "moreSignInOptions": "Digər giriş üsulları",
-    "passkeyCancelled": "Giriş açarı ilə daxil olma ləğv edildi. Yenidən cəhd edin.",
-    "passkeyNotFound": "Bu cihaz üçün heç bir giriş açarı saxlanmayıb. Bunun yerinə Apple, Google və ya e-poçtunuzla daxil olun.",
-    "passkeyUnsupported": "Giriş açarları bu cihazda mövcud deyil. Bunun yerinə Apple, Google və ya e-poçtunuzla daxil olun.",
-    "passkeyFailed": "Giriş açarı ilə daxil olmaq mümkün olmadı. Yenidən cəhd edin.",
     "couldNotCompleteSignIn": "Girişi tamamlamaq mümkün olmadı. Yenidən cəhd et.",
     "sessionEnded": "Sessiyan başa çatıb. Yenidən daxil ol.",
     "signInCodeExpired": "Giriş kodunun vaxtı bitib. Yenidən cəhd et.",
@@ -230,28 +225,7 @@
     "providerTestAccount": "Sınaq hesabı",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Korporativ SSO",
-    "passkeysTitle": "Giriş açarları",
-    "passkeysSubtitle": "Şifrəsiz daxil ol",
-    "passkeysEmpty": "Hələ giriş açarı yoxdur",
-    "passkeysEmptyHint": "$t(profile.addPasskey) şifrəsiz daxil olmaq üçün.",
-    "passkeysCouldNotLoad": "Giriş açarlarını yükləmək mümkün olmadı",
-    "passkeysLoadFailed": "Bu yüklənənə qədər giriş açarları əlçatan deyil.",
-    "addPasskey": "Giriş açarı əlavə et",
-    "passkeyDefaultName": "Giriş açarı",
-    "passkeyAddedOn": "{{date}} tarixində əlavə edildi",
-    "passkeyAdded": "Giriş açarı əlavə edildi.",
-    "passkeyAddFailed": "Giriş açarı əlavə etmək mümkün olmadı. Yenidən cəhd edin.",
-    "passkeyAddUnsupported": "Bu cihaz giriş açarı yarada bilmir.",
-    "passkeyAddCancelled": "Giriş açarının yaradılması ləğv edildi.",
-    "passkeyRemoved": "Giriş açarı silindi.",
-    "passkeyRemoveFailed": "Həmin giriş açarını silmək mümkün olmadı. Yenidən cəhd edin.",
-    "passkeyRenamed": "Giriş açarının adı dəyişdirildi.",
-    "passkeyName": "Giriş açarının adı",
-    "renamePasskey": "Giriş açarının adını dəyiş",
-    "removePasskey": "Giriş açarını sil",
-    "removePasskeyTitle": "Giriş açarı silinsin?",
-    "removePasskeyMessage": "Artıq bu giriş açarı ilə daxil ola bilməyəcəksiniz."
+    "providerEnterpriseSso": "Korporativ SSO"
   },
   "preferences": {
     "general": "Ümumi",
@@ -369,17 +343,7 @@
       "fileLoadedOfTotalCount_other": "{{total}} fayldan {{displayCount}} fayl yükləndi",
       "filesStillLoading": "Fayllar hələ yüklənir. Yeniləmək üçün aşağı çək.",
       "goToOverview": "Xülasəyə keç",
-      "goToOverviewTab": "Xülasə vərəqinə keç",
-      "expandAllLines_one": "Bütün {{displayCount}} sətri göstər",
-      "expandAllLines_other": "Bütün {{displayCount}} sətri göstər",
-      "expandLines_one": "{{displayCount}} sətir göstər ({{start}}–{{end}})",
-      "expandLines_other": "{{displayCount}} sətir göstər ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "{{displayCount}} kontekst sətri göstər",
-      "expandLinesOfContext_other": "{{displayCount}} kontekst sətri göstər",
-      "expandMoreLines_one": "Daha {{displayCount}} sətir göstər ({{start}}–{{end}})",
-      "expandMoreLines_other": "Daha {{displayCount}} sətir göstər ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} / {{total}} fayl yükləndi",
-      "loadedOfTotalFiles_other": "{{loaded}} / {{total}} fayl yükləndi"
+      "goToOverviewTab": "Xülasə vərəqinə keç"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ faylın sonunda yeni sətir yoxdur",
@@ -569,9 +533,7 @@
         "outdatedOnPath": "Köhnəlib: {{path}}"
       },
       "deletedUser": "silinmiş istifadəçi",
-      "replyForbiddenTerm": "Bu {{term}}na cavab vermək icazən yoxdur.",
-      "moreLinesAbove_one": "… yuxarıda daha {{displayCount}} sətir var.",
-      "moreLinesAbove_other": "… yuxarıda daha {{displayCount}} sətir var."
+      "replyForbiddenTerm": "Bu {{term}}na cavab vermək icazən yoxdur."
     },
     "couldNotOpenGitHubAppSettings": "GitHub tətbiqinin parametrlərini açmaq mümkün olmadı.",
     "installKiloGitHubApp": "Kilo GitHub tətbiqini quraşdır",
@@ -744,9 +706,7 @@
       "statusContext": "Kontekst",
       "lineLabel": "{{status}}, sətir {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} sətir: {{text}}",
-      "emptyLine": "(boş)",
-      "truncationBanner_one": "Dəyişdirilmiş {{total}} fayldan ilk {{limit}} fayl göstərilir — bu, GitHub API məhdudiyyətidir.",
-      "truncationBanner_other": "Dəyişdirilmiş {{total}} fayldan ilk {{limit}} fayl göstərilir — bu, GitHub API məhdudiyyətidir."
+      "emptyLine": "(boş)"
     },
     "linkPasteClipboardEmpty": "Mübadilə buferi boşdur.",
     "linkPasteNotAPullRequest": "Bu, birləşdirmə sorğusu və ya merge sorğusu keçidi deyil",
@@ -823,11 +783,11 @@
     "previewFullDescription": "Bildirişlər mesajın mətnini kilid ekranında göstərir.",
     "previewGenericDescription": "Bildirişlər yalnız hadisənin baş verdiyini göstərir. Mesajı oxumaq üçün Kilo-nu aç.",
     "channel": {
-      "agentProgress": "Agent gedişatı",
       "chat": "Söhbət mesajları",
       "kiloclaw": "KiloClaw fəaliyyəti",
       "balance": "Balans bildirişləri",
-      "security": "Təhlükəsizlik problemləri"
+      "security": "Təhlükəsizlik problemləri",
+      "agent": "Agent sessiyaları"
     },
     "category": {
       "chatMessagesSubtitle": "söhbətlərindəki cavablar",
@@ -920,9 +880,7 @@
       "uploadFailed": "Yükləmə uğursuz oldu.",
       "failedToUploadFile": "Faylı yükləmək mümkün olmadı: {{reason}}.",
       "nothingToPaste": "Yapışdırılacaq heç nə yoxdur.",
-      "metadataStripFailed": "Şəklin metaməlumatlarını silmək mümkün olmadı.",
-      "limit_one": "Ən çox {{displayCount}} fayl əlavə edə bilərsən.",
-      "limit_other": "Ən çox {{displayCount}} fayl əlavə edə bilərsən."
+      "metadataStripFailed": "Şəklin metaməlumatlarını silmək mümkün olmadı."
     },
     "attachmentPreview": {
       "accessibility": "Fayl: {{filename}}, {{status}}",
@@ -1666,11 +1624,7 @@
       "syncFindings": "Tapıntıları sinxronlaşdır",
       "syncNow": "İndi sinxronlaşdır",
       "syncQueued": "Sinxronlaşdırma növbəyə alındı",
-      "syncStatusUnavailable": "Sinxronlaşdırma statusu əlçatan deyil.",
-      "daysOverdue_one": "{{displayCount}} gün gecikib",
-      "daysOverdue_other": "{{displayCount}} gün gecikib",
-      "findingsCount_one": "{{displayCount}} tapıntı",
-      "findingsCount_other": "{{displayCount}} tapıntı"
+      "syncStatusUnavailable": "Sinxronlaşdırma statusu əlçatan deyil."
     },
     "dashboardMetrics": {
       "openFindings": "Açıq tapıntılar",
@@ -2214,13 +2168,7 @@
       "updateTodos": "Tapşırıqları yenilə",
       "linesBadge": "{{displayCount}} sətir",
       "filesBadge": "{{displayCount}} fayl",
-      "matchesBadge": "{{displayCount}} uyğunluq",
-      "filesBadge_one": "{{displayCount}} fayl",
-      "filesBadge_other": "{{displayCount}} fayl",
-      "linesBadge_one": "{{displayCount}} sətir",
-      "linesBadge_other": "{{displayCount}} sətir",
-      "matchesBadge_one": "{{displayCount}} uyğunluq",
-      "matchesBadge_other": "{{displayCount}} uyğunluq"
+      "matchesBadge": "{{displayCount}} uyğunluq"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} sətirləri (qısaldılıb)",
@@ -2510,11 +2458,7 @@
       "files": "Fayl",
       "couldNotOpenPhotoPicker": "Şəkil seçicisini açmaq mümkün olmadı. Kilo-nu yenidən başlat və yenidən cəhd et.",
       "maxFilesAllowed": "Ən çox {{displayCount}} fayl əlavə etmək olar.",
-      "onlyAddingFiles": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})",
-      "maxFilesAllowed_one": "Ən çox {{displayCount}} fayl əlavə etmək olar.",
-      "maxFilesAllowed_other": "Ən çox {{displayCount}} fayl əlavə etmək olar.",
-      "onlyAddingFiles_one": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})",
-      "onlyAddingFiles_other": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})"
+      "onlyAddingFiles": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})"
     },
     "composer": {
       "addAttachment": "Qoşma əlavə et",
@@ -2532,9 +2476,7 @@
       "discardAttachmentsMessage": "Heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək.",
       "discardAttachmentsTitle": "Əlavələr silinsin?",
       "charactersRemaining": "{{count}} simvol qalıb",
-      "insertNewline": "Yeni sətir əlavə et",
-      "charactersRemaining_one": "{{count}} simvol qalıb",
-      "charactersRemaining_other": "{{count}} simvol qalıb"
+      "insertNewline": "Yeni sətir əlavə et"
     },
     "chatLink": {
       "linkCopied": "Keçid kopyalandı",
@@ -2606,9 +2548,7 @@
       "stepsCount_one": "{{steps}} addım",
       "stepsCount": "{{steps}} addım",
       "stepsCount_other": "{{steps}} addım",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "modelsCount_one": "Model ({{displayCount}})",
-      "modelsCount_other": "Modellər ({{displayCount}})"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "autoApprove": {
       "title": "Avtomatik təsdiq",
@@ -2648,9 +2588,7 @@
     },
     "toolRun": {
       "sheetTitle": "Alət çağırışları",
-      "condensedLabel": "{{itemCount}} element; {{last}}",
-      "condensedLabel_one": "{{itemCount}} element; {{last}}",
-      "condensedLabel_other": "{{itemCount}} element; {{last}}"
+      "condensedLabel": "{{itemCount}} element; {{last}}"
     }
   },
   "bootstrap": {
@@ -2785,9 +2723,7 @@
     "cliCantReceiveFilesTitle": "Bu sessiya fayl qəbul edə bilmir",
     "cliCantReceiveFilesMessage": "Bu sessiyanın işlədiyi Kilo CLI fayl qəbul edə bilmir. Həmin kompüterdə CLI-ni yenilə və ya faylları yeni sessiyaya göndər.",
     "contentlessMessage": "Paylaşılacaq heç nə yoxdur — mətn və ya fayl daxil edilməyib.",
-    "couldNotReadContent": "Paylaşılan məzmunu oxumaq mümkün olmadı.",
-    "onlyFirstFilesAttached_one": "Yalnız ilk {{displayCount}} fayl əlavə ediləcək.",
-    "onlyFirstFilesAttached_other": "Yalnız ilk {{displayCount}} fayl əlavə ediləcək."
+    "couldNotReadContent": "Paylaşılan məzmunu oxumaq mümkün olmadı."
   },
   "kiloPass": {
     "title": "Kilo Pass",

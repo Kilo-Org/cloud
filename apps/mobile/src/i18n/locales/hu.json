@@ -163,7 +163,6 @@
     "useDifferentEmail": "Másik e-mail-cím használata",
     "signInWithApple": "Bejelentkezés Apple-fiókkal",
     "signInWithGoogle": "Bejelentkezés Google-fiókkal",
-    "signInWithPasskey": "Bejelentkezés jelkulccsal",
     "emailAddress": "E-mail-cím",
     "emailPlaceholder": "te@example.com",
     "continueWithEmail": "Folytatás e-maillel",
@@ -176,10 +175,6 @@
     "termsConnector": " és a ",
     "termsSuffix": ".",
     "moreSignInOptions": "További bejelentkezési lehetőségek",
-    "passkeyCancelled": "A jelkulccsal történő bejelentkezést megszakították. Próbáld újra.",
-    "passkeyNotFound": "Ehhez az eszközhöz nincs mentett jelkulcs. Jelentkezz be inkább Apple-lel, Google-lel vagy az e-mail-címeddel.",
-    "passkeyUnsupported": "A jelkulcsok nem érhetők el ezen az eszközön. Jelentkezz be inkább Apple-lel, Google-lel vagy az e-mail-címeddel.",
-    "passkeyFailed": "Nem sikerült jelkulccsal bejelentkezni. Próbáld újra.",
     "couldNotCompleteSignIn": "Nem sikerült befejezni a bejelentkezést. Próbáld újra.",
     "sessionEnded": "A munkameneted véget ért. Jelentkezz be újra.",
     "signInCodeExpired": "A bejelentkezési kódod lejárt. Próbáld újra.",
@@ -230,28 +225,7 @@
     "providerTestAccount": "Tesztfiók",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Vállalati SSO",
-    "passkeysTitle": "Jelkulcsok",
-    "passkeysSubtitle": "Bejelentkezés jelszó nélkül",
-    "passkeysEmpty": "Még nincsenek jelkulcsok",
-    "passkeysEmptyHint": "$t(profile.addPasskey) a jelszó nélküli bejelentkezéshez.",
-    "passkeysCouldNotLoad": "A jelkulcsokat nem sikerült betölteni",
-    "passkeysLoadFailed": "A jelkulcsok nem érhetők el, amíg ez be nem töltődik.",
-    "addPasskey": "Jelkulcs hozzáadása",
-    "passkeyDefaultName": "Jelkulcs",
-    "passkeyAddedOn": "Hozzáadva: {{date}}",
-    "passkeyAdded": "Jelkulcs hozzáadva.",
-    "passkeyAddFailed": "Nem sikerült jelkulcsot hozzáadni. Próbáld újra.",
-    "passkeyAddUnsupported": "Ez az eszköz nem tud jelkulcsokat létrehozni.",
-    "passkeyAddCancelled": "A jelkulcs létrehozását megszakították.",
-    "passkeyRemoved": "Jelkulcs eltávolítva.",
-    "passkeyRemoveFailed": "Ezt a jelkulcsot nem sikerült eltávolítani. Próbáld újra.",
-    "passkeyRenamed": "A jelkulcs át lett nevezve.",
-    "passkeyName": "Jelkulcs neve",
-    "renamePasskey": "Jelkulcs átnevezése",
-    "removePasskey": "Jelkulcs eltávolítása",
-    "removePasskeyTitle": "Eltávolítod a jelkulcsot?",
-    "removePasskeyMessage": "Ezzel a jelkulccsal már nem tudsz bejelentkezni."
+    "providerEnterpriseSso": "Vállalati SSO"
   },
   "preferences": {
     "general": "Általános",
@@ -369,17 +343,7 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} / {{total}} fájl betöltve",
       "filesStillLoading": "A fájlok betöltése még folyamatban van. Húzd lefelé a képernyőt a frissítéshez.",
       "goToOverview": "Ugrás az áttekintésre",
-      "goToOverviewTab": "Ugrás az Áttekintés fülre",
-      "expandAllLines_one": "Az összes sor kibontása: {{displayCount}} sor",
-      "expandAllLines_other": "Az összes sor kibontása: {{displayCount}} sor",
-      "expandLines_one": "{{displayCount}} sor kibontása ({{start}}–{{end}})",
-      "expandLines_other": "{{displayCount}} sor kibontása ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "{{displayCount}} környező sor kibontása",
-      "expandLinesOfContext_other": "{{displayCount}} környező sor kibontása",
-      "expandMoreLines_one": "További {{displayCount}} sor kibontása ({{start}}–{{end}})",
-      "expandMoreLines_other": "További {{displayCount}} sor kibontása ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{loaded}} / {{total}} fájl betöltve",
-      "loadedOfTotalFiles_other": "{{loaded}} / {{total}} fájl betöltve"
+      "goToOverviewTab": "Ugrás az Áttekintés fülre"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ nincs újsor a fájl végén",
@@ -569,9 +533,7 @@
         "outdatedOnPath": "Elavult: {{path}}"
       },
       "deletedUser": "törölt felhasználó",
-      "replyForbiddenTerm": "Nincs jogosultságod a {{term}} megválaszolására.",
-      "moreLinesAbove_one": "… még {{displayCount}} sor feljebb.",
-      "moreLinesAbove_other": "… még {{displayCount}} sor feljebb."
+      "replyForbiddenTerm": "Nincs jogosultságod a {{term}} megválaszolására."
     },
     "couldNotOpenGitHubAppSettings": "Nem sikerült megnyitni a GitHub-alkalmazás beállításait.",
     "installKiloGitHubApp": "A Kilo GitHub-alkalmazásának telepítése",
@@ -744,9 +706,7 @@
       "statusContext": "Környező sorok",
       "lineLabel": "{{line}}. sor, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(üres)",
-      "truncationBanner_one": "A GitHub API korlátja miatt a {{total}} módosított fájl közül csak az első {{limit}} látható.",
-      "truncationBanner_other": "A GitHub API korlátja miatt a {{total}} módosított fájl közül csak az első {{limit}} látható."
+      "emptyLine": "(üres)"
     },
     "linkPasteClipboardEmpty": "A vágólap üres.",
     "linkPasteNotAPullRequest": "Ez nem egy PR vagy merge request hivatkozása",
@@ -823,11 +783,11 @@
     "previewFullDescription": "Az értesítések megjelenítik az üzenet szövegét a zárolási képernyőn.",
     "previewGenericDescription": "Az értesítések csak azt jelzik, hogy valami történt. A részletek elolvasásához nyisd meg a Kilo alkalmazást.",
     "channel": {
-      "agentProgress": "Ügynök előrehaladása",
       "chat": "Csevegőüzenetek",
       "kiloclaw": "KiloClaw-tevékenység",
       "balance": "Egyenlegértesítések",
-      "security": "Biztonsági találatok"
+      "security": "Biztonsági találatok",
+      "agent": "Ügynökmunkamenetek"
     },
     "category": {
       "chatMessagesSubtitle": "válaszok a beszélgetéseidben",
@@ -920,9 +880,7 @@
       "uploadFailed": "A feltöltés nem sikerült.",
       "failedToUploadFile": "Nem sikerült feltölteni a fájlt: {{reason}}.",
       "nothingToPaste": "Nincs mit beilleszteni.",
-      "metadataStripFailed": "Nem sikerült eltávolítani a fotó metaadatait.",
-      "limit_one": "Legfeljebb {{displayCount}} fájlt csatolhatsz.",
-      "limit_other": "Legfeljebb {{displayCount}} fájlt csatolhatsz."
+      "metadataStripFailed": "Nem sikerült eltávolítani a fotó metaadatait."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, állapot: {{status}}",
@@ -1666,11 +1624,7 @@
       "syncFindings": "Találatok szinkronizálása",
       "syncNow": "Szinkronizálás most",
       "syncQueued": "Szinkronizálás sorba állítva",
-      "syncStatusUnavailable": "A szinkronizálás állapota nem érhető el.",
-      "daysOverdue_one": "{{displayCount}} napja lejárt",
-      "daysOverdue_other": "{{displayCount}} napja lejárt",
-      "findingsCount_one": "{{displayCount}} találat",
-      "findingsCount_other": "{{displayCount}} találat"
+      "syncStatusUnavailable": "A szinkronizálás állapota nem érhető el."
     },
     "dashboardMetrics": {
       "openFindings": "Nyitott találatok",
@@ -2214,13 +2168,7 @@
       "updateTodos": "Teendők frissítése",
       "linesBadge": "{{displayCount}} sor",
       "filesBadge": "{{displayCount}} fájl",
-      "matchesBadge": "{{displayCount}} találat",
-      "filesBadge_one": "{{displayCount}} fájl",
-      "filesBadge_other": "{{displayCount}} fájl",
-      "linesBadge_one": "{{displayCount}} sor",
-      "linesBadge_other": "{{displayCount}} sor",
-      "matchesBadge_one": "{{displayCount}} találat",
-      "matchesBadge_other": "{{displayCount}} találat"
+      "matchesBadge": "{{displayCount}} találat"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}. sor (csonkolva)",
@@ -2510,11 +2458,7 @@
       "files": "Fájl",
       "couldNotOpenPhotoPicker": "Nem sikerült megnyitni a fényképválasztót. Indítsd újra a Kilo alkalmazást, és próbáld újra.",
       "maxFilesAllowed": "Legfeljebb {{displayCount}} fájlt csatolhatsz.",
-      "onlyAddingFiles": "Összesen {{total}} fájlból csak {{accepted}} hozzáadása (legfeljebb {{max}})",
-      "maxFilesAllowed_one": "Legfeljebb {{displayCount}} fájlt csatolhatsz.",
-      "maxFilesAllowed_other": "Legfeljebb {{displayCount}} fájlt csatolhatsz.",
-      "onlyAddingFiles_one": "Összesen {{total}} fájlból csak {{accepted}} hozzáadása (legfeljebb {{max}})",
-      "onlyAddingFiles_other": "Összesen {{total}} fájlból csak {{accepted}} hozzáadása (legfeljebb {{max}})"
+      "onlyAddingFiles": "Összesen {{total}} fájlból csak {{accepted}} hozzáadása (legfeljebb {{max}})"
     },
     "composer": {
       "addAttachment": "Csatolmány hozzáadása",
@@ -2532,9 +2476,7 @@
       "discardAttachmentsMessage": "Az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",
       "discardAttachmentsTitle": "Elveted a csatolmányokat?",
       "charactersRemaining": "{{count}} karakter maradt",
-      "insertNewline": "Új sor beszúrása",
-      "charactersRemaining_one": "{{count}} karakter maradt",
-      "charactersRemaining_other": "{{count}} karakter maradt"
+      "insertNewline": "Új sor beszúrása"
     },
     "chatLink": {
       "linkCopied": "Hivatkozás másolva",
@@ -2606,9 +2548,7 @@
       "stepsCount_one": "{{steps}} lépés",
       "stepsCount": "{{steps}} lépés",
       "stepsCount_other": "{{steps}} lépés",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "modelsCount_one": "Modell ({{displayCount}})",
-      "modelsCount_other": "Modellek ({{displayCount}})"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "autoApprove": {
       "title": "Automatikus jóváhagyás",
@@ -2648,9 +2588,7 @@
     },
     "toolRun": {
       "sheetTitle": "Eszközhívások",
-      "condensedLabel": "{{itemCount}} elem; {{last}}",
-      "condensedLabel_one": "{{itemCount}} elem; {{last}}",
-      "condensedLabel_other": "{{itemCount}} elem; {{last}}"
+      "condensedLabel": "{{itemCount}} elem; {{last}}"
     }
   },
   "bootstrap": {
@@ -2785,9 +2723,7 @@
     "cliCantReceiveFilesTitle": "Ez a munkamenet nem fogadhat fájlokat",
     "cliCantReceiveFilesMessage": "Az ezt a munkamenetet futtató Kilo CLI nem fogadhat fájlokat. Frissítsd a CLI-t azon a gépen, vagy oszd meg a fájlokat egy új munkamenettel.",
     "contentlessMessage": "Nincs mit megosztani: nincs szöveg vagy csatolt fájl.",
-    "couldNotReadContent": "Nem sikerült beolvasni a megosztott tartalmat.",
-    "onlyFirstFilesAttached_one": "Csak az első {{displayCount}} fájl lesz csatolva.",
-    "onlyFirstFilesAttached_other": "Csak az első {{displayCount}} fájl lesz csatolva."
+    "couldNotReadContent": "Nem sikerült beolvasni a megosztott tartalmat."
   },
   "kiloPass": {
     "title": "Kilo Pass",

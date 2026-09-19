@@ -163,7 +163,6 @@
     "useDifferentEmail": "Koristi drugu adresu e-pošte",
     "signInWithApple": "Prijavi se putem Apple računa",
     "signInWithGoogle": "Prijavi se putem Google računa",
-    "signInWithPasskey": "Prijavi se pristupnim ključem",
     "emailAddress": "Adresa e-pošte",
     "emailPlaceholder": "ti@primjer.com",
     "continueWithEmail": "Nastavi s e-poštom",
@@ -176,10 +175,6 @@
     "termsConnector": " i ",
     "termsSuffix": ".",
     "moreSignInOptions": "Više opcija za prijavu",
-    "passkeyCancelled": "Prijava pristupnim ključem je otkazana. Pokušaj ponovo.",
-    "passkeyNotFound": "Za ovaj uređaj nije sačuvan nijedan pristupni ključ. Prijavi se umjesto toga putem Apple, Google ili svoje e-pošte.",
-    "passkeyUnsupported": "Pristupni ključevi nisu dostupni na ovom uređaju. Prijavi se umjesto toga putem Apple, Google ili svoje e-pošte.",
-    "passkeyFailed": "Prijava pristupnim ključem nije uspjela. Pokušaj ponovo.",
     "couldNotCompleteSignIn": "Nije moguće završiti prijavu. Pokušaj ponovo.",
     "sessionEnded": "Tvoja sesija je završena. Prijavi se ponovo.",
     "signInCodeExpired": "Tvoj kod za prijavu je istekao. Pokušaj ponovo.",
@@ -230,28 +225,7 @@
     "providerTestAccount": "Testni nalog",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Poslovna jedinstvena prijava (SSO)",
-    "passkeysTitle": "Pristupni ključevi",
-    "passkeysSubtitle": "Prijavi se bez lozinke",
-    "passkeysEmpty": "Još nema pristupnih ključeva",
-    "passkeysEmptyHint": "$t(profile.addPasskey) da se prijaviš bez lozinke.",
-    "passkeysCouldNotLoad": "Pristupni ključevi se ne mogu učitati",
-    "passkeysLoadFailed": "Pristupni ključevi nisu dostupni dok se ovo ne učita.",
-    "addPasskey": "Dodaj pristupni ključ",
-    "passkeyDefaultName": "Pristupni ključ",
-    "passkeyAddedOn": "Dodano {{date}}",
-    "passkeyAdded": "Pristupni ključ dodan.",
-    "passkeyAddFailed": "Pristupni ključ nije mogao biti dodan. Pokušaj ponovo.",
-    "passkeyAddUnsupported": "Ovaj uređaj ne može kreirati pristupne ključeve.",
-    "passkeyAddCancelled": "Kreiranje pristupnog ključa je otkazano.",
-    "passkeyRemoved": "Pristupni ključ uklonjen.",
-    "passkeyRemoveFailed": "Taj pristupni ključ nije mogao biti uklonjen. Pokušaj ponovo.",
-    "passkeyRenamed": "Pristupni ključ preimenovan.",
-    "passkeyName": "Naziv pristupnog ključa",
-    "renamePasskey": "Preimenuj pristupni ključ",
-    "removePasskey": "Ukloni pristupni ključ",
-    "removePasskeyTitle": "Ukloniti pristupni ključ?",
-    "removePasskeyMessage": "Više se nećeš moći prijaviti ovim pristupnim ključem."
+    "providerEnterpriseSso": "Poslovna jedinstvena prijava (SSO)"
   },
   "preferences": {
     "general": "Općenito",
@@ -371,22 +345,7 @@
       "goToOverview": "Otvori pregled",
       "goToOverviewTab": "Otvori karticu Pregled",
       "fileLoadedCount_few": "Učitane {{displayCount}} datoteke",
-      "fileLoadedOfTotalCount_few": "Učitane {{displayCount}} datoteke od {{total}}",
-      "expandAllLines_one": "Prikaži sve redove ({{displayCount}})",
-      "expandAllLines_other": "Prikaži sve redove ({{displayCount}})",
-      "expandAllLines_few": "Prikaži sve redove ({{displayCount}})",
-      "expandLines_one": "Prikaži {{displayCount}} red ({{start}}–{{end}})",
-      "expandLines_other": "Prikaži {{displayCount}} redova ({{start}}–{{end}})",
-      "expandLines_few": "Prikaži {{displayCount}} reda ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "Prikaži {{displayCount}} red konteksta",
-      "expandLinesOfContext_other": "Prikaži {{displayCount}} redova konteksta",
-      "expandLinesOfContext_few": "Prikaži {{displayCount}} reda konteksta",
-      "expandMoreLines_one": "Prikaži još {{displayCount}} red ({{start}}–{{end}})",
-      "expandMoreLines_other": "Prikaži još {{displayCount}} redova ({{start}}–{{end}})",
-      "expandMoreLines_few": "Prikaži još {{displayCount}} reda ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "Učitano {{loaded}} od {{total}} datoteka",
-      "loadedOfTotalFiles_other": "Učitano {{loaded}} od {{total}} datoteka",
-      "loadedOfTotalFiles_few": "Učitano {{loaded}} od {{total}} datoteka"
+      "fileLoadedOfTotalCount_few": "Učitane {{displayCount}} datoteke od {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ nema novog reda na kraju datoteke",
@@ -579,10 +538,7 @@
         "outdatedOnPath": "Zastarjelo na {{path}}"
       },
       "deletedUser": "obrisani korisnik",
-      "replyForbiddenTerm": "Nemaš dozvolu da odgovoriš na ovaj {{term}}.",
-      "moreLinesAbove_one": "… još {{displayCount}} red iznad",
-      "moreLinesAbove_other": "… još {{displayCount}} redova iznad",
-      "moreLinesAbove_few": "… još {{displayCount}} reda iznad"
+      "replyForbiddenTerm": "Nemaš dozvolu da odgovoriš na ovaj {{term}}."
     },
     "couldNotOpenGitHubAppSettings": "Nije moguće otvoriti postavke GitHub aplikacije.",
     "installKiloGitHubApp": "Instaliraj aplikaciju Kilo za GitHub",
@@ -759,10 +715,7 @@
       "statusContext": "Kontekst",
       "lineLabel": "{{status}}, red {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}, tekst: {{text}}",
-      "emptyLine": "(prazno)",
-      "truncationBanner_one": "Prikazuje se prvih {{limit}} od {{total}} promijenjenih datoteka zbog ograničenja GitHub API-ja.",
-      "truncationBanner_other": "Prikazuje se prvih {{limit}} od {{total}} promijenjenih datoteka zbog ograničenja GitHub API-ja.",
-      "truncationBanner_few": "Prikazuje se prvih {{limit}} od {{total}} promijenjenih datoteka zbog ograničenja GitHub API-ja."
+      "emptyLine": "(prazno)"
     },
     "linkPasteClipboardEmpty": "Međuspremnik je prazan.",
     "linkPasteNotAPullRequest": "Ovo nije povezanica na zahtjev za spajanje niti merge request",
@@ -839,11 +792,11 @@
     "previewFullDescription": "Obavijesti prikazuju tekst poruke na tvom zaključanom ekranu.",
     "previewGenericDescription": "Obavijesti pokazuju samo da se nešto dogodilo. Otvori Kilo da pročitaš poruku.",
     "channel": {
-      "agentProgress": "Napredak agenta",
       "chat": "Poruke u razgovoru",
       "kiloclaw": "Aktivnost u KiloClawu",
       "balance": "Upozorenja o stanju",
-      "security": "Sigurnosni nalazi"
+      "security": "Sigurnosni nalazi",
+      "agent": "Sesije agenta"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",
@@ -936,10 +889,7 @@
       "uploadFailed": "Otpremanje nije uspjelo.",
       "failedToUploadFile": "Otpremanje datoteke nije uspjelo: {{reason}}.",
       "nothingToPaste": "Nema sadržaja za lijepljenje.",
-      "metadataStripFailed": "Nije moguće ukloniti metapodatke fotografije.",
-      "limit_one": "Možeš priložiti do {{displayCount}} datoteka.",
-      "limit_other": "Možeš priložiti do {{displayCount}} datoteka.",
-      "limit_few": "Možeš priložiti do {{displayCount}} datoteke."
+      "metadataStripFailed": "Nije moguće ukloniti metapodatke fotografije."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1686,13 +1636,7 @@
       "syncFindings": "Sinhroniziraj nalaze",
       "syncNow": "Sinhroniziraj sada",
       "syncQueued": "Sinhronizacija je dodana u red.",
-      "syncStatusUnavailable": "Status sinhronizacije nije dostupan.",
-      "daysOverdue_one": "{{displayCount}} dan zakašnjenja",
-      "daysOverdue_other": "{{displayCount}} dana zakašnjenja",
-      "daysOverdue_few": "{{displayCount}} dana zakašnjenja",
-      "findingsCount_one": "{{displayCount}} nalaz",
-      "findingsCount_other": "{{displayCount}} nalaza",
-      "findingsCount_few": "{{displayCount}} nalaza"
+      "syncStatusUnavailable": "Status sinhronizacije nije dostupan."
     },
     "dashboardMetrics": {
       "openFindings": "Otvoreni nalazi",
@@ -2243,16 +2187,7 @@
       "updateTodos": "Ažuriraj zadatke",
       "linesBadge": "{{displayCount}} redova",
       "filesBadge": "{{displayCount}} datoteka",
-      "matchesBadge": "{{displayCount}} podudaranja",
-      "filesBadge_one": "{{displayCount}} datoteka",
-      "filesBadge_other": "{{displayCount}} datoteka",
-      "filesBadge_few": "{{displayCount}} datoteke",
-      "linesBadge_one": "{{displayCount}} red",
-      "linesBadge_other": "{{displayCount}} redova",
-      "linesBadge_few": "{{displayCount}} reda",
-      "matchesBadge_one": "{{displayCount}} podudaranje",
-      "matchesBadge_other": "{{displayCount}} podudaranja",
-      "matchesBadge_few": "{{displayCount}} podudaranja"
+      "matchesBadge": "{{displayCount}} podudaranja"
     },
     "readToolMarkdown": {
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",
@@ -2545,13 +2480,7 @@
       "files": "Datoteke",
       "couldNotOpenPhotoPicker": "Nije moguće otvoriti odabir fotografija. Ponovo pokreni Kilo i pokušaj ponovo.",
       "maxFilesAllowed": "Dozvoljeno je najviše {{displayCount}} datoteka.",
-      "onlyAddingFiles": "Dodaje se samo {{accepted}} od ukupno {{total}} datoteka (najviše {{max}})",
-      "maxFilesAllowed_one": "Dozvoljeno je najviše {{displayCount}} datoteka.",
-      "maxFilesAllowed_other": "Dozvoljeno je najviše {{displayCount}} datoteka.",
-      "maxFilesAllowed_few": "Dozvoljeno je najviše {{displayCount}} datoteke.",
-      "onlyAddingFiles_one": "Dodaje se samo {{accepted}} od ukupno {{total}} datoteka (najviše {{max}})",
-      "onlyAddingFiles_other": "Dodaje se samo {{accepted}} od ukupno {{total}} datoteka (najviše {{max}})",
-      "onlyAddingFiles_few": "Dodaje se samo {{accepted}} od ukupno {{total}} datoteka (najviše {{max}})"
+      "onlyAddingFiles": "Dodaje se samo {{accepted}} od ukupno {{total}} datoteka (najviše {{max}})"
     },
     "composer": {
       "addAttachment": "Dodaj prilog",
@@ -2569,10 +2498,7 @@
       "discardAttachmentsMessage": "Otpremljene datoteke koje nisu priložene poslanim porukama bit će obrisane.",
       "discardAttachmentsTitle": "Odbaciti priloge?",
       "charactersRemaining": "Preostalo znakova: {{count}}",
-      "insertNewline": "Umetni novi red",
-      "charactersRemaining_one": "Preostalo znak: {{count}}",
-      "charactersRemaining_other": "Preostalo znakova: {{count}}",
-      "charactersRemaining_few": "Preostalo znaka: {{count}}"
+      "insertNewline": "Umetni novi red"
     },
     "chatLink": {
       "linkCopied": "Link kopiran",
@@ -2645,10 +2571,7 @@
       "stepsCount": "{{steps}} koraka",
       "stepsCount_other": "{{steps}} koraka",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "stepsCount_few": "{{steps}} koraka",
-      "modelsCount_one": "Model ({{displayCount}})",
-      "modelsCount_other": "Modeli ({{displayCount}})",
-      "modelsCount_few": "Modeli ({{displayCount}})"
+      "stepsCount_few": "{{steps}} koraka"
     },
     "autoApprove": {
       "title": "Automatsko odobravanje",
@@ -2688,10 +2611,7 @@
     },
     "toolRun": {
       "sheetTitle": "Pozivi alata",
-      "condensedLabel": "{{itemCount}} stavki; {{last}}",
-      "condensedLabel_one": "{{itemCount}} stavka; {{last}}",
-      "condensedLabel_other": "{{itemCount}} stavki; {{last}}",
-      "condensedLabel_few": "{{itemCount}} stavke; {{last}}"
+      "condensedLabel": "{{itemCount}} stavki; {{last}}"
     }
   },
   "bootstrap": {
@@ -2826,10 +2746,7 @@
     "cliCantReceiveFilesTitle": "Ova sesija ne može primiti datoteke",
     "cliCantReceiveFilesMessage": "Kilo CLI koji pokreće ovu sesiju ne može primati datoteke. Ažuriraj CLI na tom računaru ili pošalji sadržaj u novu sesiju.",
     "contentlessMessage": "Nema sadržaja za dijeljenje — nisu priloženi ni tekst ni datoteke.",
-    "couldNotReadContent": "Čitanje podijeljenog sadržaja nije uspjelo.",
-    "onlyFirstFilesAttached_one": "Samo prvih {{displayCount}} datoteka bit će priloženo.",
-    "onlyFirstFilesAttached_other": "Samo prvih {{displayCount}} datoteka bit će priloženo.",
-    "onlyFirstFilesAttached_few": "Samo prvih {{displayCount}} datoteke bit će priloženo."
+    "couldNotReadContent": "Čitanje podijeljenog sadržaja nije uspjelo."
   },
   "kiloPass": {
     "title": "Kilo Pass",

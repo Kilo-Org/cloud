@@ -163,7 +163,6 @@
     "useDifferentEmail": "வேறு மின்னஞ்சல் முகவரியைப் பயன்படுத்தவும்",
     "signInWithApple": "Apple மூலம் உள்நுழையவும்",
     "signInWithGoogle": "Google மூலம் உள்நுழையவும்",
-    "signInWithPasskey": "பாஸ்கீ மூலம் உள்நுழையவும்",
     "emailAddress": "மின்னஞ்சல் முகவரி",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "மின்னஞ்சல் மூலம் தொடரவும்",
@@ -176,10 +175,6 @@
     "termsConnector": " மற்றும் ",
     "termsSuffix": ".",
     "moreSignInOptions": "கூடுதல் உள்நுழைவு விருப்பங்கள்",
-    "passkeyCancelled": "பாஸ்கீ மூலம் உள்நுழைவது ரத்து செய்யப்பட்டது. மீண்டும் முயற்சிக்கவும்.",
-    "passkeyNotFound": "இந்தச் சாதனத்திற்கு பாஸ்கீ எதுவும் சேமிக்கப்படவில்லை. அதற்குப் பதிலாக Apple, Google அல்லது உங்கள் மின்னஞ்சல் மூலம் உள்நுழையவும்.",
-    "passkeyUnsupported": "இந்தச் சாதனத்தில் பாஸ்கீகள் கிடைக்கவில்லை. அதற்குப் பதிலாக Apple, Google அல்லது உங்கள் மின்னஞ்சல் மூலம் உள்நுழையவும்.",
-    "passkeyFailed": "பாஸ்கீ மூலம் உள்நுழைய முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
     "couldNotCompleteSignIn": "உள்நுழைவை முடிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
     "sessionEnded": "உங்கள் அமர்வு முடிவடைந்தது. மீண்டும் உள்நுழையவும்.",
     "signInCodeExpired": "உங்கள் உள்நுழைவுக் குறியீடு காலாவதியானது. மீண்டும் முயற்சிக்கவும்.",
@@ -230,28 +225,7 @@
     "providerTestAccount": "சோதனைக் கணக்கு",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "நிறுவன SSO",
-    "passkeysTitle": "பாஸ்கீகள்",
-    "passkeysSubtitle": "கடவுச்சொல் இல்லாமல் உள்நுழையவும்",
-    "passkeysEmpty": "இன்னும் பாஸ்கீகள் இல்லை",
-    "passkeysEmptyHint": "$t(profile.addPasskey) செய்து கடவுச்சொல் இல்லாமல் உள்நுழையவும்.",
-    "passkeysCouldNotLoad": "பாஸ்கீகளை ஏற்ற முடியவில்லை",
-    "passkeysLoadFailed": "இது ஏற்றப்படும் வரை பாஸ்கீகள் கிடைக்காது.",
-    "addPasskey": "ஒரு பாஸ்கீ சேர்க்கவும்",
-    "passkeyDefaultName": "பாஸ்கீ",
-    "passkeyAddedOn": "{{date}} அன்று சேர்க்கப்பட்டது",
-    "passkeyAdded": "பாஸ்கீ சேர்க்கப்பட்டது.",
-    "passkeyAddFailed": "பாஸ்கீ சேர்க்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-    "passkeyAddUnsupported": "இந்தச் சாதனத்தால் பாஸ்கீகளை உருவாக்க முடியாது.",
-    "passkeyAddCancelled": "பாஸ்கீ உருவாக்கம் ரத்து செய்யப்பட்டது.",
-    "passkeyRemoved": "பாஸ்கீ நீக்கப்பட்டது.",
-    "passkeyRemoveFailed": "அந்தப் பாஸ்கீயை நீக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-    "passkeyRenamed": "பாஸ்கீ மறுபெயரிடப்பட்டது.",
-    "passkeyName": "பாஸ்கீ பெயர்",
-    "renamePasskey": "பாஸ்கீயை மறுபெயரிடவும்",
-    "removePasskey": "பாஸ்கீயை நீக்கவும்",
-    "removePasskeyTitle": "பாஸ்கீயை நீக்கவா?",
-    "removePasskeyMessage": "இந்தப் பாஸ்கீ மூலம் இனி உள்நுழைய முடியாது."
+    "providerEnterpriseSso": "நிறுவன SSO"
   },
   "preferences": {
     "general": "பொது",
@@ -369,17 +343,7 @@
       "fileLoadedOfTotalCount_other": "மொத்தம் {{total}} கோப்புகளில் {{displayCount}} ஏற்றப்பட்டன",
       "filesStillLoading": "கோப்புகள் இன்னும் ஏற்றப்படுகின்றன. புதுப்பிக்க இழுக்கவும்.",
       "goToOverview": "மேலோட்டத்திற்குச் செல்லவும்",
-      "goToOverviewTab": "மேலோட்டத் தாவலுக்குச் செல்லவும்",
-      "expandAllLines_one": "{{displayCount}} வரியையும் காட்டவும்",
-      "expandAllLines_other": "{{displayCount}} வரிகளையும் காட்டவும்",
-      "expandLines_one": "{{displayCount}} வரி காட்டவும் ({{start}}–{{end}})",
-      "expandLines_other": "{{displayCount}} வரிகளைக் காட்டவும் ({{start}}–{{end}})",
-      "expandLinesOfContext_one": "சுற்றியுள்ள {{displayCount}} வரி காட்டவும்",
-      "expandLinesOfContext_other": "சுற்றியுள்ள {{displayCount}} வரிகளைக் காட்டவும்",
-      "expandMoreLines_one": "மேலும் {{displayCount}} வரி காட்டவும் ({{start}}–{{end}})",
-      "expandMoreLines_other": "மேலும் {{displayCount}} வரிகளைக் காட்டவும் ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{total}} கோப்புகளில் {{loaded}} ஏற்றப்பட்டன",
-      "loadedOfTotalFiles_other": "{{total}} கோப்புகளில் {{loaded}} ஏற்றப்பட்டன"
+      "goToOverviewTab": "மேலோட்டத் தாவலுக்குச் செல்லவும்"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ கோப்பின் முடிவில் புதிய வரி இல்லை",
@@ -569,9 +533,7 @@
         "outdatedOnPath": "{{path}} — பழைய பதிப்பிலுள்ளது"
       },
       "deletedUser": "நீக்கப்பட்ட பயனர்",
-      "replyForbiddenTerm": "இந்த {{term}}-க்குப் பதிலளிக்க உங்களுக்கு அனுமதி இல்லை.",
-      "moreLinesAbove_one": "… மேலே மேலும் {{displayCount}} வரி உள்ளது.",
-      "moreLinesAbove_other": "… மேலே மேலும் {{displayCount}} வரிகள் உள்ளன."
+      "replyForbiddenTerm": "இந்த {{term}}-க்குப் பதிலளிக்க உங்களுக்கு அனுமதி இல்லை."
     },
     "couldNotOpenGitHubAppSettings": "GitHub செயலியின் அமைப்புகளைத் திறக்க முடியவில்லை.",
     "installKiloGitHubApp": "Kilo GitHub செயலியை நிறுவவும்",
@@ -744,9 +706,7 @@
       "statusContext": "சுற்றியுள்ள வரி",
       "lineLabel": "{{status}} வரி {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(காலி)",
-      "truncationBanner_one": "GitHub API வரம்பு காரணமாக மாற்றப்பட்ட {{total}} கோப்புகளில் முதல் {{limit}} கோப்புகள் காட்டப்படுகின்றன.",
-      "truncationBanner_other": "GitHub API வரம்பு காரணமாக மாற்றப்பட்ட {{total}} கோப்புகளில் முதல் {{limit}} கோப்புகள் காட்டப்படுகின்றன."
+      "emptyLine": "(காலி)"
     },
     "linkPasteClipboardEmpty": "கிளிப்போர்டு காலியாக உள்ளது.",
     "linkPasteNotAPullRequest": "இது இணைப்புக் கோரிக்கை இணைப்பு அல்ல",
@@ -823,11 +783,11 @@
     "previewFullDescription": "அறிவிப்புகள் உங்கள் பூட்டுத் திரையில் செய்தி உரையைக் காட்டும்.",
     "previewGenericDescription": "புதிய நிகழ்வு இருப்பதை அறிவிப்புகள் காட்டும். விவரங்களைப் படிக்க Kilo-வைத் திறக்கவும்.",
     "channel": {
-      "agentProgress": "ஏஜென்ட் முன்னேற்றம்",
       "chat": "அரட்டைச் செய்திகள்",
       "kiloclaw": "KiloClaw செயல்பாடு",
       "balance": "கணக்கு இருப்பு எச்சரிக்கைகள்",
-      "security": "கண்டறிந்த பாதுகாப்புச் சிக்கல்கள்"
+      "security": "கண்டறிந்த பாதுகாப்புச் சிக்கல்கள்",
+      "agent": "ஏஜென்ட் அமர்வுகள்"
     },
     "category": {
       "chatMessagesSubtitle": "உங்கள் உரையாடல்களில் வரும் பதில்கள்",
@@ -920,9 +880,7 @@
       "uploadFailed": "பதிவேற்றம் தோல்வியடைந்தது.",
       "failedToUploadFile": "கோப்பைப் பதிவேற்ற முடியவில்லை: {{reason}}.",
       "nothingToPaste": "ஒட்டுவதற்கு எதுவும் இல்லை.",
-      "metadataStripFailed": "புகைப்படத்தின் மேனிலைத் தரவை அகற்ற முடியவில்லை.",
-      "limit_one": "நீங்கள் {{displayCount}} கோப்பு வரை இணைக்கலாம்.",
-      "limit_other": "நீங்கள் {{displayCount}} கோப்புகள் வரை இணைக்கலாம்."
+      "metadataStripFailed": "புகைப்படத்தின் மேனிலைத் தரவை அகற்ற முடியவில்லை."
     },
     "attachmentPreview": {
       "accessibility": "கோப்பு: {{filename}}, {{status}}",
@@ -1666,11 +1624,7 @@
       "syncFindings": "சிக்கல்களை ஒத்திசைக்கவும்",
       "syncNow": "இப்போது ஒத்திசைக்கவும்",
       "syncQueued": "ஒத்திசைவு வரிசையில் சேர்க்கப்பட்டது",
-      "syncStatusUnavailable": "ஒத்திசைவு நிலை கிடைக்கவில்லை.",
-      "daysOverdue_one": "{{displayCount}} நாள் தாமதம்",
-      "daysOverdue_other": "{{displayCount}} நாட்கள் தாமதம்",
-      "findingsCount_one": "{{displayCount}} சிக்கல்",
-      "findingsCount_other": "{{displayCount}} சிக்கல்கள்"
+      "syncStatusUnavailable": "ஒத்திசைவு நிலை கிடைக்கவில்லை."
     },
     "dashboardMetrics": {
       "openFindings": "நிலுவைச் சிக்கல்கள்",
@@ -2214,13 +2168,7 @@
       "updateTodos": "பணிப் பட்டியலைப் புதுப்பிக்கவும்",
       "linesBadge": "{{displayCount}} வரிகள்",
       "filesBadge": "{{displayCount}} கோப்புகள்",
-      "matchesBadge": "{{displayCount}} பொருத்தங்கள்",
-      "filesBadge_one": "{{displayCount}} கோப்பு",
-      "filesBadge_other": "{{displayCount}} கோப்புகள்",
-      "linesBadge_one": "{{displayCount}} வரி",
-      "linesBadge_other": "{{displayCount}} வரிகள்",
-      "matchesBadge_one": "{{displayCount}} பொருத்தம்",
-      "matchesBadge_other": "{{displayCount}} பொருத்தங்கள்"
+      "matchesBadge": "{{displayCount}} பொருத்தங்கள்"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} வரிகள் (முழுவதும் காட்டப்படவில்லை)",
@@ -2510,11 +2458,7 @@
       "files": "கோப்புகள்",
       "couldNotOpenPhotoPicker": "புகைப்படத் தேர்வியைத் திறக்க முடியவில்லை. Kilo-வை மறுதொடக்கம் செய்து மீண்டும் முயற்சிக்கவும்.",
       "maxFilesAllowed": "அதிகபட்சம் {{displayCount}} கோப்புகளைச் சேர்க்கலாம்.",
-      "onlyAddingFiles": "{{total}} கோப்புகளில் {{accepted}} மட்டுமே சேர்க்கப்படுகின்றன (அதிகபட்சம் {{max}})",
-      "maxFilesAllowed_one": "அதிகபட்சம் {{displayCount}} கோப்பு சேர்க்கலாம்.",
-      "maxFilesAllowed_other": "அதிகபட்சம் {{displayCount}} கோப்புகளைச் சேர்க்கலாம்.",
-      "onlyAddingFiles_one": "{{total}} கோப்புகளில் {{accepted}} மட்டுமே சேர்க்கப்படுகின்றன (அதிகபட்சம் {{max}})",
-      "onlyAddingFiles_other": "{{total}} கோப்புகளில் {{accepted}} மட்டுமே சேர்க்கப்படுகின்றன (அதிகபட்சம் {{max}})"
+      "onlyAddingFiles": "{{total}} கோப்புகளில் {{accepted}} மட்டுமே சேர்க்கப்படுகின்றன (அதிகபட்சம் {{max}})"
     },
     "composer": {
       "addAttachment": "இணைப்புக் கோப்பைச் சேர்க்கவும்",
@@ -2532,9 +2476,7 @@
       "discardAttachmentsMessage": "அனுப்பிய செய்திகளில் இணைக்கப்படாத பதிவேற்றங்கள் நீக்கப்படும்.",
       "discardAttachmentsTitle": "இணைப்புகளை நீக்கவா?",
       "charactersRemaining": "{{count}} எழுத்துகள் மீதமுள்ளன",
-      "insertNewline": "புதிய வரியைச் செருகவும்",
-      "charactersRemaining_one": "{{count}} எழுத்து மீதமுள்ளது",
-      "charactersRemaining_other": "{{count}} எழுத்துகள் மீதமுள்ளன"
+      "insertNewline": "புதிய வரியைச் செருகவும்"
     },
     "chatLink": {
       "linkCopied": "இணைப்பு நகலெடுக்கப்பட்டது",
@@ -2606,9 +2548,7 @@
       "stepsCount_one": "{{steps}} படி",
       "stepsCount": "{{steps}} படிகள்",
       "stepsCount_other": "{{steps}} படிகள்",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "modelsCount_one": "மாதிரி ({{displayCount}})",
-      "modelsCount_other": "மாதிரிகள் ({{displayCount}})"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
     "autoApprove": {
       "title": "தானியங்கி ஒப்புதல்",
@@ -2648,9 +2588,7 @@
     },
     "toolRun": {
       "sheetTitle": "கருவி அழைப்புகள்",
-      "condensedLabel": "{{itemCount}} உருப்படிகள்; {{last}}",
-      "condensedLabel_one": "{{itemCount}} உருப்படி; {{last}}",
-      "condensedLabel_other": "{{itemCount}} உருப்படிகள்; {{last}}"
+      "condensedLabel": "{{itemCount}} உருப்படிகள்; {{last}}"
     }
   },
   "bootstrap": {
@@ -2785,9 +2723,7 @@
     "cliCantReceiveFilesTitle": "இந்த அமர்வு கோப்புகளைப் பெற முடியாது",
     "cliCantReceiveFilesMessage": "இந்த அமர்வை இயக்கும் Kilo CLI கோப்புகளைப் பெற முடியாது. அந்தக் கணினியில் CLI-ஐப் புதுப்பிக்கவும் அல்லது இதைப் புதிய அமர்வுக்குப் பகிரவும்.",
     "contentlessMessage": "பகிர எதுவும் இல்லை — உரை அல்லது கோப்புகள் சேர்க்கப்படவில்லை.",
-    "couldNotReadContent": "பகிரப்பட்ட உள்ளடக்கத்தைப் படிக்க முடியவில்லை.",
-    "onlyFirstFilesAttached_one": "முதல் {{displayCount}} கோப்பு மட்டுமே இணைக்கப்படும்.",
-    "onlyFirstFilesAttached_other": "முதல் {{displayCount}} கோப்புகள் மட்டுமே இணைக்கப்படும்."
+    "couldNotReadContent": "பகிரப்பட்ட உள்ளடக்கத்தைப் படிக்க முடியவில்லை."
   },
   "kiloPass": {
     "title": "Kilo Pass",

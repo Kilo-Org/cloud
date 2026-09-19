@@ -180,6 +180,29 @@ describe('createManualCodeReviewJob connected GitLab failures', () => {
     expect((error as TRPCError).code).toBe('NOT_FOUND');
     expect(getHTTPStatusCodeFromError(error as TRPCError)).not.toBe(500);
   });
+
+  it('maps a connected GitLab timeout to GATEWAY_TIMEOUT, not BAD_GATEWAY', async () => {
+    mockIsLocalCodeReviewDevelopmentEnabled.mockReturnValue(false);
+    mockGetAllIntegrationsForOwner.mockResolvedValue([
+      {
+        id: 'integration-1',
+        platform: 'gitlab',
+        integration_status: 'active',
+        metadata: { gitlab_instance_url: 'https://gitlab.com' },
+        repositories: [],
+      },
+    ]);
+    mockGetValidGitLabToken.mockResolvedValue('token');
+    // The GitLab adapter runs its own request timeout and destroys the request
+    // with a plain Error named 'Error' and this message.
+    mockFetchGitLabMergeRequest.mockRejectedValue(new Error('GitLab request timed out'));
+
+    const error = await captureError({ platform: 'gitlab', url: GITLAB_MR_URL });
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).code).toBe('GATEWAY_TIMEOUT');
+    expect(getHTTPStatusCodeFromError(error as TRPCError)).toBe(504);
+  });
 });
 
 describe('createManualCodeReviewJob happy path', () => {

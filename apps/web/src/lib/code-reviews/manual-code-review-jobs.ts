@@ -704,6 +704,21 @@ function providerLabel(platform: CodeReviewPlatform): 'GitHub' | 'GitLab' {
 }
 
 /**
+ * The GitLab adapter runs its own `req.setTimeout` and destroys the request with
+ * a plain `Error` named `Error` and the message below. Unlike `AbortSignal`
+ * timeouts it carries no `TimeoutError`/`AbortError` name, so recognize the
+ * message too — otherwise a connected-GitLab timeout falls through to
+ * BAD_GATEWAY instead of GATEWAY_TIMEOUT.
+ */
+const GITLAB_ADAPTER_TIMEOUT_MESSAGE = 'GitLab request timed out';
+
+function isProviderTimeout(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (error.name === 'TimeoutError' || error.name === 'AbortError') return true;
+  return error.message === GITLAB_ADAPTER_TIMEOUT_MESSAGE;
+}
+
+/**
  * A provider answered, but the body did not match the expected shape. That is an
  * upstream/gateway failure, not a fault in the caller's request — so it must be a
  * 502, never an unmapped error that tRPC turns into a 500.
@@ -751,7 +766,7 @@ function toProviderRequestError(error: unknown, platform: CodeReviewPlatform): T
       message: `${provider} rejected that request. Check the ${noun} URL and try again.`,
     });
   }
-  if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+  if (isProviderTimeout(error)) {
     return new TRPCError({
       code: 'GATEWAY_TIMEOUT',
       message: `${provider} took too long to respond. Try again.`,

@@ -200,12 +200,19 @@ export function LoginScreen() {
 
   // RN 0.86 Android (ReactRootView.java) reports endCoordinates.height =
   // imeInsets.bottom − barInsets.bottom (excludes the nav bar). endCoordinates.screenY
-  // is NOT the IME top under adjustResize, so full occlusion is
+  // is NOT the IME top under adjustResize, so Android full occlusion is
   // endCoordinates.height + useSafeAreaInsets().bottom (= WindowInsets.ime().bottom;
-  // verified 704px + 63px = 767px on pixel9). The bottom inset is reserved at
-  // rest as well, so the scroll viewport never extends under the navigation bar
-  // or the home indicator; both platforms take this same branch.
-  const bottomPadding = keyboardHeight + insets.bottom;
+  // verified 704px + 63px = 767px on pixel9). iOS instead reports the keyboard
+  // window frame (RCTKeyboardObserver converts UIKeyboardFrameEndUserInfoKey into
+  // window coordinates), whose height already reaches the screen bottom and so
+  // includes the home-indicator inset; adding insets.bottom there would count it
+  // twice and float the form above the IME. At rest neither platform reports a
+  // height, and the inset alone keeps the scroll viewport clear of the navigation
+  // bar and the home indicator.
+  const bottomPadding =
+    keyboardHeight > 0
+      ? keyboardHeight + (Platform.OS === 'android' ? insets.bottom : 0)
+      : insets.bottom;
   // The Globe stays enabled on idle, denied, expired, and error (those render
   // an interactive IdleAuth form); it is disabled while a device-auth flow
   // (pending/approved) or a busy auth action owns the screen.
@@ -214,8 +221,9 @@ export function LoginScreen() {
 
   return (
     // One wrapper owns the vertical space on both platforms: the bottom inset is
-    // reserved at rest and the listener above adds the keyboard height on top
-    // while the IME is up. The ScrollView's centered form then re-centres in the
+    // reserved at rest and the listener above adds the reported keyboard height
+    // while the IME is up (plus the inset again on Android, whose height excludes
+    // the navigation bar). The ScrollView's centered form then re-centres in the
     // space that stays above the keyboard, so "Continue" is never left under the
     // keyboard, the navigation bar, or the home indicator.
     <View

@@ -514,22 +514,28 @@ describe('login-screen bottom-bar clearance', () => {
   });
 
   it.each(['android', 'ios'] as const)(
-    'adds the %s keyboard height on top of the reserved inset through the same listener pair',
+    'pads the %s keyboard height through the same listener pair',
     async platform => {
       const events = keyboardEventsFor(platform);
       Platform.OS = platform;
       const renderer = await mountLoginScreen();
 
-      // Same wrapper, same rule, one listener pair per platform: the only
-      // platform difference is which keyboard events that platform fires.
+      // Same wrapper, one listener pair per platform: the only keyboard-event
+      // difference is which pair that platform fires.
       expect(vi.mocked(Keyboard.addListener).mock.calls.map(([name]) => name)).toEqual([
         events.show,
         events.hide,
       ]);
       expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
 
+      // Android's reported height excludes the navigation bar, so the reserved
+      // inset is added on top; iOS reports the keyboard window frame, whose
+      // height already covers the home indicator, so the inset is not added
+      // twice while the keyboard is up (it would leave a gap above the IME).
       emitKeyboard(events.show, 300);
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 328 });
+      expect(scrollViewport(renderer).props.style).toEqual({
+        paddingBottom: platform === 'android' ? 328 : 300,
+      });
 
       emitKeyboard(events.hide);
       expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });

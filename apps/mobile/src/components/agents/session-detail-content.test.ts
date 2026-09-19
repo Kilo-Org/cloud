@@ -9,8 +9,6 @@ import {
 } from 'react';
 import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
-import * as Clipboard from 'expo-clipboard';
-import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { type Pressable } from 'react-native';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
@@ -230,12 +228,14 @@ vi.mock('@/components/agents/context-usage-ring', () => ({
   ContextUsageRing: 'ContextUsageRing',
 }));
 // The real context sheet (rendered so the auto-approve row can be asserted)
-// reaches `copySessionId`, which imports the native `expo-clipboard` module that
-// cannot load in this DOM-free node suite. Mock the boundary, as the mounted
-// context-sheet suite does. The session header's copy-link action reaches the
-// same native module through the real chat-link copy path.
+// reaches `copySessionId`/`copySessionLink`, which import the native
+// `expo-clipboard` module that cannot load in this DOM-free node suite. Mock
+// the boundary, as the mounted context-sheet suite does.
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
-vi.mock('@/components/agents/session-row-actions', () => ({ copySessionId: vi.fn() }));
+vi.mock('@/components/agents/session-row-actions', () => ({
+  copySessionId: vi.fn(),
+  copySessionLink: vi.fn(),
+}));
 // The copy-link path reaches the browser helper; its native module cannot load here.
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 // The handoff advertiser owns the OS entry point (Head plus Android's launcher
@@ -2291,11 +2291,10 @@ describe('SessionDetailContent goal edit dialog', () => {
 });
 
 // The screen's live position: the transcript list reports the topmost visible
-// message, and the screen publishes it to the OS handoff, the copy-link action,
-// and the route's search params.
+// message, and the screen publishes it to the OS handoff and the route's
+// search params.
 describe('SessionDetailContent live position', () => {
-  it('publishes the transcript position to the handoff, the copy action, and the route', async () => {
-    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+  it('publishes the transcript position to the handoff and the route', async () => {
     routerSetParams.mockClear();
     handoffAdvertiserCalls.props.length = 0;
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
@@ -2310,18 +2309,6 @@ describe('SessionDetailContent live position', () => {
 
     // The handoff advertises the position the transcript is showing.
     expect(handoffAdvertiserCalls.props.at(-1)?.anchorMessageId).toBe('msg-77');
-
-    // The header's copy action copies that same position's universal link.
-    const copy = view.renderer.root.findByProps({
-      accessibilityLabel: i18n.t('common.copyLink'),
-    });
-    await act(async () => {
-      (copy.props as { onPress: () => void }).onPress();
-      await Promise.resolve();
-    });
-    expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
-      sessionResumeUrl({ sessionId: ROOT_ID, anchorMessageId: 'msg-77' })
-    );
 
     // The route's search params carry it after the publish debounce.
     await act(async () => {

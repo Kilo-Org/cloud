@@ -79,7 +79,7 @@ export function PrDiffFileListHeader({
   }, [router, navigatorHref]);
 
   return (
-    <View className="border-b border-hair-soft bg-background px-4 py-2">
+    <View className="border-b border-hair-soft bg-background px-4 py-4">
       <View className="flex-1 flex-row items-center justify-between" style={sideInsetStyle}>
         <Pressable
           onPress={handleOpenNavigator}

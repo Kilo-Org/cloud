@@ -78,7 +78,6 @@ import {
   useSessionAutoApproveEnabled,
 } from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
-import { SessionCopyLinkAction } from '@/components/agents/session-copy-link-action';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
@@ -1524,7 +1523,6 @@ export function SessionDetailContent({
           });
         }}
       />
-      <SessionCopyLinkAction sessionId={sessionId} anchorMessageId={anchor ?? resumeAnchor} />
     </View>
   );
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
@@ -1943,6 +1941,7 @@ export function SessionDetailContent({
               visible={sheetMountState.visible}
               info={sheetMountState.info}
               sessionId={sessionId}
+              anchorMessageId={anchor ?? resumeAnchor}
               sessionTitle={rename.title}
               activeSessionType={activeSessionType}
               ownerConnectionId={remoteModelState.ownerConnectionId}

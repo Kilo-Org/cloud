@@ -512,6 +512,18 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
   });
 
+  it('renders the empty-state New session action as the tab’s primary affordance', async () => {
+    await renderScreen();
+    const createAction = action('New session');
+    // One primary action per surface: the Agents empty state's only action is
+    // the same new-session flow Home surfaces as a filled brand-yellow button,
+    // so it must carry the primary variant rather than a low-emphasis outline.
+    expect(createAction.props.className).toContain('bg-primary');
+    expect(createAction.props.className).not.toContain('bg-card');
+    const icon = createAction.findByType('Plus');
+    expect(icon.props.color).toBe('#ffffff');
+  });
+
   it('keeps cold-loading feedback stable until an accepted result', async () => {
     state.live.hasAcceptedSuccess = false;
     state.live.isLoading = true;

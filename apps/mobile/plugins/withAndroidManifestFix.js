@@ -93,10 +93,24 @@ function withAndroidResources(config) {
   ]);
 }
 
+/**
+ * Aligns the native alert title with the alert message.
+ *
+ * This fork follows the capability, not a scope. Android is the platform that
+ * lacks a title layout following the paragraph's own direction: React Native's
+ * bundled `alert_title_layout.xml` pins the title to `viewStart`, the device's
+ * direction, while the message follows the paragraph's own direction, so on an
+ * English device with the app in Arabic the title sits on the opposite edge
+ * from the message. iOS bundles no such layout — `RCTAlertManager` hands the
+ * title and the message to one `UIAlertController` — so no iOS prebuild calls
+ * this plugin.
+ *
+ * The overlay copies the installed layout, so the native `DialogTitle` class,
+ * the `alert_title` id, the window title style, padding, and sizing stay RN's.
+ */
 function writeAlertTitleLayout(resDir) {
-  // RN's viewStart follows the device direction, not the in-app language. Use
-  // textStart like the alert message so Arabic aligns right even on an LTR device.
-  // Overlay the installed layout, preserving its native title class and styling.
+  // `textStart` follows the paragraph's own direction, like the alert message;
+  // `viewStart` follows the device direction and forks the two edges.
   const source = path.join(
     path.dirname(require.resolve('react-native/package.json')),
     'ReactAndroid/src/main/res/views/alert/layout/alert_title_layout.xml'

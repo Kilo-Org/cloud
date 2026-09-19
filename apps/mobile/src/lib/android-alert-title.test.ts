@@ -19,6 +19,13 @@ const upstreamLayout = readFileSync(
   ),
   'utf8'
 );
+const iosAlertManager = readFileSync(
+  join(
+    dirname(require.resolve('react-native/package.json')),
+    'React/CoreModules/RCTAlertManager.mm'
+  ),
+  'utf8'
+);
 
 describe('Android native alert title', () => {
   let platformProjectRoot = '';
@@ -93,5 +100,15 @@ describe('Android native alert title', () => {
     expect(readFileSync(join(resDir, 'raw/kilo_shrink_sentinel_unused'), 'utf8')).toBe(
       'resource shrink sentinel'
     );
+  });
+
+  it('keeps the override Android-only, where the bundled title layout lacks the capability', () => {
+    // The plugin comment names Android as the platform that lacks the
+    // capability. This pins the other half of the fork: iOS bundles no title
+    // layout to pin an edge — one `UIAlertController` carries both the title
+    // and the message — so no iOS prebuild calls the plugin.
+    expect(iosAlertManager).toContain('alertControllerWithTitle:title');
+    expect(iosAlertManager).toContain('alertController.message = message');
+    expect(withAndroidManifestFix({ name: 'Kilo', slug: 'kilo-app' }).mods?.ios).toBeUndefined();
   });
 });

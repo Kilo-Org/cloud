@@ -2,12 +2,12 @@ const mockGetBotUserId = jest.fn();
 const mockGetAgentConfigForOwner = jest.fn();
 const mockCreateCheckRun = jest.fn();
 const mockUpdateCheckRun = jest.fn();
-const mockUpdateCheckRunId = jest.fn();
+const mockAttachCheckRunIdIfActive = jest.fn();
 const mockCreateCodeReview = jest.fn();
 const mockCancelSupersededReviewsForPR = jest.fn();
 const mockFindExistingReview = jest.fn();
 const mockFindActiveReviewsForPR = jest.fn();
-const mockUpdateReviewHeadShaAndCheckRun = jest.fn();
+const mockUpdateReviewHeadShaAndCheckRunIfActive = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 const mockCancelReview = jest.fn();
 const mockAddReactionToPR = jest.fn();
@@ -30,13 +30,13 @@ jest.mock('@/lib/code-reviews/core/council-entitlement', () => ({
 }));
 
 jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
-  createCodeReview: (...args: unknown[]) => mockCreateCodeReview(...args),
+  createCodeReviewForWebhook: (params: unknown) => mockCreateCodeReview(params),
   cancelSupersededReviewsForPR: (...args: unknown[]) => mockCancelSupersededReviewsForPR(...args),
   findExistingReview: (...args: unknown[]) => mockFindExistingReview(...args),
   findActiveReviewsForPR: (...args: unknown[]) => mockFindActiveReviewsForPR(...args),
-  updateReviewHeadShaAndCheckRun: (...args: unknown[]) =>
-    mockUpdateReviewHeadShaAndCheckRun(...args),
-  updateCheckRunId: (...args: unknown[]) => mockUpdateCheckRunId(...args),
+  updateReviewHeadShaAndCheckRunIfActive: (...args: unknown[]) =>
+    mockUpdateReviewHeadShaAndCheckRunIfActive(...args),
+  attachCheckRunIdIfActive: (...args: unknown[]) => mockAttachCheckRunIdIfActive(...args),
 }));
 
 jest.mock('@/lib/code-reviews/dispatch/dispatch-pending-reviews', () => ({
@@ -113,12 +113,17 @@ beforeEach(() => {
   mockGetAgentConfigForOwner.mockResolvedValue(null);
   mockCreateCheckRun.mockResolvedValue(98765);
   mockUpdateCheckRun.mockResolvedValue(undefined);
-  mockUpdateCheckRunId.mockResolvedValue(undefined);
-  mockCreateCodeReview.mockResolvedValue('review-1');
+  mockAttachCheckRunIdIfActive.mockResolvedValue(true);
+  mockCreateCodeReview.mockResolvedValue({
+    reviewId: 'review-1',
+    created: true,
+    reason: 'created',
+    cancelledReviews: [],
+  });
   mockCancelSupersededReviewsForPR.mockResolvedValue([]);
   mockFindExistingReview.mockResolvedValue(null);
   mockFindActiveReviewsForPR.mockResolvedValue([]);
-  mockUpdateReviewHeadShaAndCheckRun.mockResolvedValue(undefined);
+  mockUpdateReviewHeadShaAndCheckRunIfActive.mockResolvedValue(true);
   mockTryDispatchPendingReviews.mockResolvedValue({
     dispatched: 0,
     notDispatched: 1,
@@ -281,7 +286,7 @@ describe('handlePullRequest', () => {
       is_enabled: true,
       config: {},
     });
-    mockUpdateCheckRunId.mockRejectedValue(new Error('database write failed'));
+    mockAttachCheckRunIdIfActive.mockRejectedValue(new Error('database write failed'));
 
     const response = await handlePullRequest(
       pullRequestPayload(),
@@ -572,6 +577,32 @@ describe('handlePullRequest', () => {
       );
     });
 
+    it('cancels the queued check and skips dispatch when a concurrent delivery superseded this review', async () => {
+      mockGetBotUserId.mockResolvedValue('bot-user-1');
+      mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+      // Simulates B superseding A after A's DB create but before A persists its check id.
+      mockAttachCheckRunIdIfActive.mockResolvedValue(false);
+
+      const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        message: 'Review superseded by a newer commit',
+        reviewId: 'review-1',
+      });
+      expect(mockAttachCheckRunIdIfActive).toHaveBeenCalledWith('review-1', 98765);
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        '98765',
+        'acme',
+        'widgets',
+        98765,
+        { status: 'completed', conclusion: 'cancelled' },
+        'standard'
+      );
+      expect(mockAddReactionToPR).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
     it('routes a bot PR with a merge-commit head through skip, not merge-commit migration', async () => {
       mockGetBotUserId.mockResolvedValue('bot-user-1');
       mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
@@ -726,6 +757,68 @@ describe('handlePullRequest', () => {
     expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
   });
 
+  it('returns 200 without a check run or dispatch when a review already holds the change', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+    mockCreateCodeReview.mockResolvedValueOnce({
+      reviewId: 'review-existing',
+      created: false,
+      reason: 'existing-provider-review',
+      cancelledReviews: [],
+    });
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      message: 'A code review is already active for this pull request',
+      reviewId: 'review-existing',
+    });
+    expect(mockCreateCheckRun).not.toHaveBeenCalled();
+    expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+  });
+
+  it('tears down a review the locked create cancelled when it supersedes a racing row', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+    mockCreateCodeReview.mockResolvedValueOnce({
+      reviewId: 'review-1',
+      created: true,
+      reason: 'created',
+      cancelledReviews: [
+        {
+          id: 'race-loser',
+          prevStatus: 'queued',
+          sessionId: 'session-loser',
+          latestActiveAttemptId: 'attempt-loser',
+          checkRunId: 4321,
+          headSha: 'loser-sha',
+          platform: 'github',
+          platformProjectId: null,
+          platformIntegrationId: 'integration-1',
+          triggerSource: 'webhook',
+        },
+      ],
+    });
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
+
+    expect(response.status).toBe(202);
+    expect(mockCancelReview).toHaveBeenCalledWith(
+      'race-loser',
+      'Superseded by new push',
+      'attempt-loser'
+    );
+    expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+      '98765',
+      'acme',
+      'widgets',
+      4321,
+      expect.objectContaining({ status: 'completed', conclusion: 'cancelled' }),
+      'standard'
+    );
+  });
+
   it('skips supersession cancel on merge-commit synchronize events', async () => {
     mockGetBotUserId.mockResolvedValue('bot-user-1');
     mockGetAgentConfigForOwner.mockResolvedValue({
@@ -750,13 +843,35 @@ describe('handlePullRequest', () => {
       config: {},
     });
     mockFindActiveReviewsForPR.mockResolvedValue(['review-1']);
-    mockUpdateReviewHeadShaAndCheckRun.mockRejectedValue(new Error('database write failed'));
+    mockUpdateReviewHeadShaAndCheckRunIfActive.mockRejectedValue(
+      new Error('database write failed')
+    );
     mockIsMergeCommit.mockResolvedValue(true);
 
     const response = await handlePullRequest(
       pullRequestPayload(),
       platformIntegration({ github_app_type: 'standard' })
     );
+
+    expect(response.status).toBe(200);
+    expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+      '98765',
+      'acme',
+      'widgets',
+      98765,
+      { status: 'completed', conclusion: 'cancelled' },
+      'standard'
+    );
+  });
+
+  it('cancels the new check when a merge-commit migration loses the review to a concurrent cancel', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
+    mockFindActiveReviewsForPR.mockResolvedValue(['review-1']);
+    mockUpdateReviewHeadShaAndCheckRunIfActive.mockResolvedValue(false);
+    mockIsMergeCommit.mockResolvedValue(true);
+
+    const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
 
     expect(response.status).toBe(200);
     expect(mockUpdateCheckRun).toHaveBeenCalledWith(

@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "نمونه آماده/ناموفق، اقدامات زمان‌بندی‌شده",
       "balanceAlertsSubtitle": "هشدارهای موجودی کم سازمان",
       "securityFindingsSubtitle": "یافته‌های جدید و یادآوری‌های SLA"
+    },
+    "action": {
+      "openSession": "باز کردن نشست"
+    },
+    "needsInputAction": {
+      "approved": "درخواست تأیید شد",
+      "replied": "پاسخ ارسال شد",
+      "failed": "پاسخ دادن ممکن نشد. برای تلاش دوباره دوباره ضربه بزنید.",
+      "unavailable": "این درخواست دیگر در انتظار نیست."
     }
   },
   "tabs": {
@@ -2203,20 +2212,7 @@
       "continueFrom": "نشست {{title}} را ادامه می‌دهید.",
       "importingSession": "در حال وارد کردن نشست",
       "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
-      "importFailed": "وارد کردن این نشست ممکن نشد.",
-      "sandbox": "سندباکس",
-      "sandboxAccessibility": "سندباکس: {{label}}",
-      "sandboxDefaultWithDestination": "پیش‌فرض · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "کوچک",
-      "sandboxInstanceShared": "اشتراکی",
-      "sandboxInstanceLarge": "بزرگ",
-      "sandboxInstanceDevcontainer": "کانتینر توسعه",
-      "sandboxInstanceProviderDefault": "پیش‌فرض ارائه‌دهنده",
-      "sandboxCouldNotLoad": "بارگیری گزینه‌های سندباکس ممکن نشد",
-      "sandboxUnavailable": "این سندباکس در دسترس نیست. سندباکس دیگری یا پیش‌فرض را انتخاب کنید.",
-      "sandboxUseDefault": "استفاده از پیش‌فرض"
+      "importFailed": "وارد کردن این نشست ممکن نشد."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل به‌روزرسانی شد.",

@@ -856,6 +856,15 @@
       "kiloclawActivitySubtitle": "spremnost ili pogreška instance, zakazane radnje",
       "balanceAlertsSubtitle": "upozorenja o niskom saldu organizacije",
       "securityFindingsSubtitle": "novi nalazi i podsjetnici na SLA"
+    },
+    "action": {
+      "openSession": "Otvori sesiju"
+    },
+    "needsInputAction": {
+      "approved": "Zahtjev je odobren",
+      "replied": "Odgovor je poslan",
+      "failed": "Nije uspjelo odgovoriti. Dodirnite ponovo da biste pokušali.",
+      "unavailable": "Ovaj zahtjev više ne čeka."
     }
   },
   "tabs": {
@@ -2231,20 +2240,7 @@
       "continueFrom": "Nastavlja se sesija {{title}}.",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberi Cloud Agent ili drugi CLI.",
-      "importFailed": "Uvoz ove sesije nije uspio.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Zadano · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Malo",
-      "sandboxInstanceShared": "Dijeljeno",
-      "sandboxInstanceLarge": "Veliko",
-      "sandboxInstanceDevcontainer": "Dev kontejner",
-      "sandboxInstanceProviderDefault": "Zadano od pružatelja",
-      "sandboxCouldNotLoad": "Opcije sandboxa nije moguće učitati",
-      "sandboxUnavailable": "Ovaj sandbox nije dostupan. Odaberite drugi sandbox ili Zadano.",
-      "sandboxUseDefault": "Koristi Zadano"
+      "importFailed": "Uvoz ove sesije nije uspio."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirana je {{displayCount}} datoteka.",

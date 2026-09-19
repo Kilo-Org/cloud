@@ -2,11 +2,6 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type ModeOption } from '@/components/agents/mode-normalize';
-import {
-  type SandboxAllocation,
-  type SandboxDestination,
-  type SandboxSelectionCapabilities,
-} from '@/lib/sandbox-allocation-label';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 export type ModelPickerSelection = {
@@ -109,20 +104,6 @@ export type InstancePickerBridge = {
   instances: InstancePickerInstance[];
   currentValue: InstancePickerInstance | null;
   onSelect: (instance: InstancePickerInstance | null) => void;
-};
-
-/**
- * Bridge for the new-session sandbox picker. The backend's own capabilities
- * travel with the bridge so the closed field's snapshot is what the picker
- * opens with; `onSelect(undefined)` is the backend default row. The picker
- * re-queries its scope so the list is fresh and a failure can offer Retry.
- */
-export type SandboxPickerBridge = {
-  organizationId: string | undefined;
-  options: SandboxSelectionCapabilities['options'];
-  defaultDestination: SandboxDestination | undefined;
-  currentValue: SandboxAllocation | undefined;
-  onSelect: (allocation: SandboxAllocation | undefined) => void;
 };
 
 /**

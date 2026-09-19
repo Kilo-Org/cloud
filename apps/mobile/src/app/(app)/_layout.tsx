@@ -201,15 +201,6 @@ export default function AppLayout() {
               }}
             />
             <Stack.Screen
-              name="agent-chat/sandbox-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
               name="agent-chat/profile-picker"
               options={{
                 presentation: 'formSheet',

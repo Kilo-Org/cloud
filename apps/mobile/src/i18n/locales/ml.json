@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "ഇൻസ്റ്റൻസ് തയ്യാറാകൽ/പരാജയപ്പെടൽ, മുൻകൂട്ടി നിശ്ചയിച്ച പ്രവർത്തനങ്ങൾ",
       "balanceAlertsSubtitle": "ഓർഗനൈസേഷന്റെ ബാലൻസ് കുറയുമ്പോഴുള്ള മുന്നറിയിപ്പുകൾ",
       "securityFindingsSubtitle": "പുതിയ കണ്ടെത്തലുകളും SLA ഓർമ്മപ്പെടുത്തലുകളും"
+    },
+    "action": {
+      "openSession": "സെഷൻ തുറക്കുക"
+    },
+    "needsInputAction": {
+      "approved": "അഭ്യർഥന അംഗീകരിച്ചു",
+      "replied": "മറുപടി അയച്ചു",
+      "failed": "മറുപടി നൽകാനായില്ല. വീണ്ടും ശ്രമിക്കാൻ വീണ്ടും ടാപ്പ് ചെയ്യുക.",
+      "unavailable": "ഈ അഭ്യർഥന ഇനി കാത്തിരിക്കുന്നില്ല."
     }
   },
   "tabs": {
@@ -2203,20 +2212,7 @@
       "continueFrom": "{{title}} തുടരുന്നു.",
       "importingSession": "സെഷൻ ഇംപോർട്ട് ചെയ്യുന്നു",
       "cliCannotContinue": "ഈ CLI-യ്ക്ക് ഒരു സെഷൻ തുടരാൻ കഴിയില്ല. Cloud Agent അല്ലെങ്കിൽ മറ്റൊരു CLI തിരഞ്ഞെടുക്കുക.",
-      "importFailed": "ഈ സെഷൻ ഇംപോർട്ട് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "sandbox": "സാൻഡ്ബോക്സ്",
-      "sandboxAccessibility": "സാൻഡ്ബോക്സ്: {{label}}",
-      "sandboxDefaultWithDestination": "ഡീഫോൾട്ട് · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "ചെറുത്",
-      "sandboxInstanceShared": "പങ്കിട്ടത്",
-      "sandboxInstanceLarge": "വലുത്",
-      "sandboxInstanceDevcontainer": "ഡെവ് കണ്ടെയ്നർ",
-      "sandboxInstanceProviderDefault": "പ്രോവൈഡറുടെ ഡീഫോൾട്ട്",
-      "sandboxCouldNotLoad": "സാൻഡ്ബോക്സ് ഓപ്ഷനുകൾ ലോഡ് ചെയ്യാനായില്ല",
-      "sandboxUnavailable": "ഈ സാൻഡ്ബോക്സ് ലഭ്യമല്ല. മറ്റൊരു സാൻഡ്ബോക്സ് അല്ലെങ്കിൽ ഡീഫോൾട്ട് തിരഞ്ഞെടുക്കുക.",
-      "sandboxUseDefault": "ഡീഫോൾട്ട് ഉപയോഗിക്കുക"
+      "importFailed": "ഈ സെഷൻ ഇംപോർട്ട് ചെയ്യാൻ കഴിഞ്ഞില്ല."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ഫയൽ അപ്ഡേറ്റ് ചെയ്തു.",

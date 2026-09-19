@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "tilvik tilbúið eða bilað, tímasettar aðgerðir",
       "balanceAlertsSubtitle": "viðvaranir um lága inneign félagsins",
       "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar"
+    },
+    "action": {
+      "openSession": "Opna lotu"
+    },
+    "needsInputAction": {
+      "approved": "Beiðni samþykkt",
+      "replied": "Svar sent",
+      "failed": "Ekki tókst að svara. Ýttu aftur til að reyna aftur.",
+      "unavailable": "Þessi beiðni bíður ekki lengur."
     }
   },
   "tabs": {
@@ -2203,20 +2212,7 @@
       "continueFrom": "Haldið er áfram með {{title}}.",
       "importingSession": "Flytur lotuna inn",
       "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
-      "importFailed": "Ekki tókst að flytja inn þessa lotu.",
-      "sandbox": "Sandkassi",
-      "sandboxAccessibility": "Sandkassi: {{label}}",
-      "sandboxDefaultWithDestination": "Sjálfgefið · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Lítið",
-      "sandboxInstanceShared": "Deilt",
-      "sandboxInstanceLarge": "Stórt",
-      "sandboxInstanceDevcontainer": "Dev-konteiner",
-      "sandboxInstanceProviderDefault": "Sjálfgefið hjá veitanda",
-      "sandboxCouldNotLoad": "Ekki tókst að hlaða valkostum sandkassans",
-      "sandboxUnavailable": "Þessi sandkassi er ekki tiltækur. Veldu annan sandkassa eða Sjálfgefið.",
-      "sandboxUseDefault": "Nota Sjálfgefið"
+      "importFailed": "Ekki tókst að flytja inn þessa lotu."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} skrá var uppfærð.",

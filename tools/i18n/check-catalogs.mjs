@@ -107,10 +107,6 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'agentChat.sessionFilter.platformLinear',
   'agentChat.repoPicker.platformBitbucket',
   'agentChat.prBadge.label',
-  // Sandbox provider names on the new-session picker: brand proper nouns that
-  // every catalog keeps as "Cloudflare" and "Vercel".
-  'agentChat.newSession.sandboxProviderCloudflare',
-  'agentChat.newSession.sandboxProviderVercel',
   // Profile-editor examples that name the value's own syntax, not prose: a
   // slug the field validator accepts, a server name, a JSON snippet, and
   // command lines whose tool and package paths must stay literal. Every

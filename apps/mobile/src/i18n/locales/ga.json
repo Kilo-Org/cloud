@@ -888,6 +888,15 @@
       "kiloclawActivitySubtitle": "ásc réidh nó teipthe, gníomhartha sceidealaithe",
       "balanceAlertsSubtitle": "rabhaidh faoi iarmhéid íseal na heagraíochta",
       "securityFindingsSubtitle": "torthaí nua agus meabhrúcháin SLA"
+    },
+    "action": {
+      "openSession": "Oscail an seisiún"
+    },
+    "needsInputAction": {
+      "approved": "Tá an t-iarratas ceadaithe",
+      "replied": "Tá an freagra seolta",
+      "failed": "Níorbh fhéidir freagra a thabhairt. Tapáil arís chun iarracht eile a dhéanamh.",
+      "unavailable": "Níl an t-iarratas seo ag fanacht a thuilleadh."
     }
   },
   "tabs": {
@@ -2287,20 +2296,7 @@
       "continueFrom": "Táthar ag leanúint ar aghaidh le {{title}}.",
       "importingSession": "Ag iompórtáil an tseisiúin",
       "cliCannotContinue": "Ní féidir leis an CLI seo leanúint ar aghaidh le seisiún. Roghnaigh Cloud Agent nó CLI eile.",
-      "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil.",
-      "sandbox": "Bosca gaineamh",
-      "sandboxAccessibility": "Bosca gaineamh: {{label}}",
-      "sandboxDefaultWithDestination": "Réamhshocrú · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Beag",
-      "sandboxInstanceShared": "Roinnte",
-      "sandboxInstanceLarge": "Mór",
-      "sandboxInstanceDevcontainer": "Coimeádán forbartha",
-      "sandboxInstanceProviderDefault": "Réamhshocrú an soláthraithe",
-      "sandboxCouldNotLoad": "Níorbh fhéidir roghanna na bosca gaineamh a lódáil",
-      "sandboxUnavailable": "Níl an bosca gaineamh seo ar fáil. Roghnaigh bosca gaineamh eile nó Réamhshocrú.",
-      "sandboxUseDefault": "Úsáid Réamhshocrú"
+      "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} chomhad.",

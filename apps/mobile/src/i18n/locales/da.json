@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
       "balanceAlertsSubtitle": "advarsler om lav saldo i organisationen",
       "securityFindingsSubtitle": "nye fund og SLA-påmindelser"
+    },
+    "action": {
+      "openSession": "Åbn session"
+    },
+    "needsInputAction": {
+      "approved": "Anmodning godkendt",
+      "replied": "Svar sendt",
+      "failed": "Kunne ikke svare. Tryk igen for at prøve igen.",
+      "unavailable": "Denne anmodning venter ikke længere."
     }
   },
   "tabs": {
@@ -2203,20 +2212,7 @@
       "continueFrom": "Sessionen {{title}} fortsættes.",
       "importingSession": "Importerer session",
       "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
-      "importFailed": "Kunne ikke importere denne session.",
-      "sandbox": "Sandkasse",
-      "sandboxAccessibility": "Sandkasse: {{label}}",
-      "sandboxDefaultWithDestination": "Standard · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Lille",
-      "sandboxInstanceShared": "Delt",
-      "sandboxInstanceLarge": "Stor",
-      "sandboxInstanceDevcontainer": "Dev-container",
-      "sandboxInstanceProviderDefault": "Leverandørstandard",
-      "sandboxCouldNotLoad": "Kunne ikke indlæse sandbox-valgmuligheder",
-      "sandboxUnavailable": "Denne sandkasse er ikke tilgængelig. Vælg en anden sandkasse eller Standard.",
-      "sandboxUseDefault": "Brug Standard"
+      "importFailed": "Kunne ikke importere denne session."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er opdateret.",

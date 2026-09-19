@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "instancia lista ou con erros, accións programadas",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organización",
       "securityFindingsSubtitle": "novos problemas detectados e recordatorios de SLA"
+    },
+    "action": {
+      "openSession": "Abrir a sesión"
+    },
+    "needsInputAction": {
+      "approved": "Solicitude aprobada",
+      "replied": "Resposta enviada",
+      "failed": "Non se puido responder. Toca de novo para tentalo de novo.",
+      "unavailable": "Esta solicitude xa non está á espera."
     }
   },
   "tabs": {
@@ -2203,20 +2212,7 @@
       "continueFrom": "Continúas a sesión {{title}}.",
       "importingSession": "Importando a sesión",
       "cliCannotContinue": "Este CLI non pode continuar unha sesión. Escolle Cloud Agent ou outro CLI.",
-      "importFailed": "Non se puido importar esta sesión.",
-      "sandbox": "Contorno illado",
-      "sandboxAccessibility": "Contorno illado: {{label}}",
-      "sandboxDefaultWithDestination": "Predeterminado · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Pequeno",
-      "sandboxInstanceShared": "Compartido",
-      "sandboxInstanceLarge": "Grande",
-      "sandboxInstanceDevcontainer": "Contedor de desenvolvemento",
-      "sandboxInstanceProviderDefault": "Predeterminado do provedor",
-      "sandboxCouldNotLoad": "Non se puideron cargar as opcións do contorno illado",
-      "sandboxUnavailable": "Este contorno illado non está dispoñible. Escolla outro contorno illado ou Predeterminado.",
-      "sandboxUseDefault": "Usar Predeterminado"
+      "importFailed": "Non se puido importar esta sesión."
     },
     "partRenderer": {
       "updatedFileCount_one": "Actualizouse {{displayCount}} ficheiro.",

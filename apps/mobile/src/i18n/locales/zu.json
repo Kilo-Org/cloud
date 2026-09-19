@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "uhlelo selulungile/lwehlulekile, izenzo ezihleliwe",
       "balanceAlertsSubtitle": "izexwayiso zebhalansi ephansi yenhlangano",
       "securityFindingsSubtitle": "okutholakele okusha nezikhumbuzo ze-SLA"
+    },
+    "action": {
+      "openSession": "Vula iseshini"
+    },
+    "needsInputAction": {
+      "approved": "Isicelo sigunyaziwe",
+      "replied": "Impendulo ithunyelwe",
+      "failed": "Ayikwazanga ukuphendula. Thepha kabusha ukuze uzame kabusha.",
+      "unavailable": "Lesi sicelo asisalindile."
     }
   },
   "tabs": {
@@ -2203,20 +2212,7 @@
       "continueFrom": "Kuqhutshekwa neseshini ethi {{title}}.",
       "importingSession": "Iseshini iyangeniswa",
       "cliCannotContinue": "Le CLI ayikwazi ukuqhubeka neseshini. Khetha i-Cloud Agent noma enye i-CLI.",
-      "importFailed": "Asikwazanga ukungenisa le seshini.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Okuzenzakalelayo · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Okuncane",
-      "sandboxInstanceShared": "Okwabiwe",
-      "sandboxInstanceLarge": "Okukhulu",
-      "sandboxInstanceDevcontainer": "Isiqukathi se-Dev",
-      "sandboxInstanceProviderDefault": "Okuzenzakalelayo komsungeli",
-      "sandboxCouldNotLoad": "Ayikwazanga ukulayisha izinketho ze-sandbox",
-      "sandboxUnavailable": "Le sandbox ayitholakali. Khetha enye i-sandbox noma Okuzenzakalelayo.",
-      "sandboxUseDefault": "Sebenzisa Okuzenzakalelayo"
+      "importFailed": "Asikwazanga ukungenisa le seshini."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}.",

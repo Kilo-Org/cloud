@@ -40,11 +40,20 @@ const state = vi.hoisted(() => ({
   },
   organization: { organizationId: null as string | null, isLoaded: true },
   request: vi.fn<() => Promise<CachedActiveSessionsData>>(),
+  // The notification-preference row the mount subscribes to at app start.
+  preferencesRequest: vi.fn<() => Promise<{ agentAttention: boolean }>>(),
+  pathname: '/(app)/(tabs)/(2_agents)',
+  scheduleNotificationAsync: vi.fn<(request: { identifier: string }) => Promise<void>>(),
+  dismissNotificationAsync: vi.fn<(identifier: string) => Promise<void>>(),
 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => state.auth }));
 vi.mock('@/lib/organization-context', () => ({ useOrganization: () => state.organization }));
 function key(input: unknown) {
   return [['activeSessions', 'list'], { input, type: 'query' }];
+}
+/** The preferences row the Notifications screen edits; the mount reads it. */
+function preferencesKey() {
+  return [['user', 'getNotificationPreferences'], { type: 'query' }];
 }
 vi.mock('@/lib/trpc', () => {
   const trpc = {
@@ -55,6 +64,14 @@ vi.mock('@/lib/trpc', () => {
           queryKey: key(input),
           queryFn: state.request,
           ...options,
+        }),
+      },
+    },
+    user: {
+      getNotificationPreferences: {
+        queryOptions: () => ({
+          queryKey: preferencesKey(),
+          queryFn: state.preferencesRequest,
         }),
       },
     },
@@ -71,7 +88,15 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 // the same subscribe/remove contract as React Native.
 vi.mock('react-native', () => ({
   InteractionManager: { runAfterInteractions: vi.fn() },
-  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  AppState: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+}));
+// The mount also derives the app-owned needs-input plan from the route and
+// posts through expo-notifications; both are native-backed, so this test stubs
+// them (their behavior is covered by needs-input-notification.test.ts).
+vi.mock('expo-router', () => ({ usePathname: () => state.pathname }));
+vi.mock('expo-notifications', () => ({
+  scheduleNotificationAsync: state.scheduleNotificationAsync,
+  dismissNotificationAsync: state.dismissNotificationAsync,
 }));
 
 let client = makeTestQueryClient();
@@ -106,6 +131,8 @@ beforeEach(() => {
   });
   Object.assign(state.organization, { organizationId: null, isLoaded: true });
   state.request.mockReset().mockResolvedValue({ sessions: [] });
+  state.preferencesRequest.mockReset().mockResolvedValue({ agentAttention: true });
+  state.pathname = '/(app)/(tabs)/(2_agents)';
   connection = makeConnection();
   client = makeTestQueryClient();
 });

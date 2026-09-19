@@ -336,6 +336,15 @@
       "kiloclawActivitySubtitle": "執行個體就緒或失敗、排程動作",
       "balanceAlertsSubtitle": "組織餘額不足警告",
       "securityFindingsSubtitle": "新發現的安全問題與 SLA 提醒"
+    },
+    "action": {
+      "openSession": "開啟工作階段"
+    },
+    "needsInputAction": {
+      "approved": "要求已核准",
+      "replied": "回覆已傳送",
+      "failed": "無法回答。再次點按即可重試。",
+      "unavailable": "此要求已不再等待。"
     }
   },
   "tabs": {
@@ -1699,20 +1708,7 @@
       "continueFrom": "正在接續 {{title}}。",
       "importingSession": "匯入工作階段中",
       "cliCannotContinue": "此 CLI 無法繼續工作階段。請選擇 Cloud Agent 或其他 CLI。",
-      "importFailed": "無法匯入此工作階段。",
-      "sandbox": "沙盒",
-      "sandboxAccessibility": "沙盒：{{label}}",
-      "sandboxDefaultWithDestination": "預設 · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "小型",
-      "sandboxInstanceShared": "共用",
-      "sandboxInstanceLarge": "大型",
-      "sandboxInstanceDevcontainer": "開發容器",
-      "sandboxInstanceProviderDefault": "供應商預設",
-      "sandboxCouldNotLoad": "無法載入沙盒選項",
-      "sandboxUnavailable": "此沙盒無法使用。請選擇其他沙盒或預設。",
-      "sandboxUseDefault": "使用預設"
+      "importFailed": "無法匯入此工作階段。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 個檔案。",

@@ -336,6 +336,15 @@
       "kiloclawActivitySubtitle": "máy sẵn sàng hoặc gặp lỗi, thao tác đã lên lịch",
       "balanceAlertsSubtitle": "cảnh báo số dư tổ chức thấp",
       "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA"
+    },
+    "action": {
+      "openSession": "Mở phiên"
+    },
+    "needsInputAction": {
+      "approved": "Yêu cầu đã được phê duyệt",
+      "replied": "Phản hồi đã được gửi",
+      "failed": "Không thể trả lời. Nhấn lại để thử lại.",
+      "unavailable": "Yêu cầu này không còn chờ đợi nữa."
     }
   },
   "tabs": {
@@ -1699,20 +1708,7 @@
       "continueFrom": "Đang tiếp tục phiên {{title}}.",
       "importingSession": "Đang nhập phiên",
       "cliCannotContinue": "CLI này không hỗ trợ tiếp tục phiên. Hãy chọn Cloud Agent hoặc CLI khác.",
-      "importFailed": "Không thể nhập phiên này.",
-      "sandbox": "Môi trường cô lập",
-      "sandboxAccessibility": "Môi trường cô lập: {{label}}",
-      "sandboxDefaultWithDestination": "Mặc định · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Nhỏ",
-      "sandboxInstanceShared": "Dùng chung",
-      "sandboxInstanceLarge": "Lớn",
-      "sandboxInstanceDevcontainer": "Container phát triển",
-      "sandboxInstanceProviderDefault": "Mặc định của nhà cung cấp",
-      "sandboxCouldNotLoad": "Không thể tải các tùy chọn sandbox",
-      "sandboxUnavailable": "Môi trường cô lập này không khả dụng. Hãy chọn môi trường cô lập khác hoặc Mặc định.",
-      "sandboxUseDefault": "Dùng Mặc định"
+      "importFailed": "Không thể nhập phiên này."
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp.",

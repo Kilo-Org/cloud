@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "چمتو یا ناکام انسټانس، مهالویش شوې کړنې",
       "balanceAlertsSubtitle": "د سازمان د کم بیلانس خبرداري",
       "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې"
+    },
+    "action": {
+      "openSession": "ناسته پرانیزئ"
+    },
+    "needsInputAction": {
+      "approved": "غوښتنه منظور شوه",
+      "replied": "ځواب ولېږل شو",
+      "failed": "ځواب ورکړل نه شو. بیا هڅه کولو لپاره بیا ټک ورکړئ.",
+      "unavailable": "دا غوښتنه نور انتظار نه کوي."
     }
   },
   "tabs": {
@@ -2203,20 +2212,7 @@
       "continueFrom": "د {{title}} ناستې دوام روان دی.",
       "importingSession": "ناسته واردېږي",
       "cliCannotContinue": "دا CLI ناستې ته دوام نه شي ورکولی. Cloud Agent یا بل CLI غوره کړئ.",
-      "importFailed": "دا ناسته وارده نه شوه.",
-      "sandbox": "سینډباکس",
-      "sandboxAccessibility": "سینډباکس: {{label}}",
-      "sandboxDefaultWithDestination": "تلوالیز · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "کوچنی",
-      "sandboxInstanceShared": "شریک",
-      "sandboxInstanceLarge": "لوی",
-      "sandboxInstanceDevcontainer": "د Dev کانټینر",
-      "sandboxInstanceProviderDefault": "د چمتوکونکي تلوالیز",
-      "sandboxCouldNotLoad": "د سینډباکس ټاکنې بار نه شوې",
-      "sandboxUnavailable": "دا سینډباکس موجود نه دی. بل سینډباکس یا تلوالیز وټاکه.",
-      "sandboxUseDefault": "تلوالیز کارول"
+      "importFailed": "دا ناسته وارده نه شوه."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل تازه شو.",

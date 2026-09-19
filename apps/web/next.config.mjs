@@ -52,7 +52,11 @@ const nextConfig = {
     root: monorepoRoot,
   },
 
-  devIndicators: { position: 'bottom-right' },
+  // The dev-tools indicator is a fixed overlay pinned to a viewport corner. On
+  // phone-sized viewports (device runs) it covers the bottom-right of the page,
+  // e.g. the final lines of the Terms paragraph. Hide it; compile and runtime
+  // errors are still surfaced without the indicator.
+  devIndicators: false,
 
   async rewrites() {
     // Global API rewrites - proxy to global-api.kilo.ai when not on global backend

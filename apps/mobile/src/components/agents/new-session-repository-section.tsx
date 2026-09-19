@@ -97,9 +97,9 @@ function connectNoteKey(platform: RepositoryPlatform): string | undefined {
  * Provider-aware repository section. One group per provider renders its own
  * empty/error state independently, and the picker trigger lists every
  * repository plus the Recently used rows when any provider has rows. A
- * provider's connect card is the "pick a repository" prompt — it renders only
- * while no repository is selected, so a completed selection is never
- * contradicted by an expanded connect card beneath the Branch field.
+ * provider's expanded connect prompt renders only before a repository is
+ * selected. Afterwards, compact actions keep other providers reachable without
+ * contradicting the completed selection or requiring it to be cleared.
  */
 export function NewSessionRepositorySection({
   disabled,
@@ -167,12 +167,11 @@ export function NewSessionRepositorySection({
   ): ReactElement | null {
     switch (status) {
       case 'connect': {
-        // The connect card asks the reader to connect the provider and come
-        // back to pick a repository. Once a repository is selected that step
-        // is done, so the prompt is not rendered — otherwise it stays
-        // expanded directly beneath the Branch field and contradicts the
-        // completed selection.
-        return selectedRepository === null ? renderConnectCard(platform) : null;
+        return selectedRepository === null ? (
+          renderConnectCard(platform)
+        ) : (
+          <View className="mt-3">{renderConnectActions(platform)}</View>
+        );
       }
       case 'connected-empty': {
         return renderConnectedEmptyCard(platform);
@@ -228,32 +227,39 @@ export function NewSessionRepositorySection({
           <Text variant="muted">{t(copy.connectDescription)}</Text>
           {noteKey ? <Text variant="muted">{t(noteKey)}</Text> : null}
         </View>
-        <View className="flex-row gap-2">
-          <Button
-            variant="outline"
-            className="flex-1"
-            onPress={() => {
-              onConnect(platform);
-            }}
-          >
-            <ExternalLink size={16} color={colors.foreground} />
-            <Text>{t(copy.openLabel)}</Text>
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onPress={onRefreshRepos}
-            disabled={isRetrying}
-            accessibilityLabel={t('agentChat.newSession.refreshRepositories')}
-          >
-            {isRetrying ? (
-              <ActivityIndicator size="small" color={colors.foreground} />
-            ) : (
-              <RefreshCw size={16} color={colors.foreground} />
-            )}
-          </Button>
-        </View>
+        {renderConnectActions(platform)}
       </CollapsibleSection>
+    );
+  }
+
+  function renderConnectActions(platform: RepositoryPlatform): ReactElement {
+    const copy = PROVIDER_COPY[platform];
+    return (
+      <View className="flex-row gap-2">
+        <Button
+          variant="outline"
+          className="flex-1"
+          onPress={() => {
+            onConnect(platform);
+          }}
+        >
+          <ExternalLink size={16} color={colors.foreground} />
+          <Text>{t(selectedRepository === null ? copy.openLabel : copy.connectTitle)}</Text>
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onPress={onRefreshRepos}
+          disabled={isRetrying}
+          accessibilityLabel={t('agentChat.newSession.refreshRepositories')}
+        >
+          {isRetrying ? (
+            <ActivityIndicator size="small" color={colors.foreground} />
+          ) : (
+            <RefreshCw size={16} color={colors.foreground} />
+          )}
+        </Button>
+      </View>
     );
   }
 

@@ -160,14 +160,14 @@ it.each(['ios', 'android'])(
     expect(toaster().props.offset).toBe(280 + 12 + 8);
 
     await flush(() => {
-      lifecycle.change?.('background');
+      lifecycle.change('background');
     });
     expect(toaster().props.offset).toBeUndefined();
 
     // Returning to the foreground without an IME keeps the default placement;
     // the next show restores clearance.
     await flush(() => {
-      lifecycle.change?.('active');
+      lifecycle.change('active');
     });
     expect(toaster().props.offset).toBeUndefined();
 

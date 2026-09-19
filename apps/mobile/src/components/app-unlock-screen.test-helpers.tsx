@@ -57,9 +57,21 @@ const keyboard = vi.hoisted(() => ({
   metrics: vi.fn(),
   listeners: new Map<KeyboardEventName, (event: KeyboardEvent) => void>(),
 }));
-const lifecycle = vi.hoisted(() => ({
-  change: undefined as ((state: AppStateStatus) => void) | undefined,
-}));
+// React Native's AppState supports any number of listeners, and real trees
+// register several (the unlock provider plus the toast keyboard offset). A
+// single slot would let the last registration shadow the earlier ones, so the
+// harness broadcasts to every subscriber and `change` is the emitter itself.
+const lifecycle = vi.hoisted(() => {
+  const listeners = new Set<(state: AppStateStatus) => void>();
+  return {
+    listeners,
+    change: (state: AppStateStatus) => {
+      for (const listener of listeners) {
+        listener(state);
+      }
+    },
+  };
+});
 export { announcements, catalogs, keyboard, lifecycle, native, platform, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
@@ -89,10 +101,10 @@ vi.mock('react-native', () => ({
   AppState: {
     currentState: 'active',
     addEventListener: (_event: string, listener: (state: AppStateStatus) => void) => {
-      lifecycle.change = listener;
+      lifecycle.listeners.add(listener);
       return {
         remove: () => {
-          lifecycle.change = undefined;
+          lifecycle.listeners.delete(listener);
         },
       };
     },
@@ -299,6 +311,7 @@ export function resetUnlockMocks() {
   vi.resetAllMocks();
   platform.OS = 'ios';
   keyboard.listeners.clear();
+  lifecycle.listeners.clear();
   storage.getItemAsync.mockResolvedValue('enabled');
   native.hasHardwareAsync.mockResolvedValue(true);
   native.isEnrolledAsync.mockResolvedValue(true);

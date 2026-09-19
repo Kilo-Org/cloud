@@ -1,8 +1,20 @@
 'use client';
 
 import { useState, useMemo, useEffect, useId } from 'react';
-import { Layers, ChevronDown, Check, Plus, FolderCog, X, ArrowLeft, Zap } from 'lucide-react';
+import {
+  Layers,
+  ChevronDown,
+  Check,
+  Plus,
+  FolderCog,
+  X,
+  ArrowLeft,
+  Zap,
+  Loader2,
+  AlertCircle,
+} from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import {
@@ -57,14 +69,27 @@ export function ProfilePickerPopover({
     setShowManageProfiles(true);
   };
 
-  const { data: combinedData } = useCombinedProfiles({
+  const {
+    data: combinedData,
+    isLoading: combinedProfilesLoading,
+    error: combinedProfilesError,
+    refetch: refetchCombinedProfiles,
+  } = useCombinedProfiles({
     organizationId: organizationId ?? '',
     enabled: !!organizationId,
   });
-  const { data: personalProfilesData } = useProfiles({
+  const {
+    data: personalProfilesData,
+    isLoading: personalProfilesLoading,
+    error: personalProfilesError,
+    refetch: refetchPersonalProfiles,
+  } = useProfiles({
     organizationId: undefined,
     enabled: !organizationId,
   });
+  const profilesLoading = organizationId ? combinedProfilesLoading : personalProfilesLoading;
+  const profilesError = organizationId ? combinedProfilesError : personalProfilesError;
+  const refetchProfiles = organizationId ? refetchCombinedProfiles : refetchPersonalProfiles;
 
   const allProfiles: ProfileSummaryWithOwner[] = useMemo(
     () =>
@@ -196,6 +221,12 @@ export function ProfilePickerPopover({
               topProfile={topProfile}
               topSource={topSource}
               allProfiles={allProfiles}
+              selectedOverrideProfileId={selectedOverrideProfileId}
+              isLoading={profilesLoading}
+              isError={!!profilesError}
+              onRetry={() => {
+                void refetchProfiles();
+              }}
               overrideCandidatesCount={overrideCandidates.length}
               formatCounts={formatCounts}
               onEditProfile={openEditDialog}
@@ -327,12 +358,18 @@ type ActiveProfileViewProps = {
   topProfile: ProfileSummaryWithOwner | null;
   topSource: 'repo-binding' | 'default' | 'explicit' | null;
   allProfiles: ProfileSummaryWithOwner[];
+  selectedOverrideProfileId: string | null;
+  /** The profiles query is still resolving; show a loading row, never the empty state. */
+  isLoading: boolean;
+  /** The profiles query failed; offer a retry instead of the empty state. */
+  isError: boolean;
+  onRetry: () => void;
   overrideCandidatesCount: number;
   formatCounts: (p: ProfileSummaryWithOwner) => string;
   onEditProfile: (id: string) => void;
   onStartPickOverride: () => void;
   onRemoveOverride: () => void;
-  onSelectProfile: (id: string) => void;
+  onSelectProfile: (id: string | null) => void;
 };
 
 function ActiveProfileView({
@@ -340,6 +377,10 @@ function ActiveProfileView({
   topProfile,
   topSource,
   allProfiles,
+  selectedOverrideProfileId,
+  isLoading,
+  isError,
+  onRetry,
   overrideCandidatesCount,
   formatCounts,
   onEditProfile,
@@ -347,6 +388,31 @@ function ActiveProfileView({
   onRemoveOverride,
   onSelectProfile,
 }: ActiveProfileViewProps) {
+  // The list is still resolving — never claim the user has no profiles.
+  if (isLoading) {
+    return (
+      <div className="text-muted-foreground flex min-h-24 items-center justify-center gap-2 text-xs">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        Loading profiles…
+      </div>
+    );
+  }
+
+  // A failed list request is retryable — never present it as "no profiles".
+  if (isError) {
+    return (
+      <div className="flex min-h-24 flex-col items-center justify-center gap-2 text-xs">
+        <p className="text-destructive flex items-center gap-1.5">
+          <AlertCircle className="h-3.5 w-3.5" />
+          Could not load profiles.
+        </p>
+        <Button variant="outline" size="sm" onClick={onRetry} className="h-7 px-2 text-xs">
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   // Nothing selected at all and no profiles exist.
   if (!baseProfile && !topProfile && allProfiles.length === 0) {
     return (
@@ -357,7 +423,8 @@ function ActiveProfileView({
   }
 
   // No base and no top, but profiles exist — show the picker list directly so
-  // the user can select one with a single click.
+  // the user can select one with a single click. "No profile" stays the first
+  // row so the current (unset) choice is visible and can be kept.
   if (!baseProfile && !topProfile) {
     return (
       <>
@@ -365,12 +432,17 @@ function ActiveProfileView({
           Pick a profile
         </p>
         <div className="max-h-48 space-y-0.5 overflow-y-auto">
+          <PickerRow
+            label="No profile"
+            isSelected={!selectedOverrideProfileId}
+            onClick={() => onSelectProfile(null)}
+          />
           {allProfiles.map(profile => (
             <PickerRow
               key={profile.id}
               label={profile.name}
               meta={formatCounts(profile)}
-              isSelected={false}
+              isSelected={profile.id === selectedOverrideProfileId}
               onClick={() => onSelectProfile(profile.id)}
             />
           ))}

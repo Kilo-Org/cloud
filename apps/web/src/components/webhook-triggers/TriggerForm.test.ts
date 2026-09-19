@@ -113,6 +113,9 @@ jest.mock('@/components/ui/dialog', () => ({
   DialogTitle: ({ children }: { children: React.ReactNode }) => createElement('h2', {}, children),
 }));
 jest.mock('@/components/cloud-agent/ProfileSelector', () => ({ ProfileSelector: () => null }));
+jest.mock('@/components/cloud-agent/RepoProfileBindingsDialog', () => ({
+  RepoProfileBindingsDialog: () => null,
+}));
 jest.mock('@/components/shared/RepositoryCombobox', () => ({ RepositoryCombobox: () => null }));
 jest.mock('@/components/shared/ModeCombobox', () => ({ ModeCombobox: () => null }));
 jest.mock('@/components/shared/ModelCombobox', () => ({

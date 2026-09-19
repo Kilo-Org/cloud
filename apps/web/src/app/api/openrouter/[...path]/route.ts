@@ -65,6 +65,7 @@ import {
 } from '@/lib/ai-gateway/rewriteModelResponse';
 import {
   createAnonymousContext,
+  getAnonymousUserId,
   isAnonymousContext,
   type AnonymousUserContext,
 } from '@/lib/anonymous';
@@ -240,6 +241,33 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
   );
 
+  // Extract IP early (needed for free model routing fallback and rate limiting)
+  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+
+  // Cap the account before anything below dispatches database work. Every WAF
+  // rule in front of this route counts per IP, so an actor rotating addresses
+  // buys one allowance per address; this one counts the account itself. The
+  // balance and policy lookups are chained off `authPromise` and start the
+  // moment it resolves, so the check has to run before they are created.
+  const auth = await authPromise;
+  // Mirrors the anonymous fallback below: a failed auth is billed and counted
+  // as the address, not as whatever account the token named.
+  const accountKey =
+    auth.authFailedResponse || !auth.user
+      ? getAnonymousUserId(ipAddress ?? '')
+      : auth.user.id;
+  if (await isGatewayAccountRateLimited(request, accountKey)) {
+    console.warn(`Gateway account rate limit exceeded, user: ${accountKey}`);
+    return NextResponse.json(
+      {
+        error: 'Rate limit exceeded',
+        error_type: ProxyErrorType.rate_limit_exceeded,
+        message: 'Too many requests. Please try again later.',
+      },
+      { status: 429 }
+    );
+  }
+
   const balanceAndSettingsPromise = authPromise.then(res =>
     res.user
       ? getBalanceAndOrgSettings(res.organizationId, res.user, readDb)
@@ -263,9 +291,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Some early returns do not await organization policy. Keep those paths from
   // surfacing policy-context failures as unhandled rejections.
   void organizationGroupPolicyPromise.catch(() => {});
-
-  // Extract IP early (needed for free model routing fallback and rate limiting)
-  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
 
   const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
@@ -491,21 +516,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     tokenSource = undefined;
   } else {
     user = maybeUser;
-  }
-
-  // Cap the account before anything below touches the database. Every WAF rule
-  // in front of this route counts per IP, so an actor rotating addresses buys
-  // one allowance per address; this one counts the account itself.
-  if (await isGatewayAccountRateLimited(request, user.id)) {
-    console.warn(`Gateway account rate limit exceeded, user: ${user.id}`);
-    return NextResponse.json(
-      {
-        error: 'Rate limit exceeded',
-        error_type: ProxyErrorType.rate_limit_exceeded,
-        message: 'Too many requests. Please try again later.',
-      },
-      { status: 429 }
-    );
   }
 
   // Fraud/project headers are pure header parsing; resolve them here so the

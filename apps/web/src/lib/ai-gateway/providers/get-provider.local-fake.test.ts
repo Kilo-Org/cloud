@@ -36,6 +36,7 @@ jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
 }));
 
 const user = { id: 'user-id' } as User;
+const ORG_ID = '00000000-0000-4000-8000-000000000001';
 
 function providerInput(requestedModel: string) {
   return {
@@ -218,6 +219,23 @@ describe('getProvider ChatGPT connection routing order', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  test('an organization request reads the member connection for that organization, never the personal one', async () => {
+    const env = replaceEnv({ OPENAI_CHATGPT_API_KEY: 'partner-project-key' });
+    jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(null);
+
+    await getProvider({ ...responsesInput('openai/gpt-5-nano'), organizationId: ORG_ID });
+
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith({
+      kiloUserId: user.id,
+      organizationId: ORG_ID,
+    });
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalledWith({
+      kiloUserId: user.id,
+      organizationId: null,
+    });
+    env.restore();
   });
 
   test('an enabled connection beats a Vercel openai BYOK row for an eligible responses request', async () => {

@@ -1,4 +1,5 @@
 import { getUserFromSession, nextAuthHttpHandler } from '@/lib/user/server';
+import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -47,8 +48,15 @@ const NEXT_AUTH_SIGNIN_PATH = '/api/auth/signin';
  */
 const DEFAULT_CALLBACK_FAILURE_CODE = 'OAuthCallback';
 
-function redirectToByok(request: NextRequest, errorCode: string): NextResponse {
-  const redirectUrl = new URL('/byok', request.nextUrl.origin);
+async function redirectToByok(request: NextRequest, errorCode: string): Promise<NextResponse> {
+  // An organization connect returns to the organization's BYOK page. The
+  // linking session still holds the organization on the declined/failed path,
+  // where NextAuth has not consumed it.
+  const organizationId = (await getAccountLinkingSession())?.organizationId;
+  const redirectUrl = new URL(
+    organizationId ? `/organizations/${organizationId}/byok` : '/byok',
+    request.nextUrl.origin
+  );
   redirectUrl.searchParams.set('openai_error', errorCode);
   return NextResponse.redirect(redirectUrl);
 }

@@ -195,6 +195,7 @@ import {
   listEntries,
   MissingSQLCipherError,
   removeItem,
+  removeItemIfValue,
   resetEncryptedKvOpenForTests,
   setItem,
   validateItemKey,
@@ -224,6 +225,7 @@ describe('scope and key validation', () => {
     await expect(getItem('', 'k')).rejects.toThrow(TypeError);
     await expect(setItem('', 'k', 'v')).rejects.toThrow(TypeError);
     await expect(removeItem('', 'k')).rejects.toThrow(TypeError);
+    await expect(removeItemIfValue('', 'k', 'v')).rejects.toThrow(TypeError);
     await expect(clearScope('')).rejects.toThrow(TypeError);
     await expect(clearScopePrefix('')).rejects.toThrow(TypeError);
     await expect(listEntries('')).rejects.toThrow(TypeError);
@@ -233,10 +235,12 @@ describe('scope and key validation', () => {
     await expect(getItem('s', '')).rejects.toThrow(TypeError);
     await expect(setItem('s', '', 'v')).rejects.toThrow(TypeError);
     await expect(removeItem('s', '')).rejects.toThrow(TypeError);
+    await expect(removeItemIfValue('s', '', 'v')).rejects.toThrow(TypeError);
   });
 
   it('rejects a non-string value', async () => {
     await expect(setItem('s', 'k', 123 as unknown as string)).rejects.toThrow(TypeError);
+    await expect(removeItemIfValue('s', 'k', 123 as unknown as string)).rejects.toThrow(TypeError);
   });
 
   it('validates before opening the database', async () => {
@@ -592,6 +596,32 @@ describe('kv behavior', () => {
 
   it('removeItem on a missing key is a no-op', async () => {
     await expect(removeItem('s', 'missing')).resolves.toBeUndefined();
+  });
+
+  it('removeItemIfValue removes only the matching value', async () => {
+    await setItem('s', 'a', 'x');
+
+    // A newer write replaced the value: the stale caller's conditional delete
+    // must not remove it.
+    await setItem('s', 'a', 'y');
+    await expect(removeItemIfValue('s', 'a', 'x')).resolves.toBe(false);
+    await expect(getItem('s', 'a')).resolves.toBe('y');
+
+    // The current value matches: the delete runs.
+    await expect(removeItemIfValue('s', 'a', 'y')).resolves.toBe(true);
+    await expect(getItem('s', 'a')).resolves.toBeNull();
+  });
+
+  it('removeItemIfValue leaves other keys and scopes alone', async () => {
+    await setItem('s', 'a', 'x');
+    await setItem('s', 'b', 'x');
+    await setItem('other', 'a', 'x');
+
+    await expect(removeItemIfValue('s', 'a', 'x')).resolves.toBe(true);
+
+    await expect(getItem('s', 'a')).resolves.toBeNull();
+    await expect(getItem('s', 'b')).resolves.toBe('x');
+    await expect(getItem('other', 'a')).resolves.toBe('x');
   });
 
   it('clearScope removes only the exact scope', async () => {

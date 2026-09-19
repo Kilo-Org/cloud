@@ -139,6 +139,16 @@ const consentMock = vi.hoisted(() => ({
   clearPendingConsentOutcome: vi.fn(),
 }));
 
+// Hoisted so the sign-out suite can assert the launcher-surface clears without
+// loading the last-opened store's secure-store chain or the native module.
+const lastOpenedSessionMock = vi.hoisted(() => ({
+  clearLastOpenedSession: vi.fn(),
+}));
+
+const nativeLauncherSurfacesMock = vi.hoisted(() => ({
+  clearLauncherSurfaces: vi.fn(),
+}));
+
 const ownerProducer = vi.hoisted(() => ({
   getMe: vi.fn<() => Promise<{ id: string }>>().mockResolvedValue({ id: 'user-a' }),
   ticket: vi.fn().mockResolvedValue({ token: 'ingest-ticket' }),
@@ -240,6 +250,10 @@ vi.mock('@/lib/auth/logout-cleanup', () => logoutCleanupMock);
 vi.mock('@/lib/consent', () => ({
   clearPendingConsentOutcome: consentMock.clearPendingConsentOutcome,
 }));
+
+vi.mock('@/lib/last-opened-session', () => lastOpenedSessionMock);
+
+vi.mock('@/lib/native-launcher-surfaces', () => nativeLauncherSurfacesMock);
 
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({
   setTrpcUnauthorizedHandler: vi.fn(),
@@ -693,6 +707,19 @@ describe('sign-out teardown ordering', () => {
     const { clearRunOnDestinationPreference } =
       await import('@/lib/hooks/use-persisted-run-on-destination');
     expect(clearRunOnDestinationPreference).toHaveBeenCalled();
+  });
+
+  it('clears the last-opened session and the launcher surfaces on sign-out', async () => {
+    const { ctx } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    // The dynamic shortcuts/tile are dropped natively and the durable record is
+    // deleted locally, so the next account never sees the previous session.
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+    expect(lastOpenedSessionMock.clearLastOpenedSession).toHaveBeenCalledTimes(1);
   });
 
   it('closes the ownership gate before any await and blocks a late persist', async () => {
@@ -1510,6 +1537,13 @@ describe('reactive auth epoch', () => {
     });
     const previous = scope.getAuthenticatedOwner();
     expect(previous.userId).toBe('user-a');
+    // Establish the restored state a cold start sets, so the assertion after the
+    // switch proves `signIn` clears a previously-restored flag instead of
+    // starting from the `false` a never-restored bootstrap already holds.
+    act(() => {
+      scope.markRestoredAuthenticatedOwner();
+    });
+    expect(scope.getAuthenticatedOwner().restored).toBe(true);
     // The old credentials remain readable on disk while the replacement write is held.
     hoisted.secureStore.getItemAsync.mockResolvedValue('account-a-token');
 
@@ -1546,6 +1580,9 @@ describe('reactive auth epoch', () => {
       await transition.promise;
     });
     expect(scope.getAuthenticatedOwner().userId).toBeNull();
+    // A fresh sign-in is not a restore: the previous account's persisted hint
+    // must not scope local data while these credentials are unconfirmed.
+    expect(scope.getAuthenticatedOwner().restored).toBe(false);
     const requestedTokens: (string | undefined)[] = [];
     ownerProducer.getMe.mockImplementationOnce(async () => {
       requestedTokens.push(tokens.getActiveToken()?.token);
@@ -1574,6 +1611,9 @@ describe('reactive auth epoch', () => {
     onTestFinished(() => act(unmount));
     const scope: typeof ContextScopeModule = await import('../context-scope');
     expect(scope.getAuthenticatedOwner().userId).toBeNull();
+    // Credentials restored from storage on bootstrap: the persisted identity
+    // hint may scope local data until getMe answers.
+    expect(scope.getAuthenticatedOwner().restored).toBe(true);
 
     await act(async () => {
       await requestOwnerTicket();

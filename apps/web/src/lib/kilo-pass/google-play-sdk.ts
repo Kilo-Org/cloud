@@ -23,11 +23,39 @@ function requiredEnv(name: string): string {
 }
 
 function parseGooglePlayServiceAccountCredentials(json: string): JWTInput {
-  const parsed = JSON.parse(json) as JWTInput;
-  if (!parsed.client_email || !parsed.private_key) {
+  let value: unknown;
+  try {
+    value = JSON.parse(json);
+  } catch {
     throw new Error('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid');
   }
-  return parsed;
+
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('client_email' in value) ||
+    !('private_key' in value)
+  ) {
+    throw new Error('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid');
+  }
+
+  const credentials = value as JWTInput;
+  if (!credentials.client_email || !credentials.private_key) {
+    throw new Error('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid');
+  }
+  return credentials;
+}
+
+/**
+ * Validates GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON without issuing a Play
+ * request. A one-off run calls this before scanning so a missing or malformed
+ * service account stops it with one clear, non-zero-exit message instead of
+ * turning every order lookup into an indistinguishable `failed=N`.
+ */
+export function assertGooglePlayServiceAccountConfigured(): void {
+  parseGooglePlayServiceAccountCredentials(
+    requiredEnv('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON')
+  );
 }
 
 export function createGooglePlayAndroidPublisherClient(): androidpublisher_v3.Androidpublisher {
@@ -65,7 +93,7 @@ export async function getGooglePlaySubscriptionOrder(
     packageName: GOOGLE_PLAY_PACKAGE_NAME,
     orderId,
     fields:
-      'orderId,purchaseToken,state,lineItems(productId,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime))',
+      'orderId,purchaseToken,state,total,tax,lineItems(productId,total,tax,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime))',
   });
   return response.data;
 }

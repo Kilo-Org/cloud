@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { noSemanticCandidates, searchCatalog, tokenize } from './search';
+import { searchCatalog, searchCatalogDetailed, noSemanticCandidates, tokenize } from './search';
 import type { Catalog } from './types';
 
 /**
@@ -54,6 +54,24 @@ export const testCatalog: Catalog = {
     tags: ['organizations', 'members'],
     searchBlob:
       'organizations.members.listPublic List public members of an organization. organizations members listpublic list public',
+  },
+  'admin.getMetrics': {
+    path: 'admin.getMetrics',
+    kind: 'query',
+    summary: 'Get admin-only platform metrics.',
+    inputSchema: {},
+    tags: ['admin'],
+    searchBlob: 'admin.getMetrics Get admin-only platform metrics. admin getmetrics metrics',
+    admin: true,
+  },
+  'debug.getState': {
+    path: 'debug.getState',
+    kind: 'query',
+    summary: 'Read the debug platform state.',
+    inputSchema: {},
+    tags: ['debug'],
+    searchBlob: 'debug.getState Read the debug platform state. debug getstate state',
+    debug: true,
   },
 };
 
@@ -178,6 +196,139 @@ describe('searchCatalog', () => {
       .map(row => row.score);
     expect(lexicalScores.length).toBe(3);
     expect(semanticOnly?.score).toBeLessThan(Math.min(...lexicalScores));
+  });
+
+  it('hides admin and debug rows unless the caller opted in with includeGuarded: true', async () => {
+    // `metrics` matches only the admin row, so the hidden case is empty.
+    for (const includeGuarded of [undefined, false]) {
+      const results = await searchCatalog('metrics', {
+        catalog: testCatalog,
+        ...(includeGuarded === undefined ? {} : { includeGuarded }),
+      });
+      expect(results).toEqual([]);
+    }
+    const optedIn = await searchCatalog('metrics', {
+      catalog: testCatalog,
+      includeGuarded: true,
+    });
+    expect(optedIn.map(row => row.path)).toEqual(['admin.getMetrics']);
+  });
+
+  it('treats a debug: true row exactly like an admin: true row for the gate', async () => {
+    for (const includeGuarded of [undefined, false]) {
+      const results = await searchCatalog('debug', {
+        catalog: testCatalog,
+        ...(includeGuarded === undefined ? {} : { includeGuarded }),
+      });
+      expect(results.map(row => row.path)).not.toContain('debug.getState');
+    }
+    const optedIn = await searchCatalog('debug', {
+      catalog: testCatalog,
+      includeGuarded: true,
+    });
+    expect(optedIn.map(row => row.path)).toEqual(['debug.getState']);
+  });
+
+  it('marks a returned guarded hit requiresApproval, for admin and debug alike', async () => {
+    const results = await searchCatalog('metrics', {
+      catalog: testCatalog,
+      includeGuarded: true,
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ path: 'admin.getMetrics', requiresApproval: true });
+
+    const debug = await searchCatalog('debug', {
+      catalog: testCatalog,
+      includeGuarded: true,
+    });
+    expect(debug[0]).toMatchObject({ path: 'debug.getState', requiresApproval: true });
+  });
+
+  it('leaves a non-guarded hit unmarked (no requiresApproval key)', async () => {
+    const results = await searchCatalog('balance', { catalog: testCatalog });
+    expect(results[0]?.path).toBe('user.getBalance');
+    expect('requiresApproval' in (results[0] as object)).toBe(false);
+  });
+
+  it('marks a guarded hit admitted only by the semantic hook', async () => {
+    const results = await searchCatalog('zzqqx nothing', {
+      catalog: testCatalog,
+      semanticCandidates: async () => [{ path: 'debug.getState', score: 1 }],
+      includeGuarded: true,
+    });
+    expect(results[0]).toMatchObject({ path: 'debug.getState', requiresApproval: true });
+  });
+
+  it('does not let a semantic candidate smuggle an admin or debug row past the gate', async () => {
+    // The query matches no row lexically, so the guarded rows can only arrive
+    // through the semantic hook — which must apply the same fail-closed gate.
+    for (const path of ['admin.getMetrics', 'debug.getState']) {
+      const semanticCandidates = async () => [{ path, score: 1 }];
+      expect(
+        await searchCatalog('zzqqx nothing', { catalog: testCatalog, semanticCandidates })
+      ).toEqual([]);
+      const optedIn = await searchCatalog('zzqqx nothing', {
+        catalog: testCatalog,
+        semanticCandidates,
+        includeGuarded: true,
+      });
+      expect(optedIn.map(row => row.path)).toEqual([path]);
+    }
+  });
+
+  it('reports a withheld guarded match from the single pass, reusing the semantic candidates', async () => {
+    const semantic = vi.fn(async () => []);
+    const { results, hiddenGuardedMatches } = await searchCatalogDetailed('metrics', {
+      catalog: testCatalog,
+      semanticCandidates: semantic,
+    });
+    expect(results).toEqual([]);
+    expect(hiddenGuardedMatches).toBe(true);
+    // The signal costs no second embedding/Vectorize query.
+    expect(semantic).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a withheld semantic-only guarded candidate without a second query', async () => {
+    const semantic = vi.fn(async () => [{ path: 'admin.getMetrics', score: 1 }]);
+    const { results, hiddenGuardedMatches } = await searchCatalogDetailed('zzqqx nothing', {
+      catalog: testCatalog,
+      semanticCandidates: semantic,
+    });
+    expect(results).toEqual([]);
+    expect(hiddenGuardedMatches).toBe(true);
+    expect(semantic).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a withheld debug match, not only an admin one', async () => {
+    const { results, hiddenGuardedMatches } = await searchCatalogDetailed('debug', {
+      catalog: testCatalog,
+    });
+    expect(results).toEqual([]);
+    expect(hiddenGuardedMatches).toBe(true);
+  });
+
+  it('reports no withheld guarded match for a query that matches nothing', async () => {
+    const { results, hiddenGuardedMatches } = await searchCatalogDetailed('zzqqx nothing', {
+      catalog: testCatalog,
+    });
+    expect(results).toEqual([]);
+    expect(hiddenGuardedMatches).toBe(false);
+  });
+
+  it('never reports a withheld guarded match for an opted-in grant', async () => {
+    const { hiddenGuardedMatches } = await searchCatalogDetailed('metrics', {
+      catalog: testCatalog,
+      includeGuarded: true,
+    });
+    expect(hiddenGuardedMatches).toBe(false);
+  });
+
+  it('still returns the ordinary rows and result shape through searchCatalogDetailed', async () => {
+    const { results, hiddenGuardedMatches } = await searchCatalogDetailed('balance', {
+      catalog: testCatalog,
+    });
+    expect(results[0]?.path).toBe('user.getBalance');
+    expect(hiddenGuardedMatches).toBe(false);
   });
 
   it('degrades to token-only results with a logged note when semantic search fails', async () => {

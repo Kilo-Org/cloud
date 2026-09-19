@@ -34,6 +34,7 @@ import {
   beginAuthenticatedOwner,
   confirmAuthenticatedOwner,
   getAuthenticatedOwner,
+  markRestoredAuthenticatedOwner,
 } from '@/lib/context-scope';
 import SessionDetailScreen from './[session-id]';
 
@@ -719,6 +720,9 @@ describe('SessionDetailScreen restored scope', () => {
   async function mountRestoredScope(): Promise<TestRenderer.ReactTestRenderer> {
     beginReplacement();
     commitCredentials('A');
+    // Credentials restored from storage on a cold start, not freshly signed in:
+    // only this state may scope the session from the persisted hint.
+    markRestoredAuthenticatedOwner();
     secureStoreMock.getItemAsync.mockResolvedValue('user-A');
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
     queryState.data = null;
@@ -773,6 +777,36 @@ describe('SessionDetailScreen restored scope', () => {
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
     expect(managers).toHaveLength(2);
     expect(managers.at(-1)?.manager).not.toBe(restoredManager);
+  });
+
+  it('does not mount the previous account restored scope during a direct credential switch', async () => {
+    const renderer = await mountRestoredScope();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    const managersBeforeSwitch = managers.length;
+
+    // A direct switch signs in as B: the new credentials are committed but not
+    // yet confirmed, while A's persisted hint and cached transcript are still
+    // on the device. The hint must not mount A's scope under B.
+    act(() => {
+      beginReplacement();
+      commitCredentials('B');
+    });
+    await updateRoute(renderer);
+
+    // B is unconfirmed, so the route holds its pending state: no session
+    // subtree (and no manager reading A's scope) is created for the switch.
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+    expect(managers).toHaveLength(managersBeforeSwitch);
+
+    // B's getMe confirms: the session mounts in B's own scope.
+    act(() => {
+      commitAccount('B');
+    });
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(transcriptText(renderer, 'RootText')).toBe('Account B root row');
   });
 });
 

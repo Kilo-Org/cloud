@@ -664,7 +664,10 @@ describe('tool summary translation hydration', () => {
         text: 'Alpha',
         translation: 'de:Alpha',
         storedAt: expect.any(Number),
-      })
+      }),
+      // The auth epoch captured at dispatch, so a late write can remove itself
+      // after a sign-out or direct-switch scope clear.
+      expect.any(Number)
     );
     expect(writeMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -674,7 +677,8 @@ describe('tool summary translation hydration', () => {
         text: 'Beta',
         translation: 'de:Beta',
         storedAt: expect.any(Number),
-      })
+      }),
+      expect.any(Number)
     );
   });
 
@@ -762,6 +766,98 @@ describe('retry of unresolved summaries after a connection recovery', () => {
     expect(requestCalls().at(-1)?.texts).toEqual(['final summary']);
   });
 
+  it('drops a failed summary from the retry memory when its last surface unmounts', async () => {
+    const mod = await loadRuntime();
+    requestMock.mockRejectedValue(new Error('gateway down'));
+
+    mod.ensureTranslation({
+      itemId: 'part-1',
+      text: 'unmounted summary',
+      language: 'de',
+      model: MODEL,
+    });
+    await flushBatch();
+    expect(mod.getTranslation('part-1', 'unmounted summary', 'de', MODEL.id)).toBeUndefined();
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    // The row unmounts: no surface asks for this summary any more. Its failed
+    // entry must leave the retry memory, so a reconnect edge or deep link does
+    // not re-send a summary no row shows.
+    mod.releaseTranslationInterest({
+      itemId: 'part-1',
+      text: 'unmounted summary',
+      language: 'de',
+      model: MODEL,
+    });
+    mod.retryUnresolvedTranslations();
+    await flushBatch();
+
+    expect(requestMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a failed summary from the queue when its last surface unmounts', async () => {
+    const mod = await loadRuntime();
+    // No request settles: the queued copy stays waiting for a slot.
+    const resolvers = pendingBatches();
+
+    for (const index of [0, 1]) {
+      mod.ensureTranslation({
+        itemId: `part-${index}`,
+        text: `summary ${index}`,
+        language: 'de',
+        model: MODEL,
+      });
+    }
+    await flushBatch();
+
+    // The first waiters occupy both in-flight slots; add a third that stays in
+    // the queue, then unmount it.
+    mod.ensureTranslation({ itemId: 'part-2', text: 'summary 2', language: 'de', model: MODEL });
+    expect(mod.getQueueSize()).toBe(1);
+
+    mod.releaseTranslationInterest({
+      itemId: 'part-2',
+      text: 'summary 2',
+      language: 'de',
+      model: MODEL,
+    });
+
+    // The unmounted row's copy left the queue: nothing is waiting any more.
+    expect(mod.getQueueSize()).toBe(0);
+
+    mod.setConfig({ enabled: false, model: MODEL });
+    for (const resolve of resolvers) {
+      resolve([]);
+    }
+    await flushBatch();
+  });
+
+  it('keeps a failed summary another surface still asks for', async () => {
+    const mod = await loadRuntime();
+    requestMock.mockRejectedValueOnce(new Error('gateway down'));
+    echoBatch();
+
+    // Two surfaces (a row and the detail sheet) show the same summary.
+    mod.ensureTranslation({ itemId: 'part-1', text: 'shared', language: 'de', model: MODEL });
+    mod.ensureTranslation({ itemId: 'part-1', text: 'shared', language: 'de', model: MODEL });
+    await flushBatch();
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    // One surface unmounts; the other still renders the summary, so the
+    // reconnect retry must re-send it.
+    mod.releaseTranslationInterest({
+      itemId: 'part-1',
+      text: 'shared',
+      language: 'de',
+      model: MODEL,
+    });
+    mod.retryUnresolvedTranslations();
+    await waitForTranslations(mod, [{ itemId: 'part-1', text: 'shared' }]);
+
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(requestCalls()[1]?.texts).toEqual(['shared']);
+  });
+
   it('makes no request on a retry when every summary already resolved', async () => {
     const mod = await loadRuntime();
     echoBatch();
@@ -811,6 +907,45 @@ describe('retry of unresolved summaries after a connection recovery', () => {
 
     // The pending attempt then fails. The re-queued summary must not be
     // dropped with it: it is requested again and the row resolves.
+    echoBatch();
+    resolvers[0]?.([null]);
+    await waitForTranslations(mod, [{ itemId: 'part-1', text: 'hello' }]);
+
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(requestCalls()[1]?.texts).toEqual(['hello']);
+  });
+
+  it('keeps the retry memory when a mounted row’s tick re-asks during an in-flight attempt', async () => {
+    const mod = await loadRuntime();
+    // The gateway is unreachable: the row's attempt stays pending.
+    const resolvers = pendingBatches();
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await vi.waitFor(() => {
+      expect(requestMock).toHaveBeenCalledTimes(1);
+    });
+
+    // The mounted row's 10 s retry tick releases its interest and re-asks on the
+    // same key while the attempt is still in flight. The release must not leave
+    // the key out of the retry memory: the re-ask early-returns on the in-flight
+    // guard, so without remembering it again a reconnect while the attempt is
+    // pending could no longer re-queue the row.
+    mod.releaseTranslationInterest({
+      itemId: 'part-1',
+      text: 'hello',
+      language: 'de',
+      model: MODEL,
+    });
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+
+    // Connectivity returns while that attempt is still pending: the retry
+    // re-queues the row, held as owned rather than dispatched twice.
+    mod.retryUnresolvedTranslations();
+    await flushBatch();
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    // The pending attempt then fails. The re-queued summary must survive it and
+    // be requested again.
     echoBatch();
     resolvers[0]?.([null]);
     await waitForTranslations(mod, [{ itemId: 'part-1', text: 'hello' }]);

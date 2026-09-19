@@ -708,22 +708,31 @@ export function ensureTranslation(input: {
   // so drop it from the retry memory and the queue before the freshness,
   // in-flight and queued guards return.
   forgetSupersededEntries(language, model.id, itemId, key);
-  if (isFreshCacheEntry(key, text, Date.now()) || inFlight.has(key) || queued.has(key)) {
+  if (isFreshCacheEntry(key, text, Date.now())) {
+    // Resolved: no retry memory is needed for a summary already translated.
     return;
   }
   const item: QueueItem = { key, itemId, text, language, model, generation };
-  queue.push(item);
-  queued.add(key);
-  // Remember the unresolved summary so `retryUnresolvedTranslations` can
-  // re-queue it after a connection recovery. Resolution removes it (`remember`)
-  // and the map is capped, so failures cannot grow without bound.
-  if (retryable.size >= MAX_RETRYABLE_ENTRIES) {
+  // Remember the unresolved summary before the in-flight and queued guards
+  // return, so `retryUnresolvedTranslations` can re-queue it after a connection
+  // recovery. A mounted row's retry tick releases its interest and re-asks on
+  // the same key while the attempt it waits on is still in flight; releasing
+  // drops the key from this memory, and the re-ask early-returns on the guards
+  // below, so only re-remembering it here keeps the row re-queueable for the
+  // whole attempt. Resolution removes it (`remember`) and the map is capped, so
+  // failures cannot grow without bound.
+  if (retryable.size >= MAX_RETRYABLE_ENTRIES && !retryable.has(key)) {
     const oldest = retryable.keys().next().value;
     if (oldest !== undefined) {
       retryable.delete(oldest);
     }
   }
   retryable.set(key, item);
+  if (inFlight.has(key) || queued.has(key)) {
+    return;
+  }
+  queue.push(item);
+  queued.add(key);
   scheduleFlush();
 }
 
@@ -731,10 +740,11 @@ export function ensureTranslation(input: {
  * Records that one mounted surface stopped asking for a key's source text: the
  * hook effect's cleanup calls this when its row unmounts or its source text,
  * language or model changed. Once no surface asks for a part's text any more,
- * the next `ensureTranslation` for the same part drops that text from the
- * queue and the retry memory, so a superseded copy is neither dispatched by a
- * later flush nor re-sent by `retryUnresolvedTranslations`. A text another
- * surface still renders keeps its interest and stays served.
+ * that text leaves the retry memory and the queue immediately, so a summary a
+ * row showed before it unmounted neither stays re-sendable by
+ * `retryUnresolvedTranslations` on a reconnect or deep link nor is dispatched
+ * by a later flush. A text another surface still renders keeps its interest
+ * and stays served.
  */
 export function releaseTranslationInterest(input: {
   itemId: string;
@@ -745,7 +755,24 @@ export function releaseTranslationInterest(input: {
   if (input.text.trim() === '') {
     return;
   }
-  removeSurfaceInterest(translationKey(input.language, input.model.id, input.itemId, input.text));
+  const key = translationKey(input.language, input.model.id, input.itemId, input.text);
+  removeSurfaceInterest(key);
+  if (surfaceInterest.has(key)) {
+    // Another mounted surface still renders this text: it is not superseded.
+    return;
+  }
+  // The last surface stopped showing this key. A failed attempt must not stay
+  // in the retry memory, or a reconnect edge or deep link would re-send a
+  // summary no row shows any more; a copy still waiting for a slot is dropped
+  // from the queue for the same reason.
+  retryable.delete(key);
+  if (queued.delete(key)) {
+    for (let index = queue.length - 1; index >= 0; index -= 1) {
+      if (queue[index]?.key === key) {
+        queue.splice(index, 1);
+      }
+    }
+  }
 }
 
 /**
@@ -807,10 +834,10 @@ export function clearToolSummaryTranslationMemory(): void {
  * allowed to hold sign-out teardown; the abandoned write is also forgotten, so
  * it cannot make a later sign-out wait the bound again. The scope clear that
  * follows still runs.
- * A write that settles late can only leave an orphaned blob, which never
- * renders under the next account — the in-memory cache is keyed by the
- * server-issued part id, and the reset already dropped it — and only costs a
- * warm start.
+ * An abandoned write that settles late cannot recreate the cleared entry: the
+ * store captures the auth epoch at dispatch and removes the entry again when
+ * the epoch moved, so the durable scope stays empty. The in-memory cache was
+ * already dropped by the reset, so a late store write never renders either.
  */
 async function drainPendingPersists(): Promise<void> {
   if (pendingPersists.size === 0) {

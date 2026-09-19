@@ -3,6 +3,7 @@ import {
   type readToolSummaryTranslations,
   type writeToolSummaryTranslation,
 } from '@/lib/persist/tool-summary-translation-cache';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 
 /**
  * The encrypted-KV bridge for tool-summary translation. The store is loaded by
@@ -36,11 +37,17 @@ export async function readStoredTranslations(): Promise<CachedToolSummaryTransla
   }
 }
 
-/** Fire-and-forget write of one resolved translation; never throws. */
+/**
+ * Fire-and-forget write of one resolved translation; never throws. The auth
+ * epoch is captured at dispatch — before the store module loads — and handed
+ * to the write, so a write that lands after a sign-out or direct-switch scope
+ * clear removes itself instead of recreating the previous account's entry.
+ */
 export async function persistTranslation(entry: CachedToolSummaryTranslation): Promise<void> {
+  const epoch = currentAuthEpoch();
   try {
     const { writeToolSummaryTranslation: write } = await loadStore();
-    await write(entry);
+    await write(entry, epoch);
   } catch {
     // A cache write failure is not a transcript failure.
   }

@@ -56,6 +56,8 @@ import { clearHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-prefe
 import { clearSessionScopedState } from '@/lib/auth/session-scoped-state';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
+import { clearLastOpenedSession } from '@/lib/last-opened-session';
+import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import {
   isSignOutActive,
@@ -85,7 +87,7 @@ import { clearTelemetryDecision } from '@/lib/telemetry/controller';
 import { clearSentryUser } from '@/lib/sentry-context';
 import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
 import { AppState } from 'react-native';
-import { beginAuthenticatedOwner } from '@/lib/context-scope';
+import { beginAuthenticatedOwner, markRestoredAuthenticatedOwner } from '@/lib/context-scope';
 
 // Pre-load tokens at module level so they're available before React mounts
 export const preloadedAuthToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
@@ -131,6 +133,19 @@ function readUserIdFromToken(token: string): string | null {
     return parsed.success && parsed.data.kiloUserId ? parsed.data.kiloUserId : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Run one synchronous best-effort teardown step. Sign-out's local cleanups are
+ * independent: a throw in one must never abort the transition or reject
+ * `signOut`, so each call site is guarded by this wrapper.
+ */
+function runBestEffortTeardown(step: () => void): void {
+  try {
+    step();
+  } catch {
+    // Best effort: a failed clear never aborts sign-out.
   }
 }
 
@@ -214,6 +229,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // yet, so the exchange's own epoch checks pass — the sign-out flag
             // must stop this publish, exactly like the one below.
             if (pair && isCurrentAuthEpoch(epoch) && !isSignedOutReference.current) {
+              markRestoredAuthenticatedOwner();
               setToken(pair.token);
               setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
               setIsLoading(false);
@@ -251,10 +267,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // signed-in user to the login screen.
           if (currentStored !== stored) {
             const published = getActiveToken()?.token ?? currentStored ?? undefined;
+            if (published) {
+              markRestoredAuthenticatedOwner();
+            }
             setToken(published);
             setCurrentDeepLinkUserId(published ? readUserIdFromToken(published) : null);
             return;
           }
+          markRestoredAuthenticatedOwner();
           setActiveToken(stored, expiresAtStr ? Number(expiresAtStr) : null);
           setToken(stored);
           setCurrentDeepLinkUserId(readUserIdFromToken(stored));
@@ -481,10 +501,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // The offline translation cache holds the signed-out account's tool
             // text (paths, commands, descriptions) and is refetchable, so it is
             // a cache row that must not outlive the account. The runtime reset
-            // runs first and resolves only once the writes it already
-            // dispatched have settled: a fire-and-forget persist that started
-            // before the clear must not land after it and leave the entry
-            // behind. Best effort: both helpers swallow a storage failure.
+            // runs first and drains the writes it already dispatched (bounded,
+            // so a hung write cannot hold teardown); the write fence in the
+            // store then keeps a persist that settles after this clear from
+            // recreating its entry. The scope clear itself is bounded too, so a
+            // native clear that never answers still lets the batch settle.
+            // Best effort: both helpers swallow a storage failure.
             (async () => {
               await clearToolSummaryTranslationMemoryForSignOut();
               await clearToolSummaryTranslationsForSignOut();
@@ -502,6 +524,13 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearPrReviewFooterPreference();
           clearCondenseToolCallsPreference();
           clearCollapsedConnectCtasPreference();
+          // The launcher surfaces belong to the signed-out account: drop the
+          // dynamic shortcuts/tile natively and the durable last-opened record,
+          // so the next account never sees the previous account's session.
+          // Both are synchronous best-effort clears, guarded so neither can
+          // throw into sign-out.
+          runBestEffortTeardown(clearLauncherSurfaces);
+          runBestEffortTeardown(clearLastOpenedSession);
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

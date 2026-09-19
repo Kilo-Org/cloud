@@ -13,11 +13,14 @@ import {
   sendAdminSlackNotification,
   type AdminSlackNotification,
 } from '@/lib/slack/admin-notifications';
+import { sentryLogger } from '@/lib/utils.server';
 import { coding_plan_key_inventory, coding_plan_subscriptions } from '@kilocode/db/schema';
 import { CodingPlanSubscriptionStatus } from '@kilocode/db/schema-types';
 import type { EncryptedData } from '@kilocode/db/schema-types';
 
 const MINIMAX_HEALTH_CHECK_TIMEOUT_MS = 8_000;
+
+const logBadResponse = sentryLogger('minimax-token-health', 'info');
 
 // MiniMax has been observed to apply dynamic rate limiting under load
 // (see the 2026-09-15 Token Plan incident), so this sweep bounds its own
@@ -303,7 +306,8 @@ function followUpLine(entry: MiniMaxTokenHealthEntry): string {
   const httpStatus = entry.httpStatus ? ` (HTTP ${entry.httpStatus})` : '';
   const upstreamPlanId = escapeSlackLabel(entry.upstreamPlanId);
   const subscriptionId = escapeSlackLabel(entry.subscriptionId ?? 'n/a');
-  return `${planDisplayName(entry.planId)} · upstream \`${upstreamPlanId}\` · sub \`${subscriptionId}\` (${statusLabel}) · *${entry.category}*: ${entry.reason}${httpStatus}`;
+  const userId = escapeSlackLabel(entry.userId ?? 'n/a');
+  return `${planDisplayName(entry.planId)} · upstream \`${upstreamPlanId}\` · sub \`${subscriptionId}\` (${statusLabel}) · user \`${userId}\` · *${entry.category}*: ${entry.reason}${httpStatus}`;
 }
 
 export function buildMiniMaxTokenHealthSlackNotification(
@@ -379,6 +383,27 @@ export function buildMiniMaxTokenHealthSlackNotification(
   };
 }
 
+// Slack truncates the follow-up list to DETAIL_LIMIT and only lists entries
+// with a live subscription, so this logs every `bad_response` entry (the
+// category that can't be told apart from a denied/unreachable credential by
+// HTTP status alone) with its raw reason so the underlying cause is visible
+// in cron logs even when Slack omits or aggregates it.
+function logBadResponseEntries(entries: MiniMaxTokenHealthEntry[]): void {
+  for (const entry of entries) {
+    if (entry.category !== 'bad_response') continue;
+    logBadResponse('MiniMax token health bad_response', {
+      inventoryId: entry.inventoryId,
+      planId: entry.planId,
+      upstreamPlanId: entry.upstreamPlanId,
+      subscriptionId: entry.subscriptionId,
+      userId: entry.userId,
+      subscriptionStatus: entry.subscriptionStatus,
+      reason: entry.reason,
+      httpStatus: entry.httpStatus,
+    });
+  }
+}
+
 type SendSummaryDependencies = {
   checkAll?: typeof checkAllMiniMaxTokenHealth;
   sendNotification?: typeof sendAdminSlackNotification;
@@ -389,6 +414,7 @@ export async function sendMiniMaxTokenHealthSlackSummary({
   sendNotification = sendAdminSlackNotification,
 }: SendSummaryDependencies = {}): Promise<MiniMaxTokenHealthTotals> {
   const entries = await checkAll();
+  logBadResponseEntries(entries);
   const { notification, totals } = buildMiniMaxTokenHealthSlackNotification(entries);
   await sendNotification(notification);
   return totals;

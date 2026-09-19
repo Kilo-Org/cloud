@@ -2,7 +2,9 @@ import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type * as ReactI18next from 'react-i18next';
+import * as WebBrowser from 'expo-web-browser';
 import '@/i18n';
+import { toast } from 'sonner-native';
 import { PrReviewConnectGate } from './pr-review-connect-gate';
 
 vi.mock('react-i18next', async importOriginal => {
@@ -39,6 +41,8 @@ let authorizationQueryResult = {
   refetch: vi.fn(),
 };
 
+let connectMutateAsync = vi.fn<() => Promise<{ authorizationUrl: string }>>();
+
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
   return {
@@ -52,7 +56,7 @@ vi.mock('react', async () => {
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => authorizationQueryResult,
-  useMutation: () => ({ mutateAsync: vi.fn() }),
+  useMutation: () => ({ mutateAsync: connectMutateAsync, isError: false }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
@@ -82,8 +86,9 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
-vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
-  openAuthorizationAndWaitForReturn: vi.fn(),
+vi.mock('expo-web-browser', () => ({
+  openAuthSessionAsync: vi.fn(),
+  openBrowserAsync: vi.fn(),
 }));
 
 vi.mock('@/components/ui/icons', () => ({
@@ -110,27 +115,45 @@ vi.mock('react-native', () => ({
 }));
 
 function containsType(node: unknown, type: string): boolean {
+  return findElement(node, type) !== null;
+}
+
+/**
+ * Like `containsType`, but returns the matching element so a test can invoke
+ * its props (the `action` element the gate hands to `EmptyState` is a prop,
+ * not a rendered child, so it is only reachable by walking props).
+ */
+function findElement(node: unknown, type: string): React.ReactElement | null {
   if (Array.isArray(node)) {
-    return node.some(child => containsType(child, type));
+    for (const child of node) {
+      const found = findElement(child, type);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
   }
   if (React.isValidElement(node)) {
     const element = node;
     if (element.type === type) {
-      return true;
+      return element;
     }
     // A function component element (the gate dispatches to GitHubConnectGate)
     // is walked by calling it: hooks are stubbed, so a plain call renders.
-    if (
-      typeof element.type === 'function' &&
-      containsType((element.type as (props: unknown) => unknown)(element.props), type)
-    ) {
-      return true;
+    if (typeof element.type === 'function') {
+      const found = findElement((element.type as (props: unknown) => unknown)(element.props), type);
+      if (found) {
+        return found;
+      }
     }
-    return Object.values(element.props as Record<string, unknown>).some(value =>
-      containsType(value, type)
-    );
+    for (const value of Object.values(element.props as Record<string, unknown>)) {
+      const found = findElement(value, type);
+      if (found) {
+        return found;
+      }
+    }
   }
-  return false;
+  return null;
 }
 
 describe('PrReviewConnectGate wiring', () => {
@@ -166,5 +189,33 @@ describe('PrReviewConnectGate wiring', () => {
 
     expect(containsType(tree, 'GitHubIcon')).toBe(true);
     expect(containsType(tree, 'RefreshCcw')).toBe(false);
+  });
+
+  it('surfaces a failed browser launch instead of leaving Connect inert', async () => {
+    authorizationQueryResult = {
+      data: { connected: false, revoked: false },
+      isPending: false,
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    };
+    connectMutateAsync = vi
+      .fn<() => Promise<{ authorizationUrl: string }>>()
+      .mockResolvedValue({ authorizationUrl: 'https://github.com/login/oauth/authorize' });
+    vi.mocked(WebBrowser.openAuthSessionAsync).mockRejectedValue(new Error('no browser'));
+    vi.mocked(toast.error).mockClear();
+
+    // eslint-disable-next-line new-cap
+    const tree = PrReviewConnectGate({ children: null });
+    const button = findElement(tree, 'Button');
+    if (!button) {
+      throw new Error('the connect action did not render a Button');
+    }
+
+    (button.props as { onPress: () => void }).onPress();
+    await vi.waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Could not open browser. Please try again.');
+    });
   });
 });

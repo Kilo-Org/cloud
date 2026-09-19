@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   getConnectGatePlatformPlan,
+  launchConnectGateBrowser,
   openAuthorizationAndWaitForReturn,
 } from './connect-gate-platform';
 
@@ -67,5 +68,60 @@ describe('openAuthorizationAndWaitForReturn', () => {
     expect(webBrowserMocks.openBrowserAsync).toHaveBeenCalledWith('https://example.com/connect');
     expect(webBrowserMocks.openAuthSessionAsync).not.toHaveBeenCalled();
     expect(trigger).toBe('app-foreground');
+  });
+});
+
+describe('launchConnectGateBrowser', () => {
+  it('arms the sentinel, clears it, and refetches on an iOS sheet-close', async () => {
+    webBrowserMocks.openAuthSessionAsync.mockResolvedValue('done');
+    const handlers = {
+      markLaunched: vi.fn(),
+      clearLaunch: vi.fn(),
+      onSheetClose: vi.fn().mockResolvedValue(undefined),
+      onOpenFailure: vi.fn(),
+    };
+
+    await launchConnectGateBrowser('ios', 'https://example.com/connect', handlers);
+
+    expect(handlers.markLaunched).toHaveBeenCalledOnce();
+    expect(handlers.clearLaunch).toHaveBeenCalledOnce();
+    expect(handlers.onSheetClose).toHaveBeenCalledOnce();
+    expect(handlers.onOpenFailure).not.toHaveBeenCalled();
+  });
+
+  it('leaves the sentinel armed for the Android foreground return', async () => {
+    webBrowserMocks.openBrowserAsync.mockResolvedValue(undefined);
+    const handlers = {
+      markLaunched: vi.fn(),
+      clearLaunch: vi.fn(),
+      onSheetClose: vi.fn().mockResolvedValue(undefined),
+      onOpenFailure: vi.fn(),
+    };
+
+    await launchConnectGateBrowser('android', 'https://example.com/connect', handlers);
+
+    expect(handlers.markLaunched).toHaveBeenCalledOnce();
+    expect(handlers.clearLaunch).not.toHaveBeenCalled();
+    expect(handlers.onSheetClose).not.toHaveBeenCalled();
+    expect(handlers.onOpenFailure).not.toHaveBeenCalled();
+  });
+
+  it('reports an unopenable browser instead of leaving the CTA inert', async () => {
+    webBrowserMocks.openAuthSessionAsync.mockRejectedValue(new Error('no browser'));
+    const handlers = {
+      markLaunched: vi.fn(),
+      clearLaunch: vi.fn(),
+      onSheetClose: vi.fn().mockResolvedValue(undefined),
+      onOpenFailure: vi.fn(),
+    };
+
+    await expect(
+      launchConnectGateBrowser('ios', 'https://example.com/connect', handlers)
+    ).resolves.toBeUndefined();
+
+    expect(handlers.markLaunched).toHaveBeenCalledOnce();
+    expect(handlers.clearLaunch).toHaveBeenCalledOnce();
+    expect(handlers.onOpenFailure).toHaveBeenCalledOnce();
+    expect(handlers.onSheetClose).not.toHaveBeenCalled();
   });
 });

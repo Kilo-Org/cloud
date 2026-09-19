@@ -47,3 +47,49 @@ export async function openAuthorizationAndWaitForReturn(
     : WebBrowser.openBrowserAsync(authorizationUrl));
   return plan.refetchTrigger;
 }
+
+type ConnectGateLaunchHandlers = {
+  /** Arms the foreground-return sentinel before the browser opens (Android). */
+  markLaunched: () => void;
+  /** Disarms the sentinel once it is consumed, or the launch failed. */
+  clearLaunch: () => void;
+  /** Runs the caller's refetch on the iOS `sheet-close` trigger. */
+  onSheetClose: () => Promise<void>;
+  /** The browser failed to open: tell the user instead of leaving the CTA inert. */
+  onOpenFailure: () => void;
+};
+
+/**
+ * Runs one external-auth launch for a connect gate: arms the launch sentinel,
+ * opens the URL with the platform launcher, and on iOS's `sheet-close` trigger
+ * clears the sentinel and refetches. A browser that fails to open clears the
+ * sentinel and calls `onOpenFailure`, so the Connect control never looks inert
+ * (no browser, no progress, no error). The sentinel is cleared on every
+ * terminal path, so a later unrelated foreground cannot stray-refetch.
+ *
+ * Never rejects on a launch failure; `onSheetClose` errors propagate to the
+ * caller.
+ */
+export async function launchConnectGateBrowser(
+  platform: string,
+  authorizationUrl: string,
+  handlers: ConnectGateLaunchHandlers
+): Promise<void> {
+  handlers.markLaunched();
+  // `null` is the launch-failure sentinel: `openAuthorizationAndWaitForReturn`
+  // only rejects when the browser itself could not be opened, so converting
+  // the rejection to a value keeps the failure branch explicit and lets the
+  // success path stay flat.
+  const trigger = await openAuthorizationAndWaitForReturn(platform, authorizationUrl).catch(
+    () => null
+  );
+  if (trigger === null) {
+    handlers.clearLaunch();
+    handlers.onOpenFailure();
+    return;
+  }
+  if (trigger === 'sheet-close') {
+    handlers.clearLaunch();
+    await handlers.onSheetClose();
+  }
+}

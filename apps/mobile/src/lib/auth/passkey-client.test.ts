@@ -110,9 +110,30 @@ describe('classifyPasskeyError', () => {
     ).toBe('unsupported');
   });
 
-  it('matches case-insensitively', () => {
-    expect(classifyPasskeyError({ message: 'USER  CANCELLED' })).toBe('cancelled');
-    expect(classifyPasskeyError({ message: 'nocredentials' })).toBe('no-passkey');
+  it.each(['name', 'message', 'code'])(
+    'matches platform identifiers in %s case-insensitively',
+    field => {
+      expect(classifyPasskeyError({ [field]: 'USER  CANCELLED' })).toBe('cancelled');
+      expect(classifyPasskeyError({ [field]: 'NoCrEdEnTiAlS' })).toBe('no-passkey');
+      expect(classifyPasskeyError({ [field]: 'NOTALLOWEDERROR' })).toBe('no-passkey');
+      // Native identifiers are not display copy: even in Turkish, ASCII I must fold to i.
+      expect(classifyPasskeyError({ [field]: 'NOTCONFIGURED' })).toBe('unsupported');
+      expect(classifyPasskeyError({ [field]: 'notsupported' })).toBe('unsupported');
+      expect(classifyPasskeyError({ [field]: 'UNKNOWN' })).toBe('failed');
+    }
+  );
+
+  it('does not use locale-sensitive casing for native identifiers', () => {
+    const turkishIdentifier = 'NOTCONFIGURED'.toLocaleLowerCase('tr');
+    const localeCase = vi
+      .spyOn(String.prototype, 'toLocaleLowerCase')
+      .mockReturnValue(turkishIdentifier);
+    try {
+      expect(classifyPasskeyError({ message: 'NOTCONFIGURED' })).toBe('unsupported');
+      expect(localeCase).not.toHaveBeenCalled();
+    } finally {
+      localeCase.mockRestore();
+    }
   });
 
   it('falls back to the generic failure for anything else', () => {

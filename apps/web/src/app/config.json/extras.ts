@@ -65,6 +65,11 @@ export const kiloExtras = {
       type: 'string',
       enum: ['expanded', 'preview', 'headline'],
     },
+    shared_agent_board: {
+      description:
+        'Share a board between a main session and its task subagents, including nested subagents',
+      type: 'boolean',
+    },
     terminal_command_display: {
       description:
         'Controls whether terminal command blocks are expanded or collapsed by default in the VS Code chat UI',

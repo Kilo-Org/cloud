@@ -8,7 +8,15 @@ export const PAGE_SNAPSHOT_MESSAGE = 'kilo.tabs.snapshot';
 export const VIEWPORT_SCREENSHOT_MESSAGE = 'kilo.tabs.viewportScreenshot';
 export const WEB_MCP_DISCOVER_MESSAGE = 'kilo.tabs.webMcpDiscover';
 export const WEB_MCP_EXECUTE_MESSAGE = 'kilo.tabs.webMcpExecute';
+export const BROWSER_TOOL_MESSAGE = 'kilo.tabs.browserTool';
 export const DEFAULT_EVAL_TIMEOUT_MS = 5000;
+/**
+ * The debugger can only attach to ordinary pages. `chrome://`, extension and
+ * devtools targets reject `debugger.attach`, so the browser-tool path checks
+ * the tab URL first and fails with this message instead of surfacing a
+ * browser-internal attach error.
+ */
+export const TAB_NOT_INSPECTABLE_ERROR = 'The selected tab is not inspectable.';
 /**
  * Characters of visible page text one snapshot returns. A/B-measured: a 24k
  * window reads a long article in three calls instead of nine. Fewer
@@ -31,10 +39,40 @@ export interface ChromeDebuggerTarget {
   readonly tabId: number;
 }
 
+/** CDP events report which target they came from; a session filters on `tabId`. */
+export interface ChromeDebuggerEventSource {
+  readonly tabId?: number;
+}
+
+export type ChromeDebuggerEventListener = (
+  source: ChromeDebuggerEventSource,
+  method: string,
+  params: Record<string, unknown> | undefined
+) => void;
+
+export type ChromeDebuggerDetachListener = (
+  source: ChromeDebuggerEventSource,
+  reason?: string
+) => void;
+
+/** `chrome.debugger.onEvent` — the CDP events a browser-tool session collects between calls. */
+export interface ChromeDebuggerEventApi {
+  readonly addListener: (listener: ChromeDebuggerEventListener) => void;
+  readonly removeListener: (listener: ChromeDebuggerEventListener) => void;
+}
+
+/** `chrome.debugger.onDetach` — fires when the tab closes or the debugger detaches. */
+export interface ChromeDebuggerDetachApi {
+  readonly addListener: (listener: ChromeDebuggerDetachListener) => void;
+  readonly removeListener: (listener: ChromeDebuggerDetachListener) => void;
+}
+
 export interface ChromeDebuggerApi {
   readonly attach: (target: ChromeDebuggerTarget, requiredVersion: string) => Promise<void> | void;
   readonly detach: (target: ChromeDebuggerTarget) => Promise<void> | void;
   readonly getTargets: () => Promise<ChromeDebuggerTargetInfo[]> | ChromeDebuggerTargetInfo[];
+  readonly onDetach: ChromeDebuggerDetachApi;
+  readonly onEvent: ChromeDebuggerEventApi;
   // The CDP response shape depends on `method`; callers validate it with a schema (see evalInTab).
   readonly sendCommand: (
     target: ChromeDebuggerTarget,
@@ -51,12 +89,19 @@ export interface BrowserTabInfo {
   readonly windowId?: number;
 }
 
+export interface BrowserTabRemovedApi {
+  readonly addListener: (listener: (tabId: number) => void) => void;
+  readonly removeListener: (listener: (tabId: number) => void) => void;
+}
+
 export interface BrowserTabsApi {
   readonly captureVisibleTab?: (
     windowId?: number,
     options?: { readonly format: 'png' }
   ) => Promise<string> | string;
   readonly get?: (tabId: number) => Promise<BrowserTabInfo> | BrowserTabInfo;
+  /** `chrome.tabs.onRemoved` — a browser-tool session disposes when its tab closes. */
+  readonly onRemoved?: BrowserTabRemovedApi;
   readonly query: (
     queryInfo: Record<string, unknown>
   ) => Promise<BrowserTabInfo[]> | BrowserTabInfo[];
@@ -201,6 +246,12 @@ export type TabDebuggerRequest =
       readonly tabId: number;
       readonly toolName: string;
       readonly type: typeof WEB_MCP_EXECUTE_MESSAGE;
+    }
+  | {
+      readonly arguments: Record<string, unknown>;
+      readonly tabId: number;
+      readonly tool: string;
+      readonly type: typeof BROWSER_TOOL_MESSAGE;
     };
 
 export type TabDebuggerResponse =
@@ -233,6 +284,11 @@ export type TabDebuggerResponse =
       readonly result: EvalTabResult;
       readonly ok: true;
       readonly type: typeof WEB_MCP_EXECUTE_MESSAGE;
+    }
+  | {
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof BROWSER_TOOL_MESSAGE;
     }
   | {
       readonly error: string;
@@ -288,6 +344,12 @@ const tabDebuggerRequestSchema = z.union([
     timeoutMs: z.number().optional(),
     type: z.literal(EVAL_TAB_MESSAGE),
   }),
+  z.object({
+    arguments: z.record(z.string(), z.unknown()),
+    tabId: z.number(),
+    tool: z.string(),
+    type: z.literal(BROWSER_TOOL_MESSAGE),
+  }),
 ]);
 const tabDebuggerResponseSchema = z.union([
   z.object({
@@ -321,6 +383,11 @@ const tabDebuggerResponseSchema = z.union([
     type: z.literal(WEB_MCP_EXECUTE_MESSAGE),
   }),
   z.object({
+    ok: z.literal(true),
+    result: evalTabResultSchema,
+    type: z.literal(BROWSER_TOOL_MESSAGE),
+  }),
+  z.object({
     error: z.string(),
     ok: z.literal(false),
   }),
@@ -335,7 +402,8 @@ const chromeEvalResponseSchema = z.object({
 });
 const maxEvalStringLength = 8000;
 
-const isNormalPageUrl = (url: string | undefined): url is string =>
+/** The page URLs the debugger can attach to: ordinary http(s)/file documents, never browser-internal pages. */
+export const isInspectablePageUrl = (url: string | undefined): url is string =>
   url?.startsWith('http://') === true ||
   url?.startsWith('https://') === true ||
   url?.startsWith('file://') === true;
@@ -350,7 +418,7 @@ export const listInspectableTabs = async (
       (
         target
       ): target is ChromeDebuggerTargetInfo & { readonly tabId: number; readonly url: string } =>
-        target.type === 'page' && target.tabId !== undefined && isNormalPageUrl(target.url)
+        target.type === 'page' && target.tabId !== undefined && isInspectablePageUrl(target.url)
     )
     .map(target => {
       const title = target.title?.trim();
@@ -371,7 +439,7 @@ export const listInspectableTabsWithTabsApi = async (
   return tabs
     .filter(
       (tab): tab is BrowserTabInfo & { readonly id: number; readonly url: string } =>
-        tab.id !== undefined && isNormalPageUrl(tab.url)
+        tab.id !== undefined && isInspectablePageUrl(tab.url)
     )
     .map(tab => {
       const title = tab.title?.trim();
@@ -385,6 +453,48 @@ export const listInspectableTabsWithTabsApi = async (
 };
 
 const getTabId = (tab: BrowserTabInfo | undefined): number | undefined => tab?.id;
+
+export type InspectableTabResolution =
+  | {
+      readonly ok: true;
+      readonly tab: BrowserTabInfo | undefined;
+    }
+  | {
+      readonly error: string;
+      readonly ok: false;
+    };
+
+/**
+ * Reads the selected tab and refuses the browser-tool session when the tab is
+ * gone or is a browser-internal page the debugger cannot attach to. A tabs API
+ * without `get` (Firefox scripting path) cannot check, so it is treated as
+ * inspectable and the attach call reports any real failure.
+ */
+export const getInspectableTab = async ({
+  tabId,
+  tabsApi,
+}: {
+  readonly tabId: number;
+  readonly tabsApi: BrowserTabsApi;
+}): Promise<InspectableTabResolution> => {
+  const getTab = tabsApi.get?.bind(tabsApi);
+
+  if (getTab === undefined) {
+    return { ok: true, tab: undefined };
+  }
+
+  try {
+    const tab = await getTab(tabId);
+
+    return isInspectablePageUrl(tab.url)
+      ? { ok: true, tab }
+      : { error: TAB_NOT_INSPECTABLE_ERROR, ok: false };
+  } catch {
+    // A closed or never-existing tab id is not inspectable.
+    return { error: TAB_NOT_INSPECTABLE_ERROR, ok: false };
+  }
+};
+
 const getPngDimensions = (dataUrl: string): { height: number; width: number } | undefined => {
   try {
     const bytes = Uint8Array.from(

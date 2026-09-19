@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createSafeToolCall, createToolResult } from './agent-conversation';
+import { createToolCall, createToolResult } from './agent-conversation';
 import { toPersistedConversationEvents } from './agent-conversation-persistence';
 
 describe('agent conversation persistence', () => {
-  it('strips viewport screenshot image data before storage', () => {
-    const toolCall = createSafeToolCall({
-      name: 'get_viewport_screenshot',
+  it('strips browser screenshot image data before storage', () => {
+    const toolCall = createToolCall({
+      arguments: { scale: 'css' },
+      name: 'kilo_browser_take_screenshot',
       tabId: 1,
     });
     const toolResult = createToolResult({

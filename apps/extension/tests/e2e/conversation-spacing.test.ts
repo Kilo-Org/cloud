@@ -2,7 +2,7 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi, safeToolNames, workflowToolNames } from './kilo-api-fixture';
+import { mockKiloApi, safeToolNames } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -181,8 +181,8 @@ test('tool rows stay spaced without overlapping message bubbles', async () => {
                 tool_calls: [
                   {
                     function: {
-                      arguments: JSON.stringify({}),
-                      name: 'get_viewport_screenshot',
+                      arguments: JSON.stringify({ scale: 'css' }),
+                      name: 'kilo_browser_take_screenshot',
                     },
                     id: 'call_screenshot_1',
                     index: 0,
@@ -195,16 +195,7 @@ test('tool rows stay spaced without overlapping message bubbles', async () => {
         },
       ],
       modelInputModalities: ['text', 'image'],
-      toolNames: [
-        'get_page_snapshot',
-        'get_element_details',
-        'find_in_page',
-        'web_search',
-        'search_memories',
-        'get_memory',
-        'get_viewport_screenshot',
-        ...workflowToolNames,
-      ],
+      toolNames: safeToolNames,
     });
 
     const page = await context.newPage();
@@ -220,7 +211,7 @@ test('tool rows stay spaced without overlapping message bubbles', async () => {
     await sidePanel.getByLabel('Message agent').fill('What do you see?');
     await sidePanel.getByLabel('Message agent').press('Enter');
 
-    await expect(sidePanel.getByText('get_viewport_screenshot completed')).toBeVisible();
+    await expect(sidePanel.getByText('Take a screenshot completed')).toBeVisible();
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible();
     await expect
       .poll(() => sidePanel.locator(messageRowSelector).count())

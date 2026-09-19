@@ -2,6 +2,12 @@ import { z } from 'zod';
 import type { WebMcpGatewayToolName } from '@/src/shared/kilo-gateway-chat-client';
 
 const remoteMcpAgentToolNameSchema = z.templateLiteral(['mcp_', z.string()]);
+/*
+ * The generic Playwright MCP tool call: the model-facing `kilo_browser_*` name
+ * with the upstream arguments verbatim.
+ */
+const kiloBrowserToolNameSchema = z.templateLiteral(['kilo_browser_', z.string()]);
+const memoryToolNameSchema = z.enum(['get_memory', 'search_memories', 'web_search']);
 const workflowToolNameSchema = z.enum([
   'delete_workflow',
   'get_workflow',
@@ -9,6 +15,17 @@ const workflowToolNameSchema = z.enum([
   'save_memory',
   'save_workflow',
   'search_workflows',
+]);
+/*
+ * The retired page tools stay parseable so a conversation persisted before the
+ * Playwright tool switch still loads; the conversation store migrates them to
+ * their `kilo_browser_*` counterpart on read.
+ */
+const retiredPageToolNameSchema = z.enum([
+  'find_in_page',
+  'get_element_details',
+  'get_page_snapshot',
+  'get_viewport_screenshot',
 ]);
 const genericStringSchema = z.string();
 
@@ -22,31 +39,12 @@ export const conversationEventSchema = z.union([
   }),
   z.object({ id: z.string(), text: z.string(), type: z.literal('thinking') }),
   z.object({
-    code: z.string(),
+    arguments: z.record(z.string(), z.unknown()),
     id: z.string(),
-    name: z.literal('eval'),
+    name: kiloBrowserToolNameSchema,
     providerToolCallId: z.string().optional(),
+    reasoningDetails: z.array(z.unknown()).optional(),
     tabId: z.number(),
-    type: z.literal('tool-call'),
-  }),
-  z.object({
-    elementId: z.string().optional(),
-    id: z.string(),
-    memoryId: z.string().optional(),
-    name: z.enum([
-      'find_in_page',
-      'get_element_details',
-      'get_memory',
-      'get_page_snapshot',
-      'get_viewport_screenshot',
-      'search_memories',
-      'web_search',
-    ]),
-    providerToolCallId: z.string().optional(),
-    query: z.string().optional(),
-    snapshotId: z.string().optional(),
-    tabId: z.number(),
-    textStart: z.number().optional(),
     type: z.literal('tool-call'),
   }),
   z.object({
@@ -54,6 +52,7 @@ export const conversationEventSchema = z.union([
     id: z.string(),
     name: remoteMcpAgentToolNameSchema,
     providerToolCallId: z.string().optional(),
+    reasoningDetails: z.array(z.unknown()).optional(),
     remoteToolName: z.string(),
     serverId: z.string(),
     serverName: z.string(),
@@ -64,6 +63,7 @@ export const conversationEventSchema = z.union([
     id: z.string(),
     name: workflowToolNameSchema,
     providerToolCallId: z.string().optional(),
+    reasoningDetails: z.array(z.unknown()).optional(),
     tabId: z.number(),
     type: z.literal('tool-call'),
   }),
@@ -74,9 +74,45 @@ export const conversationEventSchema = z.union([
     id: z.string(),
     name: z.custom<WebMcpGatewayToolName>(value => genericStringSchema.safeParse(value).success),
     providerToolCallId: z.string().optional(),
+    reasoningDetails: z.array(z.unknown()).optional(),
     tabId: z.number(),
     type: z.literal('tool-call'),
     webMcpOrigin: z.string(),
+  }),
+  z.object({
+    elementId: z.string().optional(),
+    id: z.string(),
+    memoryId: z.string().optional(),
+    name: memoryToolNameSchema,
+    providerToolCallId: z.string().optional(),
+    query: z.string().optional(),
+    reasoningDetails: z.array(z.unknown()).optional(),
+    snapshotId: z.string().optional(),
+    tabId: z.number(),
+    textStart: z.number().optional(),
+    type: z.literal('tool-call'),
+  }),
+  z.object({
+    code: z.string(),
+    id: z.string(),
+    name: z.literal('eval'),
+    providerToolCallId: z.string().optional(),
+    reasoningDetails: z.array(z.unknown()).optional(),
+    tabId: z.number(),
+    type: z.literal('tool-call'),
+  }),
+  z.object({
+    elementId: z.string().optional(),
+    id: z.string(),
+    memoryId: z.string().optional(),
+    name: retiredPageToolNameSchema,
+    providerToolCallId: z.string().optional(),
+    query: z.string().optional(),
+    reasoningDetails: z.array(z.unknown()).optional(),
+    snapshotId: z.string().optional(),
+    tabId: z.number(),
+    textStart: z.number().optional(),
+    type: z.literal('tool-call'),
   }),
   z.object({
     error: z.string().optional(),

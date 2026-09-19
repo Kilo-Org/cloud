@@ -3,7 +3,7 @@
  * validated event shapes plus a task scenario spec and scores the final
  * assistant answer: pinned content checks, a minimum length, tool-result
  * evidence for hallucination-prone facts, and — for action scenarios — at
- * least one ok eval exchange.
+ * least one ok action exchange.
  */
 import {
   computeBatchSummary,
@@ -15,8 +15,10 @@ import type {
   BenchBatchSummary,
   BenchEvent,
   BenchPredicate,
+  BenchToolExchange,
 } from './agent-workflow-bench-scoring';
 import type { BenchTaskScenario } from './agent-task-bench-scenarios';
+import { KILO_BROWSER_TOOL_PREFIX, isSafeBrowserToolName } from './browser-tool-contract';
 
 /** Read-and-answer tasks are held to a tighter gate than workflow creation. */
 export const TASK_SPEED_LIMIT_SECONDS = 120;
@@ -53,6 +55,28 @@ export const selectFinalAnswer = (events: readonly BenchEvent[]): string => {
   return '';
 };
 
+/**
+ * An action exchange is an ok tool result for either a real run_workflow (dry runs
+ * record actions instead of performing them) or a kilo_browser_ call whose upstream
+ * Playwright MCP tool is not read-only. Read-only browser calls and retired tool
+ * names never satisfy an action scenario.
+ */
+const isOkActionExchange = (exchange: BenchToolExchange): boolean => {
+  if (!exchange.result.ok) {
+    return false;
+  }
+
+  if (exchange.call.name === 'run_workflow') {
+    return exchange.call.arguments['dryRun'] !== true;
+  }
+
+  if (exchange.call.name.startsWith(`${KILO_BROWSER_TOOL_PREFIX}browser_`)) {
+    return !isSafeBrowserToolName(exchange.call.name.slice(KILO_BROWSER_TOOL_PREFIX.length));
+  }
+
+  return false;
+};
+
 export const scoreTaskCorrectness = ({
   events,
   scenario,
@@ -79,15 +103,9 @@ export const scoreTaskCorrectness = ({
     .map(check => check.key);
 
   const lengthOk = answer.length >= scenario.minAnswerChars;
-  // Both harness action paths count: direct eval, or a real (non-dry) run of a stored workflow.
+  // Both harness action paths count: a state-changing kilo_browser_ call, or a real (non-dry) run of a stored workflow.
   const actionOk =
-    !scenario.requiresAction ||
-    exchanges.some(
-      exchange =>
-        exchange.result.ok &&
-        (exchange.call.name === 'eval' ||
-          (exchange.call.name === 'run_workflow' && exchange.call.arguments['dryRun'] !== true))
-    );
+    !scenario.requiresAction || exchanges.some(exchange => isOkActionExchange(exchange));
 
   type BenchPredicateMap = Record<string, BenchPredicate>;
 
@@ -95,7 +113,7 @@ export const scoreTaskCorrectness = ({
     actionPerformed: predicate(
       actionOk,
       scenario.requiresAction
-        ? `ok action exchange (eval or real run_workflow) present: ${String(actionOk)}`
+        ? `ok action exchange (state-changing browser tool or real run_workflow) present: ${String(actionOk)}`
         : 'no action required'
     ),
     answerContent: predicate(

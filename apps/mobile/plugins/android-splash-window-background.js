@@ -1,5 +1,11 @@
 /**
- * Launch-surface edits that keep the Android cold start on the brand splash.
+ * Native backing-surface adapter for the shared branded splash.
+ *
+ * Android lacks the root-backed storyboard loading view Expo uses on iOS;
+ * its window drawable must cover the pre-React gap after the system splash
+ * exits. This adapter does not hide the splash: AnimatedSplashOverlay owns
+ * that lifecycle on BOTH platforms. The marker/delay below only restores the
+ * otherwise-covered Android window background for later rotation.
  *
  * Two platform defaults break the branded launch, and each needs its own edit:
  *
@@ -29,7 +35,7 @@
  * the moment the app content is up.
  *
  * Pure data in, data out: the config plugin in
- * `withAndroidSplashWindowBackground.js` owns the mod plumbing, and the unit
+ * `withBrandedSplash.js` owns the mod plumbing, and the unit
  * test drives this module directly.
  */
 

@@ -28,14 +28,10 @@ const BLOCKED_PERMISSIONS = [
 ];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
-// Pins the Android launch surface to the brand splash: the brand drawable
-// (splash color + dark Kilo mark) on the launch and post-splash themes'
-// `android:windowBackground`, and `MainActivity` keeping the native splash on
-// screen until the app's JavaScript hides it. Without it a cold start paints the
-// platform's default window surface (plain white in day mode) and dismisses the
-// splash as soon as the development launcher's React content appears — before
-// the app bundle has actually loaded.
-const SPLASH_WINDOW_BACKGROUND_PLUGIN = './plugins/withAndroidSplashWindowBackground';
+// One entry configures Expo's native splash on both platforms. Its internal
+// Android backing-surface adapter is a documented native capability exception,
+// not a separate launch lifecycle. The wrapper owns the mod ordering.
+const BRANDED_SPLASH_PLUGIN = './plugins/withBrandedSplash';
 const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSMicrophoneUsageDescription',
   'NSSpeechRecognitionUsageDescription',
@@ -160,18 +156,25 @@ check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
 );
-// The splash plugin registers after this one on purpose: mods run in reverse
-// registration order, so the later entry runs first, and this plugin has to run
-// last to see the launch theme the splash plugin writes.
-check(
-  pluginNames.includes(SPLASH_WINDOW_BACKGROUND_PLUGIN),
-  `plugins must include "${SPLASH_WINDOW_BACKGROUND_PLUGIN}"`
+const splashEntries = (config.plugins ?? []).filter(
+  plugin => Array.isArray(plugin) && plugin[0] === BRANDED_SPLASH_PLUGIN
 );
-const splashPluginIndex = pluginNames.indexOf('expo-splash-screen');
-const splashWindowBackgroundIndex = pluginNames.indexOf(SPLASH_WINDOW_BACKGROUND_PLUGIN);
+check(splashEntries.length === 1, `plugins must include exactly one "${BRANDED_SPLASH_PLUGIN}"`);
 check(
-  splashWindowBackgroundIndex !== -1 && splashPluginIndex > splashWindowBackgroundIndex,
-  `"${SPLASH_WINDOW_BACKGROUND_PLUGIN}" must be registered before "expo-splash-screen"`
+  !pluginNames.includes('expo-splash-screen') &&
+    !pluginNames.includes('./plugins/withAndroidSplashWindowBackground'),
+  'the shared branded splash must own native splash registration and mod ordering'
+);
+const splashOptions = splashEntries[0]?.[1];
+check(
+  splashOptions?.image === './assets/images/logo-mark.png' &&
+    splashOptions.backgroundColor === '#FAF74F' &&
+    splashOptions.imageWidth === 100,
+  'the shared native splash must match AnimatedSplashOverlay: yellow with the 100dp Kilo mark'
+);
+check(
+  splashOptions?.ios === undefined && splashOptions?.android === undefined,
+  'the branded splash must not fork its options by platform'
 );
 
 const extra = config.extra ?? {};

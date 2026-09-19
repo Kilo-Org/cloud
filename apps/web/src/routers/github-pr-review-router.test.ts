@@ -504,6 +504,24 @@ describe('githubPrReviewRouter infinite-query inputs accept the tRPC direction f
     ).resolves.toMatchObject({ files: [] });
   });
 
+  it('listFiles pages on when the REST response carries Link: rel="next"', async () => {
+    // GitHub's own pagination signal decides, so a first page holding fewer
+    // files than the page size still has a next cursor. The Files tab's
+    // partial-load row depends on that cursor.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    buildOctokit('t1').pulls.listFiles.mockResolvedValueOnce({
+      data: [{ filename: 'src/a.ts', status: 'modified', additions: 1, deletions: 0 }],
+      headers: {
+        link: '<https://api.github.com/repos/octocat/hello/pulls/1/files?per_page=50&page=2>; rel="next"',
+      },
+    });
+
+    await expect(
+      caller.listFiles({ owner: 'octocat', repo: 'hello', number: 1, direction: 'forward' })
+    ).resolves.toMatchObject({ nextCursor: 2 });
+  });
+
   it('listReviewThreads accepts direction: "forward"', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });

@@ -237,6 +237,37 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(mockEnsureVerifiedDomainOrganizationMembership).not.toHaveBeenCalled();
   });
 
+  it('admits a passkey without Turnstile or user settlement, after the SSO-authority block', async () => {
+    // No Turnstile cookie is set: the redeemed ticket is the identity proof.
+    const result = await signIn({
+      user: { id: 'passkey-user', email: 'passkey@example.com', name: 'Passkey User', image: '' },
+      account: { provider: 'passkey', providerAccountId: 'passkey-user', type: 'credentials' },
+      profile: undefined,
+    } as never);
+
+    expect(result).toBe(true);
+    expect(cookieStore.has('turnstile_jwt')).toBe(false);
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    expect(mockEnsureVerifiedDomainOrganizationMembership).not.toHaveBeenCalled();
+  });
+
+  it('still enforces SSO for a passkey sign-in on an SSO-protected domain', async () => {
+    mockResolveSsoAuthorityForDomain.mockResolvedValueOnce({
+      status: 'required',
+      domain: 'example.com',
+      sourceOrganizationId: 'sso-org',
+    });
+
+    const result = await signIn({
+      user: { id: 'passkey-user', email: 'passkey@example.com', name: 'Passkey User', image: '' },
+      account: { provider: 'passkey', providerAccountId: 'passkey-user', type: 'credentials' },
+      profile: undefined,
+    } as never);
+
+    expect(result).toContain('/users/sign_in?domain=example.com');
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
   it('skips ordinary SSO enforcement during provider-account linking', async () => {
     mockResolveSsoAuthorityForDomain.mockResolvedValueOnce({
       status: 'required',

@@ -23,6 +23,7 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
+import { SystemSearchIndexMount } from '@/lib/system-search-index-mount';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -117,6 +118,7 @@ export default function AppLayout() {
   return (
     <UserWebConnectionProvider>
       <ActiveSessionsLiveSyncMount />
+      <SystemSearchIndexMount />
       <GlanceablePublisherMount />
       <LauncherSurfacesMount />
       <CachePersistenceMount />

@@ -10,6 +10,7 @@ import {
   clonePart,
   createReadonlyPartView,
   createSeedTextPart,
+  forgetPartUpdateTime,
   insertPartSorted,
   insertSorted,
   isSupportedDeltaField,
@@ -51,6 +52,9 @@ function createJotaiStorage(
   const partsRevisionAtom = atom(0);
 
   const partsSnapshot = new Map<string, Part[] | null>();
+  // Ordering evidence of the last accepted update per part, owned next to the
+  // parts it describes (see `upsertPartDroppingStaleSyntheticParts`).
+  const partEvidence = new Map<string, number>();
   const subscribers = new Map<string, Set<() => void>>();
 
   // Coalesced delta publication. `applyPartDelta` buffers the incoming chunk
@@ -171,10 +175,10 @@ function createJotaiStorage(
       return store.get(messagesAtom).get(messageId);
     },
 
-    upsertPart(messageId, part) {
+    upsertPart(messageId, part, eventTime) {
       flushPendingDeltas();
       const arr = partsMap.get(messageId) ?? [];
-      const nextArr = upsertPartDroppingStaleSyntheticParts(arr, part);
+      const nextArr = upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence);
       partsMap.set(messageId, nextArr);
       bumpPartsRevision();
       partsSnapshot.set(messageId, null);
@@ -211,6 +215,7 @@ function createJotaiStorage(
       if (!arr) return;
       const filtered = arr.filter(p => p.id !== partId);
       partsMap.set(messageId, filtered);
+      forgetPartUpdateTime(partEvidence, messageId, partId);
       bumpPartsRevision();
       partsSnapshot.set(messageId, null);
       notify(subscribers, `parts:${messageId}`);
@@ -256,6 +261,7 @@ function createJotaiStorage(
       partsMap.clear();
       bumpPartsRevision();
       partsSnapshot.clear();
+      partEvidence.clear();
 
       for (const messageId of existingMessageIds) {
         notify(subscribers, `message:${messageId}`);
@@ -280,6 +286,9 @@ function createJotaiStorage(
       store.set(messageIdsAtom, nextMessageIds);
 
       if (partsMap.has(messageId)) {
+        for (const part of partsMap.get(messageId) ?? []) {
+          forgetPartUpdateTime(partEvidence, messageId, part.id);
+        }
         partsMap.delete(messageId);
         bumpPartsRevision();
         partsSnapshot.delete(messageId);

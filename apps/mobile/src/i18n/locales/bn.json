@@ -369,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{total}}টি ফাইলের মধ্যে {{displayCount}}টি লোড হয়েছে",
       "filesStillLoading": "ফাইল এখনও লোড হচ্ছে। রিফ্রেশ করতে নিচে টানুন।",
       "goToOverview": "সারসংক্ষেপে যান",
-      "goToOverviewTab": "সারসংক্ষেপ ট্যাবে যান"
+      "goToOverviewTab": "সারসংক্ষেপ ট্যাবে যান",
+      "expandAllLines_one": "সব {{displayCount}}টি লাইন দেখান",
+      "expandAllLines_other": "সব {{displayCount}}টি লাইন দেখান",
+      "expandLines_one": "{{displayCount}}টি লাইন দেখান ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}}টি লাইন দেখান ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "আশপাশের কোডের {{displayCount}}টি লাইন দেখান",
+      "expandLinesOfContext_other": "আশপাশের কোডের {{displayCount}}টি লাইন দেখান",
+      "expandMoreLines_one": "আরও {{displayCount}}টি লাইন দেখান ({{start}}–{{end}})",
+      "expandMoreLines_other": "আরও {{displayCount}}টি লাইন দেখান ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}}টি ফাইলের মধ্যে {{loaded}}টি লোড হয়েছে",
+      "loadedOfTotalFiles_other": "{{total}}টি ফাইলের মধ্যে {{loaded}}টি লোড হয়েছে"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ফাইলের শেষে নিউলাইন নেই",
@@ -559,7 +569,9 @@
         "outdatedOnPath": "পুরোনো সংস্করণের {{path}}-এ"
       },
       "deletedUser": "মুছে ফেলা ব্যবহারকারী",
-      "replyForbiddenTerm": "এই {{term}}ে উত্তর দেওয়ার অনুমতি আপনার নেই।"
+      "replyForbiddenTerm": "এই {{term}}ে উত্তর দেওয়ার অনুমতি আপনার নেই।",
+      "moreLinesAbove_one": "… ওপরে আরও {{displayCount}}টি লাইন আছে।",
+      "moreLinesAbove_other": "… ওপরে আরও {{displayCount}}টি লাইন আছে।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub অ্যাপের সেটিংস খোলা যায়নি।",
     "installKiloGitHubApp": "Kilo GitHub অ্যাপ ইনস্টল করুন",
@@ -732,7 +744,9 @@
       "statusContext": "আশপাশের কোড",
       "lineLabel": "{{status}} লাইন {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} লাইন: {{text}}",
-      "emptyLine": "(খালি)"
+      "emptyLine": "(খালি)",
+      "truncationBanner_one": "GitHub API-এর সীমার কারণে পরিবর্তিত {{total}}টি ফাইলের মধ্যে প্রথম {{limit}}টি দেখানো হচ্ছে।",
+      "truncationBanner_other": "GitHub API-এর সীমার কারণে পরিবর্তিত {{total}}টি ফাইলের মধ্যে প্রথম {{limit}}টি দেখানো হচ্ছে।"
     },
     "linkPasteClipboardEmpty": "ক্লিপবোর্ড খালি।",
     "linkPasteNotAPullRequest": "এটি পুল রিকোয়েস্ট বা মার্জ রিকোয়েস্টের লিংক নয়",
@@ -906,7 +920,9 @@
       "uploadFailed": "আপলোড ব্যর্থ হয়েছে।",
       "failedToUploadFile": "ফাইল আপলোড করা যায়নি: {{reason}}।",
       "nothingToPaste": "পেস্ট করার মতো কিছু নেই।",
-      "metadataStripFailed": "ছবির মেটাডেটা সরানো যায়নি।"
+      "metadataStripFailed": "ছবির মেটাডেটা সরানো যায়নি।",
+      "limit_one": "আপনি সর্বোচ্চ {{displayCount}}টি ফাইল সংযুক্ত করতে পারেন।",
+      "limit_other": "আপনি সর্বোচ্চ {{displayCount}}টি ফাইল সংযুক্ত করতে পারেন।"
     },
     "attachmentPreview": {
       "accessibility": "ফাইল: {{filename}}, অবস্থা: {{status}}",
@@ -1650,7 +1666,11 @@
       "syncFindings": "ত্রুটিগুলো সিঙ্ক করুন",
       "syncNow": "এখন সিঙ্ক করুন",
       "syncQueued": "সিঙ্কের অনুরোধ সারিতে যোগ করা হয়েছে।",
-      "syncStatusUnavailable": "সিঙ্কের অবস্থা জানা যাচ্ছে না।"
+      "syncStatusUnavailable": "সিঙ্কের অবস্থা জানা যাচ্ছে না।",
+      "daysOverdue_one": "{{displayCount}} দিন বিলম্বিত",
+      "daysOverdue_other": "{{displayCount}} দিন বিলম্বিত",
+      "findingsCount_one": "{{displayCount}}টি ত্রুটি",
+      "findingsCount_other": "{{displayCount}}টি ত্রুটি"
     },
     "dashboardMetrics": {
       "openFindings": "অমীমাংসিত ত্রুটি",
@@ -2194,7 +2214,13 @@
       "updateTodos": "কাজের তালিকা আপডেট",
       "linesBadge": "{{displayCount}}টি লাইন",
       "filesBadge": "{{displayCount}}টি ফাইল",
-      "matchesBadge": "{{displayCount}}টি মিল"
+      "matchesBadge": "{{displayCount}}টি মিল",
+      "filesBadge_one": "{{displayCount}}টি ফাইল",
+      "filesBadge_other": "{{displayCount}}টি ফাইল",
+      "linesBadge_one": "{{displayCount}}টি লাইন",
+      "linesBadge_other": "{{displayCount}}টি লাইন",
+      "matchesBadge_one": "{{displayCount}}টি মিল",
+      "matchesBadge_other": "{{displayCount}}টি মিল"
     },
     "readToolMarkdown": {
       "linesTruncated": "লাইন {{start}}–{{end}} (আংশিক দেখানো হয়েছে)",
@@ -2484,7 +2510,11 @@
       "files": "ফাইল",
       "couldNotOpenPhotoPicker": "ছবি বেছে নেওয়ার পর্দা খোলা যায়নি। Kilo আবার চালু করে চেষ্টা করুন।",
       "maxFilesAllowed": "সর্বোচ্চ {{displayCount}}টি ফাইল যোগ করা যায়।",
-      "onlyAddingFiles": "{{total}}টি ফাইলের মধ্যে শুধু {{accepted}}টি যোগ করা হচ্ছে (সর্বোচ্চ {{max}}টি)"
+      "onlyAddingFiles": "{{total}}টি ফাইলের মধ্যে শুধু {{accepted}}টি যোগ করা হচ্ছে (সর্বোচ্চ {{max}}টি)",
+      "maxFilesAllowed_one": "সর্বোচ্চ {{displayCount}}টি ফাইল যোগ করা যায়।",
+      "maxFilesAllowed_other": "সর্বোচ্চ {{displayCount}}টি ফাইল যোগ করা যায়।",
+      "onlyAddingFiles_one": "{{total}}টি ফাইলের মধ্যে শুধু {{accepted}}টি যোগ করা হচ্ছে (সর্বোচ্চ {{max}}টি)",
+      "onlyAddingFiles_other": "{{total}}টি ফাইলের মধ্যে শুধু {{accepted}}টি যোগ করা হচ্ছে (সর্বোচ্চ {{max}}টি)"
     },
     "composer": {
       "addAttachment": "সংযুক্তি যোগ করুন",
@@ -2502,7 +2532,9 @@
       "discardAttachmentsMessage": "আপলোড করা কিন্তু কোনো বার্তায় ব্যবহার না করা ফাইলগুলো মুছে ফেলা হবে।",
       "discardAttachmentsTitle": "সংযুক্তিগুলি বাতিল করবেন?",
       "charactersRemaining": "{{count}}টি অক্ষর বাকি",
-      "insertNewline": "নতুন লাইন যোগ করুন"
+      "insertNewline": "নতুন লাইন যোগ করুন",
+      "charactersRemaining_one": "{{count}}টি অক্ষর বাকি",
+      "charactersRemaining_other": "{{count}}টি অক্ষর বাকি"
     },
     "chatLink": {
       "linkCopied": "লিঙ্ক কপি হয়েছে",
@@ -2574,7 +2606,9 @@
       "stepsCount_one": "{{steps}}টি ধাপ",
       "stepsCount": "{{steps}}টি ধাপ",
       "stepsCount_other": "{{steps}}টি ধাপ",
-      "modelAccessibilityLabel": "মডেল: {{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "মডেল: {{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "মডেল ({{displayCount}})",
+      "modelsCount_other": "মডেল ({{displayCount}})"
     },
     "autoApprove": {
       "title": "স্বয়ংক্রিয় অনুমোদন",
@@ -2614,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "টুল কল",
-      "condensedLabel": "{{itemCount}}টি আইটেম; {{last}}"
+      "condensedLabel": "{{itemCount}}টি আইটেম; {{last}}",
+      "condensedLabel_one": "{{itemCount}}টি আইটেম; {{last}}",
+      "condensedLabel_other": "{{itemCount}}টি আইটেম; {{last}}"
     }
   },
   "bootstrap": {
@@ -2749,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "এই সেশনটি ফাইল গ্রহণ করতে পারে না",
     "cliCantReceiveFilesMessage": "এই সেশন চালানো Kilo CLI ফাইল গ্রহণ করতে পারে না। সেই মেশিনের CLI আপডেট করুন অথবা নতুন সেশনে শেয়ার করুন।",
     "contentlessMessage": "শেয়ার করার মতো কিছু নেই — কোনো টেক্সট বা ফাইল অন্তর্ভুক্ত ছিল না।",
-    "couldNotReadContent": "শেয়ার করা কনটেন্ট পড়া যায়নি।"
+    "couldNotReadContent": "শেয়ার করা কনটেন্ট পড়া যায়নি।",
+    "onlyFirstFilesAttached_one": "শুধুমাত্র প্রথম {{displayCount}}টি ফাইল সংযুক্ত হবে।",
+    "onlyFirstFilesAttached_other": "শুধুমাত্র প্রথম {{displayCount}}টি ফাইল সংযুক্ত হবে।"
   },
   "kiloPass": {
     "title": "Kilo Pass",

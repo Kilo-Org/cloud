@@ -29,14 +29,14 @@ export function LiveSessionListEmptyState({
       description={t('agents.sessionList.noSessionsYetDescription')}
       action={
         <Button
-          variant="outline"
+          variant="default"
           className="max-w-full"
           accessibilityLabel={t('common.newSession')}
           onPress={() => {
             router.push(getNewAgentSessionPath(organizationId) as Href);
           }}
         >
-          <Plus size={16} color={colors.foreground} />
+          <Plus size={16} color={colors.primaryForeground} />
           <Text className="shrink text-center">{t('common.newSession')}</Text>
         </Button>
       }

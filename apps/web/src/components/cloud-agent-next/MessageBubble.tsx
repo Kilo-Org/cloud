@@ -63,19 +63,25 @@ function TextWithLinks({ text }: { text: string }) {
 }
 
 /**
- * Compaction separator component - shown when context is compacted
+ * Compaction separator component - shown when context is compacted. It carries
+ * the group's first message id because the compactor message is the only thing
+ * a compaction-only group renders: the resume link's `?at=` anchor resolves
+ * through `[data-message-id]`, and without it the separator would be the one
+ * group a recorded position could not land on.
  */
 function CompactionSeparator({
+  messageId,
   compactionPart,
   timestamp,
 }: {
+  messageId: string;
   compactionPart: CompactionPart;
   timestamp: number | string;
 }) {
   const isAuto = compactionPart.auto;
 
   return (
-    <div className="flex items-center gap-3 py-2">
+    <div className="flex items-center gap-3 py-2" data-message-id={messageId}>
       <div className="bg-border h-px flex-1" />
       <div className="text-muted-foreground flex items-center gap-2 text-xs">
         <Scissors className="h-3 w-3" />
@@ -250,7 +256,13 @@ export function MessageBubble({
 
     // Render compaction separator for compaction-only messages
     if (hasOnlyCompactionParts && compactionPart) {
-      return <CompactionSeparator compactionPart={compactionPart} timestamp={timestamp} />;
+      return (
+        <CompactionSeparator
+          messageId={message.info.id}
+          compactionPart={compactionPart}
+          timestamp={timestamp}
+        />
+      );
     }
 
     const userContent = getUserTextContent(message.parts);
@@ -260,7 +272,11 @@ export function MessageBubble({
     const nonImageFileParts = fileParts.filter(part => !part.mime.startsWith('image/'));
 
     return (
-      <div className="group/msg flex flex-col items-end py-2" data-message-role="user">
+      <div
+        className="group/msg flex flex-col items-end py-2"
+        data-message-role="user"
+        data-message-id={message.info.id}
+      >
         <div className="bg-primary text-primary-foreground relative max-w-[95%] rounded-md px-3 py-2 sm:max-w-[85%] md:max-w-[80%]">
           {deliveryBadge && <DeliveryStatusIcon badge={deliveryBadge} />}
           {review ? (
@@ -304,7 +320,11 @@ export function MessageBubble({
     if (parts.length === 0 && !showError) return null;
 
     return (
-      <div className="group/msg py-1.5" data-message-role="assistant">
+      <div
+        className="group/msg py-1.5"
+        data-message-role="assistant"
+        data-message-id={message.info.id}
+      >
         <div className="space-y-0.5">
           {parts.map(part => (
             <PartRenderer

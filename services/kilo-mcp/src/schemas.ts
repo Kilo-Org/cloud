@@ -65,13 +65,41 @@ export const searchArgsSchema = z
   })
   .passthrough();
 
-/** The `call` tool arguments: a non-empty catalog path and an optional input object. */
+/**
+ * A catalog endpoint's input value. The published `inputSchema` decides the
+ * shape — most procedures take an object, but some legitimately take a scalar
+ * (`debug.badInputError` takes a string), so a record-only argument would leave
+ * those rows permanently uncallable. `null` is rejected because the call path
+ * treats it as "no input" and would silently drop it.
+ */
+const catalogInputValue = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.array(z.unknown()),
+  z.record(z.string(), z.unknown()),
+]);
+
+/** The `call` tool arguments: a non-empty catalog path and an optional input value. */
 export const callArgsSchema = z
   .object({
     path: nonWhitespaceString('path'),
-    input: z.record(z.string(), z.unknown()).optional(),
+    input: catalogInputValue.optional(),
   })
   .passthrough();
+
+/**
+ * The `submit_otp` tool arguments: the id `call_protected` returned and the code
+ * from the admin's authenticator app. Strict on purpose — a submit that carries
+ * `path` or `input` is an invalid-params refusal, so the reviewed payload
+ * provably cannot change between the two calls.
+ */
+export const submitOtpArgsSchema = z
+  .object({
+    request_id: nonWhitespaceString('request_id'),
+    otp: z.string().min(1).max(16),
+  })
+  .strict();
 
 /**
  * The RFC 7591 dynamic client registration metadata, read from the untrusted
@@ -111,9 +139,18 @@ export const orgPickerQuerySchema = z.object({
   code: z.string().min(1),
 });
 
-/** The org picker's POST body (form-encoded), read from the untrusted request. */
+/**
+ * The org picker's POST body (form-encoded), read from the untrusted request.
+ * `admin_enabled` is deliberately tolerant: the handler re-derives admin
+ * eligibility from apps/web and treats only the literal `on` as checked, so a
+ * junk value must never fail the whole form. `otp_code` is tolerant for the
+ * same reason: the handler reads only a string, and an absent or junk value
+ * must re-render the picker asking for a code rather than refuse the form.
+ */
 export const orgPickerFormSchema = z.object({
   organization_id: z.string().min(1),
+  admin_enabled: z.string().optional(),
+  otp_code: z.string().optional(),
 });
 
 /** A header value safe to forward upstream: bounded length, no CR/LF (header injection). */
@@ -141,6 +178,7 @@ export type InitializeParams = z.infer<typeof initializeParamsSchema>;
 export type ToolsCallParams = z.infer<typeof toolsCallParamsSchema>;
 export type SearchArgs = z.infer<typeof searchArgsSchema>;
 export type CallArgs = z.infer<typeof callArgsSchema>;
+export type SubmitOtpArgs = z.infer<typeof submitOtpArgsSchema>;
 export type ClientRegistration = z.infer<typeof clientRegistrationSchema>;
 export type PairingStatusQuery = z.infer<typeof pairingStatusQuerySchema>;
 export type OrgPickerQuery = z.infer<typeof orgPickerQuerySchema>;

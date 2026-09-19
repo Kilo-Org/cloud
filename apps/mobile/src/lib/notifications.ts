@@ -7,6 +7,7 @@ import { z } from 'zod';
 
 import * as Sentry from '@sentry/react-native';
 import {
+  agentNotificationKindForPushData,
   ANDROID_NOTIFICATION_CHANNELS,
   type AndroidNotificationChannelId,
   type PushData,
@@ -40,8 +41,10 @@ import {
   registerGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
 import { chainSave } from '@/lib/hooks/save-chain';
+import { getDndAccessGranted } from '@/glanceable-android/live-update';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
+import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
 import { notificationPathForData } from './notification-path';
 
 const easConfigSchema = z.object({ projectId: z.string().min(1) });
@@ -287,6 +290,21 @@ export function setupNotificationHandler() {
         return { ...suppressed, shouldSetBadge: applied };
       }
 
+      // A per-Focus choice covers agent progress only. The glanceable carrier
+      // above already returned (it must still reach the sinks), and anything
+      // the user has not excluded stays visible. This is the foreground half of
+      // the choice: a background or killed-app delivery never reaches this
+      // handler, so the NotificationServiceExtension target in
+      // `modules/notification-focus-filter/ios` applies the same stored choice
+      // on that path.
+      if (
+        data &&
+        agentNotificationKindForPushData(data) === 'progress' &&
+        !isAgentProgressAllowedInActiveFocus()
+      ) {
+        return suppressed;
+      }
+
       if (
         data?.type === 'chat.message' &&
         activeChatLocation?.sandboxId === data.sandboxId &&
@@ -447,22 +465,150 @@ export function checkInitialNotification(): void {
 
 // Single-flight promise so concurrent callers share one channel-creation pass.
 // The promise never rejects: a per-channel failure is reported to Sentry and
-// the remaining channels still get created.
+// the remaining channels still get created. A pass that failed any required
+// channel is not cached (see `ensureAndroidNotificationChannels`), so a later
+// start retries before it posts to a channel that may not exist.
 let androidChannelsPromise: Promise<void> | null = null;
 
-async function createAndroidNotificationChannels(): Promise<void> {
+// The channels the two named kinds replaced. Android keeps an app-created
+// channel until the app deletes it, so a stale one would still appear in the
+// system settings list after the upgrade.
+const LEGACY_ANDROID_NOTIFICATION_CHANNELS = ['agent', 'chat', 'active-agents'] as const;
+
+// Android plays a channel-based post's sound from the channel (the builder's
+// `setSound(null)` is a no-op for a channel post on API 26+), and the framework
+// keeps the sound a channel was created with — so the progress kind is silent
+// here at creation, while needs-input keeps the default sound for its alert.
+// A channel's vibration is independent of its sound: Android defaults it to
+// enabled, so silence also has to disable it explicitly.
+const SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS = new Set<AndroidNotificationChannelId>([
+  'agent-progress',
+]);
+
+/** What one Android channel write asks the framework for. */
+export type AndroidChannelWritePlan = {
+  /** The Do Not Disturb override to ask the framework for. */
+  bypassDnd: boolean;
+};
+
+/**
+ * One channel write's Do Not Disturb override.
+ *
+ * The framework applies the Do Not Disturb access gate only while it *creates*
+ * a channel and then keeps the value it stored. A write to an existing channel
+ * updates its name and description but never its override — measured on API 35
+ * on 2026-09-17: with the user's Do Not Disturb access granted, requesting
+ * `true` for a needs-input channel stored with `false` still reads back
+ * `mBypassDnd=false`. A channel created before the user granted access can
+ * therefore never gain the override from a later write. The override cannot be
+ * taken back either: a recreate of a channel that stored `true` reads back
+ * `true` even while the grant is absent, because the framework un-deletes the
+ * channel with its previous settings. `writeAndroidNotificationChannel`
+ * recreates a channel whose stored override is still `false`, so the framework
+ * applies the gate to the grant the user holds now.
+ */
+export function planAndroidChannelWrite(
+  requestedBypassDnd: boolean,
+  dndAccessGranted: boolean | null
+): AndroidChannelWritePlan {
+  if (!requestedBypassDnd) {
+    return { bypassDnd: false };
+  }
+  // An unreadable access state (no native module) keeps the pre-existing
+  // request: the framework still decides, and the feature is not silently lost.
+  return { bypassDnd: dndAccessGranted !== false };
+}
+
+/** Every channel re-write (create and rename) must pass the same sound policy. */
+function androidChannelConfiguration(
+  channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number],
+  name: string,
+  bypassDnd: boolean
+): Notifications.NotificationChannelInput {
+  return {
+    name,
+    importance:
+      channel.importance === 'high'
+        ? Notifications.AndroidImportance.HIGH
+        : Notifications.AndroidImportance.DEFAULT,
+    bypassDnd,
+    // An absent sound is the system default; an explicit null is silence, and a
+    // silent channel must not vibrate either (the default is enabled).
+    ...(SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS.has(channel.id)
+      ? { sound: null, enableVibrate: false }
+      : {}),
+  };
+}
+
+/** The user's Do Not Disturb grant as the native module reports it. */
+function androidDndAccessGranted(): boolean | null {
+  try {
+    return getDndAccessGranted();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether a channel's stored override is a stale `false` that this write must
+ * replace by recreating the channel.
+ *
+ * Only the raise needs a recreate: the framework restores the stored override
+ * when the app recreates a channel it previously deleted, so a recreate
+ * installs an override that was never applied but cannot take one back, and the
+ * delete would cost the user the ongoing card for nothing.
+ */
+export function shouldRecreateAndroidChannel(
+  storedBypassDnd: boolean | null,
+  desiredBypassDnd: boolean
+): boolean {
+  return desiredBypassDnd && storedBypassDnd === false;
+}
+
+/** The override the framework stores for a channel, or null when it has none. */
+async function storedAndroidChannelBypassDnd(
+  channelId: AndroidNotificationChannelId
+): Promise<boolean | null> {
+  try {
+    const channel = await Notifications.getNotificationChannelAsync(channelId);
+    return channel?.bypassDnd ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write one channel with the override the user's grant allows. A channel whose
+ * stored override is still `false` while the plan asks for `true` is deleted
+ * first, so the framework's create-time gate applies the user's grant; that
+ * delete also cancels an ongoing card posted to the channel, so it happens only
+ * for the one-time upgrade of a channel created before the user granted access.
+ */
+async function writeAndroidNotificationChannel(
+  channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number],
+  name: string,
+  dndAccessGranted: boolean | null
+): Promise<void> {
+  const plan = planAndroidChannelWrite(channel.bypassDnd, dndAccessGranted);
+  const stored = await storedAndroidChannelBypassDnd(channel.id);
+  if (shouldRecreateAndroidChannel(stored, plan.bypassDnd)) {
+    await Notifications.deleteNotificationChannelAsync(channel.id);
+  }
+  await Notifications.setNotificationChannelAsync(
+    channel.id,
+    androidChannelConfiguration(channel, name, plan.bypassDnd)
+  );
+}
+
+async function createAndroidNotificationChannels(): Promise<boolean> {
+  const dndAccessGranted = androidDndAccessGranted();
+  let allChannelsWritten = true;
   for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
     try {
       // eslint-disable-next-line no-await-in-loop -- channels are created sequentially so a per-channel failure is isolated
-      await Notifications.setNotificationChannelAsync(channel.id, {
-        name: channel.name,
-        importance:
-          channel.importance === 'high'
-            ? Notifications.AndroidImportance.HIGH
-            : Notifications.AndroidImportance.DEFAULT,
-        ...(channel.id === 'active-agents' ? { sound: null, enableVibrate: false } : {}),
-      });
+      await writeAndroidNotificationChannel(channel, channel.name, dndAccessGranted);
     } catch (error) {
+      allChannelsWritten = false;
       Sentry.captureException(error, {
         tags: {
           'error.subsystem': 'notifications',
@@ -472,29 +618,53 @@ async function createAndroidNotificationChannels(): Promise<void> {
       });
     }
   }
+  for (const legacy of LEGACY_ANDROID_NOTIFICATION_CHANNELS) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- channels are deleted sequentially so a per-channel failure is isolated
+      await Notifications.deleteNotificationChannelAsync(legacy);
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: {
+          'error.subsystem': 'notifications',
+          'error.operation': 'delete_android_channel',
+          'notification.channel': legacy,
+        },
+      });
+    }
+  }
+  return allChannelsWritten;
 }
 
 /**
  * Create the Android notification channels once. No-op on iOS. Idempotent and
  * single-flight: every call returns the same module-level promise, and a
  * per-channel failure never rejects it (reported to Sentry instead).
+ *
+ * A pass that failed a required channel write is not cached: the framework
+ * drops a post addressed to a channel the app never created, so the next start
+ * must retry the channels before it posts. Channel writes are idempotent, so a
+ * retry is safe, and a fully successful pass is cached again.
  */
 // eslint-disable-next-line promise-function-async -- must return the same module-level promise for single-flight
 export function ensureAndroidNotificationChannels(): Promise<void> {
   if (Platform.OS !== 'android') {
     return Promise.resolve();
   }
-  androidChannelsPromise ??= createAndroidNotificationChannels();
+  androidChannelsPromise ??= (async () => {
+    const allChannelsWritten = await createAndroidNotificationChannels();
+    if (!allChannelsWritten) {
+      androidChannelsPromise = null;
+    }
+  })();
   return androidChannelsPromise;
 }
 
 const CHANNEL_NAME_KEYS = {
-  agent: 'notifications.channel.agent',
-  chat: 'notifications.channel.chat',
+  'needs-input': 'glanceable.needsInput',
+  'agent-progress': 'notifications.channel.agentProgress',
   kiloclaw: 'notifications.channel.kiloclaw',
   balance: 'notifications.channel.balance',
   security: 'notifications.channel.security',
-  'active-agents': 'glanceable.channelName',
 } as const satisfies Record<AndroidNotificationChannelId, string>;
 
 /**
@@ -502,22 +672,24 @@ const CHANNEL_NAME_KEYS = {
  * single-flight and never cached: a language change must always re-write the
  * names, even when `ensureAndroidNotificationChannels` already returned its
  * cached promise. No-op on iOS.
+ *
+ * The re-write also reconciles the Do Not Disturb override: a channel still
+ * stored without it is recreated, so access the user granted after the channel
+ * was first created is applied on the next app start.
  */
 export async function renameAndroidNotificationChannels(): Promise<void> {
   if (Platform.OS !== 'android') {
     return;
   }
+  const dndAccessGranted = androidDndAccessGranted();
   for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
     try {
       // eslint-disable-next-line no-await-in-loop -- channels are renamed sequentially so a per-channel failure is isolated
-      await Notifications.setNotificationChannelAsync(channel.id, {
-        name: i18n.t(CHANNEL_NAME_KEYS[channel.id]),
-        importance:
-          channel.importance === 'high'
-            ? Notifications.AndroidImportance.HIGH
-            : Notifications.AndroidImportance.DEFAULT,
-        ...(channel.id === 'active-agents' ? { sound: null, enableVibrate: false } : {}),
-      });
+      await writeAndroidNotificationChannel(
+        channel,
+        i18n.t(CHANNEL_NAME_KEYS[channel.id]),
+        dndAccessGranted
+      );
     } catch (error) {
       Sentry.captureException(error, {
         tags: {

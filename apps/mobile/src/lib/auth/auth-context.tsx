@@ -53,9 +53,14 @@ import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-prefe
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
-import { clearSessionScopedState } from '@/lib/auth/session-scoped-state';
+import {
+  clearSessionScopedState,
+  clearSystemSearchIndexOnSignedOutLaunch,
+} from '@/lib/auth/session-scoped-state';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
+import { clearLastOpenedSession } from '@/lib/last-opened-session';
+import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import {
   isSignOutActive,
@@ -129,6 +134,19 @@ function readUserIdFromToken(token: string): string | null {
     return parsed.success && parsed.data.kiloUserId ? parsed.data.kiloUserId : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Run one synchronous best-effort teardown step. Sign-out's local cleanups are
+ * independent: a throw in one must never abort the transition or reject
+ * `signOut`, so each call site is guarded by this wrapper.
+ */
+function runBestEffortTeardown(step: () => void): void {
+  try {
+    step();
+  } catch {
+    // Best effort: a failed clear never aborts sign-out.
   }
 }
 
@@ -256,6 +274,22 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           setActiveToken(stored, expiresAtStr ? Number(expiresAtStr) : null);
           setToken(stored);
           setCurrentDeepLinkUserId(readUserIdFromToken(stored));
+        } else if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
+          // A launch that positively restored no session owns the index: the
+          // sign-out teardown's clear is fire-and-forget and the process can
+          // be killed before it lands, so a failure there would leave the
+          // previous account's titles searchable for the whole signed-out
+          // window with nothing to retry it. Re-run the idempotent clear; the
+          // index sync is gated off while signed out, and the next sign-in
+          // re-indexes its own account from its own cache. A sign-out or
+          // sign-in in flight owns the index instead and fires its own clear,
+          // so the epoch and sign-out fences hold here as for every other
+          // publish in this bootstrap.
+          clearSystemSearchIndexOnSignedOutLaunch();
+          // The account is now known to be none: a system-search destination
+          // captured before this point is not this process's to open, so the
+          // settle drops it instead of holding it for whoever signs in next.
+          setCurrentDeepLinkUserId(null);
         }
       } catch {
         // Every read exhausted its retries. The session is not known to be
@@ -489,6 +523,13 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearPrReviewFooterPreference();
           clearCondenseToolCallsPreference();
           clearCollapsedConnectCtasPreference();
+          // The launcher surfaces belong to the signed-out account: drop the
+          // dynamic shortcuts/tile natively and the durable last-opened record,
+          // so the next account never sees the previous account's session.
+          // Both are synchronous best-effort clears, guarded so neither can
+          // throw into sign-out.
+          runBestEffortTeardown(clearLauncherSurfaces);
+          runBestEffortTeardown(clearLastOpenedSession);
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

@@ -78,9 +78,17 @@ export function oauthErrorResponse(
   );
 }
 
+/**
+ * An HTML page response. Every page this worker renders belongs to an OAuth
+ * flow, and the org picker carries the one-time authenticator secret before a
+ * code verifies, so no cache — browser or intermediary — may retain one.
+ */
 export function htmlResponse(body: string, status = 200): Response {
   return withAuthCors(
-    new Response(body, { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+    new Response(body, {
+      status,
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+    })
   );
 }
 

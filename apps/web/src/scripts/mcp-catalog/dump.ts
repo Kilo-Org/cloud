@@ -1,6 +1,6 @@
 /**
- * CLI entry point: dumps the tRPC catalog (queries plus allowlisted mutations)
- * to services/kilo-mcp/catalog.json.
+ * CLI entry point: dumps the tRPC catalog (queries and mutations, minus the
+ * admin/debug/test denylist) to services/kilo-mcp/catalog.json.
  *
  * Usage (from apps/web):
  *   pnpm script src/scripts/mcp-catalog/dump.ts              # write or regenerate

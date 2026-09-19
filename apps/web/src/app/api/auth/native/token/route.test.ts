@@ -11,6 +11,7 @@ import {
   releaseSignInCode,
   consumeSignInCode,
 } from '@/lib/auth/magic-link-tokens';
+import { consumeSignInTicket } from '@/lib/auth/passkey';
 import {
   createOrUpdateUser,
   findUserById,
@@ -30,6 +31,9 @@ jest.mock('@/lib/auth/native-id-tokens', () => ({
   exchangeNativeGoogleAuthCode: jest.fn(),
 }));
 jest.mock('@/lib/auth/magic-link-tokens');
+jest.mock('@/lib/auth/passkey', () => ({
+  consumeSignInTicket: jest.fn(),
+}));
 jest.mock('@/lib/user');
 jest.mock('@/lib/tokens');
 jest.mock('@/lib/auth/email-signin-eligibility');
@@ -91,6 +95,7 @@ const mockReserveSignInCode = jest.mocked(reserveSignInCode);
 const mockCommitSignInCode = jest.mocked(commitSignInCode);
 const mockReleaseSignInCode = jest.mocked(releaseSignInCode);
 const mockConsumeSignInCode = jest.mocked(consumeSignInCode);
+const mockConsumeSignInTicket = jest.mocked(consumeSignInTicket);
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockFindUserById = jest.mocked(findUserById);
 const mockFindUserByNormalizedEmail = jest.mocked(findUserByNormalizedEmail);
@@ -1782,6 +1787,133 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
+    });
+  });
+
+  describe('passkey', () => {
+    const ticketBody = { provider: 'passkey', ticket: 'ticket-1' } as const;
+
+    beforeEach(() => {
+      mockConsumeSignInTicket.mockResolvedValue({
+        id: 'ticket-row-1',
+        ticket_hash: 'hash',
+        kilo_user_id: fakeUser.id,
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+      mockFindUserById.mockResolvedValue(fakeUser);
+      mockCreateDeviceSession.mockResolvedValue('device-session-1');
+      mockIssueSessionCredentials.mockResolvedValue({
+        token: 'session-jwt',
+        refreshToken: 'session-refresh',
+        expiresIn: 3600,
+      });
+    });
+
+    it('exchanges a valid ticket for a device session without touching settlement or the OTP path', async () => {
+      const response = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        token: 'session-jwt',
+        refreshToken: 'session-refresh',
+        expiresIn: 3600,
+        created: false,
+      });
+      expect(mockConsumeSignInTicket).toHaveBeenCalledWith('ticket-1');
+      expect(mockFindUserById).toHaveBeenCalledWith(fakeUser.id);
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockIssueSessionCredentials).toHaveBeenCalledWith(fakeUser, 'device-session-1');
+      // The ticket is the identity proof: no account settlement.
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+      expect(mockPersistAttestedKey).not.toHaveBeenCalled();
+      expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
+      // The email OTP reservation path stays untouched for a passkey.
+      expect(mockReserveSignInCode).not.toHaveBeenCalled();
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).not.toHaveBeenCalled();
+      expect(mockConsumeSignInCode).not.toHaveBeenCalled();
+    });
+
+    it('mints a legacy long-lived token when the client does not support refresh', async () => {
+      const response = await POST(createRequest(ticketBody));
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('refuses a replayed ticket with 401 INVALID_TICKET and mints no second session', async () => {
+      const first = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+      expect(first.status).toBe(200);
+
+      // The ticket row is consumed atomically, so the replay finds no row.
+      mockConsumeSignInTicket.mockResolvedValue(null);
+      const replayed = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(replayed.status).toBe(401);
+      expect(await replayed.json()).toEqual({ error: 'INVALID_TICKET' });
+      expect(mockCreateDeviceSession).toHaveBeenCalledTimes(1);
+      expect(mockIssueSessionCredentials).toHaveBeenCalledTimes(1);
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('refuses an expired ticket with 401 INVALID_TICKET and mints no session', async () => {
+      mockConsumeSignInTicket.mockResolvedValue(null);
+
+      const response = await POST(
+        createRequest({ provider: 'passkey', ticket: 'expired', supportsRefresh: true })
+      );
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'INVALID_TICKET' });
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('rejects a blocked user without minting a session', async () => {
+      mockFindUserById.mockResolvedValue({ ...fakeUser, blocked_reason: 'banned' });
+
+      const response = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'BLOCKED' });
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('refuses an SSO-required domain instead of bypassing it', async () => {
+      mockCheckDomainSignInEligibility.mockResolvedValue({
+        ok: false,
+        status: 403,
+        errorCode: 'SSO_ERROR',
+        ssoOrganizationId: 'workos-organization-id',
+      });
+
+      const response = await POST(createRequest({ ...ticketBody, supportsRefresh: true }));
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'SSO_ERROR',
+        ssoOrganizationId: 'workos-organization-id',
+      });
+      expect(mockCheckDomainSignInEligibility).toHaveBeenCalledWith(fakeUser.google_user_email);
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('requires a ticket', async () => {
+      const response = await POST(createRequest({ provider: 'passkey' }));
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'INVALID_REQUEST' });
+      expect(mockConsumeSignInTicket).not.toHaveBeenCalled();
     });
   });
 });

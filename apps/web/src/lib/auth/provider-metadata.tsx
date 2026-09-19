@@ -6,7 +6,7 @@ import { GitLabLogo } from '@/components/auth/GitLabLogo';
 import { GoogleLogo } from '@/components/auth/GoogleLogo';
 import { LinkedInLogo } from '@/components/auth/LinkedInLogo';
 import { OpenAILogo } from '@/components/auth/OpenAILogo';
-import { Mail, SquareUserRound } from 'lucide-react';
+import { KeyRound, Mail, SquareUserRound } from 'lucide-react';
 import React, { type JSX } from 'react';
 import * as z from 'zod';
 
@@ -36,11 +36,16 @@ const AllAuthProviders = [
   {
     id: 'openai',
     name: 'ChatGPT',
-    signInLabel: 'Sign in with ChatGPT',
+    signInLabel: 'Continue with ChatGPT',
     icon: <OpenAILogo />,
   },
   { id: 'fake-login', name: 'Test Account', icon: fakeLoginIcon },
   { id: 'workos', name: 'Enterprise SSO', icon: <SquareUserRound /> },
+  // Passkeys are not an OAuth account to link or unlink: they are listed and
+  // managed by the passkey settings UI, so `isLinkableAuthProvider` excludes
+  // this id. The metadata entry is what lets the shared provider-id union
+  // (`AuthProviderId`) resolve a passkey name and icon.
+  { id: 'passkey', name: 'Passkey', icon: <KeyRound /> },
 ] as const satisfies readonly ProviderMetadata[];
 
 const AuthProviderIds = AllAuthProviders.map(p => p.id);
@@ -48,9 +53,10 @@ export const AuthProviderIdSchema = z.enum(AuthProviderIds);
 export type { AuthProviderId } from '@kilocode/db/schema-types';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 
-// Subset used for account linking (excludes SSO, email, and dev-only providers).
+// Subset used for account linking (excludes SSO, email, passkeys, and dev-only
+// providers).
 const isLinkableAuthProvider = (p: ProviderMetadata) =>
-  p.id !== 'workos' && p.id !== 'fake-login' && p.id !== 'email';
+  p.id !== 'workos' && p.id !== 'fake-login' && p.id !== 'email' && p.id !== 'passkey';
 
 export const LinkableAuthProviders = [...AllAuthProviders.filter(isLinkableAuthProvider)] as const;
 export const OAuthProviderIds = [...LinkableAuthProviders.map(p => p.id)] as const;

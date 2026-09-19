@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the state, provider, inset, and pagination-gate suites share one mock harness in this file */
 import { createElement, type ReactElement } from 'react';
 import { type RefreshControlProps } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
@@ -94,7 +95,14 @@ vi.mock('@/lib/pr-review/diff/use-pr-diff-context-loader', () => ({
   }),
 }));
 vi.mock('@/lib/pr-review/diff/pr-review-file-list-state', () => ({
-  usePrReviewFileListQuery: () => listQueryState,
+  // React Query returns a fresh result object on every render, with a stable
+  // `fetchNextPage`; the hook mock mirrors that so a callback that closed over
+  // one render's `query` is caught reading a stale `hasNextPage`.
+  usePrReviewFileListQuery: () => ({
+    query: { ...listQueryState.query },
+    files: listQueryState.files,
+    firstPageErrorState: listQueryState.firstPageErrorState,
+  }),
   usePrReviewViewedFiles: (...args: unknown[]) => {
     viewedFilesCalls.push(args);
     return { isViewed: () => false, toggle: vi.fn(), isLoading: false };
@@ -306,6 +314,130 @@ describe('PrReviewFileList write affordances per provider', () => {
     // between its last row and the footer's top edge, on every provider.
     expect(githubPadding).toBe(12);
     expect(gitlabPadding).toBe(12);
+  });
+});
+
+// FlashList reports the end as reached for a first page that fits the
+// viewport, once, at mount, and does not report it again until the data
+// changes. The list must rest on the partial-load row until the user drags,
+// and the drag must then load the page FlashList already reported — otherwise
+// the gate opens with nothing left to let through and no page loads.
+describe('PrReviewFileList pagination gate', () => {
+  beforeEach(() => {
+    listQueryState.files = [{ path: 'src/file.ts' }];
+    listQueryState.query.hasNextPage = true;
+    listQueryState.query.fetchNextPage.mockClear();
+  });
+
+  function reportEndReached(renderer: TestRenderer.ReactTestRenderer): void {
+    const props = renderer.root.find(node => String(node.type) === 'FlashList').props;
+    act(() => {
+      (props.onEndReached as () => void)();
+    });
+  }
+
+  function beginDrag(renderer: TestRenderer.ReactTestRenderer): void {
+    const props = renderer.root.find(node => String(node.type) === 'FlashList').props;
+    act(() => {
+      (props.onScrollBeginDrag as () => void)();
+    });
+  }
+
+  // A first page that fits the viewport cannot scroll, so Android never
+  // reports `onScrollBeginDrag`; the reader's finger still moves. The live
+  // round read "1 of 2 files loaded" after a swipe and served no page 2.
+  function touchDrag(renderer: TestRenderer.ReactTestRenderer): void {
+    const props = renderer.root.find(node => String(node.type) === 'FlashList').props;
+    act(() => {
+      (props.onTouchMove as () => void)();
+    });
+  }
+
+  it('rests on the partial-load row when the first page fits the viewport', () => {
+    const renderer = mountList();
+    reportEndReached(renderer);
+    expect(listQueryState.query.fetchNextPage).not.toHaveBeenCalled();
+  });
+
+  it('loads the reported page when the user drags', () => {
+    const renderer = mountList();
+    reportEndReached(renderer);
+    beginDrag(renderer);
+    expect(listQueryState.query.fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('loads the reported page when the user drags a pane that cannot scroll', () => {
+    const renderer = mountList();
+    reportEndReached(renderer);
+    touchDrag(renderer);
+    expect(listQueryState.query.fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('lets the impossible-to-scroll drag through only once', () => {
+    const renderer = mountList();
+    reportEndReached(renderer);
+    // One finger drag reports many moves; the held end report is consumed by
+    // the first of them.
+    touchDrag(renderer);
+    touchDrag(renderer);
+    expect(listQueryState.query.fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('does not pull a page for a drag that starts before the end is reported', () => {
+    const renderer = mountList();
+    beginDrag(renderer);
+    expect(listQueryState.query.fetchNextPage).not.toHaveBeenCalled();
+    // A long first page reaches its end only once the user has scrolled there.
+    reportEndReached(renderer);
+    expect(listQueryState.query.fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('loads the page the query reports after a mount that had none', () => {
+    // The mount render has no files yet, so its `query` snapshot reports no
+    // next page; page 1 then lands and the query reports one. The gate's
+    // callback must read the live query, or it stays on the mount snapshot and
+    // the user's drag loads nothing.
+    listQueryState.files = [];
+    listQueryState.query.hasNextPage = false;
+    const renderer = mountList();
+    listQueryState.files = [{ path: 'src/file.ts' }];
+    listQueryState.query.hasNextPage = true;
+    act(() => {
+      renderer.update(createElement(PrReviewFileList, BASE_PROPS));
+    });
+    reportEndReached(renderer);
+    beginDrag(renderer);
+    expect(listQueryState.query.fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('does not pull another page while one is already fetching', () => {
+    listQueryState.query.isFetchingNextPage = true;
+    const renderer = mountList();
+    reportEndReached(renderer);
+    beginDrag(renderer);
+    expect(listQueryState.query.fetchNextPage).not.toHaveBeenCalled();
+  });
+
+  it('closes the gate again when the mounted list is handed another PR', () => {
+    const renderer = mountList();
+    reportEndReached(renderer);
+    beginDrag(renderer);
+    expect(listQueryState.query.fetchNextPage).toHaveBeenCalledOnce();
+
+    // The same component instance now renders PR B (a route param change, not
+    // a remount). The drag on PR A must not open B's gate: B's own end report
+    // has to rest on the partial-load row until the reader drags B.
+    listQueryState.query.fetchNextPage.mockClear();
+    act(() => {
+      renderer.update(createElement(PrReviewFileList, { ...BASE_PROPS, number: 8 }));
+    });
+    reportEndReached(renderer);
+    expect(listQueryState.query.fetchNextPage).not.toHaveBeenCalled();
+    // B's row rests until the reader's own drag on B. A page that fits the
+    // viewport only reports the finger's movement, so the reset must hold for
+    // that path too — it is the one the live drag-on-A/open-B round uses.
+    touchDrag(renderer);
+    expect(listQueryState.query.fetchNextPage).toHaveBeenCalledOnce();
   });
 });
 

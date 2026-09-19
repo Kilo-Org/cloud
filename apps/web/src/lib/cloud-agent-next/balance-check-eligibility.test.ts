@@ -16,7 +16,7 @@ jest.mock('@/lib/ai-gateway/byok', () => ({
 
 import { computeCloudAgentNextBalanceCheckEligibility } from './balance-check-eligibility';
 
-const KILO_EXCLUSIVE_MODEL = 'openai/gpt-5.6-sol-discounted';
+const KILO_EXCLUSIVE_MODEL = 'stealth/qwen3.6-plus';
 const NON_EXCLUSIVE_MODEL = 'anthropic/claude-sonnet-4';
 
 const fakeDb = {} as never;

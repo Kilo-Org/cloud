@@ -253,9 +253,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Mirrors the anonymous fallback below: a failed auth is billed and counted
   // as the address, not as whatever account the token named.
   const accountKey =
-    auth.authFailedResponse || !auth.user
-      ? getAnonymousUserId(ipAddress ?? '')
-      : auth.user.id;
+    auth.authFailedResponse || !auth.user ? getAnonymousUserId(ipAddress ?? '') : auth.user.id;
   if (await isGatewayAccountRateLimited(request, accountKey)) {
     console.warn(`Gateway account rate limit exceeded, user: ${accountKey}`);
     return NextResponse.json(

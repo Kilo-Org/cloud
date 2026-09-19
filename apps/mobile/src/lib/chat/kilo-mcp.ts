@@ -132,6 +132,32 @@ const keyFor = (place: ChatPlace): string =>
   `${place.chatScope}\u0000${String(currentAuthEpoch())}`;
 
 /**
+ * A call that did not reach the server, published as the failure the screen
+ * draws: the dot turns red, the sheet says what happened, and a Retry is
+ * offered. Without it the dot stays green and the sheet keeps counting tools
+ * while every call fails, because a failed tool result goes to the model and
+ * never to a screen.
+ *
+ * The answer that just stopped being true is dropped here rather than only
+ * covered up. A discovery is served from `cached` when it is `ready`, and the
+ * whole point of the Retry is to reach the server again — leaving the cached
+ * list in place would answer the Retry with the tools that had just failed
+ * every call.
+ *
+ * A sign-out between the discovery and the failure wins: the old account's
+ * failure is not published under the new one, exactly as its tools are not.
+ */
+const lostConnection =
+  (started: number) =>
+  (error: RemoteMcpError): void => {
+    if (started !== generation) {
+      return;
+    }
+    cached = undefined;
+    publish(failed(error));
+  };
+
+/**
  * One discovery. A defect — the plugin throwing rather than failing — is
  * reported as a server that could not be reached, because a rejected promise
  * here would leave a chat opening with no state to draw.
@@ -144,7 +170,12 @@ async function connect(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
     return { status: 'idle' };
   }
   const state = await Effect.runPromise(
-    remoteMcpTools(kiloServer(url), { fetch, token: kiloToken, discoverTimeoutMs: timeoutMs }).pipe(
+    remoteMcpTools(kiloServer(url), {
+      fetch,
+      token: kiloToken,
+      discoverTimeoutMs: timeoutMs,
+      onCallFailure: lostConnection(started),
+    }).pipe(
       Effect.match({ onFailure: failed, onSuccess: ready }),
       Effect.catchAllCause(cause =>
         Effect.succeed(

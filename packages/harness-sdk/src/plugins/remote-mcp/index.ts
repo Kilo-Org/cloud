@@ -1,5 +1,4 @@
 import {
-  explain,
   permissiveJsonSchemaValidator,
   remoteMcpClient,
   type RemoteMcpClient,
@@ -8,6 +7,7 @@ import {
 } from './client.js';
 import {
   callableName,
+  explain,
   mcpToolName,
   RemoteMcpError,
   type RemoteMcpAuth,

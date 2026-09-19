@@ -1,13 +1,18 @@
 import { Duration, Effect } from 'effect';
 import { type JsonSchema, type Tool, type ToolCall, ToolFailure } from '../../core/tool.js';
 import {
-  explain,
   remoteMcpClient,
   type RemoteMcpClient,
   type RemoteMcpClientDeps,
   type RemoteMcpTool,
 } from './client.js';
-import { callableName, mcpToolName, type RemoteMcpError, type RemoteMcpServer } from './server.js';
+import {
+  callableName,
+  explain,
+  mcpToolName,
+  type RemoteMcpError,
+  type RemoteMcpServer,
+} from './server.js';
 
 /**
  * A remote MCP server's tools, as tools this harness can offer a model.
@@ -20,6 +25,12 @@ import { callableName, mcpToolName, type RemoteMcpError, type RemoteMcpServer } 
  * token, has been taken down, or answers an error all come back as a failed
  * tool result, which is what the model reads before it decides what to do. That
  * is what keeps a chat usable when a server it can reach stops answering.
+ *
+ * The model is not the only party who needs to know. A call that did not reach
+ * the server is also handed to the caller through `onCallFailure`, because a
+ * failed tool result reaches the model and never a person's screen — so a
+ * caller that draws the connection says what happened rather than leaving a
+ * green dot over a server that answers nothing.
  */
 
 /** A model's arguments, read as the JSON object every tool of this shape takes. */

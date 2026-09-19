@@ -59,6 +59,22 @@ class RemoteMcpError extends Data.TaggedError('harness/RemoteMcpError')<{
   readonly cause: unknown;
 }> {}
 
+/** What the model reads when a remote tool did not answer. */
+const wordsOf: Readonly<Record<RemoteMcpFailure, string>> = {
+  unreachable: 'The remote server could not be reached. It may be down or the network may be gone.',
+  unauthorized: 'The remote server refused this session’s credential.',
+  missing: 'The remote server is not there any more. It may have been removed or moved.',
+  protocol: 'The remote server answered something the protocol does not allow.',
+};
+
+/**
+ * Why a call failed, in the words the model gets. A refusal from the server
+ * itself already carries its own words, and they are more use than anything
+ * this file could write about it.
+ */
+const explain = (error: RemoteMcpError): string =>
+  error.kind === 'protocol' && typeof error.cause === 'string' ? error.cause : wordsOf[error.kind];
+
 /**
  * Whether a server id or a tool name may be part of a tool name.
  *
@@ -71,4 +87,4 @@ const callableName = (name: string): boolean => /^[A-Za-z0-9_-]+$/u.test(name);
 const mcpToolName = (server: RemoteMcpServer, tool: string): string => `mcp_${server.id}_${tool}`;
 
 export type { RemoteMcpAuth, RemoteMcpFailure, RemoteMcpServer };
-export { callableName, mcpToolName, RemoteMcpError };
+export { callableName, explain, mcpToolName, RemoteMcpError };

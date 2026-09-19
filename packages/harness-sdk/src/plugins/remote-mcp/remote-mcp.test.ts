@@ -1,213 +1,30 @@
-import { once } from 'node:events';
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { setTimeout as sleep } from 'node:timers/promises';
 import { Effect } from 'effect';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Tool, ToolCall } from '../../core/tool.js';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
   remoteMcpClient,
   remoteMcpTools,
   type RemoteMcpClientDeps,
-  type RemoteMcpServer,
+  type RemoteMcpError,
 } from './index.js';
+import {
+  callOf,
+  deps,
+  noTools,
+  only,
+  readingFile,
+  run,
+  schema,
+  serve,
+  serverFor,
+  token,
+  type Seen,
+} from './remote-mcp-fixture.js';
 
 /**
- * The plugin against a server that really speaks the protocol: the transport
- * carries an `initialize`, a `tools/list` and a `tools/call` over HTTP, the
- * credential arrives in a header, and a server that says no leaves a failure the
- * caller can read. Only this test may name a Node builtin; `check-platform.ts`
- * reads `dist/` to be sure the plugin itself names none.
+ * The plugin against the server in `remote-mcp-fixture.ts`: discovery, the
+ * credential it carries, a call, and what a server that says no leaves behind.
+ * The fixture holds the protocol; these are the claims.
  */
-
-/** A response, whole: a status and, for one that answered, its body. */
-type Answered = readonly [status: number, body?: unknown];
-
-interface Seen {
-  readonly authorization: (string | undefined)[];
-}
-
-interface Tools {
-  readonly list: readonly unknown[];
-  call: (arguments_: Readonly<Record<string, unknown>>) => unknown;
-}
-
-/** One message off the wire. Only the fields this server answers are named. */
-interface Wire {
-  id?: unknown;
-  method?: string;
-  params?: {
-    name?: string;
-    arguments?: Readonly<Record<string, unknown>>;
-  };
-}
-
-/** One server's state, so the request handler takes one argument and not five. */
-interface Fixture {
-  readonly tools: Tools;
-  readonly seen: Seen;
-  readonly mode: 'answer' | 'refuse' | 'hang';
-  /** How long a `tools/call` is held before it answers. */
-  readonly callDelayMs: number;
-}
-
-const opened: Server[] = [];
-
-afterAll(() => {
-  for (const server of opened) {
-    server.close();
-  }
-});
-
-const write = (response: ServerResponse, [status, body]: Answered): void => {
-  response.writeHead(status, { 'content-type': 'application/json' });
-  response.end(body === undefined ? '' : JSON.stringify(body));
-};
-
-const reply = (id: unknown, result: unknown): Answered => [200, { jsonrpc: '2.0', id, result }];
-
-/** What the protocol says for each message this test exercises. */
-const answer = (message: Wire, tools: Tools): Answered => {
-  if (message.method === 'initialize') {
-    return reply(message.id, {
-      protocolVersion: '2025-06-18',
-      capabilities: { tools: {} },
-      serverInfo: { name: 'test-server', version: '0.0.0' },
-    });
-  }
-  if (message.method === 'notifications/initialized') {
-    return [202];
-  }
-  if (message.method === 'tools/list') {
-    return reply(message.id, { tools: tools.list });
-  }
-  if (message.method === 'tools/call') {
-    return reply(message.id, tools.call(message.params?.arguments ?? {}));
-  }
-  return [
-    200,
-    {
-      jsonrpc: '2.0',
-      id: message.id,
-      error: { code: -32_601, message: `no such method: ${String(message.method)}` },
-    },
-  ];
-};
-
-const bodyOf = async (request: IncomingMessage): Promise<Wire> => {
-  const chunks: string[] = [];
-  for await (const chunk of request) {
-    chunks.push(String(chunk));
-  }
-  const held: unknown = JSON.parse(chunks.join(''));
-  return typeof held === 'object' && held !== null ? held : {};
-};
-
-/** What the mode answers before a message is read: `refuse` a 401 for everything,
-    `hang` nothing, and a GET is the stream this server does not offer. */
-const beforeBody = (request: IncomingMessage, fixture: Fixture): Answered | 'hang' | undefined => {
-  if (fixture.mode === 'refuse') {
-    return [401, { error: 'unauthorized' }];
-  }
-  if (fixture.mode === 'hang') {
-    return 'hang';
-  }
-  return request.method === 'GET' ? [405] : undefined;
-};
-
-/** One request, answered whole. `tools/list` answers at once and only a
-    `tools/call` is held, so discovery's deadline cannot be the call's. */
-const answering = async (
-  request: IncomingMessage,
-  response: ServerResponse,
-  fixture: Fixture
-): Promise<void> => {
-  fixture.seen.authorization.push(request.headers.authorization);
-  const decided = beforeBody(request, fixture);
-  if (decided !== undefined) {
-    if (decided !== 'hang') {
-      write(response, decided);
-    }
-    return;
-  }
-  const message = await bodyOf(request);
-  if (message.method === 'tools/call') {
-    await sleep(fixture.callDelayMs);
-  }
-  write(response, answer(message, fixture.tools));
-};
-
-/**
- * A server answering `initialize`, `tools/list` and `tools/call` as JSON, which
- * is the streamable transport's plain HTTP half. `callDelayMs` holds a
- * `tools/call` open, so a test can ask for a call that outlives the discovery
- * deadline the same server answered at once.
- */
-const serve = async (
-  tools: Tools,
-  mode: Fixture['mode'] = 'answer',
-  callDelayMs = 0
-): Promise<{ url: string; seen: Seen }> => {
-  const seen: Seen = { authorization: [] };
-  const fixture: Fixture = { tools, seen, mode, callDelayMs };
-  const server = createServer((request, response) => {
-    void answering(request, response, fixture);
-  });
-  opened.push(server);
-  server.listen(0, '127.0.0.1');
-  await once(server, 'listening');
-  const address = server.address();
-  if (address === null || typeof address === 'string') {
-    throw new Error('the test server took no port');
-  }
-  return { url: `http://127.0.0.1:${String(address.port)}/mcp`, seen };
-};
-
-const serverFor = (id: string, url: string, bearer: string): RemoteMcpServer => ({
-  id,
-  name: 'Test server',
-  url,
-  auth: bearer === '' ? { type: 'none' } : { type: 'bearer' },
-});
-
-const token = 'token-for-the-test';
-
-/**
- * The deps one case runs with. `timeoutMs` is every operation's deadline;
- * `discoverTimeoutMs` is discovery's alone.
- */
-const deps = (
-  fields: { readonly timeoutMs?: number; readonly discoverTimeoutMs?: number } = {}
-): RemoteMcpClientDeps => ({ fetch, token: () => Effect.succeed(token), ...fields });
-
-const run = <A, E>(effect: Effect.Effect<A, E>): Promise<A> => Effect.runPromise(effect);
-
-const callOf = (name: string, arguments_: string): ToolCall => ({
-  id: 'call_1',
-  name,
-  arguments: arguments_,
-});
-
-const only = (tools: readonly Tool[]): Tool => {
-  const [first] = tools;
-  if (first === undefined) {
-    throw new Error('the server offered no tool');
-  }
-  return first;
-};
-
-const schema = {
-  type: 'object',
-  properties: { path: { type: 'string' } },
-  required: ['path'],
-  additionalProperties: false,
-};
-
-const readingFile: Tools = {
-  list: [{ name: 'read-file', description: 'Reads one file.', inputSchema: schema }],
-  call: arguments_ => ({ content: [{ type: 'text', text: `read ${String(arguments_['path'])}` }] }),
-};
-
-const noTools: Tools = { list: [], call: () => ({}) };
 
 const fixture: { url: string; seen: Seen } = { url: '', seen: { authorization: [] } };
 
@@ -295,5 +112,56 @@ describe('a call', () => {
     const offered = await run(remoteMcpTools(serverFor('work', refusing.url, ''), deps()));
     const failed = await run(Effect.flip(only(offered).run(callOf('mcp_work_deny', '{}'))));
     expect(String(failed.cause)).toBe('the file is not there');
+  });
+});
+
+describe('reporting a call that did not reach the server', () => {
+  it('hands it to the surface, because a tool result never reaches a screen', async () => {
+    const down = await serve(readingFile, 'refuse-call');
+    const failures: RemoteMcpError[] = [];
+    const offered = await run(
+      remoteMcpTools(serverFor('work', down.url, token), {
+        ...deps(),
+        onCallFailure: error => failures.push(error),
+      })
+    );
+    await run(Effect.flip(only(offered).run(callOf('mcp_work_read-file', '{"path":"/x"}'))));
+    expect(failures.map(error => error.kind)).toEqual(['unreachable']);
+    expect(failures[0]?.serverId).toBe('work');
+  });
+
+  it('hands over a credential the server refused on a call', async () => {
+    /* Discovery answers, then the server refuses the call's credential. The
+       failure is the connection's, so the surface hears about it; the model
+       still gets the failed result. */
+    const refused = await serve(readingFile, 'refuse-call-auth');
+    const failures: RemoteMcpError[] = [];
+    const offered = await run(
+      remoteMcpTools(serverFor('work', refused.url, token), {
+        ...deps(),
+        onCallFailure: error => failures.push(error),
+      })
+    );
+    const failed = await run(
+      Effect.flip(only(offered).run(callOf('mcp_work_read-file', '{"path":"/y"}')))
+    );
+    expect(failures.map(error => error.kind)).toEqual(['unauthorized']);
+    expect(String(failed.cause)).toContain('refused');
+  });
+
+  it('does not report a call the server itself refused', async () => {
+    const refusing = await serve({
+      list: [{ name: 'deny', inputSchema: { type: 'object', properties: {} } }],
+      call: () => ({ content: [{ type: 'text', text: 'the file is not there' }], isError: true }),
+    });
+    const failures: RemoteMcpError[] = [];
+    const offered = await run(
+      remoteMcpTools(serverFor('work', refusing.url, ''), {
+        ...deps(),
+        onCallFailure: error => failures.push(error),
+      })
+    );
+    await run(Effect.flip(only(offered).run(callOf('mcp_work_deny', '{}'))));
+    expect(failures).toEqual([]);
   });
 });

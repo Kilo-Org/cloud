@@ -85,6 +85,10 @@ interface RemoteMcpClientDeps {
   discoverTimeoutMs?: number;
   /** Replaces the permissive validator, for a runtime that can run Ajv. */
   jsonSchemaValidator?: jsonSchemaValidator;
+  /** Told about a call the server did not answer: unreachable, refused the
+      credential, or gone. A `protocol` failure is the server answering wrongly,
+      so it is not one; a person's screen never sees the model's tool result. */
+  onCallFailure?: (error: RemoteMcpError) => void;
 }
 
 interface RemoteMcpClient {
@@ -96,22 +100,6 @@ interface RemoteMcpClient {
     args: Readonly<Record<string, unknown>>
   ) => Effect.Effect<string, RemoteMcpError>;
 }
-
-/** What the model reads when a remote tool did not answer. */
-const wordsOf: Readonly<Record<RemoteMcpFailure, string>> = {
-  unreachable: 'The remote server could not be reached. It may be down or the network may be gone.',
-  unauthorized: 'The remote server refused this session’s credential.',
-  missing: 'The remote server is not there any more. It may have been removed or moved.',
-  protocol: 'The remote server answered something the protocol does not allow.',
-};
-
-/**
- * Why a call failed, in the words the model gets. A refusal from the server
- * itself already carries its own words, and they are more use than anything
- * this file could write about it.
- */
-const explain = (error: RemoteMcpError): string =>
-  error.kind === 'protocol' && typeof error.cause === 'string' ? error.cause : wordsOf[error.kind];
 
 /** Whether a thrown value is one of the library's own schema refusals. */
 const isSchemaError = (cause: unknown): boolean =>
@@ -282,6 +270,16 @@ const withServer = <A>(
 const discoveryDeps = (deps: RemoteMcpClientDeps): RemoteMcpClientDeps =>
   deps.discoverTimeoutMs === undefined ? deps : { ...deps, timeoutMs: deps.discoverTimeoutMs };
 
+/** The mapper that tells the surface about a call the server did not answer. */
+const tellingSurface =
+  (deps: RemoteMcpClientDeps) =>
+  (error: RemoteMcpError): RemoteMcpError => {
+    if (error.kind !== 'protocol') {
+      deps.onCallFailure?.(error);
+    }
+    return error;
+  };
+
 /**
  * A client for one server.
  *
@@ -292,8 +290,10 @@ const discoveryDeps = (deps: RemoteMcpClientDeps): RemoteMcpClientDeps =>
 const remoteMcpClient = (server: RemoteMcpServer, deps: RemoteMcpClientDeps): RemoteMcpClient => ({
   tools: withServer(server, discoveryDeps(deps), connection => discovered(connection, server)),
   call: (name, args) =>
-    withServer(server, deps, connection => called(connection, server, { name, args })),
+    withServer(server, deps, connection => called(connection, server, { name, args })).pipe(
+      Effect.mapError(tellingSurface(deps))
+    ),
 });
 
 export type { RemoteMcpClient, RemoteMcpClientDeps, RemoteMcpTool };
-export { explain, permissiveJsonSchemaValidator, remoteMcpClient };
+export { permissiveJsonSchemaValidator, remoteMcpClient };

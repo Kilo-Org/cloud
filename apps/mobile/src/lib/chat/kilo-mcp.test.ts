@@ -263,6 +263,54 @@ describe('the snapshot a screen draws', () => {
   });
 });
 
+describe('a call that could not reach the server', () => {
+  /** The failure callback the plugin was handed for the discovery just made. */
+  const lost = (): ((error: RemoteMcpError) => void) | undefined =>
+    world.calls.at(-1)?.deps.onCallFailure;
+
+  it('turns the connection into the failure the screen draws', async () => {
+    await ensureKiloMcp(place);
+    expect(kiloMcpState()).toEqual({ status: 'ready', tools: [tool] });
+
+    const fail = lost();
+    expect(fail).toBeDefined();
+    fail?.(new RemoteMcpError({ serverId: 'kilo', kind: 'unreachable', cause: 'it is gone' }));
+
+    /* The dot turns red and the Retry is offered, rather than the sheet
+       counting tools while every call fails. */
+    expect(kiloMcpState()).toEqual({ status: 'failed', kind: 'unreachable', retryable: true });
+    expect(kiloMcpTools()).toEqual([]);
+  });
+
+  it('reconnects on Retry rather than serving the list that just failed', async () => {
+    await ensureKiloMcp(place);
+    lost()?.(new RemoteMcpError({ serverId: 'kilo', kind: 'unreachable', cause: 'it is gone' }));
+
+    await ensureKiloMcp(place, 'retry');
+
+    expect(world.calls).toHaveLength(2);
+    expect(kiloMcpState()).toEqual({ status: 'ready', tools: [tool] });
+  });
+
+  it('keeps the failure when the server is not there any more, with no Retry', async () => {
+    await ensureKiloMcp(place);
+
+    lost()?.(new RemoteMcpError({ serverId: 'kilo', kind: 'missing', cause: 'it is gone' }));
+
+    expect(kiloMcpState()).toEqual({ status: 'failed', kind: 'missing', retryable: false });
+  });
+
+  it('does not publish a failure that outlived the sign-out', async () => {
+    await ensureKiloMcp(place);
+    const fail = lost();
+
+    forgetKiloMcp();
+    fail?.(new RemoteMcpError({ serverId: 'kilo', kind: 'unreachable', cause: 'it is gone' }));
+
+    expect(kiloMcpState()).toEqual({ status: 'idle' });
+  });
+});
+
 describe('the per-chat setting', () => {
   it('is on unless the person turned it off', async () => {
     expect(await mcpEnabledFor('chat-1')).toBe(true);

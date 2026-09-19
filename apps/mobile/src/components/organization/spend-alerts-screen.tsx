@@ -35,7 +35,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { formatList, formatMoney, formatNumber } from '@/lib/format';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -587,10 +587,8 @@ function RuleCard({
       <View className="rounded-lg bg-secondary px-3">
         <View className="min-h-11 flex-row items-center justify-between border-b-[0.5px] border-hair-soft">
           <Text className="text-sm">{t('common.email')}</Text>
-          {/* The row's own label names the channel; the card's switch directly
-              above announces the kind, so the two Email rows stay ordered. */}
           <Switch
-            accessibilityLabel={t('common.email')}
+            accessibilityLabel={formatList([title, t('common.email')], i18n.language)}
             value={emailEnabled}
             onValueChange={onEmailChange}
           />
@@ -613,7 +611,7 @@ function RuleCard({
           <View className="min-h-11 flex-row items-center justify-between">
             <Text className="text-sm">{t('notifications.push')}</Text>
             <Switch
-              accessibilityLabel={t('notifications.push')}
+              accessibilityLabel={formatList([title, t('notifications.push')], i18n.language)}
               value={pushEnabled}
               onValueChange={onPushChange}
             />

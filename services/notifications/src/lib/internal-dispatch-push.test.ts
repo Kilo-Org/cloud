@@ -74,6 +74,7 @@ function spendAlert(
 ): InternalDispatchSpendAlertRequest {
   return {
     kind: 'spend_alert',
+    deliveryId: 'delivery-1',
     recipientUserIds: ['user-a', 'user-b'],
     scope: 'organization',
     organizationId: 'org-1',
@@ -89,7 +90,7 @@ function expectedSpendAlertInput(userId: string): DispatchPushInput {
   return {
     userId,
     presenceContext: null,
-    idempotencyKey: 'spend-alert:organization:org-1:threshold:40',
+    idempotencyKey: 'spend-alert:delivery-1',
     badge: null,
     push: {
       title: 'Spend alert',
@@ -568,7 +569,7 @@ describe('dispatchInternalPushCore', () => {
     }
   });
 
-  it('spend_alert personal scope omits organizationId and keys on the personal scope', async () => {
+  it('spend_alert personal scope omits organizationId and keys on its outbox delivery', async () => {
     const { deps, calls } = fakeDeps();
     const result = await dispatchInternalPushCore(
       spendAlert({
@@ -582,9 +583,7 @@ describe('dispatchInternalPushCore', () => {
     );
 
     expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
-    expect(calls.dispatchPushInputs[0]!.idempotencyKey).toBe(
-      'spend-alert:personal:personal:anomaly:40'
-    );
+    expect(calls.dispatchPushInputs[0]!.idempotencyKey).toBe('spend-alert:delivery-1');
     expect(calls.dispatchPushInputs[0]!.push.data).toEqual({
       type: 'spend_alert',
       scope: 'personal',
@@ -592,7 +591,7 @@ describe('dispatchInternalPushCore', () => {
     expect(pushDataSchema.safeParse(calls.dispatchPushInputs[0]!.push.data).success).toBe(true);
   });
 
-  it('spend_alert stays one alert per crossing: the same threshold shares one idempotency key', async () => {
+  it('spend_alert retries keep the same idempotency key even if the total changes', async () => {
     const { deps, calls } = fakeDeps();
     await dispatchInternalPushCore(spendAlert({ recipientUserIds: ['user-a'] }), deps);
     // A re-evaluated sweep with a grown total must dedupe to the same key.
@@ -607,14 +606,14 @@ describe('dispatchInternalPushCore', () => {
     );
   });
 
-  it('crossing a different threshold is a distinct alert', async () => {
+  it('a new firing episode at the same threshold is a distinct alert', async () => {
     const { deps, calls } = fakeDeps();
     await dispatchInternalPushCore(
-      spendAlert({ recipientUserIds: ['user-a'], thresholdUsd: 40 }),
+      { ...spendAlert({ recipientUserIds: ['user-a'] }), deliveryId: 'delivery-1' },
       deps
     );
     await dispatchInternalPushCore(
-      spendAlert({ recipientUserIds: ['user-a'], thresholdUsd: 80 }),
+      { ...spendAlert({ recipientUserIds: ['user-a'] }), deliveryId: 'delivery-2' },
       deps
     );
 

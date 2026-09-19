@@ -20,6 +20,7 @@ function okResponse() {
 }
 
 const spendAlertInput: Omit<InternalDispatchSpendAlertRequest, 'kind'> = {
+  deliveryId: 'delivery-1',
   recipientUserIds: ['user-1'],
   scope: 'organization',
   organizationId: 'org-1',

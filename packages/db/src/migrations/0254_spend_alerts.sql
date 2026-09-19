@@ -63,7 +63,7 @@ ALTER TABLE "spend_alert_rule_state" ADD CONSTRAINT "spend_alert_rule_state_rule
 ALTER TABLE "spend_alert_rules" ADD CONSTRAINT "spend_alert_rules_settings_id_spend_alert_settings_id_fk" FOREIGN KEY ("settings_id") REFERENCES "public"."spend_alert_settings"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "spend_alert_settings" ADD CONSTRAINT "spend_alert_settings_kilo_user_id_kilocode_users_id_fk" FOREIGN KEY ("kilo_user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "spend_alert_settings" ADD CONSTRAINT "spend_alert_settings_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "IDX_spend_alert_deliveries_pending" ON "spend_alert_deliveries" USING btree ("status","next_attempt_at","attempt_count","id");--> statement-breakpoint
+CREATE INDEX "IDX_spend_alert_deliveries_pending" ON "spend_alert_deliveries" USING btree ("attempt_count","next_attempt_at","id") WHERE "spend_alert_deliveries"."status" = 'pending';--> statement-breakpoint
 CREATE UNIQUE INDEX "uq_spend_alert_hourly_scope_hour" ON "spend_alert_hourly" USING btree ("scope_key","hour_start");--> statement-breakpoint
 CREATE INDEX "IDX_spend_alert_hourly_hour_start" ON "spend_alert_hourly" USING btree ("hour_start");--> statement-breakpoint
 CREATE UNIQUE INDEX "uq_spend_alert_rules_kind" ON "spend_alert_rules" USING btree ("settings_id","kind");--> statement-breakpoint

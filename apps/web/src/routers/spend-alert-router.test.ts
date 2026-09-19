@@ -204,6 +204,25 @@ describe('spendAlertRouter', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
+  it.each([0.0000001, 0.0000009])('rejects a sub-microdollar threshold of %s', async threshold => {
+    const caller = await createCallerForUser(owner.id);
+    await expect(
+      caller.spendAlerts.save({
+        enabled: true,
+        rules: [{ ...VALID_RULES[0], threshold }, VALID_RULES[1]],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it.each([0.000001, 1_000_000])('preserves the valid threshold boundary %s', async threshold => {
+    const caller = await createCallerForUser(owner.id);
+    const saved = await caller.spendAlerts.save({
+      enabled: true,
+      rules: [{ ...VALID_RULES[0], threshold }, VALID_RULES[1]],
+    });
+    expect(saved.rules?.find(rule => rule.kind === 'threshold')?.threshold).toBe(threshold);
+  });
+
   it('reports the push channel blocked until the viewer registers a device', async () => {
     const viewer = await insertTestUser({
       google_user_email: `sa-rtr-viewer-${Date.now()}@example.com`,

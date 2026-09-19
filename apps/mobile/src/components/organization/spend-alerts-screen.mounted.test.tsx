@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { SpendAlertsScreen } from '@/components/organization/spend-alerts-screen';
 import { thresholdError } from '@/components/organization/spend-alert-validators';
+import { formatList } from '@/lib/format';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const getQueryFn = vi.hoisted(() => vi.fn());
@@ -89,6 +90,8 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 // Everything the validators need from the formatter, in the en-US shape the
 // tests write values in.
 vi.mock('@/lib/format', () => ({
+  formatList: (values: readonly string[], locale: string) =>
+    new Intl.ListFormat(locale).format(values),
   formatMoney: (amount: number) => `$${amount}`,
   formatNumber: String,
   parseLocalizedNumber: (value: string) => {
@@ -193,15 +196,17 @@ function switchByLabel(renderer: ReactTestRenderer, label: string): ReactTestIns
   return byType(renderer, 'Switch').find(node => node.props.accessibilityLabel === label);
 }
 
-/**
- * The Email or Push switches of both cards, in render order. Their label is the
- * channel's own catalog string, so the lookup works before and after the copy
- * lands in the catalog.
- */
+/** The channel switches of both cards, each identified by its rule and channel. */
 function channelSwitches(renderer: ReactTestRenderer, channelKey: string): ReactTestInstance[] {
-  return byType(renderer, 'Switch').filter(
-    node => node.props.accessibilityLabel === i18n.t(channelKey)
+  const labels = new Set(
+    ['spendAlerts.thresholdTitle', 'spendAlerts.anomalyTitle'].map(key =>
+      formatList([i18n.t(key), i18n.t(channelKey)], i18n.language)
+    )
   );
+  return byType(renderer, 'Switch').filter(node => {
+    const label: unknown = node.props.accessibilityLabel;
+    return typeof label === 'string' && labels.has(label);
+  });
 }
 
 function fieldByLabel(renderer: ReactTestRenderer, label: string): ReactTestInstance {
@@ -273,6 +278,31 @@ beforeEach(() => {
 });
 
 describe('SpendAlertsScreen happy state', () => {
+  it('identifies each channel switch by both rule and channel', async () => {
+    const { renderer } = await mountLoaded();
+    const labels = byType(renderer, 'Switch').map(node => node.props.accessibilityLabel);
+
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        'Threshold crossing and Email',
+        'Threshold crossing and Push',
+        'Hourly spike and Email',
+        'Hourly spike and Push',
+      ])
+    );
+    expect(new Set(labels).size).toBe(labels.length);
+
+    toggle(switchByLabel(renderer, 'Hourly spike and Email'), false);
+    press(buttonByVariant(renderer));
+    await waitFor(() => saveMutationFn.mock.calls.length === 1);
+    expect(saveMutationFn.mock.calls[0]?.[0]).toMatchObject({
+      rules: [
+        { kind: 'threshold', emailEnabled: true },
+        { kind: 'anomaly', emailEnabled: false },
+      ],
+    });
+  });
+
   it('renders the persisted values, the scope spend, and saves the draft', async () => {
     const { renderer } = await mountLoaded();
 
@@ -341,6 +371,16 @@ describe('SpendAlertsScreen happy state', () => {
 });
 
 describe('SpendAlertsScreen retryable states', () => {
+  it('shows the skeleton without editing controls until settings load', async () => {
+    getQueryFn.mockReturnValue(Promise.withResolvers().promise);
+    const { renderer } = await mountScreen();
+
+    expect(byType(renderer, 'Skeleton').length).toBeGreaterThan(0);
+    expect(byType(renderer, 'Switch')).toHaveLength(0);
+    expect(byType(renderer, 'Button')).toHaveLength(0);
+    expect(byType(renderer, 'QueryError')).toHaveLength(0);
+  });
+
   it('renders the load error with a retry and fills the form in place after it clears', async () => {
     getQueryFn.mockRejectedValue(new Error('offline'));
     const { renderer } = await mountScreen();

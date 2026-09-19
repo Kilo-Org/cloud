@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import { getTableConfig, type PgTable } from 'drizzle-orm/pg-core';
+import { readMigrationFiles } from 'drizzle-orm/migrator';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -45,6 +46,19 @@ function snapshot(table: PgTable): TableSnapshot {
 }
 
 describe('spend alert schema', () => {
+  it('applies the spend alert migration after every preceding migration', () => {
+    const migrations = readMigrationFiles({ migrationsFolder: path.join(__dirname, 'migrations') });
+    const index = migrations.findIndex(migration =>
+      migration.sql.some(statement => statement.includes('CREATE TABLE "spend_alert_settings"'))
+    );
+    expect(index).toBeGreaterThan(0);
+    const migration = migrations[index];
+    const latestAppliedMillis = Math.max(
+      ...migrations.slice(0, index).map(row => row.folderMillis)
+    );
+    expect(migration.folderMillis).toBeGreaterThan(latestAppliedMillis);
+  });
+
   it('stores the per-owner spend alert settings with exactly one scope column', () => {
     const table = snapshot(spend_alert_settings);
 
@@ -121,7 +135,7 @@ describe('spend alert schema', () => {
     expect(table.indexes).toEqual([
       {
         name: 'IDX_spend_alert_deliveries_pending',
-        columns: ['status', 'next_attempt_at', 'attempt_count', 'id'],
+        columns: ['attempt_count', 'next_attempt_at', 'id'],
       },
     ]);
     expect([...table.columns.keys()]).toEqual(

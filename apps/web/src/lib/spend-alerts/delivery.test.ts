@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
 import type { InternalDispatchSpendAlertRequest } from '@kilocode/notifications';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { spend_alert_deliveries } from '@kilocode/db/schema';
 import { drainPendingSpendAlertDeliveries, type SpendAlertDeliveryDeps } from './delivery';
@@ -141,6 +142,56 @@ afterEach(async () => {
 });
 
 describe('drainPendingSpendAlertDeliveries', () => {
+  it.each([
+    ['unknown_scope', { scope_key: 'invalid' }],
+    ['unknown_kind', { kind: null }],
+    ['unknown_kind', { kind: 'unsupported' }],
+    ['missing_payload', { payload: null }],
+    ['unknown_channel', { channel: null }],
+  ] as const)('makes a permanently malformed %s row terminal', async (reason, overrides) => {
+    const id = await insertDelivery(overrides);
+    const { deps, emails, pushes } = recordingDeps();
+
+    const summary = await drainPendingSpendAlertDeliveries(db, deps, { limit: 10 });
+
+    expect(summary.failed).toContainEqual({
+      deliveryId: id,
+      channel: 'channel' in overrides ? overrides.channel : 'email',
+      error: `spend_alert_delivery_${reason}`,
+    });
+    expect((await readDelivery(id))?.status).toBe('failed');
+    await drainPendingSpendAlertDeliveries(db, deps, { limit: 10 });
+    expect((await readDelivery(id))?.attempt_count).toBe(1);
+    expect(emails).toHaveLength(0);
+    expect(pushes).toHaveLength(0);
+  });
+
+  it('can claim in pending-index order without sorting the due set', async () => {
+    let claim: SQL | undefined;
+    const captureDb = new Proxy(db, {
+      get(target, prop, receiver) {
+        if (prop === 'execute')
+          return async (query: SQL) => {
+            claim = query;
+            return { rows: [] };
+          };
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    await drainPendingSpendAlertDeliveries(captureDb, recordingDeps().deps, { limit: 10 });
+    if (!claim) throw new Error('No claim query executed');
+    const query = claim;
+
+    await db.transaction(async tx => {
+      // A small fixture table may prefer a sequential scan; test the available index path.
+      await tx.execute(sql`SET LOCAL enable_seqscan = off`);
+      const plan = await tx.execute(sql`EXPLAIN (FORMAT JSON) ${query}`);
+      const text = JSON.stringify(plan.rows);
+      expect(text).toContain('IDX_spend_alert_deliveries_pending');
+      expect(text).not.toContain('"Node Type":"Sort"');
+    });
+  });
+
   it('sends an email and a push and marks both rows sent with one attempt', async () => {
     const emailId = await insertDelivery({ channel: 'email' });
     const pushId = await insertDelivery({
@@ -166,6 +217,7 @@ describe('drainPendingSpendAlertDeliveries', () => {
     const pushed = pushes.filter(input => input.recipientUserIds.includes(OWNER_USER_ID));
     expect(pushed).toHaveLength(1);
     expect(pushed[0]).toEqual({
+      deliveryId: pushId,
       recipientUserIds: [OWNER_USER_ID],
       scope: 'personal',
       alertKind: 'threshold',
@@ -326,8 +378,12 @@ describe('drainPendingSpendAlertDeliveries', () => {
       channel: 'push',
       recipients: { userIds: [OWNER_USER_ID], emails: [] },
     });
+    const attempts: PushInput[] = [];
     const { deps } = recordingDeps({
-      dispatchPush: async () => false,
+      dispatchPush: async input => {
+        attempts.push(input);
+        return attempts.length > 1;
+      },
     });
 
     const summary = await drainPendingSpendAlertDeliveries(db, deps, { limit: 10 });
@@ -339,6 +395,13 @@ describe('drainPendingSpendAlertDeliveries', () => {
       error: 'spend_alert_push_delivery_failed',
     });
     expect((await readDelivery(id))?.status).toBe('pending');
+    await db
+      .update(spend_alert_deliveries)
+      .set({ next_attempt_at: new Date(Date.now() - 60_000).toISOString() })
+      .where(eq(spend_alert_deliveries.id, id));
+    await drainPendingSpendAlertDeliveries(db, deps, { limit: 10 });
+    expect(attempts.map(input => input.deliveryId)).toEqual([id, id]);
+    expect((await readDelivery(id))?.status).toBe('sent');
   });
 
   it('does not mark a row with no recipients sent', async () => {

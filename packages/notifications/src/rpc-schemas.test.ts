@@ -8,6 +8,7 @@ import {
 describe('internalDispatchSpendAlertRequestSchema', () => {
   const personal = {
     kind: 'spend_alert',
+    deliveryId: 'delivery-1',
     recipientUserIds: ['user-a'],
     scope: 'personal',
     alertKind: 'threshold',
@@ -29,6 +30,12 @@ describe('internalDispatchSpendAlertRequestSchema', () => {
     expect(
       internalDispatchSpendAlertRequestSchema.safeParse({ ...personal, recipientUserIds: [] })
         .success
+    ).toBe(false);
+  });
+
+  it.each([undefined, ''])('rejects a missing or empty outbox identity: %s', deliveryId => {
+    expect(
+      internalDispatchSpendAlertRequestSchema.safeParse({ ...personal, deliveryId }).success
     ).toBe(false);
   });
 

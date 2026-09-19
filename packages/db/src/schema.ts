@@ -10225,12 +10225,9 @@ export const spend_alert_deliveries = pgTable(
   },
   table => [
     unique('UQ_spend_alert_deliveries_dedupe_key').on(table.dedupe_key),
-    index('IDX_spend_alert_deliveries_pending').on(
-      table.status,
-      table.next_attempt_at,
-      table.attempt_count,
-      table.id
-    ),
+    index('IDX_spend_alert_deliveries_pending')
+      .on(table.attempt_count, table.next_attempt_at, table.id)
+      .where(sql`${table.status} = 'pending'`),
   ]
 );
 

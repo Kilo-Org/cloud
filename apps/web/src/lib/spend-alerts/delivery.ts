@@ -355,9 +355,15 @@ async function deliverClaimedSpendAlertDelivery(
   row: ClaimedSpendAlertDelivery
 ): Promise<void> {
   const scope = parseSpendAlertScopeKey(row.scope_key);
-  if (scope === null) throw new Error('spend_alert_delivery_unknown_scope');
-  if (row.kind === null) throw new Error('spend_alert_delivery_unknown_kind');
-  if (!isDeliveryPayload(row.payload)) throw new Error('spend_alert_delivery_missing_payload');
+  if (scope === null) {
+    throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_unknown_scope');
+  }
+  if (row.kind !== 'threshold' && row.kind !== 'anomaly') {
+    throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_unknown_kind');
+  }
+  if (!isDeliveryPayload(row.payload)) {
+    throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_missing_payload');
+  }
 
   const recipients = recipientsOf(row.recipients);
   const scopeName = await resolveSpendAlertScopeName(database, scope);
@@ -400,6 +406,7 @@ async function deliverClaimedSpendAlertDelivery(
       throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_no_recipients');
     }
     const dispatched = await deps.dispatchPush({
+      deliveryId: row.id,
       recipientUserIds: recipients.userIds,
       scope: scope.type,
       ...(scope.type === 'organization' ? { organizationId: scope.organizationId } : {}),
@@ -413,7 +420,7 @@ async function deliverClaimedSpendAlertDelivery(
     return;
   }
 
-  throw new Error('spend_alert_delivery_unknown_channel');
+  throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_unknown_channel');
 }
 
 /** Bounded retries of the `sent` write; never a re-send. */

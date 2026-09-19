@@ -15,10 +15,12 @@ import {
   readPersistedPortOffset,
   resolveGroups,
   resolveDeletionMockSessionEnv,
+  resolveFakeLlmSessionEnv,
   resolveSessionNextAuthUrl,
   resolveTargets,
   writePersistedPortOffset,
 } from './services';
+import { LOCAL_FAKE_LLM_ADMIN_TOKEN } from '../../services/cloud-agent-next/test/e2e/fake-llm-admin';
 
 test('uses an automatic port offset for secondary worktrees by default', () => {
   assert.equal(
@@ -343,6 +345,28 @@ test('keeps existing deletion provider keys when injecting deletion-mock hosts',
   assert.equal(env?.POSTHOG_PERSONAL_API_KEY, undefined);
   assert.equal(env?.POSTHOG_ENVIRONMENT_ID, undefined);
   assert.equal(env?.POSTHOG_HOST, 'http://127.0.0.1:4010');
+});
+
+test('propagates the fake-llm admin token through the session environment', () => {
+  assert.equal(
+    resolveFakeLlmSessionEnv({
+      serviceNames: ['nextjs'],
+      env: { FAKE_LLM_ADMIN_TOKEN: 'custom-admin-token' },
+    }),
+    undefined
+  );
+
+  assert.deepEqual(
+    resolveFakeLlmSessionEnv({
+      serviceNames: ['fake-llm'],
+      env: { FAKE_LLM_ADMIN_TOKEN: 'custom-admin-token' },
+    }),
+    { FAKE_LLM_ADMIN_TOKEN: 'custom-admin-token' }
+  );
+
+  assert.deepEqual(resolveFakeLlmSessionEnv({ serviceNames: ['fake-llm'], env: {} }), {
+    FAKE_LLM_ADMIN_TOKEN: LOCAL_FAKE_LLM_ADMIN_TOKEN,
+  });
 });
 
 test('preserves auto routing backend auth secret name', () => {

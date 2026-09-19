@@ -10,17 +10,14 @@ import '@/i18n';
 
 type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
 
-const ssoRecovery = vi.hoisted(() => {
-  const value: { email: string; ssoOrganizationId: string | undefined } | null = {
-    email: 'user@example.com',
-    ssoOrganizationId: 'org_1',
-  };
-  return { value };
-});
+const ssoRecovery = vi.hoisted(() => ({
+  value: null as { email: string; ssoOrganizationId: string | undefined } | null,
+}));
+const authState = vi.hoisted(() => ({ busy: undefined as 'otp-send' | undefined }));
 
 vi.mock('@/lib/auth/use-native-auth', () => ({
   useNativeAuth: () => ({
-    busy: undefined,
+    busy: authState.busy,
     googleConfigured: false,
     signInWithApple: vi.fn(),
     signInWithGoogle: vi.fn(),
@@ -48,6 +45,7 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
   useColorScheme: () => 'light',
   View: 'View',
 }));
@@ -118,6 +116,12 @@ function findText(root: I, text: string): I {
   return node;
 }
 
+beforeEach(() => {
+  ssoRecovery.value = null;
+  authState.busy = undefined;
+  vi.mocked(openBrowserAsync).mockClear();
+});
+
 describe('IdleAuth SSO recovery', () => {
   beforeEach(() => {
     ssoRecovery.value = { email: 'user@example.com', ssoOrganizationId: 'org_1' };
@@ -175,17 +179,70 @@ describe('IdleAuth email continue copy', () => {
     const start = vi.fn<StartFn>();
     const renderer = await mountIdleAuth(start);
 
-    const terms = findText(renderer.root, 'Terms');
+    const terms = renderer.root.findByProps({
+      accessibilityRole: 'link',
+      accessibilityLabel: 'Terms',
+    });
     act(() => {
       (terms.props.onPress as () => void)();
     });
     expect(openBrowserAsync).toHaveBeenCalledWith(TERMS_URL);
 
-    const privacy = findText(renderer.root, 'Privacy Policy');
+    const privacy = renderer.root.findByProps({
+      accessibilityRole: 'link',
+      accessibilityLabel: 'Privacy Policy',
+    });
     act(() => {
       (privacy.props.onPress as () => void)();
     });
     expect(openBrowserAsync).toHaveBeenCalledWith(PRIVACY_URL);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it.each(['Terms', 'Privacy Policy'])('gives %s a standalone 44dp touch target', async label => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    const link = findText(renderer.root, label).parent;
+
+    expect(link?.props.className).toContain('min-h-[44px]');
+    expect(link?.props.className).toContain('min-w-[44px]');
+    expect(link?.props.className).toContain('max-w-full');
+    expect(link?.props.className).toContain('active:opacity-70');
+    expect(link?.type).toBe('Pressable');
+    expect(link?.props.accessibilityRole).toBe('link');
+    expect(link?.props.accessibilityLabel).toBe(label);
+    expect(link?.parent?.type).toBe('View');
+    expect(link?.parent?.props.className).toContain('flex-wrap');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps legal targets unchanged and available while sign-in is busy', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+    const originalLinks = renderer.root.findAllByProps({ accessibilityRole: 'link' });
+    const originalClasses = originalLinks.map(link => link.props.className);
+
+    act(() => {
+      authState.busy = 'otp-send';
+      renderer.update(createElement(IdleAuth, { start }));
+    });
+
+    const busyLinks = renderer.root.findAllByProps({ accessibilityRole: 'link' });
+    expect(busyLinks).toHaveLength(2);
+    expect(busyLinks.map(link => link.props.className)).toEqual(originalClasses);
+    for (const link of busyLinks) {
+      expect(link.props.disabled).not.toBe(true);
+      act(() => {
+        (link.props.onPress as () => void)();
+      });
+    }
+    expect(openBrowserAsync).toHaveBeenNthCalledWith(1, TERMS_URL);
+    expect(openBrowserAsync).toHaveBeenNthCalledWith(2, PRIVACY_URL);
 
     act(() => {
       renderer.unmount();

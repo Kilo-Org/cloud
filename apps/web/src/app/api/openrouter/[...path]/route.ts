@@ -15,10 +15,7 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  getProvider,
-  type GetProviderProviderResult,
-} from '@/lib/ai-gateway/providers/get-provider';
+import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
@@ -66,7 +63,6 @@ import {
   rewriteModelResponse,
   logUnrewrittenResponse,
 } from '@/lib/ai-gateway/rewriteModelResponse';
-import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner/routing';
 import {
   createAnonymousContext,
   isAnonymousContext,
@@ -79,17 +75,6 @@ import {
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
-import {
-  classifyAbuse,
-  awaitClassifyAbuse,
-  cacheRulesEngineAction,
-  getCachedRulesEngineAction,
-  getQuarantineFreeModel,
-  getRulesEngineActionDecision,
-  isRulesEngineBlockingAction,
-  resolveAbuseClassificationCacheIdentityKey,
-  sleepForRulesEngineAction,
-} from '@/lib/ai-gateway/abuse-service';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
@@ -113,7 +98,7 @@ import {
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@/lib/utils.server';
 import { readDb } from '@/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
 import {
@@ -404,7 +389,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     routingTarget = autoResult.routingTarget ?? null;
   }
 
-  let effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
+  const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -514,7 +499,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Bill the classifier overhead as soon as the cost is known and we have an
   // authenticated user — via after(), so the row is persisted even when the
-  // request is rejected downstream (abuse block, provider/api-kind rejection,
+  // request is rejected downstream (provider/api-kind rejection,
   // balance/org checks, upstream 4xx, …). The classifier already ran on Kilo's
   // OpenRouter credential during model resolution, so the cost is owed
   // regardless of how this request ends. Anonymous requests never reach a
@@ -665,11 +650,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     };
   }
 
-  let accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
+  const accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
 
-  // Resolve the initial provider before abuse enforcement because abuse needs
-  // provider/BYOK context, and quarantine-3 may later rewrite these values.
-  const initialProviderResultForAbuseService = await getProvider({
+  const providerResult = await getProvider({
     requestedModel: effectiveModelIdLowerCased,
     request: requestBodyParsed,
     user,
@@ -679,20 +662,20 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     machineId: machineIdHeader,
     getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
   });
-  if (initialProviderResultForAbuseService.kind === 'not-found') {
+  if (providerResult.kind === 'not-found') {
     // Paused experiment for this public id — return a local model-unavailable
     // response instead of silently falling through to default routing.
     return modelDoesNotExistResponse();
   }
-  if (initialProviderResultForAbuseService.kind === 'unavailable') {
+  if (providerResult.kind === 'unavailable') {
     return temporarilyUnavailableResponse();
   }
-  if (initialProviderResultForAbuseService.kind === 'chatgpt-reconnect') {
+  if (providerResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
     // instead of silently serving the request through another billing path.
-    return chatGptReconnectResponse(initialProviderResultForAbuseService.message);
+    return chatGptReconnectResponse(providerResult.message);
   }
-  let effectiveProviderContext = initialProviderResultForAbuseService;
+  const effectiveProviderContext = providerResult;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
     try {
@@ -716,26 +699,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
   }
 
-  // Start classification early, but do not await it unless the last cached
-  // rules-engine result says this identity is already under enforcement.
-  const classifyPromise = classifyAbuse(request, requestBodyParsed, {
-    kiloUserId: user.id,
-    organizationId,
-    projectId,
-    provider: effectiveProviderContext.provider.id,
-    isByok: !!effectiveProviderContext.userByok,
-    feature,
-  });
-  const abuseCacheIdentityKey = await resolveAbuseClassificationCacheIdentityKey({
-    kiloUserId: user.id,
-    fraudHeaders,
-  });
-  const cachedAction = await getCachedRulesEngineAction(abuseCacheIdentityKey);
-  const cachedRulesEngineAction = cachedAction?.action ?? null;
-  // Cache-gating keeps normal traffic on the fast path: only identities with a
-  // previously blocking/quarantine decision wait for a fresh abuse-service result.
-  const shouldBlockOnClassify = isRulesEngineBlockingAction(cachedRulesEngineAction);
-
   // Large responses may run longer than the 800s serverless function timeout.
   const requestMaxTokens = getMaxTokens(requestBodyParsed);
   if (requestMaxTokens && requestMaxTokens > MAX_TOKENS_LIMIT) {
@@ -754,109 +717,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     return unavailableModelResponse();
   }
 
-  let classifyResult = shouldBlockOnClassify ? await awaitClassifyAbuse(classifyPromise) : null;
-  if (classifyResult?.rules_engine) {
-    await cacheRulesEngineAction({
-      identityKey: classifyResult.context?.identity_key ?? abuseCacheIdentityKey,
-      rulesEngine: classifyResult.rules_engine,
-    });
-  }
-  // When a blocking refresh fails or times out, fall back to the cached
-  // enforcement decision. Missing/nonblocking cache entries never enforce the
-  // fresh result on this request; they only update Redis for the next request.
-  const rulesEngineActionForDecision =
-    (shouldBlockOnClassify ? classifyResult?.rules_engine?.resolved_action : null) ??
-    (shouldBlockOnClassify ? cachedAction?.action : null);
-  const rulesEngineDecision = getRulesEngineActionDecision({
-    action: rulesEngineActionForDecision,
-    userByok: !!effectiveProviderContext.userByok,
-    quarantineFreeModel:
-      rulesEngineActionForDecision === 'quarantine-3' && !effectiveProviderContext.userByok
-        ? await getQuarantineFreeModel(requestBodyParsed.kind)
-        : null,
-  });
-  if (classifyResult) {
-    console.log('Abuse classification result:', {
-      rules_engine_resolved_action: classifyResult.rules_engine?.resolved_action ?? null,
-      rules_engine_sus_score: classifyResult.rules_engine?.sus_score ?? null,
-      rules_engine_matched_abuse_rule_ids:
-        classifyResult.rules_engine?.matched_abuse_rule_ids ?? [],
-      identity_key: classifyResult.context?.identity_key,
-      kilo_user_id: user.id,
-      requested_model: effectiveModelIdLowerCased,
-      rps: classifyResult.context?.requests_per_second,
-      request_id: classifyResult.request_id,
-    });
-  }
-  if (rulesEngineDecision.response) {
-    return rulesEngineDecision.response;
-  }
-  let abuseDowngradedFrom: string | null = null;
-  if (rulesEngineDecision.modelOverride) {
-    // Quarantine-3 rewrites non-BYOK requests to an auto-free candidate, so the
-    // provider and derived policy flags must be resolved again for that model.
-    abuseDowngradedFrom = effectiveModelIdLowerCased;
-    requestBodyParsed.body.model = rulesEngineDecision.modelOverride;
-    effectiveModelIdLowerCased = rulesEngineDecision.modelOverride;
-    accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
-    const quarantineProviderResult = await getProvider({
-      requestedModel: effectiveModelIdLowerCased,
-      request: requestBodyParsed,
-      user,
-      organizationId,
-      taskId,
-      clientIp: ipAddress ?? null,
-      machineId: machineIdHeader,
-      getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
-    });
-    if (quarantineProviderResult.kind === 'not-found') {
-      if (rulesEngineDecision.delayMs > 0) {
-        await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
-      }
-      return modelDoesNotExistResponse();
-    }
-    if (quarantineProviderResult.kind === 'unavailable') {
-      if (rulesEngineDecision.delayMs > 0) {
-        await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
-      }
-      return temporarilyUnavailableResponse();
-    }
-    if (quarantineProviderResult.kind === 'chatgpt-reconnect') {
-      if (rulesEngineDecision.delayMs > 0) {
-        await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
-      }
-      return chatGptReconnectResponse(quarantineProviderResult.message);
-    }
-
-    effectiveProviderContext = quarantineProviderResult;
-
-    console.warn('SECURITY: Abuse quarantine-3 model override applied', {
-      kilo_user_id: user.id,
-      identity_key: classifyResult?.context?.identity_key ?? abuseCacheIdentityKey,
-      abuse_request_id: classifyResult?.request_id ?? null,
-      rules_engine_action: rulesEngineDecision.action,
-      rules_engine_matched_abuse_rule_ids:
-        classifyResult?.rules_engine?.matched_abuse_rule_ids ?? [],
-      original_model: abuseDowngradedFrom,
-      overridden_model: effectiveModelIdLowerCased,
-      original_provider: initialProviderResultForAbuseService.provider.id,
-      overridden_provider: effectiveProviderContext.provider.id,
-      user_byok: !!effectiveProviderContext.userByok,
-      feature,
-      project_id: projectId,
-    });
-
-    if (!effectiveProviderContext.provider.supportedChatApis.includes(requestBodyParsed.kind)) {
-      if (rulesEngineDecision.delayMs > 0) {
-        await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
-      }
-      return apiKindNotSupportedResponse(
-        requestBodyParsed.kind,
-        effectiveProviderContext.provider.supportedChatApis
-      );
-    }
-  }
-
   // Skip balance/org checks for anonymous users - they can only use free models
   if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
     const {
@@ -872,7 +732,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (
       balance <= 0 &&
       !(await isFreeModel(effectiveModelIdLowerCased)) &&
-      !effectiveProviderContext.userByok
+      !effectiveProviderContext.userByok &&
+      !effectiveProviderContext.skipBalanceCheck
     ) {
       return await creditsBlockedResponse({
         user,
@@ -920,29 +781,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  const partnerProvider = await getPercentageRoutedPartnerProvider({
-    requestedModel: effectiveModelIdLowerCased,
-    request: requestBodyParsed,
-    randomSeed: taskId || user.id,
-    sourceProviderId: effectiveProviderContext.provider.id,
-    hasUserByok: effectiveProviderContext.userByok !== null,
-  });
-  let partnerFallback:
-    | { providerContext: GetProviderProviderResult; request: GatewayRequest }
-    | undefined;
-  if (partnerProvider) {
-    partnerFallback = {
-      providerContext: effectiveProviderContext,
-      request: structuredClone(requestBodyParsed),
-    };
-    effectiveProviderContext = {
-      kind: 'provider',
-      provider: partnerProvider,
-      userByok: null,
-      bypassAccessCheck: false,
-    };
-  }
-
   console.debug(`Routing request to ${effectiveProviderContext.provider.id}`);
 
   // Extract properties for usage context after final provider selection.
@@ -973,8 +811,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     mode: modeHeader,
     auto_model: autoModel,
     ttfb_ms: null,
-    abuse_delay: rulesEngineDecision.delayMs > 0 ? rulesEngineDecision.delayMs : null,
-    abuse_downgraded_from: abuseDowngradedFrom,
     clientRequestId,
   };
 
@@ -1024,61 +860,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     signal: request.signal,
     vercelRequestId,
   };
-  let attempt = await sendUpstreamAttempt({
+  const attempt = await sendUpstreamAttempt({
     ...upstreamAttemptOptions,
     providerContext: effectiveProviderContext,
     request: requestBodyParsed,
-    delayMs: rulesEngineDecision.delayMs,
   });
   if (attempt.type === 'invalid-openrouter-model') {
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
   }
   if (attempt.type === 'error') return attempt.response;
-
-  if (partnerFallback && attempt.response.status >= 400) {
-    const partnerFailureLog = {
-      partner_provider: effectiveProviderContext.provider.id,
-      fallback_provider: partnerFallback.providerContext.provider.id,
-      status_code: attempt.response.status,
-    };
-    const responseForLogging = attempt.response.clone();
-    after(
-      (async () => {
-        try {
-          warnExceptInTest('Partner request failed before managed fallback', {
-            ...partnerFailureLog,
-            body: await responseForLogging.text(),
-          });
-        } catch (error) {
-          warnExceptInTest('Partner request failed before managed fallback', {
-            ...partnerFailureLog,
-            response_body_read_error: String(error),
-          });
-        }
-      })()
-    );
-    try {
-      await attempt.response.body?.cancel();
-    } catch {
-      warnExceptInTest('Failed to cancel discarded partner response body');
-    }
-
-    effectiveProviderContext = partnerFallback.providerContext;
-    requestBodyParsed = partnerFallback.request;
-    usageContext.provider = effectiveProviderContext.provider.id;
-    usageContext.user_byok = !!effectiveProviderContext.userByok;
-
-    attempt = await sendUpstreamAttempt({
-      ...upstreamAttemptOptions,
-      providerContext: effectiveProviderContext,
-      request: requestBodyParsed,
-      delayMs: 0,
-    });
-    if (attempt.type === 'invalid-openrouter-model') {
-      return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
-    }
-    if (attempt.type === 'error') return attempt.response;
-  }
 
   const { response, toolsAvailable, toolsUsed, experimentPromptCapture } = attempt;
   if (experimentPromptCapture) usageContext.experimentPromptCapture = experimentPromptCapture;
@@ -1144,20 +934,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   const clonedReponse = response.clone(); // reading from body is side-effectful
-
-  if (!shouldBlockOnClassify) {
-    classifyResult = await awaitClassifyAbuse(classifyPromise);
-    if (classifyResult?.rules_engine) {
-      await cacheRulesEngineAction({
-        identityKey: classifyResult.context?.identity_key ?? abuseCacheIdentityKey,
-        rulesEngine: classifyResult.rules_engine,
-      });
-    }
-  }
-
-  if (classifyResult) {
-    usageContext.abuse_request_id = classifyResult.request_id;
-  }
 
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 

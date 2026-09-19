@@ -11,7 +11,7 @@ import type * as ReactI18next from 'react-i18next';
 
 import { lightColors } from '@/lib/hooks/use-theme-colors';
 
-import { describePrState, PrStateChip } from './pr-review-overview-parts';
+import { describePrState, PrRefsRow, PrStateChip } from './pr-review-overview-parts';
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -102,6 +102,50 @@ describe('PrStateChip tone color', () => {
       node => typeof node.type === 'string' && (node.type as string) === 'Text'
     );
     expect(textNode.props.className).toContain(toneClass);
+
+    renderer.unmount();
+  });
+});
+
+function renderRefsRow(): TestRenderer.ReactTestRenderer {
+  let renderer: TestRenderer.ReactTestRenderer | null = null;
+  act(() => {
+    renderer = TestRenderer.create(
+      createElement(PrRefsRow, {
+        baseRef: 'main',
+        headRef: 'kwf/session-and-pr-entities-in-search-1092',
+        headRepoFullName: 'Kilo-Org/cloud',
+        isCrossRepo: true,
+      })
+    );
+  });
+  // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
+  if (!renderer) {
+    throw new Error('Failed to create test renderer');
+  }
+  return renderer;
+}
+
+describe('PrRefsRow truncation', () => {
+  it('shrinks the head ref so it ellipsizes instead of hard-clipping at the edge', () => {
+    const renderer = renderRefsRow();
+
+    const texts = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Text'
+    );
+    // Head ref, arrow, base ref — the head is first.
+    const [head, arrow, base] = texts;
+    if (!head || !arrow || !base) {
+      throw new Error('PrRefsRow did not render its three text nodes');
+    }
+    expect(head.props.className).toContain('min-w-0');
+    expect(head.props.className).toContain('shrink');
+    expect(head.props.numberOfLines).toBe(1);
+    expect(head.props.ellipsizeMode).toBe('middle');
+
+    // The arrow and the short base ref hold their width.
+    expect(arrow.props.className).toContain('shrink-0');
+    expect(base.props.className).toContain('shrink-0');
 
     renderer.unmount();
   });

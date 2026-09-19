@@ -6,6 +6,7 @@ import {
   type GlanceableAgentsSnapshot,
   type GlanceableAgentsSnapshotStatus,
   isEligibleGlanceableWork,
+  isStartableGlanceableWork,
   shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
@@ -217,7 +218,7 @@ export class GlanceablePublisher {
   }
 
   /** Cache update failed: keep the last counts only until their original deadline. */
-  handleFetchError(_ctx: GlanceablePublisherContext): void {
+  handleFetchError(ctx: GlanceablePublisherContext): void {
     // A failed refetch supersedes the ask: the surface now shows stale counts,
     // so a still-recorded waiting session must not stay approvable from it.
     this.noteWaitingAsk(null);
@@ -235,7 +236,17 @@ export class GlanceablePublisher {
       this.cancelTerminal();
       this.activityStarted = false;
     }
-    this.publish(snapshot);
+    if (isStartableGlanceableWork(snapshot)) {
+      // A failed refresh must never empty the shade. `publish` only updates a
+      // card that is already posted, so a restart that could not reach the
+      // server (the post is gone with the process) would leave the shade blank
+      // even though the durable mirror still holds waiting or running work.
+      // `emit` re-posts it from the last known counts, without an alert.
+      this.emit(snapshot, ctx);
+      this.activityStarted = true;
+    } else {
+      this.publish(snapshot);
+    }
     this.current = snapshot;
   }
 

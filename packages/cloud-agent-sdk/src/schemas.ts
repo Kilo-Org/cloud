@@ -644,6 +644,7 @@ export type MessageUpdatedData = z.infer<typeof messageUpdatedDataSchema>;
 
 export const messagePartUpdatedDataSchema = z.object({
   part: z.object({ id: z.string(), sessionID: z.string(), messageID: z.string() }).passthrough(),
+  time: z.number().optional(),
 });
 export type MessagePartUpdatedData = z.infer<typeof messagePartUpdatedDataSchema>;
 

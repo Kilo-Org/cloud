@@ -56,14 +56,24 @@ export function resolveMessageInputTextContentWidth(inputWidth: number): number 
 
 export function resolveMessageInputBottomPadding({
   bottomSafeAreaInset = 0,
+  keyboardLift = 0,
   platform,
 }: {
   bottomSafeAreaInset?: number;
+  /**
+   * The lift the enclosing keyboard-padding view applies right now. It already
+   * covers the whole strip the IME hides, system bars included, so the inset
+   * the composer keeps while the keyboard is closed has to yield to it;
+   * keeping both shows the insets as a blank band above the keyboard.
+   */
+  keyboardLift?: number;
   platform?: 'android' | 'ios' | string;
 } = {}): number {
+  const inset = Math.max(bottomSafeAreaInset - keyboardLift, 0);
+
   if (platform === 'android') {
-    return MESSAGE_INPUT_BOTTOM_CLEARANCE + Math.max(bottomSafeAreaInset, 0);
+    return MESSAGE_INPUT_BOTTOM_CLEARANCE + inset;
   }
 
-  return Math.max(bottomSafeAreaInset, MESSAGE_INPUT_BOTTOM_CLEARANCE);
+  return Math.max(inset, MESSAGE_INPUT_BOTTOM_CLEARANCE);
 }

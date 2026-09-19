@@ -29,32 +29,43 @@ function insertPartSorted(arr: Part[], part: Part): Part[] {
 }
 
 /**
- * Ordering evidence of the last accepted update, carried on the stored part
- * itself under a module-private symbol.
+ * Ordering evidence of the last accepted update for a stored part: the event
+ * time it was accepted on (or the settle time that ordered it), keyed by the
+ * part's message and id.
  *
- * It lives on the exact object the helper returns and puts into the parts
- * array, so the evidence can never desynchronise from the part it describes —
- * no side table keyed by object identity, and no shared module state. The
- * property is non-enumerable and symbol-keyed, so it stays out of the
- * serialized part, every `{ ...part }` copy and every `toEqual` comparison;
- * only this module reads it.
+ * The backend owns this store next to its parts. Keeping the evidence off the
+ * part matters: a part is plain data the UI renders and `structuredClone`
+ * copies, so a symbol-keyed property would be dropped by `clonePart` and
+ * `Object.defineProperty` would throw on a non-extensible part. It is keyed by
+ * the part's own id rather than by the part object, because object identity is
+ * not stable across a clone either.
  */
-const PART_UPDATE_TIME = Symbol('partUpdateTime');
+type PartOrderingEvidence = Map<string, number>;
 
-type PartWithUpdateTime = Part & { [PART_UPDATE_TIME]?: number };
-
-function rememberPartUpdateTime(part: Part, eventTime: number | undefined): void {
-  if (eventTime === undefined) return;
-  Object.defineProperty(part, PART_UPDATE_TIME, {
-    value: eventTime,
-    enumerable: false,
-    configurable: true,
-    writable: true,
-  });
+function partOrderingKey(messageID: string, partId: string): string {
+  return `${messageID}\u0000${partId}`;
 }
 
-function storedPartUpdateTime(part: Part): number | undefined {
-  return (part as PartWithUpdateTime)[PART_UPDATE_TIME];
+function rememberPartUpdateTime(
+  evidence: PartOrderingEvidence,
+  part: Part,
+  eventTime: number | undefined
+): void {
+  if (eventTime === undefined) return;
+  evidence.set(partOrderingKey(part.messageID, part.id), eventTime);
+}
+
+function storedPartUpdateTime(evidence: PartOrderingEvidence, part: Part): number | undefined {
+  return evidence.get(partOrderingKey(part.messageID, part.id));
+}
+
+/** Drop the ordering evidence of a part the backend no longer keeps. */
+function forgetPartUpdateTime(
+  evidence: PartOrderingEvidence,
+  messageID: string,
+  partId: string
+): void {
+  evidence.delete(partOrderingKey(messageID, partId));
 }
 
 function toolLifecycleRank(part: Part): number | null {
@@ -168,7 +179,8 @@ function isStaleToolLifecycleUpdate(
 function upsertPartDroppingStaleSyntheticParts(
   arr: Part[],
   part: Part,
-  eventTime?: number
+  eventTime: number | undefined,
+  evidence: PartOrderingEvidence
 ): Part[] {
   const nextPart = clonePart(part);
   const incomingIsSynthetic = Reflect.get(part, 'synthetic') === true;
@@ -190,7 +202,8 @@ function upsertPartDroppingStaleSyntheticParts(
 
   if (idx >= 0) {
     const existing = filtered[idx];
-    const storedEventTime = existing === undefined ? undefined : storedPartUpdateTime(existing);
+    const storedEventTime =
+      existing === undefined ? undefined : storedPartUpdateTime(evidence, existing);
     if (
       existing !== undefined &&
       isStaleToolLifecycleUpdate(existing, part, storedEventTime, eventTime)
@@ -203,11 +216,15 @@ function upsertPartDroppingStaleSyntheticParts(
     // own event time, else the settle time that ordered it here. Dropping that
     // evidence for an older recorded event time would let a later out-of-order
     // terminal whose event time falls between the two win.
-    rememberPartUpdateTime(nextPart, eventTime ?? partSettledAt(nextPart) ?? storedEventTime);
+    rememberPartUpdateTime(
+      evidence,
+      nextPart,
+      eventTime ?? partSettledAt(nextPart) ?? storedEventTime
+    );
     return nextArr;
   }
 
-  rememberPartUpdateTime(nextPart, eventTime);
+  rememberPartUpdateTime(evidence, nextPart, eventTime);
   return insertPartSorted(filtered, nextPart);
 }
 
@@ -291,9 +308,11 @@ export {
   clonePart,
   createReadonlyPartView,
   createSeedTextPart,
+  forgetPartUpdateTime,
   insertPartSorted,
   insertSorted,
   isSupportedDeltaField,
   notify,
   upsertPartDroppingStaleSyntheticParts,
 };
+export type { PartOrderingEvidence };

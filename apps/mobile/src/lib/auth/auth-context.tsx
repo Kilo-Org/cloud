@@ -65,6 +65,8 @@ import {
   subscribeSignOutActive,
 } from '@/lib/auth/sign-out-state';
 import { clearCacheScopeForSignOut, readCachedUserId } from '@/lib/persist/read-cache';
+import { clearToolSummaryTranslationsForSignOut } from '@/lib/persist/tool-summary-translation-cache';
+import { clearToolSummaryTranslationMemoryForSignOut } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 import { clearSessionAttentionForSignOut } from '@/lib/session-attention';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { clearViewedFiles } from '@/lib/pr-review/viewed-files';
@@ -85,7 +87,7 @@ import { clearTelemetryDecision } from '@/lib/telemetry/controller';
 import { clearSentryUser } from '@/lib/sentry-context';
 import { purgePostHogPersistence } from '@/lib/telemetry/posthog-storage';
 import { AppState } from 'react-native';
-import { beginAuthenticatedOwner } from '@/lib/context-scope';
+import { beginAuthenticatedOwner, markRestoredAuthenticatedOwner } from '@/lib/context-scope';
 
 // Pre-load tokens at module level so they're available before React mounts
 export const preloadedAuthToken = SecureStore.getItemAsync(AUTH_TOKEN_KEY);
@@ -227,6 +229,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // yet, so the exchange's own epoch checks pass — the sign-out flag
             // must stop this publish, exactly like the one below.
             if (pair && isCurrentAuthEpoch(epoch) && !isSignedOutReference.current) {
+              markRestoredAuthenticatedOwner();
               setToken(pair.token);
               setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
               setIsLoading(false);
@@ -264,10 +267,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // signed-in user to the login screen.
           if (currentStored !== stored) {
             const published = getActiveToken()?.token ?? currentStored ?? undefined;
+            if (published) {
+              markRestoredAuthenticatedOwner();
+            }
             setToken(published);
             setCurrentDeepLinkUserId(published ? readUserIdFromToken(published) : null);
             return;
           }
+          markRestoredAuthenticatedOwner();
           setActiveToken(stored, expiresAtStr ? Number(expiresAtStr) : null);
           setToken(stored);
           setCurrentDeepLinkUserId(readUserIdFromToken(stored));
@@ -491,6 +498,19 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             clearRecentPrs(),
             clearViewedFiles(),
             clearSessionAttentionForSignOut(),
+            // The offline translation cache holds the signed-out account's tool
+            // text (paths, commands, descriptions) and is refetchable, so it is
+            // a cache row that must not outlive the account. The runtime reset
+            // runs first and drains the writes it already dispatched (bounded,
+            // so a hung write cannot hold teardown); the write fence in the
+            // store then keeps a persist that settles after this clear from
+            // recreating its entry. The scope clear itself is bounded too, so a
+            // native clear that never answers still lets the batch settle.
+            // Best effort: both helpers swallow a storage failure.
+            (async () => {
+              await clearToolSummaryTranslationMemoryForSignOut();
+              await clearToolSummaryTranslationsForSignOut();
+            })(),
           ]);
           // Synchronous preference clears (best-effort) so nothing leaks to
           // the next signed-in account.

@@ -8049,6 +8049,9 @@ describe('SandboxSession worktree changes persistence', () => {
     }
   });
 
+  // The payload is deliberately near the 10 MiB snapshot cap (20 x 512 KiB
+  // files), so building, JSON-serializing, and writing the per-file KV records
+  // can exceed vitest's 5s default whenever the gate host is under load.
   it('parses, validates, and stores a near-10 MiB snapshot as bounded per-file KV records', async () => {
     const fixture = await worktreeFixture();
     try {
@@ -8132,7 +8135,7 @@ describe('SandboxSession worktree changes persistence', () => {
     } finally {
       fixture.close();
     }
-  });
+  }, 60_000);
 
   it('rolls back a replacement after body writes and deletions when the manifest write fails', async () => {
     const fixture = await worktreeFixture();
@@ -10739,7 +10742,7 @@ describe('SandboxSession control-plane regressions', () => {
       socket.close();
       replacement?.close();
     }
-  });
+  }, 30_000);
 
   it('normalizes initial and command models once without preflight or leaking session finalization', async () => {
     const { fixture, session } = messageFixture();

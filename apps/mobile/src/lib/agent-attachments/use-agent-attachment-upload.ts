@@ -429,6 +429,7 @@ export function useAgentAttachmentUpload(
       const limit = canAddAttachments(attachments.length, candidates.length);
       if (!limit.ok) {
         toast.error(
+          // i18n-dup-ok: 'agentChat.attachmentPicker.maxFilesAllowed_other' is this message's plural other category — the bare key carries that copy by i18next convention, so the family is one message, not two keys for the same copy.
           i18n.t('agentChat.attachmentPicker.maxFilesAllowed', {
             count: AGENT_ATTACHMENT_MAX_FILES,
             displayCount: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
@@ -438,8 +439,15 @@ export function useAgentAttachmentUpload(
       }
       const accepted = candidates.slice(0, limit.acceptedCount);
       if (limit.truncated) {
+        // The admitted count selects the plural category, because that is the
+        // numeral a catalog's own grammar inflects the warning's noun on
+        // ("1 of 2 files", French "Ajout de 1 fichier …"). The total the user
+        // selected is interpolated beside it, and English carries the plural
+        // noun in every category, so the sentence still reads "1 of 2 files".
+        // i18n-dup-ok: 'agentChat.attachmentPicker.onlyAddingFiles_one' and 'agentChat.attachmentPicker.onlyAddingFiles_other' are this counted message's plural categories, not two keys for one string — English reads the same at every count, but fr and zu inflect the one-form, so the family stays.
         toast.warning(
           i18n.t('agentChat.attachmentPicker.onlyAddingFiles', {
+            count: limit.acceptedCount,
             accepted: formatNumber(limit.acceptedCount, i18n.language),
             total: formatNumber(candidates.length, i18n.language),
             max: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),

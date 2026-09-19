@@ -36300,6 +36300,31 @@
     ],
     "searchBlob": "user.changeAutoTopUpPaymentMethod Change the saved payment method used for automatic credit top-up. user changeautotopuppaymentmethod amountcents amountCents"
   },
+  "user.deletePasskey": {
+    "path": "user.deletePasskey",
+    "kind": "mutation",
+    "summary": "Remove one of the signed-in user's registered passkeys, revoking that device or security key for future sign-in.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "user",
+      "deletepasskey",
+      "id"
+    ],
+    "searchBlob": "user.deletePasskey Remove one of the signed-in user's registered passkeys, revoking that device or security key for future sign-in. user deletepasskey id id"
+  },
   "user.getAuthProviders": {
     "path": "user.getAuthProviders",
     "kind": "query",
@@ -36533,6 +36558,17 @@
     ],
     "searchBlob": "user.getNotificationPreferences Get the current user's notification preferences for push notifications, chat messages, balance alerts, security findings, and more. user getnotificationpreferences"
   },
+  "user.getPasskeys": {
+    "path": "user.getPasskeys",
+    "kind": "query",
+    "summary": "List all passkeys (WebAuthn security keys, Face ID, Touch ID) registered to the signed-in user's account, including device type and last used time.",
+    "inputSchema": {},
+    "tags": [
+      "user",
+      "getpasskeys"
+    ],
+    "searchBlob": "user.getPasskeys List all passkeys (WebAuthn security keys, Face ID, Touch ID) registered to the signed-in user's account, including device type and last used time. user getpasskeys"
+  },
   "user.linkAuthProvider": {
     "path": "user.linkAuthProvider",
     "kind": "mutation",
@@ -36554,7 +36590,8 @@
             "discord",
             "openai",
             "fake-login",
-            "workos"
+            "workos",
+            "passkey"
           ]
         },
         "organizationId": {
@@ -36707,6 +36744,38 @@
       "removeautotopuppaymentmethod"
     ],
     "searchBlob": "user.removeAutoTopUpPaymentMethod Remove the saved payment method for auto top-up and turn auto top-up off. user removeautotopuppaymentmethod"
+  },
+  "user.renamePasskey": {
+    "path": "user.renamePasskey",
+    "kind": "mutation",
+    "summary": "Rename a saved passkey to a custom label so the user can identify which device or security key it belongs to.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "tags": [
+      "user",
+      "renamepasskey",
+      "id",
+      "name"
+    ],
+    "searchBlob": "user.renamePasskey Rename a saved passkey to a custom label so the user can identify which device or security key it belongs to. user renamepasskey id name id name"
   },
   "user.requestAccountDeletion": {
     "path": "user.requestAccountDeletion",
@@ -36961,7 +37030,8 @@
             "discord",
             "openai",
             "fake-login",
-            "workos"
+            "workos",
+            "passkey"
           ]
         }
       },

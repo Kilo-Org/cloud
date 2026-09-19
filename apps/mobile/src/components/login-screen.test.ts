@@ -412,13 +412,13 @@ describe('login-screen idle skeleton', () => {
   });
 });
 
-describe('login-screen bottom safe area', () => {
+describe.each(['android', 'ios'] as const)('login-screen %s bottom safe area', platform => {
   beforeEach(() => {
     deviceAuth.status = 'idle';
     deviceAuth.token = undefined;
     deviceAuth.code = undefined;
-    insets.bottom = 24;
-    Platform.OS = 'android';
+    insets.bottom = platform === 'ios' ? 34 : 24;
+    Platform.OS = platform;
     I18nManager.isRTL = true;
     vi.mocked(Keyboard.addListener).mockClear();
     addAppStateListener.mockClear();
@@ -432,7 +432,7 @@ describe('login-screen bottom safe area', () => {
   });
 
   it.each(['idle', 'pending', 'expired', 'error', 'denied'])(
-    'keeps the %s scroll viewport above the Android gesture bar in RTL',
+    'keeps the %s scroll viewport above the bottom safe area in RTL',
     async status => {
       deviceAuth.status = status;
       const renderer = await mountLoginScreen();
@@ -441,7 +441,7 @@ describe('login-screen bottom safe area', () => {
         expect(scroll.props.className).toContain('flex-1');
         expect(scroll.props.contentContainerClassName).toContain('flex-grow');
         expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
-        expect(scroll.parent?.props.style).toEqual({ paddingBottom: 24 });
+        expect(scroll.parent?.props.style).toEqual({ paddingBottom: insets.bottom });
       } finally {
         renderer.unmount();
       }
@@ -455,7 +455,7 @@ describe('login-screen bottom safe area', () => {
     try {
       expect(findByType(renderer.root, 'Skeleton')).toHaveLength(2);
       expect(renderer.root.findByType('ScrollView').parent?.props.style).toEqual({
-        paddingBottom: 24,
+        paddingBottom: insets.bottom,
       });
       await act(async () => {
         restored.resolve({ email: '', ssoRecovery: null });
@@ -464,28 +464,29 @@ describe('login-screen bottom safe area', () => {
       expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
       expect(renderer.root.findByType('IdleAuth').props.initialEmail).toBe('');
       expect(renderer.root.findByType('ScrollView').parent?.props.style).toEqual({
-        paddingBottom: 24,
+        paddingBottom: insets.bottom,
       });
     } finally {
       renderer.unmount();
     }
   });
 
-  it.each(['hide', 'background'])(
+  it.each(['hide', 'inactive', 'background'] as const)(
     'counts the navigation inset once with the IME open and restores it on %s',
     async dismissal => {
       const renderer = await mountLoginScreen();
       try {
         const show = vi
           .mocked(Keyboard.addListener)
-          .mock.calls.find(([name]) => name === 'keyboardDidShow')?.[1];
+          .mock.calls.find(
+            ([name]) => name === (platform === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow')
+          )?.[1];
         const hide = vi
           .mocked(Keyboard.addListener)
-          .mock.calls.find(([name]) => name === 'keyboardDidHide')?.[1];
+          .mock.calls.find(
+            ([name]) => name === (platform === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide')
+          )?.[1];
         const background = addAppStateListener.mock.calls.find(([name]) => name === 'change')?.[1];
-        expect(show).toBeDefined();
-        expect(hide).toBeDefined();
-        expect(background).toBeDefined();
         const event: KeyboardEvent = {
           duration: 0,
           easing: 'keyboard',
@@ -493,17 +494,28 @@ describe('login-screen bottom safe area', () => {
         };
         act(() => show?.(event));
         expect(renderer.root.findByType('ScrollView').parent?.props.style).toEqual({
-          paddingBottom: 324,
+          paddingBottom: platform === 'ios' ? 0 : 300 + insets.bottom,
         });
+        expect(show).toBeDefined();
+        expect(hide).toBeDefined();
+        expect(background).toBeDefined();
         act(() => {
           if (dismissal === 'hide') {
             hide?.(event);
           } else {
-            background?.('background');
+            background?.(dismissal);
           }
         });
         expect(renderer.root.findByType('ScrollView').parent?.props.style).toEqual({
-          paddingBottom: 24,
+          paddingBottom: insets.bottom,
+        });
+        act(() => background?.('active'));
+        expect(renderer.root.findByType('ScrollView').parent?.props.style).toEqual({
+          paddingBottom: insets.bottom,
+        });
+        act(() => show?.(event));
+        expect(renderer.root.findByType('ScrollView').parent?.props.style).toEqual({
+          paddingBottom: platform === 'ios' ? 0 : 300 + insets.bottom,
         });
       } finally {
         renderer.unmount();
@@ -512,9 +524,8 @@ describe('login-screen bottom safe area', () => {
   );
 
   it.each([0, 34])(
-    'respects a %dpt bottom inset on iOS without replacing keyboard avoidance',
+    'respects a %dpt bottom inset in LTR without replacing platform keyboard avoidance',
     async bottom => {
-      Platform.OS = 'ios';
       I18nManager.isRTL = false;
       insets.bottom = bottom;
       const renderer = await mountLoginScreen();
@@ -524,7 +535,7 @@ describe('login-screen bottom safe area', () => {
         });
         expect(renderer.root.findByType('KeyboardAvoidingView').props).toMatchObject({
           behavior: 'padding',
-          enabled: true,
+          enabled: platform === 'ios',
         });
       } finally {
         renderer.unmount();

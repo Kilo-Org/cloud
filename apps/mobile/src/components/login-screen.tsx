@@ -68,7 +68,7 @@ export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const [persistError, setPersistError] = useState<string | undefined>(undefined);
-  const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [authFormBusy, setAuthFormBusy] = useState(false);
   const [draft, setDraft] = useState<{
     email: string;
@@ -127,19 +127,16 @@ export function LoginScreen() {
   // never resizes for the IME, so KeyboardAvoidingView is inert. keyboardDidShow
   // still fires with real heights; consume them here (r0b: zero layout shift for
   // the email IME when only KAV was present).
+  // iOS uses will-show/hide to drop the safe-area pad while KAV covers it.
   useEffect(() => {
-    if (Platform.OS !== 'android') {
-      return undefined;
-    }
-
     const keyboardEvents = resolveKeyboardPaddingEventsForPlatform(Platform.OS);
     if (keyboardEvents === null) {
-      setAndroidKeyboardHeight(0);
+      setKeyboardHeight(0);
       return undefined;
     }
 
     const keyboardShowSubscription = Keyboard.addListener(keyboardEvents.show, event => {
-      setAndroidKeyboardHeight(current =>
+      setKeyboardHeight(current =>
         resolveAppAwareKeyboardPadding({
           currentPadding: current,
           event: {
@@ -150,7 +147,7 @@ export function LoginScreen() {
       );
     });
     const keyboardHideSubscription = Keyboard.addListener(keyboardEvents.hide, () => {
-      setAndroidKeyboardHeight(current =>
+      setKeyboardHeight(current =>
         resolveAppAwareKeyboardPadding({
           currentPadding: current,
           event: { type: 'keyboard-hidden' },
@@ -158,7 +155,7 @@ export function LoginScreen() {
       );
     });
     const appStateSubscription = AppState.addEventListener('change', appState => {
-      setAndroidKeyboardHeight(current =>
+      setKeyboardHeight(current =>
         resolveAppAwareKeyboardPadding({
           currentPadding: current,
           event: { type: 'app-state-change', appState },
@@ -206,7 +203,9 @@ export function LoginScreen() {
   // endCoordinates.height + useSafeAreaInsets().bottom (= WindowInsets.ime().bottom;
   // verified 704px + 63px = 767px on pixel9). Keep the bottom safe area reserved
   // even when the keyboard is hidden so the last sign-in action stays reachable.
-  const bottomPadding = androidKeyboardHeight + insets.bottom;
+  // iOS KAV already includes the home-indicator inset in its keyboard padding.
+  const bottomPadding =
+    Platform.OS === 'ios' && keyboardHeight > 0 ? 0 : keyboardHeight + insets.bottom;
   // The Globe stays enabled on idle, denied, expired, and error (those render
   // an interactive IdleAuth form); it is disabled while a device-auth flow
   // (pending/approved) or a busy auth action owns the screen.

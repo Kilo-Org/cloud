@@ -3108,6 +3108,14 @@
     "tooManySignInAttempts": "로그인 시도가 너무 많습니다. 잠시 기다린 후 다시 시도하세요."
   },
   "models": {
+    "auto": {
+      "frontier": "자동 프런티어",
+      "balanced": "자동 균형",
+      "efficient": "자동 효율",
+      "small": "자동 소형",
+      "free": "자동 무료",
+      "organization": "조직 자동"
+    },
     "dataCollected": "데이터 수집",
     "free": "무료",
     "couldNotUpdateFavorites": "즐겨찾기를 업데이트할 수 없습니다.",

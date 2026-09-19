@@ -3108,6 +3108,14 @@
     "tooManySignInAttempts": "He nui rawa ngā whakamātau takiuru. Tatari, ka whakamātau anō."
   },
   "models": {
+    "auto": {
+      "frontier": "Aunoa Pae whakamua",
+      "balanced": "Aunoa Taurite",
+      "efficient": "Aunoa Whaihua",
+      "small": "Aunoa Iti",
+      "free": "Aunoa Koreutu",
+      "organization": "Aunoa Whakahaere"
+    },
     "dataCollected": "Kua kohia ngā raraunga",
     "free": "Koreutu",
     "couldNotUpdateFavorites": "Kāore i taea te whakahou i ngā makau.",

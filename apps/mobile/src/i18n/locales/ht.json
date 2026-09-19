@@ -3108,6 +3108,14 @@
     "tooManySignInAttempts": "Twòp tantativ koneksyon. Tanpri tann epi eseye ankò."
   },
   "models": {
+    "auto": {
+      "frontier": "Otomatik Pi avanse",
+      "balanced": "Otomatik Ekilibre",
+      "efficient": "Otomatik Efikas",
+      "small": "Otomatik Piti",
+      "free": "Otomatik Gratis",
+      "organization": "Otomatik Òganizasyon"
+    },
     "dataCollected": "Done kolekte",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Nou pa t ka mete favori yo ajou.",

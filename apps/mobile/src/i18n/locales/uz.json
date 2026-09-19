@@ -3108,6 +3108,14 @@
     "tooManySignInAttempts": "Kirish urinishlari juda ko'p. Iltimos, kuting va qayta urinib ko'ring."
   },
   "models": {
+    "auto": {
+      "frontier": "Avto Ilg'or",
+      "balanced": "Avto Muvozanatli",
+      "efficient": "Avto Samarali",
+      "small": "Avto Kichik",
+      "free": "Avto Bepul",
+      "organization": "Tashkilot Avto"
+    },
     "dataCollected": "Ma'lumot yig'iladi",
     "free": "Bepul",
     "couldNotUpdateFavorites": "Sevimlilarni yangilab bo'lmadi.",

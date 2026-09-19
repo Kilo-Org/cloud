@@ -3108,6 +3108,14 @@
     "tooManySignInAttempts": "Terlalu banyak percobaan masuk. Tunggu sebentar dan coba lagi."
   },
   "models": {
+    "auto": {
+      "frontier": "Otomatis Tercanggih",
+      "balanced": "Otomatis Seimbang",
+      "efficient": "Otomatis Efisien",
+      "small": "Otomatis Kecil",
+      "free": "Otomatis Gratis",
+      "organization": "Otomatis Organisasi"
+    },
     "dataCollected": "Data dikumpulkan",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Tidak dapat memperbarui favorit.",

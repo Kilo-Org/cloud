@@ -3194,6 +3194,14 @@
     "tooManySignInAttempts": "Proběhlo příliš mnoho pokusů o přihlášení. Chvíli počkej a zkus to znovu."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatický Špičkový",
+      "balanced": "Automatický Vyvážený",
+      "efficient": "Automatický Efektivní",
+      "small": "Automatický Malý",
+      "free": "Automatický Zdarma",
+      "organization": "Automatický organizace"
+    },
     "dataCollected": "Sběr dat",
     "free": "Zdarma",
     "couldNotUpdateFavorites": "Oblíbené se nepodařilo aktualizovat.",

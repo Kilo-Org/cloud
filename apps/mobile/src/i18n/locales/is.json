@@ -3108,6 +3108,14 @@
     "tooManySignInAttempts": "Of margar innskráningartilraunir. Bíddu og reyndu aftur."
   },
   "models": {
+    "auto": {
+      "frontier": "Sjálfvirkt Fremst",
+      "balanced": "Sjálfvirkt Jafnvægis",
+      "efficient": "Sjálfvirkt Skilvirkt",
+      "small": "Sjálfvirkt Lítið",
+      "free": "Sjálfvirkt Ókeypis",
+      "organization": "Sjálfvirkt Stofnunar"
+    },
     "dataCollected": "Gögnum safnað",
     "free": "Ókeypis",
     "couldNotUpdateFavorites": "Ekki tókst að uppfæra eftirlæti.",

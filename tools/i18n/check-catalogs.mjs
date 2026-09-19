@@ -120,6 +120,9 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profiles.mcp.commandPlaceholder',
   'profiles.mcp.jsonPlaceholder',
   'profiles.agents.slugPlaceholder',
+  // The sampling parameter's technical name: `top_p` is the knob's own
+  // identifier, so every catalog keeps it verbatim.
+  'profiles.agents.topP',
   'profiles.slashCommands.namePlaceholder',
   'share.reviewPrSubtitle',
   // Format-only strings with no translatable words: a placeholder-only screen

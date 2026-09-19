@@ -119,6 +119,15 @@ vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } })
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666', primary: '#000' }),
 }));
+vi.mock('@/lib/hooks/use-themed-action-sheet', () => ({
+  useThemedActionSheetOptions: () => ({
+    containerStyle: { backgroundColor: '#17171A' },
+    textStyle: { color: '#F2F0EB' },
+    titleTextStyle: { color: '#8A8680' },
+    messageTextStyle: { color: '#8A8680' },
+    destructiveColor: '#F28B7A',
+  }),
+}));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
   useSecurityAgentConfig: () => config,

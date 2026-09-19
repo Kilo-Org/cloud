@@ -3,13 +3,13 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatMoney } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import { type ActiveOrgMember, type OrgRole } from '@/lib/hooks/use-organization-queries';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { cn, firstNonEmpty } from '@/lib/utils';
 
 type MemberRowProps = {
@@ -44,8 +44,8 @@ export function MemberRow({
 }: Readonly<MemberRowProps>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
+  const themedSheet = useThemedActionSheetOptions();
   const mutations = useOrganizationMutations(organizationId);
   const displayName = firstNonEmpty(member.name, member.email);
 
@@ -55,7 +55,7 @@ export function MemberRow({
       {
         options,
         cancelButtonIndex: options.length - 1,
-        containerStyle: { paddingBottom: bottom },
+        ...themedSheet,
       },
       index => {
         const role = index !== undefined ? ROLE_OPTIONS[index] : undefined;
@@ -113,7 +113,7 @@ export function MemberRow({
         options,
         cancelButtonIndex: options.length - 1,
         destructiveButtonIndex: options.length - 2,
-        containerStyle: { paddingBottom: bottom },
+        ...themedSheet,
       },
       index => {
         const label = index !== undefined ? options[index] : undefined;

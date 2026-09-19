@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -105,12 +105,17 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
   );
 
   const [connecting, setConnecting] = useState(false);
+  const connectAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => connectAbort.current?.abort(), []);
 
   const handleConnect = async () => {
+    const controller = new AbortController();
+    connectAbort.current = controller;
     setConnecting(true);
     try {
       const result = await connect.mutateAsync();
       await launchConnectGateBrowser(result.authorizationUrl, {
+        signal: controller.signal,
         onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
         onReturn: async () => {
           await authorization.refetch();
@@ -122,7 +127,9 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
     } catch {
       // mutateAsync toasted the server error; keep the gate showing.
     } finally {
-      setConnecting(false);
+      if (!controller.signal.aborted) {
+        setConnecting(false);
+      }
     }
   };
 
@@ -254,8 +261,12 @@ function ProviderConnectGate({
   const status = platform === 'gitlab' ? gitlabStatus : bitbucketStatus;
 
   const [connecting, setConnecting] = useState(false);
+  const connectAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => connectAbort.current?.abort(), []);
 
   const handleConnect = async () => {
+    const controller = new AbortController();
+    connectAbort.current = controller;
     setConnecting(true);
     try {
       // The provider connections are web-side integrations: open the
@@ -266,6 +277,7 @@ function ProviderConnectGate({
           ? getGitLabIntegrationUrl(WEB_BASE_URL, organizationId ?? undefined)
           : getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId ?? '');
       await launchConnectGateBrowser(integrationUrl, {
+        signal: controller.signal,
         onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
         onReturn: async () => {
           await status.refetch();
@@ -277,7 +289,9 @@ function ProviderConnectGate({
       // the query's error state renders the retryable
       // QueryError instead of letting `void handleConnect()` reject.
     } finally {
-      setConnecting(false);
+      if (!controller.signal.aborted) {
+        setConnecting(false);
+      }
     }
   };
 

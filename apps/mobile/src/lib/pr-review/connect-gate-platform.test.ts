@@ -128,6 +128,30 @@ describe('Android launch', () => {
     expect(handlers.onReturn).toHaveBeenCalledOnce();
     expect(handlers.onOpenFailure).toHaveBeenCalledOnce();
   });
+
+  it('aborts a foreground wait without refetching and allows a fresh launch', async () => {
+    mocks.openBrowserAsync.mockResolvedValue({ type: 'opened' });
+    const controller = new AbortController();
+    const handlers = {
+      signal: controller.signal,
+      onReturn: vi.fn(),
+      onOpenFailure: vi.fn(),
+    };
+    const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
+    await Promise.resolve();
+    controller.abort();
+    await launch;
+
+    expect(mocks.subscriptions[0]?.remove).toHaveBeenCalledOnce();
+    const retryHandlers = { onReturn: vi.fn(), onOpenFailure: vi.fn() };
+    const retry = launchConnectGateBrowser('https://example.com/connect', retryHandlers);
+    emitAppState('active');
+    await retry;
+    expect(handlers.onReturn).not.toHaveBeenCalled();
+    expect(handlers.onOpenFailure).not.toHaveBeenCalled();
+    expect(retryHandlers.onReturn).toHaveBeenCalledOnce();
+    expect(mocks.subscriptions[1]?.remove).toHaveBeenCalledOnce();
+  });
 });
 
 describe.each(['ios', 'android'])('shared launch contract on %s', os => {
@@ -148,6 +172,89 @@ describe.each(['ios', 'android'])('shared launch contract on %s', os => {
     ).resolves.toBeUndefined();
     expect(handlers.onOpenFailure).toHaveBeenCalledOnce();
     expect(handlers.onReturn).not.toHaveBeenCalled();
+  });
+
+  it('does not launch or notify a caller whose signal is already aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const handlers = {
+      signal: controller.signal,
+      onReturn: vi.fn(),
+      onOpenFailure: vi.fn(),
+    };
+
+    await launchConnectGateBrowser('https://example.com/connect', handlers);
+    expect(mocks.openBrowserAsync).not.toHaveBeenCalled();
+    expect(mocks.openAuthSessionAsync).not.toHaveBeenCalled();
+    expect(mocks.addAppStateListener).not.toHaveBeenCalled();
+    expect(handlers.onReturn).not.toHaveBeenCalled();
+    expect(handlers.onOpenFailure).not.toHaveBeenCalled();
+  });
+
+  it.each(['resolve', 'reject'])(
+    'ends a pending launch on abort before a late %s',
+    async outcome => {
+      const pending = Promise.withResolvers<{ type: string }>();
+      mocks.openBrowserAsync.mockReturnValue(pending.promise);
+      mocks.openAuthSessionAsync.mockReturnValue(pending.promise);
+      const controller = new AbortController();
+      const removeAbortListener = vi.spyOn(controller.signal, 'removeEventListener');
+      const handlers = {
+        signal: controller.signal,
+        onReturn: vi.fn(),
+        onOpenFailure: vi.fn(),
+      };
+
+      const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
+      controller.abort();
+      await launch;
+      if (os === 'android') {
+        expect(mocks.subscriptions[0]?.remove).toHaveBeenCalledOnce();
+      }
+      expect(removeAbortListener).toHaveBeenCalledExactlyOnceWith('abort', expect.any(Function));
+
+      if (outcome === 'resolve') {
+        pending.resolve({ type: 'cancel' });
+      } else {
+        pending.reject(new Error('late launch failure'));
+      }
+      emitAppState('active');
+      await Promise.resolve();
+      expect(handlers.onReturn).not.toHaveBeenCalled();
+      expect(handlers.onOpenFailure).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['return', 'failure'])('removes the abort listener after normal %s', async outcome => {
+    const controller = new AbortController();
+    const addAbortListener = vi.spyOn(controller.signal, 'addEventListener');
+    const removeAbortListener = vi.spyOn(controller.signal, 'removeEventListener');
+    const handlers = {
+      signal: controller.signal,
+      onReturn: vi.fn(),
+      onOpenFailure: vi.fn(),
+    };
+    if (outcome === 'failure') {
+      const open = os === 'android' ? mocks.openBrowserAsync : mocks.openAuthSessionAsync;
+      open.mockRejectedValue(new Error('no browser'));
+    } else {
+      mocks.openBrowserAsync.mockResolvedValue({ type: 'opened' });
+      mocks.openAuthSessionAsync.mockResolvedValue({ type: 'cancel' });
+    }
+
+    const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
+    emitAppState('active');
+    await launch;
+    expect(removeAbortListener).toHaveBeenCalledExactlyOnceWith(
+      'abort',
+      addAbortListener.mock.calls[0]?.[1]
+    );
+    expect(handlers.onReturn).toHaveBeenCalledTimes(outcome === 'return' ? 1 : 0);
+    expect(handlers.onOpenFailure).toHaveBeenCalledTimes(outcome === 'failure' ? 1 : 0);
+    controller.abort();
+    if (os === 'android') {
+      expect(mocks.subscriptions[0]?.remove).toHaveBeenCalledOnce();
+    }
   });
 });
 

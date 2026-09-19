@@ -182,6 +182,34 @@ afterEach(() => {
   mounted = undefined;
 });
 
+describe('Android connect gate unmount', () => {
+  it.each(providers)('%s drops its foreground listener and pending callbacks', async provider => {
+    platform.OS = 'android';
+    vi.mocked(WebBrowser.openBrowserAsync).mockResolvedValue({
+      type: WebBrowser.WebBrowserResultType.DISMISS,
+    });
+    const renderer = mount(provider);
+    await act(async () => {
+      (renderer.root.findByType('Button').props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(appState.subscriptions).toHaveLength(1);
+
+    await act(async () => {
+      renderer.unmount();
+      await Promise.resolve();
+    });
+    mounted = undefined;
+    expect(appState.subscriptions[0]?.remove).toHaveBeenCalledOnce();
+    await act(async () => {
+      emitForeground();
+      await Promise.resolve();
+    });
+    expect(queryResult.refetch).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+});
+
 describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
   beforeEach(() => {
     platform.OS = os;

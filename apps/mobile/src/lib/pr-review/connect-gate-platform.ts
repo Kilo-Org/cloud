@@ -2,8 +2,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { AppState, type AppStateStatus, Platform } from 'react-native';
 
 /**
- * Subscribes to the next foreground return. The subscription comes back too so
- * a launch that fails before the app returns can drop the listener.
+ * Subscribes to the next foreground return. The caller owns cleanup, including
+ * when the launch fails or its wait is cancelled before the app returns.
  */
 function waitForForeground() {
   let resolveReturn: (() => void) | undefined = undefined;
@@ -14,7 +14,6 @@ function waitForForeground() {
     if (state !== 'active') {
       return;
     }
-    subscription.remove();
     resolveReturn?.();
   });
   return { returned, subscription };
@@ -29,41 +28,61 @@ function waitForForeground() {
  * (KILO-APP-22), so Android opens a plain browser and resolves when the app
  * returns to the foreground instead. iOS keeps the native auth session, which
  * resolves when the sheet closes. Callers await the same promise on both.
+ * Aborting ends the wait without closing the browser or auth session.
  */
-export async function openAuthorizationAndWaitForReturn(authorizationUrl: string): Promise<void> {
-  if (Platform.OS !== 'android') {
-    await WebBrowser.openAuthSessionAsync(authorizationUrl);
+export async function openAuthorizationAndWaitForReturn(
+  authorizationUrl: string,
+  signal?: AbortSignal
+): Promise<void> {
+  if (signal?.aborted) {
     return;
   }
-  const { returned, subscription } = waitForForeground();
+  let resolveCancellation: (() => void) | undefined = undefined;
+  const cancelled = new Promise<void>(resolve => {
+    resolveCancellation = resolve;
+  });
+  const onAbort = () => resolveCancellation?.();
+  signal?.addEventListener('abort', onAbort);
+  const foreground = Platform.OS === 'android' ? waitForForeground() : undefined;
   try {
-    await WebBrowser.openBrowserAsync(authorizationUrl);
-  } catch (error) {
-    subscription.remove();
-    throw error;
+    const opened = foreground
+      ? WebBrowser.openBrowserAsync(authorizationUrl)
+      : WebBrowser.openAuthSessionAsync(authorizationUrl);
+    await Promise.race([opened, cancelled]);
+    if (foreground && !signal?.aborted) {
+      await Promise.race([foreground.returned, cancelled]);
+    }
+  } finally {
+    foreground?.subscription.remove();
+    signal?.removeEventListener('abort', onAbort);
   }
-  await returned;
 }
 
 type ConnectGateLaunchHandlers = {
+  signal?: AbortSignal;
   onReturn: () => Promise<void>;
   /** The browser failed to open: tell the user instead of leaving the CTA inert. */
   onOpenFailure: () => void;
 };
 
 /**
- * Launch failures are reported separately from refetch failures. Cancellation
- * still refetches: the server-driven connection may have completed before close.
+ * Launch failures are reported separately from refetch failures. Closing the
+ * browser still refetches: the server-driven connection may have completed.
+ * Aborting on unmount instead skips callbacks belonging to the stale caller.
  */
 export async function launchConnectGateBrowser(
   authorizationUrl: string,
   handlers: ConnectGateLaunchHandlers
 ): Promise<void> {
   try {
-    await openAuthorizationAndWaitForReturn(authorizationUrl);
+    await openAuthorizationAndWaitForReturn(authorizationUrl, handlers.signal);
   } catch {
-    handlers.onOpenFailure();
+    if (!handlers.signal?.aborted) {
+      handlers.onOpenFailure();
+    }
     return;
   }
-  await handlers.onReturn();
+  if (!handlers.signal?.aborted) {
+    await handlers.onReturn();
+  }
 }

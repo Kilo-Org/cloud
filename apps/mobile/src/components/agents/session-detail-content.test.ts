@@ -569,6 +569,10 @@ function page(
 // resolves with this cursor instead of the default `null`.
 let rootPageNextCursor: string | null = null;
 
+// Set before `mountDetails` by the long-title header tests; `fetchSession`
+// reports this session title instead of the short default.
+let sessionTitleOverride: string | null = null;
+
 function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
   return renderer.root.findAll(node => Object.is(node.type, 'MessageList'));
 }
@@ -583,6 +587,7 @@ beforeEach(() => {
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
   rootPageNextCursor = null;
+  sessionTitleOverride = null;
   condensePreference.value = false;
   currentUserId.value = 'test-user';
   connectionHealth.isConnected = true;
@@ -671,7 +676,7 @@ async function mountDetails(
       return {
         kiloSessionId: id,
         cloudAgentSessionId: null,
-        title: `Root ${id}`,
+        title: sessionTitleOverride ?? `Root ${id}`,
         organizationId: null,
         gitUrl: null,
         gitBranch: null,
@@ -840,7 +845,7 @@ describe('SessionDetailContent display scope', () => {
     });
     const header = renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 2,
+      numberOfLines: 1,
       ellipsizeMode: 'tail',
     });
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
@@ -863,6 +868,22 @@ describe('SessionDetailContent display scope', () => {
     expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
     expect(globalContext.organizationId).toBe('global-org');
     expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
+  });
+});
+
+describe('SessionDetailContent header title', () => {
+  // The title shares its row with a 44pt context pill and a copy action, so on
+  // a narrow phone the title column is a fraction of the row width. Letting the
+  // Text wrap there split a long word across two lines and truncated the second
+  // ("Moving-ave / rage empt…"). One line keeps the truncation at a clean tail
+  // ellipsis instead of breaking a word across two lines.
+  it('keeps a long session title on one line instead of breaking a word across two', async () => {
+    sessionTitleOverride = 'Moving-average rage empty baseline';
+    const { renderer } = await mountDetails();
+    const header = renderer.root.findByType(ScreenHeader);
+    const title = header.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.numberOfLines).toBe(1);
+    expect(title.props.ellipsizeMode).toBe('tail');
   });
 });
 
@@ -1454,7 +1475,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
 
     const header = view.renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 2,
+      numberOfLines: 1,
       ellipsizeMode: 'tail',
     });
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(

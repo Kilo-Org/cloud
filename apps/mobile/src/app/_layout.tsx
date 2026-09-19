@@ -998,7 +998,7 @@ function RootLayoutNav({
       >
         <Slot />
       </View>
-      {showBootstrapLoading ? <BootstrapLoadingSurface /> : null}
+      {showBootstrapLoading && !showRestoreError ? <BootstrapLoadingSurface /> : null}
       {showRestoreError ? (
         <View className="absolute inset-0">
           <BootstrapErrorScreen

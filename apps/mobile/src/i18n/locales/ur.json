@@ -3157,7 +3157,8 @@
     "couldNotApprove": "منظور نہیں کیا جا سکا",
     "couldNotStart": "شروع نہیں کیا جا سکا",
     "channelName": "فعال ایجنٹس",
-    "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔"
+    "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
+    "newestResult": "تازہ ترین نتیجہ"
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",

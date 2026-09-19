@@ -18,10 +18,10 @@ import {
   type GlanceableSink,
   type GlanceableSinkContext,
 } from '@/lib/glanceable/sink-registry';
-import type * as NotificationsModule from '@/lib/notifications';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
-import { formatGlanceableCount, isWidgetRtl } from './count-format';
+import { formatGlanceableAgo, formatGlanceableCount, isWidgetRtl } from './count-format';
+import { ensureAndroidNotificationChannels } from './ensure-notification-channels';
 import {
   end as endLiveUpdate,
   getPostedNotificationChannel,
@@ -49,25 +49,6 @@ const OPEN_AGENTS_LABEL_KEY = 'glanceable.openAgents';
 
 function translate(key: string): string {
   return i18n.t(key);
-}
-
-/**
- * Create the Android channels before the first post, lazily. `@/lib/notifications`
- * pulls the native notifications graph (expo-notifications → expo-constants),
- * and the importers of this module — the widget / Live-Update headless entry and
- * the pure widget suite — must not load it. The reverse direction already
- * lazy-requires the platform sink registrations (see
- * `ensureGlanceableSinksLoaded`), so this keeps one rule.
- *
- * The dynamic import is memoized so concurrent starts share one load, matching
- * the drafts / encrypted-kv pattern.
- */
-let notificationsModule: Promise<typeof NotificationsModule> | null = null;
-
-async function ensureAndroidNotificationChannels(): Promise<void> {
-  notificationsModule ??= import('@/lib/notifications');
-  const { ensureAndroidNotificationChannels: ensureChannels } = await notificationsModule;
-  await ensureChannels();
 }
 
 let lastWidgetSnapshot: GlanceableAgentsSnapshot | null = null;
@@ -104,7 +85,12 @@ function shouldAlert(kind: AgentNotificationKind): boolean {
 export function getCurrentWidgetProps(): AndroidWidgetProps | null {
   return lastWidgetSnapshot === null
     ? null
-    : buildCurrentWidgetProps(lastWidgetSnapshot, translate, formatGlanceableCount);
+    : buildCurrentWidgetProps(
+        lastWidgetSnapshot,
+        translate,
+        formatGlanceableCount,
+        formatGlanceableAgo
+      );
 }
 
 function renderWidgetNow(props: AndroidWidgetProps): void {
@@ -319,7 +305,12 @@ export const androidSink: GlanceableSink = {
       }
     }
     setWidgetSnapshot(snapshot);
-    const props = buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount);
+    const props = buildCurrentWidgetProps(
+      snapshot,
+      translate,
+      formatGlanceableCount,
+      formatGlanceableAgo
+    );
     renderWidgetNow(props);
     const eligible = hasCurrentWork(snapshot);
     if (eligible) {

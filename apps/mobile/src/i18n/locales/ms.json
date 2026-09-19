@@ -3157,7 +3157,8 @@
     "couldNotApprove": "Gagal meluluskan",
     "couldNotStart": "Gagal memulakan",
     "channelName": "Ejen aktif",
-    "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci."
+    "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci.",
+    "newestResult": "Hasil terbaharu"
   },
   "transcriptionModel": {
     "title": "Model transkripsi",

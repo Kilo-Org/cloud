@@ -129,6 +129,13 @@ function renderedText(renderer: TestRenderer.ReactTestRenderer): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
+/** The rendered Text node holding exactly `copy`, if it is mounted. */
+function textNode(renderer: TestRenderer.ReactTestRenderer, copy: string) {
+  return renderer.root
+    .findAllByType('Text' as never)
+    .find(node => node.children.length === 1 && node.children[0] === copy);
+}
+
 /** The headers of the connect cards; the section renders no other pressable. */
 function pressables(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root.findAllByType('Pressable' as never);
@@ -237,6 +244,30 @@ describe('NewSessionRepositorySection Bitbucket connect card', () => {
     expect(
       connectHeader(renderer, i18n.t('common.connectBitbucket'))?.props.accessibilityState
     ).toEqual({ expanded: false });
+  });
+});
+
+describe('NewSessionRepositorySection connect card open action', () => {
+  it('gives every provider open label the row width and pins it to one line', () => {
+    const renderer = mountSection({
+      groups: [
+        group('github', 'connect'),
+        group('gitlab', 'connect'),
+        group('bitbucket', 'connect'),
+      ],
+    });
+
+    // A label box sized to the label's own measured width is a fraction
+    // narrower than the glyphs Android lays out, so "Open GitLab" wrapped onto
+    // two lines. The label takes the row's remaining width instead, and
+    // `numberOfLines` pins the single line.
+    for (const key of ['openGithub', 'openGitlab', 'openBitbucket'] as const) {
+      const label = textNode(renderer, i18n.t(`agentChat.newSession.${key}`));
+      expect(label, key).toBeDefined();
+      expect(label?.props.className, key).toContain('flex-1');
+      expect(label?.props.className, key).toContain('text-center');
+      expect(label?.props.numberOfLines, key).toBe(1);
+    }
   });
 });
 

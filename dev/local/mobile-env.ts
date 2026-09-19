@@ -16,6 +16,7 @@ const URL_KEY_TO_SERVICE = new Map<string, { service: string; protocol: 'http' |
   ['KILO_CHAT_URL', { service: 'kilo-chat', protocol: 'http' }],
   ['EVENT_SERVICE_URL', { service: 'event-service', protocol: 'ws' }],
   ['NOTIFICATIONS_URL', { service: 'notifications', protocol: 'http' }],
+  ['LATENCY_INGEST_URL', { service: 'latency-ingest', protocol: 'http' }],
 ]);
 
 type MobileEnvValues = ReadonlyMap<string, string>;

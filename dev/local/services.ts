@@ -253,6 +253,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres'],
     dir: 'services/model-eval-ingest',
   },
+  'latency-ingest': {
+    group: 'observability',
+    dependsOn: [],
+    dir: 'services/latency-ingest',
+  },
   'cloudflare-ai-attribution': {
     group: 'observability',
     dependsOn: [],

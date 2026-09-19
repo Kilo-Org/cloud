@@ -9,8 +9,9 @@ import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
 } from '@/lib/organizations/effective-model-access.server';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
-export async function GET() {
+async function getModelsByProvider() {
   await connection();
 
   const result = await db
@@ -75,3 +76,5 @@ export async function GET() {
     headers: { 'Cache-Control': 'private, max-age=0, must-revalidate' },
   });
 }
+
+export const GET = withRestTiming('/api/openrouter/models-by-provider', getModelsByProvider);

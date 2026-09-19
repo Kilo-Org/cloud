@@ -18,14 +18,33 @@ import * as transcriptionModels from '@/app/api/gateway/transcription-models/rou
 import * as gatewayEmbeddingsImplementation from '@/app/api/openrouter/embeddings/route';
 
 describe('gateway route aliases', () => {
+  test('gateway/[...path] wraps the openrouter handler with its own timing pattern', () => {
+    // The gateway catch-all used to re-export the openrouter handler by
+    // reference. It now wraps it in `withRestTiming`, which returns a new
+    // function, so identity no longer holds (see the gateway timing test).
+    expect(typeof gatewayPath.POST).toBe('function');
+    expect(gatewayPath.POST).not.toBe(openrouterPath.POST);
+    expect(gatewayPath.maxDuration).toBe(800);
+  });
+
+  test('gateway/audio/transcriptions wraps the openrouter handler with its own timing pattern', () => {
+    // Same as the catch-all: this dedicated alias now carries the gateway
+    // timing pattern, so it no longer shares the implementation's identity.
+    expect(typeof gatewayAudioTranscriptions.POST).toBe('function');
+    expect(gatewayAudioTranscriptions.POST).not.toBe(openrouterAudioTranscriptions.POST);
+    expect(gatewayAudioTranscriptions.maxDuration).toBe(800);
+  });
+
+  test('openrouter/transcription-models wraps the gateway handler with its own timing pattern', () => {
+    // The gateway implementation is wrapped first for `/api/gateway/...`; the
+    // openrouter alias wraps it again so an openrouter pathname logs the
+    // openrouter pattern (the inner wrapper stays silent by prefix).
+    expect(typeof openrouterTranscriptionModels.GET).toBe('function');
+    expect(openrouterTranscriptionModels.GET).not.toBe(transcriptionModels.GET);
+  });
+
   test.each([
-    ['gateway/[...path]', gatewayPath.POST, openrouterPath.POST],
     ['gateway/embeddings', gatewayEmbeddings.POST, gatewayEmbeddingsImplementation.POST],
-    [
-      'gateway/audio/transcriptions',
-      gatewayAudioTranscriptions.POST,
-      openrouterAudioTranscriptions.POST,
-    ],
     ['gateway/models', gatewayModels.GET, openrouterModels.GET],
     ['gateway/models-by-provider', gatewayModelsByProvider.GET, openrouterModelsByProvider.GET],
     ['gateway/v1/models', gatewayV1Models.GET, openrouterModels.GET],
@@ -43,9 +62,8 @@ describe('gateway route aliases', () => {
     [
       'openrouter/v1/transcription-models',
       openrouterV1TranscriptionModels.GET,
-      transcriptionModels.GET,
+      openrouterTranscriptionModels.GET,
     ],
-    ['openrouter/transcription-models', openrouterTranscriptionModels.GET, transcriptionModels.GET],
   ])(
     '%s exports the implementation handler by identity',
     (_route, aliasHandler, implementationHandler) => {

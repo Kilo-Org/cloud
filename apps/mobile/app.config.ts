@@ -306,6 +306,10 @@ const config: ExpoConfig = {
       },
     ],
     './plugins/withAndroidManifestFix',
+    // WorkManager initializes on demand so MainApplication can first rebuild an
+    // unopenable store left by a device migration or backup restore; see the
+    // plugin header for the crash it prevents.
+    './plugins/withWorkManagerStoreRecovery',
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',

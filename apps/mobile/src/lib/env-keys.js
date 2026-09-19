@@ -28,4 +28,8 @@ export const OPTIONAL_ENV_KEYS = {
   // failure states are provable on a live build.
   e2eSecureStoreFaultMs: 'E2E_SECURE_STORE_FAULT_MS',
   sentryEnvironment: 'EXPO_PUBLIC_SENTRY_ENVIRONMENT',
+  // Client-observed request-latency ingest endpoint. Optional: config.ts falls
+  // back to the committed LATENCY_INGEST_URL_DEFAULT (url-contract.js), so a
+  // build with no env value still samples.
+  latencyIngestUrl: 'LATENCY_INGEST_URL',
 };

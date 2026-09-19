@@ -8,12 +8,13 @@ import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
 } from '@/lib/organizations/effective-model-access.server';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 /**
  * Test using:
  * curl -vvv 'http://localhost:3000/api/gateway/transcription-models'
  */
-export async function GET(): Promise<
+async function getTranscriptionModels(): Promise<
   NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>
 > {
   try {
@@ -46,3 +47,5 @@ export async function GET(): Promise<
     );
   }
 }
+
+export const GET = withRestTiming('/api/gateway/transcription-models', getTranscriptionModels);

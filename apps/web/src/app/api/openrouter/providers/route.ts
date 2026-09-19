@@ -1,4 +1,3 @@
-import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { modelsByProvider } from '@kilocode/db';
@@ -6,6 +5,7 @@ import { desc } from 'drizzle-orm';
 import { OpenRouterProvidersResponseSchema } from '@/lib/organizations/organization-types';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { readDb } from '@/lib/drizzle';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 const getProviders = createCachedFetch(
   async () => {
@@ -25,7 +25,7 @@ const getProviders = createCachedFetch(
  * Test using:
  * curl -vvv 'http://localhost:3000/api/openrouter/providers'
  */
-export async function GET(_request: NextRequest): Promise<NextResponse> {
+async function getProvidersRoute(_request: Request): Promise<NextResponse> {
   try {
     const data = await getProviders();
     if (data === null) {
@@ -48,3 +48,5 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
     );
   }
 }
+
+export const GET = withRestTiming('/api/openrouter/providers', getProvidersRoute);

@@ -1484,6 +1484,9 @@ importers:
       '@jest/globals':
         specifier: 30.3.0
         version: 30.3.0
+      '@swc/jest':
+        specifier: 0.2.39
+        version: 0.2.39(@swc/core@1.15.18(@swc/helpers@0.5.23))
       '@types/pg':
         specifier: 8.18.0
         version: 8.18.0
@@ -1496,6 +1499,9 @@ importers:
       drizzle-kit:
         specifier: 'catalog:'
         version: 0.31.10
+      jest:
+        specifier: 30.3.0
+        version: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3

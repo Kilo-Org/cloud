@@ -63,7 +63,9 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { i18n } from '@/i18n';
-import { renderWithProviders } from '@/test/render-with-providers';
+import { captureEvent, SESSION_VIEWED_EVENT } from '@/lib/analytics/posthog';
+import { recordLastOpenedSession } from '@/lib/last-opened-session';
+import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
 const connectionHealth = vi.hoisted(() => ({
@@ -359,8 +361,14 @@ vi.mock('@/lib/a11y/announce', () => ({
   moveA11yFocus: () => false,
   announceForA11y: vi.fn(),
 }));
+// `test-user` by default; the last-opened test flips it to `undefined` to model
+// the identity resolving after the session's first render.
+const currentUserId = vi.hoisted(() => ({ value: 'test-user' as string | undefined }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: () => ({ userId: 'test-user', isLoading: false }),
+  useCurrentUserId: () => ({ userId: currentUserId.value, isLoading: false }),
+}));
+vi.mock('@/lib/last-opened-session', () => ({
+  recordLastOpenedSession: vi.fn(),
 }));
 vi.mock('@/lib/hooks/use-available-models', () => ({
   useAvailableModels: () => ({ models: [], isLoading: false }),
@@ -576,6 +584,7 @@ beforeEach(() => {
   globalContext.setOrganizationId.mockClear();
   rootPageNextCursor = null;
   condensePreference.value = false;
+  currentUserId.value = 'test-user';
   connectionHealth.isConnected = true;
   connectionHealth.reconnectExhausted = false;
   connectionHealth.retryConnection.mockClear();
@@ -2202,6 +2211,41 @@ describe('SessionDetailContent goal visibility', () => {
     motionPolicy.reducedMotion = true;
     const reduced = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
     expect(goalWrapperOf(reduced).props.layout).toBeUndefined();
+  });
+});
+
+describe('SessionDetailContent last-opened record', () => {
+  it('records the viewed session when the identity resolves after the first render', async () => {
+    // A cold start: the session renders before `user.getMe` answers, so the
+    // first visit sees no `userId`.
+    currentUserId.value = undefined;
+    const record = vi.mocked(recordLastOpenedSession);
+    const capture = vi.mocked(captureEvent);
+    record.mockClear();
+    capture.mockClear();
+    onTestFinished(() => {
+      currentUserId.value = 'test-user';
+    });
+
+    const view = await mountDetails();
+
+    // The view event proves the once-per-session latch already closed while the
+    // identity was unknown.
+    await waitFor(() => capture.mock.calls.some(call => call[0] === SESSION_VIEWED_EVENT));
+    expect(record).not.toHaveBeenCalled();
+
+    // The identity resolves: the record must still land for this session.
+    currentUserId.value = 'test-user';
+    await view.switchRoot(ROOT_ID);
+
+    await waitFor(() => record.mock.calls.length > 0);
+    expect(record).toHaveBeenCalledExactlyOnceWith(ROOT_ID, 'test-user');
+
+    // A later render of the same viewed session must not record again.
+    capture.mockClear();
+    await view.switchRoot(ROOT_ID);
+    expect(record).toHaveBeenCalledOnce();
+    expect(capture).not.toHaveBeenCalled();
   });
 });
 

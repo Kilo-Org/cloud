@@ -412,6 +412,7 @@ export function NewSessionPrompt({
         />
         {PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING ? (
           <View className="flex-row justify-end px-1 pb-1">
+            {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
             <Text
               className="text-xs font-normal text-muted-foreground"
               accessibilityLabel={t('agentChat.composer.charactersRemaining', {

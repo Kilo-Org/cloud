@@ -126,6 +126,16 @@ const consentMock = vi.hoisted(() => ({
   clearPendingConsentOutcome: vi.fn(),
 }));
 
+// Hoisted so the sign-out suite can assert the launcher-surface clears without
+// loading the last-opened store's secure-store chain or the native module.
+const lastOpenedSessionMock = vi.hoisted(() => ({
+  clearLastOpenedSession: vi.fn(),
+}));
+
+const nativeLauncherSurfacesMock = vi.hoisted(() => ({
+  clearLauncherSurfaces: vi.fn(),
+}));
+
 const ownerProducer = vi.hoisted(() => ({
   getMe: vi.fn<() => Promise<{ id: string }>>().mockResolvedValue({ id: 'user-a' }),
   ticket: vi.fn().mockResolvedValue({ token: 'ingest-ticket' }),
@@ -209,11 +219,23 @@ vi.mock('@/lib/query-client', () => ({
 
 vi.mock('@/lib/persist/read-cache', () => readCacheMock);
 
+// The sign-out teardown reaches the OS search bridge through
+// `session-scoped-state`. That bridge imports the root `expo` entry, which
+// reads `__DEV__` at import time and does not parse under the node test
+// environment; the clear is a no-op here.
+vi.mock('@/lib/native-system-search', () => ({
+  clearSystemSearchIndex: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/auth/logout-cleanup', () => logoutCleanupMock);
 
 vi.mock('@/lib/consent', () => ({
   clearPendingConsentOutcome: consentMock.clearPendingConsentOutcome,
 }));
+
+vi.mock('@/lib/last-opened-session', () => lastOpenedSessionMock);
+
+vi.mock('@/lib/native-launcher-surfaces', () => nativeLauncherSurfacesMock);
 
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({
   setTrpcUnauthorizedHandler: vi.fn(),
@@ -667,6 +689,19 @@ describe('sign-out teardown ordering', () => {
     const { clearRunOnDestinationPreference } =
       await import('@/lib/hooks/use-persisted-run-on-destination');
     expect(clearRunOnDestinationPreference).toHaveBeenCalled();
+  });
+
+  it('clears the last-opened session and the launcher surfaces on sign-out', async () => {
+    const { ctx } = await mountAndGetContext();
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    // The dynamic shortcuts/tile are dropped natively and the durable record is
+    // deleted locally, so the next account never sees the previous session.
+    expect(nativeLauncherSurfacesMock.clearLauncherSurfaces).toHaveBeenCalledTimes(1);
+    expect(lastOpenedSessionMock.clearLastOpenedSession).toHaveBeenCalledTimes(1);
   });
 
   it('closes the ownership gate before any await and blocks a late persist', async () => {
@@ -1345,6 +1380,38 @@ describe('bootstrap and foreground race fencing', () => {
     fetchSpy.mockRestore();
     unmount();
   });
+
+  it('regression: a signed-out launch re-runs the OS search clear the teardown cannot await', async () => {
+    // The beforeEach leaves every read null: the launch positively restored no
+    // session, which is the retry for a teardown-time clear that failed or a
+    // process killed before it landed. No sign-out runs here, so the launch
+    // re-clear is the only call.
+    const { getCtx, unmount } = await mountProvider();
+    expect(getCtx().isLoading).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().restoreFailed).toBe(false);
+
+    const search = await import('@/lib/native-system-search');
+    expect(vi.mocked(search.clearSystemSearchIndex)).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('a restore-failure bootstrap never wipes the search index', async () => {
+    // Every credential read rejects: the session is not known to be gone, so
+    // the account may still own the index and only a positively signed-out
+    // launch may clear it.
+    hoisted.secureStore.getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+
+    const { getCtx, unmount } = await mountProvider();
+    await settleBootstrap(getCtx);
+    expect(getCtx().restoreFailed).toBe(true);
+
+    const search = await import('@/lib/native-system-search');
+    expect(vi.mocked(search.clearSystemSearchIndex)).not.toHaveBeenCalled();
+
+    unmount();
+  }, 60_000);
 });
 
 describe('reactive auth epoch', () => {

@@ -14,10 +14,14 @@ const stringCodeErrorSchema = z.object({ code: z.string() });
  * Every native auth POST routes through here, so this is also where a refused
  * admission drops the stored App Attest key id. Putting it here rather than at
  * each caller means a new sign-in path cannot forget it.
+ *
+ * `extraHeaders` carries a caller's own auth header; the login routes take
+ * none, and only the authenticated passkey registration route sets it.
  */
 export async function postAuth(
   path: string,
-  body: unknown
+  body: unknown,
+  extraHeaders?: Record<string, string>
 ): Promise<
   | { ok: true; data: unknown }
   | { ok: false; errorCode: string | undefined; ssoOrganizationId: string | undefined }
@@ -25,7 +29,11 @@ export async function postAuth(
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...buildClientMetadataHeaders() },
+      headers: {
+        'Content-Type': 'application/json',
+        ...buildClientMetadataHeaders(),
+        ...extraHeaders,
+      },
       body: JSON.stringify(body),
     });
 

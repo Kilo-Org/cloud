@@ -52,6 +52,7 @@ const EXPECTED_PROFILES = {
   variablesTitle: 'Environment variables',
   addVariable: 'Add variable',
   keyLabel: 'Key',
+  keyTooLong: 'Key must be 256 characters or fewer',
   valueLabel: 'Value',
   secretLabel: 'Secret',
   secrets: {

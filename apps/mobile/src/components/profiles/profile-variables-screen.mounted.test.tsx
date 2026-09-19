@@ -167,6 +167,21 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
+  it('non-retryable: an over-long key names the key length before the call', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Key', 'a'.repeat(257));
+    pressButton(renderer.root, 'Save');
+
+    expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Key').props.error).toBe('Key must be 256 characters or fewer');
+
+    unmount();
+  });
+
   it('retryable: a failure with no message toasts the fallback and keeps the form', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;

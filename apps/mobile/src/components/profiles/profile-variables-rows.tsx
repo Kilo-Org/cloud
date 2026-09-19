@@ -28,12 +28,12 @@ export function VariablesSkeleton() {
 }
 
 /**
- * Inline edit copy for a refused input. The catalog has no key-specific
- * validation message, so the key is marked required when empty and the
- * screen's save-failed fallback names the over-long case.
+ * Inline edit copy for a refused input. Both cases are refused before a save is
+ * attempted, so neither uses the screen's save-failed fallback: an empty key is
+ * required, and an over-long key states the server's 256-character bound.
  */
 function variableInputErrorMessage(t: (key: string) => string, error: VariableInputError): string {
-  return error === 'empty' ? t('common.required') : t('profiles.variablesSaveFailed');
+  return error === 'empty' ? t('common.required') : t('profiles.keyTooLong');
 }
 
 /**

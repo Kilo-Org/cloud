@@ -708,22 +708,31 @@ export function ensureTranslation(input: {
   // so drop it from the retry memory and the queue before the freshness,
   // in-flight and queued guards return.
   forgetSupersededEntries(language, model.id, itemId, key);
-  if (isFreshCacheEntry(key, text, Date.now()) || inFlight.has(key) || queued.has(key)) {
+  if (isFreshCacheEntry(key, text, Date.now())) {
+    // Resolved: no retry memory is needed for a summary already translated.
     return;
   }
   const item: QueueItem = { key, itemId, text, language, model, generation };
-  queue.push(item);
-  queued.add(key);
-  // Remember the unresolved summary so `retryUnresolvedTranslations` can
-  // re-queue it after a connection recovery. Resolution removes it (`remember`)
-  // and the map is capped, so failures cannot grow without bound.
-  if (retryable.size >= MAX_RETRYABLE_ENTRIES) {
+  // Remember the unresolved summary before the in-flight and queued guards
+  // return, so `retryUnresolvedTranslations` can re-queue it after a connection
+  // recovery. A mounted row's retry tick releases its interest and re-asks on
+  // the same key while the attempt it waits on is still in flight; releasing
+  // drops the key from this memory, and the re-ask early-returns on the guards
+  // below, so only re-remembering it here keeps the row re-queueable for the
+  // whole attempt. Resolution removes it (`remember`) and the map is capped, so
+  // failures cannot grow without bound.
+  if (retryable.size >= MAX_RETRYABLE_ENTRIES && !retryable.has(key)) {
     const oldest = retryable.keys().next().value;
     if (oldest !== undefined) {
       retryable.delete(oldest);
     }
   }
   retryable.set(key, item);
+  if (inFlight.has(key) || queued.has(key)) {
+    return;
+  }
+  queue.push(item);
+  queued.add(key);
   scheduleFlush();
 }
 

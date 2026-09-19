@@ -273,6 +273,44 @@ describe('tool summary translation cache', () => {
     );
   });
 
+  it('does not delete a newer same-key entry when the abandoned late write settles', async () => {
+    // A store write the sign-out drain abandoned. Its value commits, but its
+    // promise does not settle until the gate opens, so a newer write under the
+    // current epoch can land on the same key in between.
+    const gate = Promise.withResolvers<undefined>();
+    kvMock.setItem.mockImplementationOnce(async (scope: string, k: string, v: string) => {
+      let bucket = kvMock.scopes.get(scope);
+      if (!bucket) {
+        bucket = new Map();
+        kvMock.scopes.set(scope, bucket);
+      }
+      bucket.set(k, { v, updatedAt: 1 });
+      await gate.promise;
+    });
+
+    const dispatchedEpoch = currentAuthEpoch();
+    const late = writeToolSummaryTranslation(makeEntry({ itemId: 'item-shared' }), dispatchedEpoch);
+
+    // The epoch moves and the scope is cleared while the write is unsettled.
+    bumpAuthEpoch();
+    await clearToolSummaryTranslationsForSignOut();
+
+    // The next account reopens the same part under the current epoch: the same
+    // item id and text produce the same key.
+    const newer = makeEntry({
+      itemId: 'item-shared',
+      translation: 'Neu',
+      storedAt: 1_700_000_001_000,
+    });
+    await writeToolSummaryTranslation(newer);
+
+    gate.resolve(undefined);
+    await late;
+
+    // The abandoned write must not delete the newer, valid entry.
+    await expect(readToolSummaryTranslations()).resolves.toEqual([newer]);
+  });
+
   it('keeps a write made under the current auth epoch', async () => {
     await writeToolSummaryTranslation(makeEntry({ itemId: 'item-current' }), currentAuthEpoch());
 

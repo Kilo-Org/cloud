@@ -915,6 +915,45 @@ describe('retry of unresolved summaries after a connection recovery', () => {
     expect(requestCalls()[1]?.texts).toEqual(['hello']);
   });
 
+  it('keeps the retry memory when a mounted row’s tick re-asks during an in-flight attempt', async () => {
+    const mod = await loadRuntime();
+    // The gateway is unreachable: the row's attempt stays pending.
+    const resolvers = pendingBatches();
+
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+    await vi.waitFor(() => {
+      expect(requestMock).toHaveBeenCalledTimes(1);
+    });
+
+    // The mounted row's 10 s retry tick releases its interest and re-asks on the
+    // same key while the attempt is still in flight. The release must not leave
+    // the key out of the retry memory: the re-ask early-returns on the in-flight
+    // guard, so without remembering it again a reconnect while the attempt is
+    // pending could no longer re-queue the row.
+    mod.releaseTranslationInterest({
+      itemId: 'part-1',
+      text: 'hello',
+      language: 'de',
+      model: MODEL,
+    });
+    mod.ensureTranslation({ itemId: 'part-1', text: 'hello', language: 'de', model: MODEL });
+
+    // Connectivity returns while that attempt is still pending: the retry
+    // re-queues the row, held as owned rather than dispatched twice.
+    mod.retryUnresolvedTranslations();
+    await flushBatch();
+    expect(requestMock).toHaveBeenCalledTimes(1);
+
+    // The pending attempt then fails. The re-queued summary must survive it and
+    // be requested again.
+    echoBatch();
+    resolvers[0]?.([null]);
+    await waitForTranslations(mod, [{ itemId: 'part-1', text: 'hello' }]);
+
+    expect(requestMock).toHaveBeenCalledTimes(2);
+    expect(requestCalls()[1]?.texts).toEqual(['hello']);
+  });
+
   it('does not re-send a superseded text once the raced attempt settles unresolved', async () => {
     const mod = await loadRuntime();
     const resolvers = pendingBatches();

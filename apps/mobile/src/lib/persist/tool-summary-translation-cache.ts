@@ -127,7 +127,9 @@ export async function readToolSummaryTranslations(): Promise<CachedToolSummaryTr
  * abandoned can still land afterwards; the entry is therefore removed again
  * once it settles when the epoch moved, so a late write can never recreate the
  * previous account's tool text after the scope was cleared. A write that lands
- * under a newer account's epoch is left alone: it belongs to that account.
+ * under a newer account's epoch is left alone: it belongs to that account, and
+ * the removal only drops the value this write stored, so a newer entry the same
+ * key now holds is never deleted.
  */
 export async function writeToolSummaryTranslation(
   entry: CachedToolSummaryTranslation,
@@ -143,21 +145,26 @@ export async function writeToolSummaryTranslation(
     parsed.data.itemId,
     parsed.data.text
   );
+  const serialized = JSON.stringify(parsed.data);
   try {
     // The transition already cleared the scope before this write could start:
     // committing would recreate the entry the clear removed.
     if (epoch !== currentAuthEpoch()) {
       return;
     }
-    await encryptedKv.setItem(
-      TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE,
-      itemKey,
-      JSON.stringify(parsed.data)
-    );
+    await encryptedKv.setItem(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE, itemKey, serialized);
     if (epoch !== currentAuthEpoch()) {
       // The scope was cleared while this write was in flight. Remove the entry
-      // the clear could not have seen, so the durable scope stays empty.
-      await encryptedKv.removeItem(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE, itemKey);
+      // the clear could not have seen, so the durable scope stays empty — but
+      // only while it is still this write's value. The key names a
+      // server-issued part id, so a later sign-in that reopens the same part
+      // writes the same key; if such a write under the current epoch committed
+      // while this one was unsettled, the stored value is the newer account's
+      // entry and removing it would delete valid data.
+      const stored = await encryptedKv.getItem(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE, itemKey);
+      if (stored === serialized) {
+        await encryptedKv.removeItem(TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE, itemKey);
+      }
       return;
     }
     await evictOldestBeyondCap();

@@ -1510,6 +1510,13 @@ describe('reactive auth epoch', () => {
     });
     const previous = scope.getAuthenticatedOwner();
     expect(previous.userId).toBe('user-a');
+    // Establish the restored state a cold start sets, so the assertion after the
+    // switch proves `signIn` clears a previously-restored flag instead of
+    // starting from the `false` a never-restored bootstrap already holds.
+    act(() => {
+      scope.markRestoredAuthenticatedOwner();
+    });
+    expect(scope.getAuthenticatedOwner().restored).toBe(true);
     // The old credentials remain readable on disk while the replacement write is held.
     hoisted.secureStore.getItemAsync.mockResolvedValue('account-a-token');
 

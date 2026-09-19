@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "Kilo kama aqoonsado {{repository}} kayd GitHub ama GitLab ah. Dooro kayd kale gudaha Kilo.",
       "repositoryUnsupported": "{{repository}} waa kayd Bitbucket — Bilow wakiilka weli ma isticmaali karo. Dooro kayd kale gudaha Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Fur kalfadhigii ugu dambeeyay"
   }
 }

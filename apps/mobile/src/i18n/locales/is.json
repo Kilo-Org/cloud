@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "Kilo þekkir ekki {{repository}} sem GitHub- eða GitLab-kóðasafn. Veldu annað kóðasafn í Kilo.",
       "repositoryUnsupported": "{{repository}} er Bitbucket-kóðasafn — Ræsa fulltrúa getur ekki notað það enn. Veldu annað kóðasafn í Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Opna síðustu lotu"
   }
 }

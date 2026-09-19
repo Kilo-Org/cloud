@@ -13,7 +13,7 @@ import {
   unmountUnlock,
 } from '@/components/app-unlock-screen.test-helpers';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
-import { ANDROID_NAVIGATION_BAR_HEIGHT, TOAST_BOTTOM_GAP } from '@/lib/toast-offset';
+import { MIN_BOTTOM_CHROME_HEIGHT, TOAST_BOTTOM_GAP } from '@/lib/toast-offset';
 
 // One keyboard read for the whole app: the Toaster must import the hook the
 // screens reserve padding with, not run its own listener pair, or the toast's
@@ -56,21 +56,23 @@ it('anchors the toast container to the window so toasts reach the accessibility 
 });
 
 /**
- * The safe-area inset is only `navigationBars()`: it does not grow while the
- * IME's navigation row is on screen, so a toast anchored to the inset alone
- * had its last line clipped under that row (2026-09-18 device finding). The
- * offset must therefore be floored at Android's navigation bar height.
+ * The safe-area inset is not a reliable floor for the bottom chrome: on Android
+ * it is only `navigationBars()`, it does not grow while the IME's navigation
+ * row is on screen, and it can be reported as `0`. A toast anchored to the
+ * inset alone had its last line clipped under that chrome (2026-09-18 device
+ * finding), so the offset is floored at one shared bottom-chrome height for
+ * both platforms — no platform branch.
  */
-it('floors the Android toast offset at the navigation bar height', async () => {
+it('floors the toast offset at the shared bottom-chrome height', async () => {
   platform.OS = 'android';
   // Default route: a screen pushed over the tabs, so no tab bar is on screen
-  // and the navigation-bar floor decides the offset.
+  // and the bottom-chrome floor decides the offset.
   await mount();
 
   const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
 
-  // The mocked inset (12) is below the bar, so the floor decides the offset.
-  expect(toasters[0]?.props.offset).toBe(ANDROID_NAVIGATION_BAR_HEIGHT + TOAST_BOTTOM_GAP);
+  // The mocked inset (12) is below the floor, so the floor decides the offset.
+  expect(toasters[0]?.props.offset).toBe(MIN_BOTTOM_CHROME_HEIGHT + TOAST_BOTTOM_GAP);
 });
 
 /**
@@ -111,7 +113,7 @@ it('keeps the resting offset when the route hides the tab bar', async () => {
 
   const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
 
-  expect(toasters[0]?.props.offset).toBe(ANDROID_NAVIGATION_BAR_HEIGHT + TOAST_BOTTOM_GAP);
+  expect(toasters[0]?.props.offset).toBe(MIN_BOTTOM_CHROME_HEIGHT + TOAST_BOTTOM_GAP);
 });
 
 /**
@@ -141,10 +143,18 @@ it('keeps the toast above the software keyboard while it is up', async () => {
   expect(toasters[0]?.props.offset).toBe(300 + TOAST_BOTTOM_GAP);
 });
 
-it('leaves the iOS offset at the safe-area inset plus the standard gap', async () => {
+/**
+ * The same rule runs on iOS: the offset module reads no platform, so the
+ * resting offset is the shared bottom-chrome floor plus the standard gap, not
+ * the raw iOS inset (12 here). This is the platform-parity assertion for the
+ * toast path — if a per-platform branch grows back, one of the two platforms
+ * stops matching the shared floor.
+ */
+it('uses the same bottom-chrome floor on iOS', async () => {
+  platform.OS = 'ios';
   await mount();
 
   const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
 
-  expect(toasters[0]?.props.offset).toBe(12 + TOAST_BOTTOM_GAP);
+  expect(toasters[0]?.props.offset).toBe(MIN_BOTTOM_CHROME_HEIGHT + TOAST_BOTTOM_GAP);
 });

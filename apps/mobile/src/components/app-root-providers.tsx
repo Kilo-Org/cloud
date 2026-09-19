@@ -108,6 +108,10 @@ export function AppRootProviders({
  * `react-native-safe-area-context` does not report IME insets, so a
  * bottom-anchored overlay has no other way to clear the keyboard and its
  * navigation row.
+ *
+ * The resting offset is one platform-free rule (`lib/toast-offset.ts`): iOS and
+ * Android run the same math, and the only platform value it reads is the tab
+ * bar's own rendered height, which the bar's helper owns.
  */
 function AppToaster() {
   const colors = useThemeColors();
@@ -123,7 +127,10 @@ function AppToaster() {
   // `shouldHideTabBar` does not hide it — the same predicate the bar's own
   // layout uses — so the toast clears it only while it is actually on screen;
   // a screen pushed over the tabs (agent-chat, pr-review) or the auth flow
-  // keeps the toast at its resting offset. See `lib/toast-offset.ts`.
+  // keeps the toast at its resting offset. `getEffectiveTabBarHeight` is the
+  // bar's own measurement (it carries the bar's small Android-only extra
+  // padding), so the toast cannot disagree with what the bar renders. See
+  // `lib/toast-offset.ts`.
   const tabBarHeight =
     (segments as readonly string[]).includes('(tabs)') && !shouldHideTabBar(pathname)
       ? getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale })
@@ -133,11 +140,11 @@ function AppToaster() {
     <Toaster
       position="bottom-center"
       // Explicit offset, rather than sonner-native's `safe area inset + 8`:
-      // the reported inset does not cover Android's IME navigation row, which
-      // left the error toast's last line clipped under it, nor the floating
-      // tab bar, which the toast then covered. See `lib/toast-offset.ts`.
+      // the reported inset can under-report the bottom chrome (Android's IME
+      // navigation row), which left the error toast's last line clipped under
+      // it, and never covers the floating tab bar, which the toast then
+      // covered. One platform-free rule; see `lib/toast-offset.ts`.
       offset={getToastBottomOffset({
-        platform: Platform.OS,
         safeAreaBottom: bottom,
         keyboardHeight,
         tabBarHeight,

@@ -166,6 +166,7 @@ import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
@@ -388,6 +389,7 @@ export function SessionDetailContent({
   }, []);
 
   const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
 
   // Durable composer draft. The composer renders immediately — typing must
@@ -1699,7 +1701,7 @@ export function SessionDetailContent({
         options,
         cancelButtonIndex: options.length - 1,
         destructiveButtonIndex: removeIndex === -1 ? undefined : removeIndex,
-        containerStyle: { paddingBottom: bottom },
+        ...themedSheet,
       },
       index => {
         const action = index === undefined ? undefined : actions[index];
@@ -1730,7 +1732,7 @@ export function SessionDetailContent({
         void runGoalAction(action);
       }
     );
-  }, [sessionGoal, t, showActionSheetWithOptions, bottom, runGoalAction]);
+  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction]);
 
   const handleGoalEditSave = useCallback(
     async (objective: string) => {

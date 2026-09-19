@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ChevronDown } from '@/components/ui/icons';
@@ -12,6 +11,7 @@ import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
 
@@ -20,7 +20,7 @@ export type ContextDisplayScope = { organizationId: string | null; isResolved: b
 /** The caller supplies its cached memberships; the picker does not fetch data. */
 export function useContextPicker(orgs: OrgListEntry[] | undefined) {
   const { showActionSheetWithOptions } = useActionSheet();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { t } = useTranslation();
   const { setOrganizationId } = useOrganization();
 
@@ -39,7 +39,7 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
         options,
         cancelButtonIndex,
         title: t('profile.selectAccount'),
-        containerStyle: { paddingBottom: bottom },
+        ...themedSheet,
       },
       index => {
         if (index === undefined || index === cancelButtonIndex) {

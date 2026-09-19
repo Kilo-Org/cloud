@@ -522,7 +522,17 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
 
     expect(showActionSheetWithOptions).toHaveBeenCalledTimes(1);
     expect(showActionSheetWithOptions).toHaveBeenCalledWith(
-      { options: ['Open as text', 'Open in external app', 'Cancel'], cancelButtonIndex: 2 },
+      {
+        options: ['Open as text', 'Open in external app', 'Cancel'],
+        cancelButtonIndex: 2,
+        autoFocus: true,
+        useModal: true,
+        containerStyle: expect.objectContaining({ paddingBottom: 0 }),
+        textStyle: expect.anything(),
+        titleTextStyle: expect.anything(),
+        messageTextStyle: expect.anything(),
+        destructiveColor: expect.anything(),
+      },
       expect.any(Function)
     );
     expect(shareLocalFile).not.toHaveBeenCalled();

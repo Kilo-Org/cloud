@@ -59,9 +59,12 @@ public final class KiloSystemSearchModule: Module {
   /// rejected. `CSSearchableIndex` does not call its completion handler when
   /// the index is unavailable, and every apply and clear runs on the one serial
   /// queue, so an unbounded *promise* wait would leave the caller pending
-  /// forever. The queue itself stays fenced on a timeout (see
-  /// `awaitIndexCall`), so the bound releases JavaScript, not the ordering.
-  /// Mirrors the Android module's `latch.await(TIMEOUT_SECONDS, …)`.
+  /// forever. A timeout keeps the queue fenced for one further interval, to let
+  /// a merely-late completion land before a later call, but no longer (see
+  /// `awaitIndexCall`): the queue itself must never be held past two intervals,
+  /// or a completion that never arrives would wedge every later apply and clear
+  /// for the process's life. Mirrors the Android module's
+  /// `latch.await(TIMEOUT_SECONDS, …)`.
   private static let indexTimeout: DispatchTimeInterval = .seconds(30)
   private static let timeoutMessage = "The system search index did not respond."
 
@@ -70,9 +73,9 @@ public final class KiloSystemSearchModule: Module {
     Events("onSystemSearchOpen")
 
     // The apply and the clear run on one serial queue, and each blocks that
-    // queue until the index answers or the wait above times out, so their index
-    // calls and their ledger updates cannot interleave. The promise is resolved
-    // from the queue later; the closure itself returns immediately.
+    // queue until the index answers or the bounded waits above elapse, so their
+    // index calls and their ledger updates cannot interleave. The promise is
+    // resolved from the queue later; the closure itself returns immediately.
     AsyncFunction("applyUpdate") { (add: [SystemSearchRecord], removeIds: [String], promise: Promise) in
       KiloSystemSearchStore.operationQueue.async {
         self.apply(add: add, removeIds: removeIds, promise: promise)
@@ -180,14 +183,17 @@ public final class KiloSystemSearchModule: Module {
 
   /// Runs one index call under the bound above.
   ///
-  /// A timeout fails the promise, but the call is still in flight: the
-  /// completion is awaited before this method returns, so the serial operation
-  /// queue stays fenced until the native completion is observed. Otherwise a
-  /// late add or delete could land after a later clear and leave the index
-  /// holding records the ledger says are gone — exactly the race the one
-  /// serial queue exists to prevent. A call that never completes holds the
-  /// queue, the same as one that hung before the timeout was introduced; the
-  /// promise is already rejected, so JavaScript is not blocked by it.
+  /// A timeout fails the promise, but the call may still be in flight: the
+  /// completion is awaited for one further bounded interval, so a merely-late
+  /// add or delete cannot land after a later clear and leave the index holding
+  /// records the ledger says are gone — the race the one serial queue exists to
+  /// prevent. The drain is bounded, though. The timeout branch is reached
+  /// exactly when the completion has not run within the first interval, and it
+  /// may never run at all; waiting on it without a bound would hold this serial
+  /// queue for the process's life, so every later apply and clear — the
+  /// sign-out wipe among them — would sit behind it and never settle. The
+  /// promise is already rejected when the drain begins, so JavaScript is not
+  /// blocked by it.
   private func awaitIndexCall(
     _ start: (@escaping (Error?) -> Void) -> Void,
     promise: Promise
@@ -200,7 +206,7 @@ public final class KiloSystemSearchModule: Module {
     }
     guard Self.waitForIndex(wait) else {
       promise.reject(Self.indexTimeoutError())
-      wait.wait()
+      _ = Self.waitForIndex(wait)
       return .timedOut
     }
     return .completed(error)
@@ -208,7 +214,8 @@ public final class KiloSystemSearchModule: Module {
 
   /// Waits for one index call to answer, with the bound above. False means the
   /// completion never ran within it, so the caller must fail the promise
-  /// instead of reading the error it never set.
+  /// instead of reading the error it never set. The same bounded wait drains a
+  /// timed-out call, so the queue is never held past two intervals.
   private static func waitForIndex(_ wait: DispatchSemaphore) -> Bool {
     wait.wait(timeout: .now() + indexTimeout) == .success
   }

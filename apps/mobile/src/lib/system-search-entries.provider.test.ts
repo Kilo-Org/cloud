@@ -92,9 +92,10 @@ describe('providerPrSearchDocument', () => {
 
     expect(fromInbox.id).toBe(fromRecents.id);
     // The inbox row keeps the organization scope that enumerated it; the
-    // recents entry is account-level, so its source is the provider alone.
+    // recents entry is account-level, so its source is the recents list's own
+    // per-provider scope, which no inbox query enumerates.
     expect(fingerprintSourceOf(fromInbox.fingerprint)).toBe('pullRequests:gitlab:org-1');
-    expect(fingerprintSourceOf(fromRecents.fingerprint)).toBe('pullRequests:gitlab');
+    expect(fingerprintSourceOf(fromRecents.fingerprint)).toBe('pullRequests:gitlab:recents');
   });
 });
 

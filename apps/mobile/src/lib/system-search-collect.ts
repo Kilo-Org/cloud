@@ -24,6 +24,7 @@ import {
   providerInboxSourceScope,
   providerPrSearchDocument,
   recentPrSearchDocument,
+  recentPrSourceScopes,
   storedSessionSearchDocument,
   type SystemSearchDocument,
   systemSearchSourceKey,
@@ -117,14 +118,14 @@ type RowDecoder<TRow> = {
 /**
  * Every document the app can build from its current cache, plus its stored PR
  * recents, deduped by id (first occurrence wins), together with the source
- * scopes whose queries this run could fully enumerate.
+ * scopes this run could fully enumerate.
  *
  * The sources are what lets the sync distinguish "the source says the user can
  * no longer see this" from "the source's query is not in the cache this run"
  * (a cold start hydrates only a subset), so it never drops a still-valid entry
  * just because its query has not loaded yet. A scope is recorded only by a
- * query that enumerated it completely: an unfiltered list whose page window
- * `maxPages` has not trimmed.
+ * source that enumerated it completely: an unfiltered list whose page window
+ * `maxPages` has not trimmed, or the stored recents list, which is read whole.
  */
 export type SystemSearchCollection = {
   documents: SystemSearchDocument[];
@@ -150,7 +151,11 @@ export async function collectSystemSearchDocuments(
       observedSources.add(collected.observedSource);
     }
   }
-  documents.push(...(await recentPrDocuments()));
+  const recents = await recentPrDocuments();
+  documents.push(...recents.documents);
+  for (const source of recents.observedSources) {
+    observedSources.add(source);
+  }
   return { documents: dedupeById(documents), observedSources };
 }
 
@@ -468,14 +473,27 @@ function queryKeyPath(queryKey: readonly unknown[]): string | null {
   return segments.success ? segments.data.join('.') : null;
 }
 
-async function recentPrDocuments(): Promise<SystemSearchDocument[]> {
+async function recentPrDocuments(): Promise<{
+  documents: SystemSearchDocument[];
+  observedSources: string[];
+}> {
   try {
     const recents = await getRecentPrs();
-    return recents.map(entry => recentPrSearchDocument(entry));
+    return {
+      documents: recents.map(entry => recentPrSearchDocument(entry)),
+      // The stored list is read whole, so every provider's recents scope is
+      // enumerated this run: an entry that is no longer in the list is
+      // genuinely gone, not a source the cache has not hydrated. No inbox
+      // query can stand in for this — Bitbucket's inbox is organization-only
+      // and GitLab's personal one is absent in an organization context — so a
+      // recents entry would otherwise never leave the index.
+      observedSources: recentPrSourceScopes(),
+    };
   } catch {
     // SecureStore can fail (locked device, corrupt entry); the index then
-    // simply carries no recents rather than failing the whole collection.
-    return [];
+    // simply carries no recents, and no recents scope is observed, so nothing
+    // is removed on the strength of a read that did not happen.
+    return { documents: [], observedSources: [] };
   }
 }
 

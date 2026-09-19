@@ -9,6 +9,7 @@ import {
   planSystemSearchUpdate,
   providerInboxSourceScope,
   providerPrSearchDocument,
+  recentPrSearchDocument,
   storedSessionSearchDocument,
 } from './system-search-entries';
 
@@ -52,6 +53,14 @@ const ORG_FINDINGS_KEY = [
   { type: 'infinite', input: { organizationId: 'org-1', limit: 50, offset: 0 } },
 ];
 const UNRELATED_KEY = [['user', 'getMe'], { type: 'query' }];
+
+// The stored recents list is read whole on every collect, so its per-provider
+// scopes are observed alongside whatever the query cache enumerated.
+const RECENTS_SOURCES = [
+  'pullRequests:github:recents',
+  'pullRequests:gitlab:recents',
+  'pullRequests:bitbucket:recents',
+];
 
 const sessionRow = {
   session_id: 'sess-1',
@@ -250,11 +259,41 @@ describe('collectSystemSearchDocuments', () => {
     ]);
   });
 
-  it('collects nothing from an empty cache', async () => {
+  it('collects no documents from an empty cache', async () => {
     await expect(collectSystemSearchDocuments(new QueryClient())).resolves.toEqual({
       documents: [],
-      observedSources: new Set(),
+      observedSources: new Set(RECENTS_SOURCES),
     });
+  });
+
+  it('observes the recents scopes only when the stored list was read', async () => {
+    recentPrs.getRecentPrs.mockRejectedValue(new Error('SecureStore unavailable'));
+
+    const { observedSources } = await collectSystemSearchDocuments(new QueryClient());
+
+    // A read that failed is not evidence the recents are empty, so no recents
+    // scope is claimed and nothing is removed on its strength.
+    expect(observedSources).toEqual(new Set());
+  });
+
+  it('lets a GitLab recents entry leave the index once the list drops it', async () => {
+    const client = new QueryClient();
+    // The stored list is empty now: the user removed the entry, or newer opens
+    // evicted it. No inbox query can speak for a GitLab recents entry, so the
+    // recents scope read above is the only evidence that may remove it.
+    recentPrs.getRecentPrs.mockResolvedValue([]);
+    const { documents, observedSources } = await collectSystemSearchDocuments(client);
+
+    const indexed = recentPrSearchDocument({
+      owner: 'group/sub',
+      repo: 'repo',
+      number: 12,
+      title: 'Nested MR',
+      platform: 'gitlab',
+    });
+    const plan = planSystemSearchUpdate({ indexed: [indexed], documents, observedSources });
+
+    expect(plan.remove).toEqual([indexed.id]);
   });
 
   it('skips a malformed payload without throwing', async () => {
@@ -269,8 +308,9 @@ describe('collectSystemSearchDocuments', () => {
     expect(documents).toEqual([]);
     // Only a payload that decodes as the family's list speaks for that family:
     // the empty-but-valid findings page is authoritative, while a payload of
-    // the wrong shape is not evidence the family's entries are gone.
-    expect(observedSources).toEqual(new Set(['findings:org-1']));
+    // the wrong shape is not evidence the family's entries are gone. The
+    // recents scopes are observed either way, because that list was read.
+    expect(observedSources).toEqual(new Set(['findings:org-1', ...RECENTS_SOURCES]));
   });
 
   it('does not claim a family from a bounded capacity probe', async () => {
@@ -466,7 +506,9 @@ describe('collectSystemSearchDocuments', () => {
 
     const { documents, observedSources } = await collectSystemSearchDocuments(client);
 
-    expect(observedSources).toEqual(new Set());
+    // No query source is claimed; the recents scopes are, because that list was
+    // read whole rather than left half-paginated.
+    expect(observedSources).toEqual(new Set(RECENTS_SOURCES));
 
     // The index still holds a session indexed from a later page. The one-page
     // window is a prefix, so its success must not remove that entry.

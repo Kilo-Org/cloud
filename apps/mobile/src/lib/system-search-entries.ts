@@ -236,18 +236,45 @@ export function inboxPrSearchDocument(
  * GitLab or Bitbucket entry routes through its own provider route.
  *
  * Recents carry no organization: the entry is account-level, so its source is
- * the provider alone. A provider whose inbox is organization-scoped never
- * enumerates that key, so a recents entry is never removed by one
- * organization's inbox — it leaves at the account boundary with the recents
- * themselves.
+ * the recents list itself, one scope per provider. No inbox query can speak for
+ * every recents entry — Bitbucket's inbox is organization-only and GitLab's
+ * personal one is absent in an organization context — so the collector observes
+ * the recents scopes from its own read of the list. An entry the user removed,
+ * or one evicted by newer opens, then leaves the index; a provider inbox
+ * enumeration never authorises that removal.
  */
 export function recentPrSearchDocument(row: SystemSearchRecentPrRow): SystemSearchDocument {
   const platform = row.platform ?? 'github';
   return providerPrSearchDocument(
     providerRefFromRecentPr(row),
     row.title,
-    systemSearchSourceKey('pullRequests', platform)
+    recentsSourceScope(platform)
   );
+}
+
+/** The providers the stored recents list can carry, so one read enumerates them all. */
+const RECENT_PR_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
+
+/** The account-level recents list's scope name, distinct from any inbox scope. */
+const RECENTS_SOURCE_SCOPE = 'recents';
+
+/**
+ * The source scope the stored recents list enumerates for one provider. The
+ * `recents` segment keeps it distinct from every inbox scope, so a provider
+ * inbox enumeration never authorises removing an entry the recents still carry.
+ */
+export function recentsSourceScope(platform: string): string {
+  return systemSearchSourceKey('pullRequests', `${platform}:${RECENTS_SOURCE_SCOPE}`);
+}
+
+/**
+ * Every source scope a fully-read recents list enumerates. The list is
+ * account-level and read whole, so a provider with no entry in it is genuinely
+ * absent rather than a query the cache has not hydrated yet, and each provider's
+ * scope is observed from that one read.
+ */
+export function recentPrSourceScopes(): string[] {
+  return RECENT_PR_PLATFORMS.map(platform => recentsSourceScope(platform));
 }
 
 /**

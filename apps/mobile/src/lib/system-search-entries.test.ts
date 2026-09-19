@@ -8,6 +8,7 @@ import {
   inboxPrSearchDocument,
   planSystemSearchUpdate,
   recentPrSearchDocument,
+  recentsSourceScope,
   storedSessionSearchDocument,
   systemSearchDeeplinkFromId,
   type SystemSearchDocument,
@@ -369,6 +370,61 @@ describe('planSystemSearchUpdate', () => {
     });
 
     expect(plan.remove).toEqual([github.id]);
+  });
+
+  it('removes a GitLab recents entry once the recents list was read', () => {
+    const gitlab = recentPrSearchDocument({
+      owner: 'group/sub',
+      repo: 'repo',
+      number: 12,
+      title: 'Nested MR',
+      platform: 'gitlab',
+    });
+    const plan = planSystemSearchUpdate({
+      indexed: [gitlab],
+      documents: [],
+      // The stored recents list is read whole, so its per-provider scope is
+      // observed even though no inbox query enumerates it.
+      observedSources: new Set([recentsSourceScope('gitlab')]),
+    });
+
+    expect(plan.remove).toEqual([gitlab.id]);
+  });
+
+  it('removes a Bitbucket recents entry once the recents list was read', () => {
+    const bitbucket = recentPrSearchDocument({
+      owner: 'workspace',
+      repo: 'repo',
+      number: 7,
+      title: 'Bitbucket PR',
+      platform: 'bitbucket',
+    });
+    const plan = planSystemSearchUpdate({
+      indexed: [bitbucket],
+      documents: [],
+      observedSources: new Set([recentsSourceScope('bitbucket')]),
+    });
+
+    expect(plan.remove).toEqual([bitbucket.id]);
+  });
+
+  it('keeps a recents entry whose provider scope was not read', () => {
+    const gitlab = recentPrSearchDocument({
+      owner: 'group/sub',
+      repo: 'repo',
+      number: 12,
+      title: 'Nested MR',
+      platform: 'gitlab',
+    });
+    const plan = planSystemSearchUpdate({
+      indexed: [gitlab],
+      documents: [],
+      // A read that failed observes no recents scope, so nothing is removed on
+      // the strength of a list the app could not read.
+      observedSources: new Set(),
+    });
+
+    expect(plan.remove).toEqual([]);
   });
 
   it('dedupes documents by id, keeping the first occurrence', () => {

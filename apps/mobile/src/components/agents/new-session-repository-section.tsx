@@ -167,10 +167,14 @@ export function NewSessionRepositorySection({
   ): ReactElement | null {
     switch (status) {
       case 'connect': {
+        const noteKey = connectNoteKey(platform);
         return selectedRepository === null ? (
           renderConnectCard(platform)
         ) : (
-          <View className="mt-3">{renderConnectActions(platform)}</View>
+          <View className="mt-3 gap-2">
+            {noteKey ? <Text variant="muted">{t(noteKey)}</Text> : null}
+            {renderConnectActions(platform)}
+          </View>
         );
       }
       case 'connected-empty': {

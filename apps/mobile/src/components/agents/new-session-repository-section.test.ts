@@ -135,15 +135,19 @@ describe('NewSessionRepositorySection branch row', () => {
 });
 
 describe('NewSessionRepositorySection Bitbucket connect card', () => {
-  it('states outright that Bitbucket is organizations-only', () => {
-    const renderer = mountSection({
-      groups: [group('github', 'repos'), group('gitlab', 'repos'), group('bitbucket', 'connect')],
-    });
+  it.each(['', 'github:owner/repo', 'gitlab:owner/repo'])(
+    'states outright that Bitbucket is organizations-only with selection "%s"',
+    value => {
+      const renderer = mountSection({
+        value,
+        groups: [group('github', 'repos'), group('gitlab', 'repos'), group('bitbucket', 'connect')],
+      });
 
-    expect(renderedText(renderer)).toContain(
-      i18n.t('agentChat.newSession.bitbucketOrganizationsOnly')
-    );
-  });
+      expect(renderedText(renderer)).toContain(
+        i18n.t('agentChat.newSession.bitbucketOrganizationsOnly')
+      );
+    }
+  );
 
   it('leaves the GitHub connect card free of the Bitbucket restriction', () => {
     const renderer = mountSection({
@@ -258,6 +262,9 @@ describe('NewSessionRepositorySection connect cards after selection', () => {
     const text = renderedText(renderer);
     expect(text).toContain(i18n.t(`common.connect${copy}`));
     expect(text).not.toContain(i18n.t(`agentChat.newSession.connect${copy}Description`));
+    expect(text.includes(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'))).toBe(
+      platform === 'bitbucket'
+    );
     expect(pressables(renderer)).toHaveLength(0);
     const connect = renderer.root.findAllByType('Button' as never)[0];
     if (!connect) {

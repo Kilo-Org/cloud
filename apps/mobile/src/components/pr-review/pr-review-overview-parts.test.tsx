@@ -205,7 +205,7 @@ describe('PrRefsRow truncation', () => {
   it('shrinks the head ref so it ellipsizes instead of hard-clipping at the edge', () => {
     const renderer = renderRefs({
       baseRef: 'main',
-      headRef: 'kwf/session-and-pr-entities-in-search-1092',
+      headRef: 'feat/session-and-pr-entities-in-search-1092',
       headRepoFullName: 'Kilo-Org/cloud',
       isCrossRepo: true,
     });

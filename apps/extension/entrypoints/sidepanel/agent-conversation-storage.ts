@@ -112,6 +112,9 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
             ...(event.providerToolCallId === undefined
               ? {}
               : { providerToolCallId: event.providerToolCallId }),
+            ...(event.reasoningDetails === undefined
+              ? {}
+              : { reasoningDetails: event.reasoningDetails }),
             tabId: event.tabId,
             type: event.type,
             webMcpOrigin: event.webMcpOrigin,
@@ -127,6 +130,9 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
             ...(event.providerToolCallId === undefined
               ? {}
               : { providerToolCallId: event.providerToolCallId }),
+            ...(event.reasoningDetails === undefined
+              ? {}
+              : { reasoningDetails: event.reasoningDetails }),
             tabId: event.tabId,
             type: event.type,
           });
@@ -141,6 +147,9 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
             ...(event.providerToolCallId === undefined
               ? {}
               : { providerToolCallId: event.providerToolCallId }),
+            ...(event.reasoningDetails === undefined
+              ? {}
+              : { reasoningDetails: event.reasoningDetails }),
             remoteToolName: event.remoteToolName,
             serverId: event.serverId,
             serverName: event.serverName,
@@ -167,6 +176,9 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
             ...(event.providerToolCallId === undefined
               ? {}
               : { providerToolCallId: event.providerToolCallId }),
+            ...(event.reasoningDetails === undefined
+              ? {}
+              : { reasoningDetails: event.reasoningDetails }),
             tabId: event.tabId,
             type: event.type,
           });
@@ -181,6 +193,9 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
             ? {}
             : { providerToolCallId: event.providerToolCallId }),
           ...(event.query === undefined ? {} : { query: event.query }),
+          ...(event.reasoningDetails === undefined
+            ? {}
+            : { reasoningDetails: event.reasoningDetails }),
           ...(event.snapshotId === undefined ? {} : { snapshotId: event.snapshotId }),
           tabId: event.tabId,
           type: event.type,

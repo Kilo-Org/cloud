@@ -8,6 +8,7 @@ import {
   createWebMcpToolCall,
   createWorkflowToolCall,
 } from '@/src/shared/agent-conversation';
+import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 import type { StoredAgentConversationStore } from '@/src/shared/agent-conversation-tabs';
 import { conversationEventsSchema } from './agent-conversation-schemas';
 
@@ -456,6 +457,161 @@ describe('browser tool-call persistence round-trip', () => {
       id: toolCall.id,
       name: 'kilo_browser_click',
       reasoningDetails: [{ data: 'abc', type: 'reasoning.encrypted' }],
+      tabId: 7,
+      type: 'tool-call',
+    });
+  });
+});
+
+describe('reasoning details survive a persist -> reload cycle for every tool-call family', () => {
+  // The turn runner attaches the streamed reasoning to the first tool call of the turn whatever its family, and the gateway replay reads it back off that call.
+  const reasoningDetails = [{ data: 'abc', type: 'reasoning.encrypted' }];
+
+  const roundTrip = (event: AgentConversationEvent): AgentConversationEvent | undefined => {
+    const store: StoredAgentConversationStore = {
+      activeConversationId: 'conversation-1',
+      conversations: [
+        {
+          events: [event],
+          id: 'conversation-1',
+          title: 'Reasoning chat',
+          updatedAt: '2026-06-30T00:00:00.000Z',
+        },
+      ],
+      openConversationIds: ['conversation-1'],
+    };
+
+    return normalizeStoredConversationStore(toPersistedConversationStore(store))?.conversations[0]
+      ?.events[0];
+  };
+
+  it('keeps reasoningDetails on a safe memory tool call', () => {
+    const toolCall = {
+      ...createSafeToolCall({ name: 'get_memory', tabId: 7 }),
+      reasoningDetails,
+    };
+
+    expect(roundTrip(toolCall)).toStrictEqual({
+      id: toolCall.id,
+      name: 'get_memory',
+      reasoningDetails,
+      tabId: 7,
+      type: 'tool-call',
+    });
+  });
+
+  it('keeps reasoningDetails on a remote MCP tool call', () => {
+    const toolCall = {
+      ...createRemoteMcpToolCall({
+        arguments: { city: 'Skopje' },
+        name: 'mcp_fixture-mcp_get_weather',
+        remoteToolName: 'get_weather',
+        serverId: 'server-1',
+        serverName: 'Fixture MCP',
+      }),
+      reasoningDetails,
+    };
+
+    expect(roundTrip(toolCall)).toStrictEqual({
+      arguments: { city: 'Skopje' },
+      id: toolCall.id,
+      name: 'mcp_fixture-mcp_get_weather',
+      reasoningDetails,
+      remoteToolName: 'get_weather',
+      serverId: 'server-1',
+      serverName: 'Fixture MCP',
+      type: 'tool-call',
+    });
+  });
+
+  it('keeps reasoningDetails on a WebMCP tool call', () => {
+    const toolCall = {
+      ...createWebMcpToolCall({
+        arguments: { query: 'kilo' },
+        definitionSignature: '["search","Search","Find","https://example.com",{"type":"object"}]',
+        documentId: 'doc-1',
+        name: 'search',
+        providerToolCallId: 'call_webmcp_1',
+        tabId: 7,
+        webMcpOrigin: 'https://example.com',
+      }),
+      reasoningDetails,
+    };
+
+    expect(roundTrip(toolCall)).toStrictEqual({
+      arguments: { query: 'kilo' },
+      definitionSignature: '["search","Search","Find","https://example.com",{"type":"object"}]',
+      documentId: 'doc-1',
+      id: toolCall.id,
+      name: 'search',
+      providerToolCallId: 'call_webmcp_1',
+      reasoningDetails,
+      tabId: 7,
+      type: 'tool-call',
+      webMcpOrigin: 'https://example.com',
+    });
+  });
+
+  it('keeps reasoningDetails through the retired page tool migration', () => {
+    const reloaded = normalizeStoredConversationStore({
+      activeConversationId: 'conversation-1',
+      conversations: [
+        {
+          events: [
+            {
+              id: 'ev-snapshot',
+              name: 'get_page_snapshot',
+              reasoningDetails,
+              tabId: 7,
+              type: 'tool-call',
+            },
+          ],
+          id: 'conversation-1',
+          title: 'Legacy chat',
+          updatedAt: '2026-06-30T00:00:00.000Z',
+        },
+      ],
+      openConversationIds: ['conversation-1'],
+    });
+
+    expect(reloaded?.conversations[0]?.events[0]).toStrictEqual({
+      arguments: {},
+      id: 'ev-snapshot',
+      name: 'kilo_browser_snapshot',
+      reasoningDetails,
+      tabId: 7,
+      type: 'tool-call',
+    });
+  });
+
+  it('keeps reasoningDetails through the eval migration', () => {
+    const reloaded = normalizeStoredConversationStore({
+      activeConversationId: 'conversation-1',
+      conversations: [
+        {
+          events: [
+            {
+              code: 'return document.title;',
+              id: 'ev-eval',
+              name: 'eval',
+              reasoningDetails,
+              tabId: 7,
+              type: 'tool-call',
+            },
+          ],
+          id: 'conversation-1',
+          title: 'Legacy chat',
+          updatedAt: '2026-06-30T00:00:00.000Z',
+        },
+      ],
+      openConversationIds: ['conversation-1'],
+    });
+
+    expect(reloaded?.conversations[0]?.events[0]).toStrictEqual({
+      arguments: { function: 'return document.title;' },
+      id: 'ev-eval',
+      name: 'kilo_browser_evaluate',
+      reasoningDetails,
       tabId: 7,
       type: 'tool-call',
     });

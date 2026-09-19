@@ -113,7 +113,7 @@ export function ScreenHeader({
   // whole chrome off the sensor. They go on an inner wrapper so they ADD to the
   // `px-4` gutter: an inline padding on the container would beat the className
   // (inline style wins in React Native) and swallow the gutter, pulling the
-  // back control's `-ml-4` chevron back inside the sensor area. Zero insets
+  // back control's `-ms-4` chevron back inside the sensor area. Zero insets
   // collapse the wrapper style to `undefined`, so portrait geometry is
   // byte-identical and a rotation never moves anything vertically. Side padding
   // applies to every caller — a sheet with `safeAreaTop={false}` still runs
@@ -213,6 +213,17 @@ export function ScreenHeader({
   // width without placing either control out of flow.
   const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
 
+  // The leading control's pull into the gutter is a START-side margin, never a
+  // hand-picked `mr` under RTL. With `I18nManager.doLeftAndRightSwapInRTL` on
+  // (the default) React Native rewrites margin Left/Right to Yoga Start/End
+  // before layout (YogaLayoutableShadowNode `swapLeftAndRightInYogaStyleProps`),
+  // so `-mr-4` under RTL becomes a negative END margin — the side facing the
+  // title — and the heading (the next sibling, whose interactive title fills
+  // it) starts 12 points under the back control's 44-point target. Measured on
+  // the row: the title box covered 0.27 of the back target's area, and the
+  // explorer's `overlapping_controls` scan reports above 0.25. A
+  // `marginInlineStart` is resolved to Yoga Start in both directions, so `-ms-4`
+  // pulls the control into the gutter and leaves the 4-point `gap-1` intact.
   const backControl = canGoBack ? (
     <Pressable
       onPress={() => {
@@ -228,7 +239,7 @@ export function ScreenHeader({
       accessibilityLabel={resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')}
       className={cn(
         'h-11 w-11 shrink-0 items-center justify-center active:opacity-70',
-        !separateHeading && (I18nManager.isRTL ? '-mr-4' : '-ml-4')
+        !separateHeading && '-ms-4'
       )}
     >
       {resolvedBackIcon === 'close' ? (
@@ -263,9 +274,7 @@ export function ScreenHeader({
               {heading}
             </View>
             {headerRight ? (
-              <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} min-w-0 max-w-[50%] shrink`}>
-                {headerRight}
-              </View>
+              <View className="ms-3 min-w-0 max-w-[50%] shrink">{headerRight}</View>
             ) : null}
           </View>
         )}

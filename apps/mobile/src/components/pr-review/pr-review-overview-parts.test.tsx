@@ -200,3 +200,33 @@ describe('PrRefsRow width constraints', () => {
     renderer.unmount();
   });
 });
+
+describe('PrRefsRow truncation', () => {
+  it('shrinks the head ref so it ellipsizes instead of hard-clipping at the edge', () => {
+    const renderer = renderRefs({
+      baseRef: 'main',
+      headRef: 'kwf/session-and-pr-entities-in-search-1092',
+      headRepoFullName: 'Kilo-Org/cloud',
+      isCrossRepo: true,
+    });
+
+    const texts = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Text'
+    );
+    // Head ref, arrow, base ref — the head is first.
+    const [head, arrow, base] = texts;
+    if (!head || !arrow || !base) {
+      throw new Error('PrRefsRow did not render its three text nodes');
+    }
+    expect(head.props.className).toContain('min-w-0');
+    expect(head.props.className).toContain('shrink');
+    expect(head.props.numberOfLines).toBe(1);
+    expect(head.props.ellipsizeMode).toBe('middle');
+
+    // The arrow and the short base ref hold their width.
+    expect(arrow.props.className).toContain('shrink-0');
+    expect(base.props.className).toContain('shrink-0');
+
+    renderer.unmount();
+  });
+});

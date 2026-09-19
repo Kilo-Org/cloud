@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+import { type MessageFailure } from './message-failure-state';
 import {
   buildTerminalErrorCopyText,
   classifyTerminalError,
   resolveSessionTerminalError,
   sessionStatusErrorMessage,
+  statusIndicatorDuplicatesMessageFailure,
 } from './session-terminal-error';
 
 describe('classifyTerminalError', () => {
@@ -244,5 +246,75 @@ describe('sessionStatusErrorMessage', () => {
   it('never returns the raw provider text', () => {
     const raw = 'Service Unavailable: The service is temporarily unavailable.';
     expect(sessionStatusErrorMessage(raw)).not.toContain('Service Unavailable');
+  });
+});
+
+function assistantFailure(detail: string | null): MessageFailure {
+  return {
+    kind: 'assistant',
+    title: 'Response failed',
+    detail,
+    copyDetail: '',
+    canRetry: true,
+    canCopy: false,
+  };
+}
+
+describe('statusIndicatorDuplicatesMessageFailure', () => {
+  const deliveryFailure: MessageFailure = {
+    kind: 'delivery',
+    title: 'Failed to deliver',
+    detail: 'We could not deliver this message after several attempts.',
+    copyDetail: 'Unauthorized: Unauthorized',
+    canRetry: true,
+    canCopy: true,
+  };
+
+  it('suppresses an unclassified session error the last row already states', () => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'simulated error' },
+        failure: assistantFailure(null),
+      })
+    ).toBe(true);
+  });
+
+  it('suppresses the delivery line the last row already states', () => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'Message failed to deliver' },
+        failure: deliveryFailure,
+      })
+    ).toBe(true);
+  });
+
+  it('keeps a classified line the row does not carry', () => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: {
+          type: 'error',
+          message: 'Assistant request failed: insufficient credits',
+        },
+        failure: assistantFailure(null),
+      })
+    ).toBe(false);
+  });
+
+  it('keeps the line when the row renders no failure footer', () => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'simulated error' },
+        failure: null,
+      })
+    ).toBe(false);
+  });
+
+  it('keeps a non-error indicator', () => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'progress', message: 'Setting up environment…' },
+        failure: assistantFailure(null),
+      })
+    ).toBe(false);
   });
 });

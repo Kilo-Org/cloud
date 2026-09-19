@@ -162,7 +162,9 @@ function MessageBubbleImpl({
         >
           {failure.title}
         </Text>
-        <Text className="text-xs text-muted-foreground">{failure.detail}</Text>
+        {failure.detail !== null ? (
+          <Text className="text-xs text-muted-foreground">{failure.detail}</Text>
+        ) : null}
         <View className="flex-row gap-2">
           {failure.canRetry && onRetryMessage ? (
             <Button

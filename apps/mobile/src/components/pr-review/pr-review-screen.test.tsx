@@ -272,6 +272,59 @@ describe('PrReviewScreen Submit review reachability (P1-F-46b)', () => {
   });
 });
 
+// The header caps a trailing action at half the row (ScreenHeader's
+// `max-w-[50%]`). A button whose label cannot shrink overflows that cap and is
+// clipped by the screen edge at large font scales — the explorer found the
+// Overview "Submit review" label cut off at font scale 2. The button and its
+// label must shrink and wrap instead, like the Agents header action.
+describe('PrReviewScreen Submit review header fit', () => {
+  function findSubmitButton(): React.ReactElement | null {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    return findElement({
+      node: element,
+      type: 'Button',
+      prop: 'accessibilityLabel',
+      value: 'Submit review',
+    });
+  }
+
+  it('lets the Submit review button shrink inside the header action slot', () => {
+    const button = findSubmitButton();
+    if (!button) {
+      throw new Error('Submit review button not found');
+    }
+    const className = (button.props as { className?: string }).className ?? '';
+    expect(className).toContain('shrink');
+    expect(className).not.toContain('shrink-0');
+    expect(className).toContain('min-w-0');
+  });
+
+  it('lets the Submit review label wrap instead of drawing off-screen', () => {
+    const button = findSubmitButton();
+    if (!button) {
+      throw new Error('Submit review button not found');
+    }
+    const label = findElement({
+      node: button,
+      type: 'Text',
+      prop: 'className',
+      value: 'shrink text-center',
+    });
+    if (!label) {
+      throw new Error('Submit review label not found');
+    }
+    const labelProps = label.props as {
+      numberOfLines?: number;
+      allowFontScaling?: boolean;
+    };
+    // Wrapping, not truncation: no line cap and no disabled scaling, so a
+    // large font scale grows the button instead of clipping the label.
+    expect(labelProps.numberOfLines).toBeUndefined();
+    expect(labelProps.allowFontScaling).not.toBe(false);
+  });
+});
+
 describe('PrReviewScreen share action', () => {
   beforeEach(() => {
     prQueryResult = {

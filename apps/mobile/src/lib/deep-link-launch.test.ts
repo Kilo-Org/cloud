@@ -227,6 +227,102 @@ describe('deep-link-launch', () => {
     });
   });
 
+  describe('session-bound launch captures', () => {
+    // Android delivers a tap on an indexed result as the entry's `kiloapp://`
+    // link, so an app-scheme launch URL that names an indexed family is a
+    // system-search identifier and must not survive the account boundary.
+    const PR_LAUNCH = 'kiloapp://pr-review/Kilo-Org/cloud/6234';
+    const PR_HREF = '/(app)/pr-review/Kilo-Org/cloud/6234';
+
+    it('drops an app-scheme search-family launch captured while signed out', () => {
+      setCurrentDeepLinkUserId(null);
+      _setGetLinkingURLForTests(() => PR_LAUNCH);
+      captureLaunchDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+    });
+
+    it('keeps an app-scheme search-family launch captured before a signed-in settle', () => {
+      // A cold launch is captured before auth restores: the destination binds to
+      // the account it turns out to belong to.
+      _setGetLinkingURLForTests(() => PR_LAUNCH);
+      captureLaunchDeepLink();
+      expect(getPendingDeepLinkSnapshot()).toBe(PR_HREF);
+
+      setCurrentDeepLinkUserId('user-a');
+      expect(getPendingDeepLink()).toBe(PR_HREF);
+    });
+
+    it('drops an app-scheme search-family launch captured before a signed-out settle', () => {
+      _setGetLinkingURLForTests(() => PR_LAUNCH);
+      captureLaunchDeepLink();
+      expect(getPendingDeepLinkSnapshot()).toBe(PR_HREF);
+
+      setCurrentDeepLinkUserId(null);
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+
+    it('drops an app-scheme search-family launch at sign-out', () => {
+      setCurrentDeepLinkUserId('user-a');
+      _setGetLinkingURLForTests(() => PR_LAUNCH);
+      captureLaunchDeepLink();
+      expect(getPendingDeepLinkSnapshot()).toBe(PR_HREF);
+
+      clearAccountBoundPendingDeepLink();
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+
+    it('keeps an https launch link that names the same family', () => {
+      // The public universal link stays account-independent: a signed-out
+      // reader may still sign in and land on the page they opened.
+      setCurrentDeepLinkUserId(null);
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/pr-review/Kilo-Org/cloud/6234');
+      captureLaunchDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBe(PR_HREF);
+    });
+
+    it('does not restore a persisted session-bound record with no account identity', async () => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: PR_HREF,
+          source: 'universal-link',
+          storedAt: Date.now(),
+          userId: null,
+          sessionBound: true,
+        })
+      );
+
+      setCurrentDeepLinkUserId('user-b');
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+      });
+    });
+
+    it('restores a persisted session-bound record for the account that captured it', async () => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: PR_HREF,
+          source: 'universal-link',
+          storedAt: Date.now(),
+          userId: 'user-a',
+          sessionBound: true,
+        })
+      );
+
+      setCurrentDeepLinkUserId('user-a');
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLink()).toBe(PR_HREF);
+    });
+  });
+
   describe('consume exactly once', () => {
     it('lets exactly one of two consumers read a single href', () => {
       setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');

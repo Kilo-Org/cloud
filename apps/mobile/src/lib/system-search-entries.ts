@@ -28,6 +28,14 @@ import {
 import { providerRefFromRecentPr, type RecentPrRef } from '@/lib/pr-review/recent-prs';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
+import {
+  APP_SCHEME,
+  deeplinkPathFromHref,
+  FINDING_HREF_PREFIX,
+  PULL_REQUEST_HREF_PREFIX,
+  SESSION_HREF_PREFIX,
+} from './system-search-families';
+
 /** One indexed entity, in the shape the platform bridge takes. */
 export type SystemSearchDocument = {
   id: string;
@@ -51,11 +59,6 @@ export type SystemSearchDocument = {
 
 /** The route families an indexed id can name, one per source the app indexes. */
 export type SystemSearchFamily = 'sessions' | 'pullRequests' | 'findings';
-
-/** The route prefix of each indexed family, in the order the id is matched. */
-const SESSION_HREF_PREFIX = '/(app)/agent-chat/';
-const PULL_REQUEST_HREF_PREFIX = '/(app)/pr-review/';
-const FINDING_HREF_PREFIX = '/(app)/(tabs)/(3_profile)/security-agent/';
 
 /**
  * The three route groups an indexed id is allowed to name, with the source
@@ -88,13 +91,6 @@ const ROUTE_ID_PATTERNS: readonly RegExp[] = [
     String.raw`^/\(app\)/\(tabs\)/\(3_profile\)/security-agent/${ID_SEGMENT}/findings/${ID_SEGMENT}(?:\?[^#]*)?$`
   ),
 ];
-
-/** The app-scheme prefix every deeplink carries. */
-const APP_SCHEME = 'kiloapp://';
-
-/** The group segments a deeplink drops: `(app)` and the profile tab group. */
-const APP_GROUP_PREFIX = '/(app)/';
-const PROFILE_TABS_GROUP_PREFIX = '(tabs)/(3_profile)/';
 
 type DocumentContent = {
   id: string;
@@ -418,14 +414,6 @@ export function systemSearchDeeplinkFromId(id: string): string | null {
     return null;
   }
   return `${APP_SCHEME}${deeplinkPathFromHref(id)}`;
-}
-
-/** An in-app href with the app-internal group segments dropped. */
-function deeplinkPathFromHref(href: string): string {
-  const withoutAppGroup = href.slice(APP_GROUP_PREFIX.length);
-  return withoutAppGroup.startsWith(PROFILE_TABS_GROUP_PREFIX)
-    ? withoutAppGroup.slice(PROFILE_TABS_GROUP_PREFIX.length)
-    : withoutAppGroup;
 }
 
 /**

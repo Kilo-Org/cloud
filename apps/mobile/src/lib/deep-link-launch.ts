@@ -8,10 +8,24 @@ import {
 } from '@kilocode/app-shared/universal-links';
 
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
+import { APP_SCHEME, isSystemSearchFamilyLink } from './system-search-families';
 
 type DeepLinkSource = 'universal-link' | 'notification' | 'system-search';
 
 type GetLinkingURL = () => string | null;
+
+/** Per-capture flags the precedence and account rules read back. */
+type PendingDeepLinkOptions = {
+  /** Only the cold-launch capture sets this; see the module flag below. */
+  fromLaunchAppScheme?: boolean;
+  /**
+   * The destination belongs to the session that produced it and must not open
+   * for another account. Set for an app-scheme launch URL that names a family
+   * the phone's own search indexes: on Android that URL is how a tap on an
+   * indexed result is delivered.
+   */
+  sessionBound?: boolean;
+};
 
 /** Minimal SecureStore surface used by the durable mirror. */
 type SecureStoreLike = {
@@ -27,13 +41,12 @@ type PendingDeepLinkRecord = {
   storedAt: number;
   /** Signed-in user id at persist time, or null when captured while signed out. */
   userId: string | null;
+  /** Whether the destination is bound to the session that produced it. */
+  sessionBound: boolean;
 };
 
 /** A persisted record older than this is discarded on restore. */
 const PENDING_DEEP_LINK_TTL_MS = 24 * 60 * 60 * 1000;
-
-/** The app-scheme prefix a system-search launch URL carries. */
-const APP_SCHEME = 'kiloapp://';
 
 let pendingDeepLink: string | null = null;
 let pendingSource: DeepLinkSource | null = null;
@@ -54,6 +67,13 @@ let pendingUniversalLinkFromLaunch = false;
 // (with null). A null value means "captured while signed out", which still
 // restores.
 let currentDeepLinkUserId: string | null = null;
+
+// Whether the CURRENT in-memory slot holds a session-bound destination: one
+// that belongs to the session that produced it (a system-search result, or the
+// app-scheme launch URL that delivers one on Android) and so must never open
+// for another account. A destination captured before any account is known is
+// dropped when the account settles signed out.
+let pendingDeepLinkSessionBound = false;
 
 // The signed-in user id the CURRENT in-memory slot was captured for, or null
 // when it was captured while signed out. Mirrors the persisted record's
@@ -81,12 +101,16 @@ export function setCurrentDeepLinkUserId(userId: string | null): void {
   // The account is now known: a system-search tap captured during bootstrap is
   // this account's to open, or it is dropped when the launch is signed out.
   const deferred = deferredSystemSearchHref;
-  if (deferred === null) {
-    return;
-  }
   deferredSystemSearchHref = null;
-  if (userId !== null) {
+  if (deferred !== null && userId !== null) {
     applyPendingDeepLink(deferred, 'system-search');
+  }
+  // A session-bound destination captured before the account settled (a cold
+  // launch from the app-scheme URL a search tap uses) belongs to whoever was
+  // signed in then. A signed-out settle means there was no such account, so
+  // the destination must not open for whoever signs in later in this process.
+  if (userId === null && pendingDeepLinkSessionBound) {
+    clearPendingDeepLink();
   }
 }
 
@@ -154,6 +178,7 @@ function persistPendingDeepLink(href: string, source: DeepLinkSource): void {
     source,
     storedAt: Date.now(),
     userId: currentDeepLinkUserId,
+    sessionBound: pendingDeepLinkSessionBound,
   };
   enqueuePendingDeepLinkWrite(async () => {
     await getSecureStore().setItemAsync(PENDING_DEEP_LINK_KEY, JSON.stringify(record));
@@ -184,20 +209,20 @@ function deletePersistedPendingDeepLink(): void {
 export function setPendingDeepLink(
   href: string,
   source: DeepLinkSource,
-  // Only the cold-launch capture sets this; see the module flag above.
-  options?: { fromLaunchAppScheme?: boolean }
+  options?: PendingDeepLinkOptions
 ): void {
-  if (source === 'system-search') {
-    // A system-search result belongs to the session that indexed it. Before the
-    // account is known (a cold-launch tap is captured before auth restores),
-    // hold the destination and bind it when the account settles. Once settled,
-    // a signed-out capture is dropped outright rather than stored as
-    // account-independent and restored for the next account.
-    if (!deepLinkUserSettled) {
+  const sessionBound = source === 'system-search' || options?.sessionBound === true;
+  if (sessionBound) {
+    // A destination captured before the account is known. The native
+    // system-search slot is single-shot, so its capture is held until the
+    // settle binds or drops it. A session-bound launch capture is applied now
+    // instead, because a link launch must keep a universal link's precedence
+    // over that slot; the settle drops it when the launch is signed out.
+    if (!deepLinkUserSettled && source === 'system-search') {
       deferredSystemSearchHref = href;
       return;
     }
-    if (currentDeepLinkUserId === null) {
+    if (deepLinkUserSettled && currentDeepLinkUserId === null) {
       return;
     }
   }
@@ -208,12 +233,13 @@ export function setPendingDeepLink(
 function applyPendingDeepLink(
   href: string,
   source: DeepLinkSource,
-  options?: { fromLaunchAppScheme?: boolean }
+  options?: PendingDeepLinkOptions
 ): void {
   // A universal link always wins, except that the exact system-search route for
   // an app-scheme launch URL may replace the web table's lossy mapping of it —
   // and only when it names the same destination, so a stale search slot cannot
-  // displace the unrelated link the launch actually opened.
+  // displace the unrelated link the launch actually opened. An https launch
+  // link is never flagged, so it keeps its precedence over a stale slot.
   const supersedesLaunchAppSchemeLink =
     source === 'system-search' &&
     pendingSource === 'universal-link' &&
@@ -237,6 +263,7 @@ function applyPendingDeepLink(
   pendingSource = source;
   pendingDeepLinkUserId = currentDeepLinkUserId;
   pendingUniversalLinkFromLaunch = options?.fromLaunchAppScheme === true;
+  pendingDeepLinkSessionBound = source === 'system-search' || options?.sessionBound === true;
   pendingDeepLinkEpoch += 1;
   persistPendingDeepLink(href, source);
   notifyPendingDeepLinkListeners();
@@ -272,6 +299,7 @@ export function clearPendingDeepLink(): void {
   pendingSource = null;
   pendingDeepLinkUserId = null;
   pendingUniversalLinkFromLaunch = false;
+  pendingDeepLinkSessionBound = false;
   deferredSystemSearchHref = null;
   pendingDeepLinkEpoch += 1;
   deletePersistedPendingDeepLink();
@@ -280,16 +308,20 @@ export function clearPendingDeepLink(): void {
 
 /**
  * Sign-out drop: clear an account-bound destination (captured while a user was
- * signed in) and any system-search destination (bound to the session that
- * indexed it, so it must never survive into another account). A universal link
- * or notification captured while signed out is account-independent — it is the
- * link the user opened before signing in — so a redundant sign-out must not
- * drop it. The in-memory clear is synchronous; the persisted delete chains
- * behind any in-flight persist.
+ * signed in), any system-search destination, and any session-bound launch
+ * capture (bound to the session that indexed it, so it must never survive into
+ * another account). A universal link or notification captured while signed out
+ * is account-independent — it is the link the user opened before signing in —
+ * so a redundant sign-out must not drop it. The in-memory clear is synchronous;
+ * the persisted delete chains behind any in-flight persist.
  */
 export function clearAccountBoundPendingDeepLink(): void {
   deferredSystemSearchHref = null;
-  if (pendingDeepLinkUserId !== null || pendingSource === 'system-search') {
+  if (
+    pendingDeepLinkUserId !== null ||
+    pendingSource === 'system-search' ||
+    pendingDeepLinkSessionBound
+  ) {
     clearPendingDeepLink();
   }
 }
@@ -346,18 +378,19 @@ export async function restorePersistedPendingDeepLink(): Promise<void> {
 
   // A record captured for a different signed-in user must never navigate the
   // current account. A null record userId (captured while signed out) still
-  // restores, except for a system-search destination: that source is
-  // session-bound, so a record without an account identity is never trusted.
+  // restores, except for a session-bound destination: that belongs to the
+  // session that produced it, so a record without an account identity is never
+  // trusted.
   if (record.userId !== null && record.userId !== currentDeepLinkUserId) {
     deletePersistedPendingDeepLink();
     return;
   }
-  if (record.source === 'system-search' && record.userId === null) {
+  if (record.userId === null && (record.source === 'system-search' || record.sessionBound)) {
     deletePersistedPendingDeepLink();
     return;
   }
 
-  setPendingDeepLink(record.href, record.source);
+  setPendingDeepLink(record.href, record.source, { sessionBound: record.sessionBound });
 }
 
 async function readPersistedPendingDeepLink(): Promise<string | null> {
@@ -376,6 +409,10 @@ const pendingDeepLinkRecordSchema = z.object({
   source: z.enum(['universal-link', 'notification', 'system-search']),
   storedAt: z.number(),
   userId: z.string().nullable(),
+  // Absent in a record written before the session binding existed: such a
+  // record can only be an account-independent destination (a link or a
+  // notification), which is what the default restores as.
+  sessionBound: z.boolean().default(false),
 });
 
 function parsePendingDeepLinkRecord(raw: string): PendingDeepLinkRecord | null {
@@ -443,8 +480,12 @@ export function captureLaunchDeepLink(): void {
     // An app-scheme launch URL is the shape the Android system-search tap
     // delivers; flag it so the exact `system-search` route for that tap may
     // replace this lossy web-table mapping. An `https://` link is never flagged.
+    // An app-scheme URL that names a family the phone's search indexes is a
+    // search result's identifier, so it is session-bound: it must not open for
+    // the account that signs in after the one that indexed it.
     setPendingDeepLink(resumeDeepLinkHref(resume), 'universal-link', {
       fromLaunchAppScheme: url.startsWith(APP_SCHEME),
+      sessionBound: isSystemSearchFamilyLink(url),
     });
     launchLinkHandled = true;
   }
@@ -461,6 +502,7 @@ export function _resetDeepLinkLaunchForTests(): void {
   pendingSource = null;
   pendingDeepLinkUserId = null;
   pendingUniversalLinkFromLaunch = false;
+  pendingDeepLinkSessionBound = false;
   launchLinkHandled = false;
   getLinkingURLForTests = null;
   pendingDeepLinkListeners.clear();

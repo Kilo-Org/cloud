@@ -184,9 +184,18 @@ const skipBatchOptions = { context: { skipBatch: true } };
 export function createMobileAgentSessionManager({
   store,
   userWebConnection,
-  organizationId,
+  organizationId: initialOrganizationId,
   userId,
 }: Readonly<CreateMobileAgentSessionManagerOptions>): SessionManager {
+  // The route resolves the session's organization from its metadata read, but
+  // that read can be paused (offline) or stalled when the route mounts the
+  // session on its persisted transcript, so the scope handed in may still be
+  // absent. `fetchSession` learns the same organization a beat later; every
+  // request closure below reads this binding at call time, so a scope resolved
+  // after mount applies without recreating the manager — and without the route
+  // re-keying the provider, which would remount the transcript and drop the
+  // composer draft under it.
+  let organizationId = initialOrganizationId;
   // Last successful `fetchSession` metadata, memoized so `resolveSession` can
   // read `cloud_agent_session_id` without a duplicate serial
   // `cliSessionsV2.get`. It is only consulted when the id matches; any other
@@ -448,6 +457,10 @@ export function createMobileAgentSessionManager({
     },
     fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {
       const sessionResult = await fetchSessionWithNotFoundRetry(kiloSessionId);
+      // The route mounted before its metadata read could settle (offline or
+      // stalled): adopt the organization this read resolves so org-scoped
+      // requests carry it. An explicit route scope always wins.
+      organizationId ??= sessionResult.organization_id ?? undefined;
       const cloudAgentSessionId =
         sessionResult.cloud_agent_session_id as CloudAgentSessionId | null;
       // Memoize the metadata `resolveSession` needs so it never re-reads the row.

@@ -19,6 +19,7 @@ import {
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SessionCopyLinkAction } from '@/components/agents/session-copy-link-action';
 import { AgentSessionProvider } from '@/components/agents/session-provider';
+import { useSessionSlowLoadPhase } from '@/components/agents/session-slow-load';
 import { useIdentityConfirmation } from '@/components/agents/user-web-connection-provider';
 import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
@@ -30,6 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { parseParam } from '@/lib/route-params';
 import { parseResumeAnchor } from '@/lib/session-resume';
+import { useRestoredAccountId } from '@/lib/hooks/use-restored-account-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { shouldRetryNotFoundOnSpawnedRoute } from '@/lib/spawned-not-found-retry';
 import { useTRPC } from '@/lib/trpc';
@@ -37,8 +39,6 @@ import { useTRPC } from '@/lib/trpc';
 export default function SessionDetailScreen() {
   const owner = useSyncExternalStore(subscribeAuthenticatedOwner, getAuthenticatedOwner);
   const confirmation = useIdentityConfirmation();
-  const identityPending = !isAuthenticatedOwner(owner);
-  const identityFailed = identityPending && confirmation.isError;
   const {
     'session-id': rawSessionId,
     organizationId: routeOrganizationId,
@@ -139,10 +139,47 @@ export default function SessionDetailScreen() {
     enabled: isAuthenticatedOwner(owner) && routeOrganizationId === undefined && sessionId !== null,
   });
 
+  // The account that owns this device's persisted transcript. The live
+  // confirmation wins; the id restored from the encrypted read cache keeps the
+  // cached transcript readable only when the account cannot be confirmed at all
+  // — the API unreachable on a cold start. That id is written only after an
+  // authoritative `user.getMe` for the current credentials, and the cold-start
+  // restore is fenced on the auth epoch, so it can never scope another
+  // account's rows. Sign-in clears the prior hint before storing new credentials;
+  // a fresh sign-in is not a restore, so the route must stay pending
+  // (`identityPending`) until `user.getMe` answers.
+  const restoredUserId = useRestoredAccountId(owner.authEpoch, owner.restored);
+  const sessionScopeUserId = owner.userId ?? restoredUserId;
+  const identityPending = sessionScopeUserId === null;
+  const identityFailed = identityPending && confirmation.isError;
+  const providerKey = `${owner.generation}:${sessionScopeUserId}:${sessionId}:${routeOrganizationId ?? 'personal'}`;
+  const displayedProviderKey = useRef<string | null>(null);
+
   const displayScope = {
     organizationId: routeOrganizationId ?? sessionQuery.data?.organization_id ?? null,
     isResolved: routeOrganizationId !== undefined || sessionQuery.data != null,
   };
+
+  // The live account confirmed the session; a pending metadata read only
+  // decides the organization the provider mounts with, so the skeleton holds
+  // while that read can still answer on its own. Two shapes cannot resolve, and
+  // both must hand off to the session, which owns the retryable state and paints
+  // the persisted transcript:
+  //  - the scope came from the restored identity instead (the API is
+  //    unreachable), so the metadata read cannot answer either;
+  //  - the read will not run because the device is offline (React Query pauses
+  //    it), or it has outlived the open's grace — the same threshold the session
+  //    body applies to a stalled transport. Holding the skeleton there keeps an
+  //    offline or stalled open spinning forever with a composer nobody can use.
+  const scopeFromRestoredIdentity = owner.userId === null && sessionScopeUserId !== null;
+  const metadataReadWaiting = !scopeFromRestoredIdentity && sessionQuery.fetchStatus !== 'paused';
+  const metadataPhase = useSessionSlowLoadPhase({
+    isLoading: metadataReadWaiting && routeOrganizationId === undefined && sessionQuery.isPending,
+    hasContent: routeOrganizationId !== undefined || sessionQuery.data != null,
+    hasError: sessionQuery.isError,
+    hasStatusIndicator: false,
+    openStartedAt: openStart.current.startedAt,
+  });
 
   if (sessionId === null) {
     return <InvalidRouteState backTo={'/(app)' as Href} />;
@@ -150,7 +187,8 @@ export default function SessionDetailScreen() {
 
   if (
     !identityFailed &&
-    (identityPending || (routeOrganizationId === undefined && sessionQuery.isPending))
+    (identityPending ||
+      (metadataPhase === 'loading' && displayedProviderKey.current !== providerKey))
   ) {
     // The composer placeholder holds its own height: nothing may shift when
     // the query resolves. Route title hints are not bound to an account.
@@ -201,6 +239,7 @@ export default function SessionDetailScreen() {
     // An identity failure stays retriable. An authoritative metadata denial
     // (NOT_FOUND / UNAUTHORIZED / FORBIDDEN) can't be recovered by retrying, so
     // it shows a permanent state with no Retry. Both get Back and Copy.
+    displayedProviderKey.current = null;
     const errorCode = identityFailed ? undefined : sessionQuery.error?.data?.code;
     const notFound = errorCode === 'NOT_FOUND';
     const unauthorized = errorCode === 'UNAUTHORIZED' || errorCode === 'FORBIDDEN';
@@ -270,11 +309,30 @@ export default function SessionDetailScreen() {
   }
 
   const organizationId = routeOrganizationId ?? sessionQuery.data?.organization_id ?? undefined;
+  // Same-scope metadata is background work once the transcript has mounted.
+  // Confirmation/reconnection must not replace it with the initial skeleton.
+  displayedProviderKey.current = providerKey;
 
   return (
     <AgentSessionProvider
-      key={`${owner.generation}:${owner.userId}:${sessionId}:${organizationId ?? 'personal'}`}
+      // Keyed on the resolved account scope, not the live owner: a cold start
+      // mounts with `owner.userId === null` and the restored id, and the live
+      // `getMe` confirmation arrives later. Confirming the same account must
+      // not remount the session subtree — the manager, transcript and composer
+      // text all live below this key — while a stale or different hint still
+      // remounts because the resolved id changes.
+      //
+      // The metadata-derived organization is deliberately not part of the key:
+      // the metadata read can be paused or stalled when this route mounts the
+      // session on its persisted transcript (see `metadataPhase` above), and
+      // the manager adopts the organization its own read resolves, so re-keying
+      // on it would remount — new manager, transcript flash, composer text
+      // lost — for a scope the manager applies in place. An explicit route
+      // organization still re-keys, because it is authoritative from the first
+      // frame.
+      key={providerKey}
       organizationId={organizationId}
+      restoredUserId={restoredUserId ?? undefined}
     >
       <SessionDetailContent
         sessionId={sessionId as KiloSessionId}

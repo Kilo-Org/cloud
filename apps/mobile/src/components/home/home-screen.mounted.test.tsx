@@ -32,6 +32,8 @@ const state = vi.hoisted(() => ({
   internet: 'online' as BannerState,
   connection: { isConnected: true, reconnectExhausted: false },
   prReviewEnabled: true,
+  /** Landscape side safe areas (notch/sensor); portrait is all zeros. */
+  insets: { top: 0, bottom: 0, left: 0, right: 0 },
   refetch: vi.fn<() => Promise<boolean>>(),
   boundaryRefetch: vi.fn(),
   socketRetry: vi.fn(),
@@ -53,7 +55,7 @@ vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
+  useSafeAreaInsets: () => state.insets,
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -230,6 +232,7 @@ beforeEach(() => {
     terminalError: null,
   });
   Object.assign(state.connection, { isConnected: true, reconnectExhausted: false });
+  Object.assign(state.insets, { top: 0, bottom: 0, left: 0, right: 0 });
   state.internet = 'online';
   state.prReviewEnabled = true;
   state.destination = '';
@@ -855,5 +858,88 @@ describe('Home admission', () => {
     expect(nodes('RemoteSessionRow')).toHaveLength(0);
     expect(nodes('NewTaskButton')).toHaveLength(0);
     expect(text()).not.toContain('Nothing running right now');
+  });
+});
+
+describe('Home leading edge', () => {
+  /** The outer header chrome: the first `bg-background` container above the logo. */
+  function headerContainerClass() {
+    let node = nodes('Image')[0]?.parent ?? null;
+    while (node) {
+      if (
+        typeof node.props.className === 'string' &&
+        node.props.className.includes('bg-background')
+      ) {
+        return node.props.className;
+      }
+      node = node.parent;
+    }
+    throw new Error('Missing the header container above the logo');
+  }
+
+  /** Host views that carry the landscape side safe area as inline padding. */
+  function sideInsetViews(side: number) {
+    return nodes('View').filter(node => {
+      const { paddingLeft, paddingRight } = (node.props.style ?? {}) as {
+        paddingLeft?: number;
+        paddingRight?: number;
+      };
+      return paddingLeft === side && paddingRight === side;
+    });
+  }
+
+  it('clears the landscape side safe area on the page body, exactly as the header chrome does', async () => {
+    // The reporter's device reports a large left cutout in landscape (47pt is
+    // the fleet's worst case, see `tab-bar-layout.test.ts`).
+    state.insets.left = 47;
+    state.insets.right = 47;
+    await renderHome();
+
+    // The header chrome and the page body must clear the SAME sensor by the
+    // same amount, or the brand mark sits inside the leading edge of the
+    // sections, cards and actions below it.
+    const inset = sideInsetViews(47);
+    expect(inset).toHaveLength(2);
+    const scroll = nodes('ScrollView')[0];
+    expect(scroll).toBeDefined();
+    expect(inset.some(view => view.findAll(node => node === scroll).length > 0)).toBe(true);
+  });
+
+  it('clears the landscape side safe area around the centered feedback body too', async () => {
+    state.insets.left = 47;
+    state.insets.right = 47;
+    state.organization.organizationId = 'org-1';
+    state.boundary.orgs = [];
+    state.boundary.isError = true;
+    await renderHome();
+    state.prReviewEnabled = false;
+    await renderHome();
+
+    const centered = nodes('CenteredState')[0];
+    expect(centered).toBeDefined();
+    expect(
+      sideInsetViews(47).some(view => view.findAll(node => node === centered).length > 0)
+    ).toBe(true);
+  });
+
+  it('leaves portrait geometry untouched when the side insets are zero', async () => {
+    await renderHome();
+    const positivePadding = nodes('View').filter(node => {
+      const style = node.props.style as { paddingLeft?: number; paddingRight?: number } | undefined;
+      return (style?.paddingLeft ?? 0) > 0 || (style?.paddingRight ?? 0) > 0;
+    });
+    expect(positivePadding).toHaveLength(0);
+  });
+
+  it('keeps the brand mark on the page gutter that the sections and cards use', async () => {
+    await renderHome();
+    const bodyGutter = nodes('View').find(
+      node =>
+        typeof node.props.className === 'string' && node.props.className.split(' ').includes('mx-4')
+    );
+    expect(bodyGutter).toBeDefined();
+    // The logo is the header's only visible child, so the header's px-4 is the
+    // brand mark's leading edge; the body's leading edge is the mx-4 above.
+    expect(headerContainerClass()).toContain('px-4');
   });
 });

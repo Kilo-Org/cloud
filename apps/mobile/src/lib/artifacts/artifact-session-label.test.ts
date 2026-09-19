@@ -15,6 +15,7 @@ import { utf8ByteLength } from '@/lib/utf8-utils';
 
 vi.mock('expo-file-system', () => ({ Directory: vi.fn(), File: vi.fn(), Paths: {} }));
 vi.mock('expo-sharing', () => ({ isAvailableAsync: vi.fn(), shareAsync: vi.fn() }));
+vi.mock('expo/fetch', () => ({ fetch: vi.fn() }));
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     cloudAgentNext: { getAttachmentDownloadUrl: { mutate: vi.fn() } },

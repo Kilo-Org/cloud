@@ -2,8 +2,10 @@
 import { readFileSync } from 'node:fs';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, runs in node, never bundled into the app
 import { fileURLToPath } from 'node:url';
+// eslint-disable-next-line import/no-nodejs-modules -- runs the CommonJS config plugin with prebuild seams in node
+import { runInNewContext } from 'node:vm';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // Contract guard for the iOS File Provider extension.
 //
@@ -194,6 +196,56 @@ describe('artifacts File Provider target plugin contract', () => {
   const targetName = /const TARGET_NAME = '([^']+)'/.exec(pluginSource)?.[1];
   const bundleIdentifier = /const BUNDLE_IDENTIFIER = '([^']+)'/.exec(pluginSource)?.[1];
   const appGroupIdentifier = /const APP_GROUP_IDENTIFIER = '([^']+)'/.exec(pluginSource)?.[1];
+
+  it('creates the target once across repeated non-clean prebuilds', () => {
+    const targets = new Map<string, object>();
+    const helpers = Object.fromEntries(XCODE_HELPERS.map(name => [name, vi.fn()]));
+    helpers.addToPbxNativeTargetSection?.mockImplementation(
+      (_project: object, options: { targetUuid: string; targetName: string }) => {
+        const target = { uuid: options.targetUuid };
+        targets.set(options.targetName, target);
+        return target;
+      }
+    );
+    const config = {
+      modResults: {
+        pbxTargetByName: (name: string) => targets.get(name),
+        generateUuid: vi.fn(() => 'target-uuid'),
+      },
+    };
+    type Config = typeof config;
+    const pluginModule = { exports: (input: Config) => input };
+    runInNewContext(pluginSource, {
+      __dirname: '/mobile/plugins',
+      module: pluginModule,
+      require: (id: string) => {
+        if (id === 'fs') {
+          return { readdirSync: () => ['Info.plist', 'ArtifactsFileProviderExtension.swift'] };
+        }
+        if (id === 'path') {
+          return { join: (...parts: string[]) => parts.join('/') };
+        }
+        if (id === 'expo/config-plugins') {
+          return {
+            withDangerousMod: (input: Config) => input,
+            withXcodeProject: (input: Config, mod: (value: Config) => Config) => mod(input),
+          };
+        }
+        const name = id.split('/').at(-1);
+        return name ? { [name]: helpers[name] } : {};
+      },
+    });
+
+    const first = pluginModule.exports(config);
+    for (const helper of Object.values(helpers)) {
+      expect(helper).toHaveBeenCalledOnce();
+    }
+    pluginModule.exports(first);
+    for (const helper of Object.values(helpers)) {
+      expect(helper).toHaveBeenCalledOnce();
+    }
+    expect(config.modResults.generateUuid).toHaveBeenCalledOnce();
+  });
 
   it('targets the extension the plist and the entitlements describe', () => {
     expect(targetName).toBe(TARGET_NAME);

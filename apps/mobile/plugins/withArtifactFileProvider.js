@@ -19,9 +19,17 @@ const {
 // Adds the read-only File Provider extension target that serves the artifact
 // mirror to the iOS Files app.
 //
-// iOS has no in-process file provider: the Files app talks to a separate
-// `com.apple.fileprovider-nonui` extension process, and an extension can only
-// reach an app group container. The extension's source lives in
+// iOS-only by capability, not by scope: `com.apple.fileprovider-nonui` is an
+// out-of-process app extension that only an Xcode target can produce. Android
+// has no File Provider equivalent, so it serves the same mirror in-process from
+// `context.filesDir` through the module's DocumentsProvider
+// (`modules/artifacts-provider/android/`) and needs no prebuild plugin. The
+// feature's one runtime `Platform.OS` branch, in
+// `src/lib/artifacts/artifact-mirror-paths.ts`, records the same split.
+//
+// iOS has no in-process file provider: the Files app talks to that separate
+// extension process, and an extension can only reach an app group container.
+// The extension's source lives in
 // `apps/mobile/targets/ArtifactsFileProvider/` (the app-side domain lives in
 // `modules/artifacts-provider/ios/`), and this plugin composes its Xcode target
 // with the same helpers expo-widgets uses for `ExpoWidgetsTarget`
@@ -71,6 +79,10 @@ function withFileProviderSourceFiles(config) {
 function withFileProviderTarget(config) {
   return withXcodeProject(config, projectConfig => {
     const xcodeProject = projectConfig.modResults;
+    if (xcodeProject.pbxTargetByName(TARGET_NAME)) {
+      // Prebuild can run over a tree a previous pass already extended.
+      return projectConfig;
+    }
     const groupName = 'Embed Foundation Extensions';
     const marketingVersion = projectConfig.ios?.version ?? projectConfig.version ?? '1.0';
     const currentProjectVersion = projectConfig.ios?.buildNumber ?? '1';

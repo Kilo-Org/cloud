@@ -97,6 +97,15 @@ describe('upstreamRequest timeout', () => {
       search: '?beta=true',
       expectedUrl: 'https://messages.example.test/invoke/?beta=true',
     },
+    {
+      chatApi: 'messages',
+      apiUrlOverrides: {
+        messages: 'https://messages.example.test/invoke?tag=one%20two&encoded=%2f#section',
+      },
+      search: '?tag=three+four&beta=true',
+      expectedUrl:
+        'https://messages.example.test/invoke?tag=one%20two&encoded=%2f&tag=three+four&beta=true#section',
+    },
   ] as const)(
     'uses the configured $chatApi endpoint without a suffix and preserves query parameters',
     async ({ chatApi, apiUrlOverrides, search, expectedUrl }) => {

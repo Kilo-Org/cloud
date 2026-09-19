@@ -34,6 +34,14 @@ const CHAT_API_PATHS = {
   messages: '/messages',
 } as const satisfies Record<GatewayChatApiKind, string>;
 
+function appendQueryString(apiUrl: string, search: string): string {
+  if (!search) return apiUrl;
+
+  const url = new URL(apiUrl);
+  const query = `${url.search}${url.search ? '&' : '?'}${search.slice(1)}`;
+  return new URL(`${query}${url.hash}`, url).toString();
+}
+
 function getProviderTargetHost(apiUrl: string): string {
   try {
     return new URL(apiUrl).host;
@@ -250,12 +258,9 @@ export async function upstreamRequest({
   const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 
   try {
-    let targetUrl = `${apiUrl}${path}${search}`;
-    if (provider.disableUrlSuffix && search) {
-      const url = new URL(apiUrl);
-      url.search += `${url.search ? '&' : '?'}${search.slice(1)}`;
-      targetUrl = url.toString();
-    }
+    const targetUrl = provider.disableUrlSuffix
+      ? appendQueryString(apiUrl, search)
+      : `${apiUrl}${path}${search}`;
 
     return {
       type: 'success',

@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { openBrowserAsync } from 'expo-web-browser';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
@@ -23,7 +23,10 @@ const passkeySupport = vi.hoisted(() => ({ supported: true }));
 // What the screen reads from the hook: a fixed result object plus the one piece
 // of state the busy treatment depends on.
 const nativeAuth = vi.hoisted(() => ({
-  busy: undefined as 'passkey' | undefined,
+  busy: undefined as 'otp-send' | 'passkey' | undefined,
+  emailError: undefined as string | undefined,
+  clearEmailError: vi.fn(),
+  requestEmailCode: vi.fn(),
   signInWithPasskey: vi.fn(),
 }));
 
@@ -34,11 +37,13 @@ vi.mock('@/lib/auth/passkey-client', () => ({
 vi.mock('@/lib/auth/use-native-auth', () => ({
   useNativeAuth: () => ({
     busy: nativeAuth.busy,
+    emailError: nativeAuth.emailError,
+    clearEmailError: nativeAuth.clearEmailError,
     googleConfigured: false,
     signInWithApple: vi.fn(),
     signInWithGoogle: vi.fn(),
     signInWithPasskey: nativeAuth.signInWithPasskey,
-    requestEmailCode: vi.fn(),
+    requestEmailCode: nativeAuth.requestEmailCode,
     verifyEmailCode: vi.fn(),
     ssoRecovery: ssoRecovery.value,
     clearSsoRecovery: vi.fn(),
@@ -87,6 +92,15 @@ vi.mock('@/lib/config', () => ({
 
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
+const renderers: R[] = [];
+
+afterEach(() => {
+  act(() => {
+    for (const renderer of renderers.splice(0)) {
+      renderer.unmount();
+    }
+  });
+});
 
 async function mountIdleAuth(start: StartFn): Promise<R> {
   const ref: { current: R | undefined } = { current: undefined };
@@ -98,6 +112,7 @@ async function mountIdleAuth(start: StartFn): Promise<R> {
   if (!r) {
     throw new Error('renderer was not created');
   }
+  renderers.push(r);
   return r;
 }
 
@@ -152,10 +167,6 @@ describe('IdleAuth SSO recovery', () => {
     });
 
     expect(start).toHaveBeenCalledWith('sso', 'user@example.com');
-
-    act(() => {
-      renderer.unmount();
-    });
   });
 });
 
@@ -184,10 +195,6 @@ describe('IdleAuth passkey control', () => {
       'Continue with email',
       'More sign-in options',
     ]);
-
-    act(() => {
-      renderer.unmount();
-    });
   });
 
   it('starts the passkey ceremony on press', async () => {
@@ -199,10 +206,6 @@ describe('IdleAuth passkey control', () => {
     });
 
     expect(nativeAuth.signInWithPasskey).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      renderer.unmount();
-    });
   });
 
   it('shows the busy treatment while the ceremony runs', async () => {
@@ -215,10 +218,6 @@ describe('IdleAuth passkey control', () => {
       btn.findAll(n => typeof n.type === 'string' && (n.type as string) === 'ActivityIndicator')
     ).toHaveLength(1);
     expect(btn.parent?.props.pointerEvents).toBe('none');
-
-    act(() => {
-      renderer.unmount();
-    });
   });
 
   it('renders no passkey control without the native module', async () => {
@@ -231,10 +230,6 @@ describe('IdleAuth passkey control', () => {
     expect(texts(renderer.root)).not.toContain('Sign in with a passkey');
     // The other ways in are untouched.
     expect(findButton(renderer.root, 'Continue with email')).toBeTruthy();
-
-    act(() => {
-      renderer.unmount();
-    });
   });
 });
 describe('IdleAuth email continue copy', () => {
@@ -247,10 +242,6 @@ describe('IdleAuth email continue copy', () => {
 
     const btn = findButton(renderer.root, 'Continue with email');
     expect(btn).toBeTruthy();
-
-    act(() => {
-      renderer.unmount();
-    });
   });
 
   it('shows the Terms and Privacy Policy line', async () => {
@@ -259,10 +250,6 @@ describe('IdleAuth email continue copy', () => {
 
     expect(texts(renderer.root)).toContain('Terms');
     expect(texts(renderer.root)).toContain('Privacy Policy');
-
-    act(() => {
-      renderer.unmount();
-    });
   });
 
   it('opens the browser for Terms and Privacy Policy', async () => {
@@ -280,9 +267,71 @@ describe('IdleAuth email continue copy', () => {
       (privacy.props.onPress as () => void)();
     });
     expect(openBrowserAsync).toHaveBeenCalledWith(PRIVACY_URL);
+  });
+});
 
+describe('IdleAuth email validation layout', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    nativeAuth.emailError = undefined;
+    nativeAuth.clearEmailError.mockClear();
+    nativeAuth.requestEmailCode.mockReset();
+  });
+
+  it('keeps validation in the field before an enabled Continue, then accepts a correction', async () => {
+    nativeAuth.emailError = 'Check your email address and try again.';
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    const field = renderer.root.findByType('FormField');
+    expect(field.props.error).toBe(nativeAuth.emailError);
+    expect(field.props.reserveErrorMessages).toEqual([
+      'Please enter your email address.',
+      nativeAuth.emailError,
+      'Unable to deliver email to this address. Please use a different email.',
+    ]);
+    const button = findButton(renderer.root, 'Continue with email');
+    expect(button.props.disabled).toBe(false);
+    const siblings = field.parent?.children;
+    expect(siblings?.indexOf(field)).toBeLessThan(siblings?.indexOf(button) ?? 0);
     act(() => {
-      renderer.unmount();
+      (field.props.onChangeText as (value: string) => void)('user@example.com');
     });
+    expect(nativeAuth.clearEmailError).toHaveBeenCalledOnce();
+    nativeAuth.emailError = undefined;
+    nativeAuth.requestEmailCode.mockResolvedValue(true);
+    await act(async () => {
+      await (button.props.onPress as () => Promise<void>)();
+    });
+    expect(nativeAuth.requestEmailCode).toHaveBeenCalledWith('user@example.com');
+    expect(renderer.root.findByType('EmailOtpForm').props.email).toBe('user@example.com');
+    nativeAuth.requestEmailCode.mockResolvedValue(false);
+    await act(async () => {
+      (renderer.root.findByType('EmailOtpForm').props.onResend as () => void)();
+      nativeAuth.emailError =
+        'Unable to deliver email to this address. Please use a different email.';
+      renderer.update(createElement(IdleAuth, { start: vi.fn<StartFn>() }));
+      await Promise.resolve();
+    });
+    expect(renderer.root.findByType('FormField').props.error).toBe(nativeAuth.emailError);
+  });
+
+  it('keeps the reservation while loading with one indicator and disabled Continue', async () => {
+    nativeAuth.busy = 'otp-send';
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    expect(renderer.root.findByType('FormField').props.reserveErrorMessages).toHaveLength(3);
+    expect(findButton(renderer.root, 'Continue with email').props.disabled).toBe(true);
+    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1);
+  });
+
+  it('uses the keyboard submit action for an empty field too', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    const field = renderer.root.findByType('FormField');
+    expect(field.props.error).toBeUndefined();
+    await act(async () => {
+      (field.props.onSubmitEditing as () => void)();
+      await Promise.resolve();
+    });
+    expect(nativeAuth.requestEmailCode).toHaveBeenCalledWith('');
+    expect(renderer.root.findByType('FormField')).toBeTruthy();
   });
 });

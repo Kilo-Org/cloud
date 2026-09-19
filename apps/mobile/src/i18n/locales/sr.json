@@ -792,7 +792,7 @@
     "previewFullDescription": "Obaveštenja prikazuju tekst poruke na zaključanom ekranu.",
     "previewGenericDescription": "Obaveštenja samo najavljuju novu aktivnost. Otvori Kilo da pročitaš poruku.",
     "channel": {
-      "agent": "Sesije agenata",
+      "agentProgress": "Napredak agenata",
       "chat": "Poruke u ćaskanju",
       "kiloclaw": "Aktivnosti u KiloClaw-u",
       "balance": "Upozorenja o stanju kredita",

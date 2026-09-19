@@ -293,7 +293,7 @@
     "previewFullDescription": "通知会在锁定屏幕上显示消息文本。",
     "previewGenericDescription": "通知仅提示有新动态。请打开 Kilo 查看详情。",
     "channel": {
-      "agent": "智能体会话",
+      "agentProgress": "智能体进度",
       "chat": "聊天消息",
       "kiloclaw": "KiloClaw 活动",
       "balance": "余额提醒",

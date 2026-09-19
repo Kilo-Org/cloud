@@ -293,7 +293,7 @@
     "previewFullDescription": "सूचनाएँ आपकी लॉक स्क्रीन पर संदेश का टेक्स्ट दिखाती हैं।",
     "previewGenericDescription": "सूचनाएँ केवल नई गतिविधि की जानकारी देती हैं। संदेश पढ़ने के लिए Kilo खोलें।",
     "channel": {
-      "agent": "एजेंट के सत्र",
+      "agentProgress": "एजेंट की प्रगति",
       "chat": "चैट के संदेश",
       "kiloclaw": "KiloClaw की गतिविधि",
       "balance": "बैलेंस की चेतावनियाँ",

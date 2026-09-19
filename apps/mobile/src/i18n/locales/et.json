@@ -783,7 +783,7 @@
     "previewFullDescription": "Teavitused näitavad sõnumi teksti lukustuskuval.",
     "previewGenericDescription": "Teavitused annavad märku uuest sündmusest. Sõnumi lugemiseks ava Kilo.",
     "channel": {
-      "agent": "Agendi seansid",
+      "agentProgress": "Agendi edenemine",
       "chat": "Vestlussõnumid",
       "kiloclaw": "KiloClaw'i tegevus",
       "balance": "Saldohoiatused",

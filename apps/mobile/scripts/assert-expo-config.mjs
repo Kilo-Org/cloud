@@ -5,10 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { ENV_KEYS } from '../src/lib/env-keys.js';
 
 // Contract values mirrored from app.config.ts (bundle id, package, scheme,
-// orientation, associated domain, app name, blocked permissions, and Sentry
-// plugin). ENV_KEYS is imported live from src/lib/env-keys.js. The script runs
-// the full evaluated config, so these must match the resolved build-time
-// output, not the raw app.config.ts source.
+// orientation, associated domain, app name, blocked and requested permissions,
+// and Sentry plugin). ENV_KEYS is imported live from src/lib/env-keys.js. The
+// script runs the full evaluated config, so these must match the resolved
+// build-time output, not the raw app.config.ts source.
 const BUNDLE_IDENTIFIER = 'com.kilocode.kiloapp';
 const ANDROID_PACKAGE = 'com.kilocode.kiloapp';
 const SCHEME = 'kiloapp';
@@ -26,8 +26,18 @@ const BLOCKED_PERMISSIONS = [
   'android.permission.READ_MEDIA_VIDEO',
   'android.permission.READ_MEDIA_AUDIO',
 ];
+// Permissions the app itself must request. Android only offers the Do Not
+// Disturb access grant (Settings > Special app access) to an app declaring this
+// normal-protection marker, and without that grant AOSP resets a channel's
+// app-requested `bypassDnd` to false. Checked as a subset: plugins add their own
+// permissions (RECORD_AUDIO, USE_BIOMETRIC, USE_FINGERPRINT, ACCESS_COARSE/
+// FINE_LOCATION, AD_ID), so the evaluated array is never exactly this list.
+const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+// The one writer of the app target's `<tag>.lproj/Localizable.strings`: the App
+// Intent copy plus the appended Focus-filter catalog.
+const APP_INTENT_LOCALIZATIONS_PLUGIN = './plugins/withAppIntentLocalizations';
 const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSMicrophoneUsageDescription',
   'NSSpeechRecognitionUsageDescription',
@@ -106,6 +116,15 @@ check(
   `android.blockedPermissions must equal exactly [${BLOCKED_PERMISSIONS.join(', ')}]`
 );
 
+const requestedPermissions = config.android?.permissions ?? [];
+const missingRequestedPermissions = REQUESTED_PERMISSIONS.filter(
+  permission => !requestedPermissions.includes(permission)
+);
+check(
+  missingRequestedPermissions.length === 0,
+  `android.permissions must include [${missingRequestedPermissions.join(', ')}]`
+);
+
 // iOS permission prompts: Expo's built-in `withLocales` reads the top-level
 // `locales` field at prebuild and writes one InfoPlist.strings per tag. The
 // evaluated config is the integration guard the unit test cannot give: it
@@ -120,6 +139,15 @@ for (const tag of localizations) {
   check(
     Boolean(locales[tag]?.ios) && typeof locales[tag].ios === 'object',
     `locales["${tag}"].ios must be an object`
+  );
+  // The app target's `<tag>.lproj/Localizable.strings` has exactly one writer:
+  // `withAppIntentLocalizations`, which also carries the Focus-filter catalog.
+  // Expo's `withLocales` registers a second file at the same bundle path when
+  // this key is present, and Xcode fails the build with "Multiple commands
+  // produce …/Localizable.strings".
+  check(
+    !Object.hasOwn(locales[tag]?.ios ?? {}, 'Localizable.strings'),
+    `locales["${tag}"].ios must not declare Localizable.strings — Expo would register a second copy beside the App Intent catalog`
   );
   for (const key of PERMISSION_PROMPT_PLIST_KEYS) {
     const value = locales[tag]?.ios?.[key];
@@ -151,6 +179,13 @@ check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGI
 check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
+);
+// The app target's one `Localizable.strings` (the App Intent copy plus the
+// appended Focus-filter catalog) is written by this plugin; without it the
+// Shortcuts actions and the Focus filter stay English on a localized device.
+check(
+  pluginNames.includes(APP_INTENT_LOCALIZATIONS_PLUGIN),
+  `plugins must include "${APP_INTENT_LOCALIZATIONS_PLUGIN}"`
 );
 
 const extra = config.extra ?? {};

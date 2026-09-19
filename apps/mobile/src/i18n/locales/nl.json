@@ -265,7 +265,7 @@
   },
   "notifications": {
     "channel": {
-      "agent": "Agentsessies",
+      "agentProgress": "Agentvoortgang",
       "chat": "Chatberichten",
       "kiloclaw": "KiloClaw-activiteit",
       "balance": "Saldowaarschuwingen",

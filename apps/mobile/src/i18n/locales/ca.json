@@ -792,7 +792,7 @@
     "previewFullDescription": "Les notificacions mostren el text del missatge a la pantalla de bloqueig.",
     "previewGenericDescription": "Les notificacions mostren que ha passat alguna cosa. Obre Kilo per llegir-ho.",
     "channel": {
-      "agent": "Sessions d'agent",
+      "agentProgress": "Progrés de l'agent",
       "chat": "Missatges de xat",
       "kiloclaw": "Activitat de KiloClaw",
       "balance": "Alertes de saldo",

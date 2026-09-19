@@ -801,7 +801,7 @@
     "previewFullDescription": "Oznámení zobrazují text zprávy na uzamčené obrazovce.",
     "previewGenericDescription": "Oznámení pouze upozorní na novou událost. Podrobnosti si přečtete v aplikaci Kilo.",
     "channel": {
-      "agent": "Relace agentů",
+      "agentProgress": "Průběh agenta",
       "chat": "Zprávy v konverzaci",
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornění na zůstatek",

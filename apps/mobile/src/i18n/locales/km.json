@@ -783,7 +783,7 @@
     "previewFullDescription": "ការជូនដំណឹងបង្ហាញអត្ថបទសារនៅលើអេក្រង់ចាក់សោរបស់អ្នក។",
     "previewGenericDescription": "ការជូនដំណឹងបង្ហាញថាមានអ្វីមួយបានកើតឡើង។ បើក Kilo ដើម្បីអានវា។",
     "channel": {
-      "agent": "វគ្គភ្នាក់ងារ",
+      "agentProgress": "វឌ្ឍនភាពភ្នាក់ងារ",
       "chat": "សារជជែក",
       "kiloclaw": "សកម្មភាព KiloClaw",
       "balance": "ការជូនដំណឹងអំពីសមតុល្យ",

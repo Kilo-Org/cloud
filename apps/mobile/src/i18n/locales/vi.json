@@ -293,7 +293,7 @@
     "previewFullDescription": "Thông báo hiển thị nội dung tin nhắn trên màn hình khóa của bạn.",
     "previewGenericDescription": "Thông báo chỉ cho biết có hoạt động mới. Mở Kilo để xem nội dung.",
     "channel": {
-      "agent": "Phiên tác nhân",
+      "agentProgress": "Tiến độ tác nhân",
       "chat": "Tin nhắn trò chuyện",
       "kiloclaw": "Hoạt động KiloClaw",
       "balance": "Cảnh báo số dư",

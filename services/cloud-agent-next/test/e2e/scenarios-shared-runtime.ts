@@ -2,9 +2,9 @@
  * Shared scenario mechanics: the scenario deadline, the container-observation
  * seam and the send/terminal/durable turn lifecycle.
  *
- * This module imports only `client.ts` and `scenario-capabilities.ts` types, so a
- * shared scenario module can use it without importing a local-only inspection
- * module, and it performs no Docker, filesystem, process, log or database I/O.
+ * This module imports `client.ts`, `scenario-capabilities.ts` types and the
+ * correlated-progress predicates from `scenarios-shared.ts`, and it performs no
+ * Docker, filesystem, process, log or database I/O.
  *
  * `within` rejects the await when its budget expires and aborts the signal it
  * passes to the operation. It cancels an operation only where that operation
@@ -16,14 +16,24 @@
  */
 
 import {
+  fakeDirective,
+  fetchFakeRequests,
   getMessageResult,
+  getSessionSnapshot,
+  isMessageCompleted,
   openConnectedStream,
   sendMessage,
+  type ApiVersion,
   type DriverConfig,
   type StreamConnection,
   type StreamEvent,
 } from './client.js';
 import type { ScenarioEnvironment, SessionSandboxObservation } from './scenario-capabilities.js';
+import {
+  collectChildMessageText,
+  correlatedProgressSummary,
+  hasCorrelatedStreamProgress,
+} from './scenarios-shared.js';
 
 /**
  * Bound for the durable-status poll. A single read can race the DO's terminal
@@ -96,6 +106,27 @@ export function createScenarioDeadline(startedAt: number, timeoutMs: number): Sc
 }
 
 export type OwnedSession = { cloudAgentSessionId: string; kiloSessionId?: string };
+
+/**
+ * Bind the session id as soon as the start reports it. The legacy two-step
+ * `prepareSession` path reports the prepared id through `config.onSessionCreated`
+ * before initiation, so a failure between prepare and initiation still reaches
+ * the caller's failure-path cleanup instead of leaking the prepared session. A
+ * unified start reports it on success. Forwards to any runner-supplied hook so
+ * ownership tracking is kept.
+ */
+export function trackStartedSession(
+  config: DriverConfig,
+  onTracked: (sessionId: string) => void
+): DriverConfig {
+  return {
+    ...config,
+    onSessionCreated: sessionId => {
+      onTracked(sessionId);
+      config.onSessionCreated?.(sessionId);
+    },
+  };
+}
 
 /** The scenario's cleanup path: interrupt + delete, bounded and never throwing. */
 export type SessionCleanup = (
@@ -300,13 +331,15 @@ export function sessionSandboxObservation(env: ScenarioEnvironment): SessionSand
 export async function requireContainer(
   sandbox: SessionSandboxObservation | undefined,
   session: { cloudAgentSessionId: string; kiloSessionId: string },
-  timeoutMs: number
+  timeoutMs: number,
+  signal?: AbortSignal
 ): Promise<string | null> {
   if (sandbox === undefined) return null;
   return sandbox.waitForContainer({
     cloudAgentSessionId: session.cloudAgentSessionId,
     kiloSessionId: session.kiloSessionId,
     timeoutMs,
+    signal,
   });
 }
 
@@ -324,10 +357,11 @@ export async function readAllocation(
   session: { cloudAgentSessionId: string; kiloSessionId: string },
   label: string
 ): Promise<string | null> {
-  return deadline.within(`${label} allocation`, () =>
+  return deadline.within(`${label} allocation`, signal =>
     sandbox.currentContainer({
       cloudAgentSessionId: session.cloudAgentSessionId,
       kiloSessionId: session.kiloSessionId,
+      signal,
     })
   );
 }
@@ -351,11 +385,12 @@ export async function waitForPresentAllocation(
   const budget = Math.max(1, Math.min(budgetMs, deadline.remaining(tag)));
   return deadline.within(
     tag,
-    () =>
+    signal =>
       sandbox.waitForContainer({
         cloudAgentSessionId: session.cloudAgentSessionId,
         kiloSessionId: session.kiloSessionId,
         timeoutMs: budget,
+        signal,
       }),
     budget + ALLOCATION_WAIT_SLACK_MS
   );
@@ -446,5 +481,183 @@ export async function sendTurn(
   } catch (error) {
     stream.close();
     throw error;
+  }
+}
+
+/**
+ * Boot a prepared session to a completed initial turn and return its stream,
+ * message id and child text. A completed real turn is the readiness proof. The
+ * stream is acquired here and closed on every failure path; the caller owns it
+ * on success.
+ */
+export async function bootToCompletion(
+  deadline: ScenarioDeadline,
+  config: DriverConfig,
+  session: OwnedSession,
+  label: string,
+  budgetMs = 240_000
+): Promise<{ messageId: string; stream: StreamConnection; text: string }> {
+  const snapshot = await deadline.within(`${label} snapshot`, signal =>
+    getSessionSnapshot(config, session.cloudAgentSessionId, signal)
+  );
+  const messageId = snapshot.initialMessageId;
+  if (!messageId) throw new Error(`${label} did not expose an initial message id`);
+  const stream = await deadline.within(`${label} stream`, signal =>
+    openConnectedStream(config, session.cloudAgentSessionId, true, undefined, signal)
+  );
+  try {
+    const terminal = await stream.waitForTerminal(
+      Math.max(1, Math.min(budgetMs, deadline.remaining(`${label} terminal`))),
+      messageId
+    );
+    if (!isMessageCompleted(terminal, messageId)) {
+      throw new Error(`${label} boot turn ${messageId} did not complete`);
+    }
+    const status = await deadline.within(`${label} durable`, signal =>
+      awaitDurableTerminal(
+        config,
+        session.cloudAgentSessionId,
+        messageId,
+        deadline.remaining(`${label} durable`),
+        signal
+      )
+    );
+    if (status !== 'completed') throw new Error(`${label} boot durable status=${status}`);
+    return { messageId, stream, text: collectChildMessageText(stream.events, messageId) };
+  } catch (error) {
+    // This stream was acquired here, so this function owns closing it. The
+    // caller never receives it to close on a failure path.
+    stream.close();
+    throw error;
+  }
+}
+
+/**
+ * Start a paced `slow` hold and return once the turn is actually running. The
+ * pre-send fake counter baseline, the send, the correlated-progress wait and the
+ * durable-running check have one owner here so queue, callbacks, load and faults
+ * cannot drift. Pass `stream` to reuse a connected stream; otherwise a fresh one
+ * is opened and returned. A stream opened here is closed on every failure path;
+ * a caller-supplied stream stays caller-owned.
+ */
+export async function startPacedHoldTurn(input: {
+  deadline: ScenarioDeadline;
+  config: DriverConfig;
+  cloudAgentSessionId: string;
+  directive: string;
+  label: string;
+  budgetMs: number;
+  api?: ApiVersion;
+  stream?: StreamConnection;
+}): Promise<{ messageId: string; stream: StreamConnection }> {
+  const { deadline, config, cloudAgentSessionId, directive, label, budgetMs } = input;
+  const api = input.api ?? 'unified';
+  const stream =
+    input.stream ??
+    (await deadline.within(`${label} stream`, signal =>
+      openConnectedStream(config, cloudAgentSessionId, false, undefined, signal)
+    ));
+  try {
+    const baseline = await deadline.within(`${label} baseline`, signal =>
+      fetchFakeRequests(config.fakeLlmUrl, signal)
+    );
+    const sent = await deadline.within(
+      `${label} send`,
+      signal =>
+        sendMessage(config, { cloudAgentSessionId, prompt: fakeDirective(directive), signal }, api),
+      budgetMs
+    );
+    await waitForPacedProgress(
+      config,
+      stream,
+      sent.messageId,
+      baseline.chatCompletions,
+      deadline,
+      budgetMs,
+      `${label} paced progress`
+    );
+    await requireRunning(config, cloudAgentSessionId, sent.messageId, deadline, `${label} paced turn`);
+    return { messageId: sent.messageId, stream };
+  } catch (error) {
+    // Only close a stream this call opened; a caller-supplied stream is the
+    // caller's to close on its own failure path.
+    if (input.stream === undefined) stream.close();
+    throw error;
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}/**
+ * Wait until the paced turn is underway: the paced turn's own stream shows a
+ * message-correlated part (liveness; transient and empty initialization parts
+ * permitted), **and** the fake's aggregate `chatCompletions` counter has
+ * increased since the paced send. The counter is **not** authoritative: it is
+ * attributed to the paced request under the documented assumption that no
+ * auxiliary/title request is in flight in that window, so a bounded increase
+ * proves "some request was dialed", not that it was the paced primary request.
+ *
+ * A content-based predicate was tried first and reverted. Requiring a
+ * correlated **non-empty text** part looked like a model-served signal, but the
+ * Kilo CLI's transient initialization part is correlated and empty, and for a
+ * paced response the streamed content can lag the request past the wait budget.
+ * Live evidence: one run showed `children=1 parts=9 correlated=2 text=1
+ * nonEmptyText=0` while the fake had already served the paced request, so the
+ * content predicate never fired and the counter check was never consulted.
+ *
+ * The wait is a bounded poll: each counter fetch is wrapped in `deadline.within`
+ * and each sleep is capped by the remaining wait budget. The correlated-part
+ * check reads the in-memory event buffer synchronously, so it cannot observe
+ * anything after the loop guard; a counter result observed only after the budget
+ * expires is rejected (`Date.now() <= end` before returning).
+ */
+export async function waitForPacedProgress(
+  config: DriverConfig,
+  stream: StreamConnection,
+  parentMessageId: string,
+  requestsBefore: number,
+  deadline: ScenarioDeadline,
+  budgetMs: number,
+  label: string
+): Promise<void> {
+  const budget = Math.min(budgetMs, deadline.remaining(label));
+  const end = Date.now() + budget;
+  while (Date.now() < end) {
+    if (hasCorrelatedStreamProgress(stream.events, parentMessageId)) {
+      const current = await deadline.within(
+        `${label} poll`,
+        signal => fetchFakeRequests(config.fakeLlmUrl, signal),
+        Math.max(1, end - Date.now())
+      );
+      if (current.chatCompletions > requestsBefore) {
+        if (Date.now() <= end) return;
+        break;
+      }
+    }
+    await sleep(Math.min(200, Math.max(0, end - Date.now())));
+  }
+  throw new Error(
+    `${label}: no correlated turn progress and new model request for ${parentMessageId} ` +
+      `within ${budget}ms (${correlatedProgressSummary(stream.events, parentMessageId)})`
+  );
+}
+
+/**
+ * Require the held turn is actually `running`, not still `queued`: a slow
+ * directive proves the turn is live only once the wrapper has accepted and
+ * started it, and every action the caller takes next assumes an active turn.
+ */
+export async function requireRunning(
+  config: DriverConfig,
+  sessionId: string,
+  messageId: string,
+  deadline: ScenarioDeadline,
+  label: string
+): Promise<void> {
+  const result = await deadline.within(`${label} status`, signal =>
+    getMessageResult(config, sessionId, messageId, signal)
+  );
+  if (result.status !== 'running') {
+    throw new Error(`${label}: ${messageId} status=${result.status}; expected running`);
   }
 }

@@ -13,15 +13,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { streamEventSchema } from '../e2e/client.js';
 import {
   buildRealisticReasoning,
+  buildSeedFixture,
   extractLastUserMessageText,
   extractMultipartField,
+  isToolError,
   MAX_REALISTIC_CHARS,
   MAX_REALISTIC_PIECES,
   MAX_TOOL_STREAM_BYTES,
   parseDirective,
+  parseFileDirective,
   startFakeLlmServer,
   splitRealisticContent,
   stripKiloPromptWrapping,
+  toolCallId,
   type FakeLlmServerHandle,
 } from '../e2e/fake-llm-server.js';
 import { LOCAL_FAKE_LLM_ADMIN_TOKEN, resolveFakeAdminToken } from '../e2e/fake-llm-admin.js';
@@ -163,6 +167,137 @@ describe('extractMultipartField', () => {
       'Content-Disposition: form-data; name="file"; filename="audio.wav"\r\n\r\nRIFF',
     ]);
     expect(extractMultipartField(body, boundary, 'model')).toBeNull();
+  });
+});
+
+describe('parseFileDirective', () => {
+  it('parses write with literal contents, including colons', () => {
+    expect(parseFileDirective('write:turn-1:shared-checkout.txt:nonce:with:colons')).toEqual({
+      ok: true,
+      directive: {
+        op: 'write',
+        opTag: 'turn-1',
+        path: 'shared-checkout.txt',
+        contents: 'nonce:with:colons',
+      },
+    });
+  });
+
+  it('parses seed with a byte count and nonce', () => {
+    expect(parseFileDirective('seed:turn-2:big.txt:65536:nonce-abc')).toEqual({
+      ok: true,
+      directive: { op: 'seed', opTag: 'turn-2', path: 'big.txt', bytes: 65536, nonce: 'nonce-abc' },
+    });
+  });
+
+  it('parses read with a single colon-free path', () => {
+    expect(parseFileDirective('read:turn-3:shared-checkout.txt')).toEqual({
+      ok: true,
+      directive: { op: 'read', opTag: 'turn-3', path: 'shared-checkout.txt' },
+    });
+  });
+
+  it('rejects an unknown op', () => {
+    const parsed = parseFileDirective('delete:turn-4:shared.txt');
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('rejects a read directive whose path contains a colon', () => {
+    const parsed = parseFileDirective('read:turn-5:dir:file.txt');
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('rejects a seed directive whose path contains a colon', () => {
+    const parsed = parseFileDirective('seed:turn-6:dir:file.txt:10:nonce');
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('normalizes away trailing prompt lines before parsing', () => {
+    expect(
+      parseFileDirective(
+        'read:turn-normalized:shared.txt\n\n<environment_details>noise</environment_details>'
+      )
+    ).toEqual({
+      ok: true,
+      directive: { op: 'read', opTag: 'turn-normalized', path: 'shared.txt' },
+    });
+  });
+
+  it('treats a colon after the write path as literal contents, not a path', () => {
+    expect(parseFileDirective('write:turn-colon:a:b:c')).toEqual({
+      ok: true,
+      directive: { op: 'write', opTag: 'turn-colon', path: 'a', contents: 'b:c' },
+    });
+  });
+
+  it('preserves literal newlines in write contents', () => {
+    expect(parseFileDirective('write:turn-multiline:a.txt:first\nsecond')).toEqual({
+      ok: true,
+      directive: {
+        op: 'write',
+        opTag: 'turn-multiline',
+        path: 'a.txt',
+        contents: 'first\nsecond',
+      },
+    });
+  });
+
+  it('strips only the appended prompt-context block from write contents', () => {
+    expect(
+      parseFileDirective(
+        'write:turn-context:a.txt:first\nsecond\n\n<environment_details>\nnoise\n</environment_details>'
+      )
+    ).toEqual({
+      ok: true,
+      directive: { op: 'write', opTag: 'turn-context', path: 'a.txt', contents: 'first\nsecond' },
+    });
+  });
+
+  it('rejects a write path that contains a newline', () => {
+    expect(parseFileDirective('write:turn-nl:a\nb:contents').ok).toBe(false);
+  });
+
+  it('rejects a seed byte count too small for the nonce prefix', () => {
+    expect(parseFileDirective('seed:turn-small:big.txt:4:nonce').ok).toBe(false);
+  });
+
+  it('rejects a seed nonce longer than the bound', () => {
+    expect(parseFileDirective(`seed:turn-long:big.txt:200:${'x'.repeat(65)}`).ok).toBe(false);
+  });
+
+  it('rejects missing arguments and an out-of-range seed size', () => {
+    expect(parseFileDirective('read:turn-7').ok).toBe(false);
+    expect(parseFileDirective('seed:turn-8:big.txt:999999999999:nonce').ok).toBe(false);
+  });
+});
+
+describe('isToolError', () => {
+  it('recognizes an is_error JSON marker and conservative error prefixes', () => {
+    expect(isToolError('{"is_error":true,"message":"nope"}')).toBe(true);
+    expect(isToolError('Error: file not found')).toBe(true);
+    expect(isToolError('error: ENOENT')).toBe(true);
+    expect(isToolError('failed to read file')).toBe(true);
+  });
+
+  it('does not treat ordinary file contents as an error', () => {
+    expect(isToolError('nonce-value')).toBe(false);
+    expect(isToolError('Errorless text')).toBe(false);
+    expect(isToolError('')).toBe(false);
+  });
+});
+
+describe('buildSeedFixture', () => {
+  it('produces exactly the requested UTF-8 byte count including the nonce prefix', () => {
+    const fixture = buildSeedFixture(200, 'nonce');
+    expect(Buffer.byteLength(fixture, 'utf8')).toBe(200);
+    expect(fixture.startsWith('nonce\n')).toBe(true);
+    const body = fixture.slice('nonce\n'.length);
+    const lines = body.split('\n').slice(0, -1);
+    for (const line of lines) expect(line).toHaveLength(99);
+  });
+
+  it('throws when the byte count is too small for the nonce prefix', () => {
+    expect(() => buildSeedFixture(3, 'nonce')).toThrow(/smaller than/);
   });
 });
 
@@ -322,6 +457,14 @@ function extractToolCall(chunks: Array<Record<string, unknown>>): {
     name: opening.function.name,
     arguments: JSON.parse(continuation.function.arguments),
   };
+}
+
+/** The first streamed assistant content, if the response is a plain completion. */
+function assistantContent(chunks: Array<Record<string, unknown>>): string | undefined {
+  const choices = chunks[0]?.choices;
+  if (!Array.isArray(choices)) return undefined;
+  const delta = (choices[0] as { delta?: { content?: string } } | undefined)?.delta;
+  return delta?.content;
 }
 
 async function postModelValidation(
@@ -1110,6 +1253,322 @@ describe('fake-llm-server HTTP', () => {
     });
     const status = await h.adminFetch(`/test/scenario-status?tag=unsupported`);
     await expect(status.json()).resolves.toMatchObject({ unsupportedToolSchema: true });
+  });
+
+  it('echoes a real read result for a fresh file opTag and counts one call and result', async () => {
+    const h = await start();
+    const opTag = 'file-read-positive';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(call).toMatchObject({ name: 'read', arguments: { filePath: 'shared-checkout.txt' } });
+    expect(call.id).toBe(toolCallId(opTag, 'read'));
+
+    const completed = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        {
+          role: 'tool',
+          tool_call_id: call.id,
+          content:
+            '<path>/workspace/shared-checkout.txt</path>\n<content>\n1: nonce-value\n\n(End of file - total 1 lines)\n</content>',
+        },
+      ])
+    );
+    expect(assistantContent(completed)).toBe('file-read:shared-checkout.txt\nnonce-value');
+
+    const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+    await expect(status.json()).resolves.toMatchObject({
+      requests: 2,
+      toolCalls: { read: 1 },
+      toolResults: { read: 1 },
+    });
+  });
+
+  it('ignores a previous opTag tool result and emits a fresh read call', async () => {
+    const h = await start();
+    const opTag = 'file-read-fresh';
+    const staleTag = 'file-read-stale';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    await parseSse(await postToolChat(h.url, prompt));
+
+    const staleId = toolCallId(staleTag, 'read');
+    const followup = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: staleId }] },
+        { role: 'tool', tool_call_id: staleId, content: 'stale-body' },
+      ])
+    );
+    expect(extractToolCall(followup)).toMatchObject({
+      name: 'read',
+      arguments: { filePath: 'shared-checkout.txt' },
+    });
+    expect(assistantContent(followup)).toBeUndefined();
+
+    const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { read: 2 },
+      toolResults: { read: 0 },
+    });
+  });
+
+  it('treats a mismatched tool-call id as no result and emits a fresh call', async () => {
+    const h = await start();
+    const opTag = 'file-read-wrongid';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    await parseSse(await postToolChat(h.url, prompt));
+
+    const followup = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: 'call_deadbeef_read' }] },
+        { role: 'tool', tool_call_id: 'call_deadbeef_read', content: 'nonce-value' },
+      ])
+    );
+    expect(extractToolCall(followup)).toMatchObject({ name: 'read' });
+    expect(assistantContent(followup)).toBeUndefined();
+  });
+
+  it('accepts a relative request matching a same-basename result in another directory', async () => {
+    // Contract: a relative requested path is bound by an absolute result that
+    // ends with `/<requested>`. The shared-checkout proof is the nonce body, not
+    // path exactness, so the reader's own working directory may differ.
+    const h = await start();
+    const opTag = 'file-read-wrongdir';
+    const prompt = `__fake__:file:read:${opTag}:requested.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content:
+          '<path>/workspace/other/requested.txt</path>\n<content>\n1: other-value\n\n(End of file - total 1 lines)\n</content>',
+      },
+    ]);
+    expect(response.status).toBe(200);
+    expect(assistantContent(await parseSse(response))).toBe(
+      'file-read:requested.txt\nother-value'
+    );
+  });
+
+  it('rejects a same-basename result for an absolute request', async () => {
+    const h = await start();
+    const opTag = 'file-read-abs-wrongdir';
+    const prompt = `__fake__:file:read:${opTag}:/workspace/requested.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content:
+          '<path>/workspace/other/requested.txt</path>\n<content>\n1: other-value\n</content>',
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
+  it('rejects a read result whose envelope and inner path metadata conflict', async () => {
+    const h = await start();
+    const opTag = 'file-read-conflict';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: JSON.stringify({
+          path: '/workspace/shared-checkout.txt',
+          output:
+            '<path>/workspace/other/shared-checkout.txt</path>\n<content>\n1: nonce-value\n</content>',
+        }),
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
+  it('rejects a doubly nested tool-result envelope instead of echoing it', async () => {
+    const h = await start();
+    const opTag = 'file-read-nested';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: JSON.stringify({
+          path: '/workspace/shared-checkout.txt',
+          output: JSON.stringify({ output: 'Error: file not found' }),
+        }),
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
+  it('fails closed with 422 when the read result is an envelope-wrapped error', async () => {
+    const h = await start();
+    const opTag = 'file-read-envelope-error';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: JSON.stringify({
+          path: '/workspace/shared-checkout.txt',
+          output: 'Error: file not found',
+        }),
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
+  it('rejects a reused file opTag after it completed', async () => {
+    const h = await start();
+    const opTag = 'file-read-reuse';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const resultMessage = {
+      role: 'tool',
+      tool_call_id: call.id,
+      content:
+        '<path>/workspace/shared-checkout.txt</path>\n<content>\n1: nonce-value\n\n(End of file - total 1 lines)\n</content>',
+    };
+    await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        resultMessage,
+      ])
+    );
+
+    const reuse = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      resultMessage,
+    ]);
+    expect(reuse.status).toBe(409);
+    await expect(reuse.json()).resolves.toMatchObject({
+      error: { type: 'invalid_request' },
+    });
+  });
+
+  it('fails closed with 422 when the read result is a nonempty tool error', async () => {
+    const h = await start();
+    const opTag = 'file-read-error';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: '<path>/workspace/shared-checkout.txt</path>\nError: file not found',
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        message: 'read tool did not return file contents for the requested path',
+        type: 'invalid_tool_result',
+      },
+    });
+  });
+
+  it('rejects a file directive with a colon path', async () => {
+    const h = await start();
+    const response = await postChat(h.url, '__fake__:file:read:colon:dir:file.txt');
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_request' },
+    });
+  });
+
+  it('streams one write call for file:write and finishes with the write marker', async () => {
+    const h = await start();
+    const opTag = 'file-write';
+    const prompt = `__fake__:file:write:${opTag}:shared-checkout.txt:nonce-value`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(call).toMatchObject({
+      name: 'write',
+      arguments: { filePath: 'shared-checkout.txt', content: 'nonce-value' },
+    });
+
+    const completed = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        { role: 'tool', tool_call_id: call.id, content: 'File written successfully' },
+      ])
+    );
+    expect(assistantContent(completed)).toBe('file-write:shared-checkout.txt\n');
+    const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { write: 1 },
+      toolResults: { write: 1 },
+    });
+  });
+
+  it('streams one write call carrying the generated fixture for file:seed', async () => {
+    const h = await start();
+    const opTag = 'file-seed';
+    const prompt = `__fake__:file:seed:${opTag}:big.txt:200:nonce-seed`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(call.name).toBe('write');
+    expect(call.arguments.filePath).toBe('big.txt');
+    const contents = call.arguments.content as string;
+    expect(contents.startsWith('nonce-seed\n')).toBe(true);
+    expect(Buffer.byteLength(contents, 'utf8')).toBe(200);
+
+    const completed = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        { role: 'tool', tool_call_id: call.id, content: 'File written successfully' },
+      ])
+    );
+    expect(assistantContent(completed)).toBe('file-write:big.txt\n');
+  });
+
+  it('finishes a file title request without tools as a benign terminal', async () => {
+    const h = await start();
+    const opTag = 'file-title';
+    const chunks = await parseSse(
+      await postChat(h.url, `__fake__:file:read:${opTag}:shared-checkout.txt`)
+    );
+    expect(assistantContent(chunks)).toBe(`done-${opTag}`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { read: 0 },
+      toolResults: { read: 0 },
+    });
+  });
+
+  it('attributes a file directive to its opTag, never the op, for all three ops', async () => {
+    const h = await start();
+    const cases = [
+      { op: 'write', prompt: '__fake__:file:write:attr-write:shared.txt:body' },
+      { op: 'seed', prompt: '__fake__:file:seed:attr-seed:big.txt:100:nonce' },
+      { op: 'read', prompt: '__fake__:file:read:attr-read:shared.txt' },
+    ];
+    for (const { op, prompt } of cases) {
+      const opTag = prompt.split(':')[3];
+      await parseSse(await postToolChat(h.url, prompt));
+      const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+      await expect(status.json()).resolves.toMatchObject({ requests: 1 });
+      const opStatus = await h.adminFetch(`/test/scenario-status?tag=${op}`);
+      await expect(opStatus.json()).resolves.toMatchObject({ requests: 0 });
+    }
   });
 
   it('never logs directive contents, raw request bodies, or authorization headers', async () => {

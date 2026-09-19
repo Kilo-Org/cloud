@@ -45,6 +45,25 @@ function surfaceHeaders(options: SurfaceRequestOptions): Record<string, string> 
   };
 }
 
+/** Bound for the token-release cleanup call, which runs after the scenario. */
+const CLOSE_TIMEOUT_MS = 15_000;
+
+/** A `setTimeout` that settles early when `signal` aborts. */
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.resolve();
+  return new Promise(resolve => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      resolve();
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 function allocationUrl(surfaceUrl: string, cloudAgentSessionId: string): string {
   return `${surfaceUrl.replace(/\/+$/, '')}/__e2e/inspect/allocation/${encodeURIComponent(
     cloudAgentSessionId
@@ -102,16 +121,24 @@ export function createHttpSessionSandbox(
 ): SessionSandboxObservation {
   return {
     waitForContainer: async (input: SessionSandboxWaitInput) => {
+      const signal = input.signal ?? options.signal;
       const deadline = Date.now() + input.timeoutMs;
       while (Date.now() < deadline) {
-        const allocation = await fetchAllocation(options, input.cloudAgentSessionId);
+        if (signal?.aborted) return null;
+        const allocation = await fetchAllocation(
+          { ...options, signal },
+          input.cloudAgentSessionId
+        );
         if (allocation.physicalProviderRef !== null) return allocation.physicalProviderRef;
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await abortableDelay(500, signal);
       }
       return null;
     },
     currentContainer: async (input: SessionSandboxCurrentInput) => {
-      const allocation = await fetchAllocation(options, input.cloudAgentSessionId);
+      const allocation = await fetchAllocation(
+        { ...options, signal: input.signal ?? options.signal },
+        input.cloudAgentSessionId
+      );
       return allocation.physicalProviderRef;
     },
   };
@@ -128,11 +155,11 @@ export function createHttpSessionSandbox(
 export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObservation {
   const base = options.surfaceUrl.replace(/\/+$/, '');
 
-  async function mint(): Promise<{ token: string; callbackUrl: string }> {
+  async function mint(signal?: AbortSignal): Promise<{ token: string; callbackUrl: string }> {
     const response = await fetch(`${base}/__e2e/callbacks`, {
       method: 'POST',
       headers: surfaceHeaders(options),
-      ...(options.signal ? { signal: options.signal } : {}),
+      ...((signal ?? options.signal) ? { signal: signal ?? options.signal } : {}),
     });
     if (!response.ok) {
       throw new Error(`callback mint failed: ${response.status} ${response.statusText}`);
@@ -144,10 +171,11 @@ export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObs
     return { token: body.token, callbackUrl: body.callbackUrl };
   }
 
-  async function records(token: string): Promise<CallbackPayload[]> {
+  async function records(token: string, signal?: AbortSignal): Promise<CallbackPayload[]> {
+    const effective = signal ?? options.signal;
     const response = await fetch(`${base}/__e2e/callbacks/${encodeURIComponent(token)}`, {
       headers: surfaceHeaders(options),
-      ...(options.signal ? { signal: options.signal } : {}),
+      ...(effective ? { signal: effective } : {}),
     });
     if (!response.ok) {
       throw new Error(`callback read failed: ${response.status} ${response.statusText}`);
@@ -160,27 +188,32 @@ export function createHttpCallbacks(options: SurfaceRequestOptions): CallbackObs
   }
 
   return {
-    open: async () => {
-      const minted = await mint();
+    open: async signal => {
+      const minted = await mint(signal);
       return {
         callbackUrl: minted.callbackUrl,
-        records: () => records(minted.token),
-        waitFor: async (predicate, timeoutMs) => {
+        records: recordsSignal => records(minted.token, recordsSignal ?? signal),
+        waitFor: async (predicate, timeoutMs, waitSignal) => {
+          const effective = waitSignal ?? signal ?? options.signal;
           const deadline = Date.now() + timeoutMs;
           for (;;) {
-            const received = await records(minted.token);
+            if (effective?.aborted) return null;
+            const received = await records(minted.token, effective);
             const match = received.find(predicate);
             if (match !== undefined) return match;
             if (Date.now() >= deadline) return null;
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await abortableDelay(500, effective);
           }
         },
         close: async () => {
+          // Cleanup runs after the scenario, so it must not inherit the
+          // scenario signal (which may already be aborted); bound it separately.
           const response = await fetch(
             `${base}/__e2e/callbacks/${encodeURIComponent(minted.token)}`,
             {
               method: 'DELETE',
               headers: surfaceHeaders(options),
+              signal: AbortSignal.timeout(CLOSE_TIMEOUT_MS),
             }
           );
           // An expired token is already gone; cleanup is not a scenario step.

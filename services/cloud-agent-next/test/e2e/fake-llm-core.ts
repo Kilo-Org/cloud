@@ -60,6 +60,30 @@ export type Directive = {
   args: string[];
 };
 
+/**
+ * Parsed `file:` directive. One grammar, three ops:
+ *
+ *   file:write:<opTag>:<path>:<contents>       literal contents; real write call
+ *   file:seed:<opTag>:<path>:<bytes>:<nonce>   fake-generated fixture; real write call
+ *   file:read:<opTag>:<path>                   real read call; echo the parsed result
+ *
+ * `opTag` is `[A-Za-z0-9_-]+` and is the attribution key: `directiveTag` returns
+ * it, never the op. The scenario mints a fresh `opTag` per turn, so a reused
+ * tag can never match a previous turn's `tool_call_id` (a hash of the tag).
+ *
+ * Accepted contract: `write` contents are literal and may contain newlines; the
+ * single-line rule applies only to the header fields (`opTag`/`path`/`bytes`/
+ * `nonce`). Only the appended `<environment_details>` prompt block is stripped.
+ */
+export type FileDirective =
+  | { op: 'write'; opTag: string; path: string; contents: string }
+  | { op: 'seed'; opTag: string; path: string; bytes: number; nonce: string }
+  | { op: 'read'; opTag: string; path: string };
+
+export type FileDirectiveParse =
+  | { ok: true; directive: FileDirective }
+  | { ok: false; message: string };
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -88,6 +112,12 @@ export type FakeScenarioStatus = {
 
 type InternalScenarioStatus = FakeScenarioStatus & {
   seenToolResults: Set<string>;
+  /**
+   * True once a `file:` turn for this opTag accepted a tool result and echoed.
+   * A completed opTag is single-use: a later request reusing it is rejected, so
+   * a reused tag cannot return the previous turn's result.
+   */
+  fileCompleted: boolean;
 };
 
 export type GateWaiter = {
@@ -141,6 +171,8 @@ export type PersistedScenarioStatus = {
   toolResults: ScenarioCounters;
   unsupportedToolSchema: boolean;
   seenToolResults: string[];
+  /** Optional for snapshots written before file opTags became single-use. */
+  fileCompleted?: boolean;
 };
 
 /**
@@ -194,6 +226,7 @@ export function serializeFakeLlmState(state: FakeLlmState): PersistedFakeLlmStat
       toolResults: { ...status.toolResults },
       unsupportedToolSchema: status.unsupportedToolSchema,
       seenToolResults: [...status.seenToolResults],
+      fileCompleted: status.fileCompleted,
     });
   }
   // FIFO: drop the oldest entries first, keeping the newest in insertion order.
@@ -229,6 +262,7 @@ export function hydrateFakeLlmState(
       toolResults: { ...createCounters(), ...scenario.toolResults },
       unsupportedToolSchema: scenario.unsupportedToolSchema === true,
       seenToolResults: new Set(scenario.seenToolResults ?? []),
+      fileCompleted: scenario.fileCompleted === true,
     });
   }
   return state;
@@ -284,6 +318,243 @@ export function parseDirective(text: string): Directive | null {
   const args = rest.slice(1);
   return { scenario, args: args.length > 0 ? [args] : [''] };
 }
+
+const FILE_TAG = '[A-Za-z0-9_-]+';
+
+/**
+ * Upper bound for a `file:seed` fixture; mirrors `MAX_TOOL_STREAM_BYTES`.
+ */
+export const MAX_FILE_SEED_BYTES = 1024 * 1024;
+/** Upper bound for the `file:seed` nonce line (the only variable-length prefix). */
+export const MAX_FILE_SEED_NONCE_LENGTH = 64;
+
+/**
+ * Strip only the prompt-context block Kilo appends after the directive, so a
+ * literal write body keeps its own newlines. The CLI may separate the block
+ * from the payload with blank lines, so the newline run directly before the
+ * marker is dropped with it.
+ */
+function stripAppendedPromptContext(raw: string): string {
+  const contextIndex = raw.indexOf('<environment_details>');
+  if (contextIndex < 0) return raw;
+  return raw.slice(0, contextIndex).replace(/\n+$/, '');
+}
+
+/** Header-only fields (`read`/`seed`) are a single line; `write` keeps its body. */
+function firstDirectiveLine(value: string): string {
+  const lineEnd = value.search(/\r?\n/);
+  return lineEnd < 0 ? value : value.slice(0, lineEnd);
+}
+
+/**
+ * The single parser for `file:` directives, used by both the handler and
+ * `directiveTag` (it normalizes internally).
+ *
+ * Explicit colon grammar: the path is the field immediately after the opTag and
+ * must not contain `:` or a newline. For `read`/`seed` any extra `:` therefore
+ * fails the anchored match and is rejected, and the directive header is a single
+ * line. For `write` the path is the first colon-free field and everything after
+ * it is literal contents, newlines included, so a colon or newline in the input
+ * after the path is content, not a path (asserted by the unit tests). Unknown
+ * op, missing args, a colon path or an out-of-range seed size is a parse failure
+ * the handler reports as 402 `invalid_request`.
+ */
+export function parseFileDirective(raw: string): FileDirectiveParse {
+  const input = stripAppendedPromptContext(raw);
+
+  const write = input.match(new RegExp(`^write:(${FILE_TAG}):([^:\\r\\n]+):([\\s\\S]*)$`));
+  if (write) {
+    return {
+      ok: true,
+      directive: { op: 'write', opTag: write[1], path: write[2], contents: write[3] },
+    };
+  }
+
+  const header = firstDirectiveLine(input);
+  const seed = header.match(
+    new RegExp(`^seed:(${FILE_TAG}):([^:]+):(\\d+):([A-Za-z0-9_-]+)$`)
+  );
+  if (seed) {
+    const nonce = seed[4];
+    if (nonce.length > MAX_FILE_SEED_NONCE_LENGTH) {
+      return {
+        ok: false,
+        message: `file:seed nonce ${nonce.length} exceeds maximum ${MAX_FILE_SEED_NONCE_LENGTH}`,
+      };
+    }
+    const bytes = Number.parseInt(seed[3], 10);
+    if (!Number.isSafeInteger(bytes) || bytes > MAX_FILE_SEED_BYTES) {
+      return { ok: false, message: `file:seed byte count ${seed[3]} is out of range` };
+    }
+    if (bytes < nonce.length + 1) {
+      return {
+        ok: false,
+        message: `file:seed byte count ${bytes} is smaller than the ${nonce.length + 1}-byte nonce prefix`,
+      };
+    }
+    return {
+      ok: true,
+      directive: { op: 'seed', opTag: seed[1], path: seed[2], bytes, nonce },
+    };
+  }
+
+  const read = header.match(new RegExp(`^read:(${FILE_TAG}):([^:]+)$`));
+  if (read) {
+    return { ok: true, directive: { op: 'read', opTag: read[1], path: read[2] } };
+  }
+
+  return {
+    ok: false,
+    message: 'file directive requires write|seed|read with a tag and a colon-free path',
+  };
+}
+
+/**
+ * A conservative tool-error check for normalized tool output. A nonempty error
+ * must never pass as file contents. Recognizes an `is_error: true` JSON marker
+ * and the `Error`/`error:`/`failed` prefixes the read tool uses on failure,
+ * anchored at the start of any line so path metadata on an earlier line does
+ * not hide a raw error line.
+ */
+export function isToolError(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (trimmed === '') return false;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (isRecord(parsed) && parsed.is_error === true) return true;
+  } catch {
+    // Not JSON; fall through to the line-prefix check.
+  }
+  return trimmed.split('\n').some(line => /^(?:error\b|error:|failed\b)/i.test(line.trim()));
+}
+
+/**
+ * A tool result normalized through one envelope unwrap. `envelopePath` is the
+ * outer JSON envelope's declared path; `output` is the tool output with at most
+ * one `output` field unwrapped; `error` is set by the envelope's `is_error`
+ * marker or by an error prefix on the final output.
+ */
+export type NormalizedToolResult = {
+  output: string;
+  envelopePath: string | null;
+  error: boolean;
+};
+
+export type ToolResultNormalization =
+  | { ok: true; result: NormalizedToolResult }
+  | { ok: false; message: string };
+
+function isToolResultEnvelope(value: unknown): value is Record<string, unknown> & { output: string } {
+  return isRecord(value) && typeof value.output === 'string';
+}
+
+/** True when `output` is itself a JSON `output` envelope (a second unwrap). */
+function hasNestedOutputEnvelope(output: string): boolean {
+  try {
+    return isToolResultEnvelope(JSON.parse(output.trim()));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The single owner of tool-result envelope normalization. It unwraps one JSON
+ * `output` field while preserving the envelope's `is_error` and path metadata,
+ * rejects a doubly nested envelope (which would need a second, unsupported
+ * unwrap and could smuggle an error past the check), and runs the error check on
+ * the final normalized output before the caller accepts it.
+ */
+export function normalizeToolResult(raw: string): ToolResultNormalization {
+  let output = raw;
+  let envelopePath: string | null = null;
+  let error = false;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (isRecord(parsed)) {
+      if (parsed.is_error === true) error = true;
+      if (typeof parsed.path === 'string') envelopePath = parsed.path;
+      else if (typeof parsed.filePath === 'string') envelopePath = parsed.filePath;
+      if (typeof parsed.output === 'string') {
+        if (hasNestedOutputEnvelope(parsed.output)) {
+          return { ok: false, message: 'nested tool-result envelope is not supported' };
+        }
+        output = parsed.output;
+      }
+    }
+  } catch {
+    // Not JSON; the raw string is the output.
+  }
+  if (isToolError(output)) error = true;
+  return { ok: true, result: { output, envelopePath, error } };
+}
+
+export type ReadResultPath =
+  | { ok: true; path: string | null }
+  | { ok: false; message: string };
+
+/**
+ * The read tool's reported path: an envelope field or a `<path>` element in the
+ * unwrapped output. The two sources must agree; a conflicting pair is rejected
+ * rather than silently preferring one, so a result can never be relabelled.
+ */
+function readResultPath(normalized: NormalizedToolResult): ReadResultPath {
+  const inner = normalized.output.match(/<path>\s*([^<]+?)\s*<\/path>/)?.[1] ?? null;
+  if (normalized.envelopePath !== null && inner !== null && normalized.envelopePath !== inner) {
+    return { ok: false, message: 'conflicting read result path metadata' };
+  }
+  return { ok: true, path: normalized.envelopePath ?? inner };
+}
+
+/**
+ * Path contract for a `file:read` result (lead decision).
+ *
+ * The requested path is used **verbatim** in the emitted read tool call, relative
+ * or absolute; the fake cannot know the checkout's absolute path, so it does not
+ * try to resolve one. The result path is accepted when it equals the requested
+ * path exactly, or when the result path is absolute and ends with
+ * `/<requested path>` for a **relative** request. A relative request may
+ * therefore match a same-basename result in another directory (the reader's
+ * runtime resolves the relative path against its own working directory, which is
+ * what the harness is proving); an absolute request must match exactly, so a
+ * same-basename file elsewhere is rejected.
+ *
+ * The shared-checkout proof does not rest on path exactness: it rests on the
+ * writer's nonce, which is absent from the reader's path and opTag, so only a
+ * genuine read of the writer's file can produce the parsed echo body. This
+ * matcher only binds the echo to the requested file name.
+ */
+function readResultMatchesRequest(resultPath: string | null, requestedPath: string): boolean {
+  if (resultPath === null) return false;
+  const strip = (value: string) => value.replace(/^\.\//, '').replace(/\/+$/, '');
+  const requested = strip(requestedPath.trim());
+  const result = strip(resultPath.trim());
+  if (requested === '' || result === '') return false;
+  if (result === requested) return true;
+  return !requested.startsWith('/') && result.startsWith('/') && result.endsWith(`/${requested}`);
+}
+
+/**
+ * Deterministic `file:seed` payload: exactly `bytes` UTF-8 bytes, made of a
+ * `nonce\n` prefix line followed by 99-character lines + `\n` (mirroring
+ * `sandbox-control.ts`). Short lines keep the read tool's per-line handling from
+ * truncating a single long line. The parser rejects sizes too small for the
+ * prefix; this function throws if called directly with such a size.
+ */
+export function buildSeedFixture(bytes: number, nonce: string): string {
+  const prefix = `${nonce}\n`;
+  const remaining = bytes - prefix.length;
+  if (remaining < 0) {
+    throw new Error(
+      `file:seed byte count ${bytes} is smaller than the ${prefix.length}-byte nonce prefix`
+    );
+  }
+  const lineWidth = 99;
+  const line = `${'x'.repeat(lineWidth)}\n`;
+  const fullLines = Math.floor(remaining / (lineWidth + 1));
+  const remainder = remaining - fullLines * (lineWidth + 1);
+  return `${prefix}${line.repeat(fullLines)}${'x'.repeat(remainder)}`;
+}
+
 
 type MessagePart = { type?: string; text?: string };
 type Message = {
@@ -373,8 +644,12 @@ function stripPromptContext(value: string): string {
 }
 
 function directiveTag(directive: Directive | null): string | undefined {
+  if (directive === null) return undefined;
+  if (directive.scenario === 'file') {
+    const parsed = parseFileDirective(directive.args[0] ?? '');
+    return parsed.ok ? parsed.directive.opTag : undefined;
+  }
   if (
-    directive === null ||
     ![
       'gate',
       'write-then-gate',
@@ -403,6 +678,7 @@ function scenarioStatus(state: FakeLlmState, tag: string): InternalScenarioStatu
     toolResults: createCounters(),
     unsupportedToolSchema: false,
     seenToolResults: new Set(),
+    fileCompleted: false,
   };
   state.scenarios.set(tag, created);
   return created;
@@ -1137,6 +1413,110 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
       return;
     }
     parkGate(ctx, tag, `done-${tag}`);
+  },
+
+  /**
+   * `file:<op>:<opTag>:...` — one real tool turn per request, attributed to the
+   * fresh per-turn `opTag`. `toolResults()` matches `(tag, kind)` across the
+   * whole request history, so a reused tag could return a previous turn's
+   * result; the fresh tag makes a historical `tool_call_id` unmatchable because
+   * `toolCallId` hashes the tag. Only a result whose id equals
+   * `toolCallId(opTag, kind)` satisfies the current turn, and only after this
+   * tag emitted exactly one call for that kind.
+   *
+   * The read echo is the shared-checkout proof: the fake reads
+   * `<result.content>` from the current request's `role:'tool'` message for the
+   * fresh `opTag` only. It never sees the writer chat's content and keys no state
+   * on the writer's tag. That result is produced by Kilo executing the real read
+   * tool against the reading chat's runtime filesystem, so a parsed body proves
+   * the reader's runtime saw the writer's uncommitted file; a missing/error read
+   * fails closed with 422.
+   */
+  file(args, ctx) {
+    // `parseFileDirective` normalizes internally, so this and `directiveTag`
+    // parse identical input.
+    const parsed = parseFileDirective(args[0] ?? '');
+    if (!parsed.ok) {
+      writeJsonError(ctx.emit, 402, parsed.message, 'invalid_request');
+      return;
+    }
+    const directive = parsed.directive;
+    if (ctx.tools.length === 0) {
+      writeAssistantResponse(ctx, `done-${directive.opTag}`);
+      return;
+    }
+
+    const kind: ToolKind = directive.op === 'read' ? 'read' : 'write';
+    const status = scenarioStatus(ctx.state, directive.opTag);
+    // Accepted contract: a replayed identical file-completion is answered 409
+    // rather than idempotently. This is conservative fail-closed for the proof
+    // harness: a fresh opTag is minted per turn, so a replay means the scenario
+    // reused a tag and the previous result must not be re-served.
+    if (status.fileCompleted) {
+      writeJsonError(
+        ctx.emit,
+        409,
+        `file opTag ${directive.opTag} already completed`,
+        'invalid_request'
+      );
+      return;
+    }
+    const results = toolResults(ctx.body, directive.opTag, ctx.state);
+    const result =
+      status.toolCalls[kind] === 1
+        ? results.find(candidate => candidate.id === toolCallId(directive.opTag, kind))
+        : undefined;
+
+    if (!result) {
+      if (directive.op === 'read') {
+        runToolScenario(ctx, directive.opTag, 'read', { path: directive.path });
+      } else if (directive.op === 'seed') {
+        runToolScenario(ctx, directive.opTag, 'write', {
+          path: directive.path,
+          contents: buildSeedFixture(directive.bytes, directive.nonce),
+        });
+      } else {
+        runToolScenario(ctx, directive.opTag, 'write', {
+          path: directive.path,
+          contents: directive.contents,
+        });
+      }
+      return;
+    }
+
+    if (directive.op !== 'read') {
+      status.fileCompleted = true;
+      writeAssistantResponse(ctx, `file-write:${directive.path}\n`);
+      return;
+    }
+
+    const normalization = normalizeToolResult(toolResultContent(result.content));
+    if (!normalization.ok) {
+      writeJsonError(ctx.emit, 422, normalization.message, 'invalid_tool_result');
+      return;
+    }
+    const normalized = normalization.result;
+    const resultPath = readResultPath(normalized);
+    if (
+      !resultPath.ok ||
+      normalized.error ||
+      !readResultMatchesRequest(resultPath.path, directive.path)
+    ) {
+      writeJsonError(
+        ctx.emit,
+        422,
+        'read tool did not return file contents for the requested path',
+        'invalid_tool_result'
+      );
+      return;
+    }
+    const body = stripPromptContext(readFileContents(normalized.output));
+    if (body === '') {
+      writeJsonError(ctx.emit, 422, 'read tool did not return file contents', 'invalid_tool_result');
+      return;
+    }
+    status.fileCompleted = true;
+    writeAssistantResponse(ctx, `file-read:${directive.path}\n${body}`);
   },
 
   'tool-stream'(args, ctx) {

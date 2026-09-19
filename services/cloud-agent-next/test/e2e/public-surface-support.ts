@@ -2,11 +2,6 @@
  * Public-surface-only scenario helpers: nothing here reads Docker, the
  * filesystem, worker logs or `@kilocode/db`, so the deployed profile can use
  * every helper.
- *
- * `worktree-support.ts` and `lifecycle-file-state.ts` re-export
- * `requireWorktreeSessionIdentity`/`readWorktreeOwnership` and
- * `assertScenarioPreconditions` respectively, so their existing callers keep
- * their import site.
  */
 
 import {

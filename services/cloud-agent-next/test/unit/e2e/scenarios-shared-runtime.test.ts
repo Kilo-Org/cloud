@@ -2,25 +2,41 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getMessageResult: vi.fn(),
+  getSessionSnapshot: vi.fn(),
   openConnectedStream: vi.fn(),
   sendMessage: vi.fn(),
+  fetchFakeRequests: vi.fn(),
+  fakeDirective: vi.fn((conversation: string) => `__fake__:${conversation}`),
+  isMessageCompleted: vi.fn(
+    (event: { streamEventType: string; data?: { messageId?: string } } | null, messageId: string) =>
+      event !== null &&
+      event.streamEventType === 'cloud.message.completed' &&
+      event.data?.messageId === messageId
+  ),
 }));
 
 vi.mock('../../e2e/client.js', () => ({
   getMessageResult: mocks.getMessageResult,
+  getSessionSnapshot: mocks.getSessionSnapshot,
   openConnectedStream: mocks.openConnectedStream,
   sendMessage: mocks.sendMessage,
+  fetchFakeRequests: mocks.fetchFakeRequests,
+  fakeDirective: mocks.fakeDirective,
+  isMessageCompleted: mocks.isMessageCompleted,
 }));
 
 import type { DriverConfig, StreamEvent } from '../../e2e/client.js';
 import type { SessionSandboxObservation } from '../../e2e/scenario-capabilities.js';
 import {
+  bootToCompletion,
   createOwnedSessionRegistry,
   createScenarioDeadline,
   requireContainer,
   sendTurn,
   sessionSandboxObservation,
+  startPacedHoldTurn,
   trackCreations,
+  trackStartedSession,
   waitForPresentAllocation,
   type ScenarioDeadline,
 } from '../../e2e/scenarios-shared-runtime.js';
@@ -47,11 +63,22 @@ function terminalEvent(): StreamEvent {
   };
 }
 
+function completedEvent(messageId: string): StreamEvent {
+  return { ...terminalEvent(), data: { messageId } };
+}
+
 function fakeStream(terminal: StreamEvent | null = null) {
   const waitForTerminal = vi.fn(
-    async (_timeoutMs: number, _messageId: string): Promise<StreamEvent | null> => terminal
+    async (_timeoutMs: number, _messageId?: string): Promise<StreamEvent | null> => terminal
   );
-  return { events: [] as StreamEvent[], waitForTerminal, close: vi.fn() };
+  return {
+    events: [] as StreamEvent[],
+    waitForTerminal,
+    waitFor: vi.fn(async () => null),
+    receivedCount: 0,
+    isOpen: true,
+    close: vi.fn(),
+  };
 }
 
 beforeEach(() => {
@@ -197,6 +224,62 @@ describe('sendTurn', () => {
   });
 });
 
+describe('bootToCompletion', () => {
+  it('closes the internally acquired stream when the durable read does not complete', async () => {
+    const stream = fakeStream(completedEvent('message_1'));
+    mocks.openConnectedStream.mockResolvedValue(stream);
+    mocks.getSessionSnapshot.mockResolvedValue({ initialMessageId: 'message_1' });
+    mocks.getMessageResult.mockResolvedValue({ status: 'failed' });
+
+    const deadline = createScenarioDeadline(Date.now(), 30_000);
+    await expect(bootToCompletion(deadline, CONFIG, SESSION, 'boot')).rejects.toThrow(
+      /boot durable status=failed/
+    );
+    expect(stream.close).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('startPacedHoldTurn', () => {
+  it('closes the stream it opened when the baseline fetch rejects', async () => {
+    const stream = fakeStream();
+    mocks.openConnectedStream.mockResolvedValue(stream);
+    mocks.fetchFakeRequests.mockRejectedValue(new Error('baseline unavailable'));
+
+    const deadline = createScenarioDeadline(Date.now(), 30_000);
+    await expect(
+      startPacedHoldTurn({
+        deadline,
+        config: CONFIG,
+        cloudAgentSessionId: 'workspace_1',
+        directive: 'slow:2:50',
+        label: 'hold',
+        budgetMs: 10_000,
+      })
+    ).rejects.toThrow('baseline unavailable');
+    expect(stream.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a caller-supplied stream caller-owned when the baseline fetch rejects', async () => {
+    const stream = fakeStream();
+    mocks.fetchFakeRequests.mockRejectedValue(new Error('baseline unavailable'));
+
+    const deadline = createScenarioDeadline(Date.now(), 30_000);
+    await expect(
+      startPacedHoldTurn({
+        deadline,
+        config: CONFIG,
+        cloudAgentSessionId: 'workspace_1',
+        directive: 'slow:2:50',
+        label: 'hold',
+        budgetMs: 10_000,
+        stream,
+      })
+    ).rejects.toThrow('baseline unavailable');
+    expect(stream.close).not.toHaveBeenCalled();
+    expect(mocks.openConnectedStream).not.toHaveBeenCalled();
+  });
+});
+
 describe('requireContainer', () => {
   it('returns null when the capability is absent', async () => {
     await expect(requireContainer(undefined, SESSION, 5)).resolves.toBeNull();
@@ -223,11 +306,13 @@ describe('requireContainer', () => {
     };
 
     await expect(requireContainer(sessionSandbox, SESSION, 7)).resolves.toBe('container_1');
-    expect(waitForContainer).toHaveBeenCalledWith({
-      cloudAgentSessionId: SESSION.cloudAgentSessionId,
-      kiloSessionId: SESSION.kiloSessionId,
-      timeoutMs: 7,
-    });
+    expect(waitForContainer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cloudAgentSessionId: SESSION.cloudAgentSessionId,
+        kiloSessionId: SESSION.kiloSessionId,
+        timeoutMs: 7,
+      })
+    );
   });
 });
 
@@ -247,11 +332,13 @@ describe('waitForPresentAllocation', () => {
       )
     ).resolves.toBe('container_1');
 
-    expect(waitForContainer).toHaveBeenCalledWith({
-      cloudAgentSessionId: SESSION.cloudAgentSessionId,
-      kiloSessionId: SESSION.kiloSessionId,
-      timeoutMs: 30_000,
-    });
+    expect(waitForContainer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cloudAgentSessionId: SESSION.cloudAgentSessionId,
+        kiloSessionId: SESSION.kiloSessionId,
+        timeoutMs: 30_000,
+      })
+    );
     expect(currentContainer).not.toHaveBeenCalled();
   });
 
@@ -284,6 +371,31 @@ describe('waitForPresentAllocation', () => {
         5
       )
     ).resolves.toBeNull();
+  });
+});
+
+describe('trackStartedSession', () => {
+  it('binds the reported id before the start returns and keeps the prior hook', () => {
+    const prior: string[] = [];
+    const tracked: string[] = [];
+    const wrapped = trackStartedSession(
+      { ...CONFIG, onSessionCreated: id => prior.push(id) },
+      id => tracked.push(id)
+    );
+
+    // The legacy prepare path reports the id before initiation; a later failure
+    // must still find it in `tracked`.
+    wrapped.onSessionCreated?.('workspace_prepared');
+
+    expect(tracked).toEqual(['workspace_prepared']);
+    expect(prior).toEqual(['workspace_prepared']);
+    expect(wrapped).not.toBe(CONFIG);
+  });
+
+  it('works when the config has no prior onSessionCreated hook', () => {
+    const tracked: string[] = [];
+    trackStartedSession(CONFIG, id => tracked.push(id)).onSessionCreated?.('workspace_1');
+    expect(tracked).toEqual(['workspace_1']);
   });
 });
 

@@ -10,6 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   fakeDirective,
+  fetchFakeScenarioStatus,
   hasPreparationForMessage,
   isMessageCompleted,
   openConnectedStream,
@@ -25,6 +26,10 @@ import {
   echoPayloadMatches,
   type SharedScenario,
 } from './scenarios-shared.js';
+import {
+  assertReaderCannotDeriveNonce,
+  parseFileReadEcho,
+} from './scenario-assertions.js';
 import {
   awaitDurableTerminal,
   createOwnedSessionRegistry,
@@ -89,6 +94,33 @@ export const LONG_CONVERSATION_HOT_TURNS = [
 ] as const;
 
 export type AllocationSample = 'absent' | 'retained' | 'replaced';
+
+/**
+ * The writer/reader file-turn pair for `long-conversation`. The path and op tags
+ * are derived from `runId`, but the writer content is an independent UUID, so a
+ * reader that only ever sees the path and its own tag cannot synthesize the
+ * echoed body. `readerDerivedBody` is the value the pre-fix code derived from
+ * `runId`, kept so the unit test can prove the assertion rejects it.
+ */
+export type LongConversationFileTurns = {
+  filePath: string;
+  writerNonce: string;
+  writeDirective: string;
+  readDirective: string;
+  readerDerivedBody: string;
+};
+
+export function buildLongConversationFileTurns(runId: string): LongConversationFileTurns {
+  const filePath = `long-conversation-${runId}.txt`;
+  const writerNonce = `nonce-${randomUUID()}`;
+  return {
+    filePath,
+    writerNonce,
+    writeDirective: `file:write:write-${runId}:${filePath}:${writerNonce}`,
+    readDirective: `file:read:read-${runId}:${filePath}`,
+    readerDerivedBody: `conversation-nonce-${runId}`,
+  };
+}
 
 /**
  * Classify one unattended allocation sample against the baseline reference.
@@ -161,6 +193,18 @@ async function runLongConversation(
   const owned = createOwnedSessionRegistry(config, cleanupRemoteSession);
   const scenarioConfig = owned.config;
   const coldDirective = conversation && conversation !== '_' ? conversation : 'echo:cold';
+  const runId = randomUUID().slice(0, 8);
+  // A real file write followed by a real file read, both hot turns on the same
+  // warm session. The path and op tags carry the run id, but the written body is
+  // an independent UUID, so only an actual read of the writer's uncommitted file
+  // can produce the echoed body.
+  const fileTurns = buildLongConversationFileTurns(runId);
+  const { filePath } = fileTurns;
+  const hotTurns: readonly string[] = [
+    ...LONG_CONVERSATION_HOT_TURNS,
+    fileTurns.writeDirective,
+    fileTurns.readDirective,
+  ];
   const deadline = createScenarioDeadline(startedAt, timeoutMs);
   const creations = trackCreations<StartSessionResult>(deadline, owned, scenarioName);
   const events: StreamEvent[] = [];
@@ -232,7 +276,7 @@ async function runLongConversation(
     }
 
     const hotSummaries: string[] = [];
-    for (const [index, directive] of LONG_CONVERSATION_HOT_TURNS.entries()) {
+    for (const [index, directive] of hotTurns.entries()) {
       const label = `hot ${index + 1} ${directive}`;
       const before = await waitForPresentAllocation(
         deadline,
@@ -255,14 +299,49 @@ async function runLongConversation(
             `${label}: unexpected preparing event with triggerMessageId=${hot.messageId}; a hot turn must reuse the warm dispatch path`
           );
         }
+        const text = collectChildMessageText(hot.stream.events, hot.messageId);
         const payload = echoDirectivePayload(directive);
         if (payload !== null) {
-          const text = collectChildMessageText(hot.stream.events, hot.messageId);
           if (!echoPayloadMatches(text, payload)) {
             throw new Error(
               `${label}: expected correlated child text ${JSON.stringify(payload)} but observed ${JSON.stringify(text)}`
             );
           }
+          hotSummaries.push(`${directive}:complete`);
+        } else if (directive.startsWith('file:write:')) {
+          if (!text.includes(`file-write:${filePath}`)) {
+            throw new Error(
+              `${label}: expected the file-write marker for ${filePath}; observed ${JSON.stringify(text)}`
+            );
+          }
+          const status = await deadline.within(`${label} status`, signal =>
+            fetchFakeScenarioStatus(scenarioConfig.fakeLlmUrl, `write-${runId}`, signal)
+          );
+          if (status.toolCalls.write !== 1 || status.toolResults.write !== 1) {
+            throw new Error(
+              `${label}: write evidence missing: toolCalls.write=${status.toolCalls.write} toolResults.write=${status.toolResults.write}`
+            );
+          }
+          hotSummaries.push(`file:write:complete`);
+        } else if (directive.startsWith('file:read:')) {
+          const body = parseFileReadEcho(text, filePath);
+          assertReaderCannotDeriveNonce({
+            body,
+            expectedNonce: fileTurns.writerNonce,
+            readerVisible: fileTurns.readerDerivedBody,
+            label: `${label} read echo`,
+          });
+          const status = await deadline.within(`${label} status`, signal =>
+            fetchFakeScenarioStatus(scenarioConfig.fakeLlmUrl, `read-${runId}`, signal)
+          );
+          if (status.toolCalls.read !== 1 || status.toolResults.read !== 1) {
+            throw new Error(
+              `${label}: read evidence missing: toolCalls.read=${status.toolCalls.read} toolResults.read=${status.toolResults.read}`
+            );
+          }
+          hotSummaries.push(`file:read:complete`);
+        } else {
+          hotSummaries.push(`${directive}:complete`);
         }
         const after = await waitForPresentAllocation(
           deadline,
@@ -282,7 +361,6 @@ async function runLongConversation(
           );
         }
         events.push(...hot.stream.events);
-        hotSummaries.push(`${directive}:complete`);
       } finally {
         hot.stream.close();
       }
@@ -293,7 +371,7 @@ async function runLongConversation(
       conversation,
       ok: true,
       message:
-        `cold=prepare; hot=${hotSummaries.length}/${LONG_CONVERSATION_HOT_TURNS.length} complete; ` +
+        `cold=prepare; hot=${hotSummaries.length}/${hotTurns.length} complete; ` +
         `no-preparing=true; allocationRef stable=${allocationRef} (read each turn)`,
       events,
       durationMs: Date.now() - startedAt,
@@ -544,6 +622,7 @@ export const CONVERSATION_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: 'echo:cold',
     defaultTimeoutMs: LONG_CONVERSATION_TIMEOUT_MS,
+    requiresWorktreeCreation: true,
     run: runLongConversation,
   },
   'leave-and-return': {
@@ -552,6 +631,7 @@ export const CONVERSATION_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: LEAVE_AND_RETURN_TIMEOUT_MS,
+    requiresWorktreeCreation: true,
     run: runLeaveAndReturn,
   },
 };

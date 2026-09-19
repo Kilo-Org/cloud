@@ -330,8 +330,15 @@ pnpm --filter cloud-agent-next run e2e:deployed
 gate against the deployed Worker. A scenario
 whose declared capability the deployed environment does not provide is reported
 `unsupported` with the missing capability names, never run with the assertion
-dropped. The summary separates passed / failed / unsupported, and the exit
-policy is `1` if any scenario failed, else `2` if any was unsupported, else `0`.
+dropped. The four `sandboxFaults` scenarios (`external-kill`, `kill-mid-flight`,
+`wrapper-freeze-settled-reap`, `wrapper-freeze-inflight-reap`) are the expected
+deployed gaps: they need local fault injection the deployed profile does not
+provide. `auth-reject` is not a gap—the deployed profile supplies the
+`deployedHttpAuthBoundary` capability, so it runs there and is instead the local
+profile's expected unsupported. The summary separates passed / failed / unsupported, and the exit policy is
+`1` if any scenario failed, else `2` if any unsupported is outside the derived
+expected set, else `0`; an expected capability gap is a reported skip, not a
+failure.
 Each scenario owns its cleanup; the runner only repeats `interruptSession` and
 `deleteSession` as a tolerant backstop. The same script runs in the
 `workflow_dispatch`-only `E2E Deployed` workflow

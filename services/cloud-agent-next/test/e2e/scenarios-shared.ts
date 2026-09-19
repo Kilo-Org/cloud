@@ -45,6 +45,8 @@ import { MICRO_SHARED_SCENARIOS } from './scenarios-shared-micro.js';
 import { QUEUE_SHARED_SCENARIOS } from './scenarios-shared-queue.js';
 import { WORKTREE_SHARED_SCENARIOS } from './scenarios-shared-worktrees.js';
 import { CONVERSATION_SHARED_SCENARIOS } from './scenarios-shared-conversations.js';
+import { LOAD_SHARED_SCENARIOS } from './scenarios-shared-load.js';
+import { FAULT_SHARED_SCENARIOS } from './scenarios-shared-faults.js';
 
 /** Generous default per-turn budget for a real first container cold start. */
 const DEFAULT_TURN_TIMEOUT_MS = 240_000;
@@ -64,6 +66,12 @@ export type SharedScenario = {
   defaultTimeoutMs?: number;
   /** API surface the scenario must use; callers default to `unified`. */
   defaultApi?: ApiVersion;
+  /**
+   * Worktree-creation enrollment only: the local e2e user must be in
+   * `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS`. This is not a
+   * capability and must not gate a scenario's execution.
+   */
+  requiresWorktreeCreation?: boolean;
   run(args: LifecycleArgs, env: ScenarioEnvironment): Promise<LifecycleResult>;
 };
 
@@ -874,5 +882,7 @@ export const SHARED_SCENARIOS: Record<string, SharedScenario> = {
   // The longest realistic flows run last so a short-scenario failure surfaces
   // before a long cold boot is paid.
   ...WORKTREE_SHARED_SCENARIOS,
+  ...LOAD_SHARED_SCENARIOS,
   ...CONVERSATION_SHARED_SCENARIOS,
+  ...FAULT_SHARED_SCENARIOS,
 };

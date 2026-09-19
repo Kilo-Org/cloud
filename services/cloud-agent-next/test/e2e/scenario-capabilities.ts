@@ -11,6 +11,7 @@
 
 import type { ApiVersion } from './client.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
+import type { SandboxFaultReapEvidence } from './sandbox-fault-evidence.js';
 
 export type Profile = 'local' | 'deployed' | 'local-http';
 
@@ -18,7 +19,9 @@ export type CapabilityName =
   | 'sandbox'
   | 'sessionSandbox'
   | 'deployedHttpAuthBoundary'
-  | 'callbacks';
+  | 'callbacks'
+  | 'gates'
+  | 'sandboxFaults';
 
 /**
  * Local container inspection. `waitForOwnedContainer` returns `null` on
@@ -32,8 +35,14 @@ export type SandboxObservation = {
     kiloSessionId: string;
     knownIds: ReadonlySet<string>;
     timeoutMs: number;
+    /** Bounds this one wait; an aborted wait returns `null`. */
+    signal?: AbortSignal;
   }): Promise<string | null>;
-  waitForNewContainer(knownIds: ReadonlySet<string>, timeoutMs: number): Promise<string | null>;
+  waitForNewContainer(
+    knownIds: ReadonlySet<string>,
+    timeoutMs: number,
+    signal?: AbortSignal
+  ): Promise<string | null>;
 };
 
 export type DeployedAuthBoundaryObservation = { modelRoutesAuthenticated: true };
@@ -42,11 +51,15 @@ export type SessionSandboxWaitInput = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
   timeoutMs: number;
+  /** Bounds this one observation; an aborted wait returns `null`. */
+  signal?: AbortSignal;
 };
 
 export type SessionSandboxCurrentInput = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
+  /** Bounds this one read. */
+  signal?: AbortSignal;
 };
 
 /**
@@ -91,15 +104,96 @@ export type CallbackPayload = {
  */
 export type CallbackSink = {
   callbackUrl: string;
-  records(): Promise<CallbackPayload[]>;
+  records(signal?: AbortSignal): Promise<CallbackPayload[]>;
   waitFor(
     predicate: (payload: CallbackPayload) => boolean,
-    timeoutMs: number
+    timeoutMs: number,
+    signal?: AbortSignal
   ): Promise<CallbackPayload | null>;
   close(): Promise<void>;
 };
 
-export type CallbackObservation = { open(): Promise<CallbackSink> };
+export type CallbackObservation = { open(signal?: AbortSignal): Promise<CallbackSink> };
+
+/**
+ * A long parked `gate`/`hang` stream. The local Node fake keeps it open for the
+ * scenario's lifetime; the deployed fake DO drops a parked stream on eviction,
+ * so only the local profile provides this. A scenario that needs a genuinely
+ * parked hold declares `gates` and is `unsupported` deployed.
+ */
+export type GatesObservation = { parkedStreamsSupported: true };
+
+/**
+ * The identity observed before a sandbox fault. The operation must fail closed
+ * if the observed identity no longer matches, so a replacement cannot be
+ * silently rediscovered and killed/frozen instead of the intended target.
+ */
+export type SandboxFaultTarget = {
+  cloudAgentSessionId: string;
+  kiloSessionId: string;
+  expectedAllocationRef: string | null;
+  /**
+   * The wrapper identity captured from `captureWrapperIdentity` before the
+   * fault. Every induction operation (kill, stop, freeze, unfreeze) verifies it
+   * against the wrapper it observes or retains; a mismatch fails closed.
+   *
+   * Local profile contract: this is the `containerId:pid` **local
+   * physical-process handle** captured from `/proc`, not durable
+   * wrapper-instance identity. It guards against acting on a different local
+   * process; it does not survive a container/wrapper replacement.
+   */
+  expectedWrapperInstanceId: string;
+};
+
+/** The allocation half of a target, sufficient to capture a wrapper identity. */
+export type SandboxFaultAllocation = Pick<
+  SandboxFaultTarget,
+  'cloudAgentSessionId' | 'kiloSessionId' | 'expectedAllocationRef'
+>;
+
+/**
+ * Physical fault injection, provided only by the local Docker profile. There is
+ * no public induction path, so the deployed profile provides no `sandboxFaults`
+ * and every scenario that declares it is `unsupported` there.
+ */
+export type SandboxFaultObservation = {
+  /**
+   * Capture the observable identity of the owned container's wrapper process.
+   * The scenario passes the returned `instanceId` back as
+   * `expectedWrapperInstanceId`; if the identity cannot be established this
+   * refuses (throws) rather than advertising guarded injection.
+   */
+  captureWrapperIdentity(
+    allocation: SandboxFaultAllocation
+  ): Promise<{ instanceId: string; pid: number }>;
+  killOwnedContainer(
+    target: SandboxFaultTarget
+  ): Promise<{ killed: boolean; observedRef: string; detail: string }>;
+  freezeWrapperProcess(
+    target: SandboxFaultTarget
+  ): Promise<{ frozen: boolean; pid: number; detail: string }>;
+  unfreezeWrapperProcess(target: SandboxFaultTarget): Promise<void>;
+  /**
+   * Cursor at the current end of the worker-log evidence stream. Capture it
+   * before inducing a fault so a later `observeReapEvidence` only matches
+   * records written after the fault.
+   */
+  captureEvidenceCursor(): Promise<number>;
+  /**
+   * Read the identity-correlated settled-reap evidence for the durable
+   * `sandboxId` the caller read from `getSession`. The record is matched to that
+   * id, never to the replacement; a missing cause stays `null`.
+   */
+  observeReapEvidence(input: {
+    reapedAllocationRef: string;
+    sandboxId: string;
+    fromByte: number;
+    waitMs: number;
+    inflight: boolean;
+    messageId?: string;
+    signal?: AbortSignal;
+  }): Promise<SandboxFaultReapEvidence>;
+};
 
 export type ScenarioEnvironment = {
   profile: Profile;
@@ -108,6 +202,8 @@ export type ScenarioEnvironment = {
   sessionSandbox?: SessionSandboxObservation;
   deployedHttpAuthBoundary?: DeployedAuthBoundaryObservation;
   callbacks?: CallbackObservation;
+  gates?: GatesObservation;
+  sandboxFaults?: SandboxFaultObservation;
 };
 
 /** The shape `runSharedScenario` needs; `SharedScenario` is structurally assignable. */
@@ -174,6 +270,46 @@ export function missingCapabilities(
   return requires.filter(name => env[name] === undefined);
 }
 
+/** Every capability a definition needs here: profile-mandatory plus declared. */
+function requiredCapabilities(
+  requires: readonly CapabilityName[],
+  env: ScenarioEnvironment
+): CapabilityName[] {
+  return [...new Set<CapabilityName>([...mandatoryCapabilities(env), ...requires])];
+}
+
+export type ScenarioSupportAssessment = {
+  supported: boolean;
+  /** Every capability this environment must provide (profile + declared). */
+  required: CapabilityName[];
+  /** The subset that is absent, in requirement order. */
+  missing: CapabilityName[];
+};
+
+/**
+ * The single support assessment, used by `runSharedScenario` dispatch and by the
+ * matrix runners' expected-unsupported reporting. It is the missing-capability
+ * check only: the local profile's missing mandatory `sandbox` is an error in
+ * `runSharedScenario`, but the runners never dispatch a local scenario without a
+ * `sandbox` capability in practice.
+ */
+export function assessScenarioSupport(
+  definition: { requires: readonly CapabilityName[] },
+  env: ScenarioEnvironment
+): ScenarioSupportAssessment {
+  const required = requiredCapabilities(definition.requires, env);
+  const missing = missingCapabilities(required, env);
+  return { supported: missing.length === 0, required, missing };
+}
+
+/** Boolean accessor over the single support assessment. */
+export function isScenarioSupported(
+  definition: { requires: readonly CapabilityName[] },
+  env: ScenarioEnvironment
+): boolean {
+  return assessScenarioSupport(definition, env).supported;
+}
+
 /**
  * Resolve whether a shared scenario can run in `args.env`, before any side
  * effect. Gate order:
@@ -218,12 +354,11 @@ export async function runSharedScenario(
     return failed('error: local profile environment is missing the mandatory "sandbox" capability');
   }
 
-  const required = new Set<CapabilityName>([...mandatoryCapabilities(env), ...def.requires]);
-  const missing = missingCapabilities([...required], env);
-  if (missing.length > 0) {
+  const support = assessScenarioSupport(def, env);
+  if (!support.supported) {
     return {
       ...failed(
-        `unsupported: shared scenario "${def.name}" requires unavailable capabilities: ${missing.join(', ')}`
+        `unsupported: shared scenario "${def.name}" requires unavailable capabilities: ${support.missing.join(', ')}`
       ),
       unsupported: true,
     };

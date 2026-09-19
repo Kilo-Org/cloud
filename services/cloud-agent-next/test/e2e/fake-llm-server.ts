@@ -35,12 +35,18 @@ import {
 // Pure helpers stay importable from here so existing importers are untouched.
 export {
   buildRealisticReasoning,
+  buildSeedFixture,
   extractLastUserMessageText,
   extractMultipartField,
+  isToolError,
+  MAX_FILE_SEED_BYTES,
+  MAX_FILE_SEED_NONCE_LENGTH,
   MAX_REALISTIC_CHARS,
   MAX_REALISTIC_PIECES,
   MAX_TOOL_STREAM_BYTES,
+  normalizeToolResult,
   parseDirective,
+  parseFileDirective,
   scenarioRegistry,
   splitRealisticContent,
   stripKiloPromptWrapping,
@@ -49,6 +55,8 @@ export {
 export type {
   Directive,
   FakeScenarioStatus,
+  FileDirective,
+  FileDirectiveParse,
   ScenarioContext,
   ScenarioHandler,
 } from './fake-llm-core.js';

@@ -1,6 +1,6 @@
 /**
- * Cold / hot / follow-up admissions shared by the local Docker and HTTP
- * profiles: `cold`, `hot`, `followup`.
+ * Cold / hot admissions shared by the local Docker and HTTP profiles: `cold`
+ * and `hot`.
  *
  * They run against the Worker over tRPC + WebSocket only. Physical container
  * identity comes from the injected `sessionSandbox` capability, so the same
@@ -12,8 +12,8 @@
  * Docker passes an empty exclusion set, and the HTTP profile reads the
  * persisted provider reference rather than a live runtime observation. When the
  * Docker `sandbox` capability is absent the inventory half of the warm-reuse
- * check is unchecked, not silently proved; `hot`/`followup` report it in the
- * message. See `scenario-capabilities.ts` for the exact contract.
+ * check is unchecked, not silently proved; `hot` reports it in the message. See
+ * `scenario-capabilities.ts` for the exact contract.
  *
  * These conversations are admitted for `echo:`/`slow:` prompts only. The `hang`
  * variant is deliberately excluded — it never produces a terminal, so a
@@ -230,19 +230,6 @@ async function runHot(args: LifecycleArgs, env: ScenarioEnvironment): Promise<Li
   }
 }
 
-/**
- * `followup`: the same run as `hot`. At the public API level `send` always
- * keeps the same Kilo session; the name is kept distinct so a future
- * resume-path split can separate them.
- */
-async function runFollowup(
-  args: LifecycleArgs,
-  env: ScenarioEnvironment
-): Promise<LifecycleResult> {
-  const result = await runHot(args, env);
-  return { ...result, name: 'followup' };
-}
-
 export const MICRO_SHARED_SCENARIOS: Record<string, SharedScenario> = {
   cold: {
     name: 'cold',
@@ -257,12 +244,5 @@ export const MICRO_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultConversation: 'echo:hi',
     defaultTimeoutMs: HOT_TIMEOUT_MS,
     run: runHot,
-  },
-  followup: {
-    name: 'followup',
-    requires: ['sessionSandbox'],
-    defaultConversation: 'echo:continue',
-    defaultTimeoutMs: HOT_TIMEOUT_MS,
-    run: runFollowup,
   },
 };

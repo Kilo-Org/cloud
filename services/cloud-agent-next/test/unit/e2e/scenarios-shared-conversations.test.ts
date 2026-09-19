@@ -10,11 +10,14 @@ vi.mock('../../e2e/auth.js', () => ({
 
 import {
   baselineSampleDelayMs,
+  buildLongConversationFileTurns,
   classifyAllocationSample,
   LONG_CONVERSATION_HOT_TURNS,
   pollSampleDelayMs,
 } from '../../e2e/scenarios-shared-conversations.js';
 import { echoDirectivePayload } from '../../e2e/scenarios-shared.js';
+import { assertReaderCannotDeriveNonce } from '../../e2e/scenario-assertions.js';
+import { parseFileDirective } from '../../e2e/fake-llm-core.js';
 
 describe('leave-and-return sampling schedule', () => {
   it('yields a baseline at +60 s after a 20 s allocation read and no catch-up burst', () => {
@@ -54,6 +57,43 @@ describe('classifyAllocationSample', () => {
 
   it('reports replaced when a different reference is observed', () => {
     expect(classifyAllocationSample('ref_1', 'ref_2')).toBe('replaced');
+  });
+});
+
+describe('buildLongConversationFileTurns', () => {
+  it('writes an independent nonce the reader path/tag cannot derive', () => {
+    const turns = buildLongConversationFileTurns('run1234');
+
+    const write = parseFileDirective(turns.writeDirective.slice('file:'.length));
+    expect(write.ok).toBe(true);
+    if (!write.ok || write.directive.op !== 'write') throw new Error('expected a write directive');
+    expect(write.directive.path).toBe(turns.filePath);
+
+    const read = parseFileDirective(turns.readDirective.slice('file:'.length));
+    expect(read.ok).toBe(true);
+    if (!read.ok || read.directive.op !== 'read') throw new Error('expected a read directive');
+    expect(read.directive.path).toBe(turns.filePath);
+
+    // The actual generated write body must pass the private-nonce check.
+    assertReaderCannotDeriveNonce({
+      body: write.directive.contents,
+      expectedNonce: turns.writerNonce,
+      readerVisible: turns.readerDerivedBody,
+      label: 'long-conversation file read',
+    });
+    expect(turns.writerNonce).not.toBe(turns.readerDerivedBody);
+  });
+
+  it('rejects the reader-derivable body the pre-fix code expected', () => {
+    const turns = buildLongConversationFileTurns('run1234');
+    expect(() =>
+      assertReaderCannotDeriveNonce({
+        body: turns.readerDerivedBody,
+        expectedNonce: turns.writerNonce,
+        readerVisible: turns.readerDerivedBody,
+        label: 'regressed writer',
+      })
+    ).toThrow(/reader-derived value/);
   });
 });
 

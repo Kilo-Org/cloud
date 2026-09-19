@@ -1,14 +1,19 @@
 /**
- * Bounded reader and matcher for cloud-agent-next idle-stop diagnostics.
+ * Framing, matcher and bounded tail readers for cloud-agent-next
+ * `sandbox_control` diagnostics.
  *
  * This module scrapes one production-owned log contract:
  * `src/sandbox-control/diagnostics.ts` (`logControlDiagnostic` stamps
  * `logTag: 'sandbox_control'` and `diagnosticEvent`), and the emitting sites in
  * `src/persistence/SandboxControl.ts` that write the `physical_committed`,
- * `provider_stop`, and `deadline_fired` records. Keep `LOG_FIELD_KEYS` and the
- * event/field expectations below in sync with those emitters; a production
- * field rename surfaces here as a missing-evidence timeout, not a compile
- * error.
+ * `provider_stop`, `deadline_fired`, `recovery_outcome` and `heartbeat`
+ * records. Keep `LOG_FIELD_KEYS` and the event/field expectations below in sync
+ * with those emitters; a production field rename surfaces here as a
+ * missing-evidence timeout, not a compile error.
+ *
+ * Only the local Docker profile uses the tail readers: they read the local
+ * `dev/logs/cloud-agent-next.log` file and return framed records for
+ * identity-correlated evidence. The deployed profile never calls them.
  */
 
 import { open } from 'node:fs/promises';
@@ -23,7 +28,6 @@ export const CLOUD_AGENT_LOG_PATH = path.resolve(
   'dev/logs/cloud-agent-next.log'
 );
 const IDLE_LOG_READ_CHUNK_BYTES = 256 * 1024;
-const IDLE_LOG_POLL_MS = 250;
 const MAX_FRAMED_LOG_OBJECT_BYTES = 512 * 1024;
 const MAX_PENDING_IDLE_DEADLINES = 64;
 
@@ -427,47 +431,23 @@ export function matchIdleStopEvidence(
   return null;
 }
 
-export async function readIdleStopEvidence(input: {
-  allocationId: string;
-  sandboxId?: string;
-  physicalSandboxId?: string;
-  fromByte: number;
-  budgetMs: number;
-  cursorCapturedAt?: number;
-}): Promise<IdleStopEvidence> {
-  if (!Number.isInteger(input.fromByte) || input.fromByte < 0) {
-    throw new Error(`invalid idle-stop log cursor: ${input.fromByte}`);
-  }
-  if (!Number.isFinite(input.budgetMs) || input.budgetMs <= 0) {
-    throw new Error(`invalid idle-stop evidence budget: ${input.budgetMs}`);
-  }
-  const cursorCapturedAt = input.cursorCapturedAt ?? Date.now();
-  const deadline = Date.now() + input.budgetMs;
-  let cursor = input.fromByte;
-  const matcher = createIdleStopEvidenceMatcher({
-    allocationId: input.allocationId,
-    ...(input.sandboxId ? { sandboxId: input.sandboxId } : {}),
-    ...(input.physicalSandboxId ? { physicalSandboxId: input.physicalSandboxId } : {}),
-    cursorCapturedAt,
-  });
-  const framer = createLogRecordFramer();
-  const decoder = new TextDecoder();
-
-  while (Date.now() < deadline) {
-    const { chunk, next, truncated } = await readLogChunkFrom(cursor, decoder);
-    if (truncated) {
-      throw new Error('cloud-agent-next log was truncated or rotated during idle-stop wait');
+/**
+ * Byte offset at the current end of the local cloud-agent-next log, to be used
+ * as the `fromByte` cursor for a later bounded read. Capturing it before a fault
+ * keeps evidence matching to records written after the fault.
+ */
+export async function captureLogCursor(): Promise<{ fromByte: number; capturedAt: number }> {
+  try {
+    const handle = await open(CLOUD_AGENT_LOG_PATH, 'r');
+    try {
+      const size = (await handle.stat()).size;
+      return { fromByte: size, capturedAt: Date.now() };
+    } finally {
+      await handle.close().catch(() => undefined);
     }
-    cursor = next;
-    for (const record of framer.push(chunk)) {
-      const evidence = matcher.feed(record);
-      if (evidence) return evidence;
-    }
-    await new Promise(resolve =>
-      setTimeout(resolve, Math.min(IDLE_LOG_POLL_MS, deadline - Date.now()))
-    );
+  } catch {
+    return { fromByte: 0, capturedAt: Date.now() };
   }
-  throw new Error(`idle-stop evidence not found within ${input.budgetMs}ms`);
 }
 
 async function readLogChunkFrom(
@@ -530,39 +510,3 @@ export async function readWorkerLogSnapshot(input: {
   return matches;
 }
 
-/**
- * Wait up to `budgetMs` for the first framed record after `fromByte` that
- * matches `match`. Returns null on budget expiry or log truncation. Framing and
- * correlation only: callers own the record-to-identity matching.
- */
-export async function waitForWorkerLogEvidence(input: {
-  fromByte: number;
-  budgetMs: number;
-  match: (record: LogRecord) => boolean;
-}): Promise<LogRecord | null> {
-  if (!Number.isInteger(input.fromByte) || input.fromByte < 0) {
-    throw new Error(`invalid worker-log cursor: ${input.fromByte}`);
-  }
-  if (!Number.isFinite(input.budgetMs) || input.budgetMs <= 0) {
-    throw new Error(`invalid worker-log evidence budget: ${input.budgetMs}`);
-  }
-  const deadline = Date.now() + input.budgetMs;
-  const framer = createLogRecordFramer();
-  const decoder = new TextDecoder();
-  let cursor = input.fromByte;
-  while (Date.now() < deadline) {
-    const { chunk, next, truncated } = await readLogChunkFrom(cursor, decoder);
-    if (truncated) return null;
-    for (const record of framer.push(chunk)) {
-      if (input.match(record)) return record;
-    }
-    if (next > cursor) {
-      cursor = next;
-      continue;
-    }
-    await new Promise(resolve =>
-      setTimeout(resolve, Math.min(IDLE_LOG_POLL_MS, Math.max(1, deadline - Date.now())))
-    );
-  }
-  return null;
-}

@@ -5,20 +5,22 @@
  * Physical allocation identity comes from the injected `sessionSandbox`
  * capability, so the same definition works under local Docker and over the e2e
  * HTTP surface; this module never reads Docker, worker logs or `@kilocode/db`.
- *
- * The local-only `worktree-shared` scenario keeps its physical claims (one
- * shared container, distinct Kilo processes, file-tool state); they are not
- * expressible on the public surface, so they are deliberately not restated here.
+ * Physical claims that are not expressible on the public surface (one shared
+ * container, distinct Kilo processes, on-disk state) are deliberately not
+ * asserted.
  */
 
 import { randomUUID } from 'node:crypto';
 import {
+  answerQuestion,
   createWorktreeChat,
+  deleteSession,
   fakeDirective,
   fetchFakeRequests,
-  getMessageResult,
+  fetchFakeScenarioStatus,
   getSessionSnapshot,
   hasPreparationForMessage,
+  interruptSession,
   isMessageCompleted,
   messageIdFromEvent,
   openConnectedStream,
@@ -33,18 +35,19 @@ import {
 import {
   cleanupRemoteSession,
   collectChildMessageText,
-  correlatedProgressSummary,
   echoPayloadMatches,
-  hasCorrelatedStreamProgress,
   type SharedScenario,
 } from './scenarios-shared.js';
+import { assertReaderCannotDeriveNonce, parseFileReadEcho } from './scenario-assertions.js';
 import {
   awaitDurableTerminal,
   createOwnedSessionRegistry,
   createScenarioDeadline,
+  requireRunning,
   sendTurn,
   sessionSandboxObservation,
   trackCreations,
+  waitForPacedProgress,
   waitForPresentAllocation,
   type InFlightCreations,
   type ScenarioDeadline,
@@ -58,7 +61,7 @@ import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type { ScenarioEnvironment } from './scenario-capabilities.js';
 
 const WORKTREE_CHAT_TIMEOUT_MS = 10 * 60_000;
-const WORKTREE_MULTI_CHAT_TIMEOUT_MS = 12 * 60_000;
+const WORKTREE_MULTI_CHAT_TIMEOUT_MS = 25 * 60_000;
 /** Generous budget for a real first container cold start. */
 const BOOT_TERMINAL_BUDGET_MS = 240_000;
 /**
@@ -86,6 +89,18 @@ const REPLAY_OBSERVATION_MS = 5_000;
 const TURN_BUDGET_MS = 120_000;
 /** Bounded wait for a create that outlived the scenario deadline. */
 const LATE_CREATE_SETTLE_MS = 30_000;
+/** Budget for a real file write/read turn. */
+const FILE_TURN_BUDGET_MS = 180_000;
+/** Budget for the owning stream to show the question. */
+const QUESTION_WAIT_BUDGET_MS = 120_000;
+/** Budget for the reopened owning stream to replay its still-open question. */
+const QUESTION_REPLAY_BUDGET_MS = 30_000;
+/** Budget for the answered question turn to complete. */
+const QUESTION_TERMINAL_BUDGET_MS = 120_000;
+/** Paced hold used to keep the root active across the sibling's control actions. */
+const ACTIVE_HOLD_DIRECTIVE = 'slow:60:1000:16';
+/** Generous bound for the root's paced hold to complete naturally. */
+const ROOT_HOLD_TERMINAL_BUDGET_MS = 120_000;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -98,6 +113,66 @@ function terminalLabel(event: StreamEvent | null): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * The owning chat's open question, parsed from its own stream. The session id
+ * is the root `ses_*` identity, so a sibling's question never matches.
+ */
+function questionAsked(
+  event: StreamEvent,
+  kiloSessionId: string
+): { id: string; sessionId: string } | null {
+  if (event.streamEventType !== 'kilocode') return null;
+  const data = event.data;
+  if (data.type !== 'question.asked' && data.event !== 'question.asked') return null;
+  const properties = data.properties;
+  if (typeof properties !== 'object' || properties === null) return null;
+  if (!('id' in properties) || !('sessionID' in properties)) return null;
+  if (typeof properties.id !== 'string' || properties.sessionID !== kiloSessionId) return null;
+  return { id: properties.id, sessionId: kiloSessionId };
+}
+
+/**
+ * Require exactly one tool call and one tool result for this fresh op tag, so
+ * the fake emitted the call and accepted only this turn's result.
+ */
+async function assertToolEvidence(
+  config: DriverConfig,
+  deadline: ScenarioDeadline,
+  tag: string,
+  kind: 'write' | 'read',
+  label: string
+): Promise<void> {
+  const status = await deadline.within(`${label} status`, signal =>
+    fetchFakeScenarioStatus(config.fakeLlmUrl, tag, signal)
+  );
+  if (status.toolCalls[kind] !== 1 || status.toolResults[kind] !== 1) {
+    throw new Error(
+      `${label}: expected exactly one ${kind} call and result for ${tag}; ` +
+        `toolCalls.${kind}=${status.toolCalls[kind]}; toolResults.${kind}=${status.toolResults[kind]}`
+    );
+  }
+}
+
+/** Run one real file write/read turn and return its collected assistant text. */
+async function runFileTurn(
+  config: DriverConfig,
+  deadline: ScenarioDeadline,
+  sessionId: string,
+  label: string,
+  directive: string
+): Promise<{ messageId: string; stream: StreamConnection; text: string }> {
+  const turn = await sendTurn(
+    deadline,
+    config,
+    sessionId,
+    fakeDirective(directive),
+    label,
+    FILE_TURN_BUDGET_MS
+  );
+  const text = collectChildMessageText(turn.stream.events, turn.messageId);
+  return { messageId: turn.messageId, stream: turn.stream, text };
 }
 
 /**
@@ -194,76 +269,6 @@ async function verifyWorktreeChat(
   }
   requireOwnScopeAndNullParent(snapshot, session.cloudAgentSessionId, label);
   return snapshot;
-}
-
-/**
- * Wait until the paced turn is underway: the paced turn's own stream shows a
- * message-correlated part (liveness; transient and empty initialization parts
- * permitted), **and** the fake's aggregate `chatCompletions` counter has
- * increased since the paced send. The counter is **not** authoritative: it is
- * attributed to the paced request under the documented assumption that no
- * auxiliary/title request is in flight in that window, so a bounded increase
- * proves "some request was dialed", not that it was the paced primary request.
- *
- * A content-based predicate was tried first and reverted. Requiring a
- * correlated **non-empty text** part looked like a model-served signal, but the
- * Kilo CLI's transient initialization part is correlated and empty, and for a
- * paced response the streamed content can lag the request past the wait budget.
- * Live evidence: one run showed `children=1 parts=9 correlated=2 text=1
- * nonEmptyText=0` while the fake had already served the paced request, so the
- * content predicate never fired and the counter check was never consulted.
- *
- * The wait is a bounded poll: each counter fetch is wrapped in `deadline.within`
- * and each sleep is capped by the remaining wait budget. The correlated-part
- * check reads the in-memory event buffer synchronously, so it cannot observe
- * anything after the loop guard; a counter result observed only after the budget
- * expires is rejected (`Date.now() <= end` before returning).
- */
-async function waitForPacedProgress(
-  config: DriverConfig,
-  stream: StreamConnection,
-  parentMessageId: string,
-  requestsBefore: number,
-  deadline: ScenarioDeadline,
-  budgetMs: number,
-  label: string
-): Promise<void> {
-  const budget = Math.min(budgetMs, deadline.remaining(label));
-  const end = Date.now() + budget;
-  while (Date.now() < end) {
-    if (hasCorrelatedStreamProgress(stream.events, parentMessageId)) {
-      const current = await deadline.within(
-        `${label} poll`,
-        () => fetchFakeRequests(config.fakeLlmUrl),
-        Math.max(1, end - Date.now())
-      );
-      if (current.chatCompletions > requestsBefore) {
-        if (Date.now() <= end) return;
-        break;
-      }
-    }
-    await sleep(Math.min(200, Math.max(0, end - Date.now())));
-  }
-  throw new Error(
-    `${label}: no correlated turn progress and new model request for ${parentMessageId} ` +
-      `within ${budget}ms (${correlatedProgressSummary(stream.events, parentMessageId)})`
-  );
-}
-
-/** Require a message is still queued/running; a terminal here is a regression. */
-async function requireNonterminal(
-  config: DriverConfig,
-  sessionId: string,
-  messageId: string,
-  deadline: ScenarioDeadline,
-  label: string
-): Promise<void> {
-  const result = await deadline.within(`${label} status`, signal =>
-    getMessageResult(config, sessionId, messageId, signal)
-  );
-  if (result.status !== 'queued' && result.status !== 'running') {
-    throw new Error(`${label}: ${messageId} status=${result.status}; expected queued/running`);
-  }
 }
 
 /** Every text part of every `kilocode` message.part.updated event, unfiltered. */
@@ -511,8 +516,28 @@ async function runWorktreeChat(
  * some request was dialed, not that the paced turn's own prompt was finalized.
  * It then proves the sibling create is lazy (no model request while the root is
  * streaming), does not kill the active root turn, replays idempotently, and that
- * both chats coexist with chat-content isolation. Targeted cancel stays
- * local-only (`worktree-shared`); no gate, `hang` or interrupt is used.
+ * both chats coexist with chat-content isolation. On top of that it asserts the
+ * user-visible rules that are expressible on the public surface:
+ *
+ * - the shared checkout: the root writes an uncommitted file, the sibling reads
+ *   it back, the root overwrites it, and a fresh sibling read echoes the second
+ *   nonce;
+ * - sequential question ownership: a question asked in the root while the
+ *   sibling is idle appears only on the root's stream, only the root can answer
+ *   it, and reconnecting the root replays the still-open question without a new
+ *   model request;
+ * - a targeted interrupt of the sibling while the root holds a paced `slow`
+ *   turn: the root stays nonterminal and then completes, the sibling's turn
+ *   fails `reason=interrupted`, and the root keeps its allocation reference;
+ * - a targeted delete of the sibling while the root is active: the sibling's
+ *   `getSession` rejects and the root accepts and completes another turn.
+ *
+ * Honest limit: the worktree runtime services streaming model turns one at a
+ * time, so this scenario does not ask a question or start a model turn in the
+ * sibling while the root is streaming, and it does not claim two chats have
+ * streaming model turns active at one instant. Isolation here is per-chat
+ * control/state, not concurrent streaming. No `gate`/`hang` (global parked
+ * state) is used: the holds are bounded `slow` turns.
  */
 async function runWorktreeMultiChat(
   args: LifecycleArgs,
@@ -541,6 +566,10 @@ async function runWorktreeMultiChat(
   let siblingSecondStream: StreamConnection | undefined;
   let rootReplayStream: StreamConnection | undefined;
   let siblingReplayStream: StreamConnection | undefined;
+  let questionStream: StreamConnection | undefined;
+  let siblingWatchStream: StreamConnection | undefined;
+  let siblingTurnStream: StreamConnection | undefined;
+  let aHoldStream: StreamConnection | undefined;
   const rootEvents: StreamEvent[] = [];
   const siblingEvents: StreamEvent[] = [];
   const rootMessageIds: string[] = [];
@@ -655,7 +684,7 @@ async function runWorktreeMultiChat(
     const before = await deadline.within('fake requests before', () =>
       fetchFakeRequests(scenarioConfig.fakeLlmUrl)
     );
-    await requireNonterminal(
+    await requireRunning(
       scenarioConfig,
       rootId,
       paced.messageId,
@@ -678,7 +707,7 @@ async function runWorktreeMultiChat(
     if (siblingId === rootId || siblingKiloId === rootKiloId) {
       throw new Error(`sibling reused the root identity: ${siblingId}/${siblingKiloId}`);
     }
-    await requireNonterminal(
+    await requireRunning(
       scenarioConfig,
       rootId,
       paced.messageId,
@@ -853,6 +882,311 @@ async function runWorktreeMultiChat(
     }
     siblingEvents.push(...siblingSecond.stream.events);
 
+    // --- Shared-checkout file proof: A writes an uncommitted file, B reads it.
+    // The path and tags are derived from `runId`, but the contents are
+    // independent random nonces, so the reader (which only ever sees the path
+    // and its own tag) cannot synthesize the expected body.
+    const sharedPath = `shared-checkout-${runId}.txt`;
+    const firstNonce = `nonce-${randomUUID()}`;
+    const secondNonce = `nonce-${randomUUID()}`;
+    const readerDerivedBody = (tag: string): string => `nonce-from-${sharedPath}-${tag}`;
+
+    const write1 = await runFileTurn(
+      scenarioConfig,
+      deadline,
+      rootId,
+      'root file write one',
+      `file:write:wa1-${runId}:${sharedPath}:${firstNonce}`
+    );
+    try {
+      if (!write1.text.includes(`file-write:${sharedPath}`)) {
+        throw new Error(`root file write did not report the write marker for ${sharedPath}`);
+      }
+      await assertToolEvidence(
+        scenarioConfig,
+        deadline,
+        `wa1-${runId}`,
+        'write',
+        'root file write one'
+      );
+      rootEvents.push(...write1.stream.events);
+    } finally {
+      write1.stream.close();
+    }
+
+    const read1 = await runFileTurn(
+      scenarioConfig,
+      deadline,
+      siblingId,
+      'sibling file read one',
+      `file:read:rb1-${runId}:${sharedPath}`
+    );
+    try {
+      const body = parseFileReadEcho(read1.text, sharedPath);
+      assertReaderCannotDeriveNonce({
+        body,
+        expectedNonce: firstNonce,
+        readerVisible: readerDerivedBody(`rb1-${runId}`),
+        label: 'sibling read one',
+      });
+      await assertToolEvidence(
+        scenarioConfig,
+        deadline,
+        `rb1-${runId}`,
+        'read',
+        'sibling file read one'
+      );
+      siblingEvents.push(...read1.stream.events);
+    } finally {
+      read1.stream.close();
+    }
+
+    const write2 = await runFileTurn(
+      scenarioConfig,
+      deadline,
+      rootId,
+      'root file write two',
+      `file:write:wa2-${runId}:${sharedPath}:${secondNonce}`
+    );
+    try {
+      if (!write2.text.includes(`file-write:${sharedPath}`)) {
+        throw new Error(`root overwrite did not report the write marker for ${sharedPath}`);
+      }
+      await assertToolEvidence(
+        scenarioConfig,
+        deadline,
+        `wa2-${runId}`,
+        'write',
+        'root file write two'
+      );
+      rootEvents.push(...write2.stream.events);
+    } finally {
+      write2.stream.close();
+    }
+
+    const read2 = await runFileTurn(
+      scenarioConfig,
+      deadline,
+      siblingId,
+      'sibling file read two',
+      `file:read:rb2-${runId}:${sharedPath}`
+    );
+    try {
+      const body = parseFileReadEcho(read2.text, sharedPath);
+      assertReaderCannotDeriveNonce({
+        body,
+        expectedNonce: secondNonce,
+        readerVisible: readerDerivedBody(`rb2-${runId}`),
+        label: 'sibling read two (overwrite)',
+      });
+      await assertToolEvidence(
+        scenarioConfig,
+        deadline,
+        `rb2-${runId}`,
+        'read',
+        'sibling file read two'
+      );
+      siblingEvents.push(...read2.stream.events);
+    } finally {
+      read2.stream.close();
+    }
+
+    // --- Sequential question ownership: ask in the root while the sibling is
+    // idle. The worktree runtime serializes streaming model turns, so asking
+    // while the other chat streams would park the question before the wrapper.
+    // The sibling stream stays open to prove the root's question never appears
+    // on it.
+    const questionTag = `q-${runId}`;
+    questionStream = await deadline.within('question stream', signal =>
+      openConnectedStream(scenarioConfig, rootId, false, undefined, signal)
+    );
+    siblingWatchStream = await deadline.within('sibling watch stream', signal =>
+      openConnectedStream(scenarioConfig, siblingId, false, undefined, signal)
+    );
+    const questionMessage = await deadline.within(
+      'question send',
+      signal =>
+        sendMessage(
+          scenarioConfig,
+          {
+            cloudAgentSessionId: rootId,
+            prompt: fakeDirective(`question:${questionTag}:Approved by the root only`),
+            signal,
+          },
+          'unified'
+        ),
+      TURN_BUDGET_MS
+    );
+    rootMessageIds.push(questionMessage.messageId);
+    const askedEvent = await questionStream.waitFor(
+      event => questionAsked(event, rootKiloId) !== null,
+      QUESTION_WAIT_BUDGET_MS
+    );
+    const asked = askedEvent ? questionAsked(askedEvent, rootKiloId) : null;
+    if (!asked) throw new Error(`root question ${questionTag} did not reach its owning stream`);
+    if (siblingWatchStream.events.some(event => questionAsked(event, rootKiloId) !== null)) {
+      throw new Error('the root question appeared on the sibling stream');
+    }
+    const questionStatus = await deadline.within('question status', signal =>
+      fetchFakeScenarioStatus(scenarioConfig.fakeLlmUrl, questionTag, signal)
+    );
+    if (questionStatus.toolResults.question !== 0) {
+      throw new Error(
+        `root question was answered before ownership was asserted (toolResults.question=${questionStatus.toolResults.question})`
+      );
+    }
+
+    let wrongSiblingRejected = false;
+    try {
+      const wrong = await deadline.within('wrong owner answer', signal =>
+        answerQuestion(scenarioConfig, siblingId, asked.id, [['Continue']], signal)
+      );
+      wrongSiblingRejected = wrong.success !== true;
+    } catch {
+      wrongSiblingRejected = true;
+    }
+    if (!wrongSiblingRejected) throw new Error('the sibling was allowed to answer the root question');
+
+    const questionRequestsBefore = await deadline.within('question replay baseline', signal =>
+      fetchFakeScenarioStatus(scenarioConfig.fakeLlmUrl, questionTag, signal)
+    );
+    questionStream.close();
+    questionStream = await deadline.within('question replay stream', signal =>
+      openConnectedStream(scenarioConfig, rootId, true, undefined, signal)
+    );
+    const replayed = await questionStream.waitFor(
+      event => questionAsked(event, rootKiloId)?.id === asked.id,
+      QUESTION_REPLAY_BUDGET_MS
+    );
+    if (!replayed) {
+      throw new Error('the owning root did not replay its still-open question after reconnect');
+    }
+    const questionRequestsAfter = await deadline.within('question replay after', signal =>
+      fetchFakeScenarioStatus(scenarioConfig.fakeLlmUrl, questionTag, signal)
+    );
+    if (questionRequestsAfter.requests !== questionRequestsBefore.requests) {
+      throw new Error('reconnecting the root question started another model request');
+    }
+
+    const answer = await deadline.within('answer root question', signal =>
+      answerQuestion(scenarioConfig, rootId, asked.id, [['Continue']], signal)
+    );
+    if (!answer.success) throw new Error('the owning root could not resolve its question');
+    const questionTerminal = await questionStream.waitForTerminal(
+      Math.max(1, Math.min(QUESTION_TERMINAL_BUDGET_MS, deadline.remaining('question terminal'))),
+      questionMessage.messageId
+    );
+    if (!isMessageCompleted(questionTerminal, questionMessage.messageId)) {
+      throw new Error(`answered question turn ${questionMessage.messageId} did not complete`);
+    }
+    rootEvents.push(...questionStream.events);
+    siblingEvents.push(...siblingWatchStream.events);
+
+    // --- Targeted interrupt of the sibling while the root holds a paced slow
+    // turn. The sibling turn is accepted but cannot start while the root is
+    // streaming, so the interrupt is a control-plane terminalization; the root
+    // must stay nonterminal, keep its allocation and then complete.
+    const interruptAllocationBefore = await waitForPresentAllocation(
+      deadline,
+      sandbox,
+      root,
+      'interrupt before',
+      HOT_ALLOCATION_BUDGET_MS
+    );
+    aHoldStream = await deadline.within('root hold stream', signal =>
+      openConnectedStream(scenarioConfig, rootId, false, undefined, signal)
+    );
+    const aHoldBaseline = await deadline.within('root hold baseline', signal =>
+      fetchFakeRequests(scenarioConfig.fakeLlmUrl, signal)
+    );
+    const aHold = await deadline.within('root hold send', signal =>
+      sendMessage(
+        scenarioConfig,
+        { cloudAgentSessionId: rootId, prompt: fakeDirective(ACTIVE_HOLD_DIRECTIVE), signal },
+        'unified'
+      )
+    );
+    rootMessageIds.push(aHold.messageId);
+    await waitForPacedProgress(
+      scenarioConfig,
+      aHoldStream,
+      aHold.messageId,
+      aHoldBaseline.chatCompletions,
+      deadline,
+      PACED_PROGRESS_BUDGET_MS,
+      'root hold'
+    );
+    await requireRunning(scenarioConfig, rootId, aHold.messageId, deadline, 'root hold');
+
+    siblingTurnStream = await deadline.within('sibling interrupt stream', signal =>
+      openConnectedStream(scenarioConfig, siblingId, false, undefined, signal)
+    );
+    const siblingTurn = await deadline.within('sibling interrupt send', signal =>
+      sendMessage(
+        scenarioConfig,
+        {
+          cloudAgentSessionId: siblingId,
+          prompt: fakeDirective(`echo:sibling-interrupted-${runId}`),
+          signal,
+        },
+        'unified'
+      )
+    );
+    siblingMessageIds.push(siblingTurn.messageId);
+    const interruption = await deadline.within('interrupt sibling', signal =>
+      interruptSession(scenarioConfig, siblingId, signal)
+    );
+    if (!interruption.success) throw new Error('targeted sibling interruption was not accepted');
+    const siblingFailed = await siblingTurnStream.waitFor(
+      event =>
+        event.streamEventType === 'cloud.message.failed' &&
+        messageIdFromEvent(event) === siblingTurn.messageId,
+      Math.max(1, Math.min(TURN_BUDGET_MS, deadline.remaining('sibling interrupted terminal')))
+    );
+    const siblingFailure = siblingFailed?.data as
+      | { reason?: string; payload?: { reason?: string } }
+      | undefined;
+    const siblingReason = siblingFailure?.reason ?? siblingFailure?.payload?.reason;
+    if (siblingReason !== 'interrupted') {
+      throw new Error(
+        `sibling interrupted message terminal reason=${siblingReason ?? 'none'}; expected interrupted`
+      );
+    }
+    siblingEvents.push(...siblingTurnStream.events);
+    await requireRunning(
+      scenarioConfig,
+      rootId,
+      aHold.messageId,
+      deadline,
+      'root during sibling interrupt'
+    );
+    const aHoldTerminal = await aHoldStream.waitForTerminal(
+      Math.max(1, Math.min(ROOT_HOLD_TERMINAL_BUDGET_MS, deadline.remaining('root hold terminal'))),
+      aHold.messageId
+    );
+    if (!isMessageCompleted(aHoldTerminal, aHold.messageId)) {
+      throw new Error(`root turn ${aHold.messageId} did not complete after the sibling interrupt`);
+    }
+    rootEvents.push(...aHoldStream.events);
+    const interruptAllocationAfter = await waitForPresentAllocation(
+      deadline,
+      sandbox,
+      root,
+      'interrupt after',
+      HOT_ALLOCATION_BUDGET_MS
+    );
+    if (
+      interruptAllocationBefore === null ||
+      interruptAllocationAfter === null ||
+      interruptAllocationBefore !== rootAllocation ||
+      interruptAllocationAfter !== rootAllocation
+    ) {
+      throw new Error(
+        `root allocation changed around the sibling interrupt: boot=${rootAllocation}; ` +
+          `before=${interruptAllocationBefore ?? 'none'}; after=${interruptAllocationAfter ?? 'none'}`
+      );
+    }
+
     rootReplayStream = await deadline.within('root replay stream', signal =>
       openConnectedStream(scenarioConfig, rootId, true, undefined, signal)
     );
@@ -861,25 +1195,91 @@ async function runWorktreeMultiChat(
     );
     assertChatContentIsolation(
       'root chat',
-      [
-        ...(rootBootStream?.events ?? []),
-        ...(pacedStream?.events ?? []),
-        ...(rootSecondStream?.events ?? []),
-        ...rootReplayStream.events,
-      ],
+      [...rootEvents, ...rootReplayStream.events],
       siblingMessageIds,
       siblingMarkers
     );
     assertChatContentIsolation(
       'sibling chat',
-      [
-        ...(siblingFirstStream?.events ?? []),
-        ...(siblingSecondStream?.events ?? []),
-        ...siblingReplayStream.events,
-      ],
+      [...siblingEvents, ...siblingReplayStream.events],
       rootMessageIds,
       rootMarkers
     );
+
+    // --- Targeted delete of the sibling leaves the root accepting turns.
+    aHoldStream?.close();
+    aHoldStream = await deadline.within('delete hold stream', signal =>
+      openConnectedStream(scenarioConfig, rootId, false, undefined, signal)
+    );
+    const deleteHoldBaseline = await deadline.within('delete hold baseline', signal =>
+      fetchFakeRequests(scenarioConfig.fakeLlmUrl, signal)
+    );
+    const deleteHold = await deadline.within('delete hold send', signal =>
+      sendMessage(
+        scenarioConfig,
+        { cloudAgentSessionId: rootId, prompt: fakeDirective(ACTIVE_HOLD_DIRECTIVE), signal },
+        'unified'
+      )
+    );
+    rootMessageIds.push(deleteHold.messageId);
+    await waitForPacedProgress(
+      scenarioConfig,
+      aHoldStream,
+      deleteHold.messageId,
+      deleteHoldBaseline.chatCompletions,
+      deadline,
+      PACED_PROGRESS_BUDGET_MS,
+      'delete hold'
+    );
+    await requireRunning(scenarioConfig, rootId, deleteHold.messageId, deadline, 'delete hold');
+    const deleted = await deadline.within('delete sibling', signal =>
+      deleteSession(scenarioConfig, siblingId, signal)
+    );
+    if (!deleted.success) throw new Error('sibling delete returned success: false');
+    let deletedRejected = false;
+    try {
+      await deadline.within('deleted sibling read', signal =>
+        getSessionSnapshot(scenarioConfig, siblingId, signal)
+      );
+    } catch {
+      deletedRejected = true;
+    }
+    if (!deletedRejected) throw new Error('the deleted sibling still returned a session snapshot');
+    await requireRunning(
+      scenarioConfig,
+      rootId,
+      deleteHold.messageId,
+      deadline,
+      'root during sibling delete'
+    );
+    const deleteHoldTerminal = await aHoldStream.waitForTerminal(
+      Math.max(1, Math.min(TURN_BUDGET_MS, deadline.remaining('delete hold terminal'))),
+      deleteHold.messageId
+    );
+    if (!isMessageCompleted(deleteHoldTerminal, deleteHold.messageId)) {
+      throw new Error(`root turn ${deleteHold.messageId} did not complete after the sibling delete`);
+    }
+    rootEvents.push(...aHoldStream.events);
+    const afterDelete = await sendTurn(
+      deadline,
+      scenarioConfig,
+      rootId,
+      fakeDirective(`echo:survived-${runId}`),
+      'root after delete',
+      TURN_BUDGET_MS
+    );
+    try {
+      const afterDeleteText = collectChildMessageText(
+        afterDelete.stream.events,
+        afterDelete.messageId
+      );
+      if (!echoPayloadMatches(afterDeleteText, `survived-${runId}`)) {
+        throw new Error('the surviving root did not complete another turn after the sibling delete');
+      }
+      rootEvents.push(...afterDelete.stream.events);
+    } finally {
+      afterDelete.stream.close();
+    }
 
     result = {
       name: scenarioName,
@@ -891,6 +1291,11 @@ async function runWorktreeMultiChat(
         `lazyChatCompletions=${before.chatCompletions}->${after.chatCompletions} (unchanged over ${LAZINESS_OBSERVATION_MS}ms); ` +
         `replay=idempotent; siblingPreparing=true; ` +
         'interleaved=root-second+sibling-second complete; ' +
+        `sharedCheckout=read-echo (first nonce); overwrite=read-echo (second nonce); ` +
+        `question=root-owned; questionReplay=replayed-no-request; questionAnswered=owner-only; ` +
+        'targetedInterrupt=sibling-interrupted (reason=interrupted); ' +
+        'rootStillRunning=true; rootAllocationUnchanged=true; ' +
+        'targetedDelete=survivor-completes; ' +
         "chatContentIsolation=true (no other-chat ids or markers in either chat's streams/replay)",
       events: [...rootEvents, ...siblingEvents],
       durationMs: Date.now() - startedAt,
@@ -906,6 +1311,10 @@ async function runWorktreeMultiChat(
       siblingSecondStream,
       rootReplayStream,
       siblingReplayStream,
+      questionStream,
+      siblingWatchStream,
+      siblingTurnStream,
+      aHoldStream,
     ]) {
       try {
         stream?.close();
@@ -928,6 +1337,7 @@ export const WORKTREE_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: WORKTREE_CHAT_TIMEOUT_MS,
+    requiresWorktreeCreation: true,
     run: runWorktreeChat,
   },
   'worktree-multi-chat': {
@@ -936,6 +1346,7 @@ export const WORKTREE_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: WORKTREE_MULTI_CHAT_TIMEOUT_MS,
+    requiresWorktreeCreation: true,
     run: runWorktreeMultiChat,
   },
 };

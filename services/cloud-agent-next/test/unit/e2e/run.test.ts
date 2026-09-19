@@ -6,21 +6,20 @@ import {
   exitCodeForResults,
   parseArgs,
   requireScenarioApi,
-  resolveLocalDefinition,
   resultOutcome,
+  WORKTREE_ENROLLMENT_SCENARIOS,
 } from '../../e2e/run.js';
-import type { LifecycleArgs, LifecycleResult } from '../../e2e/lifecycle.js';
-import type { ScenarioEnvironment } from '../../e2e/scenario-capabilities.js';
-import type { SharedScenario } from '../../e2e/scenarios-shared.js';
+import type { LifecycleResult } from '../../e2e/lifecycle.js';
+import { SHARED_SCENARIOS } from '../../e2e/scenarios-shared.js';
 
 describe('run timeout option', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('accepts an overall timeout only for file-state scenarios', () => {
-    expect(parseArgs(['--timeout-ms=1234', 'cold-resume', '_'])).toMatchObject({
-      lifecycle: 'cold-resume',
+  it('accepts an overall timeout for a shared long-running scenario', () => {
+    expect(parseArgs(['--timeout-ms=1234', 'long-conversation', '_'])).toMatchObject({
+      lifecycle: 'long-conversation',
       timeoutMs: 1234,
     });
   });
@@ -39,10 +38,19 @@ describe('run timeout option', () => {
     });
   });
 
-  it('rejects timeout overrides for legacy scenarios', () => {
+  it('rejects timeout overrides for a name absent from the shared registry', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    expect(parseArgs(['--timeout-ms=1234', 'worktree-shared', '_'])).toBeNull();
+    expect(parseArgs(['--timeout-ms=1234', 'cold-resume', '_'])).toBeNull();
     expect(error).toHaveBeenCalledWith(expect.stringContaining('--timeout-ms is only supported'));
+  });
+
+  it('accepts a timeout override for exactly the shared registry names', () => {
+    for (const name of Object.keys(SHARED_SCENARIOS)) {
+      expect(parseArgs([`--timeout-ms=1000`, name, '_'])).toMatchObject({
+        lifecycle: name,
+        timeoutMs: 1000,
+      });
+    }
   });
 });
 
@@ -81,58 +89,34 @@ describe('requireScenarioApi (matrix fail-fast contract)', () => {
   });
 });
 
-describe('resolveLocalDefinition', () => {
-  const shared: SharedScenario = {
-    name: 'worktree-chat',
-    requires: ['sessionSandbox'],
-    defaultConversation: '_',
-    run: async () => scenarioResult({ name: 'worktree-chat' }),
-  };
-
-  it('resolves a shared-only name to its shared definition', () => {
-    expect(
-      resolveLocalDefinition({
-        lifecycle: 'worktree-chat',
-        localScenarios: {},
-        sharedScenarios: { 'worktree-chat': shared },
-      })
-    ).toBe(shared);
+describe('worktree enrollment derivation', () => {
+  it('enrolls scenarios that declare requiresWorktreeCreation', () => {
+    for (const name of ['worktree-chat', 'worktree-multi-chat', 'long-conversation', 'leave-and-return']) {
+      expect(WORKTREE_ENROLLMENT_SCENARIOS.has(name)).toBe(true);
+    }
   });
 
-  it('wraps a local-only name with no capability requirements', async () => {
-    const localRun = vi.fn(async () => scenarioResult({ name: 'cold-resume' }));
-    const definition = resolveLocalDefinition({
-      lifecycle: 'cold-resume',
-      localScenarios: { 'cold-resume': localRun },
-      sharedScenarios: {},
-    });
-
-    expect(definition).toMatchObject({
-      name: 'cold-resume',
-      requires: [],
-      defaultConversation: '_',
-    });
-    if (!definition) throw new Error('expected a wrapped local definition');
-    const result = await definition.run({} as LifecycleArgs, {} as ScenarioEnvironment);
-    expect(localRun).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({ name: 'cold-resume' });
+  it('does not enroll a scenario that creates no worktree session', () => {
+    expect(WORKTREE_ENROLLMENT_SCENARIOS.has('cold-hot')).toBe(false);
+    expect(WORKTREE_ENROLLMENT_SCENARIOS.has('hot')).toBe(false);
   });
 
-  it('prefers the shared definition when a name exists in both', () => {
-    const localRun = vi.fn(async () => scenarioResult({ name: 'cold-hot' }));
-    expect(
-      resolveLocalDefinition({
-        lifecycle: 'worktree-chat',
-        localScenarios: { 'worktree-chat': localRun },
-        sharedScenarios: { 'worktree-chat': shared },
-      })
-    ).toBe(shared);
+  it('matches exactly the shared definitions that declare the flag', () => {
+    const declared = Object.values(SHARED_SCENARIOS)
+      .filter(definition => definition.requiresWorktreeCreation === true)
+      .map(definition => definition.name)
+      .sort();
+    expect([...WORKTREE_ENROLLMENT_SCENARIOS].sort()).toEqual(declared);
   });
+});
 
-  it('returns null for a name in neither registry', () => {
-    expect(
-      resolveLocalDefinition({ lifecycle: 'nope', localScenarios: {}, sharedScenarios: {} })
-    ).toBeNull();
+describe('matrix stale-name contract', () => {
+  it('resolves every smoke matrix name from the shared registry', () => {
+    // Mirrors the smoke runner's hard-failure rule: a name absent from
+    // `SHARED_SCENARIOS` is an unknown lifecycle, never a silent skip.
+    for (const name of ['cold-hot', 'cold', 'hot', 'queue-while-busy', 'auth-reject']) {
+      expect(SHARED_SCENARIOS[name]).toBeDefined();
+    }
   });
 });
 
@@ -203,6 +187,21 @@ describe('exitCodeForResults', () => {
 
   it('returns 1 when a failure accompanies passes', () => {
     expect(exitCodeForResults([pass, failure, unsupported])).toBe(1);
+  });
+
+  it('returns 0 when every unsupported result is in the expected set', () => {
+    const expected = new Set(['unsupported']);
+    expect(exitCodeForResults([pass, unsupported], { expectedUnsupported: expected })).toBe(0);
+  });
+
+  it('returns 2 for an unsupported result outside the expected set', () => {
+    const expected = new Set(['other']);
+    expect(exitCodeForResults([pass, unsupported], { expectedUnsupported: expected })).toBe(2);
+  });
+
+  it('still returns 1 when a failure accompanies an expected unsupported result', () => {
+    const expected = new Set(['unsupported']);
+    expect(exitCodeForResults([unsupported, failure], { expectedUnsupported: expected })).toBe(1);
   });
 });
 

@@ -9,11 +9,14 @@
  *   tsx test/e2e/run.ts hot echo:hi
  *   tsx test/e2e/run.ts external-kill echo:hi
  *   tsx test/e2e/run.ts kill-mid-flight hang
- *   tsx test/e2e/run.ts queue-while-busy gate1
+ *   tsx test/e2e/run.ts queue-while-busy _
  *   tsx test/e2e/run.ts queue-overflow _
  *   tsx test/e2e/run.ts callback-completion echo:done
- *   tsx test/e2e/run.ts feed-stale-recovery _
+ *   tsx test/e2e/run.ts wrapper-freeze-settled-reap _
  *   tsx test/e2e/run.ts --api=legacy hot echo:hi
+ *
+ * The conversation is a per-scenario argument: a real directive for the turn
+ * scenarios, a result label only where the scenario owns its own directive.
  *
  * The stack must be running (`pnpm dev:start cloud-agent`). Leave
  * `KILO_OPENROUTER_BASE` on Next.js and select `kilo/fake-deterministic`.
@@ -26,7 +29,6 @@
  * `local`.
  */
 
-import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -39,67 +41,41 @@ import {
 import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
 import { bootstrapDeployedProfile, fetchStreamTicket, type DeployedAuth } from './deployed-auth.js';
 import { isControlPlaneOwner, isWorktreeOwner } from '../../src/session-plane.js';
-import {
-  LIFECYCLE_SCENARIOS,
-  LIFECYCLE_SCENARIO_TIMEOUT_MS,
-  type LifecycleResult,
-} from './lifecycle.js';
+import type { LifecycleResult } from './lifecycle.js';
 import { runSharedScenario, resolveScenarioApi } from './scenario-capabilities.js';
 import { SHARED_SCENARIOS, type SharedScenario } from './scenarios-shared.js';
 import { createLocalScenarioEnvironment } from './capabilities-local.js';
 import { createDeployedScenarioEnvironment } from './capabilities-deployed.js';
 import { createLocalHttpScenarioEnvironment } from './e2e-surface-client.js';
-import { FILE_STATE_SCENARIO_TIMEOUT_MS } from './lifecycle-file-state.js';
-import { CONTINUITY_SCENARIO_TIMEOUT_MS } from './lifecycle-continuity.js';
-
-/** Every scenario that accepts an explicit `--timeout-ms` and runs long. */
-const LONG_RUNNING_SCENARIO_TIMEOUT_MS: Record<string, number> = {
-  ...LIFECYCLE_SCENARIO_TIMEOUT_MS,
-  ...FILE_STATE_SCENARIO_TIMEOUT_MS,
-  ...CONTINUITY_SCENARIO_TIMEOUT_MS,
-};
 
 /**
- * Local runs that prepare a control-plane worktree session, so the driver owner
+ * Local runs that create a control-plane worktree session, so the driver owner
  * must be enrolled in `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS`.
- * `interrupt-then-continue` creates its session through `prepareBrowserSession`
- * but resolves its overall budget from its shared definition (not the local
- * long-running map), so enrollment names it here instead of keeping a duplicate
- * timeout entry.
+ * Derived from the shared definitions' `requiresWorktreeCreation` flag, so a
+ * converted scenario cannot silently skip the enrollment precheck.
  */
-const WORKTREE_ENROLLMENT_SCENARIOS: ReadonlySet<string> = new Set([
-  'worktree-shared',
-  'interrupt-then-continue',
-  'worktree-chat',
-  'worktree-multi-chat',
-  'long-conversation',
-  'leave-and-return',
-  ...Object.keys(LONG_RUNNING_SCENARIO_TIMEOUT_MS),
-]);
+export const WORKTREE_ENROLLMENT_SCENARIOS: ReadonlySet<string> = new Set(
+  Object.values(SHARED_SCENARIOS)
+    .filter(definition => definition.requiresWorktreeCreation === true)
+    .map(definition => definition.name)
+);
 
 /**
- * Long-running local-only keys plus every shared scenario, so `--timeout-ms`
- * is accepted for any scenario either profile can dispatch.
+ * Every scenario either profile can dispatch, so `--timeout-ms` is accepted for
+ * exactly the shared registry.
  */
-const TIMEOUT_MS_SCENARIOS: ReadonlySet<string> = new Set([
-  ...Object.keys(LONG_RUNNING_SCENARIO_TIMEOUT_MS),
-  ...Object.keys(SHARED_SCENARIOS),
-]);
+const TIMEOUT_MS_SCENARIOS: ReadonlySet<string> = new Set(Object.keys(SHARED_SCENARIOS));
 
 /**
- * Resolve the per-scenario timeout the same way under every profile: an
- * explicit request wins, then the profile's long-running default, then the
+ * Resolve the per-scenario timeout: an explicit request wins, otherwise the
  * definition's own default. The definition default is what gives an HTTP-only
- * run (`runLocalHttp` / `runDeployed`) the same budget the local profile gets
- * from `LONG_RUNNING_SCENARIO_TIMEOUT_MS`.
+ * run (`runLocalHttp` / `runDeployed`) the same budget the local profile gets.
  */
 function timeoutRequestArgs(
   definition: SharedScenario,
-  requestedTimeoutMs: number | undefined,
-  profileDefaultMs?: number
+  requestedTimeoutMs: number | undefined
 ): { timeoutMs?: number } {
   if (requestedTimeoutMs !== undefined) return { timeoutMs: requestedTimeoutMs };
-  if (profileDefaultMs !== undefined) return { timeoutMs: profileDefaultMs };
   if (definition.defaultTimeoutMs !== undefined) return { timeoutMs: definition.defaultTimeoutMs };
   return {};
 }
@@ -127,11 +103,24 @@ export function exitCodeFor(result: LifecycleResult): number {
 
 /**
  * Aggregate exit policy over a matrix: `1` when any scenario failed, else `2`
- * when any was unsupported, else `0` (including an empty set).
+ * when any unsupported is not an expected capability gap, else `0` (including
+ * an empty set). `expectedUnsupported` is derived by the caller from
+ * `isScenarioSupported`, so a declared capability gap stays a reported
+ * `unsupported` outcome without failing the matrix.
  */
-export function exitCodeForResults(results: readonly LifecycleResult[]): number {
+export function exitCodeForResults(
+  results: readonly LifecycleResult[],
+  opts: { expectedUnsupported?: ReadonlySet<string> } = {}
+): number {
   if (results.some(result => resultOutcome(result) === 'failure')) return 1;
-  if (results.some(result => resultOutcome(result) === 'unsupported')) return 2;
+  const expected = opts.expectedUnsupported ?? new Set<string>();
+  if (
+    results.some(
+      result => resultOutcome(result) === 'unsupported' && !expected.has(result.name)
+    )
+  ) {
+    return 2;
+  }
   return 0;
 }
 
@@ -153,9 +142,7 @@ export function requireScenarioApi(
 }
 
 function printUsage(): void {
-  const scenarios = [
-    ...new Set([...Object.keys(LIFECYCLE_SCENARIOS), ...Object.keys(SHARED_SCENARIOS)]),
-  ].join('|');
+  const scenarios = Object.keys(SHARED_SCENARIOS).join('|');
   console.error(
     `Usage: tsx test/e2e/run.ts [--api=unified|legacy] [--verbose] [--timeout-ms=<n>] <${scenarios}> <conversation>`
   );
@@ -172,8 +159,9 @@ function printUsage(): void {
   console.error(
     'E2E_PROFILE=deployed selects the deployed profile (unified API, except scenarios that pin the legacy prepare flow).'
   );
-  console.error(`deployed scenarios: ${Object.keys(SHARED_SCENARIOS).join('|')}`);
-  console.error('all other scenarios are local-only (Docker-backed inspection/control).');
+  console.error(
+    'Scenarios that require a local-only capability report unsupported on profiles that lack it.'
+  );
 }
 
 /**
@@ -304,40 +292,13 @@ function resolveProfile(): 'local' | 'deployed' {
   process.exit(2);
 }
 
-/**
- * Resolve the definition local dispatch should use. A shared definition wins,
- * so a name in both registries keeps its shared gate; a local-only name is
- * wrapped into the shared shape with no capability requirements; a name in
- * neither is unknown (`null`).
- */
-export function resolveLocalDefinition(input: {
-  lifecycle: string;
-  localScenarios: Record<string, SharedScenario['run']>;
-  sharedScenarios: Record<string, SharedScenario>;
-}): SharedScenario | null {
-  const shared = input.sharedScenarios[input.lifecycle];
-  if (shared) return shared;
-  const local = input.localScenarios[input.lifecycle];
-  if (!local) return null;
-  return {
-    name: input.lifecycle,
-    requires: [],
-    defaultConversation: '_',
-    run: local,
-  };
-}
-
 async function runLocal(parsed: ParsedArgs): Promise<void> {
   if (process.env.E2E_LOCAL_HTTP === '1') {
     await runLocalHttp(parsed);
     return;
   }
   const { lifecycle, conversation, verbose, timeoutMs: requestedTimeoutMs } = parsed;
-  const definition = resolveLocalDefinition({
-    lifecycle,
-    localScenarios: LIFECYCLE_SCENARIOS,
-    sharedScenarios: SHARED_SCENARIOS,
-  });
+  const definition = SHARED_SCENARIOS[lifecycle];
   if (!definition) {
     console.error(`Unknown lifecycle: ${lifecycle}`);
     printUsage();
@@ -348,16 +309,12 @@ async function runLocal(parsed: ParsedArgs): Promise<void> {
   loadRepoEnvFiles(SERVICE_PACKAGE_DIR);
   const devVars = loadDevVars(SERVICE_PACKAGE_DIR);
   const seededEmail = process.env.E2E_USER_EMAIL?.trim();
-  const email =
-    lifecycle === 'worktree-shared'
-      ? `kilo-worktree-e2e-${randomUUID()}${DRIVER_USER_EMAIL_SUFFIX}`
-      : (seededEmail ?? `kilo-e2e-driver-${Date.now()}${DRIVER_USER_EMAIL_SUFFIX}`);
-  const user =
-    lifecycle !== 'worktree-shared' && seededEmail
-      ? await loadExistingUserByEmail(process.env.DATABASE_URL, seededEmail)
-      : await ensureTestUser(process.env.DATABASE_URL, email, {
-          funded: process.env.E2E_FUNDED === '1',
-        });
+  const email = seededEmail ?? `kilo-e2e-driver-${Date.now()}${DRIVER_USER_EMAIL_SUFFIX}`;
+  const user = seededEmail
+    ? await loadExistingUserByEmail(process.env.DATABASE_URL, seededEmail)
+    : await ensureTestUser(process.env.DATABASE_URL, email, {
+        funded: process.env.E2E_FUNDED === '1',
+      });
   const expectControlPlane = Boolean(devVars.CONTROL_PLANE_IDS?.trim());
   const requiresWorktreeEnrollment = WORKTREE_ENROLLMENT_SCENARIOS.has(lifecycle);
   if (
@@ -396,11 +353,7 @@ async function runLocal(parsed: ParsedArgs): Promise<void> {
     conversation,
     api,
     env: createLocalScenarioEnvironment(),
-    ...timeoutRequestArgs(
-      definition,
-      requestedTimeoutMs,
-      LONG_RUNNING_SCENARIO_TIMEOUT_MS[lifecycle]
-    ),
+    ...timeoutRequestArgs(definition, requestedTimeoutMs),
   });
   printResult(result, { verbose });
   process.exit(exitCodeFor(result));
@@ -495,14 +448,7 @@ async function runDeployed(parsed: ParsedArgs): Promise<void> {
   const { lifecycle, conversation, verbose, timeoutMs } = parsed;
   const definition = SHARED_SCENARIOS[lifecycle];
   if (!definition) {
-    if (LIFECYCLE_SCENARIOS[lifecycle]) {
-      console.error(
-        `${lifecycle} is a local-only scenario (it needs Docker-backed inspection/control); ` +
-          `the deployed profile supports: ${Object.keys(SHARED_SCENARIOS).join(', ')}`
-      );
-    } else {
-      console.error(`Unknown lifecycle: ${lifecycle}`);
-    }
+    console.error(`Unknown lifecycle: ${lifecycle}`);
     printUsage();
     process.exit(2);
   }

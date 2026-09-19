@@ -7,13 +7,15 @@
  * identity comes from the injected `sessionSandbox` capability, so the same
  * definition works under local Docker and over the e2e HTTP surface.
  *
- * Every gate tag is `-<runId>`-scoped, and each definition releases every tag
- * it still owns before returning. A tag whose release fails is a scenario
- * failure, never a silent leak: the fake LLM DO is one global instance, so a
- * parked gate from this run would otherwise contaminate later runs.
+ * The hold is a bounded `slow:<n>:1000:16` directive, not a parked gate: a slow
+ * turn is time-based and self-terminating, so there is no global fake-LLM state
+ * to release and no cross-run contamination. The container is booted and
+ * observed on a fast warm-up turn **before** the hold starts, so the hold's
+ * action window is not consumed by container readiness. Readiness is attributed
+ * with `waitForPacedProgress` and the turn must be `running`, never merely
+ * `queued`, before the scenario queues or interrupts behind it.
  */
 
-import { randomUUID } from 'node:crypto';
 import {
   fakeDirective,
   interruptSession,
@@ -21,50 +23,134 @@ import {
   messageIdFromEvent,
   messagePhase,
   openConnectedStream,
-  openStream,
-  releaseGate,
   sendMessage,
   startSession,
-  waitForGateEngaged,
+  type ApiVersion,
+  type DriverConfig,
   type StreamConnection,
   type StreamEvent,
 } from './client.js';
-import { requireWorktreeGate } from './worktree-support.js';
-import { withOwnedGates } from './owned-gates.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type { ScenarioEnvironment, SessionSandboxObservation } from './scenario-capabilities.js';
+import {
+  createScenarioDeadline,
+  sessionSandboxObservation,
+  startPacedHoldTurn,
+  trackStartedSession,
+  type ScenarioDeadline,
+} from './scenarios-shared-runtime.js';
 import type { SharedScenario } from './scenarios-shared.js';
 
-const QUEUE_TIMEOUT_MS = 120_000;
-const INTERRUPT_CLEARS_TIMEOUT_MS = 60_000;
-const INTERRUPT_MID_STREAM_TIMEOUT_MS = 180_000;
-const SANDBOX_TIMEOUT_MS = 60_000;
+const QUEUE_TIMEOUT_MS = 240_000;
+const QUEUE_OVERFLOW_TIMEOUT_MS = 300_000;
+const INTERRUPT_CLEARS_TIMEOUT_MS = 240_000;
+const INTERRUPT_MID_STREAM_TIMEOUT_MS = 300_000;
+/** Boot/container budget, consumed before the action window starts. */
+const CONTAINER_BUDGET_MS = 120_000;
+/** Bound for the fast warm-up turn that proves the container is ready. */
+const BOOT_TERMINAL_BUDGET_MS = 120_000;
+/** Bound for the paced-progress readiness wait; the slow hold outlasts it. */
+const PACED_PROGRESS_BUDGET_MS = 60_000;
+/** Total budget for filling the pending queue before the 429 must appear. */
+const FILL_BUDGET_MS = 90_000;
+/** Bounded cleanup after a failed body. */
+const CLEANUP_TIMEOUT_MS = 15_000;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function sessionSandboxObservation(env: ScenarioEnvironment): SessionSandboxObservation {
-  if (!env.sessionSandbox) throw new Error('sessionSandbox capability is required');
-  return env.sessionSandbox;
-}
+type PacedHold = {
+  boot: Awaited<ReturnType<typeof startSession>>;
+  held: { messageId: string };
+  stream: StreamConnection;
+  container: string;
+};
 
-async function requireContainer(
+/**
+ * Boot the session on a fast warm-up turn, observe its physical container, and
+ * only then start the bounded `slow` hold. The fake request baseline is captured
+ * immediately before the hold send so `waitForPacedProgress` attributes a
+ * request to it. If this throws after acquiring the stream or session, it closes
+ * and interrupts them itself: ownership transfers to the caller only on return.
+ */
+async function startPacedHold(
+  deadline: ScenarioDeadline,
+  config: DriverConfig,
   sandbox: SessionSandboxObservation,
-  session: { cloudAgentSessionId: string; kiloSessionId: string },
-  timeoutMs: number
-): Promise<string | null> {
-  return sandbox.waitForContainer({
-    cloudAgentSessionId: session.cloudAgentSessionId,
-    kiloSessionId: session.kiloSessionId,
-    timeoutMs,
-  });
+  api: ApiVersion,
+  directive: string,
+  label: string
+): Promise<PacedHold> {
+  let stream: StreamConnection | undefined;
+  let sessionId: string | undefined;
+  try {
+    const boot = await deadline.within(`${label} boot start`, signal =>
+      startSession(
+        trackStartedSession(config, id => {
+          sessionId = id;
+        }),
+        { prompt: fakeDirective('echo:warmup'), signal },
+        api
+      )
+    );
+    sessionId = boot.cloudAgentSessionId;
+    const bootStream = await deadline.within(`${label} boot stream`, signal =>
+      openConnectedStream(config, boot.cloudAgentSessionId, true, undefined, signal)
+    );
+    stream = bootStream;
+
+    const container = await deadline.within(`${label} container`, signal =>
+      sandbox.waitForContainer({
+        cloudAgentSessionId: boot.cloudAgentSessionId,
+        kiloSessionId: boot.kiloSessionId,
+        timeoutMs: Math.max(
+          1,
+          Math.min(CONTAINER_BUDGET_MS, deadline.remaining(`${label} container`))
+        ),
+        signal,
+      })
+    );
+    if (container === null) throw new Error(`${label}: sandbox did not appear`);
+
+    const bootTerminal = await deadline.within(`${label} boot terminal`, () =>
+      bootStream.waitForTerminal(BOOT_TERMINAL_BUDGET_MS, boot.messageId)
+    );
+    if (!isMessageCompleted(bootTerminal, boot.messageId)) {
+      throw new Error(`${label}: boot turn ${boot.messageId} did not complete`);
+    }
+
+    const held = await startPacedHoldTurn({
+      deadline,
+      config,
+      cloudAgentSessionId: boot.cloudAgentSessionId,
+      directive,
+      label,
+      budgetMs: PACED_PROGRESS_BUDGET_MS,
+      api,
+      stream: bootStream,
+    });
+    return { boot, held, stream: bootStream, container };
+  } catch (error) {
+    try {
+      stream?.close();
+    } catch {
+      // A close failure must not replace the helper's error.
+    }
+    if (sessionId) {
+      await interruptSession(
+        config,
+        sessionId,
+        AbortSignal.timeout(CLEANUP_TIMEOUT_MS)
+      ).catch(() => {});
+    }
+    throw error;
+  }
 }
 
 /**
  * Every message in `messageIds` reaches a completed terminal, in that exact
- * order, with no failed terminal interleaved. Moved verbatim from the local
- * queue scenarios so the moved definitions keep the same FIFO assertion.
+ * order, with no failed terminal interleaved.
  */
 function successfulMessageOrder(events: StreamEvent[], messageIds: string[]): boolean {
   const terminal = events.filter(event => {
@@ -82,25 +168,22 @@ function successfulMessageOrder(events: StreamEvent[], messageIds: string[]): bo
 }
 
 /**
- * queue-while-busy: enqueue two messages behind an actively-blocking turn,
- * release the gate, assert FIFO delivery. See the local definition's JSDoc for
- * the full step list; only the container-identity capability and the
- * release-on-every-path wrapper differ.
+ * queue-while-busy: enqueue two messages behind a running paced turn, let the
+ * hold complete naturally, assert FIFO delivery of the held turn plus both
+ * follow-ups. The paced turn is started only after the boot container is ready.
  */
 async function queueWhileBusyBody(
   args: LifecycleArgs,
-  env: ScenarioEnvironment,
-  owned: Set<string>
+  env: ScenarioEnvironment
 ): Promise<LifecycleResult> {
   const startedAt = Date.now();
   const { config, conversation, timeoutMs = QUEUE_TIMEOUT_MS, api = 'unified' } = args;
   const scenarioName = 'queue-while-busy';
   const sandbox = sessionSandboxObservation(env);
-  const gateTag = `${conversation || 'gate1'}-${randomUUID()}`;
-  owned.add(gateTag);
+  const deadline = createScenarioDeadline(startedAt, timeoutMs);
+  let stream: StreamConnection | undefined;
   let cleanupSessionId: string | undefined;
   let terminalized = false;
-  let stream: StreamConnection | undefined;
 
   const fail = (message: string): LifecycleResult => ({
     name: scenarioName,
@@ -112,26 +195,31 @@ async function queueWhileBusyBody(
   });
 
   try {
-    const gate = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
-    cleanupSessionId = gate.cloudAgentSessionId;
-    stream = await openConnectedStream(config, gate.cloudAgentSessionId);
-    const container = await requireContainer(sandbox, gate, timeoutMs);
-    if (container === null) return fail('sandbox did not appear within 60s');
-
-    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
-    if (!engaged) {
-      return fail(`gate:${gateTag} did not engage on fake LLM within 90s`);
-    }
-
-    const second = await sendMessage(
+    const hold = await startPacedHold(
+      deadline,
       config,
-      { cloudAgentSessionId: gate.cloudAgentSessionId, prompt: fakeDirective('echo:second') },
-      api
+      sandbox,
+      api,
+      'slow:60:1000:16',
+      scenarioName
     );
-    const third = await sendMessage(
-      config,
-      { cloudAgentSessionId: gate.cloudAgentSessionId, prompt: fakeDirective('echo:third') },
-      api
+    stream = hold.stream;
+    cleanupSessionId = hold.boot.cloudAgentSessionId;
+    const sessionId = hold.boot.cloudAgentSessionId;
+
+    const second = await deadline.within('second send', signal =>
+      sendMessage(
+        config,
+        { cloudAgentSessionId: sessionId, prompt: fakeDirective('echo:second'), signal },
+        api
+      )
+    );
+    const third = await deadline.within('third send', signal =>
+      sendMessage(
+        config,
+        { cloudAgentSessionId: sessionId, prompt: fakeDirective('echo:third'), signal },
+        api
+      )
     );
 
     if (second.delivery !== 'queued' || third.delivery !== 'queued') {
@@ -140,24 +228,19 @@ async function queueWhileBusyBody(
       );
     }
 
-    // Release the gate so the queue drains.
-    await releaseGate(config.fakeLlmUrl, gateTag);
-    owned.delete(gateTag);
-
-    // Wait for the last queued message to terminate; by then the earlier two
-    // must have terminated too (queue is strict FIFO). Filter out the
-    // initial `cloud.message.queued` event for the same messageId — that
-    // one arrives immediately on send and isn't a terminal state.
+    // Wait for the last queued message to terminate; by then the held turn and
+    // the second follow-up must have terminated too (strict FIFO). Filter out
+    // the initial `cloud.message.queued` event, which is not a terminal state.
     const thirdTerminal = await stream.waitFor(
       e =>
         messagePhase(e) !== null &&
         messagePhase(e) !== 'queued' &&
         messageIdFromEvent(e) === third.messageId,
-      timeoutMs
+      deadline.remaining('third terminal')
     );
     if (!thirdTerminal) {
       return fail(
-        `third message ${third.messageId} did not terminate within ${timeoutMs}ms; owned container=${container}`
+        `third message ${third.messageId} did not terminate; owned container=${hold.container}`
       );
     }
 
@@ -165,7 +248,7 @@ async function queueWhileBusyBody(
     stream.close();
     stream = undefined;
 
-    const expectedOrder = [gate.messageId, second.messageId, third.messageId];
+    const expectedOrder = [hold.held.messageId, second.messageId, third.messageId];
     const fifoOk = successfulMessageOrder(events, expectedOrder);
     terminalized = fifoOk;
 
@@ -174,7 +257,7 @@ async function queueWhileBusyBody(
       conversation,
       ok: fifoOk,
       message: fifoOk
-        ? `session=${gate.cloudAgentSessionId}; successful FIFO: ${expectedOrder.join(' -> ')}`
+        ? `session=${hold.boot.cloudAgentSessionId}; successful FIFO: ${expectedOrder.join(' -> ')}`
         : `expected successful FIFO completion for ${expectedOrder.join(' -> ')}`,
       events,
       durationMs: Date.now() - startedAt,
@@ -188,7 +271,11 @@ async function queueWhileBusyBody(
       // A close failure must not replace the scenario result.
     }
     if (!terminalized && cleanupSessionId) {
-      await interruptSession(config, cleanupSessionId).catch(() => {});
+      await interruptSession(
+        config,
+        cleanupSessionId,
+        AbortSignal.timeout(CLEANUP_TIMEOUT_MS)
+      ).catch(() => {});
     }
   }
 }
@@ -208,6 +295,7 @@ async function queueRapidFireBody(
   const { config, conversation, timeoutMs = QUEUE_TIMEOUT_MS, api = 'unified' } = args;
   const scenarioName = 'queue-rapid-fire-no-gate';
   const sandbox = sessionSandboxObservation(env);
+  const deadline = createScenarioDeadline(startedAt, timeoutMs);
   let stream: StreamConnection | undefined;
 
   const fail = (message: string): LifecycleResult => ({
@@ -220,36 +308,59 @@ async function queueRapidFireBody(
   });
 
   try {
-    const first = await startSession(config, { prompt: fakeDirective('echo:first') }, api);
-    stream = openStream(config, first.cloudAgentSessionId, { replay: false });
+    const first = await deadline.within('first start', signal =>
+      startSession(config, { prompt: fakeDirective('echo:first'), signal }, api)
+    );
+    stream = await deadline.within('first stream', signal =>
+      openConnectedStream(config, first.cloudAgentSessionId, false, undefined, signal)
+    );
 
     // Rapid-fire the follow-ups without waiting for any terminal signal; if
     // the DO happens to be mid-init, these will land in the pending queue
     // with delivery=queued. Either way, FIFO must hold.
-    const second = await sendMessage(
-      config,
-      { cloudAgentSessionId: first.cloudAgentSessionId, prompt: fakeDirective('echo:second') },
-      api
+    const second = await deadline.within('second send', signal =>
+      sendMessage(
+        config,
+        {
+          cloudAgentSessionId: first.cloudAgentSessionId,
+          prompt: fakeDirective('echo:second'),
+          signal,
+        },
+        api
+      )
     );
-    const third = await sendMessage(
-      config,
-      { cloudAgentSessionId: first.cloudAgentSessionId, prompt: fakeDirective('echo:third') },
-      api
+    const third = await deadline.within('third send', signal =>
+      sendMessage(
+        config,
+        {
+          cloudAgentSessionId: first.cloudAgentSessionId,
+          prompt: fakeDirective('echo:third'),
+          signal,
+        },
+        api
+      )
     );
 
-    const container = await requireContainer(sandbox, first, SANDBOX_TIMEOUT_MS);
-    if (container === null) return fail('new sandbox did not appear within 60s');
+    const container = await deadline.within('container', signal =>
+      sandbox.waitForContainer({
+        cloudAgentSessionId: first.cloudAgentSessionId,
+        kiloSessionId: first.kiloSessionId,
+        timeoutMs: Math.max(1, Math.min(CONTAINER_BUDGET_MS, deadline.remaining('container'))),
+        signal,
+      })
+    );
+    if (container === null) return fail('new sandbox did not appear');
 
     const thirdTerminal = await stream.waitFor(
       e =>
         messagePhase(e) !== null &&
         messagePhase(e) !== 'queued' &&
         messageIdFromEvent(e) === third.messageId,
-      timeoutMs
+      deadline.remaining('third terminal')
     );
     if (!thirdTerminal) {
       return fail(
-        `third message ${third.messageId} did not terminate within ${timeoutMs}ms (first=${first.messageId} second=${second.messageId})`
+        `third message ${third.messageId} did not terminate (first=${first.messageId} second=${second.messageId})`
       );
     }
 
@@ -285,21 +396,20 @@ async function queueRapidFireBody(
  * queue-overflow: drive the pending queue up to `PENDING_SESSION_MESSAGE_LIMIT`
  * (10) and assert the next enqueue fails with HTTP 429 (TOO_MANY_REQUESTS).
  *
- * Strategy: block the first message with `gate:overflow-<runId>` so it stays
- * active-but-busy in the wrapper, freeing the pending slot. Then enqueue up to
- * 20 echoes (pending → capacity), and assert a later one is rejected.
+ * Strategy: hold the first message on a running `slow:120:1000:16` turn so it
+ * stays active-but-busy in the wrapper, freeing the pending slot. Then enqueue
+ * echoes (pending → capacity) until the server rejects one, within a stated
+ * fill budget, and interrupt to clear the queue.
  */
 async function queueOverflowBody(
   args: LifecycleArgs,
-  env: ScenarioEnvironment,
-  owned: Set<string>
+  env: ScenarioEnvironment
 ): Promise<LifecycleResult> {
   const startedAt = Date.now();
-  const { config, conversation, timeoutMs = QUEUE_TIMEOUT_MS, api = 'unified' } = args;
+  const { config, conversation, timeoutMs = QUEUE_OVERFLOW_TIMEOUT_MS, api = 'unified' } = args;
   const scenarioName = 'queue-overflow';
   const sandbox = sessionSandboxObservation(env);
-  const gateTag = `overflow-${randomUUID()}`;
-  owned.add(gateTag);
+  const deadline = createScenarioDeadline(startedAt, timeoutMs);
   let stream: StreamConnection | undefined;
 
   const fail = (message: string): LifecycleResult => ({
@@ -312,33 +422,52 @@ async function queueOverflowBody(
   });
 
   try {
-    const gate = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
-    stream = openStream(config, gate.cloudAgentSessionId, { replay: false });
-
-    const container = await requireContainer(sandbox, gate, SANDBOX_TIMEOUT_MS);
-    if (container === null) return fail('sandbox did not appear');
-
-    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
-    if (!engaged) {
-      return fail(`gate:${gateTag} did not engage on fake LLM — queue slot remained occupied`);
-    }
+    const hold = await startPacedHold(
+      deadline,
+      config,
+      sandbox,
+      api,
+      'slow:120:1000:16',
+      scenarioName
+    );
+    stream = hold.stream;
+    const sessionId = hold.boot.cloudAgentSessionId;
 
     // Fill the queue until enqueue starts failing with 429. The limit is
     // server-enforced (PENDING_SESSION_MESSAGE_LIMIT); the exact boundary
-    // depends on whether the gate counts toward it, so we just drain until
-    // we hit the wall rather than guessing the count.
+    // depends on whether the held turn counts toward it, so we just drain until
+    // we hit the wall rather than guessing the count. Each fill call is bounded
+    // by the remaining fill budget, the whole loop leaves the scenario deadline
+    // room for the interrupt and drain below, and a rejection observed after the
+    // budget is not accepted as evidence.
+    const fillBudget = Math.max(
+      500,
+      Math.min(FILL_BUDGET_MS, deadline.remaining('fill budget') - 2_000)
+    );
+    const fillDeadlineAt = Date.now() + fillBudget;
     const queuedIds: string[] = [];
     let overflowOk = false;
-    let overflowMessage = 'no 429 within 20 attempts';
+    let overflowMessage = `no 429 within ${fillBudget}ms fill budget`;
     for (let i = 0; i < 20; i++) {
+      const fillRemaining = fillDeadlineAt - Date.now();
+      if (fillRemaining <= 0) {
+        overflowMessage = `no 429 within ${fillBudget}ms fill budget (${queuedIds.length} queued)`;
+        break;
+      }
       try {
-        const ack = await sendMessage(
-          config,
-          {
-            cloudAgentSessionId: gate.cloudAgentSessionId,
-            prompt: fakeDirective(`echo:q${i}`),
-          },
-          api
+        const ack = await deadline.within(
+          `fill-${i}`,
+          signal =>
+            sendMessage(
+              config,
+              {
+                cloudAgentSessionId: sessionId,
+                prompt: fakeDirective(`echo:q${i}`),
+                signal,
+              },
+              api
+            ),
+          fillRemaining
         );
         if (ack.delivery !== 'queued') {
           return fail(`fill-${i}: expected delivery=queued, got ${ack.delivery}`);
@@ -348,6 +477,10 @@ async function queueOverflowBody(
         const msg = errorMessage(err);
         const is429 = msg.includes('429') || /TOO_MANY_REQUESTS|PENDING_QUEUE_FULL/.test(msg);
         if (!is429) throw err;
+        if (Date.now() > fillDeadlineAt) {
+          overflowMessage = `queue rejection observed after the ${fillBudget}ms fill budget`;
+          break;
+        }
         overflowOk = true;
         overflowMessage = `filled ${queuedIds.length} before rejection: ${msg.split('—').slice(-1)[0]?.trim() ?? '429'}`;
         break;
@@ -358,7 +491,7 @@ async function queueOverflowBody(
     // outlive this row and keep sandbox retry work active while later smoke cases
     // are cold-starting. The interrupt path is already responsible for clearing
     // queued messages, so wait for those durable failure events before returning.
-    await interruptSession(config, gate.cloudAgentSessionId);
+    await deadline.within('interrupt', signal => interruptSession(config, sessionId, signal));
     const activeStream = stream;
     const queuedFailures = await Promise.all(
       queuedIds.map(messageId =>
@@ -366,7 +499,7 @@ async function queueOverflowBody(
           event =>
             event.streamEventType === 'cloud.message.failed' &&
             messageIdFromEvent(event) === messageId,
-          timeoutMs
+          deadline.remaining(`queued failure ${messageId}`)
         )
       )
     );
@@ -381,7 +514,7 @@ async function queueOverflowBody(
       ok: overflowOk && queueCleared,
       message: overflowOk
         ? `${overflowMessage}; cleanup=${queueCleared ? 'cleared' : 'timed out'}`
-        : `expected queue rejection within 20 attempts; got: ${overflowMessage}`,
+        : `expected queue rejection within fill budget; got: ${overflowMessage}`,
       events,
       durationMs: Date.now() - startedAt,
     };
@@ -397,25 +530,19 @@ async function queueOverflowBody(
 }
 
 /**
- * queue-interrupt-clears: enqueue messages behind an active turn, fire
+ * queue-interrupt-clears: enqueue messages behind a running paced turn, fire
  * `interruptSession`, assert all queued messages surface
  * `cloud.message.failed` with `reason: 'interrupted'` and `delivery: 'queued'`.
- *
- * The gate is not released directly — the interrupt itself terminates the
- * gated turn on the wrapper side. The owned-tag wrapper releases it if the
- * fake's gated request is still parked.
  */
 async function queueInterruptClearsBody(
   args: LifecycleArgs,
-  env: ScenarioEnvironment,
-  owned: Set<string>
+  env: ScenarioEnvironment
 ): Promise<LifecycleResult> {
   const startedAt = Date.now();
   const { config, conversation, timeoutMs = INTERRUPT_CLEARS_TIMEOUT_MS, api = 'unified' } = args;
   const scenarioName = 'queue-interrupt-clears';
   const sandbox = sessionSandboxObservation(env);
-  const gateTag = `intgate-${randomUUID()}`;
-  owned.add(gateTag);
+  const deadline = createScenarioDeadline(startedAt, timeoutMs);
   let stream: StreamConnection | undefined;
 
   const fail = (message: string): LifecycleResult => ({
@@ -428,40 +555,50 @@ async function queueInterruptClearsBody(
   });
 
   try {
-    const gate = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
-    stream = openStream(config, gate.cloudAgentSessionId, { replay: false });
+    const hold = await startPacedHold(
+      deadline,
+      config,
+      sandbox,
+      api,
+      'slow:60:1000:16',
+      scenarioName
+    );
+    stream = hold.stream;
+    const sessionId = hold.boot.cloudAgentSessionId;
 
-    const container = await requireContainer(sandbox, gate, SANDBOX_TIMEOUT_MS);
-    if (container === null) return fail('sandbox did not appear');
+    const second = await deadline.within('second send', signal =>
+      sendMessage(
+        config,
+        { cloudAgentSessionId: sessionId, prompt: fakeDirective('echo:second'), signal },
+        api
+      )
+    );
+    const third = await deadline.within('third send', signal =>
+      sendMessage(
+        config,
+        { cloudAgentSessionId: sessionId, prompt: fakeDirective('echo:third'), signal },
+        api
+      )
+    );
 
-    const engaged = await waitForGateEngaged(config, gateTag, 120_000);
-    if (!engaged) {
-      return fail(`gate:${gateTag} did not engage on fake LLM`);
+    if (second.delivery !== 'queued' || third.delivery !== 'queued') {
+      return fail(
+        `expected delivery=queued for both follow-ups; got second=${second.delivery}, third=${third.delivery}`
+      );
     }
 
-    const second = await sendMessage(
-      config,
-      { cloudAgentSessionId: gate.cloudAgentSessionId, prompt: fakeDirective('echo:second') },
-      api
-    );
-    const third = await sendMessage(
-      config,
-      { cloudAgentSessionId: gate.cloudAgentSessionId, prompt: fakeDirective('echo:third') },
-      api
-    );
-
-    await interruptSession(config, gate.cloudAgentSessionId);
+    await deadline.within('interrupt', signal => interruptSession(config, sessionId, signal));
 
     // Expect cloud.message.failed for both queued follow-ups.
     const secondFailed = await stream.waitFor(
       e =>
         e.streamEventType === 'cloud.message.failed' && messageIdFromEvent(e) === second.messageId,
-      timeoutMs
+      deadline.remaining('second failure')
     );
     const thirdFailed = await stream.waitFor(
       e =>
         e.streamEventType === 'cloud.message.failed' && messageIdFromEvent(e) === third.messageId,
-      timeoutMs
+      deadline.remaining('third failure')
     );
 
     const events = [...stream.events];
@@ -508,21 +645,14 @@ async function queueInterruptClearsBody(
  */
 async function interruptMidStreamBody(
   args: LifecycleArgs,
-  env: ScenarioEnvironment,
-  owned: Set<string>
+  env: ScenarioEnvironment
 ): Promise<LifecycleResult> {
   const startedAt = Date.now();
-  const {
-    config,
-    conversation,
-    timeoutMs = INTERRUPT_MID_STREAM_TIMEOUT_MS,
-    api = 'unified',
-  } = args;
+  const { config, conversation, timeoutMs = INTERRUPT_MID_STREAM_TIMEOUT_MS, api = 'unified' } =
+    args;
   const scenarioName = 'interrupt-mid-stream';
   const sandbox = sessionSandboxObservation(env);
-  const gateTag = `intactive-${randomUUID()}`;
-  owned.add(gateTag);
-  const deadlineAt = startedAt + timeoutMs;
+  const deadline = createScenarioDeadline(startedAt, timeoutMs);
   let stream: StreamConnection | undefined;
 
   const fail = (message: string): LifecycleResult => ({
@@ -535,34 +665,29 @@ async function interruptMidStreamBody(
   });
 
   try {
-    const session = await startSession(config, { prompt: fakeDirective(`gate:${gateTag}`) }, api);
-    stream = openStream(config, session.cloudAgentSessionId, { replay: false });
-
-    const container = await requireContainer(sandbox, session, SANDBOX_TIMEOUT_MS);
-    if (container === null) return fail('sandbox did not appear');
-
-    // Pass this message's id so a `cloud.message.failed` received during
-    // sandbox discovery (before this wait) still fails fast instead of being
-    // missed by the gate window.
-    await requireWorktreeGate(
+    const hold = await startPacedHold(
+      deadline,
       config,
-      gateTag,
-      Math.max(1, deadlineAt - Date.now()),
-      stream,
-      session.messageId
+      sandbox,
+      api,
+      'slow:90:1000:16',
+      scenarioName
     );
+    stream = hold.stream;
+    const sessionId = hold.boot.cloudAgentSessionId;
 
-    await interruptSession(config, session.cloudAgentSessionId);
+    await deadline.within('interrupt', signal => interruptSession(config, sessionId, signal));
 
     const failed = await stream.waitFor(
       e =>
-        e.streamEventType === 'cloud.message.failed' && messageIdFromEvent(e) === session.messageId,
-      timeoutMs
+        e.streamEventType === 'cloud.message.failed' &&
+        messageIdFromEvent(e) === hold.held.messageId,
+      deadline.remaining('active failure')
     );
     const events = [...stream.events];
 
     if (!failed) {
-      return fail(`no cloud.message.failed for active message within ${timeoutMs}ms`);
+      return fail(`no cloud.message.failed for active message ${hold.held.messageId}`);
     }
 
     const data = failed.data as
@@ -595,7 +720,7 @@ export async function runQueueWhileBusy(
   args: LifecycleArgs,
   env: ScenarioEnvironment
 ): Promise<LifecycleResult> {
-  return withOwnedGates('queue-while-busy', args, owned => queueWhileBusyBody(args, env, owned));
+  return queueWhileBusyBody(args, env);
 }
 
 export async function runQueueRapidFireNoGate(
@@ -609,25 +734,21 @@ export async function runQueueOverflow(
   args: LifecycleArgs,
   env: ScenarioEnvironment
 ): Promise<LifecycleResult> {
-  return withOwnedGates('queue-overflow', args, owned => queueOverflowBody(args, env, owned));
+  return queueOverflowBody(args, env);
 }
 
 export async function runQueueInterruptClears(
   args: LifecycleArgs,
   env: ScenarioEnvironment
 ): Promise<LifecycleResult> {
-  return withOwnedGates('queue-interrupt-clears', args, owned =>
-    queueInterruptClearsBody(args, env, owned)
-  );
+  return queueInterruptClearsBody(args, env);
 }
 
 export async function runInterruptMidStream(
   args: LifecycleArgs,
   env: ScenarioEnvironment
 ): Promise<LifecycleResult> {
-  return withOwnedGates('interrupt-mid-stream', args, owned =>
-    interruptMidStreamBody(args, env, owned)
-  );
+  return interruptMidStreamBody(args, env);
 }
 
 export const QUEUE_SHARED_SCENARIOS: Record<string, SharedScenario> = {
@@ -649,7 +770,7 @@ export const QUEUE_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     name: 'queue-overflow',
     requires: ['sessionSandbox'],
     defaultConversation: '_',
-    defaultTimeoutMs: QUEUE_TIMEOUT_MS,
+    defaultTimeoutMs: QUEUE_OVERFLOW_TIMEOUT_MS,
     run: runQueueOverflow,
   },
   'queue-interrupt-clears': {

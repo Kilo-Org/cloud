@@ -212,6 +212,53 @@ function coldEchoEvents(text: string): StreamEvent[] {
   ];
 }
 
+/**
+ * The minimum correlated-progress evidence `waitForPacedProgress` requires: a
+ * child assistant message under the paced user message and one part for it. The
+ * part is deliberately empty, matching the transient initialization part the
+ * predicate accepts.
+ */
+function pacedProgressEvents(parentMessageId: string): StreamEvent[] {
+  const childId = `${parentMessageId}_assistant`;
+  return [
+    assistantMessageEvent(parentMessageId, childId),
+    textPartEvent(`${parentMessageId}_part`, childId, ''),
+  ];
+}
+
+/**
+ * Arm the paced-hold mocks for the boot-then-hold shape: a fast warm-up start
+ * whose terminal completes, an increasing fake request counter (so the paced
+ * request is attributed), a `running` durable status for the hold, and one
+ * stream whose events show correlated progress for `heldMessageId` and whose
+ * terminal satisfies the warm-up `bootMessageId`.
+ */
+function installPacedHold(
+  bootMessageId: string,
+  heldMessageId: string,
+  extraEvents: StreamEvent[] = []
+): FakeStream {
+  let requests = 0;
+  mocks.fetchFakeRequests.mockImplementation(async () => ({ chatCompletions: ++requests }));
+  mocks.getMessageResult.mockResolvedValue({ status: 'running' });
+  mocks.startSession.mockReset();
+  mocks.startSession.mockResolvedValue({
+    cloudAgentSessionId: SESSION_ID,
+    kiloSessionId: KILO_SESSION_ID,
+    messageId: bootMessageId,
+    delivery: 'sent',
+  });
+  mocks.sendMessage.mockReset();
+  mocks.sendMessage.mockResolvedValueOnce({ messageId: heldMessageId, delivery: 'sent' });
+  const stream = fakeStream(
+    [...pacedProgressEvents(heldMessageId), ...extraEvents],
+    completedEvent(bootMessageId)
+  );
+  mocks.openConnectedStream.mockReset();
+  mocks.openConnectedStream.mockResolvedValue(stream);
+  return stream;
+}
+
 type FakeStream = StreamConnection & {
   close: ReturnType<typeof vi.fn>;
   waitForTerminal: ReturnType<typeof vi.fn>;
@@ -1278,7 +1325,7 @@ describe('auth-reject scenario', () => {
 });
 
 describe('moved streaming and failure scenarios', () => {
-  const names = ['chunked-streaming', 'empty-response', 'waiters-clean', 'llm-error'];
+  const names = ['chunked-streaming', 'empty-response', 'llm-error'];
 
   it.each(names)('%s is admitted through the sessionSandbox capability', async name => {
     const { SHARED_SCENARIOS } = await import('../../e2e/scenarios-shared.js');
@@ -1430,9 +1477,10 @@ describe('callback scenario behaviour under both profiles', () => {
   const profiles = ['local', 'local-http'] as const;
 
   beforeEach(() => {
-    mocks.releaseGate.mockResolvedValue(undefined);
-    mocks.waitForGateEngaged.mockResolvedValue(true);
-    mocks.gateEngagementDetail.mockResolvedValue('gate did not engage');
+    let requests = 0;
+    mocks.fetchFakeRequests.mockImplementation(async () => ({ chatCompletions: ++requests }));
+    mocks.getMessageResult.mockResolvedValue({ status: 'running' });
+    mocks.openConnectedStream.mockReset();
   });
 
   function fakeSessionSandbox(): SessionSandboxObservation {
@@ -1496,6 +1544,46 @@ describe('callback scenario behaviour under both profiles', () => {
       messageId,
       delivery: 'sent',
     });
+  }
+
+  /**
+   * Arm the callback boot-then-hold mocks: a fast warm-up start whose terminal
+   * completes, an increasing fake request counter, a `running` hold, and one
+   * stream carrying correlated progress for the held message. The held turn is
+   * the first `sendMessage` once-value.
+   */
+  function installCallbackPacedHold(
+    bootMessageId: string,
+    heldMessageId: string,
+    extraEvents: StreamEvent[] = []
+  ): FakeStream {
+    let requests = 0;
+    mocks.fetchFakeRequests.mockImplementation(async () => ({ chatCompletions: ++requests }));
+    mocks.getMessageResult.mockResolvedValue({ status: 'running' });
+    mocks.startSession.mockResolvedValue({
+      cloudAgentSessionId: SESSION_ID,
+      kiloSessionId: KILO_SESSION_ID,
+      messageId: bootMessageId,
+      delivery: 'sent',
+    });
+    mocks.sendMessage.mockReset();
+    mocks.sendMessage.mockResolvedValueOnce({ messageId: heldMessageId, delivery: 'sent' });
+    const stream = fakeStream(
+      [...pacedProgressEvents(heldMessageId), ...extraEvents],
+      completedEvent(bootMessageId)
+    );
+    mocks.openConnectedStream.mockReset();
+    mocks.openConnectedStream.mockResolvedValue(stream);
+    return stream;
+  }
+
+  function bootCallback(bootMessageId: string): CallbackPayload {
+    return {
+      cloudAgentSessionId: SESSION_ID,
+      messageId: bootMessageId,
+      status: 'completed',
+      lastAssistantMessageText: 'warmup',
+    };
   }
 
   it.each(profiles)('callback-completion passes in the %s profile', async profile => {
@@ -1579,11 +1667,8 @@ describe('callback scenario behaviour under both profiles', () => {
 
   it.each(profiles)('callback-interrupt passes in the %s profile', async profile => {
     const sink = fakeCallbackSink();
-    startCallbackSession('message_interrupt');
-    mocks.openStream.mockReturnValue(
-      fakeStream([], streamEvent('interrupted', { messageId: 'message_interrupt' }))
-    );
-    mocks.waitForGateEngaged.mockResolvedValue(true);
+    installCallbackPacedHold('message_boot', 'message_interrupt');
+    sink.push(bootCallback('message_boot'));
     sink.push({
       cloudAgentSessionId: SESSION_ID,
       messageId: 'message_interrupt',
@@ -1599,43 +1684,55 @@ describe('callback scenario behaviour under both profiles', () => {
 
     expect(result.ok).toBe(true);
     expect(result.message).toContain('status=interrupted');
-    expect(mocks.interruptSession).toHaveBeenCalledWith(config, SESSION_ID);
-    expect(mocks.releaseGate).toHaveBeenCalled();
+    expect(mocks.interruptSession).toHaveBeenCalledWith(config, SESSION_ID, expect.any(AbortSignal));
+    expect(mocks.releaseGate).not.toHaveBeenCalled();
   });
 
-  it('callback-interrupt interrupts the created session when the gate never engages', async () => {
+  it('callback-interrupt interrupts the created session when paced readiness never holds', async () => {
     const sink = fakeCallbackSink();
-    startCallbackSession('message_interrupt');
-    mocks.openStream.mockReturnValue(fakeStream([], completedEvent('message_interrupt')));
-    mocks.waitForGateEngaged.mockResolvedValue(false);
-    mocks.gateEngagementDetail.mockResolvedValue('gate:callback-interrupt did not engage');
+    installCallbackPacedHold('message_boot', 'message_interrupt');
+    sink.push(bootCallback('message_boot'));
+    // Correlated progress is present, but the fake request counter never
+    // increases, so the bounded paced-progress wait must time out.
+    mocks.fetchFakeRequests.mockResolvedValue({ chatCompletions: 3 });
 
     const result = await runSharedScenario(SHARED_SCENARIOS['callback-interrupt'], {
       config,
       conversation: '_',
       api: 'legacy',
+      timeoutMs: 2_000,
       env: callbackEnvironment('local-http', sink.observation, fakeSessionSandbox()),
     });
 
     expect(result.ok).toBe(false);
-    expect(result.message).toBe('gate:callback-interrupt did not engage');
-    expect(mocks.interruptSession).toHaveBeenCalledWith(config, SESSION_ID);
-    expect(mocks.releaseGate).toHaveBeenCalled();
-  });
+    expect(result.message).toContain('paced progress');
+    expect(mocks.interruptSession).toHaveBeenCalledWith(config, SESSION_ID, expect.any(AbortSignal));
+    expect(mocks.releaseGate).not.toHaveBeenCalled();
+  }, 15_000);
 
   it.each(profiles)(
     'callback-batch-followup passes in the %s profile',
     async profile => {
       const sink = fakeCallbackSink();
-      startCallbackSession('message_first');
-      sink.push({
-        cloudAgentSessionId: SESSION_ID,
-        messageId: 'message_third',
-        status: 'completed',
-        lastAssistantMessageText: 'third',
-      });
-      mocks.sendMessage.mockImplementation(async (_config, args: { prompt: string }) => {
-        if (args.prompt.includes('after-batch')) {
+      installCallbackPacedHold('message_boot', 'message_first', [
+        completedEvent('message_third'),
+        completedEvent('message_after'),
+      ]);
+      sink.push(bootCallback('message_boot'));
+      // The batch callbacks appear only when their turns are sent, so the
+      // helper's post-warm-up baseline cannot include them.
+      mocks.sendMessage
+        .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'queued' })
+        .mockImplementationOnce(async () => {
+          sink.push({
+            cloudAgentSessionId: SESSION_ID,
+            messageId: 'message_third',
+            status: 'completed',
+            lastAssistantMessageText: 'third',
+          });
+          return { messageId: 'message_third', delivery: 'queued' as const };
+        })
+        .mockImplementationOnce(async () => {
           sink.push({
             cloudAgentSessionId: SESSION_ID,
             messageId: 'message_after',
@@ -1643,22 +1740,7 @@ describe('callback scenario behaviour under both profiles', () => {
             lastAssistantMessageText: 'after-batch',
           });
           return { messageId: 'message_after', delivery: 'sent' as const };
-        }
-        if (args.prompt.includes('second')) {
-          return { messageId: 'message_second', delivery: 'queued' as const };
-        }
-        if (args.prompt.includes('third')) {
-          return { messageId: 'message_third', delivery: 'queued' as const };
-        }
-        throw new Error(`unexpected sendMessage prompt: ${args.prompt}`);
-      });
-      mocks.openStream.mockReturnValue(
-        fakeStream(
-          [completedEvent('message_third'), completedEvent('message_after')],
-          completedEvent('message_first')
-        )
-      );
-      mocks.waitForGateEngaged.mockResolvedValue(true);
+        });
 
       const result = await runSharedScenario(SHARED_SCENARIOS['callback-batch-followup'], {
         config,
@@ -1670,11 +1752,13 @@ describe('callback scenario behaviour under both profiles', () => {
       expect(result.ok).toBe(true);
       expect(result.message).toContain('message_third -> message_after');
       expect(mocks.interruptSession).not.toHaveBeenCalled();
+      expect(mocks.releaseGate).not.toHaveBeenCalled();
     },
     15_000
   );
 
   it('callback-batch-followup rejects a callback that arrives during the quiet window', async () => {
+    const boot = bootCallback('message_boot');
     const third: CallbackPayload = {
       cloudAgentSessionId: SESSION_ID,
       messageId: 'message_third',
@@ -1693,36 +1777,33 @@ describe('callback scenario behaviour under both profiles', () => {
       status: 'completed',
       lastAssistantMessageText: 'extra',
     };
-    // Call 1 validates the queued batch, call 2 the sequential pair, call 3 is
-    // the quiet probe. The old body re-read the count at call 3 as its
-    // baseline, so the extra record hid itself; the validated baseline of two
-    // must reject it.
+    // Call 1 is the post-warm-up baseline, call 2 validates the queued batch,
+    // call 3 the sequential pair, call 4 is the quiet probe. The old body
+    // re-read the count at the quiet probe as its baseline, so the extra record
+    // hid itself; the validated baseline of baseline+2 must reject it.
     let recordsCalls = 0;
     const observation: CallbackObservation = {
       open: async () => ({
         callbackUrl: 'https://sink.example.test/cb',
         records: async () => {
           recordsCalls += 1;
-          if (recordsCalls === 1) return [third];
-          if (recordsCalls === 2) return [third, after];
-          return [third, after, extra];
+          if (recordsCalls === 1) return [boot];
+          if (recordsCalls === 2) return [boot, third];
+          if (recordsCalls === 3) return [boot, third, after];
+          return [boot, third, after, extra];
         },
-        waitFor: async predicate => [third, after].find(predicate) ?? null,
+        waitFor: async predicate => [boot, third, after].find(predicate) ?? null,
         close: async () => {},
       }),
     };
-    startCallbackSession('message_first');
+    installCallbackPacedHold('message_boot', 'message_first', [
+      completedEvent('message_third'),
+      completedEvent('message_after'),
+    ]);
     mocks.sendMessage
       .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'queued' })
       .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'queued' })
       .mockResolvedValueOnce({ messageId: 'message_after', delivery: 'sent' });
-    mocks.openStream.mockReturnValue(
-      fakeStream(
-        [completedEvent('message_third'), completedEvent('message_after')],
-        completedEvent('message_first')
-      )
-    );
-    mocks.waitForGateEngaged.mockResolvedValue(true);
 
     const result = await runSharedScenario(SHARED_SCENARIOS['callback-batch-followup'], {
       config,
@@ -1745,9 +1826,9 @@ describe('moved queue, micro, and continuity scenarios', () => {
     'queue-interrupt-clears',
     'interrupt-mid-stream',
     'interrupt-then-continue',
+    'question-idle-resume',
     'cold',
     'hot',
-    'followup',
   ];
 
   it.each(names)('%s is admitted through the sessionSandbox capability', name => {
@@ -1755,6 +1836,46 @@ describe('moved queue, micro, and continuity scenarios', () => {
     expect(definition).toBeDefined();
     expect(definition?.name).toBe(name);
     expect(definition?.requires).toEqual(['sessionSandbox']);
+  });
+});
+
+describe('converted load and fault scenarios', () => {
+  it('large-stream and concurrent-chats require only sessionSandbox', () => {
+    for (const name of ['large-stream', 'concurrent-chats']) {
+      expect(SHARED_SCENARIOS[name]?.requires).toEqual(['sessionSandbox']);
+      expect(SHARED_SCENARIOS[name]?.requiresWorktreeCreation).toBe(true);
+    }
+  });
+
+  it('kill-mid-flight requires sessionSandbox + sandboxFaults + gates', () => {
+    expect(SHARED_SCENARIOS['kill-mid-flight']?.requires).toEqual([
+      'sessionSandbox',
+      'sandboxFaults',
+      'gates',
+    ]);
+  });
+
+  it('the other fault scenarios require sessionSandbox + sandboxFaults', () => {
+    for (const name of [
+      'external-kill',
+      'wrapper-freeze-settled-reap',
+      'wrapper-freeze-inflight-reap',
+    ]) {
+      expect(SHARED_SCENARIOS[name]?.requires).toEqual(['sessionSandbox', 'sandboxFaults']);
+      expect(SHARED_SCENARIOS[name]?.requiresWorktreeCreation).toBe(true);
+    }
+  });
+
+  it('fault scenarios are unsupported without an injected sandboxFaults capability', async () => {
+    const result = await runSharedScenario(SHARED_SCENARIOS['external-kill'], {
+      config,
+      conversation: SHARED_SCENARIOS['external-kill'].defaultConversation,
+      api: 'unified',
+      env: deployedEnvironment(),
+    });
+    expect(result.ok).toBe(false);
+    expect(result.unsupported).toBe(true);
+    expect(result.message).toContain('sandboxFaults');
   });
 });
 
@@ -1816,94 +1937,46 @@ function interruptedQueuedEvent(messageId: string): StreamEvent {
 }
 
 describe('moved queue scenario run isolation', () => {
-  beforeEach(() => {
-    mocks.waitForGateEngaged.mockResolvedValue(false);
-    mocks.gateEngagementDetail.mockResolvedValue('gate did not engage');
-    mocks.releaseGate.mockResolvedValue(undefined);
-  });
-
-  it('uses a run-scoped overflow tag and releases it on the failure path', async () => {
-    startQueueSession('message_gate');
-    mocks.openStream.mockReturnValue(fakeStream([], completedEvent('message_gate')));
+  it('queue-overflow boots before the hold and never touches the gate registry', async () => {
+    installPacedHold('message_boot', 'message_held');
+    mocks.sendMessage.mockResolvedValue({ messageId: 'message_q', delivery: 'queued' });
 
     const result = await runSharedScenario(SHARED_SCENARIOS['queue-overflow'], {
       config,
       conversation: '_',
       api: 'unified',
+      timeoutMs: 4_000,
       env: queueHttpEnvironment(),
     });
 
     expect(result.ok).toBe(false);
-    const tag = result.message.match(/overflow-[0-9a-f-]{36}/)?.[0];
-    expect(tag).toBeDefined();
-    expect(mocks.releaseGate).toHaveBeenCalledWith(config.fakeLlmUrl, tag, expect.any(AbortSignal));
-  });
+    expect(result.message).toContain('queue rejection');
+    expect(mocks.releaseGate).not.toHaveBeenCalled();
+    expect(mocks.waitForGateEngaged).not.toHaveBeenCalled();
+  }, 15_000);
 
-  it('uses a run-scoped intgate tag and releases it on the failure path', async () => {
-    startQueueSession('message_gate');
-    mocks.openStream.mockReturnValue(fakeStream([], completedEvent('message_gate')));
-
-    const result = await runSharedScenario(SHARED_SCENARIOS['queue-interrupt-clears'], {
-      config,
-      conversation: '_',
-      api: 'unified',
-      env: queueHttpEnvironment(),
-    });
-
-    expect(result.ok).toBe(false);
-    const tag = result.message.match(/intgate-[0-9a-f-]{36}/)?.[0];
-    expect(tag).toBeDefined();
-    expect(mocks.releaseGate).toHaveBeenCalledWith(config.fakeLlmUrl, tag, expect.any(AbortSignal));
-  });
-});
-
-describe('owned gate leak detection', () => {
-  function installInterruptClearsSuccess(): void {
-    startQueueSession('message_gate');
-    mocks.waitForGateEngaged.mockResolvedValue(true);
+  it('queue-interrupt-clears boots before the hold and never touches the gate registry', async () => {
+    installPacedHold('message_boot', 'message_held', [
+      interruptedQueuedEvent('message_second'),
+      interruptedQueuedEvent('message_third'),
+    ]);
     mocks.sendMessage
       .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'queued' })
       .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'queued' });
-    mocks.openStream.mockReturnValue(
-      fakeStream(
-        [interruptedQueuedEvent('message_second'), interruptedQueuedEvent('message_third')],
-        completedEvent('message_gate')
-      )
-    );
-    mocks.interruptSession.mockResolvedValue({ success: true });
-  }
-
-  it('fails a scenario that cannot release a tag it still owns', async () => {
-    installInterruptClearsSuccess();
-    mocks.releaseGate.mockRejectedValue(
-      new Error('releaseGate(intgate-x) failed: 500 Internal Server Error')
-    );
 
     const result = await runSharedScenario(SHARED_SCENARIOS['queue-interrupt-clears'], {
       config,
       conversation: '_',
       api: 'unified',
-      env: queueHttpEnvironment(),
-    });
-
-    expect(result.ok).toBe(false);
-    expect(result.message).toContain('ownedGateLeak');
-  });
-
-  it('treats a release 404 as already released, not a leak', async () => {
-    installInterruptClearsSuccess();
-    mocks.releaseGate.mockRejectedValue(new Error('releaseGate(intgate-x) failed: 404 Not Found'));
-
-    const result = await runSharedScenario(SHARED_SCENARIOS['queue-interrupt-clears'], {
-      config,
-      conversation: '_',
-      api: 'unified',
+      timeoutMs: 5_000,
       env: queueHttpEnvironment(),
     });
 
     expect(result.ok).toBe(true);
-    expect(result.message).not.toContain('ownedGateLeak');
-  });
+    expect(result.message).toContain('second=ok, third=ok');
+    expect(mocks.releaseGate).not.toHaveBeenCalled();
+    expect(mocks.waitForGateEngaged).not.toHaveBeenCalled();
+  }, 15_000);
 });
 
 describe('moved micro scenarios', () => {
@@ -2053,9 +2126,8 @@ describe('moved continuity scenario run isolation', () => {
 
   /**
    * The scenario generates its run id internally, so the boot stream has to be
-   * built from the marker the prepare prompt actually carried. Without this the
-   * restored boot-text assertion cannot pass and the test would not reach the
-   * interrupt.
+   * built from the marker the prepare prompt actually carried. The paced turn
+   * must report `running`; every other durable read is `completed`.
    */
   function installContinuityBoot(): void {
     bootMarker = undefined;
@@ -2069,7 +2141,11 @@ describe('moved continuity scenario run isolation', () => {
       initialMessageId: 'message_boot',
       sandboxId: 'sandbox_boot',
     });
-    mocks.getMessageResult.mockResolvedValue({ status: 'completed' });
+    mocks.getMessageResult.mockImplementation(
+      async (_config: unknown, _sessionId: unknown, messageId: string) => ({
+        status: messageId === 'message_paced' ? 'running' : 'completed',
+      })
+    );
     mocks.openConnectedStream.mockImplementationOnce(async () => {
       if (!bootMarker) throw new Error('prepare did not run before the boot stream');
       return fakeStream(
@@ -2087,38 +2163,16 @@ describe('moved continuity scenario run isolation', () => {
     });
   }
 
-  it('uses a run-scoped interrupt tag and releases it when the gate never engages', async () => {
+  it('holds a running paced turn, interrupts it, and completes a follow-up without gates', async () => {
     installContinuityBoot();
-    mocks.openConnectedStream.mockResolvedValueOnce(fakeStream([], completedEvent('message_gate')));
-    mocks.sendMessage.mockResolvedValue({ messageId: 'message_gate', delivery: 'sent' });
-    mocks.waitForGateEngaged.mockResolvedValue(false);
-    mocks.fetchFakeScenarioStatus.mockResolvedValue({
-      unsupportedToolSchema: false,
-      requests: 1,
-      toolCalls: { write: 1, read: 0, edit: 0, question: 0 },
-      toolResults: { write: 0, read: 0, edit: 0, question: 0 },
-    });
-    mocks.releaseGate.mockResolvedValue(undefined);
-
-    const result = await runSharedScenario(SHARED_SCENARIOS['interrupt-then-continue'], {
-      config,
-      conversation: '_',
-      api: 'unified',
-      timeoutMs: 300,
-      env: queueHttpEnvironment(),
-    });
-
-    expect(result.ok).toBe(false);
-    const tag = result.message.match(/interrupt-[0-9a-f-]{36}/)?.[0];
-    expect(tag).toBeDefined();
-    expect(mocks.releaseGate).toHaveBeenCalledWith(config.fakeLlmUrl, tag, expect.any(AbortSignal));
-  }, 15_000);
-
-  it('fails when interrupt and follow-up succeed but the release leaves the gate parked', async () => {
-    installContinuityBoot();
+    let requests = 0;
+    mocks.fetchFakeRequests.mockImplementation(async () => ({ chatCompletions: ++requests }));
     mocks.openConnectedStream
       .mockResolvedValueOnce(
-        fakeStream([interruptedFailedEvent('message_gate')], completedEvent('message_gate'))
+        fakeStream(
+          [...pacedProgressEvents('message_paced'), interruptedFailedEvent('message_paced')],
+          completedEvent('message_paced')
+        )
       )
       .mockResolvedValueOnce(
         fakeStream(
@@ -2131,12 +2185,33 @@ describe('moved continuity scenario run isolation', () => {
         )
       );
     mocks.sendMessage
-      .mockResolvedValueOnce({ messageId: 'message_gate', delivery: 'sent' })
+      .mockResolvedValueOnce({ messageId: 'message_paced', delivery: 'sent' })
       .mockResolvedValueOnce({ messageId: 'message_followup', delivery: 'sent' });
-    mocks.waitForGateEngaged.mockResolvedValue(true);
-    mocks.releaseGate.mockRejectedValue(
-      new Error('releaseGate(interrupt-x) failed: 500 Internal Server Error')
+
+    const result = await runSharedScenario(SHARED_SCENARIOS['interrupt-then-continue'], {
+      config,
+      conversation: '_',
+      api: 'unified',
+      timeoutMs: 15_000,
+      env: queueHttpEnvironment(),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('sameContainer=true');
+    expect(mocks.interruptSession).toHaveBeenCalledWith(
+      config,
+      SESSION_ID,
+      expect.any(AbortSignal)
     );
+    expect(mocks.releaseGate).not.toHaveBeenCalled();
+    expect(mocks.waitForGateEngaged).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it('fails when paced readiness never holds and still interrupts the created session', async () => {
+    installContinuityBoot();
+    mocks.fetchFakeRequests.mockResolvedValue({ chatCompletions: 3 });
+    mocks.openConnectedStream.mockResolvedValueOnce(fakeStream([], completedEvent('message_paced')));
+    mocks.sendMessage.mockResolvedValue({ messageId: 'message_paced', delivery: 'sent' });
 
     const result = await runSharedScenario(SHARED_SCENARIOS['interrupt-then-continue'], {
       config,
@@ -2147,11 +2222,12 @@ describe('moved continuity scenario run isolation', () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('ownedGateLeak');
-    // The interrupt and the follow-up both ran; only the release failed.
-    expect(mocks.sendMessage).toHaveBeenCalledTimes(2);
-    const tag = result.message.match(/interrupt-[0-9a-f-]{36}/)?.[0];
-    expect(tag).toBeDefined();
-    expect(mocks.releaseGate).toHaveBeenCalledWith(config.fakeLlmUrl, tag, expect.any(AbortSignal));
+    expect(result.message).toContain('paced progress');
+    expect(mocks.interruptSession).toHaveBeenCalledWith(
+      config,
+      SESSION_ID,
+      expect.any(AbortSignal)
+    );
+    expect(mocks.releaseGate).not.toHaveBeenCalled();
   }, 15_000);
 });

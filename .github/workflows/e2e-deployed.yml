@@ -27,7 +27,13 @@ concurrency:
 jobs:
   e2e-deployed:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # Derived from the shared registry, not guessed: the sum of every
+    # scenario's effective timeout -- its declared defaultTimeoutMs where
+    # present, otherwise the function's own default -- is 14,940,000 ms
+    # (249 min). The four sandboxFaults scenarios return unsupported immediately
+    # on this profile (~60 min of that budget), so the realistic ceiling is
+    # ~189 min. 300 min leaves ~20% headroom for cold starts and runner variance.
+    timeout-minutes: 300
     env:
       WORKER_URL: ${{ inputs.worker_url }}
       FAKE_LLM_URL: ${{ inputs.fake_llm_url }}

@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
     endImmediate: vi.fn(),
     startOrUpdate: vi.fn(),
   },
+  sweepStrayActivities: vi.fn(),
+  appStateListeners: new Set<(state: string) => void>(),
   // The Home Screen widget's App Intent buttons (the timeline-patch sweep) and
   // the Live Activity's Approve control are two registrations with two
   // listeners, so both modules are mocked here.
@@ -17,11 +19,19 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({
   Platform: mocks.platform,
-  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  AppState: {
+    addEventListener: (_type: string, listener: (state: string) => void) => {
+      mocks.appStateListeners.add(listener);
+      return { remove: () => mocks.appStateListeners.delete(listener) };
+    },
+  },
   PlatformColor: (name: string) => name,
 }));
 
-vi.mock('./ios-sink', () => ({ iosSink: mocks.iosSink }));
+vi.mock('./ios-sink', () => ({
+  iosSink: mocks.iosSink,
+  sweepStrayActivities: mocks.sweepStrayActivities,
+}));
 vi.mock('./adopt-activity', () => ({ adoptPushStartedActivity: vi.fn() }));
 vi.mock('./active-agents-live-activity', () => ({
   refreshActiveAgentsLiveActivityCopy: vi.fn(),
@@ -49,6 +59,7 @@ describe('glanceable-ios register', () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mocks.appStateListeners.clear();
     mocks.registerWidgetActionHandling.mockClear();
   });
 
@@ -91,5 +102,22 @@ describe('glanceable-ios register', () => {
     expect(approve).toBeTypeOf('function');
     await approve?.();
     expect(mocks.approveFrontAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it('sweeps stray activities when the app returns to the foreground', async () => {
+    mocks.platform.OS = 'ios';
+    vi.resetModules();
+    await import('./register');
+
+    expect(mocks.appStateListeners.size).toBe(1);
+    for (const listener of mocks.appStateListeners) {
+      listener('background');
+    }
+    expect(mocks.sweepStrayActivities).not.toHaveBeenCalled();
+
+    for (const listener of mocks.appStateListeners) {
+      listener('active');
+    }
+    expect(mocks.sweepStrayActivities).toHaveBeenCalledTimes(1);
   });
 });

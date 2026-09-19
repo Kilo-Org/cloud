@@ -9,6 +9,7 @@ import {
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
 import { i18n } from '@/i18n';
+import { getLastGlanceableSnapshot } from '@/lib/glanceable/persist';
 import {
   getGlanceableDelivery,
   type GlanceableSink,
@@ -245,6 +246,58 @@ export function adoptNativeActivity(
   if (activity !== null) {
     getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
   }
+}
+
+/**
+ * True while the persisted snapshot can still own a card: present, not a
+ * terminal blank, and not past its expiry. An absent, signed-out, privacy, or
+ * expired snapshot owns nothing — those are the states a card outlives its
+ * owner in.
+ *
+ * Counts are deliberately not part of this: an empty snapshot may cover a card
+ * a push-to-start raised for a session this process has not seen yet, and
+ * ending that card would tear down a surface the server already holds a token
+ * for. The publisher retires it moments later if the work really is gone, so
+ * keeping it never leaves a stray behind.
+ */
+function snapshotOwnsSurface(snapshot: GlanceableAgentsSnapshot | null, now: number): boolean {
+  return (
+    snapshot !== null &&
+    snapshot.status !== 'signed_out' &&
+    snapshot.status !== 'privacy' &&
+    now < Date.parse(snapshot.expiresAt)
+  );
+}
+
+/**
+ * End every native card this launch cannot own, so at most one survives.
+ *
+ * The start path cannot hold the one-card invariant by itself: a card outlives
+ * the process that raised it. A session that ends while the app is suspended,
+ * an app replaced by a new build, or a killed process leaves a card that no
+ * `startOrUpdate` or `publish` of the next launch will ever look at, and
+ * ActivityKit keeps drawing it at the counts it held when it started. Native
+ * discovery (`getInstances(true)`) is the only source of truth for those, and
+ * nothing read it at launch or on foreground.
+ *
+ * Runs after the persisted snapshot is restored on launch (see
+ * `adoptPushStartedActivity`) and on every foreground (see `register.ts`).
+ * When no snapshot can own a surface — or when the in-app switch is off —
+ * every instance is ended at once. Otherwise the persisted work may own one
+ * card this process has not adopted yet, so the normal reconciliation adopts it
+ * and ends every other instance immediately.
+ */
+export function sweepStrayActivities(): void {
+  if (activityKitDeniedState) {
+    return;
+  }
+  if (!getLiveActivityEnabled() || !snapshotOwnsSurface(getLastGlanceableSnapshot(), Date.now())) {
+    // `endNow` reads native truth itself and cleans each instance's token, so a
+    // card this process never held is retired as thoroughly as its own.
+    void endNow();
+    return;
+  }
+  refreshActivity();
 }
 
 /** True once ActivityKit reported the surface unavailable (see slice psh for the alert). */

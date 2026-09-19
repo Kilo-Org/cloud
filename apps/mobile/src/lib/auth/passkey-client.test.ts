@@ -115,6 +115,15 @@ describe('classifyPasskeyError', () => {
     expect(classifyPasskeyError({ message: 'nocredentials' })).toBe('no-passkey');
   });
 
+  it.each(['name', 'message', 'code'])(
+    'classifies uppercase protocol errors in %s without locale-dependent casing',
+    field => {
+      expect(classifyPasskeyError({ [field]: 'NOCREDENTIALS' })).toBe('no-passkey');
+      expect(classifyPasskeyError({ [field]: 'NOTCONFIGURED' })).toBe('unsupported');
+      expect(classifyPasskeyError({ [field]: 'USERCANCELLED' })).toBe('cancelled');
+    }
+  );
+
   it('falls back to the generic failure for anything else', () => {
     expect(classifyPasskeyError(new Error('socket closed'))).toBe('failed');
     expect(classifyPasskeyError(undefined)).toBe('failed');

@@ -3230,5 +3230,8 @@
       "repositoryUnknown": "Nid yw Kilo'n adnabod {{repository}} fel ystorfa GitHub neu GitLab. Dewiswch ystorfa arall yn Kilo.",
       "repositoryUnsupported": "Ystorfa Bitbucket yw {{repository}} — Nid yw Dechrau asiant yn gallu ei defnyddio eto. Dewiswch ystorfa arall yn Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Agor y sesiwn ddiwethaf"
   }
 }

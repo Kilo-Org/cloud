@@ -3182,5 +3182,8 @@
       "repositoryUnknown": "Kilo neatpažįsta {{repository}} kaip GitHub ar GitLab saugyklos. Pasirink kitą saugyklą Kilo programoje.",
       "repositoryUnsupported": "{{repository}} yra Bitbucket saugykla — Paleisti agentą jos dar negali naudoti. Pasirink kitą saugyklą Kilo programoje."
     }
+  },
+  "launcher": {
+    "openLastSession": "Atidaryti paskutinę sesiją"
   }
 }

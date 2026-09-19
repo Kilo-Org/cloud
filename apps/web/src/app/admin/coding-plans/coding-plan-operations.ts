@@ -92,6 +92,52 @@ export function getExtendSubscriptionDialogCopy(userName: string): {
   };
 }
 
+export function getSwapCredentialDialogCopy(userName: string): {
+  title: string;
+  description: string;
+} {
+  return {
+    title: `Swap ${userName}'s credential?`,
+    description:
+      "Moves this subscription onto the next available credential from the pool and queues the current one for manual revocation. Billing, renewal dates, and status are unaffected, and the user doesn't need to do anything.",
+  };
+}
+
+export function getSwapCredentialCompleteToast(): string {
+  return 'Subscription moved to a new pooled credential.';
+}
+
+export function getReduceInventoryDialogCopy(planId: string): {
+  title: string;
+  description: string;
+} {
+  return {
+    title: `Queue ${planId} inventory for removal?`,
+    description:
+      'This will add the desired number of plans to the Pending Key Removal queue. After this, the admin must remove the key from the provider, and then mark the key as revoked',
+  };
+}
+
+export function canSubmitReduceCount(value: string, availableCount: number): boolean {
+  const count = Number(value);
+  return Number.isInteger(count) && count >= 1 && count <= availableCount;
+}
+
+export function getReduceInventoryCompleteToast(
+  queuedCount: number,
+  requestedCount: number,
+  upstreamPlanIds: readonly string[]
+): string {
+  if (queuedCount === 0) {
+    return 'No credentials were queued. They may have just been claimed by a subscription; refresh and try again.';
+  }
+  const idList = upstreamPlanIds.join(', ');
+  if (queuedCount < requestedCount) {
+    return `Queued ${queuedCount} of ${requestedCount} requested credentials for removal (the rest were claimed before queuing). Find them in Pending Key Rotation and deprovision using upstream plan IDs: ${idList}`;
+  }
+  return `Queued ${queuedCount} credential${queuedCount === 1 ? '' : 's'} for removal in Pending Key Rotation. Deprovision using upstream plan IDs: ${idList}`;
+}
+
 export type InsightsRangeDays = 7 | 14 | 30;
 
 export type AdminSubscriptionSummary = {

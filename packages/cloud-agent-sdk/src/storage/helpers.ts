@@ -29,16 +29,32 @@ function insertPartSorted(arr: Part[], part: Part): Part[] {
 }
 
 /**
- * Event time of the last applied update per stored part. The stored part object
- * is the identity both storage backends keep in their parts array, so the map
- * survives an in-place replace without polluting the serialized part.
+ * Ordering evidence of the last accepted update, carried on the stored part
+ * itself under a module-private symbol.
+ *
+ * It lives on the exact object the helper returns and puts into the parts
+ * array, so the evidence can never desynchronise from the part it describes —
+ * no side table keyed by object identity, and no shared module state. The
+ * property is non-enumerable and symbol-keyed, so it stays out of the
+ * serialized part, every `{ ...part }` copy and every `toEqual` comparison;
+ * only this module reads it.
  */
-const partUpdateTimes = new WeakMap<Part, number>();
+const PART_UPDATE_TIME = Symbol('partUpdateTime');
+
+type PartWithUpdateTime = Part & { [PART_UPDATE_TIME]?: number };
 
 function rememberPartUpdateTime(part: Part, eventTime: number | undefined): void {
-  if (eventTime !== undefined) {
-    partUpdateTimes.set(part, eventTime);
-  }
+  if (eventTime === undefined) return;
+  Object.defineProperty(part, PART_UPDATE_TIME, {
+    value: eventTime,
+    enumerable: false,
+    configurable: true,
+    writable: true,
+  });
+}
+
+function storedPartUpdateTime(part: Part): number | undefined {
+  return (part as PartWithUpdateTime)[PART_UPDATE_TIME];
 }
 
 function toolLifecycleRank(part: Part): number | null {
@@ -174,7 +190,7 @@ function upsertPartDroppingStaleSyntheticParts(
 
   if (idx >= 0) {
     const existing = filtered[idx];
-    const storedEventTime = existing === undefined ? undefined : partUpdateTimes.get(existing);
+    const storedEventTime = existing === undefined ? undefined : storedPartUpdateTime(existing);
     if (
       existing !== undefined &&
       isStaleToolLifecycleUpdate(existing, part, storedEventTime, eventTime)

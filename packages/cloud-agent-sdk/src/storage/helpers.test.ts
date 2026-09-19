@@ -201,6 +201,23 @@ describe('upsertPartDroppingStaleSyntheticParts', () => {
 });
 
 describe('tool part lifecycle ordering', () => {
+  test('carries its ordering evidence on the stored part, invisible to serialization', () => {
+    const arr = upsertPartDroppingStaleSyntheticParts([], makeToolPart('p-1', 'running'), 200);
+    const stored = arr[0];
+    expect(stored).toBeDefined();
+    // The evidence is a non-enumerable, symbol-keyed property of the stored
+    // part: it never reaches Object.keys, JSON, a spread copy or a structural
+    // comparison, so it cannot leak into a serialized or rendered part.
+    expect(Object.keys(stored ?? {}).sort()).toEqual(
+      ['callID', 'id', 'messageID', 'sessionID', 'state', 'tool', 'type'].sort()
+    );
+    expect(JSON.parse(JSON.stringify(stored))).toEqual(stored);
+    // A spread copy is a plain Part: the evidence is not enumerable, so it
+    // cannot be carried into a clone that a caller hands back to a backend.
+    const copy = { ...(stored as Part) };
+    expect(Object.getOwnPropertySymbols(copy)).toEqual([]);
+  });
+
   test('drops a terminal update whose event time predates the stored running update', () => {
     const arr = upsertPartDroppingStaleSyntheticParts([], makeToolPart('p-1', 'running'), 200);
     const result = upsertPartDroppingStaleSyntheticParts(

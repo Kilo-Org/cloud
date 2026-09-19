@@ -4,6 +4,9 @@ import { clearSessionAutoApprove } from '@/components/agents/session-auto-approv
 import { clearSessionGoalCollapseState } from '@/components/agents/session-goal-collapse';
 import { clearToolCardImageCache } from '@/components/agents/tool-card-image-cache';
 import { clearClipboardImages } from '@/lib/agent-attachments/clipboard-image';
+import { clearArtifactMirror } from '@/lib/artifacts/artifact-mirror';
+import { resetArtifactMirrorSyncState } from '@/lib/artifacts/artifact-mirror-sync';
+import { notifyArtifactsChanged } from '@/lib/artifacts/artifact-provider-native';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
@@ -86,28 +89,39 @@ function clearRecentPrsBestEffort(): void {
 /**
  * Clear the session-scoped local state that must not leak across an account
  * boundary: trusted hosts, confirmed markdown images, media caches, per-session
- * auto-approve and goal-disclosure flags, app-owned temp copies, the stored PR
- * recents, and the phone's own search index. Every member is best-effort; a
- * throw falls through to the caller's own sign-in/sign-out state reset. The
- * recents delete and the OS search clear are asynchronous and fired without
- * awaiting, so the function stays synchronous and never throws; a rejection is
- * reported through telemetry, and the signed-out-launch re-clear below retries
- * the index clear.
+ * auto-approve and goal-disclosure flags, the browsable artifact mirror,
+ * app-owned temp copies, the stored PR recents, and the phone's own search index.
+ * Every member is best-effort; one member's throw falls through to the members
+ * after it, and to the caller's own sign-in/sign-out state reset. The recents
+ * delete and OS search clear are fired without awaiting, so the function stays
+ * synchronous; a rejection is reported through telemetry, and the
+ * signed-out-launch re-clear retries the index clear.
  */
 export function clearSessionScopedState(): void {
-  clearTrustedHosts();
-  clearMarkdownImageConfirmMemory();
-  clearToolCardImageCache();
-  clearFilePartCache();
-  clearClipboardImages();
-  clearSessionAutoApprove();
-  clearSessionGoalCollapseState();
-  reapTempFiles({ all: true });
+  runClear(clearTrustedHosts);
+  runClear(clearMarkdownImageConfirmMemory);
+  runClear(clearToolCardImageCache);
+  runClear(clearFilePartCache);
+  runClear(clearClipboardImages);
+  runClear(clearSessionAutoApprove);
+  runClear(clearSessionGoalCollapseState);
+  // Wiping the mirror is what makes "signed out shows nothing to browse" true;
+  // dropping the engine memo keeps a completed run from repopulating it. The
+  // wipe alone is invisible to an open Files app, which keeps the listing it
+  // last read until the platform provider says the tree changed, so the
+  // provider is signalled after the wipe — an empty location, never the
+  // previous account's folders.
+  runClear(clearArtifactMirror);
+  runClear(notifyArtifactsChanged);
+  runClear(resetArtifactMirrorSyncState);
+  runClear(() => {
+    reapTempFiles({ all: true });
+  });
   // The stored PR recents are account-bound data the index folds in, and the
   // key is device-global, so the account boundary must drop them as well as the
   // index itself. Without this, an account switch re-indexes the previous
   // account's pull requests from the recents the new account then inherits.
-  clearRecentPrsBestEffort();
+  runClear(clearRecentPrsBestEffort);
   // The phone's search index is device-wide, not scoped to the signed-in
   // session, so without this the previous account's session, pull-request and
   // security titles stay searchable in Spotlight and Android app search after a
@@ -115,5 +129,14 @@ export function clearSessionScopedState(): void {
   // `clearSearchIndexBestEffort`: the native clear also wipes the fingerprint
   // ledger the indexer diffs against, so the next sync re-indexes whatever the
   // new account can see.
-  clearSearchIndexBestEffort();
+  runClear(clearSearchIndexBestEffort);
+}
+
+/** One best-effort clear: a throw never stops the clears that follow it. */
+function runClear(clear: () => void): void {
+  try {
+    clear();
+  } catch {
+    // Session-scoped teardown continues with the remaining members.
+  }
 }

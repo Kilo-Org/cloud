@@ -452,6 +452,7 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
           .select({
             title: cli_sessions_v2.title,
             organizationId: cli_sessions_v2.organization_id,
+            prUrl: cli_sessions_v2.pr_url,
           })
           .from(cli_sessions_v2)
           .where(

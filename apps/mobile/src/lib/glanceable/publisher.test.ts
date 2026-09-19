@@ -486,10 +486,59 @@ describe('GlanceablePublisher', () => {
     publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
     publisher.handleSessions([{ status: 'busy' }, { status: 'busy' }], PUB_CTX);
     publisher.handleFetchError(PUB_CTX);
+    // The error reposts the last known work itself, so the pending coalesced
+    // happy emit must not fire on top of it.
+    expect(lastSnapshot(calls, 'startOrUpdate').status).toBe('stale');
+    const afterError = count(calls, 'startOrUpdate');
     vi.advanceTimersByTime(1000);
-    // The pre-error happy emit must not fire after the stale republish.
-    expect(count(calls, 'startOrUpdate')).toBe(1);
+    expect(count(calls, 'startOrUpdate')).toBe(afterError);
     expect(lastSnapshot(calls, 'publish').status).toBe('stale');
+    publisher.dispose();
+  });
+
+  it('re-posts the durable snapshot when the first refresh fails after a restart', () => {
+    // A cold start restores the persisted snapshot but has no cache data; the
+    // post itself died with the previous process. The failed refresh must put
+    // the card back from the restored counts, not leave the shade empty.
+    const { sink, calls } = makeSink();
+    const restored = snapshotFor([{ status: 'question' }], NOW - 60_000, 7);
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, initial: restored });
+
+    publisher.handleFetchError(PUB_CTX);
+
+    expect(lastSnapshot(calls, 'startOrUpdate')).toMatchObject({
+      status: 'stale',
+      running: 0,
+      needsInput: 1,
+    });
+    expect(count(calls, 'endImmediate')).toBe(0);
+    publisher.dispose();
+  });
+
+  it('does not re-post a restored snapshot with no startable work', () => {
+    const { sink, calls } = makeSink();
+    const restored = snapshotFor([{ status: 'idle' }], NOW - 60_000, 7);
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, initial: restored });
+
+    publisher.handleFetchError(PUB_CTX);
+
+    expect(count(calls, 'startOrUpdate')).toBe(0);
+    publisher.dispose();
+  });
+
+  it('does not resurrect a card the terminal end already retired', () => {
+    vi.useFakeTimers();
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    publisher.handleSessions([], PUB_CTX);
+    vi.advanceTimersByTime(8000);
+    expect(count(calls, 'endImmediate')).toBe(1);
+
+    publisher.handleFetchError(PUB_CTX);
+
+    expect(count(calls, 'startOrUpdate')).toBe(1);
+    expect(count(calls, 'endImmediate')).toBe(1);
     publisher.dispose();
   });
 

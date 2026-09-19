@@ -3,7 +3,10 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { user_notification_preferences, user_push_tokens } from '@kilocode/db/schema';
 import {
   androidChannelIdForPushData,
+  androidChannelIdForPushDataToAppVersion,
   genericPushContentForPushData,
+  iosInterruptionLevelForPushData,
+  iosMutableContentForPushData,
   resolvePushLocale,
   translatePush,
   type DispatchPushInput,
@@ -20,6 +23,7 @@ import {
   flushDueGlanceableRefreshes,
   refreshGlanceableSnapshot,
 } from '../lib/glanceable-refresh';
+import { expoPushExtrasForPushData } from '../lib/push-message-extras';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
@@ -193,10 +197,23 @@ export class NotificationChannelDO extends DurableObject<Env> {
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, input.userId));
 
-    // Preview mode + Android channel. Resolved before the sink branch so the
-    // sink log can record them (both are non-content). Fail closed: a read
-    // that throws, or an absent row, is treated as 'generic'.
+    // Preview mode + notification kind routing. Resolved before the sink
+    // branch so the sink log can record them (both are non-content). Fail
+    // closed: a read that throws, or an absent row, is treated as 'generic'.
+    //
+    // iOS has no per-kind channel: the interruption level is the iOS
+    // equivalent of the Android channel and is what lets needs-input break
+    // through a Focus / Do Not Disturb. The per-Focus filter that lets the
+    // user choose which Focuses allow agent progress is applied on the client:
+    // the foreground handler reads the stored choice, and `mutableContent`
+    // below routes a progress push through the extension that reads the same
+    // choice when the app is not in the foreground.
     const channelId = androidChannelIdForPushData(input.push.data);
+    // Attention extras keep the action category; the shared kind model below
+    // owns interruption levels and Focus filtering for every push.
+    const pushExtras = expoPushExtrasForPushData(input.push.data);
+    const interruptionLevel = iosInterruptionLevelForPushData(input.push.data);
+    const mutableContent = iosMutableContentForPushData(input.push.data);
     let previews: 'generic' | 'full' = 'generic';
     try {
       const [prefRow] = await db
@@ -241,6 +258,8 @@ export class NotificationChannelDO extends DurableObject<Env> {
           sound: input.push.sound ?? null,
           priority: input.push.priority ?? 'default',
           channelId,
+          interruptionLevel,
+          mutableContent,
           previews,
         },
         to: '<redacted>',
@@ -283,16 +302,30 @@ export class NotificationChannelDO extends DurableObject<Env> {
         body = input.push.body;
       }
 
+      // Android 8+ drops a notification addressed to a channel that does not
+      // exist. Only clients that create channels (a non-null app version at
+      // registration) get a channelId; older clients fall back to the default
+      // channel. The split agent channels are newer than the rest, so a token
+      // registered before they shipped only has the legacy `agent` channel and
+      // keeps routing there. iOS ignores channelId either way.
+      const clientChannelId = androidChannelIdForPushDataToAppVersion(input.push.data, app_version);
       return {
         to: token,
         title,
         body,
         data: input.push.data,
-        // Android 8+ drops a notification addressed to a channel that does
-        // not exist. Only clients that create channels (a non-null app
-        // version at registration) get a channelId; older clients fall back
-        // to the default channel. iOS ignores channelId either way.
-        ...(app_version != null && { channelId }),
+        ...pushExtras,
+        ...(clientChannelId !== undefined && { channelId: clientChannelId }),
+        // iOS has no per-kind channel; the interruption level is its
+        // equivalent and it is what lets a needs-input push break through a
+        // Focus / Do Not Disturb. Applied to every message — unlike
+        // channelId there is no older-client failure mode for the field.
+        interruptionLevel,
+        // A progress push carries `mutable-content` so the iOS notification
+        // service extension can drop it when the active Focus excluded agent
+        // progress. Older clients without the extension still show it: the
+        // extension only filters, it never adds a banner.
+        ...(mutableContent && { mutableContent: true }),
         sound: input.push.sound ?? undefined,
         priority: input.push.priority ?? 'default',
       } satisfies ExpoPushMessage;

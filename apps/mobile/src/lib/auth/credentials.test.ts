@@ -86,6 +86,11 @@ vi.mock('@/lib/kiloclaw-tab-ownership', () => ({
 vi.mock('@/lib/last-active-instance', () => ({
   clearLastActiveInstance: vi.fn().mockResolvedValue(undefined),
 }));
+// The sign-out block clears the launcher surfaces and the last-opened record.
+// Stub them like the rest of the teardown graph: the native wrapper imports
+// `expo`, which needs `__DEV__` and cannot load in the node test environment.
+vi.mock('@/lib/last-opened-session', () => ({ clearLastOpenedSession: vi.fn() }));
+vi.mock('@/lib/native-launcher-surfaces', () => ({ clearLauncherSurfaces: vi.fn() }));
 vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));
@@ -135,6 +140,13 @@ vi.mock('@/lib/agent-attachments/clipboard-image', () => ({
 
 vi.mock('@/lib/temp-file-registry', () => ({
   reapTempFiles: vi.fn(),
+}));
+
+// The sign-out teardown's OS search clear reaches the root `expo` entry, which
+// reads `__DEV__` at import time and does not parse under the node test
+// environment. The clear is a no-op here.
+vi.mock('@/lib/native-system-search', () => ({
+  clearSystemSearchIndex: vi.fn().mockResolvedValue(undefined),
 }));
 
 import * as SecureStore from 'expo-secure-store';

@@ -40,6 +40,7 @@ import {
   getUserFromSessionForCredentialIssuanceOrRedirect,
 } from './server';
 import { db } from '@/lib/drizzle';
+import { createSignInTicket } from '@/lib/auth/passkey';
 import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
 import {
   openai_chatgpt_connections,
@@ -47,6 +48,7 @@ import {
   organization_domain_claims,
   organization_seats_purchases,
   organizations,
+  passkey_sign_in_tickets,
   user_auth_provider,
 } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
@@ -1878,5 +1880,111 @@ describe('getProfileRedirectPath', () => {
 
       await expect(getProfileRedirectPath(orphanUser)).resolves.toBe('/connected-accounts');
     });
+  });
+});
+
+type PasskeyAuthorizeResult = {
+  id: string;
+  email: string;
+  name: string;
+  image: string;
+} | null;
+
+type PasskeyProviderConfig = {
+  id?: string;
+  name?: string;
+  credentials?: Record<string, unknown>;
+  authorize?: (credentials: { ticket: string } | undefined) => unknown;
+};
+
+/**
+ * next-auth v4 keeps a CredentialsProvider's user config under `options` until
+ * the request-scoped normalization merges it onto the provider, so the raw
+ * `authOptions.providers` entries for both `email` and `passkey` read
+ * `id: 'credentials'`. Resolve the user config the way next-auth does.
+ */
+function passkeyProviderConfigs(): PasskeyProviderConfig[] {
+  return authOptions.providers.map(candidate => ({
+    id: candidate.id,
+    ...((candidate as { options?: PasskeyProviderConfig }).options ?? {}),
+  }));
+}
+
+function getPasskeyAuthorize() {
+  const config = passkeyProviderConfigs().find(candidate => candidate.id === 'passkey');
+  if (!config || typeof config.authorize !== 'function') {
+    throw new Error('Passkey credentials provider is not registered');
+  }
+  return config.authorize as unknown as (
+    credentials: { ticket: string } | undefined
+  ) => Promise<PasskeyAuthorizeResult>;
+}
+
+describe('passkey provider', () => {
+  test('registers a passkey credentials provider that exchanges a ticket', () => {
+    expect(passkeyProviderConfigs().find(candidate => candidate.id === 'passkey')).toMatchObject({
+      name: 'Passkey',
+      credentials: { ticket: expect.anything() },
+    });
+  });
+
+  test('a ticket authorizes its owner and a replayed ticket mints no session', async () => {
+    const authorize = getPasskeyAuthorize();
+    const user = await insertTestUser({ google_user_name: 'Passkey Owner' });
+    const ticket = await createSignInTicket(user.id);
+
+    await expect(authorize({ ticket })).resolves.toEqual({
+      id: user.id,
+      email: user.google_user_email,
+      name: 'Passkey Owner',
+      image: user.google_user_image_url,
+    });
+
+    // A ticket is single-use: the atomic redemption consumed the row, so the
+    // replay resolves no user and NextAuth mints no session for it.
+    await expect(authorize({ ticket })).resolves.toBeNull();
+    await expect(authorize({ ticket: 'not-a-ticket' })).resolves.toBeNull();
+    await expect(authorize(undefined)).resolves.toBeNull();
+
+    // No `user_auth_provider` row is written for a passkey.
+    const providerRows = await db
+      .select({ provider: user_auth_provider.provider })
+      .from(user_auth_provider)
+      .where(eq(user_auth_provider.kilo_user_id, user.id));
+    expect(providerRows).toEqual([]);
+  });
+
+  test('an expired ticket is refused', async () => {
+    const authorize = getPasskeyAuthorize();
+    const user = await insertTestUser();
+    const ticket = await createSignInTicket(user.id);
+    await db
+      .update(passkey_sign_in_tickets)
+      .set({ expires_at: new Date(Date.now() - 60_000).toISOString() })
+      .where(eq(passkey_sign_in_tickets.kilo_user_id, user.id));
+
+    await expect(authorize({ ticket })).resolves.toBeNull();
+  });
+
+  test('the jwt callback resolves a passkey by user id and sets the session claims', async () => {
+    const user = await insertTestUser({
+      google_user_name: 'Passkey Jwt User',
+      web_session_pepper: 'passkey-web-session-pepper',
+    });
+    const jwtCallback = authOptions.callbacks!.jwt!;
+
+    const token = await jwtCallback({
+      token: {},
+      account: { provider: 'passkey', providerAccountId: user.id, type: 'credentials' },
+      user: { id: user.id, email: user.google_user_email },
+      trigger: 'signIn',
+      profile: undefined,
+      isNewUser: false,
+      session: undefined,
+    } as never);
+
+    expect(token.kiloUserId).toBe(user.id);
+    expect(token.authProvider).toBe('passkey');
+    expect(token.webSessionPepper).toBe('passkey-web-session-pepper');
   });
 });

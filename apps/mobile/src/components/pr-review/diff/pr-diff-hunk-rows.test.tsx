@@ -3,8 +3,8 @@ import { RefreshControl } from '@/components/ui/refresh-control';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
-import { EmptyFilesView, TabStateMessage } from './pr-diff-hunk-rows';
+import { i18n } from '@/i18n';
+import { EmptyFilesView, PaginationRow, TabStateMessage } from './pr-diff-hunk-rows';
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -87,5 +87,39 @@ describe('Files pane full-body states', () => {
       (cta.props.onPress as () => void)();
     });
     expect(onRequestOverview).toHaveBeenCalledOnce();
+  });
+});
+
+describe('PaginationRow', () => {
+  function renderPaginationRow() {
+    const renderer = mountNode(
+      createElement(PaginationRow, {
+        state: 'no-pages',
+        loadedFiles: 1,
+        totalFiles: 5,
+        onRetry: vi.fn<() => void>(),
+        onFetchAll: vi.fn<() => void>(),
+      })
+    );
+    return renderer.root
+      .findAll(node => String(node.type) === 'Text')
+      .map(node => String(node.props.children));
+  }
+
+  it('reads the one-file page as plural files, naming the whole page set', () => {
+    expect(renderPaginationRow()).toContain('1 of 5 files loaded');
+  });
+
+  // The count handed to i18next picks the plural category. It must be the
+  // loaded count, because the catalogs inflect the participle on the loaded
+  // number — French says "1 fichier chargé sur 5", not the plural
+  // "1 fichiers chargés sur 5" a total-keyed category renders.
+  it('keys the plural category on the loaded count, not the total', async () => {
+    await i18n.changeLanguage('fr');
+    try {
+      expect(renderPaginationRow()).toContain('1 fichier chargé sur 5');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

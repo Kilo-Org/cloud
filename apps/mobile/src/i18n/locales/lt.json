@@ -163,6 +163,7 @@
     "useDifferentEmail": "Naudoti kitą el. pašto adresą",
     "signInWithApple": "Prisijungti per Apple",
     "signInWithGoogle": "Prisijungti per Google",
+    "signInWithPasskey": "Prisijungti su priėjimo raktu",
     "emailAddress": "El. pašto adresas",
     "emailPlaceholder": "vardas@example.com",
     "continueWithEmail": "Tęsti el. paštu",
@@ -175,6 +176,10 @@
     "termsConnector": " ir ",
     "termsSuffix": ".",
     "moreSignInOptions": "Daugiau prisijungimo parinkčių",
+    "passkeyCancelled": "Prisijungimas su priėjimo raktu atšauktas. Bandykite dar kartą.",
+    "passkeyNotFound": "Šiam įrenginiui neišsaugotas joks priėjimo raktas. Prisijunkite naudodami Apple, Google arba savo el. paštą.",
+    "passkeyUnsupported": "Priėjimo raktai šiame įrenginyje nepasiekiami. Prisijunkite naudodami Apple, Google arba savo el. paštą.",
+    "passkeyFailed": "Nepavyko prisijungti su priėjimo raktu. Bandykite dar kartą.",
     "couldNotCompleteSignIn": "Nepavyko užbaigti prisijungimo. Bandyk dar kartą.",
     "sessionEnded": "Tavo sesija baigėsi. Prisijunk dar kartą.",
     "signInCodeExpired": "Tavo prisijungimo kodas nebegalioja. Bandyk dar kartą.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Bandomoji paskyra",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Įmonės SSO"
+    "providerEnterpriseSso": "Įmonės SSO",
+    "passkeysTitle": "Priėjimo raktai",
+    "passkeysSubtitle": "Prisijunkite be slaptažodžio",
+    "passkeysEmpty": "Kol kas nėra priėjimo raktų",
+    "passkeysEmptyHint": "$t(profile.addPasskey), kad prisijungtumėte be slaptažodžio.",
+    "passkeysCouldNotLoad": "Nepavyko įkelti priėjimo raktų",
+    "passkeysLoadFailed": "Priėjimo raktai nepasiekiami, kol tai nebus įkelta.",
+    "addPasskey": "Pridėti priėjimo raktą",
+    "passkeyDefaultName": "Priėjimo raktas",
+    "passkeyAddedOn": "Pridėta {{date}}",
+    "passkeyAdded": "Priėjimo raktas pridėtas.",
+    "passkeyAddFailed": "Nepavyko pridėti priėjimo rakto. Bandykite dar kartą.",
+    "passkeyAddUnsupported": "Šis įrenginys negali kurti priėjimo raktų.",
+    "passkeyAddCancelled": "Priėjimo rakto kūrimas atšauktas.",
+    "passkeyRemoved": "Priėjimo raktas pašalintas.",
+    "passkeyRemoveFailed": "Nepavyko pašalinti to priėjimo rakto. Bandykite dar kartą.",
+    "passkeyRenamed": "Priėjimo raktas pervardytas.",
+    "passkeyName": "Priėjimo rakto pavadinimas",
+    "renamePasskey": "Pervadyti priėjimo raktą",
+    "removePasskey": "Pašalinti priėjimo raktą",
+    "removePasskeyTitle": "Pašalinti priėjimo raktą?",
+    "removePasskeyMessage": "Daugiau negalėsite prisijungti su šiuo priėjimo raktu."
   },
   "preferences": {
     "general": "Bendra",
@@ -347,7 +373,27 @@
       "fileLoadedCount_few": "Įkelti {{displayCount}} failai",
       "fileLoadedCount_many": "Įkelta {{displayCount}} failo",
       "fileLoadedOfTotalCount_few": "Įkelti {{displayCount}} failai iš {{total}}",
-      "fileLoadedOfTotalCount_many": "Įkelta {{displayCount}} failo iš {{total}}"
+      "fileLoadedOfTotalCount_many": "Įkelta {{displayCount}} failo iš {{total}}",
+      "expandAllLines_one": "Išskleisti visas eilutes: {{displayCount}}",
+      "expandAllLines_other": "Išskleisti visas eilutes: {{displayCount}}",
+      "expandAllLines_few": "Išskleisti visas eilutes: {{displayCount}}",
+      "expandAllLines_many": "Išskleisti visas eilutes: {{displayCount}}",
+      "expandLines_one": "Išskleisti eilutes: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_other": "Išskleisti eilutes: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_few": "Išskleisti eilutes: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_many": "Išskleisti eilutes: {{displayCount}} ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Išskleisti konteksto eilutes: {{displayCount}}",
+      "expandLinesOfContext_other": "Išskleisti konteksto eilutes: {{displayCount}}",
+      "expandLinesOfContext_few": "Išskleisti konteksto eilutes: {{displayCount}}",
+      "expandLinesOfContext_many": "Išskleisti konteksto eilutes: {{displayCount}}",
+      "expandMoreLines_one": "Išskleisti daugiau eilučių: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_other": "Išskleisti daugiau eilučių: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_few": "Išskleisti daugiau eilučių: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_many": "Išskleisti daugiau eilučių: {{displayCount}} ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "įkelta {{loaded}} iš {{total}} failų",
+      "loadedOfTotalFiles_other": "įkelta {{loaded}} iš {{total}} failų",
+      "loadedOfTotalFiles_few": "įkelta {{loaded}} iš {{total}} failų",
+      "loadedOfTotalFiles_many": "įkelta {{loaded}} iš {{total}} failų"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ failo pabaigoje nėra naujos eilutės.",
@@ -543,7 +589,11 @@
         "outdatedOnPath": "Pasenęs komentaras: {{path}}"
       },
       "deletedUser": "ištrintas naudotojas",
-      "replyForbiddenTerm": "Neturi teisės atsakyti į {{term}}."
+      "replyForbiddenTerm": "Neturi teisės atsakyti į {{term}}.",
+      "moreLinesAbove_one": "… Daugiau eilučių aukščiau: {{displayCount}}.",
+      "moreLinesAbove_other": "… Daugiau eilučių aukščiau: {{displayCount}}.",
+      "moreLinesAbove_few": "… Daugiau eilučių aukščiau: {{displayCount}}.",
+      "moreLinesAbove_many": "… Daugiau eilučių aukščiau: {{displayCount}}."
     },
     "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų.",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
@@ -586,7 +636,7 @@
       "checksCount": "patikrinimų: {{displayCount}}",
       "checksCount_one": "patikrinimas: {{displayCount}}",
       "checksCount_few": "patikrinimai: {{displayCount}}",
-      "checksCount_many": "patikrinimo: {{displayCount}}",
+      "checksCount_many": "patikrinimų: {{displayCount}}",
       "checksCount_other": "patikrinimų: {{displayCount}}",
       "checkDetails": "patikrinimo informacija"
     },
@@ -724,7 +774,11 @@
       "statusContext": "Kontekstas",
       "lineLabel": "{{status}}, {{line}} eilutė: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(tuščia)"
+      "emptyLine": "(tuščia)",
+      "truncationBanner_one": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}.",
+      "truncationBanner_other": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}.",
+      "truncationBanner_few": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}.",
+      "truncationBanner_many": "Dėl GitHub API apribojimo rodomi tik pirmieji pakeisti failai: {{limit}} iš {{total}}."
     },
     "linkPasteClipboardEmpty": "Iškarpinė tuščia.",
     "linkPasteNotAPullRequest": "Tai ne pakeitimų užklausos ar merge request nuoroda",
@@ -801,7 +855,7 @@
     "previewFullDescription": "Užrakinimo ekrane rodomas pranešimų žinučių tekstas.",
     "previewGenericDescription": "Pranešimai tik informuoja apie įvykį. Norėdami perskaityti žinutę, atidarykite Kilo.",
     "channel": {
-      "agent": "Agentų sesijos",
+      "agentProgress": "Agentų eiga",
       "chat": "Pokalbių žinutės",
       "kiloclaw": "KiloClaw veikla",
       "balance": "Įspėjimai apie likutį",
@@ -818,6 +872,15 @@
       "kiloclawActivitySubtitle": "egzemplioriaus parengtis ar klaida, suplanuoti veiksmai",
       "balanceAlertsSubtitle": "įspėjimai apie mažą organizacijos likutį",
       "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai"
+    },
+    "action": {
+      "openSession": "Atidaryti sesiją"
+    },
+    "needsInputAction": {
+      "approved": "Užklausa patvirtinta",
+      "replied": "Atsakymas išsiųstas",
+      "failed": "Nepavyko atsakyti. Bakstelėkite dar kartą, kad pabandytumėte.",
+      "unavailable": "Šios užklausos nebelaukiama."
     }
   },
   "tabs": {
@@ -898,7 +961,11 @@
       "uploadFailed": "Nepavyko įkelti.",
       "failedToUploadFile": "Nepavyko įkelti failo: {{reason}}.",
       "nothingToPaste": "Nėra ko įklijuoti.",
-      "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų."
+      "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų.",
+      "limit_one": "Gali pridėti iki {{displayCount}} failas.",
+      "limit_other": "Gali pridėti iki {{displayCount}} failų.",
+      "limit_few": "Gali pridėti iki {{displayCount}} failai.",
+      "limit_many": "Gali pridėti iki {{displayCount}} failų."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}. Būsena: {{status}}",
@@ -1648,7 +1715,15 @@
       "syncFindings": "Sinchronizuoti radinius",
       "syncNow": "Sinchronizuoti dabar",
       "syncQueued": "Sinchronizavimas įtrauktas į eilę",
-      "syncStatusUnavailable": "Nepavyko gauti sinchronizavimo būsenos."
+      "syncStatusUnavailable": "Nepavyko gauti sinchronizavimo būsenos.",
+      "daysOverdue_one": "Pradelsta diena: {{displayCount}}",
+      "daysOverdue_other": "Pradelsta dienų: {{displayCount}}",
+      "daysOverdue_few": "Pradelsta dienos: {{displayCount}}",
+      "daysOverdue_many": "Pradelsta dienų: {{displayCount}}",
+      "findingsCount_one": "Radinys: {{displayCount}}",
+      "findingsCount_other": "Radinių: {{displayCount}}",
+      "findingsCount_few": "Radiniai: {{displayCount}}",
+      "findingsCount_many": "Radinių: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Atviri radiniai",
@@ -2167,20 +2242,7 @@
       "continueFrom": "Tęsiama sesija „{{title}}“.",
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šioje CLI sesijos tęsti negalima. Pasirinkite „Cloud Agent“ arba kitą CLI.",
-      "importFailed": "Nepavyko importuoti šios sesijos.",
-      "sandbox": "Smėlio dėžė",
-      "sandboxAccessibility": "Smėlio dėžė: {{label}}",
-      "sandboxDefaultWithDestination": "Numatytasis · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Mažas",
-      "sandboxInstanceShared": "Bendras",
-      "sandboxInstanceLarge": "Didelis",
-      "sandboxInstanceDevcontainer": "Kūrimo konteineris",
-      "sandboxInstanceProviderDefault": "Tiekėjo numatytasis",
-      "sandboxCouldNotLoad": "Nepavyko įkelti smėlio dėžės parinkčių",
-      "sandboxUnavailable": "Ši smėlio dėžė neprieinama. Pasirinkite kitą smėlio dėžę arba Numatytąjį.",
-      "sandboxUseDefault": "Naudoti Numatytąjį"
+      "importFailed": "Nepavyko importuoti šios sesijos."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujintas {{displayCount}} failas.",
@@ -2206,7 +2268,19 @@
       "updateTodos": "Atnaujinti užduočių sąrašą",
       "linesBadge": "eil.: {{displayCount}}",
       "filesBadge": "failų: {{displayCount}}",
-      "matchesBadge": "atitikčių: {{displayCount}}"
+      "matchesBadge": "atitikčių: {{displayCount}}",
+      "filesBadge_one": "failas: {{displayCount}}",
+      "filesBadge_other": "failų: {{displayCount}}",
+      "filesBadge_few": "failai: {{displayCount}}",
+      "filesBadge_many": "failų: {{displayCount}}",
+      "linesBadge_one": "eil.: {{displayCount}}",
+      "linesBadge_other": "eil.: {{displayCount}}",
+      "linesBadge_few": "eil.: {{displayCount}}",
+      "linesBadge_many": "eil.: {{displayCount}}",
+      "matchesBadge_one": "atitiktis: {{displayCount}}",
+      "matchesBadge_other": "atitikčių: {{displayCount}}",
+      "matchesBadge_few": "atitiktys: {{displayCount}}",
+      "matchesBadge_many": "atitikčių: {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "eilutės {{start}}–{{end}} (sutrumpinta)",
@@ -2502,7 +2576,15 @@
       "files": "Failai",
       "couldNotOpenPhotoPicker": "Nepavyko atidaryti nuotraukų parinkiklio. Iš naujo paleiskite Kilo ir bandykite dar kartą.",
       "maxFilesAllowed": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
-      "onlyAddingFiles": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})"
+      "onlyAddingFiles": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
+      "maxFilesAllowed_one": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
+      "maxFilesAllowed_other": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
+      "maxFilesAllowed_few": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
+      "maxFilesAllowed_many": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
+      "onlyAddingFiles_one": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
+      "onlyAddingFiles_other": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
+      "onlyAddingFiles_few": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})",
+      "onlyAddingFiles_many": "Pridedama tik dalis failų: {{accepted}} iš {{total}} (daugiausia {{max}})"
     },
     "composer": {
       "addAttachment": "Pridėti priedą",
@@ -2520,7 +2602,11 @@
       "discardAttachmentsMessage": "Prie išsiųstų žinučių nepridėti įkelti failai bus ištrinti.",
       "discardAttachmentsTitle": "Atmesti priedus?",
       "charactersRemaining": "Liko simbolių: {{count}}",
-      "insertNewline": "Įterpti naują eilutę"
+      "insertNewline": "Įterpti naują eilutę",
+      "charactersRemaining_one": "Liko simbolis: {{count}}",
+      "charactersRemaining_other": "Liko simbolių: {{count}}",
+      "charactersRemaining_few": "Liko simboliai: {{count}}",
+      "charactersRemaining_many": "Liko simbolių: {{count}}"
     },
     "chatLink": {
       "linkCopied": "Nuoroda nukopijuota",
@@ -2594,7 +2680,11 @@
       "stepsCount_other": "{{steps}} žingsnių",
       "modelAccessibilityLabel": "Modelis {{name}}, teikėjas {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} žingsniai",
-      "stepsCount_many": "{{steps}} žingsnio"
+      "stepsCount_many": "{{steps}} žingsnio",
+      "modelsCount_one": "Modelis ({{displayCount}})",
+      "modelsCount_other": "Modeliai ({{displayCount}})",
+      "modelsCount_few": "Modeliai ({{displayCount}})",
+      "modelsCount_many": "Modeliai ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Automatinis tvirtinimas",
@@ -2634,7 +2724,11 @@
     },
     "toolRun": {
       "sheetTitle": "Įrankių iškvietimai",
-      "condensedLabel": "{{itemCount}} elementų; {{last}}"
+      "condensedLabel": "{{itemCount}} elementų; {{last}}",
+      "condensedLabel_one": "{{itemCount}} elementas; {{last}}",
+      "condensedLabel_other": "{{itemCount}} elementų; {{last}}",
+      "condensedLabel_few": "{{itemCount}} elementai; {{last}}",
+      "condensedLabel_many": "{{itemCount}} elementų; {{last}}"
     }
   },
   "bootstrap": {
@@ -2769,7 +2863,11 @@
     "cliCantReceiveFilesTitle": "Ši sesija negali gauti failų",
     "cliCantReceiveFilesMessage": "Šią sesiją vykdanti Kilo CLI negali gauti failų. Atnaujink CLI tame įrenginyje arba bendrink turinį naujoje sesijoje.",
     "contentlessMessage": "Nėra ką bendrinti — nepridėta nei teksto, nei failų.",
-    "couldNotReadContent": "Nepavyko perskaityti bendrinamo turinio."
+    "couldNotReadContent": "Nepavyko perskaityti bendrinamo turinio.",
+    "onlyFirstFilesAttached_one": "Bus pridėti tik pirmieji failai ({{displayCount}}).",
+    "onlyFirstFilesAttached_other": "Bus pridėti tik pirmieji failai ({{displayCount}}).",
+    "onlyFirstFilesAttached_few": "Bus pridėti tik pirmieji failai ({{displayCount}}).",
+    "onlyFirstFilesAttached_many": "Bus pridėti tik pirmieji failai ({{displayCount}})."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3182,5 +3280,8 @@
       "repositoryUnknown": "Kilo neatpažįsta {{repository}} kaip GitHub ar GitLab saugyklos. Pasirink kitą saugyklą Kilo programoje.",
       "repositoryUnsupported": "{{repository}} yra Bitbucket saugykla — Paleisti agentą jos dar negali naudoti. Pasirink kitą saugyklą Kilo programoje."
     }
+  },
+  "launcher": {
+    "openLastSession": "Atidaryti paskutinę sesiją"
   }
 }

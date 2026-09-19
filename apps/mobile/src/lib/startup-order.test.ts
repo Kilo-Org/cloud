@@ -77,6 +77,23 @@ describe('root layout startup order (text contract)', () => {
     ).toBe(true);
   });
 
+  // The module-scope category registration runs under the English default
+  // while the stored preference is still loading, so the post-preference
+  // language apply must re-register the needs-input categories next to the
+  // channel rename — or every non-English user keeps English Approve / Reply
+  // buttons for the whole session.
+  it('re-registers the needs-input categories next to the language-apply channel rename', () => {
+    const codeSource = stripComments(layoutSource);
+    const pair =
+      /void renameAndroidNotificationChannels\(\);\s*void registerNeedsInputCategories\(\);/.exec(
+        codeSource
+      );
+    expect(
+      pair,
+      '_layout.tsx must re-register the needs-input categories right after renameAndroidNotificationChannels in prepareLanguage'
+    ).not.toBe(null);
+  });
+
   it.each(FORBIDDEN_IDENTIFIERS)('does not reference %s', identifier => {
     expect(layoutSource.includes(identifier), `_layout.tsx must not contain "${identifier}"`).toBe(
       false

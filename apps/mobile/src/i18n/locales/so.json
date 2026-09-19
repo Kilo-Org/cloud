@@ -163,6 +163,7 @@
     "useDifferentEmail": "Isticmaal iimayl kale",
     "signInWithApple": "Ku soo gal Apple",
     "signInWithGoogle": "Ku soo gal Google",
+    "signInWithPasskey": "Ku soo gal furaha gelitaanka",
     "emailAddress": "Cinwaanka iimaylka",
     "emailPlaceholder": "adiga@example.com",
     "continueWithEmail": "Ku sii wad iimaylka",
@@ -175,6 +176,10 @@
     "termsConnector": " iyo ",
     "termsSuffix": ".",
     "moreSignInOptions": "Xulashooyin soo galis oo dheeri ah",
+    "passkeyCancelled": "Gelitaanka furaha gelitaanka waa la joojiyay. Fadlan isku day mar kale.",
+    "passkeyNotFound": "Ma jiro furaha gelitaanka la kaydiyay oo loogu talagalay qalabkan. Taa beddelkeeda ku soo gal Apple, Google ama iimaylkaaga.",
+    "passkeyUnsupported": "Furahayaasha gelitaanka lagama heli karo qalabkan. Taa beddelkeeda ku soo gal Apple, Google ama iimaylkaaga.",
+    "passkeyFailed": "Lama geli karin furaha gelitaanka. Fadlan isku day mar kale.",
     "couldNotCompleteSignIn": "Soo galista lama dhammayn karin. Fadlan mar kale isku day.",
     "sessionEnded": "Kalfadhigaagii wuu dhammaaday. Fadlan mar kale soo gal.",
     "signInCodeExpired": "Koodhkaaga soo galista wuu dhacay. Fadlan mar kale isku day.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Akoon tijaabo ah",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO-ga shirkadda"
+    "providerEnterpriseSso": "SSO-ga shirkadda",
+    "passkeysTitle": "Furahayaasha gelitaanka",
+    "passkeysSubtitle": "Ku soo gal iyada oo aan lahayn furaha sirta ah",
+    "passkeysEmpty": "Weli ma jiro furaha gelitaanka",
+    "passkeysEmptyHint": "$t(profile.addPasskey) si aad u gasho iyada oo aan lahayn furaha sirta ah.",
+    "passkeysCouldNotLoad": "Furahayaasha gelitaanka lama soo dejisan karin",
+    "passkeysLoadFailed": "Furahayaasha gelitaanka lama heli karo ilaa tan la soo dejiyo.",
+    "addPasskey": "Ku dar furaha gelitaanka",
+    "passkeyDefaultName": "Furaha gelitaanka",
+    "passkeyAddedOn": "La daray {{date}}",
+    "passkeyAdded": "Furaha gelitaanka waa la daray.",
+    "passkeyAddFailed": "Lama dari karin furaha gelitaanka. Isku day mar kale.",
+    "passkeyAddUnsupported": "Qalabkan ma abuuri karo furahayaasha gelitaanka.",
+    "passkeyAddCancelled": "Abuurista furaha gelitaanka waa la joojiyay.",
+    "passkeyRemoved": "Furaha gelitaanka waa la tirtiray.",
+    "passkeyRemoveFailed": "Furaha gelitaankaas lama tirtiri karin. Isku day mar kale.",
+    "passkeyRenamed": "Magaca furaha gelitaanka waa la beddelay.",
+    "passkeyName": "Magaca furaha gelitaanka",
+    "renamePasskey": "Beddel magaca furaha gelitaanka",
+    "removePasskey": "Tirtir furaha gelitaanka",
+    "removePasskeyTitle": "Tirtir furaha gelitaanka?",
+    "removePasskeyMessage": "Ma awoodi doontid inaad ku soo gasho furaha gelitaanka kan."
   },
   "preferences": {
     "general": "Guud",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} fayl oo ka mid ah {{total}} ayaa la soo raray",
       "filesStillLoading": "Faylasha weli waa la soo rarayaa. Hoos u jiid si aad u cusboonaysiiso.",
       "goToOverview": "Tag dulmarka",
-      "goToOverviewTab": "Tag tabka dulmarka"
+      "goToOverviewTab": "Tag tabka dulmarka",
+      "expandAllLines_one": "Muuji dhammaan {{displayCount}} sadar",
+      "expandAllLines_other": "Muuji dhammaan {{displayCount}} sadar",
+      "expandLines_one": "Muuji {{displayCount}} sadar ({{start}}–{{end}})",
+      "expandLines_other": "Muuji {{displayCount}} sadar ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Muuji {{displayCount}} sadar oo ku xeeran",
+      "expandLinesOfContext_other": "Muuji {{displayCount}} sadar oo ku xeeran",
+      "expandMoreLines_one": "Muuji {{displayCount}} sadar oo dheeraad ah ({{start}}–{{end}})",
+      "expandMoreLines_other": "Muuji {{displayCount}} sadar oo dheeraad ah ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} ka mid ah {{total}} fayl ayaa la soo raray",
+      "loadedOfTotalFiles_other": "{{loaded}} ka mid ah {{total}} fayl ayaa la soo raray"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ faylku kuma dhammaado sadar cusub.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Duugoobay: {{path}}"
       },
       "deletedUser": "isticmaale la tirtiray",
-      "replyForbiddenTerm": "Ma haysatid oggolaansho aad uga jawaabto {{term}}."
+      "replyForbiddenTerm": "Ma haysatid oggolaansho aad uga jawaabto {{term}}.",
+      "moreLinesAbove_one": "… {{displayCount}} sadar oo dheeraad ah ayaa ka sarreeya.",
+      "moreLinesAbove_other": "… {{displayCount}} sadar oo dheeraad ah ayaa ka sarreeya."
     },
     "couldNotOpenGitHubAppSettings": "Dejinta abka GitHub lama furi karin.",
     "installKiloGitHubApp": "Rakib barnaamijka Kilo ee GitHub",
@@ -706,7 +744,9 @@
       "statusContext": "Ku xeeran",
       "lineLabel": "{{status}}, sadarka {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(madhan)"
+      "emptyLine": "(madhan)",
+      "truncationBanner_one": "Waxaa la muujinayaa {{limit}}-ka ugu horreeya ee {{total}} fayl oo la beddelay — xadka API-ga GitHub.",
+      "truncationBanner_other": "Waxaa la muujinayaa {{limit}}-ka ugu horreeya ee {{total}} fayl oo la beddelay — xadka API-ga GitHub."
     },
     "linkPasteClipboardEmpty": "Sabuuradda nuqulladu waa madhan tahay.",
     "linkPasteNotAPullRequest": "Kani ma aha xiriiriye PR ama merge request ah",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Ogeysiisyadu waxay qoraalka farriinta ku muujiyaan shaashaddaada qufulka.",
     "previewGenericDescription": "Ogeysiisyadu waxay muujiyaan in wax dhaceen. Fur Kilo si aad u akhrido.",
     "channel": {
-      "agent": "Kalfadhiyada wakiilka",
+      "agentProgress": "Halka ay wakiilku marayso",
       "chat": "Fariimaha sheekaysiga",
       "kiloclaw": "Hawlaha KiloClaw",
       "balance": "Digniinaha haraaga",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "nuqul diyaar ah ama fashilmay, ficillo la jadwaleeyay",
       "balanceAlertsSubtitle": "digniinaha hadhaaga yar ee ururka",
       "securityFindingsSubtitle": "natiijooyin cusub iyo xusuusinno SLA"
+    },
+    "action": {
+      "openSession": "Fur kalfadhi"
+    },
+    "needsInputAction": {
+      "approved": "Codsiga waa la oggolaaday",
+      "replied": "Jawaabta waa la diray",
+      "failed": "Ma jawaabin karo. Guji mar kale si aad isku daydo.",
+      "unavailable": "Codsigaan hadda ma sugayo."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Soo gelintu way fashilantay.",
       "failedToUploadFile": "Faylka lama soo gelin karin: {{reason}}.",
       "nothingToPaste": "Ma jiraan wax la dhejiyo.",
-      "metadataStripFailed": "Xogta dheeraadka ah ee sawirka lama saari karin."
+      "metadataStripFailed": "Xogta dheeraadka ah ee sawirka lama saari karin.",
+      "limit_one": "Waxaad ku lifaaqi kartaa ilaa {{displayCount}} fayl.",
+      "limit_other": "Waxaad ku lifaaqi kartaa ilaa {{displayCount}} fayl."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Isku waafaji natiijooyinka",
       "syncNow": "Hadda isku waafaji",
       "syncQueued": "Isku waafajinta ayaa safka la geliyay",
-      "syncStatusUnavailable": "Xaaladda isku waafajinta lama heli karo."
+      "syncStatusUnavailable": "Xaaladda isku waafajinta lama heli karo.",
+      "daysOverdue_one": "Waqtigii dhaafay {{displayCount}} maalmood",
+      "daysOverdue_other": "Waqtigii dhaafay {{displayCount}} maalmood",
+      "findingsCount_one": "{{displayCount}} natiijooyin",
+      "findingsCount_other": "{{displayCount}} natiijooyin"
     },
     "dashboardMetrics": {
       "openFindings": "Natiijooyin furan",
@@ -2131,20 +2186,7 @@
       "continueFrom": "Waxaa la sii wadaa {{title}}.",
       "importingSession": "Kalfadhiga waa la soo gelinayaa",
       "cliCannotContinue": "CLI-kan ma sii wadi karo kalfadhi. Dooro Cloud Agent ama CLI kale.",
-      "importFailed": "Kalfadhigan lama soo gelin karin.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Caadi · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Yar",
-      "sandboxInstanceShared": "La wadaago",
-      "sandboxInstanceLarge": "Weyn",
-      "sandboxInstanceDevcontainer": "Weelka Dev",
-      "sandboxInstanceProviderDefault": "Caadiga bixiyaha",
-      "sandboxCouldNotLoad": "Lama soo dejin karin xulashooyinka sandbox-ka",
-      "sandboxUnavailable": "Sandbox-kan lama heli karo. Dooro sandbox kale ama Caadi.",
-      "sandboxUseDefault": "Isticmaal Caadi"
+      "importFailed": "Kalfadhigan lama soo gelin karin."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay.",
@@ -2168,7 +2210,13 @@
       "updateTodos": "Cusboonaysii liiska hawlaha",
       "linesBadge": "{{displayCount}} sadar",
       "filesBadge": "{{displayCount}} fayl",
-      "matchesBadge": "{{displayCount}} natiijo"
+      "matchesBadge": "{{displayCount}} natiijo",
+      "filesBadge_one": "{{displayCount}} fayl",
+      "filesBadge_other": "{{displayCount}} fayl",
+      "linesBadge_one": "{{displayCount}} sadar",
+      "linesBadge_other": "{{displayCount}} sadar",
+      "matchesBadge_one": "{{displayCount}} natiijo",
+      "matchesBadge_other": "{{displayCount}} natiijo"
     },
     "readToolMarkdown": {
       "linesTruncated": "sadarrada {{start}}–{{end}} (la soo gaabiyay)",
@@ -2458,7 +2506,11 @@
       "files": "Faylal",
       "couldNotOpenPhotoPicker": "Xulaha sawirrada lama furi karin. Dib u bilow Kilo oo mar kale isku day.",
       "maxFilesAllowed": "Ugu badnaan {{displayCount}} fayl ayaa la oggol yahay.",
-      "onlyAddingFiles": "Waxaa lagu darayaa oo keliya {{accepted}} ka mid ah {{total}} fayl (ugu badnaan {{max}})"
+      "onlyAddingFiles": "Waxaa lagu darayaa oo keliya {{accepted}} ka mid ah {{total}} fayl (ugu badnaan {{max}})",
+      "maxFilesAllowed_one": "Ugu badnaan {{displayCount}} fayl ayaa la oggol yahay.",
+      "maxFilesAllowed_other": "Ugu badnaan {{displayCount}} fayl ayaa la oggol yahay.",
+      "onlyAddingFiles_one": "Waxaa lagu darayaa oo keliya {{accepted}} ka mid ah {{total}} fayl (ugu badnaan {{max}})",
+      "onlyAddingFiles_other": "Waxaa lagu darayaa oo keliya {{accepted}} ka mid ah {{total}} fayl (ugu badnaan {{max}})"
     },
     "composer": {
       "addAttachment": "Ku dar lifaaq",
@@ -2476,7 +2528,9 @@
       "discardAttachmentsMessage": "Faylasha la gudbiyay ee aan weli la isticmaalin waa la tirtiri doonaa.",
       "discardAttachmentsTitle": "Ma tirtiraysaa lifaaqyada?",
       "charactersRemaining": "{{count}} xaraf ayaa harsan",
-      "insertNewline": "Geli sadar cusub"
+      "insertNewline": "Geli sadar cusub",
+      "charactersRemaining_one": "{{count}} xaraf ayaa harsan",
+      "charactersRemaining_other": "{{count}} xaraf ayaa harsan"
     },
     "chatLink": {
       "linkCopied": "Xiriiriyaha nuqul ayaa laga sameeyay",
@@ -2548,7 +2602,9 @@
       "stepsCount_one": "{{steps}} tallaabo",
       "stepsCount": "{{steps}} tallaabo",
       "stepsCount_other": "{{steps}} tallaabo",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Moodeel ({{displayCount}})",
+      "modelsCount_other": "Moodeellada ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Oggolaansho otomaatig ah",
@@ -2588,7 +2644,9 @@
     },
     "toolRun": {
       "sheetTitle": "Wicitaannada qalabka",
-      "condensedLabel": "{{itemCount}} qaybood; {{last}}"
+      "condensedLabel": "{{itemCount}} qaybood; {{last}}",
+      "condensedLabel_one": "{{itemCount}} qaybood; {{last}}",
+      "condensedLabel_other": "{{itemCount}} qaybood; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2781,9 @@
     "cliCantReceiveFilesTitle": "Kalfadhigani ma qaabili karo faylal",
     "cliCantReceiveFilesMessage": "Kilo CLI-ga socodsiiya kalfadhigan ma qaabili karo faylal. Cusboonaysii CLI-ga mashiinkaas ama la wadaag kalfadhi cusub.",
     "contentlessMessage": "Waxba lama wadaagi karo — qoraal ama fayl laguma darin.",
-    "couldNotReadContent": "Waxyaabaha la wadaagay lama akhrin karin."
+    "couldNotReadContent": "Waxyaabaha la wadaagay lama akhrin karin.",
+    "onlyFirstFilesAttached_one": "Waxaa lagu lifaaqi doonaa oo keliya {{displayCount}}-kii fayl ee ugu horreeyay.",
+    "onlyFirstFilesAttached_other": "Waxaa lagu lifaaqi doonaa oo keliya {{displayCount}}-kii fayl ee ugu horreeyay."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3134,5 +3194,8 @@
       "repositoryUnknown": "Kilo kama aqoonsado {{repository}} kayd GitHub ama GitLab ah. Dooro kayd kale gudaha Kilo.",
       "repositoryUnsupported": "{{repository}} waa kayd Bitbucket — Bilow wakiilka weli ma isticmaali karo. Dooro kayd kale gudaha Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Fur kalfadhigii ugu dambeeyay"
   }
 }

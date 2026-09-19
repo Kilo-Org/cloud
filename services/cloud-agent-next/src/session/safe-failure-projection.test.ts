@@ -612,6 +612,25 @@ describe('classifyAssistantFailure', () => {
       expect(classifyAssistantFailure(projectSafeAssistantError(source))).toEqual(failure);
     }
   });
+
+  // A 4xx that merely mentions "context_length" (a field-name validation error)
+  // and a 413 payload-size rejection are not context-window overflows. They must
+  // keep the invalid-request wording instead of claiming the model's context
+  // limit was exceeded.
+  it.each([
+    ["Invalid value for 'context_length'", 400, 'invalid_request'],
+    ['Request Entity Too Large', 413, 'invalid_request'],
+  ] as const)(
+    'does not classify non-overflow 4xx wording as context_limit: %s',
+    (message, statusCode, reason) => {
+      const source = { name: 'APIError', data: { message, statusCode } };
+      const failure = classifyAssistantFailure(source);
+
+      expect(failure.reason).toBe(reason);
+      expect(projectSafeAssistantError(source)).toBe(assistantFailureMessage(reason));
+      expect(classifyAssistantFailure(projectSafeAssistantError(source))).toEqual(failure);
+    }
+  );
 });
 
 describe('isAssistantInterrupt', () => {

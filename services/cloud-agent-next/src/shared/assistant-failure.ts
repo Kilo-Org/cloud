@@ -144,11 +144,16 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
   // request. Match the wording providers use (Kilo/Nex AGI "exceeds this
   // model's context length", OpenAI "maximum context length", Anthropic
   // "prompt is too long") plus the provider_code token, so the transcript
-  // names the real cause instead of "Assistant request was invalid".
+  // names the real cause instead of "Assistant request was invalid". Every
+  // branch requires an over-limit qualifier: a field-name validation error like
+  // "Invalid value for 'context_length'" or a payload-size 413 ("Request Entity
+  // Too Large") must stay an invalid request, not claim the context window.
   if (
-    /\bcontext[_ ]?(?:length|window|limit|size)/.test(message) ||
-    /\b(?:exceeds?|exceeded|overflow(?:ed)?)\b[^.]{0,40}\bcontext\b/.test(message) ||
-    /\b(?:prompt|request|input|messages?)\b[^.]{0,40}\btoo (?:long|large)\b/.test(message) ||
+    /\bcontext[_ ]?(?:length|window|limit|size)[_ ]?(?:exceeds?|exceeded|overflow(?:ed)?|too (?:long|large)|max(?:imum)?)\b/.test(
+      message
+    ) ||
+    /\b(?:exceeds?|exceeded|overflow(?:ed)?|max(?:imum)?)\b[^.]{0,40}\bcontext\b/.test(message) ||
+    /\b(?:prompt|request|input|messages?)\b[^.]{0,40}\btoo long\b/.test(message) ||
     /\btoo many tokens\b/.test(message)
   ) {
     return 'context_limit';

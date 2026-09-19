@@ -5,15 +5,24 @@ import { afterEach, describe, expect, jest, test } from '@jest/globals';
 // pulled key does not match the committed ciphertexts.
 const MISMATCHED_KEY = Buffer.alloc(32, 7).toString('base64');
 const UNREADABLE_CIPHERTEXT = 'aXY=:dGFn:Y2lwaGVy';
+// Not the iv:authTag:encrypted shape at all — a data-entry mistake in the
+// stored code, not the expected key/ciphertext mismatch.
+const MALFORMED_CIPHERTEXT = 'not-an-encrypted-value';
+// A key that is not 256 bits; `decryptWithSymmetricKey` rejects it before it
+// can even attempt decryption.
+const WRONG_LENGTH_KEY = Buffer.alloc(16, 3).toString('base64');
 
 type PromoEncryptionModule = { decryptPromoCode: (encrypted: string) => string };
 
-function loadModule(nodeEnv: 'development' | 'production' | 'test'): PromoEncryptionModule {
+function loadModule(
+  nodeEnv: 'development' | 'production' | 'test',
+  key = MISMATCHED_KEY
+): PromoEncryptionModule {
   jest.resetModules();
   jest.replaceProperty(process, 'env', { ...process.env, NODE_ENV: nodeEnv });
   jest.doMock('@/lib/config.server', () => ({
     CREDIT_CATEGORIES_ENCRYPTION_KEY_V2: '',
-    CREDIT_CATEGORIES_ENCRYPTION_KEY: MISMATCHED_KEY,
+    CREDIT_CATEGORIES_ENCRYPTION_KEY: key,
   }));
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   return require('./promoCreditEncryption') as PromoEncryptionModule;
@@ -37,6 +46,18 @@ describe('decryptPromoCode', () => {
 
   test('still fails loudly on a key mismatch in production', () => {
     const { decryptPromoCode } = loadModule('production');
+
+    expect(() => decryptPromoCode(UNREADABLE_CIPHERTEXT)).toThrow();
+  });
+
+  test('surfaces a malformed stored ciphertext outside production', () => {
+    const { decryptPromoCode } = loadModule('development');
+
+    expect(() => decryptPromoCode(MALFORMED_CIPHERTEXT)).toThrow();
+  });
+
+  test('surfaces an invalid key length outside production', () => {
+    const { decryptPromoCode } = loadModule('development', WRONG_LENGTH_KEY);
 
     expect(() => decryptPromoCode(UNREADABLE_CIPHERTEXT)).toThrow();
   });

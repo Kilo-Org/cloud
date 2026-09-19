@@ -1,5 +1,10 @@
 import 'server-only';
-import { encryptWithSymmetricKey, decryptWithSymmetricKey } from '@/lib/encryption';
+import {
+  encryptWithSymmetricKey,
+  decryptWithSymmetricKey,
+  EncryptionConfigurationError,
+  EncryptionFormatError,
+} from '@/lib/encryption';
 import {
   CREDIT_CATEGORIES_ENCRYPTION_KEY,
   CREDIT_CATEGORIES_ENCRYPTION_KEY_V2,
@@ -41,7 +46,12 @@ function placeholderPromoCode(): string {
  * production. `promoCreditCategories` decrypts at module load, so letting one
  * undecryptable entry throw takes down every route that imports the catalogue
  * (native sign-in, session preparation). Fall back to a placeholder outside
- * production; production still fails loudly on a misconfigured key.
+ * production for that expected mismatch; production still fails loudly.
+ *
+ * A malformed stored value (`EncryptionFormatError`) or an invalid key
+ * (`EncryptionConfigurationError`) is a data-entry or configuration mistake
+ * rather than the expected key/ciphertext mismatch, so it is thrown everywhere
+ * instead of being replaced by a placeholder.
  *
  * @param encrypted - Encrypted string in format iv:authTag:encrypted
  * @returns The original plaintext promo code
@@ -57,7 +67,13 @@ export function decryptPromoCode(encrypted: string): string {
   try {
     return decryptWithSymmetricKey(encrypted, getEncryptionKey());
   } catch (error) {
-    if (process.env.NODE_ENV === 'production') throw error;
+    if (
+      error instanceof EncryptionFormatError ||
+      error instanceof EncryptionConfigurationError ||
+      process.env.NODE_ENV === 'production'
+    ) {
+      throw error;
+    }
     console.warn(
       '[promo-credits] CREDIT_CATEGORIES_ENCRYPTION_KEY cannot decrypt a stored promo code; using a placeholder outside production',
       error

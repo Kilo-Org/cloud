@@ -67,7 +67,7 @@ vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo-web-browser', () => ({
   openAuthSessionAsync: vi.fn(),
   openBrowserAsync: vi.fn(),
-  WebBrowserResultType: { DISMISS: 'dismiss', CANCEL: 'cancel' },
+  WebBrowserResultType: { OPENED: 'opened', DISMISS: 'dismiss', CANCEL: 'cancel' },
 }));
 vi.mock('@/components/ui/icons', () => ({
   PlugZap: 'PlugZap',
@@ -104,7 +104,7 @@ function beginPendingLaunch() {
     vi.mocked(WebBrowser.openBrowserAsync).mockReturnValueOnce(pending.promise);
     return {
       settle: () => {
-        pending.resolve({ type: WebBrowser.WebBrowserResultType.DISMISS });
+        pending.resolve({ type: WebBrowser.WebBrowserResultType.OPENED });
       },
     };
   }
@@ -186,7 +186,7 @@ describe('Android connect gate unmount', () => {
   it.each(providers)('%s drops its foreground listener and pending callbacks', async provider => {
     platform.OS = 'android';
     vi.mocked(WebBrowser.openBrowserAsync).mockResolvedValue({
-      type: WebBrowser.WebBrowserResultType.DISMISS,
+      type: WebBrowser.WebBrowserResultType.OPENED,
     });
     const renderer = mount(provider);
     await act(async () => {

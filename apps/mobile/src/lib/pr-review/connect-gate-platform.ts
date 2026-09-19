@@ -22,13 +22,18 @@ function waitForForeground() {
 /**
  * Opens the authorization URL and resolves once the user is back in the app.
  *
- * Android is the one platform branch: it has no native auth-session completion
- * callback, and expo-web-browser's `openAuthSessionAsync` polyfill keeps
- * module-level state that can get stuck and reject every later call
- * (KILO-APP-22), so Android opens a plain browser and resolves when the app
- * returns to the foreground instead. iOS keeps the native auth session, which
- * resolves when the sheet closes. Callers await the same promise on both.
- * Aborting ends the wait without closing the browser or auth session.
+ * The foreground subscription is registered on both platforms; it completes the
+ * wait wherever the browser cannot report its own dismissal. A plain browser
+ * resolves `opened` as soon as it launches, while the native iOS auth session
+ * only resolves when the sheet closes.
+ *
+ * Android is the one platform branch left, and it exists because the platform
+ * is missing a capability: it has no native auth-session completion callback.
+ * expo-web-browser's Android `openAuthSessionAsync` fallback is a polyfill that
+ * keeps module-level state which can get stuck and reject every later call
+ * (KILO-APP-22), so Android opens a plain browser instead. Callers await the
+ * same promise on both platforms, and aborting ends the wait without closing
+ * the browser or auth session.
  */
 export async function openAuthorizationAndWaitForReturn(
   authorizationUrl: string,
@@ -43,17 +48,21 @@ export async function openAuthorizationAndWaitForReturn(
   });
   const onAbort = () => resolveCancellation?.();
   signal?.addEventListener('abort', onAbort);
-  const foreground = Platform.OS === 'android' ? waitForForeground() : undefined;
+  const foreground = waitForForeground();
   try {
-    const opened = foreground
-      ? WebBrowser.openBrowserAsync(authorizationUrl)
-      : WebBrowser.openAuthSessionAsync(authorizationUrl);
+    const opened =
+      Platform.OS === 'android'
+        ? WebBrowser.openBrowserAsync(authorizationUrl)
+        : WebBrowser.openAuthSessionAsync(authorizationUrl);
     await Promise.race([opened, cancelled]);
-    if (foreground && !signal?.aborted) {
-      await Promise.race([foreground.returned, cancelled]);
+    if (!signal?.aborted) {
+      const result = await opened;
+      if (result.type === WebBrowser.WebBrowserResultType.OPENED) {
+        await Promise.race([foreground.returned, cancelled]);
+      }
     }
   } finally {
-    foreground?.subscription.remove();
+    foreground.subscription.remove();
     signal?.removeEventListener('abort', onAbort);
   }
 }

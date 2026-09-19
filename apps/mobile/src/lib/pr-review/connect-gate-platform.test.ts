@@ -23,6 +23,7 @@ vi.mock('react-native', () => ({
 vi.mock('expo-web-browser', () => ({
   openAuthSessionAsync: mocks.openAuthSessionAsync,
   openBrowserAsync: mocks.openBrowserAsync,
+  WebBrowserResultType: { OPENED: 'opened', CANCEL: 'cancel', DISMISS: 'dismiss' },
 }));
 
 function emitAppState(state: string) {
@@ -58,7 +59,11 @@ describe('iOS launch', () => {
       'https://example.com/connect'
     );
     expect(mocks.openBrowserAsync).not.toHaveBeenCalled();
-    expect(mocks.addAppStateListener).not.toHaveBeenCalled();
+    // The foreground subscription is cross-platform: iOS registers it too, and
+    // the native auth session's own resolution means it is only awaited when
+    // the browser cannot report its dismissal.
+    expect(mocks.addAppStateListener).toHaveBeenCalledOnce();
+    expect(mocks.subscriptions[0]?.remove).toHaveBeenCalledOnce();
     expect(handlers.onReturn).toHaveBeenCalledOnce();
     expect(handlers.onOpenFailure).not.toHaveBeenCalled();
   });
@@ -208,9 +213,9 @@ describe.each(['ios', 'android'])('shared launch contract on %s', os => {
       const launch = launchConnectGateBrowser('https://example.com/connect', handlers);
       controller.abort();
       await launch;
-      if (os === 'android') {
-        expect(mocks.subscriptions[0]?.remove).toHaveBeenCalledOnce();
-      }
+      // The foreground subscription is registered on both platforms, and abort
+      // drops it on both.
+      expect(mocks.subscriptions[0]?.remove).toHaveBeenCalledOnce();
       expect(removeAbortListener).toHaveBeenCalledExactlyOnceWith('abort', expect.any(Function));
 
       if (outcome === 'resolve') {
@@ -252,9 +257,8 @@ describe.each(['ios', 'android'])('shared launch contract on %s', os => {
     expect(handlers.onReturn).toHaveBeenCalledTimes(outcome === 'return' ? 1 : 0);
     expect(handlers.onOpenFailure).toHaveBeenCalledTimes(outcome === 'failure' ? 1 : 0);
     controller.abort();
-    if (os === 'android') {
-      expect(mocks.subscriptions[0]?.remove).toHaveBeenCalledOnce();
-    }
+    // Registered on both platforms, removed on both.
+    expect(mocks.subscriptions[0]?.remove).toHaveBeenCalledOnce();
   });
 });
 

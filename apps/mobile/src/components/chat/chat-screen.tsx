@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChatComposer, type ChatComposerSendOptions } from '@/components/agents/chat-composer';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
@@ -162,6 +163,18 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const composerPadding = { paddingBottom: keyboardVisible ? 0 : bottom };
 
   function renderTranscript() {
+    if (state.status === 'opening') {
+      // The chat is being reopened. A stored conversation has history that is
+      // not on screen yet, so this is a transcript that is loading, not one
+      // that is empty: the empty state waits for the open to finish.
+      //
+      // It is the sessions list's own placeholder — anchored to the bottom and
+      // shaped like the bubbles — and it is rendered as a direct child of the
+      // area so its fade-out plays as the stored transcript arrives. The
+      // transcript lands where the placeholder stood instead of jumping from
+      // the top of the area to the bottom when the open finishes.
+      return <SessionSkeletonMessages sessionId={state.sessionId} />;
+    }
     if (messages.length === 0) {
       return (
         <EmptyState

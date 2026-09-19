@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
@@ -50,6 +50,7 @@ import {
   resolveNewSessionStartDisabled,
 } from '@/lib/new-session-submit';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
+import { getRepoBindingsPath } from '@/lib/profile-agent-navigation';
 import {
   clearDraft,
   NEW_SESSION_DRAFT_KEY,
@@ -59,6 +60,7 @@ import {
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
+import { profilePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import {
   PRESELECT_CLOUD_RUN_ON,
   readPreselectRunOn,
@@ -95,6 +97,7 @@ function AndroidPendingPickerRecovery({
 export function NewSessionScreenBody() {
   const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
   const { t } = useTranslation();
+  const router = useRouter();
   const { showActionSheetWithOptions } = useActionSheet();
   const searchParams = useLocalSearchParams<{
     organizationId?: string;
@@ -123,6 +126,8 @@ export function NewSessionScreenBody() {
   // Start is never a silent no-op; a retryable one keeps the Retry control.
   const [cloudCreateError, setCloudCreateError] = useState<CloudCreateFailure | null>(null);
   const [hasPrompt, setHasPrompt] = useState(false);
+  // The profile picked for THIS session; null keeps the effective default.
+  const [overrideProfileId, setOverrideProfileId] = useState<string | null>(null);
   // Commit choice for the cloud session: Leave changes (false) is the default.
   const [autoCommit, setAutoCommit] = useState(false);
   // Relative launch folder the folder picker confirmed (`""` = launch directory).
@@ -277,8 +282,29 @@ export function NewSessionScreenBody() {
     profileId,
     isLoading: isProfileLoading,
     isError: isProfileError,
+    overrideNeedsAttention: profileOverrideNeedsAttention,
     refetch: refetchProfile,
-  } = useEffectiveAgentProfile(organizationId);
+  } = useEffectiveAgentProfile(organizationId, overrideProfileId);
+
+  // The picker opens as the app's standard native formSheet. The bridge carries
+  // the current pick; the sheet reports the new one back through `onSelect`.
+  const handleOpenProfilePicker = useCallback(() => {
+    profilePickerSlot.set(UNFENCED_ROUTE_KEY, {
+      organizationId,
+      selectedOverrideProfileId: overrideProfileId,
+      // The server resolves a repo's bound profile at session creation; the
+      // picker base layer stays empty here.
+      repoBindingProfileId: null,
+      onSelect: id => {
+        setOverrideProfileId(id);
+      },
+    });
+    router.push('/(app)/agent-chat/profile-picker' as Href);
+  }, [organizationId, overrideProfileId, router]);
+
+  const handleOpenRepoDefaults = useCallback(() => {
+    router.push(getRepoBindingsPath(organizationId));
+  }, [organizationId, router]);
 
   // Keep the inline selector and picker list in sync.
   const {
@@ -770,7 +796,12 @@ export function NewSessionScreenBody() {
         profile={profile}
         isProfileLoading={isProfileLoading}
         isProfileError={isProfileError}
+        profileOverrideNeedsAttention={profileOverrideNeedsAttention}
         onRetryProfile={() => void refetchProfile()}
+        onOpenProfilePicker={handleOpenProfilePicker}
+        selectedProfileId={overrideProfileId}
+        onSelectProfile={setOverrideProfileId}
+        onOpenRepoDefaults={handleOpenRepoDefaults}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}

@@ -1951,6 +1951,44 @@ describe('session detail exit retry row', () => {
 });
 
 describe('transcript time markers', () => {
+  it.each(['message', 'tool-run'] as const)(
+    'keeps the %s subtree mounted when a prepend moves its marker',
+    async kind => {
+      condensePreference.value = kind === 'tool-run';
+      rootPageNextCursor = 'older-cursor';
+      const message =
+        kind === 'tool-run'
+          ? toolRunMessage(ROOT_ID, 'm2', ['t2a', 't2b'])
+          : childMessage(ROOT_ID, 'Existing answer');
+      message.info.time.created = 1_000_000_000;
+      const view = await mountDetails([message]);
+      const findRow = () =>
+        kind === 'tool-run'
+          ? view.renderer.root.find(node => Object.is(node.type, 'CondensedToolRunRow'))
+          : view.renderer.root.findByProps({ children: 'Existing answer' });
+      const before = findRow();
+      expect(before).toBeDefined();
+      const keys = transcriptKeys(view.renderer);
+
+      await act(async () => {
+        void view.manager.loadOlderMessages();
+        await Promise.resolve();
+      });
+      const older = childMessage(ROOT_ID, 'Older answer');
+      older.info = { ...older.info, id: 'm1', time: { created: 999_999_000 } };
+      older.parts = [
+        stubTextPart({ id: 'text-m1', sessionID: ROOT_ID, messageID: 'm1', text: 'Older answer' }),
+      ];
+      await view.respond(ROOT_ID, [older]);
+
+      expect(transcriptKeys(view.renderer)).toEqual(['m1', ...keys]);
+      expect(
+        view.renderer.root.findAll(node => Object.is(node.type, 'TranscriptTimeMarker'))
+      ).toHaveLength(1);
+      expect(findRow() === before).toBe(true);
+    }
+  );
+
   it('renders the marker in the same row as the message that opens the burst', async () => {
     const message: StoredMessage = {
       info: { ...assistantMessage('msg-marker').info, sessionID: ROOT_ID },

@@ -1295,16 +1295,16 @@ export function SessionDetailContent({
         );
         // A condensed run can open a burst: its message's marker rides here so
         // marker and row share one FlashList key and one measured height.
-        return item.timeMarker ? (
+        return (
           <View>
-            <TranscriptTimeMarker
-              created={item.timeMarker.created}
-              dayChanged={item.timeMarker.dayChanged}
-            />
+            {item.timeMarker && (
+              <TranscriptTimeMarker
+                created={item.timeMarker.created}
+                dayChanged={item.timeMarker.dayChanged}
+              />
+            )}
             {run}
           </View>
-        ) : (
-          run
         );
       }
       // Delivery events can lag a successful drop. The retained row must expose Restore immediately.
@@ -1342,17 +1342,18 @@ export function SessionDetailContent({
       );
       // The burst marker rides on its message row so the row keeps one FlashList
       // key and one measured height: a prepend that moves the marker to an older
-      // message changes no key that is already on screen.
-      return item.timeMarker ? (
+      // message changes no key that is already on screen. Keep the wrapper and
+      // bubble's child slot stable so moving the marker does not remount it.
+      return (
         <View>
-          <TranscriptTimeMarker
-            created={item.timeMarker.created}
-            dayChanged={item.timeMarker.dayChanged}
-          />
+          {item.timeMarker && (
+            <TranscriptTimeMarker
+              created={item.timeMarker.created}
+              dayChanged={item.timeMarker.dayChanged}
+            />
+          )}
           {bubble}
         </View>
-      ) : (
-        bubble
       );
     },
     [

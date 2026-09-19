@@ -761,6 +761,77 @@ describe('condenseTranscriptToolRuns', () => {
     expect(keysOf(after)).toEqual(['tool-run:t1', 'u', 'tool-run:t3']);
   });
 
+  it.each([true, false])(
+    'reserves a later failed message key after a run adopted it (retryable: %s)',
+    isRetryable => {
+      const base = 1_000_000_000;
+      const owner = assistantToolOnlyMessageAt('m2', base + 1000, ['t2']);
+      const lone = condenseTranscriptToolRuns(mergeSessionTranscript([owner], []));
+      const older = assistantToolOnlyMessageAt('m1', base, ['t1a', 't1b']);
+      const joined = condenseTranscriptToolRuns(
+        mergeSessionTranscript([older, owner], []),
+        collectTranscriptItemKeysByPart(lone)
+      );
+      expect(keysOf(joined)).toEqual(['m2']);
+
+      const failed = {
+        ...owner,
+        info: {
+          ...owner.info,
+          error: { name: 'APIError' as const, data: { message: 'boom', isRetryable } },
+        },
+      };
+      const after = condenseTranscriptToolRuns(
+        mergeSessionTranscript([older, failed], []),
+        collectTranscriptItemKeysByPart(joined)
+      );
+
+      expect(keysOf(after)).toEqual(['tool-run:t1a', 'm2']);
+      expect(after[1]).toMatchObject({ type: 'message', message: failed });
+      expect(toolPartCount(after)).toBe(3);
+    }
+  );
+
+  it('reserves a later plain fragment key after a run adopted it', () => {
+    const base = 1_000_000_000;
+    const owner = assistantToolOnlyMessageAt('m2', base + 1000, ['t2']);
+    const lone = condenseTranscriptToolRuns(mergeSessionTranscript([owner], []));
+    const older = assistantToolOnlyMessageAt('m1', base, ['t1a', 't1b']);
+    const joined = condenseTranscriptToolRuns(
+      mergeSessionTranscript([older, owner], []),
+      collectTranscriptItemKeysByPart(lone)
+    );
+    const after = condenseTranscriptToolRuns(
+      mergeSessionTranscript(
+        [older, assistantTextThenToolsMessageAt('m2', base + 1000, ['t2'])],
+        []
+      ),
+      collectTranscriptItemKeysByPart(joined)
+    );
+
+    expect(keysOf(after)).toEqual(['tool-run:t1a', 'm2']);
+    expect(toolPartCount(after)).toBe(3);
+  });
+
+  it('reserves the default key of a later run when an adopted run splits again', () => {
+    const base = 1_000_000_000;
+    const owner = assistantToolOnlyMessageAt('m2', base + 1000, ['t2a', 't2b']);
+    const before = condenseTranscriptToolRuns(mergeSessionTranscript([owner], []));
+    const older = assistantToolOnlyMessageAt('m1', base, ['t1a', 't1b']);
+    const joined = condenseTranscriptToolRuns(
+      mergeSessionTranscript([older, owner], []),
+      collectTranscriptItemKeysByPart(before)
+    );
+    expect(keysOf(joined)).toEqual(['tool-run:t2a']);
+    const after = condenseTranscriptToolRuns(
+      mergeSessionTranscript([older, userMessageWithTextAt('u', base + 500, 'between'), owner], []),
+      collectTranscriptItemKeysByPart(joined)
+    );
+
+    expect(keysOf(after)).toEqual(['tool-run:t1a', 'u', 'tool-run:t2a']);
+    expect(toolPartCount(after)).toBe(4);
+  });
+
   it('splits the run around a user message', () => {
     const base = 1_000_000_000;
     const messages = [

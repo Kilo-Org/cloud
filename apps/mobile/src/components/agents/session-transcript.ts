@@ -252,14 +252,8 @@ export function condenseTranscriptToolRuns(
 ): SessionTranscriptItem[] {
   const condensed: SessionTranscriptItem[] = [];
 
-  // The keys of the items emitted so far in this build. A carried key may be
-  // reused by only one item, so a run never duplicates a row that is already on
-  // screen.
-  const emittedKeys = new Set<string>();
-
   const emit = (item: SessionTranscriptItem) => {
     condensed.push(item);
-    emittedKeys.add(getSessionTranscriptItemKey(item));
   };
 
   // The maximal run of consecutive condensable tool parts, each with its source
@@ -333,18 +327,10 @@ export function condenseTranscriptToolRuns(
     }
     if (run.length >= 2) {
       flushFragment();
-      // Reuse the key the first part still-carried from the previous build had,
-      // unless an item already emitted in this build took it. Otherwise nothing
-      // in the run was on screen before, so fall back to the first part's id.
-      const carriedKey = carriedKeysByPart
-        ? run
-            .map(entry => carriedKeysByPart.get(entry.part.id))
-            .find(key => key !== undefined && !emittedKeys.has(key))
-        : undefined;
       const first = run[0];
       emit({
         type: 'tool-run',
-        id: carriedKey ?? `tool-run:${first?.part.id ?? ''}`,
+        id: `tool-run:${first?.part.id ?? ''}`,
         messageId: first?.message.info.id ?? '',
         parts: run.map(entry => entry.part),
         ...(runMarker ? { timeMarker: runMarker } : {}),
@@ -416,5 +402,31 @@ export function condenseTranscriptToolRuns(
   }
   flushRun();
   flushFragment();
+  if (!carriedKeysByPart) {
+    return condensed;
+  }
+
+  // Reserve every current row's key before reusing old ones. A run can carry a
+  // later message's id (or another run's fallback key) after a prepend, then
+  // split away from that row on the next build.
+  const reservedKeys = new Set(condensed.map(item => getSessionTranscriptItemKey(item)));
+  const emittedKeys = new Set<string>();
+  for (const [index, item] of condensed.entries()) {
+    if (item.type === 'tool-run') {
+      const carriedKey = item.parts
+        .map(part => carriedKeysByPart.get(part.id))
+        .find(
+          key =>
+            key !== undefined &&
+            !emittedKeys.has(key) &&
+            (!reservedKeys.has(key) || key === item.id)
+        );
+      const id = carriedKey ?? item.id;
+      emittedKeys.add(id);
+      if (id !== item.id) {
+        condensed[index] = { ...item, id };
+      }
+    }
+  }
   return condensed;
 }

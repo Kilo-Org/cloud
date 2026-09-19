@@ -6,7 +6,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 import { AgentSessionProvider } from './session-provider';
 
-type ManagerFactoryOptions = { store: unknown; userId: string; organizationId?: string };
+type ManagerFactoryOptions = { store: unknown; organizationId?: string };
 
 const mocks = vi.hoisted(() => {
   const manager = {
@@ -68,6 +68,7 @@ describe('AgentSessionProvider live manager registry', () => {
 
     expect(mocks.createManager).toHaveBeenCalledTimes(1);
     const options = mocks.createManager.mock.calls[0]?.[0];
+    expect(options).not.toHaveProperty('userId');
     const registered = getLiveSessionManager('provider-session-a');
     expect(registered?.manager).toBe(mocks.manager);
     // The store must travel with the manager: the orchestrator reads the

@@ -166,12 +166,6 @@ type CreateMobileAgentSessionManagerOptions = {
   store: JotaiStore;
   userWebConnection: UserWebConnection;
   organizationId?: string;
-  /**
-   * The authenticated owner the open belongs to. Callers pass it so the
-   * manager construction stays owner-scoped; the manager no longer persists a
-   * transcript itself.
-   */
-  userId: string;
 };
 
 const skipBatchOptions = { context: { skipBatch: true } };

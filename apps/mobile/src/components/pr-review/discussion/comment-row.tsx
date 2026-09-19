@@ -23,7 +23,6 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { MoreHorizontal } from '@/components/ui/icons';
@@ -34,6 +33,7 @@ import { ReactionsRow } from '@/components/pr-review/discussion/reactions-row';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { COMMENT_ACTIONS_HIT_SLOP } from '@/lib/pr-review/comment-trailing-controls';
 import { type PrCommentKind } from '@/lib/pr-review/fix-with-kilo';
 import {
@@ -129,7 +129,7 @@ export function CommentRow({
   const relative = timeAgo(timestamp);
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -231,7 +231,7 @@ export function CommentRow({
         options,
         cancelButtonIndex: options.length - 1,
         disabledButtonIndices,
-        containerStyle: { paddingBottom: bottom },
+        ...themedSheet,
       },
       index => {
         if (index === undefined) {

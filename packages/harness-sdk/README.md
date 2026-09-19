@@ -656,6 +656,34 @@ it costs. Neither fails: a store that refuses a write is a finding, not an
 exception to handle. `checkStore` writes under identifiers of its own, so it is
 safe against a real database.
 
+## Remote MCP
+
+A remote MCP server is another tool source, reached over the transport the MCP
+specification defines. The client is `@modelcontextprotocol/sdk`, the MCP
+project's own reference implementation and the maintained client for it, pinned
+to the version this repository already installs: it ships the Streamable HTTP
+client transport and every request and response schema, so nothing here
+hand-rolls JSON-RPC over SSE. The plugin is
+`@kilocode/harness-sdk/plugins/remote-mcp`, and `remoteMcpTools(server, deps)`
+turns one server into tools a session can offer, each named
+`mcp_<server>_<tool>` so a transcript says which server answered.
+
+The one thing a runtime must supply is its `fetch`, passed in and never read off
+a global. Every request is bounded by a deadline built from `AbortController`
+and `setTimeout`, because React Native's `AbortSignal` is `abort-controller` and
+has neither `AbortSignal.timeout` nor `AbortSignal.any`. The library's schema
+validator is replaced with a permissive one, because its default Ajv compiles
+subschemas with `new Function` and Hermes has no eval for it. A bearer server's
+token comes from an accessor asked per call, so a refreshed credential is used
+rather than the one the process started with, and the credential is never part
+of a message or a log.
+
+A server that refuses the credential, has gone away, or answers an error is a
+failed tool result rather than the end of the conversation: the model reads what
+happened and decides what to do about it. A caller wiring the client by hand
+gets the same failures as a tagged `RemoteMcpError`, whose `kind` tells
+`unreachable`, `unauthorized`, `missing` and `protocol` apart.
+
 ## Entry points
 
 | Import | Holds |
@@ -665,6 +693,7 @@ safe against a real database.
 | `@kilocode/harness-sdk/plugins/fetch` | `webFetch`, for a runtime with a WHATWG `fetch` |
 | `@kilocode/harness-sdk/plugins/gateway` | The gateway plugin on its own |
 | `@kilocode/harness-sdk/plugins/prompt` | The assembler on its own |
+| `@kilocode/harness-sdk/plugins/remote-mcp` | Remote MCP servers: `remoteMcpTools`, and the Streamable HTTP client under it |
 | `@kilocode/harness-sdk/plugins/tools` | The tools the package ships |
 | `@kilocode/harness-sdk/plugins/store/node` | The store on `node:sqlite` |
 | `@kilocode/harness-sdk/plugins/store/expo` | The store on `expo-sqlite` |

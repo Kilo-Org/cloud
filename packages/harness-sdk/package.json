@@ -11,6 +11,7 @@
     "./plugins/fetch": "./dist/plugins/fetch/web.js",
     "./plugins/gateway": "./dist/plugins/gateway/index.js",
     "./plugins/prompt": "./dist/plugins/prompt/default.js",
+    "./plugins/remote-mcp": "./dist/plugins/remote-mcp/index.js",
     "./plugins/tools": "./dist/plugins/tools/index.js",
     "./plugins/store/node": "./dist/plugins/store/node.js",
     "./plugins/store/expo": "./dist/plugins/store/expo.js",
@@ -55,6 +56,7 @@
     "typecheck:e2e": "ttsc --noEmit -p e2e/tsconfig.json"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
     "drizzle-orm": "catalog:",
     "effect": "3.22.1",
     "eventsource-parser": "3.0.8",

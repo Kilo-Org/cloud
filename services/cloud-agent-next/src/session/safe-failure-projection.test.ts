@@ -582,6 +582,36 @@ describe('classifyAssistantFailure', () => {
       providerOwnership: 'unknown',
     });
   });
+
+  // A provider reports an over-long request as an APIError 400. The SDK status
+  // fallback used to call every unrecognized 4xx "invalid request", so the
+  // transcript told the reporter their request was invalid instead of over the
+  // model's context window. Observed in production wrapper logs as
+  // `error.error.code=400 error.error.metadata.provider_code=context_length_exceeded`
+  // and persisted as `failure_reason=assistant_invalid_request`.
+  it.each([
+    "The request is 280913 tokens long and exceeds this model's context length of 262144 tokens.",
+    "[Nex AGI] The request is 282364 tokens long and exceeds this model's context length of 262144 tokens.",
+    "This endpoint's maximum context length is 204800 tokens. However, you requested about 300000 tokens",
+    'prompt is too long: 300000 tokens > 200000 maximum',
+    'context_length_exceeded',
+  ])('classifies an over-long provider request as context_limit: %s', message => {
+    for (const source of [
+      { name: 'APIError', data: { message, statusCode: 400 } },
+      { name: 'APIError', data: { message } },
+      message,
+    ]) {
+      const failure = classifyAssistantFailure(source);
+
+      expect(failure).toEqual({
+        reason: 'context_limit',
+        safeMessage: 'The model context limit was exceeded',
+        providerOwnership: 'unknown',
+      });
+      expect(projectSafeAssistantError(source)).toBe('The model context limit was exceeded');
+      expect(classifyAssistantFailure(projectSafeAssistantError(source))).toEqual(failure);
+    }
+  });
 });
 
 describe('isAssistantInterrupt', () => {

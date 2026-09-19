@@ -810,11 +810,11 @@
     "previewFullDescription": "Taispeánann fógraí téacs na teachtaireachta ar do scáileán glasála.",
     "previewGenericDescription": "Léiríonn na fógraí gur tharla rud éigin. Oscail Kilo chun an teachtaireacht a léamh.",
     "channel": {
-      "agent": "Seisiúin gníomhairí",
       "chat": "Teachtaireachtaí comhrá",
       "kiloclaw": "Gníomhaíocht KiloClaw",
       "balance": "Foláirimh iarmhéid",
-      "security": "Torthaí slándála"
+      "security": "Torthaí slándála",
+      "agent": "Seisiúin gníomhairí"
     },
     "category": {
       "chatMessagesSubtitle": "freagraí i do chomhráite",

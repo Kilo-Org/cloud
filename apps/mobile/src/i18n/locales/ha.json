@@ -783,11 +783,11 @@
     "previewFullDescription": "Sanarwa suna nuna rubutun saƙo a allon kullenka.",
     "previewGenericDescription": "Sanarwa suna nuna cewa wani abu ya faru. Buɗe Kilo don karanta shi.",
     "channel": {
-      "agent": "Zamannin wakilai",
       "chat": "Saƙonnin tattaunawa",
       "kiloclaw": "Ayyukan KiloClaw",
       "balance": "Faɗakarwar ragowar kuɗi",
-      "security": "Sakamakon binciken tsaro"
+      "security": "Sakamakon binciken tsaro",
+      "agent": "Zamannin wakilai"
     },
     "category": {
       "chatMessagesSubtitle": "amsoshi a cikin tattaunawarka",

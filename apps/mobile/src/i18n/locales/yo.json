@@ -783,11 +783,11 @@
     "previewFullDescription": "Àwọn ìfitónilétí máa ń fi ọ̀rọ̀ ìfiránṣẹ́ hàn lórí iboju títìpa rẹ.",
     "previewGenericDescription": "Àwọn ìfitónilétí máa ń fi hàn pé ohun kan ṣẹlẹ̀. Ṣí Kilo láti kà á.",
     "channel": {
-      "agent": "Àwọn ìgbà iṣẹ́ aṣojú",
       "chat": "Àwọn ìfiránṣẹ́ ìfọ̀rọ̀wérọ̀",
       "kiloclaw": "Àwọn ìgbòkègbodò KiloClaw",
       "balance": "Àwọn ìkìlọ̀ nípa owó tó kù",
-      "security": "Àwọn àwárí ààbò"
+      "security": "Àwọn àwárí ààbò",
+      "agent": "Àwọn ìgbà iṣẹ́ aṣojú"
     },
     "category": {
       "chatMessagesSubtitle": "àwọn ìdáhùn nínú ìjíròrò rẹ",

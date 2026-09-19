@@ -783,11 +783,11 @@
     "previewFullDescription": "Ilmoitukset näyttävät viestin tekstin lukitusnäytöllä.",
     "previewGenericDescription": "Ilmoitukset kertovat uudesta tapahtumasta. Avaa Kilo, jotta voit lukea viestin.",
     "channel": {
-      "agent": "Agentti-istunnot",
       "chat": "Keskusteluviestit",
       "kiloclaw": "KiloClaw-tapahtumat",
       "balance": "Saldoilmoitukset",
-      "security": "Tietoturvahavainnot"
+      "security": "Tietoturvahavainnot",
+      "agent": "Agentti-istunnot"
     },
     "category": {
       "chatMessagesSubtitle": "vastaukset keskusteluissasi",

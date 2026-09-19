@@ -783,11 +783,11 @@
     "previewFullDescription": "Notifikasyon yo montre tèks mesaj la sou ekran fèmen ou a.",
     "previewGenericDescription": "Notifikasyon yo fè ou konnen gen yon bagay ki rive. Louvri Kilo pou li mesaj la.",
     "channel": {
-      "agent": "Sesyon ajan",
       "chat": "Mesaj diskisyon",
       "kiloclaw": "Aktivite KiloClaw",
       "balance": "Alèt balans",
-      "security": "Pwoblèm sekirite detekte"
+      "security": "Pwoblèm sekirite detekte",
+      "agent": "Sesyon ajan"
     },
     "category": {
       "chatMessagesSubtitle": "repons nan konvèsasyon ou yo",

@@ -1,10 +1,36 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const nativeSearchMock = vi.hoisted(() => ({
+  clearSystemSearchIndex: vi.fn<() => Promise<void>>(),
+}));
+
+const telemetryMock = vi.hoisted(() => ({
+  captureTelemetry: vi.fn(),
+}));
+
+const recentPrsMock = vi.hoisted(() => ({
+  clearRecentPrs: vi.fn<() => Promise<void>>(),
+}));
+
+vi.mock('@/lib/native-system-search', () => nativeSearchMock);
+
+vi.mock('@/lib/telemetry/error-sink', () => telemetryMock);
+
+// The stored PR recents are the other account-bound store this clear owns; the
+// recents module reaches SecureStore on import, so it is mocked here.
+vi.mock('@/lib/pr-review/recent-prs', () => recentPrsMock);
+
+/* eslint-disable import/first */
+// vi.mock is hoisted by Vitest before the real import resolves.
 import {
   isSessionGoalCollapsed,
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
-import { clearSessionScopedState } from '@/lib/auth/session-scoped-state';
+import {
+  clearSessionScopedState,
+  clearSystemSearchIndexOnSignedOutLaunch,
+} from './session-scoped-state';
+/* eslint-enable import/first */
 
 /** One tracked entry of the fake filesystem, keyed by the URI parts it was built from. */
 const fakeFs = vi.hoisted(() => {
@@ -112,8 +138,89 @@ beforeEach(() => {
   vi.clearAllMocks();
   fakeFs.deleted.length = 0;
   fakeFs.state.rootExists = true;
+  nativeSearchMock.clearSystemSearchIndex.mockResolvedValue(undefined);
+  recentPrsMock.clearRecentPrs.mockResolvedValue(undefined);
 });
 
+describe('clearSessionScopedState', () => {
+  it('clears the OS search index exactly once per call', () => {
+    clearSessionScopedState();
+    expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
+
+    clearSessionScopedState();
+    expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops the stored PR recents the index folds into every document set', () => {
+    // A direct account switch runs this clear but not sign-out's own recents
+    // clear; without it the collector re-indexes the previous account's PRs.
+    clearSessionScopedState();
+    expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a rejected recents clear instead of leaving it unhandled', async () => {
+    const failure = new Error('The stored pull requests did not clear.');
+    recentPrsMock.clearRecentPrs.mockRejectedValue(failure);
+
+    expect(() => {
+      clearSessionScopedState();
+    }).not.toThrow();
+
+    await vi.waitFor(() => {
+      expect(telemetryMock.captureTelemetry).toHaveBeenCalledWith({
+        error: failure,
+        level: 'warning',
+        tags: { 'error.subsystem': 'recent-prs', 'error.operation': 'clear' },
+      });
+    });
+  });
+
+  it('stays synchronous and reports a rejected native clear instead of swallowing it', async () => {
+    const failure = new Error('The system search index did not respond.');
+    nativeSearchMock.clearSystemSearchIndex.mockRejectedValue(failure);
+
+    expect(() => {
+      clearSessionScopedState();
+    }).not.toThrow();
+    expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
+
+    // The fire-and-forget clear owns its own rejection handler: the failure is
+    // reported, never left unhandled (an unhandled rejection fails this file).
+    await vi.waitFor(() => {
+      expect(telemetryMock.captureTelemetry).toHaveBeenCalledWith({
+        error: failure,
+        level: 'warning',
+        tags: { 'error.subsystem': 'system-search', 'error.operation': 'clear' },
+      });
+    });
+  });
+});
+
+describe('clearSystemSearchIndexOnSignedOutLaunch', () => {
+  it('re-runs the idempotent OS search clear for the signed-out launch', () => {
+    clearSystemSearchIndexOnSignedOutLaunch();
+    expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a failed re-clear through telemetry and never throws', async () => {
+    const failure = new Error('The system search index did not respond.');
+    nativeSearchMock.clearSystemSearchIndex.mockRejectedValue(failure);
+
+    expect(() => {
+      clearSystemSearchIndexOnSignedOutLaunch();
+    }).not.toThrow();
+
+    await vi.waitFor(() => {
+      expect(telemetryMock.captureTelemetry).toHaveBeenCalledWith({
+        error: failure,
+        level: 'warning',
+        tags: { 'error.subsystem': 'system-search', 'error.operation': 'clear' },
+      });
+    });
+  });
+});
+
+// The mirror and goal-disclosure stores stay real, so the wiring is under test.
 describe('clearSessionScopedState', () => {
   it('deletes the browsable mirror root', () => {
     clearSessionScopedState();
@@ -157,6 +264,8 @@ describe('clearSessionScopedState', () => {
 
     expect(fakeFs.deleted).toEqual([MIRROR_ROOT_URI]);
     expect(mocks.reapTempFiles).toHaveBeenCalledWith({ all: true });
+    expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(1);
+    expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
   });
 
   it('still reaps when the sync-engine memo reset throws', () => {
@@ -170,6 +279,21 @@ describe('clearSessionScopedState', () => {
 
     expect(fakeFs.deleted).toEqual([MIRROR_ROOT_URI]);
     expect(mocks.reapTempFiles).toHaveBeenCalledWith({ all: true });
+    expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(1);
+    expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
+  });
+
+  it('still clears PR recents and OS search when temp-file cleanup throws', () => {
+    mocks.reapTempFiles.mockImplementationOnce(() => {
+      throw new Error('temp files unavailable');
+    });
+
+    expect(() => {
+      clearSessionScopedState();
+    }).not.toThrow();
+
+    expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(1);
+    expect(nativeSearchMock.clearSystemSearchIndex).toHaveBeenCalledTimes(1);
   });
 
   // The goal-disclosure store stays real, like the mirror: this asserts the

@@ -792,11 +792,11 @@
     "previewFullDescription": "Obaveštenja prikazuju tekst poruke na zaključanom ekranu.",
     "previewGenericDescription": "Obaveštenja samo najavljuju novu aktivnost. Otvori Kilo da pročitaš poruku.",
     "channel": {
-      "agent": "Sesije agenata",
       "chat": "Poruke u ćaskanju",
       "kiloclaw": "Aktivnosti u KiloClaw-u",
       "balance": "Upozorenja o stanju kredita",
-      "security": "Bezbednosni nalazi"
+      "security": "Bezbednosni nalazi",
+      "agent": "Sesije agenata"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",

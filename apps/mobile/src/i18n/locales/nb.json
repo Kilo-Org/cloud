@@ -783,11 +783,11 @@
     "previewFullDescription": "Varsler viser meldingsteksten på låseskjermen din.",
     "previewGenericDescription": "Varslene viser bare at noe har skjedd. Åpne Kilo for å lese meldingen.",
     "channel": {
-      "agent": "Agentøkter",
       "chat": "Samtalemeldinger",
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarsler",
-      "security": "Sikkerhetsfunn"
+      "security": "Sikkerhetsfunn",
+      "agent": "Agentøkter"
     },
     "category": {
       "chatMessagesSubtitle": "svar i samtalene dine",

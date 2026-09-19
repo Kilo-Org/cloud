@@ -7,6 +7,7 @@ import {
   getGooglePlaySubscriptionOrder,
   getGooglePlaySubscriptionPurchase,
 } from './google-play-sdk';
+import { googlePlayOrderMoneyForProduct } from './store-purchase-money';
 
 export type GooglePlayEnvironment = 'Sandbox' | 'Production';
 
@@ -114,6 +115,7 @@ export function mapGooglePlayKiloPassPurchase(
     expiresAtIso: new Date(decoded.expiryTimeMs).toISOString(),
     tier: product.tier,
     cadence: product.cadence,
+    ...googlePlayOrderMoneyForProduct(order, orderProductId ?? ''),
     googlePlayReplacement: decoded.linkedPurchaseToken
       ? {
           linkedPurchaseToken: decoded.linkedPurchaseToken,

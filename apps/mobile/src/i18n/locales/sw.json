@@ -783,11 +783,11 @@
     "previewFullDescription": "Arifa zinaonyesha maandishi ya ujumbe kwenye skrini iliyofungwa.",
     "previewGenericDescription": "Arifa zinaonyesha kwamba jambo limetokea. Fungua Kilo ili usome ujumbe.",
     "channel": {
-      "agent": "Vikao vya wakala",
       "chat": "Ujumbe wa mazungumzo",
       "kiloclaw": "Shughuli za KiloClaw",
       "balance": "Tahadhari za salio",
-      "security": "Matokeo ya ukaguzi wa usalama"
+      "security": "Matokeo ya ukaguzi wa usalama",
+      "agent": "Vikao vya wakala"
     },
     "category": {
       "chatMessagesSubtitle": "majibu kwenye mazungumzo yako",

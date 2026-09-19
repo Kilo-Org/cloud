@@ -293,11 +293,11 @@
     "previewFullDescription": "تعرض الإشعارات نص الرسالة على شاشة القفل.",
     "previewGenericDescription": "تُعلمك الإشعارات بوجود نشاط جديد دون عرض محتواه. افتح Kilo لقراءته.",
     "channel": {
-      "agent": "جلسات الوكيل",
       "chat": "رسائل الدردشة",
       "kiloclaw": "نشاط KiloClaw",
       "balance": "تنبيهات الرصيد",
-      "security": "ملاحظات الأمان"
+      "security": "ملاحظات الأمان",
+      "agent": "جلسات الوكيل"
     },
     "category": {
       "chatMessagesSubtitle": "الردود في محادثاتك",

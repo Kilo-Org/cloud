@@ -792,11 +792,11 @@
     "previewFullDescription": "As notificações mostram o texto da mensagem no ecrã bloqueado.",
     "previewGenericDescription": "As notificações indicam que há novidades. Abra o Kilo para ler a mensagem.",
     "channel": {
-      "agent": "Sessões de agente",
       "chat": "Mensagens da conversa",
       "kiloclaw": "Atividade do KiloClaw",
       "balance": "Alertas de saldo",
-      "security": "Ocorrências de segurança"
+      "security": "Ocorrências de segurança",
+      "agent": "Sessões de agente"
     },
     "category": {
       "chatMessagesSubtitle": "respostas nas suas conversas",

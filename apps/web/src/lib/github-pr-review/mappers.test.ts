@@ -308,6 +308,36 @@ describe('buildFilesPage', () => {
     expect(result.nextCursor).toBe(2);
   });
 
+  it('follows a short page that carries a Link: rel="next"', () => {
+    // A page can be shorter than the requested size and still have more pages;
+    // the client's partial-load row ("1 of 5 files loaded") only exists because
+    // of this case.
+    const result = buildFilesPage({
+      page: 1,
+      perPage: 50,
+      rawFiles: [makeFile(0)],
+      linkHasNext: true,
+    });
+    expect(result.files).toHaveLength(1);
+    expect(result.nextCursor).toBe(2);
+  });
+
+  it('stops on a full page that carries no Link: rel="next"', () => {
+    const raw = Array.from({ length: 50 }, (_, i) => makeFile(i));
+    const result = buildFilesPage({ page: 1, perPage: 50, rawFiles: raw, linkHasNext: false });
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('still stops at the page cap when the Link header says there is a next page', () => {
+    const result = buildFilesPage({
+      page: FILES_MAX_PAGES,
+      perPage: 50,
+      rawFiles: [makeFile(0)],
+      linkHasNext: true,
+    });
+    expect(result.nextCursor).toBeNull();
+  });
+
   it('clamps to FILES_MAX_PAGES and returns null nextCursor at the cap', () => {
     const raw = Array.from({ length: 50 }, (_, i) => makeFile(i));
     const result = buildFilesPage({ page: FILES_MAX_PAGES, perPage: 50, rawFiles: raw });

@@ -801,11 +801,11 @@
     "previewFullDescription": "Oznámení zobrazují text zprávy na uzamčené obrazovce.",
     "previewGenericDescription": "Oznámení pouze upozorní na novou událost. Podrobnosti si přečtete v aplikaci Kilo.",
     "channel": {
-      "agent": "Relace agentů",
       "chat": "Zprávy v konverzaci",
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornění na zůstatek",
-      "security": "Bezpečnostní zjištění"
+      "security": "Bezpečnostní zjištění",
+      "agent": "Relace agentů"
     },
     "category": {
       "chatMessagesSubtitle": "odpovědi ve vašich konverzacích",

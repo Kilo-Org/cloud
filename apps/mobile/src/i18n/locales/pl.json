@@ -293,11 +293,11 @@
     "previewFullDescription": "Powiadomienia pokazują treść wiadomości na ekranie blokady.",
     "previewGenericDescription": "Powiadomienia informują o zdarzeniach bez wyświetlania treści wiadomości. Otwórz Kilo, aby ją przeczytać.",
     "channel": {
-      "agent": "Sesje agenta",
       "chat": "Wiadomości na czacie",
       "kiloclaw": "Aktywność KiloClaw",
       "balance": "Powiadomienia o saldzie",
-      "security": "Wykryte problemy z bezpieczeństwem"
+      "security": "Wykryte problemy z bezpieczeństwem",
+      "agent": "Sesje agenta"
     },
     "category": {
       "chatMessagesSubtitle": "odpowiedzi w twoich rozmowach",

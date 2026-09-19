@@ -293,11 +293,11 @@
     "previewFullDescription": "ロック画面の通知にメッセージ本文を表示します。",
     "previewGenericDescription": "通知では新しい動きがあったことだけを知らせます。内容を読むにはKiloを開いてください。",
     "channel": {
-      "agent": "エージェントセッション",
       "chat": "チャットメッセージ",
       "kiloclaw": "KiloClawのアクティビティ",
       "balance": "残高アラート",
-      "security": "セキュリティの検出事項"
+      "security": "セキュリティの検出事項",
+      "agent": "エージェントセッション"
     },
     "category": {
       "chatMessagesSubtitle": "会話内の返信",

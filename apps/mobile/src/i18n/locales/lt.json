@@ -801,11 +801,11 @@
     "previewFullDescription": "Užrakinimo ekrane rodomas pranešimų žinučių tekstas.",
     "previewGenericDescription": "Pranešimai tik informuoja apie įvykį. Norėdami perskaityti žinutę, atidarykite Kilo.",
     "channel": {
-      "agent": "Agentų sesijos",
       "chat": "Pokalbių žinutės",
       "kiloclaw": "KiloClaw veikla",
       "balance": "Įspėjimai apie likutį",
-      "security": "Saugos problemos"
+      "security": "Saugos problemos",
+      "agent": "Agentų sesijos"
     },
     "category": {
       "chatMessagesSubtitle": "atsakymai jūsų pokalbiuose",

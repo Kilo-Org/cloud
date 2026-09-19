@@ -3,7 +3,9 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ImageResult } from 'expo-image-manipulator';
+import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { AGENT_ATTACHMENT_MAX_BYTES } from './constants';
 import {
   type AgentAttachment,
@@ -461,6 +463,44 @@ describe('addCandidates uploads documents at selection (Step 2)', () => {
     expect(chip?.terminal).toBe(true);
     expect(chip?.metadataStripFailed).toBe(true);
     expect(hoisted.uploadOne).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('renders the limit warning with the plural noun for the total it names', async () => {
+    const renderer = await mountHook();
+    // Four chips already fill the composer (max 5), so a two-file selection
+    // admits one and the warning fires. English carries the plural noun in
+    // every category, so the sentence reads "1 of 2 files" — never "1 of 2
+    // file".
+    await act(async () => {
+      hookApi().restoreFileParts(
+        Array.from({ length: 4 }, (_, index) => ({
+          filename: `existing-${index}.pdf`,
+          mime: 'application/pdf',
+          url: `https://r2.example.com/attachments/user-1/cloud-agent/msg-uuid-1/existing-${index}.pdf`,
+        }))
+      );
+      await settle();
+    });
+    vi.mocked(toast.warning).mockClear();
+    const translate = vi.spyOn(i18n, 't');
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'a.pdf', uri: 'file:///cache/a.pdf' },
+        { name: 'b.pdf', uri: 'file:///cache/b.pdf' },
+      ]);
+    });
+    // The admitted count selects the plural category: it is the numeral a
+    // catalog's own grammar inflects the warning's noun on ("1 fichier"),
+    // while the total the user selected only fills the interpolation. Picking
+    // the category from the selected total would render a plural noun beside
+    // the singular numeral in those catalogs.
+    expect(translate).toHaveBeenCalledWith(
+      'agentChat.attachmentPicker.onlyAddingFiles',
+      expect.objectContaining({ count: 1 })
+    );
+    expect(toast.warning).toHaveBeenCalledWith('Only adding 1 of 2 files (max 5)');
+    translate.mockRestore();
     renderer.unmount();
   });
 });

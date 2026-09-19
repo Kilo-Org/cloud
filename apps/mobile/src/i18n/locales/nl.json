@@ -265,11 +265,11 @@
   },
   "notifications": {
     "channel": {
-      "agent": "Agentsessies",
       "chat": "Chatberichten",
       "kiloclaw": "KiloClaw-activiteit",
       "balance": "Saldowaarschuwingen",
-      "security": "Beveiligingsbevindingen"
+      "security": "Beveiligingsbevindingen",
+      "agent": "Agentsessies"
     },
     "category": {
       "chatMessagesSubtitle": "antwoorden in je gesprekken",

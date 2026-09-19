@@ -783,11 +783,11 @@
     "previewFullDescription": "Njoftimet shfaqin tekstin e mesazhit në ekranin e kyçjes.",
     "previewGenericDescription": "Njoftimet tregojnë se diçka ndodhi. Hap Kilo për ta lexuar.",
     "channel": {
-      "agent": "Seancat e agjentit",
       "chat": "Mesazhet e bisedës",
       "kiloclaw": "Aktiviteti i KiloClaw",
       "balance": "Njoftimet për gjendjen e llogarisë",
-      "security": "Gjetjet e sigurisë"
+      "security": "Gjetjet e sigurisë",
+      "agent": "Seancat e agjentit"
     },
     "category": {
       "chatMessagesSubtitle": "përgjigje në bisedat e tua",

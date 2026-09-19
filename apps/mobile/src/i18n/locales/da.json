@@ -783,11 +783,11 @@
     "previewFullDescription": "Notifikationer viser beskedteksten på din låseskærm.",
     "previewGenericDescription": "Notifikationer viser kun, at der er sket noget. Åbn Kilo for at læse beskeden.",
     "channel": {
-      "agent": "Agentsessioner",
       "chat": "Chatbeskeder",
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Advarsler om saldo",
-      "security": "Sikkerhedsfund"
+      "security": "Sikkerhedsfund",
+      "agent": "Agentsessioner"
     },
     "category": {
       "chatMessagesSubtitle": "svar i dine samtaler",

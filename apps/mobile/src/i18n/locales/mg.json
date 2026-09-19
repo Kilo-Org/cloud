@@ -783,11 +783,11 @@
     "previewFullDescription": "Asehon'ny fampandrenesana eo amin'ny efijery mihidy ny soratry ny hafatra.",
     "previewGenericDescription": "Mampiseho fa nisy zava-nitranga ny fampandrenesana. Sokafy ny Kilo hamakiana ny hafatra.",
     "channel": {
-      "agent": "Fotoam-piasan'ny mpanampy",
       "chat": "Hafatra amin'ny resaka",
       "kiloclaw": "Hetsika ao amin'ny KiloClaw",
       "balance": "Fampitandremana momba ny vola sisa",
-      "security": "Olana hita amin'ny fiarovana"
+      "security": "Olana hita amin'ny fiarovana",
+      "agent": "Fotoam-piasan'ny mpanampy"
     },
     "category": {
       "chatMessagesSubtitle": "valiny amin'ny resakao",

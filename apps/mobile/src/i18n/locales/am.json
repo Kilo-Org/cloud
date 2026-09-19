@@ -783,11 +783,11 @@
     "previewFullDescription": "ማሳወቂያዎች በመቆለፊያ ማያ ገጽዎ ላይ የመልእክቱን ጽሑፍ ያሳያሉ።",
     "previewGenericDescription": "ማሳወቂያዎች አንድ ነገር እንደተከሰተ ያሳያሉ። መልእክቱን ለማንበብ Kiloን ይክፈቱ።",
     "channel": {
-      "agent": "የወኪል ክፍለ ጊዜዎች",
       "chat": "የውይይት መልእክቶች",
       "kiloclaw": "የKiloClaw እንቅስቃሴ",
       "balance": "የቀሪ ሂሳብ ማስጠንቀቂያዎች",
-      "security": "የደህንነት ግኝቶች"
+      "security": "የደህንነት ግኝቶች",
+      "agent": "የወኪል ክፍለ ጊዜዎች"
     },
     "category": {
       "chatMessagesSubtitle": "በውይይቶችዎ ውስጥ የሚሰጡ ምላሾች",

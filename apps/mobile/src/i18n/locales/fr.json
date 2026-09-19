@@ -234,6 +234,15 @@
     "emptyTitle": "Aucun profil pour l'instant",
     "emptyDescription": "Créez un profil pour réutiliser les variables d'environnement, les commandes de configuration et les compétences au fil des sessions.",
     "loadFailed": "Impossible de charger les profils",
+    "counts": {
+      "vars": "{{count}} variables",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} compétences",
+      "commands": "{{count}} commandes",
+      "varsShort": "{{count}}var",
+      "skillsShort": "{{count}}comp",
+      "commandsShort": "{{count}}cmd"
+    },
     "nameLabel": "Nom du profil",
     "namePlaceholder": "par ex. Débogage back-end",
     "descriptionLabel": "Description du profil",
@@ -258,12 +267,15 @@
     "variablesTitle": "Variables d'environnement",
     "addVariable": "Ajouter une variable",
     "keyLabel": "Clé",
+    "keyTooLong": "La clé doit contenir 256 caractères ou moins",
     "valueLabel": "Valeur",
     "secretLabel": "Secrète",
     "secrets": {
       "markSecret": "Marquer comme secret",
       "masked": "Valeur cachée",
-      "reveal": "Révéler la valeur"
+      "reveal": "Révéler la valeur",
+      "newValuePlaceholder": "Saisir une nouvelle valeur secrète",
+      "valuePlaceholder": "Valeur secrète (chiffrée)"
     },
     "variablesEmpty": "Aucune variable pour l'instant",
     "variablesSaveFailed": "Impossible d'enregistrer la variable",

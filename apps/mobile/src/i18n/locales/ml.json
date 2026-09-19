@@ -234,6 +234,15 @@
     "emptyTitle": "ഇതുവരെ പ്രൊഫൈലുകളൊന്നുമില്ല",
     "emptyDescription": "സെഷനുകളിലുടനീളമുള്ള എൻവയോൺമെൻ്റ് വേരിയബിളുകൾ, സജ്ജീകരണ കമാൻഡുകൾ, കഴിവുകൾ എന്നിവ പുനരുപയോഗിക്കാൻ ഒരു പ്രൊഫൈൽ സൃഷ്‌ടിക്കുക.",
     "loadFailed": "പ്രൊഫൈലുകൾ ലോഡ് ചെയ്യാനായില്ല",
+    "counts": {
+      "vars": "{{count}} വേരിയബിളുകൾ",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} കഴിവുകൾ",
+      "commands": "{{count}} കമാൻഡുകൾ",
+      "varsShort": "{{count}}വ",
+      "skillsShort": "{{count}}ക",
+      "commandsShort": "{{count}}കമ"
+    },
     "nameLabel": "പ്രൊഫൈൽ പേര്",
     "namePlaceholder": "ഉദാ. ബാക്കെൻഡ് ഡീബഗ്ഗിംഗ്",
     "descriptionLabel": "പ്രൊഫൈൽ വിവരണം",
@@ -258,12 +267,15 @@
     "variablesTitle": "പരിസ്ഥിതി വേരിയബിളുകൾ",
     "addVariable": "വേരിയബിൾ ചേർക്കുക",
     "keyLabel": "താക്കോൽ",
+    "keyTooLong": "കീയിൽ 256 അക്ഷരങ്ങളോ അതിൽ കുറവോ ഉണ്ടായിരിക്കണം",
     "valueLabel": "മൂല്യം",
     "secretLabel": "രഹസ്യം",
     "secrets": {
       "markSecret": "രഹസ്യമായി അടയാളപ്പെടുത്തുക",
       "masked": "മറഞ്ഞിരിക്കുന്ന മൂല്യം",
-      "reveal": "മൂല്യം വെളിപ്പെടുത്തുക"
+      "reveal": "മൂല്യം വെളിപ്പെടുത്തുക",
+      "newValuePlaceholder": "പുതിയ രഹസ്യ മൂല്യം നൽകുക",
+      "valuePlaceholder": "രഹസ്യ മൂല്യം (എൻക്രിപ്റ്റ് ചെയ്തത്)"
     },
     "variablesEmpty": "ഇതുവരെ വേരിയബിളുകളൊന്നുമില്ല",
     "variablesSaveFailed": "വേരിയബിൾ സംരക്ഷിക്കാൻ കഴിഞ്ഞില്ല",

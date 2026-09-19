@@ -234,6 +234,15 @@
     "emptyTitle": "ยังไม่มีโปรไฟล์",
     "emptyDescription": "สร้างโปรไฟล์เพื่อนำตัวแปรสภาพแวดล้อม คำสั่งการตั้งค่า และทักษะมาใช้ซ้ำในเซสชันต่างๆ",
     "loadFailed": "ไม่สามารถโหลดโปรไฟล์ได้",
+    "counts": {
+      "vars": "{{count}} ตัวแปร",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ทักษะ",
+      "commands": "{{count}} คำสั่ง",
+      "varsShort": "{{count}}ต",
+      "skillsShort": "{{count}}ท",
+      "commandsShort": "{{count}}ค"
+    },
     "nameLabel": "ชื่อโปรไฟล์",
     "namePlaceholder": "เช่น การแก้ไขข้อบกพร่องแบ็กเอนด์",
     "descriptionLabel": "คำอธิบายโปรไฟล์",
@@ -258,12 +267,15 @@
     "variablesTitle": "ตัวแปรสภาพแวดล้อม",
     "addVariable": "เพิ่มตัวแปร",
     "keyLabel": "สำคัญ",
+    "keyTooLong": "คีย์ต้องมี 256 อักขระหรือน้อยกว่า",
     "valueLabel": "ค่า",
     "secretLabel": "ความลับ",
     "secrets": {
       "markSecret": "ทำเครื่องหมายว่าเป็นความลับ",
       "masked": "คุณค่าที่ซ่อนอยู่",
-      "reveal": "เผยคุณค่า"
+      "reveal": "เผยคุณค่า",
+      "newValuePlaceholder": "ป้อนค่าเป็นความลับใหม่",
+      "valuePlaceholder": "ค่าเป็นความลับ (เข้ารหัสแล้ว)"
     },
     "variablesEmpty": "ยังไม่มีตัวแปร",
     "variablesSaveFailed": "ไม่สามารถบันทึกตัวแปรได้",

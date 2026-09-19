@@ -234,6 +234,15 @@
     "emptyTitle": "Zatím žádné profily",
     "emptyDescription": "Vytvořte profil pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi.",
     "loadFailed": "Profily se nepodařilo načíst",
+    "counts": {
+      "vars": "{{count}} proměnných",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} dovedností",
+      "commands": "{{count}} příkazů",
+      "varsShort": "{{count}}prom",
+      "skillsShort": "{{count}}dov",
+      "commandsShort": "{{count}}pří"
+    },
     "nameLabel": "Název profilu",
     "namePlaceholder": "např. Ladění backendu",
     "descriptionLabel": "Popis profilu",
@@ -258,12 +267,15 @@
     "variablesTitle": "Proměnné prostředí",
     "addVariable": "Přidat proměnnou",
     "keyLabel": "Klíč",
+    "keyTooLong": "Klíč musí mít 256 znaků nebo méně",
     "valueLabel": "Hodnota",
     "secretLabel": "Tajný",
     "secrets": {
       "markSecret": "Označit jako tajné",
       "masked": "Skrytá hodnota",
-      "reveal": "Odhalit hodnotu"
+      "reveal": "Odhalit hodnotu",
+      "newValuePlaceholder": "Zadejte novou tajnou hodnotu",
+      "valuePlaceholder": "Tajná hodnota (šifrovaná)"
     },
     "variablesEmpty": "Zatím žádné proměnné",
     "variablesSaveFailed": "Proměnnou se nepodařilo uložit",

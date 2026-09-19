@@ -234,6 +234,15 @@
     "emptyTitle": "තවම පැතිකඩ නැත",
     "emptyDescription": "සැසි හරහා පරිසර විචල්‍ය, සැකසුම් විධාන සහ කුසලතා නැවත භාවිතා කිරීමට පැතිකඩක් සාදන්න.",
     "loadFailed": "පැතිකඩ පූරණය කළ නොහැකි විය",
+    "counts": {
+      "vars": "{{count}} විචල්ය",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} කුසලතා",
+      "commands": "{{count}} විධාන",
+      "varsShort": "{{count}}වි",
+      "skillsShort": "{{count}}කු",
+      "commandsShort": "{{count}}විධ"
+    },
     "nameLabel": "පැතිකඩ නම",
     "namePlaceholder": "උදා. පසුපෙළ නිදොස්කරණය",
     "descriptionLabel": "පැතිකඩ විස්තරය",
@@ -258,12 +267,15 @@
     "variablesTitle": "පාරිසරික විචල්යයන්",
     "addVariable": "විචල්‍ය එකතු කරන්න",
     "keyLabel": "යතුර",
+    "keyTooLong": "යතුර අක්ෂර 256ක් හෝ ඊට අඩු විය යුතුය",
     "valueLabel": "වටිනාකම",
     "secretLabel": "රහස",
     "secrets": {
       "markSecret": "රහසක් ලෙස සලකුණු කරන්න",
       "masked": "සැඟවුණු අගය",
-      "reveal": "වටිනාකම හෙළි කරන්න"
+      "reveal": "වටිනාකම හෙළි කරන්න",
+      "newValuePlaceholder": "නව රහස් අගයක් ඇතුළත් කරන්න",
+      "valuePlaceholder": "රහස් අගය (සංකේතනය කළ)"
     },
     "variablesEmpty": "තවමත් විචල්‍ය නොමැත",
     "variablesSaveFailed": "විචල්‍යය සුරැකීමට නොහැකි විය",

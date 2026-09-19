@@ -234,6 +234,15 @@
     "emptyTitle": "እስካሁን ምንም መገለጫዎች የሉም",
     "emptyDescription": "የአካባቢ ተለዋዋጮችን፣ የማዋቀር ትዕዛዞችን እና በክፍለ-ጊዜዎች ያሉ ክህሎቶችን እንደገና ለመጠቀም መገለጫ ይፍጠሩ።",
     "loadFailed": "መገለጫዎችን መጫን አልተቻለም",
+    "counts": {
+      "vars": "{{count}} ተለዋዋጮች",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ችሎታዎች",
+      "commands": "{{count}} ትዕዛዞች",
+      "varsShort": "{{count}}ተ",
+      "skillsShort": "{{count}}ች",
+      "commandsShort": "{{count}}ት"
+    },
     "nameLabel": "የመገለጫ ስም",
     "namePlaceholder": "ለምሳሌ. የጀርባ ማረም",
     "descriptionLabel": "የመገለጫ መግለጫ",
@@ -258,12 +267,15 @@
     "variablesTitle": "የአካባቢ ተለዋዋጮች",
     "addVariable": "ተለዋዋጭ ያክሉ",
     "keyLabel": "ቁልፍ",
+    "keyTooLong": "ቁልፉ 256 ቁምፊዎች ወይም ከዚያ ያነሰ መሆን አለበት",
     "valueLabel": "ዋጋ",
     "secretLabel": "ምስጢር",
     "secrets": {
       "markSecret": "እንደ ምስጢር ምልክት ያድርጉ",
       "masked": "የተደበቀ እሴት",
-      "reveal": "ዋጋን አሳይ"
+      "reveal": "ዋጋን አሳይ",
+      "newValuePlaceholder": "አዲስ ምስጢራዊ ዋጋ ያስገቡ",
+      "valuePlaceholder": "ምስጢራዊ ዋጋ (የተመሰጠረ)"
     },
     "variablesEmpty": "እስካሁን ምንም ተለዋዋጮች የሉም",
     "variablesSaveFailed": "ተለዋዋጭ ማስቀመጥ አልተቻለም",

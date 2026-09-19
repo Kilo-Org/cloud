@@ -234,6 +234,15 @@
     "emptyTitle": "아직 프로필이 없습니다.",
     "emptyDescription": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 프로필을 만듭니다.",
     "loadFailed": "프로필을 로드할 수 없습니다.",
+    "counts": {
+      "vars": "{{count}} 변수",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} 스킬",
+      "commands": "{{count}} 명령",
+      "varsShort": "{{count}}변",
+      "skillsShort": "{{count}}스",
+      "commandsShort": "{{count}}명"
+    },
     "nameLabel": "프로필 이름",
     "namePlaceholder": "예를 들어 백엔드 디버깅",
     "descriptionLabel": "프로필 설명",
@@ -258,12 +267,15 @@
     "variablesTitle": "환경변수",
     "addVariable": "변수 추가",
     "keyLabel": "열쇠",
+    "keyTooLong": "키는 256자 이하여야 합니다",
     "valueLabel": "값",
     "secretLabel": "비밀",
     "secrets": {
       "markSecret": "비밀로 표시",
       "masked": "숨겨진 가치",
-      "reveal": "가치 공개"
+      "reveal": "가치 공개",
+      "newValuePlaceholder": "새 비밀 값 입력",
+      "valuePlaceholder": "비밀 값(암호화됨)"
     },
     "variablesEmpty": "아직 변수가 없습니다.",
     "variablesSaveFailed": "변수를 저장할 수 없습니다.",

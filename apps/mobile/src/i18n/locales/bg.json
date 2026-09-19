@@ -234,6 +234,15 @@
     "emptyTitle": "Все още няма профили",
     "emptyDescription": "Създайте профил за повторно използване на променливи на средата, команди за настройка и умения в сесиите.",
     "loadFailed": "Профилите не можаха да се заредят",
+    "counts": {
+      "vars": "{{count}} променливи",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} умения",
+      "commands": "{{count}} команди",
+      "varsShort": "{{count}}п",
+      "skillsShort": "{{count}}у",
+      "commandsShort": "{{count}}к"
+    },
     "nameLabel": "Име на профила",
     "namePlaceholder": "напр. Отстраняване на грешки в задната част",
     "descriptionLabel": "Описание на профила",
@@ -258,12 +267,15 @@
     "variablesTitle": "Променливи на средата",
     "addVariable": "Добавете променлива",
     "keyLabel": "Ключ",
+    "keyTooLong": "Ключът трябва да е 256 знака или по-малко",
     "valueLabel": "Стойност",
     "secretLabel": "Тайна",
     "secrets": {
       "markSecret": "Маркирайте като секретно",
       "masked": "Скрита стойност",
-      "reveal": "Разкриване на стойност"
+      "reveal": "Разкриване на стойност",
+      "newValuePlaceholder": "Въведете нова тайна стойност",
+      "valuePlaceholder": "Тайна стойност (криптирана)"
     },
     "variablesEmpty": "Все още няма променливи",
     "variablesSaveFailed": "Променливата не можа да бъде запазена",

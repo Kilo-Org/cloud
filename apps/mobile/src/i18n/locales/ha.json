@@ -234,6 +234,15 @@
     "emptyTitle": "Babu bayanan martaba tukuna",
     "emptyDescription": "Ƙirƙirar bayanin martaba don sake amfani da masu canjin yanayi, umarnin saitin, da ƙwarewa a cikin zaman.",
     "loadFailed": "An kasa loda bayanan martaba",
+    "counts": {
+      "vars": "{{count}} masu canji",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ƙwarewa",
+      "commands": "{{count}} umarni",
+      "varsShort": "{{count}}m",
+      "skillsShort": "{{count}}ƙ",
+      "commandsShort": "{{count}}u"
+    },
     "nameLabel": "Sunan bayanin martaba",
     "namePlaceholder": "misali Gyaran baya",
     "descriptionLabel": "Bayanin bayanin martaba",
@@ -258,12 +267,15 @@
     "variablesTitle": "Matsalolin muhalli",
     "addVariable": "Ƙara m",
     "keyLabel": "Maɓalli",
+    "keyTooLong": "Maɓalli dole ya zama haruffa 256 ko ƙasa da haka",
     "valueLabel": "Daraja",
     "secretLabel": "Sirrin",
     "secrets": {
       "markSecret": "Yi alama a matsayin sirri",
       "masked": "Ƙimar ɓoye",
-      "reveal": "Bayyana darajar"
+      "reveal": "Bayyana darajar",
+      "newValuePlaceholder": "Shigar da sabuwar ƙimar sirri",
+      "valuePlaceholder": "Ƙimar sirri (an ɓoye)"
     },
     "variablesEmpty": "Babu masu canji tukuna",
     "variablesSaveFailed": "An kasa ajiye canji",

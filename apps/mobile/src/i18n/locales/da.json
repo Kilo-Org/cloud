@@ -234,6 +234,15 @@
     "emptyTitle": "Ingen profiler endnu",
     "emptyDescription": "Opret en profil for at genbruge miljøvariabler, opsætningskommandoer og færdigheder på tværs af sessioner.",
     "loadFailed": "Kunne ikke indlæse profiler",
+    "counts": {
+      "vars": "{{count}} variabler",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} færdigheder",
+      "commands": "{{count}} kommandoer",
+      "varsShort": "{{count}}var",
+      "skillsShort": "{{count}}fæ",
+      "commandsShort": "{{count}}kom"
+    },
     "nameLabel": "Profilnavn",
     "namePlaceholder": "f.eks. Backend debugging",
     "descriptionLabel": "Profilbeskrivelse",
@@ -258,12 +267,15 @@
     "variablesTitle": "Miljøvariabler",
     "addVariable": "Tilføj variabel",
     "keyLabel": "Nøgle",
+    "keyTooLong": "Nøglen må højst være 256 tegn",
     "valueLabel": "Værdi",
     "secretLabel": "Hemmelighed",
     "secrets": {
       "markSecret": "Markér som hemmelig",
       "masked": "Skjult værdi",
-      "reveal": "Afsløre værdi"
+      "reveal": "Afsløre værdi",
+      "newValuePlaceholder": "Indtast ny hemmelig værdi",
+      "valuePlaceholder": "Hemmelig værdi (krypteret)"
     },
     "variablesEmpty": "Ingen variabler endnu",
     "variablesSaveFailed": "Variablen kunne ikke gemmes",

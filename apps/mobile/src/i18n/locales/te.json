@@ -234,6 +234,15 @@
     "emptyTitle": "ఇంకా ప్రొఫైల్‌లు లేవు",
     "emptyDescription": "సెషన్‌లలో ఎన్విరాన్‌మెంట్ వేరియబుల్స్, సెటప్ కమాండ్‌లు మరియు స్కిల్స్‌ని మళ్లీ ఉపయోగించేందుకు ప్రొఫైల్‌ను సృష్టించండి.",
     "loadFailed": "ప్రొఫైల్‌లను లోడ్ చేయడం సాధ్యపడలేదు",
+    "counts": {
+      "vars": "{{count}} వేరియబుల్స్",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} నైపుణ్యాలు",
+      "commands": "{{count}} ఆదేశాలు",
+      "varsShort": "{{count}}వే",
+      "skillsShort": "{{count}}నై",
+      "commandsShort": "{{count}}ఆ"
+    },
     "nameLabel": "ప్రొఫైల్ పేరు",
     "namePlaceholder": "ఉదా బ్యాకెండ్ డీబగ్గింగ్",
     "descriptionLabel": "ప్రొఫైల్ వివరణ",
@@ -258,12 +267,15 @@
     "variablesTitle": "పర్యావరణ వేరియబుల్స్",
     "addVariable": "వేరియబుల్ జోడించండి",
     "keyLabel": "కీ",
+    "keyTooLong": "కీ 256 అక్షరాలు లేదా తక్కువ ఉండాలి",
     "valueLabel": "విలువ",
     "secretLabel": "రహస్యం",
     "secrets": {
       "markSecret": "రహస్యంగా గుర్తించండి",
       "masked": "దాచిన విలువ",
-      "reveal": "విలువను బహిర్గతం చేయండి"
+      "reveal": "విలువను బహిర్గతం చేయండి",
+      "newValuePlaceholder": "కొత్త రహస్య విలువను నమోదు చేయండి",
+      "valuePlaceholder": "రహస్య విలువ (ఎన్క్రిప్ట్ చేయబడింది)"
     },
     "variablesEmpty": "ఇంకా వేరియబుల్స్ లేవు",
     "variablesSaveFailed": "వేరియబుల్‌ని సేవ్ చేయడం సాధ్యపడలేదు",

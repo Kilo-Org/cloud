@@ -234,6 +234,15 @@
     "emptyTitle": "Դեռևս պրոֆիլներ չկան",
     "emptyDescription": "Ստեղծեք պրոֆիլ՝ շրջակա միջավայրի փոփոխականները, կարգաբերման հրամանները և հմտությունները սեսիաներում կրկին օգտագործելու համար:",
     "loadFailed": "Չհաջողվեց բեռնել պրոֆիլները",
+    "counts": {
+      "vars": "{{count}} փոփոխական",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} հմտություն",
+      "commands": "{{count}} հրաման",
+      "varsShort": "{{count}}փ",
+      "skillsShort": "{{count}}հ",
+      "commandsShort": "{{count}}հր"
+    },
     "nameLabel": "Պրոֆիլի անունը",
     "namePlaceholder": "օր. Backend-ի վրիպազերծում",
     "descriptionLabel": "Պրոֆիլի նկարագրություն",
@@ -258,12 +267,15 @@
     "variablesTitle": "Շրջակա միջավայրի փոփոխականներ",
     "addVariable": "Ավելացնել փոփոխական",
     "keyLabel": "Բանալին",
+    "keyTooLong": "Բանալին պետք է լինի 256 նիշ կամ ավելի քիչ",
     "valueLabel": "Արժեք",
     "secretLabel": "Գաղտնիք",
     "secrets": {
       "markSecret": "Նշել որպես գաղտնի",
       "masked": "Թաքնված արժեք",
-      "reveal": "Բացահայտել արժեքը"
+      "reveal": "Բացահայտել արժեքը",
+      "newValuePlaceholder": "Մուտքագրեք նոր գաղտնի արժեք",
+      "valuePlaceholder": "Գաղտնի արժեք (գաղտնագրված)"
     },
     "variablesEmpty": "Փոփոխականներ դեռ չկան",
     "variablesSaveFailed": "Չհաջողվեց պահպանել փոփոխականը",

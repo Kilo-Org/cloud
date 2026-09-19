@@ -234,6 +234,15 @@
     "emptyTitle": "अद्याप कोणतेही प्रोफाइल नाहीत",
     "emptyDescription": "संपूर्ण सत्रांमध्ये पर्यावरण व्हेरिएबल्स, सेटअप कमांड आणि कौशल्ये पुन्हा वापरण्यासाठी प्रोफाइल तयार करा.",
     "loadFailed": "प्रोफाइल लोड करू शकलो नाही",
+    "counts": {
+      "vars": "{{count}} चल",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} कौशल्य",
+      "commands": "{{count}} कमांड",
+      "varsShort": "{{count}}च",
+      "skillsShort": "{{count}}क",
+      "commandsShort": "{{count}}कम"
+    },
     "nameLabel": "प्रोफाइल नाव",
     "namePlaceholder": "उदा. बॅकएंड डीबगिंग",
     "descriptionLabel": "प्रोफाइल वर्णन",
@@ -258,12 +267,15 @@
     "variablesTitle": "पर्यावरण परिवर्तने",
     "addVariable": "व्हेरिएबल जोडा",
     "keyLabel": "की",
+    "keyTooLong": "की 256 अक्षरे किंवा कमी असावी",
     "valueLabel": "मूल्य",
     "secretLabel": "गुप्त",
     "secrets": {
       "markSecret": "गुप्त म्हणून चिन्हांकित करा",
       "masked": "लपलेले मूल्य",
-      "reveal": "मूल्य प्रकट करा"
+      "reveal": "मूल्य प्रकट करा",
+      "newValuePlaceholder": "नवीन गुप्त मूल्य प्रविष्ट करा",
+      "valuePlaceholder": "गुप्त मूल्य (एन्क्रिप्ट केलेले)"
     },
     "variablesEmpty": "अद्याप कोणतेही व्हेरिएबल्स नाहीत",
     "variablesSaveFailed": "व्हेरिएबल सेव्ह करू शकलो नाही",

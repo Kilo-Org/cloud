@@ -234,6 +234,15 @@
     "emptyTitle": "अहिलेसम्म कुनै प्रोफाइल छैन",
     "emptyDescription": "वातावरण चरहरू, सेटअप आदेशहरू, र सत्रहरूमा सीपहरू पुन: प्रयोग गर्न प्रोफाइल सिर्जना गर्नुहोस्।",
     "loadFailed": "प्रोफाइलहरू लोड गर्न सकिएन",
+    "counts": {
+      "vars": "{{count}} चर",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} सीप",
+      "commands": "{{count}} आदेश",
+      "varsShort": "{{count}}च",
+      "skillsShort": "{{count}}स",
+      "commandsShort": "{{count}}आ"
+    },
     "nameLabel": "प्रोफाइल नाम",
     "namePlaceholder": "जस्तै ब्याकएन्ड डिबगिङ",
     "descriptionLabel": "प्रोफाइल विवरण",
@@ -258,12 +267,15 @@
     "variablesTitle": "वातावरण चर",
     "addVariable": "चर थप्नुहोस्",
     "keyLabel": "कुञ्जी",
+    "keyTooLong": "कुञ्जी 256 अक्षर वा कम हुनुपर्छ",
     "valueLabel": "मूल्य",
     "secretLabel": "गोप्य",
     "secrets": {
       "markSecret": "गोप्य रूपमा चिन्ह लगाउनुहोस्",
       "masked": "लुकेको मूल्य",
-      "reveal": "मूल्य प्रकट गर्नुहोस्"
+      "reveal": "मूल्य प्रकट गर्नुहोस्",
+      "newValuePlaceholder": "नयाँ गोप्य मान प्रविष्ट गर्नुहोस्",
+      "valuePlaceholder": "गोप्य मान (इन्क्रिप्ट गरिएको)"
     },
     "variablesEmpty": "अहिलेसम्म कुनै चर छैन",
     "variablesSaveFailed": "चर बचत गर्न सकिएन",

@@ -234,6 +234,15 @@
     "emptyTitle": "Zatiaľ žiadne profily",
     "emptyDescription": "Vytvorte profil na opätovné použitie premenných prostredia, príkazov nastavenia a zručností v rámci relácií.",
     "loadFailed": "Profily sa nepodarilo načítať",
+    "counts": {
+      "vars": "{{count}} premenných",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} zručností",
+      "commands": "{{count}} príkazov",
+      "varsShort": "{{count}}pre",
+      "skillsShort": "{{count}}zru",
+      "commandsShort": "{{count}}prí"
+    },
     "nameLabel": "Názov profilu",
     "namePlaceholder": "napr. Ladenie backendu",
     "descriptionLabel": "Popis profilu",
@@ -258,12 +267,15 @@
     "variablesTitle": "Premenné prostredia",
     "addVariable": "Pridať premennú",
     "keyLabel": "kľúč",
+    "keyTooLong": "Kľúč môže mať maximálne 256 znakov",
     "valueLabel": "Hodnota",
     "secretLabel": "Tajomstvo",
     "secrets": {
       "markSecret": "Označiť ako tajné",
       "masked": "Skrytá hodnota",
-      "reveal": "Odhaliť hodnotu"
+      "reveal": "Odhaliť hodnotu",
+      "newValuePlaceholder": "Zadajte novú tajnú hodnotu",
+      "valuePlaceholder": "Tajná hodnota (šifrovaná)"
     },
     "variablesEmpty": "Zatiaľ žiadne premenné",
     "variablesSaveFailed": "Premennú sa nepodarilo uložiť",

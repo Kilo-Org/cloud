@@ -234,6 +234,15 @@
     "emptyTitle": "Chưa có hồ sơ nào",
     "emptyDescription": "Tạo hồ sơ để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên.",
     "loadFailed": "Không thể tải hồ sơ",
+    "counts": {
+      "vars": "{{count}} biến",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} kỹ năng",
+      "commands": "{{count}} lệnh",
+      "varsShort": "{{count}}b",
+      "skillsShort": "{{count}}k",
+      "commandsShort": "{{count}}l"
+    },
     "nameLabel": "Tên hồ sơ",
     "namePlaceholder": "ví dụ. Gỡ lỗi phụ trợ",
     "descriptionLabel": "Mô tả hồ sơ",
@@ -258,12 +267,15 @@
     "variablesTitle": "Biến môi trường",
     "addVariable": "Thêm biến",
     "keyLabel": "Chìa khóa",
+    "keyTooLong": "Khóa phải có 256 ký tự hoặc ít hơn",
     "valueLabel": "Giá trị",
     "secretLabel": "Bí mật",
     "secrets": {
       "markSecret": "Đánh dấu là bí mật",
       "masked": "Giá trị ẩn",
-      "reveal": "Tiết lộ giá trị"
+      "reveal": "Tiết lộ giá trị",
+      "newValuePlaceholder": "Nhập giá trị bí mật mới",
+      "valuePlaceholder": "Giá trị bí mật (đã mã hóa)"
     },
     "variablesEmpty": "Chưa có biến nào",
     "variablesSaveFailed": "Không thể lưu biến",

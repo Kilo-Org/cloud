@@ -234,6 +234,15 @@
     "emptyTitle": "अभी तक कोई प्रोफ़ाइल नहीं",
     "emptyDescription": "सभी सत्रों में पर्यावरण चर, सेटअप कमांड और कौशल का पुन: उपयोग करने के लिए एक प्रोफ़ाइल बनाएं।",
     "loadFailed": "प्रोफ़ाइल लोड नहीं हो सकीं",
+    "counts": {
+      "vars": "{{count}} चर",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} कौशल",
+      "commands": "{{count}} आदेश",
+      "varsShort": "{{count}}च",
+      "skillsShort": "{{count}}क",
+      "commandsShort": "{{count}}आ"
+    },
     "nameLabel": "प्रोफ़ाइल नाम",
     "namePlaceholder": "जैसे बैकएंड डिबगिंग",
     "descriptionLabel": "प्रोफाइल विवरण",
@@ -258,12 +267,15 @@
     "variablesTitle": "पर्यावरण चर",
     "addVariable": "वेरिएबल जोड़ें",
     "keyLabel": "चाबी",
+    "keyTooLong": "कुंजी 256 अक्षरों या उससे कम की होनी चाहिए",
     "valueLabel": "कीमत",
     "secretLabel": "गुप्त",
     "secrets": {
       "markSecret": "रहस्य के रूप में चिह्नित करें",
       "masked": "छिपा हुआ मूल्य",
-      "reveal": "मूल्य प्रकट करें"
+      "reveal": "मूल्य प्रकट करें",
+      "newValuePlaceholder": "नया गुप्त मान दर्ज करें",
+      "valuePlaceholder": "गुप्त मान (एन्क्रिप्टेड)"
     },
     "variablesEmpty": "अभी तक कोई चर नहीं",
     "variablesSaveFailed": "वेरिएबल सहेजा नहीं जा सका",

@@ -234,6 +234,15 @@
     "emptyTitle": "Ще немає профілів",
     "emptyDescription": "Створіть профіль, щоб повторно використовувати змінні середовища, команди налаштування та навички під час сеансів.",
     "loadFailed": "Не вдалося завантажити профілі",
+    "counts": {
+      "vars": "{{count}} змінних",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} навичок",
+      "commands": "{{count}} команд",
+      "varsShort": "{{count}}зм",
+      "skillsShort": "{{count}}нав",
+      "commandsShort": "{{count}}ком"
+    },
     "nameLabel": "Ім'я профілю",
     "namePlaceholder": "напр. Бекенд налагодження",
     "descriptionLabel": "Опис профілю",
@@ -258,12 +267,15 @@
     "variablesTitle": "Змінні середовища",
     "addVariable": "Додайте змінну",
     "keyLabel": "ключ",
+    "keyTooLong": "Ключ має містити не більше 256 символів",
     "valueLabel": "Значення",
     "secretLabel": "Секрет",
     "secrets": {
       "markSecret": "Позначити як секрет",
       "masked": "Прихована цінність",
-      "reveal": "Розкрийте значення"
+      "reveal": "Розкрийте значення",
+      "newValuePlaceholder": "Введіть нове секретне значення",
+      "valuePlaceholder": "Секретне значення (зашифровано)"
     },
     "variablesEmpty": "Ще немає змінних",
     "variablesSaveFailed": "Не вдалося зберегти змінну",

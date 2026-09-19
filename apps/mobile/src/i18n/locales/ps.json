@@ -234,6 +234,15 @@
     "emptyTitle": "تراوسه هیڅ پروفایل نشته",
     "emptyDescription": "د چاپیریال متغیرونو ، تنظیم کولو امرونو ، او په غونډو کې مهارتونه د بیا کارولو لپاره پروفایل رامینځته کړئ.",
     "loadFailed": "پروفایلونه نشي پورته کولی",
+    "counts": {
+      "vars": "{{count}} تغیرات",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} مهارتونه",
+      "commands": "{{count}} امرونه",
+      "varsShort": "{{count}}ت",
+      "skillsShort": "{{count}}م",
+      "commandsShort": "{{count}}ا"
+    },
     "nameLabel": "د پروفایل نوم",
     "namePlaceholder": "د مثال په توګه د شاتړ ډیبګ کول",
     "descriptionLabel": "د پروفایل توضیحات",
@@ -258,12 +267,15 @@
     "variablesTitle": "د چاپیریال تغیرات",
     "addVariable": "متغیر اضافه کړئ",
     "keyLabel": "کلید",
+    "keyTooLong": "کلید باید 256 توري یا لږ وي",
     "valueLabel": "ارزښت",
     "secretLabel": "پټه",
     "secrets": {
       "markSecret": "د پټ په توګه نښه کړئ",
       "masked": "پټ ارزښت",
-      "reveal": "ارزښت څرګند کړئ"
+      "reveal": "ارزښت څرګند کړئ",
+      "newValuePlaceholder": "نوی پټ ارزښت ولیکئ",
+      "valuePlaceholder": "پټ ارزښت (کوډ شوی)"
     },
     "variablesEmpty": "تر اوسه کوم تغیرات نشته",
     "variablesSaveFailed": "متغیر خوندي نه شو",

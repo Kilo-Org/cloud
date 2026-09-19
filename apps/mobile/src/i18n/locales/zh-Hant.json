@@ -234,6 +234,15 @@
     "emptyTitle": "還沒有設定檔",
     "emptyDescription": "建立設定檔以跨會話重複使用環境變數、設定命令和技能。",
     "loadFailed": "無法載入設定檔",
+    "counts": {
+      "vars": "{{count}} 個變數",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} 個技能",
+      "commands": "{{count}} 個命令",
+      "varsShort": "{{count}}變",
+      "skillsShort": "{{count}}技",
+      "commandsShort": "{{count}}命"
+    },
     "nameLabel": "設定檔名稱",
     "namePlaceholder": "例如後端偵錯",
     "descriptionLabel": "設定檔說明",
@@ -258,12 +267,15 @@
     "variablesTitle": "環境變數",
     "addVariable": "新增變數",
     "keyLabel": "鍵",
+    "keyTooLong": "鍵不能超過 256 個字元",
     "valueLabel": "值",
     "secretLabel": "秘密",
     "secrets": {
       "markSecret": "標記為秘密",
       "masked": "隱藏值",
-      "reveal": "顯示值"
+      "reveal": "顯示值",
+      "newValuePlaceholder": "輸入新的秘密值",
+      "valuePlaceholder": "秘密值（已加密）"
     },
     "variablesEmpty": "還沒有變數",
     "variablesSaveFailed": "無法保存變數",

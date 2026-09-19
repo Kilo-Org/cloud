@@ -234,6 +234,15 @@
     "emptyTitle": "还没有配置文件",
     "emptyDescription": "创建配置文件以跨会话重复使用环境变量、设置命令和技能。",
     "loadFailed": "无法加载配置文件",
+    "counts": {
+      "vars": "{{count}} 个变量",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} 个技能",
+      "commands": "{{count}} 个命令",
+      "varsShort": "{{count}}变",
+      "skillsShort": "{{count}}技",
+      "commandsShort": "{{count}}命"
+    },
     "nameLabel": "配置文件名称",
     "namePlaceholder": "例如后端调试",
     "descriptionLabel": "配置文件说明",
@@ -258,12 +267,15 @@
     "variablesTitle": "环境变量",
     "addVariable": "添加变量",
     "keyLabel": "键",
+    "keyTooLong": "键不能超过 256 个字符",
     "valueLabel": "值",
     "secretLabel": "秘密",
     "secrets": {
       "markSecret": "标记为秘密",
       "masked": "隐藏值",
-      "reveal": "显示值"
+      "reveal": "显示值",
+      "newValuePlaceholder": "输入新的秘密值",
+      "valuePlaceholder": "秘密值（已加密）"
     },
     "variablesEmpty": "还没有变量",
     "variablesSaveFailed": "无法保存变量",

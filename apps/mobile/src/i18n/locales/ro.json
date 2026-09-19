@@ -234,6 +234,15 @@
     "emptyTitle": "Niciun profil încă",
     "emptyDescription": "Creați un profil pentru a reutiliza variabilele de mediu, comenzile de configurare și abilitățile în sesiuni.",
     "loadFailed": "Profilurile nu au putut fi încărcate",
+    "counts": {
+      "vars": "{{count}} variabile",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} abilități",
+      "commands": "{{count}} comenzi",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}a",
+      "commandsShort": "{{count}}c"
+    },
     "nameLabel": "Numele profilului",
     "namePlaceholder": "de ex. Depanare backend",
     "descriptionLabel": "Descrierea profilului",
@@ -258,12 +267,15 @@
     "variablesTitle": "Variabile de mediu",
     "addVariable": "Adăugați o variabilă",
     "keyLabel": "Cheie",
+    "keyTooLong": "Cheia trebuie să aibă 256 de caractere sau mai puțin",
     "valueLabel": "Valoare",
     "secretLabel": "Secret",
     "secrets": {
       "markSecret": "Marcați ca secret",
       "masked": "Valoare ascunsă",
-      "reveal": "Dezvăluie valoarea"
+      "reveal": "Dezvăluie valoarea",
+      "newValuePlaceholder": "Introdu o nouă valoare secretă",
+      "valuePlaceholder": "Valoare secretă (criptată)"
     },
     "variablesEmpty": "Încă nu există variabile",
     "variablesSaveFailed": "Variabila nu a putut fi salvată",

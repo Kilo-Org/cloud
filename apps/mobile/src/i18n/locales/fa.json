@@ -234,6 +234,15 @@
     "emptyTitle": "هنوز پروفایلی وجود ندارد",
     "emptyDescription": "یک نمایه برای استفاده مجدد از متغیرهای محیطی، دستورات راه‌اندازی و مهارت‌ها در جلسات ایجاد کنید.",
     "loadFailed": "نمایه ها بارگیری نشد",
+    "counts": {
+      "vars": "{{count}} متغیر",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} مهارت",
+      "commands": "{{count}} فرمان",
+      "varsShort": "{{count}}متغ",
+      "skillsShort": "{{count}}مهار",
+      "commandsShort": "{{count}}ف"
+    },
     "nameLabel": "نام پروفایل",
     "namePlaceholder": "به عنوان مثال اشکال زدایی باطن",
     "descriptionLabel": "توضیحات پروفایل",
@@ -258,12 +267,15 @@
     "variablesTitle": "متغیرهای محیطی",
     "addVariable": "متغیر اضافه کنید",
     "keyLabel": "کلید",
+    "keyTooLong": "کلید باید 256 نویسه یا کمتر باشد",
     "valueLabel": "ارزش",
     "secretLabel": "راز",
     "secrets": {
       "markSecret": "علامت گذاری به عنوان راز",
       "masked": "ارزش پنهان",
-      "reveal": "ارزش را آشکار کند"
+      "reveal": "ارزش را آشکار کند",
+      "newValuePlaceholder": "مقدار مخفی جدید را وارد کنید",
+      "valuePlaceholder": "مقدار مخفی (رمزگذاری شده)"
     },
     "variablesEmpty": "هنوز هیچ متغیری وجود ندارد",
     "variablesSaveFailed": "متغیر ذخیره نشد",

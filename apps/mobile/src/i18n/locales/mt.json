@@ -234,6 +234,15 @@
     "emptyTitle": "Għadu l-ebda profil",
     "emptyDescription": "Oħloq profil biex tuża mill-ġdid il-varjabbli ambjentali, il-kmandi tas-setup, u l-ħiliet matul is-sessjonijiet.",
     "loadFailed": "Ma setgħetx tagħbija profili",
+    "counts": {
+      "vars": "{{count}} varjabbli",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ħiliet",
+      "commands": "{{count}} kmandi",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}ħ",
+      "commandsShort": "{{count}}km"
+    },
     "nameLabel": "Isem tal-profil",
     "namePlaceholder": "eż. Debugging backend",
     "descriptionLabel": "Deskrizzjoni tal-profil",
@@ -258,12 +267,15 @@
     "variablesTitle": "Varjabbli ambjentali",
     "addVariable": "Żid varjabbli",
     "keyLabel": "Ewlenin",
+    "keyTooLong": "L-ewlenin irid ikun 256 karattru jew inqas",
     "valueLabel": "Valur",
     "secretLabel": "Sigriet",
     "secrets": {
       "markSecret": "Immarka bħala sigriet",
       "masked": "Valur moħbi",
-      "reveal": "Ikxef il-valur"
+      "reveal": "Ikxef il-valur",
+      "newValuePlaceholder": "Daħħal valur sigriet ġdid",
+      "valuePlaceholder": "Valur sigriet (inkriptat)"
     },
     "variablesEmpty": "S'issa l-ebda varjabbli",
     "variablesSaveFailed": "Ma setgħetx tissejvja l-varjabbli",

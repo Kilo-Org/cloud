@@ -234,6 +234,15 @@
     "emptyTitle": "Сè уште нема профили",
     "emptyDescription": "Создадете профил за повторна употреба на променливи на околината, команди за поставување и вештини низ сесиите.",
     "loadFailed": "Не може да се вчитаат профилите",
+    "counts": {
+      "vars": "{{count}} променливи",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} вештини",
+      "commands": "{{count}} команди",
+      "varsShort": "{{count}}п",
+      "skillsShort": "{{count}}в",
+      "commandsShort": "{{count}}к"
+    },
     "nameLabel": "Име на профилот",
     "namePlaceholder": "на пр. Дебагирање на задниот дел",
     "descriptionLabel": "Опис на профилот",
@@ -258,12 +267,15 @@
     "variablesTitle": "Променливи на животната средина",
     "addVariable": "Додадете променлива",
     "keyLabel": "Клуч",
+    "keyTooLong": "Клучот мора да има 256 знаци или помалку",
     "valueLabel": "Вредност",
     "secretLabel": "Тајна",
     "secrets": {
       "markSecret": "Означи како тајна",
       "masked": "Скриена вредност",
-      "reveal": "Откријте вредност"
+      "reveal": "Откријте вредност",
+      "newValuePlaceholder": "Внесете нова тајна вредност",
+      "valuePlaceholder": "Тајна вредност (шифрирана)"
     },
     "variablesEmpty": "Сè уште нема променливи",
     "variablesSaveFailed": "Не може да се зачува променливата",

@@ -234,6 +234,15 @@
     "emptyTitle": "Henüz profil yok",
     "emptyDescription": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir profil oluşturun.",
     "loadFailed": "Profiller yüklenemedi",
+    "counts": {
+      "vars": "{{count}} değişken",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} yetenek",
+      "commands": "{{count}} komut",
+      "varsShort": "{{count}}d",
+      "skillsShort": "{{count}}y",
+      "commandsShort": "{{count}}k"
+    },
     "nameLabel": "Profil adı",
     "namePlaceholder": "örneğin Arka uç hata ayıklaması",
     "descriptionLabel": "Profil açıklaması",
@@ -258,12 +267,15 @@
     "variablesTitle": "Ortam değişkenleri",
     "addVariable": "Değişken ekle",
     "keyLabel": "Anahtar",
+    "keyTooLong": "Anahtar en fazla 256 karakter olmalıdır",
     "valueLabel": "Değer",
     "secretLabel": "Gizli",
     "secrets": {
       "markSecret": "Gizli olarak işaretle",
       "masked": "Gizli değer",
-      "reveal": "Değeri ortaya çıkarın"
+      "reveal": "Değeri ortaya çıkarın",
+      "newValuePlaceholder": "Yeni gizli değer girin",
+      "valuePlaceholder": "Gizli değer (şifrelenmiş)"
     },
     "variablesEmpty": "Henüz değişken yok",
     "variablesSaveFailed": "Değişken kaydedilemedi",

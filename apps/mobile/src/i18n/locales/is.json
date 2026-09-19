@@ -234,6 +234,15 @@
     "emptyTitle": "Engir prófílar ennþá",
     "emptyDescription": "Búðu til prófíl til að endurnýta umhverfisbreytur, uppsetningarskipanir og færni yfir lotur.",
     "loadFailed": "Ekki tókst að hlaða prófílum",
+    "counts": {
+      "vars": "{{count}} breytur",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} færni",
+      "commands": "{{count}} skipanir",
+      "varsShort": "{{count}}b",
+      "skillsShort": "{{count}}f",
+      "commandsShort": "{{count}}s"
+    },
     "nameLabel": "Nafn prófíls",
     "namePlaceholder": "t.d. Bakenda villuleit",
     "descriptionLabel": "Prófíllýsing",
@@ -258,12 +267,15 @@
     "variablesTitle": "Umhverfisbreytur",
     "addVariable": "Bæta við breytu",
     "keyLabel": "Lykill",
+    "keyTooLong": "Lykillinn má vera að hámarki 256 stafir",
     "valueLabel": "Gildi",
     "secretLabel": "Leyndarmál",
     "secrets": {
       "markSecret": "Merktu sem leyndarmál",
       "masked": "Falið gildi",
-      "reveal": "Sýndu gildi"
+      "reveal": "Sýndu gildi",
+      "newValuePlaceholder": "Sláðu inn nýtt leynilegt gildi",
+      "valuePlaceholder": "Leynilegt gildi (dulkóðað)"
     },
     "variablesEmpty": "Engar breytur ennþá",
     "variablesSaveFailed": "Ekki tókst að vista breytu",

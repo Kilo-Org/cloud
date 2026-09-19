@@ -234,6 +234,15 @@
     "emptyTitle": "Tiada profil lagi",
     "emptyDescription": "Buat profil untuk menggunakan semula pembolehubah persekitaran, arahan persediaan dan kemahiran merentas sesi.",
     "loadFailed": "Tidak dapat memuatkan profil",
+    "counts": {
+      "vars": "{{count}} pembolehubah",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} kemahiran",
+      "commands": "{{count}} perintah",
+      "varsShort": "{{count}}pb",
+      "skillsShort": "{{count}}k",
+      "commandsShort": "{{count}}pr"
+    },
     "nameLabel": "Nama profil",
     "namePlaceholder": "cth. Penyahpepijatan bahagian belakang",
     "descriptionLabel": "Perihalan profil",
@@ -258,12 +267,15 @@
     "variablesTitle": "Pembolehubah persekitaran",
     "addVariable": "Tambah pembolehubah",
     "keyLabel": "kunci",
+    "keyTooLong": "Kunci mestilah 256 aksara atau kurang",
     "valueLabel": "Nilai",
     "secretLabel": "Rahsia",
     "secrets": {
       "markSecret": "Tandakan sebagai rahsia",
       "masked": "Nilai tersembunyi",
-      "reveal": "Mendedahkan nilai"
+      "reveal": "Mendedahkan nilai",
+      "newValuePlaceholder": "Masukkan nilai rahsia baharu",
+      "valuePlaceholder": "Nilai rahsia (disulitkan)"
     },
     "variablesEmpty": "Tiada pembolehubah lagi",
     "variablesSaveFailed": "Tidak dapat menyimpan pembolehubah",

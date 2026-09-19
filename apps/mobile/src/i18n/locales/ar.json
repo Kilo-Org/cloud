@@ -234,6 +234,15 @@
     "emptyTitle": "لا توجد ملفات شخصية حتى الآن",
     "emptyDescription": "قم بإنشاء ملف تعريف لإعادة استخدام متغيرات البيئة وأوامر الإعداد والمهارات عبر الجلسات.",
     "loadFailed": "تعذر تحميل الملفات الشخصية",
+    "counts": {
+      "vars": "{{count}} متغيرات",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} مهارات",
+      "commands": "{{count}} أوامر",
+      "varsShort": "{{count}}مت",
+      "skillsShort": "{{count}}مه",
+      "commandsShort": "{{count}}أ"
+    },
     "nameLabel": "اسم الملف الشخصي",
     "namePlaceholder": "على سبيل المثال تصحيح أخطاء الواجهة الخلفية",
     "descriptionLabel": "وصف الملف الشخصي",
@@ -258,12 +267,15 @@
     "variablesTitle": "متغيرات البيئة",
     "addVariable": "إضافة متغير",
     "keyLabel": "مفتاح",
+    "keyTooLong": "يجب ألا يزيد المفتاح عن 256 حرفًا",
     "valueLabel": "قيمة",
     "secretLabel": "سر",
     "secrets": {
       "markSecret": "ضع علامة على أنها سرية",
       "masked": "القيمة المخفية",
-      "reveal": "كشف القيمة"
+      "reveal": "كشف القيمة",
+      "newValuePlaceholder": "أدخل قيمة سرية جديدة",
+      "valuePlaceholder": "قيمة سرية (مشفرة)"
     },
     "variablesEmpty": "لا توجد متغيرات بعد",
     "variablesSaveFailed": "تعذر حفظ المتغير",

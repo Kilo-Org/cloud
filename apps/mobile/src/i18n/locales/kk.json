@@ -234,6 +234,15 @@
     "emptyTitle": "Әзірге профильдер жоқ",
     "emptyDescription": "Орташа айнымалы мәндерді, орнату пәрмендерін және сеанстардағы дағдыларды қайта пайдалану үшін профиль жасаңыз.",
     "loadFailed": "Профильдерді жүктеу мүмкін болмады",
+    "counts": {
+      "vars": "{{count}} айнымалы",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} дағды",
+      "commands": "{{count}} пәрмен",
+      "varsShort": "{{count}}а",
+      "skillsShort": "{{count}}д",
+      "commandsShort": "{{count}}п"
+    },
     "nameLabel": "Профиль аты",
     "namePlaceholder": "мысалы Backend жөндеу",
     "descriptionLabel": "Профиль сипаттамасы",
@@ -258,12 +267,15 @@
     "variablesTitle": "Қоршаған ортаның айнымалылары",
     "addVariable": "Айнымалыны қосыңыз",
     "keyLabel": "Кілт",
+    "keyTooLong": "Кілт 256 таңбадан аспауы керек",
     "valueLabel": "Мән",
     "secretLabel": "Құпия",
     "secrets": {
       "markSecret": "Құпия деп белгілеңіз",
       "masked": "Жасырын мән",
-      "reveal": "Құндылық таныту"
+      "reveal": "Құндылық таныту",
+      "newValuePlaceholder": "Жаңа құпия мәнді енгізіңіз",
+      "valuePlaceholder": "Құпия мән (шифрланған)"
     },
     "variablesEmpty": "Айнымалылар әлі жоқ",
     "variablesSaveFailed": "Айнымалы мәнді сақтау мүмкін болмады",

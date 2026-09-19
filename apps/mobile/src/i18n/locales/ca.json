@@ -234,6 +234,15 @@
     "emptyTitle": "Encara no hi ha perfils",
     "emptyDescription": "Creeu un perfil per reutilitzar variables d'entorn, ordres de configuració i habilitats entre sessions.",
     "loadFailed": "No s'han pogut carregar els perfils",
+    "counts": {
+      "vars": "{{count}} variables",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} habilitats",
+      "commands": "{{count}} ordres",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}h",
+      "commandsShort": "{{count}}o"
+    },
     "nameLabel": "Nom del perfil",
     "namePlaceholder": "p. ex. Depuració del backend",
     "descriptionLabel": "Descripció del perfil",
@@ -258,12 +267,15 @@
     "variablesTitle": "Variables d'entorn",
     "addVariable": "Afegeix variable",
     "keyLabel": "clau",
+    "keyTooLong": "La clau ha de tenir 256 caràcters o menys",
     "valueLabel": "Valor",
     "secretLabel": "Secret",
     "secrets": {
       "markSecret": "Marca com a secret",
       "masked": "Valor ocult",
-      "reveal": "Revelar valor"
+      "reveal": "Revelar valor",
+      "newValuePlaceholder": "Introdueix un valor secret nou",
+      "valuePlaceholder": "Valor secret (xifrat)"
     },
     "variablesEmpty": "Encara no hi ha variables",
     "variablesSaveFailed": "No s'ha pogut desar la variable",

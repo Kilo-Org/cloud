@@ -234,6 +234,15 @@
     "emptyTitle": "Még nincsenek profilok",
     "emptyDescription": "Hozzon létre egy profilt a környezeti változók, a beállítási parancsok és a készségek munkamenetek közötti újrafelhasználásához.",
     "loadFailed": "Nem sikerült betölteni a profilokat",
+    "counts": {
+      "vars": "{{count}} változó",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} készség",
+      "commands": "{{count}} parancs",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}k",
+      "commandsShort": "{{count}}p"
+    },
     "nameLabel": "Profil neve",
     "namePlaceholder": "például Háttérbeli hibakeresés",
     "descriptionLabel": "Profil leírása",
@@ -258,12 +267,15 @@
     "variablesTitle": "Környezeti változók",
     "addVariable": "Változó hozzáadása",
     "keyLabel": "Kulcsfontosságú",
+    "keyTooLong": "A kulcs legfeljebb 256 karakter lehet",
     "valueLabel": "Érték",
     "secretLabel": "Titkos",
     "secrets": {
       "markSecret": "Jelölje meg titkosként",
       "masked": "Rejtett érték",
-      "reveal": "Érték feltárása"
+      "reveal": "Érték feltárása",
+      "newValuePlaceholder": "Adj meg új titkos értéket",
+      "valuePlaceholder": "Titkos érték (titkosítva)"
     },
     "variablesEmpty": "Még nincsenek változók",
     "variablesSaveFailed": "Nem sikerült menteni a változót",

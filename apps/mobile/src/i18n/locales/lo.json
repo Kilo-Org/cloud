@@ -234,6 +234,15 @@
     "emptyTitle": "ບໍ່ມີໂປຣໄຟລ໌ເທື່ອ",
     "emptyDescription": "ສ້າງໂປຣໄຟລ໌ເພື່ອນຳໃຊ້ຕົວແປສະພາບແວດລ້ອມຄືນໃໝ່, ຕັ້ງຄ່າຄຳສັ່ງ ແລະທັກສະຕ່າງໆໃນທົ່ວເຊດຊັນ.",
     "loadFailed": "ບໍ່ສາມາດໂຫຼດໂປຣໄຟລ໌ໄດ້",
+    "counts": {
+      "vars": "{{count}} ຕົວແປ",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ທັກສະ",
+      "commands": "{{count}} ຄຳສັ່ງ",
+      "varsShort": "{{count}}ຕ",
+      "skillsShort": "{{count}}ທ",
+      "commandsShort": "{{count}}ຄ"
+    },
     "nameLabel": "ຊື່ໂປຣໄຟລ໌",
     "namePlaceholder": "ຕົວຢ່າງ: ການດີບັກດ້ານຫຼັງ",
     "descriptionLabel": "ລາຍລະອຽດໂປຣໄຟລ໌",
@@ -258,12 +267,15 @@
     "variablesTitle": "ຕົວແປສະພາບແວດລ້ອມ",
     "addVariable": "ເພີ່ມຕົວແປ",
     "keyLabel": "ກະແຈ",
+    "keyTooLong": "ກະແຈຕ້ອງມີ 256 ຕົວອັກສອນ ຫຼື ໜ້ອຍກວ່າ",
     "valueLabel": "ມູນຄ່າ",
     "secretLabel": "ຄວາມລັບ",
     "secrets": {
       "markSecret": "ໝາຍເປັນຄວາມລັບ",
       "masked": "ຄ່າທີ່ເຊື່ອງໄວ້",
-      "reveal": "ເປີດເຜີຍມູນຄ່າ"
+      "reveal": "ເປີດເຜີຍມູນຄ່າ",
+      "newValuePlaceholder": "ປ້ອນມູນຄ່າຄວາມລັບໃໝ່",
+      "valuePlaceholder": "ມູນຄ່າຄວາມລັບ (ເຂົ້າລະຫັດແລ້ວ)"
     },
     "variablesEmpty": "ບໍ່ມີຕົວແປເທື່ອ",
     "variablesSaveFailed": "ບໍ່ສາມາດບັນທຶກຕົວແປໄດ້",

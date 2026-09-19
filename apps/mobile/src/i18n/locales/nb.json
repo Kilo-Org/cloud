@@ -234,6 +234,15 @@
     "emptyTitle": "Ingen profiler ennå",
     "emptyDescription": "Opprett en profil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter.",
     "loadFailed": "Kunne ikke laste inn profiler",
+    "counts": {
+      "vars": "{{count}} variabler",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ferdigheter",
+      "commands": "{{count}} kommandoer",
+      "varsShort": "{{count}}var",
+      "skillsShort": "{{count}}fer",
+      "commandsShort": "{{count}}kom"
+    },
     "nameLabel": "Profilnavn",
     "namePlaceholder": "f.eks. Backend-feilsøking",
     "descriptionLabel": "Profilbeskrivelse",
@@ -258,12 +267,15 @@
     "variablesTitle": "Miljøvariabler",
     "addVariable": "Legg til variabel",
     "keyLabel": "Nøkkel",
+    "keyTooLong": "Nøkkelen kan ha høyst 256 tegn",
     "valueLabel": "Verdi",
     "secretLabel": "Hemmelig",
     "secrets": {
       "markSecret": "Merk som hemmelig",
       "masked": "Skjult verdi",
-      "reveal": "Avslør verdi"
+      "reveal": "Avslør verdi",
+      "newValuePlaceholder": "Skriv inn ny hemmelig verdi",
+      "valuePlaceholder": "Hemmelig verdi (kryptert)"
     },
     "variablesEmpty": "Ingen variabler ennå",
     "variablesSaveFailed": "Kunne ikke lagre variabelen",

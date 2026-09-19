@@ -234,6 +234,15 @@
     "emptyTitle": "Hələ profil yoxdur",
     "emptyDescription": "Mühit dəyişənlərindən, quraşdırma əmrlərindən və sessiyalar arasında bacarıqlardan təkrar istifadə etmək üçün profil yaradın.",
     "loadFailed": "Profilləri yükləmək mümkün olmadı",
+    "counts": {
+      "vars": "{{count}} dəyişən",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} bacarıq",
+      "commands": "{{count}} əmr",
+      "varsShort": "{{count}}d",
+      "skillsShort": "{{count}}b",
+      "commandsShort": "{{count}}ə"
+    },
     "nameLabel": "Profil adı",
     "namePlaceholder": "məs. Backend sazlama",
     "descriptionLabel": "Profil təsviri",
@@ -258,12 +267,15 @@
     "variablesTitle": "Ətraf mühit dəyişənləri",
     "addVariable": "Dəyişən əlavə edin",
     "keyLabel": "Açar",
+    "keyTooLong": "Açar 256 simvol və ya daha az olmalıdır",
     "valueLabel": "Dəyər",
     "secretLabel": "Gizli",
     "secrets": {
       "markSecret": "Gizli olaraq qeyd edin",
       "masked": "Gizli dəyər",
-      "reveal": "Dəyəri aşkar etmək"
+      "reveal": "Dəyəri aşkar etmək",
+      "newValuePlaceholder": "Yeni gizli dəyər daxil edin",
+      "valuePlaceholder": "Gizli dəyər (şifrələnmiş)"
     },
     "variablesEmpty": "Hələ heç bir dəyişən yoxdur",
     "variablesSaveFailed": "Dəyişən yadda saxlamaq mümkün olmadı",

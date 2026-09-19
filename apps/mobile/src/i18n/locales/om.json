@@ -234,6 +234,15 @@
     "emptyTitle": "Ammatti piroofaayilii hin jiru",
     "emptyDescription": "Jijjiiramoota naannoo, ajajoota saaguu, fi dandeettiiwwan turtii hunda irra deebi'ee fayyadamuuf piroofaayilii uumi.",
     "loadFailed": "Profaayilii fe'uu hin dandeenye",
+    "counts": {
+      "vars": "{{count}} jijjiiramoota",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} dandeettiiwwan",
+      "commands": "{{count}} ajajoota",
+      "varsShort": "{{count}}j",
+      "skillsShort": "{{count}}d",
+      "commandsShort": "{{count}}a"
+    },
     "nameLabel": "Maqaa piroofaayilii",
     "namePlaceholder": "fkn. Backend sirreessuu",
     "descriptionLabel": "Ibsa piroofaayilii",
@@ -258,12 +267,15 @@
     "variablesTitle": "Jijjiiramoota naannoo",
     "addVariable": "Jijjiiramaa itti dabali",
     "keyLabel": "Furtuu",
+    "keyTooLong": "Furtuun 256 arfii ykn isaa gadi ta'uu qaba",
     "valueLabel": "Gatii",
     "secretLabel": "Icitii",
     "secrets": {
       "markSecret": "Akka iccitiitti Mallatteessi",
       "masked": "Gatii dhokataa",
-      "reveal": "Gatii mul'isuu"
+      "reveal": "Gatii mul'isuu",
+      "newValuePlaceholder": "Gatii iccitii haaraa galchi",
+      "valuePlaceholder": "Gatii iccitii (dhoksame)"
     },
     "variablesEmpty": "Jijjiiramoota hanga ammaatti hin jiran",
     "variablesSaveFailed": "Jijjiiramaa qusachuu hin dandeenye",

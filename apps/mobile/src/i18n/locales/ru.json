@@ -234,6 +234,15 @@
     "emptyTitle": "Пока нет профилей",
     "emptyDescription": "Создайте профиль для повторного использования переменных среды, команд настройки и навыков в разных сеансах.",
     "loadFailed": "Не удалось загрузить профили",
+    "counts": {
+      "vars": "{{count}} переменных",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} навыков",
+      "commands": "{{count}} команд",
+      "varsShort": "{{count}}пер",
+      "skillsShort": "{{count}}нав",
+      "commandsShort": "{{count}}ком"
+    },
     "nameLabel": "Имя профиля",
     "namePlaceholder": "например Серверная отладка",
     "descriptionLabel": "Описание профиля",
@@ -258,12 +267,15 @@
     "variablesTitle": "Переменные среды",
     "addVariable": "Добавить переменную",
     "keyLabel": "Ключ",
+    "keyTooLong": "Ключ должен содержать не более 256 символов",
     "valueLabel": "Ценить",
     "secretLabel": "Секрет",
     "secrets": {
       "markSecret": "Отметить как секретное",
       "masked": "Скрытое значение",
-      "reveal": "Раскрыть ценность"
+      "reveal": "Раскрыть ценность",
+      "newValuePlaceholder": "Введите новое секретное значение",
+      "valuePlaceholder": "Секретное значение (зашифровано)"
     },
     "variablesEmpty": "Переменных пока нет",
     "variablesSaveFailed": "Не удалось сохранить переменную",

@@ -234,6 +234,15 @@
     "emptyTitle": "Pa gen pwofil ankò",
     "emptyDescription": "Kreye yon pwofil pou reitilize varyab anviwònman yo, lòd konfigirasyon, ak ladrès atravè sesyon yo.",
     "loadFailed": "Pa t 'kapab chaje pwofil yo",
+    "counts": {
+      "vars": "{{count}} varyab",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} konpetans",
+      "commands": "{{count}} kòmandman",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}k",
+      "commandsShort": "{{count}}kò"
+    },
     "nameLabel": "Non pwofil la",
     "namePlaceholder": "pa egzanp Backend debogaj",
     "descriptionLabel": "Deskripsyon Profile",
@@ -258,12 +267,15 @@
     "variablesTitle": "Varyab anviwònman an",
     "addVariable": "Ajoute varyab",
     "keyLabel": "Kle",
+    "keyTooLong": "Kle a dwe gen 256 karaktè oswa mwens",
     "valueLabel": "Valè",
     "secretLabel": "Sekrè",
     "secrets": {
       "markSecret": "Make kòm sekrè",
       "masked": "Valè kache",
-      "reveal": "Revele valè"
+      "reveal": "Revele valè",
+      "newValuePlaceholder": "Antre yon nouvo valè sekrè",
+      "valuePlaceholder": "Valè sekrè (chifre)"
     },
     "variablesEmpty": "Pa gen varyab ankò",
     "variablesSaveFailed": "Pa t 'kapab sove varyab",

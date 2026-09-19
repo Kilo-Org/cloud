@@ -234,6 +234,15 @@
     "emptyTitle": "Še ni profilov",
     "emptyDescription": "Ustvarite profil za ponovno uporabo spremenljivk okolja, nastavitvenih ukazov in veščin med sejami.",
     "loadFailed": "Profilov ni bilo mogoče naložiti",
+    "counts": {
+      "vars": "{{count}} spremenljivk",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} spretnosti",
+      "commands": "{{count}} ukazov",
+      "varsShort": "{{count}}s",
+      "skillsShort": "{{count}}sp",
+      "commandsShort": "{{count}}u"
+    },
     "nameLabel": "Ime profila",
     "namePlaceholder": "npr. Odpravljanje napak v ozadju",
     "descriptionLabel": "Opis profila",
@@ -258,12 +267,15 @@
     "variablesTitle": "Spremenljivke okolja",
     "addVariable": "Dodajte spremenljivko",
     "keyLabel": "Ključ",
+    "keyTooLong": "Ključ ima lahko največ 256 znakov",
     "valueLabel": "Vrednost",
     "secretLabel": "Skrivnost",
     "secrets": {
       "markSecret": "Označi kot skrivnost",
       "masked": "Skrita vrednost",
-      "reveal": "Razkrij vrednost"
+      "reveal": "Razkrij vrednost",
+      "newValuePlaceholder": "Vnesite novo skrivno vrednost",
+      "valuePlaceholder": "Skrivna vrednost (šifrirana)"
     },
     "variablesEmpty": "Ni še spremenljivk",
     "variablesSaveFailed": "Spremenljivke ni bilo mogoče shraniti",

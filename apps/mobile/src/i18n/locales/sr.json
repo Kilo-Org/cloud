@@ -234,6 +234,15 @@
     "emptyTitle": "Još nema profila",
     "emptyDescription": "Napravite profil da biste ponovo koristili promenljive okruženja, komande za podešavanje i veštine u svim sesijama.",
     "loadFailed": "Učitavanje profila nije uspelo",
+    "counts": {
+      "vars": "{{count}} promenljivi",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} veština",
+      "commands": "{{count}} komandi",
+      "varsShort": "{{count}}pro",
+      "skillsShort": "{{count}}veš",
+      "commandsShort": "{{count}}kom"
+    },
     "nameLabel": "Ime profila",
     "namePlaceholder": "npr. Backend otklanjanje grešaka",
     "descriptionLabel": "Opis profila",
@@ -258,12 +267,15 @@
     "variablesTitle": "Promenljive okruženja",
     "addVariable": "Dodaj promenljivu",
     "keyLabel": "Ključ",
+    "keyTooLong": "Ključ može imati najviše 256 znakova",
     "valueLabel": "Vrednost",
     "secretLabel": "Tajna",
     "secrets": {
       "markSecret": "Označi kao tajnu",
       "masked": "Skrivena vrednost",
-      "reveal": "Otkrijte vrednost"
+      "reveal": "Otkrijte vrednost",
+      "newValuePlaceholder": "Unesite novu tajnu vrednost",
+      "valuePlaceholder": "Tajna vrednost (šifrovana)"
     },
     "variablesEmpty": "Još nema promenljivih",
     "variablesSaveFailed": "Nije moguće sačuvati promenljivu",

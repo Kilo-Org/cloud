@@ -234,6 +234,15 @@
     "emptyTitle": "Vēl nav neviena profila",
     "emptyDescription": "Izveidojiet profilu, lai sesijās atkārtoti izmantotu vides mainīgos, iestatīšanas komandas un prasmes.",
     "loadFailed": "Nevarēja ielādēt profilus",
+    "counts": {
+      "vars": "{{count}} mainīgo",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} prasmju",
+      "commands": "{{count}} komandu",
+      "varsShort": "{{count}}m",
+      "skillsShort": "{{count}}p",
+      "commandsShort": "{{count}}k"
+    },
     "nameLabel": "Profila nosaukums",
     "namePlaceholder": "piem. Aizmugursistēmas atkļūdošana",
     "descriptionLabel": "Profila apraksts",
@@ -258,12 +267,15 @@
     "variablesTitle": "Vides mainīgie",
     "addVariable": "Pievienot mainīgo",
     "keyLabel": "Atslēga",
+    "keyTooLong": "Atslēgai jābūt 256 rakstzīmēm vai mazāk",
     "valueLabel": "Vērtība",
     "secretLabel": "Noslēpums",
     "secrets": {
       "markSecret": "Atzīmēt kā noslēpumu",
       "masked": "Slēptā vērtība",
-      "reveal": "Atklāj vērtību"
+      "reveal": "Atklāj vērtību",
+      "newValuePlaceholder": "Ievadiet jaunu slepenu vērtību",
+      "valuePlaceholder": "Slepena vērtība (šifrēta)"
     },
     "variablesEmpty": "Vēl nav mainīgo",
     "variablesSaveFailed": "Nevarēja saglabāt mainīgo",

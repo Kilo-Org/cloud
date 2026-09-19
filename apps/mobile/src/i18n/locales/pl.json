@@ -234,6 +234,15 @@
     "emptyTitle": "Nie ma jeszcze profili",
     "emptyDescription": "Utwórz profil, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach.",
     "loadFailed": "Nie udało się załadować profili",
+    "counts": {
+      "vars": "{{count}} zmiennych",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} umiejętności",
+      "commands": "{{count}} poleceń",
+      "varsShort": "{{count}}z",
+      "skillsShort": "{{count}}u",
+      "commandsShort": "{{count}}p"
+    },
     "nameLabel": "Nazwa profilu",
     "namePlaceholder": "np. Debugowanie backendu",
     "descriptionLabel": "Opis profilu",
@@ -258,12 +267,15 @@
     "variablesTitle": "Zmienne środowiskowe",
     "addVariable": "Dodaj zmienną",
     "keyLabel": "Klawisz",
+    "keyTooLong": "Klucz może mieć maksymalnie 256 znaków",
     "valueLabel": "Wartość",
     "secretLabel": "Sekret",
     "secrets": {
       "markSecret": "Oznacz jako tajne",
       "masked": "Ukryta wartość",
-      "reveal": "Ujawnij wartość"
+      "reveal": "Ujawnij wartość",
+      "newValuePlaceholder": "Wprowadź nową tajną wartość",
+      "valuePlaceholder": "Tajna wartość (zaszyfrowana)"
     },
     "variablesEmpty": "Nie ma jeszcze zmiennych",
     "variablesSaveFailed": "Nie udało się zapisać zmiennej",

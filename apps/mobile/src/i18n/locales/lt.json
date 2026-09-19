@@ -234,6 +234,15 @@
     "emptyTitle": "Dar nėra profilių",
     "emptyDescription": "Sukurkite profilį, kad seansų metu pakartotinai naudotumėte aplinkos kintamuosius, sąrankos komandas ir įgūdžius.",
     "loadFailed": "Nepavyko įkelti profilių",
+    "counts": {
+      "vars": "{{count}} kintamųjų",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} įgūdžių",
+      "commands": "{{count}} komandų",
+      "varsShort": "{{count}}k",
+      "skillsShort": "{{count}}į",
+      "commandsShort": "{{count}}kom"
+    },
     "nameLabel": "Profilio pavadinimas",
     "namePlaceholder": "pvz. Backend derinimas",
     "descriptionLabel": "Profilio aprašymas",
@@ -258,12 +267,15 @@
     "variablesTitle": "Aplinkos kintamieji",
     "addVariable": "Pridėti kintamąjį",
     "keyLabel": "Raktas",
+    "keyTooLong": "Raktas gali būti ne ilgesnis kaip 256 simboliai",
     "valueLabel": "Vertė",
     "secretLabel": "Paslaptis",
     "secrets": {
       "markSecret": "Pažymėti kaip paslaptį",
       "masked": "Paslėpta vertė",
-      "reveal": "Atskleiskite vertę"
+      "reveal": "Atskleiskite vertę",
+      "newValuePlaceholder": "Įveskite naują slaptą reikšmę",
+      "valuePlaceholder": "Slapta reikšmė (užšifruota)"
     },
     "variablesEmpty": "Dar nėra kintamųjų",
     "variablesSaveFailed": "Nepavyko išsaugoti kintamojo",

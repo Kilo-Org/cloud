@@ -234,6 +234,15 @@
     "emptyTitle": "Ei vielä profiileja",
     "emptyDescription": "Luo profiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana.",
     "loadFailed": "Profiilien lataaminen epäonnistui",
+    "counts": {
+      "vars": "{{count}} muuttujaa",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} taitoa",
+      "commands": "{{count}} komentoa",
+      "varsShort": "{{count}}m",
+      "skillsShort": "{{count}}t",
+      "commandsShort": "{{count}}k"
+    },
     "nameLabel": "Profiilin nimi",
     "namePlaceholder": "esim. Taustavirheenkorjaus",
     "descriptionLabel": "Profiilin kuvaus",
@@ -258,12 +267,15 @@
     "variablesTitle": "Ympäristömuuttujat",
     "addVariable": "Lisää muuttuja",
     "keyLabel": "Avain",
+    "keyTooLong": "Avaimessa saa olla enintään 256 merkkiä",
     "valueLabel": "Arvo",
     "secretLabel": "Salaisuus",
     "secrets": {
       "markSecret": "Merkitse salaiseksi",
       "masked": "Piilotettu arvo",
-      "reveal": "Paljasta arvo"
+      "reveal": "Paljasta arvo",
+      "newValuePlaceholder": "Syötä uusi salainen arvo",
+      "valuePlaceholder": "Salainen arvo (salattu)"
     },
     "variablesEmpty": "Ei vielä muuttujia",
     "variablesSaveFailed": "Muuttujan tallentaminen epäonnistui",

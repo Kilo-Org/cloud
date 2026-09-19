@@ -234,6 +234,15 @@
     "emptyTitle": "এখনো কোনো প্রোফাইল নেই",
     "emptyDescription": "সেশন জুড়ে পরিবেশ ভেরিয়েবল, সেটআপ কমান্ড এবং দক্ষতা পুনরায় ব্যবহার করার জন্য একটি প্রোফাইল তৈরি করুন।",
     "loadFailed": "প্রোফাইল লোড করা যায়নি",
+    "counts": {
+      "vars": "{{count}} ভেরিয়েবল",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} দক্ষতা",
+      "commands": "{{count}} কমান্ড",
+      "varsShort": "{{count}}ভ",
+      "skillsShort": "{{count}}দ",
+      "commandsShort": "{{count}}ক"
+    },
     "nameLabel": "প্রোফাইল নাম",
     "namePlaceholder": "যেমন ব্যাকএন্ড ডিবাগিং",
     "descriptionLabel": "প্রোফাইল বিবরণ",
@@ -258,12 +267,15 @@
     "variablesTitle": "পরিবেশ পরিবর্তনশীল",
     "addVariable": "পরিবর্তনশীল যোগ করুন",
     "keyLabel": "চাবি",
+    "keyTooLong": "কী 256টি অক্ষর বা তার কম হতে হবে",
     "valueLabel": "মান",
     "secretLabel": "গোপন",
     "secrets": {
       "markSecret": "গোপন হিসাবে চিহ্নিত করুন",
       "masked": "লুকানো মান",
-      "reveal": "মান প্রকাশ করুন"
+      "reveal": "মান প্রকাশ করুন",
+      "newValuePlaceholder": "নতুন গোপন মান লিখুন",
+      "valuePlaceholder": "গোপন মান (এনক্রিপ্ট করা)"
     },
     "variablesEmpty": "এখনও কোন পরিবর্তনশীল",
     "variablesSaveFailed": "ভেরিয়েবল সংরক্ষণ করা যায়নি",

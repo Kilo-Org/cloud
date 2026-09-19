@@ -234,6 +234,15 @@
     "emptyTitle": "Ko si awọn profaili sibẹsibẹ",
     "emptyDescription": "Ṣẹda profaili kan lati tun lo awọn oniyipada ayika, awọn pipaṣẹ iṣeto, ati awọn ọgbọn kọja awọn akoko.",
     "loadFailed": "Ko le kojọpọ awọn profaili",
+    "counts": {
+      "vars": "{{count}} oniyipada",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ogbon",
+      "commands": "{{count}} aṣẹ",
+      "varsShort": "{{count}}oni",
+      "skillsShort": "{{count}}ogb",
+      "commandsShort": "{{count}}a"
+    },
     "nameLabel": "Orukọ profaili",
     "namePlaceholder": "f.eks. N ṣatunṣe aṣiṣe afẹyinti",
     "descriptionLabel": "Apejuwe profaili",
@@ -258,12 +267,15 @@
     "variablesTitle": "Awọn oniyipada ayika",
     "addVariable": "Fi oniyipada kun",
     "keyLabel": "Bọtini",
+    "keyTooLong": "Bọtini gbọdọ̀ jẹ́ 256 àmì tàbí kéré sí i",
     "valueLabel": "Iye",
     "secretLabel": "Asiri",
     "secrets": {
       "markSecret": "Samisi bi asiri",
       "masked": "Iye farasin",
-      "reveal": "Iye ifihan"
+      "reveal": "Iye ifihan",
+      "newValuePlaceholder": "Tẹ iye asiri tuntun sii",
+      "valuePlaceholder": "Iye asiri (ti a fi pamọ́)"
     },
     "variablesEmpty": "Ko si awọn oniyipada sibẹsibẹ",
     "variablesSaveFailed": "Ko le fi oniyipada pamọ",

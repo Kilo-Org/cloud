@@ -234,6 +234,15 @@
     "emptyTitle": "Belum ada profil",
     "emptyDescription": "Buat profil untuk menggunakan kembali variabel lingkungan, perintah pengaturan, dan keterampilan di seluruh sesi.",
     "loadFailed": "Tidak dapat memuat profil",
+    "counts": {
+      "vars": "{{count}} variabel",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} keterampilan",
+      "commands": "{{count}} perintah",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}k",
+      "commandsShort": "{{count}}p"
+    },
     "nameLabel": "Nama profil",
     "namePlaceholder": "misalnya Backend debugging",
     "descriptionLabel": "Deskripsi profil",
@@ -258,12 +267,15 @@
     "variablesTitle": "Variabel lingkungan",
     "addVariable": "Tambahkan variabel",
     "keyLabel": "Kunci",
+    "keyTooLong": "Kunci harus 256 karakter atau kurang",
     "valueLabel": "Nilai",
     "secretLabel": "Rahasia",
     "secrets": {
       "markSecret": "Tandai sebagai rahasia",
       "masked": "Nilai tersembunyi",
-      "reveal": "Mengungkapkan nilai"
+      "reveal": "Mengungkapkan nilai",
+      "newValuePlaceholder": "Masukkan nilai rahasia baru",
+      "valuePlaceholder": "Nilai rahasia (terenkripsi)"
     },
     "variablesEmpty": "Belum ada variabel",
     "variablesSaveFailed": "Tidak dapat menyimpan variabel",

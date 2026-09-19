@@ -234,6 +234,15 @@
     "emptyTitle": "Inga profiler än",
     "emptyDescription": "Skapa en profil för att återanvända miljövariabler, inställningskommandon och färdigheter över sessioner.",
     "loadFailed": "Det gick inte att läsa in profiler",
+    "counts": {
+      "vars": "{{count}} variabler",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} färdigheter",
+      "commands": "{{count}} kommandon",
+      "varsShort": "{{count}}var",
+      "skillsShort": "{{count}}fär",
+      "commandsShort": "{{count}}kom"
+    },
     "nameLabel": "Profilnamn",
     "namePlaceholder": "till exempel Backend-felsökning",
     "descriptionLabel": "Profilbeskrivning",
@@ -258,12 +267,15 @@
     "variablesTitle": "Miljövariabler",
     "addVariable": "Lägg till variabel",
     "keyLabel": "Nyckel",
+    "keyTooLong": "Nyckeln får innehålla högst 256 tecken",
     "valueLabel": "Värde",
     "secretLabel": "Hemlighet",
     "secrets": {
       "markSecret": "Markera som hemlig",
       "masked": "Dolt värde",
-      "reveal": "Avslöja värde"
+      "reveal": "Avslöja värde",
+      "newValuePlaceholder": "Ange ett nytt hemligt värde",
+      "valuePlaceholder": "Hemligt värde (krypterat)"
     },
     "variablesEmpty": "Inga variabler ännu",
     "variablesSaveFailed": "Det gick inte att spara variabeln",

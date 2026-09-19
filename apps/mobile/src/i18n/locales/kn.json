@@ -234,6 +234,15 @@
     "emptyTitle": "ಇನ್ನೂ ಯಾವುದೇ ಪ್ರೊಫೈಲ್‌ಗಳಿಲ್ಲ",
     "emptyDescription": "ಸೆಷನ್‌ಗಳಾದ್ಯಂತ ಪರಿಸರ ವೇರಿಯಬಲ್‌ಗಳು, ಸೆಟಪ್ ಕಮಾಂಡ್‌ಗಳು ಮತ್ತು ಕೌಶಲ್ಯಗಳನ್ನು ಮರುಬಳಕೆ ಮಾಡಲು ಪ್ರೊಫೈಲ್ ಅನ್ನು ರಚಿಸಿ.",
     "loadFailed": "ಪ್ರೊಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+    "counts": {
+      "vars": "{{count}} ಅಸ್ಥಿರ",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ಕೌಶಲ್ಯಗಳು",
+      "commands": "{{count}} ಆಜ್ಞೆಗಳು",
+      "varsShort": "{{count}}ಅ",
+      "skillsShort": "{{count}}ಕ",
+      "commandsShort": "{{count}}ಆ"
+    },
     "nameLabel": "ಪ್ರೊಫೈಲ್ ಹೆಸರು",
     "namePlaceholder": "ಉದಾ. ಬ್ಯಾಕೆಂಡ್ ಡೀಬಗ್ ಮಾಡುವಿಕೆ",
     "descriptionLabel": "ಪ್ರೊಫೈಲ್ ವಿವರಣೆ",
@@ -258,12 +267,15 @@
     "variablesTitle": "ಪರಿಸರ ಅಸ್ಥಿರ",
     "addVariable": "ವೇರಿಯಬಲ್ ಸೇರಿಸಿ",
     "keyLabel": "ಕೀ",
+    "keyTooLong": "ಕೀಲಿಯು 256 ಅಕ್ಷರಗಳು ಅಥವಾ ಕಡಿಮೆ ಇರಬೇಕು",
     "valueLabel": "ಮೌಲ್ಯ",
     "secretLabel": "ರಹಸ್ಯ",
     "secrets": {
       "markSecret": "ರಹಸ್ಯವೆಂದು ಗುರುತಿಸಿ",
       "masked": "ಗುಪ್ತ ಮೌಲ್ಯ",
-      "reveal": "ಮೌಲ್ಯವನ್ನು ಬಹಿರಂಗಪಡಿಸಿ"
+      "reveal": "ಮೌಲ್ಯವನ್ನು ಬಹಿರಂಗಪಡಿಸಿ",
+      "newValuePlaceholder": "ಹೊಸ ರಹಸ್ಯ ಮೌಲ್ಯವನ್ನು ನಮೂದಿಸಿ",
+      "valuePlaceholder": "ರಹಸ್ಯ ಮೌಲ್ಯ (ಎನ್ಕ್ರಿಪ್ಟ್ ಮಾಡಲಾಗಿದೆ)"
     },
     "variablesEmpty": "ಇನ್ನೂ ಯಾವುದೇ ಅಸ್ಥಿರಗಳಿಲ್ಲ",
     "variablesSaveFailed": "ವೇರಿಯಬಲ್ ಅನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",

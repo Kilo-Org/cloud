@@ -234,6 +234,15 @@
     "emptyTitle": "Nog geen profiele nie",
     "emptyDescription": "Skep 'n profiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik.",
     "loadFailed": "Kon nie profiele laai nie",
+    "counts": {
+      "vars": "{{count}} veranderlikes",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} vaardighede",
+      "commands": "{{count}} opdragte",
+      "varsShort": "{{count}}ver",
+      "skillsShort": "{{count}}vaa",
+      "commandsShort": "{{count}}opr"
+    },
     "nameLabel": "Profielnaam",
     "namePlaceholder": "bv. Backend-ontfouting",
     "descriptionLabel": "Profielbeskrywing",
@@ -258,12 +267,15 @@
     "variablesTitle": "Omgewingsveranderlikes",
     "addVariable": "Voeg veranderlike by",
     "keyLabel": "Sleutel",
+    "keyTooLong": "Sleutel moet 256 karakters of minder wees",
     "valueLabel": "Waarde",
     "secretLabel": "Geheim",
     "secrets": {
       "markSecret": "Merk as geheim",
       "masked": "Versteekte waarde",
-      "reveal": "Onthul waarde"
+      "reveal": "Onthul waarde",
+      "newValuePlaceholder": "Voer nuwe geheime waarde in",
+      "valuePlaceholder": "Geheime waarde (geïnkripteer)"
     },
     "variablesEmpty": "Nog geen veranderlikes nie",
     "variablesSaveFailed": "Kon nie veranderlike stoor nie",

@@ -234,6 +234,15 @@
     "emptyTitle": "Ainda não há perfis",
     "emptyDescription": "Crie um perfil para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões.",
     "loadFailed": "Não foi possível carregar perfis",
+    "counts": {
+      "vars": "{{count}} variáveis",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} competências",
+      "commands": "{{count}} comandos",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}comp",
+      "commandsShort": "{{count}}cmd"
+    },
     "nameLabel": "Nome do perfil",
     "namePlaceholder": "ex.: Depuração de back-end",
     "descriptionLabel": "Descrição do perfil",
@@ -258,12 +267,15 @@
     "variablesTitle": "Variáveis de ambiente",
     "addVariable": "Adicionar variável",
     "keyLabel": "Chave",
+    "keyTooLong": "A chave deve ter 256 caracteres ou menos",
     "valueLabel": "Valor",
     "secretLabel": "Segredo",
     "secrets": {
       "markSecret": "Marcar como secreto",
       "masked": "Valor oculto",
-      "reveal": "Mostrar valor"
+      "reveal": "Mostrar valor",
+      "newValuePlaceholder": "Introduza um novo valor secreto",
+      "valuePlaceholder": "Valor secreto (encriptado)"
     },
     "variablesEmpty": "Ainda não há variáveis",
     "variablesSaveFailed": "Não foi possível guardar a variável",

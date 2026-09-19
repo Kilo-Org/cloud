@@ -234,6 +234,15 @@
     "emptyTitle": "Dim proffiliau eto",
     "emptyDescription": "Creu proffil i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau.",
     "loadFailed": "Methu llwytho proffiliau",
+    "counts": {
+      "vars": "{{count}} newidynnau",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} sgiliau",
+      "commands": "{{count}} gorchmynion",
+      "varsShort": "{{count}}n",
+      "skillsShort": "{{count}}s",
+      "commandsShort": "{{count}}g"
+    },
     "nameLabel": "Enw proffil",
     "namePlaceholder": "e.e. Difa chwilod cefn",
     "descriptionLabel": "Disgrifiad proffil",
@@ -258,12 +267,15 @@
     "variablesTitle": "Newidynnau amgylcheddol",
     "addVariable": "Ychwanegu newidyn",
     "keyLabel": "Allwedd",
+    "keyTooLong": "Rhaid i'r allwedd fod yn 256 nod neu lai",
     "valueLabel": "Gwerth",
     "secretLabel": "Cyfrinach",
     "secrets": {
       "markSecret": "Marciwch fel cyfrinach",
       "masked": "Gwerth cudd",
-      "reveal": "Datgelu gwerth"
+      "reveal": "Datgelu gwerth",
+      "newValuePlaceholder": "Nodwch werth cyfrinachol newydd",
+      "valuePlaceholder": "Gwerth cyfrinachol (wedi'i amgryptio)"
     },
     "variablesEmpty": "Dim newidynnau eto",
     "variablesSaveFailed": "Methu â chadw'r newidyn",

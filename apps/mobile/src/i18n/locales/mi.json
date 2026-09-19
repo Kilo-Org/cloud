@@ -234,6 +234,15 @@
     "emptyTitle": "Karekau he pūkete",
     "emptyDescription": "Waihangatia he kōtaha hei whakamahi ano i nga taurangi taiao, nga whakahau tatūnga, me nga pukenga puta noa i nga waahi.",
     "loadFailed": "Kāore i taea te uta kōtaha",
+    "counts": {
+      "vars": "{{count}} taurangi",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} pukenga",
+      "commands": "{{count}} whakahau",
+      "varsShort": "{{count}}t",
+      "skillsShort": "{{count}}p",
+      "commandsShort": "{{count}}w"
+    },
     "nameLabel": "Ingoa kōtaha",
     "namePlaceholder": "e.g. Ko te patuiro o muri",
     "descriptionLabel": "Whakaahuatanga pūkete",
@@ -258,12 +267,15 @@
     "variablesTitle": "Taurangi taiao",
     "addVariable": "Tāpiri taurangi",
     "keyLabel": "Kī",
+    "keyTooLong": "Kia 256 pūāhua iti iho rānei te kī",
     "valueLabel": "Uara",
     "secretLabel": "Mea ngaro",
     "secrets": {
       "markSecret": "Tohua hei mea ngaro",
       "masked": "Uara huna",
-      "reveal": "Whakakitea te uara"
+      "reveal": "Whakakitea te uara",
+      "newValuePlaceholder": "Whakauruhia he uara ngaro hou",
+      "valuePlaceholder": "Uara ngaro (kua whakamunatia)"
     },
     "variablesEmpty": "Kaore ano kia rereke",
     "variablesSaveFailed": "Kāore i taea te tiaki taurangi",

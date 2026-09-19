@@ -234,6 +234,15 @@
     "emptyTitle": "Weli profiles ma jiraan",
     "emptyDescription": "Abuur profile si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan.",
     "loadFailed": "Waa la rari waayay muuqaallada",
+    "counts": {
+      "vars": "{{count}} doorsoomayaal",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} xirfado",
+      "commands": "{{count}} amar",
+      "varsShort": "{{count}}d",
+      "skillsShort": "{{count}}x",
+      "commandsShort": "{{count}}a"
+    },
     "nameLabel": "Magaca astaanta",
     "namePlaceholder": "tusaale. Dejinta dhabarka",
     "descriptionLabel": "Sharaxaada astaanta",
@@ -258,12 +267,15 @@
     "variablesTitle": "Doorsoomayaasha deegaanka",
     "addVariable": "Ku dar doorsoome",
     "keyLabel": "Furaha",
+    "keyTooLong": "Furaha waa inuu ahaadaa 256 xaraf ama ka yar",
     "valueLabel": "Qiimaha",
     "secretLabel": "Sirta",
     "secrets": {
       "markSecret": "Ku calaamadee sir",
       "masked": "Qiimaha qarsoon",
-      "reveal": "Muujinta qiimaha"
+      "reveal": "Muujinta qiimaha",
+      "newValuePlaceholder": "Geli qiime sir ah oo cusub",
+      "valuePlaceholder": "Qiime sir ah (la sireeyay)"
     },
     "variablesEmpty": "Wali ma jiro doorsoomayaal",
     "variablesSaveFailed": "Ma keydin karin doorsoomayaasha",

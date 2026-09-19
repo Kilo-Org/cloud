@@ -234,6 +234,15 @@
     "emptyTitle": "Níl próifílí ann fós",
     "emptyDescription": "Cruthaigh próifíl chun athróga timpeallachta, orduithe socraithe, agus scileanna a athúsáid thar seisiúin.",
     "loadFailed": "Níorbh fhéidir próifílí a lódáil",
+    "counts": {
+      "vars": "{{count}} athróg",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} scil",
+      "commands": "{{count}} ordú",
+      "varsShort": "{{count}}a",
+      "skillsShort": "{{count}}s",
+      "commandsShort": "{{count}}o"
+    },
     "nameLabel": "Ainm próifíle",
     "namePlaceholder": "e.g. Debugging backend",
     "descriptionLabel": "Cur síos ar phróifíl",
@@ -258,12 +267,15 @@
     "variablesTitle": "Athróga timpeallachta",
     "addVariable": "Cuir athróg leis",
     "keyLabel": "eochair",
+    "keyTooLong": "Caithfidh an eochair a bheith 256 carachtar nó níos lú",
     "valueLabel": "Luach",
     "secretLabel": "Rúnda",
     "secrets": {
       "markSecret": "Marcáil mar rún",
       "masked": "Luach i bhfolach",
-      "reveal": "Nocht luach"
+      "reveal": "Nocht luach",
+      "newValuePlaceholder": "Cuir isteach luach rúnda nua",
+      "valuePlaceholder": "Luach rúnda (criptithe)"
     },
     "variablesEmpty": "Níl aon athróg ann fós",
     "variablesSaveFailed": "Níorbh fhéidir an athróg a shábháil",

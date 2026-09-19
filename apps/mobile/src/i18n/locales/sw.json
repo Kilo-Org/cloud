@@ -234,6 +234,15 @@
     "emptyTitle": "Bado hakuna wasifu",
     "emptyDescription": "Unda wasifu ili kutumia tena vigezo vya mazingira, amri za usanidi na ujuzi katika vipindi vyote.",
     "loadFailed": "Haikuweza kupakia wasifu",
+    "counts": {
+      "vars": "{{count}} vigezo",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ujuzi",
+      "commands": "{{count}} amri",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}u",
+      "commandsShort": "{{count}}a"
+    },
     "nameLabel": "Jina la wasifu",
     "namePlaceholder": "k.m. Utatuzi wa nyuma",
     "descriptionLabel": "Maelezo ya wasifu",
@@ -258,12 +267,15 @@
     "variablesTitle": "Vigezo vya mazingira",
     "addVariable": "Ongeza tofauti",
     "keyLabel": "Ufunguo",
+    "keyTooLong": "Ufunguo lazima uwe na vibambo 256 au chini yake",
     "valueLabel": "Thamani",
     "secretLabel": "Siri",
     "secrets": {
       "markSecret": "Weka alama kuwa siri",
       "masked": "Thamani iliyofichwa",
-      "reveal": "Onyesha thamani"
+      "reveal": "Onyesha thamani",
+      "newValuePlaceholder": "Weka thamani mpya ya siri",
+      "valuePlaceholder": "Thamani ya siri (imesimbwa)"
     },
     "variablesEmpty": "Bado hakuna vigeu",
     "variablesSaveFailed": "Haikuweza kuhifadhi tofauti",

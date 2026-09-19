@@ -234,6 +234,15 @@
     "emptyTitle": "עדיין אין פרופילים",
     "emptyDescription": "צור פרופיל לשימוש חוזר במשתני סביבה, פקודות הגדרה ומיומנויות בפעילויות שונות.",
     "loadFailed": "לא ניתן היה לטעון פרופילים",
+    "counts": {
+      "vars": "{{count}} משתנים",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} מיומנויות",
+      "commands": "{{count}} פקודות",
+      "varsShort": "{{count}}מ",
+      "skillsShort": "{{count}}מי",
+      "commandsShort": "{{count}}פ"
+    },
     "nameLabel": "שם פרופיל",
     "namePlaceholder": "לְמָשָׁל ניפוי באגים בקצה האחורי",
     "descriptionLabel": "תיאור הפרופיל",
@@ -258,12 +267,15 @@
     "variablesTitle": "משתני סביבה",
     "addVariable": "הוסף משתנה",
     "keyLabel": "מַפְתֵחַ",
+    "keyTooLong": "המפתח חייב להכיל 256 תווים או פחות",
     "valueLabel": "עֵרֶך",
     "secretLabel": "סוֹד",
     "secrets": {
       "markSecret": "סמן כסוד",
       "masked": "ערך נסתר",
-      "reveal": "לחשוף ערך"
+      "reveal": "לחשוף ערך",
+      "newValuePlaceholder": "הזן ערך סודי חדש",
+      "valuePlaceholder": "ערך סודי (מוצפן)"
     },
     "variablesEmpty": "עדיין אין משתנים",
     "variablesSaveFailed": "לא ניתן לשמור משתנה",

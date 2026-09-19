@@ -234,6 +234,15 @@
     "emptyTitle": "ჯერ არ არის პროფილები",
     "emptyDescription": "შექმენით პროფილი გარემოს ცვლადების, დაყენების ბრძანებებისა და უნარების ხელახლა გამოსაყენებლად სესიებზე.",
     "loadFailed": "პროფილების ჩატვირთვა ვერ მოხერხდა",
+    "counts": {
+      "vars": "{{count}} ცვლადი",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} უნარი",
+      "commands": "{{count}} ბრძანება",
+      "varsShort": "{{count}}ც",
+      "skillsShort": "{{count}}უ",
+      "commandsShort": "{{count}}ბ"
+    },
     "nameLabel": "პროფილის სახელი",
     "namePlaceholder": "მაგ. Backend-ის გამართვა",
     "descriptionLabel": "პროფილის აღწერა",
@@ -258,12 +267,15 @@
     "variablesTitle": "გარემოს ცვლადები",
     "addVariable": "ცვლადის დამატება",
     "keyLabel": "გასაღები",
+    "keyTooLong": "გასაღები უნდა იყოს 256 სიმბოლო ან ნაკლები",
     "valueLabel": "ღირებულება",
     "secretLabel": "საიდუმლო",
     "secrets": {
       "markSecret": "საიდუმლოდ მონიშვნა",
       "masked": "ფარული ღირებულება",
-      "reveal": "გამოავლინე ღირებულება"
+      "reveal": "გამოავლინე ღირებულება",
+      "newValuePlaceholder": "შეიყვანეთ ახალი საიდუმლო მნიშვნელობა",
+      "valuePlaceholder": "საიდუმლო მნიშვნელობა (დაშიფრული)"
     },
     "variablesEmpty": "ჯერ არ არის ცვლადი",
     "variablesSaveFailed": "ცვლადის შენახვა ვერ მოხერხდა",

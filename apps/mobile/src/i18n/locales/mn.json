@@ -234,6 +234,15 @@
     "emptyTitle": "Одоогоор профайл байхгүй байна",
     "emptyDescription": "Хүрээлэн буй орчны хувьсагч, тохируулах команд, ур чадварыг сешнүүдэд дахин ашиглахын тулд профайл үүсгээрэй.",
     "loadFailed": "Профайлуудыг ачаалж чадсангүй",
+    "counts": {
+      "vars": "{{count}} хувьсагч",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ур чадвар",
+      "commands": "{{count}} команд",
+      "varsShort": "{{count}}х",
+      "skillsShort": "{{count}}у",
+      "commandsShort": "{{count}}к"
+    },
     "nameLabel": "Профайлын нэр",
     "namePlaceholder": "жишээ нь Ар талд дибаг хийх",
     "descriptionLabel": "Профайлын тайлбар",
@@ -258,12 +267,15 @@
     "variablesTitle": "Хүрээлэн буй орчны хувьсагчид",
     "addVariable": "Хувьсагч нэмэх",
     "keyLabel": "Түлхүүр",
+    "keyTooLong": "Түлхүүр нь 256 тэмдэгт эсвэл түүнээс бага байх ёстой",
     "valueLabel": "Үнэ цэнэ",
     "secretLabel": "Нууц",
     "secrets": {
       "markSecret": "Нууц гэж тэмдэглэ",
       "masked": "Нуугдсан үнэ цэнэ",
-      "reveal": "Үнэ цэнийг илчлэх"
+      "reveal": "Үнэ цэнийг илчлэх",
+      "newValuePlaceholder": "Шинэ нууц утгыг оруулна уу",
+      "valuePlaceholder": "Нууц утга (шифрлэгдсэн)"
     },
     "variablesEmpty": "Одоогоор хувьсагч алга",
     "variablesSaveFailed": "Хувьсагчийг хадгалж чадсангүй",

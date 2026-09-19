@@ -234,6 +234,15 @@
     "emptyTitle": "Još nema profila",
     "emptyDescription": "Izradite profil za ponovno korištenje varijabli okoline, naredbi za postavljanje i vještina u više sesija.",
     "loadFailed": "Nije moguće učitati profile",
+    "counts": {
+      "vars": "{{count}} varijabli",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} vještina",
+      "commands": "{{count}} naredbi",
+      "varsShort": "{{count}}var",
+      "skillsShort": "{{count}}vje",
+      "commandsShort": "{{count}}nar"
+    },
     "nameLabel": "Naziv profila",
     "namePlaceholder": "npr. Pozadinsko otklanjanje pogrešaka",
     "descriptionLabel": "Opis profila",
@@ -258,12 +267,15 @@
     "variablesTitle": "Varijable okoline",
     "addVariable": "Dodaj varijablu",
     "keyLabel": "Ključ",
+    "keyTooLong": "Ključ može imati najviše 256 znakova",
     "valueLabel": "Vrijednost",
     "secretLabel": "Tajna",
     "secrets": {
       "markSecret": "Označi kao tajno",
       "masked": "Skrivena vrijednost",
-      "reveal": "Otkrijte vrijednost"
+      "reveal": "Otkrijte vrijednost",
+      "newValuePlaceholder": "Unesite novu tajnu vrijednost",
+      "valuePlaceholder": "Tajna vrijednost (šifrirana)"
     },
     "variablesEmpty": "Još nema varijabli",
     "variablesSaveFailed": "Nije moguće spremiti varijablu",

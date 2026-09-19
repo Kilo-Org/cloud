@@ -234,6 +234,15 @@
     "emptyTitle": "まだプロフィールがありません",
     "emptyDescription": "プロファイルを作成して、セッション間で環境変数、セットアップ コマンド、スキルを再利用します。",
     "loadFailed": "プロファイルを読み込めませんでした",
+    "counts": {
+      "vars": "{{count}} 変数",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} スキル",
+      "commands": "{{count}} コマンド",
+      "varsShort": "{{count}}変",
+      "skillsShort": "{{count}}ス",
+      "commandsShort": "{{count}}コ"
+    },
     "nameLabel": "プロファイル名",
     "namePlaceholder": "例えばバックエンドのデバッグ",
     "descriptionLabel": "プロフィールの説明",
@@ -258,12 +267,15 @@
     "variablesTitle": "環境変数",
     "addVariable": "変数の追加",
     "keyLabel": "鍵",
+    "keyTooLong": "キーは256文字以内で入力してください",
     "valueLabel": "価値",
     "secretLabel": "秘密",
     "secrets": {
       "markSecret": "シークレットとしてマークする",
       "masked": "隠された値",
-      "reveal": "値を明らかにする"
+      "reveal": "値を明らかにする",
+      "newValuePlaceholder": "新しいシークレット値を入力",
+      "valuePlaceholder": "シークレット値（暗号化）"
     },
     "variablesEmpty": "まだ変数がありません",
     "variablesSaveFailed": "変数を保存できませんでした",

@@ -234,6 +234,15 @@
     "emptyTitle": "Noch keine Profile",
     "emptyDescription": "Erstellen Sie ein Profil, um Umgebungsvariablen, Setup-Befehle und Fähigkeiten sitzungsübergreifend wiederzuverwenden.",
     "loadFailed": "Profile konnten nicht geladen werden",
+    "counts": {
+      "vars": "{{count}} Variablen",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} Fähigkeiten",
+      "commands": "{{count}} Befehle",
+      "varsShort": "{{count}}Var",
+      "skillsShort": "{{count}}Fäh",
+      "commandsShort": "{{count}}Bef"
+    },
     "nameLabel": "Profilname",
     "namePlaceholder": "z.B. Backend-Debugging",
     "descriptionLabel": "Profilbeschreibung",
@@ -258,12 +267,15 @@
     "variablesTitle": "Umgebungsvariablen",
     "addVariable": "Variable hinzufügen",
     "keyLabel": "Schlüssel",
+    "keyTooLong": "Der Schlüssel darf höchstens 256 Zeichen lang sein",
     "valueLabel": "Wert",
     "secretLabel": "Geheimnis",
     "secrets": {
       "markSecret": "Als geheim markieren",
       "masked": "Versteckter Wert",
-      "reveal": "Wert offenbaren"
+      "reveal": "Wert offenbaren",
+      "newValuePlaceholder": "Neuen geheimen Wert eingeben",
+      "valuePlaceholder": "Geheimer Wert (verschlüsselt)"
     },
     "variablesEmpty": "Noch keine Variablen",
     "variablesSaveFailed": "Variable konnte nicht gespeichert werden",

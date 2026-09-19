@@ -234,6 +234,15 @@
     "emptyTitle": "Enweghị profaịlụ",
     "emptyDescription": "Mepụta profaịlụ iji megharịa mgbanwe gburugburu ebe obibi, iwu ntọlite na nka n'ofe oge.",
     "loadFailed": "Enweghị ike ibunye profaịlụ",
+    "counts": {
+      "vars": "{{count}} mgbanwe",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} nkà",
+      "commands": "{{count}} iwu",
+      "varsShort": "{{count}}m",
+      "skillsShort": "{{count}}n",
+      "commandsShort": "{{count}}i"
+    },
     "nameLabel": "Aha profaịlụ",
     "namePlaceholder": "eg. Ndozi azụ azụ",
     "descriptionLabel": "Nkọwa profaịlụ",
@@ -258,12 +267,15 @@
     "variablesTitle": "Ụdị mgbanwe gburugburu",
     "addVariable": "Tinye mgbanwe",
     "keyLabel": "Igodo",
+    "keyTooLong": "Igodo ga-abụ mkpụrụedemede 256 ma ọ bụ obere",
     "valueLabel": "Uru",
     "secretLabel": "Nzuzo",
     "secrets": {
       "markSecret": "Kaa akara dị ka nzuzo",
       "masked": "Uru zoro ezo",
-      "reveal": "Gosi uru"
+      "reveal": "Gosi uru",
+      "newValuePlaceholder": "Tinye uru nzuzo ọhụrụ",
+      "valuePlaceholder": "Uru nzuzo (ezoro ezo)"
     },
     "variablesEmpty": "Enweghị mgbanwe ma",
     "variablesSaveFailed": "Enweghị ike ichekwa mgbanwe",

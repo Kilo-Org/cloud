@@ -234,6 +234,15 @@
     "emptyTitle": "Δεν υπάρχουν ακόμα προφίλ",
     "emptyDescription": "Δημιουργήστε ένα προφίλ για να επαναχρησιμοποιήσετε μεταβλητές περιβάλλοντος, εντολές ρύθμισης και δεξιότητες στις συνεδρίες.",
     "loadFailed": "Δεν ήταν δυνατή η φόρτωση των προφίλ",
+    "counts": {
+      "vars": "{{count}} μεταβλητές",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} δεξιότητες",
+      "commands": "{{count}} εντολές",
+      "varsShort": "{{count}}μ",
+      "skillsShort": "{{count}}δ",
+      "commandsShort": "{{count}}ε"
+    },
     "nameLabel": "Όνομα προφίλ",
     "namePlaceholder": "π.χ. Αποσφαλμάτωση backend",
     "descriptionLabel": "Περιγραφή προφίλ",
@@ -258,12 +267,15 @@
     "variablesTitle": "Μεταβλητές περιβάλλοντος",
     "addVariable": "Προσθήκη μεταβλητής",
     "keyLabel": "Κλειδί",
+    "keyTooLong": "Το κλειδί πρέπει να έχει 256 χαρακτήρες ή λιγότερους",
     "valueLabel": "Αξία",
     "secretLabel": "Μυστικό",
     "secrets": {
       "markSecret": "Επισήμανση ως μυστικό",
       "masked": "Κρυφή τιμή",
-      "reveal": "Αποκαλύψτε την αξία"
+      "reveal": "Αποκαλύψτε την αξία",
+      "newValuePlaceholder": "Εισαγάγετε νέα μυστική τιμή",
+      "valuePlaceholder": "Μυστική τιμή (κρυπτογραφημένη)"
     },
     "variablesEmpty": "Δεν υπάρχουν ακόμη μεταβλητές",
     "variablesSaveFailed": "Δεν ήταν δυνατή η αποθήκευση της μεταβλητής",

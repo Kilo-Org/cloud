@@ -234,6 +234,15 @@
     "emptyTitle": "હજુ સુધી કોઈ પ્રોફાઇલ નથી",
     "emptyDescription": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ કમાન્ડ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે પ્રોફાઇલ બનાવો.",
     "loadFailed": "પ્રોફાઇલ લોડ કરી શકાઈ નથી",
+    "counts": {
+      "vars": "{{count}} ચલો",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} કૌશલ્ય",
+      "commands": "{{count}} આદેશો",
+      "varsShort": "{{count}}ચ",
+      "skillsShort": "{{count}}ક",
+      "commandsShort": "{{count}}આ"
+    },
     "nameLabel": "પ્રોફાઇલ નામ",
     "namePlaceholder": "દા.ત. બેકએન્ડ ડીબગીંગ",
     "descriptionLabel": "પ્રોફાઇલ વર્ણન",
@@ -258,12 +267,15 @@
     "variablesTitle": "પર્યાવરણ ચલો",
     "addVariable": "ચલ ઉમેરો",
     "keyLabel": "કી",
+    "keyTooLong": "કી 256 અક્ષરો કે તેથી ઓછા હોવી જોઈએ",
     "valueLabel": "મૂલ્ય",
     "secretLabel": "ગુપ્ત",
     "secrets": {
       "markSecret": "ગુપ્ત તરીકે ચિહ્નિત કરો",
       "masked": "છુપાયેલ મૂલ્ય",
-      "reveal": "મૂલ્ય જણાવો"
+      "reveal": "મૂલ્ય જણાવો",
+      "newValuePlaceholder": "નવું ગુપ્ત મૂલ્ય દાખલ કરો",
+      "valuePlaceholder": "ગુપ્ત મૂલ્ય (એન્ક્રિપ્ટ કરેલ)"
     },
     "variablesEmpty": "હજુ સુધી કોઈ ચલ નથી",
     "variablesSaveFailed": "ચલ સાચવી શકાયું નથી",

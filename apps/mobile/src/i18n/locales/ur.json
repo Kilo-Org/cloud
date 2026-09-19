@@ -234,6 +234,15 @@
     "emptyTitle": "ابھی تک کوئی پروفائلز نہیں ہیں۔",
     "emptyDescription": "سیشنوں میں ماحولیاتی متغیرات، سیٹ اپ کمانڈز، اور مہارتوں کو دوبارہ استعمال کرنے کے لیے ایک پروفائل بنائیں۔",
     "loadFailed": "پروفائلز لوڈ نہیں ہو سکے۔",
+    "counts": {
+      "vars": "{{count}} متغیرات",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ہنر",
+      "commands": "{{count}} کمانڈز",
+      "varsShort": "{{count}}م",
+      "skillsShort": "{{count}}ہ",
+      "commandsShort": "{{count}}ک"
+    },
     "nameLabel": "پروفائل کا نام",
     "namePlaceholder": "جیسے بیک اینڈ ڈیبگنگ",
     "descriptionLabel": "پروفائل کی تفصیل",
@@ -258,12 +267,15 @@
     "variablesTitle": "ماحولیاتی متغیرات",
     "addVariable": "متغیر شامل کریں۔",
     "keyLabel": "چابی",
+    "keyTooLong": "چابی 256 حروف یا اس سے کم ہونی چاہیے",
     "valueLabel": "قدر",
     "secretLabel": "خفیہ",
     "secrets": {
       "markSecret": "خفیہ کے طور پر نشان زد کریں۔",
       "masked": "پوشیدہ قدر",
-      "reveal": "قدر ظاہر کریں۔"
+      "reveal": "قدر ظاہر کریں۔",
+      "newValuePlaceholder": "نیا خفیہ قدر درج کریں",
+      "valuePlaceholder": "خفیہ قدر (خفیہ کردہ)"
     },
     "variablesEmpty": "ابھی تک کوئی متغیر نہیں ہے۔",
     "variablesSaveFailed": "متغیر کو محفوظ نہیں کیا جا سکا",

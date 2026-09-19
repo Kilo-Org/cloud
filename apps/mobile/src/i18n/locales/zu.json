@@ -234,6 +234,15 @@
     "emptyTitle": "Awekho amaphrofayela okwamanje",
     "emptyDescription": "Dala iphrofayela ukuze usebenzise kabusha okuguquguqukayo kwendawo, imiyalo yokusetha, namakhono kuzo zonke izikhathi.",
     "loadFailed": "Ayikwazanga ukulayisha amaphrofayela",
+    "counts": {
+      "vars": "{{count}} okuguquguqukayo",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} amakhono",
+      "commands": "{{count}} imiyalo",
+      "varsShort": "{{count}}o",
+      "skillsShort": "{{count}}a",
+      "commandsShort": "{{count}}i"
+    },
     "nameLabel": "Igama lephrofayela",
     "namePlaceholder": "isib. Ukulungisa iphutha emuva",
     "descriptionLabel": "Incazelo yephrofayela",
@@ -258,12 +267,15 @@
     "variablesTitle": "Okuguquguqukayo kwemvelo",
     "addVariable": "Engeza okuguquguqukayo",
     "keyLabel": "Ukhiye",
+    "keyTooLong": "Ukhiye kufanele ube yizinhlamvu ezingu-256 noma ngaphansi",
     "valueLabel": "Inani",
     "secretLabel": "Imfihlo",
     "secrets": {
       "markSecret": "Maka njengokuyimfihlo",
       "masked": "Inani elifihliwe",
-      "reveal": "Veza inani"
+      "reveal": "Veza inani",
+      "newValuePlaceholder": "Faka inani eliyimfihlo elisha",
+      "valuePlaceholder": "Inani eliyimfihlo (kubethelwe)"
     },
     "variablesEmpty": "Akukho okuguquguqukayo okwamanje",
     "variablesSaveFailed": "Ayikwazanga ukulondoloza okuhlukile",

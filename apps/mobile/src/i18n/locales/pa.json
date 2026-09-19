@@ -234,6 +234,15 @@
     "emptyTitle": "ਅਜੇ ਤੱਕ ਕੋਈ ਪ੍ਰੋਫਾਈਲ ਨਹੀਂ",
     "emptyDescription": "ਸਾਰੇ ਸੈਸ਼ਨਾਂ ਵਿੱਚ ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਅਤੇ ਹੁਨਰਾਂ ਦੀ ਮੁੜ ਵਰਤੋਂ ਕਰਨ ਲਈ ਇੱਕ ਪ੍ਰੋਫਾਈਲ ਬਣਾਓ।",
     "loadFailed": "ਪ੍ਰੋਫਾਈਲਾਂ ਨੂੰ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+    "counts": {
+      "vars": "{{count}} ਵੇਰੀਏਬਲ",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ਹੁਨਰ",
+      "commands": "{{count}} ਕਮਾਂਡਾਂ",
+      "varsShort": "{{count}}ਵ",
+      "skillsShort": "{{count}}ਹ",
+      "commandsShort": "{{count}}ਕ"
+    },
     "nameLabel": "ਪ੍ਰੋਫਾਈਲ ਨਾਮ",
     "namePlaceholder": "ਜਿਵੇਂ ਕਿ ਬੈਕਐਂਡ ਡੀਬੱਗਿੰਗ",
     "descriptionLabel": "ਪ੍ਰੋਫਾਈਲ ਵਰਣਨ",
@@ -258,12 +267,15 @@
     "variablesTitle": "ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ",
     "addVariable": "ਵੇਰੀਏਬਲ ਸ਼ਾਮਲ ਕਰੋ",
     "keyLabel": "ਕੁੰਜੀ",
+    "keyTooLong": "ਕੁੰਜੀ 256 ਅੱਖਰਾਂ ਜਾਂ ਘੱਟ ਦੀ ਹੋਣੀ ਚਾਹੀਦੀ ਹੈ",
     "valueLabel": "ਮੁੱਲ",
     "secretLabel": "ਗੁਪਤ",
     "secrets": {
       "markSecret": "ਗੁਪਤ ਵਜੋਂ ਮਾਰਕ ਕਰੋ",
       "masked": "ਲੁਕਿਆ ਹੋਇਆ ਮੁੱਲ",
-      "reveal": "ਮੁੱਲ ਪ੍ਰਗਟ ਕਰੋ"
+      "reveal": "ਮੁੱਲ ਪ੍ਰਗਟ ਕਰੋ",
+      "newValuePlaceholder": "ਨਵਾਂ ਗੁਪਤ ਮੁੱਲ ਦਰਜ ਕਰੋ",
+      "valuePlaceholder": "ਗੁਪਤ ਮੁੱਲ (ਐਨਕ੍ਰਿਪਟ ਕੀਤਾ)"
     },
     "variablesEmpty": "ਹਾਲੇ ਕੋਈ ਵੇਰੀਏਬਲ ਨਹੀਂ",
     "variablesSaveFailed": "ਵੇਰੀਏਬਲ ਨੂੰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",

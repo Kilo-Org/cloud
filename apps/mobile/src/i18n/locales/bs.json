@@ -234,6 +234,15 @@
     "emptyTitle": "Još nema profila",
     "emptyDescription": "Kreirajte profil za ponovno korištenje varijabli okruženja, naredbi za postavljanje i vještina u svim sesijama.",
     "loadFailed": "Učitavanje profila nije uspjelo",
+    "counts": {
+      "vars": "{{count}} varijabli",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} vještina",
+      "commands": "{{count}} komandi",
+      "varsShort": "{{count}}var",
+      "skillsShort": "{{count}}vje",
+      "commandsShort": "{{count}}kom"
+    },
     "nameLabel": "Ime profila",
     "namePlaceholder": "npr. Backend debugging",
     "descriptionLabel": "Opis profila",
@@ -258,12 +267,15 @@
     "variablesTitle": "Varijable okruženja",
     "addVariable": "Dodaj varijablu",
     "keyLabel": "Ključ",
+    "keyTooLong": "Ključ može imati najviše 256 znakova",
     "valueLabel": "Vrijednost",
     "secretLabel": "Tajna",
     "secrets": {
       "markSecret": "Označi kao tajnu",
       "masked": "Skrivena vrijednost",
-      "reveal": "Otkrijte vrijednost"
+      "reveal": "Otkrijte vrijednost",
+      "newValuePlaceholder": "Unesite novu tajnu vrijednost",
+      "valuePlaceholder": "Tajna vrijednost (šifrovana)"
     },
     "variablesEmpty": "Još nema varijabli",
     "variablesSaveFailed": "Nije moguće sačuvati varijablu",

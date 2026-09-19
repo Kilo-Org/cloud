@@ -234,6 +234,15 @@
     "emptyTitle": "هێشتا هیچ پڕۆفایلی نییە",
     "emptyDescription": "پرۆفایلی دروست بکە بۆ دووبارە بەکارهێنانەوەی گۆڕاوە ژینگەییەکان، فەرمانەکانی ڕێکخستن و لێهاتووییەکان لە سەرانسەری دانیشتنەکاندا.",
     "loadFailed": "نەتوانرا پڕۆفایلی باربکرێت",
+    "counts": {
+      "vars": "{{count}} گۆڕاوە",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} کارامەیی",
+      "commands": "{{count}} فەرمان",
+      "varsShort": "{{count}}گ",
+      "skillsShort": "{{count}}ک",
+      "commandsShort": "{{count}}ف"
+    },
     "nameLabel": "ناوی پڕۆفایلی",
     "namePlaceholder": "بۆ نموونە. چاککردنەوەی باکئەند",
     "descriptionLabel": "وەسفکردنی پڕۆفایلی",
@@ -258,12 +267,15 @@
     "variablesTitle": "گۆڕاوە ژینگەییەکان",
     "addVariable": "زیادکردنی گۆڕاو",
     "keyLabel": "کلیل",
+    "keyTooLong": "کلیلەکە دەبێت 256 نووسە یان کەمتر بێت",
     "valueLabel": "بەها",
     "secretLabel": "نهێنی",
     "secrets": {
       "markSecret": "وەک نهێنی مارک بکە",
       "masked": "بەهای شاراوە",
-      "reveal": "بەها ئاشکرا بکە"
+      "reveal": "بەها ئاشکرا بکە",
+      "newValuePlaceholder": "بەهای نهێنی نوێ بنووسە",
+      "valuePlaceholder": "بەهای نهێنی (شێفرکراو)"
     },
     "variablesEmpty": "هێشتا هیچ گۆڕاوێک نییە",
     "variablesSaveFailed": "نەتوانرا گۆڕاوەکە پاشەکەوت بکات",

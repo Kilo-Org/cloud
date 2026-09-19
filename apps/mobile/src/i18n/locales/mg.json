@@ -234,6 +234,15 @@
     "emptyTitle": "Tsy mbola misy mombamomba",
     "emptyDescription": "Mamorona mombamomba hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana.",
     "loadFailed": "Tsy afaka mampiditra ny mombamomba",
+    "counts": {
+      "vars": "{{count}} miovaova",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} fahaiza-manao",
+      "commands": "{{count}} baiko",
+      "varsShort": "{{count}}m",
+      "skillsShort": "{{count}}f",
+      "commandsShort": "{{count}}b"
+    },
     "nameLabel": "Anaran'ny mombamomba",
     "namePlaceholder": "oh. Backend debugging",
     "descriptionLabel": "Famaritana ny mombamomba",
@@ -258,12 +267,15 @@
     "variablesTitle": "Tontolo iainana miovaova",
     "addVariable": "Ampio miovaova",
     "keyLabel": "Fanalahidy",
+    "keyTooLong": "Tokony tsy mihoatra ny 256 tarehintsoratra ny fanalahidy",
     "valueLabel": "Sanda",
     "secretLabel": "zava-miafina",
     "secrets": {
       "markSecret": "Mariho ho tsiambaratelo",
       "masked": "Sanda miafina",
-      "reveal": "Asehoy ny sandany"
+      "reveal": "Asehoy ny sandany",
+      "newValuePlaceholder": "Ampidiro ny sandan-tsiambaratelo vaovao",
+      "valuePlaceholder": "Sanda tsiambaratelo (voaaro)"
     },
     "variablesEmpty": "Tsy mbola misy variables",
     "variablesSaveFailed": "Tsy voatahiry ny fari-piainana",

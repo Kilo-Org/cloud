@@ -234,6 +234,15 @@
     "emptyTitle": "Профіляў пакуль няма",
     "emptyDescription": "Стварыце профіль для паўторнага выкарыстання зменных асяроддзя, каманд наладкі і навыкаў у сеансах.",
     "loadFailed": "Не ўдалося загрузіць профілі",
+    "counts": {
+      "vars": "{{count}} зменных",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} навыкаў",
+      "commands": "{{count}} каманд",
+      "varsShort": "{{count}}з",
+      "skillsShort": "{{count}}н",
+      "commandsShort": "{{count}}к"
+    },
     "nameLabel": "Імя профілю",
     "namePlaceholder": "напр. Бэкэнд-адладка",
     "descriptionLabel": "Апісанне профілю",
@@ -258,12 +267,15 @@
     "variablesTitle": "Зменныя асяроддзя",
     "addVariable": "Дадаць зменную",
     "keyLabel": "ключ",
+    "keyTooLong": "Ключ павінен змяшчаць не больш за 256 сімвалаў",
     "valueLabel": "Каштоўнасць",
     "secretLabel": "сакрэт",
     "secrets": {
       "markSecret": "Пазначыць як сакрэтнае",
       "masked": "Схаваная каштоўнасць",
-      "reveal": "Раскрыйце значэнне"
+      "reveal": "Раскрыйце значэнне",
+      "newValuePlaceholder": "Увядзіце новае сакрэтнае значэнне",
+      "valuePlaceholder": "Сакрэтнае значэнне (зашыфраванае)"
     },
     "variablesEmpty": "Зменных пакуль няма",
     "variablesSaveFailed": "Не ўдалося захаваць зменную",

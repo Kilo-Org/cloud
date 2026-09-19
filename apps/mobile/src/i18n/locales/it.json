@@ -234,6 +234,15 @@
     "emptyTitle": "Nessun profilo ancora",
     "emptyDescription": "Crea un profilo per riutilizzare variabili di ambiente, comandi di configurazione e competenze tra le sessioni.",
     "loadFailed": "Impossibile caricare i profili",
+    "counts": {
+      "vars": "{{count}} variabili",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} competenze",
+      "commands": "{{count}} comandi",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}comp",
+      "commandsShort": "{{count}}cmd"
+    },
     "nameLabel": "Nome del profilo",
     "namePlaceholder": "per esempio. Debug del backend",
     "descriptionLabel": "Descrizione del profilo",
@@ -258,12 +267,15 @@
     "variablesTitle": "Variabili d'ambiente",
     "addVariable": "Aggiungi variabile",
     "keyLabel": "Chiave",
+    "keyTooLong": "La chiave deve contenere 256 caratteri o meno",
     "valueLabel": "Valore",
     "secretLabel": "Segreto",
     "secrets": {
       "markSecret": "Contrassegna come segreto",
       "masked": "Valore nascosto",
-      "reveal": "Rivela valore"
+      "reveal": "Rivela valore",
+      "newValuePlaceholder": "Inserisci un nuovo valore segreto",
+      "valuePlaceholder": "Valore segreto (cifrato)"
     },
     "variablesEmpty": "Nessuna variabile ancora",
     "variablesSaveFailed": "Impossibile salvare la variabile",

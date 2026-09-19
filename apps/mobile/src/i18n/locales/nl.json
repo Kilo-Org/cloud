@@ -234,6 +234,15 @@
     "emptyTitle": "Nog geen profielen",
     "emptyDescription": "Maak een profiel aan om omgevingsvariabelen, installatieopdrachten en vaardigheden tijdens sessies opnieuw te gebruiken.",
     "loadFailed": "Kan profielen niet laden",
+    "counts": {
+      "vars": "{{count}} variabelen",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} vaardigheden",
+      "commands": "{{count}} opdrachten",
+      "varsShort": "{{count}}var",
+      "skillsShort": "{{count}}vaa",
+      "commandsShort": "{{count}}opd"
+    },
     "nameLabel": "Profielnaam",
     "namePlaceholder": "bijv. Foutopsporing in de backend",
     "descriptionLabel": "Profielbeschrijving",
@@ -258,12 +267,15 @@
     "variablesTitle": "Omgevingsvariabelen",
     "addVariable": "Variabele toevoegen",
     "keyLabel": "Sleutel",
+    "keyTooLong": "De sleutel mag maximaal 256 tekens bevatten",
     "valueLabel": "Waarde",
     "secretLabel": "Geheim",
     "secrets": {
       "markSecret": "Markeer als geheim",
       "masked": "Verborgen waarde",
-      "reveal": "Onthul waarde"
+      "reveal": "Onthul waarde",
+      "newValuePlaceholder": "Voer een nieuwe geheime waarde in",
+      "valuePlaceholder": "Geheime waarde (versleuteld)"
     },
     "variablesEmpty": "Nog geen variabelen",
     "variablesSaveFailed": "Kan variabele niet opslaan",

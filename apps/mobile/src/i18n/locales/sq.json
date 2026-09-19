@@ -234,6 +234,15 @@
     "emptyTitle": "Nuk ka ende profile",
     "emptyDescription": "Krijo një profil për të ripërdorur variablat e mjedisit, komandat e konfigurimit dhe aftësitë nëpër sesione.",
     "loadFailed": "Profilet nuk mund të ngarkoheshin",
+    "counts": {
+      "vars": "{{count}} variabla",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} aftësi",
+      "commands": "{{count}} komanda",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}a",
+      "commandsShort": "{{count}}k"
+    },
     "nameLabel": "Emri i profilit",
     "namePlaceholder": "p.sh. Korrigjimi i backend-it",
     "descriptionLabel": "Përshkrimi i profilit",
@@ -258,12 +267,15 @@
     "variablesTitle": "Variablat e mjedisit",
     "addVariable": "Shto variabël",
     "keyLabel": "Çelësi",
+    "keyTooLong": "Çelësi duhet të ketë 256 karaktere ose më pak",
     "valueLabel": "Vlera",
     "secretLabel": "Sekret",
     "secrets": {
       "markSecret": "Shënoni si sekret",
       "masked": "Vlera e fshehur",
-      "reveal": "Zbuloni vlerën"
+      "reveal": "Zbuloni vlerën",
+      "newValuePlaceholder": "Vendos një vlerë të re sekrete",
+      "valuePlaceholder": "Vlerë sekrete (e kriptuar)"
     },
     "variablesEmpty": "Ende nuk ka variabla",
     "variablesSaveFailed": "Variabla nuk mund të ruhej",

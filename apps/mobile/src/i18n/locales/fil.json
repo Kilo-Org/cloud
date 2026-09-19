@@ -234,6 +234,15 @@
     "emptyTitle": "Wala pang mga profile",
     "emptyDescription": "Gumawa ng profile para magamit muli ang mga variable ng kapaligiran, mga command sa pag-setup, at mga kasanayan sa mga session.",
     "loadFailed": "Hindi ma-load ang mga profile",
+    "counts": {
+      "vars": "{{count}} variable",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} kasanayan",
+      "commands": "{{count}} utos",
+      "varsShort": "{{count}}v",
+      "skillsShort": "{{count}}k",
+      "commandsShort": "{{count}}u"
+    },
     "nameLabel": "Pangalan ng profile",
     "namePlaceholder": "hal. Backend debugging",
     "descriptionLabel": "Paglalarawan ng profile",
@@ -258,12 +267,15 @@
     "variablesTitle": "Mga variable ng kapaligiran",
     "addVariable": "Magdagdag ng variable",
     "keyLabel": "Susi",
+    "keyTooLong": "Ang susi ay dapat 256 na character o mas kaunti",
     "valueLabel": "Halaga",
     "secretLabel": "Lihim",
     "secrets": {
       "markSecret": "Markahan bilang sikreto",
       "masked": "Nakatagong halaga",
-      "reveal": "Ipakita ang halaga"
+      "reveal": "Ipakita ang halaga",
+      "newValuePlaceholder": "Maglagay ng bagong lihim na halaga",
+      "valuePlaceholder": "Lihim na halaga (naka-encrypt)"
     },
     "variablesEmpty": "Wala pang variable",
     "variablesSaveFailed": "Hindi ma-save ang variable",

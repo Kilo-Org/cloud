@@ -234,6 +234,15 @@
     "emptyTitle": "Oraindik ez dago profilik",
     "emptyDescription": "Sortu profil bat ingurune-aldagaiak, konfigurazio komandoak eta trebetasunak saioetan berrerabiltzeko.",
     "loadFailed": "Ezin izan dira kargatu profilak",
+    "counts": {
+      "vars": "{{count}} aldagai",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} trebetasun",
+      "commands": "{{count}} komando",
+      "varsShort": "{{count}}a",
+      "skillsShort": "{{count}}t",
+      "commandsShort": "{{count}}k"
+    },
     "nameLabel": "Profilaren izena",
     "namePlaceholder": "adib. Backend arazketa",
     "descriptionLabel": "Profilaren deskribapena",
@@ -258,12 +267,15 @@
     "variablesTitle": "Inguruko aldagaiak",
     "addVariable": "Gehitu aldagaia",
     "keyLabel": "Gakoa",
+    "keyTooLong": "Gakoak 256 karaktere edo gutxiago izan behar ditu",
     "valueLabel": "Balioa",
     "secretLabel": "Sekretua",
     "secrets": {
       "markSecret": "Markatu sekretu gisa",
       "masked": "Ezkutuko balioa",
-      "reveal": "Erakutsi balioa"
+      "reveal": "Erakutsi balioa",
+      "newValuePlaceholder": "Sartu balio sekretu berria",
+      "valuePlaceholder": "Balio sekretua (zifratuta)"
     },
     "variablesEmpty": "Oraindik ez dago aldagairik",
     "variablesSaveFailed": "Ezin izan da aldagaia gorde",

@@ -234,6 +234,15 @@
     "emptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ପ୍ରୋଫାଇଲ୍ ନାହିଁ।",
     "emptyDescription": "ପରିବେଶ ଭେରିଏବଲ୍, ସେଟଅପ୍ କମାଣ୍ଡ, ଏବଂ ଅଧିବେଶନରେ କୌଶଳ ପୁନଃ ବ୍ୟବହାର କରିବାକୁ ଏକ ପ୍ରୋଫାଇଲ୍ ସୃଷ୍ଟି କରନ୍ତୁ।",
     "loadFailed": "ପ୍ରୋଫାଇଲ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "counts": {
+      "vars": "{{count}} ଭେରିଏବଲ୍",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ଦକ୍ଷତା",
+      "commands": "{{count}} କମାଣ୍ଡ୍",
+      "varsShort": "{{count}}ଭ",
+      "skillsShort": "{{count}}ଦ",
+      "commandsShort": "{{count}}କ"
+    },
     "nameLabel": "ପ୍ରୋଫାଇଲ୍ ନାମ",
     "namePlaceholder": "ଯଥା ବ୍ୟାକେଣ୍ଡ୍ ତ୍ରୁଟି ନିବାରଣ।",
     "descriptionLabel": "ପ୍ରୋଫାଇଲ୍ ବର୍ଣ୍ଣନା",
@@ -258,12 +267,15 @@
     "variablesTitle": "ପରିବେଶ ଭେରିଏବଲ୍।",
     "addVariable": "ଭେରିଏବଲ୍ ଆଡ୍ କରନ୍ତୁ।",
     "keyLabel": "ଚାବି",
+    "keyTooLong": "ଚାବି 256 ଅକ୍ଷର କିମ୍ବା କମ୍ ହେବା ଉଚିତ୍",
     "valueLabel": "ମୂଲ୍ୟ",
     "secretLabel": "ଗୁପ୍ତ",
     "secrets": {
       "markSecret": "ଗୁପ୍ତ ଭାବରେ ଚିହ୍ନିତ କର।",
       "masked": "ଲୁକ୍କାୟିତ ମୂଲ୍ୟ",
-      "reveal": "ମୂଲ୍ୟ ପ୍ରକାଶ କରନ୍ତୁ।"
+      "reveal": "ମୂଲ୍ୟ ପ୍ରକାଶ କରନ୍ତୁ।",
+      "newValuePlaceholder": "ନୂଆ ଗୁପ୍ତ ମୂଲ୍ୟ ପ୍ରବେଶ କରନ୍ତୁ",
+      "valuePlaceholder": "ଗୁପ୍ତ ମୂଲ୍ୟ (ଏନକ୍ରିପ୍ଟ ହୋଇଛି)"
     },
     "variablesEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଭେରିଏବଲ୍ ନାହିଁ।",
     "variablesSaveFailed": "ଭେରିଏବଲ୍ ସେଭ୍ କରିପାରିଲା ନାହିଁ।",

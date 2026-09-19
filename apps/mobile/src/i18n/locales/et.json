@@ -234,6 +234,15 @@
     "emptyTitle": "Profiilid veel puuduvad",
     "emptyDescription": "Looge profiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul.",
     "loadFailed": "Profiilide laadimine nurjus",
+    "counts": {
+      "vars": "{{count}} muutujat",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} oskust",
+      "commands": "{{count}} käsku",
+      "varsShort": "{{count}}m",
+      "skillsShort": "{{count}}o",
+      "commandsShort": "{{count}}k"
+    },
     "nameLabel": "Profiili nimi",
     "namePlaceholder": "nt. Taustasüsteemi silumine",
     "descriptionLabel": "Profiili kirjeldus",
@@ -258,12 +267,15 @@
     "variablesTitle": "Keskkonnamuutujad",
     "addVariable": "Lisa muutuja",
     "keyLabel": "Võti",
+    "keyTooLong": "Võti võib olla kuni 256 tähemärki",
     "valueLabel": "Väärtus",
     "secretLabel": "Saladus",
     "secrets": {
       "markSecret": "Märgi salajaseks",
       "masked": "Varjatud väärtus",
-      "reveal": "Avalda väärtust"
+      "reveal": "Avalda väärtust",
+      "newValuePlaceholder": "Sisesta uus salajane väärtus",
+      "valuePlaceholder": "Salajane väärtus (krüpteeritud)"
     },
     "variablesEmpty": "Muutujaid veel pole",
     "variablesSaveFailed": "Muutujat ei saanud salvestada",

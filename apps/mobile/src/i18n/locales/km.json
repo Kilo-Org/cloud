@@ -234,6 +234,15 @@
     "emptyTitle": "មិនទាន់មានប្រវត្តិរូបទេ។",
     "emptyDescription": "បង្កើតទម្រង់ដើម្បីប្រើអថេរបរិស្ថានឡើងវិញ រៀបចំពាក្យបញ្ជា និងជំនាញនៅទូទាំងវគ្គ។",
     "loadFailed": "មិនអាចផ្ទុកទម្រង់បានទេ។",
+    "counts": {
+      "vars": "{{count}} អថេរ",
+      "mcp": "{{count}} MCP",
+      "skills": "{{count}} ជំនាញ",
+      "commands": "{{count}} ពាក្យបញ្ជា",
+      "varsShort": "{{count}}អ",
+      "skillsShort": "{{count}}ជ",
+      "commandsShort": "{{count}}ព"
+    },
     "nameLabel": "ឈ្មោះប្រវត្តិរូប",
     "namePlaceholder": "ឧ. ការកែកំហុសផ្នែកខាងក្រោយ",
     "descriptionLabel": "ការពិពណ៌នាអំពីប្រវត្តិរូប",
@@ -258,12 +267,15 @@
     "variablesTitle": "អថេរបរិស្ថាន",
     "addVariable": "បន្ថែមអថេរ",
     "keyLabel": "សោ",
+    "keyTooLong": "សោត្រូវតែមាន 256 តួអក្សរ ឬតិចជាងនេះ",
     "valueLabel": "តម្លៃ",
     "secretLabel": "សម្ងាត់",
     "secrets": {
       "markSecret": "សម្គាល់ជាសម្ងាត់",
       "masked": "តម្លៃលាក់",
-      "reveal": "បង្ហាញតម្លៃ"
+      "reveal": "បង្ហាញតម្លៃ",
+      "newValuePlaceholder": "បញ្ចូលតម្លៃសម្ងាត់ថ្មី",
+      "valuePlaceholder": "តម្លៃសម្ងាត់ (បានអ៊ិនគ្រីប)"
     },
     "variablesEmpty": "មិនមានអថេរនៅឡើយ",
     "variablesSaveFailed": "មិនអាចរក្សាទុកអថេរបានទេ។",

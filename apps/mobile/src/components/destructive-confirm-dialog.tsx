@@ -18,8 +18,8 @@ type DestructiveConfirmDialogProps = {
  *
  * Android's native `AlertDialog` paints every button with the theme accent, so
  * `Alert.alert`'s `style: 'destructive'` never reaches the screen there (iOS
- * honors it). Destructive confirmations render this surface on both platforms,
- * so the red affordance is identical on iOS and Android.
+ * honors it and keeps the native alert). Android renders this surface instead,
+ * so the destructive choice still carries the red affordance.
  *
  * Mount it only while it should be open (e.g. `{confirming && <DestructiveConfirmDialog ... />}`),
  * the same lifecycle `RenameModal` uses.

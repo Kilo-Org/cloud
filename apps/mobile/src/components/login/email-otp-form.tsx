@@ -78,7 +78,7 @@ export function EmailOtpForm({
         accessibilityLabel={t('login.resendCode')}
       >
         {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
-        <Text>{t('login.resendCode')}</Text>
+        <Text className="flex-1 text-center">{t('login.resendCode')}</Text>
       </Button>
       <Button
         variant="ghost"

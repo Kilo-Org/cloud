@@ -125,6 +125,21 @@ describe('provider-neutral URL field', () => {
     expect(mocks.push).not.toHaveBeenCalled();
   });
 
+  it('keeps the one-line field from wrapping and clipping its placeholder', async () => {
+    const tree = await renderLoaded();
+    const input = propsOf(find(tree, 'TextInput', () => true));
+    // The field is one line tall, so Android must not wrap the hint onto a
+    // second line: the hint's second line was drawn below the field's own
+    // bounds and clipped at its bottom edge (explorer capture). numberOfLines
+    // caps the native hint layout at one line instead of wrapping it.
+    expect(input.numberOfLines).toBe(1);
+    expect(input.multiline).toBeFalsy();
+    // Height comes from min-h-* (see apps/mobile/AGENTS.md), never py-*:
+    // vertical padding draws the single-line text below the middle.
+    expect(String(input.className)).toContain('min-h-14');
+    expect(String(input.className)).not.toContain('py-3');
+  });
+
   it('shows the clear control only once the field has text', async () => {
     const before = await renderLoaded();
     expect(

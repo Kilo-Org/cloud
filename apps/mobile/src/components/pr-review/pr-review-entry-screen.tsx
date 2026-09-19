@@ -275,9 +275,16 @@ export function PrReviewEntryScreen() {
                 inputValueRef.current = value;
                 setHasInput(value.length > 0);
               }}
+              // A one-line field: without numberOfLines the native hint wraps
+              // onto a second line the field's bounds then clip at the bottom
+              // edge (Android explorer capture). The cap keeps the hint on one
+              // line; the label above already states what the field takes.
+              numberOfLines={1}
               // leading-[normal] so no lineHeight reaches the style: an explicit lineHeight
               // makes iOS draw the placeholder lower than the typed text (see AGENTS.md).
-              className="min-w-0 flex-1 bg-transparent py-3 pl-3 pr-1 text-base text-foreground leading-[normal]"
+              // min-h-14 (not py-3) sizes the field: vertical padding draws the
+              // single-line text below the middle (see AGENTS.md).
+              className="min-h-14 min-w-0 flex-1 bg-transparent pl-3 pr-1 text-base text-foreground leading-[normal]"
               accessibilityLabel={t('prReview.entry.urlAccessibility')}
               returnKeyType="go"
               onSubmitEditing={handleSubmit}

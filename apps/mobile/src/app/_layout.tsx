@@ -49,7 +49,7 @@ import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { OfflineBannerSpaceGate } from '@/components/offline-banner';
 import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
-import { QueryError } from '@/components/query-error';
+import { RuntimeErrorScreen } from '@/components/runtime-error-screen';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
@@ -1098,11 +1098,7 @@ function RootLayout() {
 }
 
 function RootErrorBoundary({ retry }: ErrorBoundaryProps) {
-  return (
-    <StateSurface className="flex-1 bg-background">
-      <QueryError onRetry={() => void retry()} />
-    </StateSurface>
-  );
+  return <RuntimeErrorScreen onRetry={() => void retry()} />;
 }
 
 export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(RootErrorBoundary);

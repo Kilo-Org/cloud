@@ -14,6 +14,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
+import { expectReliableTapTarget } from '@/test/touch-target.test-helpers';
 
 import '@/i18n';
 import { OrganizationMembersScreen } from './members-screen';
@@ -96,7 +97,8 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: () => null,
+  ScreenHeader: (props: { headerRight?: ReactNode }) =>
+    createElement('ScreenHeader', null, props.headerRight),
 }));
 
 vi.mock('@/components/ui/button', () => ({
@@ -211,5 +213,21 @@ describe('OrganizationMembersScreen empty-state precedence', () => {
     const texts = await renderScreen();
     expect(texts).not.toContain('QUERY_ERROR');
     expect(texts).not.toContain('EMPTY_STATE:No members yet');
+  });
+});
+
+describe('OrganizationMembersScreen invite control', () => {
+  // The explorer found the header's "Invite member" control at its bare 22dp
+  // icon size, below the 28dp minimum. This pins the box that replaced it.
+  it('sizes the invite control for a reliable tap target', async () => {
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrganizationMembersScreen)
+    );
+    const button = renderer.root.find(
+      node => String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Invite member'
+    );
+
+    expectReliableTapTarget(button.props);
+    unmount();
   });
 });

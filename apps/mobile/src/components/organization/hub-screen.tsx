@@ -19,6 +19,7 @@ import { OrgUsageStats } from '@/components/organization/org-usage-stats';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { IconButton } from '@/components/ui/icon-button';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -111,17 +112,14 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               {org.organizationName}
             </Text>
             {showMoney && (
-              <Pressable
+              <IconButton
                 onPress={() => {
                   setRenameVisible(true);
                 }}
-                hitSlop={12}
-                accessibilityRole="button"
                 accessibilityLabel={t('organization.hub.renameTitle')}
-                className="active:opacity-70"
               >
                 <Pencil size={16} color={colors.mutedForeground} />
-              </Pressable>
+              </IconButton>
             )}
           </View>
           {showMoney && (

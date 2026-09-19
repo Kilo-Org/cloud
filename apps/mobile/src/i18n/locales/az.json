@@ -783,11 +783,11 @@
     "previewFullDescription": "Bildirişlər mesajın mətnini kilid ekranında göstərir.",
     "previewGenericDescription": "Bildirişlər yalnız hadisənin baş verdiyini göstərir. Mesajı oxumaq üçün Kilo-nu aç.",
     "channel": {
-      "agent": "Agent sessiyaları",
       "chat": "Söhbət mesajları",
       "kiloclaw": "KiloClaw fəaliyyəti",
       "balance": "Balans bildirişləri",
-      "security": "Təhlükəsizlik problemləri"
+      "security": "Təhlükəsizlik problemləri",
+      "agent": "Agent sessiyaları"
     },
     "category": {
       "chatMessagesSubtitle": "söhbətlərindəki cavablar",

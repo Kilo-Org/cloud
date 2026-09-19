@@ -801,11 +801,11 @@
     "previewFullDescription": "Upozornenia zobrazujú text správy na uzamknutej obrazovke.",
     "previewGenericDescription": "Upozornenia oznámia novú udalosť bez zobrazenia obsahu. Správu si prečítaš v aplikácii Kilo.",
     "channel": {
-      "agent": "Relácie agentov",
       "chat": "Správy v čete",
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornenia na zostatok",
-      "security": "Bezpečnostné zistenia"
+      "security": "Bezpečnostné zistenia",
+      "agent": "Relácie agentov"
     },
     "category": {
       "chatMessagesSubtitle": "odpovede v tvojich konverzáciách",

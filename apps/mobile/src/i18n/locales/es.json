@@ -265,11 +265,11 @@
   },
   "notifications": {
     "channel": {
-      "agent": "Sesiones de agentes",
       "chat": "Mensajes de chat",
       "kiloclaw": "Actividad de KiloClaw",
       "balance": "Alertas de saldo",
-      "security": "Hallazgos de seguridad"
+      "security": "Hallazgos de seguridad",
+      "agent": "Sesiones de agentes"
     },
     "category": {
       "chatMessagesSubtitle": "respuestas en tus conversaciones",

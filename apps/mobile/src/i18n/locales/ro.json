@@ -792,11 +792,11 @@
     "previewFullDescription": "Notificările afișează textul mesajului pe ecranul de blocare.",
     "previewGenericDescription": "Notificările semnalează activitatea fără a afișa textul mesajului. Deschide Kilo pentru a-l citi.",
     "channel": {
-      "agent": "Sesiuni ale agenților",
       "chat": "Mesaje din conversații",
       "kiloclaw": "Activitate KiloClaw",
       "balance": "Alerte privind soldul",
-      "security": "Probleme de securitate detectate"
+      "security": "Probleme de securitate detectate",
+      "agent": "Sesiuni ale agenților"
     },
     "category": {
       "chatMessagesSubtitle": "răspunsuri în conversațiile tale",

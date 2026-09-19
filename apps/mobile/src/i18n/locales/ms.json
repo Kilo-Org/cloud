@@ -783,11 +783,11 @@
     "previewFullDescription": "Pemberitahuan memaparkan teks mesej pada skrin kunci anda.",
     "previewGenericDescription": "Pemberitahuan hanya memaklumkan bahawa terdapat aktiviti baharu. Buka Kilo untuk membaca mesej.",
     "channel": {
-      "agent": "Sesi ejen",
       "chat": "Mesej sembang",
       "kiloclaw": "Aktiviti KiloClaw",
       "balance": "Amaran baki",
-      "security": "Dapatan keselamatan"
+      "security": "Dapatan keselamatan",
+      "agent": "Sesi ejen"
     },
     "category": {
       "chatMessagesSubtitle": "balasan dalam perbualan anda",

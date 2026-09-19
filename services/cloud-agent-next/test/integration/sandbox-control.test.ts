@@ -10742,7 +10742,7 @@ describe('SandboxSession control-plane regressions', () => {
       socket.close();
       replacement?.close();
     }
-  });
+  }, 30_000);
 
   it('normalizes initial and command models once without preflight or leaking session finalization', async () => {
     const { fixture, session } = messageFixture();

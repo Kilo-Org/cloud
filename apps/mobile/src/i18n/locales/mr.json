@@ -783,11 +783,11 @@
     "previewFullDescription": "सूचनांमध्ये तुमच्या लॉक स्क्रीनवर संदेशाचा मजकूर दिसतो.",
     "previewGenericDescription": "सूचनांमध्ये फक्त काहीतरी घडल्याचे कळते. संदेश वाचण्यासाठी Kilo उघडा.",
     "channel": {
-      "agent": "एजंटची सत्रे",
       "chat": "चॅटमधील संदेश",
       "kiloclaw": "KiloClaw मधील घडामोडी",
       "balance": "शिल्लक रकमेच्या सूचना",
-      "security": "सुरक्षा निष्कर्ष"
+      "security": "सुरक्षा निष्कर्ष",
+      "agent": "एजंटची सत्रे"
     },
     "category": {
       "chatMessagesSubtitle": "तुमच्या संभाषणांमधील उत्तरे",

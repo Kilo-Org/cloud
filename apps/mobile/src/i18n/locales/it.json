@@ -229,11 +229,11 @@
   },
   "notifications": {
     "channel": {
-      "agent": "Sessioni degli agenti",
       "chat": "Messaggi di chat",
       "kiloclaw": "Attività di KiloClaw",
       "balance": "Avvisi sul saldo",
-      "security": "Problemi di sicurezza"
+      "security": "Problemi di sicurezza",
+      "agent": "Sessioni degli agenti"
     },
     "category": {
       "chatMessagesSubtitle": "risposte nelle tue conversazioni",

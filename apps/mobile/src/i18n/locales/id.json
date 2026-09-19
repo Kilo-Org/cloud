@@ -293,11 +293,11 @@
     "previewFullDescription": "Notifikasi menampilkan teks pesan di layar kuncimu.",
     "previewGenericDescription": "Notifikasi hanya menunjukkan adanya aktivitas. Buka Kilo untuk membaca pesannya.",
     "channel": {
-      "agent": "Sesi agen",
       "chat": "Pesan obrolan",
       "kiloclaw": "Aktivitas KiloClaw",
       "balance": "Peringatan saldo",
-      "security": "Temuan keamanan"
+      "security": "Temuan keamanan",
+      "agent": "Sesi agen"
     },
     "category": {
       "chatMessagesSubtitle": "balasan dalam percakapanmu",

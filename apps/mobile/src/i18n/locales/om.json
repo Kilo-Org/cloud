@@ -783,11 +783,11 @@
     "previewFullDescription": "Beeksisoonni barreeffama ergaa iskiriinii qulfii kee irratti agarsiisu.",
     "previewGenericDescription": "Beeksisoonni wanti tokko akka ta'e agarsiisu. Dubbisuuf Kilo bani.",
     "channel": {
-      "agent": "Turtiiwwan ergamaa",
       "chat": "Ergaawwan marii",
       "kiloclaw": "Sochii KiloClaw",
       "balance": "Akeekkachiisa haftee maallaqaa",
-      "security": "Argannoowwan nageenyaa"
+      "security": "Argannoowwan nageenyaa",
+      "agent": "Turtiiwwan ergamaa"
     },
     "category": {
       "chatMessagesSubtitle": "deebiiwwan mariiwwan kee keessatti",

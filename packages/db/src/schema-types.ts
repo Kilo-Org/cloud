@@ -1248,6 +1248,7 @@ export type AuthProviderId =
   | 'apple'
   | 'email'
   | 'google'
+  | 'passkey'
   | 'anaconda'
   | 'github'
   | 'gitlab'

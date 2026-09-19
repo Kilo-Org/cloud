@@ -792,11 +792,11 @@
     "previewFullDescription": "Les notificacions mostren el text del missatge a la pantalla de bloqueig.",
     "previewGenericDescription": "Les notificacions mostren que ha passat alguna cosa. Obre Kilo per llegir-ho.",
     "channel": {
-      "agent": "Sessions d'agent",
       "chat": "Missatges de xat",
       "kiloclaw": "Activitat de KiloClaw",
       "balance": "Alertes de saldo",
-      "security": "Problemes de seguretat"
+      "security": "Problemes de seguretat",
+      "agent": "Sessions d'agent"
     },
     "category": {
       "chatMessagesSubtitle": "respostes a les teves converses",

@@ -783,11 +783,11 @@
     "previewFullDescription": "Kennisgewings wys die boodskapteks op jou sluitskerm.",
     "previewGenericDescription": "Kennisgewings wys dat iets gebeur het. Maak Kilo oop om dit te lees.",
     "channel": {
-      "agent": "Agentsessies",
       "chat": "Kletsboodskappe",
       "kiloclaw": "KiloClaw-aktiwiteit",
       "balance": "Saldowaarskuwings",
-      "security": "Sekuriteitsbevindings"
+      "security": "Sekuriteitsbevindings",
+      "agent": "Agentsessies"
     },
     "category": {
       "chatMessagesSubtitle": "antwoorde in jou gesprekke",

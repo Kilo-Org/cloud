@@ -783,11 +783,11 @@
     "previewFullDescription": "Bildirishnomalar qulflangan ekranda xabar matnini ko'rsatadi.",
     "previewGenericDescription": "Bildirishnomalar faqat yangi hodisa haqida xabar beradi. Xabarni o'qish uchun Kilo ilovasini oching.",
     "channel": {
-      "agent": "Agent sessiyalari",
       "chat": "Suhbat xabarlari",
       "kiloclaw": "KiloClaw faoliyati",
       "balance": "Balans haqida ogohlantirishlar",
-      "security": "Aniqlangan xavfsizlik muammolari"
+      "security": "Aniqlangan xavfsizlik muammolari",
+      "agent": "Agent sessiyalari"
     },
     "category": {
       "chatMessagesSubtitle": "suhbatlaringizdagi javoblar",

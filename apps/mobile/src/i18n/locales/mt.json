@@ -810,11 +810,11 @@
     "previewFullDescription": "In-notifiki juru t-test tal-messaġġ fuq l-iskrin tal-qfil tiegħek.",
     "previewGenericDescription": "In-notifiki juru li ġrat xi ħaġa. Iftaħ Kilo biex taqra l-messaġġ.",
     "channel": {
-      "agent": "Sessjonijiet tal-aġent",
       "chat": "Messaġġi tat-taħdit",
       "kiloclaw": "Attività ta' KiloClaw",
       "balance": "Twissijiet tal-bilanċ",
-      "security": "Sejbiet tas-sigurtà"
+      "security": "Sejbiet tas-sigurtà",
+      "agent": "Sessjonijiet tal-aġent"
     },
     "category": {
       "chatMessagesSubtitle": "tweġibiet fil-konversazzjonijiet tiegħek",

@@ -783,11 +783,11 @@
     "previewFullDescription": "خبرتیاوې د قلف پر سکرین د پیغام متن ښیي.",
     "previewGenericDescription": "خبرتیاوې یوازې د یوې پېښې خبر درکوي. د پیغام د لوستلو لپاره Kilo پرانیزئ.",
     "channel": {
-      "agent": "د ایجنټ ناستې",
       "chat": "د خبرو اترو پیغامونه",
       "kiloclaw": "د KiloClaw فعالیت",
       "balance": "د بیلانس خبرتیاوې",
-      "security": "امنیتي موندنې"
+      "security": "امنیتي موندنې",
+      "agent": "د ایجنټ ناستې"
     },
     "category": {
       "chatMessagesSubtitle": "ستاسو په خبرو اترو کې ځوابونه",

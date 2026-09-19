@@ -10,6 +10,8 @@
 import {
   type GlanceableLiveActivityContentState,
   type PushData,
+  agentNotificationKindForGlanceableSnapshot,
+  androidChannelIdForAgentKind,
   translatePush,
 } from '@kilocode/notifications';
 
@@ -81,6 +83,7 @@ export function buildGlanceableExpoMessages(
   snapshot: ActiveAgentsGlanceable,
   priority: 'default' | 'high'
 ): ExpoPushMessage[] {
+  const kind = agentNotificationKindForGlanceableSnapshot(snapshot);
   return tokens.map(
     ({ token }) =>
       ({
@@ -99,7 +102,10 @@ export function buildGlanceableExpoMessages(
         // iOS stays `default`: APNs background `content-available` pushes use
         // priority 5, and Live Activity freshness rides the direct APNs path.
         priority,
-        channelId: 'active-agents',
+        // The wake names the kind's channel because the ongoing card is posted
+        // locally on that same channel; the legacy `active-agents` id is deleted
+        // on startup and no client creates it, so posting to it would be dropped.
+        channelId: androidChannelIdForAgentKind(kind),
         // Android collapse key = the opaque scope key, so every aggregate update
         // for one user+org collapses into the same ongoing notification.
         tag: snapshot.scopeKey,

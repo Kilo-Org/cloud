@@ -783,11 +783,11 @@
     "previewFullDescription": "Aviseringarna visar meddelandetexten på din låsskärm.",
     "previewGenericDescription": "Aviseringarna visar att något har hänt. Öppna Kilo för att läsa meddelandet.",
     "channel": {
-      "agent": "Agentsessioner",
       "chat": "Chattmeddelanden",
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarningar",
-      "security": "Säkerhetsanmärkningar"
+      "security": "Säkerhetsanmärkningar",
+      "agent": "Agentsessioner"
     },
     "category": {
       "chatMessagesSubtitle": "svar i dina konversationer",

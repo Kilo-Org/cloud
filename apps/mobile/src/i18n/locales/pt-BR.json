@@ -229,11 +229,11 @@
   },
   "notifications": {
     "channel": {
-      "agent": "Sessões de agentes",
       "chat": "Mensagens da conversa",
       "kiloclaw": "Atividade do KiloClaw",
       "balance": "Alertas de saldo",
-      "security": "Problemas de segurança"
+      "security": "Problemas de segurança",
+      "agent": "Sessões de agentes"
     },
     "liveActivities": "Atividades ao vivo",
     "liveActivitySubtitle": "Mostrar agentes ativos na tela de bloqueio",

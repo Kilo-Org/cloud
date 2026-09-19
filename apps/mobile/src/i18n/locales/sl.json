@@ -801,11 +801,11 @@
     "previewFullDescription": "Obvestila prikažejo besedilo sporočila na zaklenjenem zaslonu.",
     "previewGenericDescription": "Obvestila sporočijo le, da se je nekaj zgodilo. Za ogled vsebine odpri Kilo.",
     "channel": {
-      "agent": "Seje agentov",
       "chat": "Sporočila v klepetu",
       "kiloclaw": "Dejavnost v KiloClaw",
       "balance": "Opozorila o stanju dobroimetja",
-      "security": "Varnostne ugotovitve"
+      "security": "Varnostne ugotovitve",
+      "agent": "Seje agentov"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori v tvojih pogovorih",

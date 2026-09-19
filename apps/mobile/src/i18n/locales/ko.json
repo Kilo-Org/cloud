@@ -293,11 +293,11 @@
     "previewFullDescription": "잠금 화면의 알림에 메시지 내용이 표시됩니다.",
     "previewGenericDescription": "알림에는 새 소식이 있다는 사실만 표시됩니다. 내용을 읽으려면 Kilo를 여세요.",
     "channel": {
-      "agent": "에이전트 세션",
       "chat": "채팅 메시지",
       "kiloclaw": "KiloClaw 활동",
       "balance": "잔액 알림",
-      "security": "보안 진단 결과"
+      "security": "보안 진단 결과",
+      "agent": "에이전트 세션"
     },
     "category": {
       "chatMessagesSubtitle": "대화에 달린 답장",

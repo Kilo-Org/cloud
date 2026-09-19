@@ -783,11 +783,11 @@
     "previewFullDescription": "Az értesítések megjelenítik az üzenet szövegét a zárolási képernyőn.",
     "previewGenericDescription": "Az értesítések csak azt jelzik, hogy valami történt. A részletek elolvasásához nyisd meg a Kilo alkalmazást.",
     "channel": {
-      "agent": "Ügynökmunkamenetek",
       "chat": "Csevegőüzenetek",
       "kiloclaw": "KiloClaw-tevékenység",
       "balance": "Egyenlegértesítések",
-      "security": "Biztonsági találatok"
+      "security": "Biztonsági találatok",
+      "agent": "Ügynökmunkamenetek"
     },
     "category": {
       "chatMessagesSubtitle": "válaszok a beszélgetéseidben",

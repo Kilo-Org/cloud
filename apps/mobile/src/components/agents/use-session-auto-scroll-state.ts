@@ -123,3 +123,40 @@ export function shouldFollowSessionContentSize({
   }
   return true;
 }
+
+/**
+ * Decide whether a transcript viewport resize should trigger a follow scroll
+ * to the latest message. The fixed status rows (the working indicator, the
+ * session status indicator) live OUTSIDE the list, so they shrink the list's
+ * viewport while its scroll offset stays put: the newest row is then left
+ * below the fold and — because the list does not clip its overflow
+ * (`removeClippedSubviews={false}`, see session-message-list.tsx) — is drawn
+ * under the transparent status row. Re-pin on the resize.
+ *
+ * Like `shouldFollowSessionContentSize`, this does NOT gate on
+ * `isAutoScrolling`: the resize lands during the streaming follow window, and
+ * gating on it would drop exactly the correction this exists for. The
+ * user-facing guards still apply, and an unchanged viewport height does not
+ * take this path (the caller keeps the guarded scheduler for it), so a
+ * redundant layout pass cannot stack scrolls.
+ */
+export function shouldFollowSessionViewportResize({
+  isUserScrolling,
+  shouldAutoScroll,
+  didViewportHeightChange,
+}: {
+  isUserScrolling: boolean;
+  shouldAutoScroll: boolean;
+  didViewportHeightChange: boolean;
+}): boolean {
+  if (!shouldAutoScroll) {
+    return false;
+  }
+  if (isUserScrolling) {
+    return false;
+  }
+  if (!didViewportHeightChange) {
+    return false;
+  }
+  return true;
+}

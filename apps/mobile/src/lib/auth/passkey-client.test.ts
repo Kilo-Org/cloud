@@ -129,8 +129,8 @@ describe('classifyPasskeyError', () => {
       .spyOn(String.prototype, 'toLocaleLowerCase')
       .mockReturnValue(turkishIdentifier);
     try {
-      expect('NOTCONFIGURED'.toLocaleLowerCase()).toBe('notconfıgured');
       expect(classifyPasskeyError({ message: 'NOTCONFIGURED' })).toBe('unsupported');
+      expect(localeCase).not.toHaveBeenCalled();
     } finally {
       localeCase.mockRestore();
     }

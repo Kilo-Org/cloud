@@ -576,9 +576,13 @@ async function ontoTools(sessionId: string, place: ChatPlace): Promise<string> {
  * Turns the Kilo MCP tools on or off for one chat.
  *
  * The setting is written first, so it survives whatever happens to the session.
- * A chat that is answering is not moved under the answer — the tool set would
- * change between two rounds of one question — so the choice is remembered and
- * applied when the answer settles.
+ * Turning it on reaches the server, because a chat that had the feature off
+ * never ran a discovery: without asking, the session would be moved onto the
+ * base tools alone, the sheet would still say the server is not available, and
+ * the switch the person just turned on would snap back off. A chat that is
+ * answering is not moved under the answer — the tool set would change between
+ * two rounds of one question — so the choice is remembered and applied when the
+ * answer settles.
  */
 export async function setMcpEnabled(sessionId: string, enabled: boolean): Promise<void> {
   const current = snapshotOf(sessionId).sessionId;
@@ -590,8 +594,45 @@ export async function setMcpEnabled(sessionId: string, enabled: boolean): Promis
   if (chat === undefined) {
     return;
   }
+  if (enabled && KILO_MCP_URL !== undefined) {
+    /* An open, so the four-second bound: a server that is slow or down leaves
+       the chat to be moved onto what is known rather than holding the switch. */
+    await ensureKiloMcp(chat, 'automatic');
+  }
   if (chat.answering !== undefined) {
     chat.pendingMcp = enabled;
+    return;
+  }
+  await ontoTools(current, chat);
+}
+
+/**
+ * Asks the Kilo server again, and moves the chat onto the tools that answered.
+ *
+ * A Retry is a person asking, so it gets the longer deadline the module keeps
+ * for one. The tool set is frozen for the life of a session, so tools that were
+ * not there when the chat opened need a session that names them: the chat is
+ * moved onto one, the way turning the setting on moves it. A server that still
+ * refuses leaves the chat where it is, because the failure is already on screen
+ * and a move onto the same tools would only churn the session.
+ *
+ * A chat that is answering is not moved under the answer, for the same reason
+ * the setting is not: the tool set would change between two rounds of one
+ * question. The recovered tools are applied when the answer settles, unless the
+ * person turned the setting off while it was arriving.
+ */
+export async function retryKiloMcp(sessionId: string): Promise<void> {
+  const current = snapshotOf(sessionId).sessionId;
+  const chat = chats.get(current);
+  if (chat === undefined) {
+    return;
+  }
+  const state = await ensureKiloMcp(chat, 'retry');
+  if (state.status !== 'ready' || state.tools.length === 0) {
+    return;
+  }
+  if (chat.answering !== undefined) {
+    chat.pendingMcp ??= true;
     return;
   }
   await ontoTools(current, chat);

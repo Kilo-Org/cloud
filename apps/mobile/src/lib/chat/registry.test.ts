@@ -44,7 +44,10 @@ const mcp = vi.hoisted(() => ({
   enabled: new Map<string, boolean>(),
   ensure: vi.fn(async () => {
     await Promise.resolve();
-    return { status: 'ready' as const, tools: [] };
+    return {
+      status: 'ready' as const,
+      tools: [] as { readonly definition: { readonly name: string } }[],
+    };
   }),
 }));
 
@@ -171,7 +174,7 @@ vi.mock('./store', () => ({
   touchChat: () => undefined,
 }));
 
-const { enterChat, releaseChat, say, setMcpEnabled, startChat, stopChat } =
+const { enterChat, releaseChat, retryKiloMcp, say, setMcpEnabled, startChat, stopChat } =
   await import('./registry');
 const { change, snapshotOf } = await import('./state');
 const { chatPlaceOf } = await import('./use-chat');
@@ -246,6 +249,29 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     expect(mcp.ensure).not.toHaveBeenCalled();
   });
 
+  it('reaches the server when the setting is turned on for a chat that never discovered', async () => {
+    /* The chat was opened with the setting off, so no discovery ran and the
+       connection is idle. Turning it on has to ask the server: without that the
+       chat is moved onto the base tools, the view stays "not available", and
+       the switch the person just turned on snaps back off. */
+    mcp.tools.push(discovered);
+    await releaseChat(opened);
+    opened = await startChat(place, 'kilo/one', false);
+    await settled();
+    expect(mcp.ensure).not.toHaveBeenCalled();
+
+    mcp.ensure.mockResolvedValueOnce({ status: 'ready', tools: mcp.tools });
+    await setMcpEnabled(opened, true);
+    await settled();
+
+    expect(mcp.ensure).toHaveBeenCalledWith(
+      expect.objectContaining({ chatScope: 'me:personal' }),
+      'automatic'
+    );
+    expect(clonedWith).toEqual({ tools: ['time', 'mcp_kilo_read-file'] });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
   it('moves an idle chat off the server tools when the setting is turned off', async () => {
     mcp.tools.push(discovered);
     await releaseChat(opened);
@@ -302,6 +328,42 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     /* The chat it opened is released here, so the session it moved onto does
        not outlive the test that made it. */
     await releaseChat('stale');
+  });
+
+  it('retries a failed discovery and moves the chat onto the tools that answered', async () => {
+    /* The chat opened while the server was down, so it named the clock alone.
+       The retry finds the server, and the session is frozen on what it was
+       opened with, so the recovered tools need a session that names them. */
+    await releaseChat(opened);
+    opened = await startChat(place, 'kilo/one');
+    await settled();
+    expect(openedWith?.tools).toEqual(['time']);
+
+    mcp.tools.push(discovered);
+    mcp.ensure.mockResolvedValueOnce({ status: 'ready', tools: mcp.tools });
+    await retryKiloMcp(opened);
+    await settled();
+
+    expect(mcp.ensure).toHaveBeenLastCalledWith(
+      expect.objectContaining({ chatScope: 'me:personal' }),
+      'retry'
+    );
+    expect(clonedWith).toEqual({ tools: ['time', 'mcp_kilo_read-file'] });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
+  it('leaves the chat where it is when the retry still finds no tools', async () => {
+    await releaseChat(opened);
+    opened = await startChat(place, 'kilo/one');
+    await settled();
+    clonedWith = undefined;
+
+    mcp.ensure.mockResolvedValueOnce({ status: 'ready', tools: [] });
+    await retryKiloMcp(opened);
+    await settled();
+
+    expect(clonedWith).toBeUndefined();
+    expect(snapshotOf(opened).sessionId).toBe('s1');
   });
 });
 

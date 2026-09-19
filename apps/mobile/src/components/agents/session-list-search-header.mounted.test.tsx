@@ -18,8 +18,11 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ Search: 'Search', X: 'X' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// Mutable so the landscape case can put sensor insets on the sides; portrait
+// insets are 0 and leave the fixed 22px field margin unchanged.
+const safeArea = vi.hoisted(() => ({ left: 0, right: 0 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: safeArea.left, right: safeArea.right }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6f6a61' }),
@@ -40,6 +43,8 @@ let mounted: ReactTestRenderer | undefined = undefined;
 afterEach(() => {
   mounted?.unmount();
   mounted = undefined;
+  safeArea.left = 0;
+  safeArea.right = 0;
 });
 
 function mountHeader(hasText: boolean): ReactTestRenderer {
@@ -68,6 +73,18 @@ function clearPressable(renderer: ReactTestRenderer) {
   );
 }
 
+function fieldContainer(renderer: ReactTestRenderer) {
+  return renderer.root.find(
+    node =>
+      node.type === ('View' as ElementType) &&
+      String(node.props.className).includes('rounded-[10px]')
+  );
+}
+
+function searchInput(renderer: ReactTestRenderer) {
+  return renderer.root.find(node => node.type === ('TextInput' as ElementType));
+}
+
 describe('SessionListSearchHeader clear-search tap target', () => {
   it('carries at least 28dp on both sides while the field holds text', () => {
     const box = declaredBoxSize(String(clearPressable(mountHeader(true)).props.className));
@@ -83,5 +100,22 @@ describe('SessionListSearchHeader clear-search tap target', () => {
           node.props.accessibilityLabel === 'common.clearSearch'
       )
     ).toHaveLength(0);
+  });
+});
+
+describe('SessionListSearchHeader field layout', () => {
+  it('adds landscape sensor insets to the field margins', () => {
+    safeArea.left = 48;
+    safeArea.right = 24;
+    expect(fieldContainer(mountHeader(false)).props.style).toEqual({
+      marginLeft: 70,
+      marginRight: 46,
+    });
+  });
+
+  it('sizes the single-line input with min-h, never py', () => {
+    const className = String(searchInput(mountHeader(false)).props.className);
+    expect(className).toMatch(/(?:^|\s)min-h-\[\d+px\]/);
+    expect(className).not.toMatch(/(?:^|\s)py-/);
   });
 });

@@ -367,6 +367,8 @@ function defaultProps() {
     profileOverrideNeedsAttention: false,
     onRetryProfile: vi.fn(),
     onOpenProfilePicker: vi.fn(),
+    selectedProfileId: null as string | null,
+    onSelectProfile: vi.fn(),
     autoCommit: false,
     onAutoCommitChange: vi.fn(),
     isSpawningRemote: false,
@@ -810,15 +812,22 @@ describe('NewSessionConfigureForm', () => {
   it('mounts the collapsed advanced-config panel under Environment for a cloud target', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = NewSessionConfigureForm({
       ...defaultProps(),
       runOnInstance: null,
       organizationId: 'org-1',
+      selectedProfileId: 'profile-1',
+      onSelectProfile,
     }) as Node;
 
+    // The panel is controlled by the session, so it gets the same override the
+    // Environment row shows and reports picks back through the same callback.
     expect(findElementByType(element, 'AdvancedConfigPanel')).toMatchObject({
       organizationId: 'org-1',
+      selectedProfileId: 'profile-1',
+      onSelectProfile,
       disabled: false,
     });
   });

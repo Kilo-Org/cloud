@@ -1,4 +1,5 @@
-import { createElement, type ReactNode } from 'react';
+/* eslint-disable max-lines -- one mounted case per panel state: the controlled selector, both manual editors, the save flow, and the retryable failure */
+import { createElement, type ReactNode, useState } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -116,15 +117,52 @@ function listState(overrides: Partial<ListState> = {}): ListState {
   };
 }
 
+/**
+ * The panel's profile pick is controlled by the session, so the harness mirrors
+ * the real parent: it owns `selectedProfileId` and reports each pick both to
+ * the spy and to its own state, the way the new-session body does.
+ */
+function ControlledPanel({
+  organizationId,
+  initialSelectedProfileId,
+  onSelectProfile,
+}: {
+  organizationId?: string;
+  initialSelectedProfileId?: string | null;
+  onSelectProfile?: (id: string | null) => void;
+}) {
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
+    initialSelectedProfileId ?? null
+  );
+  return createElement(AdvancedConfigPanel, {
+    organizationId,
+    selectedProfileId,
+    onSelectProfile: id => {
+      onSelectProfile?.(id);
+      setSelectedProfileId(id);
+    },
+  });
+}
+
 function mount(
-  options: { list?: Partial<ListState>; mocks?: Mutations; organizationId?: string } = {}
+  options: {
+    list?: Partial<ListState>;
+    mocks?: Mutations;
+    organizationId?: string;
+    selectedProfileId?: string | null;
+    onSelectProfile?: (id: string | null) => void;
+  } = {}
 ) {
   listMock.useAgentProfileList.mockReturnValue(listState(options.list));
   listMock.useAgentProfileMutations.mockReturnValue(options.mocks ?? mutations());
   const ref: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
   act(() => {
     ref.current = TestRenderer.create(
-      createElement(AdvancedConfigPanel, { organizationId: options.organizationId })
+      createElement(ControlledPanel, {
+        organizationId: options.organizationId,
+        initialSelectedProfileId: options.selectedProfileId,
+        onSelectProfile: options.onSelectProfile,
+      })
     );
   });
   const renderer = ref.current;
@@ -257,8 +295,17 @@ describe('AdvancedConfigPanel', () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('selects a profile from the sheet and shows it in the row and summary', () => {
-    const renderer = mount();
+  it('renders the session-owned selectedProfileId in the closed row', () => {
+    const renderer = mount({ selectedProfileId: 'backend' });
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    expect(texts(renderer)).toContain('Backend');
+    expect(texts(renderer)).toContain('3 environment variables · 1 setup commands');
+  });
+
+  it('reports a pick from the sheet through onSelectProfile and shows it', () => {
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ onSelectProfile });
     press(byLabel(renderer, 'Advanced Configuration'));
     press(byLabel(renderer, 'Pick a profile'));
 
@@ -267,8 +314,21 @@ describe('AdvancedConfigPanel', () => {
     });
     press(radio(renderer, 'Backend'));
 
+    expect(onSelectProfile).toHaveBeenCalledWith('backend');
     expect(texts(renderer)).toContain('Backend');
     expect(texts(renderer)).toContain('3 environment variables · 1 setup commands');
+  });
+
+  it('reports No profile through onSelectProfile(null) and clears the row', () => {
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    const renderer = mount({ selectedProfileId: 'backend', onSelectProfile });
+    press(byLabel(renderer, 'Advanced Configuration'));
+    press(byLabel(renderer, 'Pick a profile'));
+
+    press(radio(renderer, 'No profile'));
+
+    expect(onSelectProfile).toHaveBeenCalledWith(null);
+    expect(texts(renderer)).toContain('No profile');
   });
 
   it('saves the manual config in the web order and shows the new profile', async () => {

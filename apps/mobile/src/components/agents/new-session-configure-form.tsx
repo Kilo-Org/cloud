@@ -108,6 +108,13 @@ type NewSessionConfigureFormProps = {
   onRetryProfile: () => void;
   /** Opens the profile picker sheet. */
   onOpenProfilePicker: () => void;
+  /**
+   * The session's profile override, shared by the Environment row and the
+   * advanced-config selector; null keeps the effective default.
+   */
+  selectedProfileId: string | null;
+  /** Reports a pick (or `No profile`) from the advanced-config selector. */
+  onSelectProfile: (id: string | null) => void;
   /** Opens the repo default-profile bindings screen from the advanced config. */
   onOpenRepoDefaults?: () => void;
   // Commit choice (Cloud Agent only).
@@ -183,6 +190,8 @@ export function NewSessionConfigureForm({
   profileOverrideNeedsAttention,
   onRetryProfile,
   onOpenProfilePicker,
+  selectedProfileId,
+  onSelectProfile,
   onOpenRepoDefaults,
   autoCommit,
   onAutoCommitChange,
@@ -335,11 +344,14 @@ export function NewSessionConfigureForm({
       {
         // The advanced configuration disclosure sits under Environment. It is
         // collapsed by default, so the screen is unchanged until it is tapped;
-        // the panel owns its own profile pick and manual config state.
+        // the panel owns its manual config state, while the profile pick is
+        // the session's own override so both selectors drive one submitted id.
       }
       {!isRemote && !isCloneEntry ? (
         <AdvancedConfigPanel
           organizationId={organizationId}
+          selectedProfileId={selectedProfileId}
+          onSelectProfile={onSelectProfile}
           disabled={isStarting}
           onRepoDefaults={onOpenRepoDefaults}
         />

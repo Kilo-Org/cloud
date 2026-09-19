@@ -840,6 +840,8 @@ export function NewSessionScreenBody() {
         profileOverrideNeedsAttention={profileOverrideNeedsAttention}
         onRetryProfile={() => void refetchProfile()}
         onOpenProfilePicker={handleOpenProfilePicker}
+        selectedProfileId={overrideProfileId}
+        onSelectProfile={setOverrideProfileId}
         onOpenRepoDefaults={handleOpenRepoDefaults}
         autoCommit={autoCommit}
         onAutoCommitChange={setAutoCommit}

@@ -54,6 +54,15 @@ function toSelectorProfile(
 type AdvancedConfigPanelProps = Readonly<{
   /** The route's organization scope; `undefined` is a personal session. */
   organizationId?: string;
+  /**
+   * The profile the session currently holds, or null for `No profile`. Owned
+   * by the session body so the Environment row and this selector are one
+   * control driving the submitted `profileId`. Required: a caller cannot
+   * render an inert selector.
+   */
+  selectedProfileId: string | null;
+  /** Reports a pick (or `No profile`) to the session that owns the override. */
+  onSelectProfile: (id: string | null) => void;
   disabled?: boolean;
   /**
    * Opens the repo default-profile bindings. Omitted until that surface
@@ -72,6 +81,8 @@ type AdvancedConfigPanelProps = Readonly<{
  */
 export function AdvancedConfigPanel({
   organizationId,
+  selectedProfileId,
+  onSelectProfile,
   disabled = false,
   onRepoDefaults,
 }: Readonly<AdvancedConfigPanelProps>) {
@@ -87,7 +98,6 @@ export function AdvancedConfigPanel({
   } = useAgentProfileMutations(organizationId);
 
   const [isExpanded, setIsExpanded] = useState(false);
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [createdProfile, setCreatedProfile] = useState<ProfileSelectorProfile | null>(null);
   const [draftVars, setDraftVars] = useState<VariableEdit[]>([]);
   const [commands, setCommands] = useState<string[]>([]);
@@ -179,7 +189,7 @@ export function AdvancedConfigPanel({
         isDefault: submission.setAsDefault,
         ownerType: organizationId === undefined ? 'user' : 'organization',
       });
-      setSelectedProfileId(profileId);
+      onSelectProfile(profileId);
       toast.success(t('agentChat.newSession.profileSaved', { name: submission.name }));
       return true;
     } catch (error) {
@@ -228,7 +238,7 @@ export function AdvancedConfigPanel({
             onRetry={() => {
               void list.refetch();
             }}
-            onSelect={setSelectedProfileId}
+            onSelect={onSelectProfile}
             onManageProfiles={() => {
               router.push(PROFILES_HREF);
             }}

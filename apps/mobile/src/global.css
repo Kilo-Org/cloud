@@ -24,6 +24,10 @@
   --accent-foreground: #ffffff;
   --primary: #4f5a10;
   --primary-foreground: #ffffff;
+  /* Disabled primary fill. The palette's warm neutral, chosen because it keeps
+   * the ink label (primary-foreground) legible: white on this fill clears 4.5:1,
+   * so a disabled default button reads as inactive without losing its label. */
+  --primary-disabled: #6f6a61;
   --destructive: #b0483a;
   --destructive-foreground: #ffffff;
   --border: rgba(20, 15, 10, 0.09);
@@ -95,6 +99,8 @@
     --accent-foreground: #1a1a10;
     --primary: #e8f27a;
     --primary-foreground: #1a1a10;
+    /* Dark counterpart of the disabled primary fill; near-black ink clears 4.5:1. */
+    --primary-disabled: #8a8680;
     --destructive: #f28b7a;
     --destructive-foreground: #1a1a10;
     --border: rgba(255, 255, 255, 0.07);
@@ -155,6 +161,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-disabled: var(--primary-disabled);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);

@@ -8,6 +8,7 @@ const colors = {
   foreground: '#14130F',
   primary: '#4F5A10',
   primaryForeground: '#FFFFFF',
+  primaryDisabled: '#6F6A61',
   secondary: '#F0EEE6',
   secondaryForeground: '#14130F',
   muted: '#F0EEE6',

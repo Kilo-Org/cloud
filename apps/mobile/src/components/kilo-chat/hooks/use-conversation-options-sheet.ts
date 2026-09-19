@@ -4,9 +4,9 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { i18n } from '@/i18n';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
 
 import { useConversationRename } from './use-conversation-rename';
@@ -26,7 +26,7 @@ export function useConversationOptionsSheet({
   conversationTitle: string;
 }) {
   const router = useRouter();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const leaveConversation = useLeaveConversation(client);
   const rename = useConversationRename(client, conversationId, sandboxId);
@@ -43,7 +43,7 @@ export function useConversationOptionsSheet({
         ],
         cancelButtonIndex: 2,
         destructiveButtonIndex: 1,
-        containerStyle: { paddingBottom: bottom },
+        ...themedSheet,
       },
       index => {
         if (index === 0) {
@@ -77,7 +77,6 @@ export function useConversationOptionsSheet({
       }
     );
   }, [
-    bottom,
     conversationId,
     conversationTitle,
     leaveConversation,
@@ -85,6 +84,7 @@ export function useConversationOptionsSheet({
     router,
     sandboxId,
     showActionSheetWithOptions,
+    themedSheet,
   ]);
 
   return {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { showSessionActionMenu } from './session-row-actions';
+import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 
 const reactNativeMock = vi.hoisted(() => ({
   alert: vi.fn(),
@@ -21,7 +22,19 @@ type SheetOptions = {
   options: string[];
   cancelButtonIndex?: number;
   destructiveButtonIndex?: number | number[];
-  containerStyle?: { paddingBottom?: number };
+  containerStyle?: { paddingBottom?: number; backgroundColor?: string };
+  textStyle?: { color: string };
+  titleTextStyle?: { color: string };
+  messageTextStyle?: { color: string };
+  destructiveColor?: string;
+};
+
+const themedSheet: ThemedActionSheetOptions = {
+  containerStyle: { backgroundColor: '#17171A', paddingBottom: 12 },
+  textStyle: { color: '#F2F0EB' },
+  titleTextStyle: { color: '#8A8680' },
+  messageTextStyle: { color: '#8A8680' },
+  destructiveColor: '#F28B7A',
 };
 
 type Captured = {
@@ -33,7 +46,7 @@ function openMenu(args: {
   onRename?: () => void;
   onExit?: () => void;
   onDelete?: () => void;
-  bottomInset?: number;
+  themedSheet?: ThemedActionSheetOptions;
 }): Captured & {
   onCopySessionId: ReturnType<typeof vi.fn>;
   onRename: ReturnType<typeof vi.fn> | undefined;
@@ -57,7 +70,7 @@ function openMenu(args: {
     ...(onRename ? { onRename } : {}),
     ...(onExit ? { onExit } : {}),
     ...(onDelete ? { onDelete } : {}),
-    bottomInset: args.bottomInset ?? 12,
+    themedSheet: args.themedSheet ?? themedSheet,
   });
 
   if (!captured.current) {
@@ -83,7 +96,12 @@ describe('showSessionActionMenu', () => {
     expect(sheetOptions.options).toEqual(['Copy session ID', 'Cancel']);
     expect(sheetOptions.cancelButtonIndex).toBe(1);
     expect(sheetOptions.destructiveButtonIndex).toBeUndefined();
-    expect(sheetOptions.containerStyle).toEqual({ paddingBottom: 12 });
+    expect(sheetOptions.containerStyle).toEqual({
+      backgroundColor: '#17171A',
+      paddingBottom: 12,
+    });
+    expect(sheetOptions.textStyle).toEqual({ color: '#F2F0EB' });
+    expect(sheetOptions.destructiveColor).toBe('#F28B7A');
   });
 
   it('includes rename when onRename is provided', () => {
@@ -106,13 +124,19 @@ describe('showSessionActionMenu', () => {
     const { sheetOptions } = openMenu({
       onRename: () => undefined,
       onDelete: () => undefined,
-      bottomInset: 34,
+      themedSheet: {
+        ...themedSheet,
+        containerStyle: { backgroundColor: '#17171A', paddingBottom: 34 },
+      },
     });
 
     expect(sheetOptions.options).toEqual(['Copy session ID', 'Rename', 'Delete session', 'Cancel']);
     expect(sheetOptions.cancelButtonIndex).toBe(3);
     expect(sheetOptions.destructiveButtonIndex).toBe(2);
-    expect(sheetOptions.containerStyle).toEqual({ paddingBottom: 34 });
+    expect(sheetOptions.containerStyle).toEqual({
+      backgroundColor: '#17171A',
+      paddingBottom: 34,
+    });
   });
 
   it('dispatches copy / rename / delete by index and ignores cancel', () => {

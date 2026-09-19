@@ -12,7 +12,7 @@ import { scrubEvent } from './sentry-scrub';
 describe('scrubEvent identifier paths', () => {
   it('keeps the agent-message-render subsystem tag the render boundary reports', () => {
     const event = {
-      exception: { values: [{ type: 'Error', value: 'kwf staged render crash' }] },
+      exception: { values: [{ type: 'Error', value: 'staged render crash' }] },
       tags: { 'error.subsystem': 'agent-message-render', 'error.operation': 'render_part' },
     };
 

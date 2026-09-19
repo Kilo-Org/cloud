@@ -137,6 +137,6 @@ run-milvus-test.sh
 !.envrc
 .playwright-mcp
 
-# Harness markers: the kwf workflow drops these in a worktree, and one
-# reached a product commit (46640f5e8e96) before it was removed by hand.
+# Markers an end-to-end run drops in a worktree. One reached a product
+# commit (46640f5e8e96) before it was removed by hand.
 .kwf*

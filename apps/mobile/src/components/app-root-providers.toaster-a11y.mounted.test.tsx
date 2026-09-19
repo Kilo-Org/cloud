@@ -28,6 +28,7 @@ afterEach(unmountUnlock);
  * confirmation unreadable again.
  */
 it('anchors the toast container to the window so toasts reach the accessibility tree', async () => {
+  platform.OS = 'ios';
   await mount();
 
   const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
@@ -35,7 +36,10 @@ it('anchors the toast container to the window so toasts reach the accessibility 
   expect(toasters).toHaveLength(1);
   expect(toasters[0]?.props.positionerStyle).toEqual({ top: 0 });
   expect(toasters[0]?.props.offset).toBeUndefined();
-  expect(keyboard.listeners.size).toBe(0);
+  // The keyboard listeners attach on iOS too: clearance is not Android-only.
+  expect(keyboard.listeners.size).toBe(2);
+  expect(keyboard.listeners.has('keyboardDidShow')).toBe(true);
+  expect(keyboard.listeners.has('keyboardDidHide')).toBe(true);
 });
 
 const keyboardEvent = (height: number): KeyboardEvent => ({
@@ -50,54 +54,97 @@ async function showKeyboard(height: number) {
   });
 }
 
-it.each([36, 280])(
-  'clears an Android keyboard of height %i without losing its accessibility anchor',
-  async height => {
-    platform.OS = 'android';
+/**
+ * Mount the real provider tree on `os` with `height` already reported, read the
+ * offset sonner receives, and unmount. Every keyboard case runs on both
+ * platforms with the same expected value, so a re-introduced platform branch
+ * (Android clearing the key, iOS not) fails here.
+ */
+async function keyboardOffsetFor(os: string, height: number): Promise<unknown> {
+  platform.OS = os;
+  await mount();
+  await showKeyboard(height);
+  const offset: unknown = unlockRoot().findByType('Toaster' as ElementType).props.offset;
+  await unmountUnlock();
+  return offset;
+}
+
+const KEYBOARD_CASES: [string, number][] = [
+  ['ios', 36],
+  ['android', 36],
+  ['ios', 280],
+  ['android', 280],
+];
+
+const NON_OCCLUDING_CASES: [string, number][] = [
+  ['ios', 0],
+  ['android', 0],
+  ['ios', -1],
+  ['android', -1],
+];
+
+it('gives iOS and Android the same keyboard clearance', async () => {
+  const ios = await keyboardOffsetFor('ios', 280);
+  const android = await keyboardOffsetFor('android', 280);
+
+  expect(ios).toBe(280 + 12 + 8);
+  expect(android).toBe(280 + 12 + 8);
+});
+
+it.each(KEYBOARD_CASES)(
+  'clears a %s keyboard of height %i without losing its accessibility anchor',
+  async (os, height) => {
+    platform.OS = os;
     await mount();
 
     await showKeyboard(height);
 
     const toaster = unlockRoot().findByType('Toaster' as ElementType);
-    // Android's keyboard event excludes the navigation inset (12 in this harness).
+    // The keyboard event excludes the navigation inset (12 in this harness).
     expect(toaster.props.offset).toBe(height + 12 + 8);
     expect(toaster.props.position).toBe('bottom-center');
     expect(toaster.props.positionerStyle).toEqual({ top: 0 });
   }
 );
 
-it('updates clearance when the keyboard changes height and restores safe-area placement on hide', async () => {
-  platform.OS = 'android';
-  await mount();
-  const toaster = () => unlockRoot().findByType('Toaster' as ElementType);
-  expect(toaster().props.offset).toBeUndefined();
+it.each(['ios', 'android'])(
+  'updates clearance when the %s keyboard changes height and restores safe-area placement on hide',
+  async os => {
+    platform.OS = os;
+    await mount();
+    const toaster = () => unlockRoot().findByType('Toaster' as ElementType);
+    expect(toaster().props.offset).toBeUndefined();
 
-  await showKeyboard(280);
-  expect(toaster().props.offset).toBe(280 + 12 + 8);
-  await showKeyboard(36);
-  expect(toaster().props.offset).toBe(36 + 12 + 8);
+    await showKeyboard(280);
+    expect(toaster().props.offset).toBe(280 + 12 + 8);
+    await showKeyboard(36);
+    expect(toaster().props.offset).toBe(36 + 12 + 8);
 
-  await flush(() => {
-    keyboard.listeners.get('keyboardDidHide')?.(keyboardEvent(0));
-  });
-  expect(toaster().props.offset).toBeUndefined();
+    await flush(() => {
+      keyboard.listeners.get('keyboardDidHide')?.(keyboardEvent(0));
+    });
+    expect(toaster().props.offset).toBeUndefined();
 
-  await unmountUnlock();
-  expect(keyboard.listeners.size).toBe(0);
-});
+    await unmountUnlock();
+    expect(keyboard.listeners.size).toBe(0);
+  }
+);
 
-it('clears the keyboard when the toast host mounts while it is already open', async () => {
-  platform.OS = 'android';
-  keyboard.metrics.mockReturnValue(keyboardEvent(36).endCoordinates);
-  await mount();
+it.each(['ios', 'android'])(
+  'clears the %s keyboard when the toast host mounts while it is already open',
+  async os => {
+    platform.OS = os;
+    keyboard.metrics.mockReturnValue(keyboardEvent(36).endCoordinates);
+    await mount();
 
-  expect(unlockRoot().findByType('Toaster' as ElementType).props.offset).toBe(36 + 12 + 8);
-});
+    expect(unlockRoot().findByType('Toaster' as ElementType).props.offset).toBe(36 + 12 + 8);
+  }
+);
 
-it.each([0, -1])(
-  'uses the default safe-area placement for a non-occluding keyboard height %i',
-  async height => {
-    platform.OS = 'android';
+it.each(NON_OCCLUDING_CASES)(
+  'uses the default safe-area placement for a %s non-occluding keyboard height %i',
+  async (os, height) => {
+    platform.OS = os;
     await mount();
 
     await showKeyboard(height);

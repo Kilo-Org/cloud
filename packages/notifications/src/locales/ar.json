@@ -7,6 +7,7 @@
       "instanceLifecycle": "المثيل لديك به تحديث",
       "scheduledAction": "إجراء مجدول به تحديث",
       "lowBalance": "رصيدك يحتاج إلى انتباه",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "نتيجة أمان تحتاج إلى انتباه",
       "activeAgentsGlanceable": "الوكلاء النشطون لديهم تحديث"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "تنبيه انخفاض الرصيد",
       "body": "انخفض رصيد {{organizationName}} إلى أقل من ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "نتيجة أمان جديدة ({{severity}})",

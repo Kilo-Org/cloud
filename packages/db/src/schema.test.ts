@@ -633,6 +633,37 @@ describe('database schema', () => {
     }
   });
 
+  it('keeps a newly appended migration newer than every entry before it', () => {
+    const journalPath = path.join(__dirname, 'migrations', 'meta', '_journal.json');
+    const journal = JSON.parse(fs.readFileSync(journalPath, 'utf-8')) as {
+      entries: { idx: number; when: number; tag: string }[];
+    };
+    const entries = journal.entries;
+
+    for (let index = 1; index < entries.length; index++) {
+      const previous = entries[index - 1];
+      const current = entries[index];
+      if (!previous || !current) throw new Error('journal entry missing');
+      expect(current.idx).toBe(previous.idx + 1);
+    }
+
+    // Drizzle applies a migration only when its folderMillis is newer than the
+    // newest applied row, so a rebased branch that appends its migration with a
+    // stale `when` is skipped forever on every database that already applied the
+    // entry before it. New migrations are appended, so the tail must be newer
+    // than every earlier entry. (0035 predates this guard and is re-created by
+    // 0038, so only the appended tail is asserted here.)
+    const last = entries.at(-1);
+    if (!last) throw new Error('journal is empty');
+    for (const entry of entries.slice(0, -1)) {
+      expect(last.when).toBeGreaterThan(entry.when);
+    }
+
+    for (const entry of entries) {
+      expect(fs.existsSync(path.join(__dirname, 'migrations', `${entry.tag}.sql`))).toBe(true);
+    }
+  });
+
   it('requires cloud agent run diagnostic text and expiry to be set and cleared together', async () => {
     const sessionId = `schema-cloud-agent-${crypto.randomUUID()}`;
     const now = new Date().toISOString();
@@ -1847,8 +1878,11 @@ describe('database schema', () => {
       await expect(lite).resolves.not.toThrow();
     });
 
-    it('runs migration 0204 against duplicates before creating its unique index', async () => {
-      const migrationPath = path.join(__dirname, 'migrations/0204_brainy_baron_strucker.sql');
+    it('runs the GitHub installation backfill before creating its unique index', async () => {
+      // The backfill and the unique index that this test exercises live in
+      // `0205_device_auth_hardening.sql` in the current journal; the earlier
+      // `0204_brainy_baron_strucker.sql` name no longer exists on disk.
+      const migrationPath = path.join(__dirname, 'migrations/0205_device_auth_hardening.sql');
       const fullMigration = fs.readFileSync(migrationPath, 'utf8');
       const statements = fullMigration.split('--> statement-breakpoint');
       // The dedup DO block is its own statement. The COMMIT/CONCURRENTLY/BEGIN
@@ -1917,7 +1951,7 @@ describe('database schema', () => {
           expect(loser).toMatchObject({ status: 'suspended', installationId: null });
           expect(loser?.metadata).toMatchObject({
             github_dedup: {
-              reason: 'Duplicate installation resolved by migration 0204',
+              reason: 'Duplicate installation resolved by migration 0205',
               original_installation_id: installationId,
             },
           });

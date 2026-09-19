@@ -22,7 +22,16 @@ const templateNames = Object.keys(subjects) as [TemplateName, ...TemplateName[]]
 
 const TemplateNameSchema = z.enum(templateNames);
 
-function fixtureTemplateVars(template: TemplateName): Record<string, string | RawHtml> {
+/**
+ * Every subject needs a preview fixture: the admin email-testing page renders
+ * whatever `getTemplates` lists, so a subject without a case here breaks its
+ * preview and send-test. Taking `never` makes a missing case a type error.
+ */
+function missingTemplateFixture(template: never): never {
+  throw new Error(`Unknown template: ${String(template)}`);
+}
+
+export function fixtureTemplateVars(template: TemplateName): Record<string, string | RawHtml> {
   const formatDate = (d: Date) => format(d, 'MMMM d, yyyy');
   const orgId = 'fixture-org-id';
   const organization_url = `${NEXTAUTH_URL}/organizations/${orgId}`;
@@ -57,10 +66,28 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         app_url: NEXTAUTH_URL,
       };
+    case 'signInCode':
+      return { code: '482913', email: 'user@example.com', expires_in: '10 minutes' };
     case 'balanceAlert':
       return { minimum_balance: '10', organization_url };
+    case 'spendAlert':
+      return {
+        scope_name: 'Acme Corp',
+        kind_label: 'Spend threshold',
+        amount_usd: '12.50',
+        threshold_usd: '10.00',
+        spend_url: `${NEXTAUTH_URL}/organizations/${orgId}/usage-details`,
+        cta_label: 'Open spend view',
+      };
     case 'autoTopUpFailed':
       return { reason: 'Card declined', credits_url: `${NEXTAUTH_URL}/credits?show-auto-top-up` };
+    case 'codeReviewDisabled':
+      return {
+        reason:
+          'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
+        recovery_url: 'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts',
+        recovery_label: 'Contact support',
+      };
     case 'ossInviteNewUser':
       return {
         organization_name: 'Acme OSS',
@@ -214,6 +241,18 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         next_billing_date: formatDate(new Date(Date.now() + 30 * 86_400_000)),
         manage_url: `${NEXTAUTH_URL}/claw/subscription`,
       };
+    case 'kiloPassOrgBlocked':
+      return {
+        organization_name: 'Acme Corp',
+        manage_url: `${NEXTAUTH_URL}/organizations/${orgId}/subscriptions/kilo-pass`,
+      };
+    case 'kiloPassDuplicateCardCanceled':
+      return { support_url: 'mailto:hi@kilocode.ai' };
+    case 'userDataExportReady':
+      return {
+        data_exports_url: `${NEXTAUTH_URL}/data-exports`,
+        expiry_date: formatDate(new Date(Date.now() + 7 * 86_400_000)),
+      };
     case 'securityFindingNew':
       return securityFindingTemplateVars({
         severity: 'high',
@@ -279,7 +318,7 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       };
     }
   }
-  throw new Error(`Unknown template: ${template}`);
+  return missingTemplateFixture(template);
 }
 
 export const emailTestingRouter = createTRPCRouter({

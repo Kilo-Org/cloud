@@ -827,7 +827,8 @@
       "chat": "Ujumbe wa mazungumzo",
       "kiloclaw": "Shughuli za KiloClaw",
       "balance": "Tahadhari za salio",
-      "security": "Matokeo ya ukaguzi wa usalama"
+      "security": "Matokeo ya ukaguzi wa usalama",
+      "spend": "Tahadhari za matumizi"
     },
     "category": {
       "chatMessagesSubtitle": "majibu kwenye mazungumzo yako",
@@ -839,6 +840,8 @@
       "sessionStatusSubtitle": "kimekamilika / kimeshindikana / kiko tayari kudhibitiwa",
       "kiloclawActivitySubtitle": "nakala iko tayari au imeshindikana, vitendo vilivyoratibiwa",
       "balanceAlertsSubtitle": "maonyo ya salio la chini la shirika",
+      "spendAlertsSubtitle": "kuvuka vizingiti na kuongezeka kwa saa",
+      "spendAlertsToggle": "Aina ya tahadhari za matumizi",
       "securityFindingsSubtitle": "matokeo mapya na vikumbusho vya SLA"
     },
     "action": {
@@ -3197,5 +3200,28 @@
   },
   "launcher": {
     "openLastSession": "Fungua kikao cha mwisho"
+  },
+  "spendAlerts": {
+    "subtitle": "Tuma tahadhari kwa barua pepe au push kwa anwani za bili wakati matumizi ya wigo huu yanapita kikomo au yanapanda juu ya kiwango chake cha kawaida cha saa.",
+    "enable": "Washa tahadhari za matumizi",
+    "thresholdTitle": "Kuvuka kizingiti",
+    "thresholdSubtitle": "Matumizi yanayoendelea yanapita kikomo chako",
+    "anomalyTitle": "Kuongezeka kwa saa",
+    "anomalySubtitle": "Saa moja iko juu sana kuliko kiwango cha kawaida cha wigo huu",
+    "limitLabel": "Kikomo (USD)",
+    "windowLabel": "Kipindi",
+    "window24h": "Saa 24",
+    "window7d": "Siku 7",
+    "window30d": "Siku 30",
+    "multiplierLabel": "Kizidishi cha kuongezeka",
+    "saved": "Mipangilio ya tahadhari za matumizi imehifadhiwa",
+    "loadError": "Tahadhari za matumizi hazikuweza kupakiwa.",
+    "saveError": "Tahadhari za matumizi hazikuweza kuhifadhiwa.",
+    "empty": "Tahadhari za matumizi zimezimwa. Ziwasha ili kuwatahadharisha anwani za bili za wigo huu.",
+    "noSpend": "Hakuna matumizi yaliyorekodiwa bado",
+    "spend24h": "Matumizi katika saa 24 zilizopita",
+    "multiplierError": "Weka kizidishi cha 1 au zaidi",
+    "permissionDenied": "Huna ruhusa ya kusimamia tahadhari za matumizi.",
+    "pushOffByCategory": "Imezimwa katika Arifa"
   }
 }

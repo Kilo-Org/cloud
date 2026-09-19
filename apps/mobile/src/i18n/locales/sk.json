@@ -859,7 +859,8 @@
       "chat": "Správy v čete",
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornenia na zostatok",
-      "security": "Bezpečnostné zistenia"
+      "security": "Bezpečnostné zistenia",
+      "spend": "Upozornenia na výdavky"
     },
     "category": {
       "chatMessagesSubtitle": "odpovede v tvojich konverzáciách",
@@ -871,6 +872,8 @@
       "sessionStatusSubtitle": "dokončená / zlyhala / pripravená na ovládanie",
       "kiloclawActivitySubtitle": "pripravená inštancia, zlyhanie inštancie, naplánované akcie",
       "balanceAlertsSubtitle": "upozornenia na nízky zostatok organizácie",
+      "spendAlertsSubtitle": "prekročenia prahov a hodinové špičky",
+      "spendAlertsToggle": "Kategória upozornení na výdavky",
       "securityFindingsSubtitle": "nové zistenia a pripomienky SLA"
     },
     "action": {
@@ -3283,5 +3286,28 @@
   },
   "launcher": {
     "openLastSession": "Otvoriť poslednú reláciu"
+  },
+  "spendAlerts": {
+    "subtitle": "Pošli e-mailom alebo push oznámením upozornenie fakturačným kontaktom, keď výdavky tohto rozsahu prekročia limit alebo vyskočia nad obvyklú hodinovú sadzbu.",
+    "enable": "Povoliť upozornenia na výdavky",
+    "thresholdTitle": "Prekročenie prahu",
+    "thresholdSubtitle": "Priebežné výdavky prekračujú tvoj limit",
+    "anomalyTitle": "Hodinová špička",
+    "anomalySubtitle": "Hodina je výrazne nad obvyklou sadzbou tohto rozsahu",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Okno",
+    "window24h": "24 hodín",
+    "window7d": "7 dní",
+    "window30d": "30 dní",
+    "multiplierLabel": "Násobiteľ špičky",
+    "saved": "Nastavenia upozornení na výdavky boli uložené",
+    "loadError": "Upozornenia na výdavky sa nepodarilo načítať.",
+    "saveError": "Upozornenia na výdavky sa nepodarilo uložiť.",
+    "empty": "Upozornenia na výdavky sú vypnuté. Zapni ich, aby si upozornil fakturačné kontakty tohto rozsahu.",
+    "noSpend": "Zatiaľ nie sú zaznamenané žiadne výdavky",
+    "spend24h": "Výdavky za posledných 24 hodín",
+    "multiplierError": "Zadaj násobiteľ 1 alebo väčší",
+    "permissionDenied": "Nemáš povolenie spravovať upozornenia na výdavky.",
+    "pushOffByCategory": "Vypnuté v Upozorneniach"
   }
 }

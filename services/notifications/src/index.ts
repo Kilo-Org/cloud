@@ -127,8 +127,9 @@ async function hasValidInternalSecret(c: {
   return timingSafeEqual(provided, expected);
 }
 
-// Internal service-to-service dispatch (low-balance + security-finding).
-// Intentionally outside `/v1/*` so user-JWT auth middleware does not apply.
+// Internal service-to-service dispatch (low-balance + spend-alert +
+// security-finding). Intentionally outside `/v1/*` so user-JWT auth
+// middleware does not apply.
 app.post('/internal/v1/dispatch', async c => {
   if (!(await hasValidInternalSecret(c))) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -543,6 +544,7 @@ async function readPreferencesRow(
       sessionStatusEnabled: user_notification_preferences.session_status_enabled,
       kiloclawActivityEnabled: user_notification_preferences.kiloclaw_activity_enabled,
       balanceAlertsEnabled: user_notification_preferences.balance_alerts_enabled,
+      spendAlertsEnabled: user_notification_preferences.spend_alerts_enabled,
       securityFindingsEnabled: user_notification_preferences.security_findings_enabled,
     })
     .from(user_notification_preferences)

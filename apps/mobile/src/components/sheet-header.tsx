@@ -14,9 +14,9 @@ import { cn } from '@/lib/utils';
  *   the status-bar inset applies whenever it is non-zero.
  * - 'bottom-form-sheet': a bottom-anchored formSheet never draws under the
  *   status bar, so it reserves no top clearance on either platform — the
- *   window inset would only be a dead band above the header (p7). Android
- *   caps the detents just below the inset (useFormSheetDetents) and the iOS
- *   sheet clears the top edge with its grabber, so the same rule holds
+ *   window inset would only be a dead band above the header (p7). The native
+ *   Android sheet measures detents against the inset-adjusted height and the
+ *   iOS sheet clears the top edge with its grabber, so the same rule holds
  *   everywhere.
  * - 'ios-page-sheet': the SessionPageSheet surface owns the top of the window
  *   on both platforms, so the header reserves no top clearance — the native
@@ -67,7 +67,7 @@ export function SheetHeader({
   // gutters. Keeping the inset on an inner wrapper preserves the header's own
   // padding. Android can report top: 0 for the frame a freshly presented
   // sheet first lays out (before the insets propagate); fall back to the
-  // synchronous status-bar height the same way the form-sheet detents do.
+  // synchronous status-bar height for surfaces that own their top clearance.
   // `StatusBar.currentHeight` is an Android-only API and `undefined` on iOS,
   // so the nullish fallback yields the status-bar height on both platforms
   // without branching on Platform.OS.

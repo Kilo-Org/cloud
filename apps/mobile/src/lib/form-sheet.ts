@@ -1,15 +1,7 @@
-import { Platform, StatusBar, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-// Android formSheets can't hit 1.0 without clipping under the status bar, so
-// the "full" detent is capped just below the top inset there; iOS can use 1.
+// Native formSheets already respect the top safe area on both platforms.
+// On Android, react-native-screens defaults sheetShouldOverflowTopInset to
+// false and measures detents against the inset-adjusted height. Subtracting
+// the inset again exposes a strip of the presenting screen's header.
 export function useFormSheetDetents() {
-  const { height } = useWindowDimensions();
-  const { top } = useSafeAreaInsets();
-  const androidTopInset = top > 0 ? top : (StatusBar.currentHeight ?? 0);
-  const androidFullSheetDetent =
-    height > 0 ? Math.max(0.5, (height - androidTopInset) / height) : 1;
-  const fullSheetDetent = Platform.OS === 'android' ? androidFullSheetDetent : 1;
-
-  return { fullSheetDetent };
+  return { fullSheetDetent: 1 };
 }

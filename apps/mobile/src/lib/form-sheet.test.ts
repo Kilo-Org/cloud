@@ -36,21 +36,42 @@ describe('useFormSheetDetents', () => {
     vi.clearAllMocks();
   });
 
-  it('keeps the Android detent that subtracts the safe-area top', () => {
-    mocks.insets.top = 47;
+  it.each([
+    { name: 'portrait cutout', height: 800, nativeTop: 47, top: 47, statusBar: 24 },
+    { name: 'portrait status bar', height: 800, nativeTop: 24, top: 24, statusBar: 24 },
+    { name: 'initial zero JS inset', height: 800, nativeTop: 24, top: 0, statusBar: 24 },
+    { name: 'landscape without top inset', height: 400, nativeTop: 0, top: 0, statusBar: 24 },
+    { name: 'hidden status bar', height: 800, nativeTop: 0, top: 0, statusBar: null },
+  ])('covers the presenting header up to the native safe area ($name)', scenario => {
+    mocks.dimensions.height = scenario.height;
+    mocks.insets.top = scenario.top;
+    mocks.statusBar.currentHeight = scenario.statusBar;
 
-    expect(useFormSheetDetents()).toEqual({
-      fullSheetDetent: (800 - 47) / 800,
-    });
+    const { fullSheetDetent } = useFormSheetDetents();
+    // react-native-screens measures detents against height minus the top inset
+    // by default (sheetShouldOverflowTopInset=false). A second subtraction in
+    // JS exposes a strip of the presenting screen below the native safe area.
+    const nativeAvailableHeight = scenario.height - scenario.nativeTop;
+    const sheetTop = scenario.height - Math.trunc(fullSheetDetent * nativeAvailableHeight);
+
+    expect(sheetTop).toBe(scenario.nativeTop);
+    expect(fullSheetDetent).toBe(1);
   });
 
-  it('keeps the Android detent that subtracts the StatusBar fallback', () => {
-    mocks.insets.top = 0;
+  it('keeps the full detent stable as insets arrive and the window resizes', () => {
     mocks.statusBar.currentHeight = 24;
+    const initial = useFormSheetDetents();
 
-    expect(useFormSheetDetents()).toEqual({
-      fullSheetDetent: (800 - 24) / 800,
-    });
+    mocks.insets.top = 47;
+    const insetReady = useFormSheetDetents();
+
+    mocks.insets.top = 0;
+    mocks.dimensions.height = 400;
+    const landscape = useFormSheetDetents();
+
+    expect(initial).toEqual({ fullSheetDetent: 1 });
+    expect(insetReady).toEqual(initial);
+    expect(landscape).toEqual(initial);
   });
 
   it('keeps the iOS detent at 1', () => {

@@ -24,6 +24,7 @@ import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refr
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
 import { SystemSearchIndexMount } from '@/lib/system-search-index-mount';
+import { ToolSummaryTranslationRetryMount } from '@/lib/tool-summary-translation/tool-summary-translation-retry-mount';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -122,6 +123,7 @@ export default function AppLayout() {
       <GlanceablePublisherMount />
       <LauncherSurfacesMount />
       <CachePersistenceMount />
+      <ToolSummaryTranslationRetryMount />
       <LogoutReconciliationMount />
       <PushRegistrationMount />
       <AppWideFreshnessMount />

@@ -1893,6 +1893,7 @@ export function SessionDetailContent({
             reserveTitleSpace
             backFallback="/(app)/(tabs)/(2_agents)"
             headerRight={headerRight}
+            className="pb-1"
             {...(rename.isTitleInteractive
               ? {
                   onTitlePress: rename.openModal,

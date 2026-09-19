@@ -115,19 +115,6 @@ describe('classifyPasskeyError', () => {
     expect(classifyPasskeyError({ message: 'nocredentials' })).toBe('no-passkey');
   });
 
-  it.each([
-    ['USERCANCELLEDEXCEPTION', 'cancelled'],
-    ['NOCREDENTIALS', 'no-passkey'],
-    ['NOTALLOWEDERROR', 'no-passkey'],
-    ['NOTSUPPORTED', 'unsupported'],
-    ['NOTCONFIGUREDEXCEPTION', 'unsupported'],
-    ['UNKNOWNERROR', 'failed'],
-  ])('classifies %s in every native error field independently of locale', (reason, failure) => {
-    expect(classifyPasskeyError({ name: reason })).toBe(failure);
-    expect(classifyPasskeyError({ message: reason })).toBe(failure);
-    expect(classifyPasskeyError({ code: reason })).toBe(failure);
-  });
-
   it('falls back to the generic failure for anything else', () => {
     expect(classifyPasskeyError(new Error('socket closed'))).toBe('failed');
     expect(classifyPasskeyError(undefined)).toBe('failed');

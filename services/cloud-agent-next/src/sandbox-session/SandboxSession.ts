@@ -1,7 +1,13 @@
+import { logRuntimeAuthorizationDiagnostic } from '../session/runtime-authorization-diagnostics.js';
 import {
-  logRuntimeAuthorizationDiagnostic,
-  runtimeAuthorizationRecoveryDenied,
-} from '../session/runtime-authorization-diagnostics.js';
+  loadRecoverableRuntimeAuthorization,
+  RUNTIME_AUTHORIZATION_RESTORE_ERRORS,
+  replaceStoredRuntimeAuthorization,
+  unsealActiveRuntimeAuthorization,
+  type ReauthorizeRequest,
+  type RecoveryOutcome,
+  type RecoveryRequest,
+} from '../session/runtime-authorization-seal.js';
 import jwt from 'jsonwebtoken';
 import { DurableObject } from 'cloudflare:workers';
 import type {
@@ -17,7 +23,6 @@ import {
   renewRuntimeAuthorization,
   RuntimeAuthorizationExpiredError,
   RuntimeAuthorizationRevokedError,
-  unsealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
@@ -1326,37 +1331,20 @@ export class SandboxSession extends DurableObject<Env> {
     return this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY) !== undefined;
   }
 
-  async recoverExpiredRuntimeAuthorization(input: {
-    ownerId: string;
-    expectedOldId: string;
-    recoveryId: string;
-    runtimeAuthorizationSeal: string;
-    runtimeToken: string;
-  }): Promise<{ status: 'recovered' | 'not-needed' | 'denied' | 'busy' | 'retry' }> {
-    const metadata = await this.getMetadata();
-    const denied = (reason: Parameters<typeof runtimeAuthorizationRecoveryDenied>[1]) =>
-      runtimeAuthorizationRecoveryDenied(metadata?.identity.sessionId ?? this.sessionId, reason);
-    if (!metadata) return denied('metadata_unavailable');
-    if (metadata.identity.userId !== input.ownerId) return denied('owner_mismatch');
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) return denied('missing_secret');
-    let fresh: RuntimeAuthorization;
-    try {
-      fresh = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
-        resourceKind: 'cloud-agent-next',
-        resourceId: metadata.identity.sessionId,
-        userId: metadata.identity.userId,
-        organizationId: metadata.identity.orgId,
-      });
-    } catch {
-      return denied('invalid_seal');
-    }
-    if (fresh.state !== 'active') return denied('fresh_authorization_inactive');
-    if (!metadata.auth.kiloSessionId) return denied('kilo_session_missing');
+  async recoverExpiredRuntimeAuthorization(input: RecoveryRequest): Promise<RecoveryOutcome> {
+    const prelude = await loadRecoverableRuntimeAuthorization(
+      input,
+      await this.getMetadata(),
+      this.sessionId,
+      this.env.NEXTAUTH_SECRET
+    );
+    if (prelude.status === 'denied') return prelude;
+    const { metadata, authorization: fresh, deny } = prelude;
+    if (!metadata.auth.kiloSessionId) return deny('kilo_session_missing');
     const current = await this.getRuntimeAuthorizationRecoveryState();
     if (current.state === 'legacy' || current.state === 'active') return { status: 'not-needed' };
     if (current.state !== 'expired' || current.id !== input.expectedOldId)
-      return denied('authorization_state_changed');
+      return deny('authorization_state_changed');
     if (
       this.loadMessages().some(
         message => message.state === 'accepted' || message.state === 'queued'
@@ -1531,33 +1519,14 @@ export class SandboxSession extends DurableObject<Env> {
     });
   }
 
-  async reauthorizeRuntimeAuthorization(input: {
-    ownerId: string;
-    expectedOldId: string;
-    runtimeAuthorizationSeal: string;
-  }): Promise<boolean> {
-    const metadata = await this.getMetadata();
-    if (!metadata || metadata.identity.userId !== input.ownerId) return false;
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) return false;
-    let authorization: RuntimeAuthorization;
-    try {
-      authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
-        resourceKind: 'cloud-agent-next',
-        resourceId: metadata.identity.sessionId,
-        userId: metadata.identity.userId,
-        organizationId: metadata.identity.orgId,
-      });
-    } catch {
-      return false;
-    }
-    if (authorization.state !== 'active') return false;
-    const current = RuntimeAuthorizationSchema.safeParse(
-      this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+  async reauthorizeRuntimeAuthorization(input: ReauthorizeRequest): Promise<boolean> {
+    return replaceStoredRuntimeAuthorization(
+      input,
+      await this.getMetadata(),
+      this.env.NEXTAUTH_SECRET,
+      async () => this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      authorization => this.ctx.storage.kv.put(RUNTIME_AUTHORIZATION_KEY, authorization)
     );
-    if (!current.success || current.data.id !== input.expectedOldId) return false;
-    this.ctx.storage.kv.put(RUNTIME_AUTHORIZATION_KEY, authorization);
-    return true;
   }
 
   async getCredentialMetadata(): Promise<SessionMetadata | null> {
@@ -2583,21 +2552,15 @@ export class SandboxSession extends DurableObject<Env> {
     }
     let runtimeAuthorization: RuntimeAuthorization | undefined;
     if (input.runtimeAuthorizationSeal) {
-      const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-      if (!secret) return { success: false, error: 'Authentication unavailable' };
-      let authorization: RuntimeAuthorization;
-      try {
-        authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
-          resourceKind: 'cloud-agent-next',
-          resourceId: input.identity.sessionId,
-          userId: input.identity.userId,
-          organizationId: input.identity.orgId,
-        });
-      } catch {
-        return { success: false, error: 'Invalid runtime authorization' };
+      const unsealed = await unsealActiveRuntimeAuthorization({
+        secretBinding: this.env.NEXTAUTH_SECRET,
+        seal: input.runtimeAuthorizationSeal,
+        identity: input.identity,
+      });
+      if (unsealed.status !== 'active') {
+        return { success: false, error: RUNTIME_AUTHORIZATION_RESTORE_ERRORS[unsealed.status] };
       }
-      if (authorization.state !== 'active')
-        return { success: false, error: 'Runtime authorization revoked' };
+      const authorization = unsealed.authorization;
       if (this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_KEY)) {
         return { success: false, error: 'Runtime authorization already installed' };
       }

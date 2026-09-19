@@ -4824,23 +4824,19 @@ export class SandboxControl extends DurableObject<Env> {
     return this.recordStopAttempt();
   }
 
-  private async observeCurrentProvider(physical: PhysicalRecord): Promise<PhysicalRecord> {
-    if (shouldRearmReconciliation(physical.state)) {
-      await this.rearmReconciliation(physical);
-    }
+  private async observeProviderWithDiagnostics(
+    physical: PhysicalRecord,
+    observe: () => Promise<ProviderObservation>,
+    timeoutMessage: string
+  ): Promise<{ current: PhysicalRecord; stale: boolean; observation: ProviderObservation }> {
     const startedAt = Date.now();
     let timedOut = false;
     let failed = false;
     let result: ProviderObservation;
     try {
-      result = await withTimeout(
-        this.provider.observe(physical.providerRef, physical.createIntent),
-        DEADLINE_MS.stopAttempt,
-        'Sandbox observation timed out',
-        () => {
-          timedOut = true;
-        }
-      );
+      result = await withTimeout(observe(), DEADLINE_MS.stopAttempt, timeoutMessage, () => {
+        timedOut = true;
+      });
     } catch {
       failed = true;
       result = { status: 'unknown' };
@@ -4856,11 +4852,26 @@ export class SandboxControl extends DurableObject<Env> {
       stale,
       durationMs: Date.now() - startedAt,
     });
-    if (stale) return current;
-    if (result.providerRef && current.providerRef === null) {
-      await savePhysicalRecord(this.ctx.storage, { ...current, providerRef: result.providerRef });
+    return { current, stale, observation: result };
+  }
+
+  private async observeCurrentProvider(physical: PhysicalRecord): Promise<PhysicalRecord> {
+    if (shouldRearmReconciliation(physical.state)) {
+      await this.rearmReconciliation(physical);
     }
-    return this.observeProvider(result.status);
+    const { current, stale, observation } = await this.observeProviderWithDiagnostics(
+      physical,
+      () => this.provider.observe(physical.providerRef, physical.createIntent),
+      'Sandbox observation timed out'
+    );
+    if (stale) return current;
+    if (observation.providerRef && current.providerRef === null) {
+      await savePhysicalRecord(this.ctx.storage, {
+        ...current,
+        providerRef: observation.providerRef,
+      });
+    }
+    return this.observeProvider(observation.status);
   }
 
   // Non-waking probe for a bound running allocation whose wrapper incarnation
@@ -4872,35 +4883,12 @@ export class SandboxControl extends DurableObject<Env> {
     physical: PhysicalRecord,
     wrapperInstanceId: string
   ): Promise<void> {
-    const startedAt = Date.now();
-    let timedOut = false;
-    let failed = false;
-    let result: ProviderObservation;
-    try {
-      result = await withTimeout(
-        this.provider.observe(physical.providerRef),
-        DEADLINE_MS.stopAttempt,
-        'Sandbox loss observation timed out',
-        () => {
-          timedOut = true;
-        }
-      );
-    } catch {
-      failed = true;
-      result = { status: 'unknown' };
-    }
-    const current = await loadPhysicalRecord(this.ctx.storage);
-    const stale = !sameAllocation(current, physical) || current.state === 'stopped';
-    this.logDiagnostic('provider_observation', {
-      allocationId: physical.createIntent?.intentId,
-      physicalSandboxId: physical.createIntent?.allocationName,
-      physicalState: physical.state,
-      observation: result.status,
-      result: timedOut ? 'timed_out' : failed ? 'failed' : 'completed',
-      stale,
-      durationMs: Date.now() - startedAt,
-    });
-    if (result.status !== 'terminal') return;
+    const { observation } = await this.observeProviderWithDiagnostics(
+      physical,
+      () => this.provider.observe(physical.providerRef),
+      'Sandbox loss observation timed out'
+    );
+    if (observation.status !== 'terminal') return;
     await this.commitRunningAllocationLoss(physical, wrapperInstanceId);
   }
 

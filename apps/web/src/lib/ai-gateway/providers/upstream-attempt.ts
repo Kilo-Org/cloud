@@ -1,7 +1,6 @@
 import type { NextResponse } from 'next/server';
 
 import { buildExperimentPromptCapture } from '@/lib/ai-gateway/experiments/persist';
-import { getToolsAvailable, getToolsUsed } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import type { ExperimentPromptCapture } from '@/lib/ai-gateway/processUsage.types';
 import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GetProviderProviderResult } from '@/lib/ai-gateway/providers/get-provider';
@@ -32,8 +31,6 @@ type SendUpstreamAttemptResult =
   | {
       type: 'success';
       response: Response;
-      toolsAvailable: string[];
-      toolsUsed: string[];
       experimentPromptCapture?: ExperimentPromptCapture;
     };
 
@@ -93,8 +90,6 @@ export async function sendUpstreamAttempt({
   return {
     type: 'success',
     response: result.response,
-    toolsAvailable: getToolsAvailable(request),
-    toolsUsed: getToolsUsed(request),
     experimentPromptCapture,
   };
 }

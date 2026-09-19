@@ -16,7 +16,6 @@ import {
   getOpenRouterModelsFromDatabase,
   isValidOpenRouterModelId,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ReasoningDetailsTransform, type Provider } from '@/lib/ai-gateway/providers/types';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
@@ -77,11 +76,6 @@ jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
 }));
 jest.mock('@/lib/ai-gateway/providers/upstream-request');
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache');
-jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
-  emitApiMetricsForResponse: jest.fn(),
-  getToolsAvailable: jest.fn(() => false),
-  getToolsUsed: jest.fn(() => false),
-}));
 jest.mock('@/lib/ai-gateway/rewriteModelResponse', () => {
   const actual = jest.requireActual('@/lib/ai-gateway/rewriteModelResponse');
   const { wrapInSafeNextResponse } = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
@@ -128,7 +122,6 @@ const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
 const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
-const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
 const mockedCollectDeniedAutoRoutingModelIds = jest.mocked(collectDeniedAutoRoutingModelIds);
@@ -248,7 +241,6 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       type: 'success',
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
-    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
   });
 
@@ -482,7 +474,6 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       type: 'success',
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
-    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
   });
 
@@ -813,7 +804,6 @@ describe('kilo-auto/efficient classifier billing', () => {
         choices: [],
       }),
     });
-    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
     mockedLogMicrodollarUsage.mockResolvedValue(null);
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
@@ -1266,7 +1256,6 @@ describe('auto-routing shadow classifier', () => {
       type: 'success',
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
-    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
     mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
       if (opts.efficientDecision) await opts.efficientDecision();

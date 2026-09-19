@@ -15,9 +15,9 @@ import type { SecurityFinding } from '@kilocode/db/schema';
 import type { SecurityFindingSandboxAnalysis, SandboxSuggestedAction } from '../core/types';
 import { addBreadcrumb, captureException, startSpan } from '@sentry/nextjs';
 import { sentryLogger } from '@/lib/utils.server';
-import { emitApiMetrics } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { O11Y_KILO_GATEWAY_CLIENT_SECRET } from '@/lib/config.server';
 import { DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL } from '../core/constants';
+import { emitApiMetrics } from './api-metrics.server';
 
 const VALID_SUGGESTED_ACTIONS: SandboxSuggestedAction[] = [
   'dismiss',

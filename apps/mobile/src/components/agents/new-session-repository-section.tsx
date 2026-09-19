@@ -95,8 +95,11 @@ function connectNoteKey(platform: RepositoryPlatform): string | undefined {
 
 /**
  * Provider-aware repository section. One group per provider renders its own
- * connect/empty/error state independently, and the picker trigger lists every
- * repository plus the Recently used rows when any provider has rows.
+ * empty/error state independently, and the picker trigger lists every
+ * repository plus the Recently used rows when any provider has rows. A
+ * provider's connect card is the "pick a repository" prompt — it renders only
+ * while no repository is selected, so a completed selection is never
+ * contradicted by an expanded connect card beneath the Branch field.
  */
 export function NewSessionRepositorySection({
   disabled,
@@ -164,7 +167,12 @@ export function NewSessionRepositorySection({
   ): ReactElement | null {
     switch (status) {
       case 'connect': {
-        return renderConnectCard(platform);
+        // The connect card asks the reader to connect the provider and come
+        // back to pick a repository. Once a repository is selected that step
+        // is done, so the prompt is not rendered — otherwise it stays
+        // expanded directly beneath the Branch field and contradicts the
+        // completed selection.
+        return selectedRepository === null ? renderConnectCard(platform) : null;
       }
       case 'connected-empty': {
         return renderConnectedEmptyCard(platform);

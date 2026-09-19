@@ -318,3 +318,31 @@ describe('NewSessionRepositorySection connect card collapse', () => {
     expect(pressables(renderer)).toHaveLength(0);
   });
 });
+
+describe('NewSessionRepositorySection connect cards after selection', () => {
+  it('hides the GitLab connect prompt once a repository is selected', () => {
+    // The prompt says "return here to pick a repository". Once a repository is
+    // chosen that step is done, so an expanded prompt must not stay rendered
+    // beneath the Branch field of the completed selection.
+    const renderer = mountSection({
+      value: 'github:owner/repo',
+      groups: [group('github', 'repos'), group('gitlab', 'connect')],
+    });
+
+    const text = renderedText(renderer);
+    expect(text).not.toContain(i18n.t('common.connectGitlab'));
+    expect(text).not.toContain(i18n.t('agentChat.newSession.connectGitlabDescription'));
+    expect(pressables(renderer)).toHaveLength(0);
+  });
+
+  it('keeps the connect prompt while no repository is selected', () => {
+    const renderer = mountSection({
+      value: '',
+      groups: [group('github', 'repos'), group('gitlab', 'connect')],
+    });
+
+    expect(renderedText(renderer)).toContain(
+      i18n.t('agentChat.newSession.connectGitlabDescription')
+    );
+  });
+});

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveBootstrapDecision } from './bootstrap-decision';
+import { resolveBootstrapDecision, shouldShowBootstrapLoading } from './bootstrap-decision';
 
 // The settled, signed-in, consent-granted, app-ready state: every guard passes
 // and the decision falls through to `settle-app`.
@@ -248,5 +248,31 @@ describe('resolveBootstrapDecision derivations', () => {
     expect(
       resolveBootstrapDecision({ ...ready, restoreFailed: true, hasToken: false }).hidden
     ).toBe(false);
+  });
+});
+
+describe('shouldShowBootstrapLoading', () => {
+  it('paints the loading surface only for a hidden tree after startup settled', () => {
+    expect(shouldShowBootstrapLoading({ startupFinished: true, hidden: true })).toBe(true);
+  });
+
+  it('stays off while the splash covers the initial launch', () => {
+    expect(shouldShowBootstrapLoading({ startupFinished: false, hidden: true })).toBe(false);
+  });
+
+  it('stays off when the tree is visible', () => {
+    expect(shouldShowBootstrapLoading({ startupFinished: true, hidden: false })).toBe(false);
+    expect(shouldShowBootstrapLoading({ startupFinished: false, hidden: false })).toBe(false);
+  });
+
+  it('covers the post-sign-in window: settled startup, hidden tree', () => {
+    // The explorer capture (app-blank-after-oauth): the login screen has
+    // completed startup, the token is published, and the redirect + consent
+    // check hide the tree with no splash over it.
+    const decision = resolveBootstrapDecision({ ...ready, consentChecked: false });
+    expect(decision.hidden).toBe(true);
+    expect(shouldShowBootstrapLoading({ startupFinished: true, hidden: decision.hidden })).toBe(
+      true
+    );
   });
 });

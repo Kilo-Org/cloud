@@ -1,15 +1,14 @@
-import { type BottomTabBarButtonProps } from 'expo-router/js-tabs';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
-import { TabBarButton } from './tab-bar-button';
+import { TabBarButton, type TabBarButtonProps } from './tab-bar-button';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable' }));
 
 /** The props expo-router's BottomTabItem passes, including Android's role `tab`. */
-const TAB_ITEM_PROPS: Omit<BottomTabBarButtonProps, 'children'> = {
+const TAB_ITEM_PROPS: Omit<TabBarButtonProps, 'children'> = {
   'aria-label': 'Home, tab, 1 of 3',
   'aria-selected': true,
   android_ripple: { borderless: true },
@@ -22,9 +21,9 @@ const TAB_ITEM_PROPS: Omit<BottomTabBarButtonProps, 'children'> = {
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function renderButton() {
+function renderButton(itemProps: Omit<TabBarButtonProps, 'children'> = TAB_ITEM_PROPS) {
   act(() => {
-    const element = createElement(TabBarButton, TAB_ITEM_PROPS, null);
+    const element = createElement(TabBarButton, itemProps, null);
     if (renderer) {
       renderer.update(element);
     } else {
@@ -45,10 +44,15 @@ afterEach(() => {
 describe('TabBarButton', () => {
   // React Native maps role `tab` to `android.view.View` and role `button` to
   // `android.widget.Button`, so the override is what makes the OS and a screen
-  // reader see the tab as a control instead of a bare view.
-  it('reports the tab as a button so the OS gives the control a role', () => {
-    expect(renderButton().props.role).toBe('button');
-  });
+  // reader see the tab as a control instead of a bare view. expo-router hands
+  // in `tab` on Android and `button` on iOS; the same component reports the
+  // same control role for both.
+  it.each(['tab', 'button'] as const)(
+    'reports a button when expo-router passes the role %s',
+    incomingRole => {
+      expect(renderButton({ ...TAB_ITEM_PROPS, role: incomingRole }).props.role).toBe('button');
+    }
+  );
 
   it('keeps the tab label, selected state, ripple and test id', () => {
     const button = renderButton();

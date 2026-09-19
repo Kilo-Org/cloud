@@ -5,7 +5,14 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import {
+  hitSlopPerSide,
+  MIN_TAP_TARGET_CLASS,
+  MIN_TAP_TARGET_DP,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 type SessionListSearchHeaderProps = {
   inputRef: RefObject<TextInput | null>;
@@ -78,8 +85,10 @@ export function SessionListSearchHeader({
             onPress={onClearSearch}
             accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
-            hitSlop={12}
-            className="active:opacity-70"
+            // The icon sits in a 28dp box so the control's own accessibility node
+            // is at least 28dp; the slop tops the touch region up to 44pt.
+            hitSlop={hitSlopPerSide(MIN_TAP_TARGET_DP, TOUCH_TARGET_DP)}
+            className={cn('active:opacity-70', MIN_TAP_TARGET_CLASS)}
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>

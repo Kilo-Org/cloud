@@ -152,6 +152,8 @@ export default function SessionDetailScreen() {
   const sessionScopeUserId = owner.userId ?? restoredUserId;
   const identityPending = sessionScopeUserId === null;
   const identityFailed = identityPending && confirmation.isError;
+  const providerKey = `${owner.generation}:${sessionScopeUserId}:${sessionId}:${routeOrganizationId ?? 'personal'}`;
+  const mountedProviderKey = useRef<string | null>(null);
 
   const displayScope = {
     organizationId: routeOrganizationId ?? sessionQuery.data?.organization_id ?? null,
@@ -183,7 +185,10 @@ export default function SessionDetailScreen() {
     return <InvalidRouteState backTo={'/(app)' as Href} />;
   }
 
-  if (!identityFailed && (identityPending || metadataPhase === 'loading')) {
+  if (
+    !identityFailed &&
+    (identityPending || (metadataPhase === 'loading' && mountedProviderKey.current !== providerKey))
+  ) {
     // The composer placeholder holds its own height: nothing may shift when
     // the query resolves. Route title hints are not bound to an account.
     // The right cluster reserves the loaded header's Copy-link action too, so
@@ -302,6 +307,9 @@ export default function SessionDetailScreen() {
   }
 
   const organizationId = routeOrganizationId ?? sessionQuery.data?.organization_id ?? undefined;
+  // Metadata may start fetching after a restored/paused mount. Once this scope
+  // is visible, refresh it in place rather than discarding its manager and draft.
+  mountedProviderKey.current = providerKey;
 
   return (
     <AgentSessionProvider
@@ -320,7 +328,7 @@ export default function SessionDetailScreen() {
       // lost — for a scope the manager applies in place. An explicit route
       // organization still re-keys, because it is authoritative from the first
       // frame.
-      key={`${owner.generation}:${sessionScopeUserId}:${sessionId}:${routeOrganizationId ?? 'personal'}`}
+      key={providerKey}
       organizationId={organizationId}
       restoredUserId={restoredUserId ?? undefined}
     >

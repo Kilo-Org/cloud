@@ -193,6 +193,7 @@ import {
   getItem,
   isValidDbKey,
   listEntries,
+  listValues,
   MissingSQLCipherError,
   removeItem,
   removeItemIfValue,
@@ -221,6 +222,23 @@ beforeEach(() => {
 });
 
 describe('scope and key validation', () => {
+  it('reads only the requested scope values in one oldest-first statement', async () => {
+    const values = Array.from({ length: 200 }, (_, index) => `value-${index}`);
+    for (const [index, value] of values.entries()) {
+      vi.spyOn(Date, 'now').mockReturnValue(index);
+      // eslint-disable-next-line no-await-in-loop -- writes establish chronological order
+      await setItem('translations', `part-${index}`, value);
+    }
+    vi.restoreAllMocks();
+    await setItem('another-account', 'private', 'not this scope');
+    sqlLog.length = 0;
+
+    await expect(listValues('translations')).resolves.toEqual(values);
+    expect(sqlLog).toHaveLength(1);
+    await expect(listValues('missing')).resolves.toEqual([]);
+    await expect(listValues('')).rejects.toThrow(TypeError);
+  });
+
   it('rejects an empty scope on every API', async () => {
     await expect(getItem('', 'k')).rejects.toThrow(TypeError);
     await expect(setItem('', 'k', 'v')).rejects.toThrow(TypeError);

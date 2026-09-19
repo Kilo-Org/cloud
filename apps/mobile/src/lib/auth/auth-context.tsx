@@ -359,8 +359,13 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // account is signed in restores only for this account.
         setCurrentDeepLinkUserId(readUserIdFromToken(tokenValue));
         const epoch = currentAuthEpoch();
+        // Invalidate the old cache identity before new credentials reach disk.
+        // A kill before getMe confirms must not restore B's token with A's hint.
+        // Serialize behind old hint writes and fail closed if deletion fails.
+        await deleteAccountMetadata(ACTIVE_USER_ID_KEY);
         const published = await persistSignInCredentialsAtEpoch(tokenValue, refreshTokenValue, {
           expiresIn,
+          expectedEpoch: epoch,
         });
         // A sign-in superseded by a newer sign-in or sign-out while its
         // credential write was fenced must not clear the signed-out guard,
@@ -527,8 +532,11 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // native clear that never answers still lets the batch settle.
             // Best effort: both helpers swallow a storage failure.
             (async () => {
-              await clearToolSummaryTranslationMemoryForSignOut();
-              await clearToolSummaryTranslationsForSignOut();
+              try {
+                await clearToolSummaryTranslationMemoryForSignOut();
+              } finally {
+                await clearToolSummaryTranslationsForSignOut();
+              }
             })(),
           ]);
           // Synchronous preference clears (best-effort) so nothing leaks to

@@ -386,3 +386,16 @@ export async function listEntries(scope: string): Promise<KVPair[]> {
     .orderBy(asc(kv.updatedAt))
     .all();
 }
+
+/** Reads one scope's values oldest-first in a single statement for hydration. */
+export async function listValues(scope: string): Promise<string[]> {
+  validateScope(scope);
+  const db = await openDatabase();
+  return db
+    .select({ v: kv.v })
+    .from(kv)
+    .where(eq(kv.scope, scope))
+    .orderBy(asc(kv.updatedAt))
+    .all()
+    .map(row => row.v);
+}

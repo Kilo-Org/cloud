@@ -21,10 +21,16 @@ type CacheStore = {
 
 let storePromise: Promise<CacheStore> | null = null;
 
-// eslint-disable-next-line typescript-eslint/promise-function-async -- memoizes the dynamic import; there is nothing to await
-function loadStore(): Promise<CacheStore> {
-  storePromise ??= import('@/lib/persist/tool-summary-translation-cache');
-  return storePromise;
+async function loadStore(): Promise<CacheStore> {
+  const pending = (storePromise ??= import('@/lib/persist/tool-summary-translation-cache'));
+  try {
+    return await pending;
+  } catch (error) {
+    if (storePromise === pending) {
+      storePromise = null;
+    }
+    throw error;
+  }
 }
 
 /** Reads every stored translation; a store failure reads as no entries. */

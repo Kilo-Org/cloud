@@ -57,8 +57,16 @@ export function CachePersistenceMount() {
     if (previousUserId !== null && previousUserId !== userId) {
       void clearCacheScopeForSignOut(previousUserId);
       void (async () => {
-        await clearToolSummaryTranslationMemoryForSignOut();
-        await clearToolSummaryTranslationsForSignOut();
+        try {
+          try {
+            await clearToolSummaryTranslationMemoryForSignOut();
+          } finally {
+            await clearToolSummaryTranslationsForSignOut();
+          }
+        } catch {
+          // Independent privacy cleanup: always attempt disk even if a memory
+          // subscriber throws, and never leak a fire-and-forget rejection.
+        }
       })();
     }
     previousUserIdRef.current = userId;

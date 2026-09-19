@@ -380,6 +380,27 @@ describe('CachePersistenceMount', () => {
     });
   });
 
+  it('still clears disk translations if the memory reset rejects on an account switch', async () => {
+    identityMock.value = { userId: 'u1', isLoading: false, isError: false };
+    const renderer = mount();
+    await flushMicrotasks();
+    toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut.mockRejectedValueOnce(
+      new Error('translation subscriber failed')
+    );
+    identityMock.value = { userId: 'u2', isLoading: false, isError: false };
+    act(() => {
+      renderer.update(createElement(CachePersistenceMount));
+    });
+    await flushMicrotasks();
+    act(() => {
+      renderer.unmount();
+    });
+
+    expect(
+      toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut
+    ).toHaveBeenCalledTimes(1);
+  });
+
   it('unsubscribes the persister on unmount', async () => {
     identityMock.value = { userId: 'u1', isLoading: false, isError: false };
     const renderer = mount();

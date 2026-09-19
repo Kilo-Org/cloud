@@ -741,26 +741,30 @@ describe('SessionDetailScreen restored scope', () => {
     return renderer;
   }
 
-  it('keeps the session mounted when the live confirmation matches the restored account', async () => {
-    const renderer = await mountRestoredScope();
-    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
-    const restoredManager = managers.at(-1)?.manager;
-    expect(restoredManager).toBeDefined();
+  it.each(['paused', 'fetching'] as const)(
+    'keeps the session mounted when confirmation matches and metadata is %s',
+    async fetchStatus => {
+      const renderer = await mountRestoredScope();
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+      const restoredManager = managers.at(-1)?.manager;
+      expect(restoredManager).toBeDefined();
 
-    // The live getMe confirms the same account the hint restored: the resolved
-    // scope id is unchanged, so the provider key must not remount the session
-    // subtree — the painted transcript, the manager and the composer text all
-    // live below this key.
-    await act(async () => {
-      confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-A');
-      await Promise.resolve();
-    });
+      // The live getMe confirms the same account the hint restored: the resolved
+      // scope id is unchanged, so the provider key must not remount the session
+      // subtree — the painted transcript, the manager and the composer text all
+      // live below this key.
+      queryState.fetchStatus = fetchStatus;
+      await act(async () => {
+        confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-A');
+        await Promise.resolve();
+      });
 
-    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
-    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(0);
-    expect(managers).toHaveLength(1);
-    expect(managers.at(-1)?.manager).toBe(restoredManager);
-  });
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+      expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(0);
+      expect(managers).toHaveLength(1);
+      expect(managers.at(-1)?.manager).toBe(restoredManager);
+    }
+  );
 
   it('remounts the session when the confirmation names a different account than the hint', async () => {
     const renderer = await mountRestoredScope();
@@ -777,6 +781,42 @@ describe('SessionDetailScreen restored scope', () => {
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
     expect(managers).toHaveLength(2);
     expect(managers.at(-1)?.manager).not.toBe(restoredManager);
+  });
+
+  it('keeps restored content during a retryable metadata refresh but retires it on denial', async () => {
+    const renderer = await mountRestoredScope();
+    const restoredManager = managers.at(-1)?.manager;
+    queryState.fetchStatus = 'fetching';
+    act(() => {
+      confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-A');
+    });
+    await updateRoute(renderer);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+
+    queryState.isPending = false;
+    queryState.isError = true;
+    queryState.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
+    await updateRoute(renderer);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(managers).toHaveLength(1);
+    expect(managers.at(-1)?.manager).toBe(restoredManager);
+
+    queryState.error = { data: { code: 'FORBIDDEN' } };
+    await updateRoute(renderer);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry')).toBeUndefined();
+  });
+
+  it('does not carry a mounted scope across a different session waiting for metadata', async () => {
+    const renderer = await mountRestoredScope();
+    queryState.fetchStatus = 'fetching';
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-2' });
+    act(() => {
+      confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-A');
+    });
+    await updateRoute(renderer);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
   });
 
   it('does not mount the previous account restored scope during a direct credential switch', async () => {

@@ -5,8 +5,9 @@
  * already exist (created via `app:create-user`). Used to test that removing a
  * member closes their socket.
  *
- * Idempotent: deletes this fixture's previously created organizations
- * (stable `[seed:w4c-org-pair]` name prefix) before recreating one pair.
+ * Idempotent: deletes this fixture's previously created organizations for the
+ * given owner (stable `[seed:w4c-org-pair] <owner-email>` name) before
+ * recreating one pair.
  *
  * Usage: pnpm dev:seed app:w4c-org-pair <owner-email> <member-email>
  */
@@ -21,16 +22,14 @@ import {
   organization_seats_purchases,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { eq, ilike, inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { w4cOrgPairCleanupPredicate, w4cOrgPairName } from '../lib/w4c-org-pair-fixture';
 import type { SeedResult } from '../index';
 
 export const usage = '<owner-email> <member-email>';
-
-/** Stable fixture name prefix: every org this topic has ever created. */
-const ORG_NAME_PREFIX = '[seed:w4c-org-pair]';
 
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:w4c-org-pair ${usage}`);
@@ -60,19 +59,19 @@ async function lookupUserId(email: string): Promise<string> {
 }
 
 /**
- * Deletes this fixture's previously created organizations so reruns stay
- * idempotent. Matches on the stable fixture-name prefix; the member email
- * changes between harness runs while the owner email is the stable key, so
- * prior runs otherwise accumulate one identically named org per run and the
- * app's org picker lists them all.
+ * Deletes this fixture's previously created organizations for one owner so
+ * reruns stay idempotent. The owner email is the stable key (the member email
+ * changes between harness runs) and the org name embeds it, so scoping the
+ * predicate to that owner avoids accumulating one identically named org per
+ * run without deleting fixture orgs seeded for a different owner.
  */
-async function cleanupPreviousOrgs(): Promise<void> {
+async function cleanupPreviousOrgs(ownerEmail: string): Promise<void> {
   const db = getSeedDb();
 
   const previousOrgs = await db
     .select({ id: organizations.id })
     .from(organizations)
-    .where(ilike(organizations.name, `${ORG_NAME_PREFIX}%`));
+    .where(w4cOrgPairCleanupPredicate(ownerEmail));
 
   const orgIds = previousOrgs.map(org => org.id);
   if (orgIds.length === 0) {
@@ -119,13 +118,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('owner-email and member-email must refer to different users');
   }
 
-  await cleanupPreviousOrgs();
+  await cleanupPreviousOrgs(trimmedOwnerEmail);
 
   const organizationId = randomUUID();
 
   await db.insert(organizations).values({
     id: organizationId,
-    name: `[seed:w4c-org-pair] ${trimmedOwnerEmail}`,
+    name: w4cOrgPairName(trimmedOwnerEmail),
   });
 
   await db.insert(organization_memberships).values([

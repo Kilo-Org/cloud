@@ -8,12 +8,15 @@ const UNREADABLE_CIPHERTEXT = 'aXY=:dGFn:Y2lwaGVy';
 
 type PromoEncryptionModule = { decryptPromoCode: (encrypted: string) => string };
 
-function loadModule(nodeEnv: 'development' | 'production' | 'test'): PromoEncryptionModule {
+function loadModule(
+  nodeEnv: 'development' | 'production' | 'test',
+  key: string = MISMATCHED_KEY
+): PromoEncryptionModule {
   jest.resetModules();
   jest.replaceProperty(process, 'env', { ...process.env, NODE_ENV: nodeEnv });
   jest.doMock('@/lib/config.server', () => ({
     CREDIT_CATEGORIES_ENCRYPTION_KEY_V2: '',
-    CREDIT_CATEGORIES_ENCRYPTION_KEY: MISMATCHED_KEY,
+    CREDIT_CATEGORIES_ENCRYPTION_KEY: key,
   }));
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   return require('./promoCreditEncryption') as PromoEncryptionModule;
@@ -37,6 +40,22 @@ describe('decryptPromoCode', () => {
 
   test('still fails loudly on a key mismatch in production', () => {
     const { decryptPromoCode } = loadModule('production');
+
+    expect(() => decryptPromoCode(UNREADABLE_CIPHERTEXT)).toThrow();
+  });
+
+  // A malformed ciphertext or a wrong-length key is a data-entry or
+  // configuration mistake, not the expected development key mismatch, so it
+  // must not be replaced by a placeholder outside production.
+  test('surfaces a malformed ciphertext outside production', () => {
+    const { decryptPromoCode } = loadModule('development');
+
+    expect(() => decryptPromoCode('not-an-encrypted-value')).toThrow();
+  });
+
+  test('surfaces a wrong-length key outside production', () => {
+    const shortKey = Buffer.alloc(16, 7).toString('base64');
+    const { decryptPromoCode } = loadModule('development', shortKey);
 
     expect(() => decryptPromoCode(UNREADABLE_CIPHERTEXT)).toThrow();
   });

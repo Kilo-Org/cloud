@@ -612,6 +612,20 @@ describe('classifyAssistantFailure', () => {
       expect(classifyAssistantFailure(projectSafeAssistantError(source))).toEqual(failure);
     }
   });
+
+  // Guard the context-limit patterns against the false positives the review
+  // flagged: a validation error that merely names a "context_length" field, and
+  // an HTTP 413 payload-size rejection. Both are request-size/validation
+  // failures, not context-window overflow.
+  it.each(["Invalid value for 'context_length'", 'Request Entity Too Large'])(
+    'does not classify %s as context_limit from a bare context mention',
+    message => {
+      expect(classifyAssistantFailure(message).reason).not.toBe('context_limit');
+      expect(
+        classifyAssistantFailure({ name: 'APIError', data: { message, statusCode: 400 } }).reason
+      ).toBe('invalid_request');
+    }
+  );
 });
 
 describe('isAssistantInterrupt', () => {

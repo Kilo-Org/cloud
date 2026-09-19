@@ -1,5 +1,10 @@
 import 'server-only';
-import { encryptWithSymmetricKey, decryptWithSymmetricKey } from '@/lib/encryption';
+import {
+  EncryptionConfigurationError,
+  EncryptionFormatError,
+  encryptWithSymmetricKey,
+  decryptWithSymmetricKey,
+} from '@/lib/encryption';
 import {
   CREDIT_CATEGORIES_ENCRYPTION_KEY,
   CREDIT_CATEGORIES_ENCRYPTION_KEY_V2,
@@ -57,7 +62,19 @@ export function decryptPromoCode(encrypted: string): string {
   try {
     return decryptWithSymmetricKey(encrypted, getEncryptionKey());
   } catch (error) {
-    if (process.env.NODE_ENV === 'production') throw error;
+    // Only the authentication failure caused by a key that does not match the
+    // committed ciphertext is expected outside production. A malformed
+    // ciphertext (EncryptionFormatError) or a wrong-length key
+    // (EncryptionConfigurationError) is a data-entry or configuration mistake,
+    // so surface it instead of masking it with a placeholder that hides the
+    // problem until production.
+    if (
+      process.env.NODE_ENV === 'production' ||
+      error instanceof EncryptionFormatError ||
+      error instanceof EncryptionConfigurationError
+    ) {
+      throw error;
+    }
     console.warn(
       '[promo-credits] CREDIT_CATEGORIES_ENCRYPTION_KEY cannot decrypt a stored promo code; using a placeholder outside production',
       error

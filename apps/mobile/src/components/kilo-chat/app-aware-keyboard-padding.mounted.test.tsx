@@ -9,6 +9,7 @@ import { AppAwareKeyboardPaddingView } from './app-aware-keyboard-padding';
 const native = vi.hoisted(() => ({
   platform: 'android',
   screenHeight: 900,
+  bottomInset: 24,
   keyboardListeners: new Map<string, (event: KeyboardEvent) => void>(),
   appStateListener: undefined as ((state: string) => void) | undefined,
 }));
@@ -37,6 +38,10 @@ vi.mock('react-native', () => ({
       };
     },
   },
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: native.bottomInset, left: 0, right: 0 }),
 }));
 
 function showKeyboard(height: number, screenY: number) {
@@ -84,22 +89,22 @@ describe.each(['android', 'ios'])('keyboard clearance on %s', platform => {
     native.appStateListener = undefined;
   });
 
-  it.each([300, 324])('uses the visible top, not the reported height (%i)', height => {
+  it.each([300, 324])('adds the Android system-bar inset to the reported height %i', height => {
     const view = mountPadding();
     expect(view.padding()).toBe(0);
-    // The same top edge can carry a height excluding system bars or including them.
-    showKeyboard(height, 576);
-    expect(view.padding()).toBe(324);
+    // Android edge-to-edge reports the nav-bar-excluded height, not the IME top.
+    showKeyboard(height, platform === 'android' ? 876 : 576);
+    expect(view.padding()).toBe(platform === 'android' ? height + native.bottomInset : 324);
     view.unmount();
   });
 
   it('tracks a short keyboard and a changed screen size', () => {
     const view = mountPadding();
-    showKeyboard(24, 852);
-    expect(view.padding()).toBe(48);
+    showKeyboard(24, platform === 'android' ? 876 : 852);
+    expect(view.padding()).toBe(platform === 'android' ? 24 + native.bottomInset : 48);
     native.screenHeight = 600;
-    showKeyboard(200, 400);
-    expect(view.padding()).toBe(200);
+    showKeyboard(200, platform === 'android' ? 576 : 400);
+    expect(view.padding()).toBe(platform === 'android' ? 200 + native.bottomInset : 200);
     view.unmount();
   });
 
@@ -123,14 +128,14 @@ describe.each(['android', 'ios'])('keyboard clearance on %s', platform => {
     expect(native.appStateListener).toBeUndefined();
   });
 
-  it('clamps offscreen keyboards and applies a caller offset only while visible', () => {
-    const view = mountPadding(16);
+  it('applies a caller offset only while the keyboard has positive overlap', () => {
+    const view = mountPadding(24);
     expect(view.padding()).toBe(0);
-    showKeyboard(324, 576);
-    expect(view.padding()).toBe(340);
-    showKeyboard(0, 900);
+    showKeyboard(300, platform === 'android' ? 876 : 600);
+    expect(view.padding()).toBe(platform === 'android' ? 300 + 24 + native.bottomInset : 324);
+    showKeyboard(0, platform === 'android' ? 876 : 900);
     expect(view.padding()).toBe(0);
-    showKeyboard(0, 950);
+    showKeyboard(-50, platform === 'android' ? 876 : 950);
     expect(view.padding()).toBe(0);
     view.unmount();
   });

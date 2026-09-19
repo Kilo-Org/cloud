@@ -189,14 +189,18 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     expect(keyboardShow.length).toBeGreaterThan(0);
     act(() => {
       for (const listener of keyboardShow) {
-        listener({ endCoordinates: { height: platform === 'android' ? 300 : 324, screenY: 576 } });
+        listener({
+          endCoordinates: {
+            height: platform === 'android' ? 300 : 324,
+            screenY: platform === 'android' ? 876 : 576,
+          },
+        });
       }
     });
 
     const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
-    // Nearest first: the footer drops its tab-bar clearance, and the
-    // Keyboard lift uses the visible top on both platforms, with no safe-area
-    // offset (which would double-count system bars when included in height).
+    // Nearest first: the footer drops its tab-bar clearance. Android restores
+    // the system-bar inset excluded from height; iOS uses the keyboard top.
     expect(paddingBottomsAbove(action)).toEqual([0, 324]);
 
     const hide = platform === 'android' ? 'keyboardDidHide' : 'keyboardWillHide';
@@ -225,7 +229,12 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     // whole clearance for it parked the action behind the tab bar (e1-fill).
     act(() => {
       for (const listener of keyboardShow) {
-        listener({ endCoordinates: { height: platform === 'android' ? 24 : 48, screenY: 852 } });
+        listener({
+          endCoordinates: {
+            height: platform === 'android' ? 24 : 48,
+            screenY: platform === 'android' ? 876 : 852,
+          },
+        });
       }
     });
 

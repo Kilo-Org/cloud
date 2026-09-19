@@ -1,5 +1,6 @@
 import { type ComponentProps, useEffect, useState } from 'react';
 import { AppState, Dimensions, Keyboard, type KeyboardEvent, Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   resolveAppAwareKeyboardPadding,
@@ -7,18 +8,25 @@ import {
 } from './app-aware-keyboard-padding-state';
 
 function keyboardPaddingFromEvent(event: KeyboardEvent): number {
-  // Both platforms report the keyboard's top in screen coordinates. Measuring
-  // from that edge includes system bars without assuming they are in `height`.
+  // Android edge-to-edge reports the visible-frame bottom as screenY, not the
+  // IME top, and its height excludes the bottom system-bar inset; the inset
+  // added back in the hook rebuilds the IME top. iOS reports the keyboard's top
+  // in screen coordinates, which already includes the system bars.
+  if (Platform.OS === 'android') {
+    return event.endCoordinates.height;
+  }
   return Dimensions.get('screen').height - event.endCoordinates.screenY;
 }
 
 /**
- * The bottom padding an AppAwareKeyboardPaddingView applies: the screen overlap
- * while the keyboard is open (plus the caller's offset), 0 while it is closed.
- * Exported so a pinned footer inside the padding view can measure its own
- * clearance using the same calculation.
+ * The bottom padding an AppAwareKeyboardPaddingView applies: the strip the IME
+ * hides from the screen bottom — its reported height plus the bottom system-bar
+ * inset on Android, the screen overlap on iOS — plus the caller's offset while
+ * the keyboard is open, else 0. Exported so a pinned footer inside the padding
+ * view can measure its own clearance using the same calculation.
  */
 export function useAppAwareKeyboardPadding(keyboardOffset = 0): number {
+  const { bottom } = useSafeAreaInsets();
   const [keyboardPadding, setKeyboardPadding] = useState(0);
 
   useEffect(() => {
@@ -63,7 +71,12 @@ export function useAppAwareKeyboardPadding(keyboardOffset = 0): number {
     };
   }, []);
 
-  return keyboardPadding > 0 ? keyboardPadding + keyboardOffset : 0;
+  // Android reports the IME height with the navigation bar already subtracted
+  // (ReactRootView: imeInsets.bottom − barInsets.bottom), so the shared lift
+  // adds it back and covers the whole strip the keyboard hides. Callers that
+  // reserve the same inset while the keyboard is closed then yield to this lift.
+  const systemBarInset = Platform.OS === 'android' ? bottom : 0;
+  return keyboardPadding > 0 ? keyboardPadding + keyboardOffset + systemBarInset : 0;
 }
 
 export function AppAwareKeyboardPaddingView({

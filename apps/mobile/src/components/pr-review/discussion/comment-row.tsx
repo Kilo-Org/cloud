@@ -34,7 +34,6 @@ import { ReactionsRow } from '@/components/pr-review/discussion/reactions-row';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { COMMENT_ACTIONS_HIT_SLOP } from '@/lib/pr-review/comment-trailing-controls';
 import { type PrCommentKind } from '@/lib/pr-review/fix-with-kilo';
 import {
   type ReviewComment,
@@ -273,11 +272,8 @@ export function CommentRow({
         <Text variant="muted" className="text-xs">
           {relative}
         </Text>
-        {/* `gap-3` (12pt) >= the pill's 2pt right hitSlop + the overflow's
-            8pt left bleed, leaving commentTrailingControlsClearanceDp() dp
-            between the two tap areas, so a tap anywhere on the pill —
-            including its right edge — opens the session and never the
-            moderation sheet (vr1). See comment-trailing-controls.ts. */}
+        {/* The overflow owns its full target without hitSlop, leaving the
+            pill's expanded edge clear. See comment-trailing-controls.ts. */}
         <View className="ml-auto flex-row items-center gap-3">
           <PrCommentFixWithKilo
             owner={owner}
@@ -290,8 +286,7 @@ export function CommentRow({
             onPress={openOverflow}
             accessibilityRole="button"
             accessibilityLabel={t('prReview.discussion.commentActions')}
-            hitSlop={COMMENT_ACTIONS_HIT_SLOP}
-            className="h-7 w-7 items-center justify-center rounded-full active:bg-muted"
+            className="h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full active:bg-muted"
           >
             <MoreHorizontal size={16} color={colors.mutedForeground} />
           </Pressable>

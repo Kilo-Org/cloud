@@ -16,6 +16,13 @@ export function notificationPathForData(data: PushData): string {
     case 'low_balance': {
       return `/(app)/(tabs)/(3_profile)/organization/credit-activity?org=${data.organizationId}&via=push`;
     }
+    case 'spend_alert': {
+      // The alert's single CTA opens the scope's spend view: the caller's own
+      // screen, or the named organization's.
+      return data.scope === 'organization' && data.organizationId
+        ? `/(app)/(tabs)/(3_profile)/spend-alerts?org=${data.organizationId}&via=push`
+        : '/(app)/(tabs)/(3_profile)/spend-alerts?via=push';
+    }
     case 'security_finding':
     case 'security_lifecycle': {
       // getSecurityAgentPath returns Href; coerce to string for query append (cast style of security-agent.ts).

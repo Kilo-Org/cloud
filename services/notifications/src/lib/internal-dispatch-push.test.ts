@@ -7,6 +7,7 @@ import {
   type InternalDispatchLowBalanceRequest,
   type InternalDispatchSecurityFindingRequest,
   type InternalDispatchSecurityLifecycleRequest,
+  type InternalDispatchSpendAlertRequest,
 } from '@kilocode/notifications';
 
 import type { UserNotificationPreferences } from './cloud-agent-session-push';
@@ -19,6 +20,7 @@ const ALL_ON: UserNotificationPreferences = {
   sessionStatusEnabled: true,
   kiloclawActivityEnabled: true,
   balanceAlertsEnabled: true,
+  spendAlertsEnabled: true,
   securityFindingsEnabled: true,
 };
 
@@ -64,6 +66,40 @@ function securityLifecycle(
     prUrl: 'https://github.com/acme/api/pull/42',
     recipientUserIds: ['user-a', 'user-b'],
     ...overrides,
+  };
+}
+
+function spendAlert(
+  overrides: Partial<InternalDispatchSpendAlertRequest> = {}
+): InternalDispatchSpendAlertRequest {
+  return {
+    kind: 'spend_alert',
+    recipientUserIds: ['user-a', 'user-b'],
+    scope: 'organization',
+    organizationId: 'org-1',
+    alertKind: 'threshold',
+    scopeName: 'Acme Corp',
+    amountUsd: 42.5,
+    thresholdUsd: 40,
+    ...overrides,
+  };
+}
+
+function expectedSpendAlertInput(userId: string): DispatchPushInput {
+  return {
+    userId,
+    presenceContext: null,
+    idempotencyKey: 'spend-alert:organization:org-1:threshold:40',
+    badge: null,
+    push: {
+      title: 'Spend alert',
+      body: 'Acme Corp spend crossed $42.5',
+      i18nKey: 'internal.spendAlert',
+      i18nParams: { scopeName: 'Acme Corp', amountUsd: '42.5' },
+      data: { type: 'spend_alert', scope: 'organization', organizationId: 'org-1' },
+      sound: 'default',
+      priority: 'high',
+    },
   };
 }
 
@@ -513,5 +549,141 @@ describe('dispatchInternalPushCore', () => {
       { userId: 'user-b', outcome: 'delivered' },
     ]);
     expect(calls.dispatchPushInputs).toHaveLength(2);
+  });
+
+  it('spend_alert dispatches every recipient with an exact, schema-valid payload', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await dispatchInternalPushCore(spendAlert(), deps);
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'delivered' },
+      { userId: 'user-b', outcome: 'delivered' },
+    ]);
+    expect(calls.dispatchPushInputs).toEqual([
+      expectedSpendAlertInput('user-a'),
+      expectedSpendAlertInput('user-b'),
+    ]);
+    for (const input of calls.dispatchPushInputs) {
+      expect(pushDataSchema.safeParse(input.push.data).success).toBe(true);
+    }
+  });
+
+  it('spend_alert personal scope omits organizationId and keys on the personal scope', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await dispatchInternalPushCore(
+      spendAlert({
+        scope: 'personal',
+        organizationId: undefined,
+        scopeName: 'you',
+        alertKind: 'anomaly',
+        recipientUserIds: ['user-a'],
+      }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs[0]!.idempotencyKey).toBe(
+      'spend-alert:personal:personal:anomaly:40'
+    );
+    expect(calls.dispatchPushInputs[0]!.push.data).toEqual({
+      type: 'spend_alert',
+      scope: 'personal',
+    });
+    expect(pushDataSchema.safeParse(calls.dispatchPushInputs[0]!.push.data).success).toBe(true);
+  });
+
+  it('spend_alert stays one alert per crossing: the same threshold shares one idempotency key', async () => {
+    const { deps, calls } = fakeDeps();
+    await dispatchInternalPushCore(spendAlert({ recipientUserIds: ['user-a'] }), deps);
+    // A re-evaluated sweep with a grown total must dedupe to the same key.
+    await dispatchInternalPushCore(
+      spendAlert({ recipientUserIds: ['user-a'], amountUsd: 61.25 }),
+      deps
+    );
+
+    expect(calls.dispatchPushInputs).toHaveLength(2);
+    expect(calls.dispatchPushInputs[0]!.idempotencyKey).toBe(
+      calls.dispatchPushInputs[1]!.idempotencyKey
+    );
+  });
+
+  it('crossing a different threshold is a distinct alert', async () => {
+    const { deps, calls } = fakeDeps();
+    await dispatchInternalPushCore(
+      spendAlert({ recipientUserIds: ['user-a'], thresholdUsd: 40 }),
+      deps
+    );
+    await dispatchInternalPushCore(
+      spendAlert({ recipientUserIds: ['user-a'], thresholdUsd: 80 }),
+      deps
+    );
+
+    expect(calls.dispatchPushInputs).toHaveLength(2);
+    expect(calls.dispatchPushInputs[0]!.idempotencyKey).not.toBe(
+      calls.dispatchPushInputs[1]!.idempotencyKey
+    );
+  });
+
+  it('suppresses spend_alert when spendAlertsEnabled is false (no DO call)', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: { ...ALL_ON, spendAlertsEnabled: false },
+    });
+    const result = await dispatchInternalPushCore(spendAlert(), deps);
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'suppressed_preference' },
+      { userId: 'user-b', outcome: 'suppressed_preference' },
+    ]);
+    expect(calls.dispatchPushInputs).toHaveLength(0);
+  });
+
+  it('spend_alert reads only spendAlertsEnabled (ignores all other categories)', async () => {
+    const { deps, calls } = fakeDeps({
+      preferences: {
+        ...ALL_ON,
+        agentPushEnabled: false,
+        chatMessagesEnabled: false,
+        agentAttentionEnabled: false,
+        sessionStatusEnabled: false,
+        kiloclawActivityEnabled: false,
+        balanceAlertsEnabled: false,
+        securityFindingsEnabled: false,
+        spendAlertsEnabled: true,
+      },
+    });
+    const result = await dispatchInternalPushCore(
+      spendAlert({ recipientUserIds: ['user-a'] }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
+    expect(calls.dispatchPushInputs).toHaveLength(1);
+  });
+
+  it('a preference-read throw fails closed for the whole recipient set', async () => {
+    // The preference read throws for every recipient in this batch: the whole
+    // recipient set fails closed and zero dispatchPush calls happen.
+    const { deps, calls } = fakeDeps({ preferencesThrows: true });
+    const result = await dispatchInternalPushCore(spendAlert(), deps);
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'failed' },
+      { userId: 'user-b', outcome: 'failed' },
+    ]);
+    expect(calls.dispatchPushInputs).toHaveLength(0);
+  });
+
+  it('dedups duplicate recipient ids in spend_alert to one call', async () => {
+    const { deps, calls } = fakeDeps();
+    const result = await dispatchInternalPushCore(
+      spendAlert({ recipientUserIds: ['user-a', 'user-a', 'user-b'] }),
+      deps
+    );
+
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'delivered' },
+      { userId: 'user-b', outcome: 'delivered' },
+    ]);
+    expect(calls.dispatchPushInputs.map(i => i.userId)).toEqual(['user-a', 'user-b']);
   });
 });

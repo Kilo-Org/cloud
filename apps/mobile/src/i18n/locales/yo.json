@@ -827,7 +827,8 @@
       "chat": "Àwọn ìfiránṣẹ́ ìfọ̀rọ̀wérọ̀",
       "kiloclaw": "Àwọn ìgbòkègbodò KiloClaw",
       "balance": "Àwọn ìkìlọ̀ nípa owó tó kù",
-      "security": "Àwọn àwárí ààbò"
+      "security": "Àwọn àwárí ààbò",
+      "spend": "Àwọn ìkìlọ̀ ìnáwó"
     },
     "category": {
       "chatMessagesSubtitle": "àwọn ìdáhùn nínú ìjíròrò rẹ",
@@ -839,6 +840,8 @@
       "sessionStatusSubtitle": "ó parí / ó kùnà / ó ti ṣe tán fún ìṣàkóso",
       "kiloclawActivitySubtitle": "ẹ̀rọ iṣẹ́ ti ṣe tán/ó kùnà, àwọn ìṣe tí a ṣètò àkókò wọn",
       "balanceAlertsSubtitle": "àwọn ìkìlọ̀ pé owó àjọ tó kù ti dín kù",
+      "spendAlertsSubtitle": "àwọn ìkọjá ààlà àti ìgbésókè lójú wákàtí",
+      "spendAlertsToggle": "Ẹ̀ka àwọn ìkìlọ̀ ìnáwó",
       "securityFindingsSubtitle": "àwọn àwárí tuntun àti ìránnilétí SLA"
     }
   },
@@ -3201,5 +3204,28 @@
   },
   "launcher": {
     "openLastSession": "Ṣí ìgbà iṣẹ́ tó kẹ́yìn"
+  },
+  "spendAlerts": {
+    "subtitle": "Fi ìkìlọ̀ ránṣẹ́ nípasẹ̀ ímeèlì tàbí push sí àwọn olùbáṣepọ̀ ìsanwó nígbà tí ìnáwó ẹ̀ka yìí bá kọjá ààlà tàbí gòkè ju ìwọ̀n wákàtí tó máa ń ṣe lọ.",
+    "enable": "Tan àwọn ìkìlọ̀ ìnáwó",
+    "thresholdTitle": "Ìkọjá ààlà",
+    "thresholdSubtitle": "Ìnáwó tí ń lọ kọjá ààlà rẹ",
+    "anomalyTitle": "Ìgbésókè lójú wákàtí",
+    "anomalySubtitle": "Wákàtí kan ga ju ìwọ̀n ìṣe ẹ̀ka yìí lọ",
+    "limitLabel": "Ààlà (USD)",
+    "windowLabel": "Àkókò",
+    "window24h": "Wákàtí 24",
+    "window7d": "Ọjọ́ 7",
+    "window30d": "Ọjọ́ 30",
+    "multiplierLabel": "Ìlọ́po ìgbésókè",
+    "saved": "A ti fipamọ́ àwọn ètò ìkìlọ̀ ìnáwó",
+    "loadError": "A kò lè gbé àwọn ìkìlọ̀ ìnáwó wọlé.",
+    "saveError": "A kò lè fipamọ́ àwọn ìkìlọ̀ ìnáwó.",
+    "empty": "Àwọn ìkìlọ̀ ìnáwó ti pa. Tan wọ́n kí o lè kìlọ̀ fún àwọn olùbáṣepọ̀ ìsanwó ẹ̀ka yìí.",
+    "noSpend": "A kò tíì ṣe àkọsílẹ̀ ìnáwó kankan",
+    "spend24h": "Ìnáwó ní wákàtí 24 sẹ́yìn",
+    "multiplierError": "Tẹ ìlọ́po 1 tàbí jù bẹ́ẹ̀ lọ",
+    "permissionDenied": "O kò ní ìyọ̀ǹda láti ṣàkóso àwọn ìkìlọ̀ ìnáwó.",
+    "pushOffByCategory": "Ti pa nínú Àwọn ìfitónilétí"
   }
 }

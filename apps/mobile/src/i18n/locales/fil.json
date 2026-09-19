@@ -827,7 +827,8 @@
       "chat": "Mga mensahe sa usapan",
       "kiloclaw": "Aktibidad ng KiloClaw",
       "balance": "Mga babala sa balanse",
-      "security": "Mga natukoy na isyu sa seguridad"
+      "security": "Mga natukoy na isyu sa seguridad",
+      "spend": "Mga babala sa gastos"
     },
     "category": {
       "chatMessagesSubtitle": "mga tugon sa iyong mga pag-uusap",
@@ -839,6 +840,8 @@
       "sessionStatusSubtitle": "tapos / nabigo / handa nang kontrolin",
       "kiloclawActivitySubtitle": "handa o nabigo ang instance, mga nakaiskedyul na aksyon",
       "balanceAlertsSubtitle": "mga babala sa mababang balanse ng organisasyon",
+      "spendAlertsSubtitle": "mga paglampas sa hangganan at pagtaas bawat oras",
+      "spendAlertsToggle": "Kategorya ng mga babala sa gastos",
       "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA"
     }
   },
@@ -3201,5 +3204,28 @@
   },
   "launcher": {
     "openLastSession": "Buksan ang huling sesyon"
+  },
+  "spendAlerts": {
+    "subtitle": "Magpadala ng babala sa email o push sa mga contact sa pagsingil kapag ang gastos ng saklaw na ito ay lumampas sa limitasyon o tumaas nang higit sa karaniwang rate bawat oras.",
+    "enable": "Paganahin ang mga babala sa gastos",
+    "thresholdTitle": "Paglampas sa hangganan",
+    "thresholdSubtitle": "Ang kasalukuyang gastos ay lumampas sa iyong limitasyon",
+    "anomalyTitle": "Pagtaas bawat oras",
+    "anomalySubtitle": "Ang isang oras ay malayo sa itaas ng karaniwang rate ng saklaw na ito",
+    "limitLabel": "Limitasyon (USD)",
+    "windowLabel": "Panahon",
+    "window24h": "24 na oras",
+    "window7d": "7 araw",
+    "window30d": "30 araw",
+    "multiplierLabel": "Multiplier ng pagtaas",
+    "saved": "Nai-save ang mga setting ng babala sa gastos",
+    "loadError": "Hindi ma-load ang mga babala sa gastos.",
+    "saveError": "Hindi mai-save ang mga babala sa gastos.",
+    "empty": "Naka-off ang mga babala sa gastos. I-on ang mga ito para abisuhan ang mga contact sa pagsingil ng saklaw na ito.",
+    "noSpend": "Wala pang naitalang gastos",
+    "spend24h": "Gastos sa nakalipas na 24 na oras",
+    "multiplierError": "Maglagay ng multiplier na 1 o higit pa",
+    "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa gastos.",
+    "pushOffByCategory": "Naka-off sa Mga abiso"
   }
 }

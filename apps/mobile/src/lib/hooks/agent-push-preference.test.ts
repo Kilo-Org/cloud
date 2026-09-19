@@ -2,6 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 
 import {
+  applyAgentPushOptimistic,
   DEFAULT_NOTIFICATION_PREFERENCE,
   deriveAgentPushEditable,
   deriveGateSettled,
@@ -9,6 +10,7 @@ import {
   NOTIFICATION_CATEGORY_KEYS,
   type NotificationPreferences,
   readAgentPushPreference,
+  rollbackAgentPushOptimistic,
 } from './agent-push-preference';
 
 const key = ['user', 'getNotificationPreferences'] as const;
@@ -25,6 +27,7 @@ function fullRow(overrides: Partial<NotificationPreferences> = {}): Notification
     sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
     kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
     balanceAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
+    spendAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
     securityFindings: DEFAULT_NOTIFICATION_PREFERENCE,
     agentPushEnabled: DEFAULT_NOTIFICATION_PREFERENCE,
     ...overrides,
@@ -38,7 +41,7 @@ describe('DEFAULT_NOTIFICATION_PREFERENCE', () => {
 });
 
 describe('NOTIFICATION_CATEGORY_KEYS', () => {
-  it('lists the categories rendered on the dedicated screen including balance and security', () => {
+  it('lists the categories rendered on the dedicated screen including balance, spend and security', () => {
     expect([...NOTIFICATION_CATEGORY_KEYS]).toEqual([
       'chatMessages',
       'agentAttention',
@@ -46,6 +49,7 @@ describe('NOTIFICATION_CATEGORY_KEYS', () => {
       'sessionStatus',
       'kiloclawActivity',
       'balanceAlerts',
+      'spendAlerts',
       'securityFindings',
     ]);
   });
@@ -132,6 +136,7 @@ describe('readAgentPushPreference', () => {
       sessionStatus: false,
       kiloclawActivity: true,
       balanceAlerts: false,
+      spendAlerts: false,
       securityFindings: true,
       agentPushEnabled: true,
     });
@@ -141,6 +146,7 @@ describe('readAgentPushPreference', () => {
     expect(readAgentPushPreference(qc, key, 'sessionStatus')).toBe(false);
     expect(readAgentPushPreference(qc, key, 'kiloclawActivity')).toBe(true);
     expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(false);
+    expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(false);
     expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(true);
   });
 
@@ -152,6 +158,7 @@ describe('readAgentPushPreference', () => {
     // legacy field is present.
     expect(readAgentPushPreference(qc, key, 'chatMessages')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
     expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
+    expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(DEFAULT_NOTIFICATION_PREFERENCE);
     expect(readAgentPushPreference(qc, key, 'securityFindings')).toBe(
       DEFAULT_NOTIFICATION_PREFERENCE
     );
@@ -161,5 +168,28 @@ describe('readAgentPushPreference', () => {
     const qc = makeQueryClient();
     qc.setQueryData(key, fullRow({ agentUpdates: false }));
     expect(readAgentPushPreference(qc, key)).toBe(false);
+  });
+});
+
+describe('spendAlerts optimistic flip (agreement with the spend view column)', () => {
+  it('applies the optimistic flip to spendAlerts and rolls back on error', async () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, fullRow({ spendAlerts: true, balanceAlerts: true }));
+
+    const context = await applyAgentPushOptimistic({
+      queryClient: qc,
+      queryKey: key,
+      next: false,
+      category: 'spendAlerts',
+    });
+    // The flip lands on spendAlerts only: the sibling balance row is untouched.
+    expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(false);
+    expect(readAgentPushPreference(qc, key, 'balanceAlerts')).toBe(true);
+
+    rollbackAgentPushOptimistic({ queryClient: qc, queryKey: key, context });
+    // Rollback restores the previous snapshot, so a failed save cannot leave
+    // the screen disagreeing with the column the spend view writes.
+    expect(readAgentPushPreference(qc, key, 'spendAlerts')).toBe(true);
+    expect(qc.getQueryData(key)).toEqual(fullRow({ spendAlerts: true, balanceAlerts: true }));
   });
 });

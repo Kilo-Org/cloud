@@ -42,6 +42,14 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     type: z.literal('low_balance'),
     organizationId: nonEmptyStringSchema,
   }),
+  // Spend alert push. Carries the owner scope and its id only — never an
+  // amount, an email, or the configured threshold: this blob crosses the OS
+  // lock screen, so the generic preview copy above must stay content-free.
+  z.object({
+    type: z.literal('spend_alert'),
+    scope: z.enum(['personal', 'organization']),
+    organizationId: nonEmptyStringSchema.optional(),
+  }),
   z.object({
     type: z.literal('security_finding'),
     findingId: nonEmptyStringSchema,

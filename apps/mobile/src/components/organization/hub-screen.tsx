@@ -106,8 +106,11 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeIn.duration(200)} className="rounded-lg bg-secondary px-3">
-          <View className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3">
-            <Text className="flex-1 pr-3 text-sm font-medium text-foreground" numberOfLines={1}>
+          <View className="min-h-[44px] flex-row items-center justify-between border-b-[0.5px] border-hair-soft">
+            <Text
+              className="flex-1 py-3 pr-3 text-sm font-medium text-foreground"
+              numberOfLines={1}
+            >
               {org.organizationName}
             </Text>
             {showMoney && (
@@ -115,10 +118,9 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 onPress={() => {
                   setRenameVisible(true);
                 }}
-                hitSlop={12}
                 accessibilityRole="button"
                 accessibilityLabel={t('organization.hub.renameTitle')}
-                className="active:opacity-70"
+                className="h-[44px] w-[44px] shrink-0 items-center justify-center active:opacity-70"
               >
                 <Pencil size={16} color={colors.mutedForeground} />
               </Pressable>

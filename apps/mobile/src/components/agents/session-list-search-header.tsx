@@ -44,7 +44,7 @@ export function SessionListSearchHeader({
     <View>
       <View
         style={fieldMargins}
-        className="my-2 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
+        className="my-2 flex-row items-center gap-2 rounded-[10px] border border-border bg-card pl-4 pr-1"
       >
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
         <View className="h-[18px] w-[18px] items-center justify-center">
@@ -78,12 +78,13 @@ export function SessionListSearchHeader({
             onPress={onClearSearch}
             accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
-            hitSlop={12}
-            className="active:opacity-70"
+            className="h-[44px] w-[44px] shrink-0 items-center justify-center active:opacity-70"
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>
-        ) : null}
+        ) : (
+          <View className="h-[44px] w-[44px] shrink-0" pointerEvents="none" />
+        )}
       </View>
     </View>
   );

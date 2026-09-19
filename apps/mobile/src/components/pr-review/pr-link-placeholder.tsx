@@ -1,25 +1,29 @@
-import { Platform, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 
 /**
- * The visible placeholder for the PR-link field, drawn as one ellipsized line.
+ * The visible placeholder for the PR-link field, drawn as one ellipsized line
+ * on both platforms.
  *
- * Android renders a TextInput's placeholder as the native EditText hint, and
- * React Native never marks a single-line input as single-line — it only clears
- * the multiline input-type flag — so a hint wider than the field lays out on a
- * second line that the one-line field clips (pr-review-home at font scale 2).
- * `numberOfLines` cannot stop it: the hint layout ignores it. Drawing the
- * placeholder ourselves keeps it on one line at any font scale or translation
- * length, and the field keeps its native hint (transparent) for the
- * accessibility and digest text.
+ * A TextInput's native placeholder is not reliably single-line here. Android
+ * renders the placeholder as the native EditText hint, and React Native never
+ * marks a single-line input as single-line — it only clears the multiline
+ * input-type flag — so a hint wider than the field lays out on a second line
+ * that the one-line field clips (pr-review-home at font scale 2).
+ * `numberOfLines` cannot stop it: the hint layout ignores it. iOS truncates its
+ * own placeholder, but the field must render the same on both platforms, so
+ * both draw this overlay and keep the native hint (transparent) for the
+ * accessibility and digest text. That keeps the placeholder on one line at any
+ * font scale or translation length on either platform.
  *
- * iOS truncates its own placeholder, so this renders nothing there.
+ * The overlay is hidden from assistive tech on both platforms by spelling the
+ * one capability with each platform's prop: `accessibilityElementsHidden`
+ * applies on iOS and `importantForAccessibility` on Android. Neither platform
+ * is missing the capability — each just names it differently — so both props
+ * are set unconditionally.
  */
 export function PrLinkPlaceholder({ label }: Readonly<{ label: string }>) {
-  if (Platform.OS !== 'android') {
-    return null;
-  }
   return (
     <View
       testID="pr-link-placeholder"

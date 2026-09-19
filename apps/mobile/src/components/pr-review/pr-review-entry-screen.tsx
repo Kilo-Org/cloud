@@ -4,7 +4,7 @@ import { Clipboard as ClipboardIcon, Link2, SearchX, X } from '@/components/ui/i
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Platform, Pressable, TextInput, View } from 'react-native';
+import { Alert, Pressable, TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
@@ -258,12 +258,12 @@ export function PrReviewEntryScreen() {
               ref={inputRef}
               defaultValue=""
               placeholder={urlPlaceholder}
-              // Android's native hint wraps and clips (see PrLinkPlaceholder);
-              // it stays set for the digest/accessibility text but is invisible,
-              // and the one-line overlay draws the visible placeholder instead.
-              placeholderTextColor={
-                Platform.OS === 'android' ? 'transparent' : colors.mutedForeground
-              }
+              // The native hint is not reliably one line: Android lays it out
+              // on a second line the one-line field clips. Both platforms draw
+              // the visible placeholder with the one-line PrLinkPlaceholder
+              // overlay instead; the hint stays set for the digest and
+              // accessibility text but is invisible.
+              placeholderTextColor="transparent"
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"

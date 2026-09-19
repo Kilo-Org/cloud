@@ -3112,6 +3112,14 @@
     "tooManySignInAttempts": "Жүйеге кіру әрекеттері тым көп. Сәл күтіп, қайталап көріңіз."
   },
   "models": {
+    "auto": {
+      "frontier": "Авто Озық",
+      "balanced": "Авто Теңгерімді",
+      "efficient": "Авто Тиімді",
+      "small": "Авто Кішкене",
+      "free": "Авто Тегін",
+      "organization": "Ұйымдық авто"
+    },
     "dataCollected": "Деректер жиналады",
     "free": "Тегін",
     "couldNotUpdateFavorites": "Таңдаулыларды жаңарту мүмкін болмады.",

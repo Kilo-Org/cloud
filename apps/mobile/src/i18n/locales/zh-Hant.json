@@ -3112,6 +3112,14 @@
     "tooManySignInAttempts": "登入嘗試次數過多。請稍候再試。"
   },
   "models": {
+    "auto": {
+      "frontier": "自動頂尖",
+      "balanced": "自動均衡",
+      "efficient": "自動高效",
+      "small": "自動小型",
+      "free": "自動免費",
+      "organization": "組織自動"
+    },
     "dataCollected": "會收集資料",
     "free": "免費",
     "couldNotUpdateFavorites": "無法更新我的最愛。",

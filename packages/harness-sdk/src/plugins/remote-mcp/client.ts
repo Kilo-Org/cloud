@@ -21,23 +21,20 @@ import {
 import { RemoteMcpError, type RemoteMcpFailure, type RemoteMcpServer } from './server.js';
 
 /**
- * The remote MCP client, over the transport the specification defines.
- *
- * The protocol is `@modelcontextprotocol/sdk`, the MCP project's own client:
- * the transport, every schema, and nothing here re-implements JSON-RPC or SSE.
- * What it leaves to this file: the `fetch` is the caller's (`http.ts`);
- * discovery is bounded by `discoverTimeoutMs` and a call by `timeoutMs`, so a
- * silent server cannot hold a chat; the validator is permissive, because Hermes
- * has no `new Function`; and a failure is classified by kind.
+ * The remote MCP client, over the transport the specification defines: the MCP
+ * project's own `@modelcontextprotocol/sdk`, so nothing here re-implements
+ * JSON-RPC or SSE. The `fetch` is the caller's (`http.ts`); discovery is bounded
+ * by `discoverTimeoutMs` and a call by `timeoutMs`, so a silent server cannot
+ * hold a chat; the validator is permissive, because Hermes has no `new
+ * Function`; and a failure is classified by kind.
  */
 
 /**
- * The transport the client library is handed.
- *
- * Not the library's `Transport` itself: the class reads `sessionId` as
- * `string | undefined` and the interface declares it `sessionId?: string`,
- * which `exactOptionalPropertyTypes` refuses to join. Nothing here reads the
- * member — the library owns it — so it is left off the seam, not asserted.
+ * The transport the client library is handed. Not the library's `Transport`
+ * itself: the class reads `sessionId` as `string | undefined` and the interface
+ * declares it `sessionId?: string`, which `exactOptionalPropertyTypes` refuses
+ * to join. Nothing here reads the member — the library owns it — so it is left
+ * off the seam, not asserted.
  */
 type RemoteMcpTransport = Omit<StreamableHTTPClientTransport, 'sessionId'>;
 
@@ -220,10 +217,8 @@ const discovered = (
   );
 
 /**
- * The text a result carries, joined with newlines.
- *
- * An image, an audio clip or an embedded resource is not something a model
- * reads as words, so only the pieces that carry text are handed on.
+ * The text a result carries, joined with newlines: an image, an audio clip or
+ * an embedded resource is not something a model reads as words.
  */
 const textOf = (content: readonly { readonly type: string; readonly text?: string }[]): string =>
   content.flatMap(part => (typeof part.text === 'string' ? [part.text] : [])).join('\n');
@@ -281,9 +276,8 @@ const withServer = <A>(
   );
 
 /**
- * The deps one discovery runs under: the caller's `discoverTimeoutMs`, when it
- * names one, standing in for the per-operation `timeoutMs` that `withServer`
- * reads. A call is handed `deps` untouched, so it keeps `timeoutMs`.
+ * The deps discovery runs under, where the caller's `discoverTimeoutMs` stands
+ * in for the `timeoutMs` that `withServer` reads. A call keeps `deps` untouched.
  */
 const discoveryDeps = (deps: RemoteMcpClientDeps): RemoteMcpClientDeps =>
   deps.discoverTimeoutMs === undefined ? deps : { ...deps, timeoutMs: deps.discoverTimeoutMs };

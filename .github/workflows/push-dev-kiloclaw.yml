@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   push-dev:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     name: Build & Push Dev Image

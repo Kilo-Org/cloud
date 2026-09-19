@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   deploy:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     name: Deploy KiloClaw
@@ -251,7 +252,7 @@ jobs:
   # when its content was last built, so we don't pull a large unchanged image.
   attest-sbom:
     needs: deploy
-    if: needs.deploy.outputs.image-built == 'true' && needs.deploy.outputs.image-digest != ''
+    if: github.repository == 'Kilo-Org/cloud' && needs.deploy.outputs.image-built == 'true' && needs.deploy.outputs.image-digest != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     name: Attest image SBOM
@@ -291,6 +292,7 @@ jobs:
   # continue-on-error ensures a dev push failure never blocks prod.
   push-dev-image:
     needs: [deploy]
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     name: Push Dev Image

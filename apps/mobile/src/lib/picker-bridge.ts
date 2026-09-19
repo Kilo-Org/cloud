@@ -126,6 +126,20 @@ export type SandboxPickerBridge = {
 };
 
 /**
+ * Bridge for the new-session profile picker. `selectedOverrideProfileId` is the
+ * pick the form already holds (null for the effective default), and
+ * `repoBindingProfileId` is the base layer when the caller knows the target
+ * repo. The picker re-queries its scope so the list is fresh and a failure can
+ * offer Retry.
+ */
+export type ProfilePickerBridge = {
+  organizationId: string | undefined;
+  selectedOverrideProfileId: string | null;
+  repoBindingProfileId: string | null;
+  onSelect: (id: string | null) => void;
+};
+
+/**
  * Bridge for the new-session folder picker. `currentPath` is `""` at launch
  * (the CLI's launch directory) and a relative path once the user has drilled
  * into — and confirmed — a child directory. `onSelect` reports that path back

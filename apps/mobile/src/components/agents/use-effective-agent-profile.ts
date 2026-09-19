@@ -2,18 +2,18 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import {
+  resolveSessionProfilePicker,
+  type SessionProfilePickerProfile,
+} from '@/components/agents/session-profile-picker-model';
 import { useTRPC } from '@/lib/trpc';
 
 type ProfileSummary = inferRouterOutputs<MobileRouter>['agentProfiles']['list'][number];
 type CombinedProfiles = inferRouterOutputs<MobileRouter>['agentProfiles']['listCombined'];
 
 /** The read-only capability view the new-session form renders. */
-export type EffectiveAgentProfile = {
-  id: string;
-  name: string;
+export type EffectiveAgentProfile = SessionProfilePickerProfile & {
   commandCount: number;
-  mcpServerCount: number;
-  skillCount: number;
   agentCount: number;
 };
 
@@ -21,9 +21,11 @@ function toEffective(profile: ProfileSummary): EffectiveAgentProfile {
   return {
     id: profile.id,
     name: profile.name,
-    commandCount: profile.commandCount,
+    varCount: profile.varCount,
     mcpServerCount: profile.mcpServerCount,
     skillCount: profile.skillCount,
+    kiloCommandCount: profile.kiloCommandCount,
+    commandCount: profile.commandCount,
     agentCount: profile.agentCount,
   };
 }
@@ -57,8 +59,17 @@ export function resolveCombinedDefault(combined: CombinedProfiles): ProfileSumma
  * profile. Personal context reads `agentProfiles.list`; org context reads
  * `agentProfiles.listCombined` (whose `effectiveDefaultId` already encodes
  * "personal default > org default > none").
+ *
+ * `overrideProfileId` is the profile the user picked for this task. When it is
+ * null the effective default resolves as before; when it names a profile it
+ * replaces the default in the top layer; when it no longer resolves the hook
+ * reports `overrideNeedsAttention` and returns no id to submit, so a stale pick
+ * is never sent.
  */
-export function useEffectiveAgentProfile(organizationId?: string) {
+export function useEffectiveAgentProfile(
+  organizationId?: string,
+  overrideProfileId?: string | null
+) {
   const trpc = useTRPC();
 
   const personal = useQuery({
@@ -74,23 +85,54 @@ export function useEffectiveAgentProfile(organizationId?: string) {
   const isOrg = organizationId !== undefined;
   const query = isOrg ? combined : personal;
 
-  const profile = useMemo(() => {
-    // A failed profile query must not leak a cached profile into the form:
-    // the error row is shown and Start submits with no effective profile id.
-    if (query.isError) {
-      return null;
-    }
+  const { allProfiles, effectiveDefaultId } = useMemo(() => {
     if (isOrg) {
-      const resolved = combined.data ? resolveCombinedDefault(combined.data) : null;
-      return resolved ? toEffective(resolved) : null;
+      const data = combined.data;
+      if (!data || !Array.isArray(data.orgProfiles) || !Array.isArray(data.personalProfiles)) {
+        return { allProfiles: [] as EffectiveAgentProfile[], effectiveDefaultId: null };
+      }
+      return {
+        allProfiles: [...data.orgProfiles, ...data.personalProfiles].map(profile =>
+          toEffective(profile)
+        ),
+        effectiveDefaultId: data.effectiveDefaultId,
+      };
     }
-    const resolved = personal.data ? resolvePersonalDefault(personal.data) : null;
-    return resolved ? toEffective(resolved) : null;
-  }, [isOrg, personal.data, combined.data, query.isError]);
+    const profiles = personal.data ?? [];
+    return {
+      allProfiles: profiles.map(profile => toEffective(profile)),
+      effectiveDefaultId: profiles.find(profile => profile.isDefault)?.id ?? null,
+    };
+  }, [isOrg, personal.data, combined.data]);
+
+  const picker = useMemo(
+    () =>
+      resolveSessionProfilePicker({
+        profiles: allProfiles,
+        // The server resolves a repo's bound profile from the submitted
+        // repository at session creation (profile-session-config), so the
+        // mobile picker shows only the default and override layers.
+        repoBindingProfileId: null,
+        effectiveDefaultProfileId: effectiveDefaultId,
+        selectedOverrideProfileId: overrideProfileId ?? null,
+      }),
+    [allProfiles, effectiveDefaultId, overrideProfileId]
+  );
+
+  // A failed profile query must not leak a cached profile into the form: the
+  // error row is shown and Start submits with no effective profile id.
+  const profile = query.isError ? null : (picker.topProfile ?? picker.baseProfile);
+  const profileId = query.isError ? null : picker.selectedProfileId;
 
   return {
     profile,
-    profileId: profile?.id ?? null,
+    profileId,
+    allProfiles,
+    effectiveDefaultId,
+    // The user's explicit pick, echoed for the picker's selected row.
+    selectedProfileId: overrideProfileId ?? null,
+    hasOverride: query.isError ? false : picker.hasOverride,
+    overrideNeedsAttention: query.isError ? false : picker.overrideNeedsAttention,
     // Gate on `isPending`, not `isLoading`: in React Query v5 `isLoading` is
     // `isPending && isFetching`, so a paused (offline) first fetch has
     // `isLoading: false` while still unsettled. `isPending` stays true until

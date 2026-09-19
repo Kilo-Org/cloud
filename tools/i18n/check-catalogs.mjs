@@ -111,6 +111,23 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // every catalog keeps as "Cloudflare" and "Vercel".
   'agentChat.newSession.sandboxProviderCloudflare',
   'agentChat.newSession.sandboxProviderVercel',
+  // Profile-editor examples that name the value's own syntax, not prose: a
+  // slug the field validator accepts, a server name, a JSON snippet, and
+  // command lines whose tool and package paths must stay literal. Every
+  // catalog keeps them English so the example never contradicts validation.
+  'profiles.commandPlaceholder',
+  'profiles.mcp.namePlaceholder',
+  'profiles.mcp.commandPlaceholder',
+  'profiles.mcp.jsonPlaceholder',
+  'profiles.agents.slugPlaceholder',
+  // The sampling parameter's technical name: `top_p` is the knob's own
+  // identifier, so every catalog keeps it verbatim.
+  'profiles.agents.topP',
+  'profiles.slashCommands.namePlaceholder',
+  // The MCP count label. `MCP` is the protocol's own acronym, and its unit
+  // word is already as short as a compact count badge allows, so every catalog
+  // keeps the same "{{count}} MCP" the MCP-server rows use.
+  'profiles.counts.mcp',
   'share.reviewPrSubtitle',
   // Format-only strings with no translatable words: a placeholder-only screen
   // title, a placeholder-plus-UTC time-range label, the GitLab merge request
@@ -193,6 +210,15 @@ function placeholders(value) {
 /** The `$t(key)` set of one string. A copy names a label; it never spells it. */
 function nestingRefs(value) {
   return [...value.matchAll(/\$t\(\s*([^)\s,]+)\s*\)/g)].map(match => match[1]).sort();
+}
+
+/**
+ * The `$TOKEN` expansion tokens of one string, e.g. `$ARGUMENTS`. Kilo expands
+ * these literally, so a translator who spells one out (or translates it) leaves
+ * the reader with a token nothing replaces. The set must match English.
+ */
+function expansionTokens(value) {
+  return [...value.matchAll(/\$[A-Z][A-Z0-9_]*/g)].map(match => match[0]).sort();
 }
 
 /** The leading and trailing whitespace of one string, as a signature. */
@@ -552,6 +578,12 @@ for (const catalog of CATALOGS) {
       const expectedRefs = nestingRefs(englishValue).join(',');
       if (nestingRefs(value).join(',') !== expectedRefs) {
         fail(`${label}: "${key}" $t() references differ from English (${expectedRefs || 'none'})`);
+      }
+      const expectedTokens = expansionTokens(englishValue).join(',');
+      if (expansionTokens(value).join(',') !== expectedTokens) {
+        fail(
+          `${label}: "${key}" $TOKEN expansion tokens differ from English (${expectedTokens || 'none'})`
+        );
       }
       if (edges(value) !== edges(englishValue)) {
         fail(`${label}: "${key}" leading or trailing space differs from English`);

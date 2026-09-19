@@ -112,6 +112,7 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
   getCodeReviewerProfilePath: () => '/code-reviewer',
   getProfileAgentScope: getProfileAgentScopeMock,
   getPrReviewEntryPath: () => '/pr-review',
+  getProfilesPath: () => '/profiles',
 }));
 
 vi.mock('@/lib/security-agent', () => ({

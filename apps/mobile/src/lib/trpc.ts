@@ -123,12 +123,26 @@ const latencyBuffer = createLatencyBuffer({
   },
 });
 
+// tRPC's single `httpLink` omits the request body for a call with no input.
+// The server reads that as `undefined`, which a procedure with a required
+// `.input()` schema rejects with 400 BAD_REQUEST (`activeSessions.list` is
+// called that way from the session resolver), while the batched link sends
+// `{}` for the same call. Send the empty object the batched link sends so an
+// unbatched no-input query reaches its procedure with the input the schema
+// expects. Only a POST with no body is touched; a caller's own body is kept.
+const withJsonBody: typeof fetch = async (input, init) => {
+  const normalized =
+    init?.method === 'POST' && init.body === undefined ? { ...init, body: '{}' } : init;
+  const response = await observedFetch(input, normalized);
+  return response;
+};
+
 // Every tRPC HTTP call (single or batched) gets a per-call `x-kilo-request-id`
 // header and records one latency sample, so the server timing line and the
 // client sample join by the same id. The id comes from `expo-crypto`'s
 // `randomUUID`: UUID generation exists identically on iOS and Android, so
 // neither platform lacks the capability and no per-platform branch is kept.
-const measuredFetch = createLatencyFetch(observedFetch, latencyBuffer, {
+const measuredFetch = createLatencyFetch(withJsonBody, latencyBuffer, {
   now: () => Date.now(),
   newId: () => Crypto.randomUUID(),
 });

@@ -527,6 +527,36 @@ describe('latency wiring', () => {
     expect(sent.get('authorization')).toBe('Bearer token');
   });
 
+  // tRPC's single `httpLink` leaves the body off a POST for a no-input call,
+  // and the server's fetch adapter rejects that empty body with 400. The
+  // shared fetch sends `{}` so an unbatched no-input query reaches its
+  // procedure, matching the batched `{"0":{"json":null}}` shape.
+  it('sends an empty JSON object body when a POST has none', async () => {
+    const { httpFetch } = await loadLatencyLinks();
+    mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    await httpFetch('https://api.example.com/api/trpc/activeSessions.list', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const init = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init?.body).toBe('{}');
+  });
+
+  it('keeps a body the caller already provided', async () => {
+    const { httpFetch } = await loadLatencyLinks();
+    mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    await httpFetch('https://api.example.com/api/trpc/activeSessions.list', {
+      method: 'POST',
+      body: '{"organizationId":null}',
+    });
+
+    const init = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init?.body).toBe('{"organizationId":null}');
+  });
+
   it('posts a non-empty batch with auth, client metadata, and the JSON content type', async () => {
     latencyIngestUrlMock.value = 'https://latency.example.com';
     secureStoreMock.store.set('auth-token', 'stored-token');

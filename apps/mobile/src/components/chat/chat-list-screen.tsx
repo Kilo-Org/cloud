@@ -1,6 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -11,6 +11,7 @@ import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -81,11 +82,25 @@ function ScopedChatListScreen() {
     [models]
   );
 
+  /* Starting a chat discovers the Kilo MCP server before the session opens, and
+     a slow or offline one takes up to four seconds to give up. The button says
+     it is working for that whole time, so a tap never reads as one that was
+     ignored — and the second tap a silent wait invites cannot open a second
+     chat. The ref is the guard, not the state: two presses in one frame both
+     read the state as it was before the first one re-rendered. */
+  const [starting, setStarting] = useState(false);
+  const startingRef = useRef(false);
+
   const start = useCallback(() => {
+    if (startingRef.current) {
+      return;
+    }
     const model = models.find(one => one.isPreferred)?.id ?? models[0]?.id;
     if (place === null || model === undefined) {
       return;
     }
+    startingRef.current = true;
+    setStarting(true);
     void (async () => {
       try {
         const sessionId = await newChat(place, model);
@@ -103,6 +118,9 @@ function ScopedChatListScreen() {
           duration: Infinity,
           closeButton: true,
         });
+      } finally {
+        startingRef.current = false;
+        setStarting(false);
       }
     })();
   }, [models, place, router, t]);
@@ -190,7 +208,7 @@ function ScopedChatListScreen() {
           title={t('modelChat.empty.title')}
           description={t('modelChat.empty.description')}
           action={
-            <Button onPress={start} accessibilityLabel={t('modelChat.list.new')}>
+            <Button onPress={start} loading={starting} accessibilityLabel={t('modelChat.list.new')}>
               <Text>{t('modelChat.list.new')}</Text>
             </Button>
           }
@@ -235,12 +253,18 @@ function ScopedChatListScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('modelChat.list.new')}
+            accessibilityState={{ disabled: starting, busy: starting }}
             testID="chat-new-fab"
+            disabled={starting}
             onPress={start}
             className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80"
             style={fabStyle}
           >
-            <Plus size={24} color={colors.primaryForeground} />
+            {starting ? (
+              <ActivityIndicator size="small" color={colors.primaryForeground} />
+            ) : (
+              <Plus size={24} color={colors.primaryForeground} />
+            )}
           </Pressable>
         )}
       </View>

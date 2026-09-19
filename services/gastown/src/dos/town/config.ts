@@ -41,7 +41,9 @@ const NEW_TOWN_CONFIG_DEFAULTS = {
   },
 };
 
-export async function getTownConfig(storage: DurableObjectStorage): Promise<TownConfig> {
+export async function getTownConfig(
+  storage: Pick<DurableObjectStorage, 'get' | 'put'>
+): Promise<TownConfig> {
   const raw = await storage.get<unknown>(CONFIG_KEY);
   if (!raw) {
     // Fresh town: seed the new-style defaults from #2725 and persist so they
@@ -57,7 +59,7 @@ export async function getTownConfig(storage: DurableObjectStorage): Promise<Town
 }
 
 export async function updateTownConfig(
-  storage: DurableObjectStorage,
+  storage: Pick<DurableObjectStorage, 'get' | 'put'>,
   update: TownConfigUpdate
 ): Promise<TownConfig> {
   const current = await getTownConfig(storage);

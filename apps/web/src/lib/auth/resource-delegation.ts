@@ -194,9 +194,11 @@ async function membershipsFor(userId: string) {
       role: organization_memberships.role,
     })
     .from(organization_memberships)
+    .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
     .where(
       and(
         eq(organization_memberships.kilo_user_id, userId),
+        isNull(organizations.deleted_at),
         ne(organization_memberships.role, 'billing_manager')
       )
     );
@@ -405,7 +407,11 @@ export async function createControlTokenForRequest(
   }
   if (!isResourceTokenIssuanceEnabled(resource)) {
     if (authority.isModern) {
-      if (authority.credentialKind === 'device-access' && authority.deviceSessionId) {
+      if (
+        resource !== 'gastown' &&
+        authority.credentialKind === 'device-access' &&
+        authority.deviceSessionId
+      ) {
         return await createModernControlToken(authority, resource, options);
       }
       throw new TypedResourceDelegationError(

@@ -21,7 +21,7 @@ type ChatToolbarProps = {
   disabled?: boolean;
   isLoadingModels?: boolean;
   order?: ChatToolbarOrder;
-  /** When set, an always-present paste button renders at the row's trailing edge. */
+  /** When set, an always-present paste button renders at the end of the model chip's line. */
   onPaste?: () => void;
   /** Disabled state for the paste button; the composer's input rule owns it. */
   pasteDisabled?: boolean;
@@ -70,13 +70,18 @@ export function ChatToolbar({
       lockLabel={modelLocked ? modelLockLabel : undefined}
     />
   );
-
-  return (
-    <View
-      className={cn('flex-row items-center gap-2 px-3 py-2.5', disabled && 'opacity-50', className)}
-    >
-      {order === 'model-first' ? modelSelector : modeSelector}
-      {order === 'model-first' ? modeSelector : modelSelector}
+  // The paste button rides with the model chip as one wrap unit. As a sibling
+  // of the chips it is the item that overflows the full first line, so it wraps
+  // alone onto the next line and strands itself at the far edge with an empty
+  // row to its left. Packed, the chip and the button move to the next line
+  // together and the button stays at the end of the chip's line.
+  const modelSelectorWithPaste = (
+    // Content-sized for the wrap decision (grow leaves the basis at auto), so
+    // the outer row still sees the chip's real width and wraps the unit instead
+    // of squeezing the chip; on its line the unit fills the row and the paste
+    // keeps the trailing edge.
+    <View className="min-w-0 grow flex-row items-center gap-2">
+      {modelSelector}
       {onPaste ? (
         <ComposerPasteButton
           size="sm"
@@ -85,6 +90,24 @@ export function ChatToolbar({
           className="ml-auto shrink-0"
         />
       ) : null}
+    </View>
+  );
+
+  return (
+    // The chips reflow instead of shrinking each other: the mode chip is
+    // `shrink-0`, so in a nowrap row the only flexible part is the model chip,
+    // and a long model name ("DeepSeek V4.1 Flash") collapses to "Dee..." next
+    // to the effort badge. Wrapping moves the model chip to its own line, where
+    // it has the full row width to show the selected model.
+    <View
+      className={cn(
+        'flex-row flex-wrap items-center gap-2 px-3 py-2.5',
+        disabled && 'opacity-50',
+        className
+      )}
+    >
+      {order === 'model-first' ? modelSelectorWithPaste : modeSelector}
+      {order === 'model-first' ? modeSelector : modelSelectorWithPaste}
     </View>
   );
 }

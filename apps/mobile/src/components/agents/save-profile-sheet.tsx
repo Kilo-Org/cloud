@@ -15,7 +15,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 const PROFILE_DESCRIPTION_MAX_LENGTH = 500;
 
 /** One manual environment variable as the sheet saves it. */
-export type SaveProfileVar = Readonly<{ key: string; value: string; isSecret: boolean }>;
+type SaveProfileVar = Readonly<{ key: string; value: string; isSecret: boolean }>;
 
 export type SaveProfileSubmission = Readonly<{
   name: string;

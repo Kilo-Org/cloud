@@ -6,7 +6,7 @@ import { type TFunction } from 'i18next';
  * own unit words, so no screen spells an English unit (`3 vars`, `2v`).
  */
 
-export type ProfileCountKind = 'vars' | 'mcp' | 'skills' | 'commands';
+type ProfileCountKind = 'vars' | 'mcp' | 'skills' | 'commands';
 
 export type ProfileCountItem = {
   kind: ProfileCountKind;

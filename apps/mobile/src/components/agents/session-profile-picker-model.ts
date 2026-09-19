@@ -13,7 +13,7 @@ import { type ProfileCountItem } from '@/lib/profile-count-labels';
  * effective default, and a top that duplicates the base is dropped.
  */
 
-export type ProfileLayerSource = 'repo-binding' | 'default' | 'explicit';
+type ProfileLayerSource = 'repo-binding' | 'default' | 'explicit';
 
 /** One profile as the picker and the chip render it. */
 export type SessionProfilePickerProfile = {

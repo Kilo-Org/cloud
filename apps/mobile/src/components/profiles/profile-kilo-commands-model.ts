@@ -21,12 +21,12 @@ import { moveCommand } from '@/lib/agent-profile-forms';
  * server package, so the set is repeated here. The server refuses a create or
  * rename that collides, so the form refuses it first.
  */
-export const BUILTIN_COMMAND_NAMES: readonly string[] = [
+const BUILTIN_COMMAND_NAMES = new Set([
   'init',
   'review',
   'local-review',
   'local-review-uncommitted',
-];
+]);
 
 const COMMAND_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
 
@@ -132,7 +132,7 @@ export function validateKiloCommandForm(state: KiloCommandFormState): KiloComman
   if (!COMMAND_NAME_PATTERN.test(name)) {
     return 'name-invalid';
   }
-  if (BUILTIN_COMMAND_NAMES.includes(name)) {
+  if (BUILTIN_COMMAND_NAMES.has(name)) {
     return 'name-conflict';
   }
   if (state.template.trim().length === 0) {

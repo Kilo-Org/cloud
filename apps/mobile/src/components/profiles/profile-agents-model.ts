@@ -20,7 +20,7 @@ import { type AgentProfileDetail } from '@/lib/hooks/agent-profile-types';
  * not depend on that server package, so the set is repeated here. The server
  * rejects a create or rename that collides, so the form refuses it first.
  */
-export const BUILTIN_AGENT_SLUGS: readonly string[] = [
+const BUILTIN_AGENT_SLUGS = new Set([
   'code',
   'plan',
   'debug',
@@ -29,7 +29,7 @@ export const BUILTIN_AGENT_SLUGS: readonly string[] = [
   'build',
   'architect',
   'custom',
-];
+]);
 
 /**
  * Tools the UI exposes as disableable per agent. Cloud sessions allow every
@@ -214,7 +214,7 @@ export function validateAgentForm(state: AgentFormState): AgentFormError | null 
   if (!AGENT_SLUG_PATTERN.test(slug)) {
     return 'slug-invalid';
   }
-  if (BUILTIN_AGENT_SLUGS.includes(slug)) {
+  if (BUILTIN_AGENT_SLUGS.has(slug)) {
     return 'slug-conflict';
   }
   if (state.name.trim().length === 0) {
@@ -224,7 +224,7 @@ export function validateAgentForm(state: AgentFormState): AgentFormError | null 
 }
 
 /** The config shape the agent mutations send; mirrors the server's `AgentConfigSchema`. */
-export type AgentConfigPayload = Record<string, unknown>;
+type AgentConfigPayload = Record<string, unknown>;
 
 /** The payload the agent mutations send. */
 export type AgentPayload = {

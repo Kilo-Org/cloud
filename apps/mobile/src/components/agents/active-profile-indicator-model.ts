@@ -20,7 +20,7 @@ export const ACTIVE_PROFILE_INDICATOR_KEYS = {
   profileSelection: 'agentChat.newSession.profileSelection',
 } as const;
 
-export type ActiveProfileIndicatorKind =
+type ActiveProfileIndicatorKind =
   | 'profile-active'
   | 'profiles-active'
   | 'custom-config-active'

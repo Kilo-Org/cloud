@@ -4,12 +4,11 @@ import { useMemo } from 'react';
 import { splitProfilesByOwner } from '@/components/profiles/profile-owner-model';
 import {
   type AgentProfileDetail,
-  type AgentProfileListCombined,
   type AgentProfileListItem,
 } from '@/lib/hooks/agent-profile-types';
 import { useTRPC } from '@/lib/trpc';
 
-export type { AgentProfileDetail, AgentProfileListCombined, AgentProfileListItem };
+export type { AgentProfileDetail, AgentProfileListItem };
 export { useAgentProfileMutations } from '@/lib/hooks/use-agent-profile-mutations';
 export { useAgentProfileSectionMutations } from '@/lib/hooks/use-agent-profile-section-mutations';
 

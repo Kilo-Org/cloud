@@ -16,7 +16,7 @@ export type ProfileOwnerChoice = 'personal' | 'organization';
  * The owner tag a profile list item carries. The server tags organization rows
  * `organization` and personal rows `user` (`ProfilesListDialog.tsx:95-98`).
  */
-export type ProfileOwnerType = 'user' | 'organization';
+type ProfileOwnerType = 'user' | 'organization';
 
 /** The part of a profile summary ownership depends on. */
 type OwnerBearing = { ownerType?: ProfileOwnerType };

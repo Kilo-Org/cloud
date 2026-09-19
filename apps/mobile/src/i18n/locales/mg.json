@@ -3112,6 +3112,14 @@
     "tooManySignInAttempts": "Betsaka loatra ny andrana fidirana. Miandrasa kely ary andramo indray azafady."
   },
   "models": {
+    "auto": {
+      "frontier": "Ho azy Lohalaharana",
+      "balanced": "Ho azy Voalanjalanja",
+      "efficient": "Ho azy Mahomby",
+      "small": "Ho azy Kely",
+      "free": "Ho azy Maimaimpoana",
+      "organization": "Ho azy Fikambanana"
+    },
     "dataCollected": "Angona voaangona",
     "free": "Maimaimpoana",
     "couldNotUpdateFavorites": "Tsy nahomby ny fanavaozana ny ankafizinao.",

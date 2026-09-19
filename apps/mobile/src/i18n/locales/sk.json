@@ -3198,6 +3198,14 @@
     "tooManySignInAttempts": "Príliš veľa pokusov o prihlásenie. Chvíľu počkaj a skús to znova."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatický Špičkový",
+      "balanced": "Automatický Vyvážený",
+      "efficient": "Automatický Efektívny",
+      "small": "Automatický Malý",
+      "free": "Automatický Zadarmo",
+      "organization": "Automatický organizácie"
+    },
     "dataCollected": "Zber údajov",
     "free": "Zadarmo",
     "couldNotUpdateFavorites": "Obľúbené sa nepodarilo aktualizovať.",

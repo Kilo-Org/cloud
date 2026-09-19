@@ -3284,6 +3284,14 @@
     "tooManySignInAttempts": "تجاوزت الحد المسموح لمحاولات تسجيل الدخول. انتظر قليلًا وحاول مرة أخرى."
   },
   "models": {
+    "auto": {
+      "frontier": "تلقائي متقدم",
+      "balanced": "تلقائي متوازن",
+      "efficient": "تلقائي فعّال",
+      "small": "تلقائي صغير",
+      "free": "تلقائي مجاني",
+      "organization": "تلقائي المؤسسة"
+    },
     "dataCollected": "يجمع البيانات",
     "free": "مجاني",
     "couldNotUpdateFavorites": "تعذّر تحديث المفضلة.",

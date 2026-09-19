@@ -3112,6 +3112,14 @@
     "tooManySignInAttempts": "Liian monta kirjautumisyritystä. Odota hetki ja yritä uudelleen."
   },
   "models": {
+    "auto": {
+      "frontier": "Automaattinen Huippuluokan",
+      "balanced": "Automaattinen Tasapainoinen",
+      "efficient": "Automaattinen Tehokas",
+      "small": "Automaattinen Pieni",
+      "free": "Automaattinen Ilmainen",
+      "organization": "Organisaation automaattinen"
+    },
     "dataCollected": "Tietoja kerätään",
     "free": "Ilmainen",
     "couldNotUpdateFavorites": "Suosikkeja ei voitu päivittää.",

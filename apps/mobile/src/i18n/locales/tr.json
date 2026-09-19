@@ -3112,6 +3112,14 @@
     "tooManySignInAttempts": "Çok fazla oturum açma denemesi yapıldı. Lütfen biraz bekle ve tekrar dene."
   },
   "models": {
+    "auto": {
+      "frontier": "Otomatik Öncü",
+      "balanced": "Otomatik Dengeli",
+      "efficient": "Otomatik Verimli",
+      "small": "Otomatik Küçük",
+      "free": "Otomatik Ücretsiz",
+      "organization": "Kuruluş Otomatik"
+    },
     "dataCollected": "Veri toplanıyor",
     "free": "Ücretsiz",
     "couldNotUpdateFavorites": "Favoriler güncellenemedi.",

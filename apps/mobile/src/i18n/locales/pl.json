@@ -3198,6 +3198,14 @@
     "tooManySignInAttempts": "Zbyt wiele prób logowania. Poczekaj i spróbuj ponownie."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatyczny Najlepszy",
+      "balanced": "Automatyczny Zrównoważony",
+      "efficient": "Automatyczny Wydajny",
+      "small": "Automatyczny Mały",
+      "free": "Automatyczny Bezpłatny",
+      "organization": "Automatyczny organizacji"
+    },
     "dataCollected": "Zbieranie danych",
     "free": "Bezpłatny",
     "couldNotUpdateFavorites": "Nie udało się zaktualizować ulubionych.",

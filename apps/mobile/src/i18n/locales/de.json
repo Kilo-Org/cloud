@@ -3112,6 +3112,14 @@
     "tooManySignInAttempts": "Du hast zu viele Anmeldeversuche unternommen. Bitte warte einen Moment und versuche es erneut."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Spitzenmodell",
+      "balanced": "Auto Ausgewogen",
+      "efficient": "Auto Effizient",
+      "small": "Auto Klein",
+      "free": "Auto Kostenlos",
+      "organization": "Organisations-Auto"
+    },
     "dataCollected": "Daten werden erfasst",
     "free": "Kostenlos",
     "couldNotUpdateFavorites": "Die Favoriten konnten nicht aktualisiert werden.",

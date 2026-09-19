@@ -3155,6 +3155,14 @@
     "tooManySignInAttempts": "יותר מדי ניסיונות התחברות. המתן ונסה שוב."
   },
   "models": {
+    "auto": {
+      "frontier": "אוטומטי מתקדם",
+      "balanced": "אוטומטי מאוזן",
+      "efficient": "אוטומטי יעיל",
+      "small": "אוטומטי קטן",
+      "free": "אוטומטי חינם",
+      "organization": "אוטומטי של הארגון"
+    },
     "dataCollected": "אוסף נתונים",
     "free": "חינם",
     "couldNotUpdateFavorites": "לא ניתן היה לעדכן את המועדפים.",

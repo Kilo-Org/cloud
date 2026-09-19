@@ -3198,6 +3198,14 @@
     "tooManySignInAttempts": "Забагато спроб входу. Зачекайте та спробуйте ще раз."
   },
   "models": {
+    "auto": {
+      "frontier": "Авто Передовий",
+      "balanced": "Авто Збалансований",
+      "efficient": "Авто Ефективний",
+      "small": "Авто Малий",
+      "free": "Авто Безкоштовний",
+      "organization": "Авто організації"
+    },
     "dataCollected": "Збір даних",
     "free": "Безкоштовно",
     "couldNotUpdateFavorites": "Не вдалося оновити обране.",

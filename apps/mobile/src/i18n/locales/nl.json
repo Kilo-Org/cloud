@@ -3112,6 +3112,14 @@
     "tooManySignInAttempts": "Te veel aanmeldpogingen. Wacht even en probeer het opnieuw."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatisch Toonaangevend",
+      "balanced": "Automatisch Evenwichtig",
+      "efficient": "Automatisch Efficiënt",
+      "small": "Automatisch Klein",
+      "free": "Automatisch Gratis",
+      "organization": "Organisatie-Auto"
+    },
     "dataCollected": "Gegevensverzameling",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Je favorieten konden niet worden bijgewerkt.",

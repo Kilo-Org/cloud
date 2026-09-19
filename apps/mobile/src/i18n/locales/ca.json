@@ -3155,6 +3155,14 @@
     "tooManySignInAttempts": "Has fet massa intents d'inici de sessió. Espera un moment i torna-ho a provar."
   },
   "models": {
+    "auto": {
+      "frontier": "Automàtic Avançat",
+      "balanced": "Automàtic Equilibrat",
+      "efficient": "Automàtic Eficient",
+      "small": "Automàtic Petit",
+      "free": "Automàtic Gratuït",
+      "organization": "Automàtic d'organització"
+    },
     "dataCollected": "Recull dades",
     "free": "Gratuït",
     "couldNotUpdateFavorites": "No s'han pogut actualitzar els preferits.",

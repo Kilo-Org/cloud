@@ -3198,6 +3198,14 @@
     "tooManySignInAttempts": "Занадта шмат спроб уваходу. Пачакай і паспрабуй яшчэ раз."
   },
   "models": {
+    "auto": {
+      "frontier": "Аўта Перадавы",
+      "balanced": "Аўта Збалансаваны",
+      "efficient": "Аўта Эфектыўны",
+      "small": "Аўта Малы",
+      "free": "Аўта Бясплатны",
+      "organization": "Аўта арганізацыі"
+    },
     "dataCollected": "Збор даных",
     "free": "Бясплатна",
     "couldNotUpdateFavorites": "Не ўдалося абнавіць абранае.",

@@ -3112,6 +3112,14 @@
     "tooManySignInAttempts": "登录尝试次数过多。请稍等片刻再试。"
   },
   "models": {
+    "auto": {
+      "frontier": "自动前沿",
+      "balanced": "自动均衡",
+      "efficient": "自动高效",
+      "small": "自动小型",
+      "free": "自动免费",
+      "organization": "组织自动"
+    },
     "dataCollected": "会收集数据",
     "free": "免费",
     "couldNotUpdateFavorites": "无法更新收藏。",

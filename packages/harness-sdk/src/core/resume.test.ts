@@ -1,10 +1,12 @@
-import { Effect } from 'effect';
+import { Effect, Layer, Option } from 'effect';
 import { expect, it } from 'vitest';
 import { asked, bench, options, prompted } from './resume-fixture.js';
 import { cloneSession, continueSession, SessionNotFoundError } from './resume.js';
 import { openSession } from './run.js';
 import { texts } from './session-fixture.js';
 import { textIn } from './prompt.js';
+import { SessionStore } from './storage.js';
+import { type Tool, ToolRegistry } from './tool.js';
 
 it('carries the turns of an earlier run into the next one', async () => {
   const desk = bench();
@@ -172,6 +174,79 @@ it('keeps the thinking when the copy stays on the same model', async () => {
 
   const kinds = branched.value.flatMap(turn => turn.parts.map(part => part.kind));
   expect(kinds).toContain('reasoning');
+});
+
+/**
+ * Moving a conversation onto another tool set.
+ *
+ * A session freezes the tools it offers, because a tool's definition sits in
+ * front of every message, so a chat that gains or loses a remote MCP server is
+ * opened as a copy. The copy is a session of its own precisely because its
+ * prefix differs: the turns come across unchanged and the tool set does not.
+ */
+
+/** A tool the registry holds. Its definition is what reaches the model. */
+const named = (name: string): Tool => ({
+  definition: { name, description: name, parameters: { type: 'object', properties: {} } },
+  run: () => Effect.succeed('done'),
+});
+
+const registry = Layer.succeed(ToolRegistry, {
+  tools: [named('time'), named('mcp_kilo_search')],
+});
+
+it('opens the copy on the tools it was moved onto', async () => {
+  const desk = bench();
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  const moved = await desk.run(
+    Effect.provide(
+      Effect.gen(function* () {
+        const session = yield* cloneSession(opened.value, {
+          tools: ['time', 'mcp_kilo_search'],
+        });
+        const history = yield* session.history;
+        const store = yield* SessionStore;
+        const stored = yield* store.read(session.id);
+        yield* asked(session, 'next');
+        return { history, stored };
+      }),
+      registry
+    )
+  );
+
+  expect(moved.calls[0]?.tools?.map(tool => tool.name)).toEqual(['time', 'mcp_kilo_search']);
+  /* The names are written down with the copy, so continuing it later reopens
+     with the set it was moved onto rather than with the source's. */
+  expect(Option.getOrThrow(moved.value.stored).tools).toEqual(['time', 'mcp_kilo_search']);
+  /* Only the tool set moved. The turns came across as they were, and the system
+     prompt still comes from the store. */
+  expect(texts(moved.value.history)).toEqual(['user:first', 'assistant:an answer']);
+  expect(moved.calls[0]?.prompt.system[0]?.text).toBe(options.system);
+});
+
+it('leaves the tools as they were when the copy names none', async () => {
+  const desk = bench();
+  const opened = await desk.run(
+    Effect.provide(
+      Effect.flatMap(openSession({ ...options, tools: ['time'] }), session =>
+        Effect.as(asked(session, 'first'), session.id)
+      ),
+      registry
+    )
+  );
+
+  const branched = await desk.run(
+    Effect.provide(
+      Effect.flatMap(cloneSession(opened.value), session => asked(session, 'next')),
+      registry
+    )
+  );
+
+  /* An absent field is the stored set, never "unset it". */
+  expect(branched.calls[0]?.tools?.map(tool => tool.name)).toEqual(['time']);
 });
 
 /**

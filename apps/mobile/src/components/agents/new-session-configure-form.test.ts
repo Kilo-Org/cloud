@@ -51,8 +51,10 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
+const keyboardLiftState = vi.hoisted(() => ({ current: 0 }));
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
+  useAppAwareKeyboardPadding: () => keyboardLiftState.current,
 }));
 
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
@@ -758,6 +760,41 @@ describe('NewSessionConfigureForm', () => {
     expect(prompt!.onMoveAttachment).toBe(onMoveAttachment);
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(prompt!.onReorderAttachments).toBe(onReorderAttachments);
+  });
+
+  // ── Case 15: the safe-area reservation yields to the keyboard lift ──
+  it('drops the safe-area reservation while the keyboard lift covers it', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    insetsState.bottom = 42;
+    keyboardLiftState.current = 300;
+    try {
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      const element = NewSessionConfigureForm({ ...defaultProps() }) as Node;
+
+      // The lift already covers the navigation bar the inset reserved, so the
+      // outer View must not hold it open as a band above the keyboard.
+      expect(findElementByType(element, 'View')?.style).toEqual({ paddingBottom: 0 });
+    } finally {
+      keyboardLiftState.current = 0;
+      insetsState.bottom = 0;
+    }
+  });
+
+  it('keeps the leftover safe-area reservation while the lift is shorter than the inset', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    insetsState.bottom = 42;
+    keyboardLiftState.current = 10;
+    try {
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      const element = NewSessionConfigureForm({ ...defaultProps() }) as Node;
+
+      expect(findElementByType(element, 'View')?.style).toEqual({ paddingBottom: 32 });
+    } finally {
+      keyboardLiftState.current = 0;
+      insetsState.bottom = 0;
+    }
   });
 
   // ── Case 14: a cloud-create failure belongs to the cloud target only ──

@@ -19,7 +19,10 @@ import { type CloudCreateFailure } from '@/components/agents/use-new-session-cre
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { type ModeOption } from '@/components/agents/mode-normalize';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
+import {
+  AppAwareKeyboardPaddingView,
+  useAppAwareKeyboardPadding,
+} from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import {
@@ -194,6 +197,12 @@ export function NewSessionConfigureForm({
   // layout and never re-anchors, so the keyboard must be dismissed before
   // the sheet opens.)
   const { bottom } = useSafeAreaInsets();
+  // The keyboard-lift view below already covers the strip the IME hides,
+  // system bars included, so the navigation-bar padding the form keeps while
+  // the keyboard is closed has to yield to that lift; keeping both shows the
+  // inset as a blank band between the content and the keyboard.
+  const keyboardLift = useAppAwareKeyboardPadding();
+  const formBottomPadding = Math.max(0, bottom - keyboardLift);
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
   const runOnNote =
@@ -333,7 +342,7 @@ export function NewSessionConfigureForm({
   );
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingBottom: bottom }}>
+    <View className="flex-1 bg-background" style={{ paddingBottom: formBottomPadding }}>
       <AppAwareKeyboardPaddingView className="flex-1">{body}</AppAwareKeyboardPaddingView>
     </View>
   );

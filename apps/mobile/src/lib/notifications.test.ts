@@ -58,6 +58,9 @@ const mocks = vi.hoisted(() => ({
   defineTask: vi.fn(),
   registerTaskAsync: vi.fn(),
   captureEvent: vi.fn(),
+  scheduleNotificationAsync: vi.fn(),
+  dismissNotificationAsync: vi.fn(),
+  runNeedsInputInteraction: vi.fn(),
   requireOptionalNativeModule: vi.fn(),
 }));
 
@@ -85,6 +88,8 @@ vi.mock('expo-notifications', () => ({
   requestPermissionsAsync: mocks.requestPermissionsAsync,
   getExpoPushTokenAsync: mocks.getExpoPushTokenAsync,
   setNotificationHandler: mocks.setNotificationHandler,
+  scheduleNotificationAsync: mocks.scheduleNotificationAsync,
+  dismissNotificationAsync: mocks.dismissNotificationAsync,
   addNotificationResponseReceivedListener: (listener: ResponseListener) => {
     mocks.listeners.add(listener);
     return { remove: () => mocks.listeners.delete(listener) };
@@ -99,6 +104,12 @@ vi.mock('expo-notifications', () => ({
 
 vi.mock('expo-task-manager', () => ({
   defineTask: mocks.defineTask,
+}));
+
+// The s4 entry point builds the real mobile session manager (RN / tRPC graph),
+// so the suite stubs the module the lazy dynamic import resolves to.
+vi.mock('./notification-action-interaction', () => ({
+  runNeedsInputInteraction: mocks.runNeedsInputInteraction,
 }));
 
 vi.mock('@sentry/react-native', () => ({
@@ -223,6 +234,8 @@ beforeEach(() => {
   mocks.appState.currentState = 'active';
   mocks.setBadgeCountAsync.mockResolvedValue(true);
   mocks.setNotificationChannelAsync.mockResolvedValue(undefined);
+  mocks.scheduleNotificationAsync.mockResolvedValue(undefined);
+  mocks.dismissNotificationAsync.mockResolvedValue(undefined);
   mocks.getNotificationChannelAsync.mockResolvedValue(null);
   mocks.deleteNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
@@ -1567,11 +1580,16 @@ describe('setupNotificationBackgroundHandler', () => {
 
     setupNotificationBackgroundHandler();
 
+    // Exactly one registered task name: the native side hands a notification
+    // response to every registered consumer, so a second name would run an
+    // Approve / Reply twice under the same needs-input identifier.
     expect(mocks.defineTask).toHaveBeenCalledTimes(1);
     expect(mocks.defineTask).toHaveBeenCalledWith(
       'active-agents-glanceable-background-task',
       expect.any(Function)
     );
+    await flushMicrotasks();
+    expect(mocks.registerTaskAsync).toHaveBeenCalledTimes(1);
     expect(mocks.registerTaskAsync).toHaveBeenCalledWith(
       'active-agents-glanceable-background-task'
     );
@@ -1687,6 +1705,188 @@ describe('setupNotificationBackgroundHandler', () => {
     expect(sink.publish).not.toHaveBeenCalled();
 
     unregisterGlanceableSink(sink);
+  });
+
+  it('dispatches a headless notification response to the needs-input action handler', async () => {
+    const loaded = await loadNotifications();
+    // The fresh module instance needs its own loader seam: the static-import
+    // seam in the other tests belongs to a different instance.
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    loaded.setupNotificationBackgroundHandler();
+    const executor = executorFor(mocks.defineTask);
+    const result = await executor({
+      data: {
+        actionIdentifier: 'kilo:approve',
+        notification: {
+          request: {
+            identifier: 'fcm-remote-1',
+            content: {
+              title: 'Deploy',
+              data: {
+                type: 'cloud_agent_session',
+                cliSessionId: 'ses_1',
+                category: 'attention',
+                attentionKind: 'permission',
+              },
+              categoryIdentifier: 'kilo-needs-input:permission',
+            },
+          },
+        },
+      },
+      error: null,
+      executionInfo: { eventId: 'e3', taskName: 'active-agents-glanceable-background-task' },
+    });
+
+    expect(mocks.runNeedsInputInteraction).toHaveBeenCalledWith({
+      kiloSessionId: 'ses_1',
+      action: 'approve',
+    });
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ identifier: 'needs-input:ses_1' })
+    );
+    expect(mocks.dismissNotificationAsync).toHaveBeenCalledWith('fcm-remote-1');
+    // A handled action replaced its notification: NewData (0), not NoData (1).
+    expect(result).toBe(0);
+  });
+
+  it('reports NoData for a headless body tap so iOS wakes stay throttled', async () => {
+    const loaded = await loadNotifications();
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+    loaded.setupNotificationBackgroundHandler();
+    const executor = executorFor(mocks.defineTask);
+    const result = await executor({
+      data: {
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        notification: {
+          request: {
+            identifier: 'fcm-remote-2',
+            content: {
+              data: {
+                type: 'cloud_agent_session',
+                cliSessionId: 'ses_1',
+                category: 'attention',
+                attentionKind: 'permission',
+              },
+            },
+          },
+        },
+      },
+      error: null,
+      executionInfo: { eventId: 'e4', taskName: 'active-agents-glanceable-background-task' },
+    });
+
+    expect(result).toBe(1);
+    expect(loaded.pending.getPendingDeepLinkSnapshot()).toBe('/(app)/agent-chat/ses_1?via=push');
+  });
+});
+
+describe('foreground attention-push suppression', () => {
+  async function loadHandler() {
+    const loaded = await loadNotifications();
+    // Imported through the same resetModules cycle as './notifications', so the
+    // posted marker this test reads is the one the handler reads.
+    const needsInput = await import('./needs-input-notification');
+    loaded.setupNotificationHandler();
+    const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
+      handleNotification: (notification: {
+        request: { identifier?: string; content: { data: unknown } };
+      }) => Promise<{ shouldShowBanner: boolean; shouldSetBadge: boolean }>;
+    };
+    return { loaded, needsInput, registration };
+  }
+
+  const attentionPush = {
+    type: 'cloud_agent_session',
+    cliSessionId: 'ses_1',
+    category: 'attention',
+    attentionKind: 'permission',
+  } as const;
+
+  const postedRow = {
+    sessionId: 'ses_1',
+    title: 'Fix the bug',
+    kind: 'permission',
+    prUrl: null,
+    organizationId: null,
+  } as const;
+
+  it('suppresses the server attention push while the app notification for that session is posted', async () => {
+    const { needsInput, registration } = await loadHandler();
+
+    await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
+
+    const behavior = await registration.handleNotification({
+      request: { identifier: 'expo-push-remote-1', content: { data: attentionPush } },
+    });
+    expect(behavior.shouldShowBanner).toBe(false);
+    expect(behavior.shouldSetBadge).toBe(false);
+  });
+
+  it('shows the app-owned needs-input notification even while its session is posted', async () => {
+    const { needsInput, registration } = await loadHandler();
+
+    await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
+
+    // The app's own post carries the same parsed payload as the server push;
+    // suppressing it would drop the only notification the app presents.
+    const behavior = await registration.handleNotification({
+      request: {
+        identifier: needsInput.notificationIdentifierForSession('ses_1'),
+        content: { data: attentionPush },
+      },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
+    expect(behavior.shouldSetBadge).toBe(true);
+  });
+
+  it('shows the app-owned notification while the posted marker is not yet set', async () => {
+    // The schedule resolves before the handler consults the posted marker, so
+    // the app's own post must not depend on it.
+    const { registration } = await loadHandler();
+
+    const behavior = await registration.handleNotification({
+      request: {
+        identifier: 'needs-input:ses_1',
+        content: { data: attentionPush },
+      },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
+  });
+
+  it('shows the server attention push when the app notification is not posted', async () => {
+    const { registration } = await loadHandler();
+
+    const behavior = await registration.handleNotification({
+      request: { content: { data: attentionPush } },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
+  });
+
+  it('shows the server attention push again after the raise is answered headless', async () => {
+    const { needsInput, registration } = await loadHandler();
+    await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
+
+    needsInput.clearPostedNeedsInputNotification('ses_1');
+
+    const behavior = await registration.handleNotification({
+      request: { content: { data: attentionPush } },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
+  });
+
+  it('shows an ordinary agent progress push even while the raise is posted', async () => {
+    const { needsInput, registration } = await loadHandler();
+    await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
+
+    const progress = await registration.handleNotification({
+      request: {
+        content: {
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1' },
+        },
+      },
+    });
+    expect(progress.shouldShowBanner).toBe(true);
   });
 });
 

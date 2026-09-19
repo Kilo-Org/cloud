@@ -67,12 +67,6 @@ vi.mock('expo-secure-store', () => ({
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
 }));
 
-vi.mock('@/lib/config', () => ({
-  API_BASE_URL: 'https://api.example.com',
-  E2E_LATENCY_MESSAGES_MS: 0,
-  E2E_LATENCY_SESSION_MS: 0,
-}));
-
 vi.mock('@/lib/storage-keys', () => ({
   AUTH_TOKEN_KEY: 'auth-token',
   TOKEN_EXPIRES_AT_KEY: 'token-expires-at',

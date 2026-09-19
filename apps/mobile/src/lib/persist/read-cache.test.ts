@@ -558,6 +558,24 @@ describe('cold-start restore and takeover', () => {
     expect(takeOverColdStartRestore()).toBeNull();
   });
 
+  it('retries a rejected identity-hint read and still hydrates the cache', async () => {
+    const { scopes } = createFakeKv();
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    scopes.set(
+      'cache:u1:1',
+      new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
+    );
+    // The keychain read can reject transiently; the restore must retry it
+    // rather than abandoning the whole cold-start restore.
+    vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain unavailable'));
+    const queryClient = new QueryClient();
+
+    await restorePersistedCacheOnColdStart(queryClient);
+
+    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toEqual({ id: 'u1' });
+    expect(takeOverColdStartRestore()).toBe('cache:u1:1');
+  });
+
   it('drops an expired blob instead of hydrating it', async () => {
     const { kv, scopes } = createFakeKv();
     store.set(ACTIVE_USER_ID_KEY, 'u1');

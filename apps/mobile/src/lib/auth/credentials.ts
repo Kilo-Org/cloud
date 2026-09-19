@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/lib/config';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { parseTokenPair } from '@/lib/auth/native-auth-contract';
+import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
@@ -146,7 +147,7 @@ async function doRefresh(): Promise<RefreshOutcome> {
     return { ok: false, refused: false, superseded: true };
   }
   try {
-    const storedRefreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+    const storedRefreshToken = await readStoredValueWithRetry(REFRESH_TOKEN_KEY);
     if (superseded()) {
       return { ok: false, refused: false, superseded: true };
     }

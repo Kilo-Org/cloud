@@ -1,6 +1,5 @@
-import * as SecureStore from 'expo-secure-store';
-
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
 
 export type ActiveToken = {
@@ -97,7 +96,7 @@ export async function getAuthTokenForRequest(): Promise<string | null> {
   if (isSignOutTeardownActive()) {
     return null;
   }
-  const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+  const token = await readStoredValueWithRetry(AUTH_TOKEN_KEY);
   // A sign-in or refresh may have published a newer owner while the cold read
   // was in flight: prefer it and never overwrite it with the stale read.
   const published = getActiveToken();

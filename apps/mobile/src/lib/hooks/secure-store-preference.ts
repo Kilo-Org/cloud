@@ -1,9 +1,9 @@
 import * as Sentry from '@sentry/react-native';
-import * as SecureStore from 'expo-secure-store';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import { deleteAccountMetadata, setAccountMetadata } from '@/lib/auth/account-metadata-write';
+import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 
 function noop(): void {
   // Placeholder until the promise executor hands over its resolve.
@@ -54,7 +54,7 @@ export function createSecureStorePreference<T>(options: {
 
   const load = async () => {
     try {
-      const raw = await SecureStore.getItemAsync(key);
+      const raw = await readStoredValueWithRetry(key);
       if (!dirty) {
         value = parse(raw);
       } else if (mergeOnLoad && !cleared) {

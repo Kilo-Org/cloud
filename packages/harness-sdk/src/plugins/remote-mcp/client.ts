@@ -23,17 +23,12 @@ import { RemoteMcpError, type RemoteMcpFailure, type RemoteMcpServer } from './s
 /**
  * The remote MCP client, over the transport the specification defines.
  *
- * The protocol is `@modelcontextprotocol/sdk`, the MCP project's own client: it
- * ships the Streamable HTTP transport and every request and response schema, so
- * what goes on the wire is checked against the schema that describes it and
- * nothing here re-implements JSON-RPC or SSE.
- *
- * Four things the library does not do, this file does: the request goes out
- * through a `fetch` the caller passes (`http.ts`); every request is bounded, so
- * a server that stops answering cannot hold a chat; the schema validator is
- * permissive, because Ajv compiles schemas with `new Function` and Hermes has
- * no eval; and a failure is classified, so a caller can tell a wrong token from
- * a server that is gone.
+ * The protocol is `@modelcontextprotocol/sdk`, the MCP project's own client:
+ * the transport, every schema, and nothing here re-implements JSON-RPC or SSE.
+ * What it leaves to this file: the `fetch` is the caller's (`http.ts`);
+ * discovery is bounded by `discoverTimeoutMs` and a call by `timeoutMs`, so a
+ * silent server cannot hold a chat; the validator is permissive, because Hermes
+ * has no `new Function`; and a failure is classified by kind.
  */
 
 /**
@@ -89,6 +84,8 @@ interface RemoteMcpClientDeps {
   signal?: RemoteMcpAbort;
   /** How long one operation may take. 15 seconds by default. */
   timeoutMs?: number;
+  /** How long tool discovery may take. The per-operation `timeoutMs` by default. */
+  discoverTimeoutMs?: number;
   /** Replaces the permissive validator, for a runtime that can run Ajv. */
   jsonSchemaValidator?: jsonSchemaValidator;
 }
@@ -284,6 +281,14 @@ const withServer = <A>(
   );
 
 /**
+ * The deps one discovery runs under: the caller's `discoverTimeoutMs`, when it
+ * names one, standing in for the per-operation `timeoutMs` that `withServer`
+ * reads. A call is handed `deps` untouched, so it keeps `timeoutMs`.
+ */
+const discoveryDeps = (deps: RemoteMcpClientDeps): RemoteMcpClientDeps =>
+  deps.discoverTimeoutMs === undefined ? deps : { ...deps, timeoutMs: deps.discoverTimeoutMs };
+
+/**
  * A client for one server.
  *
  * `tools` and `call` each open a connection of their own, so each reads the
@@ -291,7 +296,7 @@ const withServer = <A>(
  * rather than reused.
  */
 const remoteMcpClient = (server: RemoteMcpServer, deps: RemoteMcpClientDeps): RemoteMcpClient => ({
-  tools: withServer(server, deps, connection => discovered(connection, server)),
+  tools: withServer(server, discoveryDeps(deps), connection => discovered(connection, server)),
   call: (name, args) =>
     withServer(server, deps, connection => called(connection, server, { name, args })),
 });

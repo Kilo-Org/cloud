@@ -1,5 +1,6 @@
 import { once } from 'node:events';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { Effect } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Tool, ToolCall } from '../../core/tool.js';
@@ -58,6 +59,8 @@ interface Fixture {
   readonly tools: Tools;
   readonly seen: Seen;
   readonly mode: Mode;
+  /** How long a `tools/call` is held before it answers. */
+  readonly callDelayMs: number;
 }
 
 const opened: Server[] = [];
@@ -143,18 +146,29 @@ const answering = async (
     write(response, { status: 405 });
     return;
   }
-  write(response, answer(await bodyOf(request), fixture.tools));
+  const message = await bodyOf(request);
+  /* `tools/list` still answers at once: only the call is slow, so a deadline
+     that bounds discovery cannot be the one that kills the call. */
+  if (message.method === 'tools/call') {
+    await sleep(fixture.callDelayMs);
+  }
+  write(response, answer(message, fixture.tools));
 };
 
 /**
  * A server answering `initialize`, `tools/list` and `tools/call` as JSON, which
  * is the streamable transport's plain HTTP half. `refuse` makes every request a
  * 401 and `hang` answers none of them, which are the two failures the client is
- * asked to tell apart.
+ * asked to tell apart. `callDelayMs` holds a `tools/call` open, so a test can
+ * ask for a call that outlives the discovery deadline.
  */
-const serve = async (tools: Tools, mode: Mode = 'answer'): Promise<{ url: string; seen: Seen }> => {
+const serve = async (
+  tools: Tools,
+  mode: Mode = 'answer',
+  callDelayMs = 0
+): Promise<{ url: string; seen: Seen }> => {
   const seen: Seen = { authorization: [] };
-  const fixture: Fixture = { tools, seen, mode };
+  const fixture: Fixture = { tools, seen, mode, callDelayMs };
   const server = createServer((request, response) => {
     void answering(request, response, fixture);
   });
@@ -178,10 +192,20 @@ const serverFor = (id: string, url: string, bearer: string): RemoteMcpServer => 
 /** A secret no server should be able to read off the wire by accident. */
 const token = 'token-for-the-test';
 
-const deps = (timeoutMs?: number): RemoteMcpClientDeps => ({
+/**
+ * The deps one case runs with. `timeoutMs` is the deadline of every operation;
+ * `discoverTimeoutMs` is the deadline of discovery alone, and a case that sets
+ * only that is proving a call keeps the harness's own bound.
+ */
+const deps = (
+  fields: { readonly timeoutMs?: number; readonly discoverTimeoutMs?: number } = {}
+): RemoteMcpClientDeps => ({
   fetch,
   token: () => Effect.succeed(token),
-  ...(timeoutMs === undefined ? {} : { timeoutMs }),
+  ...(fields.timeoutMs === undefined ? {} : { timeoutMs: fields.timeoutMs }),
+  ...(fields.discoverTimeoutMs === undefined
+    ? {}
+    : { discoverTimeoutMs: fields.discoverTimeoutMs }),
 });
 
 const run = <A, E>(effect: Effect.Effect<A, E>): Promise<A> => Effect.runPromise(effect);
@@ -280,9 +304,35 @@ describe('a remote server that says no', () => {
   it('gives up on a server that stops answering', async () => {
     const silent = await serve({ list: [], call: () => ({}) }, 'hang');
     const error = await run(
-      Effect.flip(remoteMcpClient(serverFor('work', silent.url, ''), deps(50)).tools)
+      Effect.flip(
+        remoteMcpClient(serverFor('work', silent.url, ''), deps({ timeoutMs: 50 })).tools
+      )
     );
     expect(error.kind).toBe('unreachable');
+  });
+
+  it('bounds discovery by its own deadline, not by the call’s', async () => {
+    const silent = await serve({ list: [], call: () => ({}) }, 'hang');
+    const error = await run(
+      Effect.flip(
+        remoteMcpClient(serverFor('work', silent.url, ''), deps({ discoverTimeoutMs: 50 })).tools
+      )
+    );
+    expect(error.kind).toBe('unreachable');
+  });
+
+  it('lets a call outlive the discovery deadline and still answer', async () => {
+    /* Discovery answers at once and the call sleeps 600 ms, which is past the
+       200 ms discovery deadline. The call keeps the harness's own bound, so the
+       server's text is the answer rather than a failure at the chat-open one. */
+    const slow = await serve(readingFile, 'answer', 600);
+    const offered = await run(
+      remoteMcpTools(serverFor('work', slow.url, token), deps({ discoverTimeoutMs: 200 }))
+    );
+    const answered = await run(
+      only(offered).run(callOf('mcp_work_read-file', '{"path":"/tmp/slow"}'))
+    );
+    expect(answered).toBe('read /tmp/slow');
   });
 
   it('fails the tool, not the session, when the server refuses the call', async () => {

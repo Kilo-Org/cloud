@@ -206,7 +206,10 @@ describe('a server that says no', () => {
 
     await ensureKiloMcp(place, 'retry');
 
-    expect(world.calls.map(call => call.deps.timeoutMs)).toEqual([4000, 15_000]);
+    expect(world.calls.map(call => call.deps.discoverTimeoutMs)).toEqual([4000, 15_000]);
+    /* The chat-open number bounds discovery only. A tool call keeps the
+       harness's own bound, so no call is handed the app's deadline. */
+    expect(world.calls.map(call => 'timeoutMs' in call.deps)).toEqual([false, false]);
   });
 
   it('keeps an open at four seconds even after a failure, so the chat is never held', async () => {
@@ -219,7 +222,7 @@ describe('a server that says no', () => {
        fifteen, or the send waits on a server instead of opening the chat. */
     await ensureKiloMcp(place, 'automatic');
 
-    expect(world.calls.map(call => call.deps.timeoutMs)).toEqual([4000, 4000]);
+    expect(world.calls.map(call => call.deps.discoverTimeoutMs)).toEqual([4000, 4000]);
   });
 });
 

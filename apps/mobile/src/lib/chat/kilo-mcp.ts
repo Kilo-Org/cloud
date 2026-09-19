@@ -39,11 +39,16 @@ export type KiloMcpState =
 const SERVER_ID = 'kilo';
 
 /**
- * How long a discovery may take, chosen by the caller. A chat opening bounds it
- * at four seconds, because that happens while the chat is opening and a server
- * that has not answered by then is one the chat should not wait for. A Retry
- * gets fifteen: a person asked for it, so they are willing to wait, and the
- * failure is the thing being given another chance.
+ * How long a *discovery* may take, chosen by the caller. A chat opening bounds
+ * it at four seconds, because that happens while the chat is opening and a
+ * server that has not answered by then is one the chat should not wait for. A
+ * Retry gets fifteen: a person asked for it, so they are willing to wait, and
+ * the failure is the thing being given another chance.
+ *
+ * It bounds the discovery and nothing else. A tool call keeps the harness's own
+ * bound — fifteen seconds, the tool's own `inlineFor` — so a slow call answers,
+ * or is backgrounded by the session, instead of failing at the chat-open
+ * deadline.
  */
 const AUTOMATIC_TIMEOUT_MS = 4000;
 const RETRY_TIMEOUT_MS = 15_000;
@@ -139,7 +144,7 @@ async function connect(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
     return { status: 'idle' };
   }
   const state = await Effect.runPromise(
-    remoteMcpTools(kiloServer(url), { fetch, token: kiloToken, timeoutMs }).pipe(
+    remoteMcpTools(kiloServer(url), { fetch, token: kiloToken, discoverTimeoutMs: timeoutMs }).pipe(
       Effect.match({ onFailure: failed, onSuccess: ready }),
       Effect.catchAllCause(cause =>
         Effect.succeed(

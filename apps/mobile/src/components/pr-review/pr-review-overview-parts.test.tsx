@@ -113,7 +113,7 @@ function renderRefsRow(): TestRenderer.ReactTestRenderer {
     renderer = TestRenderer.create(
       createElement(PrRefsRow, {
         baseRef: 'main',
-        headRef: 'kwf/session-and-pr-entities-in-search-1092',
+        headRef: 'feat/session-and-pr-entities-in-search-1092',
         headRepoFullName: 'Kilo-Org/cloud',
         isCrossRepo: true,
       })

@@ -39,11 +39,11 @@ export type KiloMcpState =
 const SERVER_ID = 'kilo';
 
 /**
- * How long a discovery may take. The first attempt is bounded at four seconds,
- * because it happens while a chat is opening and a server that has not answered
- * by then is one the chat should not wait for. A Retry gets fifteen: a person
- * asked for it, so they are willing to wait, and the failure is the thing being
- * given another chance.
+ * How long a discovery may take, chosen by the caller. A chat opening bounds it
+ * at four seconds, because that happens while the chat is opening and a server
+ * that has not answered by then is one the chat should not wait for. A Retry
+ * gets fifteen: a person asked for it, so they are willing to wait, and the
+ * failure is the thing being given another chance.
  */
 const AUTOMATIC_TIMEOUT_MS = 4000;
 const RETRY_TIMEOUT_MS = 15_000;
@@ -186,20 +186,37 @@ async function attempt(place: ChatPlace, timeoutMs: number): Promise<KiloMcpStat
 }
 
 /**
+ * Who is waiting for a discovery, which is the only thing that sets its
+ * deadline. `automatic` is the four-second bound an open gets: a chat must not
+ * wait on a server that has not answered by then. `retry` is the fifteen-second
+ * bound a person's Retry gets, because they asked for it and the failure is what
+ * is being given another chance.
+ */
+export type KiloMcpRequest = 'automatic' | 'retry';
+
+/** The deadline for one request: the person's Retry waits longer than an open. */
+const deadlineFor = (request: KiloMcpRequest): number =>
+  request === 'retry' ? RETRY_TIMEOUT_MS : AUTOMATIC_TIMEOUT_MS;
+
+/**
  * Discovers the server's tools for the chat's scope, reusing an answer already
  * made for the same account and epoch.
  *
- * A failure is not cached as an answer: asking again reconnects, which is what
- * the Retry under the failure does, and that attempt is given the longer
- * deadline. A call made while one is already running joins it rather than
- * opening a second connection.
+ * The deadline belongs to the caller, not to the last answer: a chat opening
+ * asks for `automatic` and gives the server four seconds, so a slow one leaves
+ * the chat usable on the base tools rather than holding the send; a person
+ * pressing Retry asks for `retry` and waits longer, because they asked for it.
+ * Nothing here reads a previous failure to choose one — that made an open that
+ * followed a Retry wait the Retry's fifteen seconds.
+ *
+ * A failure is not cached as an answer: asking again reconnects. A call made
+ * while one is already running joins it rather than opening a second connection.
  */
-export async function ensureKiloMcp(place: ChatPlace): Promise<KiloMcpState> {
-  const key = keyFor(place);
-  const last = cached?.key === key ? cached.state : undefined;
-  const timeoutMs =
-    last?.status === 'failed' && last.retryable ? RETRY_TIMEOUT_MS : AUTOMATIC_TIMEOUT_MS;
-  const state = await attempt(place, timeoutMs);
+export async function ensureKiloMcp(
+  place: ChatPlace,
+  request: KiloMcpRequest = 'automatic'
+): Promise<KiloMcpState> {
+  const state = await attempt(place, deadlineFor(request));
   return state;
 }
 

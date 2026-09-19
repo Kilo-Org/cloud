@@ -42,10 +42,11 @@ const infoFor = (turn: Turn, model: string): MessageInfo =>
 /**
  * What of a turn a reader sees.
  *
- * The words, and only the words. A chat offers no tools, so a tool part can
- * only come from a conversation that was moved here from elsewhere; thinking is
- * the model's own working and is not what was said. Both would draw as empty
- * bubbles, so neither becomes one.
+ * The words, and only the words. A chat offers the clock and, when it has them
+ * on, the Kilo MCP server's tools — so a tool part can be a call the model
+ * made. That is not what was said: the model's prose is the answer, and a call
+ * is working, which would draw as an empty bubble. Thinking is the model's own
+ * working too, so neither becomes a bubble.
  */
 const said = (turn: Turn) => turn.parts.filter(part => part.kind === 'text');
 

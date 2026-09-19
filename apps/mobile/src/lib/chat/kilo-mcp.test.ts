@@ -199,14 +199,27 @@ describe('a server that says no', () => {
     expect(state).toEqual({ status: 'failed', kind, retryable });
   });
 
-  it('gives a Retry the longer deadline, because a person asked for it', async () => {
+  it('gives a person a Retry the longer deadline, because they asked for it', async () => {
     answer = refusing('unreachable');
     await ensureKiloMcp(place);
     answer = discovering;
 
-    await ensureKiloMcp(place);
+    await ensureKiloMcp(place, 'retry');
 
     expect(world.calls.map(call => call.deps.timeoutMs)).toEqual([4000, 15_000]);
+  });
+
+  it('keeps an open at four seconds even after a failure, so the chat is never held', async () => {
+    answer = refusing('unreachable');
+    await ensureKiloMcp(place);
+    answer = discovering;
+
+    /* The deadline is the caller's, not the last answer's: an open that follows
+       a retryable failure reconnects with four seconds, not the Retry's
+       fifteen, or the send waits on a server instead of opening the chat. */
+    await ensureKiloMcp(place, 'automatic');
+
+    expect(world.calls.map(call => call.deps.timeoutMs)).toEqual([4000, 4000]);
   });
 });
 

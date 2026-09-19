@@ -18,7 +18,7 @@ import { type SQLiteDatabase } from 'expo-sqlite';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
 import { chatFetch } from './fetch';
-import { chatTools } from './tools';
+import { chatToolsWithMcp } from './tools';
 
 /**
  * The plugins the chat runs on.
@@ -111,11 +111,19 @@ const layerToken = Layer.succeed(TokenSource, {
 } satisfies TokenSourceService);
 
 /**
- * The tools a session may name. It is assembled once: the set is frozen for
- * the life of a session, so a registry rebuilt per call would be the same one
- * every time.
+ * The tools a session may name.
+ *
+ * The set is not frozen: the Kilo MCP server's tools are discovered while the
+ * app runs, and a session opened after a discovery must be able to name them.
+ * So the registry is a live view over the tools rather than a copy taken when
+ * the layer was built — `resolveTools` reads it at open, and a tool found later
+ * reaches the next session without the runtime being rebuilt.
  */
-const layerTools = Layer.succeed(ToolRegistry, { tools: chatTools() });
+export const layerTools = Layer.succeed(ToolRegistry, {
+  get tools() {
+    return chatToolsWithMcp();
+  },
+});
 
 /** Whose credit pays for the chat. */
 export type ChatOrg =

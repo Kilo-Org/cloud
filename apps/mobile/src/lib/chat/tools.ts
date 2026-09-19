@@ -2,16 +2,22 @@ import { type Tool } from '@kilocode/harness-sdk';
 import { timeTool } from '@kilocode/harness-sdk/plugins/tools';
 
 import { dateTimeFormat } from '@/lib/intl-cache';
+import { kiloMcpToolNames, kiloMcpTools } from './kilo-mcp';
 
 /**
  * What a chat can do besides talk.
  *
- * One tool: the clock. A model does not have one — it answers "what day is it"
- * from the date it was trained on, confidently and wrong — and a phone is where
- * that question gets asked. The rest of the SDK's tools are for a harness
- * driving work: asking the person something is what the composer is already
- * for, delegating to a second session costs a second session, and a to-do list
- * is working memory for a long run that a chat does not have.
+ * One tool of its own: the clock. A model does not have one — it answers "what
+ * day is it" from the date it was trained on, confidently and wrong — and a
+ * phone is where that question gets asked. The rest of the SDK's tools are for
+ * a harness driving work: asking the person something is what the composer is
+ * already for, delegating to a second session costs a second session, and a
+ * to-do list is working memory for a long run that a chat does not have.
+ *
+ * On top of that set sit the tools of the Kilo MCP server, when the chat has it
+ * on. They are not written here: they are discovered from the server while the
+ * app runs, which is why the functions below read them at the moment a session
+ * opens rather than holding a set of their own.
  */
 
 /**
@@ -34,3 +40,28 @@ export function chatTools(): readonly Tool[] {
 
 /** The names of those tools, which is what a session is opened with. */
 export const CHAT_TOOL_NAMES: readonly string[] = chatTools().map(tool => tool.definition.name);
+
+/**
+ * The base tools plus the Kilo MCP tools discovered so far.
+ *
+ * This is the registry's view of what a session may name. It is read when a
+ * session opens, not when the runtime is built, because the server's tools
+ * arrive while the app runs: a tool discovered after the runtime was built
+ * still reaches the next session.
+ */
+export function chatToolsWithMcp(): readonly Tool[] {
+  return [...chatTools(), ...kiloMcpTools()];
+}
+
+/**
+ * The names a chat is opened with.
+ *
+ * A chat with the Kilo MCP off names the base tools alone, and one that has it
+ * on but has discovered nothing yet names the same: a session is never opened
+ * with a name the registry cannot resolve.
+ */
+export function chatToolNames(mcpEnabled: boolean): readonly string[] {
+  return mcpEnabled && kiloMcpTools().length > 0
+    ? [...CHAT_TOOL_NAMES, ...kiloMcpToolNames()]
+    : CHAT_TOOL_NAMES;
+}

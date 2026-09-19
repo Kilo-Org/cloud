@@ -1,6 +1,8 @@
+import { Effect } from 'effect';
+import { ToolRegistry } from '@kilocode/harness-sdk';
 import { describe, expect, it, vi } from 'vitest';
 
-import { modelFactsFor, RELAYED_SHAPE } from './layers';
+import { layerTools, modelFactsFor, RELAYED_SHAPE } from './layers';
 
 // The catalog is read here without the device plugins the runtime builds around
 // it, so the ones that only exist on a device are stubbed.
@@ -9,7 +11,18 @@ vi.mock('@kilocode/harness-sdk/plugins/store/expo', () => ({ layerExpoStore: () 
 vi.mock('@/lib/auth/token-owner', () => ({ getAuthTokenForRequest: vi.fn() }));
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'http://localhost:4700' }));
 vi.mock('./fetch', () => ({ chatFetch: () => undefined }));
-vi.mock('./tools', () => ({ chatTools: () => [] }));
+vi.mock('@/lib/intl-cache', () => ({
+  dateTimeFormat: () => ({ resolvedOptions: () => ({ timeZone: 'Europe/Amsterdam' }) }),
+}));
+// The Kilo MCP tools are discovered while the app runs; what is under test is
+// that the registry reads them when a session opens, not the discovery itself.
+const mcp = vi.hoisted(() => ({
+  tools: [] as { readonly definition: { readonly name: string } }[],
+}));
+vi.mock('./kilo-mcp', () => ({
+  kiloMcpTools: () => mcp.tools,
+  kiloMcpToolNames: () => mcp.tools.map(tool => tool.definition.name),
+}));
 
 /**
  * What the app tells a session a gateway model can speak.
@@ -41,5 +54,33 @@ describe('the shape a gateway model is asked over', () => {
 
   it('answers with a shape even when the gateway named no window', () => {
     expect(modelFactsFor({ id: 'unwindowed', context_length: null }).contextWindow).toBeUndefined();
+  });
+});
+
+/**
+ * The tools the registry holds.
+ *
+ * A session resolves the names it was opened with against this at open, so a
+ * tool discovered after the runtime was built has to be in it — otherwise a
+ * chat would need a new runtime every time the server's list arrived.
+ */
+const namesHeld = async (): Promise<readonly string[]> => {
+  const names = await Effect.runPromise(
+    Effect.gen(function* held() {
+      const registry = yield* ToolRegistry;
+      return registry.tools.map(tool => tool.definition.name);
+    }).pipe(Effect.provide(layerTools))
+  );
+  return names;
+};
+
+describe('the tools the registry holds', () => {
+  it('is a live view, so a tool discovered after the runtime was built is in it', async () => {
+    mcp.tools.length = 0;
+    expect(await namesHeld()).toEqual(['time']);
+
+    mcp.tools.push({ definition: { name: 'mcp_kilo_read-file' } });
+
+    expect(await namesHeld()).toEqual(['time', 'mcp_kilo_read-file']);
   });
 });

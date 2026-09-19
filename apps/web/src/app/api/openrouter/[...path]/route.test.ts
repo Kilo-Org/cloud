@@ -717,10 +717,11 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   });
 
   it.each([
+    'openai/gpt-5.6-sol-discounted',
     'google/gemma-4-26b-a4b-it:free',
     'google/gemma-4-31b-it:free',
     'thinkingmachines/inkling:free',
-  ])('rejects the unavailable free model %s before upstream', async modelId => {
+  ])('rejects the unavailable or disabled model %s before upstream', async modelId => {
     mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: true, requestCount: 0 });
 
     const { POST } = await import('./route');

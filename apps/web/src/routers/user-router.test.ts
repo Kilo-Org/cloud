@@ -1967,6 +1967,9 @@ describe('user router - hasGatewayUsage', () => {
           otherUser.id,
         ])
       );
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, orgUser.id));
     await db.delete(organizations).where(eq(organizations.created_by_kilo_user_id, orgUser.id));
     await db
       .delete(kilocode_users)

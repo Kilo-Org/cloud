@@ -5,6 +5,7 @@ import { subscribeToConsentChanges } from '@/lib/consent';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
+  claimTourAutoOpenAttempt,
   isTourAutoOpenAttemptSpent,
   spendTourAutoOpenAttempt,
 } from '@/lib/tour/tour-auto-open-boot';
@@ -85,8 +86,9 @@ function useConsentGateState(userId: string | undefined): ConsentGateState {
  * account has no gateway usage. A ref keyed by user id makes the push
  * once-only for that account, so later renders (and later sign-ins of the same
  * account) never re-open it — the persisted decision reinforces that for a
- * fresh mount. Returns null; it is mounted in the `(app)` layout beside the
- * other mounts.
+ * fresh mount. The attempt is bound to the first account this process sees, so
+ * a warm account switch after a held launch cannot auto-open either. Returns
+ * null; it is mounted in the `(app)` layout beside the other mounts.
  *
  * A brand-new account signs in behind the consent gate, which is shown until
  * the person answers it. The gate cannot host the tour: its bootstrap guard
@@ -125,6 +127,18 @@ export function TourAutoOpen() {
     // One automatic attempt per app process. A warm (app) entry or a resume
     // must never auto-open; only the launch that created this process may.
     if (isTourAutoOpenAttemptSpent()) {
+      return;
+    }
+    // The process has one automatic attempt, and it belongs to the launch
+    // account: the first account this gate saw after a cold boot. A warm
+    // account switch — including a sign-out, which unmounts the (app) tree, and
+    // a different sign-in, which remounts it — must not inherit the attempt, so
+    // spend it there. The binding lives in the boot marker's module state, not a
+    // ref, so the remount cannot mistake the second account for the launch
+    // account. The launch account's own consent or usage hold still keeps the
+    // attempt for a later success in this same launch.
+    if (!claimTourAutoOpenAttempt(userId)) {
+      spendTourAutoOpenAttempt();
       return;
     }
     // An account that finished the tour can never auto-open; spend the attempt

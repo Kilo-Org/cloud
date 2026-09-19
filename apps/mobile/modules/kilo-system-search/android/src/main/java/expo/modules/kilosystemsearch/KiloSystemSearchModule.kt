@@ -7,6 +7,7 @@ import android.app.appsearch.AppSearchSchema
 import android.app.appsearch.AppSearchSession
 import android.app.appsearch.BatchResultCallback
 import android.app.appsearch.GenericDocument
+import android.app.appsearch.PackageIdentifier
 import android.app.appsearch.PutDocumentsRequest
 import android.app.appsearch.RemoveByDocumentIdRequest
 import android.app.appsearch.SearchResult
@@ -14,6 +15,7 @@ import android.app.appsearch.SearchSpec
 import android.app.appsearch.SetSchemaRequest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -38,6 +40,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.security.MessageDigest
 import java.util.function.Consumer
 
 private const val NAMESPACE = "kilo"
@@ -53,6 +56,7 @@ private const val PROPERTY_KEYWORDS = "keywords"
 private const val PROPERTY_FINGERPRINT = "fingerprint"
 private const val PROPERTY_ROUTE = "route"
 private const val APP_SCHEME_PREFIX = "kiloapp://"
+private const val GLOBAL_SEARCH_PACKAGE = "com.google.android.googlequicksearchbox"
 private const val PAGE_SIZE = 100
 private const val TIMEOUT_SECONDS = 30L
 private const val TIMEOUT_MESSAGE = "The system search index did not respond."
@@ -371,7 +375,7 @@ private fun openPlatformSession(context: Context, executor: ExecutorService): Ap
     }
     opened = created
     awaitPlatformResult { callback ->
-      created.setSchema(platformSchemaRequest(), executor, executor, callback)
+      created.setSchema(platformSchemaRequest(context), executor, executor, callback)
     }
     return created
   } catch (error: Throwable) {
@@ -519,11 +523,51 @@ private fun jetpackNamespaceSpec(): JetpackSearchSpec = JetpackSearchSpec.Builde
 // exists to be read there, so the request states it rather than relying on the
 // API's default. Documented at
 // `SetSchemaRequest.Builder.setSchemaTypeDisplayedBySystem`.
-private fun platformSchemaRequest(): SetSchemaRequest = SetSchemaRequest.Builder()
-  .addSchemas(platformSchema())
-  .setSchemaTypeDisplayedBySystem(SCHEMA_TYPE, true)
-  .setForceOverride(true)
-  .build()
+private fun platformSchemaRequest(context: Context?): SetSchemaRequest {
+  val builder = SetSchemaRequest.Builder()
+    .addSchemas(platformSchema())
+    .setSchemaTypeDisplayedBySystem(SCHEMA_TYPE, true)
+    .setForceOverride(true)
+  // From API 35 the schema is additionally made publicly visible to the
+  // phone's own search surface. A surface without
+  // `READ_GLOBAL_APP_SEARCH_DATA` — the launcher's Google search holds none on
+  // the images seen here — can only read a foreign database the owner has
+  // named this way, and the platform honours the name only against the
+  // installed app (`VisibilityCheckerImpl` re-checks the named certificate
+  // against the installed package at query time). Google ships that app signed
+  // differently per image family — GMS release keys, OEM keys, the emulator's
+  // platform test key — so no single hardcoded certificate can name it, and
+  // the surface's own installed certificate is read instead. On a device
+  // without the surface the grant is simply not made.
+  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+    globalSearchSurfaceCertificate(context)?.let { certificate ->
+      builder.setPubliclyVisibleSchema(
+        SCHEMA_TYPE,
+        PackageIdentifier(GLOBAL_SEARCH_PACKAGE, certificate)
+      )
+    }
+  }
+  return builder.build()
+}
+
+/**
+ * The signing certificate of the phone's own search surface, as the SHA-256
+ * digest the visibility grant names, or null when the surface is not installed
+ * or not visible to this app.
+ */
+private fun globalSearchSurfaceCertificate(context: Context?): ByteArray? {
+  if (context == null) return null
+  return try {
+    val info = context.packageManager.getPackageInfo(
+      GLOBAL_SEARCH_PACKAGE,
+      PackageManager.GET_SIGNING_CERTIFICATES
+    )
+    val signer = info.signingInfo?.apkContentsSigners?.firstOrNull() ?: return null
+    MessageDigest.getInstance("SHA-256").digest(signer.toByteArray())
+  } catch (error: Exception) {
+    null
+  }
+}
 
 private fun jetpackSchemaRequest(): JetpackSetSchemaRequest = JetpackSetSchemaRequest.Builder()
   .addSchemas(jetpackSchema())

@@ -67,6 +67,41 @@ describe('adminCustomLlmRouter', () => {
       expect(decrypted.api_key).toBe('sk-test-secret-key-123');
     });
 
+    it.each([false, true])(
+      'creates a custom LLM without an internal ID and with disable_url_suffix=%s',
+      async disableUrlSuffix => {
+        const caller = await createCallerForUser(admin.id);
+        const publicId = 'kilo-internal/test-model-no-internal-id';
+        const definition: CustomLlmDefinition = {
+          ...validDefinition,
+          base_url: 'https://api.example.com/custom/messages',
+          disable_url_suffix: disableUrlSuffix,
+        };
+        delete definition.internal_id;
+
+        const result = await caller.admin.customLlm.upsert({
+          public_id: publicId,
+          definition,
+          credentials: { type: 'api_key', api_key: 'sk-test-secret' },
+        });
+
+        expect(result.definition).toEqual(definition);
+        expect(result.definition).not.toHaveProperty('internal_id');
+
+        const [row] = await db
+          .select()
+          .from(custom_llm2)
+          .where(eq(custom_llm2.public_id, publicId));
+        expect(row?.definition).toEqual(definition);
+        expect(row?.definition).not.toHaveProperty('internal_id');
+
+        const listResult = await caller.admin.customLlm.list();
+        expect(listResult.items.find(item => item.public_id === publicId)?.definition).toEqual(
+          definition
+        );
+      }
+    );
+
     it('creates a new custom LLM with Google Service Account credentials', async () => {
       const caller = await createCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-gsa';
@@ -139,6 +174,39 @@ describe('adminCustomLlmRouter', () => {
       const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
       const decrypted = JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY));
       expect(decrypted.api_key).toBe('sk-initial-secret');
+    });
+
+    it('clears an omitted internal ID on update while preserving the suffix flag and credentials', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/test-model-update-no-internal-id';
+      const definition: CustomLlmDefinition = {
+        ...validDefinition,
+        disable_url_suffix: true,
+      };
+
+      await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition,
+        credentials: { type: 'api_key', api_key: 'sk-test-secret' },
+      });
+      const [originalRow] = await db
+        .select()
+        .from(custom_llm2)
+        .where(eq(custom_llm2.public_id, publicId));
+
+      delete definition.internal_id;
+      const updated = await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition,
+      });
+
+      expect(updated.definition).toEqual(definition);
+      expect(updated.definition).not.toHaveProperty('internal_id');
+
+      const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+      expect(row?.definition).toEqual(definition);
+      expect(row?.definition).not.toHaveProperty('internal_id');
+      expect(row?.encrypted_api_key).toEqual(originalRow?.encrypted_api_key);
     });
 
     it('updates existing custom LLM rotating encrypted key when new credentials are provided', async () => {
@@ -229,6 +297,54 @@ describe('adminCustomLlmRouter', () => {
       expect((result as Record<string, unknown>).encrypted_api_key).toBeUndefined();
     });
 
+    it.each(['source-model', undefined])(
+      'copies without an internal ID when the source internal ID is %s, preserving other fields',
+      async sourceInternalId => {
+        const caller = await createCallerForUser(admin.id);
+        const sourcePublicId = 'kilo-internal/test-model-copy-optional-id-source';
+        const copiedPublicId = 'kilo-internal/test-model-copy-optional-id-target';
+        const sourceDefinition: CustomLlmDefinition = {
+          ...validDefinition,
+          internal_id: sourceInternalId,
+          disable_url_suffix: true,
+        };
+
+        await caller.admin.customLlm.upsert({
+          public_id: sourcePublicId,
+          definition: sourceDefinition,
+          credentials: { type: 'api_key', api_key: 'sk-source-secret' },
+        });
+
+        const result = await caller.admin.customLlm.copy({
+          source_public_id: sourcePublicId,
+          public_id: copiedPublicId,
+          display_name: 'Copied model without internal ID',
+        });
+        const copiedDefinition = {
+          ...sourceDefinition,
+          display_name: 'Copied model without internal ID',
+        };
+        delete copiedDefinition.internal_id;
+
+        expect(result).toEqual({ public_id: copiedPublicId, definition: copiedDefinition });
+        expect(result.definition).not.toHaveProperty('internal_id');
+
+        const [sourceRow] = await db
+          .select()
+          .from(custom_llm2)
+          .where(eq(custom_llm2.public_id, sourcePublicId));
+        const [copiedRow] = await db
+          .select()
+          .from(custom_llm2)
+          .where(eq(custom_llm2.public_id, copiedPublicId));
+
+        expect(sourceRow?.definition).toEqual(sourceDefinition);
+        expect(copiedRow?.definition).toEqual(copiedDefinition);
+        expect(copiedRow?.definition).not.toHaveProperty('internal_id');
+        expect(copiedRow?.encrypted_api_key).toEqual(sourceRow?.encrypted_api_key);
+      }
+    );
+
     it('does not overwrite a custom LLM with the requested new ID', async () => {
       const caller = await createCallerForUser(admin.id);
       const sourcePublicId = 'kilo-internal/test-model-copy-conflict-source';
@@ -263,7 +379,7 @@ describe('adminCustomLlmRouter', () => {
       expect(existingRow?.definition.display_name).toBe('Existing model');
     });
 
-    it('rejects a copy with an empty internal ID', async () => {
+    it.each(['', '   '])('rejects a copy with a blank internal ID: %j', async internalId => {
       const caller = await createCallerForUser(admin.id);
       const sourcePublicId = 'kilo-internal/test-model-copy-empty-internal-id-source';
       const copiedPublicId = 'kilo-internal/test-model-copy-empty-internal-id-target';
@@ -279,7 +395,7 @@ describe('adminCustomLlmRouter', () => {
           source_public_id: sourcePublicId,
           public_id: copiedPublicId,
           display_name: 'Copied model',
-          internal_id: '   ',
+          internal_id: internalId,
         })
       ).rejects.toMatchObject({
         code: 'BAD_REQUEST',

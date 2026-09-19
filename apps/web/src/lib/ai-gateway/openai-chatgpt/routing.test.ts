@@ -4,6 +4,11 @@ jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
 jest.mock('@/lib/ai-gateway/openai-chatgpt/served-models', () => ({
   isOpenAiModelServed: jest.fn().mockResolvedValue(true),
 }));
+jest.mock('@/lib/ai-gateway/models', () => ({
+  ...jest.requireActual<typeof GatewayModels>('@/lib/ai-gateway/models'),
+  findKiloExclusiveModel: (model: string) =>
+    model === 'openai/test-exclusive-model' ? { public_id: model } : null,
+}));
 jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
   resolveOpenAiChatGptAccessToken: jest.fn(),
   OPENAI_CHATGPT_RECONNECT_MESSAGE: 'Your ChatGPT connection has expired. Reconnect to continue.',
@@ -22,6 +27,7 @@ jest.mock('next/server', () => ({
 }));
 
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
+import type * as GatewayModels from '@/lib/ai-gateway/models';
 import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import { isOpenAiModelServed } from '@/lib/ai-gateway/openai-chatgpt/served-models';
@@ -189,8 +195,8 @@ describe('isOpenAiChatGptEligible', () => {
     {
       label: 'a Kilo-exclusive OpenAI model',
       overrides: {
-        request: responsesRequest('openai/gpt-5.6-sol-discounted'),
-        requestedModel: 'openai/gpt-5.6-sol-discounted',
+        request: responsesRequest('openai/test-exclusive-model'),
+        requestedModel: 'openai/test-exclusive-model',
       },
     },
     { label: 'an anonymous caller', overrides: { userId: null } },
@@ -311,7 +317,7 @@ describe('getOpenAiChatGptByokModelIds', () => {
     await expect(
       getOpenAiChatGptByokModelIds(USER_OWNER, [
         'openai/gpt-oss-20b',
-        'openai/gpt-5.6-sol-discounted',
+        'openai/test-exclusive-model',
       ])
     ).resolves.toEqual(new Set());
     expect(isOpenAiModelServed).not.toHaveBeenCalled();

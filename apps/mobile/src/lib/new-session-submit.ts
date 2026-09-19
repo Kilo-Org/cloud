@@ -78,13 +78,6 @@ export function resolveNewSessionSubmitDisabled(input: {
  * submitting with no effective profile id (the default is omitted). Only a
  * still-loading profile blocks Start, so an unsettled default is never
  * silently dropped.
- *
- * The sandbox gate mirrors that split: a settled capabilities verdict that the
- * picked sandbox is unavailable (`sandboxUnavailable`) blocks Start — the
- * server would reject the create outright — while a failed or still-loading
- * capabilities query does not: the form shows Retry and Start stays enabled,
- * submitting the pick for the server to arbitrate (the default still starts
- * when nothing was picked).
  */
 export function resolveNewSessionStartDisabled(input: {
   attachmentsHasFailed: boolean;
@@ -98,8 +91,6 @@ export function resolveNewSessionStartDisabled(input: {
   /** True when the selected repo key still resolves to a picker row. */
   selectedRepositoryResolved: boolean;
   isProfileLoading: boolean;
-  /** True when the picked sandbox is known unavailable to this owner. */
-  sandboxUnavailable: boolean;
 }): boolean {
   // A selected key that no longer resolves to a row (after a refresh or a
   // provider change) must not submit: the create body would carry no
@@ -117,8 +108,7 @@ export function resolveNewSessionStartDisabled(input: {
       model: input.model,
       selectedRepo: input.selectedRepo,
     }) ||
-    input.isProfileLoading ||
-    input.sandboxUnavailable
+    input.isProfileLoading
   );
 }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner-native';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { SheetHeader } from '@/components/sheet-header';
@@ -43,6 +44,7 @@ export type McpSettings = {
  * to the new session id.
  */
 export function useMcpSettings(sessionId: string): McpSettings {
+  const { t } = useTranslation();
   const state = useSyncExternalStore(watchKiloMcp, kiloMcpState);
   const [enabled, setEnabledState] = useState(true);
   const [retrying, setRetrying] = useState(false);
@@ -65,10 +67,23 @@ export function useMcpSettings(sessionId: string): McpSettings {
 
   const setEnabled = useCallback(
     (next: boolean) => {
+      /* The switch moves at once, so the tap answers without waiting for the
+         write. The write and the move it makes can both fail, and the chat is
+         then still on the tool set it had: the switch is put back where it was
+         and the reason is said out loud, rather than left claiming a tool set
+         the live session never got. */
+      const previous = enabled;
       setEnabledState(next);
-      void setChatMcpEnabled(sessionId, next);
+      void (async () => {
+        try {
+          await setChatMcpEnabled(sessionId, next);
+        } catch (error) {
+          setEnabledState(previous);
+          toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'));
+        }
+      })();
     },
-    [sessionId]
+    [enabled, sessionId, t]
   );
 
   const retry = useCallback(() => {

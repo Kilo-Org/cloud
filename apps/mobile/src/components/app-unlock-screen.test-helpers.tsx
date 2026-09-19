@@ -166,7 +166,18 @@ vi.mock('@/lib/trpc', () => ({
   TRPCProvider: 'TRPCProvider',
   trpcClient: {},
   useTRPC: () => ({
-    user: { getMe: { queryKey: () => [] } },
+    user: {
+      getMe: { queryKey: () => [] },
+      // The (app) layout's TourAutoOpen reads the account's gateway usage;
+      // give it a settled zero-usage answer so the tour gate stays closed in
+      // these layout scenes (the signed-out user id already blocks the push).
+      hasGatewayUsage: {
+        queryOptions: () => ({
+          queryKey: ['user', 'hasGatewayUsage'],
+          queryFn: () => ({ hasUsage: false }),
+        }),
+      },
+    },
     organizations: { list: { queryKey: () => [] } },
   }),
 }));

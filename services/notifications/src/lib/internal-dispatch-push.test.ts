@@ -74,6 +74,7 @@ function spendAlert(
 ): InternalDispatchSpendAlertRequest {
   return {
     kind: 'spend_alert',
+    deliveryId: 'delivery-1',
     recipientUserIds: ['user-a', 'user-b'],
     scope: 'organization',
     organizationId: 'org-1',
@@ -89,7 +90,7 @@ function expectedSpendAlertInput(userId: string): DispatchPushInput {
   return {
     userId,
     presenceContext: null,
-    idempotencyKey: 'spend-alert:organization:org-1:threshold:40',
+    idempotencyKey: 'spend-alert:delivery-1',
     badge: null,
     push: {
       title: 'Spend alert',
@@ -582,9 +583,7 @@ describe('dispatchInternalPushCore', () => {
     );
 
     expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'delivered' }]);
-    expect(calls.dispatchPushInputs[0]!.idempotencyKey).toBe(
-      'spend-alert:personal:personal:anomaly:40'
-    );
+    expect(calls.dispatchPushInputs[0]!.idempotencyKey).toBe('spend-alert:delivery-1');
     expect(calls.dispatchPushInputs[0]!.push.data).toEqual({
       type: 'spend_alert',
       scope: 'personal',
@@ -592,7 +591,7 @@ describe('dispatchInternalPushCore', () => {
     expect(pushDataSchema.safeParse(calls.dispatchPushInputs[0]!.push.data).success).toBe(true);
   });
 
-  it('spend_alert stays one alert per crossing: the same threshold shares one idempotency key', async () => {
+  it('retries of the same delivery share one idempotency key', async () => {
     const { deps, calls } = fakeDeps();
     await dispatchInternalPushCore(spendAlert({ recipientUserIds: ['user-a'] }), deps);
     // A re-evaluated sweep with a grown total must dedupe to the same key.
@@ -607,14 +606,37 @@ describe('dispatchInternalPushCore', () => {
     );
   });
 
-  it('crossing a different threshold is a distinct alert', async () => {
+  it('a cleared and re-crossed threshold reaches the recipient as a new episode', async () => {
+    const seen = new Set<string>();
+    const { deps } = fakeDeps({
+      dispatchPush: async input => {
+        if (seen.has(input.idempotencyKey)) return { kind: 'duplicate' };
+        seen.add(input.idempotencyKey);
+        return { kind: 'delivered', tokenCount: 1 };
+      },
+    });
+    const first = spendAlert({ recipientUserIds: ['user-a'], deliveryId: 'delivery-1' });
+    const second = spendAlert({ recipientUserIds: ['user-a'], deliveryId: 'delivery-2' });
+
+    expect((await dispatchInternalPushCore(first, deps)).perRecipient[0]?.outcome).toBe(
+      'delivered'
+    );
+    expect((await dispatchInternalPushCore(first, deps)).perRecipient[0]?.outcome).toBe(
+      'duplicate'
+    );
+    expect((await dispatchInternalPushCore(second, deps)).perRecipient[0]?.outcome).toBe(
+      'delivered'
+    );
+  });
+
+  it('crossing a different threshold creates a distinct delivery', async () => {
     const { deps, calls } = fakeDeps();
     await dispatchInternalPushCore(
       spendAlert({ recipientUserIds: ['user-a'], thresholdUsd: 40 }),
       deps
     );
     await dispatchInternalPushCore(
-      spendAlert({ recipientUserIds: ['user-a'], thresholdUsd: 80 }),
+      spendAlert({ recipientUserIds: ['user-a'], thresholdUsd: 80, deliveryId: 'delivery-2' }),
       deps
     );
 

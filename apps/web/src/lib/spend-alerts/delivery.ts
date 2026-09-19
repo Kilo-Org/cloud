@@ -61,7 +61,7 @@ type ClaimedSpendAlertDelivery = {
   id: string;
   scope_key: string;
   rule_id: string | null;
-  kind: SpendAlertRuleKind | null;
+  kind: string | null;
   channel: SpendAlertChannel | null;
   recipients: SpendAlertRecipients | null;
   payload: SpendAlertDeliveryPayload | null;
@@ -355,9 +355,18 @@ async function deliverClaimedSpendAlertDelivery(
   row: ClaimedSpendAlertDelivery
 ): Promise<void> {
   const scope = parseSpendAlertScopeKey(row.scope_key);
-  if (scope === null) throw new Error('spend_alert_delivery_unknown_scope');
-  if (row.kind === null) throw new Error('spend_alert_delivery_unknown_kind');
-  if (!isDeliveryPayload(row.payload)) throw new Error('spend_alert_delivery_missing_payload');
+  if (scope === null) {
+    throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_unknown_scope');
+  }
+  if (row.kind !== 'threshold' && row.kind !== 'anomaly') {
+    throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_unknown_kind');
+  }
+  if (!isDeliveryPayload(row.payload)) {
+    throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_missing_payload');
+  }
+  if (row.channel !== 'email' && row.channel !== 'push') {
+    throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_unknown_channel');
+  }
 
   const recipients = recipientsOf(row.recipients);
   const scopeName = await resolveSpendAlertScopeName(database, scope);
@@ -400,6 +409,7 @@ async function deliverClaimedSpendAlertDelivery(
       throw new SpendAlertDeliveryUndeliverableError('spend_alert_delivery_no_recipients');
     }
     const dispatched = await deps.dispatchPush({
+      deliveryId: row.id,
       recipientUserIds: recipients.userIds,
       scope: scope.type,
       ...(scope.type === 'organization' ? { organizationId: scope.organizationId } : {}),
@@ -412,8 +422,6 @@ async function deliverClaimedSpendAlertDelivery(
     if (!dispatched) throw new SpendAlertDeliveryRetryableError('spend_alert_push_delivery_failed');
     return;
   }
-
-  throw new Error('spend_alert_delivery_unknown_channel');
 }
 
 /** Bounded retries of the `sent` write; never a re-send. */

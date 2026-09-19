@@ -141,6 +141,35 @@ afterEach(async () => {
 });
 
 describe('drainPendingSpendAlertDeliveries', () => {
+  it.each([
+    [{ scope_key: 'invalid' }, 'unknown_scope'],
+    [{ kind: null }, 'unknown_kind'],
+    [{ kind: 'unsupported' }, 'unknown_kind'],
+    [{ payload: null }, 'missing_payload'],
+    [{ payload: {} }, 'missing_payload'],
+    [{ channel: null }, 'unknown_channel'],
+  ] as const)('makes malformed row %j terminal', async (overrides, reason) => {
+    const id = await insertDelivery(overrides);
+    const { deps, emails, pushes } = recordingDeps();
+
+    const summary = await drainPendingSpendAlertDeliveries(db, deps, { limit: 10 });
+
+    expect(summary.failed).toContainEqual({
+      deliveryId: id,
+      channel: 'channel' in overrides ? overrides.channel : 'email',
+      error: `spend_alert_delivery_${reason}`,
+    });
+    expect(await readDelivery(id)).toMatchObject({
+      status: 'failed',
+      attempt_count: 1,
+      last_error_redacted: `spend_alert_delivery_${reason}`,
+    });
+    await drainPendingSpendAlertDeliveries(db, deps, { limit: 10 });
+    expect((await readDelivery(id))?.attempt_count).toBe(1);
+    expect(emails).toHaveLength(0);
+    expect(pushes).toHaveLength(0);
+  });
+
   it('sends an email and a push and marks both rows sent with one attempt', async () => {
     const emailId = await insertDelivery({ channel: 'email' });
     const pushId = await insertDelivery({
@@ -166,6 +195,7 @@ describe('drainPendingSpendAlertDeliveries', () => {
     const pushed = pushes.filter(input => input.recipientUserIds.includes(OWNER_USER_ID));
     expect(pushed).toHaveLength(1);
     expect(pushed[0]).toEqual({
+      deliveryId: pushId,
       recipientUserIds: [OWNER_USER_ID],
       scope: 'personal',
       alertKind: 'threshold',
@@ -339,6 +369,34 @@ describe('drainPendingSpendAlertDeliveries', () => {
       error: 'spend_alert_push_delivery_failed',
     });
     expect((await readDelivery(id))?.status).toBe('pending');
+  });
+
+  it('reuses the outbox identity when retrying a push and changes it for a new episode', async () => {
+    const pushRow = {
+      channel: 'push' as const,
+      recipients: { userIds: [OWNER_USER_ID], emails: [] },
+    };
+    const id = await insertDelivery(pushRow);
+    const identities: string[] = [];
+    const { deps } = recordingDeps({
+      dispatchPush: async input => {
+        identities.push(input.deliveryId);
+        return identities.length > 1;
+      },
+    });
+
+    await drainPendingSpendAlertDeliveries(db, deps, { limit: 10 });
+    await db
+      .update(spend_alert_deliveries)
+      .set({ next_attempt_at: new Date(Date.now() - 60_000).toISOString() })
+      .where(eq(spend_alert_deliveries.id, id));
+    await drainPendingSpendAlertDeliveries(db, deps, { limit: 10 });
+    const nextId = await insertDelivery(pushRow);
+    await drainPendingSpendAlertDeliveries(db, deps, { limit: 10 });
+
+    expect(identities).toEqual([id, id, nextId]);
+    expect((await readDelivery(id))?.status).toBe('sent');
+    expect((await readDelivery(nextId))?.status).toBe('sent');
   });
 
   it('does not mark a row with no recipients sent', async () => {

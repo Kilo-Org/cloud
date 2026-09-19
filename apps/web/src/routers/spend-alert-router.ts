@@ -31,7 +31,11 @@ const SpendAlertRuleInputSchema = z
     kind: SpendAlertRuleKindSchema,
     enabled: z.boolean(),
     /** Rolling-window threshold in USD. Required for the threshold kind. */
-    threshold: z.number().positive().max(1_000_000).nullish(),
+    threshold: z
+      .number()
+      .min(1 / MICRODOLLARS_PER_USD)
+      .max(1_000_000)
+      .nullish(),
     windowHours: SpendAlertWindowHoursSchema.nullish(),
     /** Anomaly multiplier in basis points (100 = 1x). Required for the anomaly kind. */
     multiplierBasisPoints: z.number().int().min(100).max(5000).nullish(),

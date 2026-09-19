@@ -82,14 +82,12 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
         },
       } satisfies DispatchPushInput;
     case 'spend_alert':
-      // One alert per (scope, kind, threshold) crossing, even with several
-      // recipients: the owner's contacts must not get a second push for the
-      // same crossing, and the amount is not part of the identity so a
-      // re-evaluated sweep with a slightly different total still dedupes.
+      // The outbox identity survives retries and differs for each firing
+      // episode. The DO is already per recipient.
       return {
         userId,
         presenceContext: null,
-        idempotencyKey: `spend-alert:${input.scope}:${input.organizationId ?? 'personal'}:${input.alertKind}:${input.thresholdUsd}`,
+        idempotencyKey: `spend-alert:${input.deliveryId}`,
         badge: null,
         push: {
           title: 'Spend alert',

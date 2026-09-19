@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { rewriteWidgetProviderCategory } from '../../plugins/android-widget-category';
+import {
+  rewriteWidgetProviderCategory,
+  rewriteWidgetProviderCategoryOrThrow,
+} from '../../plugins/android-widget-category';
 
 /**
  * The provider XML react-native-android-widget's `withWidgetProviderXml` writes
@@ -51,5 +54,44 @@ describe('rewriteWidgetProviderCategory', () => {
     const withoutCategory = PROVIDER_XML.replace('    android:widgetCategory="home_screen">', '>');
 
     expect(rewriteWidgetProviderCategory(withoutCategory)).toBe(withoutCategory);
+  });
+});
+
+/**
+ * The mod cannot trust the literal replacement: if the library reshapes the
+ * attribute the rewrite matches nothing and the prebuild would otherwise ship
+ * a provider with no keyguard host. The checked rewrite fails the prebuild
+ * instead, so these are the drift cases that must throw.
+ */
+describe('rewriteWidgetProviderCategoryOrThrow', () => {
+  const NAME = 'widgetprovider_activeagentswidget.xml';
+
+  it('returns the provider once it declares the keyguard host', () => {
+    const rewritten = rewriteWidgetProviderCategoryOrThrow(PROVIDER_XML, NAME);
+
+    expect(rewritten).toContain('android:widgetCategory="home_screen|keyguard"');
+  });
+
+  it('is idempotent on an already-rewritten provider', () => {
+    const once = rewriteWidgetProviderCategoryOrThrow(PROVIDER_XML, NAME);
+
+    expect(rewriteWidgetProviderCategoryOrThrow(once, NAME)).toBe(once);
+  });
+
+  it('throws when the library requotes the attribute, instead of no-opping', () => {
+    const singleQuoted = PROVIDER_XML.replace(
+      'android:widgetCategory="home_screen"',
+      "android:widgetCategory='home_screen'"
+    );
+
+    expect(() => rewriteWidgetProviderCategoryOrThrow(singleQuoted, NAME)).toThrow(NAME);
+  });
+
+  it('throws when the attribute is gone, instead of no-opping', () => {
+    const withoutCategory = PROVIDER_XML.replace('    android:widgetCategory="home_screen">', '>');
+
+    expect(() => rewriteWidgetProviderCategoryOrThrow(withoutCategory, NAME)).toThrow(
+      /home_screen\|keyguard/
+    );
   });
 });

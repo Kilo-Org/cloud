@@ -22,6 +22,9 @@ vi.mock('react-native-android-widget', () => ({
 
 const NOW = 1_750_000_000_000;
 
+/** The newest result's timestamp, forwarded to the age formatter below. */
+const NEWEST_AT = new Date(NOW - 180_000).toISOString();
+
 type MockElement = {
   kind: string;
   props: {
@@ -62,9 +65,10 @@ function translate(key: string): string {
   return COPY[key] ?? key;
 }
 
-/** The two formatters the app injects, stubbed deterministically. */
-const AGO = '3 min ago';
-const formatAgo = (): string => AGO;
+/** The two formatters the app injects, stubbed deterministically. `formatAgo`
+ * echoes its argument, so the rendered age proves the forwarded timestamp. */
+const formatAgo = (at: string): string => `ago:${at}`;
+const AGO = formatAgo(NEWEST_AT);
 
 function snapshotFor(
   sessions: { status: string; statusUpdatedAt?: string }[],
@@ -175,7 +179,7 @@ const COUNT_ROWS = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
 
 function propsWithNewest(): ReturnType<typeof buildAndroidWidgetProps> {
   return buildAndroidWidgetProps(
-    snapshotFor([{ status: 'busy', statusUpdatedAt: new Date(NOW - 180_000).toISOString() }], 0),
+    snapshotFor([{ status: 'busy', statusUpdatedAt: NEWEST_AT }], 0),
     {},
     translate,
     String,
@@ -508,11 +512,7 @@ describe('the large widget cell', () => {
   it('keeps the rows and swaps the footer result for the stale copy', () => {
     const props = buildAndroidWidgetProps(
       {
-        ...snapshotFor(
-          [{ status: 'busy', statusUpdatedAt: new Date(NOW - 180_000).toISOString() }],
-          0,
-          'stale'
-        ),
+        ...snapshotFor([{ status: 'busy', statusUpdatedAt: NEWEST_AT }], 0, 'stale'),
         needsInput: 2,
         idle: 3,
         running: 4,
@@ -546,10 +546,7 @@ describe('the large widget cell', () => {
     vi.setSystemTime(NOW + 31 * 60_000);
     const props = buildCurrentWidgetProps(
       {
-        ...snapshotFor(
-          [{ status: 'busy', statusUpdatedAt: new Date(NOW - 180_000).toISOString() }],
-          0
-        ),
+        ...snapshotFor([{ status: 'busy', statusUpdatedAt: NEWEST_AT }], 0),
         needsInput: 2,
         idle: 3,
         running: 4,

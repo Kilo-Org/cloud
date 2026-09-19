@@ -20,6 +20,9 @@ import widgetConfig from './widget-config.json';
 
 const NOW = 1_750_000_000_000;
 
+/** The newest result's timestamp, forwarded to the age formatter below. */
+const NEWEST_AT = new Date(NOW - 180_000).toISOString();
+
 const COPY: Record<string, string> = {
   'glanceable.needsInput': 'Needs input',
   'common.idle': 'Idle',
@@ -46,9 +49,13 @@ const translate = (key: string): string => COPY[key] ?? key;
 /**
  * The two formatters the app injects. The builder stays free of i18n and of
  * `Intl`, so the suite hands it the same shapes `count-format.ts` supplies.
+ *
+ * `formatAgo` echoes its argument: the age the props carry is the timestamp the
+ * builder forwarded, so a regression that passed `updatedAt` or any other field
+ * would produce a different string and fail every `newestResultAgo` assertion.
  */
-const AGO = '3 min ago';
-const formatAgo = (): string => AGO;
+const formatAgo = (at: string): string => `ago:${at}`;
+const AGO = formatAgo(NEWEST_AT);
 
 // The extras are module state shared by the publisher and every surface; a
 // case that sets them resets them here so it cannot colour the next one.
@@ -80,8 +87,6 @@ const MIXED = {
   idle: 3,
   running: 4,
 };
-
-const NEWEST_AT = new Date(NOW - 180_000).toISOString();
 
 describe('buildAndroidWidgetProps', () => {
   it('ranks the compact primary count and keeps all expanded numeric counts', () => {

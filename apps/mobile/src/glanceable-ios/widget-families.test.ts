@@ -43,7 +43,12 @@ describe('ActiveAgentsWidget families', () => {
     // front, so a stale→happy swap cannot move the counts.
     expect(large).toContain('{systemRows}');
     expect(large).toContain('{newestResultFooter}');
-    expect(large.lastIndexOf('<Spacer />')).toBeLessThan(large.indexOf('{newestResultFooter}'));
+    // The spacer the comment names sits between the two markers: asserting the
+    // last spacer in the whole slice would also accept one from the footer body
+    // or the mark row, so a deleted spacer here would still pass.
+    expect(
+      large.slice(large.indexOf('{systemRows}'), large.indexOf('{newestResultFooter}'))
+    ).toContain('<Spacer />');
   });
 
   it('prefers the delayed copy over the newest result while the counts are stale', () => {

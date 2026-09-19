@@ -20,9 +20,40 @@ const HOME_AND_KEYGUARD_CATEGORY = 'android:widgetCategory="home_screen|keyguard
  *
  * Pure and import-free on purpose: a unit test requires this file directly, and
  * an `expo` import here would drag the whole config-plugin graph into it.
+ *
+ * @param {string} xml
+ * @returns {string}
  */
 function rewriteWidgetProviderCategory(xml) {
   return xml.replaceAll(HOME_SCREEN_CATEGORY, HOME_AND_KEYGUARD_CATEGORY);
 }
 
-module.exports = { rewriteWidgetProviderCategory };
+/**
+ * Rewrite the provider and prove the keyguard host landed.
+ *
+ * The replacement matches one exact literal, so a library bump that requotes,
+ * reorders, or templates the attribute would match nothing and return the input
+ * unchanged. The mod that writes the file would then skip the write while the
+ * prebuild still succeeded, silently dropping the lock-screen host — exactly
+ * the outcome this rewrite exists to prevent. Assert the outcome and throw
+ * instead, so the drift fails the prebuild.
+ *
+ * `label` names the file in the error; the rewrite itself is pure.
+ *
+ * @param {string} xml
+ * @param {string} [label]
+ * @returns {string}
+ */
+function rewriteWidgetProviderCategoryOrThrow(xml, label) {
+  const rewritten = rewriteWidgetProviderCategory(xml);
+  if (!rewritten.includes(HOME_AND_KEYGUARD_CATEGORY)) {
+    throw new Error(
+      `withActiveAgentsAndroidWidget: ${label ?? 'provider XML'} does not declare ` +
+        `${HOME_AND_KEYGUARD_CATEGORY} after the rewrite; react-native-android-widget ` +
+        `must write ${HOME_SCREEN_CATEGORY} for this mod to rewrite`
+    );
+  }
+  return rewritten;
+}
+
+module.exports = { rewriteWidgetProviderCategory, rewriteWidgetProviderCategoryOrThrow };

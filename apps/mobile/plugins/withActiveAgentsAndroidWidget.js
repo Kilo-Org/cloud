@@ -3,7 +3,7 @@ const path = require('path');
 
 const { withAppBuildGradle, withDangerousMod } = require('expo/config-plugins');
 
-const { rewriteWidgetProviderCategory } = require('./android-widget-category');
+const { rewriteWidgetProviderCategoryOrThrow } = require('./android-widget-category');
 
 const GALLERY_COPY = require('./widget-gallery-copy.json');
 
@@ -64,7 +64,10 @@ configurations.configureEach {
  * to the prebuild's working directory (it captures `projectRoot` only after the
  * dangerous mods have run), so the file it leaves behind is this one. A missing
  * provider means that rule changed, and the widget silently losing its keyguard
- * host is worse than a failed prebuild: throw.
+ * host is worse than a failed prebuild: throw. The same rule guards the
+ * rewrite: `rewriteWidgetProviderCategoryOrThrow` throws when the attribute it
+ * matches is no longer there, so a library bump that reshapes the attribute
+ * fails the prebuild instead of quietly dropping the lock-screen host.
  */
 function withKeyguardWidgetCategory(config, widgets) {
   return withDangerousMod(config, [
@@ -81,7 +84,10 @@ function withKeyguardWidgetCategory(config, widgets) {
           );
         }
         const xml = fs.readFileSync(xmlPath, 'utf8');
-        const rewritten = rewriteWidgetProviderCategory(xml);
+        // The literal replacement silently no-ops when the library changes the
+        // attribute's shape, so assert the keyguard host landed: a provider
+        // that lost it must fail the prebuild rather than ship.
+        const rewritten = rewriteWidgetProviderCategoryOrThrow(xml, xmlName);
         if (rewritten !== xml) {
           fs.writeFileSync(xmlPath, rewritten);
         }

@@ -118,7 +118,7 @@ export function TourAutoOpen() {
   const openedForRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!userId || !isLoaded) {
+    if (!userId) {
       return;
     }
     if (openedForRef.current === userId) {
@@ -135,10 +135,13 @@ export function TourAutoOpen() {
     // a different sign-in, which remounts it — must not inherit the attempt, so
     // spend it there. The binding lives in the boot marker's module state, not a
     // ref, so the remount cannot mistake the second account for the launch
-    // account. The launch account's own consent or usage hold still keeps the
-    // attempt for a later success in this same launch.
+    // account. The launch account's own completion, consent, or usage hold
+    // still keeps the attempt for a later success in this same launch.
     if (!claimTourAutoOpenAttempt(userId)) {
       spendTourAutoOpenAttempt();
+      return;
+    }
+    if (!isLoaded) {
       return;
     }
     // An account that finished the tour can never auto-open; spend the attempt

@@ -211,34 +211,38 @@ describe('TourAutoOpen', () => {
   });
 
   // A warm account switch must not inherit the launch's unspent attempt: if the
-  // launch account held (its usage read never answered), a different account
-  // signing in later in the same process must not auto-open the tour.
-  it('does not auto-open for a warm account switch after a held launch attempt', async () => {
-    usage.isLoaded = false;
-    const renderer = mountAutoOpen();
-    await flushConsentRead();
+  // launch account held (a completion or usage read never answered), a different
+  // account signing in later in the same process must not auto-open the tour.
+  it.each(['completion', 'usage'])(
+    'never auto-opens after a warm switch during %s loading',
+    async hold => {
+      state.isLoaded = hold !== 'completion';
+      usage.isLoaded = hold !== 'usage';
+      const renderer = mountAutoOpen();
+      await flushConsentRead();
 
-    // The launch account holds on the unanswered usage read: no push, unspent.
-    expect(routerPush).not.toHaveBeenCalled();
-    expect(boot.spent).toBe(false);
+      // The launch account holds on the unanswered read: no push, unspent.
+      expect(routerPush).not.toHaveBeenCalled();
+      expect(boot.spent).toBe(false);
 
-    // A different account signs in later in the same process with zero usage.
-    state.userId = 'user-2';
-    usage.isLoaded = true;
-    usage.hasUsage = false;
-    rerender(renderer);
-    await flushConsentRead();
+      // A different account signs in later in the same process with zero usage.
+      state.userId = 'user-2';
+      state.isLoaded = true;
+      usage.isLoaded = true;
+      rerender(renderer);
+      await flushConsentRead();
 
-    // The launch attempt belongs to the first account, so the switch spends it
-    // instead of opening the tour.
-    expect(routerPush).not.toHaveBeenCalled();
-    expect(boot.spent).toBe(true);
+      // The launch attempt belongs to the first account, so the switch spends it
+      // instead of opening the tour.
+      expect(routerPush).not.toHaveBeenCalled();
+      expect(boot.spent).toBe(true);
 
-    rerender(renderer);
-    expect(routerPush).not.toHaveBeenCalled();
+      rerender(renderer);
+      expect(routerPush).not.toHaveBeenCalled();
 
-    renderer.unmount();
-  });
+      renderer.unmount();
+    }
+  );
 
   // The consent hold is the other hold that leaves the attempt unspent. The
   // launch account never answered the gate, so a different account signing in
@@ -274,35 +278,39 @@ describe('TourAutoOpen', () => {
   // process-wide attempt survives. A different account signing in remounts the
   // gate: the launch-account binding must survive that remount, or the second
   // account looks like the launch account and auto-opens the tour.
-  it('does not auto-open for a different account that signs in after the gate remounts', async () => {
-    usage.isLoaded = false;
-    const first = mountAutoOpen();
-    await flushConsentRead();
+  it.each(['completion', 'usage'])(
+    'never auto-opens after remounting during %s loading',
+    async hold => {
+      state.isLoaded = hold !== 'completion';
+      usage.isLoaded = hold !== 'usage';
+      const first = mountAutoOpen();
+      await flushConsentRead();
 
-    // The launch account held its unspent attempt; the (app) tree then unmounts
-    // on the sign-out redirect.
-    expect(routerPush).not.toHaveBeenCalled();
-    expect(boot.spent).toBe(false);
-    first.unmount();
+      // The launch account held its unspent attempt; the (app) tree then unmounts
+      // on the sign-out redirect.
+      expect(routerPush).not.toHaveBeenCalled();
+      expect(boot.spent).toBe(false);
+      first.unmount();
 
-    // A different account signs in and remounts the gate, with consent on file
-    // and zero usage.
-    state.userId = 'user-2';
-    usage.isLoaded = true;
-    usage.hasUsage = false;
-    const second = mountAutoOpen();
-    await flushConsentRead();
+      // A different account signs in and remounts the gate, with consent on file
+      // and zero usage.
+      state.userId = 'user-2';
+      state.isLoaded = true;
+      usage.isLoaded = true;
+      const second = mountAutoOpen();
+      await flushConsentRead();
 
-    // The launch attempt belongs to the first account, so the remount spends it
-    // instead of opening the tour.
-    expect(routerPush).not.toHaveBeenCalled();
-    expect(boot.spent).toBe(true);
+      // The launch attempt belongs to the first account, so the remount spends it
+      // instead of opening the tour.
+      expect(routerPush).not.toHaveBeenCalled();
+      expect(boot.spent).toBe(true);
 
-    rerender(second);
-    expect(routerPush).not.toHaveBeenCalled();
+      rerender(second);
+      expect(routerPush).not.toHaveBeenCalled();
 
-    second.unmount();
-  });
+      second.unmount();
+    }
+  );
 
   it('never pushes once the account has finished or skipped the tour', async () => {
     state.isCompleted = true;
@@ -323,17 +331,29 @@ describe('TourAutoOpen', () => {
 
     rerender(renderer);
     expect(routerPush).not.toHaveBeenCalled();
+    expect(boot.attemptUserId).toBeNull();
+    expect(boot.spent).toBe(false);
 
     renderer.unmount();
   });
 
-  it('never pushes before the stored decision has loaded', async () => {
+  it('holds the launch account attempt until its stored decision has loaded', async () => {
     state.isLoaded = false;
     const renderer = mountAutoOpen();
     await flushConsentRead();
 
     rerender(renderer);
     expect(routerPush).not.toHaveBeenCalled();
+    expect(boot.attemptUserId).toBe('user-1');
+    expect(boot.spent).toBe(false);
+
+    state.isLoaded = true;
+    rerender(renderer);
+    expect(routerPush).toHaveBeenCalledWith('/(app)/tour');
+    expect(boot.spent).toBe(true);
+
+    rerender(renderer);
+    expect(routerPush).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });

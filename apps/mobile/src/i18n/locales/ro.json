@@ -3155,6 +3155,14 @@
     "tooManySignInAttempts": "Prea multe încercări de autentificare. Așteaptă și încearcă din nou."
   },
   "models": {
+    "auto": {
+      "frontier": "Automat Avansat",
+      "balanced": "Automat Echilibrat",
+      "efficient": "Automat Eficient",
+      "small": "Automat Mic",
+      "free": "Automat Gratuit",
+      "organization": "Automat de organizație"
+    },
     "dataCollected": "Date colectate",
     "free": "Gratuit",
     "couldNotUpdateFavorites": "Nu s-au putut actualiza favoritele.",

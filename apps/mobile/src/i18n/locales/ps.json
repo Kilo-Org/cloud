@@ -3112,6 +3112,14 @@
     "tooManySignInAttempts": "د ننوتلو ډېرې هڅې وشوې. مهرباني وکړئ انتظار وکړئ او بیا هڅه وکړئ."
   },
   "models": {
+    "auto": {
+      "frontier": "اتومات مخکښ",
+      "balanced": "اتومات متوازن",
+      "efficient": "اتومات اغیزمن",
+      "small": "اتومات کوچنی",
+      "free": "اتومات وړیا",
+      "organization": "اتومات اداره"
+    },
     "dataCollected": "معلومات راټولېږي",
     "free": "وړیا",
     "couldNotUpdateFavorites": "د خوښې ماډلونه تازه نه شول.",

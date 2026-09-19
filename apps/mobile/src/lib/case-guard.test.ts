@@ -40,6 +40,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/use-new-session-repos.ts': 'repo key normalization',
   'lib/organization-invoice-download.ts': 'filename comparison',
   'lib/agent-attachments/validate.ts': 'file-extension normalization',
+  'lib/auth/passkey-client.ts': 'native credential error classification, not display text',
   'lib/auth/use-native-auth.ts': 'email normalization',
   'lib/telemetry/install-error-reporting.ts': 'hostname comparison',
   'lib/pr-review/diff/highlight.ts': 'file-extension normalization',

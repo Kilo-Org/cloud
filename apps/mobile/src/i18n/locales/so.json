@@ -3112,6 +3112,14 @@
     "tooManySignInAttempts": "Isku dayo soo gelitaan oo aad u badan. Fadlan sug oo mar kale isku day."
   },
   "models": {
+    "auto": {
+      "frontier": "Otomaatig Heerka ugu sarreeya",
+      "balanced": "Otomaatig Dheellitiran",
+      "efficient": "Otomaatig Waxtar leh",
+      "small": "Otomaatig Yar",
+      "free": "Otomaatig Bilaash",
+      "organization": "Otomaatig Hay'adda"
+    },
     "dataCollected": "Xog la ururiyay",
     "free": "Bilaash",
     "couldNotUpdateFavorites": "Kuwa la jecel yahay lama cusboonaysiin karin.",

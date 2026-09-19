@@ -3112,6 +3112,14 @@
     "tooManySignInAttempts": "Həddindən çox giriş cəhdi edilib. Bir az gözlə və yenidən cəhd et."
   },
   "models": {
+    "auto": {
+      "frontier": "Avtomatik Qabaqcıl",
+      "balanced": "Avtomatik Balanslı",
+      "efficient": "Avtomatik Səmərəli",
+      "small": "Avtomatik Kiçik",
+      "free": "Avtomatik Pulsuz",
+      "organization": "Təşkilat Avtomatik"
+    },
     "dataCollected": "Məlumat toplanır",
     "free": "Pulsuz",
     "couldNotUpdateFavorites": "Sevimliləri yeniləmək mümkün olmadı.",

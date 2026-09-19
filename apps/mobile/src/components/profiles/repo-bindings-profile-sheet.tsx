@@ -53,6 +53,12 @@ export function ProfilePickerSheet({
         isRetrying={isRefetching}
       />
     );
+  } else if (profiles.length === 0) {
+    body = (
+      <Text className="px-4 py-3 text-sm text-muted-foreground">
+        {t('agentChat.newSession.noProfiles')}
+      </Text>
+    );
   } else {
     body = profiles.map(profile => (
       <Pressable

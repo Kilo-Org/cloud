@@ -78,8 +78,9 @@ export function ProfileCommandsScreen({
   const serverCommands = useMemo(() => serverRows.map(row => row.command), [serverRows]);
 
   // The screen owns the ordered list — `setCommands` replaces the whole list,
-  // so a move/delete/edit works on a local copy and the sync below swaps in
-  // server truth whenever a refetch lands.
+  // so a move/delete/edit works on a local copy. Refetches must not replace
+  // drafts typed after the last submitted payload (including blank rows), or
+  // a newer payload whose save is still pending.
   const [commands, setCommands] = useState<string[]>(serverCommands);
   const [syncedCommands, setSyncedCommands] = useState<string[]>(serverCommands);
   const persistedRef = useRef<string[]>(serverCommands);
@@ -88,8 +89,13 @@ export function ProfileCommandsScreen({
   const [generation, setGeneration] = useState(0);
   if (serverCommands !== syncedCommands) {
     setSyncedCommands(serverCommands);
-    setCommands(serverCommands);
-    persistedRef.current = serverCommands;
+    if (!saveCommands.isPending) {
+      if (sameCommands(commands, persistedRef.current) && !sameCommands(commands, serverCommands)) {
+        setCommands(serverCommands);
+        setGeneration(current => current + 1);
+      }
+      persistedRef.current = serverCommands;
+    }
   }
 
   const persist = async (next: string[]) => {

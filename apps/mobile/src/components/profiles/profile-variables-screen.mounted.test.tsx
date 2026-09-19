@@ -312,6 +312,40 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
+  it('disables deletion while pending and restores it after a failed delete', async () => {
+    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.isPending = false;
+    const pending = Promise.withResolvers<unknown>();
+    h.mutations.deleteVar.mutateAsync.mockReturnValue(pending.promise);
+    const { renderer, queryClient, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Delete');
+    act(() => {
+      confirmAlert(h.alert as TestAlertMock);
+    });
+    h.mutations.deleteVar.isPending = true;
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(findPressable(renderer.root, 'Delete').props.disabled).toBe(true);
+    pressPressable(renderer.root, 'Delete');
+    expect(h.alert).toHaveBeenCalledTimes(1);
+    expect(h.mutations.deleteVar.mutateAsync).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      pending.reject(new Error('Network unavailable'));
+      await Promise.resolve();
+    });
+    h.mutations.deleteVar.isPending = false;
+    await act(async () => {
+      rerenderScreen(renderer, queryClient);
+      await Promise.resolve();
+    });
+    expect(findPressable(renderer.root, 'Delete').props.disabled).toBe(false);
+    pressPressable(renderer.root, 'Delete');
+    expect(h.alert).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+
   it('keeps the rows while a refetch is in flight', async () => {
     h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;

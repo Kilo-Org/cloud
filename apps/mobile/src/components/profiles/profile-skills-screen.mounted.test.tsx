@@ -163,6 +163,28 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
+  it('clears the stored description when it is removed from frontmatter', async () => {
+    h.query.data = testProfile([
+      testSkill({
+        rawMarkdown: '---\nname: code-review\ndescription: Old description\n---\nBody',
+      }),
+    ]);
+    h.query.isPending = false;
+    h.mutations.updateSkill.mutateAsync.mockResolvedValue({ success: true });
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit skill');
+    changeText(renderer.root, 'Skill content', '---\nname: code-review\n---\nBody');
+    pressSheetDone(renderer.root);
+    expect(h.mutations.updateSkill.mutateAsync).toHaveBeenCalledWith({
+      profileId: 'profile-1',
+      skillId: 'skill-1',
+      name: 'code-review',
+      rawMarkdown: '---\nname: code-review\n---\nBody',
+      description: null,
+    });
+    unmount();
+  });
+
   it('happy: a valid add saves through createCustomSkill and closes the sheet', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;

@@ -44,11 +44,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/trpc', () => {
   function queryProcedure(name: keyof typeof mocks.queries, path: string) {
     return {
-      pathFilter: () => ({ queryKey: ['agentProfiles', path] }),
+      pathFilter: () => ({ queryKey: [['agentProfiles', path]] }),
       queryOptions: (input: unknown) => {
         mocks.queryInputs[name] = input;
         return {
-          queryKey: ['agentProfiles', path, input],
+          queryKey: [['agentProfiles', path], { input, type: 'query' }],
           queryFn: () => mocks.queries[name](),
         };
       },
@@ -66,7 +66,7 @@ vi.mock('@/lib/trpc', () => {
   }
   const trpc = {
     agentProfiles: {
-      pathFilter: () => ({ queryKey: ['agentProfiles'] }),
+      pathFilter: () => ({ queryKey: [['agentProfiles']] }),
       list: queryProcedure('list', 'list'),
       listCombined: queryProcedure('listCombined', 'listCombined'),
       get: queryProcedure('get', 'get'),
@@ -154,6 +154,8 @@ function current<T>(holder: { current: T | null }): T {
   }
   return result;
 }
+
+const key = (path: string, input: object) => [['agentProfiles', path], { input, type: 'query' }];
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
@@ -262,7 +264,7 @@ describe('useAgentProfileMutations', () => {
       isSecret: false,
     });
     await waitFor(() => invalidateSpy.mock.calls.length > 0);
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['agentProfiles'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: [['agentProfiles']] });
     unmount();
   });
 
@@ -305,7 +307,7 @@ describe('useAgentProfileMutations', () => {
     );
 
     const queryClient = createTestQueryClient();
-    const listKey = ['agentProfiles', 'list', {}];
+    const listKey = [['agentProfiles', 'list'], { input: {}, type: 'query' }];
     queryClient.setQueryData<AgentProfileListItem[]>(listKey, [
       summary({ id: 'personal-1', isDefault: true }),
       summary({ id: 'personal-2', isDefault: false }),
@@ -340,11 +342,88 @@ describe('useAgentProfileMutations', () => {
     unmount();
   });
 
+  it.each([
+    { organizationId: 'org-1', clear: false, personalDefault: true, orgDefault: true },
+    { organizationId: 'org-1', clear: true, personalDefault: true, orgDefault: false },
+    { organizationId: undefined, clear: false, personalDefault: true, orgDefault: true },
+    { organizationId: undefined, clear: true, personalDefault: false, orgDefault: true },
+  ])(
+    'scopes default writes to their owner: %j',
+    async ({ organizationId, clear, personalDefault, orgDefault }) => {
+      const deferred = Promise.withResolvers<{ success: boolean }>();
+      const mutationFn = clear ? mocks.mutations.clearDefault : mocks.mutations.setAsDefault;
+      mutationFn.mockReturnValue(deferred.promise);
+      const queryClient = createTestQueryClient();
+      const combinedKey = key('listCombined', { organizationId: 'org-1' });
+      const otherCombinedKey = key('listCombined', { organizationId: 'org-2' });
+      const personal = summary({ id: 'personal', isDefault: true, ownerType: 'user' });
+      const org = summary({ id: 'org', isDefault: true, ownerType: 'organization' });
+      const combined = {
+        personalProfiles: [personal],
+        orgProfiles: [org],
+        effectiveDefaultId: 'personal',
+      };
+      queryClient.setQueryData(combinedKey, combined);
+      queryClient.setQueryData(otherCombinedKey, combined);
+      for (const scope of [undefined, 'org-1', 'org-2']) {
+        const profile = scope ? org : personal;
+        queryClient.setQueryData(key('list', { organizationId: scope }), [profile]);
+        queryClient.setQueryData(
+          key('get', { organizationId: scope, profileId: profile.id }),
+          profile
+        );
+      }
+      const holder: { current: MutationsResult | null } = { current: null };
+      const { unmount } = await renderWithProviders(
+        createElement(MutationsProbe, { holder, organizationId }),
+        { queryClient }
+      );
+      let pending: Promise<unknown> | undefined = undefined;
+      act(() => {
+        const mutation = clear ? current(holder).clearDefault : current(holder).setAsDefault;
+        pending = mutation.mutateAsync({ profileId: organizationId ? 'org' : 'personal' });
+      });
+      await waitFor(() => mutationFn.mock.calls.length > 0);
+      expect(queryClient.getQueryData(combinedKey)).toEqual({
+        personalProfiles: [{ ...personal, isDefault: personalDefault }],
+        orgProfiles: [{ ...org, isDefault: orgDefault }],
+        effectiveDefaultId: personalDefault ? 'personal' : 'org',
+      });
+      expect(queryClient.getQueryData(otherCombinedKey)).toEqual({
+        personalProfiles: [{ ...personal, isDefault: personalDefault }],
+        orgProfiles: [org],
+        effectiveDefaultId: personalDefault ? 'personal' : 'org',
+      });
+      for (const scope of [undefined, 'org-1', 'org-2']) {
+        const profile = scope ? org : personal;
+        const orgIsDefault = scope === 'org-1' ? orgDefault : true;
+        const isDefault = scope === undefined ? personalDefault : orgIsDefault;
+        expect(queryClient.getQueryData(key('list', { organizationId: scope }))).toEqual([
+          { ...profile, isDefault },
+        ]);
+        expect(
+          queryClient.getQueryData(key('get', { organizationId: scope, profileId: profile.id }))
+        ).toEqual({ ...profile, isDefault });
+      }
+      await act(async () => {
+        deferred.reject(new Error('Default write failed'));
+        await pending?.catch(() => undefined);
+      });
+      expect(queryClient.getQueryData(combinedKey)).toEqual(combined);
+      expect(queryClient.getQueryData(otherCombinedKey)).toEqual(combined);
+      expect(mocks.toastError).toHaveBeenCalledExactlyOnceWith('Default write failed');
+      unmount();
+    }
+  );
+
   it('setSkillEnabled applies optimistically to the profile detail', async () => {
     mocks.mutations.setSkillEnabled.mockResolvedValue({ success: true });
 
     const queryClient = createTestQueryClient();
-    const detailKey = ['agentProfiles', 'get', { profileId: 'profile-1' }];
+    const detailKey = [
+      ['agentProfiles', 'get'],
+      { input: { profileId: 'profile-1' }, type: 'query' },
+    ];
     queryClient.setQueryData(detailKey, {
       id: 'profile-1',
       name: 'Profile',

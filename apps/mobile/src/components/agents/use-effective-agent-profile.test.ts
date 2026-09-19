@@ -2,6 +2,8 @@ import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 import { useQuery } from '@tanstack/react-query';
+import { profileOrganizationId } from '@/components/profiles/profile-owner-model';
+import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
 
 import {
   resolveCombinedDefault,
@@ -256,6 +258,32 @@ describe('useEffectiveAgentProfile', () => {
     expect(result.allProfiles.map(p => p.id)).toEqual(['a', 'default']);
     expect(result.profileId).toBe('default');
     expect(result.hasOverride).toBe(false);
+  });
+
+  it.each(['personal', 'org'])('retains ownership for the %s default profile editor', defaultId => {
+    vi.mocked(useQuery, { partial: true }).mockReturnValue({
+      data: {
+        orgProfiles: [withOwner(profile({ id: 'org' }), 'organization')],
+        personalProfiles: [withOwner(profile({ id: 'personal' }), 'user')],
+        effectiveDefaultId: defaultId,
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const result = mountProfile('org-1');
+    expect(result.profile).toMatchObject({
+      id: defaultId,
+      ownerType: defaultId === 'org' ? 'organization' : 'user',
+    });
+    if (!result.profile) {
+      throw new Error('Expected a default profile');
+    }
+    expect(
+      getProfileOverviewPath(result.profile.id, profileOrganizationId('org-1', result.profile))
+    ).toBe(
+      `/(app)/(tabs)/(3_profile)/profiles/${defaultId}${defaultId === 'org' ? '?organizationId=org-1' : ''}`
+    );
   });
 
   it('composes org and personal profiles for the org picker', () => {

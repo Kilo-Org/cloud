@@ -225,6 +225,43 @@ describe('RepoBindingsScreen', () => {
     unmount();
   });
 
+  it('explains an empty profile picker and lets the user close it', async () => {
+    h.bindingsQuery.isLoading = false;
+    h.profileList.personalProfiles = [];
+    const { renderer, unmount } = await mountScreen();
+    pressButton(renderer.root, 'Add default');
+    pressPressable(renderer.root, 'Select profile');
+    const sheet = findOne(renderer.root, 'SessionPageSheet');
+    expect(findAll(sheet, 'Text').map(node => node.props.children)).toContain(
+      'No profiles yet. Create one to add environment variables, MCP servers, and skills.'
+    );
+    act(() => {
+      (findOne(sheet, 'SheetHeader').props as { onCancel: () => void }).onCancel();
+    });
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
+    expect(findButton(renderer.root, 'Add default').props.disabled).toBe(true);
+    unmount();
+  });
+
+  it.each(['loading', 'error'] as const)('shows the profile picker %s state', async state => {
+    h.bindingsQuery.isLoading = false;
+    h.profileList.personalProfiles = [];
+    h.profileList.isLoading = state === 'loading';
+    h.profileList.isError = state === 'error';
+    const { renderer, unmount } = await mountScreen();
+    pressButton(renderer.root, 'Add default');
+    pressPressable(renderer.root, 'Select profile');
+    const sheet = findOne(renderer.root, 'SessionPageSheet');
+    expect(findAll(sheet, state === 'loading' ? 'Skeleton' : 'QueryError')).toHaveLength(1);
+    if (state === 'error') {
+      act(() => {
+        (findOne(sheet, 'QueryError').props as { onRetry: () => void }).onRetry();
+      });
+      expect(h.profileList.refetch).toHaveBeenCalledTimes(1);
+    }
+    unmount();
+  });
+
   it('happy: picking a repo and a profile binds through bindToRepo', async () => {
     Object.assign(h.bindingsQuery, { isLoading: false });
     h.mutations.bind.mutateAsync.mockResolvedValue({ success: true });

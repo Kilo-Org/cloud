@@ -54,6 +54,7 @@ function valueFieldPlaceholder(
 
 type VariableRowViewProps = Readonly<{
   row: VariableRow;
+  isDeleting?: boolean;
   /**
    * Optional row-level reveal. The profile Variables screen omits it so a
    * secret is only ever revealed from the edit form; the draft editors pass it
@@ -73,6 +74,7 @@ type VariableRowViewProps = Readonly<{
  */
 export function VariableRowView({
   row,
+  isDeleting = false,
   revealed = false,
   onToggleReveal,
   onEdit,
@@ -127,6 +129,8 @@ export function VariableRowView({
         className="h-11 w-11 items-center justify-center active:opacity-70"
         accessibilityRole="button"
         accessibilityLabel={t('common.delete')}
+        disabled={isDeleting}
+        accessibilityState={{ disabled: isDeleting }}
         onPress={onDelete}
       >
         <Trash2 size={18} color={colors.destructive} />

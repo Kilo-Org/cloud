@@ -1,4 +1,5 @@
-import { type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import { type Query, type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { toast } from 'sonner-native';
 
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
@@ -69,6 +70,21 @@ export function useAgentProfileMutations(organizationId?: string) {
   const listFilter = trpc.agentProfiles.list.pathFilter();
   const combinedFilter = trpc.agentProfiles.listCombined.pathFilter();
   const detailFilter = trpc.agentProfiles.get.pathFilter();
+  const belongsToOwner = ({ queryKey }: Query) => {
+    // These filters only visit tRPC profile queries, which share this input envelope.
+    const options = queryKey[1] as
+      | {
+          input?: inferRouterInputs<MobileRouter>['agentProfiles']['list'];
+        }
+      | undefined;
+    return options?.input?.organizationId === organizationId;
+  };
+  const defaultListFilter = { ...listFilter, predicate: belongsToOwner };
+  const defaultCombinedFilter = {
+    ...combinedFilter,
+    predicate: organizationId === undefined ? undefined : belongsToOwner,
+  };
+  const defaultDetailFilter = { ...detailFilter, predicate: belongsToOwner };
 
   const invalidateProfiles = () => {
     void queryClient.invalidateQueries(profilesFilter);
@@ -84,35 +100,44 @@ export function useAgentProfileMutations(organizationId?: string) {
   };
 
   const applyDefault = (defaultId: string | null) => {
-    queryClient.setQueriesData<AgentProfileListItem[]>({ queryKey: listFilter.queryKey }, old =>
+    queryClient.setQueriesData<AgentProfileListItem[]>(defaultListFilter, old =>
       old ? withDefaultFlag(old, defaultId) : old
     );
-    queryClient.setQueriesData<AgentProfileListCombined>(
-      { queryKey: combinedFilter.queryKey },
-      old =>
-        old
-          ? {
-              orgProfiles: withDefaultFlag(old.orgProfiles, defaultId),
-              personalProfiles: withDefaultFlag(old.personalProfiles, defaultId),
-              effectiveDefaultId: defaultId,
-            }
-          : old
-    );
-    queryClient.setQueriesData<AgentProfileDetail>({ queryKey: detailFilter.queryKey }, old =>
+    queryClient.setQueriesData<AgentProfileListCombined>(defaultCombinedFilter, old => {
+      if (!old) {
+        return old;
+      }
+      const orgProfiles =
+        organizationId === undefined
+          ? old.orgProfiles
+          : withDefaultFlag(old.orgProfiles, defaultId);
+      const personalProfiles =
+        organizationId === undefined
+          ? withDefaultFlag(old.personalProfiles, defaultId)
+          : old.personalProfiles;
+      return {
+        ...old,
+        orgProfiles,
+        personalProfiles,
+        effectiveDefaultId:
+          personalProfiles.find(profile => profile.isDefault)?.id ??
+          orgProfiles.find(profile => profile.isDefault)?.id ??
+          null,
+      };
+    });
+    queryClient.setQueriesData<AgentProfileDetail>(defaultDetailFilter, old =>
       old ? withDefaultDetail(old, defaultId) : old
     );
   };
 
   const snapshotProfiles = async () => {
-    await queryClient.cancelQueries({ queryKey: listFilter.queryKey });
-    await queryClient.cancelQueries({ queryKey: combinedFilter.queryKey });
-    await queryClient.cancelQueries({ queryKey: detailFilter.queryKey });
+    await queryClient.cancelQueries(defaultListFilter);
+    await queryClient.cancelQueries(defaultCombinedFilter);
+    await queryClient.cancelQueries(defaultDetailFilter);
     const previous: [QueryKey, unknown][] = [
-      ...queryClient.getQueriesData<AgentProfileListItem[]>({ queryKey: listFilter.queryKey }),
-      ...queryClient.getQueriesData<AgentProfileListCombined>({
-        queryKey: combinedFilter.queryKey,
-      }),
-      ...queryClient.getQueriesData<AgentProfileDetail>({ queryKey: detailFilter.queryKey }),
+      ...queryClient.getQueriesData<AgentProfileListItem[]>(defaultListFilter),
+      ...queryClient.getQueriesData<AgentProfileListCombined>(defaultCombinedFilter),
+      ...queryClient.getQueriesData<AgentProfileDetail>(defaultDetailFilter),
     ];
     return { generation: nextMutationGeneration(DEFAULT_MUTATION_KEY), previous };
   };

@@ -119,6 +119,7 @@ import { ActiveProfileIndicator } from '@/components/agents/active-profile-indic
 import { buildActiveProfileIndicatorState } from '@/components/agents/active-profile-indicator-model';
 import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
+import { profileOrganizationId } from '@/components/profiles/profile-owner-model';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import {
   SESSION_SLOW_LOAD_MS,
@@ -485,7 +486,12 @@ export function SessionDetailContent({
   });
   const openSessionProfileEditor = () => {
     if (sessionProfile) {
-      router.push(getProfileOverviewPath(sessionProfile.id, organizationId));
+      router.push(
+        getProfileOverviewPath(
+          sessionProfile.id,
+          profileOrganizationId(organizationId, sessionProfile)
+        )
+      );
     }
   };
 

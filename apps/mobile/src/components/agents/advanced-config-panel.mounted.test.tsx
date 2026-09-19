@@ -267,6 +267,19 @@ describe('AdvancedConfigPanel', () => {
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
   });
 
+  it('offers Save as Profile only for commands that will be persisted', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+    press(buttonByText(renderer, 'Add command'));
+    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    typeInto(renderer, 'Command', '   ');
+    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+    typeInto(renderer, 'Command', 'pnpm install');
+    expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
+    typeInto(renderer, 'Command', '');
+    expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+  });
+
   it('offers Save as Profile once a manual variable exists', () => {
     const renderer = mount();
     press(byLabel(renderer, 'Advanced Configuration'));

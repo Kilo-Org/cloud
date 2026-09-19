@@ -103,6 +103,9 @@ export function ProfileVariablesScreen({
   };
 
   const runDelete = async (key: string) => {
+    if (deleteVar.isPending) {
+      return;
+    }
     try {
       await deleteVar.mutateAsync({ profileId, key });
     } catch (error) {
@@ -115,6 +118,9 @@ export function ProfileVariablesScreen({
   };
 
   const confirmDelete = (key: string) => {
+    if (deleteVar.isPending) {
+      return;
+    }
     Alert.alert(t('common.delete'), key, [
       { text: t('common.cancel'), style: 'cancel' },
       {
@@ -175,6 +181,7 @@ export function ProfileVariablesScreen({
             <VariableRowView
               key={row.key}
               row={row}
+              isDeleting={deleteVar.isPending}
               onEdit={() => {
                 setEditingKey(row.key);
               }}

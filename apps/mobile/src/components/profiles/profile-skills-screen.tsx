@@ -119,7 +119,12 @@ export function ProfileSkillsScreen({
     try {
       await (target === null
         ? createCustomSkill.mutateAsync({ profileId, ...submission })
-        : updateSkill.mutateAsync({ profileId, skillId: target.id, ...submission }));
+        : updateSkill.mutateAsync({
+            profileId,
+            skillId: target.id,
+            ...submission,
+            description: submission.description ?? null,
+          }));
     } catch (error) {
       if (!hasUsableMessage(error)) {
         toast.error(t('profiles.skillSaveFailed'));

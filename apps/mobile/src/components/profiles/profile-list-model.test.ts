@@ -12,7 +12,7 @@ type TestProfile = {
   name: string;
   isDefault: boolean;
   varCount: number;
-  commandCount: number;
+  mcpServerCount: number;
   skillCount: number;
 };
 
@@ -21,7 +21,7 @@ function profile(overrides: Partial<TestProfile> & { id: string }): TestProfile 
     name: 'Backend debugging',
     isDefault: false,
     varCount: 0,
-    commandCount: 0,
+    mcpServerCount: 0,
     skillCount: 0,
     ...overrides,
   };
@@ -104,26 +104,26 @@ describe('isEffectiveDefault', () => {
 });
 
 describe('profileCounts', () => {
-  it('returns the var / command / skill triple', () => {
+  it('returns the var / MCP / skill triple', () => {
     expect(
-      profileCounts(profile({ id: 'a', varCount: 3, commandCount: 2, skillCount: 1 }))
-    ).toEqual({ varCount: 3, commandCount: 2, skillCount: 1 });
+      profileCounts(profile({ id: 'a', varCount: 3, mcpServerCount: 2, skillCount: 1 }))
+    ).toEqual({ varCount: 3, mcpServerCount: 2, skillCount: 1 });
   });
 });
 
 describe('profileListCountItems', () => {
   it('resolves the non-zero counts in web order', () => {
-    expect(profileListCountItems({ varCount: 3, commandCount: 2, skillCount: 1 })).toEqual([
+    expect(profileListCountItems({ varCount: 3, mcpServerCount: 2, skillCount: 1 })).toEqual([
       { kind: 'vars', count: 3 },
-      { kind: 'commands', count: 2 },
+      { kind: 'mcp', count: 2 },
       { kind: 'skills', count: 1 },
     ]);
-    expect(profileListCountItems({ varCount: 0, commandCount: 2, skillCount: 0 })).toEqual([
-      { kind: 'commands', count: 2 },
+    expect(profileListCountItems({ varCount: 0, mcpServerCount: 2, skillCount: 0 })).toEqual([
+      { kind: 'mcp', count: 2 },
     ]);
   });
 
   it('resolves nothing when every count is zero', () => {
-    expect(profileListCountItems({ varCount: 0, commandCount: 0, skillCount: 0 })).toEqual([]);
+    expect(profileListCountItems({ varCount: 0, mcpServerCount: 0, skillCount: 0 })).toEqual([]);
   });
 });

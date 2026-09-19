@@ -369,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "Kulayishwe amafayela angu-{{displayCount}} kwangu-{{total}}",
       "filesStillLoading": "Amafayela asalayishwa. Donsela phansi ukuze uvuselele.",
       "goToOverview": "Iya ekubukeni konke",
-      "goToOverviewTab": "Iya kuthebhu yokubuka konke"
+      "goToOverviewTab": "Iya kuthebhu yokubuka konke",
+      "expandAllLines_one": "Nweba wonke umugqa ongu-{{displayCount}}",
+      "expandAllLines_other": "Nweba yonke imigqa engu-{{displayCount}}",
+      "expandLines_one": "Nweba umugqa ongu-{{displayCount}} ({{start}}–{{end}})",
+      "expandLines_other": "Nweba imigqa engu-{{displayCount}} ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Nweba umugqa womongo ongu-{{displayCount}}",
+      "expandLinesOfContext_other": "Nweba imigqa yomongo engu-{{displayCount}}",
+      "expandMoreLines_one": "Nweba omunye umugqa ongu-{{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_other": "Nweba eminye imigqa engu-{{displayCount}} ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "kulayishwe ifayela elingu-{{loaded}} kwangu-{{total}}",
+      "loadedOfTotalFiles_other": "kulayishwe amafayela angu-{{loaded}} kwangu-{{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ akukho mugqa omusha ekugcineni kwefayela",
@@ -559,7 +569,9 @@
         "outdatedOnPath": "Aphelelwe yisikhathi ku-{{path}}"
       },
       "deletedUser": "umsebenzisi osusiwe",
-      "replyForbiddenTerm": "Awunayo imvume yokuphendula ku-{{term}}."
+      "replyForbiddenTerm": "Awunayo imvume yokuphendula ku-{{term}}.",
+      "moreLinesAbove_one": "… omunye umugqa ongu-{{displayCount}} ngenhla",
+      "moreLinesAbove_other": "… eminye imigqa engu-{{displayCount}} ngenhla"
     },
     "couldNotOpenGitHubAppSettings": "Asikwazanga ukuvula izilungiselelo zohlelo lokusebenza lwe-GitHub.",
     "installKiloGitHubApp": "Faka i-Kilo GitHub App",
@@ -732,7 +744,9 @@
       "statusContext": "Umongo",
       "lineLabel": "umugqa {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(okungenalutho)"
+      "emptyLine": "(okungenalutho)",
+      "truncationBanner_one": "Kuboniswa amafayela okuqala angu-{{limit}} kwangu-{{total}} ashintshiwe — umkhawulo we-API ye-GitHub.",
+      "truncationBanner_other": "Kuboniswa amafayela okuqala angu-{{limit}} kwangu-{{total}} ashintshiwe — umkhawulo we-API ye-GitHub."
     },
     "linkPasteClipboardEmpty": "Ibhodi lokukopisha alinalutho.",
     "linkPasteNotAPullRequest": "Lokhu akusiso isixhumanisi se-PR noma sesicelo sokuhlanganisa",
@@ -906,7 +920,9 @@
       "uploadFailed": "Ukulayisha kwehlulekile.",
       "failedToUploadFile": "Asikwazanga ukulayisha ifayela: {{reason}}.",
       "nothingToPaste": "Akukho ongakunamathisela.",
-      "metadataStripFailed": "Asikwazanga ukususa imininingwane efihliwe yesithombe."
+      "metadataStripFailed": "Asikwazanga ukususa imininingwane efihliwe yesithombe.",
+      "limit_one": "Unganamathisela ifayela afinyelela ku-{{displayCount}}.",
+      "limit_other": "Unganamathisela amafayela afinyelela ku-{{displayCount}}."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1650,7 +1666,11 @@
       "syncFindings": "Vumelanisa okutholakele",
       "syncNow": "Vumelanisa manje",
       "syncQueued": "Ukuvumelanisa kufakwe emgqeni",
-      "syncStatusUnavailable": "Isimo sokuvumelanisa asitholakali."
+      "syncStatusUnavailable": "Isimo sokuvumelanisa asitholakali.",
+      "daysOverdue_one": "Kudlule umnqamulajuqu ngosuku olungu-{{displayCount}}",
+      "daysOverdue_other": "Kudlule umnqamulajuqu ngezinsuku ezingu-{{displayCount}}",
+      "findingsCount_one": "Okutholakele: {{displayCount}}",
+      "findingsCount_other": "Okutholakele: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Okutholakele okungakaxazululwa",
@@ -2194,7 +2214,13 @@
       "updateTodos": "Buyekeza uhlu lwemisebenzi",
       "linesBadge": "imigqa engu-{{displayCount}}",
       "filesBadge": "amafayela angu-{{displayCount}}",
-      "matchesBadge": "okufanayo okungu-{{displayCount}}"
+      "matchesBadge": "okufanayo okungu-{{displayCount}}",
+      "filesBadge_one": "ifayela elingu-{{displayCount}}",
+      "filesBadge_other": "amafayela angu-{{displayCount}}",
+      "linesBadge_one": "umugqa ongu-{{displayCount}}",
+      "linesBadge_other": "imigqa engu-{{displayCount}}",
+      "matchesBadge_one": "okufanayo okungu-{{displayCount}}",
+      "matchesBadge_other": "okufanayo okungu-{{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "imigqa {{start}}–{{end}} (ifinyeziwe)",
@@ -2484,7 +2510,11 @@
       "files": "Amafayela",
       "couldNotOpenPhotoPicker": "Asikwazanga ukuvula isikhethi sezithombe. Qala kabusha i-Kilo bese uzama futhi.",
       "maxFilesAllowed": "Kuvunyelwe amafayela angeqi ku-{{displayCount}}.",
-      "onlyAddingFiles": "Kwengezwa amafayela angu-{{accepted}} kuphela kwangu-{{total}} (umkhawulo: {{max}})"
+      "onlyAddingFiles": "Kwengezwa amafayela angu-{{accepted}} kuphela kwangu-{{total}} (umkhawulo: {{max}})",
+      "maxFilesAllowed_one": "Kuvunyelwe ifayela angeqi ku-{{displayCount}}.",
+      "maxFilesAllowed_other": "Kuvunyelwe amafayela angeqi ku-{{displayCount}}.",
+      "onlyAddingFiles_one": "Kwengezwa ifayela elingu-{{accepted}} kuphela kwangu-{{total}} (umkhawulo: {{max}})",
+      "onlyAddingFiles_other": "Kwengezwa amafayela angu-{{accepted}} kuphela kwangu-{{total}} (umkhawulo: {{max}})"
     },
     "composer": {
       "addAttachment": "Engeza okunamathiselwe",
@@ -2502,7 +2532,9 @@
       "discardAttachmentsMessage": "Amafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe azosuswa.",
       "discardAttachmentsTitle": "Uyafuna ukulahla okunamathiselwe?",
       "charactersRemaining": "Kusele izinhlamvu ezingu-{{count}}",
-      "insertNewline": "Faka umugqa omusha"
+      "insertNewline": "Faka umugqa omusha",
+      "charactersRemaining_one": "Kusele uhlamvu olungu-{{count}}",
+      "charactersRemaining_other": "Kusele izinhlamvu ezingu-{{count}}"
     },
     "chatLink": {
       "linkCopied": "Isixhumanisi sikopiwe",
@@ -2574,7 +2606,9 @@
       "stepsCount_one": "isinyathelo esi-{{steps}}",
       "stepsCount": "Izinyathelo ezingu-{{steps}}",
       "stepsCount_other": "Izinyathelo ezingu-{{steps}}",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Imodeli ({{displayCount}})",
+      "modelsCount_other": "Amamodeli ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Ukuvumela okuzenzakalelayo",
@@ -2614,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "Izingcingo zamathuluzi",
-      "condensedLabel": "{{itemCount}} izinto; {{last}}"
+      "condensedLabel": "{{itemCount}} izinto; {{last}}",
+      "condensedLabel_one": "{{itemCount}} into; {{last}}",
+      "condensedLabel_other": "{{itemCount}} izinto; {{last}}"
     }
   },
   "bootstrap": {
@@ -2749,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "Le seshini ayikwazi ukwamukela amafayela",
     "cliCantReceiveFilesMessage": "I-Kilo CLI eqhuba le seshini ayikwazi ukwamukela amafayela. Buyekeza i-CLI kulowo mshini noma wabelane kuseshini entsha.",
     "contentlessMessage": "Akukho ongabelana ngakho — akufakiwe umbhalo namafayela.",
-    "couldNotReadContent": "Asikwazanga ukufunda okuqukethwe okwabelwane ngakho."
+    "couldNotReadContent": "Asikwazanga ukufunda okuqukethwe okwabelwane ngakho.",
+    "onlyFirstFilesAttached_one": "Ifayela okuqala angu-{{displayCount}} kuphela azonamathiselwa.",
+    "onlyFirstFilesAttached_other": "Amafayela okuqala angu-{{displayCount}} kuphela azonamathiselwa."
   },
   "kiloPass": {
     "title": "I-Kilo Pass",

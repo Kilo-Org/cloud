@@ -345,8 +345,16 @@ export function buildFilesPage(args: {
   page: number;
   perPage: number;
   rawFiles: PullRequestFileInput[];
+  /**
+   * Whether the REST response carried `Link: rel="next"`. GitHub's own
+   * pagination signal wins when it is present: a page shorter than the
+   * requested size can still have more pages, and the last page carries no
+   * `next` link whatever its length. Without a Link header the page-length
+   * heuristic below is the only signal available.
+   */
+  linkHasNext?: boolean;
 }): GitHubPrReviewFilesResult {
-  const { page, perPage, rawFiles } = args;
+  const { page, perPage, rawFiles, linkHasNext } = args;
   const clampedPage = Math.max(1, Math.min(FILES_MAX_PAGES, page));
   const files: GitHubPrReviewFile[] = rawFiles.map(f => ({
     path: f.filename,
@@ -359,7 +367,8 @@ export function buildFilesPage(args: {
   }));
   const reachedCap = clampedPage >= FILES_MAX_PAGES;
   const shortPage = files.length < perPage;
-  const nextCursor = shortPage || reachedCap ? null : clampedPage + 1;
+  const hasNext = linkHasNext ?? !shortPage;
+  const nextCursor = !hasNext || reachedCap ? null : clampedPage + 1;
   return GitHubPrReviewFilesResultSchema.parse({ files, nextCursor });
 }
 

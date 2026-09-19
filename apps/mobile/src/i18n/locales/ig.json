@@ -369,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "Ebudatala faịlụ {{displayCount}} n'ime {{total}}",
       "filesStillLoading": "A ka na-ebudata faịlụ. Dọrọ ka ị bugharịa.",
       "goToOverview": "Gaa na nchịkọta",
-      "goToOverviewTab": "Gaa na taabụ nchịkọta"
+      "goToOverviewTab": "Gaa na taabụ nchịkọta",
+      "expandAllLines_one": "Gosi ahịrị {{displayCount}} niile",
+      "expandAllLines_other": "Gosi ahịrị {{displayCount}} niile",
+      "expandLines_one": "Gosi ahịrị {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_other": "Gosi ahịrị {{displayCount}} ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Gosi ahịrị {{displayCount}} gbara ya gburugburu",
+      "expandLinesOfContext_other": "Gosi ahịrị {{displayCount}} gbara ya gburugburu",
+      "expandMoreLines_one": "Gosi ahịrị {{displayCount}} ọzọ ({{start}}–{{end}})",
+      "expandMoreLines_other": "Gosi ahịrị {{displayCount}} ọzọ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "ebudatala faịlụ {{loaded}} n'ime {{total}}",
+      "loadedOfTotalFiles_other": "ebudatala faịlụ {{loaded}} n'ime {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ enweghị ahịrị ọhụrụ na njedebe faịlụ",
@@ -559,7 +569,9 @@
         "outdatedOnPath": "Adịla ochie na {{path}}"
       },
       "deletedUser": "onye ọrụ ehichapụrụ",
-      "replyForbiddenTerm": "Ị nweghị ikike ịzaghachi {{term}} a."
+      "replyForbiddenTerm": "Ị nweghị ikike ịzaghachi {{term}} a.",
+      "moreLinesAbove_one": "… ahịrị {{displayCount}} ọzọ dị n'elu.",
+      "moreLinesAbove_other": "… ahịrị {{displayCount}} ọzọ dị n'elu."
     },
     "couldNotOpenGitHubAppSettings": "Enweghị ike imepe ntọala ngwa GitHub.",
     "installKiloGitHubApp": "Tinye ngwa Kilo GitHub",
@@ -732,7 +744,9 @@
       "statusContext": "Ahịrị gbara ya gburugburu",
       "lineLabel": "Ahịrị {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(efu)"
+      "emptyLine": "(efu)",
+      "truncationBanner_one": "A na-egosi faịlụ {{limit}} mbụ n'ime faịlụ {{total}} agbanwere — oke API GitHub.",
+      "truncationBanner_other": "A na-egosi faịlụ {{limit}} mbụ n'ime faịlụ {{total}} agbanwere — oke API GitHub."
     },
     "linkPasteClipboardEmpty": "Ebe nchekwa nwa oge tọgbọ chakoo.",
     "linkPasteNotAPullRequest": "Ọ bụghị njikọ arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta",
@@ -906,7 +920,9 @@
       "uploadFailed": "Enweghị ike ibugo faịlụ.",
       "failedToUploadFile": "Enweghị ike ibugo faịlụ: {{reason}}.",
       "nothingToPaste": "Enweghị ihe a ga-amado.",
-      "metadataStripFailed": "Enweghị ike iwepụ ozi gbasara foto ahụ."
+      "metadataStripFailed": "Enweghị ike iwepụ ozi gbasara foto ahụ.",
+      "limit_one": "Ị nwere ike itinye mgbakwunye faịlụ ruru {{displayCount}}.",
+      "limit_other": "Ị nwere ike itinye mgbakwunye faịlụ ruru {{displayCount}}."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1650,7 +1666,11 @@
       "syncFindings": "Mekọrịta data ihe achọpụtara",
       "syncNow": "Mekọrịta data ugbu a",
       "syncQueued": "E tinyela mmekọrịta data n'ahịrị nchere",
-      "syncStatusUnavailable": "Enweghị ike ịnweta ọnọdụ mmekọrịta data."
+      "syncStatusUnavailable": "Enweghị ike ịnweta ọnọdụ mmekọrịta data.",
+      "daysOverdue_one": "Gafere oge site n'ụbọchị {{displayCount}}",
+      "daysOverdue_other": "Gafere oge site n'ụbọchị {{displayCount}}",
+      "findingsCount_one": "{{displayCount}} ihe achọpụtara",
+      "findingsCount_other": "{{displayCount}} ihe achọpụtara"
     },
     "dashboardMetrics": {
       "openFindings": "Ihe achọpụtara a ka na-arụ na ya",
@@ -2194,7 +2214,13 @@
       "updateTodos": "Melite ndepụta ọrụ",
       "linesBadge": "ahịrị {{displayCount}}",
       "filesBadge": "faịlụ {{displayCount}}",
-      "matchesBadge": "ndakọrịta {{displayCount}}"
+      "matchesBadge": "ndakọrịta {{displayCount}}",
+      "filesBadge_one": "faịlụ {{displayCount}}",
+      "filesBadge_other": "faịlụ {{displayCount}}",
+      "linesBadge_one": "ahịrị {{displayCount}}",
+      "linesBadge_other": "ahịrị {{displayCount}}",
+      "matchesBadge_one": "ndakọrịta {{displayCount}}",
+      "matchesBadge_other": "ndakọrịta {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "ahịrị {{start}}–{{end}} (ebipụrụ akụkụ)",
@@ -2484,7 +2510,11 @@
       "files": "Faịlụ",
       "couldNotOpenPhotoPicker": "Enweghị ike imepe ihe ịhọrọ foto. Malitegharịa Kilo ma nwaa ọzọ.",
       "maxFilesAllowed": "A naghị anabata karịa faịlụ {{displayCount}}.",
-      "onlyAddingFiles": "Na-agbakwunye naanị faịlụ {{accepted}} n'ime {{total}} (oke {{max}})"
+      "onlyAddingFiles": "Na-agbakwunye naanị faịlụ {{accepted}} n'ime {{total}} (oke {{max}})",
+      "maxFilesAllowed_one": "A naghị anabata karịa faịlụ {{displayCount}}.",
+      "maxFilesAllowed_other": "A naghị anabata karịa faịlụ {{displayCount}}.",
+      "onlyAddingFiles_one": "Na-agbakwunye naanị faịlụ {{accepted}} n'ime {{total}} (oke {{max}})",
+      "onlyAddingFiles_other": "Na-agbakwunye naanị faịlụ {{accepted}} n'ime {{total}} (oke {{max}})"
     },
     "composer": {
       "addAttachment": "Tinye ihe mgbakwunye",
@@ -2502,7 +2532,9 @@
       "discardAttachmentsMessage": "A ga-ehichapụ faịlụ ebugotere ndị a na-ejikọtaghị na ozi ezigara.",
       "discardAttachmentsTitle": "Tụfuo faịlụ mgbakwunye?",
       "charactersRemaining": "Mkpụrụedemede {{count}} fọdụrụ",
-      "insertNewline": "Tinye ahịrị ọhụrụ"
+      "insertNewline": "Tinye ahịrị ọhụrụ",
+      "charactersRemaining_one": "Mkpụrụedemede {{count}} fọdụrụ",
+      "charactersRemaining_other": "Mkpụrụedemede {{count}} fọdụrụ"
     },
     "chatLink": {
       "linkCopied": "Edetuola njikọ",
@@ -2574,7 +2606,9 @@
       "stepsCount_one": "nzọụkwụ {{steps}}",
       "stepsCount": "nzọụkwụ {{steps}}",
       "stepsCount_other": "nzọụkwụ {{steps}}",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Ihe nlereanya ({{displayCount}})",
+      "modelsCount_other": "Ihe nlereanya ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Nkwenye akpaka",
@@ -2614,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "Oku ngwá ọrụ",
-      "condensedLabel": "{{itemCount}} ihe; {{last}}"
+      "condensedLabel": "{{itemCount}} ihe; {{last}}",
+      "condensedLabel_one": "{{itemCount}} ihe; {{last}}",
+      "condensedLabel_other": "{{itemCount}} ihe; {{last}}"
     }
   },
   "bootstrap": {
@@ -2749,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "Nnọkọ a enweghị ike ịnata faịlụ",
     "cliCantReceiveFilesMessage": "Kilo CLI na-agba nnọkọ a enweghị ike ịnata faịlụ. Melite CLI na igwe ahụ, ma ọ bụ kekọrịta na nnọkọ ọhụrụ kama.",
     "contentlessMessage": "Ọ dịghị ihe ịkekọrịta — ọ dịghị ederede ma ọ bụ faịlụ etinyere.",
-    "couldNotReadContent": "Enweghị ike ịgụ ọdịnaya e kekọrịtara."
+    "couldNotReadContent": "Enweghị ike ịgụ ọdịnaya e kekọrịtara.",
+    "onlyFirstFilesAttached_one": "Naanị faịlụ {{displayCount}} mbụ ka a ga-etinye.",
+    "onlyFirstFilesAttached_other": "Naanị faịlụ {{displayCount}} mbụ ka a ga-etinye."
   },
   "kiloPass": {
     "title": "Kilo Pass",

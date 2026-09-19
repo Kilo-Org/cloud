@@ -369,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} ਵਿੱਚੋਂ {{displayCount}} ਫਾਈਲਾਂ ਲੋਡ ਹੋਈਆਂ",
       "filesStillLoading": "ਫਾਈਲਾਂ ਅਜੇ ਵੀ ਲੋਡ ਹੋ ਰਹੀਆਂ ਹਨ। ਰੀਫ੍ਰੈਸ਼ ਕਰਨ ਲਈ ਹੇਠਾਂ ਖਿੱਚੋ।",
       "goToOverview": "ਸੰਖੇਪ 'ਤੇ ਜਾਓ",
-      "goToOverviewTab": "ਸੰਖੇਪ ਟੈਬ 'ਤੇ ਜਾਓ"
+      "goToOverviewTab": "ਸੰਖੇਪ ਟੈਬ 'ਤੇ ਜਾਓ",
+      "expandAllLines_one": "ਸਾਰੀਆਂ {{displayCount}} ਲਾਈਨ ਦਿਖਾਓ",
+      "expandAllLines_other": "ਸਾਰੀਆਂ {{displayCount}} ਲਾਈਨਾਂ ਦਿਖਾਓ",
+      "expandLines_one": "{{displayCount}} ਲਾਈਨ ਦਿਖਾਓ ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} ਲਾਈਨਾਂ ਦਿਖਾਓ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "ਆਸ-ਪਾਸ ਦੇ ਕੋਡ ਦੀਆਂ {{displayCount}} ਲਾਈਨ ਦਿਖਾਓ",
+      "expandLinesOfContext_other": "ਆਸ-ਪਾਸ ਦੇ ਕੋਡ ਦੀਆਂ {{displayCount}} ਲਾਈਨਾਂ ਦਿਖਾਓ",
+      "expandMoreLines_one": "ਹੋਰ {{displayCount}} ਲਾਈਨ ਦਿਖਾਓ ({{start}}–{{end}})",
+      "expandMoreLines_other": "ਹੋਰ {{displayCount}} ਲਾਈਨਾਂ ਦਿਖਾਓ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}} ਫਾਈਲਾਂ ਵਿੱਚੋਂ {{loaded}} ਲੋਡ ਹੋਈਆਂ",
+      "loadedOfTotalFiles_other": "{{total}} ਫਾਈਲਾਂ ਵਿੱਚੋਂ {{loaded}} ਲੋਡ ਹੋਈਆਂ"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ਫਾਈਲ ਦੇ ਅੰਤ ਵਿੱਚ ਨਵੀਂ ਲਾਈਨ ਨਹੀਂ ਹੈ।",
@@ -559,7 +569,9 @@
         "outdatedOnPath": "{{path}} 'ਤੇ ਪੁਰਾਣਾ"
       },
       "deletedUser": "ਮਿਟਾਇਆ ਗਿਆ ਵਰਤੋਂਕਾਰ",
-      "replyForbiddenTerm": "ਤੁਹਾਨੂੰ ਇਸ {{term}} 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।"
+      "replyForbiddenTerm": "ਤੁਹਾਨੂੰ ਇਸ {{term}} 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+      "moreLinesAbove_one": "… ਉੱਪਰ {{displayCount}} ਹੋਰ ਲਾਈਨ ਹੈ।",
+      "moreLinesAbove_other": "… ਉੱਪਰ {{displayCount}} ਹੋਰ ਲਾਈਨਾਂ ਹਨ।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ਐਪ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕੀਆਂ।",
     "installKiloGitHubApp": "Kilo GitHub ਐਪ ਸਥਾਪਿਤ ਕਰੋ",
@@ -732,7 +744,9 @@
       "statusContext": "ਬਿਨਾਂ ਬਦਲਾਅ ਵਾਲੀ",
       "lineLabel": "{{status}} ਲਾਈਨ {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(ਖਾਲੀ)"
+      "emptyLine": "(ਖਾਲੀ)",
+      "truncationBanner_one": "ਬਦਲੀਆਂ {{total}} ਫਾਈਲਾਂ ਵਿੱਚੋਂ ਪਹਿਲੀਆਂ {{limit}} ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ — GitHub API ਦੀ ਸੀਮਾ ਹੈ।",
+      "truncationBanner_other": "ਬਦਲੀਆਂ {{total}} ਫਾਈਲਾਂ ਵਿੱਚੋਂ ਪਹਿਲੀਆਂ {{limit}} ਦਿਖਾਈਆਂ ਜਾ ਰਹੀਆਂ ਹਨ — GitHub API ਦੀ ਸੀਮਾ ਹੈ।"
     },
     "linkPasteClipboardEmpty": "ਕਲਿੱਪਬੋਰਡ ਖਾਲੀ ਹੈ।",
     "linkPasteNotAPullRequest": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਨਹੀਂ ਹੈ",
@@ -906,7 +920,9 @@
       "uploadFailed": "ਅੱਪਲੋਡ ਅਸਫਲ ਰਿਹਾ।",
       "failedToUploadFile": "ਫਾਈਲ ਅੱਪਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ: {{reason}}।",
       "nothingToPaste": "ਪੇਸਟ ਕਰਨ ਲਈ ਕੁਝ ਨਹੀਂ ਹੈ।",
-      "metadataStripFailed": "ਫੋਟੋ ਦਾ ਮੈਟਾਡੇਟਾ ਹਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।"
+      "metadataStripFailed": "ਫੋਟੋ ਦਾ ਮੈਟਾਡੇਟਾ ਹਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
+      "limit_one": "ਤੁਸੀਂ ਵੱਧ ਤੋਂ ਵੱਧ {{displayCount}} ਫਾਈਲ ਨੱਥੀ ਕਰ ਸਕਦੇ ਹੋ।",
+      "limit_other": "ਤੁਸੀਂ ਵੱਧ ਤੋਂ ਵੱਧ {{displayCount}} ਫਾਈਲਾਂ ਨੱਥੀ ਕਰ ਸਕਦੇ ਹੋ।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1650,7 +1666,11 @@
       "syncFindings": "ਸਮੱਸਿਆਵਾਂ ਸਿੰਕ ਕਰੋ",
       "syncNow": "ਹੁਣੇ ਸਿੰਕ ਕਰੋ",
       "syncQueued": "ਸਿੰਕ ਕਰਨ ਦੀ ਬੇਨਤੀ ਕਤਾਰ ਵਿੱਚ ਪਾਈ ਗਈ",
-      "syncStatusUnavailable": "ਸਿੰਕ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।"
+      "syncStatusUnavailable": "ਸਿੰਕ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+      "daysOverdue_one": "ਮਿਆਦ ਤੋਂ {{displayCount}} ਦਿਨ ਵੱਧ",
+      "daysOverdue_other": "ਮਿਆਦ ਤੋਂ {{displayCount}} ਦਿਨ ਵੱਧ",
+      "findingsCount_one": "{{displayCount}} ਸਮੱਸਿਆ",
+      "findingsCount_other": "{{displayCount}} ਸਮੱਸਿਆਵਾਂ"
     },
     "dashboardMetrics": {
       "openFindings": "ਖੁੱਲ੍ਹੀਆਂ ਸਮੱਸਿਆਵਾਂ",
@@ -2194,7 +2214,13 @@
       "updateTodos": "ਕੰਮਾਂ ਦੀ ਸੂਚੀ ਅੱਪਡੇਟ ਕਰੋ",
       "linesBadge": "{{displayCount}} ਲਾਈਨਾਂ",
       "filesBadge": "{{displayCount}} ਫਾਈਲਾਂ",
-      "matchesBadge": "{{displayCount}} ਮੇਲ"
+      "matchesBadge": "{{displayCount}} ਮੇਲ",
+      "filesBadge_one": "{{displayCount}} ਫਾਈਲ",
+      "filesBadge_other": "{{displayCount}} ਫਾਈਲਾਂ",
+      "linesBadge_one": "{{displayCount}} ਲਾਈਨ",
+      "linesBadge_other": "{{displayCount}} ਲਾਈਨਾਂ",
+      "matchesBadge_one": "{{displayCount}} ਮੇਲ",
+      "matchesBadge_other": "{{displayCount}} ਮੇਲ"
     },
     "readToolMarkdown": {
       "linesTruncated": "ਲਾਈਨਾਂ {{start}}–{{end}} (ਪੂਰੀ ਸਮੱਗਰੀ ਨਹੀਂ ਦਿਖਾਈ ਗਈ)",
@@ -2484,7 +2510,11 @@
       "files": "ਫਾਈਲਾਂ",
       "couldNotOpenPhotoPicker": "ਫੋਟੋ ਚੁਣਨ ਵਾਲੀ ਸਕ੍ਰੀਨ ਨਹੀਂ ਖੋਲ੍ਹੀ ਜਾ ਸਕੀ। Kilo ਮੁੜ ਚਾਲੂ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "maxFilesAllowed": "ਵੱਧ ਤੋਂ ਵੱਧ {{displayCount}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਸਕਦੀਆਂ ਹਨ।",
-      "onlyAddingFiles": "{{total}} ਵਿੱਚੋਂ ਸਿਰਫ਼ {{accepted}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਰਹੀਆਂ ਹਨ (ਵੱਧ ਤੋਂ ਵੱਧ {{max}})"
+      "onlyAddingFiles": "{{total}} ਵਿੱਚੋਂ ਸਿਰਫ਼ {{accepted}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਰਹੀਆਂ ਹਨ (ਵੱਧ ਤੋਂ ਵੱਧ {{max}})",
+      "maxFilesAllowed_one": "ਵੱਧ ਤੋਂ ਵੱਧ {{displayCount}} ਫਾਈਲ ਜੋੜੀਆਂ ਜਾ ਸਕਦੀਆਂ ਹਨ।",
+      "maxFilesAllowed_other": "ਵੱਧ ਤੋਂ ਵੱਧ {{displayCount}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਸਕਦੀਆਂ ਹਨ।",
+      "onlyAddingFiles_one": "{{total}} ਵਿੱਚੋਂ ਸਿਰਫ਼ {{accepted}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਰਹੀਆਂ ਹਨ (ਵੱਧ ਤੋਂ ਵੱਧ {{max}})",
+      "onlyAddingFiles_other": "{{total}} ਵਿੱਚੋਂ ਸਿਰਫ਼ {{accepted}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਰਹੀਆਂ ਹਨ (ਵੱਧ ਤੋਂ ਵੱਧ {{max}})"
     },
     "composer": {
       "addAttachment": "ਫਾਈਲ ਨੱਥੀ ਕਰੋ",
@@ -2502,7 +2532,9 @@
       "discardAttachmentsMessage": "ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਉਹ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ ਜੋ ਕਿਸੇ ਭੇਜੇ ਗਏ ਸੁਨੇਹੇ ਨਾਲ ਅਟੈਚ ਨਹੀਂ ਹਨ।",
       "discardAttachmentsTitle": "ਕੀ ਅਟੈਚਮੈਂਟਾਂ ਮਿਟਾਉਣੀਆਂ ਹਨ?",
       "charactersRemaining": "{{count}} ਅੱਖਰ ਬਾਕੀ ਹਨ",
-      "insertNewline": "ਨਵੀਂ ਲਾਈਨ ਪਾਓ"
+      "insertNewline": "ਨਵੀਂ ਲਾਈਨ ਪਾਓ",
+      "charactersRemaining_one": "{{count}} ਅੱਖਰ ਬਾਕੀ ਹੈ",
+      "charactersRemaining_other": "{{count}} ਅੱਖਰ ਬਾਕੀ ਹਨ"
     },
     "chatLink": {
       "linkCopied": "ਲਿੰਕ ਕਾਪੀ ਹੋ ਗਿਆ",
@@ -2574,7 +2606,9 @@
       "stepsCount_one": "{{steps}} ਕਦਮ",
       "stepsCount": "{{steps}} ਕਦਮ",
       "stepsCount_other": "{{steps}} ਕਦਮ",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "ਮਾਡਲ ({{displayCount}})",
+      "modelsCount_other": "ਮਾਡਲ ({{displayCount}})"
     },
     "autoApprove": {
       "title": "ਆਟੋ-ਪ੍ਰਵਾਨਗੀ",
@@ -2614,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "ਟੂਲ ਕਾਲਾਂ",
-      "condensedLabel": "{{itemCount}} ਆਈਟਮਾਂ; {{last}}"
+      "condensedLabel": "{{itemCount}} ਆਈਟਮਾਂ; {{last}}",
+      "condensedLabel_one": "{{itemCount}} ਆਈਟਮ; {{last}}",
+      "condensedLabel_other": "{{itemCount}} ਆਈਟਮਾਂ; {{last}}"
     }
   },
   "bootstrap": {
@@ -2749,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "ਇਹ ਸੈਸ਼ਨ ਫਾਈਲਾਂ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ",
     "cliCantReceiveFilesMessage": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਚਲਾਉਣ ਵਾਲਾ Kilo CLI ਫਾਈਲਾਂ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ। ਉਸ ਮਸ਼ੀਨ 'ਤੇ CLI ਅੱਪਡੇਟ ਕਰੋ, ਜਾਂ ਇਸ ਦੀ ਬਜਾਏ ਨਵੇਂ ਸੈਸ਼ਨ ਵਿੱਚ ਸਾਂਝਾ ਕਰੋ।",
     "contentlessMessage": "ਸਾਂਝਾ ਕਰਨ ਲਈ ਕੁਝ ਨਹੀਂ — ਕੋਈ ਟੈਕਸਟ ਜਾਂ ਫਾਈਲ ਸ਼ਾਮਲ ਨਹੀਂ ਸੀ।",
-    "couldNotReadContent": "ਸਾਂਝੀ ਕੀਤੀ ਸਮੱਗਰੀ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ।"
+    "couldNotReadContent": "ਸਾਂਝੀ ਕੀਤੀ ਸਮੱਗਰੀ ਪੜ੍ਹੀ ਨਹੀਂ ਜਾ ਸਕੀ।",
+    "onlyFirstFilesAttached_one": "ਸਿਰਫ਼ ਪਹਿਲੀਆਂ {{displayCount}} ਫਾਈਲ ਨੱਥੀ ਕੀਤੀਆਂ ਜਾਣਗੀਆਂ।",
+    "onlyFirstFilesAttached_other": "ਸਿਰਫ਼ ਪਹਿਲੀਆਂ {{displayCount}} ਫਾਈਲਾਂ ਨੱਥੀ ਕੀਤੀਆਂ ਜਾਣਗੀਆਂ।"
   },
   "kiloPass": {
     "title": "Kilo Pass",

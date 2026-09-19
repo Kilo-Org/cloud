@@ -18,6 +18,25 @@ function makePart(id: string, messageId: string, text = ''): Part {
   return { id, sessionID: 'ses-1', messageID: messageId, type: 'text', text } as Part;
 }
 
+function makeToolPart(
+  id: string,
+  status: 'running' | 'completed',
+  time: { start: number; end?: number }
+): Part {
+  return {
+    id,
+    sessionID: 'ses-1',
+    messageID: 'msg-1',
+    type: 'tool',
+    callID: `call-${id}`,
+    tool: 'task',
+    state:
+      status === 'running'
+        ? { status, input: {}, raw: '', time }
+        : { status, input: {}, raw: '', output: 'done', title: 'task', metadata: {}, time },
+  } as unknown as Part;
+}
+
 describe('createMemoryStorage', () => {
   let s: SessionStorage;
 
@@ -99,6 +118,34 @@ describe('createMemoryStorage', () => {
       const parts = s.getParts('msg-1');
       expect(parts).toHaveLength(1);
       expect(parts[0]).toEqual(expect.objectContaining({ id: 'prt-real', text: 'hello' }));
+    });
+
+    test('keeps a running tool part live when a stale terminal replays through the backend', () => {
+      // The accepted update's ordering evidence lives in the backend's own
+      // store, keyed by the part id: a running update ingested at t=200, a
+      // no-event-time re-delivery of the same run, then an out-of-order
+      // terminal (event time 150) must not settle the part.
+      s.upsertPart('msg-1', makeToolPart('p-1', 'running', { start: 1 }), 200);
+      s.upsertPart('msg-1', makeToolPart('p-1', 'running', { start: 1 }));
+      s.upsertPart('msg-1', makeToolPart('p-1', 'completed', { start: 1, end: 150 }), 150);
+
+      const parts = s.getParts('msg-1');
+      const part = parts.find(p => p.id === 'p-1');
+      expect(part?.type).toBe('tool');
+      expect(part?.type === 'tool' ? part.state.status : undefined).toBe('running');
+    });
+
+    test('drops a deleted part’s ordering evidence with the part', () => {
+      s.upsertPart('msg-1', makeToolPart('p-1', 'running', { start: 1 }), 200);
+      s.deletePart('msg-1', 'p-1');
+      // The removal took the part's evidence with it, so a re-delivered update
+      // is ordered by the part's own state times, not the deleted part's event
+      // time (150 postdates this run's start of 1).
+      s.upsertPart('msg-1', makeToolPart('p-1', 'completed', { start: 1, end: 150 }), 150);
+
+      const parts = s.getParts('msg-1');
+      const part = parts.find(p => p.id === 'p-1');
+      expect(part?.type === 'tool' ? part.state.status : undefined).toBe('completed');
     });
   });
 

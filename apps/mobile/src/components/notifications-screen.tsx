@@ -374,7 +374,12 @@ export function NotificationsScreen() {
         if (deviceToken) {
           queryClient.setQueryData(pushTokensQueryKey, (old: typeof pushTokens) => [
             ...(old ?? []),
-            { token: deviceToken, platform: getPlatform(), locale: getResolvedLanguage() },
+            {
+              token: deviceToken,
+              platform: getPlatform(),
+              locale: getResolvedLanguage(),
+              appVersion: Application.nativeApplicationVersion ?? null,
+            },
           ]);
         }
         return { previous, generation };

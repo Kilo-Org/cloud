@@ -1,14 +1,25 @@
+import { type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { i18n } from '@/i18n';
 import { TestRenderer } from '@/test/renderer';
 
 import { renderProfileRow } from './new-session-profile-row';
+import { useEffectiveAgentProfile } from './use-effective-agent-profile';
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    agentProfiles: {
+      list: { queryOptions: () => ({ queryKey: ['personal-profiles'] }) },
+      listCombined: { queryOptions: () => ({ queryKey: ['combined-profiles'] }) },
+    },
+  }),
+}));
 
 type RowProps = Parameters<typeof renderProfileRow>[0];
 
@@ -22,11 +33,27 @@ const PROFILE = {
 };
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+let client: QueryClient | undefined = undefined;
 
 afterEach(() => {
   renderer?.unmount();
   renderer = undefined;
+  client?.clear();
+  client = undefined;
 });
+
+function QueryProfileRow({ organizationId }: { organizationId?: string }): ReactNode {
+  const result = useEffectiveAgentProfile(organizationId);
+  return renderProfileRow({
+    t: i18n.t.bind(i18n),
+    profile: result.profile,
+    isProfileLoading: result.isLoading,
+    isProfileError: result.isError,
+    onRetryProfile: () => {
+      void result.refetch();
+    },
+  });
+}
 
 function renderRow(overrides: Partial<RowProps> = {}) {
   const element = (
@@ -147,4 +174,93 @@ describe('new-session environment feedback', () => {
       }
     }
   );
+
+  describe.each([
+    { context: 'personal', organizationId: undefined, queryKey: ['personal-profiles'] },
+    { context: 'organization', organizationId: 'org-1', queryKey: ['combined-profiles'] },
+  ])('$context cached profile', ({ organizationId, queryKey }) => {
+    it.each(['profile', 'empty', 'error'] as const)(
+      'shows loading during Retry and settles to %s without remounting',
+      async outcome => {
+        const profiles = [{ ...PROFILE, isDefault: true }];
+        const data = organizationId
+          ? { personalProfiles: profiles, orgProfiles: [], effectiveDefaultId: PROFILE.id }
+          : profiles;
+        const empty = organizationId
+          ? { personalProfiles: [], orgProfiles: [], effectiveDefaultId: null }
+          : [];
+        const refresh = Promise.withResolvers<unknown>();
+        const retry = Promise.withResolvers<unknown>();
+        const queryFn = vi
+          .fn()
+          .mockReturnValueOnce(refresh.promise)
+          .mockReturnValueOnce(retry.promise);
+        const queryClient = new QueryClient({
+          defaultOptions: { queries: { queryFn, retry: false, gcTime: Infinity } },
+        });
+        client = queryClient;
+        queryClient.setQueryData(queryKey, data);
+        TestRenderer.act(() => {
+          renderer = TestRenderer.create(
+            <QueryClientProvider client={queryClient}>
+              <QueryProfileRow organizationId={organizationId} />
+            </QueryClientProvider>
+          );
+        });
+        if (!renderer) {
+          throw new Error('Profile row did not mount');
+        }
+        const root = renderer.root;
+        const slot = body(root);
+
+        // A normal background refresh must keep the successful cached profile visible.
+        expect(text(root)).toContain('Production');
+        expect(root.findAllByType('Skeleton')).toHaveLength(0);
+        TestRenderer.act(() => {
+          refresh.reject(new Error('Profile request failed'));
+        });
+        await vi.waitFor(() => {
+          expect(text(root)).toContain("Couldn't load your environment");
+        });
+
+        const onPress = root.findByType('Button').props.onPress as () => void;
+        TestRenderer.act(onPress);
+        await vi.waitFor(() => {
+          expect(queryFn).toHaveBeenCalledTimes(2);
+        });
+        expect(queryClient.getQueryState(queryKey)).toMatchObject({
+          status: 'error',
+          fetchStatus: 'fetching',
+          data,
+        });
+        await vi.waitFor(() => {
+          expect(text(root)).toContain('Loading…');
+        });
+        expect(text(root)).not.toContain("Couldn't load your environment");
+        expect(text(root)).not.toContain('Production');
+        expect(root.findAllByType('Button')).toHaveLength(0);
+        expect(root.findAllByType('Skeleton')).toHaveLength(1);
+        expect(body(root)).toBe(slot);
+
+        TestRenderer.act(() => {
+          if (outcome === 'error') {
+            retry.reject(new Error('Retry failed'));
+          } else {
+            retry.resolve(outcome === 'empty' ? empty : data);
+          }
+        });
+        const title = {
+          error: "Couldn't load your environment",
+          empty: 'Default environment',
+          profile: 'Production',
+        }[outcome];
+        await vi.waitFor(() => {
+          expect(text(root)).toContain(title);
+        });
+        expect(root.findAllByType('Button')).toHaveLength(outcome === 'error' ? 1 : 0);
+        expect(root.findAllByType('Skeleton')).toHaveLength(0);
+        expect(body(root)).toBe(slot);
+      }
+    );
+  });
 });

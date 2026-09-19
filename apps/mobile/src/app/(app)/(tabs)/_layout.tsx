@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
+import { TabBarButton } from '@/components/tab-bar-button';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
 import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
@@ -142,6 +143,11 @@ export default function TabsLayout() {
         screenOptions={{
           headerShown: false,
           freezeOnBlur: true,
+          // expo-router's default tab button renders an Android tab as a bare
+          // `android.view.View` (role `tab`); this one reports `button` so the
+          // OS and a screen reader know the control (defect: a screen's
+          // controls carry no role, explorer-a-screen-s-controls-carry-no-role).
+          tabBarButton: TabBarButton,
           tabBarActiveTintColor: colors.foreground,
           tabBarInactiveTintColor: colors.mutedForeground,
           tabBarBackground: TabBarBackground,

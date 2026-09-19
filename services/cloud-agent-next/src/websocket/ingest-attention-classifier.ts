@@ -146,6 +146,7 @@ export async function dispatchCloudAgentAttentionPush(
     executionId: `attention:${event.requestId}`,
     status: 'completed',
     category: 'attention',
+    attentionKind: event.kind,
     body: 'Kilo needs your input.',
     suppressIfViewingSession: true,
   });

@@ -3119,7 +3119,8 @@
     "couldNotApprove": "Tsy nahomby ny fanekena",
     "couldNotStart": "Tsy nahomby ny fanombohana",
     "channelName": "Mpanatanteraka mandeha",
-    "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy."
+    "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy.",
+    "newestResult": "Vokatra vaovao indrindra"
   },
   "transcriptionModel": {
     "title": "Modely fanovana feo ho soratra",

@@ -3119,7 +3119,8 @@
     "couldNotApprove": "Pa t kapab apwouve",
     "couldNotStart": "Pa t kapab kòmanse",
     "channelName": "Ajan aktif",
-    "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an."
+    "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an.",
+    "newestResult": "Dènye rezilta"
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",

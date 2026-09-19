@@ -183,13 +183,17 @@ describe('buildGlanceableLiveActivityContentState needsApproval', () => {
     // Screen widget and the complication render `GlanceableViewProps`, whose
     // Approve button is driven by the retained wait itself. Assert the whole
     // key set so the approvable count (or any other field) cannot silently
-    // ship onto a widget shape that has no use for it.
+    // ship onto a widget shape that has no use for it; the newest-result trio
+    // is the deliberate read-only data the large card draws in its footer.
     const props = buildGlanceableViewProps(snapshotFor([PERMISSION_ROW]), {}, translate);
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
       'actions',
       'countLines',
       'needsInputSince',
+      'newestResultAt',
+      'newestResultKind',
+      'newestResultLabel',
       'newestTitle',
       'primaryCount',
       'primaryKind',

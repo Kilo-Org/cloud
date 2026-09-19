@@ -3119,7 +3119,8 @@
     "couldNotApprove": "Could not approve",
     "couldNotStart": "Could not start",
     "channelName": "Active agents",
-    "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."
+    "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
+    "newestResult": "Newest result"
   },
   "transcriptionModel": {
     "title": "Transcription model",

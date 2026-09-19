@@ -3143,7 +3143,8 @@
     "couldNotApprove": "Approvazione non riuscita",
     "couldNotStart": "Avvio non riuscito",
     "channelName": "Agenti attivi",
-    "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco."
+    "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco.",
+    "newestResult": "Risultato più recente"
   },
   "transcriptionModel": {
     "title": "Modello di trascrizione",

@@ -3143,7 +3143,8 @@
     "couldNotApprove": "Échec de l'approbation",
     "couldNotStart": "Échec du démarrage",
     "channelName": "Agents actifs",
-    "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé."
+    "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé.",
+    "newestResult": "Dernier résultat"
   },
   "transcriptionModel": {
     "title": "Modèle de transcription",

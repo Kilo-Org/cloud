@@ -3143,7 +3143,8 @@
     "couldNotApprove": "Não foi possível aprovar",
     "couldNotStart": "Não foi possível iniciar",
     "channelName": "Agentes ativos",
-    "activityKitDisabledBody": "Ativa as atividades em direto nas definições para ver os agentes ativos no ecrã bloqueado."
+    "activityKitDisabledBody": "Ativa as atividades em direto nas definições para ver os agentes ativos no ecrã bloqueado.",
+    "newestResult": "Resultado mais recente"
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",

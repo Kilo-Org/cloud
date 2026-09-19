@@ -3119,7 +3119,8 @@
     "couldNotApprove": "Hyväksyntä epäonnistui",
     "couldNotStart": "Käynnistys epäonnistui",
     "channelName": "Aktiiviset agentit",
-    "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä."
+    "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
+    "newestResult": "Uusin tulos"
   },
   "transcriptionModel": {
     "title": "Puheentunnistusmalli",

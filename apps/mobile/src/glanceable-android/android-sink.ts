@@ -21,7 +21,7 @@ import {
 import type * as NotificationsModule from '@/lib/notifications';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
-import { formatGlanceableCount, isWidgetRtl } from './count-format';
+import { formatGlanceableAgo, formatGlanceableCount, isWidgetRtl } from './count-format';
 import {
   end as endLiveUpdate,
   getPostedNotificationChannel,
@@ -104,7 +104,12 @@ function shouldAlert(kind: AgentNotificationKind): boolean {
 export function getCurrentWidgetProps(): AndroidWidgetProps | null {
   return lastWidgetSnapshot === null
     ? null
-    : buildCurrentWidgetProps(lastWidgetSnapshot, translate, formatGlanceableCount);
+    : buildCurrentWidgetProps(
+        lastWidgetSnapshot,
+        translate,
+        formatGlanceableCount,
+        formatGlanceableAgo
+      );
 }
 
 function renderWidgetNow(props: AndroidWidgetProps): void {
@@ -319,7 +324,12 @@ export const androidSink: GlanceableSink = {
       }
     }
     setWidgetSnapshot(snapshot);
-    const props = buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount);
+    const props = buildCurrentWidgetProps(
+      snapshot,
+      translate,
+      formatGlanceableCount,
+      formatGlanceableAgo
+    );
     renderWidgetNow(props);
     const eligible = hasCurrentWork(snapshot);
     if (eligible) {

@@ -301,7 +301,12 @@ export function IdleAuth({
         autoCorrect={false}
         autoComplete="email"
         textContentType="emailAddress"
-        defaultValue={initialEmail || undefined}
+        // Seed from the live ref, not the mount-time draft: the field remounts
+        // when an address error (or SSO recovery) returns the view from OTP, and
+        // an uncontrolled field reads `defaultValue` only on mount. Using the
+        // ref keeps the rejected address visible under its own error instead of
+        // blanking the field while `emailRef` still holds it.
+        defaultValue={emailRef.current || undefined}
         // Small-phone IME (Defect B / QB-A1): the IME's Go key must submit
         // the same way the "Continue" button does, instead of only
         // dismissing the keyboard as `actionDone` previously did.

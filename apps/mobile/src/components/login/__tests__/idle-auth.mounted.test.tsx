@@ -312,7 +312,11 @@ describe('IdleAuth email validation layout', () => {
       renderer.update(createElement(IdleAuth, { start: vi.fn<StartFn>() }));
       await Promise.resolve();
     });
-    expect(renderer.root.findByType('FormField').props.error).toBe(nativeAuth.emailError);
+    const remounted = renderer.root.findByType('FormField');
+    expect(remounted.props.error).toBe(nativeAuth.emailError);
+    // The field remounted when the view returned from OTP: it must show the
+    // rejected address, not blank out while `emailRef` still holds it.
+    expect(remounted.props.defaultValue).toBe('user@example.com');
   });
 
   it('keeps the reservation while loading with one indicator and disabled Continue', async () => {

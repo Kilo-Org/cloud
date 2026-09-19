@@ -39,6 +39,7 @@ import {
 } from '@/lib/organizations/organization-auto-model';
 import { getModelVariants } from '@/lib/ai-gateway/providers/model-settings';
 import type { OpenCodeVariant } from '@kilocode/db/schema-types';
+import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -50,6 +51,7 @@ type ResolveAutoModelParams = {
   isAutoFreeCandidateAllowed: ((modelId: string) => Promise<boolean>) | null;
   // Lazily fetches the auto-routing worker's decision (route.ts owns the request-body capture).
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
+  isOrganizationAutoTarget?: boolean;
   organizationContext?: Promise<{
     organizationId?: string;
     settings?: OrganizationSettings;
@@ -135,6 +137,35 @@ export type ResolveAutoModelResult =
   | { kind: 'no_free_models_available' }
   | { kind: 'organization_auto_configuration_error'; message: string };
 
+type PrimaryDefaultFallbackCause =
+  | 'decision_resolver_unavailable'
+  | 'organization_auto_static_fallback'
+  | 'no_decision_returned'
+  | 'virtual_auto_model_returned'
+  | 'decision_variant_unavailable';
+
+function fallBackToPrimaryDefault(
+  params: ResolveAutoModelParams,
+  cause: PrimaryDefaultFallbackCause,
+  decision?: { model: string; variant?: string | null }
+): ResolveAutoModelResult {
+  const logFallback =
+    cause === 'organization_auto_static_fallback' ? logExceptInTest : warnExceptInTest;
+  logFallback('Kilo Auto model falling back to primary default', {
+    cause,
+    requestedModel: params.model,
+    fallbackModel: PRIMARY_DEFAULT_MODEL,
+    apiKind: params.apiKind,
+    ...(decision
+      ? {
+          decisionModel: decision.model,
+          ...(decision.variant ? { decisionVariant: decision.variant } : {}),
+        }
+      : {}),
+  });
+  return { kind: 'ok', resolved: { model: PRIMARY_DEFAULT_MODEL } };
+}
+
 async function resolveOrganizationAutoModel(
   params: ResolveAutoModelParams,
   userPromise: Promise<User | null>,
@@ -210,6 +241,7 @@ async function resolveOrganizationAutoModel(
       {
         ...params,
         model: validation.modelId,
+        isOrganizationAutoTarget: true,
       },
       userPromise,
       balancePromise
@@ -317,19 +349,29 @@ export async function resolveAutoModel(
     };
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
-    const fallbackModel = { model: PRIMARY_DEFAULT_MODEL };
-    const decision = params.efficientDecision ? await params.efficientDecision() : null;
-    if (decision && !isVirtualAutoModelId(decision.model)) {
-      const resolvedFromDecision = await resolveEfficientDecisionModel(decision);
-      if (resolvedFromDecision) {
-        return { kind: 'ok', resolved: resolvedFromDecision };
-      }
-      // Exact catalog variant missing or removed: never serve the chosen model
-      // with implicit defaults — use the same fallback as the no-decision path.
-      return { kind: 'ok', resolved: fallbackModel };
+    if (!params.efficientDecision) {
+      return fallBackToPrimaryDefault(
+        params,
+        params.isOrganizationAutoTarget
+          ? 'organization_auto_static_fallback'
+          : 'decision_resolver_unavailable'
+      );
     }
-    // Static fallback when the worker is slow or unavailable.
-    return { kind: 'ok', resolved: fallbackModel };
+    const decision = await params.efficientDecision();
+    if (!decision) {
+      return fallBackToPrimaryDefault(params, 'no_decision_returned');
+    }
+    if (isVirtualAutoModelId(decision.model)) {
+      return fallBackToPrimaryDefault(params, 'virtual_auto_model_returned', decision);
+    }
+    const resolvedFromDecision = await resolveEfficientDecisionModel(decision);
+    if (!resolvedFromDecision) {
+      return fallBackToPrimaryDefault(params, 'decision_variant_unavailable', {
+        model: decision.model,
+        ...('variant' in decision && decision.variant ? { variant: decision.variant } : {}),
+      });
+    }
+    return { kind: 'ok', resolved: resolvedFromDecision };
   }
   const mode = resolveMode(modeHeader, featureHeader);
   return {

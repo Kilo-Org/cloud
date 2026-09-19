@@ -33,24 +33,19 @@ export const COMMENT_ACTIONS_HIT_SLOP = {
   right: COMPACT_CONTROL_HIT_SLOP_DP,
 } as const;
 
-/** The trailing group's `gap-3` class, in dp. */
-export const COMMENT_TRAILING_CONTROLS_GAP_DP = 12;
-
-/**
- * Horizontal dp of the overflow's tap area that reaches left of its visible
- * circle: half the frame's inset plus the left slop.
- */
-export function commentActionsLeftBandDp(): number {
-  return (COMMENT_ACTIONS_FRAME_DP - COMMENT_ACTIONS_VISUAL_DP) / 2 + COMMENT_ACTIONS_HIT_SLOP.left;
-}
+/** The trailing group's `gap-3` class, in dp: 0.75rem at NativeWind's 14pt rem. */
+export const COMMENT_TRAILING_CONTROLS_GAP_DP = 10.5;
 
 /**
  * Horizontal dp between the pill's expanded right edge and the overflow's
- * expanded left edge. A positive value means the two tap areas never overlap,
+ * expanded left edge: the gap between the two frames less each control's slop
+ * on the facing side. The overflow's frame is wider than its visible circle,
+ * but the gap and both slops are measured from the frame, so the frame's inset
+ * does not enter here. A positive value means the two tap areas never overlap,
  * so each control keeps every tap that lands on it.
  */
 export function commentTrailingControlsClearanceDp(): number {
   return (
-    COMMENT_TRAILING_CONTROLS_GAP_DP - FIX_WITH_KILO_HIT_SLOP.right - commentActionsLeftBandDp()
+    COMMENT_TRAILING_CONTROLS_GAP_DP - FIX_WITH_KILO_HIT_SLOP.right - COMMENT_ACTIONS_HIT_SLOP.left
   );
 }

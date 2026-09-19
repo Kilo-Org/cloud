@@ -6,7 +6,6 @@ import {
   COMMENT_ACTIONS_HIT_SLOP,
   COMMENT_ACTIONS_VISUAL_DP,
   COMMENT_TRAILING_CONTROLS_GAP_DP,
-  commentActionsLeftBandDp,
   commentTrailingControlsClearanceDp,
   FIX_WITH_KILO_HIT_SLOP,
 } from '@/lib/pr-review/comment-trailing-controls';
@@ -37,9 +36,16 @@ describe('comment trailing controls tap areas', () => {
     );
   });
 
-  it('derives the clearance from the gap and both tap areas', () => {
+  it('derives the clearance from the gap and the two facing slops', () => {
+    // The gap and both tap areas are measured from the frames, so the overflow
+    // frame's inset around its visible circle does not enter here. `gap-3` is
+    // 0.75rem, which is 10.5dp at NativeWind's 14pt rem, so the pill's 2pt
+    // right slop and the overflow's 3pt left slop leave 5.5dp.
     expect(commentTrailingControlsClearanceDp()).toBe(
-      COMMENT_TRAILING_CONTROLS_GAP_DP - FIX_WITH_KILO_HIT_SLOP.right - commentActionsLeftBandDp()
+      COMMENT_TRAILING_CONTROLS_GAP_DP -
+        FIX_WITH_KILO_HIT_SLOP.right -
+        COMMENT_ACTIONS_HIT_SLOP.left
     );
+    expect(commentTrailingControlsClearanceDp()).toBe(5.5);
   });
 });

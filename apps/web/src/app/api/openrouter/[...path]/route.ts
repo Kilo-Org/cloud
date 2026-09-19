@@ -249,7 +249,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // buys one allowance per address; this one counts the account itself. The
   // balance and policy lookups are chained off `authPromise` and start the
   // moment it resolves, so the check has to run before they are created.
+  const authSpan = startInactiveSpan({ name: 'auth-check' });
   const auth = await authPromise;
+  authSpan.end();
   // Mirrors the anonymous fallback below: a failed auth is billed and counted
   // as the address, not as whatever account the token named.
   const accountKey =
@@ -449,16 +451,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  // Now check auth
-  const authSpan = startInactiveSpan({ name: 'auth-check' });
+  // Auth already resolved above, before the account cap.
   const {
     user: maybeUser,
     authFailedResponse,
     organizationId: authOrganizationId,
     botId: authBotId,
     tokenSource: authTokenSource,
-  } = await authPromise;
-  authSpan.end();
+  } = auth;
 
   let user: typeof maybeUser | AnonymousUserContext;
   let organizationId: string | undefined = authOrganizationId;

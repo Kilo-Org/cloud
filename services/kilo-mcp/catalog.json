@@ -35284,7 +35284,7 @@
                 "anyOf": [
                   {
                     "type": "number",
-                    "exclusiveMinimum": 0,
+                    "minimum": 0.000001,
                     "maximum": 1000000
                   },
                   {

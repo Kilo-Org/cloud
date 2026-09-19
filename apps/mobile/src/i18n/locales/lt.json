@@ -2193,6 +2193,7 @@
       "accessibility": "Įrankis „{{label}}“, {{status}}",
       "accessibilityLabel": "Įrankis „{{name}}“, {{status}}",
       "noTasks": "Užduočių nėra.",
+      "noOutput": "Nėra išvesties.",
       "toolRead": "skaityti",
       "toolEdit": "redaguoti",
       "toolWrite": "rašyti",

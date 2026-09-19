@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} उपकरण, {{status}}",
       "accessibilityLabel": "{{name}} उपकरण, {{status}}",
       "noTasks": "कुनै काम छैन।",
+      "noOutput": "कुनै आउटपुट छैन।",
       "toolRead": "पढ्नुहोस्",
       "toolEdit": "सम्पादन गर्नुहोस्",
       "toolWrite": "लेख्नुहोस्",

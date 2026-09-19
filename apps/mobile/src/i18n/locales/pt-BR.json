@@ -1639,6 +1639,7 @@
       "accessibility": "Ferramenta {{label}}, {{status}}",
       "accessibilityLabel": "Ferramenta {{name}}, {{status}}",
       "noTasks": "Não há tarefas.",
+      "noOutput": "Nenhuma saída.",
       "toolRead": "ler",
       "toolEdit": "editar",
       "toolWrite": "escrever",

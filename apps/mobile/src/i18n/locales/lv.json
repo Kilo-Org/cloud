@@ -2174,6 +2174,7 @@
       "accessibility": "Rīks {{label}}, {{status}}",
       "accessibilityLabel": "Rīks {{name}}, {{status}}",
       "noTasks": "Nav uzdevumu.",
+      "noOutput": "Nav izvades.",
       "toolRead": "lasīt",
       "toolEdit": "rediģēt",
       "toolWrite": "rakstīt",

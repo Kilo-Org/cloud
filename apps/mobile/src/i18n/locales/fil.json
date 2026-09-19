@@ -2155,6 +2155,7 @@
       "accessibility": "Kagamitang {{label}}, {{status}}",
       "accessibilityLabel": "Kagamitang {{name}}, {{status}}",
       "noTasks": "Walang gawain.",
+      "noOutput": "Walang output.",
       "toolRead": "basahin",
       "toolEdit": "i-edit",
       "toolWrite": "isulat",

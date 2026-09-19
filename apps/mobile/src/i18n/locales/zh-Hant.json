@@ -1665,6 +1665,7 @@
       "accessibility": "{{label}} 工具，{{status}}",
       "accessibilityLabel": "{{name}} 工具，{{status}}",
       "noTasks": "沒有任務。",
+      "noOutput": "沒有輸出。",
       "toolRead": "讀取",
       "toolEdit": "編輯",
       "toolWrite": "寫入",

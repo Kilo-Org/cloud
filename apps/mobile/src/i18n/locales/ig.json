@@ -2155,6 +2155,7 @@
       "accessibility": "Ngwá ọrụ {{label}}, {{status}}",
       "accessibilityLabel": "Ngwá ọrụ {{name}}, {{status}}",
       "noTasks": "Enweghị ọrụ.",
+      "noOutput": "Enweghị mpụta.",
       "toolRead": "gụọ",
       "toolEdit": "dezie",
       "toolWrite": "dee",

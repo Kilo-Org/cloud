@@ -1665,6 +1665,7 @@
       "accessibility": "Alat {{label}}, {{status}}",
       "accessibilityLabel": "Alat {{name}}, {{status}}",
       "noTasks": "Tidak ada tugas.",
+      "noOutput": "Tidak ada keluaran.",
       "toolRead": "baca",
       "toolEdit": "sunting",
       "toolWrite": "tulis",

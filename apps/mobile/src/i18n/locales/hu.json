@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} eszköz, {{status}}",
       "accessibilityLabel": "{{name}} eszköz, {{status}}",
       "noTasks": "Nincs feladat.",
+      "noOutput": "Nincs kimenet.",
       "toolRead": "olvasás",
       "toolEdit": "szerkesztés",
       "toolWrite": "írás",

@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} ٹول، {{status}}",
       "accessibilityLabel": "{{name}} ٹول، {{status}}",
       "noTasks": "کوئی کام نہیں ہے۔",
+      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔",
       "toolRead": "پڑھنا",
       "toolEdit": "ترمیم کریں",
       "toolWrite": "لکھنا",

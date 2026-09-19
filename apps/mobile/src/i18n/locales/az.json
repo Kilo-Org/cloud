@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} aləti, {{status}}",
       "accessibilityLabel": "{{name}} aləti, {{status}}",
       "noTasks": "Tapşırıq yoxdur.",
+      "noOutput": "Çıxış yoxdur.",
       "toolRead": "oxu",
       "toolEdit": "redaktə et",
       "toolWrite": "yaz",

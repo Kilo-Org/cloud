@@ -2155,6 +2155,7 @@
       "accessibility": "Työkalu: {{label}}, {{status}}",
       "accessibilityLabel": "Työkalu: {{name}}, {{status}}",
       "noTasks": "Ei tehtäviä.",
+      "noOutput": "Ei tulostetta.",
       "toolRead": "lue",
       "toolEdit": "muokkaa",
       "toolWrite": "kirjoita",

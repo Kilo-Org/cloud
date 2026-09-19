@@ -2155,6 +2155,7 @@
       "accessibility": "ابزار {{label}}، {{status}}",
       "accessibilityLabel": "ابزار {{name}}، {{status}}",
       "noTasks": "هیچ کاری وجود ندارد.",
+      "noOutput": "هیچ خروجی وجود ندارد.",
       "toolRead": "خواندن",
       "toolEdit": "ویرایش",
       "toolWrite": "نوشتن",

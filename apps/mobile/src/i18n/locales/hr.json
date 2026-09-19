@@ -2174,6 +2174,7 @@
       "accessibility": "alat {{label}}, {{status}}",
       "accessibilityLabel": "alat {{name}}, {{status}}",
       "noTasks": "Nema zadataka.",
+      "noOutput": "Nema izlaza.",
       "toolRead": "pročitaj",
       "toolEdit": "uredi",
       "toolWrite": "zapiši",

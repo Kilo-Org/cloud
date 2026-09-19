@@ -1665,6 +1665,7 @@
       "accessibility": "{{label}} aracı, {{status}}",
       "accessibilityLabel": "{{name}} aracı, {{status}}",
       "noTasks": "Görev yok.",
+      "noOutput": "Çıktı yok.",
       "toolRead": "oku",
       "toolEdit": "düzenle",
       "toolWrite": "yaz",

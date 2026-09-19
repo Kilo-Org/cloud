@@ -1665,6 +1665,7 @@
       "accessibility": "công cụ {{label}}, {{status}}",
       "accessibilityLabel": "công cụ {{name}}, {{status}}",
       "noTasks": "Không có tác vụ nào.",
+      "noOutput": "Không có đầu ra.",
       "toolRead": "đọc",
       "toolEdit": "chỉnh sửa",
       "toolWrite": "ghi",

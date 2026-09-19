@@ -1685,6 +1685,7 @@
       "accessibility": "Інструмент {{label}}, {{status}}",
       "accessibilityLabel": "Інструмент {{name}}, {{status}}",
       "noTasks": "Немає завдань.",
+      "noOutput": "Немає виводу.",
       "toolRead": "прочитати",
       "toolEdit": "редагувати",
       "toolWrite": "записати",

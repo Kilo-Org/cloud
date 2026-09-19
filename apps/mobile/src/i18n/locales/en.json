@@ -2163,6 +2163,7 @@
       "accessibility": "{{label}} tool, {{status}}",
       "accessibilityLabel": "{{name}} tool, {{status}}",
       "noTasks": "No tasks.",
+      "noOutput": "No output.",
       "toolRead": "read",
       "toolEdit": "edit",
       "toolWrite": "write",

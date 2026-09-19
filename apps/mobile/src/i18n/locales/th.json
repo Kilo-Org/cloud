@@ -2155,6 +2155,7 @@
       "accessibility": "เครื่องมือ {{label}}, {{status}}",
       "accessibilityLabel": "เครื่องมือ {{name}}, {{status}}",
       "noTasks": "ไม่มีงาน",
+      "noOutput": "ไม่มีเอาต์พุต",
       "toolRead": "อ่าน",
       "toolEdit": "แก้ไข",
       "toolWrite": "เขียน",

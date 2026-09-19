@@ -1665,6 +1665,7 @@
       "accessibility": "Tool {{label}}, {{status}}",
       "accessibilityLabel": "Tool {{name}}, {{status}}",
       "noTasks": "Er zijn geen taken.",
+      "noOutput": "Geen uitvoer.",
       "toolRead": "lezen",
       "toolEdit": "bewerken",
       "toolWrite": "schrijven",

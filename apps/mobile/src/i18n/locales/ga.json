@@ -2212,6 +2212,7 @@
       "accessibility": "uirlis {{label}}, {{status}}",
       "accessibilityLabel": "uirlis {{name}}, {{status}}",
       "noTasks": "Níl aon tasc ann.",
+      "noOutput": "Níl aon aschur ann.",
       "toolRead": "léigh",
       "toolEdit": "cuir in eagar",
       "toolWrite": "scríobh",

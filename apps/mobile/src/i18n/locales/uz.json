@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} vositasi, {{status}}",
       "accessibilityLabel": "{{name}} vositasi, {{status}}",
       "noTasks": "Vazifalar yo'q.",
+      "noOutput": "Chiqish yo'q.",
       "toolRead": "o'qish",
       "toolEdit": "tahrirlash",
       "toolWrite": "yozish",

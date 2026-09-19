@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} գործիք, {{status}}",
       "accessibilityLabel": "{{name}} գործիք, {{status}}",
       "noTasks": "Առաջադրանքներ չկան։",
+      "noOutput": "Ելք չկա։",
       "toolRead": "կարդալ",
       "toolEdit": "խմբագրել",
       "toolWrite": "գրել",

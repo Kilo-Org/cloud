@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} хэрэгсэл, {{status}}",
       "accessibilityLabel": "{{name}} хэрэгсэл, {{status}}",
       "noTasks": "Даалгавар байхгүй.",
+      "noOutput": "Гаралт байхгүй.",
       "toolRead": "унших",
       "toolEdit": "засварлах",
       "toolWrite": "бичих",

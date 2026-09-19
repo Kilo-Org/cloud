@@ -2045,6 +2045,7 @@
       "accessibility": "{{label}} टूल, {{status}}",
       "accessibilityLabel": "{{name}} टूल, {{status}}",
       "noTasks": "कोई कार्य नहीं है।",
+      "noOutput": "कोई आउटपुट नहीं है।",
       "toolRead": "पढ़ें",
       "toolEdit": "संपादित करें",
       "toolWrite": "लिखें",

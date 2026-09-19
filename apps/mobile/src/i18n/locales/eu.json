@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} tresna, {{status}}",
       "accessibilityLabel": "{{name}} tresna, {{status}}",
       "noTasks": "Ez dago zereginik.",
+      "noOutput": "Irteerarik ez.",
       "toolRead": "irakurri",
       "toolEdit": "editatu",
       "toolWrite": "idatzi",

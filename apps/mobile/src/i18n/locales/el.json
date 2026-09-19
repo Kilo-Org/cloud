@@ -2155,6 +2155,7 @@
       "accessibility": "Εργαλείο {{label}}, {{status}}",
       "accessibilityLabel": "Εργαλείο {{name}}, {{status}}",
       "noTasks": "Δεν υπάρχουν εργασίες.",
+      "noOutput": "Δεν υπάρχει έξοδος.",
       "toolRead": "ανάγνωση",
       "toolEdit": "επεξεργασία",
       "toolWrite": "εγγραφή",

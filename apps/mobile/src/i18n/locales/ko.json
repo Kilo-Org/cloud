@@ -1665,6 +1665,7 @@
       "accessibility": "{{label}} 도구, {{status}}",
       "accessibilityLabel": "{{name}} 도구, {{status}}",
       "noTasks": "작업이 없습니다.",
+      "noOutput": "출력이 없습니다.",
       "toolRead": "읽기",
       "toolEdit": "편집",
       "toolWrite": "쓰기",

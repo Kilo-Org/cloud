@@ -2155,6 +2155,7 @@
       "accessibility": "Kayan aiki na {{label}}, {{status}}",
       "accessibilityLabel": "Kayan aiki na {{name}}, {{status}}",
       "noTasks": "Babu ayyuka.",
+      "noOutput": "Babu fitarwa.",
       "toolRead": "karanta",
       "toolEdit": "gyara",
       "toolWrite": "rubuta",

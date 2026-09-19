@@ -2155,6 +2155,7 @@
       "accessibility": "ئامرازی {{label}}، {{status}}",
       "accessibilityLabel": "ئامرازی {{name}}، {{status}}",
       "noTasks": "هیچ ئەرکێک نییە.",
+      "noOutput": "هیچ دەرچووێک نییە.",
       "toolRead": "خوێندنەوە",
       "toolEdit": "دەستکاری",
       "toolWrite": "نووسین",

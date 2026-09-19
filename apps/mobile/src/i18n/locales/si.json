@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} මෙවලම, {{status}}",
       "accessibilityLabel": "{{name}} මෙවලම, {{status}}",
       "noTasks": "කාර්යයන් නැත.",
+      "noOutput": "ප්රතිදානයක් නැත.",
       "toolRead": "කියවන්න",
       "toolEdit": "සංස්කරණය කරන්න",
       "toolWrite": "ලියන්න",

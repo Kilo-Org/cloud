@@ -2174,6 +2174,7 @@
       "accessibility": "Eina {{label}}, {{status}}",
       "accessibilityLabel": "Eina {{name}}, {{status}}",
       "noTasks": "No hi ha cap tasca.",
+      "noOutput": "No hi ha cap sortida.",
       "toolRead": "llegeix",
       "toolEdit": "edita",
       "toolWrite": "escriu",

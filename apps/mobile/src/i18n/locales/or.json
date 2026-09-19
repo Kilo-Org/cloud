@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} ଟୁଲ୍, {{status}}",
       "accessibilityLabel": "{{name}} ଟୁଲ୍, {{status}}",
       "noTasks": "କୌଣସି କାର୍ଯ୍ୟ ନାହିଁ।",
+      "noOutput": "କୌଣସି ଆଉଟପୁଟ୍ ନାହିଁ।",
       "toolRead": "ପଢ଼ା",
       "toolEdit": "ସମ୍ପାଦନ କରନ୍ତୁ",
       "toolWrite": "ଲେଖା",

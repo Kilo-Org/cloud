@@ -1675,6 +1675,7 @@
       "accessibility": "הכלי {{label}}, {{status}}",
       "accessibilityLabel": "הכלי {{name}}, {{status}}",
       "noTasks": "אין משימות.",
+      "noOutput": "אין פלט.",
       "toolRead": "קריאה",
       "toolEdit": "עריכה",
       "toolWrite": "כתיבה",

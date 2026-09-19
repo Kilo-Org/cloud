@@ -2174,6 +2174,7 @@
       "accessibility": "Instrumentul {{label}}, {{status}}",
       "accessibilityLabel": "Instrumentul {{name}}, {{status}}",
       "noTasks": "Nu există sarcini.",
+      "noOutput": "Nicio ieșire.",
       "toolRead": "citire",
       "toolEdit": "editează",
       "toolWrite": "scriere",

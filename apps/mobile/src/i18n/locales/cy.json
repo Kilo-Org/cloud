@@ -2231,6 +2231,7 @@
       "accessibility": "Offeryn {{label}}, {{status}}",
       "accessibilityLabel": "Offeryn {{name}}, {{status}}",
       "noTasks": "Nid oes tasgau.",
+      "noOutput": "Dim allbwn.",
       "toolRead": "darllen",
       "toolEdit": "golygu",
       "toolWrite": "ysgrifennu",

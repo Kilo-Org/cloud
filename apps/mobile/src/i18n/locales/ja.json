@@ -1665,6 +1665,7 @@
       "accessibility": "{{label}}ツール、{{status}}",
       "accessibilityLabel": "{{name}}ツール、{{status}}",
       "noTasks": "タスクはありません。",
+      "noOutput": "出力はありません。",
       "toolRead": "読み取り",
       "toolEdit": "編集",
       "toolWrite": "書き込み",

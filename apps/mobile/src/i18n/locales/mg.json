@@ -2155,6 +2155,7 @@
       "accessibility": "Fitaovana {{label}}, {{status}}",
       "accessibilityLabel": "Fitaovana {{name}}, {{status}}",
       "noTasks": "Tsy misy asa.",
+      "noOutput": "Tsy misy vokatra.",
       "toolRead": "vakio",
       "toolEdit": "ovay",
       "toolWrite": "soraty",

@@ -2155,6 +2155,7 @@
       "accessibility": "{{label}} መሳሪያ፣ {{status}}",
       "accessibilityLabel": "{{name}} መሳሪያ፣ {{status}}",
       "noTasks": "ምንም ተግባራት የሉም።",
+      "noOutput": "ምንም ውጤት የለም።",
       "toolRead": "ማንበብ",
       "toolEdit": "አርትዕ",
       "toolWrite": "መጻፍ",

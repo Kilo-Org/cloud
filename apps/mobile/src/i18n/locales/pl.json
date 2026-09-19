@@ -1685,6 +1685,7 @@
       "accessibility": "Narzędzie {{label}}, {{status}}",
       "accessibilityLabel": "Narzędzie {{name}}, {{status}}",
       "noTasks": "Brak zadań.",
+      "noOutput": "Brak wyjścia.",
       "toolRead": "odczyt",
       "toolEdit": "edytuj",
       "toolWrite": "zapis",

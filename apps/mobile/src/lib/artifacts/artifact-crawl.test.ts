@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- one suite for the crawl's reads, the size cap, and the mirror-entry assembly */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the injected probe and download seams resolve immediately, so they settle without await */
 import { File } from 'expo-file-system';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   type ArtifactCrawlDeps,
@@ -56,6 +56,8 @@ const fakeFs = vi.hoisted(() => {
 
 vi.mock('expo-file-system', () => ({ Directory: vi.fn(), File: fakeFs.File, Paths: {} }));
 vi.mock('expo-sharing', () => ({ isAvailableAsync: vi.fn(), shareAsync: vi.fn() }));
+const probeFetch = vi.hoisted(() => vi.fn<typeof fetch>());
+vi.mock('expo/fetch', () => ({ fetch: probeFetch }));
 
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
@@ -124,8 +126,12 @@ const rowOf = (id: string, title: string | null): MirrorSessionRow => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  probeFetch.mockReset();
+  vi.stubGlobal('fetch', probeFetch);
   fakeFs.reset();
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('extractSessionArtifacts', () => {
   it('takes file parts and tool attachments, and skips what the live sink skips', () => {
@@ -293,6 +299,112 @@ describe('materializeArtifact', () => {
     expect(downloadFile).not.toHaveBeenCalled();
     expect(tracked.deleted).toBe(false);
     expect(tracked.size).toBe(0);
+  });
+
+  it('sizes a GET-presigned attachment from Content-Range before downloading it', async () => {
+    const { file, tracked } = target();
+    const signedUrl = 'https://r2.example.com/signed';
+    const downloadFile = downloadResolving(MAX_ARTIFACT_BYTES + 1);
+    // SigV4 binds the method: HEAD is forbidden for a GetObject signature.
+    probeFetch.mockImplementation(async (_url, init) =>
+      init?.method === 'GET'
+        ? new Response('x', {
+            status: 206,
+            headers: {
+              'content-length': '1',
+              'content-range': `bytes 0-0/${MAX_ARTIFACT_BYTES + 1}`,
+            },
+          })
+        : new Response(null, { status: 403 })
+    );
+
+    expect(
+      await materializeArtifact({ id: 'f1', mime: 'image/png', url: SANDBOX_URL }, file, {
+        downloadFile,
+        presignAttachmentDownload: presignResolving(signedUrl),
+      })
+    ).toEqual({ ok: false, reason: 'too-large' });
+    expect(downloadFile).not.toHaveBeenCalled();
+    expect(tracked.writes).toEqual([]);
+    expect(probeFetch).toHaveBeenCalledWith(signedUrl, {
+      method: 'GET',
+      headers: { Range: 'bytes=0-0' },
+      signal: expect.any(AbortSignal),
+    });
+    expect(probeFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+  });
+
+  it.each([1, MAX_ARTIFACT_BYTES])(
+    'downloads a ranged artifact of %s bytes within the cap',
+    async size => {
+      probeFetch.mockResolvedValue(
+        new Response('x', {
+          status: 206,
+          headers: { 'content-length': '1', 'content-range': `bytes 0-0/${size}` },
+        })
+      );
+      const { file } = target();
+      const downloadFile = downloadResolving(size);
+
+      expect(
+        await materializeArtifact({ id: 'f1', mime: 'text/plain', url: 'https://x/f1' }, file, {
+          downloadFile,
+        })
+      ).toEqual({ ok: true, size });
+      expect(downloadFile).toHaveBeenCalledOnce();
+      expect(probeFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+    }
+  );
+
+  it('rejects a full oversized response and aborts when the server ignores Range', async () => {
+    probeFetch.mockResolvedValue(
+      new Response(null, {
+        status: 200,
+        headers: { 'content-length': String(MAX_ARTIFACT_BYTES + 1) },
+      })
+    );
+    const downloadFile = vi.fn<ArtifactCrawlDeps['downloadFile']>();
+    expect(
+      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: 'https://x/f1' }, new File(), {
+        downloadFile,
+      })
+    ).toEqual({ ok: false, reason: 'too-large' });
+    expect(downloadFile).not.toHaveBeenCalled();
+    expect(probeFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+  });
+
+  it.each<ResponseInit>([
+    { status: 206, headers: { 'content-length': '1' } },
+    { status: 206, headers: { 'content-range': 'bytes 0-0/*' } },
+    { status: 206, headers: { 'content-range': 'invalid' } },
+    { status: 200, headers: {} },
+    { status: 200, headers: { 'content-length': '-1' } },
+    { status: 200, headers: { 'content-length': 'invalid' } },
+    { status: 403, headers: {} },
+    { status: 416, headers: { 'content-range': 'bytes */0' } },
+  ])('keeps the post-download cap after an unknown length: %j', async init => {
+    probeFetch.mockResolvedValue(new Response(null, init));
+    const { file, tracked } = target();
+    const downloadFile = downloadResolving(MAX_ARTIFACT_BYTES + 1);
+
+    expect(
+      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: 'https://x/f1' }, file, {
+        downloadFile,
+      })
+    ).toEqual({ ok: false, reason: 'too-large' });
+    expect(downloadFile).toHaveBeenCalledOnce();
+    expect(tracked.deleted).toBe(true);
+    expect(probeFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+  });
+
+  it('still downloads an empty artifact when the probe is unavailable', async () => {
+    probeFetch.mockRejectedValue(new Error('offline'));
+    expect(
+      await materializeArtifact({ id: 'f1', mime: 'text/plain', url: 'https://x/f1' }, new File(), {
+        downloadFile: downloadResolving(0),
+      })
+    ).toEqual({ ok: true, size: 0 });
+    expect(probeFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
   });
 });
 

@@ -390,7 +390,12 @@ async function materializeOne(
   if (!canPublish(advance.epoch)) {
     return artifactNote({ discarded: true });
   }
-  const staged = mirrorStagedTarget(advance.sessionId, artifact, advance);
+  let staged: StagedTarget | null = null;
+  try {
+    staged = mirrorStagedTarget(advance.sessionId, artifact, advance);
+  } catch {
+    return artifactNote({ failed: 1, retryable: true });
+  }
   if (staged === null) {
     return artifactNote();
   }
@@ -429,7 +434,8 @@ type StagedTarget = { canonical: File; staging: File };
 /**
  * The target files for one artifact, with its session folder created first
  * because a run materializes before the snapshot creates the layout. Null means
- * this build has nowhere browsable to put the bytes.
+ * this build has nowhere browsable to put the bytes. Filesystem errors throw so
+ * the caller holds the page for a retry instead of treating it as a no-op.
  */
 function mirrorStagedTarget(
   sessionId: string,
@@ -440,11 +446,7 @@ function mirrorStagedTarget(
   if (directory === null) {
     return null;
   }
-  try {
-    directory.create({ idempotent: true, intermediates: true });
-  } catch {
-    return null;
-  }
+  directory.create({ idempotent: true, intermediates: true });
   return {
     canonical: new File(directory, artifact.id),
     staging: new File(directory, stagingFileName(artifact.id, advance.generation)),

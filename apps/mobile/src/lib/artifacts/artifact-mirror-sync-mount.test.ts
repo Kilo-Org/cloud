@@ -20,6 +20,7 @@ vi.mock('expo-secure-store', () => ({
   setItemAsync: vi.fn(async () => undefined),
 }));
 vi.mock('expo-sharing', () => ({ isAvailableAsync: vi.fn(), shareAsync: vi.fn() }));
+vi.mock('expo/fetch', () => ({ fetch: vi.fn() }));
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {

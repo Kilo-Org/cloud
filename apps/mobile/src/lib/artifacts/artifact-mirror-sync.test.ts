@@ -89,6 +89,7 @@ vi.mock('expo-file-system', () => ({
 }));
 vi.mock('expo', () => ({ requireOptionalNativeModule: () => null }));
 vi.mock('expo-sharing', () => ({ isAvailableAsync: vi.fn(), shareAsync: vi.fn() }));
+vi.mock('expo/fetch', () => ({ fetch: vi.fn() }));
 // `artifact-mirror-paths` is the only Platform.OS branch; the sync never reads
 // it because `mirrorSessionDir` is injected, but the import must resolve.
 vi.mock('react-native', () => ({ Platform: { OS: 'android' } }));
@@ -321,6 +322,54 @@ describe('syncArtifactMirror gating', () => {
 });
 
 describe('syncArtifactMirror crawling', () => {
+  it.each([null, 'c2'])('retries folder creation without advancing to %s', async nextCursor => {
+    const directory = new Directory('file:///mirror/sessions/s1');
+    const create = vi.spyOn(directory, 'create');
+    const h = harness({ mirrorSessionDir: () => directory });
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    h.pages.set('s1', { messages: [], nextCursor: 'c1' });
+    await syncArtifactMirror({ deps: h.deps });
+
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+    h.pages.set('s1', { messages: [messageOf(['f1'])], nextCursor });
+    create.mockImplementationOnce(() => {
+      throw new Error('temporary filesystem failure');
+    });
+    expect(await syncArtifactMirror({ force: true, deps: h.deps })).toMatchObject({
+      status: 'synced',
+      failed: 1,
+      files: 0,
+    });
+    expect(h.downloadFile).not.toHaveBeenCalled();
+    expect(sessionFiles(h.lastManifest(), 's1')).toEqual([]);
+
+    expect(await syncArtifactMirror({ force: true, deps: h.deps })).toMatchObject({
+      status: 'synced',
+      failed: 0,
+      files: 1,
+    });
+    expect(h.getSessionMessagesPage).toHaveBeenCalledTimes(3);
+    expect(h.getSessionMessagesPage).toHaveBeenLastCalledWith({ session_id: 's1', cursor: 'c1' });
+    expect(sessionFiles(h.lastManifest(), 's1')).toEqual(['f1']);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a missing browsable container a successful no-op', async () => {
+    const h = harness({ mirrorSessionDir: () => null });
+    h.sessions.push({ id: 's1', updatedAt: T1 });
+    setFiles(h, 's1', [{ id: 'f1', size: 10, url: 'https://x/f1' }]);
+
+    expect(await syncArtifactMirror({ deps: h.deps })).toMatchObject({
+      status: 'synced',
+      failed: 0,
+      files: 0,
+    });
+    await syncArtifactMirror({ force: true, deps: h.deps });
+    expect(h.getSessionMessagesPage).toHaveBeenCalledTimes(1);
+    expect(h.downloadFile).not.toHaveBeenCalled();
+    expect(sessionFiles(h.lastManifest(), 's1')).toEqual([]);
+  });
+
   it('keeps the previous mirror when a download fails and retries it next run', async () => {
     const h = harness();
     h.sessions.push({ id: 's1', updatedAt: T1 });

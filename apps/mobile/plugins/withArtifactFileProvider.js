@@ -71,6 +71,10 @@ function withFileProviderSourceFiles(config) {
 function withFileProviderTarget(config) {
   return withXcodeProject(config, projectConfig => {
     const xcodeProject = projectConfig.modResults;
+    if (xcodeProject.pbxTargetByName(TARGET_NAME)) {
+      // Prebuild can run over a tree a previous pass already extended.
+      return projectConfig;
+    }
     const groupName = 'Embed Foundation Extensions';
     const marketingVersion = projectConfig.ios?.version ?? projectConfig.version ?? '1.0';
     const currentProjectVersion = projectConfig.ios?.buildNumber ?? '1';

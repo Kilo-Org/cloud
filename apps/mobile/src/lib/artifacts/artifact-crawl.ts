@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- the crawl reads the session tree, bounds and materializes bytes, and assembles the mirror entries as one cohesive module */
 import { File } from 'expo-file-system';
+import { fetch } from 'expo/fetch';
 
 import { parseCloudAgentAttachmentUrl } from '@/components/agents/file-part-preview';
 import { stripDataUrlBase64Prefix } from '@/components/agents/tool-card-image-cache';
@@ -135,7 +136,7 @@ export type ArtifactCrawlDeps = {
     messageUuid: string;
   }) => Promise<{ signedUrl: string }>;
   /**
-   * The byte length a URL declares before its body is transferred, or null when
+   * The byte length a URL declares before its body is downloaded, or null when
    * it does not say (or the probe fails). Used to reject an oversized artifact
    * before the whole response reaches device storage.
    */
@@ -154,27 +155,38 @@ const DEFAULT_DEPS: ArtifactCrawlDeps = {
 /* eslint-enable @typescript-eslint/promise-function-async */
 
 /**
- * The byte length a URL declares before its body is transferred, or null.
+ * The full byte length declared by a URL, or null when unknown.
  *
- * A `HEAD` request is the only way to learn the size before writing the body.
- * Anything unexpected — a server that refuses HEAD, omits `Content-Length`, or
- * is unreachable — reads as "unknown": the download below still enforces
- * {@link MAX_ARTIFACT_BYTES} on the bytes it receives.
+ * Attachment URLs are signed for GET, so HEAD would fail signature validation.
+ * Request one byte and read the total from Content-Range, not the partial body's
+ * Content-Length. Expo's streaming fetch lets us abort at the headers even if a
+ * server ignores Range and sends a full response. Unknown lengths still get the
+ * post-download size check below.
  */
 async function probeContentLength(url: string): Promise<number | null> {
+  const controller = new AbortController();
   try {
-    const response = await fetch(url, { method: 'HEAD' });
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { Range: 'bytes=0-0' },
+      signal: controller.signal,
+    });
     if (!response.ok) {
       return null;
     }
-    const header = response.headers.get('content-length');
-    if (header === null) {
+    const header =
+      response.status === 206
+        ? /^bytes \d+-\d+\/(\d+)$/.exec(response.headers.get('content-range') ?? '')?.[1]
+        : response.headers.get('content-length');
+    if (header == null || !/^\d+$/.test(header)) {
       return null;
     }
     const declared = Number(header);
-    return Number.isFinite(declared) && declared >= 0 ? declared : null;
+    return Number.isSafeInteger(declared) && declared >= 0 ? declared : null;
   } catch {
     return null;
+  } finally {
+    controller.abort();
   }
 }
 

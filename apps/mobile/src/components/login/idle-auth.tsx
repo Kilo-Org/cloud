@@ -52,6 +52,11 @@ export function IdleAuth({
   const [browserAuthStarting, setBrowserAuthStarting] = useState(false);
   const emailRef = useRef(initialEmail);
   const browserAuthStartingRef = useRef(false);
+  // Field-level validation message for the email input. Rendered under the
+  // field through FormField's `error` slot (AccessibleStatus announces it and
+  // keeps it on screen) instead of a toast, which is not part of the
+  // accessibility hierarchy.
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +114,13 @@ export function IdleAuth({
   }, [ssoRecovery]);
 
   const handleSendCode = async () => {
+    if (!emailRef.current.trim()) {
+      // Empty input is a field-level error: show it under the field so the
+      // landing never looks dead, and never post an empty address.
+      setEmailError(t('login.pleaseEnterEmail'));
+      return;
+    }
+    setEmailError(null);
     const ok = await requestEmailCode(emailRef.current);
     if (ok) {
       setView('otp');
@@ -295,6 +307,7 @@ export function IdleAuth({
         autoComplete="email"
         textContentType="emailAddress"
         defaultValue={initialEmail || undefined}
+        error={emailError ?? undefined}
         // Small-phone IME (Defect B / QB-A1): the IME's Go key must submit
         // the same way the "Continue" button does, instead of only
         // dismissing the keyboard as `actionDone` previously did.
@@ -307,6 +320,10 @@ export function IdleAuth({
         onChangeText={value => {
           emailRef.current = value;
           setLoginEmailDraft(value);
+          // Clear the validation message as soon as the user starts fixing it.
+          if (emailError !== null) {
+            setEmailError(null);
+          }
         }}
       />
       <Button

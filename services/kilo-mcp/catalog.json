@@ -36533,6 +36533,17 @@
     ],
     "searchBlob": "user.getNotificationPreferences Get the current user's notification preferences for push notifications, chat messages, balance alerts, security findings, and more. user getnotificationpreferences"
   },
+  "user.hasGatewayUsage": {
+    "path": "user.hasGatewayUsage",
+    "kind": "query",
+    "summary": "Check whether the signed-in user has any recorded AI Gateway or model usage on their account. Use to determine if a user is brand new to the gateway or has prior usage history.",
+    "inputSchema": {},
+    "tags": [
+      "user",
+      "hasgatewayusage"
+    ],
+    "searchBlob": "user.hasGatewayUsage Check whether the signed-in user has any recorded AI Gateway or model usage on their account. Use to determine if a user is brand new to the gateway or has prior usage history. user hasgatewayusage"
+  },
   "user.linkAuthProvider": {
     "path": "user.linkAuthProvider",
     "kind": "mutation",

@@ -43,6 +43,7 @@ import {
   getProfileAgentScope,
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
+import { useScreenSideInsets } from '@/lib/screen-insets';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -70,6 +71,8 @@ function providerLabel(provider: string) {
 }
 
 export function ProfileScreen() {
+  const { left, right } = useScreenSideInsets();
+  const scrollStyle = { marginLeft: left, marginRight: right };
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
@@ -150,7 +153,8 @@ export function ProfileScreen() {
       <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 pt-4"
+        style={scrollStyle}
+        contentContainerClassName="px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {/* Credits */}

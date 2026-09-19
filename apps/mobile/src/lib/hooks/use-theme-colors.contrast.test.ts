@@ -156,6 +156,21 @@ describe('light diff token contrast on tinted surfaces (WCAG AA text)', () => {
   });
 });
 
+describe('disabled primary fill contrast (WCAG AA text)', () => {
+  // A disabled default-variant Button paints primaryForeground on
+  // `--primary-disabled`; the pair must clear 4.5:1 in both themes so the
+  // label (and any child that hard-codes primaryForeground) stays legible.
+  it('light theme: primaryForeground vs primaryDisabled >= 4.5:1', () => {
+    const ratio = contrastRatio(lightColors.primaryForeground, lightColors.primaryDisabled);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+
+  it('dark theme: primaryForeground vs primaryDisabled >= 4.5:1', () => {
+    const ratio = contrastRatio(darkColors.primaryForeground, darkColors.primaryDisabled);
+    expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+});
+
 describe('warn foreground token contrast (WCAG AA text)', () => {
   it('light theme: warnForeground vs warn >= 4.5:1', () => {
     // Precomputed ≈ 5.30:1 for #FFFFFF on #956011.

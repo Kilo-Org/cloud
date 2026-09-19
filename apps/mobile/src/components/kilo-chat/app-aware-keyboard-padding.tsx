@@ -10,11 +10,13 @@ function keyboardPaddingFromEvent(event: KeyboardEvent): number {
   return event.endCoordinates.height;
 }
 
-export function AppAwareKeyboardPaddingView({
-  style,
-  keyboardOffset = 0,
-  ...props
-}: ComponentProps<typeof View> & { keyboardOffset?: number }) {
+/**
+ * The bottom padding an AppAwareKeyboardPaddingView applies: the IME's height
+ * while the keyboard is open (plus the caller's offset), 0 while it is closed.
+ * Exported so a pinned footer inside the padding view can measure its own
+ * clearance against the same lift instead of re-listening to the keyboard.
+ */
+export function useAppAwareKeyboardPadding(keyboardOffset = 0): number {
   const [keyboardPadding, setKeyboardPadding] = useState(0);
 
   useEffect(() => {
@@ -59,7 +61,15 @@ export function AppAwareKeyboardPaddingView({
     };
   }, []);
 
-  const resolvedKeyboardPadding = keyboardPadding > 0 ? keyboardPadding + keyboardOffset : 0;
+  return keyboardPadding > 0 ? keyboardPadding + keyboardOffset : 0;
+}
+
+export function AppAwareKeyboardPaddingView({
+  style,
+  keyboardOffset = 0,
+  ...props
+}: ComponentProps<typeof View> & { keyboardOffset?: number }) {
+  const resolvedKeyboardPadding = useAppAwareKeyboardPadding(keyboardOffset);
 
   return <View {...props} style={[style, { paddingBottom: resolvedKeyboardPadding }]} />;
 }

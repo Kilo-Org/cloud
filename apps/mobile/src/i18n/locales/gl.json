@@ -827,7 +827,8 @@
       "chat": "Mensaxes de conversa",
       "kiloclaw": "Actividade de KiloClaw",
       "balance": "Alertas de saldo",
-      "security": "Problemas de seguridade"
+      "security": "Problemas de seguridade",
+      "spend": "Alertas de gasto"
     },
     "category": {
       "chatMessagesSubtitle": "respostas nas túas conversas",
@@ -839,6 +840,8 @@
       "sessionStatusSubtitle": "rematada / con erros / lista para controlar",
       "kiloclawActivitySubtitle": "instancia lista ou con erros, accións programadas",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organización",
+      "spendAlertsSubtitle": "superacións de limiares e picos por hora",
+      "spendAlertsToggle": "Categoría de alertas de gasto",
       "securityFindingsSubtitle": "novos problemas detectados e recordatorios de SLA"
     }
   },
@@ -3201,5 +3204,28 @@
   },
   "launcher": {
     "openLastSession": "Abrir a última sesión"
+  },
+  "spendAlerts": {
+    "subtitle": "Envía unha alerta por correo ou notificación push aos contactos de facturación cando o gasto deste ámbito supere un límite ou se dispare por riba do seu ritmo horario habitual.",
+    "enable": "Activar as alertas de gasto",
+    "thresholdTitle": "Superación do limiar",
+    "thresholdSubtitle": "O gasto acumulado supera o teu límite",
+    "anomalyTitle": "Pico por hora",
+    "anomalySubtitle": "Unha hora está moi por riba do ritmo habitual deste ámbito",
+    "limitLabel": "Límite (USD)",
+    "windowLabel": "Ventá",
+    "window24h": "24 horas",
+    "window7d": "7 días",
+    "window30d": "30 días",
+    "multiplierLabel": "Multiplicador do pico",
+    "saved": "Gardáronse os axustes das alertas de gasto",
+    "loadError": "Non se puideron cargar as alertas de gasto.",
+    "saveError": "Non se puideron gardar as alertas de gasto.",
+    "empty": "As alertas de gasto están desactivadas. Actívaas para avisar os contactos de facturación deste ámbito.",
+    "noSpend": "Aínda non se rexistrou ningún gasto",
+    "spend24h": "Gasto nas últimas 24 horas",
+    "multiplierError": "Introduce un multiplicador de 1 ou máis",
+    "permissionDenied": "Non tes permiso para xestionar as alertas de gasto.",
+    "pushOffByCategory": "Desactivado en Notificacións"
   }
 }

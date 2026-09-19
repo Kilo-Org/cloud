@@ -7,6 +7,7 @@
       "instanceLifecycle": "Η παρουσία σας έχει μια ενημέρωση",
       "scheduledAction": "Μια προγραμματισμένη ενέργεια έχει μια ενημέρωση",
       "lowBalance": "Το υπόλοιπό σας χρειάζεται προσοχή",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Ένα εύρημα ασφαλείας χρειάζεται προσοχή",
       "activeAgentsGlanceable": "Οι ενεργοί πράκτορες έχουν μια ενημέρωση"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Ειδοποίηση χαμηλού υπολοίπου",
       "body": "Το υπόλοιπο του {{organizationName}} έπεσε κάτω από ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Νέο εύρημα ασφαλείας ({{severity}})",

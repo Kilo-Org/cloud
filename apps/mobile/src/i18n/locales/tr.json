@@ -336,6 +336,15 @@
       "kiloclawActivitySubtitle": "örnek hazır/başarısız, zamanlanmış eylemler",
       "balanceAlertsSubtitle": "düşük kuruluş bakiyesi uyarıları",
       "securityFindingsSubtitle": "yeni bulgular ve SLA hatırlatmaları"
+    },
+    "action": {
+      "openSession": "Oturumu aç"
+    },
+    "needsInputAction": {
+      "approved": "İstek onaylandı",
+      "replied": "Yanıt gönderildi",
+      "failed": "Yanıtlanamadı. Yeniden denemek için tekrar dokunun.",
+      "unavailable": "Bu istek artık beklemiyor."
     }
   },
   "tabs": {
@@ -1673,20 +1682,7 @@
       "continueFrom": "{{title}} oturumuna devam ediliyor.",
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam etmeyi desteklemiyor. Cloud Agent veya başka bir CLI seç.",
-      "importFailed": "Bu oturum içe aktarılamadı.",
-      "sandbox": "Korumalı alan",
-      "sandboxAccessibility": "Korumalı alan: {{label}}",
-      "sandboxDefaultWithDestination": "Varsayılan · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Küçük",
-      "sandboxInstanceShared": "Paylaşımlı",
-      "sandboxInstanceLarge": "Büyük",
-      "sandboxInstanceDevcontainer": "Geliştirme kapsayıcısı",
-      "sandboxInstanceProviderDefault": "Sağlayıcı varsayılanı",
-      "sandboxCouldNotLoad": "Korumalı alan seçenekleri yüklenemedi",
-      "sandboxUnavailable": "Bu korumalı alan kullanılamıyor. Başka bir korumalı alan veya Varsayılan seçin.",
-      "sandboxUseDefault": "Varsayılanı kullan"
+      "importFailed": "Bu oturum içe aktarılamadı."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi.",

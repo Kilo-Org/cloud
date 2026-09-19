@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "ອິນສະແຕນພ້ອມໃຊ້ງານ/ຂັດຂ້ອງ, ວຽກທີ່ຕັ້ງເວລາໄວ້",
       "balanceAlertsSubtitle": "ຄຳເຕືອນເມື່ອຍອດເງິນຂອງອົງກອນຕໍ່າ",
       "securityFindingsSubtitle": "ບັນຫາທີ່ພົບໃໝ່ ແລະ ການແຈ້ງເຕືອນກ່ຽວກັບ SLA"
+    },
+    "action": {
+      "openSession": "ເປີດເຊສຊັນ"
+    },
+    "needsInputAction": {
+      "approved": "ອະນຸມັດຄຳຮ້ອງຂໍແລ້ວ",
+      "replied": "ສົ່ງຄຳຕອບແລ້ວ",
+      "failed": "ບໍ່ສາມາດຕອບໄດ້. ແຕະອີກເທື່ອໜຶ່ງເພື່ອລອງໃໝ່.",
+      "unavailable": "ຄຳຮ້ອງນີ້ບໍ່ລໍຖ້າຕື່ມແລ້ວ."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "ກຳລັງເຮັດວຽກຕໍ່ຈາກ {{title}}.",
       "importingSession": "ກຳລັງນຳເຂົ້າເຊດຊັນ",
       "cliCannotContinue": "CLI ນີ້ບໍ່ສາມາດເຮັດວຽກຕໍ່ຈາກເຊດຊັນໄດ້. ເລືອກ Cloud Agent ຫຼື CLI ອື່ນ.",
-      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "ຄ່າເລີ່ມຕົ້ນ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "ນ້ອຍ",
-      "sandboxInstanceShared": "ແບ່ງປັນ",
-      "sandboxInstanceLarge": "ໃຫຍ່",
-      "sandboxInstanceDevcontainer": "ຄອນເທນເນີ Dev",
-      "sandboxInstanceProviderDefault": "ຄ່າເລີ່ມຕົ້ນຂອງຜູ້ໃຫ້ບໍລິການ",
-      "sandboxCouldNotLoad": "ໂຫຼດຕົວເລືອກ Sandbox ບໍ່ໄດ້",
-      "sandboxUnavailable": "Sandbox ນີ້ໃຊ້ບໍ່ໄດ້. ເລືອກ Sandbox ອື່ນ ຫຼື ຄ່າເລີ່ມຕົ້ນ.",
-      "sandboxUseDefault": "ໃຊ້ຄ່າເລີ່ມຕົ້ນ"
+      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້."
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດໄຟລ໌ແລ້ວ {{displayCount}} ໄຟລ໌.",

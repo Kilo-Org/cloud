@@ -2,8 +2,10 @@ import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { PortalHost } from '@rn-primitives/portal';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
+import { Keyboard, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
@@ -37,6 +39,34 @@ import { trpcClient, TRPCProvider } from '@/lib/trpc';
  */
 const TOAST_POSITIONER_STYLE = { top: 0 } as const;
 
+function useAndroidToastOffset() {
+  const { bottom } = useSafeAreaInsets();
+  const [keyboardHeight, setKeyboardHeight] = useState(() =>
+    Platform.OS === 'android' ? (Keyboard.metrics()?.height ?? 0) : 0
+  );
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return undefined;
+    }
+    const show = Keyboard.addListener('keyboardDidShow', event => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  // Edge-to-edge Android does not resize the toast's window for the IME.
+  // RN's keyboard height excludes the navigation inset; add it back and keep
+  // sonner's 8-point safe-area gap. With no IME, leave its default insets alone.
+  return Platform.OS === 'android' && keyboardHeight > 0 ? keyboardHeight + bottom + 8 : undefined;
+}
+
 export function AppRootProviders({
   children,
   languageReady,
@@ -46,6 +76,7 @@ export function AppRootProviders({
 }) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const toastOffset = useAndroidToastOffset();
 
   return (
     // bg-background: the gesture root is the first opaque surface above the
@@ -81,6 +112,7 @@ export function AppRootProviders({
                     */}
                     <Toaster
                       position="bottom-center"
+                      offset={toastOffset}
                       positionerStyle={TOAST_POSITIONER_STYLE}
                       icons={{
                         success: <CheckCircle2 size={20} color={colors.good} />,

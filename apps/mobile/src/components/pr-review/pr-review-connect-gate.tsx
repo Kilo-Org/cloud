@@ -18,7 +18,7 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useExternalAuthReturn } from '@/lib/external-auth/use-external-auth-return';
-import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
+import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
@@ -123,27 +123,20 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
     setConnecting(true);
     try {
       const result = await connect.mutateAsync();
-      markLaunched();
-      const trigger = await openAuthorizationAndWaitForReturn(Platform.OS, result.authorizationUrl);
-      if (trigger === 'sheet-close') {
-        // iOS: refetch immediately. Clear the launch sentinel so the
-        // AppState handler (if it ever fires) doesn't double-refetch.
-        clearLaunch();
-        await authorization.refetch();
-        await queryClient.invalidateQueries({
-          queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
-        });
-      }
-      // Android: refetch is handled by the AppState listener when the app
-      // returns to foreground. `openBrowserAsync` resolves as soon as the
-      // browser is launched, so we must NOT clear the sentinel here — the
-      // foreground handler clears it once it has consumed it.
+      await launchConnectGateBrowser(Platform.OS, result.authorizationUrl, {
+        markLaunched,
+        clearLaunch,
+        onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
+        onSheetClose: async () => {
+          // iOS only: the auth sheet has closed, so refetch immediately.
+          await authorization.refetch();
+          await queryClient.invalidateQueries({
+            queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
+          });
+        },
+      });
     } catch {
-      // mutateAsync already toasted; the openAuthorizationAndWaitForReturn
-      // rejection means the browser failed to open — clear the sentinel so
-      // a later unrelated foreground doesn't trigger a stray refetch, and
-      // keep the gate showing.
-      clearLaunch();
+      // mutateAsync toasted the server error; keep the gate showing.
     } finally {
       setConnecting(false);
     }
@@ -287,23 +280,24 @@ function ProviderConnectGate({
     try {
       // The provider connections are web-side integrations: open the
       // existing integration page and re-check the status when the app
-      // returns (pattern: `openAuthorizationAndWaitForReturn`).
-      markLaunched();
+      // returns (pattern: `launchConnectGateBrowser`).
       const integrationUrl =
         platform === 'gitlab'
           ? getGitLabIntegrationUrl(WEB_BASE_URL, organizationId ?? undefined)
           : getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId ?? '');
-      const trigger = await openAuthorizationAndWaitForReturn(Platform.OS, integrationUrl);
-      if (trigger === 'sheet-close') {
-        clearLaunch();
-        await status.refetch();
-      }
-      // Android: the AppState listener in `useExternalAuthReturn` refetches
-      // when the app returns to foreground; the sentinel stays set until it
-      // consumes the launch.
+      await launchConnectGateBrowser(Platform.OS, integrationUrl, {
+        markLaunched,
+        clearLaunch,
+        onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
+        onSheetClose: async () => {
+          await status.refetch();
+        },
+      });
     } catch {
-      // The browser failed to open — clear the sentinel so a later unrelated
-      // foreground doesn't trigger a stray refetch, and keep the gate showing.
+      // The helper reports a failed launch itself, so a rejected `onSheetClose`
+      // refetch is the only error that reaches here. Clear the sentinel and
+      // keep the gate showing: the query's error state renders the retryable
+      // QueryError instead of letting `void handleConnect()` reject.
       clearLaunch();
     } finally {
       setConnecting(false);

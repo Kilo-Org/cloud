@@ -42,6 +42,10 @@ const BLOCKED_PERMISSIONS = [
 const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+// One entry configures Expo's native splash on both platforms. Its internal
+// Android backing-surface adapter is a documented native capability exception,
+// not a separate launch lifecycle. The wrapper owns the mod ordering.
+const BRANDED_SPLASH_PLUGIN = './plugins/withBrandedSplash';
 // The one writer of the app target's `<tag>.lproj/Localizable.strings`: the App
 // Intent copy plus the appended Focus-filter catalog.
 const APP_INTENT_LOCALIZATIONS_PLUGIN = './plugins/withAppIntentLocalizations';
@@ -190,6 +194,26 @@ check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGI
 check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
+);
+const splashEntries = (config.plugins ?? []).filter(
+  plugin => Array.isArray(plugin) && plugin[0] === BRANDED_SPLASH_PLUGIN
+);
+check(splashEntries.length === 1, `plugins must include exactly one "${BRANDED_SPLASH_PLUGIN}"`);
+check(
+  !pluginNames.includes('expo-splash-screen') &&
+    !pluginNames.includes('./plugins/withAndroidSplashWindowBackground'),
+  'the shared branded splash must own native splash registration and mod ordering'
+);
+const splashOptions = splashEntries[0]?.[1];
+check(
+  splashOptions?.image === './assets/images/logo-mark.png' &&
+    splashOptions.backgroundColor === '#FAF74F' &&
+    splashOptions.imageWidth === 100,
+  'the shared native splash must match AnimatedSplashOverlay: yellow with the 100dp Kilo mark'
+);
+check(
+  splashOptions?.ios === undefined && splashOptions?.android === undefined,
+  'the branded splash must not fork its options by platform'
 );
 // The app target's one `Localizable.strings` (the App Intent copy plus the
 // appended Focus-filter catalog) is written by this plugin; without it the

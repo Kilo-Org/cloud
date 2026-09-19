@@ -101,12 +101,14 @@ describe('AgentSessionProvider live manager registry', () => {
 
     expect(getAuthenticatedOwner().userId).toBeNull();
     expect(mocks.createManager.mock.calls[0]?.[0].userId).toBe('user-1');
-    expect(getLiveSessionManager('restored-session')?.manager).toBe(mocks.manager);
+    const registered = getLiveSessionManager('restored-session');
+    expect(registered?.manager).toBe(mocks.manager);
     expect(mocks.manager.destroy).not.toHaveBeenCalled();
     act(() => {
       confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-1');
     });
-    expect(mocks.createManager).toHaveBeenCalledTimes(1);
+    // Route-key remount coverage lives in [session-id].mounted.test.tsx.
+    expect(getLiveSessionManager('restored-session')).toBe(registered);
     expect(mocks.manager.destroy).not.toHaveBeenCalled();
 
     act(() => {

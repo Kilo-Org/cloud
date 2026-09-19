@@ -148,7 +148,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
         <EmptyState
           icon={ShieldOff}
-          className="flex-1"
           title={t('securityAgent.dismiss.notFoundTitle')}
           description={t('securityAgent.dismiss.notFoundDescription')}
         />
@@ -161,7 +160,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
         <QueryError
-          className="flex-1"
           message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
         />
@@ -174,7 +172,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
         <QueryError
-          className="flex-1"
           message={t('securityAgent.dismiss.couldNotCheckPermissions')}
           onRetry={() => void capability.refetch()}
         />
@@ -199,7 +196,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
         <EmptyState
           icon={ShieldOff}
-          className="flex-1"
           title={t('securityAgent.dismiss.cannotDismissTitle')}
           description={t('securityAgent.dismiss.cannotDismissDescription')}
         />
@@ -213,7 +209,6 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         <ScreenHeader title={t('securityAgent.dismiss.title')} modal />
         <EmptyState
           icon={ShieldOff}
-          className="flex-1"
           title={t('securityAgent.dismiss.cannotDismissTitle')}
           description={t('securityAgent.dismiss.alreadyResolvedDescription')}
         />

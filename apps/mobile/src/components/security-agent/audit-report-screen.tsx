@@ -165,10 +165,14 @@ function AuditReportView({
     const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language, {
       timeZone: 'UTC',
     });
+    // No `flex-1` here: CenteredState centers its child by measuring the
+    // child's intrinsic height, and a `flex-1` (flexBasis 0%) child inside its
+    // auto-height wrapper collapses to zero, which zeroes the height Yoga lets
+    // the title and description measure into. The screenshot then shows the
+    // icon bubble with no readable copy (explorer audit-report-empty).
     return (
       <EmptyState
         icon={FileText}
-        className="flex-1"
         title={t('securityAgent.auditReport.noActivity')}
         description={t('securityAgent.auditReport.noActivityDescription', { start, end })}
       />
@@ -215,7 +219,6 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
       {forbidden && (
         <EmptyState
           icon={ShieldOff}
-          className="flex-1"
           title={t('securityAgent.auditReport.unavailable')}
           description={t('securityAgent.auditReport.unavailableDescription')}
         />

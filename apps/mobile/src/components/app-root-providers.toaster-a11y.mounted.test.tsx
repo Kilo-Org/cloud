@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import {
   flush,
   keyboard,
+  lifecycle,
   mount,
   platform,
   resetUnlockMocks,
@@ -138,6 +139,40 @@ it.each(['ios', 'android'])(
     await mount();
 
     expect(unlockRoot().findByType('Toaster' as ElementType).props.offset).toBe(36 + 12 + 8);
+  }
+);
+
+/**
+ * Backgrounding the app with the IME open does not reliably deliver
+ * `keyboardDidHide`, so a height cached from before the app left the foreground
+ * would otherwise lift every later toast on a keyboard-less screen. The
+ * composer's `AppAwareKeyboardPaddingView` already clears on non-active states;
+ * the toast host must do the same, and re-arm on the next show.
+ */
+it.each(['ios', 'android'])(
+  'clears the %s keyboard clearance when the app leaves the foreground',
+  async os => {
+    platform.OS = os;
+    await mount();
+    const toaster = () => unlockRoot().findByType('Toaster' as ElementType);
+
+    await showKeyboard(280);
+    expect(toaster().props.offset).toBe(280 + 12 + 8);
+
+    await flush(() => {
+      lifecycle.change?.('background');
+    });
+    expect(toaster().props.offset).toBeUndefined();
+
+    // Returning to the foreground without an IME keeps the default placement;
+    // the next show restores clearance.
+    await flush(() => {
+      lifecycle.change?.('active');
+    });
+    expect(toaster().props.offset).toBeUndefined();
+
+    await showKeyboard(280);
+    expect(toaster().props.offset).toBe(280 + 12 + 8);
   }
 );
 

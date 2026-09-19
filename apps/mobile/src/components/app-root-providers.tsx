@@ -3,7 +3,7 @@ import { PortalHost } from '@rn-primitives/portal';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
 import { type ReactNode, useEffect, useState } from 'react';
-import { Keyboard } from 'react-native';
+import { AppState, Keyboard } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
@@ -54,9 +54,20 @@ function useToastKeyboardOffset() {
     const hide = Keyboard.addListener('keyboardDidHide', () => {
       setKeyboardHeight(0);
     });
+    // Backgrounding the app with the IME open does not reliably deliver
+    // `keyboardDidHide` on Android, so the last reported height would survive
+    // and keep every toast lifted after the user returns to a keyboard-less
+    // screen. Non-active app states clear it, matching the composer's
+    // `AppAwareKeyboardPaddingView`; the next `keyboardDidShow` re-arms it.
+    const appState = AppState.addEventListener('change', state => {
+      if (state !== 'active') {
+        setKeyboardHeight(0);
+      }
+    });
     return () => {
       show.remove();
       hide.remove();
+      appState.remove();
     };
   }, []);
 

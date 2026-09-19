@@ -19,6 +19,14 @@ import type { SeedResult } from '../index';
 
 export const usage = '<owner-email> <member-email>';
 
+/**
+ * The name the app shows for this fixture's organization.
+ *
+ * The mobile account sheet renders an organization's name verbatim, so the
+ * name must stay user-facing and never carry a `[seed:...]` developer marker.
+ */
+export const SEEDED_ORGANIZATION_NAME = 'Acme Corp';
+
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:w4c-org-pair ${usage}`);
   console.log('');
@@ -77,7 +85,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   await db.insert(organizations).values({
     id: organizationId,
-    name: `[seed:w4c-org-pair] ${trimmedOwnerEmail}`,
+    name: SEEDED_ORGANIZATION_NAME,
   });
 
   await db.insert(organization_memberships).values([

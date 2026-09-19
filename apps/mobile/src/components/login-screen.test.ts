@@ -48,7 +48,6 @@ vi.mock('react-native', () => ({
   AppState: { addEventListener: addAppStateListener },
   I18nManager: { isRTL: false },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
-  KeyboardAvoidingView: 'KeyboardAvoidingView',
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
@@ -472,7 +471,7 @@ describe.each(['android', 'ios'] as const)('login-screen %s bottom safe area', p
   });
 
   it.each(['hide', 'inactive', 'background'] as const)(
-    'counts the navigation inset once with the IME open and restores it on %s',
+    'reserves the keyboard occlusion with the IME open and restores the safe area on %s',
     async dismissal => {
       const renderer = await mountLoginScreen();
       try {
@@ -492,9 +491,13 @@ describe.each(['android', 'ios'] as const)('login-screen %s bottom safe area', p
           easing: 'keyboard',
           endCoordinates: { height: 300, width: 400, screenX: 0, screenY: 500 },
         };
+        // iOS reports the keyboard frame down to the window bottom, so 300
+        // already contains the home-indicator inset; Android reports it above
+        // the system bar, so the bar inset is added to reach the same occlusion.
+        const imeOcclusion = platform === 'ios' ? 300 : 300 + insets.bottom;
         act(() => show?.(event));
         expect(renderer.root.findByType('ScrollView').parent?.props.style).toEqual({
-          paddingBottom: platform === 'ios' ? 0 : 300 + insets.bottom,
+          paddingBottom: imeOcclusion,
         });
         expect(show).toBeDefined();
         expect(hide).toBeDefined();
@@ -515,7 +518,7 @@ describe.each(['android', 'ios'] as const)('login-screen %s bottom safe area', p
         });
         act(() => show?.(event));
         expect(renderer.root.findByType('ScrollView').parent?.props.style).toEqual({
-          paddingBottom: platform === 'ios' ? 0 : 300 + insets.bottom,
+          paddingBottom: imeOcclusion,
         });
       } finally {
         renderer.unmount();
@@ -524,7 +527,7 @@ describe.each(['android', 'ios'] as const)('login-screen %s bottom safe area', p
   );
 
   it.each([0, 34])(
-    'respects a %dpt bottom inset in LTR without replacing platform keyboard avoidance',
+    'respects a %dpt bottom inset in LTR while the keyboard is hidden',
     async bottom => {
       I18nManager.isRTL = false;
       insets.bottom = bottom;
@@ -532,10 +535,6 @@ describe.each(['android', 'ios'] as const)('login-screen %s bottom safe area', p
       try {
         expect(renderer.root.findByType('ScrollView').parent?.props.style).toEqual({
           paddingBottom: bottom,
-        });
-        expect(renderer.root.findByType('KeyboardAvoidingView').props).toMatchObject({
-          behavior: 'padding',
-          enabled: platform === 'ios',
         });
       } finally {
         renderer.unmount();

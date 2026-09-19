@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+import { MIN_AUDITED_CONTROL_FRAME_DP } from '@/lib/a11y/touch-target';
 import {
+  COMMENT_ACTIONS_FRAME_DP,
   COMMENT_ACTIONS_HIT_SLOP,
+  COMMENT_ACTIONS_VISUAL_DP,
   COMMENT_TRAILING_CONTROLS_GAP_DP,
+  commentActionsLeftBandDp,
   commentTrailingControlsClearanceDp,
   FIX_WITH_KILO_HIT_SLOP,
 } from '@/lib/pr-review/comment-trailing-controls';
@@ -15,21 +19,27 @@ describe('comment trailing controls tap areas', () => {
     expect(commentTrailingControlsClearanceDp()).toBeGreaterThan(0);
   });
 
+  it('keeps the overflow frame at or above the 28dp the size audit measures', () => {
+    // h-7 measured 24.5dp on device (NativeWind's rem is 14pt) and was
+    // reported as too small to tap.
+    expect(COMMENT_ACTIONS_FRAME_DP).toBeGreaterThanOrEqual(MIN_AUDITED_CONTROL_FRAME_DP);
+    expect(COMMENT_ACTIONS_VISUAL_DP).toBeLessThan(COMMENT_ACTIONS_FRAME_DP);
+  });
+
   it('keeps both controls at the 44pt minimum touch target', () => {
-    // The overflow is a 28pt visual button; the pill is ~26pt tall.
+    // The pill is ~26pt tall; the overflow reaches 44pt from its frame plus
+    // the slop on every side.
     expect(
-      COMMENT_ACTIONS_HIT_SLOP.top + COMMENT_ACTIONS_HIT_SLOP.bottom + 28
+      COMMENT_ACTIONS_FRAME_DP + COMMENT_ACTIONS_HIT_SLOP.top + COMMENT_ACTIONS_HIT_SLOP.bottom
     ).toBeGreaterThanOrEqual(44);
     expect(FIX_WITH_KILO_HIT_SLOP.top + FIX_WITH_KILO_HIT_SLOP.bottom + 26).toBeGreaterThanOrEqual(
       44
     );
   });
 
-  it('derives the clearance from the gap and both hit slops', () => {
+  it('derives the clearance from the gap and both tap areas', () => {
     expect(commentTrailingControlsClearanceDp()).toBe(
-      COMMENT_TRAILING_CONTROLS_GAP_DP -
-        FIX_WITH_KILO_HIT_SLOP.right -
-        COMMENT_ACTIONS_HIT_SLOP.left
+      COMMENT_TRAILING_CONTROLS_GAP_DP - FIX_WITH_KILO_HIT_SLOP.right - commentActionsLeftBandDp()
     );
   });
 });

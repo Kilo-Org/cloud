@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "Kilo, {{repository}}ను GitHub లేదా GitLab రిపోజిటరీగా గుర్తించదు. Kiloలో మరో రిపోజిటరీని ఎంచుకోండి.",
       "repositoryUnsupported": "{{repository}} ఒక Bitbucket రిపోజిటరీ — ఏజెంట్‌ను ప్రారంభించండి ఇంకా దీన్ని ఉపయోగించడం సాధ్యం కాదు. Kiloలో మరో రిపోజిటరీని ఎంచుకోండి."
     }
+  },
+  "launcher": {
+    "openLastSession": "చివరి సెషన్ను తెరవండి"
   }
 }

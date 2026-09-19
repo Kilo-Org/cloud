@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "Kilo non recoñece {{repository}} como un repositorio de GitHub ou GitLab. Escolle outro repositorio en Kilo.",
       "repositoryUnsupported": "{{repository}} é un repositorio de Bitbucket — Iniciar un axente aínda non pode usalo. Escolle outro repositorio en Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Abrir a última sesión"
   }
 }

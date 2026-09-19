@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "Kilo ले {{repository}} लाई GitHub वा GitLab रिपोजिटरीका रूपमा चिन्दैन। Kilo मा अर्को रिपोजिटरी छान्नुहोस्।",
       "repositoryUnsupported": "{{repository}} एउटा Bitbucket रिपोजिटरी हो — एजेन्ट सुरु गर्नुहोस् अझै यसलाई प्रयोग गर्न सक्दैन। Kilo मा अर्को रिपोजिटरी छान्नुहोस्।"
     }
+  },
+  "launcher": {
+    "openLastSession": "पछिल्लो सत्र खोल्नुहोस्"
   }
 }

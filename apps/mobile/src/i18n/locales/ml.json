@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "{{repository}} GitHub അല്ലെങ്കിൽ GitLab റിപ്പോസിറ്ററിയായി Kilo തിരിച്ചറിയുന്നില്ല. Kilo-യിൽ മറ്റൊരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കുക.",
       "repositoryUnsupported": "{{repository}} ഒരു Bitbucket റിപ്പോസിറ്ററിയാണ് — ഏജന്റ് ആരംഭിക്കുക ഇതുവരെ അത് ഉപയോഗിക്കാൻ കഴിയില്ല. Kilo-യിൽ മറ്റൊരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കുക."
     }
+  },
+  "launcher": {
+    "openLastSession": "അവസാന സെഷൻ തുറക്കുക"
   }
 }

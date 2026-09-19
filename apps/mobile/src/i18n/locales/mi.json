@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "Kāore a Kilo e āhukahuka i a {{repository}} hei pūranga waehere GitHub, GitLab rānei. Kōwhiria tētahi atu pūranga waehere i roto i a Kilo.",
       "repositoryUnsupported": "He pūranga waehere Bitbucket a {{repository}} — Kāore anō a Tīmata i te kaiāwhina e taea te whakamahi. Kōwhiria tētahi atu pūranga waehere i roto i a Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Whakatuwheratia te wātū whakamutunga"
   }
 }

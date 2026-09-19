@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "Kilo 無法將 {{repository}} 辨識為 GitHub 或 GitLab 存放庫。請在 Kilo 中選擇其他存放庫。",
       "repositoryUnsupported": "{{repository}} 是 Bitbucket 存放庫——啟動代理程式暫時無法使用它。請在 Kilo 中選擇其他存放庫。"
     }
+  },
+  "launcher": {
+    "openLastSession": "開啟上次工作階段"
   }
 }

@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "Kilo مخزن {{repository}} را به عنوان مخزن GitHub یا GitLab نمی‌شناسد. در Kilo مخزن دیگری انتخاب کنید.",
       "repositoryUnsupported": "{{repository}} یک مخزن Bitbucket است — شروع عامل هنوز نمی‌تواند از آن استفاده کند. در Kilo مخزن دیگری انتخاب کنید."
     }
+  },
+  "launcher": {
+    "openLastSession": "باز کردن آخرین نشست"
   }
 }

@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "Kilo nuk e njeh {{repository}} si depo GitHub ose GitLab. Zgjidh një depo tjetër në Kilo.",
       "repositoryUnsupported": "{{repository}} është një depo Bitbucket — Fillo agjentin nuk mund ta përdorë ende. Zgjidh një depo tjetër në Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Hap sesionin e fundit"
   }
 }

@@ -3182,5 +3182,8 @@
       "repositoryUnknown": "Kilo nerozpoznáva {{repository}} ako repozitár na GitHube alebo GitLabe. Vyber iný repozitár v Kile.",
       "repositoryUnsupported": "{{repository}} je repozitár na Bitbuckete — Spustiť agenta ho zatiaľ nemôže použiť. Vyber iný repozitár v Kile."
     }
+  },
+  "launcher": {
+    "openLastSession": "Otvoriť poslednú reláciu"
   }
 }

@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "Kilo {{repository}} ni GitHub yoki GitLab repozitoriyasi deb tanimaydi. Kilo'da boshqa repozitoriy tanlang.",
       "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasi — Agentni ishga tushirish hali undan foydalana olmaydi. Kilo'da boshqa repozitoriy tanlang."
     }
+  },
+  "launcher": {
+    "openLastSession": "Oxirgi seansni ochish"
   }
 }

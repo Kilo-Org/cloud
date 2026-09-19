@@ -3134,5 +3134,8 @@
       "repositoryUnknown": "Το Kilo δεν αναγνωρίζει το {{repository}} ως αποθετήριο GitHub ή GitLab. Επίλεξε άλλο αποθετήριο στο Kilo.",
       "repositoryUnsupported": "Το {{repository}} είναι αποθετήριο Bitbucket — Η έναρξη πράκτορα δεν μπορεί να το χρησιμοποιήσει ακόμη. Επίλεξε άλλο αποθετήριο στο Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Άνοιγμα τελευταίας συνεδρίας"
   }
 }

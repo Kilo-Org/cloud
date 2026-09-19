@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/icons';
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
@@ -44,6 +43,7 @@ import {
   getProfileAgentScope,
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
+import { useScreenSideInsets } from '@/lib/screen-insets';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -71,8 +71,8 @@ function providerLabel(provider: string) {
 }
 
 export function ProfileScreen() {
-  const insets = useSafeAreaInsets();
-  const scrollStyle = { marginLeft: insets.left, marginRight: insets.right };
+  const { left, right } = useScreenSideInsets();
+  const scrollStyle = { marginLeft: left, marginRight: right };
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();

@@ -96,6 +96,43 @@ describe('CliHistoricalTransport', () => {
     transport.destroy();
   });
 
+  it('threads a settled tool part settle time through the snapshot replay', async () => {
+    const taskPart = {
+      id: 'part-task-1',
+      sessionID: SES_ID,
+      messageID: 'msg-1',
+      type: 'tool' as const,
+      callID: 'call-1',
+      tool: 'task',
+      state: {
+        status: 'completed' as const,
+        input: {},
+        output: 'done',
+        title: 'task',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      },
+    };
+    const snapshot: SessionSnapshot = {
+      info: { id: SES_ID },
+      messages: [
+        {
+          info: stubUserMessage({ id: 'msg-1', sessionID: SES_ID }),
+          parts: [taskPart],
+        },
+      ],
+    };
+
+    const { transport, chatEvents } = createTransportWithSinks(() => Promise.resolve(snapshot));
+
+    transport.connect();
+    await Promise.resolve();
+
+    expect(chatEvents).toContainEqual({ type: 'message.part.updated', part: taskPart, time: 2 });
+
+    transport.destroy();
+  });
+
   it('fires session.created and stopped for empty snapshot', async () => {
     const snapshot = makeSnapshot({ id: SES_ID });
 

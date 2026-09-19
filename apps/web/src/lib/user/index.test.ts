@@ -136,6 +136,9 @@ import {
   cloud_agent_pending_uploads,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  passkey_credentials,
+  passkey_challenges,
+  passkey_sign_in_tickets,
 } from '@kilocode/db/schema';
 
 import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
@@ -1469,6 +1472,24 @@ describe('User', () => {
           distinct_id: user.id,
           properties: { email: 'reintroduced@example.com' },
         });
+        await db.insert(passkey_credentials).values({
+          kilo_user_id: user.id,
+          credential_id: `credential-${randomUUID()}`,
+          public_key: 'public-key',
+          name: 'Reintroduced Device',
+        });
+        await db.insert(passkey_challenges).values({
+          id: randomUUID(),
+          challenge: `challenge-${randomUUID()}`,
+          kind: 'authentication',
+          kilo_user_id: user.id,
+          expires_at: new Date().toISOString(),
+        });
+        await db.insert(passkey_sign_in_tickets).values({
+          ticket_hash: `ticket-${randomUUID()}`,
+          kilo_user_id: user.id,
+          expires_at: new Date().toISOString(),
+        });
 
         await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
 
@@ -1506,6 +1527,29 @@ describe('User', () => {
             .select()
             .from(analytics_event_outbox)
             .where(eq(analytics_event_outbox.distinct_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(passkey_credentials)
+            .where(eq(passkey_credentials.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(passkey_challenges)
+            .where(
+              and(
+                eq(passkey_challenges.kilo_user_id, user.id),
+                isNull(passkey_challenges.consumed_at)
+              )
+            )
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select()
+            .from(passkey_sign_in_tickets)
+            .where(eq(passkey_sign_in_tickets.kilo_user_id, user.id))
         ).toHaveLength(0);
         expect(await db.select().from(deleted_user_email_tombstones)).toEqual([]);
       }
@@ -3252,6 +3296,117 @@ describe('User', () => {
         .from(user_auth_provider)
         .where(eq(user_auth_provider.kilo_user_id, user.id));
       expect(providers).toHaveLength(0);
+    });
+
+    it('should delete passkey credentials, passkey challenges and sign-in tickets for the user', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const now = new Date().toISOString();
+
+      await db.insert(passkey_credentials).values([
+        {
+          kilo_user_id: user.id,
+          credential_id: `credential-${user.id}`,
+          public_key: 'public-key',
+          name: 'Test Laptop',
+        },
+        {
+          kilo_user_id: otherUser.id,
+          credential_id: `credential-${otherUser.id}`,
+          public_key: 'public-key',
+        },
+      ]);
+      await db.insert(passkey_challenges).values([
+        {
+          id: randomUUID(),
+          challenge: 'open-challenge',
+          kind: 'registration',
+          kilo_user_id: user.id,
+          expires_at: now,
+        },
+        {
+          id: randomUUID(),
+          challenge: 'consumed-challenge',
+          kind: 'registration',
+          kilo_user_id: user.id,
+          expires_at: now,
+          consumed_at: now,
+        },
+        {
+          id: randomUUID(),
+          challenge: 'other-open-challenge',
+          kind: 'authentication',
+          kilo_user_id: otherUser.id,
+          expires_at: now,
+        },
+      ]);
+      await db.insert(passkey_sign_in_tickets).values([
+        {
+          ticket_hash: `open-ticket-${user.id}`,
+          kilo_user_id: user.id,
+          expires_at: now,
+        },
+        {
+          ticket_hash: `consumed-ticket-${user.id}`,
+          kilo_user_id: user.id,
+          expires_at: now,
+          consumed_at: now,
+        },
+        {
+          ticket_hash: `other-ticket-${otherUser.id}`,
+          kilo_user_id: otherUser.id,
+          expires_at: now,
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(passkey_credentials)
+          .where(eq(passkey_credentials.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(passkey_credentials)
+          .where(eq(passkey_credentials.kilo_user_id, otherUser.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(passkey_challenges)
+          .where(
+            and(
+              eq(passkey_challenges.kilo_user_id, user.id),
+              isNull(passkey_challenges.consumed_at)
+            )
+          )
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(passkey_challenges)
+          .where(
+            and(
+              eq(passkey_challenges.kilo_user_id, otherUser.id),
+              isNull(passkey_challenges.consumed_at)
+            )
+          )
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(passkey_sign_in_tickets)
+          .where(eq(passkey_sign_in_tickets.kilo_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(passkey_sign_in_tickets)
+          .where(eq(passkey_sign_in_tickets.kilo_user_id, otherUser.id))
+      ).toHaveLength(1);
     });
 
     it('should delete affiliate attributions for the user', async () => {

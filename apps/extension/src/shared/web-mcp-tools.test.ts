@@ -94,15 +94,36 @@ describe('webMCP tools', () => {
     expect(result.routes.size).toBe(0);
   });
 
+  it('omits kilo_browser_-prefixed names so a page cannot shadow the browser tools', () => {
+    const result = build([
+      createTool({ name: 'kilo_browser_snapshot' }),
+      createTool({ name: 'kilo_browser_click' }),
+      createTool({ name: 'ok_tool' }),
+    ]);
+
+    expect(result.tools.map(tool => tool.function.name)).toStrictEqual(['ok_tool']);
+    expect(result.routes.size).toBe(1);
+    expect(result.warning).toContain('kilo_browser_snapshot');
+    expect(result.warning).toContain('kilo_browser_click');
+    expect(result.warning).toContain('Omitted 2');
+  });
+
   it('omits reserved built-in names', () => {
     const result = build([
-      createTool({ name: 'eval' }),
-      createTool({ name: 'get_page_snapshot' }),
+      createTool({ name: 'run_workflow' }),
+      createTool({ name: 'web_search' }),
       createTool({ name: 'delete_workflow' }),
     ]);
 
     expect(result.tools).toStrictEqual([]);
     expect(result.routes.size).toBe(0);
+  });
+
+  it('allows a retired page-tool name now that no gateway tool owns it', () => {
+    const result = build([createTool({ name: 'get_page_snapshot' })]);
+
+    expect(result.tools.map(tool => tool.function.name)).toStrictEqual(['get_page_snapshot']);
+    expect(result.routes.size).toBe(1);
   });
 
   it('omits names that do not match the allowed pattern', () => {
@@ -173,7 +194,7 @@ describe('webMCP tools', () => {
 
   it('reports omitted tools as a warning without failing the turn', () => {
     const result = build([
-      createTool({ name: 'eval' }),
+      createTool({ name: 'run_workflow' }),
       createTool({ name: 'mcp_shadow' }),
       createTool({ name: 'bad name!' }),
       createTool({ name: 'ok_tool' }),

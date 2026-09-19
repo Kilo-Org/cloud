@@ -81,7 +81,10 @@ describe('remote MCP tool-call event converter', () => {
 
   it('drops non-mcp tool calls', () => {
     expect(
-      toRemoteMcpToolCallEvents([{ arguments: {}, id: 'c', name: 'eval' }], new Map())
+      toRemoteMcpToolCallEvents(
+        [{ arguments: {}, id: 'c', name: 'kilo_browser_evaluate' }],
+        new Map()
+      )
     ).toHaveLength(0);
   });
 });

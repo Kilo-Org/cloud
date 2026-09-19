@@ -3,10 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createRemoteMcpToolCall,
   createSafeToolCall,
+  createToolCall,
   createToolResult,
   createWebMcpToolCall,
   createWorkflowToolCall,
 } from '@/src/shared/agent-conversation';
+import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 import type { StoredAgentConversationStore } from '@/src/shared/agent-conversation-tabs';
 import { conversationEventsSchema } from './agent-conversation-schemas';
 
@@ -298,6 +300,122 @@ describe('workflow tool-call persistence round-trip', () => {
     expect(reloaded?.conversations).toHaveLength(1);
   });
 });
+describe('retired browser tool migration on load', () => {
+  it('loads a conversation persisted with the retired page tools and eval', () => {
+    const store = {
+      activeConversationId: 'conversation-1',
+      conversations: [
+        {
+          events: [
+            {
+              code: 'return document.title;',
+              id: 'ev-eval',
+              name: 'eval',
+              tabId: 7,
+              type: 'tool-call',
+            },
+            {
+              id: 'ev-snapshot',
+              name: 'get_page_snapshot',
+              tabId: 7,
+              textStart: 100,
+              type: 'tool-call',
+            },
+            { id: 'ev-shot', name: 'get_viewport_screenshot', tabId: 7, type: 'tool-call' },
+            {
+              id: 'ev-find',
+              name: 'find_in_page',
+              query: 'checkout',
+              tabId: 7,
+              type: 'tool-call',
+            },
+            {
+              elementId: 'e12',
+              id: 'ev-element',
+              name: 'get_element_details',
+              snapshotId: 'snapshot-1',
+              tabId: 7,
+              type: 'tool-call',
+            },
+            {
+              id: 'ev-memory',
+              memoryId: 'memory-42',
+              name: 'get_memory',
+              tabId: 7,
+              type: 'tool-call',
+            },
+            {
+              id: 'ev-result',
+              ok: true,
+              toolCallId: 'ev-snapshot',
+              type: 'tool-result',
+              value: 'page text',
+            },
+          ],
+          id: 'conversation-1',
+          title: 'Legacy chat',
+          updatedAt: '2026-06-30T00:00:00.000Z',
+        },
+      ],
+      openConversationIds: ['conversation-1'],
+    };
+
+    const reloaded = normalizeStoredConversationStore(store);
+
+    expect(reloaded?.conversations[0]?.events).toStrictEqual([
+      {
+        arguments: { function: 'return document.title;' },
+        id: 'ev-eval',
+        name: 'kilo_browser_evaluate',
+        tabId: 7,
+        type: 'tool-call',
+      },
+      {
+        arguments: {},
+        id: 'ev-snapshot',
+        name: 'kilo_browser_snapshot',
+        tabId: 7,
+        type: 'tool-call',
+      },
+      {
+        arguments: { scale: 'css' },
+        id: 'ev-shot',
+        name: 'kilo_browser_take_screenshot',
+        tabId: 7,
+        type: 'tool-call',
+      },
+      {
+        arguments: { text: 'checkout' },
+        id: 'ev-find',
+        name: 'kilo_browser_find',
+        tabId: 7,
+        type: 'tool-call',
+      },
+      {
+        arguments: { target: 'e12' },
+        id: 'ev-element',
+        name: 'kilo_browser_snapshot',
+        tabId: 7,
+        type: 'tool-call',
+      },
+      {
+        id: 'ev-memory',
+        memoryId: 'memory-42',
+        name: 'get_memory',
+        tabId: 7,
+        type: 'tool-call',
+      },
+      {
+        id: 'ev-result',
+        ok: true,
+        toolCallId: 'ev-snapshot',
+        type: 'tool-result',
+        value: 'page text',
+      },
+    ]);
+  });
+});
+
 describe('schema rejection of unknown workflow-shaped tool', () => {
   it('rejects a tool-call with arguments and a name not in WorkflowToolName', () => {
     const result = conversationEventsSchema.safeParse([
@@ -310,6 +428,193 @@ describe('schema rejection of unknown workflow-shaped tool', () => {
       },
     ]);
     expect(result.success).toBe(false);
+  });
+});
+
+describe('browser tool-call persistence round-trip', () => {
+  it('preserves reasoningDetails through a persist -> reload cycle', () => {
+    const toolCall = {
+      ...createToolCall({ arguments: { target: 'e1' }, name: 'kilo_browser_click', tabId: 7 }),
+      reasoningDetails: [{ data: 'abc', type: 'reasoning.encrypted' }],
+    };
+    const store: StoredAgentConversationStore = {
+      activeConversationId: 'conversation-1',
+      conversations: [
+        {
+          events: [toolCall],
+          id: 'conversation-1',
+          title: 'Browser chat',
+          updatedAt: '2026-06-30T00:00:00.000Z',
+        },
+      ],
+      openConversationIds: ['conversation-1'],
+    };
+
+    const reloaded = normalizeStoredConversationStore(toPersistedConversationStore(store));
+
+    expect(reloaded?.conversations[0]?.events[0]).toStrictEqual({
+      arguments: { target: 'e1' },
+      id: toolCall.id,
+      name: 'kilo_browser_click',
+      reasoningDetails: [{ data: 'abc', type: 'reasoning.encrypted' }],
+      tabId: 7,
+      type: 'tool-call',
+    });
+  });
+});
+
+describe('reasoning details survive a persist -> reload cycle for every tool-call family', () => {
+  // The turn runner attaches the streamed reasoning to the first tool call of the turn whatever its family, and the gateway replay reads it back off that call.
+  const reasoningDetails = [{ data: 'abc', type: 'reasoning.encrypted' }];
+
+  const roundTrip = (event: AgentConversationEvent): AgentConversationEvent | undefined => {
+    const store: StoredAgentConversationStore = {
+      activeConversationId: 'conversation-1',
+      conversations: [
+        {
+          events: [event],
+          id: 'conversation-1',
+          title: 'Reasoning chat',
+          updatedAt: '2026-06-30T00:00:00.000Z',
+        },
+      ],
+      openConversationIds: ['conversation-1'],
+    };
+
+    return normalizeStoredConversationStore(toPersistedConversationStore(store))?.conversations[0]
+      ?.events[0];
+  };
+
+  it('keeps reasoningDetails on a safe memory tool call', () => {
+    const toolCall = {
+      ...createSafeToolCall({ name: 'get_memory', tabId: 7 }),
+      reasoningDetails,
+    };
+
+    expect(roundTrip(toolCall)).toStrictEqual({
+      id: toolCall.id,
+      name: 'get_memory',
+      reasoningDetails,
+      tabId: 7,
+      type: 'tool-call',
+    });
+  });
+
+  it('keeps reasoningDetails on a remote MCP tool call', () => {
+    const toolCall = {
+      ...createRemoteMcpToolCall({
+        arguments: { city: 'Skopje' },
+        name: 'mcp_fixture-mcp_get_weather',
+        remoteToolName: 'get_weather',
+        serverId: 'server-1',
+        serverName: 'Fixture MCP',
+      }),
+      reasoningDetails,
+    };
+
+    expect(roundTrip(toolCall)).toStrictEqual({
+      arguments: { city: 'Skopje' },
+      id: toolCall.id,
+      name: 'mcp_fixture-mcp_get_weather',
+      reasoningDetails,
+      remoteToolName: 'get_weather',
+      serverId: 'server-1',
+      serverName: 'Fixture MCP',
+      type: 'tool-call',
+    });
+  });
+
+  it('keeps reasoningDetails on a WebMCP tool call', () => {
+    const toolCall = {
+      ...createWebMcpToolCall({
+        arguments: { query: 'kilo' },
+        definitionSignature: '["search","Search","Find","https://example.com",{"type":"object"}]',
+        documentId: 'doc-1',
+        name: 'search',
+        providerToolCallId: 'call_webmcp_1',
+        tabId: 7,
+        webMcpOrigin: 'https://example.com',
+      }),
+      reasoningDetails,
+    };
+
+    expect(roundTrip(toolCall)).toStrictEqual({
+      arguments: { query: 'kilo' },
+      definitionSignature: '["search","Search","Find","https://example.com",{"type":"object"}]',
+      documentId: 'doc-1',
+      id: toolCall.id,
+      name: 'search',
+      providerToolCallId: 'call_webmcp_1',
+      reasoningDetails,
+      tabId: 7,
+      type: 'tool-call',
+      webMcpOrigin: 'https://example.com',
+    });
+  });
+
+  it('keeps reasoningDetails through the retired page tool migration', () => {
+    const reloaded = normalizeStoredConversationStore({
+      activeConversationId: 'conversation-1',
+      conversations: [
+        {
+          events: [
+            {
+              id: 'ev-snapshot',
+              name: 'get_page_snapshot',
+              reasoningDetails,
+              tabId: 7,
+              type: 'tool-call',
+            },
+          ],
+          id: 'conversation-1',
+          title: 'Legacy chat',
+          updatedAt: '2026-06-30T00:00:00.000Z',
+        },
+      ],
+      openConversationIds: ['conversation-1'],
+    });
+
+    expect(reloaded?.conversations[0]?.events[0]).toStrictEqual({
+      arguments: {},
+      id: 'ev-snapshot',
+      name: 'kilo_browser_snapshot',
+      reasoningDetails,
+      tabId: 7,
+      type: 'tool-call',
+    });
+  });
+
+  it('keeps reasoningDetails through the eval migration', () => {
+    const reloaded = normalizeStoredConversationStore({
+      activeConversationId: 'conversation-1',
+      conversations: [
+        {
+          events: [
+            {
+              code: 'return document.title;',
+              id: 'ev-eval',
+              name: 'eval',
+              reasoningDetails,
+              tabId: 7,
+              type: 'tool-call',
+            },
+          ],
+          id: 'conversation-1',
+          title: 'Legacy chat',
+          updatedAt: '2026-06-30T00:00:00.000Z',
+        },
+      ],
+      openConversationIds: ['conversation-1'],
+    });
+
+    expect(reloaded?.conversations[0]?.events[0]).toStrictEqual({
+      arguments: { function: 'return document.title;' },
+      id: 'ev-eval',
+      name: 'kilo_browser_evaluate',
+      reasoningDetails,
+      tabId: 7,
+      type: 'tool-call',
+    });
   });
 });
 

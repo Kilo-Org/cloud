@@ -95,11 +95,10 @@ const getToolCallDetail = (
     return stringifyToolValue(event.arguments);
   }
 
-  if (event.name === 'eval') {
-    return event.code;
-  }
-
-  return event.query ?? event.elementId ?? event.memoryId ?? event.snapshotId;
+  // What remains are the safe read tools, whose input is the query or element reference.
+  return 'elementId' in event || 'memoryId' in event || 'query' in event || 'snapshotId' in event
+    ? (event.query ?? event.elementId ?? event.memoryId ?? event.snapshotId)
+    : undefined;
 };
 
 const renderEvent = (event: AgentConversationEvent): string | undefined => {
@@ -111,7 +110,7 @@ const renderEvent = (event: AgentConversationEvent): string | undefined => {
       return undefined;
     }
     case 'tool-call': {
-      // The tool input carries the facts the next turn needs (the eval code, the query/element).
+      // The tool input carries the facts the next turn needs (the call arguments).
       const detail = getToolCallDetail(event);
 
       return detail === undefined || detail === ''
@@ -133,7 +132,7 @@ const renderEvent = (event: AgentConversationEvent): string | undefined => {
         return `Tool result (ok): [${event.value.mediaType} screenshot omitted]`;
       }
 
-      // The result payload (snapshot text, eval return, element details) is often the only record.
+      // The result payload (snapshot text, page facts) is often the only record.
       return `Tool result (ok): ${truncateToolText(stringifyToolValue(event.value))}`;
     }
   }

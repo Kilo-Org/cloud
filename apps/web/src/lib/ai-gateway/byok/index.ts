@@ -24,7 +24,7 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
   }
   const providers: UserByokProviderId[] = [
     ...new Set(
-      vercelModelMetadata[mapModelIdToVercel(modelId)]?.endpoints
+      vercelModelMetadata[await mapModelIdToVercel(modelId)]?.endpoints
         .map(ep => getVercelUserByokProviderIdForEndpoint(ep.provider_name ?? ep.tag))
         .filter(providerId => providerId !== undefined) ?? []
     ),

@@ -2,6 +2,7 @@ import { resolveIncomingResume } from '@kilocode/app-shared/universal-links';
 
 import { resumeDeepLinkHref, setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
 import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
+import { isSystemSearchFamilyLink } from './system-search-families';
 
 /** Target app path for the /cloud/sessions universal-link route. */
 const AGENTS_TAB_HREF = '/(app)/(tabs)/(2_agents)';
@@ -68,6 +69,13 @@ export function redirectSystemPath({
       }
     }
 
+    // An app-scheme URL that names a family the phone's search indexes is a
+    // system-search result's identifier (the app scheme is how Android
+    // delivers the tap), so it is bound to the session that indexed it and
+    // must not open for another account. An `https://` link stays
+    // account-independent.
+    const sessionBound = isSystemSearchFamilyLink(path);
+
     if (initial) {
       // COLD: stash only. Never navigate — router isn't mounted.
       // Skip when the synchronous launch capture already stashed this launch
@@ -75,12 +83,13 @@ export function redirectSystemPath({
       // the slot, and a restash would surface as a duplicate navigation on a
       // later, unrelated effect re-run (e.g. token refresh).
       if (!wasLaunchLinkHandled()) {
-        setPendingDeepLink(stashHref, 'universal-link');
+        setPendingDeepLink(stashHref, 'universal-link', { sessionBound });
       }
     } else {
       // WARM: stash like the cold path. The layout consumer navigates once the
-      // shell is ready, so a signed-out warm link survives login.
-      setPendingDeepLink(stashHref, 'universal-link');
+      // shell is ready, so a signed-out warm https link survives login; a
+      // session-bound one is dropped by the slot's account rules instead.
+      setPendingDeepLink(stashHref, 'universal-link', { sessionBound });
     }
     // Falsy in both handled cases — critical (see above).
     return null;

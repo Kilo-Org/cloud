@@ -1,8 +1,12 @@
+/* eslint-disable eslint-plugin-import/no-nodejs-modules, eslint-plugin-unicorn/prefer-module -- this test also reads the entry screen off disk, which is the only place an import-time `Platform` capture is observable */
 // The entry screen is the first route into a review for every provider
 // (s7): the field must accept a GitHub PR, a GitLab MR (gitlab.com or a
 // self-managed host) and a Bitbucket PR. The URL-field arm of the tests;
 // the recents arm lives in pr-review-entry-recents.test.ts and the shared
 // plain-function-call harness in pr-review-entry-screen-test-utils.ts.
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,6 +22,11 @@ import {
   seedRecents,
 } from './pr-review-entry-screen-test-utils';
 
+// The field draws the visible placeholder with the same one-line overlay on
+// both platforms; a `Platform` symbol in the screen would let one platform
+// fork it, so the source is pinned below.
+const ENTRY_SCREEN_SOURCE = readFileSync(join(__dirname, 'pr-review-entry-screen.tsx'), 'utf8');
+
 beforeEach(() => {
   vi.clearAllMocks();
   resetHookSlots();
@@ -32,6 +41,48 @@ describe('provider-neutral URL field', () => {
     expect(input.props?.placeholder).toBe('Pull request or merge request URL');
     expect(input.props?.accessibilityLabel).toBe('Enter a pull request or merge request URL');
     expect(String(input.props?.placeholder)).not.toContain('github');
+  });
+
+  it('draws the placeholder as one ellipsized line instead of the wrapping native hint', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'TextInput', () => true);
+    // pr-review-home finding: at font scale 2 the native EditText lays the long
+    // placeholder hint out on two lines while Yoga sizes the field to one line,
+    // so the second line is clipped. `numberOfLines` cannot stop that — RN
+    // never marks a single-line input as single-line, so the hint still wraps —
+    // hence the visible placeholder is the one-line overlay below. The native
+    // hint stays set (the device digest binds the field's text and hint to the
+    // placeholder copy) but is transparent on both platforms so it cannot draw.
+    expect(input.props?.placeholder).toBe('Pull request or merge request URL');
+    expect(input.props?.placeholderTextColor).toBe('transparent');
+    expect(input.props?.numberOfLines).toBe(1);
+    const overlay = find(tree, 'PrLinkPlaceholder', () => true);
+    expect(overlay.props?.label).toBe('Pull request or merge request URL');
+  });
+
+  it('hides the placeholder overlay once the field has text', async () => {
+    const before = await renderLoaded();
+    expect(findAll(before, 'PrLinkPlaceholder')).toHaveLength(1);
+    const input = find(before, 'TextInput', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)('https://github.com/a/b/pull/1');
+    const after = render();
+    expect(findAll(after, 'PrLinkPlaceholder')).toHaveLength(0);
+  });
+
+  it('keeps no Platform.OS fork in the entry screen', () => {
+    // One implementation for both platforms: the field, its transparent native
+    // hint and the one-line overlay render identically on iOS and Android.
+    expect(ENTRY_SCREEN_SOURCE).not.toMatch(/\bPlatform\b/);
+  });
+
+  it('sizes the field with min-h and no vertical padding per the mobile input rules', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'TextInput', () => true);
+    const classes = String(input.props?.className).split(' ');
+    // apps/mobile/AGENTS.md: single-line inputs set their height with min-h-*,
+    // not py-*; vertical padding draws the placeholder off-centre.
+    expect(classes).toContain('min-h-14');
+    expect(classes.filter(name => name.startsWith('py-'))).toEqual([]);
   });
 
   it('opens a GitHub PR URL on the GitHub route', async () => {

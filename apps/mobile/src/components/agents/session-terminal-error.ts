@@ -1,5 +1,9 @@
+import { type SessionStatusIndicator } from '@kilocode/cloud-agent-sdk';
+
 import { i18n } from '@/i18n';
 import { type QueryErrorVariant } from '@/components/query-error';
+
+import { type MessageFailure } from './message-failure-state';
 
 /**
  * Terminal error class for a session startup failure. The session manager's
@@ -244,6 +248,36 @@ export function sessionStatusErrorMessage(raw: string): string {
   return cls === 'unknown'
     ? i18n.t('agentChat.messageFailure.assistantFailed')
     : messageForClass(cls);
+}
+
+/**
+ * True when the fixed footer's error line would only restate the failure the
+ * transcript's last message row already shows. The row owns its failure and its
+ * action; a second copy of the same sentence in the footer reads as a glitch,
+ * not a designed error state. A line the row does not carry — a classified
+ * credits, service or permission failure, or the Durable Object's own safe
+ * projection — is kept: the footer is where the reader gets that reason.
+ */
+export function statusIndicatorDuplicatesMessageFailure(input: {
+  indicator: Pick<SessionStatusIndicator, 'type' | 'message'>;
+  failure: MessageFailure | null;
+}): boolean {
+  const { indicator, failure } = input;
+  if (indicator.type !== 'error' || failure === null) {
+    return false;
+  }
+  const copy = sessionStatusErrorMessage(indicator.message);
+  if (copy === failure.title) {
+    return true;
+  }
+  if (failure.detail !== null && copy === failure.detail) {
+    return true;
+  }
+  // An unclassified status error resolves to the generic assistant line, which
+  // is the same failure the row's own title states.
+  return (
+    failure.kind === 'assistant' && copy === i18n.t('agentChat.messageFailure.assistantFailed')
+  );
 }
 
 /**

@@ -25,10 +25,13 @@ export const NON_RETRYABLE_ASSISTANT_ERRORS: readonly string[] = [
 ];
 
 /**
- * Fixed, safe copy for a known assistant error name. Unknown names fall back
- * to the generic line. Never surfaces `error.data` or provider message text.
+ * Fixed, safe copy for a known assistant error name. An unknown name has no
+ * line of its own: the title already states that the response failed, so the
+ * footer adds no detail rather than repeating the title in a sentence
+ * (`messageFailure.assistantFailed` is the fixed footer's line, not the
+ * message row's). Never surfaces `error.data` or provider message text.
  */
-function assistantDetail(errorName: string): string {
+function assistantDetail(errorName: string): string | null {
   switch (errorName) {
     case 'ProviderAuthError': {
       return i18n.t('agentChat.messageFailure.assistantProviderRejected');
@@ -40,7 +43,7 @@ function assistantDetail(errorName: string): string {
       return i18n.t('agentChat.messageFailure.assistantContextOverflow');
     }
     default: {
-      return i18n.t('agentChat.messageFailure.assistantFailed');
+      return null;
     }
   }
 }
@@ -48,7 +51,12 @@ function assistantDetail(errorName: string): string {
 export type MessageFailure = {
   kind: 'delivery' | 'assistant';
   title: string;
-  detail: string;
+  /**
+   * The explanation line under the title, or `null` when the title alone says
+   * it (an assistant failure with no classified reason). The footer then shows
+   * one statement plus the action rather than the same sentence twice.
+   */
+  detail: string | null;
   /**
    * The untranslated transport text for a failed delivery ("Unauthorized:
    * Unauthorized"), for the copy action only — same split as the terminal

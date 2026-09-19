@@ -322,6 +322,20 @@ function filterButtonProps() {
   }
   return button.props as { accessibilityLabel?: string; accessibilityValue?: unknown };
 }
+/**
+ * Nearest ancestor whose className holds `token`. Each header control renders
+ * through its own component, so a control's parent chain depth is not fixed.
+ */
+function ancestorWithClassName(
+  node: TestRenderer.ReactTestInstance | undefined,
+  token: string
+): TestRenderer.ReactTestInstance | null {
+  let current = node?.parent ?? null;
+  while (current && !String(current.props.className).includes(token)) {
+    current = current.parent;
+  }
+  return current;
+}
 function applyFilters(projectFilter: string[], platformFilter: string[]) {
   act(() => {
     headerAction('agents-open-filters').props.onPress();
@@ -1062,7 +1076,7 @@ describe('AgentSessionListScreen header and admission', () => {
     const filters = nodes('Pressable').find(node => node.props.testID === 'agents-open-filters');
     expect(history?.parent?.props.className).toContain('items-center');
     expect(history?.parent?.props.className).toContain('min-h-11');
-    expect(filters?.parent?.parent).toBe(history?.parent);
+    expect(ancestorWithClassName(filters, 'min-h-11')).toBe(history?.parent);
     const updating = nodes('Text').find(node => node.children.includes('Updating'));
     expect(updating).toBeUndefined();
     state.live.isFetching = true;

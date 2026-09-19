@@ -76,6 +76,7 @@ import {
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
+import { isGatewayAccountRateLimited } from '@/lib/ai-gateway/gateway-account-rate-limit';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
@@ -490,6 +491,21 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     tokenSource = undefined;
   } else {
     user = maybeUser;
+  }
+
+  // Cap the account before anything below touches the database. Every WAF rule
+  // in front of this route counts per IP, so an actor rotating addresses buys
+  // one allowance per address; this one counts the account itself.
+  if (await isGatewayAccountRateLimited(request, user.id)) {
+    console.warn(`Gateway account rate limit exceeded, user: ${user.id}`);
+    return NextResponse.json(
+      {
+        error: 'Rate limit exceeded',
+        error_type: ProxyErrorType.rate_limit_exceeded,
+        message: 'Too many requests. Please try again later.',
+      },
+      { status: 429 }
+    );
   }
 
   // Fraud/project headers are pure header parsing; resolve them here so the

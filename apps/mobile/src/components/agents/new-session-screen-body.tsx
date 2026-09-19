@@ -44,7 +44,6 @@ import { useLaunchFolder } from '@/lib/hooks/use-launch-folder';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { usePersistedRunOnDestination } from '@/lib/hooks/use-persisted-run-on-destination';
-import { useSandboxSelection } from '@/lib/hooks/use-sandbox-selection';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
 import {
@@ -67,10 +66,6 @@ import {
   resolvePersistedRunOn,
   shouldRestorePersistedRunOn,
 } from '@/lib/run-on-destination';
-import {
-  resolveSandboxSelectionError,
-  type SandboxAllocation,
-} from '@/lib/sandbox-allocation-label';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { peekSharePayload } from '@/lib/share-payload';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
@@ -254,26 +249,6 @@ export function NewSessionScreenBody() {
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
   });
 
-  // The sandbox selection is owned here, not by the form: the route's scope is
-  // this screen's, and the picked allocation resets with it inside the hook.
-  // The pick rides the create call below, and a settled capabilities verdict
-  // that the pick is unavailable blocks Start.
-  const sandboxSelection = useSandboxSelection(organizationId);
-  const sandboxError = resolveSandboxSelectionError({
-    capabilities: sandboxSelection.capabilities,
-    allocation: sandboxSelection.allocation,
-  });
-  const setSandboxAllocation = sandboxSelection.setAllocation;
-  const handleSandboxChange = (next: SandboxAllocation | undefined) => {
-    setSandboxAllocation(next);
-  };
-  const handleRetrySandbox = () => {
-    sandboxSelection.refetch();
-  };
-  const handleUseDefaultSandbox = () => {
-    setSandboxAllocation(undefined);
-  };
-
   // The branch pick belongs to THIS screen, not to the repository section: the
   // section unmounts when the run target becomes a remote instance, and
   // clearing there would silently drop the user's pick while the repository
@@ -427,7 +402,6 @@ export function NewSessionScreenBody() {
     variant: displayVariant,
     autoCommit,
     profileId,
-    sandboxAllocation: sandboxSelection.allocation,
   });
 
   // Seed the route-owned prompt state from the restored draft once the load
@@ -678,11 +652,6 @@ export function NewSessionScreenBody() {
       selectedRepo,
       selectedRepositoryResolved: selectedRepository !== null,
       isProfileLoading,
-      // Only a settled capabilities verdict blocks: with the query errored or
-      // still loading the pick cannot be checked, so Start stays enabled and
-      // the server arbitrates the pick (a rejection surfaces as the inline
-      // create error). Nothing picked means the backend default applies.
-      sandboxUnavailable: sandboxSelection.status === 'ready' && sandboxError !== undefined,
     });
   }
 
@@ -804,16 +773,6 @@ export function NewSessionScreenBody() {
         recents={recents}
         selectedRepo={selectedRepo}
         organizationId={organizationId}
-        sandbox={{
-          status: sandboxSelection.status,
-          capabilities: sandboxSelection.capabilities,
-          value: sandboxSelection.allocation,
-          error: sandboxError,
-          organizationId,
-          onChange: handleSandboxChange,
-          onRetry: handleRetrySandbox,
-          onUseDefault: handleUseDefaultSandbox,
-        }}
         profile={profile}
         isProfileLoading={isProfileLoading}
         isProfileError={isProfileError}

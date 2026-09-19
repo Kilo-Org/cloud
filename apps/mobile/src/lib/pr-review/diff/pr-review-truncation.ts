@@ -17,7 +17,9 @@ export function shouldShowTruncationBanner(changedFiles: number): boolean {
 }
 
 export function truncationBannerCopy(changedFiles: number): string {
+  // i18n-dup-ok: 'prReview.diff.truncationBanner_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
   return i18n.t('prReview.diff.truncationBanner', {
+    count: changedFiles,
     limit: formatNumber(PR_REVIEW_TRUNCATION_BANNER_THRESHOLD, i18n.language),
     total: formatNumber(changedFiles, i18n.language),
   });

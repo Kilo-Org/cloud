@@ -366,6 +366,7 @@ export function SessionContextSheet({
 
         {modelsSectionCount > 0 ? (
           <View className="mt-8 gap-3">
+            {/* i18n-dup-ok: 'agentChat.contextUsage.modelsCount_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
             <Text className="text-sm font-semibold text-foreground">
               {t('agentChat.contextUsage.modelsCount', {
                 count: modelsSectionCount,

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildProfileSelectorState,
-  formatProfileSelectorCounts,
   PROFILE_SELECTOR_KEYS as K,
+  profileSelectorCountItems,
   type ProfileSelectorProfile,
 } from './profile-selector-model';
 
@@ -36,15 +36,18 @@ const rowKinds = (state: ReturnType<typeof buildProfileSelectorState>) =>
 const profileIds = (state: ReturnType<typeof buildProfileSelectorState>) =>
   state.rows.flatMap(row => (row.kind === 'profile' ? [row.profile.id] : []));
 
-describe('formatProfileSelectorCounts', () => {
-  it('renders N vars and N cmds when either count is non-zero', () => {
+describe('profileSelectorCountItems', () => {
+  it('resolves N vars and N cmds when either count is non-zero', () => {
     expect(
-      formatProfileSelectorCounts(profile({ id: 'a', name: 'A', varCount: 3, commandCount: 1 }))
-    ).toBe('3 vars, 1 cmds');
+      profileSelectorCountItems(profile({ id: 'a', name: 'A', varCount: 3, commandCount: 1 }))
+    ).toEqual([
+      { kind: 'vars', count: 3 },
+      { kind: 'commands', count: 1 },
+    ]);
   });
 
-  it('renders nothing when both counts are zero', () => {
-    expect(formatProfileSelectorCounts(profile({ id: 'a', name: 'A' }))).toBe('');
+  it('resolves nothing when both counts are zero', () => {
+    expect(profileSelectorCountItems(profile({ id: 'a', name: 'A' }))).toEqual([]);
   });
 });
 

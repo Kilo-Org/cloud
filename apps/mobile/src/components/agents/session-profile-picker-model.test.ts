@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  formatSessionProfileCounts,
   resolveSessionProfileLayerIds,
   resolveSessionProfilePicker,
+  sessionProfileCountItems,
   type SessionProfilePickerProfile,
 } from './session-profile-picker-model';
 
@@ -71,10 +71,10 @@ describe('resolveSessionProfileLayerIds', () => {
   });
 });
 
-describe('formatSessionProfileCounts', () => {
-  it('joins the non-zero counts in web order', () => {
+describe('sessionProfileCountItems', () => {
+  it('resolves the non-zero counts in web order', () => {
     expect(
-      formatSessionProfileCounts(
+      sessionProfileCountItems(
         profile({
           id: 'p',
           name: 'P',
@@ -84,11 +84,19 @@ describe('formatSessionProfileCounts', () => {
           kiloCommandCount: 4,
         })
       )
-    ).toBe('3 vars · 1 MCP · 2 skills · 4 cmds');
+    ).toEqual([
+      { kind: 'vars', count: 3 },
+      { kind: 'mcp', count: 1 },
+      { kind: 'skills', count: 2 },
+      { kind: 'commands', count: 4 },
+    ]);
   });
 
-  it('returns an empty string for an all-zero profile', () => {
-    expect(formatSessionProfileCounts(profile({ id: 'p', name: 'P' }))).toBe('');
+  it('omits zero counts, so an all-zero profile resolves no items', () => {
+    expect(sessionProfileCountItems(profile({ id: 'p', name: 'P', skillCount: 2 }))).toEqual([
+      { kind: 'skills', count: 2 },
+    ]);
+    expect(sessionProfileCountItems(profile({ id: 'p', name: 'P' }))).toEqual([]);
   });
 });
 
@@ -111,7 +119,7 @@ describe('resolveSessionProfilePicker', () => {
     });
 
     expect(state.chipName).toBe('Default profile');
-    expect(state.chipCounts).toBe('2 MCP');
+    expect(state.chipCountItems).toEqual([{ kind: 'mcp', count: 2 }]);
     expect(state.hasOverride).toBe(false);
     expect(state.topSource).toBe('default');
     expect(state.selectedProfileId).toBe('default');
@@ -146,7 +154,11 @@ describe('resolveSessionProfilePicker', () => {
     expect(state.topProfile?.id).toBe('picked');
     // vars take the larger layer; MCP/skills/cmds add across the pair. The
     // override replaces the default, so the default's MCP count is not added.
-    expect(state.chipCounts).toBe('1 vars · 3 skills · 1 cmds');
+    expect(state.chipCountItems).toEqual([
+      { kind: 'vars', count: 1 },
+      { kind: 'skills', count: 3 },
+      { kind: 'commands', count: 1 },
+    ]);
     expect(state.candidates.map(candidate => candidate.id)).toEqual(['default', 'picked']);
   });
 
@@ -172,7 +184,7 @@ describe('resolveSessionProfilePicker', () => {
     });
 
     expect(state.chipName).toBeNull();
-    expect(state.chipCounts).toBe('');
+    expect(state.chipCountItems).toEqual([]);
     expect(state.selectedProfileId).toBeNull();
     expect(state.overrideNeedsAttention).toBe(false);
     expect(state.candidates).toEqual([]);

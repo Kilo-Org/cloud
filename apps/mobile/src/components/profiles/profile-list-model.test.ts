@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildProfileSections,
-  formatProfileCounts,
   isEffectiveDefault,
   profileCounts,
+  profileListCountItems,
 } from '@/components/profiles/profile-list-model';
 
 type TestProfile = {
@@ -111,15 +111,19 @@ describe('profileCounts', () => {
   });
 });
 
-describe('formatProfileCounts', () => {
-  it('joins the non-zero counts into a compact subtitle', () => {
-    expect(formatProfileCounts({ varCount: 3, commandCount: 2, skillCount: 1 })).toBe(
-      '3v · 2c · 1s'
-    );
-    expect(formatProfileCounts({ varCount: 0, commandCount: 2, skillCount: 0 })).toBe('2c');
+describe('profileListCountItems', () => {
+  it('resolves the non-zero counts in web order', () => {
+    expect(profileListCountItems({ varCount: 3, commandCount: 2, skillCount: 1 })).toEqual([
+      { kind: 'vars', count: 3 },
+      { kind: 'commands', count: 2 },
+      { kind: 'skills', count: 1 },
+    ]);
+    expect(profileListCountItems({ varCount: 0, commandCount: 2, skillCount: 0 })).toEqual([
+      { kind: 'commands', count: 2 },
+    ]);
   });
 
-  it('returns undefined when every count is zero', () => {
-    expect(formatProfileCounts({ varCount: 0, commandCount: 0, skillCount: 0 })).toBeUndefined();
+  it('resolves nothing when every count is zero', () => {
+    expect(profileListCountItems({ varCount: 0, commandCount: 0, skillCount: 0 })).toEqual([]);
   });
 });

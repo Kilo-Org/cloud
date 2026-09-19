@@ -19,6 +19,15 @@ const EXPECTED_PROFILES = {
   emptyDescription:
     'Create a profile to reuse environment variables, setup commands, and skills across sessions.',
   loadFailed: "Couldn't load profiles",
+  counts: {
+    vars: '{{count}} vars',
+    mcp: '{{count}} MCP',
+    skills: '{{count}} skills',
+    commands: '{{count}} cmds',
+    varsShort: '{{count}}v',
+    skillsShort: '{{count}}s',
+    commandsShort: '{{count}}c',
+  },
   nameLabel: 'Profile name',
   namePlaceholder: 'e.g. Backend debugging',
   descriptionLabel: 'Profile description',

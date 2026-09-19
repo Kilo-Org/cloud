@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import {
-  formatProfileSelectorCounts,
+  profileSelectorCountItems,
   type ProfileSelectorProfile,
   type ProfileSelectorRow,
   type ProfileSelectorState,
@@ -25,6 +25,7 @@ import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { formatProfileCountItems } from '@/lib/profile-count-labels';
 
 type ProfileSelectorRowProps = Readonly<{
   state: ProfileSelectorState;
@@ -100,7 +101,7 @@ export function ProfileSelectorRow({
       return null;
     }
     const profile = row.profile;
-    const counts = formatProfileSelectorCounts(profile);
+    const counts = formatProfileCountItems(t, profileSelectorCountItems(profile)).join(', ');
     return (
       <Pressable
         key={row.key}

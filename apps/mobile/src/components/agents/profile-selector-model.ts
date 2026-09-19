@@ -1,3 +1,5 @@
+import { type ProfileCountItem } from '@/lib/profile-count-labels';
+
 /**
  * Pure option model for the advanced-config profile selector.
  *
@@ -60,14 +62,18 @@ export type ProfileSelectorState = Readonly<{
 }>;
 
 /**
- * The per-row `N vars, N cmds` count the web selector appends. Empty when both
- * counts are zero, so the row renders no count at all.
+ * The per-row count the web selector appends. Both counts render even at zero
+ * (web parity), in var-then-command order; the caller localizes and joins
+ * them. Empty when both counts are zero, so the row renders no count at all.
  */
-export function formatProfileSelectorCounts(profile: ProfileSelectorProfile): string {
+export function profileSelectorCountItems(profile: ProfileSelectorProfile): ProfileCountItem[] {
   if (profile.varCount === 0 && profile.commandCount === 0) {
-    return '';
+    return [];
   }
-  return `${profile.varCount} vars, ${profile.commandCount} cmds`;
+  return [
+    { kind: 'vars', count: profile.varCount },
+    { kind: 'commands', count: profile.commandCount },
+  ];
 }
 
 export type BuildProfileSelectorStateInput = Readonly<{

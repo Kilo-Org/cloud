@@ -5,9 +5,9 @@ import { View } from 'react-native';
 import { EmptyState } from '@/components/empty-state';
 import {
   buildProfileSections,
-  formatProfileCounts,
   isEffectiveDefault,
   profileCounts,
+  profileListCountItems,
 } from '@/components/profiles/profile-list-model';
 import { profileOrganizationId, profileOwnerType } from '@/components/profiles/profile-owner-model';
 import { QueryError } from '@/components/query-error';
@@ -27,6 +27,7 @@ import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { formatProfileCountItemsShort } from '@/lib/profile-count-labels';
 import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganization } from '@/lib/organization-context';
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
@@ -169,25 +170,31 @@ export function ProfilesListScreen() {
                     })}
                   </Text>
                 ) : null}
-                {section.profiles.map((profile, index) => (
-                  <ConfigureRow
-                    key={profile.id}
-                    icon={ownerIcon(profile)}
-                    title={profile.name}
-                    subtitle={formatProfileCounts(profileCounts(profile))}
-                    className="rounded-lg bg-secondary px-3"
-                    last={index === section.profiles.length - 1}
-                    trailing={renderDefaultStar({
-                      isDefault: isEffectiveDefault(profile, effectiveDefaultId),
-                      name: profile.name,
-                      label: t('profiles.defaultSectionTitle'),
-                      color: colors.primary,
-                    })}
-                    onPress={() => {
-                      openProfile(profile);
-                    }}
-                  />
-                ))}
+                {section.profiles.map((profile, index) => {
+                  const subtitle = formatProfileCountItemsShort(
+                    t,
+                    profileListCountItems(profileCounts(profile))
+                  ).join(' · ');
+                  return (
+                    <ConfigureRow
+                      key={profile.id}
+                      icon={ownerIcon(profile)}
+                      title={profile.name}
+                      subtitle={subtitle || undefined}
+                      className="rounded-lg bg-secondary px-3"
+                      last={index === section.profiles.length - 1}
+                      trailing={renderDefaultStar({
+                        isDefault: isEffectiveDefault(profile, effectiveDefaultId),
+                        name: profile.name,
+                        label: t('profiles.defaultSectionTitle'),
+                        color: colors.primary,
+                      })}
+                      onPress={() => {
+                        openProfile(profile);
+                      }}
+                    />
+                  );
+                })}
               </View>
             ))}
 

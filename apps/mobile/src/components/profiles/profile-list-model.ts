@@ -1,3 +1,5 @@
+import { type ProfileCountItem } from '@/lib/profile-count-labels';
+
 /**
  * Pure view-model helpers for the mobile profile manager.
  *
@@ -96,16 +98,16 @@ export function profileCounts(profile: ProfileCounts): ProfileCounts {
 }
 
 /**
- * Compact subtitle for a row, e.g. `3v · 2c · 1s`. Mirrors the web list row
- * (`ProfilesListDialog.tsx` `ProfileListItem`), which abbreviates the same
- * counts and hides the ones that are zero. Returns `undefined` when the
- * profile has nothing configured, so the row renders without a subtitle.
+ * The non-zero counts a row subtitle shows, in web order (vars, commands,
+ * skills). The caller localizes them with the compact unit suffixes and joins
+ * them; empty when the profile has nothing configured, so the row renders
+ * without a subtitle.
  */
-export function formatProfileCounts(counts: ProfileCounts): string | undefined {
-  const parts = [
-    counts.varCount > 0 ? `${counts.varCount}v` : null,
-    counts.commandCount > 0 ? `${counts.commandCount}c` : null,
-    counts.skillCount > 0 ? `${counts.skillCount}s` : null,
-  ].filter((part): part is string => part !== null);
-  return parts.length > 0 ? parts.join(' · ') : undefined;
+export function profileListCountItems(counts: ProfileCounts): ProfileCountItem[] {
+  const items: (ProfileCountItem | null)[] = [
+    counts.varCount > 0 ? { kind: 'vars', count: counts.varCount } : null,
+    counts.commandCount > 0 ? { kind: 'commands', count: counts.commandCount } : null,
+    counts.skillCount > 0 ? { kind: 'skills', count: counts.skillCount } : null,
+  ];
+  return items.filter((item): item is ProfileCountItem => item !== null);
 }

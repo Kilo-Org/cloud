@@ -383,7 +383,7 @@ function AttachmentChip({
               'overflow-hidden rounded-md border border-border bg-card',
               isImage ? 'h-16 w-20' : 'h-12 w-48',
               description.showRetry && 'border-destructive',
-              isErrored && !description.showRetry && 'border-destructive/60'
+              isErrored && !description.showRetry && 'border-danger-tile-border'
             )}
           >
             {description.showRetry ? (

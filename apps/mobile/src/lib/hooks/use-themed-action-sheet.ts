@@ -1,4 +1,5 @@
 import { type ActionSheetOptions } from '@expo/react-native-action-sheet';
+import { useMemo } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -19,14 +20,19 @@ export type ThemedActionSheetOptions = Pick<
 export function useThemedActionSheetOptions(): ThemedActionSheetOptions {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
-  return {
-    // Preserve native-sheet focus and visibility above modal screens on both platforms.
-    autoFocus: true,
-    useModal: true,
-    containerStyle: { backgroundColor: colors.card, paddingBottom: bottom },
-    textStyle: { color: colors.foreground },
-    titleTextStyle: { color: colors.mutedForeground },
-    messageTextStyle: { color: colors.mutedForeground },
-    destructiveColor: colors.destructive,
-  };
+  // Stable identity across renders so call sites can safely list this value in
+  // `useCallback` dependencies without recreating their handlers every render.
+  return useMemo(
+    () => ({
+      // Preserve native-sheet focus and visibility above modal screens on both platforms.
+      autoFocus: true,
+      useModal: true,
+      containerStyle: { backgroundColor: colors.card, paddingBottom: bottom },
+      textStyle: { color: colors.foreground },
+      titleTextStyle: { color: colors.mutedForeground },
+      messageTextStyle: { color: colors.mutedForeground },
+      destructiveColor: colors.destructive,
+    }),
+    [colors, bottom]
+  );
 }

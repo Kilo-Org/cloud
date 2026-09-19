@@ -16,6 +16,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   Globe: 'Globe',
+  KeyRound: 'KeyRound',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
 }));
@@ -63,12 +64,16 @@ beforeEach(() => {
 });
 
 describe('AccountSettingsScreen', () => {
-  it('renders the Language, Trusted hosts, and Device sessions rows', async () => {
+  it('renders the Language, Trusted hosts, Passkeys, and Device sessions rows', async () => {
     const renderer = await mountAccount();
 
     const language = findConfigureRow(renderer, 'Language');
     expect(language.props).toMatchObject({ icon: 'Globe', subtitle: 'Device · English' });
     expect(findConfigureRow(renderer, 'Trusted hosts')).toBeDefined();
+    expect(findConfigureRow(renderer, 'Passkeys').props).toMatchObject({
+      icon: 'KeyRound',
+      subtitle: 'Sign in without a password',
+    });
     expect(findConfigureRow(renderer, 'Device sessions')).toBeDefined();
   });
 
@@ -86,13 +91,18 @@ describe('AccountSettingsScreen', () => {
     });
   });
 
-  it('opens trusted hosts and device sessions from their rows', async () => {
+  it('opens trusted hosts, passkeys, and device sessions from their rows', async () => {
     const renderer = await mountAccount();
 
     act(() => {
       (findConfigureRow(renderer, 'Trusted hosts').props.onPress as () => void)();
     });
     expect(push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/trusted-hosts');
+
+    act(() => {
+      (findConfigureRow(renderer, 'Passkeys').props.onPress as () => void)();
+    });
+    expect(push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/passkeys');
 
     act(() => {
       (findConfigureRow(renderer, 'Device sessions').props.onPress as () => void)();

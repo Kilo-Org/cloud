@@ -129,7 +129,19 @@ const config: ExpoConfig = {
     requireFullScreen: true,
     supportsTablet: true,
     usesAppleSignIn: true,
-    associatedDomains: ['applinks:app.kilo.ai'],
+    // `webcredentials` is the passkey half of the claim: it lets the iOS
+    // platform authenticator offer the passkey created at app.kilo.ai (the
+    // relying-party id) inside the app. It is the one platform-specific line
+    // the feature needs, and only because the platform has no equivalent
+    // app-config capability: the Associated Domains entitlement is how iOS's
+    // AuthenticationServices learns the association, while Android's
+    // Credential Manager resolves the same association from the
+    // `delegate_permission/common.get_login_creds` relation served at
+    // apps/web/public/.well-known/assetlinks.json. Both platforms therefore
+    // share the one relying-party id, the one hosted association, and the one
+    // credential set; only the declaration's location differs. `applinks` keeps
+    // universal links.
+    associatedDomains: ['applinks:app.kilo.ai', 'webcredentials:app.kilo.ai'],
     entitlements: {
       // App Attest, used by @expo/app-integrity for native admission. `production`
       // is required for App Store builds; a development build against the

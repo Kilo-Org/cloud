@@ -9,11 +9,16 @@ import { renderWithProviders } from '@/test/render-with-providers';
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
 const signOutFn = vi.hoisted(() => vi.fn());
+const platform = vi.hoisted(() => ({ os: 'android' as 'android' | 'ios' }));
 
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   Modal: 'Modal',
-  Platform: { OS: 'android' as const },
+  Platform: {
+    get OS() {
+      return platform.os;
+    },
+  },
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -140,29 +145,33 @@ describe('ProfileScreen sign-out confirmation', () => {
   });
 
   // The finding: the native Android alert painted sign-out and cancel the same
-  // teal, so the destructive choice had no distinct affordance. On Android the
-  // confirmation is now in-app, where sign-out carries the destructive (red)
-  // button variant; iOS keeps the native alert.
-  it('opens a dialog whose destructive control is the one that signs out', async () => {
-    const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
+  // teal, so the destructive choice had no distinct affordance. The confirmation
+  // is now the same in-app dialog on iOS and Android, where sign-out carries the
+  // destructive (red) button variant; neither platform falls back to Alert.alert.
+  it.each(['ios', 'android'] as const)(
+    'opens the in-app dialog whose destructive control signs out on %s',
+    async os => {
+      platform.os = os;
+      const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
 
-    const tile = renderer.root.find(
-      node => isType(node, 'ActionTile') && node.props.label === 'Sign out'
-    );
-    act(() => {
-      (tile.props as { onPress?: () => void }).onPress?.();
-    });
+      const tile = renderer.root.find(
+        node => isType(node, 'ActionTile') && node.props.label === 'Sign out'
+      );
+      act(() => {
+        (tile.props as { onPress?: () => void }).onPress?.();
+      });
 
-    // Opening the confirmation signs nobody out; only its destructive control does.
-    expect(signOutFn).not.toHaveBeenCalled();
-    const confirm = renderer.root.find(
-      node => isType(node, 'Button') && node.props.variant === 'destructive'
-    );
-    act(() => {
-      (confirm.props as { onPress?: () => void }).onPress?.();
-    });
-    expect(signOutFn).toHaveBeenCalledTimes(1);
+      // Opening the confirmation signs nobody out; only its destructive control does.
+      expect(signOutFn).not.toHaveBeenCalled();
+      const confirm = renderer.root.find(
+        node => isType(node, 'Button') && node.props.variant === 'destructive'
+      );
+      act(() => {
+        (confirm.props as { onPress?: () => void }).onPress?.();
+      });
+      expect(signOutFn).toHaveBeenCalledTimes(1);
 
-    unmount();
-  });
+      unmount();
+    }
+  );
 });

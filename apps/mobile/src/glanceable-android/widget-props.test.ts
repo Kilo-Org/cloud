@@ -9,7 +9,6 @@ import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 
 import {
   buildAndroidWidgetProps,
-  buildApproveLabel,
   buildCompactNotificationText,
   buildCurrentWidgetProps,
   buildOngoingNotificationText,
@@ -205,20 +204,26 @@ describe('buildOngoingNotificationText', () => {
       'No work in progress'
     );
   });
-});
 
-describe('buildApproveLabel', () => {
-  it('offers the Approve action only while a permission waits', () => {
-    expect(buildApproveLabel({ ...MIXED, needsApproval: 1 }, translate)).toBe('Approve');
-    expect(buildApproveLabel({ ...MIXED, needsApproval: 3 }, translate)).toBe('Approve');
+  it('prefixes a pending action notice to the counts', () => {
+    expect(buildOngoingNotificationText(MIXED, {}, translate, String, 'Approval failed')).toBe(
+      'Approval failed 2 Needs input, 4 Working, 3 Idle'
+    );
   });
 
-  it.each([
-    ['a question-only wait', { ...MIXED, needsInput: 2, needsApproval: 0 }],
-    ['an older producer that omits the count', { ...MIXED, needsInput: 2 }],
-    ['no work', snapshotFor([])],
-  ] as const)('offers no Approve action for %s', (_reason, snapshot) => {
-    expect(buildApproveLabel(snapshot, translate)).toBeNull();
+  it('prefixes the notice to the stale warning and to the locked copy', () => {
+    expect(
+      buildOngoingNotificationText(
+        { ...MIXED, status: 'stale' },
+        {},
+        translate,
+        String,
+        'Approval failed'
+      )
+    ).toBe('Approval failed Updates delayed, 2 Needs input, 4 Working, 3 Idle');
+    expect(
+      buildOngoingNotificationText(snapshotFor([]), {}, translate, String, 'Approval failed')
+    ).toBe('Approval failed No work in progress');
   });
 });
 

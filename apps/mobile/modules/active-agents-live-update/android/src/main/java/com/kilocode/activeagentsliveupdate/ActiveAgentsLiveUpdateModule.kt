@@ -15,12 +15,13 @@ import expo.modules.kotlin.modules.ModuleDefinition
 /**
  * Local Expo module for the Android aggregate ongoing notification.
  *
- * The JS side owns the translated copy, the notification kind's channel (and
+ * The JS side owns the translated copy, the deep link, the kind's channel (and
  * its creation), the alert decision, and the revision guard; this module owns
  * the fixed notification id, the posted-channel mirror, the API 36.1+ promotion
- * gate, and the content intent plus named actions: one that opens the Agents tab
- * via a deep link, and one that runs the headless approval when a permission
- * waits.
+ * gate, and the content intent plus named actions: Open deep-links into the
+ * recorded session (the Agents tab when nothing waits), and Approve runs the
+ * headless approval when a cloud-agent permission waits. Both platforms answer
+ * through `src/lib/glanceable/approve-ask.ts`.
  *
  * This is the Android mechanism for the one shared kind model, not a second
  * behaviour: `@kilocode/notifications` maps each agent surface to `needs-input`
@@ -52,8 +53,10 @@ class ActiveAgentsLiveUpdateModule : Module() {
       notificationManager.isNotificationPolicyAccessGranted
     }
 
-    Function("start") { title: String, text: String, openAgentsLabel: String, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean ->
-      post(title, text, openAgentsLabel, approveLabel, compactText, channelId, alerting, promotion, 0)
+    // Group the Open label and URL so both entry points fit Expo's eight-argument
+    // Function limit while preserving the action and notification-kind fields.
+    Function("start") { title: String, text: String, openAction: Map<String, String>, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean ->
+      post(title, text, openAction.getValue("label"), openAction.getValue("url"), approveLabel, compactText, channelId, alerting, promotion, 0)
     }
 
     // Expo's `Function` builder has one overload per arity and stops at eight
@@ -61,8 +64,8 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // cannot carry `start`'s `promotion` flag on top of the terminal
     // `timeoutMs`. The flag is redundant on this path: `post` gates promotion
     // on `isPromotionCapable()` itself, which is the value the JS side passed.
-    Function("update") { title: String, text: String, openAgentsLabel: String, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, timeoutMs: Double ->
-      post(title, text, openAgentsLabel, approveLabel, compactText, channelId, alerting, isPromotionCapable(), timeoutMs.toLong())
+    Function("update") { title: String, text: String, openAction: Map<String, String>, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, timeoutMs: Double ->
+      post(title, text, openAction.getValue("label"), openAction.getValue("url"), approveLabel, compactText, channelId, alerting, isPromotionCapable(), timeoutMs.toLong())
     }
 
     Function("end") {
@@ -129,27 +132,30 @@ class ActiveAgentsLiveUpdateModule : Module() {
   @Suppress("DEPRECATION")
   private fun legacyBuilder(): Notification.Builder = Notification.Builder(context)
 
-  /** A PendingIntent that deep-links the app to the Open agents route. */
-  private fun openAgentsPendingIntent(): PendingIntent {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(OPEN_AGENTS_DEEP_LINK)).apply {
+  /**
+   * A PendingIntent that deep-links the app to the URL the JS side named: the
+   * waiting session's route when one is recorded, the Agents tab otherwise.
+   */
+  private fun openPendingIntent(openUrl: String): PendingIntent {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).apply {
       setPackage(context.packageName)
     }
     return PendingIntent.getActivity(
       context,
-      OPEN_AGENTS_REQUEST_CODE,
+      OPEN_REQUEST_CODE,
       intent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
   }
 
   /**
-   * A PendingIntent that hands the tap to the headless approve task. A
-   * broadcast, not an Activity: the phone can be locked when the Wear OS
-   * surface answers, and the approval needs no screen.
+   * The Approve action: one broadcast the receiver turns into a unique answer,
+   * with no Activity. The phone can be locked when the surface answers, and the
+   * approval needs no screen.
    */
   private fun approvePendingIntent(): PendingIntent {
-    val intent = Intent(context, ActiveAgentsApproveReceiver::class.java)
-      .setAction(ACTION_APPROVE)
+    val intent = Intent(context, ActiveAgentsActionReceiver::class.java)
+      .setAction(ActiveAgentsActionReceiver.ACTION_APPROVE)
     return PendingIntent.getBroadcast(
       context,
       APPROVE_REQUEST_CODE,
@@ -183,7 +189,8 @@ class ActiveAgentsLiveUpdateModule : Module() {
   private fun post(
     title: String,
     text: String,
-    openAgentsLabel: String,
+    openLabel: String,
+    openUrl: String,
     approveLabel: String?,
     compactText: String?,
     channelId: String,
@@ -191,7 +198,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
     promotion: Boolean,
     timeoutMs: Long
   ) {
-    val contentIntent = openAgentsPendingIntent()
+    val contentIntent = openPendingIntent(openUrl)
     // The two OS paths a notification can interrupt Do Not Disturb with are the
     // channel's DND override (user-granted, requested by the app) and the
     // message category, which is what a notification that expects an answer
@@ -208,14 +215,13 @@ class ActiveAgentsLiveUpdateModule : Module() {
       .addAction(
         Notification.Action.Builder(
           Icon.createWithResource(context, smallIconId()),
-          openAgentsLabel,
+          openLabel,
           contentIntent
         ).build()
       )
 
-    // The second action is the wrist control: it appears exactly while a
-    // session waits on a permission, and the JS side drops the label when the
-    // wait is answered.
+    // No recorded approvable ask: the action is omitted, not disabled. The JS
+    // side drops the label once the wait is answered elsewhere.
     if (approveLabel != null) {
       builder.addAction(
         Notification.Action.Builder(
@@ -317,13 +323,11 @@ class ActiveAgentsLiveUpdateModule : Module() {
 
   private companion object {
     const val HAS_TIMEOUT = "has_timeout"
+    const val OPEN_REQUEST_CODE = 1002
     const val POSTED_CHANNEL = "posted_channel"
 
     /** The kind marker in the channel id the JS side creates for needs-input. */
     const val NEEDS_INPUT_CHANNEL_ID = "needs-input"
-    const val OPEN_AGENTS_DEEP_LINK = "kiloapp:///cloud/sessions"
-    const val OPEN_AGENTS_REQUEST_CODE = 1002
-    const val ACTION_APPROVE = "com.kilocode.activeagentsliveupdate.action.APPROVE"
     const val APPROVE_REQUEST_CODE = 1003
   }
 }

@@ -3112,6 +3112,14 @@
     "tooManySignInAttempts": "Yaalii seensaa baay'etu godhame. Xiqqoo eegiitii irra deebi'ii yaali."
   },
   "models": {
+    "auto": {
+      "frontier": "Ofumaan Sadarkaa olaanaa",
+      "balanced": "Ofumaan Madaalawaa",
+      "efficient": "Ofumaan Gahumsa",
+      "small": "Ofumaan Xiqqaa",
+      "free": "Ofumaan Bilisa",
+      "organization": "Ofumaan Dhaabbata"
+    },
     "dataCollected": "Odeeffannoon walitti qabama",
     "free": "Bilisa",
     "couldNotUpdateFavorites": "Kan jaallatte haaromsuu hin danda'amne.",

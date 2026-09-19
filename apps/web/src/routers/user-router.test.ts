@@ -7,6 +7,7 @@ import {
   kiloclaw_instances,
   kilocode_users,
   magic_link_tokens,
+  microdollar_usage,
   organization_memberships,
   organizations,
   passkey_credentials,
@@ -1896,6 +1897,117 @@ describe('user router - account deletion', () => {
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
 
     expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+  });
+});
+
+describe('user router - hasGatewayUsage', () => {
+  let freshUser: User;
+  let usedUser: User;
+  let orgUser: User;
+  let otherUser: User;
+
+  beforeAll(async () => {
+    freshUser = await insertTestUser({
+      google_user_email: 'has-gateway-usage-fresh@example.com',
+      google_user_name: 'Gateway Usage Fresh',
+    });
+    usedUser = await insertTestUser({
+      google_user_email: 'has-gateway-usage-used@example.com',
+      google_user_name: 'Gateway Usage Used',
+    });
+    orgUser = await insertTestUser({
+      google_user_email: 'has-gateway-usage-org@example.com',
+      google_user_name: 'Gateway Usage Org',
+    });
+    otherUser = await insertTestUser({
+      google_user_email: 'has-gateway-usage-other@example.com',
+      google_user_name: 'Gateway Usage Other',
+    });
+
+    // A personal, non-zero-cost gateway row.
+    await db.insert(microdollar_usage).values({
+      kilo_user_id: usedUser.id,
+      cost: 1000,
+      input_tokens: 1,
+      output_tokens: 1,
+      cache_write_tokens: 1,
+      cache_hit_tokens: 1,
+    });
+
+    // An org-scoped, zero-cost free-model row still counts as "used Kilo".
+    const org = await createTestOrganization('has-gateway-usage-org', orgUser.id, 0);
+    await db.insert(microdollar_usage).values({
+      kilo_user_id: orgUser.id,
+      organization_id: org.id,
+      cost: 0,
+      input_tokens: 1,
+      output_tokens: 1,
+      cache_write_tokens: 1,
+      cache_hit_tokens: 1,
+    });
+
+    // Another user's row must never make this caller report usage.
+    await db.insert(microdollar_usage).values({
+      kilo_user_id: otherUser.id,
+      cost: 1000,
+      input_tokens: 1,
+      output_tokens: 1,
+      cache_write_tokens: 1,
+      cache_hit_tokens: 1,
+    });
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(microdollar_usage)
+      .where(
+        inArray(microdollar_usage.kilo_user_id, [
+          freshUser.id,
+          usedUser.id,
+          orgUser.id,
+          otherUser.id,
+        ])
+      );
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.kilo_user_id, orgUser.id));
+    await db.delete(organizations).where(eq(organizations.created_by_kilo_user_id, orgUser.id));
+    await db
+      .delete(kilocode_users)
+      .where(inArray(kilocode_users.id, [freshUser.id, usedUser.id, orgUser.id, otherUser.id]));
+  });
+
+  it('reports no usage for a fresh user', async () => {
+    const caller = await createCallerForUser(freshUser.id);
+
+    await expect(caller.user.hasGatewayUsage()).resolves.toEqual({ hasUsage: false });
+  });
+
+  it('reports usage after a personal gateway row', async () => {
+    const caller = await createCallerForUser(usedUser.id);
+
+    await expect(caller.user.hasGatewayUsage()).resolves.toEqual({ hasUsage: true });
+  });
+
+  it('reports usage for an org-scoped row', async () => {
+    const caller = await createCallerForUser(orgUser.id);
+
+    await expect(caller.user.hasGatewayUsage()).resolves.toEqual({ hasUsage: true });
+  });
+
+  it("ignores another user's gateway rows", async () => {
+    const isolatedUser = await insertTestUser({
+      google_user_email: `has-gateway-usage-isolated-${crypto.randomUUID()}@example.com`,
+    });
+
+    try {
+      const caller = await createCallerForUser(isolatedUser.id);
+
+      await expect(caller.user.hasGatewayUsage()).resolves.toEqual({ hasUsage: false });
+    } finally {
+      await db.delete(microdollar_usage).where(eq(microdollar_usage.kilo_user_id, isolatedUser.id));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, isolatedUser.id));
+    }
   });
 });
 

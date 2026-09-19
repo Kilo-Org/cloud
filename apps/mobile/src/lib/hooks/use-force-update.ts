@@ -3,6 +3,7 @@ import { onlineManager } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
+import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import { API_BASE_URL } from '@/lib/config';
 import { resolveForceUpdateState } from '@/lib/force-update-policy';
 import { subscribeToForceUpdateRecheck } from '@/lib/force-update-signal';
@@ -34,7 +35,10 @@ export function useForceUpdate() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/app/min-version`, {
         signal: controller.signal,
-        headers: { Accept: 'application/json' },
+        // The client dimensions every other mobile request carries. Without
+        // them the server's timing sampler treats this REST call as unknown
+        // traffic and drops it, so the launch's only REST line goes missing.
+        headers: { Accept: 'application/json', ...buildClientMetadataHeaders() },
       });
       const data = await response.json().catch(() => undefined);
       const state = resolveForceUpdateState(

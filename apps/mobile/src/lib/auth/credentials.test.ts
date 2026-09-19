@@ -142,6 +142,21 @@ vi.mock('@/lib/temp-file-registry', () => ({
   reapTempFiles: vi.fn(),
 }));
 
+// The artifact mirror members of the same teardown read expo-file-system and
+// the native provider bridge. This suite asserts the credential deletes, and
+// the mirror's own suite covers the wipe and its provider signal.
+vi.mock('@/lib/artifacts/artifact-mirror', () => ({
+  clearArtifactMirror: vi.fn(),
+}));
+
+vi.mock('@/lib/artifacts/artifact-mirror-sync', () => ({
+  resetArtifactMirrorSyncState: vi.fn(),
+}));
+
+vi.mock('@/lib/artifacts/artifact-provider-native', () => ({
+  notifyArtifactsChanged: vi.fn(),
+}));
+
 // The sign-out teardown's OS search clear reaches the root `expo` entry, which
 // reads `__DEV__` at import time and does not parse under the node test
 // environment. The clear is a no-op here.

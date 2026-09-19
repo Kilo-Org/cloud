@@ -1,0 +1,21 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!--
+      Read-only DocumentsProvider over the artifact mirror, so the phone's file
+      browser can open what an agent produced without the Kilo app in front.
+      `MANAGE_DOCUMENTS` is signature-level: only the system file browser and
+      holders of the system permission can query us. The authority is
+      `<applicationId>.artifacts` (com.kilocode.kiloapp.artifacts).
+    -->
+    <provider
+      android:name="com.kilocode.artifactsprovider.ArtifactsDocumentsProvider"
+      android:authorities="${applicationId}.artifacts"
+      android:exported="true"
+      android:grantUriPermissions="true"
+      android:permission="android.permission.MANAGE_DOCUMENTS">
+      <intent-filter>
+        <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+      </intent-filter>
+    </provider>
+  </application>
+</manifest>

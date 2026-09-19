@@ -96,7 +96,9 @@ export function useEffectiveAgentProfile(organizationId?: string) {
     // `isLoading: false` while still unsettled. `isPending` stays true until
     // the query settles (success or error), so Start stays blocked and
     // `profileId` stays unset only after a settled empty or error result.
-    isLoading: query.isPending,
+    // With cached data, a retry keeps error status rather than becoming pending.
+    // Keep successful background refreshes visible; only error retries load here.
+    isLoading: query.isPending || (query.isError && query.isFetching),
     isError: query.isError,
     refetch: query.refetch,
   };

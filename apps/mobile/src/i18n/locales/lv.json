@@ -3117,7 +3117,8 @@
     "couldNotApprove": "Neizdevās apstiprināt",
     "couldNotStart": "Neizdevās palaist",
     "channelName": "Aktīvie aģenti",
-    "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus."
+    "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus.",
+    "newestResult": "Jaunākais rezultāts"
   },
   "transcriptionModel": {
     "title": "Transkripcijas modelis",

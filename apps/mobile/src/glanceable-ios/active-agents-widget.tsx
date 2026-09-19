@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- every family, the in-place action buttons, and the newest-result footer compose inside one stringified 'widget' layout, which cannot be split across modules */
 import { Button, type ButtonProps, HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   accessibilityElement,
@@ -371,6 +372,88 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     containerBackground(PlatformColor('systemBackground'), 'widget'),
     ...a11y,
   ];
+
+  // The large card's lower third. A stale frame keeps the counts but drops the
+  // claim that they are current, so the footer prefers the delayed copy where
+  // the relative time would otherwise assert a freshness the snapshot no
+  // longer has.
+  const newestResultKind = props.newestResultKind ?? null;
+  const newestResultLabel = props.newestResultLabel ?? null;
+  const newestResultAt = props.newestResultAt ?? null;
+  const newestResultBody = () => {
+    if (statusLine !== null) {
+      return (
+        <Text modifiers={[font({ textStyle: 'footnote' }), mutedForeground]}>{statusLine}</Text>
+      );
+    }
+    if (newestResultKind === null || newestResultLabel === null || newestResultAt === null) {
+      return null;
+    }
+    return (
+      <HStack alignment="center" spacing={6}>
+        <Image
+          systemName={GLYPH[newestResultKind].icon}
+          color={GLYPH[newestResultKind].color}
+          size={13}
+        />
+        <Text
+          modifiers={[
+            font({ textStyle: 'subheadline', weight: 'semibold' }),
+            lineLimit(1),
+            minimumScaleFactor(0.6),
+            allowsTightening(true),
+            primaryForeground,
+          ]}
+        >
+          {newestResultLabel}
+        </Text>
+        <Spacer />
+        <Text
+          date={new Date(newestResultAt)}
+          dateStyle="relative"
+          modifiers={[
+            font({ textStyle: 'subheadline' }),
+            monospacedDigit(),
+            lineLimit(1),
+            mutedForeground,
+          ]}
+        />
+      </HStack>
+    );
+  };
+
+  // The locked frames draw their status line through `systemRows` instead, so
+  // the footer is absent entirely there rather than repeating that copy.
+  const footerBody = newestResultBody();
+  const newestResultFooter =
+    !hasCounts || footerBody === null ? null : (
+      <VStack alignment="leading" spacing={4}>
+        <Text modifiers={[font({ textStyle: 'footnote' }), mutedForeground]}>
+          {COPY.newestResult}
+        </Text>
+        {footerBody}
+      </VStack>
+    );
+
+  // StandBy draws this family on a charging phone in landscape. The mark sits
+  // at the top, the three count rows centre, and the newest result owns the
+  // bottom of the card, so the extra height reads as composed rather than
+  // empty. The spacers hold the rows in place as the footer appears and
+  // disappears, so a state change cannot shift the counts.
+  if (family === 'systemLarge') {
+    return (
+      <VStack alignment="leading" spacing={10} modifiers={systemModifiers}>
+        <HStack alignment="center" spacing={8}>
+          {logo(26)}
+          <Spacer />
+        </HStack>
+        <Spacer />
+        {systemRows}
+        <Spacer />
+        {newestResultFooter}
+      </VStack>
+    );
+  }
 
   // The medium family is wide, not tall: the mark sits beside the rows and the
   // whole block centres, the same composition as the Live Activity banner. A

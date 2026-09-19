@@ -3,6 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getLiveSessionManager } from '@/components/agents/live-session-manager-registry';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { act } from '@/test/renderer';
+import { setSignOutActive } from '@/lib/auth/sign-out-state';
+import {
+  beginAuthenticatedOwner,
+  confirmAuthenticatedOwner,
+  getAuthenticatedOwner,
+  markRestoredAuthenticatedOwner,
+} from '@/lib/context-scope';
 
 import { AgentSessionProvider } from './session-provider';
 
@@ -37,15 +45,6 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
   useUserWebConnection: () => mocks.connection,
 }));
 
-vi.mock('@/lib/context-scope', () => ({
-  getAuthenticatedOwner: () => ({ authEpoch: 0, generation: 0, userId: 'user-1' }),
-  isAuthenticatedOwner: () => true,
-  // The provider's retirement fence reads the captured owner against the live
-  // one; the mock owner stands, so the registry must stay populated.
-  isCurrentOwner: () => true,
-  subscribeAuthenticatedOwner: () => () => undefined,
-}));
-
 type RouteParams = Record<string, string | string[] | undefined>;
 
 /** Each case names an id it must not find registered under. */
@@ -62,6 +61,8 @@ describe('AgentSessionProvider live manager registry', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.route.params = {};
+    setSignOutActive(false);
+    confirmAuthenticatedOwner(beginAuthenticatedOwner(), 'user-1');
   });
 
   it('registers the open session manager under the route session id', async () => {
@@ -88,6 +89,42 @@ describe('AgentSessionProvider live manager registry', () => {
     unmount();
 
     expect(getLiveSessionManager('provider-session-b')).toBeNull();
+  });
+
+  it('keeps a restored manager alive through confirmation and retires it on revocation', async () => {
+    beginAuthenticatedOwner();
+    markRestoredAuthenticatedOwner();
+    mocks.route.params = { 'session-id': 'restored-session' };
+    const { unmount } = await renderWithProviders(
+      <AgentSessionProvider restoredUserId="user-1">{null}</AgentSessionProvider>
+    );
+
+    expect(getAuthenticatedOwner().userId).toBeNull();
+    expect(mocks.createManager.mock.calls[0]?.[0].userId).toBe('user-1');
+    expect(getLiveSessionManager('restored-session')?.manager).toBe(mocks.manager);
+    expect(mocks.manager.destroy).not.toHaveBeenCalled();
+    act(() => {
+      confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-1');
+    });
+    expect(mocks.createManager).toHaveBeenCalledTimes(1);
+    expect(mocks.manager.destroy).not.toHaveBeenCalled();
+
+    act(() => {
+      beginAuthenticatedOwner();
+      // Retirement is synchronous, not deferred until React unmounts the route.
+      expect(mocks.manager.destroy).toHaveBeenCalledTimes(1);
+    });
+    unmount();
+    expect(getLiveSessionManager('restored-session')).toBeNull();
+  });
+
+  it('retires a manager immediately when neither live nor restored scope exists', async () => {
+    beginAuthenticatedOwner();
+    const { unmount } = await renderWithProviders(createElement(AgentSessionProvider, null, null));
+
+    expect(mocks.createManager.mock.calls[0]?.[0].userId).toBe('');
+    expect(mocks.manager.destroy).toHaveBeenCalledTimes(1);
+    unmount();
   });
 
   it.each(noSingleSessionIdCases)(

@@ -57,8 +57,16 @@ export function CachePersistenceMount() {
     if (previousUserId !== null && previousUserId !== userId) {
       void clearCacheScopeForSignOut(previousUserId);
       void (async () => {
-        await clearToolSummaryTranslationMemoryForSignOut();
-        await clearToolSummaryTranslationsForSignOut();
+        try {
+          await clearToolSummaryTranslationMemoryForSignOut();
+        } catch {
+          // A failed runtime reset must not skip the independent privacy clear.
+        }
+        try {
+          await clearToolSummaryTranslationsForSignOut();
+        } catch {
+          // Best effort: cleanup must not escape as an unhandled rejection.
+        }
       })();
     }
     previousUserIdRef.current = userId;

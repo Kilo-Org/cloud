@@ -666,6 +666,38 @@ describe('SessionDetailScreen metadata read that cannot settle', () => {
     expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(0);
   });
 
+  it('keeps an offline session mounted while its metadata starts fetching on reconnect', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'paused';
+    const renderer = await mountRoute();
+    const manager = managers.at(-1)?.manager;
+
+    queryState.fetchStatus = 'fetching';
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(0);
+    expect(managers).toHaveLength(1);
+    expect(managers.at(-1)?.manager).toBe(manager);
+  });
+
+  it('does not reuse the mounted scope admission for a different session', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    const renderer = await mountRoute();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-2' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'fetching';
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+  });
+
   it('mounts the session once an in-flight metadata read outlives the open grace', async () => {
     vi.useFakeTimers();
     onTestFinished(() => {
@@ -741,26 +773,30 @@ describe('SessionDetailScreen restored scope', () => {
     return renderer;
   }
 
-  it('keeps the session mounted when the live confirmation matches the restored account', async () => {
-    const renderer = await mountRestoredScope();
-    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
-    const restoredManager = managers.at(-1)?.manager;
-    expect(restoredManager).toBeDefined();
+  it.each(['paused', 'fetching'] as const)(
+    'keeps the session mounted when the live confirmation matches with metadata %s',
+    async fetchStatus => {
+      const renderer = await mountRestoredScope();
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+      const restoredManager = managers.at(-1)?.manager;
+      expect(restoredManager).toBeDefined();
 
-    // The live getMe confirms the same account the hint restored: the resolved
-    // scope id is unchanged, so the provider key must not remount the session
-    // subtree — the painted transcript, the manager and the composer text all
-    // live below this key.
-    await act(async () => {
-      confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-A');
-      await Promise.resolve();
-    });
+      // The live getMe confirms the same account the hint restored: the resolved
+      // scope id is unchanged, so the provider key must not remount the session
+      // subtree — the painted transcript, the manager and the composer text all
+      // live below this key.
+      queryState.fetchStatus = fetchStatus;
+      await act(async () => {
+        confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-A');
+        await Promise.resolve();
+      });
 
-    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
-    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(0);
-    expect(managers).toHaveLength(1);
-    expect(managers.at(-1)?.manager).toBe(restoredManager);
-  });
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+      expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(0);
+      expect(managers).toHaveLength(1);
+      expect(managers.at(-1)?.manager).toBe(restoredManager);
+    }
+  );
 
   it('remounts the session when the confirmation names a different account than the hint', async () => {
     const renderer = await mountRestoredScope();
@@ -778,6 +814,26 @@ describe('SessionDetailScreen restored scope', () => {
     expect(managers).toHaveLength(2);
     expect(managers.at(-1)?.manager).not.toBe(restoredManager);
   });
+
+  it.each(['NOT_FOUND', 'FORBIDDEN', 'UNAUTHORIZED'])(
+    'retires a restored session when metadata returns %s after confirmation',
+    async code => {
+      const renderer = await mountRestoredScope();
+      queryState.fetchStatus = 'fetching';
+      act(() => {
+        confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-A');
+      });
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+
+      queryState.isPending = false;
+      queryState.isError = true;
+      queryState.error = { data: { code } };
+      await updateRoute(renderer);
+
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+      expect(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry')).toBeUndefined();
+    }
+  );
 
   it('does not mount the previous account restored scope during a direct credential switch', async () => {
     const renderer = await mountRestoredScope();

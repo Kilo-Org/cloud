@@ -193,6 +193,7 @@ import {
   getItem,
   isValidDbKey,
   listEntries,
+  listValues,
   MissingSQLCipherError,
   removeItem,
   removeItemIfValue,
@@ -229,6 +230,7 @@ describe('scope and key validation', () => {
     await expect(clearScope('')).rejects.toThrow(TypeError);
     await expect(clearScopePrefix('')).rejects.toThrow(TypeError);
     await expect(listEntries('')).rejects.toThrow(TypeError);
+    await expect(listValues('')).rejects.toThrow(TypeError);
   });
 
   it('rejects an empty key', async () => {
@@ -700,5 +702,23 @@ describe('kv behavior', () => {
 
   it('listEntries returns an empty array for an absent scope', async () => {
     await expect(listEntries('nope')).resolves.toEqual([]);
+  });
+
+  it('listValues reads only the requested scope oldest-first with one statement', async () => {
+    const clock = vi.spyOn(Date, 'now');
+    try {
+      clock.mockReturnValue(2000);
+      await setItem('s', 'newer', 'new');
+      clock.mockReturnValue(1000);
+      await setItem('s', 'older', 'old');
+      await setItem('other', 'older', 'private');
+      sqlLog.length = 0;
+
+      await expect(listValues('s')).resolves.toEqual(['old', 'new']);
+      expect(sqlLog).toHaveLength(1);
+      await expect(listValues('missing')).resolves.toEqual([]);
+    } finally {
+      clock.mockRestore();
+    }
   });
 });

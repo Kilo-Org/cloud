@@ -18,7 +18,7 @@ import {
   restoreLoginDrafts,
 } from '@/lib/login-draft';
 import { LoginScreen } from './login-screen';
-import { errorMessage } from './login-screen-state';
+import { errorMessage, resolveKeyboardBottomPadding } from './login-screen-state';
 
 // ── Hoisted mocks for the mounted globe tests ──────────────────────────────
 
@@ -232,6 +232,35 @@ describe('login-screen error mapping', () => {
 
   it('falls back to default when no error is provided', () => {
     expect(errorMessage('error', undefined)).toBe('Something went wrong. Please try again.');
+  });
+});
+
+describe('login-screen keyboard bottom padding', () => {
+  it.each(['android', 'ios'] as const)(
+    'reserves the bottom inset alone for the %s keyboard-down state',
+    platform => {
+      expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 28, platform })).toBe(
+        28
+      );
+    }
+  );
+
+  it('adds the bottom inset to Android, whose keyboard metric stops at the navigation bar', () => {
+    expect(
+      resolveKeyboardBottomPadding({ keyboardHeight: 300, bottomInset: 28, platform: 'android' })
+    ).toBe(328);
+  });
+
+  it('keeps the iOS keyboard frame height, which already includes the home indicator', () => {
+    expect(
+      resolveKeyboardBottomPadding({ keyboardHeight: 300, bottomInset: 28, platform: 'ios' })
+    ).toBe(300);
+  });
+
+  it('ignores a negative reported height', () => {
+    expect(
+      resolveKeyboardBottomPadding({ keyboardHeight: -1, bottomInset: 28, platform: 'android' })
+    ).toBe(28);
   });
 });
 

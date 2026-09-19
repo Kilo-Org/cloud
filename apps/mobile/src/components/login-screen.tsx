@@ -25,7 +25,7 @@ import {
   resolveKeyboardPaddingEventsForPlatform,
 } from '@/components/kilo-chat/app-aware-keyboard-padding-state';
 import { IdleAuth } from '@/components/login/idle-auth';
-import { errorMessage } from '@/components/login-screen-state';
+import { errorMessage, resolveKeyboardBottomPadding } from '@/components/login-screen-state';
 import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -198,21 +198,17 @@ export function LoginScreen() {
     );
   }
 
-  // RN 0.86 Android (ReactRootView.java) reports endCoordinates.height =
-  // imeInsets.bottom − barInsets.bottom (excludes the nav bar). endCoordinates.screenY
-  // is NOT the IME top under adjustResize, so Android full occlusion is
-  // endCoordinates.height + useSafeAreaInsets().bottom (= WindowInsets.ime().bottom;
-  // verified 704px + 63px = 767px on pixel9). iOS instead reports the keyboard
-  // window frame (RCTKeyboardObserver converts UIKeyboardFrameEndUserInfoKey into
-  // window coordinates), whose height already reaches the screen bottom and so
-  // includes the home-indicator inset; adding insets.bottom there would count it
-  // twice and float the form above the IME. At rest neither platform reports a
-  // height, and the inset alone keeps the scroll viewport clear of the navigation
-  // bar and the home indicator.
-  const bottomPadding =
-    keyboardHeight > 0
-      ? keyboardHeight + (Platform.OS === 'android' ? insets.bottom : 0)
-      : insets.bottom;
+  // One padded wrapper for both platforms: the bottom inset is reserved at
+  // rest, and while the IME is up the reported keyboard occlusion is resolved
+  // from the platform's metric origin (see `resolveKeyboardBottomPadding` for
+  // the capability each platform reports). The ScrollView's centered form then
+  // re-centres in the space that stays above the keyboard, so "Continue" is
+  // never left under the keyboard, the navigation bar, or the home indicator.
+  const bottomPadding = resolveKeyboardBottomPadding({
+    keyboardHeight,
+    bottomInset: insets.bottom,
+    platform: Platform.OS,
+  });
   // The Globe stays enabled on idle, denied, expired, and error (those render
   // an interactive IdleAuth form); it is disabled while a device-auth flow
   // (pending/approved) or a busy auth action owns the screen.
@@ -220,12 +216,10 @@ export function LoginScreen() {
   const globeTrailing = I18nManager.isRTL ? { left: 16 } : { right: 16 };
 
   return (
-    // One wrapper owns the vertical space on both platforms: the bottom inset is
-    // reserved at rest and the listener above adds the reported keyboard height
-    // while the IME is up (plus the inset again on Android, whose height excludes
-    // the navigation bar). The ScrollView's centered form then re-centres in the
-    // space that stays above the keyboard, so "Continue" is never left under the
-    // keyboard, the navigation bar, or the home indicator.
+    // One wrapper owns the vertical space on both platforms: it paints the
+    // screen background and reserves the bottom padding resolved above, so the
+    // ScrollView's centered form stays above the keyboard, the navigation bar,
+    // and the home indicator.
     <View
       className="flex-1 bg-background"
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic keyboard and safe-area padding

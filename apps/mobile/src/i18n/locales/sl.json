@@ -872,6 +872,15 @@
       "kiloclawActivitySubtitle": "instanca pripravljena ali neuspešna, načrtovana dejanja",
       "balanceAlertsSubtitle": "opozorila o nizkem stanju organizacije",
       "securityFindingsSubtitle": "nove ugotovitve in opomniki SLA"
+    },
+    "action": {
+      "openSession": "Odpri sejo"
+    },
+    "needsInputAction": {
+      "approved": "Zahteva odobrena",
+      "replied": "Odgovor poslan",
+      "failed": "Odgovoriti ni uspelo. Znova se dotaknite, da poskusite znova.",
+      "unavailable": "Ta zahteva ne čaka več."
     }
   },
   "tabs": {
@@ -2233,20 +2242,7 @@
       "continueFrom": "Nadaljuje se seja {{title}}.",
       "importingSession": "Uvažanje seje",
       "cliCannotContinue": "Ta CLI ne podpira nadaljevanja seje. Izberi Cloud Agent ali drug CLI.",
-      "importFailed": "Te seje ni bilo mogoče uvoziti.",
-      "sandbox": "Peskovnik",
-      "sandboxAccessibility": "Peskovnik: {{label}}",
-      "sandboxDefaultWithDestination": "Privzeto · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Malo",
-      "sandboxInstanceShared": "V skupni rabi",
-      "sandboxInstanceLarge": "Veliko",
-      "sandboxInstanceDevcontainer": "Razvojni vsebnik",
-      "sandboxInstanceProviderDefault": "Privzeto ponudnika",
-      "sandboxCouldNotLoad": "Možnosti peskovnika ni bilo mogoče naložiti",
-      "sandboxUnavailable": "Ta peskovnik ni na voljo. Izberite drug peskovnik ali Privzeto.",
-      "sandboxUseDefault": "Uporabi Privzeto"
+      "importFailed": "Te seje ni bilo mogoče uvoziti."
     },
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena je {{displayCount}} datoteka.",

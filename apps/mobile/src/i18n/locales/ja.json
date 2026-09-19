@@ -336,6 +336,15 @@
       "kiloclawActivitySubtitle": "インスタンスの準備完了や失敗、予定された操作",
       "balanceAlertsSubtitle": "組織の残高低下に関する警告",
       "securityFindingsSubtitle": "新たな検出結果とSLAのリマインダー"
+    },
+    "action": {
+      "openSession": "セッションを開く"
+    },
+    "needsInputAction": {
+      "approved": "リクエストを承認しました",
+      "replied": "返信を送信しました",
+      "failed": "回答できませんでした。もう一度タップして再試行してください。",
+      "unavailable": "このリクエストは待機中ではなくなりました。"
     }
   },
   "tabs": {
@@ -1673,20 +1682,7 @@
       "continueFrom": "{{title}}を続行しています。",
       "importingSession": "セッションをインポート中",
       "cliCannotContinue": "このCLIではセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
-      "importFailed": "このセッションをインポートできませんでした。",
-      "sandbox": "サンドボックス",
-      "sandboxAccessibility": "サンドボックス：{{label}}",
-      "sandboxDefaultWithDestination": "デフォルト · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "小",
-      "sandboxInstanceShared": "共有",
-      "sandboxInstanceLarge": "大",
-      "sandboxInstanceDevcontainer": "開発コンテナ",
-      "sandboxInstanceProviderDefault": "プロバイダーのデフォルト",
-      "sandboxCouldNotLoad": "サンドボックスのオプションを読み込めませんでした",
-      "sandboxUnavailable": "このサンドボックスは利用できません。別のサンドボックスかデフォルトを選択してください。",
-      "sandboxUseDefault": "デフォルトを使用"
+      "importFailed": "このセッションをインポートできませんでした。"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました。",

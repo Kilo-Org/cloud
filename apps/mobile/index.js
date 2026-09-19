@@ -51,3 +51,15 @@ require('expo-router/entry');
 const { registerAppActionDispatcher } = require('./src/lib/app-actions/app-action-dispatch');
 
 void registerAppActionDispatcher();
+
+// Approve / Reply on a needs-input notification and data-only glanceable pushes
+// run through a background expo-notifications task, which Android starts from a
+// headless JS context: it loads this bundle with no Activity and never evaluates
+// the root layout, so the task has to be defined and registered here too, after
+// the router entry. The registration is light — the task executor lazy-loads
+// the notification module when a task fires (notification-background-task.ts).
+require('./src/lib/notification-background-task')
+  .registerNotificationBackgroundTask()
+  .catch(() => {
+    // Registration already reports its own failure; the entry must never crash.
+  });

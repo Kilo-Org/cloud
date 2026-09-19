@@ -3035,6 +3035,23 @@
       "openHint": "چیٹ کھولتا ہے۔ حذف کرنے کے لیے دبائے رکھیں۔",
       "deleteTitle": "یہ چیٹ حذف کریں؟"
     },
-    "beta": "بیٹا"
+    "beta": "بیٹا",
+    "mcp": {
+      "title": "Kilo ٹولز",
+      "use": "Kilo ٹولز استعمال کریں",
+      "useDescription": "اس چیٹ کو Kilo سرور کے فراہم کردہ ٹولز استعمال کرنے دیں۔",
+      "off": "Kilo ٹولز بند ہیں",
+      "offDescription": "یہ چیٹ ماڈل کو کوئی بھی Kilo ٹول نہیں بھیجتی۔",
+      "connecting": "Kilo ٹولز سے منسلک ہو رہا ہے…",
+      "available": "دستیاب ٹولز: {{count}}",
+      "none": "کوئی ٹول دستیاب نہیں",
+      "noneDescription": "Kilo سرور نے کوئی ٹول واپس نہیں کیا۔",
+      "unreachable": "Kilo ٹولز تک نہیں پہنچ سکا",
+      "unreachableDescription": "سرور نے جواب نہیں دیا۔ اپنا کنکشن چیک کریں، پھر دوبارہ کوشش کریں۔",
+      "unauthorized": "Kilo ٹولز نے یہ سیشن مسترد کر دیا",
+      "unauthorizedDescription": "اس چیٹ میں Kilo ٹولز استعمال کرنے کے لیے دوبارہ سائن ان کریں۔",
+      "unavailable": "Kilo ٹولز دستیاب نہیں",
+      "unavailableDescription": "اس اکاؤنٹ کے لیے Kilo سرور دستیاب نہیں۔"
+    }
   }
 }

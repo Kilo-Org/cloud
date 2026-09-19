@@ -3035,6 +3035,23 @@
       "openHint": "Opnar spjallið. Haltu inni til að eyða.",
       "deleteTitle": "Eyða þessu spjalli?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo-verkfæri",
+      "use": "Nota Kilo-verkfæri",
+      "useDescription": "Leyfðu þessu spjalli að nota verkfærin sem Kilo-þjónninn býður upp á.",
+      "off": "Kilo-verkfæri eru óvirk",
+      "offDescription": "Þetta spjall sendir ekkert Kilo-verkfæri til líkansins.",
+      "connecting": "Tengist Kilo-verkfærum…",
+      "available": "Verkfæri í boði: {{count}}",
+      "none": "Engin verkfæri í boði",
+      "noneDescription": "Kilo-þjónninn skilaði engum verkfærum.",
+      "unreachable": "Náði ekki sambandi við Kilo-verkfæri",
+      "unreachableDescription": "Þjónninn svaraði ekki. Athugaðu tenginguna og reyndu aftur.",
+      "unauthorized": "Kilo-verkfæri höfnuðu þessu setu",
+      "unauthorizedDescription": "Skráðu þig inn aftur til að nota Kilo-verkfærin í þessu spjalli.",
+      "unavailable": "Kilo-verkfæri eru ekki í boði",
+      "unavailableDescription": "Kilo-þjónninn er ekki í boði fyrir þennan reikning."
+    }
   }
 }

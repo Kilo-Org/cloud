@@ -3035,6 +3035,23 @@
       "openHint": "Öppnar chatten. Tryck länge för att ta bort.",
       "deleteTitle": "Ta bort den här chatten?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo-verktyg",
+      "use": "Använd Kilo-verktyg",
+      "useDescription": "Låt den här chatten använda verktygen som Kilo-servern erbjuder.",
+      "off": "Kilo-verktyg är avstängda",
+      "offDescription": "Den här chatten skickar inga Kilo-verktyg till modellen.",
+      "connecting": "Ansluter till Kilo-verktyg…",
+      "available": "Tillgängliga verktyg: {{count}}",
+      "none": "Inga verktyg tillgängliga",
+      "noneDescription": "Kilo-servern svarade utan verktyg.",
+      "unreachable": "Kunde inte nå Kilo-verktyg",
+      "unreachableDescription": "Servern svarade inte. Kontrollera anslutningen och försök igen.",
+      "unauthorized": "Kilo-verktyg avvisade den här sessionen",
+      "unauthorizedDescription": "Logga in igen för att använda Kilo-verktygen i den här chatten.",
+      "unavailable": "Kilo-verktyg är inte tillgängliga",
+      "unavailableDescription": "Kilo-servern är inte tillgänglig för det här kontot."
+    }
   }
 }

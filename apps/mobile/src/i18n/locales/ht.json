@@ -3035,6 +3035,23 @@
       "openHint": "Louvri chat la. Peze lontan pou efase.",
       "deleteTitle": "Efase chat sa a?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Zouti Kilo",
+      "use": "Sèvi ak zouti Kilo",
+      "useDescription": "Kite chat sa a sèvi ak zouti sèvè Kilo a ofri yo.",
+      "off": "Zouti Kilo etenn",
+      "offDescription": "Chat sa a pa voye okenn zouti Kilo bay modèl la.",
+      "connecting": "Ap konekte ak zouti Kilo…",
+      "available": "Zouti ki disponib: {{count}}",
+      "none": "Pa gen zouti disponib",
+      "noneDescription": "Sèvè Kilo a pa tounen okenn zouti.",
+      "unreachable": "Nou pa t kapab rive jwenn zouti Kilo",
+      "unreachableDescription": "Sèvè a pa reponn. Verifye koneksyon w, epi eseye ankò.",
+      "unauthorized": "Zouti Kilo yo refize sesyon sa a",
+      "unauthorizedDescription": "Konekte ankò pou w sèvi ak zouti Kilo yo nan chat sa a.",
+      "unavailable": "Zouti Kilo yo pa disponib",
+      "unavailableDescription": "Sèvè Kilo a pa disponib pou kont sa a."
+    }
   }
 }

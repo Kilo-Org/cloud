@@ -3035,6 +3035,23 @@
       "openHint": "Megnyitja a csevegést. Hosszan nyomja meg a törléshez.",
       "deleteTitle": "Törli ezt a csevegést?"
     },
-    "beta": "Béta"
+    "beta": "Béta",
+    "mcp": {
+      "title": "Kilo-eszközök",
+      "use": "Kilo-eszközök használata",
+      "useDescription": "Engedélyezd, hogy ez a csevegés a Kilo-kiszolgáló által kínált eszközöket használja.",
+      "off": "A Kilo-eszközök ki vannak kapcsolva",
+      "offDescription": "Ez a csevegés egyetlen Kilo-eszközt sem küld a modellnek.",
+      "connecting": "Csatlakozás a Kilo-eszközökhöz…",
+      "available": "Elérhető eszközök: {{count}}",
+      "none": "Nincsenek elérhető eszközök",
+      "noneDescription": "A Kilo-kiszolgáló nem adott vissza eszközöket.",
+      "unreachable": "Nem sikerült elérni a Kilo-eszközöket",
+      "unreachableDescription": "A kiszolgáló nem válaszolt. Ellenőrizd a kapcsolatot, majd próbáld újra.",
+      "unauthorized": "A Kilo-eszközök elutasították ezt a munkamenetet",
+      "unauthorizedDescription": "Jelentkezz be újra, hogy használhasd a Kilo-eszközöket ebben a csevegésben.",
+      "unavailable": "A Kilo-eszközök nem érhetők el",
+      "unavailableDescription": "A Kilo-kiszolgáló nem érhető el ehhez a fiókhoz."
+    }
   }
 }

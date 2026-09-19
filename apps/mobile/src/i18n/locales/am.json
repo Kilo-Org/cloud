@@ -3035,6 +3035,23 @@
       "openHint": "ውይይቱን ይከፍታል። ለመሰረዝ ተጭነው ይያዙ።",
       "deleteTitle": "ይህ ውይይት ይሰረዝ?"
     },
-    "beta": "ቤታ"
+    "beta": "ቤታ",
+    "mcp": {
+      "title": "የKilo መሳሪያዎች",
+      "use": "የKilo መሳሪያዎችን ተጠቀም",
+      "useDescription": "ይህ ውይይት የKilo ሰርቨር የሚያቀርባቸውን መሳሪያዎች እንዲጠቀም ፍቀድ።",
+      "off": "የKilo መሳሪያዎች ተዘግተዋል",
+      "offDescription": "ይህ ውይይት ምንም የKilo መሳሪያ ወደ ሞዴሉ አይልክም።",
+      "connecting": "ወደ Kilo መሳሪያዎች በመገናኘት ላይ…",
+      "available": "የሚገኙ መሳሪያዎች፦ {{count}}",
+      "none": "ምንም መሳሪያ አይገኝም",
+      "noneDescription": "የKilo ሰርቨር ምንም መሳሪያ አልመለሰም።",
+      "unreachable": "የKilo መሳሪያዎችን ማግኘት አልተቻለም",
+      "unreachableDescription": "ሰርቨሩ አልመለሰም። ግንኙነትዎን ያረጋግጡ እና እንደገና ይሞክሩ።",
+      "unauthorized": "የKilo መሳሪያዎች ይህን ክፍለ ጊዜ አልተቀበሉም",
+      "unauthorizedDescription": "በዚህ ውይይት የKilo መሳሪያዎችን ለመጠቀም እንደገና ይግቡ።",
+      "unavailable": "የKilo መሳሪያዎች አይገኙም",
+      "unavailableDescription": "የKilo ሰርቨር ለዚህ መለያ አይገኝም።"
+    }
   }
 }

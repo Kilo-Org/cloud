@@ -3057,6 +3057,23 @@
       "openHint": "Obre el xat. Mantén premut per suprimir.",
       "deleteTitle": "Vols suprimir aquest xat?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Eines de Kilo",
+      "use": "Utilitza les eines de Kilo",
+      "useDescription": "Permet que aquest xat faci servir les eines que ofereix el servidor de Kilo.",
+      "off": "Les eines de Kilo estan desactivades",
+      "offDescription": "Aquest xat no envia cap eina de Kilo al model.",
+      "connecting": "S'està connectant amb les eines de Kilo…",
+      "available": "Eines disponibles: {{count}}",
+      "none": "Cap eina disponible",
+      "noneDescription": "El servidor de Kilo no ha retornat cap eina.",
+      "unreachable": "No s'ha pogut contactar amb les eines de Kilo",
+      "unreachableDescription": "El servidor no ha respost. Comprova la connexió i torna-ho a provar.",
+      "unauthorized": "Les eines de Kilo han rebutjat aquesta sessió",
+      "unauthorizedDescription": "Torna a iniciar la sessió per utilitzar les eines de Kilo en aquest xat.",
+      "unavailable": "Les eines de Kilo no estan disponibles",
+      "unavailableDescription": "El servidor de Kilo no està disponible per a aquest compte."
+    }
   }
 }

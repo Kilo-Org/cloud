@@ -3035,6 +3035,23 @@
       "openHint": "Membuka sembang. Tekan lama untuk memadam.",
       "deleteTitle": "Padam sembang ini?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Alat Kilo",
+      "use": "Gunakan alat Kilo",
+      "useDescription": "Benarkan sembang ini menggunakan alat yang ditawarkan oleh pelayan Kilo.",
+      "off": "Alat Kilo dimatikan",
+      "offDescription": "Sembang ini tidak menghantar sebarang alat Kilo kepada model.",
+      "connecting": "Menyambung ke alat Kilo…",
+      "available": "Alat tersedia: {{count}}",
+      "none": "Tiada alat tersedia",
+      "noneDescription": "Pelayan Kilo tidak memulangkan sebarang alat.",
+      "unreachable": "Tidak dapat menghubungi alat Kilo",
+      "unreachableDescription": "Pelayan tidak menjawab. Periksa sambungan anda, kemudian cuba lagi.",
+      "unauthorized": "Alat Kilo menolak sesi ini",
+      "unauthorizedDescription": "Log masuk semula untuk menggunakan alat Kilo dalam sembang ini.",
+      "unavailable": "Alat Kilo tidak tersedia",
+      "unavailableDescription": "Pelayan Kilo tidak tersedia untuk akaun ini."
+    }
   }
 }

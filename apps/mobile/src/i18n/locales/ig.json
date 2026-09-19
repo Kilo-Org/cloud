@@ -3035,6 +3035,23 @@
       "openHint": "Na-emeghe nkata ahụ. Pịgide iji hichapụ.",
       "deleteTitle": "Hichapụ nkata a?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Ngwá ọrụ Kilo",
+      "use": "Jiri ngwá ọrụ Kilo",
+      "useDescription": "Kwe ka nkata a jiri ngwá ọrụ sava Kilo na-enye.",
+      "off": "Ngwá ọrụ Kilo agbanyụrụ",
+      "offDescription": "Nkata a anaghị ezipu ngwá ọrụ Kilo ọ bụla na ihe nlereanya.",
+      "connecting": "Na-ejikọ na ngwá ọrụ Kilo…",
+      "available": "Ngwá ọrụ dịnụ: {{count}}",
+      "none": "Ọ dịghị ngwá ọrụ dịnụ",
+      "noneDescription": "Sava Kilo ezipụtaghị ngwá ọrụ ọ bụla.",
+      "unreachable": "Enweghị ike iru ngwá ọrụ Kilo",
+      "unreachableDescription": "Sava azaghị. Lelee njikọ gị, wee nwaa ọzọ.",
+      "unauthorized": "Ngwá ọrụ Kilo jụrụ nnọkọ a",
+      "unauthorizedDescription": "Banye ọzọ iji ngwá ọrụ Kilo na nkata a.",
+      "unavailable": "Ngwá ọrụ Kilo adịghị",
+      "unavailableDescription": "Sava Kilo adịghị maka akaụntụ a."
+    }
   }
 }

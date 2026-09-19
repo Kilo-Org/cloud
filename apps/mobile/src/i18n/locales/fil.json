@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "handa o nabigo ang instance, mga nakaiskedyul na aksyon",
       "balanceAlertsSubtitle": "mga babala sa mababang balanse ng organisasyon",
       "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA"
+    },
+    "action": {
+      "openSession": "Buksan ang sesyon"
+    },
+    "needsInputAction": {
+      "approved": "Aprubado ang kahilingan",
+      "replied": "Naipadala ang sagot",
+      "failed": "Hindi nasagot. I-tap muli para subukang muli.",
+      "unavailable": "Hindi na naghihintay ang kahilingang ito."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Ipinagpapatuloy ang {{title}}.",
       "importingSession": "Ini-import ang sesyon",
       "cliCannotContinue": "Hindi kayang magpatuloy ng sesyon ang CLI na ito. Pumili ng Cloud Agent o ibang CLI.",
-      "importFailed": "Hindi ma-import ang sesyong ito.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Default · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Maliit",
-      "sandboxInstanceShared": "Nakabahagi",
-      "sandboxInstanceLarge": "Malaki",
-      "sandboxInstanceDevcontainer": "Dev container",
-      "sandboxInstanceProviderDefault": "Default ng provider",
-      "sandboxCouldNotLoad": "Hindi na-load ang mga opsyon ng sandbox",
-      "sandboxUnavailable": "Hindi available ang sandbox na ito. Pumili ng ibang sandbox o ng Default.",
-      "sandboxUseDefault": "Gamitin ang Default"
+      "importFailed": "Hindi ma-import ang sesyong ito."
     },
     "partRenderer": {
       "updatedFileCount_one": "Na-update ang {{displayCount}} na file.",

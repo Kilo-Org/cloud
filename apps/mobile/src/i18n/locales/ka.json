@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "ინსტანცია მზადაა / ჩაიშალა, დაგეგმილი მოქმედებები",
       "balanceAlertsSubtitle": "ორგანიზაციის დაბალი ბალანსის გაფრთხილებები",
       "securityFindingsSubtitle": "ახლად აღმოჩენილი პრობლემები და SLA-ის შეხსენებები"
+    },
+    "action": {
+      "openSession": "სესიის გახსნა"
+    },
+    "needsInputAction": {
+      "approved": "მოთხოვნა დამტკიცდა",
+      "replied": "პასუხი გაიგზავნა",
+      "failed": "პასუხის გაცემა ვერ მოხერხდა. ხელახლა საცდელად ისევ შეეხეთ.",
+      "unavailable": "ეს მოთხოვნა აღარ ელოდება."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "გრძელდება სესია: {{title}}.",
       "importingSession": "სესიის იმპორტი მიმდინარეობს…",
       "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
-      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა.",
-      "sandbox": "სენდბოქსი",
-      "sandboxAccessibility": "სენდბოქსი: {{label}}",
-      "sandboxDefaultWithDestination": "ნაგულისხმევი · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "პატარა",
-      "sandboxInstanceShared": "საერთო",
-      "sandboxInstanceLarge": "დიდი",
-      "sandboxInstanceDevcontainer": "დევ კონტეინერი",
-      "sandboxInstanceProviderDefault": "მომწოდებლის ნაგულისხმევი",
-      "sandboxCouldNotLoad": "სენდბოქსის ვარიანტების ჩატვირთვა ვერ მოხერხდა",
-      "sandboxUnavailable": "ეს სენდბოქსი მიუწვდომელია. აირჩიეთ სხვა სენდბოქსი ან ნაგულისხმევი.",
-      "sandboxUseDefault": "ნაგულისხმევის გამოყენება"
+      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა."
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი.",

@@ -872,6 +872,15 @@
       "kiloclawActivitySubtitle": "instance připravena/selhala, naplánované akce",
       "balanceAlertsSubtitle": "upozornění na nízký zůstatek organizace",
       "securityFindingsSubtitle": "nové nálezy a připomenutí lhůt SLA"
+    },
+    "action": {
+      "openSession": "Otevřít relaci"
+    },
+    "needsInputAction": {
+      "approved": "Žádost schválena",
+      "replied": "Odpověď odeslána",
+      "failed": "Odpovědět se nepodařilo. Klepnutím to zkuste znovu.",
+      "unavailable": "Tato žádost už nečeká."
     }
   },
   "tabs": {
@@ -2233,20 +2242,7 @@
       "continueFrom": "Pokračujete v relaci {{title}}.",
       "importingSession": "Import relace",
       "cliCannotContinue": "Toto CLI nepodporuje pokračování v relaci. Vyberte službu Cloud Agent nebo jiné CLI.",
-      "importFailed": "Tuto relaci se nepodařilo importovat.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Výchozí · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Malý",
-      "sandboxInstanceShared": "Sdílený",
-      "sandboxInstanceLarge": "Velký",
-      "sandboxInstanceDevcontainer": "Dev kontejner",
-      "sandboxInstanceProviderDefault": "Výchozí od poskytovatele",
-      "sandboxCouldNotLoad": "Možnosti sandboxu se nepodařilo načíst",
-      "sandboxUnavailable": "Tento sandbox není dostupný. Vyberte jiný sandbox nebo Výchozí.",
-      "sandboxUseDefault": "Použít Výchozí"
+      "importFailed": "Tuto relaci se nepodařilo importovat."
     },
     "partRenderer": {
       "updatedFileCount_one": "Byl aktualizován {{displayCount}} soubor.",

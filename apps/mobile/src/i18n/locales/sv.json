@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "instans klar eller misslyckad, schemalagda åtgärder",
       "balanceAlertsSubtitle": "varningar om lågt organisationssaldo",
       "securityFindingsSubtitle": "nya säkerhetsfynd och SLA-påminnelser"
+    },
+    "action": {
+      "openSession": "Öppna session"
+    },
+    "needsInputAction": {
+      "approved": "Begäran godkänd",
+      "replied": "Svar skickat",
+      "failed": "Kunde inte svara. Tryck igen för att försöka igen.",
+      "unavailable": "Denna begäran väntar inte längre."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Sessionen {{title}} fortsätter.",
       "importingSession": "Importerar sessionen",
       "cliCannotContinue": "Den här CLI-versionen kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI-instans.",
-      "importFailed": "Det gick inte att importera den här sessionen.",
-      "sandbox": "Sandlåda",
-      "sandboxAccessibility": "Sandlåda: {{label}}",
-      "sandboxDefaultWithDestination": "Standard · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Liten",
-      "sandboxInstanceShared": "Delad",
-      "sandboxInstanceLarge": "Stor",
-      "sandboxInstanceDevcontainer": "Utvecklingscontainer",
-      "sandboxInstanceProviderDefault": "Leverantörsstandard",
-      "sandboxCouldNotLoad": "Det gick inte att läsa in sandlådealternativ",
-      "sandboxUnavailable": "Den här sandlådan är inte tillgänglig. Välj en annan sandlåda eller Standard.",
-      "sandboxUseDefault": "Använd Standard"
+      "importFailed": "Det gick inte att importera den här sessionen."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil har uppdaterats.",

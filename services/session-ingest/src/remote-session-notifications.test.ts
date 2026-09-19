@@ -12,8 +12,15 @@ function completedSignal(
   return { signalId: 'msg-1', kind: 'completed' as const, messageExcerpt };
 }
 
-function needsInputSignal(): Extract<AttentionSignal, { messageExcerpt: string }> {
-  return { signalId: 'status:question:123', kind: 'needs_input' as const, messageExcerpt: '' };
+function needsInputSignal(
+  attentionKind?: 'question' | 'permission'
+): Extract<AttentionSignal, { messageExcerpt: string }> {
+  return {
+    signalId: 'status:question:123',
+    kind: 'needs_input' as const,
+    messageExcerpt: '',
+    attentionKind,
+  };
 }
 
 function agentNotificationSignal(
@@ -73,7 +80,7 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
     });
   });
 
-  it('tags a needs_input push with category "attention"', async () => {
+  it('tags a needs_input push with category "attention" and the question kind', async () => {
     const hasActiveCliSession = vi.fn(async () => true);
     const sendPush = vi.fn(async () => ({ dispatched: true }));
     const outcome = await dispatchRemoteSessionAttentionSignal(
@@ -81,7 +88,7 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
         kiloUserId: 'usr_1',
         sessionId: 'ses_1',
         createdOnPlatform: null,
-        signal: needsInputSignal(),
+        signal: needsInputSignal('question'),
       },
       {
         hasActiveCliSession,
@@ -97,9 +104,62 @@ describe('dispatchRemoteSessionAttentionSignal', () => {
       executionId: 'remote:status:question:123',
       status: 'completed',
       category: 'attention',
+      attentionKind: 'question',
       body: 'Kilo needs your input.',
       suppressIfViewingSession: true,
     });
+  });
+
+  it('forwards the permission kind for a permission raise', async () => {
+    const sendPush = vi.fn(async () => ({ dispatched: true }));
+    const outcome = await dispatchRemoteSessionAttentionSignal(
+      {
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        createdOnPlatform: null,
+        signal: needsInputSignal('permission'),
+      },
+      {
+        hasActiveCliSession: vi.fn(async () => true),
+        sendPush,
+        sendAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
+      }
+    );
+
+    expect(outcome).toBe('sent');
+    expect(sendPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'attention',
+        attentionKind: 'permission',
+        body: 'Kilo needs your input.',
+      })
+    );
+  });
+
+  // Non-retryable unhappy: an old producer (or an unrecognized status) emits a needs_input
+  // signal without a kind. The push must still dispatch, with the kind omitted so the app
+  // falls back to its `unknown` action set rather than mislabelling the raise.
+  it('dispatches a needs_input push with the kind omitted when the signal carries none', async () => {
+    const sendPush = vi.fn(async () => ({ dispatched: true }));
+    const outcome = await dispatchRemoteSessionAttentionSignal(
+      {
+        kiloUserId: 'usr_1',
+        sessionId: 'ses_1',
+        createdOnPlatform: null,
+        signal: needsInputSignal(),
+      },
+      {
+        hasActiveCliSession: vi.fn(async () => true),
+        sendPush,
+        sendAgentSessionNotification: vi.fn(async () => ({ dispatched: true })),
+      }
+    );
+
+    expect(outcome).toBe('sent');
+    expect(sendPush).toHaveBeenCalledOnce();
+    const [payload] = sendPush.mock.calls[0] as unknown as [Record<string, unknown>];
+    expect(payload.category).toBe('attention');
+    expect(payload.attentionKind).toBeUndefined();
   });
 
   it('suppresses pushes when no remote CLI session is active', async () => {

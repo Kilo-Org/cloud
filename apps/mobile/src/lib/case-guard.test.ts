@@ -42,6 +42,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/agent-attachments/validate.ts': 'file-extension normalization',
   'lib/auth/passkey-client.ts':
     'credential-API error classification; display copy uses catalog keys',
+  'lib/auth/passkey-client.ts': 'credential-error classification key',
   'lib/auth/use-native-auth.ts': 'email normalization',
   'lib/telemetry/install-error-reporting.ts': 'hostname comparison',
   'lib/pr-review/diff/highlight.ts': 'file-extension normalization',

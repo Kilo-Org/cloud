@@ -2,8 +2,10 @@ import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { PortalHost } from '@rn-primitives/portal';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
+import { Keyboard } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
@@ -37,6 +39,38 @@ import { trpcClient, TRPCProvider } from '@/lib/trpc';
  */
 const TOAST_POSITIONER_STYLE = { top: 0 } as const;
 
+function useToastKeyboardOffset() {
+  const { bottom } = useSafeAreaInsets();
+  const [keyboardHeight, setKeyboardHeight] = useState(() => Keyboard.metrics()?.height ?? 0);
+
+  useEffect(() => {
+    // One listener pair for both platforms: `keyboardDidShow`/`keyboardDidHide`
+    // are the events Android and iOS share — Android has no native
+    // `keyboardWillShow`/`keyboardWillHide`, and `Keyboard.metrics()` is filled
+    // from the same JS events on both. Nothing here needs a platform branch.
+    const show = Keyboard.addListener('keyboardDidShow', event => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  // The toast window never resizes for the IME on either platform: Android's
+  // edge-to-edge window keeps its full height, and iOS renders the toaster
+  // inside a `FullWindowOverlay` window above the app. The keyboard therefore
+  // covers a bottom-center toast on both, clipping its lower corners and
+  // padding. RN excludes the navigation bar from Android's reported IME height
+  // but includes the home-indicator area on iOS, so adding the safe-area bottom
+  // inset restores Android's navigation bar and only widens the gap on iOS.
+  // With no IME, `undefined` leaves sonner's own safe-area placement untouched.
+  return keyboardHeight > 0 ? keyboardHeight + bottom + 8 : undefined;
+}
+
 export function AppRootProviders({
   children,
   languageReady,
@@ -46,6 +80,7 @@ export function AppRootProviders({
 }) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const toastOffset = useToastKeyboardOffset();
 
   return (
     // bg-background: the gesture root is the first opaque surface above the
@@ -81,6 +116,7 @@ export function AppRootProviders({
                     */}
                     <Toaster
                       position="bottom-center"
+                      offset={toastOffset}
                       positionerStyle={TOAST_POSITIONER_STYLE}
                       icons={{
                         success: <CheckCircle2 size={20} color={colors.good} />,

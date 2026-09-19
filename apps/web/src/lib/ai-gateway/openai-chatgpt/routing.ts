@@ -1,5 +1,5 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { isDisabledKiloExclusiveModel, isKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import { isGptOssModel } from '@/lib/ai-gateway/providers/openai';
 import type {
   GatewayRequest,
@@ -109,9 +109,13 @@ export type OpenAiChatGptRoutingResult =
       message: string;
     };
 
+function isKiloOwnedModelId(model: string): boolean {
+  return isKiloExclusiveModel(model) || isDisabledKiloExclusiveModel(model);
+}
+
 function isOpenAiChatGptModel(requestedModel: string): boolean {
   const model = requestedModel.trim();
-  return OPENAI_MODEL_PREFIX.test(model) && !isGptOssModel(model) && !findKiloExclusiveModel(model);
+  return OPENAI_MODEL_PREFIX.test(model) && !isGptOssModel(model) && !isKiloOwnedModelId(model);
 }
 
 /**

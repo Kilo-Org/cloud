@@ -460,22 +460,33 @@ async function resolveConnectedGitLabSource(
       userId: owner.userId,
       ...(owner.type === 'org' ? { organizationId: owner.id } : {}),
     });
-    const rawMergeRequest = await fetchGitLabMergeRequest({
-      accessToken,
-      projectId: parsed.projectPath,
-      mrIid: parsed.mrIid,
-      instanceUrl,
-    });
-    const mergeRequest = GitLabMergeRequestApiSchema.parse(rawMergeRequest);
-    validateOpenGitLabMergeRequest(mergeRequest);
+    let rawMergeRequest: unknown;
+    try {
+      rawMergeRequest = await fetchGitLabMergeRequest({
+        accessToken,
+        projectId: parsed.projectPath,
+        mrIid: parsed.mrIid,
+        instanceUrl,
+      });
+    } catch (error) {
+      // The adapter throws a plain Error whose message ends with the provider
+      // status; map it so an unreadable merge request is a client error, not a
+      // 500. See toProviderRequestError.
+      throw toProviderRequestError(error, PLATFORM.GITLAB);
+    }
+    const mergeRequest = GitLabMergeRequestApiSchema.safeParse(rawMergeRequest);
+    if (!mergeRequest.success) {
+      throw unreadableProviderResponse('GitLab');
+    }
+    validateOpenGitLabMergeRequest(mergeRequest.data);
 
     return buildGitLabSource({
-      mergeRequest,
+      mergeRequest: mergeRequest.data,
       projectPath: parsed.projectPath,
       integrationId: integration.id,
       platformProjectId:
-        mergeRequest.target_project_id ??
-        mergeRequest.project_id ??
+        mergeRequest.data.target_project_id ??
+        mergeRequest.data.project_id ??
         getGitLabRepositoryIdFromIntegration(integration, parsed.projectPath),
     });
   }
@@ -603,10 +614,19 @@ async function fetchPublicGitHubPullRequest(
   parsed: ParsedGitHubPullRequestUrl
 ): Promise<GitHubPullRequestApi> {
   const url = `https://api.github.com/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}/pulls/${parsed.prNumber}`;
-  const data = await fetchJson(url, {
-    headers: { Accept: 'application/vnd.github+json' },
-  });
-  return GitHubPullRequestApiSchema.parse(data);
+  let data: unknown;
+  try {
+    data = await fetchJson(url, {
+      headers: { Accept: 'application/vnd.github+json' },
+    });
+  } catch (error) {
+    throw toProviderRequestError(error, PLATFORM.GITHUB);
+  }
+  const pullRequest = GitHubPullRequestApiSchema.safeParse(data);
+  if (!pullRequest.success) {
+    throw unreadableProviderResponse('GitHub');
+  }
+  return pullRequest.data;
 }
 
 async function fetchGitHubPullRequest(
@@ -634,8 +654,17 @@ async function fetchPublicGitLabMergeRequest(
   parsed: ParsedGitLabMergeRequestUrl
 ): Promise<GitLabMergeRequestApi> {
   const url = `https://gitlab.com/api/v4/projects/${encodeURIComponent(parsed.projectPath)}/merge_requests/${parsed.mrIid}`;
-  const data = await fetchJson(url, { headers: { Accept: 'application/json' } });
-  return GitLabMergeRequestApiSchema.parse(data);
+  let data: unknown;
+  try {
+    data = await fetchJson(url, { headers: { Accept: 'application/json' } });
+  } catch (error) {
+    throw toProviderRequestError(error, PLATFORM.GITLAB);
+  }
+  const mergeRequest = GitLabMergeRequestApiSchema.safeParse(data);
+  if (!mergeRequest.success) {
+    throw unreadableProviderResponse('GitLab');
+  }
+  return mergeRequest.data;
 }
 
 async function fetchJson(url: string, init: RequestInit): Promise<unknown> {
@@ -650,6 +679,88 @@ async function fetchJson(url: string, init: RequestInit): Promise<unknown> {
   }
 
   return await response.json();
+}
+
+/**
+ * Pull the upstream HTTP status out of a provider failure.
+ *
+ * `ProviderFetchError` carries it directly. The GitLab adapter throws a plain
+ * `Error` whose message ends with the status (`GitLab MR fetch failed: 403`) —
+ * the same contract `classifyGitLabError` in `provider-review/gitlab-authorization`
+ * relies on.
+ */
+function providerErrorStatus(error: unknown): number | null {
+  if (error instanceof ProviderFetchError) return error.status;
+  if (error instanceof Error) {
+    const match = error.message.match(/:\s*(\d{3})\b/);
+    const status = match?.[1] ? Number(match[1]) : Number.NaN;
+    if (Number.isInteger(status) && status >= 400 && status < 600) return status;
+  }
+  return null;
+}
+
+function providerLabel(platform: CodeReviewPlatform): 'GitHub' | 'GitLab' {
+  return platform === PLATFORM.GITLAB ? 'GitLab' : 'GitHub';
+}
+
+/**
+ * A provider answered, but the body did not match the expected shape. That is an
+ * upstream/gateway failure, not a fault in the caller's request — so it must be a
+ * 502, never an unmapped error that tRPC turns into a 500.
+ */
+function unreadableProviderResponse(provider: 'GitHub' | 'GitLab'): TRPCError {
+  return new TRPCError({
+    code: 'BAD_GATEWAY',
+    message: `We couldn't read ${provider}'s response for that request. Try again in a moment.`,
+  });
+}
+
+/**
+ * Convert a provider round-trip failure into a client-visible tRPC error.
+ *
+ * The manual-review resolver talks to GitHub/GitLab while resolving the pull
+ * request. Those fetches raise raw errors (`ProviderFetchError`, a network
+ * `TypeError`, a timeout `DOMException`, or a schema `ZodError`). Left unmapped
+ * they reach tRPC as unknown errors and the mutation answers
+ * INTERNAL_SERVER_ERROR — a 500 for what is usually user input: a nonexistent or
+ * private pull request, a rate-limited API, or a provider outage. Map each onto
+ * the closest client error so the mutation never returns 500 for a provider
+ * round-trip.
+ */
+function toProviderRequestError(error: unknown, platform: CodeReviewPlatform): TRPCError {
+  if (error instanceof TRPCError) return error;
+  const provider = providerLabel(platform);
+  const noun = platform === PLATFORM.GITLAB ? 'merge request' : 'pull request';
+  const status = providerErrorStatus(error);
+
+  if (status === 404) {
+    return new TRPCError({
+      code: 'NOT_FOUND',
+      message: `We couldn't find that ${provider} ${noun}. Check the URL and that you have access to it.`,
+    });
+  }
+  if (status === 403 || status === 429) {
+    return new TRPCError({
+      code: 'TOO_MANY_REQUESTS',
+      message: `${provider} is limiting requests right now. Try again in a few minutes.`,
+    });
+  }
+  if (status !== null && status >= 400 && status < 500) {
+    return new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `${provider} rejected that request. Check the ${noun} URL and try again.`,
+    });
+  }
+  if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+    return new TRPCError({
+      code: 'GATEWAY_TIMEOUT',
+      message: `${provider} took too long to respond. Try again.`,
+    });
+  }
+  return new TRPCError({
+    code: 'BAD_GATEWAY',
+    message: `We couldn't reach ${provider} to read that ${noun}. Try again in a moment.`,
+  });
 }
 
 function validateOpenGitHubPullRequest(pullRequest: GitHubPullRequestApi): void {

@@ -14,6 +14,14 @@ type SessionFilterButtonProps = {
 };
 
 /**
+ * 36pt square + 4pt slop = the 44pt minimum target DESIGN.md asks for. The box
+ * is a real layout size, not slop alone: the on-device explorer measures
+ * laid-out bounds and `hitSlop` never widens them. `h-[36px]`, not `h-9` — the
+ * app's native rem is 14pt, so `h-9` lays out at 31.5pt.
+ */
+const FILTER_HIT_SLOP = 4;
+
+/**
  * Filter affordance shared by both session-list pages: the sliders icon, plus
  * a count badge while filters are applied. The count is the point — it tells
  * the user the list is narrowed without making them open the picker.
@@ -30,8 +38,7 @@ export function SessionFilterButton({
   return (
     <Pressable
       onPress={onPress}
-      // left slop capped against the 16px gap, right slop reaches 44pt wide
-      hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
+      hitSlop={FILTER_HIT_SLOP}
       accessibilityRole="button"
       // The count is spoken as part of the name, so no new translated string is
       // needed to announce "Filter sessions, 2".
@@ -40,24 +47,31 @@ export function SessionFilterButton({
         activeCount
       )}
       testID={testID}
-      className="active:opacity-70"
+      className="h-[36px] w-[36px] items-center justify-center active:opacity-70"
     >
-      <SlidersHorizontal size={20} color={isActive ? colors.foreground : colors.mutedForeground} />
-      {isActive ? (
-        // Overlaps the icon's top-right corner; `pointer-events-none` keeps the
-        // whole 44pt target on the Pressable underneath.
-        <View
-          pointerEvents="none"
-          className="absolute -right-1.5 -top-1.5 h-[15px] min-w-[15px] items-center justify-center rounded-full bg-primary px-1"
-        >
-          <Text
-            className="font-mono-medium text-[10px] leading-[normal] text-primary-foreground"
-            testID="session-filter-badge"
+      {/* Anchored to the icon, not the 36pt box, so enlarging the target never
+          drifts the badge off the glyph's top-right corner. */}
+      <View className="relative">
+        <SlidersHorizontal
+          size={20}
+          color={isActive ? colors.foreground : colors.mutedForeground}
+        />
+        {isActive ? (
+          // Overlaps the icon's top-right corner; `pointer-events-none` keeps the
+          // whole target on the Pressable underneath.
+          <View
+            pointerEvents="none"
+            className="absolute -right-1.5 -top-1.5 h-[15px] min-w-[15px] items-center justify-center rounded-full bg-primary px-1"
           >
-            {activeCount}
-          </Text>
-        </View>
-      ) : null}
+            <Text
+              className="font-mono-medium text-[10px] leading-[normal] text-primary-foreground"
+              testID="session-filter-badge"
+            >
+              {activeCount}
+            </Text>
+          </View>
+        ) : null}
+      </View>
     </Pressable>
   );
 }

@@ -70,6 +70,14 @@ function MemberRowSkeleton({ last }: Readonly<{ last?: boolean }>) {
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = { paddingTop: 16, flexGrow: 1 } satisfies ViewStyle;
 
+/**
+ * 36pt square + 4pt slop = the 44pt minimum target DESIGN.md asks for. The box
+ * is a real layout size, not slop alone: the on-device explorer measures
+ * laid-out bounds and `hitSlop` never widens them. `h-[36px]`, not `h-9` — the
+ * app's native rem is 14pt, so `h-9` lays out at 31.5pt.
+ */
+const INVITE_HIT_SLOP = 4;
+
 export function OrganizationMembersScreen() {
   const router = useRouter();
   const { t } = useTranslation();
@@ -205,10 +213,10 @@ export function OrganizationMembersScreen() {
               onPress={() => {
                 router.push('/(app)/(tabs)/(3_profile)/organization/invite-member' as Href);
               }}
-              hitSlop={12}
+              hitSlop={INVITE_HIT_SLOP}
               accessibilityRole="button"
               accessibilityLabel={t('organization.inviteMember.title')}
-              className="active:opacity-70"
+              className="h-[36px] w-[36px] items-center justify-center active:opacity-70"
             >
               <UserPlus size={22} color={colors.foreground} />
             </Pressable>

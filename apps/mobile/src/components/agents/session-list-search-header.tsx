@@ -7,6 +7,14 @@ import { useTranslation } from 'react-i18next';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+/**
+ * 36pt square + 4pt slop = the 44pt minimum target DESIGN.md asks for. The box
+ * is a real layout size, not slop alone: the on-device explorer measures
+ * laid-out bounds and `hitSlop` never widens them. `h-[36px]`, not `h-9` — the
+ * app's native rem is 14pt, so `h-9` lays out at 31.5pt.
+ */
+const CLEAR_HIT_SLOP = 4;
+
 type SessionListSearchHeaderProps = {
   inputRef: RefObject<TextInput | null>;
   /** Drives the in-field X's visibility. Derived from `onChangeText` by the
@@ -42,9 +50,12 @@ export function SessionListSearchHeader({
   );
   return (
     <View>
+      {/* `min-h-[50px]` reserves the clear control's 36pt box (36 + 6pt padding
+          + 1pt border) so the first keystroke does not grow the row and shift
+          the list below. */}
       <View
         style={fieldMargins}
-        className="my-2 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
+        className="my-2 min-h-[50px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
       >
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
         <View className="h-[18px] w-[18px] items-center justify-center">
@@ -78,8 +89,8 @@ export function SessionListSearchHeader({
             onPress={onClearSearch}
             accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
-            hitSlop={12}
-            className="active:opacity-70"
+            hitSlop={CLEAR_HIT_SLOP}
+            className="h-[36px] w-[36px] items-center justify-center active:opacity-70"
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>

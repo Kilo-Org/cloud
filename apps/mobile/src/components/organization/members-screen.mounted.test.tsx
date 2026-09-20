@@ -14,6 +14,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
+import { compiledDimensions } from '@/test/native-dimensions';
 
 import '@/i18n';
 import { OrganizationMembersScreen } from './members-screen';
@@ -96,7 +97,9 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: () => null,
+  // Render headerRight so the invite control under test stays in the tree.
+  ScreenHeader: (props: { headerRight?: ReactNode }) =>
+    createElement('ScreenHeader', null, props.headerRight),
 }));
 
 vi.mock('@/components/ui/button', () => ({
@@ -211,5 +214,29 @@ describe('OrganizationMembersScreen empty-state precedence', () => {
     const texts = await renderScreen();
     expect(texts).not.toContain('QUERY_ERROR');
     expect(texts).not.toContain('EMPTY_STATE:No members yet');
+  });
+});
+
+describe('OrganizationMembersScreen invite control', () => {
+  // The on-device accessibility explorer measures laid-out bounds and `hitSlop`
+  // never widens them: the header's icon-only invite Pressable is read as its
+  // 22pt glyph and reported too small to tap.
+  it('lays out a box at least 28dp on a side', async () => {
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrganizationMembersScreen)
+    );
+    const invite = renderer.root.find(
+      node => String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Invite member'
+    );
+    const declarations = (await compiledDimensions(invite.props.className as string)) as {
+      height?: number;
+      width?: number;
+    }[];
+    const box = Object.assign({}, ...declarations) as { height: number; width: number };
+
+    expect(box.height).toBeGreaterThanOrEqual(28);
+    expect(box.width).toBeGreaterThanOrEqual(28);
+    expect(box.height + 2 * (invite.props.hitSlop as number)).toBeGreaterThanOrEqual(44);
+    unmount();
   });
 });

@@ -24,11 +24,23 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 /**
- * The account settings list (Language / Trusted hosts / Device sessions) once
- * hashed each row title into the agent hue ramp, so one list showed three
- * different accent tints. These rows must share one tile.
+ * The account settings list (Language / Trusted hosts / Passkeys / Device
+ * sessions) once hashed each row title into the agent hue ramp, so the list
+ * showed three different accent tints (olive, blue, purple). Passkeys and
+ * Device sessions collided on the same hue, so a test over three titles could
+ * pass while a fourth row still rendered a hashed tint — every account row is
+ * named here.
  */
-const ACCOUNT_ROW_TITLES = ['Language', 'Trusted hosts', 'Device sessions'];
+const ACCOUNT_ROW_TITLES = ['Language', 'Trusted hosts', 'Passkeys', 'Device sessions'];
+
+/** The Preferences hub rows all render through this same component. */
+const PREFERENCES_HUB_ROW_TITLES = [
+  'General',
+  'Voice input',
+  'Translate tool summaries',
+  'Account',
+  'Notifications',
+];
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
@@ -65,14 +77,21 @@ afterEach(() => {
 });
 
 describe('ConfigureRow icon tile', () => {
-  it('gives every row the same neutral tile, whatever the title', () => {
-    const rows = ACCOUNT_ROW_TITLES.map(title => renderRow({ title }));
+  it.each(ACCOUNT_ROW_TITLES)('gives the %s account row the shared neutral tile', title => {
+    const row = renderRow({ title });
 
-    expect(new Set(rows.map(row => row.tileClassName)).size).toBe(1);
-    expect(new Set(rows.map(row => row.iconColor)).size).toBe(1);
-    expect(rows[0]?.tileClassName).toContain('bg-hair-soft');
-    expect(rows[0]?.tileClassName).not.toContain('agent-');
-    expect(rows[0]?.iconColor).toBe('#F2F0EB');
+    expect(row.tileClassName).toContain('bg-hair-soft');
+    expect(row.tileClassName).toContain('border-border');
+    expect(row.tileClassName).not.toContain('agent-');
+    expect(row.iconColor).toBe('#F2F0EB');
+  });
+
+  it('gives the account and Preferences hub rows one identical tile', () => {
+    const tiles = [...ACCOUNT_ROW_TITLES, ...PREFERENCES_HUB_ROW_TITLES].map(
+      title => renderRow({ title }).tileClassName
+    );
+
+    expect(new Set(tiles).size).toBe(1);
   });
 
   it('still lets a semantic tone override the neutral tile', () => {

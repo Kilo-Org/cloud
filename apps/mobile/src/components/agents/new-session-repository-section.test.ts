@@ -318,3 +318,27 @@ describe('NewSessionRepositorySection connect card collapse', () => {
     expect(pressables(renderer)).toHaveLength(0);
   });
 });
+
+describe('NewSessionRepositorySection connect card layout stability', () => {
+  // The branch row mounts above the connect card the moment a repository is
+  // chosen. A layout transition on the card would paint it at its pre-insertion
+  // position, covering the row and leaving an empty gap below; the card must
+  // not carry one, while its content still fades in.
+  it('leaves the layout transition off the connect card and keeps the content fade', () => {
+    const renderer = mountSection({
+      value: 'gitlab:owner/repo',
+      groups: [group('github', 'repos'), group('gitlab', 'connect')],
+    });
+
+    const card = renderer.root.find(
+      node =>
+        node.type === ('Animated.View' as never) && String(node.props.className).includes('bg-card')
+    );
+    expect(card.props.layout).toBeUndefined();
+
+    const content = renderer.root.find(
+      node => node.type === ('Animated.View' as never) && node.props.entering !== undefined
+    );
+    expect(content.props.entering).toEqual({ __fadeIn: 150 });
+  });
+});

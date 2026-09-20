@@ -68,6 +68,11 @@ vi.mock('@/components/agents/tool-card-image-cache', () => ({
 vi.mock('@/components/agents/file-part-cache', () => ({
   cacheFilePart: vi.fn(),
 }));
+// The shared answer path is a sibling module whose pure suite covers its body;
+// this suite only pins the manager's wiring to it. Mocking it keeps this suite
+// free of the transient native imports `approve-ask` pulls (secure store,
+// widgets) and of the sibling record store.
+vi.mock('@/lib/glanceable/approve-ask', () => ({ answerSessionPermission: vi.fn() }));
 
 const mutate = vi.fn();
 const prepareSessionMutate = vi.fn();
@@ -101,6 +106,9 @@ vi.mock('@/lib/trpc', () => ({
 
 const { buildRemoteAttachmentParts } =
   await import('@/components/agents/mobile-session-manager-helpers');
+const { answerSessionPermission: mockedAnswerSessionPermission } =
+  await import('@/lib/glanceable/approve-ask');
+const answerSessionPermissionMock = vi.mocked(mockedAnswerSessionPermission);
 const {
   createMobileAgentSessionManager,
   fetchSessionWithNotFoundRetry,
@@ -614,6 +622,55 @@ describe('createMobileAgentSessionManager api.cancelQueuedMessage', () => {
       { sessionId: 'c-1', messageId: 'm-1', organizationId: 'org-1' },
       { context: { skipBatch: true } }
     );
+  });
+});
+
+describe('createMobileAgentSessionManager api.respondToPermission', () => {
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+    answerSessionPermissionMock.mockReset();
+  });
+
+  function setup(organizationId?: string): SessionManagerConfig {
+    const options = {
+      store: {},
+      userWebConnection: {},
+      ...(organizationId ? { organizationId } : {}),
+    };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    return config;
+  }
+
+  it('answers through the shared answerSessionPermission body', async () => {
+    const config = setup();
+    const input = { sessionId: 'c-1', requestId: 'p-1', response: 'once' };
+    await config.api.respondToPermission(input as never);
+
+    expect(answerSessionPermissionMock).toHaveBeenCalledTimes(1);
+    expect(answerSessionPermissionMock).toHaveBeenCalledWith({
+      cloudAgentSessionId: 'c-1',
+      requestId: 'p-1',
+      response: 'once',
+      organizationId: undefined,
+    });
+  });
+
+  it('passes the manager organization through to the shared body', async () => {
+    const config = setup('org-1');
+    const input = { sessionId: 'c-1', requestId: 'p-1', response: 'always' };
+    await config.api.respondToPermission(input as never);
+
+    expect(answerSessionPermissionMock).toHaveBeenCalledWith({
+      cloudAgentSessionId: 'c-1',
+      requestId: 'p-1',
+      response: 'always',
+      organizationId: 'org-1',
+    });
   });
 });
 

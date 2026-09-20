@@ -2248,7 +2248,8 @@
       "linesBadge_few": "{{displayCount}} reda",
       "matchesBadge_one": "{{displayCount}} podudaranje",
       "matchesBadge_other": "{{displayCount}} podudaranja",
-      "matchesBadge_few": "{{displayCount}} podudaranja"
+      "matchesBadge_few": "{{displayCount}} podudaranja",
+      "noOutput": "Nema izlaza."
     },
     "readToolMarkdown": {
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",

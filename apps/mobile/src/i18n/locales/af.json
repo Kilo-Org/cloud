@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} reël",
       "linesBadge_other": "{{displayCount}} reëls",
       "matchesBadge_one": "{{displayCount}} treffer",
-      "matchesBadge_other": "{{displayCount}} treffers"
+      "matchesBadge_other": "{{displayCount}} treffers",
+      "noOutput": "Geen uitset nie."
     },
     "readToolMarkdown": {
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",

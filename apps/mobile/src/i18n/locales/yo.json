@@ -2216,7 +2216,8 @@
       "linesBadge_one": "ìlà {{displayCount}}",
       "linesBadge_other": "ìlà {{displayCount}}",
       "matchesBadge_one": "ìbámu {{displayCount}}",
-      "matchesBadge_other": "ìbámu {{displayCount}}"
+      "matchesBadge_other": "ìbámu {{displayCount}}",
+      "noOutput": "Kò sí ìjáde."
     },
     "readToolMarkdown": {
       "linesTruncated": "ìlà {{start}}–{{end}} (a gé kúrú)",

@@ -2216,7 +2216,8 @@
       "linesBadge_one": "Sarara {{displayCount}}",
       "linesBadge_other": "Sarara {{displayCount}}",
       "matchesBadge_one": "Walsimsiisota {{displayCount}}",
-      "matchesBadge_other": "Walsimsiisota {{displayCount}}"
+      "matchesBadge_other": "Walsimsiisota {{displayCount}}",
+      "noOutput": "Bu'aan hin jiru."
     },
     "readToolMarkdown": {
       "linesTruncated": "sararoota {{start}}–{{end}} (gabaabbate)",

@@ -1776,7 +1776,8 @@
       "matchesBadge_zero": "تطابقات: {{displayCount}}",
       "matchesBadge_two": "تطابقان: {{displayCount}}",
       "matchesBadge_few": "تطابقات: {{displayCount}}",
-      "matchesBadge_many": "تطابقًا: {{displayCount}}"
+      "matchesBadge_many": "تطابقًا: {{displayCount}}",
+      "noOutput": "لا توجد مخرجات."
     },
     "readToolMarkdown": {
       "linesTruncated": "الأسطر {{start}}–{{end}} (مقتطعة)",

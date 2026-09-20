@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} บรรทัด",
       "linesBadge_other": "{{displayCount}} บรรทัด",
       "matchesBadge_one": "พบ {{displayCount}} รายการ",
-      "matchesBadge_other": "พบ {{displayCount}} รายการ"
+      "matchesBadge_other": "พบ {{displayCount}} รายการ",
+      "noOutput": "ไม่มีเอาต์พุต"
     },
     "readToolMarkdown": {
       "linesTruncated": "บรรทัด {{start}}–{{end}} (ตัดบางส่วนออก)",

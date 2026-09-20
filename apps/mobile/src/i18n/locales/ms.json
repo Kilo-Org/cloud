@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} baris",
       "linesBadge_other": "{{displayCount}} baris",
       "matchesBadge_one": "{{displayCount}} padanan",
-      "matchesBadge_other": "{{displayCount}} padanan"
+      "matchesBadge_other": "{{displayCount}} padanan",
+      "noOutput": "Tiada keluaran."
     },
     "readToolMarkdown": {
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",

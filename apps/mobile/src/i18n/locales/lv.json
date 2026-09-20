@@ -2248,7 +2248,8 @@
       "linesBadge_zero": "{{displayCount}} rindu",
       "matchesBadge_one": "{{displayCount}} atbilstība",
       "matchesBadge_other": "{{displayCount}} atbilstības",
-      "matchesBadge_zero": "{{displayCount}} atbilstību"
+      "matchesBadge_zero": "{{displayCount}} atbilstību",
+      "noOutput": "Nav izvades."
     },
     "readToolMarkdown": {
       "linesTruncated": "rindas {{start}}–{{end}} (saturs saīsināts)",

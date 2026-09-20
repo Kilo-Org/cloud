@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} sətir",
       "linesBadge_other": "{{displayCount}} sətir",
       "matchesBadge_one": "{{displayCount}} uyğunluq",
-      "matchesBadge_other": "{{displayCount}} uyğunluq"
+      "matchesBadge_other": "{{displayCount}} uyğunluq",
+      "noOutput": "Çıxış yoxdur."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} sətirləri (qısaldılıb)",

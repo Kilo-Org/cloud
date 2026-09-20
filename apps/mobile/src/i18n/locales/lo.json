@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} ບັນທັດ",
       "linesBadge_other": "{{displayCount}} ບັນທັດ",
       "matchesBadge_one": "ພົບ {{displayCount}} ລາຍການ",
-      "matchesBadge_other": "ພົບ {{displayCount}} ລາຍການ"
+      "matchesBadge_other": "ພົບ {{displayCount}} ລາຍການ",
+      "noOutput": "ບໍ່ມີຜົນອອກ."
     },
     "readToolMarkdown": {
       "linesTruncated": "ບັນທັດ {{start}}–{{end}} (ຕັດບາງສ່ວນອອກ)",

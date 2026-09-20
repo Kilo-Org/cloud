@@ -2280,7 +2280,8 @@
       "matchesBadge_one": "zhoda: {{displayCount}}",
       "matchesBadge_other": "zhody: {{displayCount}}",
       "matchesBadge_few": "zhody: {{displayCount}}",
-      "matchesBadge_many": "zhôd: {{displayCount}}"
+      "matchesBadge_many": "zhôd: {{displayCount}}",
+      "noOutput": "Žiadny výstup."
     },
     "readToolMarkdown": {
       "linesTruncated": "riadky {{start}}–{{end}} (skrátené)",

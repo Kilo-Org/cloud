@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}}ଟି ଧାଡ଼ି",
       "linesBadge_other": "{{displayCount}}ଟି ଧାଡ଼ି",
       "matchesBadge_one": "{{displayCount}}ଟି ମେଳ",
-      "matchesBadge_other": "{{displayCount}}ଟି ମେଳ"
+      "matchesBadge_other": "{{displayCount}}ଟି ମେଳ",
+      "noOutput": "କୌଣସି ଆଉଟପୁଟ୍ ନାହିଁ।"
     },
     "readToolMarkdown": {
       "linesTruncated": "ଧାଡ଼ି {{start}}–{{end}} (କାଟି ଦିଆଯାଇଛି)",

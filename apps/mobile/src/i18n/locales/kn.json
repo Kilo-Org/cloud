@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} ಸಾಲು",
       "linesBadge_other": "{{displayCount}} ಸಾಲುಗಳು",
       "matchesBadge_one": "{{displayCount}} ಹೊಂದಾಣಿಕೆ",
-      "matchesBadge_other": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು"
+      "matchesBadge_other": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು",
+      "noOutput": "ಯಾವುದೇ ಔಟ್ಪುಟ್ ಇಲ್ಲ."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} ಸಾಲುಗಳು (ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ)",

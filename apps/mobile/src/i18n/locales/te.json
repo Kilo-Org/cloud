@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} పంక్తి",
       "linesBadge_other": "{{displayCount}} పంక్తులు",
       "matchesBadge_one": "{{displayCount}} సరిపోలిక",
-      "matchesBadge_other": "{{displayCount}} సరిపోలికలు"
+      "matchesBadge_other": "{{displayCount}} సరిపోలికలు",
+      "noOutput": "అవుట్పుట్ లేదు."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} పంక్తులు (కొంత భాగం మాత్రమే)",

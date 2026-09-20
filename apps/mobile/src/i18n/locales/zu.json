@@ -2216,7 +2216,8 @@
       "linesBadge_one": "umugqa ongu-{{displayCount}}",
       "linesBadge_other": "imigqa engu-{{displayCount}}",
       "matchesBadge_one": "okufanayo okungu-{{displayCount}}",
-      "matchesBadge_other": "okufanayo okungu-{{displayCount}}"
+      "matchesBadge_other": "okufanayo okungu-{{displayCount}}",
+      "noOutput": "Akukho mphumela."
     },
     "readToolMarkdown": {
       "linesTruncated": "imigqa {{start}}–{{end}} (ifinyeziwe)",

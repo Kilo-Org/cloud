@@ -2216,7 +2216,8 @@
       "linesBadge_one": "පේළි {{displayCount}}",
       "linesBadge_other": "පේළි {{displayCount}}",
       "matchesBadge_one": "ගැළපීම් {{displayCount}}",
-      "matchesBadge_other": "ගැළපීම් {{displayCount}}"
+      "matchesBadge_other": "ගැළපීම් {{displayCount}}",
+      "noOutput": "ප්රතිදානයක් නැත."
     },
     "readToolMarkdown": {
       "linesTruncated": "පේළි {{start}}–{{end}} (කෙටි කර ඇත)",

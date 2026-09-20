@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} سطر",
       "linesBadge_other": "{{displayCount}} سطریں",
       "matchesBadge_one": "{{displayCount}} مماثلت",
-      "matchesBadge_other": "{{displayCount}} مماثلتیں"
+      "matchesBadge_other": "{{displayCount}} مماثلتیں",
+      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔"
     },
     "readToolMarkdown": {
       "linesTruncated": "سطریں {{start}}–{{end}} (نامکمل متن)",

@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} liy",
       "linesBadge_other": "{{displayCount}} liy",
       "matchesBadge_one": "{{displayCount}} rezilta",
-      "matchesBadge_other": "{{displayCount}} rezilta"
+      "matchesBadge_other": "{{displayCount}} rezilta",
+      "noOutput": "Pa gen rezilta."
     },
     "readToolMarkdown": {
       "linesTruncated": "liy {{start}}–{{end}} (koupe)",

@@ -2216,7 +2216,8 @@
       "linesBadge_one": "ahịrị {{displayCount}}",
       "linesBadge_other": "ahịrị {{displayCount}}",
       "matchesBadge_one": "ndakọrịta {{displayCount}}",
-      "matchesBadge_other": "ndakọrịta {{displayCount}}"
+      "matchesBadge_other": "ndakọrịta {{displayCount}}",
+      "noOutput": "Enweghị mpụta."
     },
     "readToolMarkdown": {
       "linesTruncated": "ahịrị {{start}}–{{end}} (ebipụrụ akụkụ)",

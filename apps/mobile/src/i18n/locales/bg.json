@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} ред",
       "linesBadge_other": "{{displayCount}} реда",
       "matchesBadge_one": "{{displayCount}} съвпадение",
-      "matchesBadge_other": "{{displayCount}} съвпадения"
+      "matchesBadge_other": "{{displayCount}} съвпадения",
+      "noOutput": "Няма изход."
     },
     "readToolMarkdown": {
       "linesTruncated": "редове {{start}}–{{end}} (съкратено)",

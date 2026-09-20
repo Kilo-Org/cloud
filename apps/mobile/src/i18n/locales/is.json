@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} lína",
       "linesBadge_other": "{{displayCount}} línur",
       "matchesBadge_one": "{{displayCount}} samsvörun",
-      "matchesBadge_other": "{{displayCount}} samsvaranir"
+      "matchesBadge_other": "{{displayCount}} samsvaranir",
+      "noOutput": "Ekkert úttak."
     },
     "readToolMarkdown": {
       "linesTruncated": "línur {{start}}–{{end}} (stytt)",

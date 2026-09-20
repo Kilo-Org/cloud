@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} rārangi",
       "linesBadge_other": "{{displayCount}} rārangi",
       "matchesBadge_one": "{{displayCount}} kitenga",
-      "matchesBadge_other": "{{displayCount}} kitenga"
+      "matchesBadge_other": "{{displayCount}} kitenga",
+      "noOutput": "Kāore he putanga."
     },
     "readToolMarkdown": {
       "linesTruncated": "ngā rārangi {{start}}–{{end}} (kua poroa)",

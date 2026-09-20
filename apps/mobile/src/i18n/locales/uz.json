@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} qator",
       "linesBadge_other": "{{displayCount}} qator",
       "matchesBadge_one": "{{displayCount}} natija",
-      "matchesBadge_other": "{{displayCount}} natija"
+      "matchesBadge_other": "{{displayCount}} natija",
+      "noOutput": "Chiqish yo'q."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}-qatorlar (qisqartirilgan)",

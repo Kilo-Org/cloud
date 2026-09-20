@@ -1744,7 +1744,8 @@
       "matchesBadge_one": "совпадение: {{displayCount}}",
       "matchesBadge_other": "совпадений: {{displayCount}}",
       "matchesBadge_few": "совпадения: {{displayCount}}",
-      "matchesBadge_many": "совпадений: {{displayCount}}"
+      "matchesBadge_many": "совпадений: {{displayCount}}",
+      "noOutput": "Нет вывода."
     },
     "readToolMarkdown": {
       "linesTruncated": "строки {{start}}–{{end}} (вывод сокращён)",

@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} خط",
       "linesBadge_other": "{{displayCount}} خط",
       "matchesBadge_one": "{{displayCount}} تطابق",
-      "matchesBadge_other": "{{displayCount}} تطابق"
+      "matchesBadge_other": "{{displayCount}} تطابق",
+      "noOutput": "هیچ خروجی وجود ندارد."
     },
     "readToolMarkdown": {
       "linesTruncated": "خطوط {{start}}–{{end}} (نمایش ناقص)",

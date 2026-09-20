@@ -1728,7 +1728,8 @@
       "linesBadge_many": "{{displayCount}} líneas",
       "matchesBadge_one": "{{displayCount}} coincidencia",
       "matchesBadge_other": "{{displayCount}} coincidencias",
-      "matchesBadge_many": "{{displayCount}} coincidencias"
+      "matchesBadge_many": "{{displayCount}} coincidencias",
+      "noOutput": "No hay salida."
     },
     "readToolMarkdown": {
       "linesTruncated": "líneas {{start}}–{{end}} (truncadas)",

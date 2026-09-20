@@ -2280,7 +2280,8 @@
       "matchesBadge_one": "супадзенне: {{displayCount}}",
       "matchesBadge_other": "супадзенняў: {{displayCount}}",
       "matchesBadge_few": "супадзенні: {{displayCount}}",
-      "matchesBadge_many": "супадзенняў: {{displayCount}}"
+      "matchesBadge_many": "супадзенняў: {{displayCount}}",
+      "noOutput": "Няма вываду."
     },
     "readToolMarkdown": {
       "linesTruncated": "радкі {{start}}–{{end}} (скарочана)",

@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} na linya",
       "linesBadge_other": "{{displayCount}} na linya",
       "matchesBadge_one": "{{displayCount}} tugma",
-      "matchesBadge_other": "{{displayCount}} tugma"
+      "matchesBadge_other": "{{displayCount}} tugma",
+      "noOutput": "Walang output."
     },
     "readToolMarkdown": {
       "linesTruncated": "mga linyang {{start}}–{{end}} (pinaikli)",

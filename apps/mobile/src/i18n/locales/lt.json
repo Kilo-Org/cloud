@@ -2280,7 +2280,8 @@
       "matchesBadge_one": "atitiktis: {{displayCount}}",
       "matchesBadge_other": "atitikčių: {{displayCount}}",
       "matchesBadge_few": "atitiktys: {{displayCount}}",
-      "matchesBadge_many": "atitikčių: {{displayCount}}"
+      "matchesBadge_many": "atitikčių: {{displayCount}}",
+      "noOutput": "Nėra išvesties."
     },
     "readToolMarkdown": {
       "linesTruncated": "eilutės {{start}}–{{end}} (sutrumpinta)",

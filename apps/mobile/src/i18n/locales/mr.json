@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} ओळ",
       "linesBadge_other": "{{displayCount}} ओळी",
       "matchesBadge_one": "{{displayCount}} जुळणारे परिणाम",
-      "matchesBadge_other": "{{displayCount}} जुळणारे परिणाम"
+      "matchesBadge_other": "{{displayCount}} जुळणारे परिणाम",
+      "noOutput": "कोणतेही आउटपुट नाही."
     },
     "readToolMarkdown": {
       "linesTruncated": "ओळी {{start}}–{{end}} (काही मजकूर वगळला)",

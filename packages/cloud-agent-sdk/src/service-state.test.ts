@@ -2118,6 +2118,27 @@ describe('createServiceState', () => {
       });
     });
 
+    it('a later stopped event takes the terminal failure over', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.sent', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+
+      // The session then terminates with its own error. That is the terminal
+      // state now, so a late prune of the old delivery failure — the durable
+      // memory of retried failures can resolve after the replay applied it —
+      // must not discard the newer state.
+      state.process({ type: 'stopped', reason: 'error' });
+
+      expect(state.clearFailedMessage('m1')).toBe(false);
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Session terminated' });
+    });
+
     it('terminal delivery failure resolves a stale preparing status', () => {
       const state = createServiceState(makeConfig());
 

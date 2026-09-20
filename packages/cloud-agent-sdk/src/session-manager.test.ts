@@ -5886,6 +5886,29 @@ describe('createSessionManager', () => {
       expect(mockSession.state.clearFailedMessage).not.toHaveBeenCalled();
     });
 
+    it('suppresses the replay when the user switches back before the durable write lands', async () => {
+      // The durable store never sees the retry: the fire-and-forget write has
+      // not landed yet, so both reads return the pre-write list.
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn().mockResolvedValue([]),
+        persistResolvedDeliveryFailure: jest.fn(),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.switchSession(kiloId('ses-2'));
+
+      // The re-send was accepted on `ses-1` while the user was on `ses-2`.
+      mgr.clearFailedMessage('m-other', kiloId('ses-1'));
+
+      // The user switches straight back. The durable read returns [], but the
+      // in-memory record for `ses-1` keeps the resolution, so the session's
+      // predicate suppresses the DO's replayed failure.
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.('m-other')).toBe(true);
+    });
+
     it('undoes the terminal error a failure pruned by the durable read had set', async () => {
       const read = deferred<readonly string[]>();
       const config = createMockConfig({

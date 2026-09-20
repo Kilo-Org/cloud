@@ -3035,6 +3035,23 @@
       "openHint": "চ্যাট খোলে। মুছে ফেলতে চেপে ধরুন।",
       "deleteTitle": "এই চ্যাট মুছবেন?"
     },
-    "beta": "বিটা"
+    "beta": "বিটা",
+    "mcp": {
+      "title": "Kilo টুল",
+      "use": "Kilo টুল ব্যবহার করুন",
+      "useDescription": "এই চ্যাটকে Kilo সার্ভার যে টুল দেয় তা ব্যবহার করতে দিন।",
+      "off": "Kilo টুল বন্ধ আছে",
+      "offDescription": "এই চ্যাট মডেলকে কোনো Kilo টুল পাঠায় না।",
+      "connecting": "Kilo টুলে সংযোগ করা হচ্ছে…",
+      "available": "ব্যবহারযোগ্য টুল: {{count}}",
+      "none": "কোনো টুল নেই",
+      "noneDescription": "Kilo সার্ভার কোনো টুল ফেরত দেয়নি।",
+      "unreachable": "Kilo টুলে পৌঁছানো যায়নি",
+      "unreachableDescription": "সার্ভার সাড়া দেয়নি। সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
+      "unauthorized": "Kilo টুল এই সেশন প্রত্যাখ্যান করেছে",
+      "unauthorizedDescription": "এই চ্যাটে Kilo টুল ব্যবহার করতে আবার সাইন-ইন করুন।",
+      "unavailable": "Kilo টুল পাওয়া যাচ্ছে না",
+      "unavailableDescription": "এই অ্যাকাউন্টের জন্য Kilo সার্ভার নেই।"
+    }
   }
 }

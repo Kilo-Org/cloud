@@ -3079,6 +3079,23 @@
       "openHint": "Otwiera czat. Naciśnij i przytrzymaj, aby usunąć.",
       "deleteTitle": "Usunąć ten czat?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Narzędzia Kilo",
+      "use": "Używaj narzędzi Kilo",
+      "useDescription": "Pozwól temu czatowi używać narzędzi oferowanych przez serwer Kilo.",
+      "off": "Narzędzia Kilo są wyłączone",
+      "offDescription": "Ten czat nie wysyła modelowi żadnego narzędzia Kilo.",
+      "connecting": "Łączenie z narzędziami Kilo…",
+      "available": "Dostępne narzędzia: {{count}}",
+      "none": "Brak dostępnych narzędzi",
+      "noneDescription": "Serwer Kilo nie zwrócił żadnych narzędzi.",
+      "unreachable": "Nie udało się połączyć z narzędziami Kilo",
+      "unreachableDescription": "Serwer nie odpowiedział. Sprawdź połączenie i spróbuj ponownie.",
+      "unauthorized": "Narzędzia Kilo odrzuciły tę sesję",
+      "unauthorizedDescription": "Zaloguj się ponownie, aby używać narzędzi Kilo w tym czacie.",
+      "unavailable": "Narzędzia Kilo są niedostępne",
+      "unavailableDescription": "Serwer Kilo jest niedostępny dla tego konta."
+    }
   }
 }

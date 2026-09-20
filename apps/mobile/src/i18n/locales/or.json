@@ -3035,6 +3035,23 @@
       "openHint": "ଚାଟ୍ ଖୋଲେ। ବିଲୋପ କରିବାକୁ ଦବାଇ ଧରନ୍ତୁ।",
       "deleteTitle": "ଏହି ଚାଟ୍ ବିଲୋପ କରିବେ?"
     },
-    "beta": "ବିଟା"
+    "beta": "ବିଟା",
+    "mcp": {
+      "title": "Kilo ସାଧନ",
+      "use": "Kilo ସାଧନ ବ୍ୟବହାର କରନ୍ତୁ",
+      "useDescription": "ଏହି ଚାଟ୍‌କୁ Kilo ସର୍ଭର ଦେଉଥିବା ସାଧନ ବ୍ୟବହାର କରିବାକୁ ଦିଅନ୍ତୁ।",
+      "off": "Kilo ସାଧନ ବନ୍ଦ ଅଛି",
+      "offDescription": "ଏହି ଚାଟ୍ ମଡେଲ୍‌କୁ କୌଣସି Kilo ସାଧନ ପଠାଏ ନାହିଁ।",
+      "connecting": "Kilo ସାଧନ ସହିତ ସଂଯୋଗ ହେଉଛି…",
+      "available": "ଉପଲବ୍ଧ ସାଧନ: {{count}}",
+      "none": "କୌଣସି ସାଧନ ଉପଲବ୍ଧ ନାହିଁ",
+      "noneDescription": "Kilo ସର୍ଭର କୌଣସି ସାଧନ ଫେରାଇ ନାହିଁ।",
+      "unreachable": "Kilo ସାଧନ ପର୍ଯ୍ୟନ୍ତ ପହଞ୍ଚି ପାରିଲା ନାହିଁ",
+      "unreachableDescription": "ସର୍ଭର ଉତ୍ତର ଦେଲା ନାହିଁ। ତୁମର ସଂଯୋଗ ଯାଞ୍ଚ କର, ତାପରେ ପୁଣି ଚେଷ୍ଟା କର।",
+      "unauthorized": "Kilo ସାଧନ ଏହି ଅଧିବେଶନକୁ ଅସ୍ୱୀକାର କଲା",
+      "unauthorizedDescription": "ଏହି ଚାଟ୍‌ରେ Kilo ସାଧନ ବ୍ୟବହାର କରିବାକୁ ପୁଣି ସାଇନ୍ ଇନ୍ କର।",
+      "unavailable": "Kilo ସାଧନ ଉପଲବ୍ଧ ନାହିଁ",
+      "unavailableDescription": "ଏହି ଖାତା ପାଇଁ Kilo ସର୍ଭର ନାହିଁ।"
+    }
   }
 }

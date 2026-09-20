@@ -1,5 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- the DOM-free `test-renderer` mounts React/RN trees under vitest (see src/test/render-with-providers.tsx) */
-import { createElement } from 'react';
+import { createElement, type ElementType } from 'react';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -20,13 +20,14 @@ const state = vi.hoisted(() => ({
   push: vi.fn<(path: string) => void>(),
   toastError: vi.fn<(message: string, options?: unknown) => void>(),
   toastDismiss: vi.fn<(id?: string | number) => void>(),
+  chats: [] as { sessionId: string; model: string; title: string; updatedAt: number }[],
 }));
 
 vi.mock('@/lib/chat/use-chat', () => ({
   chatPlaceOf: () => ({ chatScope: 'u1:personal', org: { kind: 'personal' } }),
   newChat: state.newChat,
   useChatList: () => ({
-    chats: [],
+    chats: state.chats,
     isLoading: false,
     isError: false,
     refetch: () => undefined,
@@ -75,6 +76,7 @@ vi.mock('@/components/centered-state-surface', () => ({
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({ MessageCircle: 'MessageCircle', Plus: 'Plus' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -86,6 +88,7 @@ let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefine
 
 beforeEach(() => {
   vi.clearAllMocks();
+  state.chats = [];
   state.newChat.mockResolvedValue('session-1');
 });
 afterEach(() => {
@@ -106,6 +109,15 @@ async function pressStart(tree: ReactTestRenderer): Promise<void> {
   await act(async () => {
     empty.props.action.props.onPress();
     await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+/** Press the corner button, the one a list with a chat already in it shows. */
+async function pressFab(tree: ReactTestRenderer): Promise<void> {
+  const fab = tree.root.findByProps({ testID: 'chat-new-fab' });
+  await act(async () => {
+    (fab.props as { onPress: () => void }).onPress();
     await Promise.resolve();
   });
 }
@@ -138,5 +150,39 @@ describe('starting a chat from the list', () => {
       closeButton: true,
     });
     expect(state.push).not.toHaveBeenCalled();
+  });
+
+  it('shows the new-chat button busy and ignores a second press while the chat starts', async () => {
+    state.chats = [{ sessionId: 'older', model: 'm1', title: 'Older', updatedAt: 1 }];
+    // A chat that is slow to start: the button must say so for as long as it takes.
+    const pending: { resolve?: (sessionId: string) => void } = {};
+    state.newChat.mockReturnValue(
+      new Promise<string>(resolve => {
+        pending.resolve = resolve;
+      })
+    );
+    const tree = await mount();
+
+    await pressFab(tree);
+
+    const busy = tree.root.findByProps({ testID: 'chat-new-fab' });
+    expect(busy.props.disabled).toBe(true);
+    expect(busy.props.accessibilityState).toEqual({ disabled: true, busy: true });
+    expect(tree.root.findAllByType('ActivityIndicator' as ElementType)).toHaveLength(1);
+
+    // A second tap while it works is what opened a second chat before.
+    await pressFab(tree);
+    expect(state.newChat).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      pending.resolve?.('session-1');
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(state.push).toHaveBeenCalledWith('/(app)/(tabs)/(4_chat)/session-1');
+    expect(tree.root.findByProps({ testID: 'chat-new-fab' }).props.accessibilityState).toEqual({
+      disabled: false,
+      busy: false,
+    });
   });
 });

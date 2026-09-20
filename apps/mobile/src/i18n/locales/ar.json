@@ -3123,6 +3123,23 @@
       "openHint": "يفتح المحادثة. اضغط مطولاً للحذف.",
       "deleteTitle": "حذف هذه المحادثة؟"
     },
-    "beta": "بيتا"
+    "beta": "بيتا",
+    "mcp": {
+      "title": "أدوات Kilo",
+      "use": "استخدام أدوات Kilo",
+      "useDescription": "اسمح لهذه المحادثة باستخدام الأدوات التي يقدمها خادم Kilo.",
+      "off": "أدوات Kilo متوقفة",
+      "offDescription": "لا ترسل هذه المحادثة أي أداة من Kilo إلى النموذج.",
+      "connecting": "جارٍ الاتصال بأدوات Kilo…",
+      "available": "الأدوات المتاحة: {{count}}",
+      "none": "لا توجد أدوات متاحة",
+      "noneDescription": "لم يُرجع خادم Kilo أي أدوات.",
+      "unreachable": "تعذّر الوصول إلى أدوات Kilo",
+      "unreachableDescription": "لم يستجب الخادم. تحقق من اتصالك ثم حاول مرة أخرى.",
+      "unauthorized": "رفضت أدوات Kilo هذه الجلسة",
+      "unauthorizedDescription": "سجّل الدخول مرة أخرى لاستخدام أدوات Kilo في هذه المحادثة.",
+      "unavailable": "أدوات Kilo غير متاحة",
+      "unavailableDescription": "خادم Kilo غير متاح لهذا الحساب."
+    }
   }
 }

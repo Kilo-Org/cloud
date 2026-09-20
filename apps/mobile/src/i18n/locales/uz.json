@@ -3035,6 +3035,23 @@
       "openHint": "Chatni ochadi. Oʻchirish uchun bosib turing.",
       "deleteTitle": "Bu chat oʻchirilsinmi?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo vositalari",
+      "use": "Kilo vositalaridan foydalanish",
+      "useDescription": "Bu suhbatga Kilo serveri taklif qilgan vositalardan foydalanishga ruxsat ber.",
+      "off": "Kilo vositalari o'chirilgan",
+      "offDescription": "Bu suhbat modelga hech qanday Kilo vositasi yubormaydi.",
+      "connecting": "Kilo vositalariga ulanmoqda…",
+      "available": "Mavjud vositalar: {{count}}",
+      "none": "Mavjud vosita yo'q",
+      "noneDescription": "Kilo serveri hech qanday vosita qaytarmadi.",
+      "unreachable": "Kilo vositalariga yetib bo'lmadi",
+      "unreachableDescription": "Server javob bermadi. Ulanishni tekshirib, qayta urinib ko'ring.",
+      "unauthorized": "Kilo vositalari bu sessiyani rad etdi",
+      "unauthorizedDescription": "Bu suhbatda Kilo vositalaridan foydalanish uchun qayta kiring.",
+      "unavailable": "Kilo vositalari mavjud emas",
+      "unavailableDescription": "Kilo serveri bu hisob uchun mavjud emas."
+    }
   }
 }

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the registry suite pins one question at a time, the moves onto another model or tool set, and the MCP discovery around an open on one fake SDK harness. */
 import { Effect, Layer, Stream } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,7 +10,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * session, a question asked on a model the person had already changed, a
  * question asked of a session that is closing — is what these cover. The SDK
  * is faked because none of it is about the SDK: it is about what this app does
- * with one question at a time.
+ * with one question at a time. The Kilo MCP connection is faked for the same
+ * reason: what is under test is what the registry does around a discovery, not
+ * the discovery.
  */
 
 type Asked = { readonly sessionId: string; readonly text: string };
@@ -17,14 +20,36 @@ type Asked = { readonly sessionId: string; readonly text: string };
 const asked: Asked[] = [];
 /** What the session was opened with, so the tools it offers can be read back. */
 let openedWith: { readonly tools?: readonly string[] } | undefined = undefined;
+/** What a clone was moved onto, so the tool set it names can be read back. */
+let clonedWith: { readonly tools?: readonly string[]; readonly model?: string } | undefined =
+  undefined;
 /** Ends the answer that is arriving, so a test decides when a turn finishes. */
 let finish: (() => void) | undefined = undefined;
 /** A session id whose reopen fails, so the failed-open path can be exercised. */
 let failOpenFor: string | undefined = undefined;
+/** A session id whose stored tool names no longer resolve, so the mover can be. */
+let missingToolsFor: string | undefined = undefined;
 /** A session id whose history read fails, so the half-open path can be exercised. */
 let failHistoryFor: string | undefined = undefined;
 /** Every session whose scope was closed, so a leaked one can be told from one released. */
 const released: string[] = [];
+
+/**
+ * The Kilo MCP connection, faked the way the plugin is: what is under test is
+ * what the registry does around discovery, not the discovery itself.
+ */
+const mcp = vi.hoisted(() => ({
+  tools: [] as { readonly definition: { readonly name: string } }[],
+  /** The per-chat setting, absent meaning on. */
+  enabled: new Map<string, boolean>(),
+  ensure: vi.fn(async () => {
+    await Promise.resolve();
+    return {
+      status: 'ready' as const,
+      tools: [] as { readonly definition: { readonly name: string } }[],
+    };
+  }),
+}));
 
 /** One stored turn, so a state that still holds turns can be told from an empty one. */
 const TURN = {
@@ -59,18 +84,67 @@ const openInScope = (id: string) =>
     })
   );
 
-vi.mock('@kilocode/harness-sdk', () => ({
-  openSession: (options: { readonly tools?: readonly string[] }) => {
-    openedWith = options;
-    return Effect.succeed(handleFor('s1'));
-  },
-  continueSession: (id: string) =>
-    failOpenFor === id
-      ? openInScope(id).pipe(Effect.andThen(Effect.fail(new Error('no such session'))))
-      : openInScope(id),
-  cloneSession: () => Effect.succeed(handleFor('s2')),
-}));
+vi.mock('@kilocode/harness-sdk', () => {
+  /** The name a session was stored with that the registry no longer holds. */
+  class FakeToolMissingError extends Error {
+    constructor() {
+      super('the session names a tool the registry does not hold');
+      this.name = 'ToolMissingError';
+    }
+  }
+  return {
+    ToolMissingError: FakeToolMissingError,
+    openSession: (options: { readonly tools?: readonly string[] }) => {
+      openedWith = options;
+      return Effect.succeed(handleFor('s1'));
+    },
+    continueSession: (id: string) => {
+      if (failOpenFor === id) {
+        return openInScope(id).pipe(Effect.andThen(Effect.fail(new Error('no such session'))));
+      }
+      if (missingToolsFor === id) {
+        return Effect.fail(new FakeToolMissingError());
+      }
+      return openInScope(id);
+    },
+    cloneSession: (
+      _id: string,
+      onto: { readonly tools?: readonly string[]; readonly model?: string } | undefined
+    ) => {
+      clonedWith = onto;
+      return Effect.succeed(handleFor('s2'));
+    },
+  };
+});
 vi.mock('./layers', () => ({ chatLayers: () => Layer.empty }));
+vi.mock('@/lib/config', () => ({ KILO_MCP_URL: 'https://mcp.example' }));
+vi.mock('./kilo-mcp', () => ({
+  ensureKiloMcp: mcp.ensure,
+  mcpEnabledFor: async (sessionId: string) => {
+    await Promise.resolve();
+    return mcp.enabled.get(sessionId) ?? true;
+  },
+  setMcpEnabled: async (sessionId: string, enabled: boolean) => {
+    await Promise.resolve();
+    if (enabled) {
+      mcp.enabled.delete(sessionId);
+      return;
+    }
+    mcp.enabled.set(sessionId, false);
+  },
+  moveMcpEnabled: async (from: string, to: string) => {
+    await Promise.resolve();
+    const held = mcp.enabled.get(from);
+    mcp.enabled.delete(from);
+    if (held === undefined) {
+      mcp.enabled.delete(to);
+      return;
+    }
+    mcp.enabled.set(to, held);
+  },
+  kiloMcpTools: () => mcp.tools,
+  kiloMcpToolNames: () => mcp.tools.map(tool => tool.definition.name),
+}));
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   encryptedDatabase: async () => {
     await Promise.resolve();
@@ -100,7 +174,8 @@ vi.mock('./store', () => ({
   touchChat: () => undefined,
 }));
 
-const { enterChat, releaseChat, say, startChat, stopChat } = await import('./registry');
+const { enterChat, releaseChat, retryKiloMcp, say, setMcpEnabled, startChat, stopChat } =
+  await import('./registry');
 const { change, snapshotOf } = await import('./state');
 const { chatPlaceOf } = await import('./use-chat');
 
@@ -128,14 +203,167 @@ beforeEach(async () => {
   released.length = 0;
   finish = undefined;
   failOpenFor = undefined;
+  missingToolsFor = undefined;
   failHistoryFor = undefined;
+  clonedWith = undefined;
+  openedWith = undefined;
+  mcp.tools.length = 0;
+  mcp.enabled.clear();
   opened = await startChat(place, 'kilo/one');
   await settled();
+  /* Cleared after the chat above, so a test counts only its own discoveries. */
+  mcp.ensure.mockClear();
 });
 
 describe('what a chat is opened with', () => {
   it('offers the clock, because a model has none and answers from a stale date', () => {
     expect(openedWith?.tools).toEqual(['time']);
+  });
+});
+
+describe('the Kilo MCP tools a chat is opened with', () => {
+  /** The one tool the fake server offers, named the way the harness names it. */
+  const discovered = { definition: { name: 'mcp_kilo_read-file' } };
+
+  it('opens a new chat on the server tools once they are discovered', async () => {
+    mcp.tools.push(discovered);
+    await releaseChat(opened);
+
+    opened = await startChat(place, 'kilo/one');
+    await settled();
+
+    /* The open asks for the automatic deadline, so a slow server leaves the
+       chat opening rather than holding the send on it. */
+    expect(mcp.ensure).toHaveBeenCalledWith(place, 'automatic');
+    expect(openedWith?.tools).toEqual(['time', 'mcp_kilo_read-file']);
+  });
+
+  it('opens a chat with the setting off on the clock alone, and reaches no server', async () => {
+    mcp.tools.push(discovered);
+    await releaseChat(opened);
+
+    opened = await startChat(place, 'kilo/one', false);
+    await settled();
+
+    expect(openedWith?.tools).toEqual(['time']);
+    expect(mcp.ensure).not.toHaveBeenCalled();
+  });
+
+  it('reaches the server when the setting is turned on for a chat that never discovered', async () => {
+    /* The chat was opened with the setting off, so no discovery ran and the
+       connection is idle. Turning it on has to ask the server: without that the
+       chat is moved onto the base tools, the view stays "not available", and
+       the switch the person just turned on snaps back off. */
+    mcp.tools.push(discovered);
+    await releaseChat(opened);
+    opened = await startChat(place, 'kilo/one', false);
+    await settled();
+    expect(mcp.ensure).not.toHaveBeenCalled();
+
+    mcp.ensure.mockResolvedValueOnce({ status: 'ready', tools: mcp.tools });
+    await setMcpEnabled(opened, true);
+    await settled();
+
+    expect(mcp.ensure).toHaveBeenCalledWith(
+      expect.objectContaining({ chatScope: 'me:personal' }),
+      'automatic'
+    );
+    expect(clonedWith).toEqual({ tools: ['time', 'mcp_kilo_read-file'] });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
+  it('moves an idle chat off the server tools when the setting is turned off', async () => {
+    mcp.tools.push(discovered);
+    await releaseChat(opened);
+    opened = await startChat(place, 'kilo/one');
+    await settled();
+    expect(snapshotOf(opened).sessionId).toBe('s1');
+
+    await setMcpEnabled(opened, false);
+    await settled();
+
+    /* The tool set is frozen for the life of a session, so turning it off is a
+       copy onto a session without those tools, and the setting follows it. */
+    expect(clonedWith).toEqual({ tools: ['time'] });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+    expect(mcp.enabled.get('s2')).toBe(false);
+  });
+
+  it('applies a choice made while an answer was arriving once it settles', async () => {
+    mcp.tools.push(discovered);
+    await releaseChat(opened);
+    opened = await startChat(place, 'kilo/one');
+    await settled();
+    await say(opened, 'first', 'kilo/one');
+    await settled();
+
+    await setMcpEnabled(opened, false);
+    await settled();
+
+    /* Never under an answer that is still coming: the chat has not moved. */
+    expect(clonedWith).toBeUndefined();
+    expect(snapshotOf(opened).sessionId).toBe('s1');
+
+    finish?.();
+    await settled();
+
+    expect(clonedWith).toEqual({ tools: ['time'] });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
+  it('opens a stored chat whose tool names no longer resolve, on the names now held', async () => {
+    mcp.tools.push(discovered);
+    missingToolsFor = 'stale';
+
+    await enterChat(place, 'stale');
+    await settled();
+
+    /* The server's list moved on, or it is down while the session was stored
+       with its tools. The chat opens either way rather than failing on a name
+       nothing holds. */
+    expect(clonedWith).toEqual({ tools: ['time', 'mcp_kilo_read-file'] });
+    expect(snapshotOf('stale').status).toBe('idle');
+    expect(snapshotOf('stale').failed).toBeNull();
+
+    /* The chat it opened is released here, so the session it moved onto does
+       not outlive the test that made it. */
+    await releaseChat('stale');
+  });
+
+  it('retries a failed discovery and moves the chat onto the tools that answered', async () => {
+    /* The chat opened while the server was down, so it named the clock alone.
+       The retry finds the server, and the session is frozen on what it was
+       opened with, so the recovered tools need a session that names them. */
+    await releaseChat(opened);
+    opened = await startChat(place, 'kilo/one');
+    await settled();
+    expect(openedWith?.tools).toEqual(['time']);
+
+    mcp.tools.push(discovered);
+    mcp.ensure.mockResolvedValueOnce({ status: 'ready', tools: mcp.tools });
+    await retryKiloMcp(opened);
+    await settled();
+
+    expect(mcp.ensure).toHaveBeenLastCalledWith(
+      expect.objectContaining({ chatScope: 'me:personal' }),
+      'retry'
+    );
+    expect(clonedWith).toEqual({ tools: ['time', 'mcp_kilo_read-file'] });
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+
+  it('leaves the chat where it is when the retry still finds no tools', async () => {
+    await releaseChat(opened);
+    opened = await startChat(place, 'kilo/one');
+    await settled();
+    clonedWith = undefined;
+
+    mcp.ensure.mockResolvedValueOnce({ status: 'ready', tools: [] });
+    await retryKiloMcp(opened);
+    await settled();
+
+    expect(clonedWith).toBeUndefined();
+    expect(snapshotOf(opened).sessionId).toBe('s1');
   });
 });
 

@@ -3,7 +3,11 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { openBrowserAsync } from 'expo-web-browser';
-import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
+import {
+  INLINE_LINK_CONNECTOR_CLASS,
+  MIN_TAP_TARGET_DP,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 
 import { IdleAuth } from '../idle-auth';
@@ -322,6 +326,26 @@ describe('IdleAuth email continue copy', () => {
     expect(texts(renderer.root)).toEqual(
       expect.arrayContaining(['Terms', 'Privacy Policy', ' and ', '.'])
     );
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('routes the sentence connector through the shared inline-link gap', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    // The connector text is the only node between the two links, so it carries
+    // the shared gap class that keeps their facing slops off each other in a
+    // catalog with a short conjunction (ru " и ", pl " i ", ar " و ",
+    // zh " 和 "). `tap-target.test.ts` compiles the class's width.
+    const connectors = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' && (n.type as string) === 'Text' && n.props.children === ' and '
+    );
+    expect(connectors).toHaveLength(1);
+    expect(connectors[0]?.props.className).toContain(INLINE_LINK_CONNECTOR_CLASS);
 
     act(() => {
       renderer.unmount();

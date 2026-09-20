@@ -50,6 +50,18 @@ export const INLINE_LINK_BOX_CLASS = 'min-h-[28px] min-w-[28px] items-center jus
 export const INLINE_LINK_HIT_SLOP_DP = 10;
 
 /**
+ * The class an inline-link connector carries so the two links' facing slops do
+ * not overlap. The connector node is the only thing between them, so it has to
+ * be at least `2 * {@link INLINE_LINK_HIT_SLOP_DP}` = 20dp wide; a narrower
+ * node (ru `" и "`, pl `" i "`, ar `" و "`, zh `" 和 "`) would let the second
+ * link's left slop reach into the first's right slop, and a tap between them
+ * would be claimed by the later sibling. English `" and "` is already wider, so
+ * its spacing is unchanged; `text-center` keeps the shorter connectors centred
+ * on the space they reserve.
+ */
+export const INLINE_LINK_CONNECTOR_CLASS = 'min-w-[20px] text-center';
+
+/**
  * The reach a box plus its per-side slop offers. This is the number the tests
  * assert against {@link TOUCH_TARGET_DP} and the control-size audit floor.
  */

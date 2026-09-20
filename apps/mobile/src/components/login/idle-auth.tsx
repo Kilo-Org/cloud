@@ -17,7 +17,11 @@ import { GoogleLogo } from '@/components/login/google-logo';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
-import { INLINE_LINK_BOX_CLASS, INLINE_LINK_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import {
+  INLINE_LINK_BOX_CLASS,
+  INLINE_LINK_CONNECTOR_CLASS,
+  INLINE_LINK_HIT_SLOP_DP,
+} from '@/lib/a11y/tap-target';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
@@ -324,7 +328,10 @@ export function IdleAuth({
       <View className="flex-row flex-wrap items-center justify-center">
         {/* The sentence is a row of nodes, not one Text with nested handlers: an
             inline link's own box is what the control-size audit measures, so
-            each link carries the shared inline-link box and its own reach. */}
+            each link carries the shared inline-link box and its own reach. The
+            connector between them reserves at least both facing slops, so the
+            two touch regions never overlap in a catalog with a short
+            conjunction. */}
         <Text className="text-xs text-muted-foreground">{t('login.termsPrefix')} </Text>
         <Pressable
           className={cn(INLINE_LINK_BOX_CLASS, 'px-1')}
@@ -335,7 +342,9 @@ export function IdleAuth({
         >
           <Text className="text-xs text-primary underline">{t('login.terms')}</Text>
         </Pressable>
-        <Text className="text-xs text-muted-foreground">{t('login.termsConnector')}</Text>
+        <Text className={cn('text-xs text-muted-foreground', INLINE_LINK_CONNECTOR_CLASS)}>
+          {t('login.termsConnector')}
+        </Text>
         <Pressable
           className={cn(INLINE_LINK_BOX_CLASS, 'px-1')}
           hitSlop={INLINE_LINK_HIT_SLOP_DP}

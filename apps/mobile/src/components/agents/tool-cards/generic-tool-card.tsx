@@ -18,7 +18,9 @@ import { getToolDisplay, toolPartHasDetails } from '../tool-card-display';
  * row per projected argument (or question) field, the formatted output, and the
  * error. A terminal part with none of those — an unknown tool that took no
  * arguments and returned nothing — still shows a muted `No output.` line, so the
- * sheet never opens as an empty region under its header. Renders only inside
+ * sheet never opens as an empty region under its header. A failed part shows
+ * its error line in place of that empty line, even when the message is blank,
+ * so a failed call never reads as a successful empty result. Renders only inside
  * the detail sheet — attachments and the pending/running status line live in
  * `ToolPartDetailBody`.
  *
@@ -38,10 +40,18 @@ export function GenericToolCardBody({
   // terminal part with nothing else to show needs the empty state.
   const hasAttachments =
     getToolImageAttachments(part).length + getToolFileAttachments(part).length > 0;
+  // The status, not the message text, decides whether the part failed. A blank
+  // error message therefore still shows a failure line (falling back to a plain
+  // label) rather than the `No output.` line, which would read as a successful
+  // empty result.
+  let errorText: string | undefined = detail.status === 'error' ? detail.error : undefined;
+  if (errorText?.trim().length === 0) {
+    errorText = t('common.failed');
+  }
   const showEmptyState =
     detail.fields.length === 0 &&
     detail.output === undefined &&
-    !detail.error &&
+    errorText === undefined &&
     !hasAttachments &&
     detail.status !== 'pending' &&
     detail.status !== 'running';
@@ -59,8 +69,8 @@ export function GenericToolCardBody({
       {detail.output ? (
         <MonoScrollBlock content={detail.output.text} textClassName="text-foreground" />
       ) : null}
-      {detail.error ? (
-        <SelectableText className="text-xs text-destructive">{detail.error}</SelectableText>
+      {errorText ? (
+        <SelectableText className="text-xs text-destructive">{errorText}</SelectableText>
       ) : null}
       {showEmptyState ? (
         <SelectableText className="text-sm text-muted-foreground">

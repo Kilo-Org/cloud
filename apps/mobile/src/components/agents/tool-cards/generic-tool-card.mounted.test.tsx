@@ -100,6 +100,23 @@ function makeEmptyUnknownPart(): ToolPart {
   };
 }
 
+function makeBlankErrorPart(): ToolPart {
+  return {
+    id: 'error-blank-1',
+    sessionID: 'session-1',
+    messageID: 'message-1',
+    type: 'tool',
+    callID: 'call-5',
+    tool: 'unknown-tool',
+    state: {
+      status: 'error',
+      input: {},
+      error: '',
+      time: { start: 0, end: 1 },
+    },
+  };
+}
+
 function makeParameterlessMcpPart(): ToolPart {
   return {
     id: 'mcp-empty-1',
@@ -212,6 +229,20 @@ describe('GenericToolCardBody mounted', () => {
     // The dispatcher's `Running…` line is the visible state; the body must not
     // stack a second one on top of it.
     expect(textValues(renderer.root)).toEqual([]);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('shows a failure line for an errored part with a blank message', async () => {
+    const renderer = await renderBody(makeBlankErrorPart());
+
+    // The status, not the message, drives the failure line: a blank message
+    // must not fall through to the success-looking `No output.` empty state.
+    const values = textValues(renderer.root);
+    expect(values).toEqual(['Failed']);
+    expect(values).not.toContain('No output.');
 
     act(() => {
       renderer.unmount();

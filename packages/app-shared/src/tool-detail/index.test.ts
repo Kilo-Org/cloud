@@ -198,6 +198,33 @@ describe('buildToolDetail question fields', () => {
       { key: 'options', value: 'Red' },
     ]);
   });
+
+  it('omits a blank question instead of emitting an empty row', () => {
+    const result = detail(
+      'question',
+      pending({
+        questions: [
+          { header: 'Pick one', question: '   ' },
+          { header: 'Pick two', question: 'Which two?' },
+        ],
+      })
+    );
+
+    expect(result.fields).toEqual([
+      { key: 'header 1', value: 'Pick one' },
+      { key: 'header 2', value: 'Pick two' },
+      { key: 'question 2', value: 'Which two?' },
+    ]);
+  });
+
+  it('drops a blank bare question and keeps its options', () => {
+    const result = detail(
+      'question',
+      pending({ question: '', options: [{ label: 'Red', description: 'the color' }] })
+    );
+
+    expect(result.fields).toEqual([{ key: 'options', value: 'Red — the color' }]);
+  });
 });
 
 describe('buildToolDetail fields', () => {
@@ -246,6 +273,14 @@ describe('buildToolDetail empty projection fallback', () => {
 
   it('keeps an empty projection for empty input', () => {
     const result = detail('custom', completed({}, ''));
+
+    expect(result.fields).toEqual([]);
+  });
+
+  it('does not fall back to a blank raw value', () => {
+    // A fallback row with an empty value would still read as a blank sheet, so
+    // the raw fallback only keeps values that project something.
+    const result = detail('question', completed({ question: '   ' }, ''));
 
     expect(result.fields).toEqual([]);
   });

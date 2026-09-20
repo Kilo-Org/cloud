@@ -168,7 +168,7 @@ function buildQuestionFields(input: Record<string, unknown>): ToolDetailField[] 
       if (typeof entry.header === 'string' && entry.header.trim().length > 0) {
         fields.push({ key: `header${ordinal}`, value: entry.header });
       }
-      if (typeof entry.question === 'string') {
+      if (typeof entry.question === 'string' && entry.question.trim().length > 0) {
         fields.push({ key: `question${ordinal}`, value: entry.question });
       }
       const options = formatQuestionOptions(entry.options);
@@ -178,7 +178,7 @@ function buildQuestionFields(input: Record<string, unknown>): ToolDetailField[] 
     }
     return fields;
   }
-  if (typeof input.question === 'string') {
+  if (typeof input.question === 'string' && input.question.trim().length > 0) {
     fields.push({ key: 'question', value: input.question });
   }
   const options = formatQuestionOptions(input.options);
@@ -270,10 +270,14 @@ export function buildToolDetail(
   // A parameterless MCP call (`arguments: {}`) or a `question` with an empty
   // `questions` array projects to no fields at all. The raw input still names
   // the call, so fall back to it rather than opening a titled but blank sheet.
-  const fields =
-    projectedFields.length === 0 && Object.keys(input).length > 0
-      ? buildArgumentFields(input, maxLength)
-      : projectedFields;
+  // A blank raw value (`question: ''`) is not content either: a row with an
+  // empty value reads as a blank sheet, so the fallback keeps only the rows
+  // that project a value.
+  const fallbackFields =
+    projectedFields.length === 0
+      ? buildArgumentFields(input, maxLength).filter(field => field.value.trim().length > 0)
+      : [];
+  const fields = fallbackFields.length > 0 ? fallbackFields : projectedFields;
 
   const { name, summary } = resolveNameAndSummary(tool, input, args);
   const detail: ToolDetail = {

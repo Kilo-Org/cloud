@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
@@ -48,20 +48,22 @@ export function useMcpSettings(sessionId: string): McpSettings {
   const state = useSyncExternalStore(watchKiloMcp, kiloMcpState);
   const [enabled, setEnabledState] = useState(true);
   const [retrying, setRetrying] = useState(false);
-  // The read is async and the session id can change under it (a model switch),
-  // so a value that answers late for the session that left is dropped.
-  const live = useRef(true);
 
   useEffect(() => {
-    live.current = true;
-    void (async () => {
+    // The read is async and the session id can change under it (a model switch),
+    // so the run keeps its own flag: a value that answers late for the session
+    // that left is dropped, and a flag shared between runs could not tell the
+    // run that was replaced from the one that replaced it.
+    let cancelled = false;
+    const read = async () => {
       const stored = await mcpEnabledFor(sessionId);
-      if (live.current) {
+      if (!cancelled) {
         setEnabledState(stored);
       }
-    })();
+    };
+    void read();
     return () => {
-      live.current = false;
+      cancelled = true;
     };
   }, [sessionId]);
 
@@ -91,11 +93,17 @@ export function useMcpSettings(sessionId: string): McpSettings {
     void (async () => {
       try {
         await retryKiloMcp(sessionId);
+      } catch (error) {
+        /* A Retry can fail before it reaches the server — the chat may not be
+           movable — and the sheet then keeps the failure it already showed.
+           Saying it out loud is the only cue, because the state behind the sheet
+           is unchanged. */
+        toast.error(error instanceof Error ? error.message : t('common.somethingWentWrong'));
       } finally {
         setRetrying(false);
       }
     })();
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   return { view: mcpSettingsView(state, enabled), setEnabled, retry, retrying };
 }

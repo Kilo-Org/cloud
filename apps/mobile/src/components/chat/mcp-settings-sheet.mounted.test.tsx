@@ -19,9 +19,10 @@ import { act, TestRenderer } from '@/test/renderer';
 type Settings = ReturnType<typeof useMcpSettings>;
 
 const setMcpEnabled = vi.hoisted(() => vi.fn());
+const retryKiloMcp = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 const mcpEnabledFor = vi.hoisted(() =>
-  vi.fn(async () => {
+  vi.fn(async (_sessionId: string) => {
     await Promise.resolve();
     return true;
   })
@@ -44,7 +45,7 @@ vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('sonner-native', () => ({ toast: { error: toastError } }));
 
 vi.mock('@/lib/chat/registry', () => ({
-  retryKiloMcp: vi.fn(),
+  retryKiloMcp,
   setMcpEnabled,
 }));
 
@@ -85,6 +86,7 @@ afterEach(() => {
   held.settings = undefined;
   vi.clearAllMocks();
   mcpEnabledFor.mockResolvedValue(true);
+  retryKiloMcp.mockResolvedValue(undefined);
 });
 
 describe('the Kilo MCP switch', () => {
@@ -116,6 +118,59 @@ describe('the Kilo MCP switch', () => {
     await tap(false);
 
     expect(held.settings?.view.enabled).toBe(true);
+    expect(toastError).toHaveBeenCalledWith(i18n.t('common.somethingWentWrong'));
+  });
+
+  it('drops a setting that answers late for the session that left', async () => {
+    const left = Promise.withResolvers<boolean>();
+    const arrived = Promise.withResolvers<boolean>();
+    mcpEnabledFor.mockReturnValueOnce(left.promise).mockReturnValueOnce(arrived.promise);
+
+    renderer = TestRenderer.create(createElement(Harness, { sessionId: 's1' }));
+    // The first session's read is in flight and must not be flushed yet.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      renderer?.update(createElement(Harness, { sessionId: 's2' }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      arrived.resolve(true);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      left.resolve(false);
+      await Promise.resolve();
+    });
+
+    expect(mcpEnabledFor).toHaveBeenCalledWith('s1');
+    expect(mcpEnabledFor).toHaveBeenCalledWith('s2');
+    expect(held.settings?.view.enabled).toBe(true);
+  });
+
+  it('says why when the Retry itself fails', async () => {
+    retryKiloMcp.mockRejectedValue(new Error('the chat could not be moved'));
+    await mount();
+
+    await act(async () => {
+      held.settings?.retry();
+      await Promise.resolve();
+    });
+
+    expect(toastError).toHaveBeenCalledWith('the chat could not be moved');
+    expect(held.settings?.retrying).toBe(false);
+  });
+
+  it('says something went wrong when the Retry failure carries no reason', async () => {
+    retryKiloMcp.mockRejectedValue('no reason');
+    await mount();
+
+    await act(async () => {
+      held.settings?.retry();
+      await Promise.resolve();
+    });
+
     expect(toastError).toHaveBeenCalledWith(i18n.t('common.somethingWentWrong'));
   });
 });

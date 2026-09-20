@@ -3,15 +3,16 @@
  * settled yet. Only pending submissions live in JavaScript; native discovery
  * owns terminal visibility, so this map is empty again once each end lands.
  */
-import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 import { after, type LiveActivity } from 'expo-widgets';
 
-export type Activity = LiveActivity<Partial<GlanceableLiveActivityContentState>>;
+import { type GlanceableLiveActivityProps } from './view-props';
+
+export type Activity = LiveActivity<Partial<GlanceableLiveActivityProps>>;
 
 type EndIntent = {
   /** Milliseconds ActivityKit retains the card, or null to dismiss it at once. */
   dismissMs: number | null;
-  props: Partial<GlanceableLiveActivityContentState> | null;
+  props: Partial<GlanceableLiveActivityProps> | null;
 };
 
 export type EndingActivity = {

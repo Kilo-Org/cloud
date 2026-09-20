@@ -98,6 +98,14 @@ function createRecordingBuffer(): { buffer: LatencyBuffer; recorded: LatencySamp
   };
 }
 
+/** The fetch wrapper records a sample once the cloned body read settles, so a
+ *  test that reads `recorded`/`batches` drains the pending microtasks first. */
+async function settleMeasurement(): Promise<void> {
+  await new Promise(resolve => {
+    setTimeout(resolve, 0);
+  });
+}
+
 async function recordStatus(status: number): Promise<LatencySample | undefined> {
   const collector = createCollector();
   const buffer = createLatencyBuffer({
@@ -109,6 +117,7 @@ async function recordStatus(status: number): Promise<LatencySample | undefined> 
   const wrapped = createLatencyFetch(base, buffer, { now: () => 0, newId: () => 'id' });
 
   await wrapped('https://api.kilo.ai/api/trpc/user.getMe');
+  await settleMeasurement();
   buffer.flush();
 
   return collector.batches[0]?.samples[0];
@@ -326,6 +335,7 @@ describe('createLatencyFetch', () => {
     });
 
     await wrapped('https://api.kilo.ai/api/trpc/user.getMe');
+    await settleMeasurement();
     buffer.flush();
 
     expect(collector.batches[0]?.samples[0]).toMatchObject({ ttfbMs: 50, totalMs: 100 });
@@ -349,6 +359,7 @@ describe('createLatencyFetch', () => {
     });
 
     await wrapped('https://api.kilo.ai/api/trpc/user.getMe');
+    await settleMeasurement();
     buffer.flush();
 
     expect(collector.batches[0]?.samples[0]).toMatchObject({ ttfbMs: 20, totalMs: 20 });
@@ -367,6 +378,7 @@ describe('createLatencyFetch', () => {
     await wrapped(
       'https://api.kilo.ai/api/trpc/user.getMe,activeSessions.list,cliSessionsV2.getSessionMessagesPage?batch=1'
     );
+    await settleMeasurement();
     buffer.flush();
 
     expect(collector.batches[0]?.samples[0]?.procedures).toEqual([
@@ -374,6 +386,46 @@ describe('createLatencyFetch', () => {
       'activeSessions.list',
       'cliSessionsV2.getSessionMessagesPage',
     ]);
+  });
+
+  it('returns the response before the cloned body read settles', async () => {
+    const { buffer, recorded } = createRecordingBuffer();
+    const gate: { release?: () => void } = {};
+    const readGate = new Promise<void>(resolve => {
+      gate.release = resolve;
+    });
+    const response = new Response('{"result":1}', { status: 200 });
+    // The clone's body read stays pending until this test releases it, so a
+    // wrapper that awaited the measurement would never return the response.
+    vi.spyOn(response, 'clone').mockReturnValue({
+      text: async () => {
+        await readGate;
+        return '{"result":1}';
+      },
+    } as unknown as Response);
+    const { base } = capturingFetch(response);
+    const wrapped = createLatencyFetch(base, buffer, { now: () => 0, newId: () => 'id' });
+
+    let delivered = false;
+    const pending = (async () => {
+      const result = await wrapped('https://api.kilo.ai/api/trpc/user.getMe');
+      delivered = true;
+      return result;
+    })();
+    await settleMeasurement();
+
+    // The caller holds the response while the body read is still pending, and
+    // no sample has been recorded yet.
+    expect(delivered).toBe(true);
+    expect(recorded).toHaveLength(0);
+
+    gate.release?.();
+    const result = await pending;
+    await expect(result.text()).resolves.toBe('{"result":1}');
+    await settleMeasurement();
+
+    expect(result).toBe(response);
+    expect(recorded).toHaveLength(1);
   });
 
   it('records status and ok for success, batch, and failure responses', async () => {

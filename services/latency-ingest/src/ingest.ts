@@ -9,8 +9,8 @@ export const MAX_BATCH_SAMPLES = 50;
 
 const VERSION_PATTERN = /^\d+(\.\d+)*$/;
 
-/** Hex characters of the SHA-256 bearer digest used as the limiter key. */
-const SESSION_KEY_HEX_LENGTH = 32;
+/** Prefix of the limiter key, so the edge-client bucket is never confusable. */
+const CLIENT_KEY_PREFIX = 'client:';
 
 const LatencySampleSchema = z
   .object({
@@ -40,8 +40,10 @@ function errorResponse(status: number): Response {
 }
 
 /**
- * The bearer is only the per-session identity; it is hashed before it reaches
- * the limiter and is never logged.
+ * The bearer is only the per-session identity: presence-checked as the caller's
+ * session signal and never logged. It is deliberately NOT the rate-limit key,
+ * because it is not verified here and a caller could rotate it to get a fresh
+ * bucket on every request.
  */
 function bearerToken(authorization: string | null): string | null {
   if (!authorization || !authorization.startsWith('Bearer ')) {
@@ -51,12 +53,47 @@ function bearerToken(authorization: string | null): string | null {
   return token.length > 0 ? token : null;
 }
 
-async function sessionKey(bearer: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(bearer));
-  const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join(
-    ''
-  );
-  return hex.slice(0, SESSION_KEY_HEX_LENGTH);
+/**
+ * The trusted dimension for the rate limiter. Cloudflare sets
+ * `cf-connecting-ip` at the edge and overwrites any caller-supplied value, so
+ * a caller cannot mint a new limiter bucket by rotating a header the way it
+ * can rotate the unverified bearer. The header is absent only on a local
+ * request, where every caller shares the one fallback bucket.
+ */
+function clientKey(request: Request): string {
+  return `${CLIENT_KEY_PREFIX}${request.headers.get('cf-connecting-ip') ?? 'unknown'}`;
+}
+
+/**
+ * Read the request body, stopping as soon as it exceeds `MAX_PAYLOAD_BYTES`.
+ * Returns null when the body is over the cap, so an oversized (or
+ * chunked-encoded, content-length-less) payload is never buffered whole in the
+ * isolate's memory. The chunk normalization mirrors the sibling bounded reader
+ * at services/cloud-agent-next/src/server.ts, because
+ * worker-configuration.d.ts types the stream's chunks as `any`.
+ */
+async function readBodyWithinCap(request: Request): Promise<string | null> {
+  const body = request.body;
+  if (body === null) {
+    return '';
+  }
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  let total = 0;
+  for (;;) {
+    const chunk = await reader.read();
+    if (chunk.done) {
+      return text + decoder.decode();
+    }
+    const bytes = new Uint8Array(chunk.value);
+    total += bytes.byteLength;
+    if (total > MAX_PAYLOAD_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    text += decoder.decode(bytes, { stream: true });
+  }
 }
 
 export async function handleLatencyIngest(
@@ -78,7 +115,7 @@ export async function handleLatencyIngest(
     return errorResponse(403);
   }
 
-  const { success } = await deps.rateLimiter.limit({ key: await sessionKey(bearer) });
+  const { success } = await deps.rateLimiter.limit({ key: clientKey(request) });
   if (!success) {
     return errorResponse(429);
   }
@@ -88,8 +125,8 @@ export async function handleLatencyIngest(
     return errorResponse(413);
   }
 
-  const rawBody = await request.text();
-  if (new TextEncoder().encode(rawBody).byteLength > MAX_PAYLOAD_BYTES) {
+  const rawBody = await readBodyWithinCap(request);
+  if (rawBody === null) {
     return errorResponse(413);
   }
 

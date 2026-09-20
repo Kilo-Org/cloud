@@ -21,6 +21,7 @@ import {
   assertUrlScheme,
   PRODUCTION_HOSTS,
   URL_SCHEMES,
+  urlEnvVariable,
 } from './src/lib/url-contract';
 
 const isProductionBuild = process.env.EAS_BUILD_PROFILE === 'production';
@@ -40,11 +41,14 @@ if (missing.length > 0) {
   }
 }
 
-// URL contract: every URL value must use its allowed scheme. Non-production
+// URL contract: every URL value must use its allowed scheme. The env name is
+// resolved through both key maps because URL_SCHEMES carries the optional
+// latency ingest URL as well as the required ones, so an override of an
+// optional URL is caught here rather than at runtime in config.ts. Non-production
 // builds additionally permit http:/ws: for local development; production
 // builds also assert the host against the production allowlist.
 for (const [key, schemes] of Object.entries(URL_SCHEMES)) {
-  const value = process.env[ENV_KEYS[key as keyof typeof ENV_KEYS]];
+  const value = process.env[urlEnvVariable(key)];
   if (!value) continue;
   assertUrlScheme(key, value, schemes, { allowInsecure: !isProductionBuild });
   if (isProductionBuild) {

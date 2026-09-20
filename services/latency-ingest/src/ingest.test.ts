@@ -202,6 +202,41 @@ describe('handleLatencyIngest body validation', () => {
 
     expect(response.status).toBe(413);
   });
+
+  it('aborts the body read as soon as the cap is exceeded', async () => {
+    const { deps, lines } = makeDeps();
+    const totalChunks = 256;
+    let pulled = 0;
+    // Chunked transfer encoding: no content-length, so the pre-check is
+    // skipped and only the read loop can bound the buffering.
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulled >= totalChunks) {
+          controller.close();
+          return;
+        }
+        pulled += 1;
+        controller.enqueue(new Uint8Array(1024));
+      },
+    });
+    const request = new Request(ENDPOINT, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${BEARER}`,
+        'x-kilo-app-version': '1.0.12',
+        'content-type': 'application/json',
+      },
+      body,
+      // Node's fetch requires an explicit duplex mode for a streamed body.
+      duplex: 'half',
+    } as RequestInit);
+
+    const response = await handleLatencyIngest(request, deps);
+
+    expect(response.status).toBe(413);
+    expect(lines).toHaveLength(0);
+    expect(pulled).toBeLessThan(totalChunks);
+  });
 });
 
 describe('handleLatencyIngest accepted batches', () => {
@@ -251,21 +286,42 @@ describe('handleLatencyIngest accepted batches', () => {
   });
 });
 
-describe('handleLatencyIngest session key', () => {
-  it('uses the same limiter key for the same bearer and a different key otherwise', async () => {
+describe('handleLatencyIngest rate-limit key', () => {
+  it('keys the limiter on the trusted edge client, not the caller-supplied bearer', async () => {
     const { deps, keys } = makeDeps();
 
-    await handleLatencyIngest(post({ samples: [sample()] }), deps);
-    await handleLatencyIngest(post({ samples: [sample()] }), deps);
     await handleLatencyIngest(
-      post({ samples: [sample()] }, { authorization: 'Bearer a-different-bearer' }),
+      post({ samples: [sample()] }, { 'cf-connecting-ip': '203.0.113.7' }),
+      deps
+    );
+    await handleLatencyIngest(
+      post(
+        { samples: [sample()] },
+        { 'cf-connecting-ip': '203.0.113.7', authorization: 'Bearer a-rotated-bearer' }
+      ),
+      deps
+    );
+    await handleLatencyIngest(
+      post({ samples: [sample()] }, { 'cf-connecting-ip': '198.51.100.9' }),
       deps
     );
 
-    expect(keys).toHaveLength(3);
-    expect(keys[0]).toBe(keys[1]);
-    expect(keys[0]).not.toBe(keys[2]);
+    expect(keys).toEqual(['client:203.0.113.7', 'client:203.0.113.7', 'client:198.51.100.9']);
+    // A rotated bearer does not mint a fresh bucket for the same client.
     expect(keys[0]).not.toContain(BEARER);
+    expect(keys[0]).not.toContain('a-rotated-bearer');
+  });
+
+  it('falls back to one shared bucket when the edge header is absent', async () => {
+    const { deps, keys } = makeDeps();
+
+    await handleLatencyIngest(post({ samples: [sample()] }), deps);
+    await handleLatencyIngest(
+      post({ samples: [sample()] }, { authorization: 'Bearer another-bearer' }),
+      deps
+    );
+
+    expect(keys).toEqual(['client:unknown', 'client:unknown']);
   });
 });
 

@@ -204,12 +204,44 @@ function headersWithRequestId(
   return headers;
 }
 
+/** Everything a latency sample carries except the two measurements. */
+type LatencyTarget = Omit<LatencySample, 'ttfbMs' | 'totalMs'>;
+
+/**
+ * Record one sample once the cloned body read settles. `createLatencyFetch`
+ * deliberately does not await this promise, so the caller receives the
+ * response while the body is still streaming; awaiting the clone read would
+ * hold the response back for the whole download and drain the body ahead of
+ * the caller. The original Response stays untouched for the caller, and a
+ * failed read — including a body that can no longer be cloned — records
+ * `totalMs` as `ttfbMs`.
+ */
+async function recordWhenBodyRead(args: {
+  response: Response;
+  startedAt: number;
+  ttfbMs: number;
+  sample: LatencyTarget;
+  now: () => number;
+  buffer: LatencyBuffer;
+}): Promise<void> {
+  const { response, startedAt, ttfbMs, sample, now, buffer } = args;
+  let totalMs = ttfbMs;
+  try {
+    await response.clone().text();
+    totalMs = now() - startedAt;
+  } catch {
+    totalMs = ttfbMs;
+  }
+  buffer.record({ ...sample, ttfbMs, totalMs });
+}
+
 /**
  * Wrap a fetch implementation so every `/api/trpc/` call records one latency
  * sample: `ttfbMs` when the response headers arrive and `totalMs` when a
  * `response.clone()` body read settles (falling back to `ttfbMs` when that
  * read fails). The original Response is returned unchanged and a rejection is
- * re-thrown unchanged with nothing recorded.
+ * re-thrown unchanged with nothing recorded. The measurement is left to settle
+ * on its own so it never delays the response the caller gets.
  */
 export function createLatencyFetch(
   baseFetch: typeof fetch,
@@ -229,21 +261,18 @@ export function createLatencyFetch(
     }
 
     const ttfbMs = now() - startedAt;
-    let totalMs = ttfbMs;
-    try {
-      await response.clone().text();
-      totalMs = now() - startedAt;
-    } catch {
-      totalMs = ttfbMs;
-    }
-
-    buffer.record({
-      requestId,
-      procedures: trpcProceduresFromUrl(url),
+    void recordWhenBodyRead({
+      response,
+      startedAt,
       ttfbMs,
-      totalMs,
-      status: response.status,
-      ok: response.status < 400 || response.status === 207,
+      sample: {
+        requestId,
+        procedures: trpcProceduresFromUrl(url),
+        status: response.status,
+        ok: response.status < 400 || response.status === 207,
+      },
+      now,
+      buffer,
     });
 
     return response;

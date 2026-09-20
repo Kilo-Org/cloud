@@ -4,6 +4,8 @@
  *  import .js fine, so the same file serves the config boundary
  *  (app.config.ts), the runtime boundary (config.ts), and the unit tests. */
 
+import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './env-keys.js';
+
 /** Config key → allowed URL schemes. URL keys only — appsFlyerDevKey,
  *  appsFlyerAppId, and posthogApiKey are not URLs and get no scheme check. */
 export const URL_SCHEMES = {
@@ -20,6 +22,22 @@ export const URL_SCHEMES = {
   // is LATENCY_INGEST_URL_DEFAULT below; an explicit value overrides it.
   latencyIngestUrl: ['https:'],
 };
+
+/** Environment variable name backing a URL config key. Both key maps are
+ *  consulted, because a URL key may be optional (`latencyIngestUrl` is):
+ *  resolving through `ENV_KEYS` alone silently skipped its build-time contract
+ *  check. A URL key with no env name is a contract violation, not a value to
+ *  skip, so it throws.
+ *  @param {string} key
+ *  @returns {string}
+ */
+export function urlEnvVariable(key) {
+  const name = ENV_KEYS[key] ?? OPTIONAL_ENV_KEYS[key];
+  if (!name) {
+    throw new Error(`No environment variable for URL config key: ${key}`);
+  }
+  return name;
+}
 
 /** Production host allowlist, seeded from the committed mobile production
  *  defaults: the apps/mobile/.env URL values (api.kilo.ai, app.kilo.ai,

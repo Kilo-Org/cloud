@@ -18,9 +18,10 @@ Headers:
 
 | Header | Required | Purpose |
 |---|---|---|
-| `authorization: Bearer <session>` | yes | Session identity. Hashed with SHA-256; never logged or stored. |
+| `authorization: Bearer <session>` | yes | Session identity, presence-checked only (the Worker cannot verify it). Never logged or stored, and never the rate-limit key. |
 | `x-kilo-app-version` | yes | Must match `/^\d+(\.\d+)*$/` and be at least `MIN_APP_VERSION`. |
 | `x-kilo-app-platform` | no | `ios` or `android`; logged as `platform` (`unknown` when absent). |
+| `cf-connecting-ip` | set by the edge | The trusted rate-limit identity. Cloudflare overwrites any caller value. |
 
 Body (strict schema):
 
@@ -47,8 +48,8 @@ Responses:
 | `400` | Unparseable JSON or a schema mismatch (unknown keys included). |
 | `401` | Missing or non-bearer `authorization`. |
 | `403` | Missing, malformed, or below-minimum `x-kilo-app-version`. |
-| `413` | Body over 64 KiB, or more than 50 samples in the batch. |
-| `429` | The per-session rate limiter rejected the request (120 requests / 60 s). |
+| `413` | Body over 64 KiB (enforced while reading, so an oversized chunked body is never buffered), or more than 50 samples in the batch. |
+| `429` | The rate limiter rejected the client (120 requests / 60 s per Cloudflare edge client IP). |
 
 Each accepted sample logs one line:
 
@@ -80,7 +81,8 @@ pnpm --filter cloudflare-latency-ingest dev
 ```
 
 Wrangler serves the Worker at `http://localhost:8816`. The rate-limit binding works locally, so
-the limits above apply in dev too.
+the limits above apply in dev too. A local request carries no `cf-connecting-ip`, so every caller
+there shares the one `client:unknown` bucket.
 
 Smoke test:
 
@@ -103,6 +105,8 @@ There are no secrets to configure; `.dev.vars.example` is documentation only.
 
 - Custom domain route `latency.kiloapps.io` (zone `kiloapps.io`).
 - Rate-limit binding `LATENCY_RATE_LIMITER` (namespace `1004`, 120 requests / 60 s per key).
+  The key is the Cloudflare edge client IP (`cf-connecting-ip`), because the caller-supplied
+  bearer is not verified and would let a caller rotate a fresh bucket per request.
 - `MIN_APP_VERSION` var — bump it when a release must be retired.
 - `observability.enabled` and `logpush: true` so the structured lines reach Axiom.
 

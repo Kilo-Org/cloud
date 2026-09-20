@@ -11,6 +11,7 @@ import {
   LATENCY_INGEST_URL_DEFAULT,
   PRODUCTION_HOSTS,
   URL_SCHEMES,
+  urlEnvVariable,
 } from '@/lib/url-contract';
 import { ENV_KEYS } from './env-keys';
 
@@ -241,5 +242,22 @@ describe('app.config.ts config boundary (text contract)', () => {
 
   it('gates the runtime production host check on the baked flag', () => {
     expect(configTsCodeSource).toContain('extra?.isProductionBuild === true');
+  });
+});
+
+// The build-time loop reads each URL value through `urlEnvVariable`, which
+// consults the required and the optional key maps. Resolving through ENV_KEYS
+// alone silently skipped the optional latency ingest URL, so a bad override
+// passed the build gate and threw at runtime in config.ts instead.
+describe('URL key → environment variable resolution', () => {
+  it('resolves every URL key, optional keys included', () => {
+    for (const key of Object.keys(URL_SCHEMES)) {
+      expect(urlEnvVariable(key), `${key} must resolve to an env var name`).toBeTruthy();
+    }
+    expect(urlEnvVariable('latencyIngestUrl')).toBe('LATENCY_INGEST_URL');
+  });
+
+  it('keeps app.config.ts resolving URL values through urlEnvVariable', () => {
+    expect(configCodeSource).toMatch(/process\.env\[urlEnvVariable\(/);
   });
 });

@@ -843,7 +843,8 @@
       "chat": "Mensagens da conversa",
       "kiloclaw": "Atividade do KiloClaw",
       "balance": "Alertas de saldo",
-      "security": "Ocorrências de segurança"
+      "security": "Ocorrências de segurança",
+      "spend": "Alertas de gastos"
     },
     "category": {
       "chatMessagesSubtitle": "respostas nas suas conversas",
@@ -855,6 +856,8 @@
       "sessionStatusSubtitle": "concluída / com erro / pronta para controlo",
       "kiloclawActivitySubtitle": "instância pronta ou com erro, ações agendadas",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organização",
+      "spendAlertsSubtitle": "ultrapassagens de limites e picos horários",
+      "spendAlertsToggle": "Categoria de alertas de gastos",
       "securityFindingsSubtitle": "novas ocorrências e lembretes de SLA"
     },
     "action": {
@@ -3240,5 +3243,28 @@
   },
   "launcher": {
     "openLastSession": "Abrir última sessão"
+  },
+  "spendAlerts": {
+    "subtitle": "Envie um alerta por e-mail ou notificação push aos contactos de faturação quando os gastos deste âmbito ultrapassarem um limite ou subirem acima do seu ritmo horário habitual.",
+    "enable": "Ativar os alertas de gastos",
+    "thresholdTitle": "Ultrapassagem do limite",
+    "thresholdSubtitle": "Os gastos acumulados ultrapassam o seu limite",
+    "anomalyTitle": "Pico horário",
+    "anomalySubtitle": "Uma hora está muito acima do ritmo habitual deste âmbito",
+    "limitLabel": "Limite (USD)",
+    "windowLabel": "Janela",
+    "window24h": "24 horas",
+    "window7d": "7 dias",
+    "window30d": "30 dias",
+    "multiplierLabel": "Multiplicador do pico",
+    "saved": "Definições dos alertas de gastos guardadas",
+    "loadError": "Não foi possível carregar os alertas de gastos.",
+    "saveError": "Não foi possível guardar os alertas de gastos.",
+    "empty": "Os alertas de gastos estão desativados. Ative-os para avisar os contactos de faturação deste âmbito.",
+    "noSpend": "Ainda não há gastos registados",
+    "spend24h": "Gastos nas últimas 24 horas",
+    "multiplierError": "Introduza um multiplicador de 1 ou mais",
+    "permissionDenied": "Não tem permissão para gerir os alertas de gastos.",
+    "pushOffByCategory": "Desativado em Notificações"
   }
 }

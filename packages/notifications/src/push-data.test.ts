@@ -69,6 +69,26 @@ describe('pushDataSchema security_lifecycle', () => {
   });
 });
 
+describe('pushDataSchema spend_alert', () => {
+  it('parses a personal-scope alert without an organizationId', () => {
+    const payload = { type: 'spend_alert', scope: 'personal' };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('parses an organization-scope alert with its organizationId', () => {
+    const payload = { type: 'spend_alert', scope: 'organization', organizationId: 'org-1' };
+    expect(pushDataSchema.parse(payload)).toEqual(payload);
+  });
+
+  it('rejects an unknown scope and an empty organizationId', () => {
+    expect(pushDataSchema.safeParse({ type: 'spend_alert', scope: 'team' }).success).toBe(false);
+    expect(
+      pushDataSchema.safeParse({ type: 'spend_alert', scope: 'organization', organizationId: '' })
+        .success
+    ).toBe(false);
+  });
+});
+
 describe('pushDataSchema cloud_agent_session', () => {
   it('parses the optional attentionKind and prUrl of a needs-input raise', () => {
     const payload = {

@@ -259,7 +259,8 @@
       "chat": "Messaggi di chat",
       "kiloclaw": "Attività di KiloClaw",
       "balance": "Avvisi sul saldo",
-      "security": "Problemi di sicurezza"
+      "security": "Problemi di sicurezza",
+      "spend": "Avvisi di spesa"
     },
     "category": {
       "chatMessagesSubtitle": "risposte nelle tue conversazioni",
@@ -271,6 +272,8 @@
       "sessionStatusSubtitle": "terminata / non riuscita / pronta per il controllo",
       "kiloclawActivitySubtitle": "istanza pronta o in errore, azioni pianificate",
       "balanceAlertsSubtitle": "avvisi di saldo basso dell'organizzazione",
+      "spendAlertsSubtitle": "superamenti di soglia e picchi orari",
+      "spendAlertsToggle": "Categoria avvisi di spesa",
       "securityFindingsSubtitle": "nuovi problemi di sicurezza e promemoria SLA"
     },
     "liveActivities": "Attività in tempo reale",
@@ -3240,5 +3243,28 @@
   },
   "launcher": {
     "openLastSession": "Apri l'ultima sessione"
+  },
+  "spendAlerts": {
+    "subtitle": "Invia un avviso via email o push ai contatti di fatturazione quando la spesa di questo ambito supera un limite o schizza sopra il suo ritmo orario abituale.",
+    "enable": "Attiva gli avvisi di spesa",
+    "thresholdTitle": "Superamento della soglia",
+    "thresholdSubtitle": "La spesa progressiva supera il tuo limite",
+    "anomalyTitle": "Picco orario",
+    "anomalySubtitle": "Un'ora è molto sopra il ritmo abituale di questo ambito",
+    "limitLabel": "Limite (USD)",
+    "windowLabel": "Finestra",
+    "window24h": "24 ore",
+    "window7d": "7 giorni",
+    "window30d": "30 giorni",
+    "multiplierLabel": "Moltiplicatore del picco",
+    "saved": "Impostazioni degli avvisi di spesa salvate",
+    "loadError": "Impossibile caricare gli avvisi di spesa.",
+    "saveError": "Impossibile salvare gli avvisi di spesa.",
+    "empty": "Gli avvisi di spesa sono disattivati. Attivali per avvisare i contatti di fatturazione di questo ambito.",
+    "noSpend": "Nessuna spesa registrata finora",
+    "spend24h": "Spesa nelle ultime 24 ore",
+    "multiplierError": "Inserisci un moltiplicatore di 1 o più",
+    "permissionDenied": "Non hai l'autorizzazione per gestire gli avvisi di spesa.",
+    "pushOffByCategory": "Disattivato in Notifiche"
   }
 }

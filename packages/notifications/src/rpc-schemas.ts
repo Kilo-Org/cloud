@@ -293,6 +293,29 @@ export type InternalDispatchLowBalanceRequest = z.infer<
   typeof internalDispatchLowBalanceRequestSchema
 >;
 
+/**
+ * Spend-alert dispatch. `organizationId` is present only for an
+ * `organization` scope; a `personal` scope carries the user's own spend and
+ * nothing else. `dedupeKey` is the outbox row's identity, which carries the
+ * firing episode: it joins the idempotency key alongside the alert kind and
+ * threshold, so a condition that clears and crosses again inside the channel's
+ * idempotency window is a new alert rather than a collapsed duplicate.
+ */
+export const internalDispatchSpendAlertRequestSchema = z.object({
+  kind: z.literal('spend_alert'),
+  recipientUserIds: z.array(z.string().min(1)).min(1),
+  scope: z.enum(['personal', 'organization']),
+  organizationId: z.string().min(1).optional(),
+  alertKind: z.enum(['threshold', 'anomaly']),
+  scopeName: z.string().min(1),
+  amountUsd: z.number().nonnegative(),
+  thresholdUsd: z.number().nonnegative(),
+  dedupeKey: z.string().min(1),
+});
+export type InternalDispatchSpendAlertRequest = z.infer<
+  typeof internalDispatchSpendAlertRequestSchema
+>;
+
 export const internalDispatchSecurityFindingRequestSchema = z.object({
   kind: z.literal('security_finding'),
   recipientUserId: z.string().min(1),
@@ -340,6 +363,7 @@ export type InternalDispatchSecurityLifecycleRequest = z.infer<
 
 export const internalDispatchRequestSchema = z.discriminatedUnion('kind', [
   internalDispatchLowBalanceRequestSchema,
+  internalDispatchSpendAlertRequestSchema,
   internalDispatchSecurityFindingRequestSchema,
   internalDispatchSecurityLifecycleRequestSchema,
 ]);

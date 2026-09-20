@@ -3241,7 +3241,8 @@
     "channelName": "Aktívne agenty",
     "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke.",
     "openSession": "Otvoriť",
-    "approveFailed": "Schválenie sa nepodarilo. Klepnutím na $t(common.approve) to skús znova."
+    "approveFailed": "Schválenie sa nepodarilo. Klepnutím na $t(common.approve) to skús znova.",
+    "newestResult": "Najnovší výsledok"
   },
   "transcriptionModel": {
     "title": "Model prepisu",

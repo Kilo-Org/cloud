@@ -3241,7 +3241,8 @@
     "channelName": "Активные агенты",
     "activityKitDisabledBody": "Включите «Эфир активности» в настройках, чтобы видеть активных агентов на экране блокировки.",
     "openSession": "Открыть",
-    "approveFailed": "Не удалось одобрить. Нажмите $t(common.approve), чтобы повторить."
+    "approveFailed": "Не удалось одобрить. Нажмите $t(common.approve), чтобы повторить.",
+    "newestResult": "Последний результат"
   },
   "transcriptionModel": {
     "title": "Модель распознавания речи",

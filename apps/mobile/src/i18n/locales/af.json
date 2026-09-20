@@ -3155,7 +3155,8 @@
     "channelName": "Aktiewe agente",
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
     "openSession": "Oop",
-    "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer."
+    "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer.",
+    "newestResult": "Nuutste resultaat"
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",

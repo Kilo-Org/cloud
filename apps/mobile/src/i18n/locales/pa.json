@@ -3155,7 +3155,8 @@
     "channelName": "ਸਰਗਰਮ ਏਜੰਟ",
     "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।",
     "openSession": "ਖੋਲ੍ਹੋ",
-    "approveFailed": "ਮਨਜ਼ੂਰ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ $t(common.approve) 'ਤੇ ਟੈਪ ਕਰੋ।"
+    "approveFailed": "ਮਨਜ਼ੂਰ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ $t(common.approve) 'ਤੇ ਟੈਪ ਕਰੋ।",
+    "newestResult": "ਸਭ ਤੋਂ ਨਵਾਂ ਨਤੀਜਾ"
   },
   "transcriptionModel": {
     "title": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਦਾ ਮਾਡਲ",

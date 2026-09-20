@@ -401,13 +401,14 @@ const config: ExpoConfig = {
             displayName: WIDGET_GALLERY_COPY.en.displayName,
             description: WIDGET_GALLERY_COPY.en.description,
             contentMarginsDisabled: false,
-            // Home Screen: the small square and the medium row. `systemLarge`
-            // is deliberately absent — three counts cannot fill a card that
-            // tall, and the whitespace read as an unfinished widget. Add it
-            // back only with a layout that earns the extra area.
+            // Home Screen: the small square, the medium row, and the large
+            // StandBy card. The large family carries the three counts plus the
+            // newest result below them, so its extra height is used rather
+            // than left as the whitespace that read as unfinished.
             supportedFamilies: [
               'systemSmall',
               'systemMedium',
+              'systemLarge',
               'accessoryCircular',
               'accessoryRectangular',
               'accessoryInline',

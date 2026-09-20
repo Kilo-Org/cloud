@@ -3327,7 +3327,8 @@
     "channelName": "الوكلاء النشطون",
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل.",
     "openSession": "افتح",
-    "approveFailed": "تعذّر الموافقة. اضغط على $t(common.approve) للمحاولة مرة أخرى."
+    "approveFailed": "تعذّر الموافقة. اضغط على $t(common.approve) للمحاولة مرة أخرى.",
+    "newestResult": "أحدث نتيجة"
   },
   "transcriptionModel": {
     "title": "نموذج التفريغ الصوتي",

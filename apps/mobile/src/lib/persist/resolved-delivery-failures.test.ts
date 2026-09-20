@@ -191,6 +191,35 @@ describe('resolved delivery failures', () => {
     expect(kvMock.setItem).not.toHaveBeenCalled();
   });
 
+  it('serializes concurrent writes so neither resolution is dropped', async () => {
+    // `persistResolvedDeliveryFailure` is fired without awaiting per retry, so
+    // the second call starts while the first one's read is still in flight. The
+    // chain must keep the read-modify-write pairs apart: unserialized, the
+    // second write would start from the pre-write list and drop the first id.
+    const first = persistResolvedDeliveryFailure(OWNER, SESSION_ID, 'msg-1');
+    const second = persistResolvedDeliveryFailure(OWNER, SESSION_ID, 'msg-2');
+    await Promise.all([first, second]);
+
+    await expect(readResolvedDeliveryFailures(USER_ID, SESSION_ID)).resolves.toEqual([
+      'msg-1',
+      'msg-2',
+    ]);
+  });
+
+  it('refuses a write when sign-out starts during the awaited read', async () => {
+    // Sign-out flips its flag, bumps the epoch and clears `cache:<userId>:`
+    // while this call is still awaiting its read. The write that follows must
+    // not repopulate the scope teardown just cleared.
+    kvMock.getItem.mockImplementationOnce(async () => {
+      setSignOutActive(true);
+      return null;
+    });
+
+    await persistResolvedDeliveryFailure(OWNER, SESSION_ID, 'msg-1');
+
+    expect(kvMock.setItem).not.toHaveBeenCalled();
+  });
+
   it('swallows a read failure', async () => {
     kvMock.getItem.mockRejectedValueOnce(new Error('kv unavailable'));
 

@@ -108,8 +108,12 @@ type ServiceState = {
   getSuggestion(): SuggestionState | null;
   getSessionInfo(): SessionInfo | null;
   getPendingMessages(): ReadonlyMap<string, MessageDeliveryState>;
-  /** Remove one failed delivery entry (called after a successful retry). */
-  clearFailedMessage(messageId: string): void;
+  /**
+   * Remove one failed delivery entry (called after a successful retry).
+   * Returns true when that entry was also the failure that set the terminal
+   * error state, which this removal has undone together with the footer.
+   */
+  clearFailedMessage(messageId: string): boolean;
   snapshot(): ServiceStateSnapshot;
   /** Set activity directly (for transport lifecycle events like connecting/disconnected). */
   setActivity(activity: SessionActivity): void;
@@ -162,6 +166,17 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   // Tracks whether we've received a terminal stopped event (error/interrupted/disconnected).
   // While terminated, session.error events are suppressed as aftershocks.
   let terminated = false;
+
+  /**
+   * The message id whose `cloud.message.failed` last set the terminal error
+   * state (`status`, `terminated`, `config.onError`). Kept so a later
+   * `clearFailedMessage` for that id undoes the whole failure, not just the
+   * footer: the durable memory of retried failures can resolve after the DO
+   * replay already applied the failure, and that late removal must leave the
+   * same state the suppressed-at-replay path leaves. Null once another event
+   * takes the turn over (`processMessageSent`).
+   */
+  let terminalFailureMessageId: string | null = null;
 
   const subscribers = new Set<() => void>();
 
@@ -643,6 +658,10 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
   function processMessageSent(event: Extract<ServiceEvent, { type: 'cloud.message.sent' }>): void {
     activeMessageId = event.messageId;
+    // A new turn takes the terminal error over: the previous failure is no
+    // longer what the error state describes, so a later clear of its id must
+    // not reset this turn's state.
+    terminalFailureMessageId = null;
     if (
       status.type === 'error' ||
       status.type === 'interrupted' ||
@@ -717,6 +736,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
           ? { type: 'interrupted' }
           : { type: 'error', message: event.error };
       terminated = true;
+      terminalFailureMessageId = event.reason === 'interrupted' ? null : event.messageId;
       disconnectedSource = null;
       completed = false;
       clearPendingInteractions();
@@ -960,9 +980,21 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     getSessionInfo: () => sessionInfo,
     getPendingMessages: () => pendingMessages,
 
-    clearFailedMessage(messageId: string): void {
+    clearFailedMessage(messageId: string): boolean {
       pendingMessages.delete(messageId);
+      if (terminalFailureMessageId === messageId) {
+        // The removed failure is the one that set the terminal error, so the
+        // error state goes with it — the suppressed-at-replay path never
+        // applied it in the first place.
+        terminalFailureMessageId = null;
+        status = IDLE_STATUS;
+        terminated = false;
+        completed = false;
+        notify();
+        return true;
+      }
       notify();
+      return false;
     },
 
     snapshot: () => ({
@@ -1015,6 +1047,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       suggestion = null;
       pendingMessages.clear();
       activeMessageId = null;
+      terminalFailureMessageId = null;
       terminated = false;
       disconnectedSource = null;
       completed = false;

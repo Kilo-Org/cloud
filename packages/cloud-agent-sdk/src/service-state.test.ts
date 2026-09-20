@@ -2050,6 +2050,74 @@ describe('createServiceState', () => {
       expect(state.getPendingMessages().get('m2')?.status).toBe('failed');
     });
 
+    it('clearing the failure that set the terminal error undoes the status with it', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+      state.process({ type: 'cloud.message.sent', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'The message could not be delivered',
+      });
+
+      // The durable memory of retried failures can resolve after this replay
+      // applied the failure. Removing it must leave what the
+      // suppressed-at-replay path leaves: no footer and no terminal error.
+      expect(state.clearFailedMessage('m1')).toBe(true);
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
+    it('clearing a failure that never set the terminal error leaves the status alone', () => {
+      const state = createServiceState(makeConfig());
+
+      // No `cloud.message.sent` for m1, so this failure is not the active
+      // turn's and never set a terminal error.
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+
+      expect(state.clearFailedMessage('m1')).toBe(false);
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
+    it('a later sent turn takes the terminal error over', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'cloud.message.sent', messageId: 'm1' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+      state.process({ type: 'cloud.message.sent', messageId: 'm2' });
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm2',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+
+      // m2 owns the terminal error now; clearing the older failure must not
+      // reset the newer turn's state.
+      expect(state.clearFailedMessage('m1')).toBe(false);
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'The message could not be delivered',
+      });
+    });
+
     it('terminal delivery failure resolves a stale preparing status', () => {
       const state = createServiceState(makeConfig());
 

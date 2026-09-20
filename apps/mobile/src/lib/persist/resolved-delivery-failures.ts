@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { chainSave } from '@/lib/hooks/save-chain';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
 import { readCacheScope } from '@/lib/persist/read-cache';
 
@@ -40,6 +41,15 @@ const resolvedIdsSchema = z.array(z.string().min(1));
 
 function resolvedDeliveryKey(sessionId: string): string {
   return `${RESOLVED_DELIVERY_KEY_PREFIX}${sessionId}`;
+}
+
+/**
+ * Serializes the read-modify-write for one user's session through `chainSave`.
+ * Keys are namespaced with the user id so one account's queue never blocks or
+ * interleaves with another's in the same process.
+ */
+function resolvedDeliveryChainKey(userId: string, sessionId: string): string {
+  return `${RESOLVED_DELIVERY_KEY_PREFIX}${userId}:${sessionId}`;
 }
 
 /**
@@ -96,6 +106,12 @@ export type ResolvedDeliveryFailureOwner = {
  * Records one resolved delivery failure for a session. Refused while sign-out
  * is active or the owner's `authEpoch` has moved, and bounded to
  * {@link RESOLVED_DELIVERY_MAX_IDS} (oldest first). Never throws.
+ *
+ * The read-modify-write is serialized per user and session through
+ * `chainSave` (the same pattern as `drafts.ts`): `persistResolvedDeliveryFailure`
+ * is fired without awaiting per retry, so two overlapping calls would
+ * otherwise both read the pre-write list and the later write would drop the
+ * earlier id — restoring its footer after a relaunch.
  */
 export async function persistResolvedDeliveryFailure(
   owner: ResolvedDeliveryFailureOwner,
@@ -107,17 +123,29 @@ export async function persistResolvedDeliveryFailure(
     return;
   }
   try {
-    if (isSignOutActive() || !isCurrentAuthEpoch(authEpoch)) {
-      return;
-    }
-    const existing = await readResolvedDeliveryFailures(userId, sessionId);
-    if (existing.includes(messageId)) {
-      return;
-    }
-    const next = [...existing, messageId].slice(-RESOLVED_DELIVERY_MAX_IDS);
-    const scope = readCacheScope(userId);
-    await encryptedKv.setItem(scope, resolvedDeliveryKey(sessionId), JSON.stringify(next));
-    await evictOldestSessions(scope);
+    await chainSave(resolvedDeliveryChainKey(userId, sessionId), async () => {
+      // Early exit, and the fence for the queued case: a write that chained
+      // behind another one must not proceed once teardown has started.
+      if (isSignOutActive() || !isCurrentAuthEpoch(authEpoch)) {
+        return;
+      }
+      const existing = await readResolvedDeliveryFailures(userId, sessionId);
+      if (existing.includes(messageId)) {
+        return;
+      }
+      const next = [...existing, messageId].slice(-RESOLVED_DELIVERY_MAX_IDS);
+      const scope = readCacheScope(userId);
+      // The fence is re-read after the awaited read and before the write, with
+      // no await in between: sign-out flips its flag and bumps the epoch
+      // synchronously, before it clears `cache:<userId>:`, so a read that
+      // resolved past that moment must not repopulate the scope teardown just
+      // cleared. Same fence as `session-transcript-cache.ts`.
+      if (isSignOutActive() || !isCurrentAuthEpoch(authEpoch)) {
+        return;
+      }
+      await encryptedKv.setItem(scope, resolvedDeliveryKey(sessionId), JSON.stringify(next));
+      await evictOldestSessions(scope);
+    });
   } catch {
     // A failed write costs one restored footer, never a broken retry.
   }

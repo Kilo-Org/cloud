@@ -935,7 +935,10 @@ describe('session detail failed delivery retry', () => {
     });
 
     expect(send).toHaveBeenCalledTimes(1);
-    expect(clearFailedMessage).toHaveBeenCalledExactlyOnceWith('msg-failed');
+    // The clear carries the session that owns the retried row, so the
+    // resolution is never recorded under a session the user switched to while
+    // the re-send was in flight.
+    expect(clearFailedMessage).toHaveBeenCalledExactlyOnceWith('msg-failed', ROOT_ID);
   });
 });
 

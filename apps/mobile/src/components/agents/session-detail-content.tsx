@@ -1124,18 +1124,22 @@ export function SessionDetailContent({
       }
       // The re-send is a new submission; `retryFailedMessage` clears the
       // original delivery failure once it is accepted so the row stops showing
-      // as failed.
+      // as failed. It is cleared against this screen's session — the one that
+      // owns the row and that the manager opened — because the await above can
+      // outlive it: switching sessions while the re-send is in flight must not
+      // record this resolution under the session the user switched to.
+      const ownerSessionId = sessionId;
       void retryFailedMessage({
         message,
         send: async () => {
           await handleSend(prompt);
         },
         clearFailedMessage: messageId => {
-          manager.clearFailedMessage(messageId);
+          manager.clearFailedMessage(messageId, ownerSessionId);
         },
       });
     },
-    [messages, requiresModel, pinned.model, currentModel, handleSend, manager]
+    [messages, requiresModel, pinned.model, currentModel, handleSend, manager, sessionId]
   );
 
   const handleCancelQueued = useCallback(

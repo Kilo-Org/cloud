@@ -827,7 +827,8 @@
       "chat": "Mesej sembang",
       "kiloclaw": "Aktiviti KiloClaw",
       "balance": "Amaran baki",
-      "security": "Dapatan keselamatan"
+      "security": "Dapatan keselamatan",
+      "spend": "Amaran perbelanjaan"
     },
     "category": {
       "chatMessagesSubtitle": "balasan dalam perbualan anda",
@@ -839,6 +840,8 @@
       "sessionStatusSubtitle": "selesai / gagal / sedia untuk dikawal",
       "kiloclawActivitySubtitle": "instans sedia/gagal, tindakan berjadual",
       "balanceAlertsSubtitle": "amaran baki rendah untuk organisasi",
+      "spendAlertsSubtitle": "melepasi ambang dan lonjakan setiap jam",
+      "spendAlertsToggle": "Kategori amaran perbelanjaan",
       "securityFindingsSubtitle": "penemuan baharu dan peringatan SLA"
     },
     "action": {
@@ -3199,5 +3202,28 @@
   },
   "launcher": {
     "openLastSession": "Buka sesi terakhir"
+  },
+  "spendAlerts": {
+    "subtitle": "Hantar amaran melalui e-mel atau push kepada kenalan pengebilan apabila perbelanjaan skop ini melepasi had atau melonjak melebihi kadar setiap jam biasanya.",
+    "enable": "Dayakan amaran perbelanjaan",
+    "thresholdTitle": "Melepasi ambang",
+    "thresholdSubtitle": "Perbelanjaan berjalan melepasi had anda",
+    "anomalyTitle": "Lonjakan setiap jam",
+    "anomalySubtitle": "Satu jam jauh melebihi kadar biasa skop ini",
+    "limitLabel": "Had (USD)",
+    "windowLabel": "Tetingkap",
+    "window24h": "24 jam",
+    "window7d": "7 hari",
+    "window30d": "30 hari",
+    "multiplierLabel": "Pengganda lonjakan",
+    "saved": "Tetapan amaran perbelanjaan disimpan",
+    "loadError": "Tidak dapat memuatkan amaran perbelanjaan.",
+    "saveError": "Tidak dapat menyimpan amaran perbelanjaan.",
+    "empty": "Amaran perbelanjaan dimatikan. Hidupkannya untuk memberitahu kenalan pengebilan skop ini.",
+    "noSpend": "Belum ada perbelanjaan direkodkan",
+    "spend24h": "Perbelanjaan dalam 24 jam terakhir",
+    "multiplierError": "Masukkan pengganda 1 atau lebih",
+    "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus amaran perbelanjaan.",
+    "pushOffByCategory": "Dimatikan dalam Pemberitahuan"
   }
 }

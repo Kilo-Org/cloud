@@ -323,7 +323,8 @@
       "chat": "Wiadomości na czacie",
       "kiloclaw": "Aktywność KiloClaw",
       "balance": "Powiadomienia o saldzie",
-      "security": "Wykryte problemy z bezpieczeństwem"
+      "security": "Wykryte problemy z bezpieczeństwem",
+      "spend": "Alerty o wydatkach"
     },
     "category": {
       "chatMessagesSubtitle": "odpowiedzi w twoich rozmowach",
@@ -335,6 +336,8 @@
       "sessionStatusSubtitle": "zakończona / nieudana / gotowa do sterowania",
       "kiloclawActivitySubtitle": "gotowość lub błąd instancji, zaplanowane działania",
       "balanceAlertsSubtitle": "ostrzeżenia o niskim saldzie organizacji",
+      "spendAlertsSubtitle": "przekroczenia progów i skoki godzinowe",
+      "spendAlertsToggle": "Kategoria alertów o wydatkach",
       "securityFindingsSubtitle": "nowe wykryte problemy i przypomnienia o terminach SLA"
     },
     "action": {
@@ -3285,5 +3288,28 @@
   },
   "launcher": {
     "openLastSession": "Otwórz ostatnią sesję"
+  },
+  "spendAlerts": {
+    "subtitle": "Wyślij alert e-mailem lub powiadomieniem push do kontaktów rozliczeniowych, gdy wydatki tego zakresu przekroczą limit lub wzrosną powyżej zwykłego tempa godzinowego.",
+    "enable": "Włącz alerty o wydatkach",
+    "thresholdTitle": "Przekroczenie progu",
+    "thresholdSubtitle": "Bieżące wydatki przekraczają twój limit",
+    "anomalyTitle": "Skok godzinowy",
+    "anomalySubtitle": "Godzina jest znacznie powyżej zwykłego tempa tego zakresu",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Okno",
+    "window24h": "24 godziny",
+    "window7d": "7 dni",
+    "window30d": "30 dni",
+    "multiplierLabel": "Mnożnik skoku",
+    "saved": "Zapisano ustawienia alertów o wydatkach",
+    "loadError": "Nie udało się wczytać alertów o wydatkach.",
+    "saveError": "Nie udało się zapisać alertów o wydatkach.",
+    "empty": "Alerty o wydatkach są wyłączone. Włącz je, aby ostrzegać kontakty rozliczeniowe tego zakresu.",
+    "noSpend": "Nie zarejestrowano jeszcze żadnych wydatków",
+    "spend24h": "Wydatki z ostatnich 24 godzin",
+    "multiplierError": "Podaj mnożnik równy 1 lub większy",
+    "permissionDenied": "Nie masz uprawnień do zarządzania alertami o wydatkach.",
+    "pushOffByCategory": "Wyłączone w Powiadomieniach"
   }
 }

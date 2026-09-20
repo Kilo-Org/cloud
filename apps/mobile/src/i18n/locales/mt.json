@@ -875,7 +875,8 @@
       "chat": "Messaġġi tat-taħdit",
       "kiloclaw": "Attività ta' KiloClaw",
       "balance": "Twissijiet tal-bilanċ",
-      "security": "Sejbiet tas-sigurtà"
+      "security": "Sejbiet tas-sigurtà",
+      "spend": "Twissijiet tal-infiq"
     },
     "category": {
       "chatMessagesSubtitle": "tweġibiet fil-konversazzjonijiet tiegħek",
@@ -887,6 +888,8 @@
       "sessionStatusSubtitle": "tlestiet / falliet / lesta biex tikkontrollaha",
       "kiloclawActivitySubtitle": "istanza lesta jew falliet, azzjonijiet skedati",
       "balanceAlertsSubtitle": "twissijiet ta' bilanċ baxx tal-organizzazzjoni",
+      "spendAlertsSubtitle": "qbiż ta' limiti u żidiet fis-siegħa",
+      "spendAlertsToggle": "Kategorija tat-twissijiet tal-infiq",
       "securityFindingsSubtitle": "sejbiet ġodda u tfakkiriet tal-SLA"
     },
     "action": {
@@ -3328,5 +3331,28 @@
   },
   "launcher": {
     "openLastSession": "Iftaħ l-aħħar sessjoni"
+  },
+  "spendAlerts": {
+    "subtitle": "Ibgħat twissija bil-posta elettronika jew push lill-kuntatti tal-ħlasijiet meta l-infiq ta' dan il-kamp jinqabeż limitu jew jogħla 'l fuq mir-rata tas-siegħa tas-soltu.",
+    "enable": "Attiva t-twissijiet tal-infiq",
+    "thresholdTitle": "Qbiż tal-limitu",
+    "thresholdSubtitle": "L-infiq attwali jaqbeż il-limitu tiegħek",
+    "anomalyTitle": "Żieda fis-siegħa",
+    "anomalySubtitle": "Siegħa hija 'l fuq ħafna mir-rata tas-soltu ta' dan il-kamp",
+    "limitLabel": "Limitu (USD)",
+    "windowLabel": "Tieqa",
+    "window24h": "24 siegħa",
+    "window7d": "7 ijiem",
+    "window30d": "30 jum",
+    "multiplierLabel": "Multiplikatur taż-żieda",
+    "saved": "Is-settings tat-twissijiet tal-infiq ġew salvati",
+    "loadError": "It-twissijiet tal-infiq ma setgħux jitgħabbew.",
+    "saveError": "It-twissijiet tal-infiq ma setgħux jiġu salvati.",
+    "empty": "It-twissijiet tal-infiq huma mitfija. Xegħelhom biex tavża lill-kuntatti tal-ħlasijiet ta' dan il-kamp.",
+    "noSpend": "Għadu ma ġie rreġistrat l-ebda infiq",
+    "spend24h": "Infiq fl-aħħar 24 siegħa",
+    "multiplierError": "Daħħal multiplikatur ta' 1 jew aktar",
+    "permissionDenied": "M'għandekx permess biex timmaniġġja t-twissijiet tal-infiq.",
+    "pushOffByCategory": "Mitfi fin-Notifiki"
   }
 }

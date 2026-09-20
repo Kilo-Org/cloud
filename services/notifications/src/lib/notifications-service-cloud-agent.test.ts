@@ -27,6 +27,7 @@ const ALL_ON: UserNotificationPreferences = {
   sessionStatusEnabled: true,
   kiloclawActivityEnabled: true,
   balanceAlertsEnabled: true,
+  spendAlertsEnabled: true,
   securityFindingsEnabled: true,
 };
 

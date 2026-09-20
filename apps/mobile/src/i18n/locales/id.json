@@ -323,7 +323,8 @@
       "chat": "Pesan obrolan",
       "kiloclaw": "Aktivitas KiloClaw",
       "balance": "Peringatan saldo",
-      "security": "Temuan keamanan"
+      "security": "Temuan keamanan",
+      "spend": "Peringatan pengeluaran"
     },
     "category": {
       "chatMessagesSubtitle": "balasan dalam percakapanmu",
@@ -335,6 +336,8 @@
       "sessionStatusSubtitle": "selesai / gagal / siap dikendalikan",
       "kiloclawActivitySubtitle": "instans siap/gagal, tindakan terjadwal",
       "balanceAlertsSubtitle": "peringatan saat saldo organisasi rendah",
+      "spendAlertsSubtitle": "melewati ambang batas dan lonjakan per jam",
+      "spendAlertsToggle": "Kategori peringatan pengeluaran",
       "securityFindingsSubtitle": "temuan baru dan pengingat SLA"
     },
     "action": {
@@ -3199,5 +3202,28 @@
   },
   "launcher": {
     "openLastSession": "Buka sesi terakhir"
+  },
+  "spendAlerts": {
+    "subtitle": "Kirim peringatan lewat email atau push ke kontak penagihan saat pengeluaran cakupan ini melewati batas atau melonjak di atas laju per jam biasanya.",
+    "enable": "Aktifkan peringatan pengeluaran",
+    "thresholdTitle": "Melewati ambang batas",
+    "thresholdSubtitle": "Pengeluaran berjalan melewati batas kamu",
+    "anomalyTitle": "Lonjakan per jam",
+    "anomalySubtitle": "Satu jam jauh di atas laju biasanya cakupan ini",
+    "limitLabel": "Batas (USD)",
+    "windowLabel": "Jendela",
+    "window24h": "24 jam",
+    "window7d": "7 hari",
+    "window30d": "30 hari",
+    "multiplierLabel": "Pengali lonjakan",
+    "saved": "Setelan peringatan pengeluaran disimpan",
+    "loadError": "Tidak dapat memuat peringatan pengeluaran.",
+    "saveError": "Tidak dapat menyimpan peringatan pengeluaran.",
+    "empty": "Peringatan pengeluaran nonaktif. Aktifkan untuk memberi tahu kontak penagihan cakupan ini.",
+    "noSpend": "Belum ada pengeluaran yang tercatat",
+    "spend24h": "Pengeluaran dalam 24 jam terakhir",
+    "multiplierError": "Masukkan pengali 1 atau lebih",
+    "permissionDenied": "Kamu tidak memiliki izin untuk mengelola peringatan pengeluaran.",
+    "pushOffByCategory": "Nonaktif di Notifikasi"
   }
 }

@@ -827,7 +827,8 @@
       "chat": "Keskusteluviestit",
       "kiloclaw": "KiloClaw-tapahtumat",
       "balance": "Saldoilmoitukset",
-      "security": "Tietoturvahavainnot"
+      "security": "Tietoturvahavainnot",
+      "spend": "Kulutusvaroitukset"
     },
     "category": {
       "chatMessagesSubtitle": "vastaukset keskusteluissasi",
@@ -839,6 +840,8 @@
       "sessionStatusSubtitle": "valmis / epäonnistui / valmis hallittavaksi",
       "kiloclawActivitySubtitle": "instanssi valmis/epäonnistui, ajoitetut toiminnot",
       "balanceAlertsSubtitle": "varoitukset organisaation alhaisesta saldosta",
+      "spendAlertsSubtitle": "raja-arvojen ylitykset ja tunneittaiset piikit",
+      "spendAlertsToggle": "Kulutusvaroitusten luokka",
       "securityFindingsSubtitle": "uudet löydökset ja SLA-muistutukset"
     },
     "action": {
@@ -3199,5 +3202,28 @@
   },
   "launcher": {
     "openLastSession": "Avaa viimeisin istunto"
+  },
+  "spendAlerts": {
+    "subtitle": "Lähetä laskutusyhteyshenkilöille sähköposti- tai push-varoitus, kun tämän alueen kulutus ylittää rajan tai nousee tavanomaisen tuntitahdin yläpuolelle.",
+    "enable": "Ota kulutusvaroitukset käyttöön",
+    "thresholdTitle": "Rajan ylitys",
+    "thresholdSubtitle": "Juokseva kulutus ylittää rajasi",
+    "anomalyTitle": "Tunneittainen piikki",
+    "anomalySubtitle": "Yksi tunti on selvästi tämän alueen tavanomaista tahtia korkeampi",
+    "limitLabel": "Raja (USD)",
+    "windowLabel": "Aikaikkuna",
+    "window24h": "24 tuntia",
+    "window7d": "7 päivää",
+    "window30d": "30 päivää",
+    "multiplierLabel": "Piikin kerroin",
+    "saved": "Kulutusvaroitusten asetukset tallennettu",
+    "loadError": "Kulutusvaroituksia ei voitu ladata.",
+    "saveError": "Kulutusvaroituksia ei voitu tallentaa.",
+    "empty": "Kulutusvaroitukset ovat pois päältä. Ota ne käyttöön, jotta voit varoittaa tämän alueen laskutusyhteyshenkilöitä.",
+    "noSpend": "Kulutusta ei ole vielä kirjattu",
+    "spend24h": "Kulutus viimeisten 24 tunnin aikana",
+    "multiplierError": "Anna kerroin, joka on 1 tai suurempi",
+    "permissionDenied": "Sinulla ei ole oikeutta hallita kulutusvaroituksia.",
+    "pushOffByCategory": "Pois päältä Ilmoituksissa"
   }
 }

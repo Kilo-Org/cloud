@@ -323,7 +323,8 @@
       "chat": "聊天消息",
       "kiloclaw": "KiloClaw 活动",
       "balance": "余额提醒",
-      "security": "安全问题"
+      "security": "安全问题",
+      "spend": "支出提醒"
     },
     "category": {
       "chatMessagesSubtitle": "对话中的回复",
@@ -335,6 +336,8 @@
       "sessionStatusSubtitle": "已完成 / 已失败 / 可接管",
       "kiloclawActivitySubtitle": "实例就绪/失败、计划操作",
       "balanceAlertsSubtitle": "组织余额不足警告",
+      "spendAlertsSubtitle": "阈值突破与每小时激增",
+      "spendAlertsToggle": "支出提醒类别",
       "securityFindingsSubtitle": "新发现的安全问题和 SLA 提醒"
     },
     "action": {
@@ -3199,5 +3202,28 @@
   },
   "launcher": {
     "openLastSession": "打开上次会话"
+  },
+  "spendAlerts": {
+    "subtitle": "当此范围的支出超过限额或高于其平时每小时速率时，通过邮件或推送向账单联系人发送提醒。",
+    "enable": "启用支出提醒",
+    "thresholdTitle": "阈值突破",
+    "thresholdSubtitle": "累计支出超过你的限额",
+    "anomalyTitle": "每小时激增",
+    "anomalySubtitle": "某一小时的支出远高于此范围的平时速率",
+    "limitLabel": "限额 (USD)",
+    "windowLabel": "时间窗口",
+    "window24h": "24 小时",
+    "window7d": "7 天",
+    "window30d": "30 天",
+    "multiplierLabel": "激增倍数",
+    "saved": "支出提醒设置已保存",
+    "loadError": "无法加载支出提醒。",
+    "saveError": "无法保存支出提醒。",
+    "empty": "支出提醒已关闭。开启后会通知此范围的账单联系人。",
+    "noSpend": "尚无支出记录",
+    "spend24h": "过去 24 小时的支出",
+    "multiplierError": "请输入 1 或更大的倍数",
+    "permissionDenied": "你没有管理支出提醒的权限。",
+    "pushOffByCategory": "已在通知中关闭"
   }
 }

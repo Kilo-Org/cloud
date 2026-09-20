@@ -827,7 +827,8 @@
       "chat": "Suhbat xabarlari",
       "kiloclaw": "KiloClaw faoliyati",
       "balance": "Balans haqida ogohlantirishlar",
-      "security": "Aniqlangan xavfsizlik muammolari"
+      "security": "Aniqlangan xavfsizlik muammolari",
+      "spend": "Xarajat bildirishnomalari"
     },
     "category": {
       "chatMessagesSubtitle": "suhbatlaringizdagi javoblar",
@@ -839,6 +840,8 @@
       "sessionStatusSubtitle": "tugadi / xatolik yuz berdi / boshqarishga tayyor",
       "kiloclawActivitySubtitle": "nusxa tayyor yoki xatolik yuz berdi, rejalashtirilgan amallar",
       "balanceAlertsSubtitle": "tashkilot balansi kamaygani haqida ogohlantirishlar",
+      "spendAlertsSubtitle": "chegaradan oshish va soatlik ko'tarilishlar",
+      "spendAlertsToggle": "Xarajat bildirishnomalari toifasi",
       "securityFindingsSubtitle": "aniqlangan yangi zaifliklar va SLA eslatmalari"
     },
     "action": {
@@ -3199,5 +3202,28 @@
   },
   "launcher": {
     "openLastSession": "Oxirgi seansni ochish"
+  },
+  "spendAlerts": {
+    "subtitle": "Bu sohaning xarajati chegaradan oshganda yoki odatdagi soatlik sur'atidan yuqoriga ko'tarilganda to'lov bo'yicha kontaktlarga email yoki push orqali bildirishnoma yubor.",
+    "enable": "Xarajat bildirishnomalarini yoqish",
+    "thresholdTitle": "Chegaradan oshish",
+    "thresholdSubtitle": "Joriy xarajat limitingizdan oshib ketdi",
+    "anomalyTitle": "Soatlik ko'tarilish",
+    "anomalySubtitle": "Bir soat bu sohaning odatdagi sur'atidan ancha yuqori",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Oyna",
+    "window24h": "24 soat",
+    "window7d": "7 kun",
+    "window30d": "30 kun",
+    "multiplierLabel": "Ko'tarilish koeffitsiyenti",
+    "saved": "Xarajat bildirishnomasi sozlamalari saqlandi",
+    "loadError": "Xarajat bildirishnomalarini yuklab bo'lmadi.",
+    "saveError": "Xarajat bildirishnomalarini saqlab bo'lmadi.",
+    "empty": "Xarajat bildirishnomalari o'chirilgan. Bu sohaning to'lov kontaktlarini ogohlantirish uchun ularni yoqing.",
+    "noSpend": "Hozircha xarajat qayd etilmagan",
+    "spend24h": "Oxirgi 24 soatdagi xarajat",
+    "multiplierError": "1 yoki undan katta koeffitsiyent kiriting",
+    "permissionDenied": "Xarajat bildirishnomalarini boshqarishga ruxsatingiz yo'q.",
+    "pushOffByCategory": "Bildirishnomalarda o'chirilgan"
   }
 }

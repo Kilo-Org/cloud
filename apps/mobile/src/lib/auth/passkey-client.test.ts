@@ -115,6 +115,15 @@ describe('classifyPasskeyError', () => {
     expect(classifyPasskeyError({ message: 'nocredentials' })).toBe('no-passkey');
   });
 
+  it.each(['name', 'message', 'code'])(
+    'classifies ASCII identifiers in %s without changing the localized copy key',
+    field => {
+      const failure = classifyPasskeyError({ [field]: 'NOTCONFIGURED' });
+      expect(failure).toBe('unsupported');
+      expect(passkeyFailureKey(failure)).toBe('login.passkeyUnsupported');
+    }
+  );
+
   it.each([
     [{ name: 'USERCANCELLEDEXCEPTION' }, 'login.passkeyCancelled'],
     [{ message: 'NOCREDENTIALS' }, 'login.passkeyNotFound'],

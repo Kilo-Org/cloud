@@ -31,6 +31,7 @@ export type UserNotificationPreferences = {
   sessionStatusEnabled: boolean;
   kiloclawActivityEnabled: boolean;
   balanceAlertsEnabled: boolean;
+  spendAlertsEnabled: boolean;
   securityFindingsEnabled: boolean;
 };
 
@@ -42,6 +43,7 @@ export const DEFAULT_USER_NOTIFICATION_PREFERENCES: UserNotificationPreferences 
   sessionStatusEnabled: true,
   kiloclawActivityEnabled: true,
   balanceAlertsEnabled: true,
+  spendAlertsEnabled: true,
   securityFindingsEnabled: true,
 };
 

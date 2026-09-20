@@ -82,6 +82,15 @@ type ServiceStateConfig = {
   onMessageFailed?:
     | ((messageId: string, state: Extract<MessageDeliveryState, { status: 'failed' }>) => void)
     | undefined;
+  /**
+   * True when the user already retried this message's delivery failure. A
+   * successful retry clears the original row's footer locally, and that clear
+   * must survive a relaunch: the DO replays its stored events (including the
+   * original `cloud.message.failed`) on the next open, so a replayed failure
+   * for a resolved id is dropped instead of resurrecting the footer. The id
+   * is final on the server, so a failure for a resolved id is always a replay.
+   */
+  isDeliveryFailureResolved?: ((messageId: string) => boolean) | undefined;
 };
 
 type ServiceState = {
@@ -660,6 +669,12 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processMessageFailed(
     event: Extract<ServiceEvent, { type: 'cloud.message.failed' }>
   ): void {
+    // A replayed failure for a message the user already retried must not
+    // restore the footer the retry cleared (see
+    // `isDeliveryFailureResolved`).
+    if (config.isDeliveryFailureResolved?.(event.messageId)) {
+      return;
+    }
     const deliveryState: Extract<MessageDeliveryState, { status: 'failed' }> = {
       status: 'failed',
       error: event.error,

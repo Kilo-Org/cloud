@@ -1122,11 +1122,20 @@ export function SessionDetailContent({
         void handleSend(prompt);
         return;
       }
-      void retryFailedMessage(async () => {
-        await handleSend(prompt);
+      // The re-send is a new submission; `retryFailedMessage` clears the
+      // original delivery failure once it is accepted so the row stops showing
+      // as failed.
+      void retryFailedMessage({
+        message,
+        send: async () => {
+          await handleSend(prompt);
+        },
+        clearFailedMessage: messageId => {
+          manager.clearFailedMessage(messageId);
+        },
       });
     },
-    [messages, requiresModel, pinned.model, currentModel, handleSend]
+    [messages, requiresModel, pinned.model, currentModel, handleSend, manager]
   );
 
   const handleCancelQueued = useCallback(

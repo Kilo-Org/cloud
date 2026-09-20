@@ -36,6 +36,10 @@ import {
   readSessionTranscriptPage,
   writeSessionTranscriptPage,
 } from '@/lib/persist/session-transcript-cache';
+import {
+  persistResolvedDeliveryFailure,
+  readResolvedDeliveryFailures,
+} from '@/lib/persist/resolved-delivery-failures';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { i18n } from '@/i18n';
 
@@ -210,6 +214,13 @@ export function createMobileAgentSessionManager({
     // promise and no-ops on an empty owner.
     // eslint-disable-next-line @typescript-eslint/promise-function-async -- passthrough returns the promise directly
     readCachedSnapshotPage: (id: KiloSessionId) => readSessionTranscriptPage(userId, id),
+    // Durable memory of retried delivery failures, so the DO's stored-event
+    // replay on the next open cannot restore a footer the retry cleared.
+    // eslint-disable-next-line @typescript-eslint/promise-function-async -- passthrough returns the promise directly
+    readResolvedDeliveryFailures: (id: KiloSessionId) => readResolvedDeliveryFailures(userId, id),
+    persistResolvedDeliveryFailure: (id: KiloSessionId, messageId: string) => {
+      void persistResolvedDeliveryFailure(transcriptOwner, id, messageId);
+    },
     // A tRPC call whose client control-plane deadline expired never got an
     // answer: the open is stalled, not failed. The manager keeps the skeleton
     // (then the slow-load state with Retry) instead of a premature error

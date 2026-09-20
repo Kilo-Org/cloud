@@ -88,6 +88,13 @@ vi.mock('@/lib/persist/session-transcript-cache', () => ({
   readSessionTranscriptPage: vi.fn(async () => null),
   writeSessionTranscriptPage: vi.fn(async () => undefined),
 }));
+// Same seam for the resolved-delivery-failure memory: it shares that chain, so
+// without this mock `mobile-session-manager.ts` pulls the native encrypted KV
+// (and its `react-native` promise shim) into this node suite.
+vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
+  readResolvedDeliveryFailures: vi.fn(async () => []),
+  persistResolvedDeliveryFailure: vi.fn(async () => undefined),
+}));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
   CLOUD_AGENT_WS_URL: 'wss://ws.test',

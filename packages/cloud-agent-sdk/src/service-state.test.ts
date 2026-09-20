@@ -2024,6 +2024,32 @@ describe('createServiceState', () => {
       });
     });
 
+    it('a replayed failure for a retried message does not restore the footer', () => {
+      const resolved = new Set(['m1']);
+      const state = createServiceState(
+        makeConfig({ isDeliveryFailureResolved: id => resolved.has(id) })
+      );
+
+      // The retry cleared the original row's footer, and the DO's stored-event
+      // replay delivers its failure again on the next open.
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        error: 'The agent could not run this message.',
+        reason: 'execution',
+      });
+
+      expect(state.getPendingMessages().has('m1')).toBe(false);
+      // A failure the user has not retried still shows its footer.
+      state.process({
+        type: 'cloud.message.failed',
+        messageId: 'm2',
+        error: 'The agent could not run this message.',
+        reason: 'execution',
+      });
+      expect(state.getPendingMessages().get('m2')?.status).toBe('failed');
+    });
+
     it('terminal delivery failure resolves a stale preparing status', () => {
       const state = createServiceState(makeConfig());
 

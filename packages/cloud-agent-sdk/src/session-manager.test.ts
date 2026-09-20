@@ -5838,6 +5838,86 @@ describe('createSessionManager', () => {
     });
   });
 
+  describe('resolved delivery failures', () => {
+    function lastSessionConfig() {
+      return jest.mocked(createCloudAgentSession).mock.calls.at(-1)?.[0];
+    }
+
+    it('seeds the resolved ids from the durable reader and persists a retry', async () => {
+      const persistResolvedDeliveryFailure = jest.fn();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn().mockResolvedValue(['m-original']),
+        persistResolvedDeliveryFailure,
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      // The durable read is not awaited on the open path: let its microtask land.
+      await Promise.resolve();
+
+      const sessionConfig = lastSessionConfig();
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-original')).toBe(true);
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-other')).toBe(false);
+
+      mgr.clearFailedMessage('m-other');
+
+      expect(persistResolvedDeliveryFailure).toHaveBeenCalledWith(kiloId('ses-1'), 'm-other');
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-other')).toBe(true);
+    });
+
+    it('reads the durable memory for the session being opened', async () => {
+      const readResolvedDeliveryFailures = jest.fn().mockResolvedValue([]);
+      const config = createMockConfig({ readResolvedDeliveryFailures });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(readResolvedDeliveryFailures).toHaveBeenCalledWith(kiloId('ses-1'));
+    });
+
+    it('prunes a replayed failure that landed before the durable read resolved', async () => {
+      const read = deferred<readonly string[]>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = lastSessionConfig();
+      // The DO's stored-event replay delivered the failure first.
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-original')).toBe(false);
+
+      read.resolve(['m-original']);
+      await read.promise;
+      await Promise.resolve();
+
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-original');
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-original')).toBe(true);
+    });
+
+    it('ignores a durable read that resolves after the session switched', async () => {
+      const read = deferred<readonly string[]>();
+      const readResolvedDeliveryFailures = jest
+        .fn()
+        .mockReturnValueOnce(read.promise)
+        .mockResolvedValue([]);
+      const config = createMockConfig({ readResolvedDeliveryFailures });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.switchSession(kiloId('ses-2'));
+      const secondConfig = lastSessionConfig();
+
+      read.resolve(['m-original']);
+      await read.promise;
+      await Promise.resolve();
+
+      expect(secondConfig?.isDeliveryFailureResolved?.('m-original')).toBe(false);
+      expect(mockSession.state.clearFailedMessage).not.toHaveBeenCalledWith('m-original');
+    });
+  });
+
   describe('cancelQueuedMessage', () => {
     it('delegates to the active session without interrupting and returns its { dropped } result', async () => {
       const config = createMockConfig();

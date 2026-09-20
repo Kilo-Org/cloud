@@ -53,6 +53,11 @@ vi.mock('@/lib/persist/session-transcript-cache', () => ({
   writeSessionTranscriptPage: vi.fn(async () => undefined),
   clearSessionTranscriptPage: vi.fn(async () => undefined),
 }));
+// Same seam for the resolved-delivery-failure memory: it shares that chain.
+vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
+  readResolvedDeliveryFailures: vi.fn(async () => []),
+  persistResolvedDeliveryFailure: vi.fn(async () => undefined),
+}));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
   CLOUD_AGENT_WS_URL: 'wss://ws.test',

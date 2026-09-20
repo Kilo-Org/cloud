@@ -20,21 +20,37 @@ export function countInFlightMessages(
 }
 
 /**
- * Re-sends a failed submission as a new one. The failed row keeps its typed
- * footer and its Retry action: it is the record of a submission that did fail,
- * and the re-send materialises its own row with its own delivery state. Clearing
- * the original footer on an accepted re-send left the transcript with fewer
- * failure footers than failed submissions (the re-send can fail too), so the
- * failed row's state is left alone. The manager has already surfaced any failure
- * through its own toast, so the rejection is swallowed here.
+ * Re-sends a failed submission as a new one, then clears the original delivery
+ * failure once the re-send is accepted so it stops showing (`.specs/
+ * cloud-agent-session.md`, Errors 3: a message that will never be delivered
+ * shows as failed and MUST stop showing after a successful retry). The failed
+ * message id is final on the server and is never re-admitted, so the re-send
+ * materialises its own row with its own delivery state; the original row keeps
+ * only its content — a client-materialised row that existed for its failure
+ * alone stops showing — and a re-send that fails again keeps its own footer.
+ *
+ * A rejected re-send leaves the original footer alone: nothing was delivered,
+ * so the failure is still the truth, and the manager has already surfaced it
+ * through its own toast. The rejection is swallowed here so the caller's
+ * `void`ed promise never rejects.
+ *
+ * An assistant failure's row is left alone: a failed turn stays marked, and
+ * `clearFailedMessage` is about a user message's delivery entry.
  */
-export async function retryFailedMessage(send: () => Promise<void>): Promise<void> {
+export async function retryFailedMessage(input: {
+  message: StoredMessage;
+  send: () => Promise<void>;
+  clearFailedMessage: (messageId: string) => void;
+}): Promise<void> {
   try {
-    await send();
+    await input.send();
   } catch {
-    // Swallow: the manager already surfaced the failure toast and the failed
-    // row stays so the user can retry again.
+    return;
   }
+  if (input.message.info.role !== 'user') {
+    return;
+  }
+  input.clearFailedMessage(input.message.info.id);
 }
 
 /**

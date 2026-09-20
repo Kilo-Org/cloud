@@ -11,10 +11,6 @@ import {
   runProcess,
 } from './utils.js';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type RestoreResult =
   | {
       ok: true;
@@ -63,10 +59,6 @@ const JQ_SANITIZE_TRANSIENT_PARTS_FILTER =
 // Both sanitizations run in a single jq pass so the snapshot is read+rewritten
 // once per restore — exports can be very large.
 const JQ_SANITIZE_SNAPSHOT_FILTER = `${JQ_SANITIZE_TOKEN_COUNTS_FILTER} | ${JQ_SANITIZE_TRANSIENT_PARTS_FILTER}`;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function log(msg: string): void {
   const message = `restore-session: ${msg}`;
@@ -843,10 +835,6 @@ async function applyPatch(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Main logic
-// ---------------------------------------------------------------------------
-
 export async function restoreSession(
   kiloSessionId: string,
   workspacePath: string,
@@ -1101,10 +1089,6 @@ export async function restoreSession(
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// CLI entrypoint — only runs when executed directly, not when imported
-// ---------------------------------------------------------------------------
 
 if (import.meta.main) {
   const rawArgs = process.argv.slice(2);

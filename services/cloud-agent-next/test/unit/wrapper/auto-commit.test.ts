@@ -43,10 +43,6 @@ const mockGetCurrentBranch = vi.mocked(getCurrentBranch);
 const mockHasGitUpstream = vi.mocked(hasGitUpstream);
 const mockGit = vi.mocked(git);
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const ok = (stdout = '', stderr = ''): Utils.ExecResult => ({ stdout, stderr, exitCode: 0 });
 
 const createMockKiloClient = (): WrapperKiloClient => ({
@@ -128,10 +124,6 @@ function setupHappyPathGit(): void {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe('runAutoCommit', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -141,10 +133,6 @@ describe('runAutoCommit', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
-
-  // -------------------------------------------------------------------------
-  // Detached HEAD
-  // -------------------------------------------------------------------------
 
   it('skips on detached HEAD', async () => {
     mockGetCurrentBranch.mockResolvedValue('');
@@ -182,10 +170,6 @@ describe('runAutoCommit', () => {
     expect(mockGit).not.toHaveBeenCalled();
   });
 
-  // -------------------------------------------------------------------------
-  // Protected branch — no upstreamBranch
-  // -------------------------------------------------------------------------
-
   it('skips on main when no upstreamBranch is set', async () => {
     mockGetCurrentBranch.mockResolvedValue('main');
 
@@ -217,10 +201,6 @@ describe('runAutoCommit', () => {
     );
   });
 
-  // -------------------------------------------------------------------------
-  // Protected branch — upstreamBranch does NOT match current branch
-  // -------------------------------------------------------------------------
-
   it('skips on main when upstreamBranch is a different branch', async () => {
     mockGetCurrentBranch.mockResolvedValue('main');
 
@@ -249,10 +229,6 @@ describe('runAutoCommit', () => {
       })
     );
   });
-
-  // -------------------------------------------------------------------------
-  // Protected branch — upstreamBranch MATCHES current branch → bypass
-  // -------------------------------------------------------------------------
 
   it('allows commit to main when upstreamBranch is main', async () => {
     mockGetCurrentBranch.mockResolvedValue('main');
@@ -289,10 +265,6 @@ describe('runAutoCommit', () => {
     );
   });
 
-  // -------------------------------------------------------------------------
-  // No uncommitted changes
-  // -------------------------------------------------------------------------
-
   it('skips when there are no uncommitted changes', async () => {
     mockGetCurrentBranch.mockResolvedValue('feature/foo');
     mockGit.mockResolvedValueOnce(ok('')); // git status --porcelain → empty
@@ -307,10 +279,6 @@ describe('runAutoCommit', () => {
       })
     );
   });
-
-  // -------------------------------------------------------------------------
-  // Happy path on a regular feature branch
-  // -------------------------------------------------------------------------
 
   it('commits and pushes on a feature branch', async () => {
     mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');

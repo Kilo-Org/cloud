@@ -20,10 +20,6 @@ import { createHash } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo, Socket } from 'node:net';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type FakeLlmServerHandle = {
   /** Base URL without trailing slash, e.g. `http://0.0.0.0:18811`. */
   url: string;
@@ -102,10 +98,6 @@ function logEvent(event: string, fields: LogFields): void {
   }
   console.log(parts.join(' '));
 }
-
-// ---------------------------------------------------------------------------
-// Pure helpers (unit-testable without a socket)
-// ---------------------------------------------------------------------------
 
 const DIRECTIVE_PREFIX = '__fake__:';
 
@@ -426,10 +418,6 @@ function readFileContents(result: string): string {
     .trimEnd();
 }
 
-// ---------------------------------------------------------------------------
-// Model catalogue
-// ---------------------------------------------------------------------------
-
 /**
  * One model, shaped to satisfy kilo's `openRouterModelSchema`
  * (see `packages/kilo-gateway/src/api/models.ts` in the kilocode repo).
@@ -488,10 +476,6 @@ const TRANSCRIPTION_MODELS = [
     pricing: { prompt: '0', completion: '0' },
   },
 ];
-
-// ---------------------------------------------------------------------------
-// SSE framing helpers
-// ---------------------------------------------------------------------------
 
 type ToolCallDelta = {
   index: number;
@@ -605,10 +589,6 @@ function writeJsonError(res: ServerResponse, status: number, message: string, ty
     })
   );
 }
-
-// ---------------------------------------------------------------------------
-// Scenario registry
-// ---------------------------------------------------------------------------
 
 export type ScenarioContext = {
   req: IncomingMessage;
@@ -1063,10 +1043,6 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// Request handling
-// ---------------------------------------------------------------------------
-
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -1386,10 +1362,6 @@ function handleWaiters(res: ServerResponse, state: ServerState): void {
   res.end(JSON.stringify({ tags, liveResponses: totalHangs }));
 }
 
-// ---------------------------------------------------------------------------
-// Server lifecycle
-// ---------------------------------------------------------------------------
-
 export async function startFakeLlmServer(opts?: {
   host?: string;
   port?: number;
@@ -1517,10 +1489,6 @@ export async function startFakeLlmServer(opts?: {
 
   return { url, port, close };
 }
-
-// ---------------------------------------------------------------------------
-// CLI entry — `tsx fake-llm-server.ts` started by the dev service launcher.
-// ---------------------------------------------------------------------------
 
 const isMain = (() => {
   // import.meta.url → file:// path; process.argv[1] → executed script path

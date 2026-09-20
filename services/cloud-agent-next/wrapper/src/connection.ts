@@ -234,10 +234,6 @@ function isAssistantCompletionSignal(info: unknown): boolean {
   return typeof time?.completed === 'number' || (info.error !== undefined && info.error !== null);
 }
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type ConnectionConfig = {
   kiloClient: WrapperKiloClient;
 };
@@ -461,10 +457,6 @@ export async function openIngestProgressChannel(
     }, INGEST_INITIAL_CONNECT_TIMEOUT_MS);
   });
 }
-
-// ---------------------------------------------------------------------------
-// Connection Manager
-// ---------------------------------------------------------------------------
 
 export type ConnectionManager = {
   /** Open ingest WS and SSE consumer. Resolves when both are connected. */

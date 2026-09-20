@@ -187,10 +187,6 @@ function remainingMs(resources: ScenarioResources, label: string): number {
   return timeoutMs;
 }
 
-// ---------------------------------------------------------------------------
-// Stream and durable-turn helpers
-// ---------------------------------------------------------------------------
-
 async function awaitDurableCompletion(
   resources: ScenarioResources,
   session: WorktreeSessionResult,
@@ -306,10 +302,6 @@ async function sendAndAwaitCompletion(
   const lifecycle = assertMessageLifecycle(stream, sent.messageId, label);
   return { messageId: sent.messageId, terminal, lifecycle };
 }
-
-// ---------------------------------------------------------------------------
-// Wrapper + worker-log evidence helpers (framing/correlation only)
-// ---------------------------------------------------------------------------
 
 export type ConnectionIdentity = {
   sandboxId: string;
@@ -598,10 +590,6 @@ async function waitForEngagedFault(
   return fault;
 }
 
-// ---------------------------------------------------------------------------
-// Idle-stop and resume helpers
-// ---------------------------------------------------------------------------
-
 type IdleEvidence = Awaited<ReturnType<typeof readIdleStopEvidence>>;
 
 async function waitForAutomaticIdleStop(
@@ -786,10 +774,6 @@ async function resumeSameSession(
   const lifecycle = assertMessageLifecycle(stream, sent.messageId, `resume ${input.tag}`);
   return { runtime: resumed, messageId: sent.messageId, lifecycle, fileSurvival };
 }
-
-// ---------------------------------------------------------------------------
-// Question helpers
-// ---------------------------------------------------------------------------
 
 function questionFromEvent(
   event: StreamEvent,

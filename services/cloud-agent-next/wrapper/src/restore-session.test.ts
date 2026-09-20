@@ -7,10 +7,6 @@ import { buildWorktreeKiloEnvironment } from './control/worktree-runtime';
 
 const SESSION_ID = 'ses_test123';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 // Real session-ingest exports always carry a top-level `info` block with at
 // least `id`. The orchestrator's malformed-snapshot guardrail keys off that
 // field, so test fixtures must match real shape.
@@ -142,10 +138,6 @@ wait
   const kiloPath = path.join(binDir, 'kilo');
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
-
-// ---------------------------------------------------------------------------
-// Test suite
-// ---------------------------------------------------------------------------
 
 async function rejected(operation: Promise<void>): Promise<unknown> {
   try {
@@ -1542,10 +1534,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     }
   });
 });
-
-// ---------------------------------------------------------------------------
-// extractDiffs (subprocess-based diff extraction)
-// ---------------------------------------------------------------------------
 
 describe('extractDiffs', () => {
   let tmpDir: string;

@@ -364,13 +364,11 @@ export function createSessionManagementHandlers() {
           // Get DO stub keyed by userId:sessionId for user isolation
           const getStub = () => resolveSessionStub(env, userId, sessionId);
 
-          // Fetch metadata with retry
           const metadata = await withDORetry<
             DurableObjectStub<CloudAgentSession>,
             CloudAgentSessionState | null
           >(getStub, s => s.getMetadata(), 'getMetadata');
 
-          // Handle not found
           if (!metadata) {
             logger.info('Session not found');
             throw new TRPCError({

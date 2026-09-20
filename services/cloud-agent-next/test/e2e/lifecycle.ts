@@ -101,10 +101,6 @@ export const RECOVERY_BUDGET_MS = 8 * 60_000;
 
 const execFileAsync = promisify(execFile);
 
-// ---------------------------------------------------------------------------
-// Shared types
-// ---------------------------------------------------------------------------
-
 export type ConversationScenario = string; // e.g. "echo:hi", "tools:3", "hang"
 
 export type LifecycleResult = {
@@ -1199,10 +1195,6 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
   }
 }
 
-// ---------------------------------------------------------------------------
-// Scenarios
-// ---------------------------------------------------------------------------
-
 /**
  * Cold start: fresh sessionId with a newly-created per-session sandbox. Send first prompt.
  * Asserts: a sandbox container appears; the conversation completes (for
@@ -1769,10 +1761,6 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// Queue-focused scenarios
-// ---------------------------------------------------------------------------
-
 type QueuedOrCompleted = 'queued' | 'completed' | 'failed';
 
 function messagePhase(event: StreamEvent): QueuedOrCompleted | null {
@@ -2302,10 +2290,6 @@ export async function lifecycleQueueInterruptClears(args: LifecycleArgs): Promis
   }
 }
 
-// ---------------------------------------------------------------------------
-// Single-turn scenarios driving specific fake-LLM directives
-// ---------------------------------------------------------------------------
-
 function isRetryStatusEvent(event: StreamEvent): boolean {
   if (event.streamEventType !== 'kilocode') return false;
   const data = event.data as
@@ -2799,10 +2783,6 @@ export async function lifecycleWaitersClean(args: LifecycleArgs): Promise<Lifecy
     };
   }
 }
-
-// ---------------------------------------------------------------------------
-// Callback scenarios
-// ---------------------------------------------------------------------------
 
 type CallbackPayload = {
   sessionId?: string;
@@ -3312,10 +3292,6 @@ export async function lifecycleCallbackInterrupt(args: LifecycleArgs): Promise<L
     await sink?.close().catch(() => {});
   }
 }
-
-// ---------------------------------------------------------------------------
-// Dispatch
-// ---------------------------------------------------------------------------
 
 export const LIFECYCLE_SCENARIOS: Record<
   string,

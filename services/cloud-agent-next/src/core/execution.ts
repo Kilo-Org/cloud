@@ -7,19 +7,11 @@
 
 import { STALE_THRESHOLD_MS } from './lease.js';
 
-// ---------------------------------------------------------------------------
-// Execution Status
-// ---------------------------------------------------------------------------
-
 /** Possible states of an execution */
 export type ExecutionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'interrupted';
 
 /** Health status for running executions */
 export type ExecutionHealth = 'healthy' | 'stale' | 'unknown';
-
-// ---------------------------------------------------------------------------
-// State Machine
-// ---------------------------------------------------------------------------
 
 /**
  * Valid state transitions for executions.
@@ -65,10 +57,6 @@ export function getAllowedTransitions(status: ExecutionStatus): ExecutionStatus[
   return VALID_TRANSITIONS[status];
 }
 
-// ---------------------------------------------------------------------------
-// Execution Health
-// ---------------------------------------------------------------------------
-
 /** Startup grace period before marking execution as unknown (2 minutes) */
 const STARTUP_GRACE_MS = 2 * 60 * 1000;
 
@@ -95,12 +83,10 @@ export function computeExecutionHealth(
   lastHeartbeat: number | undefined,
   now: number = Date.now()
 ): ExecutionHealth | null {
-  // Only compute health for running executions
   if (status !== 'running') {
     return null;
   }
 
-  // If we have a heartbeat, check its recency
   if (lastHeartbeat !== undefined) {
     const timeSinceHeartbeat = now - lastHeartbeat;
 

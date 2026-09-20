@@ -41,7 +41,6 @@ export async function runCondenseOnComplete(
       timestamp: new Date().toISOString(),
     });
 
-  // Check if already aborted before starting
   if (opts.wasAborted()) {
     logToFile('condense: skipped - execution was aborted');
     return { wasAborted: true, success: false };
@@ -64,7 +63,6 @@ export async function runCondenseOnComplete(
       auto: true,
     });
 
-    // Wait for completion with timeout
     logToFile('condense: waiting for completion');
     const completionPromise = opts.waitForCompletion();
     const timeoutPromise = new Promise<'timeout'>(resolve =>
@@ -96,7 +94,6 @@ export async function runCondenseOnComplete(
       return { wasAborted: true, success: false, error: 'Timed out' };
     }
 
-    // Check if aborted during execution
     if (opts.wasAborted()) {
       logToFile('condense: aborted during execution');
       return { wasAborted: true, success: false };

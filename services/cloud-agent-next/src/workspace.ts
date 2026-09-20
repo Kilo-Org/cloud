@@ -48,7 +48,6 @@ export function sanitizeIdForPath(value: string): string {
 function sanitizeGitUrlForLogging(gitUrl: string): string {
   try {
     const url = new URL(gitUrl);
-    // Remove username and password if present
     url.username = '';
     url.password = '';
     return url.toString();
@@ -846,7 +845,6 @@ export async function cloneGitRepo(
 
     logger.info('Successfully cloned generic git repository');
   } catch (err) {
-    // Log actual error for debugging
     const errorMessage = err instanceof Error ? err.message : String(err);
     logger.error('Git clone failed', {
       error: sanitizeGitOutput(errorMessage),
@@ -1128,7 +1126,6 @@ export async function manageBranch(
     return branchName;
   }
 
-  // Check branch existence in parallel
   const [existsLocally, existsRemotely] = await Promise.all([
     branchExistsLocally(session, workspacePath, branchName),
     branchExistsRemotely(session, workspacePath, branchName),

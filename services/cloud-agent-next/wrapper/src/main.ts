@@ -48,19 +48,11 @@ import {
   RestoredWorkspaceReconciliationError,
 } from './session-bootstrap.js';
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 /** Grace period before force exit during shutdown (110 seconds) */
 const SHUTDOWN_TIMEOUT_MS = 110_000;
 
 /** Timeout for createKilo() server startup */
 const KILO_STARTUP_TIMEOUT_MS = 30_000;
-
-// ---------------------------------------------------------------------------
-// Environment Variable Parsing
-// ---------------------------------------------------------------------------
 
 function getOptionalEnvInt(name: string, defaultValue: number): number {
   const value = process.env[name];
@@ -165,10 +157,6 @@ function parseStartupArgs(argv: string[]): StartupArgs {
   return { agentSessionId, userId, sessionId, wrapperInstanceId, wrapperInstanceGeneration };
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
 async function main() {
   logToFile(`wrapper starting (long-running mode) bun=${Bun.version}`);
 
@@ -234,9 +222,6 @@ async function main() {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Wire up components
-  // ---------------------------------------------------------------------------
   // Confine tool subprocesses to a memory-capped cgroup (best-effort; null
   // when the cgroup fs is unavailable, e.g. in devcontainers).
   const toolCgroup = startToolCgroup(process.env);
@@ -883,10 +868,6 @@ async function main() {
   );
   console.log(`Wrapper listening on port ${wrapperPort}`);
 
-  // ---------------------------------------------------------------------------
-  // Graceful shutdown
-  // ---------------------------------------------------------------------------
-
   async function handleShutdown(signal: string): Promise<void> {
     if (isShuttingDown) return;
     isShuttingDown = true;
@@ -963,9 +944,6 @@ async function main() {
   process.on('SIGTERM', () => void handleShutdown('SIGTERM'));
   process.on('SIGINT', () => void handleShutdown('SIGINT'));
 
-  // ---------------------------------------------------------------------------
-  // Crash handlers — best-effort log upload on unexpected crashes
-  // ---------------------------------------------------------------------------
   function handleCrash(label: string): void {
     if (isShuttingDown) return;
 

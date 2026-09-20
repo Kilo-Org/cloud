@@ -162,10 +162,6 @@ export async function findWrapperForSession(
   return findWrapperContainerForSession(sandbox, sessionId);
 }
 
-// ---------------------------------------------------------------------------
-// Docker-label discovery (devcontainer flow)
-// ---------------------------------------------------------------------------
-
 /**
  * `docker ps --format` rows for wrapper containers tagged with
  * `kilo.agentSession=<id>`. The published port we want is buried in the
@@ -195,7 +191,6 @@ type DockerExecutor = {
  * and ignores any non-tcp / IPv6 mappings the runtime might emit.
  */
 export function extractPublishedWrapperPort(portsField: string): number | null {
-  // Iterate every "ip:port->port/tcp" mapping; take the first valid one.
   const re = /(?:0\.0\.0\.0|127\.0\.0\.1):(\d+)->\d+\/tcp/g;
   let match: RegExpExecArray | null;
   while ((match = re.exec(portsField)) !== null) {

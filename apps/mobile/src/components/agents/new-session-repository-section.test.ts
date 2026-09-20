@@ -337,4 +337,20 @@ describe('NewSessionRepositorySection connect button label', () => {
     expect(String(label?.props.className)).toContain('flex-1');
     expect(String(label?.props.className)).toContain('text-center');
   });
+
+  it('offsets the label with a logical inline-end margin so RTL stays centred', () => {
+    // The trailing offset mirrors the leading glyph plus the row gap. It must be
+    // the logical `me-*` (React Native resolves `marginInlineEnd` to
+    // `marginLeft` under RTL), not the physical `mr-*`: in RTL the row mirrors
+    // the glyph to the right, so a physical right margin would offset the label
+    // on the same side as the glyph and land it 24px off the button's centre.
+    const renderer = mountSection({ groups: [group('gitlab', 'connect')] });
+
+    const className = String(
+      labelNode(renderer, i18n.t('agentChat.newSession.openGitlab'))?.props.className
+    );
+
+    expect(className).toContain('me-[24px]');
+    expect(className).not.toMatch(/\bmr-|margin-?[rR]ight/);
+  });
 });

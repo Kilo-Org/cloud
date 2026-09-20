@@ -128,7 +128,6 @@ describe('classifyCloudAgentFailure', () => {
   it.each([
     ['invalid_request', 'assistant_invalid_request'],
     ['context_limit', 'assistant_context_limit'],
-    ['output_limit', 'assistant_output_limit'],
   ] as const)(
     'attributes %s by provider ownership without collapsing the cause',
     (assistantReason, expectedReason) => {
@@ -153,6 +152,21 @@ describe('classifyCloudAgentFailure', () => {
       }
     }
   );
+
+  it('attributes an output limit to the user in every ownership case', () => {
+    for (const providerOwnership of [...CLOUD_AGENT_PROVIDER_OWNERSHIPS, undefined]) {
+      const failure = classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: 'output_limit',
+        providerOwnership,
+      });
+
+      expect(failure).toEqual({ responsibility: 'user', reason: 'assistant_output_limit' });
+      expect(CloudAgentFailureReasonSchema.parse(failure.reason)).toBe('assistant_output_limit');
+    }
+  });
 
   it('attributes content filter to the user and structured output to the platform', () => {
     for (const providerOwnership of [...CLOUD_AGENT_PROVIDER_OWNERSHIPS, undefined]) {

@@ -1,4 +1,5 @@
-import { type ReactElement } from 'react';
+import { type ComponentProps, type ReactElement } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -16,11 +17,16 @@ import { renderWithProviders } from '@/test/render-with-providers';
  *
  * These two screens are mounted for real here -- `ScreenHeader`, `ConfigureRow`
  * and the appearance `SegmentedControl` included, not stubbed -- and every
- * pressable control in the rendered tree is checked to announce something:
- * either its own `accessibilityLabel` or text somewhere below it, which is the
- * same tree rule the device scan applies. A control that announces nothing
- * fails the test. The non-empty-walk guards matter: a tree that stops rendering
- * controls must fail, not pass vacuously.
+ * pressable control in the rendered tree is checked to announce its own copy:
+ * either its own `accessibilityLabel` or text below it, which is the same tree
+ * rule the device scan applies. The rule prunes a subtree the platform prunes
+ * from the hierarchy (`importantForAccessibility="no-hide-descendants"`,
+ * `accessibilityElementsHidden`): text a screen reader never reaches cannot
+ * label a control, and counting it would let the walk pass where the device
+ * scan fails. Both reported scenes are mounted, the dark appearance included,
+ * and each row is pinned to the copy it shows. The non-empty-walk guards
+ * matter: a tree that stops rendering controls must fail, not pass vacuously,
+ * and the walk reports a control that announces nothing (see the last case).
  */
 
 vi.hoisted(() => {
@@ -33,6 +39,10 @@ const push = vi.hoisted(() => vi.fn());
 const back = vi.hoisted(() => vi.fn());
 const replace = vi.hoisted(() => vi.fn());
 const canGoBack = vi.hoisted(() => vi.fn(() => true));
+
+// Read per render so one case can mount the appearance the finding names
+// (settings-preferences-dark) and the next one starts from the system default.
+const themePreference = vi.hoisted(() => ({ current: 'system' }));
 
 // Every theme token resolves to a color string; the real palette is not the
 // subject here and `src/global.css` is not compiled in a node environment.
@@ -83,7 +93,7 @@ vi.mock('@/components/feature-flags-section', () => ({ FeatureFlagsSection: () =
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => themeColors }));
 vi.mock('@/lib/hooks/use-theme-preference', () => ({
   setThemePreference: vi.fn(),
-  useThemePreference: () => ({ preference: 'system' }),
+  useThemePreference: () => ({ preference: themePreference.current }),
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1' }),
@@ -126,10 +136,28 @@ function controls(root: ReactTestInstance): ReactTestInstance[] {
   );
 }
 
+/**
+ * True when the platform keeps this node's label out of the accessibility
+ * tree. Android prunes a `no-hide-descendants` subtree outright, and React
+ * Native maps `accessibilityElementsHidden` onto the same pruning, so neither
+ * carries a content-desc a screen reader can reach.
+ */
+function prunedFromAssistiveTech(node: ReactTestInstance): boolean {
+  return (
+    node.props.importantForAccessibility === 'no-hide-descendants' ||
+    node.props.accessibilityElementsHidden === true
+  );
+}
+
 /** All text below a node, joined -- the tree scan accepts a labelled child. */
 function subtreeText(node: ReactTestInstance): string {
   return node.children
-    .map(child => (typeof child === 'string' ? child : subtreeText(child)))
+    .map(child => {
+      if (typeof child === 'string') {
+        return child;
+      }
+      return prunedFromAssistiveTech(child) ? '' : subtreeText(child);
+    })
     .join(' ');
 }
 
@@ -141,11 +169,23 @@ function announcedBy(control: ReactTestInstance): string {
   return subtreeText(control).trim();
 }
 
+/**
+ * One control announces each row's visible copy. A non-empty walk alone accepts
+ * any text under the control, so a row that announced another row's title would
+ * still pass; matching the copy the row shows catches that.
+ */
+function expectEachRowAnnounced(labels: readonly string[], titles: readonly string[]): void {
+  for (const title of titles) {
+    expect(labels.filter(label => label.startsWith(title))).toHaveLength(1);
+  }
+}
+
 beforeEach(() => {
   vi.stubGlobal('__DEV__', false);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.resetAllMocks();
   canGoBack.mockReturnValue(true);
+  themePreference.current = 'system';
 });
 
 afterEach(() => {
@@ -158,33 +198,46 @@ describe('settings screens announce every control', () => {
   it('labels the back control and every Account settings row', async () => {
     const renderer = await mount(<AccountSettingsScreen />);
     const found = controls(renderer.root);
+    const labels = found.map(control => announcedBy(control));
 
     // Back, then the account rows (language, trusted hosts, passkeys, sessions).
     expect(found.length).toBeGreaterThanOrEqual(5);
-    expect(
-      found.map(control => announcedBy(control)).filter(label => label === i18n.t('common.goBack'))
-    ).toHaveLength(1);
+    expect(labels.filter(label => label === i18n.t('common.goBack'))).toHaveLength(1);
 
-    for (const control of found) {
-      expect(announcedBy(control)).not.toBe('');
+    for (const label of labels) {
+      expect(label).not.toBe('');
     }
+
+    expectEachRowAnnounced(labels, [
+      i18n.t('common.language'),
+      i18n.t('trustedHosts.title'),
+      i18n.t('profile.passkeysTitle'),
+      i18n.t('common.deviceSessions'),
+    ]);
   });
 
   it('labels the back control, every Preferences row, and the appearance control', async () => {
     const renderer = await mount(<PreferencesScreen />);
     const found = controls(renderer.root);
+    const labels = found.map(control => announcedBy(control));
 
     // Back, the five hub rows, and the three appearance options. The floor
     // matches that full count, so a screen that stops rendering a row fails
     // the walk instead of passing on a lower threshold.
     expect(found.length).toBeGreaterThanOrEqual(9);
-    expect(
-      found.map(control => announcedBy(control)).filter(label => label === i18n.t('common.goBack'))
-    ).toHaveLength(1);
+    expect(labels.filter(label => label === i18n.t('common.goBack'))).toHaveLength(1);
 
-    for (const control of found) {
-      expect(announcedBy(control)).not.toBe('');
+    for (const label of labels) {
+      expect(label).not.toBe('');
     }
+
+    expectEachRowAnnounced(labels, [
+      i18n.t('preferences.general'),
+      i18n.t('preferences.voiceInput'),
+      i18n.t('preferences.toolSummaryTranslation'),
+      i18n.t('preferences.account'),
+      i18n.t('common.notifications'),
+    ]);
 
     // The appearance control is mounted for real: its group carries the visible
     // section name and every option announces its own label, so a screen reader
@@ -203,5 +256,43 @@ describe('settings screens announce every control', () => {
       i18n.t('preferences.appearanceLight'),
       i18n.t('preferences.appearanceDark'),
     ]);
+  });
+
+  it('announces every control in the dark appearance the finding names', async () => {
+    // settings-preferences-dark is one of the two reported scenes: the same
+    // tree with the dark option selected, checked state and all.
+    themePreference.current = 'dark';
+    const renderer = await mount(<PreferencesScreen />);
+
+    const found = controls(renderer.root);
+    expect(found.length).toBeGreaterThanOrEqual(9);
+    for (const control of found) {
+      expect(announcedBy(control)).not.toBe('');
+    }
+
+    const selected = renderer.root.findAll(
+      node => (node.props as ComponentProps<typeof Pressable>).accessibilityState?.checked === true
+    );
+    expect(selected.map(option => announcedBy(option))).toEqual([
+      i18n.t('preferences.appearanceDark'),
+    ]);
+  });
+
+  it('reports a pressable control that announces nothing', async () => {
+    // The guard for the walk itself: a control with no label and no text below
+    // it, and one whose only text the platform prunes from the accessibility
+    // tree, must both come back empty -- otherwise every per-screen assertion
+    // above would pass on a walk that can no longer see anything, or that
+    // counts text a screen reader never reaches.
+    const renderer = await mount(
+      <View>
+        <Pressable accessibilityRole="button" onPress={vi.fn<() => void>()} />
+        <Pressable accessibilityRole="button" onPress={vi.fn<() => void>()}>
+          <Text accessibilityElementsHidden>Hidden call to action</Text>
+        </Pressable>
+      </View>
+    );
+    const found = controls(renderer.root);
+    expect(found.map(control => announcedBy(control))).toEqual(['', '']);
   });
 });

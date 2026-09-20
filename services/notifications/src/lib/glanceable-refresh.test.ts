@@ -65,7 +65,9 @@ class FailingListStorage extends FakeStorage {
     super();
   }
 
-  override async list<T>(options: { prefix?: string; limit?: number } = {}): Promise<Map<string, T>> {
+  override async list<T>(
+    options: { prefix?: string; limit?: number } = {}
+  ): Promise<Map<string, T>> {
     if (options.prefix === this.failingPrefix) throw new Error('storage unavailable');
     return super.list<T>(options);
   }

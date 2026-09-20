@@ -3,13 +3,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
+  GLANCEABLE_COALESCE_MS,
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
+  GLANCEABLE_STALE_MS,
   type GlanceableAgentsSnapshot,
   isStartableGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { getTerminalBlankEpoch, writeSignedOutSnapshotAndEnd } from './cleanup';
-import { GlanceablePublisher } from './publisher';
+import {
+  GLANCEABLE_RENEW_MARGIN_MS,
+  GlanceablePublisher,
+  hasSameGlanceableContent,
+} from './publisher';
 import {
   type GlanceableSink,
   type GlanceableSinkContext,
@@ -68,6 +74,10 @@ function snapshotFor(sessions: { status: string }[], now: number, revision = 0) 
   });
 }
 
+function withTitle(snapshot: GlanceableAgentsSnapshot, newestSessionTitle: string | null = null) {
+  return { snapshot, newestSessionTitle };
+}
+
 afterEach(() => {
   vi.useRealTimers();
   setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
@@ -122,6 +132,20 @@ describe('GlanceablePublisher', () => {
     publisher.dispose();
   });
 
+  it('starts the activity when the first tray write matches the seeded snapshot', () => {
+    // A restored revision can equal the tray's content, but nothing has raised
+    // the surface yet, so the first eligible emit must not be skipped.
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({
+      sinks: [sink],
+      now: () => NOW,
+      initial: snapshotFor([{ status: 'busy' }], NOW, 0),
+    });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(1);
+    publisher.dispose();
+  });
+
   it('counts an unrecognized status as running, matching what the row glyph draws', () => {
     // One session, unknown status: the shared kind map folds every non-idle,
     // non-needs-input status into running, and the list row's glyph draws the
@@ -155,6 +179,163 @@ describe('GlanceablePublisher', () => {
     expect(lastSnapshot(calls, 'startOrUpdate').needsInput).toBe(1);
     publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
     expect(lastSnapshot(calls, 'startOrUpdate').needsInput).toBe(0);
+    publisher.dispose();
+  });
+
+  it('emits an approval transition immediately instead of on the coalesce window', () => {
+    // `question` and `permission` both count as needs-input, so `needsInput`
+    // stays constant while `needsApproval` (the Approve control gate) changes.
+    // The approval transition must not wait for the coalesce window.
+    vi.useFakeTimers();
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, coalesceMs: 1000 });
+    publisher.handleSessions([{ status: 'question' }], PUB_CTX);
+    publisher.handleSessions([{ status: 'permission' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+    publisher.dispose();
+  });
+
+  it('emits a cleared approval immediately too', () => {
+    vi.useFakeTimers();
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, coalesceMs: 1000 });
+    publisher.handleSessions([{ status: 'permission' }], PUB_CTX);
+    publisher.handleSessions([{ status: 'question' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+    publisher.dispose();
+  });
+
+  it('does not redraw the native surfaces for a heartbeat that changes no visible content', () => {
+    vi.useFakeTimers();
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, coalesceMs: 1000 });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    for (let heartbeat = 0; heartbeat < 50; heartbeat += 1) {
+      publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    }
+    vi.advanceTimersByTime(1000);
+    // Every heartbeat writes the tray cache, but only the first one changed the
+    // surface, so the 50 identical writes must not re-render it and must not
+    // rewrite the widget timeline or Live Activity either.
+    expect(count(calls, 'startOrUpdate')).toBe(1);
+    expect(count(calls, 'publish')).toBe(1);
+    publisher.dispose();
+  });
+
+  it('renews the deadline on an unchanged heartbeat only once the stale window approaches', () => {
+    // Identical heartbeats must still renew before the published deadline
+    // lapses: `updatedAt`/`expiresAt`, the widget stale frame, and the Live
+    // Activity stale date all key off the write, so never renewing falsely
+    // flags confirmed-current data as stale. Renewing on every heartbeat would
+    // rewrite the native surface every few seconds, so it waits for the margin.
+    vi.useFakeTimers();
+    let now = NOW;
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now, coalesceMs: 1000 });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    const first = lastSnapshot(calls, 'publish');
+
+    // Inside the margin: no write at all, so the heartbeat cannot amplify.
+    now += GLANCEABLE_RENEW_MARGIN_MS - 1;
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(count(calls, 'publish')).toBe(1);
+
+    // At the margin the local write renews the deadline well before it lapses.
+    now += 1;
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    const renewed = lastSnapshot(calls, 'publish');
+    expect(count(calls, 'publish')).toBe(2);
+    expect(renewed.revision).toBeGreaterThan(first.revision);
+    expect(renewed.updatedAt).toBe(new Date(now).toISOString());
+    expect(renewed.expiresAt).toBe(new Date(now + GLANCEABLE_SNAPSHOT_EXPIRY_MS).toISOString());
+    expect(Date.parse(renewed.updatedAt)).toBeLessThan(
+      Date.parse(first.updatedAt) + GLANCEABLE_STALE_MS
+    );
+    // The renewal still carries a start/update so a failed or deferred Live
+    // Activity start is retried while the counts stay stable; it happens at the
+    // renewal margin, never on every heartbeat.
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+    expect(lastSnapshot(calls, 'startOrUpdate').running).toBe(1);
+    publisher.dispose();
+  });
+
+  it('retries the Live Activity start on an unchanged heartbeat past the renewal margin', () => {
+    // A start the sink could not raise (transient ActivityKit failure, or a
+    // start deferred behind a dismissal) must not be stranded: the renewal
+    // re-emits it while the visible counts are unchanged.
+    vi.useFakeTimers();
+    let now = NOW;
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now, coalesceMs: 1000 });
+    publisher.handleSessions([{ status: 'permission' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(1);
+
+    now += GLANCEABLE_RENEW_MARGIN_MS;
+    publisher.handleSessions([{ status: 'permission' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+    publisher.dispose();
+  });
+
+  it('renews at most once per stale margin across many unchanged heartbeats', () => {
+    // A 10 s heartbeat for 15 minutes is exactly one renewal, not one native
+    // rewrite per heartbeat (the in-app amplification the heat fix removed).
+    vi.useFakeTimers();
+    let now = NOW;
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now, coalesceMs: 1000 });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    for (let heartbeat = 0; heartbeat < 90; heartbeat += 1) {
+      now += 10_000;
+      publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    }
+    expect(count(calls, 'publish')).toBe(2);
+    // The single renewal re-emits the start so a failed start is retried; the
+    // other 89 heartbeats write nothing.
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+    publisher.dispose();
+  });
+
+  it('bounds count churn to one native update per window', () => {
+    vi.useFakeTimers();
+    let now = NOW;
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({
+      sinks: [sink],
+      now: () => now,
+      coalesceMs: GLANCEABLE_COALESCE_MS,
+    });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(1);
+    for (let second = 1; second <= 5; second += 1) {
+      vi.advanceTimersByTime(1000);
+      now += 1000;
+      publisher.handleSessions(
+        Array.from({ length: second + 1 }, () => ({ status: 'busy' })),
+        PUB_CTX
+      );
+    }
+    // Five once-a-second count changes coalesce into the one window's update,
+    // not one native re-render per heartbeat.
+    expect(count(calls, 'startOrUpdate')).toBe(1);
+    publisher.dispose();
+  });
+
+  it('still redraws when only the newest session title changes', () => {
+    vi.useFakeTimers();
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, coalesceMs: 1000 });
+    publisher.handleSessions(
+      [{ status: 'busy', title: 'First session', updatedAt: '2026-01-01T00:00:00.000Z' }],
+      PUB_CTX
+    );
+    publisher.handleSessions(
+      [{ status: 'busy', title: 'Renamed session', updatedAt: '2026-01-01T00:00:00.000Z' }],
+      PUB_CTX
+    );
+    vi.advanceTimersByTime(1000);
+    // The counts are identical, but the widget draws the title, so the rename
+    // must still reach the native surface.
+    expect(count(calls, 'startOrUpdate')).toBe(2);
     publisher.dispose();
   });
 
@@ -422,6 +603,64 @@ describe('GlanceablePublisher', () => {
     publisher.handleFetchError(PUB_CTX);
     expect(lastSnapshot(calls, 'publish')).toEqual({ ...fresh, revision: 45, status: 'stale' });
     publisher.dispose();
+  });
+});
+
+describe('hasSameGlanceableContent', () => {
+  const busy = (previousRevision: number, now = NOW) =>
+    buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }],
+      userId: 'u1',
+      organizationId: null,
+      now,
+      previousRevision,
+    });
+
+  it('ignores revision and timestamps but compares every visible field', () => {
+    const first = busy(0);
+    const nextRevision = busy(1, NOW + 5000);
+    expect(nextRevision.revision).toBe(2);
+    expect(hasSameGlanceableContent(withTitle(first), withTitle(nextRevision))).toBe(true);
+    // The widget draws the newest title, so a title-only change still differs.
+    expect(
+      hasSameGlanceableContent(withTitle(first, 'First'), withTitle(nextRevision, 'Renamed'))
+    ).toBe(false);
+
+    const moreRunning = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }, { status: 'busy' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW + 5000,
+      previousRevision: 1,
+    });
+    expect(hasSameGlanceableContent(withTitle(first), withTitle(moreRunning))).toBe(false);
+  });
+
+  it('compares the approval count, the wait anchor, and the status', () => {
+    const question = buildGlanceableSnapshot({
+      sessions: [{ status: 'question' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    const permission = buildGlanceableSnapshot({
+      sessions: [{ status: 'permission' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    // Same needsInput total, but only one of the two can be approved.
+    expect(question.needsInput).toBe(permission.needsInput);
+    expect(hasSameGlanceableContent(withTitle(question), withTitle(permission))).toBe(false);
+    expect(
+      hasSameGlanceableContent(withTitle(question), withTitle({ ...question, status: 'stale' }))
+    ).toBe(false);
+    expect(
+      hasSameGlanceableContent(
+        withTitle(question),
+        withTitle({ ...question, needsInputSince: '2026-01-01T00:00:00.000Z' })
+      )
+    ).toBe(false);
   });
 });
 

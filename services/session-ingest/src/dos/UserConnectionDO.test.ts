@@ -6,6 +6,7 @@ import {
 import { getWorkerDb } from '@kilocode/db/client';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import { NotificationChannelDO, NotificationsService } from '../../../notifications/src/index';
+import { GLANCEABLE_DELIVERY_MIN_INTERVAL_MS } from '../../../notifications/src/lib/glanceable-refresh';
 import {
   sendPushNotifications,
   type ExpoPushMessage,
@@ -84,9 +85,10 @@ function createMockWs(tags: string[] = [], attachment?: unknown): MockWS {
   return ws;
 }
 
-/** In-memory Map-backed KV fake for ctx.storage (put/get/delete/list). */
+/** In-memory Map-backed KV fake for ctx.storage (put/get/delete/list/alarm). */
 function makeStorageFake() {
   const store = new Map<string, unknown>();
+  let alarmTime: number | null = null;
   return {
     store,
     kv: {
@@ -98,7 +100,9 @@ function makeStorageFake() {
       list: (opts?: { prefix?: string }) =>
         new Map([...store].filter(([key]) => key.startsWith(opts?.prefix ?? ''))),
     },
-    deleteAlarm: vi.fn(async () => undefined),
+    deleteAlarm: vi.fn(async () => {
+      alarmTime = null;
+    }),
     put: vi.fn(async (key: string, value: unknown) => {
       store.set(key, value);
     }),
@@ -118,7 +122,12 @@ function makeStorageFake() {
       }
       return result;
     }),
-    setAlarm: vi.fn(),
+    // The glanceable deferral reads the current alarm before re-arming it, so
+    // the fake must model the alarm rather than return `undefined`.
+    getAlarm: vi.fn(async () => alarmTime),
+    setAlarm: vi.fn(async (scheduledTime: number | Date) => {
+      alarmTime = typeof scheduledTime === 'number' ? scheduledTime : scheduledTime.getTime();
+    }),
   };
 }
 
@@ -168,6 +177,24 @@ async function flushAsync(): Promise<void> {
   });
 }
 
+/**
+ * The aggregate delivery coordinator wakes a device at most once per account
+ * scope per `GLANCEABLE_DELIVERY_MIN_INTERVAL_MS`, deferring a change inside the
+ * window to the Durable Object alarm. The glanceable cases below assert the
+ * connection DO's own per-status-change trigger, so step the wall clock past
+ * the window between heartbeats. The window itself is covered by
+ * `services/notifications/src/lib/glanceable-refresh.test.ts`.
+ */
+function useDeliveryWindowClock(): { tick: () => void } {
+  let now = Date.now();
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
+  return {
+    tick: () => {
+      now += GLANCEABLE_DELIVERY_MIN_INTERVAL_MS + 1_000;
+    },
+  };
+}
+
 function makeSession(
   id: string,
   status = 'busy',
@@ -214,6 +241,10 @@ function setup(env: Partial<Env> = {}) {
   const ctx = mockCtx.build();
   const doInstance = new UserConnectionDO(ctx as never, env as Env);
   return { doInstance, ctx, mockCtx };
+}
+
+function pendingGlanceableKey(userId: string, organizationId: string | null): string {
+  return `glanceable-pending:${JSON.stringify([userId, organizationId])}`;
 }
 
 function setupGlanceableDelivery(foreignSessionIds: string[] = []) {
@@ -269,7 +300,7 @@ function setupGlanceableDelivery(foreignSessionIds: string[] = []) {
       })
     );
   });
-  return { ...result, env, messages };
+  return { ...result, env, messages, channelStorage: storage };
 }
 
 function connectWebSocket(doInstance: UserConnectionDO, connectionId: string): MockWS {
@@ -576,7 +607,9 @@ describe('UserConnectionDO', () => {
     it('delivers rowless personal busy, retry, attention-clear, and idle heartbeats through the real coordinator', async () => {
       const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
       for (const status of ['busy', 'retry', 'question', 'busy', 'idle']) {
+        clock.tick();
         sendHeartbeat(doInstance, cliWs, [makeSession('s1', status)]);
         await flushAsync();
       }
@@ -602,6 +635,46 @@ describe('UserConnectionDO', () => {
       expect(messages.every(message => message.data?.organizationBound === false)).toBe(true);
     });
 
+    it('delivers a question -> permission move inside the delivery window', async () => {
+      const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
+      clock.tick();
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      await flushAsync();
+      expect(messages).toHaveLength(1);
+      // No clock tick: still inside the delivery window. The Approve control
+      // gates nothing here except this window, so the move must not wait it out.
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'permission')]);
+      await flushAsync();
+      expect(messages.map(message => message.data)).toMatchObject([
+        { needsInput: 1, needsApproval: 0 },
+        { needsInput: 1, needsApproval: 1 },
+      ]);
+    });
+
+    it('defers a counts-only move inside the delivery window and arms the trailing alarm', async () => {
+      const { doInstance, mockCtx, messages, channelStorage } = setupGlanceableDelivery();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
+      clock.tick();
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await flushAsync();
+      expect(messages).toHaveLength(1);
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'idle')]);
+      await flushAsync();
+      // Deferred to the trailing alarm, not delivered on the spot.
+      expect(messages).toHaveLength(1);
+      // The deferral is stored and the alarm is armed at its deadline. Without
+      // both, the trailing delivery that lands the final counts never runs and
+      // the deferral is a silent drop.
+      const pending = (await channelStorage.get(pendingGlanceableKey('usr_1', null))) as
+        | { dueAt: number }
+        | undefined;
+      expect(pending).toMatchObject({ userId: 'usr_1', organizationId: null });
+      expect(channelStorage.setAlarm).toHaveBeenCalledWith(pending?.dueAt);
+    });
+
     it('does not authorize a foreign-owned row from a real authenticated heartbeat', async () => {
       const { doInstance, mockCtx, messages } = setupGlanceableDelivery(['foreign']);
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
@@ -614,18 +687,23 @@ describe('UserConnectionDO', () => {
     it('resends only when a reorder, rename, or child attention changes the roots', async () => {
       const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2', 'retry')]);
       await flushAsync();
       // A reorder and a rename leave every root status unchanged: no resend.
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [makeSession('s2', 'retry', 'Renamed'), makeSession('s1')]);
       await flushAsync();
       // A child raise hoists NEEDS INPUT onto its root, so the counts change.
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [
         makeSession('s1'),
         makeSession('s2', 'retry'),
         makeSession('child', 'question', 'Child', 's1'),
       ]);
       await flushAsync();
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [
         makeSession('s1'),
         makeSession('s2', 'retry'),
@@ -664,8 +742,11 @@ describe('UserConnectionDO', () => {
     it('delivers an empty aggregate when a root disappears from the heartbeat', async () => {
       const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       await flushAsync();
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, []);
       await flushAsync();
       expect(messages.map(message => message.data)).toMatchObject([
@@ -679,10 +760,16 @@ describe('UserConnectionDO', () => {
       async listed => {
         const { doInstance, mockCtx, ctx, messages } = setupGlanceableDelivery();
         const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+        const clock = useDeliveryWindowClock();
+        clock.tick();
         sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
         await flushAsync();
         messages.length = 0;
         if (!listed) mockCtx.removeSocket(cliWs);
+        // The disconnect's empty aggregate is a counts-only change and the
+        // preceding heartbeat consumed the delivery window, so step the clock
+        // past it; otherwise the refresh is deferred to the alarm.
+        clock.tick();
         await disconnectCli(doInstance, cliWs);
         await flushAsync();
         // The raise is held, not cleared: no delegate write happens on the

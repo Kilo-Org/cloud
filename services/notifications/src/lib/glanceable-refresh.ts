@@ -3,6 +3,13 @@ import { z } from 'zod';
 
 import { deliverGlanceableSnapshot, type GlanceableDeliveryDeps } from './glanceable-delivery';
 
+/**
+ * At most one aggregate device wake per account scope per window. A change
+ * inside the window leaves a trailing refresh for the DO alarm, so the final
+ * counts still land. See #6112: these surfaces must never add device wakeups.
+ */
+export const GLANCEABLE_DELIVERY_MIN_INTERVAL_MS = 10_000;
+
 const scopeSchema = z.object({
   userId: z.string().min(1),
   organizationId: z.string().min(1).nullable(),
@@ -19,14 +26,89 @@ const snapshotTimestampsSchema = refreshStateSchema
   .pick({ updatedAt: true })
   .extend({ expiresAt: z.string().datetime(), needsInputSince: z.string().datetime().nullable() });
 
+/** The last device wake for a scope, used to rate-limit aggregate delivery. */
+const deliveryStateSchema = z.object({ deliveredAt: z.number() });
+
+/** A refresh deferred until the delivery window elapses. */
+const pendingRefreshSchema = z.object({
+  userId: z.string().min(1),
+  organizationId: z.string().min(1).nullable(),
+  dueAt: z.number(),
+  // When the deferral was written. A delivery can tell a record it superseded
+  // from one that landed while it was in flight only by write time: both carry
+  // the same `dueAt` when they defer inside the same window. Optional for
+  // records written before this field existed.
+  deferredAt: z.number().optional(),
+});
+type PendingGlanceableRefresh = z.infer<typeof pendingRefreshSchema>;
+
+const PENDING_PREFIX = 'glanceable-pending:';
+
+function pendingKey(scope: { userId: string; organizationId: string | null }): string {
+  return `${PENDING_PREFIX}${JSON.stringify([scope.userId, scope.organizationId])}`;
+}
+
+/**
+ * Whether a pending record read after a delivery is the same one that was
+ * already stored when the delivery started. A deferral written while the
+ * delivery was in flight carries a later `deferredAt`, so the delivery must not
+ * cancel it: its counts are not in the delivered snapshot.
+ */
+function isSameDeferral(
+  before: PendingGlanceableRefresh | undefined,
+  after: PendingGlanceableRefresh | undefined
+): boolean {
+  if (before === undefined || after === undefined) return before === after;
+  return before.dueAt === after.dueAt && before.deferredAt === after.deferredAt;
+}
+
 /** The user DO owns these records; no ordering or interval state lives in a Worker instance. */
 export async function refreshGlanceableSnapshot(
   params: { userId: string; organizationId: string | null },
   storage: DurableObjectStorage,
-  deps: GlanceableDeliveryDeps
+  deps: GlanceableDeliveryDeps,
+  nowMs: () => number = Date.now,
+  options: { trailing?: boolean; approvalChanged?: boolean } = {}
 ): Promise<void> {
   const scope = scopeSchema.parse(params);
   const key = `glanceable:${JSON.stringify([scope.userId, scope.organizationId])}`;
+  const deliveryKey = `${key}:delivery`;
+  // Rate-limit the device wake per scope. A change inside the window is
+  // deferred to the alarm rather than dropping it, so the final counts land.
+  // `needsApproval` is exempt: it gates the Approve control, which must appear
+  // and clear at once on the locked/background surfaces, exactly as the
+  // in-app publisher emits a question <-> permission move without waiting.
+  const delivery = deliveryStateSchema.optional().parse(await storage.get(deliveryKey));
+  if (
+    options.approvalChanged !== true &&
+    delivery !== undefined &&
+    nowMs() - delivery.deliveredAt < GLANCEABLE_DELIVERY_MIN_INTERVAL_MS
+  ) {
+    const now = nowMs();
+    const dueAt = delivery.deliveredAt + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS;
+    await storage.put<PendingGlanceableRefresh>(pendingKey(scope), {
+      userId: scope.userId,
+      organizationId: scope.organizationId,
+      dueAt,
+      deferredAt: now,
+    });
+    const currentAlarm = await storage.getAlarm();
+    // Only keep an alarm that will actually fire and reschedule before `dueAt`.
+    // A past alarm is not a usable schedule — it may be a stale record left by a
+    // restart — so a deferral must (re)arm at `dueAt` or the trailing delivery
+    // that lands the final counts is never delivered.
+    if (currentAlarm === null || currentAlarm <= now || dueAt < currentAlarm) {
+      await storage.setAlarm(dueAt);
+    }
+    return;
+  }
+  // The delivery that follows supersedes any deferral already stored: its
+  // snapshot is built after that change. A deferral written while it is in
+  // flight is not superseded, so remember the one that existed at the start and
+  // keep a newer one when the delivery completes.
+  const pendingBeforeDelivery = pendingRefreshSchema
+    .optional()
+    .parse(await storage.get(pendingKey(scope)));
   // Row renewal or temporary absence cannot prove that the native token is live.
   const iosEndPrefix = (token: string) => `glanceable-ios-end:${JSON.stringify(token)}:`;
   // A card raised by push-to-start carries no update token until the app runs
@@ -36,7 +118,7 @@ export async function refreshGlanceableSnapshot(
   const iosStartKey = (token: string) => `${iosStartPrefix}${JSON.stringify(token)}`;
   const request = await storage.transaction(async tx => {
     const previous = refreshStateSchema.optional().parse(await tx.get(key));
-    const now = Date.now();
+    const now = nowMs();
     const next = {
       revision: (previous?.revision ?? 0) + 1,
       updatedAt: new Date(
@@ -54,7 +136,22 @@ export async function refreshGlanceableSnapshot(
 
   const snapshot = await deps.buildSnapshot(scope.userId, scope.organizationId);
   // Only the authoritative happy/empty result can change an eligible interval.
-  if (snapshot === null || (snapshot.status !== 'happy' && snapshot.status !== 'empty')) return;
+  if (snapshot === null || (snapshot.status !== 'happy' && snapshot.status !== 'empty')) {
+    // A trailing refresh owes the deferred change its final counts. Production
+    // `buildSnapshot` returns null (it never throws) when the route or its
+    // credentials fail, and the flush has already consumed the pending record,
+    // so re-arm the next window instead of dropping the change with no alarm.
+    if (options.trailing === true) {
+      const now = nowMs();
+      await storage.put<PendingGlanceableRefresh>(pendingKey(scope), {
+        userId: scope.userId,
+        organizationId: scope.organizationId,
+        dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+        deferredAt: now,
+      });
+    }
+    return;
+  }
   // The shared wire schema accepts strings; validate the dates before delivery.
   snapshotTimestampsSchema.parse(snapshot);
 
@@ -74,54 +171,207 @@ export async function refreshGlanceableSnapshot(
   });
   if (committed === null) return;
 
-  const eligible = committed.running + committed.needsInput + committed.idle > 0;
-  await deliverGlanceableSnapshot(scope, {
-    ...deps,
-    buildSnapshot: async () => committed,
-    apnsTimestampSeconds: request.apnsTimestampSeconds,
-    isCurrent: async () => {
-      const current = refreshStateSchema.parse(await storage.get(key));
-      return current.revision === request.revision;
-    },
-    listIosActivityTokens: async (userId, organizationId) => {
-      const tokens = await deps.listIosActivityTokens(userId, organizationId);
-      const current = refreshStateSchema.parse(await storage.get(key));
-      if (current.revision !== request.revision) return [];
-      const withoutFencedStarts = await dropFencedStarts(tokens, storage, {
-        prefix: iosStartPrefix,
-        key: iosStartKey,
-      });
-      // Empty work can retry ends. Eligible work excludes every accepted or uncertain end.
-      if (!eligible) return withoutFencedStarts;
-      const retiring = await Promise.all(
-        withoutFencedStarts.map(async ({ token, kind }) =>
-          kind === 'ios_activity'
-            ? (await storage.list({ prefix: iosEndPrefix(token), limit: 1 })).size > 0
-            : false
-        )
-      );
-      return withoutFencedStarts.filter((_, index) => !retiring[index]);
-    },
-    onIosStarted: async token => {
-      // Hold the fence for the whole maximum life of the card it raised. An
-      // orphan card cannot be ended remotely, so a second one would simply sit
-      // beside it until ActivityKit dismisses them both.
-      await storage.put(iosStartKey(token), Date.now() + GLANCEABLE_SNAPSHOT_EXPIRY_MS);
-    },
-    beforeIosEnd: async token => {
-      return storage.transaction(async tx => {
-        const current = refreshStateSchema.parse(await tx.get(key));
-        if (current.revision !== request.revision) return false;
-        // Each revision sends at most one end per token. Keep its obligation separate.
-        await tx.put(`${iosEndPrefix(token)}${key}:${request.revision}`, true);
-        return true;
-      });
-    },
-    onIosEndRejected: async token => {
-      // A delayed rejection releases only its attempt, not another pending or accepted end.
-      await storage.delete(`${iosEndPrefix(token)}${key}:${request.revision}`);
-    },
+  // Content-free success evidence for the one-build-per-window invariant
+  // (§4.15 rules: identifiers and aggregate counts, never session content).
+  // Without this line a passing delivery window leaves no trace in the
+  // notifications log and the per-scope window cannot be audited.
+  console.log({
+    event: 'glanceable_snapshot_build',
+    scope: [scope.userId, scope.organizationId],
+    revision: request.revision,
+    trailing: options.trailing === true,
+    status: committed.status,
+    running: committed.running,
+    needsInput: committed.needsInput,
+    idle: committed.idle,
+    needsApproval: committed.needsApproval ?? 0,
   });
+
+  const eligible = committed.running + committed.needsInput + committed.idle > 0;
+  try {
+    await deliverGlanceableSnapshot(scope, {
+      ...deps,
+      buildSnapshot: async () => committed,
+      apnsTimestampSeconds: request.apnsTimestampSeconds,
+      isCurrent: async () => {
+        const current = refreshStateSchema.parse(await storage.get(key));
+        return current.revision === request.revision;
+      },
+      listIosActivityTokens: async (userId, organizationId) => {
+        const tokens = await deps.listIosActivityTokens(userId, organizationId);
+        const current = refreshStateSchema.parse(await storage.get(key));
+        if (current.revision !== request.revision) return [];
+        const withoutFencedStarts = await dropFencedStarts(tokens, storage, {
+          prefix: iosStartPrefix,
+          key: iosStartKey,
+        });
+        // Empty work can retry ends. Eligible work excludes every accepted or uncertain end.
+        if (!eligible) return withoutFencedStarts;
+        const retiring = await Promise.all(
+          withoutFencedStarts.map(async ({ token, kind }) =>
+            kind === 'ios_activity'
+              ? (await storage.list({ prefix: iosEndPrefix(token), limit: 1 })).size > 0
+              : false
+          )
+        );
+        return withoutFencedStarts.filter((_, index) => !retiring[index]);
+      },
+      onIosStarted: async token => {
+        // Hold the fence for the whole maximum life of the card it raised. An
+        // orphan card cannot be ended remotely, so a second one would simply sit
+        // beside it until ActivityKit dismisses them both.
+        await storage.put(iosStartKey(token), Date.now() + GLANCEABLE_SNAPSHOT_EXPIRY_MS);
+      },
+      beforeIosEnd: async token => {
+        return storage.transaction(async tx => {
+          const current = refreshStateSchema.parse(await tx.get(key));
+          if (current.revision !== request.revision) return false;
+          // Each revision sends at most one end per token. Keep its obligation separate.
+          await tx.put(`${iosEndPrefix(token)}${key}:${request.revision}`, true);
+          return true;
+        });
+      },
+      onIosEndRejected: async token => {
+        // A delayed rejection releases only its attempt, not another pending or accepted end.
+        await storage.delete(`${iosEndPrefix(token)}${key}:${request.revision}`);
+      },
+    });
+  } catch (error) {
+    // A failed attempt still spent the window: the send reached for every
+    // device (or the transport is down for all of them), and without a
+    // recorded window every later change inside GLANCEABLE_DELIVERY_MIN_INTERVAL_MS
+    // retries the whole build+send at once — a failing transport turns each
+    // session flip into another burst of builds and device wakes. One attempt
+    // per window per scope, and the trailing refresh still carries the final
+    // counts at the window end. Re-check the revision first so a superseded
+    // attempt opens no window (same rule as the delivered path below), and
+    // keep any pending trailing refresh so the deferred change still lands.
+    // The error propagates: the entrypoints' existing failure logs stay the
+    // per-attempt evidence.
+    const current = refreshStateSchema.optional().parse(await storage.get(key));
+    if (current?.revision === request.revision) {
+      await storage.put(deliveryKey, { deliveredAt: nowMs() });
+    }
+    throw error;
+  }
+
+  // A superseded delivery sent nothing: a newer revision already owns the
+  // surface, so opening a window or cancelling its trailing refresh here would
+  // drop the change that superseded this one. Re-check the revision first.
+  const current = refreshStateSchema.optional().parse(await storage.get(key));
+  if (current?.revision !== request.revision) return;
+
+  // A delivered snapshot starts the next window and cancels the trailing
+  // refresh it superseded. A deferral written while this delivery was in flight
+  // (an approval-exempt delivery can run inside an open window) is not in the
+  // snapshot, so keep it: its counts must still land on the trailing alarm.
+  await storage.put(deliveryKey, { deliveredAt: nowMs() });
+  const pendingAfterDelivery = pendingRefreshSchema
+    .optional()
+    .parse(await storage.get(pendingKey(scope)));
+  if (isSameDeferral(pendingBeforeDelivery, pendingAfterDelivery)) {
+    await storage.delete(pendingKey(scope));
+  }
+  // One delivery event per window per scope; the trailing flush's line carries
+  // the final counts so a deferred burst settles on them.
+  console.log({
+    event: 'glanceable_delivery',
+    scope: [scope.userId, scope.organizationId],
+    revision: request.revision,
+    trailing: options.trailing === true,
+    status: committed.status,
+    running: committed.running,
+    needsInput: committed.needsInput,
+    idle: committed.idle,
+    needsApproval: committed.needsApproval ?? 0,
+  });
+}
+
+/**
+ * Deliver every deferred refresh whose window has elapsed, then report the
+ * earliest deadline still pending so the caller can reschedule its alarm.
+ *
+ * A scope that throws must not abort the sweep or the DO's idem GC, so each
+ * refresh is isolated. The pending record is consumed before the refresh runs,
+ * so a refresh that throws (a rejected build or a rejected transport) re-arms
+ * the record here: a build that returns no snapshot re-arms itself, and a
+ * record written while the sweep runs is caught by the second list. Either way
+ * the deferred change keeps a deadline instead of being dropped.
+ */
+export async function flushDueGlanceableRefreshes(
+  storage: DurableObjectStorage,
+  deps: GlanceableDeliveryDeps,
+  nowMs: () => number = Date.now
+): Promise<number | null> {
+  const pending = await storage.list<PendingGlanceableRefresh>({ prefix: PENDING_PREFIX });
+  for (const [key, record] of pending) {
+    if (record.dueAt > nowMs()) continue;
+    await storage.delete(key);
+    try {
+      await refreshGlanceableSnapshot(
+        { userId: record.userId, organizationId: record.organizationId },
+        storage,
+        deps,
+        nowMs,
+        { trailing: true }
+      );
+    } catch (error) {
+      console.warn('Glanceable trailing refresh failed', {
+        scope: [record.userId, record.organizationId],
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // The refresh threw before it could deliver or re-arm itself: the build
+      // rejected (a network/DNS failure on the snapshot route) or the transport
+      // rejected. The pending record was consumed above, so re-arm the next
+      // window or the deferred counts are dropped with no alarm left to retry
+      // them. A record written while the refresh ran already owns the key and a
+      // later deadline; only an empty slot is re-armed. The next window, not
+      // now, so a persistently failing route is retried once per window instead
+      // of spinning the alarm.
+      if ((await storage.get(key)) === undefined) {
+        const now = nowMs();
+        await storage.put<PendingGlanceableRefresh>(key, {
+          userId: record.userId,
+          organizationId: record.organizationId,
+          dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+          deferredAt: now,
+        });
+      }
+    }
+  }
+
+  // Re-list so a record written during the sweep is not stranded.
+  return earliestPendingGlanceableRefresh(storage);
+}
+
+/**
+ * Earliest `dueAt` among the pending refreshes still stored, or null when none
+ * remains. The alarm sweep re-reads this after its awaits so a deferral that
+ * landed mid-sweep is not overwritten by the alarm it schedules.
+ */
+export async function earliestPendingGlanceableRefresh(
+  storage: DurableObjectStorage
+): Promise<number | null> {
+  const remaining = await storage.list<PendingGlanceableRefresh>({ prefix: PENDING_PREFIX });
+  let earliest: number | null = null;
+  for (const [, record] of remaining) {
+    if (earliest === null || record.dueAt < earliest) earliest = record.dueAt;
+  }
+  return earliest;
+}
+
+/**
+ * Fold the earliest pending glanceable deadline into the alarm the sweep chose.
+ * The sweep awaits between choosing `candidate` and setting it, so a deferral
+ * that landed in between must not be overwritten by the later `candidate`.
+ */
+export async function foldPendingGlanceableRefreshDeadline(
+  storage: DurableObjectStorage,
+  candidate: number | undefined
+): Promise<number | undefined> {
+  const pending = await earliestPendingGlanceableRefresh(storage);
+  if (pending === null) return candidate;
+  return candidate === undefined || pending < candidate ? pending : candidate;
 }
 
 /**

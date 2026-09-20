@@ -14,6 +14,13 @@ import { useMotionPolicy } from '@/lib/a11y/motion';
 
 type UseSessionListAutoScrollParams = {
   itemCount: number;
+  /**
+   * Key of `items.at(-1)` (the newest item) or `null` for an empty list.
+   * The item-count effect only schedules a scroll when this key changes, so
+   * prepending an older page (count grows, newest unchanged) can never yank
+   * the viewport back to the newest message.
+   */
+  newestItemKey: string | null;
   resetKey: string;
   /**
    * Whether the session opens following the newest message. Default true keeps
@@ -42,6 +49,7 @@ type UseSessionListAutoScrollParams = {
  */
 export function useSessionListAutoScroll<ItemT>({
   itemCount,
+  newestItemKey,
   resetKey,
   initialAutoScroll = true,
   resumeKey = null,
@@ -76,6 +84,10 @@ export function useSessionListAutoScroll<ItemT>({
   // (see the reset effect) while a drag's claim outranks the link.
   const sendTakeoverRef = useRef(false);
   const lastContentHeightRef = useRef(0);
+  // Newest item key seen by the previous render. The item-count effect
+  // compares against it to tell a genuine append (newest key changed) from
+  // an older page landing (count grew, newest key untouched).
+  const lastNewestItemKeyRef = useRef<string | null>(null);
   const autoScrollResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoScrollRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userScrollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -193,35 +205,39 @@ export function useSessionListAutoScroll<ItemT>({
     [clearAutoScrollResetTimeout]
   );
 
-  const scheduleScrollToLatestMessage = useCallback(() => {
-    if (
-      !shouldScheduleSessionAutoScroll({
-        isAutoScrolling: isAutoScrollingRef.current,
-        isUserScrolling: isUserScrollingRef.current,
-        shouldAutoScroll: shouldAutoScrollRef.current,
-      })
-    ) {
-      return;
-    }
-    scrollToLatestMessage();
-    clearAutoScrollRetryTimeout();
-    autoScrollRetryTimeoutRef.current = setTimeout(() => {
-      autoScrollRetryTimeoutRef.current = null;
-      // The 80ms safety-net retry must not gate on `isAutoScrolling`:
-      // a programmatic scroll that's still within its 150ms window
-      // would otherwise suppress the retry and make it dead during the
-      // highest-frequency streaming window. It still honours the
-      // user-facing and follow-bottom guards.
+  const scheduleScrollToLatestMessage = useCallback(
+    (newestKeyChanged = true) => {
       if (
-        shouldRetrySessionAutoScroll({
+        !shouldScheduleSessionAutoScroll({
+          isAutoScrolling: isAutoScrollingRef.current,
           isUserScrolling: isUserScrollingRef.current,
           shouldAutoScroll: shouldAutoScrollRef.current,
+          newestKeyChanged,
         })
       ) {
-        scrollToLatestMessage();
+        return;
       }
-    }, 80);
-  }, [clearAutoScrollRetryTimeout, scrollToLatestMessage]);
+      scrollToLatestMessage();
+      clearAutoScrollRetryTimeout();
+      autoScrollRetryTimeoutRef.current = setTimeout(() => {
+        autoScrollRetryTimeoutRef.current = null;
+        // The 80ms safety-net retry must not gate on `isAutoScrolling`:
+        // a programmatic scroll that's still within its 150ms window
+        // would otherwise suppress the retry and make it dead during the
+        // highest-frequency streaming window. It still honours the
+        // user-facing and follow-bottom guards.
+        if (
+          shouldRetrySessionAutoScroll({
+            isUserScrolling: isUserScrollingRef.current,
+            shouldAutoScroll: shouldAutoScrollRef.current,
+          })
+        ) {
+          scrollToLatestMessage();
+        }
+      }, 80);
+    },
+    [clearAutoScrollRetryTimeout, scrollToLatestMessage]
+  );
 
   // A new session resets the follow policy and the sticky takeover flag. A
   // policy that flips on its own mid-session — a `?at=` resume whose anchor
@@ -251,16 +267,19 @@ export function useSessionListAutoScroll<ItemT>({
     const initial = getInitialSessionListAutoScrollVisibility({ followTail: initialAutoScroll });
     shouldAutoScrollRef.current = initial.shouldAutoScroll;
     lastContentHeightRef.current = 0;
+    lastNewestItemKeyRef.current = null;
     userInteractedRef.current = false;
     sendTakeoverRef.current = false;
     setIsAtBottom(prev => (prev === initial.isAtBottom ? prev : initial.isAtBottom));
   }, [resetKey, initialAutoScroll, resumeKey]);
 
   useEffect(() => {
-    if (itemCount > 0 && shouldAutoScrollRef.current && !isUserScrollingRef.current) {
-      scheduleScrollToLatestMessage();
+    const newestKeyChanged = lastNewestItemKeyRef.current !== newestItemKey;
+    lastNewestItemKeyRef.current = newestItemKey;
+    if (itemCount > 0) {
+      scheduleScrollToLatestMessage(newestKeyChanged);
     }
-  }, [itemCount, scheduleScrollToLatestMessage]);
+  }, [itemCount, newestItemKey, scheduleScrollToLatestMessage]);
 
   useEffect(
     () => () => {

@@ -20,11 +20,10 @@ type AgentSessionProviderProps = {
   children: ReactNode;
   organizationId?: string;
   /**
-   * The account the manager's persisted transcript is scoped to when the live
-   * owner is not confirmed — a cold start with the API unreachable, where the
-   * route resolves the scope from the encrypted read cache instead. The live
-   * owner always wins, so this only ever restores a transcript the same
-   * credentials already own.
+   * The account resolved from the encrypted read cache on a cold start whose
+   * live owner is not confirmed yet — the API is unreachable, so the route
+   * cannot confirm the credentials. The live owner always wins; a restored id
+   * only keeps this manager alive while the same credentials still own it.
    */
   restoredUserId?: string;
 };
@@ -37,18 +36,17 @@ export function AgentSessionProvider({
   const userWebConnection = useUserWebConnection();
   const storeRef = useRef(createStore());
   const managerRef = useRef<SessionManager | null>(null);
-  // Capture the owner before the manager is created so its transcript cache is
-  // scoped to this account. The route keys the provider on the owner, so a new
-  // account gets a new manager; the scope falls back to the restored id only
-  // while the live owner is unconfirmed, and `?? ''` makes the manager skip the
-  // cache if neither is known.
+  // Capture the owner before the manager is created so the effect below can
+  // fence this manager to the account that mounted it. The route keys the
+  // provider on the resolved scope, so a new account gets a new manager; a
+  // restored id keeps the manager alive only while the live owner is
+  // unconfirmed, and `?? ''` means neither scope is known.
   const owner = useRef(getAuthenticatedOwner()).current;
   const scopeUserId = owner.userId ?? restoredUserId ?? '';
   managerRef.current ??= createMobileAgentSessionManager({
     store: storeRef.current,
     userWebConnection,
     organizationId,
-    userId: scopeUserId,
   });
 
   // The provider only mounts on the agent-chat route, so the route's session id

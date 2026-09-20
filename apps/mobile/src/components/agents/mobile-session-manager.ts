@@ -27,16 +27,11 @@ import {
 } from '@/lib/cloud-agent-stream-ticket';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import { trpcClient } from '@/lib/trpc';
-import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 import { answerSessionPermission } from '@/lib/glanceable/approve-ask';
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
 import { cacheFilePart } from '@/components/agents/file-part-cache';
-import {
-  readSessionTranscriptPage,
-  writeSessionTranscriptPage,
-} from '@/lib/persist/session-transcript-cache';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { i18n } from '@/i18n';
 
@@ -173,11 +168,11 @@ type CreateMobileAgentSessionManagerOptions = {
   userWebConnection: UserWebConnection;
   organizationId?: string;
   /**
-   * The authenticated owner the cached transcript is scoped to. Empty means
-   * the owner is not confirmed yet, in which case the cache is skipped
-   * entirely rather than writing to a shared anonymous scope.
+   * The authenticated owner, accepted for the headless notification manager
+   * that scopes its work by the active user id. The manager's own persisted
+   * transcript cache is gone, so this scope is no longer read here.
    */
-  userId: string;
+  userId?: string;
 };
 
 const skipBatchOptions = { context: { skipBatch: true } };
@@ -186,7 +181,6 @@ export function createMobileAgentSessionManager({
   store,
   userWebConnection,
   organizationId: initialOrganizationId,
-  userId,
 }: Readonly<CreateMobileAgentSessionManagerOptions>): SessionManager {
   // The route resolves the session's organization from its metadata read, but
   // that read can be paused (offline) or stalled when the route mounts the
@@ -205,21 +199,12 @@ export function createMobileAgentSessionManager({
     sessionId: KiloSessionId;
     cloudAgentSessionId: CloudAgentSessionId | null;
   } | null = null;
-  // The auth epoch this manager was created under. A transcript-cache write
-  // captured before a sign-out/sign-in must not land in the previous account's
-  // scope, so the write path re-checks this epoch (same fence as the read
-  // cache's persister).
-  const transcriptOwner = { userId, authEpoch: currentAuthEpoch() };
   return createSessionManager({
     store,
     websocketBaseUrl: CLOUD_AGENT_WS_URL,
     websocketHeaders: { Origin: WEB_BASE_URL },
     lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
     userWebConnection,
-    // Thin cache passthrough: `readSessionTranscriptPage` already returns the
-    // promise and no-ops on an empty owner.
-    // eslint-disable-next-line @typescript-eslint/promise-function-async -- passthrough returns the promise directly
-    readCachedSnapshotPage: (id: KiloSessionId) => readSessionTranscriptPage(userId, id),
     // A tRPC call whose client control-plane deadline expired never got an
     // answer: the open is stalled, not failed. The manager keeps the skeleton
     // (then the slow-load state with Retry) instead of a premature error
@@ -304,12 +289,6 @@ export function createMobileAgentSessionManager({
     },
     fetchSnapshotPage: async (id: KiloSessionId, options: { cursor?: string }) => {
       const outcome = await fetchMobileSessionSnapshotPage(id, options);
-      // Only the first page (no cursor) is cached: it holds the newest
-      // messages, which is what a warm open paints before the live refresh.
-      // Best effort — the write never affects the returned page.
-      if (outcome.kind === 'success' && options.cursor === undefined) {
-        void writeSessionTranscriptPage(transcriptOwner, id, outcome);
-      }
       return outcome;
     },
     api: {

@@ -41,7 +41,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/organization-invoice-download.ts': 'filename comparison',
   'lib/agent-attachments/validate.ts': 'file-extension normalization',
   'lib/auth/passkey-client.ts':
-    'native credential-API credential-error classification key, not display text',
+    'native passkey error and credential-API credential-error classification key, case-insensitive and not display text; display copy uses catalog keys',
   'lib/auth/use-native-auth.ts': 'email normalization',
   'lib/telemetry/install-error-reporting.ts': 'hostname comparison',
   'lib/pr-review/diff/highlight.ts': 'file-extension normalization',

@@ -19,6 +19,18 @@ const { assignColorValue } = AndroidConfig.Colors;
  * pasted over the screen instead of a modal in the app's language
  * (explorer-signout-confirm, 2026-09-19).
  *
+ * Android is the one platform that has the capability this overlay uses, and
+ * the only one that needs it: React Native renders `Alert.alert()` as
+ * AppCompat's `AlertDialog` there, and that dialog resolves its panel and
+ * accent from the activity theme, so the theme is where app tokens can reach
+ * it. iOS renders the same call as a `UIAlertController`, which already follows
+ * the device's light/dark appearance (`userInterfaceStyle: 'automatic'` in
+ * app.config.ts) and exposes no supported override for its panel or accent —
+ * the platform has no app-token capability to target, so it gets no half here
+ * and none may be invented. One shared `Alert.alert()` call site serves both
+ * platforms; this plugin is the only platform-specific piece on the path, and
+ * src/lib/alert-dialog-platform-parity.test.ts holds it to that.
+ *
  * The generated styles.xml is a prebuild output (`/android` is git-ignored),
  * so the theme and the colors it names are declared here, beside the
  * rotation-surface plugin that pins `android:windowBackground` the same way.

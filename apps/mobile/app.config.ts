@@ -365,7 +365,9 @@ const config: ExpoConfig = {
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
     // Alert dialogs (Alert.alert) follow the app theme too: AppCompat's
-    // DayNight defaults are #424242 / teal, not the app's surfaces.
+    // DayNight defaults are #424242 / teal, not the app's surfaces. Android-only
+    // by capability — iOS's UIAlertController already follows the system
+    // appearance and takes no app-token override (see the plugin's doc comment).
     './plugins/withAndroidAlertDialogTheme',
     './plugins/withAndroidExpoModuleRepos',
     // Writes the app target's single `Localizable.strings` per language: the

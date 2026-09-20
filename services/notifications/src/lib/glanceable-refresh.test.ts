@@ -6,6 +6,7 @@ import type { ActiveAgentsGlanceable, GlanceableDeliveryDeps } from './glanceabl
 import {
   foldPendingGlanceableRefreshDeadline,
   flushDueGlanceableRefreshes,
+  flushDueGlanceableRefreshesSafely,
   GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
   refreshGlanceableSnapshot,
 } from './glanceable-refresh';
@@ -55,6 +56,18 @@ class FakeStorage {
 
   async setAlarm(scheduledTime: number | Date): Promise<void> {
     this.alarmTime = typeof scheduledTime === 'number' ? scheduledTime : scheduledTime.getTime();
+  }
+}
+
+/** Fails `list` for one prefix, as a transient storage error would. */
+class FailingListStorage extends FakeStorage {
+  constructor(private readonly failingPrefix: string) {
+    super();
+  }
+
+  override async list<T>(options: { prefix?: string; limit?: number } = {}): Promise<Map<string, T>> {
+    if (options.prefix === this.failingPrefix) throw new Error('storage unavailable');
+    return super.list<T>(options);
   }
 }
 
@@ -313,6 +326,56 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     release.resolve();
     // The superseded trailing fetch must not re-arm a redundant device wake.
     await expect(trailing).resolves.toBeNull();
+    expect(await h.storage.get(key)).toBeUndefined();
+  });
+
+  it('cancels a re-armed trailing refresh when the superseding delivery lands afterwards', async () => {
+    const h = makeHarness();
+    const base = 82_500_000;
+    let now = base;
+    const scope = { userId: 'user-rearm-race', organizationId: null };
+    const key = pendingKey('user-rearm-race', null);
+    // The flush consumes this due record; its write time is what the re-arm
+    // must preserve so the later delivery still sees the change as covered.
+    await h.storage.put(key, {
+      userId: 'user-rearm-race',
+      organizationId: null,
+      dueAt: now - 1,
+      deferredAt: now - 2,
+    });
+
+    // The trailing build stalls so a concurrent refresh can bump the revision
+    // and reach its transport before the trailing fetch re-arms.
+    const started = Promise.withResolvers<void>();
+    const releaseBuild = Promise.withResolvers<void>();
+    let build = 0;
+    h.deps.buildSnapshot = async () => {
+      build += 1;
+      if (build === 1) {
+        started.resolve();
+        await releaseBuild.promise;
+        return null;
+      }
+      return snapshot({ running: 5 });
+    };
+
+    const trailing = flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now);
+    await started.promise;
+
+    // The superseding delivery is in flight — revision bumped, delivery record
+    // not yet written — when the trailing fetch re-arms.
+    now = base + 1_000;
+    const gate = h.blockNextExpoPush();
+    const delivery = refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+    await gate.started;
+    releaseBuild.resolve();
+    await trailing;
+    expect(await h.storage.get(key)).toMatchObject({ deferredAt: base - 2 });
+
+    // Its snapshot already covers the deferred change, so the re-arm must not
+    // survive the delivery as a redundant device wake.
+    gate.release();
+    await delivery;
     expect(await h.storage.get(key)).toBeUndefined();
   });
 
@@ -603,12 +666,14 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       outcome: 'failed',
     });
     // A throwing trailing delivery keeps the deferred counts: re-armed for the
-    // next window instead of dropped with no retry left.
+    // next window instead of dropped with no retry left. The re-arm keeps the
+    // deferral's original write time so a delivery that lands later still
+    // recognises it as covered.
     expect(await h.storage.get(pendingKey('user-failed-send', null))).toEqual({
       userId: 'user-failed-send',
       organizationId: null,
       dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
-      deferredAt: now,
+      deferredAt: base + 2_000,
     });
   });
 
@@ -1024,6 +1089,29 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       deferredAt: now + 1,
     });
   });
+
+  it('contains a failing flush sweep so the caller can still run its own sweep', async () => {
+    const h = makeHarness();
+    const now = 1_000;
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const storage = new FailingListStorage('glanceable-pending:');
+    await storage.put(pendingKey('user-sweep', null), {
+      userId: 'user-sweep',
+      organizationId: null,
+      dueAt: now,
+    });
+
+    // The sweep's own storage read rejects. The guard must absorb it so the
+    // caller's GC pass still runs instead of the alarm aborting here.
+    await expect(
+      flushDueGlanceableRefreshesSafely(asStorage(storage), h.deps, () => now)
+    ).resolves.toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Glanceable trailing refresh sweep failed',
+      expect.objectContaining({ error: 'storage unavailable' })
+    );
+    expect(h.builds).toBe(0);
+  });
 });
 
 describe('NotificationChannelDO alarm glanceable flush', () => {
@@ -1094,5 +1182,60 @@ describe('NotificationChannelDO alarm glanceable flush', () => {
     await expect(foldPendingGlanceableRefreshDeadline(asStorage(storage), undefined)).resolves.toBe(
       5_000
     );
+  });
+
+  it('runs the idem/rate-limit GC even when the glanceable flush fails', async () => {
+    const id = env.NOTIFICATION_CHANNEL_DO.idFromName('user-glanceable-gc');
+    const stub = env.NOTIFICATION_CHANNEL_DO.get(id);
+    const now = Date.now();
+    const dueAt = now + 30_000;
+
+    await runInDurableObject(stub, async (_instance, state) => {
+      await state.storage.put('idem:expired', { stage: 'delivered', ts: now - 2 * 60 * 60 * 1000 });
+      await state.storage.put('rl:expired', { expiresAt: now - 1_000, timestamps: [] });
+      await state.storage.put('glanceable-pending:["user-glanceable-gc",null]', {
+        userId: 'user-glanceable-gc',
+        organizationId: null,
+        dueAt,
+      });
+    });
+
+    await runInDurableObject(stub, async (instance, state) => {
+      // The flush's first pending-prefix read rejects; the guard must absorb it
+      // so the GC below still runs. Later reads (the fold) succeed.
+      const mutable = state.storage as unknown as {
+        list: (options?: { prefix?: string }) => Promise<unknown>;
+      };
+      const originalList = state.storage.list.bind(state.storage);
+      let pendingLists = 0;
+      mutable.list = (options?: { prefix?: string }) => {
+        if (options?.prefix === 'glanceable-pending:' && ++pendingLists === 1) {
+          return Promise.reject(new Error('storage unavailable'));
+        }
+        return originalList(options);
+      };
+      try {
+        await (instance as unknown as { alarm: () => Promise<void> }).alarm();
+      } finally {
+        delete (mutable as { list?: unknown }).list;
+      }
+    });
+
+    const result = await runInDurableObject(stub, async (_instance, state) => ({
+      idem: await state.storage.get('idem:expired'),
+      rl: await state.storage.get('rl:expired'),
+      pending: await state.storage.get<{ dueAt: number }>(
+        'glanceable-pending:["user-glanceable-gc",null]'
+      ),
+      alarm: await state.storage.getAlarm(),
+    }));
+
+    // A failing flush no longer skips the sweep's storage reclamation.
+    expect(result.idem).toBeUndefined();
+    expect(result.rl).toBeUndefined();
+    // The deferred counts are not dropped: the record and its deadline survive
+    // the failed flush, so the trailing delivery is rescheduled.
+    expect(result.pending?.dueAt).toBe(dueAt);
+    expect(result.alarm).toBe(dueAt);
   });
 });

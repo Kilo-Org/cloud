@@ -79,36 +79,55 @@ function isSameDeferral(
  *
  * `buildSnapshot` is awaited after the revision bump, so a concurrent refresh
  * for this scope can deliver while the fetch is in flight. That delivery
- * already covers the change; re-arming would leave a record its
- * `isSameDeferral` check keeps and the alarm would later fire a redundant
- * build+send. Skip the re-arm only when such a delivery actually landed, told
- * by the outcome in the record it wrote: the failure branch writes the same
- * record with `outcome: 'failed'` after spending the window, and treating that
- * as a landed delivery would drop the deferred change with no pending record
- * and no alarm left to retry it. A record without an outcome predates the field
- * and only ever meant a delivery.
+ * already covers the change; re-arming would leave a record the alarm later
+ * fires a redundant build+send for. Two things keep that from happening:
+ *
+ * - The delivery record is read and the re-arm is written in one transaction,
+ *   the same slot the superseding delivery writes. If the delivery commits
+ *   first this read sees it and skips; if the re-arm commits first the
+ *   delivery's own landing transaction sees the re-arm and removes it. A plain
+ *   read-then-write pair would let the delivery land in between and leave a
+ *   record behind.
+ * - The re-arm keeps the deferral's original write time in `deferredAt`. The
+ *   landing transaction cancels a pending record whose change predates the
+ *   delivery's revision, so a re-arm written while the delivery was in flight
+ *   is still recognised as superseded. Without the preserved time its own
+ *   `deferredAt` would look newer than the snapshot and survive.
+ *
+ * Skip the re-arm when a delivery actually landed, told by the outcome in the
+ * record it wrote: the failure branch writes the same record with
+ * `outcome: 'failed'` after spending the window, and treating that as a landed
+ * delivery would drop the deferred change with no pending record and no alarm
+ * left to retry it. A record without an outcome predates the field and only
+ * ever meant a delivery. A pending record already in the slot is a newer
+ * deferral this flush did not consume; leave its deadline alone.
  */
 async function rearmTrailingRefresh(
   scope: { userId: string; organizationId: string | null },
   storage: DurableObjectStorage,
   deliveryKey: string,
   deliveryAtStart: DeliveryState | undefined,
+  deferredChangeAt: number | undefined,
   nowMs: () => number
 ): Promise<void> {
-  const landed = deliveryStateSchema.optional().parse(await storage.get(deliveryKey));
-  if (
-    landed !== undefined &&
-    landed.outcome !== 'failed' &&
-    landed.deliveredAt !== deliveryAtStart?.deliveredAt
-  ) {
-    return;
-  }
+  const pendingK = pendingKey(scope);
   const now = nowMs();
-  await storage.put<PendingGlanceableRefresh>(pendingKey(scope), {
-    userId: scope.userId,
-    organizationId: scope.organizationId,
-    dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
-    deferredAt: now,
+  await storage.transaction(async tx => {
+    const landed = deliveryStateSchema.optional().parse(await tx.get(deliveryKey));
+    if (
+      landed !== undefined &&
+      landed.outcome !== 'failed' &&
+      landed.deliveredAt !== deliveryAtStart?.deliveredAt
+    ) {
+      return;
+    }
+    if ((await tx.get(pendingK)) !== undefined) return;
+    await tx.put<PendingGlanceableRefresh>(pendingK, {
+      userId: scope.userId,
+      organizationId: scope.organizationId,
+      dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      deferredAt: deferredChangeAt ?? now,
+    });
   });
 }
 
@@ -118,7 +137,7 @@ export async function refreshGlanceableSnapshot(
   storage: DurableObjectStorage,
   deps: GlanceableDeliveryDeps,
   nowMs: () => number = Date.now,
-  options: { trailing?: boolean; approvalChanged?: boolean } = {}
+  options: { trailing?: boolean; approvalChanged?: boolean; deferredAt?: number } = {}
 ): Promise<void> {
   const scope = scopeSchema.parse(params);
   const key = `glanceable:${JSON.stringify([scope.userId, scope.organizationId])}`;
@@ -192,7 +211,7 @@ export async function refreshGlanceableSnapshot(
     // credentials fail, and the flush has already consumed the pending record,
     // so re-arm the next window instead of dropping the change with no alarm.
     if (options.trailing === true) {
-      await rearmTrailingRefresh(scope, storage, deliveryKey, delivery, nowMs);
+      await rearmTrailingRefresh(scope, storage, deliveryKey, delivery, options.deferredAt, nowMs);
     }
     return;
   }
@@ -222,7 +241,7 @@ export async function refreshGlanceableSnapshot(
     // deferred change unless a delivery actually landed, exactly as the
     // no-snapshot branch above does.
     if (options.trailing === true) {
-      await rearmTrailingRefresh(scope, storage, deliveryKey, delivery, nowMs);
+      await rearmTrailingRefresh(scope, storage, deliveryKey, delivery, options.deferredAt, nowMs);
     }
     return;
   }
@@ -318,16 +337,31 @@ export async function refreshGlanceableSnapshot(
   if (current?.revision !== request.revision) return;
 
   // A delivered snapshot starts the next window and cancels the trailing
-  // refresh it superseded. A deferral written while this delivery was in flight
-  // (an approval-exempt delivery can run inside an open window) is not in the
-  // snapshot, so keep it: its counts must still land on the trailing alarm.
-  await storage.put(deliveryKey, { deliveredAt: nowMs(), outcome: 'delivered' });
-  const pendingAfterDelivery = pendingRefreshSchema
-    .optional()
-    .parse(await storage.get(pendingKey(scope)));
-  if (isSameDeferral(pendingBeforeDelivery, pendingAfterDelivery)) {
-    await storage.delete(pendingKey(scope));
-  }
+  // refresh it superseded. The record write and the cancel are one transaction
+  // so the re-arm in `rearmTrailingRefresh` cannot interleave: whichever
+  // commits second sees the other and either skips or removes the record, so a
+  // re-arm can never survive as a redundant device wake.
+  const deliveredAt = nowMs();
+  const deliveredRevisionAt = Date.parse(request.updatedAt);
+  await storage.transaction(async tx => {
+    await tx.put(deliveryKey, { deliveredAt, outcome: 'delivered' });
+    const pendingAfterDelivery = pendingRefreshSchema
+      .optional()
+      .parse(await tx.get(pendingKey(scope)));
+    if (pendingAfterDelivery === undefined) return;
+    // A deferral whose change predates this delivery's revision is in the
+    // snapshot, whether it was the one this delivery superseded or a re-arm
+    // written while the delivery was in flight (a re-arm carries the original
+    // deferral's write time). A deferral written after the revision (an
+    // approval-exempt delivery can run inside an open window) is not in the
+    // snapshot, so keep it: its counts must still land on the trailing alarm.
+    const supersededByRevision =
+      pendingAfterDelivery.deferredAt !== undefined &&
+      pendingAfterDelivery.deferredAt <= deliveredRevisionAt;
+    if (isSameDeferral(pendingBeforeDelivery, pendingAfterDelivery) || supersededByRevision) {
+      await tx.delete(pendingKey(scope));
+    }
+  });
   // One delivery event per window per scope; the trailing flush's line carries
   // the final counts so a deferred burst settles on them.
   console.log({
@@ -369,7 +403,7 @@ export async function flushDueGlanceableRefreshes(
         storage,
         deps,
         nowMs,
-        { trailing: true }
+        { trailing: true, deferredAt: record.deferredAt }
       );
     } catch (error) {
       console.warn('Glanceable trailing refresh failed', {
@@ -383,14 +417,17 @@ export async function flushDueGlanceableRefreshes(
       // them. A record written while the refresh ran already owns the key and a
       // later deadline; only an empty slot is re-armed. The next window, not
       // now, so a persistently failing route is retried once per window instead
-      // of spinning the alarm.
+      // of spinning the alarm. Keep the consumed record's write time: a delivery
+      // that lands later covers that change and cancels this record, while a
+      // fresh `now` would look newer than the delivery's snapshot and survive as
+      // a redundant wake.
       if ((await storage.get(key)) === undefined) {
         const now = nowMs();
         await storage.put<PendingGlanceableRefresh>(key, {
           userId: record.userId,
           organizationId: record.organizationId,
           dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
-          deferredAt: now,
+          deferredAt: record.deferredAt ?? now,
         });
       }
     }
@@ -398,6 +435,29 @@ export async function flushDueGlanceableRefreshes(
 
   // Re-list so a record written during the sweep is not stranded.
   return earliestPendingGlanceableRefresh(storage);
+}
+
+/**
+ * `flushDueGlanceableRefreshes` with its own failures contained. The
+ * NotificationChannelDO alarm runs the flush before its idem/rate-limit GC, and
+ * that GC is storage reclamation that must not be skipped by a transient
+ * glanceable failure (a rejected `list`, a bug in the sweep). The alarm re-reads
+ * the pending deadlines after the GC, so a swallowed failure still reschedules
+ * the trailing delivery instead of stranding it.
+ */
+export async function flushDueGlanceableRefreshesSafely(
+  storage: DurableObjectStorage,
+  deps: GlanceableDeliveryDeps,
+  nowMs: () => number = Date.now
+): Promise<number | null> {
+  try {
+    return await flushDueGlanceableRefreshes(storage, deps, nowMs);
+  } catch (error) {
+    console.warn('Glanceable trailing refresh sweep failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
 }
 
 /**

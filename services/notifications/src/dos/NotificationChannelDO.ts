@@ -20,7 +20,7 @@ import { sendPushNotifications } from '../lib/expo-push';
 import { glanceableDeliveryDeps } from '../lib/glanceable-delivery-deps';
 import {
   foldPendingGlanceableRefreshDeadline,
-  flushDueGlanceableRefreshes,
+  flushDueGlanceableRefreshesSafely,
   refreshGlanceableSnapshot,
 } from '../lib/glanceable-refresh';
 import { expoPushExtrasForPushData } from '../lib/push-message-extras';
@@ -484,8 +484,11 @@ export class NotificationChannelDO extends DurableObject<Env> {
     const now = Date.now();
     // Deliver any glanceable refresh the rate-limit window deferred. Its
     // remaining deadline folds into this sweep's alarm so the trailing
-    // delivery is not stranded when no idem/rl record outlives it.
-    const dueGlanceableRefreshAt = await flushDueGlanceableRefreshes(
+    // delivery is not stranded when no idem/rl record outlives it. The flush runs
+    // safely: a failure inside it must not skip the idem/rate-limit GC below,
+    // which is storage reclamation. The fold re-reads the pending deadlines, so
+    // a failed flush still reschedules the trailing delivery.
+    const dueGlanceableRefreshAt = await flushDueGlanceableRefreshesSafely(
       this.ctx.storage,
       glanceableDeliveryDeps(this.env)
     );

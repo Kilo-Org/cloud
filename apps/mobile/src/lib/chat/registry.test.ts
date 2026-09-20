@@ -29,6 +29,8 @@ let finish: (() => void) | undefined = undefined;
 let failOpenFor: string | undefined = undefined;
 /** A session id whose stored tool names no longer resolve, so the mover can be. */
 let missingToolsFor: string | undefined = undefined;
+/** A session id whose stored names no longer resolve when it is cloned onto. */
+let missingCloneFor: string | undefined = undefined;
 /** A session id whose history read fails, so the half-open path can be exercised. */
 let failHistoryFor: string | undefined = undefined;
 /** Every session whose scope was closed, so a leaked one can be told from one released. */
@@ -108,10 +110,15 @@ vi.mock('@kilocode/harness-sdk', () => {
       return openInScope(id);
     },
     cloneSession: (
-      _id: string,
+      id: string,
       onto: { readonly tools?: readonly string[]; readonly model?: string } | undefined
     ) => {
       clonedWith = onto;
+      /* A clone that names no tools keeps the stored set, so it is the one that
+         fails when the registry no longer holds those names. */
+      if (missingCloneFor === id && onto?.tools === undefined) {
+        return Effect.fail(new FakeToolMissingError());
+      }
       return Effect.succeed(handleFor('s2'));
     },
   };
@@ -204,6 +211,7 @@ beforeEach(async () => {
   finish = undefined;
   failOpenFor = undefined;
   missingToolsFor = undefined;
+  missingCloneFor = undefined;
   failHistoryFor = undefined;
   clonedWith = undefined;
   openedWith = undefined;
@@ -328,6 +336,28 @@ describe('the Kilo MCP tools a chat is opened with', () => {
     /* The chat it opened is released here, so the session it moved onto does
        not outlive the test that made it. */
     await releaseChat('stale');
+  });
+
+  it('moves onto another model on the names it holds when the stored ones no longer resolve', async () => {
+    mcp.tools.push(discovered);
+    await releaseChat(opened);
+    opened = await startChat(place, 'kilo/one');
+    await settled();
+    expect(openedWith?.tools).toEqual(['time', 'mcp_kilo_read-file']);
+
+    /* A call that did not reach the server dropped the tools from the registry,
+       so the session is stored naming one nothing holds. Switching the model
+       must still move the chat rather than report the send as failed. */
+    mcp.tools.length = 0;
+    missingCloneFor = opened;
+
+    await say(opened, 'second', 'kilo/two');
+    await settled();
+
+    expect(clonedWith).toEqual({ model: 'kilo/two', tools: ['time'] });
+    expect(snapshotOf(opened).failed).toBeNull();
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+    expect(asked.at(-1)).toEqual({ sessionId: 's2', text: 'second' });
   });
 
   it('retries a failed discovery and moves the chat onto the tools that answered', async () => {

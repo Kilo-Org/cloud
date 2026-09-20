@@ -232,8 +232,18 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
   await work;
 }
 
+/** A session that opened, or nothing when the names it was opened with no longer resolve. */
+type Opened =
+  | { readonly opened: false }
+  | {
+      readonly opened: true;
+      readonly handle: SessionHandle;
+      readonly scope: Scope.CloseableScope;
+    };
+
 /**
- * Reopens the stored session, answering whether its names still resolve.
+ * Opens a session in a scope of its own, answering nothing rather than throwing
+ * when the names it was opened with no longer resolve.
  *
  * A session that names a tool the registry no longer holds fails here rather
  * than opening: the names are frozen for the life of a session, so the caller
@@ -241,17 +251,12 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
  * of the exit is what tells that case from every other way an open can fail —
  * a thrown failure is wrapped by the runtime and loses its type.
  */
-async function continueOrMissing(
+async function openOrMissing<E>(
   runtime: ChatRuntime,
-  sessionId: string
-): Promise<
-  | { readonly opened: false }
-  | { readonly opened: true; readonly handle: SessionHandle; readonly scope: Scope.CloseableScope }
-> {
+  opened: Effect.Effect<SessionHandle, E, ChatContext | Scope.Scope>
+): Promise<Opened> {
   const scope = await runtime.runPromise(Scope.make());
-  const exit = await runtime.runPromise(
-    Effect.exit(Scope.extend(continueSession(sessionId), scope))
-  );
+  const exit = await runtime.runPromise(Effect.exit(Scope.extend(opened, scope)));
   if (Exit.isSuccess(exit)) {
     return { opened: true, handle: exit.value, scope };
   }
@@ -276,7 +281,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   /* The stored names are what the session was opened with, and a continued
      session may not change them. Discovering the server first is what makes
      them resolve again after a restart. */
-  const opened = await continueOrMissing(runtime, sessionId);
+  const opened = await openOrMissing(runtime, continueSession(sessionId));
   if (!opened.opened) {
     /* The stored names no longer resolve: the server's tool list moved on, or
        the server is down while the session was stored with its tools. The chat
@@ -507,6 +512,11 @@ type Onto = {
  *
  * The chat may not be open yet: a stored session whose names no longer resolve
  * is moved by reopening it, and there is no live session to close or record.
+ *
+ * A move onto another model keeps the tools the session was stored with, and
+ * those can be names the registry has since dropped — a Kilo MCP call that did
+ * not reach the server clears them — so the copy falls back to the names it
+ * holds now rather than reporting the send as failed.
  */
 async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<string> {
   const chat = chats.get(sessionId);
@@ -520,7 +530,7 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
     return sessionId;
   }
   const runtime = await runtimeFor(chat ?? place);
-  const { handle, scope } = await inOwnScope(runtime, cloneSession(sessionId, wanted));
+  const { handle, scope } = await cloneOnto(runtime, sessionId, wanted);
   const database = await open();
   moveChat(database, { from: sessionId, to: handle.id, at: Date.now() });
   await moveAsked(sessionId, handle.id);
@@ -546,6 +556,40 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
   }
   forgetSession(database, sessionId);
   return handle.id;
+}
+
+/**
+ * Copies the session onto another model or tool set, on names the registry can
+ * still resolve.
+ *
+ * A copy the caller gives no tools to keeps the ones the session was stored
+ * with, and those can be the Kilo MCP tools the registry has since dropped: a
+ * call that did not reach the server clears them, so the next move onto another
+ * model would fail with `ToolMissingError` and the question would be reported
+ * as failed rather than asked. The copy then names what the registry holds now,
+ * which is the same fallback an open takes for a stored session whose names no
+ * longer resolve.
+ */
+async function cloneOnto(
+  runtime: ChatRuntime,
+  sessionId: string,
+  wanted: Onto
+): Promise<{ readonly handle: SessionHandle; readonly scope: Scope.CloseableScope }> {
+  const cloned = await openOrMissing(runtime, cloneSession(sessionId, wanted));
+  if (cloned.opened) {
+    return cloned;
+  }
+  if (wanted.tools !== undefined) {
+    /* The caller named the tools, so a name nothing holds is its own mistake
+       rather than a stored set that moved on. */
+    throw new Error('the chat was moved onto a tool the registry does not hold');
+  }
+  const tools = chatToolNames(await mcpEnabledFor(sessionId));
+  const again = await openOrMissing(runtime, cloneSession(sessionId, { ...wanted, tools }));
+  if (!again.opened) {
+    throw new Error('the chat names a tool the registry does not hold');
+  }
+  return again;
 }
 
 /**

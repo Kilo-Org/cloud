@@ -16,10 +16,20 @@ import {
 } from './fixed-part-row.mounted.test-helpers';
 import { ToolSummaryTranslationScope } from './tool-summary-translation-scope';
 
-const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
+const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
+  requestMock: vi.fn(),
+  readMock: vi.fn(),
+  writeMock: vi.fn(),
+}));
 
 vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
-  requestToolSummaryTranslation: requestMock,
+  requestToolSummaryTranslations: requestMock,
+}));
+// The encrypted-KV cache is a native module, loaded by the runtime's dynamic
+// import; mock it the same way as the client so this suite stays native-free.
+vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
+  readToolSummaryTranslations: readMock,
+  writeToolSummaryTranslation: writeMock,
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -275,7 +285,11 @@ function renderScopedRowSync(props: RowProps): TestRenderer.ReactTestRenderer {
   };
   act(() => {
     rendererRef.current = TestRenderer.create(
-      createElement(ToolSummaryTranslationScope, null, createElement(FixedPartRow, props))
+      createElement(ToolSummaryTranslationScope, {
+        itemId: 'part-1',
+        // eslint-disable-next-line no-children-prop -- the scope's props require children; the variadic form does not typecheck
+        children: createElement(FixedPartRow, props),
+      })
     );
   });
   const renderer = rendererRef.current;
@@ -288,9 +302,9 @@ function renderScopedRowSync(props: RowProps): TestRenderer.ReactTestRenderer {
 async function settleTranslation(): Promise<void> {
   await act(async () => {
     for (let i = 0; i < 5; i += 1) {
-      // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the dynamic import and request
+      // eslint-disable-next-line no-await-in-loop -- real time for the batch window, then the macrotask that settles the dynamic import and request
       await new Promise<void>(resolve => {
-        setImmediate(resolve);
+        setTimeout(resolve, 20);
       });
     }
   });
@@ -299,11 +313,15 @@ async function settleTranslation(): Promise<void> {
 describe('FixedPartRow tool-summary translation', () => {
   beforeEach(() => {
     requestMock.mockReset();
+    readMock.mockReset();
+    writeMock.mockReset();
+    readMock.mockResolvedValue([]);
+    writeMock.mockResolvedValue(undefined);
     setConfig({ enabled: false, model: MODEL });
   });
 
   it('translates the visible label and the spoken summary inside the scope', async () => {
-    requestMock.mockResolvedValue('Lire le fichier');
+    requestMock.mockResolvedValue(['Lire le fichier']);
     setConfig({ enabled: true, model: MODEL });
     const renderer = renderScopedRowSync({
       icon: Eye,
@@ -324,7 +342,7 @@ describe('FixedPartRow tool-summary translation', () => {
   });
 
   it('keeps the raw label and makes no request outside the scope while enabled', async () => {
-    requestMock.mockResolvedValue('Traduit');
+    requestMock.mockResolvedValue(['Traduit']);
     setConfig({ enabled: true, model: MODEL });
     const renderer = await renderRow({
       icon: Eye,
@@ -363,7 +381,7 @@ describe('FixedPartRow tool-summary translation', () => {
   });
 
   it('keeps the raw label and makes no request inside the scope while disabled', async () => {
-    requestMock.mockResolvedValue('Traduit');
+    requestMock.mockResolvedValue(['Traduit']);
     setConfig({ enabled: false, model: MODEL });
     const renderer = renderScopedRowSync({
       icon: Eye,
@@ -383,7 +401,7 @@ describe('FixedPartRow tool-summary translation', () => {
   });
 
   it('keeps the raw label and makes no request for a non-translatable label', async () => {
-    requestMock.mockResolvedValue('Traduit');
+    requestMock.mockResolvedValue(['Traduit']);
     setConfig({ enabled: true, model: MODEL });
     const renderer = renderScopedRowSync({
       icon: Eye,

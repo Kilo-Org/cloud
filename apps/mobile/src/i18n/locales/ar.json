@@ -3351,7 +3351,9 @@
     "couldNotApprove": "تعذّرت الموافقة",
     "couldNotStart": "تعذّر البدء",
     "channelName": "الوكلاء النشطون",
-    "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل."
+    "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل.",
+    "openSession": "افتح",
+    "approveFailed": "تعذّر الموافقة. اضغط على $t(common.approve) للمحاولة مرة أخرى."
   },
   "transcriptionModel": {
     "title": "نموذج التفريغ الصوتي",

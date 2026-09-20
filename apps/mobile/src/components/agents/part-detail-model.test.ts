@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   findPartById,
   getPartDetailTitle,
+  type PartDetailTitle,
   shouldAutoFollowPartDetail,
   shouldCenterPartDetail,
 } from './part-detail-model';
@@ -98,37 +99,42 @@ describe('findPartById', () => {
   });
 });
 
+/** A prefixless, non-translatable title: reasoning and the non-tool fallback. */
+function untranslated(text: string): PartDetailTitle {
+  return { prefix: null, text, translatable: false };
+}
+
 describe('getPartDetailTitle', () => {
   beforeEach(() => {
     getToolDisplay.mockReset();
   });
 
-  it('combines the display title and subtitle for tools and carries its translatable provenance', () => {
+  it('translates the row subtitle under the display title prefix and carries its provenance', () => {
     getToolDisplay.mockReturnValue({ title: 'bash', subtitle: 'echo hi', translatable: true });
     expect(getPartDetailTitle(makeToolPart())).toEqual({
-      title: 'bash: echo hi',
+      prefix: 'bash',
+      text: 'echo hi',
       translatable: true,
     });
+    getToolDisplay.mockReturnValue({ title: 'glob', translatable: false });
+    expect(getPartDetailTitle(makeToolPart({ tool: 'glob' }))).toEqual(untranslated('glob'));
   });
 
-  it('uses the display title alone when the tool has no subtitle', () => {
-    getToolDisplay.mockReturnValue({ title: 'glob', translatable: false });
-    expect(getPartDetailTitle(makeToolPart({ tool: 'glob' }))).toEqual({
-      title: 'glob',
-      translatable: false,
-    });
+  it('falls back to the tool title when the row subtitle is empty', () => {
+    // A bash call whose `description` is '' projects an empty subtitle; the
+    // header must show the tool title rather than a blank.
+    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: '', translatable: true });
+    expect(getPartDetailTitle(makeToolPart())).toEqual(untranslated('bash'));
   });
 
   it('never marks reasoning or other part types translatable', () => {
-    expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toEqual({
-      title: 'Thinking',
-      translatable: false,
-    });
-    expect(getPartDetailTitle(makeReasoningPart('reasoning', true))).toEqual({
-      title: 'Thought',
-      translatable: false,
-    });
-    expect(getPartDetailTitle(makeTextPart())).toEqual({ title: 'Details', translatable: false });
+    expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toEqual(
+      untranslated('Thinking')
+    );
+    expect(getPartDetailTitle(makeReasoningPart('reasoning', true))).toEqual(
+      untranslated('Thought')
+    );
+    expect(getPartDetailTitle(makeTextPart())).toEqual(untranslated('Details'));
   });
 });
 

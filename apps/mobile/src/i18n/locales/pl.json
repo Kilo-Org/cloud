@@ -3265,7 +3265,9 @@
     "couldNotApprove": "Nie udało się zatwierdzić",
     "couldNotStart": "Nie udało się uruchomić",
     "channelName": "Aktywni agenci",
-    "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
+    "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady.",
+    "openSession": "Otwórz",
+    "approveFailed": "Nie udało się zatwierdzić. Dotknij $t(common.approve), aby spróbować ponownie."
   },
   "transcriptionModel": {
     "title": "Model transkrypcji",

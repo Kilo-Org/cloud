@@ -59,7 +59,7 @@ export function ChildSessionSection({
 
   const { agentName, taskName, translatable, latestActivity }: ChildSessionCardState =
     getChildSessionCardState(part, childMessages);
-  const shownTaskName = useTranslatedToolSummary(taskName, translatable);
+  const shownTaskName = useTranslatedToolSummary(taskName, translatable, part.id);
   const latestActivityLabel = getChildSessionActivityLabel(latestActivity);
   const modelLabel = getChildSessionModelLabel(childMessages, modelOptions ?? []);
 

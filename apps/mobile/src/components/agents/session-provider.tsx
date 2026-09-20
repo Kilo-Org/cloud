@@ -10,7 +10,7 @@ import {
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 import {
   getAuthenticatedOwner,
-  isAuthenticatedOwner,
+  isCurrentOwner,
   subscribeAuthenticatedOwner,
 } from '@/lib/context-scope';
 
@@ -19,18 +19,30 @@ const ManagerContext = createContext<SessionManager | null>(null);
 type AgentSessionProviderProps = {
   children: ReactNode;
   organizationId?: string;
+  /**
+   * The account resolved from the encrypted read cache on a cold start whose
+   * live owner is not confirmed yet — the API is unreachable, so the route
+   * cannot confirm the credentials. The live owner always wins; a restored id
+   * only keeps this manager alive while the same credentials still own it.
+   */
+  restoredUserId?: string;
 };
 
 export function AgentSessionProvider({
   children,
   organizationId,
+  restoredUserId,
 }: Readonly<AgentSessionProviderProps>) {
   const userWebConnection = useUserWebConnection();
   const storeRef = useRef(createStore());
   const managerRef = useRef<SessionManager | null>(null);
-  // Capture the owner so the effect below retires this manager if it changes.
-  // The route keys the provider on the owner, so a new account gets a new manager.
+  // Capture the owner before the manager is created so the effect below can
+  // fence this manager to the account that mounted it. The route keys the
+  // provider on the resolved scope, so a new account gets a new manager; a
+  // restored id keeps the manager alive only while the live owner is
+  // unconfirmed, and `?? ''` means neither scope is known.
   const owner = useRef(getAuthenticatedOwner()).current;
+  const scopeUserId = owner.userId ?? restoredUserId ?? '';
   managerRef.current ??= createMobileAgentSessionManager({
     store: storeRef.current,
     userWebConnection,
@@ -65,8 +77,10 @@ export function AgentSessionProvider({
 
   useEffect(() => {
     const manager = managerRef.current;
+    // Ownership revocation must destroy the manager; a restored scope keeps it
+    // alive only while the captured credentials are still current.
     const retire = () => {
-      if (!isAuthenticatedOwner(owner)) {
+      if (scopeUserId === '' || !isCurrentOwner(owner)) {
         manager?.destroy();
       }
     };
@@ -76,7 +90,7 @@ export function AgentSessionProvider({
       unsubscribe();
       manager?.destroy();
     };
-  }, [owner]);
+  }, [owner, scopeUserId]);
 
   return (
     <JotaiProvider store={storeRef.current}>

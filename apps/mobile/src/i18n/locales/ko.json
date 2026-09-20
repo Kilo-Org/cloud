@@ -163,6 +163,7 @@
     "useDifferentEmail": "다른 이메일 사용",
     "signInWithApple": "Apple로 로그인",
     "signInWithGoogle": "Google로 로그인",
+    "signInWithPasskey": "패스키로 로그인",
     "emailAddress": "이메일 주소",
     "emailPlaceholder": "email@example.com",
     "continueWithEmail": "이메일로 계속하기",
@@ -175,6 +176,10 @@
     "termsConnector": " 및 ",
     "termsSuffix": "에 동의합니다.",
     "moreSignInOptions": "다른 방법으로 로그인",
+    "passkeyCancelled": "패스키 로그인이 취소되었습니다. 다시 시도하세요.",
+    "passkeyNotFound": "이 기기에 저장된 패스키가 없습니다. 대신 Apple, Google 또는 이메일로 로그인하세요.",
+    "passkeyUnsupported": "이 기기에서는 패스키를 사용할 수 없습니다. 대신 Apple, Google 또는 이메일로 로그인하세요.",
+    "passkeyFailed": "패스키로 로그인하지 못했습니다. 다시 시도하세요.",
     "couldNotCompleteSignIn": "로그인을 완료할 수 없습니다. 다시 시도하세요.",
     "sessionEnded": "세션이 종료되었습니다. 다시 로그인하세요.",
     "signInCodeExpired": "로그인 코드가 만료되었습니다. 다시 시도하세요.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "테스트 계정",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "엔터프라이즈 SSO"
+    "providerEnterpriseSso": "엔터프라이즈 SSO",
+    "passkeysTitle": "패스키",
+    "passkeysSubtitle": "비밀번호 없이 로그인",
+    "passkeysEmpty": "아직 패스키가 없습니다",
+    "passkeysEmptyHint": "$t(profile.addPasskey)하여 비밀번호 없이 로그인하세요.",
+    "passkeysCouldNotLoad": "패스키를 불러오지 못했습니다",
+    "passkeysLoadFailed": "이 항목이 로드될 때까지 패스키를 사용할 수 없습니다.",
+    "addPasskey": "패스키 추가",
+    "passkeyDefaultName": "패스키",
+    "passkeyAddedOn": "{{date}}에 추가됨",
+    "passkeyAdded": "패스키가 추가되었습니다.",
+    "passkeyAddFailed": "패스키를 추가하지 못했습니다. 다시 시도하세요.",
+    "passkeyAddUnsupported": "이 기기에서는 패스키를 만들 수 없습니다.",
+    "passkeyAddCancelled": "패스키 생성이 취소되었습니다.",
+    "passkeyRemoved": "패스키가 제거되었습니다.",
+    "passkeyRemoveFailed": "해당 패스키를 제거하지 못했습니다. 다시 시도하세요.",
+    "passkeyRenamed": "패스키 이름이 변경되었습니다.",
+    "passkeyName": "패스키 이름",
+    "renamePasskey": "패스키 이름 변경",
+    "removePasskey": "패스키 제거",
+    "removePasskeyTitle": "패스키를 제거할까요?",
+    "removePasskeyMessage": "이 패스키로는 더 이상 로그인할 수 없습니다."
   },
   "preferences": {
     "general": "일반",
@@ -293,7 +319,7 @@
     "previewFullDescription": "잠금 화면의 알림에 메시지 내용이 표시됩니다.",
     "previewGenericDescription": "알림에는 새 소식이 있다는 사실만 표시됩니다. 내용을 읽으려면 Kilo를 여세요.",
     "channel": {
-      "agent": "에이전트 세션",
+      "agentProgress": "에이전트 진행 상황",
       "chat": "채팅 메시지",
       "kiloclaw": "KiloClaw 활동",
       "balance": "잔액 알림",
@@ -310,6 +336,15 @@
       "kiloclawActivitySubtitle": "인스턴스 준비 완료 및 실패, 예약된 작업",
       "balanceAlertsSubtitle": "조직 잔액 부족 경고",
       "securityFindingsSubtitle": "새 보안 문제 및 SLA 알림"
+    },
+    "action": {
+      "openSession": "세션 열기"
+    },
+    "needsInputAction": {
+      "approved": "요청이 승인되었습니다",
+      "replied": "답장을 보냈습니다",
+      "failed": "답변하지 못했습니다. 다시 탭하여 재시도하세요.",
+      "unavailable": "이 요청은 더 이상 대기 중이 아닙니다."
     }
   },
   "tabs": {
@@ -390,7 +425,9 @@
       "uploadFailed": "업로드하지 못했습니다.",
       "failedToUploadFile": "파일을 업로드하지 못했습니다. 사유: {{reason}}",
       "nothingToPaste": "붙여넣을 내용이 없습니다.",
-      "metadataStripFailed": "사진 메타데이터를 제거하지 못했습니다."
+      "metadataStripFailed": "사진 메타데이터를 제거하지 못했습니다.",
+      "limit_one": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
+      "limit_other": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, 상태: {{status}}",
@@ -1159,7 +1196,11 @@
       "syncNow": "지금 동기화",
       "syncQueued": "동기화를 대기열에 추가했습니다.",
       "syncStatusUnavailable": "동기화 상태를 확인할 수 없습니다.",
-      "withinDeadline": "기한 내"
+      "withinDeadline": "기한 내",
+      "daysOverdue_one": "기한 {{displayCount}}일 초과",
+      "daysOverdue_other": "기한 {{displayCount}}일 초과",
+      "findingsCount_one": "발견된 문제 {{displayCount}}건",
+      "findingsCount_other": "발견된 문제 {{displayCount}}건"
     },
     "dashboardMetrics": {
       "openFindings": "미해결 문제",
@@ -1641,20 +1682,7 @@
       "continueFrom": "{{title}} 세션을 이어서 진행합니다.",
       "importingSession": "세션 가져오는 중",
       "cliCannotContinue": "이 CLI에서는 세션을 이어서 진행할 수 없습니다. Cloud Agent 또는 다른 CLI를 선택하세요.",
-      "importFailed": "이 세션을 가져올 수 없습니다.",
-      "sandbox": "샌드박스",
-      "sandboxAccessibility": "샌드박스: {{label}}",
-      "sandboxDefaultWithDestination": "기본값 · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "소형",
-      "sandboxInstanceShared": "공유",
-      "sandboxInstanceLarge": "대형",
-      "sandboxInstanceDevcontainer": "개발 컨테이너",
-      "sandboxInstanceProviderDefault": "공급자 기본값",
-      "sandboxCouldNotLoad": "샌드박스 옵션을 불러올 수 없습니다",
-      "sandboxUnavailable": "이 샌드박스는 사용할 수 없습니다. 다른 샌드박스 또는 기본값을 선택하세요.",
-      "sandboxUseDefault": "기본값 사용"
+      "importFailed": "이 세션을 가져올 수 없습니다."
     },
     "partRenderer": {
       "updatedFileCount_one": "파일 {{displayCount}}개를 업데이트했습니다.",
@@ -1678,7 +1706,13 @@
       "updateTodos": "할 일 업데이트",
       "linesBadge": "{{displayCount}}줄",
       "filesBadge": "파일 {{displayCount}}개",
-      "matchesBadge": "{{displayCount}}건 일치"
+      "matchesBadge": "{{displayCount}}건 일치",
+      "filesBadge_one": "파일 {{displayCount}}개",
+      "filesBadge_other": "파일 {{displayCount}}개",
+      "linesBadge_one": "{{displayCount}}줄",
+      "linesBadge_other": "{{displayCount}}줄",
+      "matchesBadge_one": "{{displayCount}}건 일치",
+      "matchesBadge_other": "{{displayCount}}건 일치"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}줄 (일부 생략)",
@@ -1968,7 +2002,11 @@
       "files": "파일",
       "couldNotOpenPhotoPicker": "사진 선택 화면을 열지 못했습니다. Kilo를 다시 시작한 후 다시 시도하세요.",
       "maxFilesAllowed": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
-      "onlyAddingFiles": "파일 {{total}}개 중 {{accepted}}개만 추가 (최대 {{max}}개)"
+      "onlyAddingFiles": "파일 {{total}}개 중 {{accepted}}개만 추가 (최대 {{max}}개)",
+      "maxFilesAllowed_one": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
+      "maxFilesAllowed_other": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
+      "onlyAddingFiles_one": "파일 {{total}}개 중 {{accepted}}개만 추가 (최대 {{max}}개)",
+      "onlyAddingFiles_other": "파일 {{total}}개 중 {{accepted}}개만 추가 (최대 {{max}}개)"
     },
     "composer": {
       "addAttachment": "첨부 파일 추가",
@@ -1986,7 +2024,9 @@
       "discardAttachmentsMessage": "보낸 메시지에 첨부되지 않은 업로드 파일이 삭제됩니다.",
       "discardAttachmentsTitle": "첨부 파일을 삭제할까요?",
       "charactersRemaining": "{{count}}자 남음",
-      "insertNewline": "줄바꿈 삽입"
+      "insertNewline": "줄바꿈 삽입",
+      "charactersRemaining_one": "{{count}}자 남음",
+      "charactersRemaining_other": "{{count}}자 남음"
     },
     "chatLink": {
       "linkCopied": "링크를 복사했습니다.",
@@ -2058,7 +2098,9 @@
       "stepsCount_one": "{{steps}}단계",
       "stepsCount": "{{steps}}단계",
       "stepsCount_other": "{{steps}}단계",
-      "modelAccessibilityLabel": "{{name}}, 제공업체: {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, 제공업체: {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "모델 ({{displayCount}})",
+      "modelsCount_other": "모델 ({{displayCount}})"
     },
     "autoApprove": {
       "title": "자동 승인",
@@ -2098,7 +2140,9 @@
     },
     "toolRun": {
       "sheetTitle": "도구 호출",
-      "condensedLabel": "{{itemCount}}개 항목; {{last}}"
+      "condensedLabel": "{{itemCount}}개 항목; {{last}}",
+      "condensedLabel_one": "{{itemCount}}개 항목; {{last}}",
+      "condensedLabel_other": "{{itemCount}}개 항목; {{last}}"
     }
   },
   "bootstrap": {
@@ -2233,7 +2277,9 @@
     "cliCantReceiveFilesTitle": "파일을 받을 수 없는 세션",
     "cliCantReceiveFilesMessage": "이 세션을 실행하는 Kilo CLI가 파일을 받을 수 없습니다. 해당 컴퓨터에서 CLI를 업데이트하거나 새 세션으로 공유하세요.",
     "contentlessMessage": "텍스트나 파일이 없어 공유할 내용이 없습니다.",
-    "couldNotReadContent": "공유된 내용을 읽지 못했습니다."
+    "couldNotReadContent": "공유된 내용을 읽지 못했습니다.",
+    "onlyFirstFilesAttached_one": "처음 {{displayCount}}개의 파일만 첨부됩니다.",
+    "onlyFirstFilesAttached_other": "처음 {{displayCount}}개의 파일만 첨부됩니다."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2541,7 +2587,9 @@
         "outdatedOnPath": "{{path}} · 이전 버전"
       },
       "deletedUser": "삭제된 사용자",
-      "replyForbiddenTerm": "이 {{term}}에 답글을 달 권한이 없습니다."
+      "replyForbiddenTerm": "이 {{term}}에 답글을 달 권한이 없습니다.",
+      "moreLinesAbove_one": "… 위에 {{displayCount}}줄이 더 있습니다.",
+      "moreLinesAbove_other": "… 위에 {{displayCount}}줄이 더 있습니다."
     },
     "entry": {
       "eyebrow": "URL로 풀 리퀘스트 또는 머지 요청 열기",
@@ -2639,7 +2687,17 @@
       "loadingLines": "{{total}}줄 중 {{loaded}}줄 불러오는 중…",
       "loadingMoreFiles": "파일 더 불러오는 중…",
       "retryLoadingContext": "주변 코드 불러오기 다시 시도",
-      "retryLoadingNextPage": "다음 페이지 불러오기 다시 시도"
+      "retryLoadingNextPage": "다음 페이지 불러오기 다시 시도",
+      "expandAllLines_one": "{{displayCount}}줄 모두 펼치기",
+      "expandAllLines_other": "{{displayCount}}줄 모두 펼치기",
+      "expandLines_one": "{{displayCount}}줄 펼치기 ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}}줄 펼치기 ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "주변 코드 {{displayCount}}줄 펼치기",
+      "expandLinesOfContext_other": "주변 코드 {{displayCount}}줄 펼치기",
+      "expandMoreLines_one": "{{displayCount}}줄 더 펼치기 ({{start}}–{{end}})",
+      "expandMoreLines_other": "{{displayCount}}줄 더 펼치기 ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "파일 {{total}}개 중 {{loaded}}개 불러옴",
+      "loadedOfTotalFiles_other": "파일 {{total}}개 중 {{loaded}}개 불러옴"
     },
     "inbox": {
       "couldNotLoad": "받은 편지함을 불러오지 못했습니다.",
@@ -2836,7 +2894,9 @@
       "statusContext": "변경 없음",
       "lineLabel": "{{status}}, {{line}}번 줄: {{text}}",
       "lineLabelNoNumber": "{{status}}, {{text}}",
-      "emptyLine": "(비어 있음)"
+      "emptyLine": "(비어 있음)",
+      "truncationBanner_one": "GitHub API 제한으로 변경된 파일 {{total}}개 중 처음 {{limit}}개만 표시합니다.",
+      "truncationBanner_other": "GitHub API 제한으로 변경된 파일 {{total}}개 중 처음 {{limit}}개만 표시합니다."
     },
     "linkPasteClipboardEmpty": "클립보드가 비어 있습니다.",
     "linkPasteNotAPullRequest": "풀 리퀘스트 또는 머지 요청 링크가 아닙니다",
@@ -3093,7 +3153,9 @@
     "couldNotApprove": "승인할 수 없음",
     "couldNotStart": "시작할 수 없음",
     "channelName": "활성 에이전트",
-    "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요."
+    "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요.",
+    "openSession": "열기",
+    "approveFailed": "승인하지 못했습니다. 다시 시도하려면 $t(common.approve)을 탭하세요."
   },
   "transcriptionModel": {
     "title": "음성 텍스트 변환 모델",

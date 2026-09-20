@@ -56,7 +56,7 @@ import {
 /** Chat events — data mutations for messages and parts. */
 export type ChatEvent =
   | { type: 'message.updated'; info: Message }
-  | { type: 'message.part.updated'; part: Part }
+  | { type: 'message.part.updated'; part: Part; time?: number | undefined }
   | {
       type: 'message.part.delta';
       sessionId: string;
@@ -335,7 +335,11 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     case 'message.part.updated': {
       const r = messagePartUpdatedDataSchema.safeParse(data);
       if (!r.success) return null;
-      return { type: 'message.part.updated', part: r.data.part as Part };
+      return {
+        type: 'message.part.updated',
+        part: r.data.part as Part,
+        ...(r.data.time === undefined ? {} : { time: r.data.time }),
+      };
     }
 
     case 'message.part.delta': {

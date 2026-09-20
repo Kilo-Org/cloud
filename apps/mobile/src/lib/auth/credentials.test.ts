@@ -98,6 +98,12 @@ vi.mock('@/lib/persist/read-cache', () => ({
   clearCacheScopeForSignOut: vi.fn().mockResolvedValue(undefined),
   readCachedUserId: vi.fn().mockReturnValue(null),
 }));
+// The offline tool-summary translation scope: `clearToolSummaryTranslationsForSignOut`
+// imports the encrypted KV store, whose expo-crypto binding crashes the node
+// environment, so the sign-out graph must not load the real module here.
+vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
+  clearToolSummaryTranslationsForSignOut: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@/lib/pr-review/recent-prs', () => ({
   clearRecentPrs: vi.fn().mockResolvedValue(undefined),
 }));
@@ -140,6 +146,13 @@ vi.mock('@/lib/agent-attachments/clipboard-image', () => ({
 
 vi.mock('@/lib/temp-file-registry', () => ({
   reapTempFiles: vi.fn(),
+}));
+
+// The sign-out teardown's OS search clear reaches the root `expo` entry, which
+// reads `__DEV__` at import time and does not parse under the node test
+// environment. The clear is a no-op here.
+vi.mock('@/lib/native-system-search', () => ({
+  clearSystemSearchIndex: vi.fn().mockResolvedValue(undefined),
 }));
 
 import * as SecureStore from 'expo-secure-store';

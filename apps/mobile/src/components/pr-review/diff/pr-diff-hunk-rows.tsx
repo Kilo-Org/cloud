@@ -101,6 +101,7 @@ export function ExpandSeparatorRow({
     ? t('prReview.hunkRows.expandMoreContext')
     : t('prReview.hunkRows.expandContext');
   if (!isUnknownEnd) {
+    // i18n-dup-ok: 'prReview.hunkRows.expandMoreLines_other' and 'prReview.hunkRows.expandLines_other' are these counted messages' plural other categories — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
     expandText = isPartial
       ? t('prReview.hunkRows.expandMoreLines', {
           count: windowSize,
@@ -125,6 +126,7 @@ export function ExpandSeparatorRow({
         className="flex-row items-center gap-1 active:opacity-70"
         accessibilityRole="button"
         accessibilityLabel={
+          // i18n-dup-ok: 'prReview.hunkRows.expandLinesOfContext_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
           isUnknownEnd
             ? t('prReview.hunkRows.expandContext')
             : t('prReview.hunkRows.expandLinesOfContext', {
@@ -140,6 +142,7 @@ export function ExpandSeparatorRow({
         </Text>
       </Pressable>
       {canExpandAll ? (
+        // i18n-dup-ok: 'prReview.hunkRows.expandAllLines_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
         <Pressable
           onPress={() => {
             onLoad(gapSize);
@@ -221,7 +224,13 @@ export function PaginationRow({
     return (
       <View className="flex-row items-center justify-center gap-3 py-4">
         <Text variant="muted" className="text-xs">
+          {/* i18n-dup-ok: 'prReview.hunkRows.loadedOfTotalFiles_one' and 'prReview.hunkRows.loadedOfTotalFiles_other' are this counted message's plural categories, not two keys for one string — English reads the same at every count, but fr and zu inflect the one-form, so the family stays. */}
           {t('prReview.hunkRows.loadedOfTotalFiles', {
+            // The loaded count drives the plural category: a catalog inflects
+            // the participle on the number of files actually loaded
+            // ("1 fichier chargé sur 5"). English carries the plural noun
+            // because the page set, not the loaded page, names the files.
+            count: loadedFiles,
             loaded: formatNumber(loadedFiles, i18n.language),
             total: totalFiles == null ? '?' : formatNumber(totalFiles, i18n.language),
           })}

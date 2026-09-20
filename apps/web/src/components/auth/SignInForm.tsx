@@ -6,6 +6,7 @@ import { TurnstileView } from '@/components/auth/sign-in/TurnstileView';
 import { ProviderSelectView } from '@/components/auth/sign-in/ProviderSelectView';
 import { EmailInputForm } from '@/components/auth/sign-in/EmailInputForm';
 import { AuthProviderButtons } from '@/components/auth/sign-in/AuthProviderButtons';
+import { PasskeySignInButton } from '@/components/auth/sign-in/PasskeySignInButton';
 import { SignInButton } from '@/components/auth/SigninButton';
 import { Separator } from '@/components/ui/separator';
 import { FakeLoginForm } from '@/components/auth/FakeLoginForm';
@@ -18,6 +19,7 @@ import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
 import { useChatGptSignInAccess } from '@/hooks/useChatGptSignInAccess';
 import { OAuthProviderIds, type AuthProviderId } from '@/lib/auth/provider-metadata';
 import { buildEnterpriseSsoHref, buildNormalSignInHref } from '@/lib/auth/sign-in-navigation';
+import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
 
 /**
  * 'Sign in with ChatGPT' is restricted by the PostHog flag's email allow-list.
@@ -158,6 +160,9 @@ export function SignInForm({
   // Landing state - render based on tier
   // ────────────────────────────────────
 
+  // A passkey sign-in lands where the other providers land.
+  const passkeyCallbackUrl = getSignInCallbackUrl(searchParams);
+
   return (
     <>
       {allowFakeLogin && <FakeLoginForm searchParams={searchParams} />}
@@ -203,13 +208,16 @@ export function SignInForm({
                 const lastAuthMethod = hint.lastAuthMethod;
 
                 if (lastAuthMethod === 'workos' && hint.orgId) {
-                  // SSO user - only show SSO button, no "other methods" option
+                  // SSO user - no "other methods" discovery, so the SSO button is
+                  // the whole list of remembered methods; a passkey the user
+                  // registered is offered beside it rather than behind a link.
                   const orgId = hint.orgId;
                   return (
                     <div className="mx-auto max-w-md space-y-4">
                       <SignInButton onClick={() => flow.handleSSOContinue(orgId)}>
                         Sign in with Enterprise SSO
                       </SignInButton>
+                      <PasskeySignInButton callbackUrl={passkeyCallbackUrl} />
                     </div>
                   );
                 }
@@ -235,6 +243,9 @@ export function SignInForm({
 
                 return (
                   <div className="mx-auto max-w-md space-y-4">
+                    {/* A passkey sits beside the remembered provider, never replacing it */}
+                    <PasskeySignInButton callbackUrl={passkeyCallbackUrl} />
+
                     {/* Preferred provider button only */}
                     <AuthProviderButtons
                       providers={displayedProviders}
@@ -374,6 +385,8 @@ export function SignInForm({
                 // Provider buttons view (initial state)
                 <>
                   <div className="space-y-2">
+                    {/* Passkey sign-in sits above the OAuth providers; none of them move */}
+                    <PasskeySignInButton callbackUrl={passkeyCallbackUrl} />
                     {/* OAuth provider buttons - Google first */}
                     <AuthProviderButtons
                       providers={withoutChatGptWhenUnavailable(OAuthProviderIds, chatGptAllowed)}

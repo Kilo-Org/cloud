@@ -8,6 +8,16 @@ jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
   resolveOpenAiChatGptAccessToken: jest.fn(),
   OPENAI_CHATGPT_RECONNECT_MESSAGE: 'Your ChatGPT connection has expired. Reconnect to continue.',
 }));
+// The catalog's live Kilo-exclusive models come and go as promotions are
+// disabled, and at one point none were live at all, which silently turned the
+// exclusive cases below into ordinary-model cases. Stub the lookup so these
+// assertions test the routing rule rather than today's catalog.
+jest.mock('@/lib/ai-gateway/models', () => ({
+  ...(jest.requireActual('@/lib/ai-gateway/models') as Record<string, unknown>),
+  findKiloExclusiveModel: jest.fn((model: string) =>
+    model === 'openai/kilo-exclusive-test-model' ? { public_id: model } : null
+  ),
+}));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
@@ -189,8 +199,8 @@ describe('isOpenAiChatGptEligible', () => {
     {
       label: 'a Kilo-exclusive OpenAI model',
       overrides: {
-        request: responsesRequest('openai/gpt-5.6-sol-discounted'),
-        requestedModel: 'openai/gpt-5.6-sol-discounted',
+        request: responsesRequest('openai/kilo-exclusive-test-model'),
+        requestedModel: 'openai/kilo-exclusive-test-model',
       },
     },
     { label: 'an anonymous caller', overrides: { userId: null } },
@@ -311,7 +321,7 @@ describe('getOpenAiChatGptByokModelIds', () => {
     await expect(
       getOpenAiChatGptByokModelIds(USER_OWNER, [
         'openai/gpt-oss-20b',
-        'openai/gpt-5.6-sol-discounted',
+        'openai/kilo-exclusive-test-model',
       ])
     ).resolves.toEqual(new Set());
     expect(isOpenAiModelServed).not.toHaveBeenCalled();

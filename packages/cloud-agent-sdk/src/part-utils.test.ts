@@ -3,6 +3,7 @@ import {
   getStepFinishRoutedModel,
   normalizeMissingPartText,
   normalizeMissingPatchFiles,
+  partSettledAt,
 } from './part-utils';
 
 function stepFinishPart(overrides: Partial<StepFinishPart> = {}): StepFinishPart {
@@ -194,6 +195,64 @@ describe('normalizeMissingPartText', () => {
 
     expect(normalizeMissingPartText(toolPart)).toBe(toolPart);
     expect(normalizeMissingPartText(stepFinishPart)).toBe(stepFinishPart);
+  });
+});
+
+describe('partSettledAt', () => {
+  function settledToolPart(status: 'completed' | 'error', time?: { start: number; end: number }) {
+    return {
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'task',
+      state: {
+        status,
+        input: {},
+        raw: '',
+        ...(status === 'completed'
+          ? { output: 'ok', title: 'task', metadata: {} }
+          : { error: 'boom' }),
+        ...(time === undefined ? {} : { time }),
+      },
+    } as unknown as Part;
+  }
+
+  it('returns the settle time of a completed tool part', () => {
+    expect(partSettledAt(settledToolPart('completed', { start: 1, end: 2 }))).toBe(2);
+  });
+
+  it('returns the settle time of an errored tool part', () => {
+    expect(partSettledAt(settledToolPart('error', { start: 3, end: 4 }))).toBe(4);
+  });
+
+  // Ingest-frame compaction strips `state.time` down to `state.status`, so a
+  // persisted terminal part can arrive with no settle time at all.
+  it('returns undefined for a compacted terminal tool part with no time', () => {
+    expect(partSettledAt(settledToolPart('completed'))).toBeUndefined();
+    expect(partSettledAt(settledToolPart('error'))).toBeUndefined();
+  });
+
+  it('returns undefined for a running tool part and for non-tool parts', () => {
+    const running: Part = {
+      id: 'p-tool',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'task',
+      state: { status: 'running', input: {}, time: { start: 5 } },
+    };
+    const text: TextPart = {
+      id: 'p-text',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'text',
+      text: 'hi',
+    };
+    expect(partSettledAt(running)).toBeUndefined();
+    expect(partSettledAt(text)).toBeUndefined();
   });
 });
 

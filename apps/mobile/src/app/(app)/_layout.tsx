@@ -23,6 +23,8 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
+import { SystemSearchIndexMount } from '@/lib/system-search-index-mount';
+import { ToolSummaryTranslationRetryMount } from '@/lib/tool-summary-translation/tool-summary-translation-retry-mount';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -117,9 +119,11 @@ export default function AppLayout() {
   return (
     <UserWebConnectionProvider>
       <ActiveSessionsLiveSyncMount />
+      <SystemSearchIndexMount />
       <GlanceablePublisherMount />
       <LauncherSurfacesMount />
       <CachePersistenceMount />
+      <ToolSummaryTranslationRetryMount />
       <LogoutReconciliationMount />
       <PushRegistrationMount />
       <AppWideFreshnessMount />
@@ -191,15 +195,6 @@ export default function AppLayout() {
             />
             <Stack.Screen
               name="agent-chat/folder-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="agent-chat/sandbox-picker"
               options={{
                 presentation: 'formSheet',
                 sheetAllowedDetents: [0.5, fullSheetDetent],

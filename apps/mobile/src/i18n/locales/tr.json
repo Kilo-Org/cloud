@@ -163,6 +163,7 @@
     "useDifferentEmail": "Farklı bir e-posta adresi kullan",
     "signInWithApple": "Apple ile oturum aç",
     "signInWithGoogle": "Google ile oturum aç",
+    "signInWithPasskey": "Geçiş anahtarı ile oturum aç",
     "emailAddress": "E-posta adresi",
     "emailPlaceholder": "ad@ornek.com",
     "continueWithEmail": "E-posta ile devam et",
@@ -175,6 +176,10 @@
     "termsConnector": " ve ",
     "termsSuffix": ".",
     "moreSignInOptions": "Daha fazla oturum açma seçeneği",
+    "passkeyCancelled": "Geçiş anahtarı ile oturum açma iptal edildi. Lütfen tekrar deneyin.",
+    "passkeyNotFound": "Bu cihaz için kayıtlı bir geçiş anahtarı yok. Bunun yerine Apple, Google veya e-postanızla oturum açın.",
+    "passkeyUnsupported": "Geçiş anahtarları bu cihazda kullanılamıyor. Bunun yerine Apple, Google veya e-postanızla oturum açın.",
+    "passkeyFailed": "Geçiş anahtarı ile oturum açılamadı. Lütfen tekrar deneyin.",
     "couldNotCompleteSignIn": "Oturum açma tamamlanamadı. Lütfen tekrar dene.",
     "sessionEnded": "Oturumun sona erdi. Lütfen tekrar oturum aç.",
     "signInCodeExpired": "Oturum açma kodunun süresi doldu. Lütfen tekrar dene.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Test hesabı",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Kurumsal SSO"
+    "providerEnterpriseSso": "Kurumsal SSO",
+    "passkeysTitle": "Geçiş anahtarları",
+    "passkeysSubtitle": "Parolasız oturum açın",
+    "passkeysEmpty": "Henüz geçiş anahtarı yok",
+    "passkeysEmptyHint": "$t(profile.addPasskey) ile parolasız oturum açın.",
+    "passkeysCouldNotLoad": "Geçiş anahtarları yüklenemedi",
+    "passkeysLoadFailed": "Bu yüklenene kadar geçiş anahtarları kullanılamaz.",
+    "addPasskey": "Geçiş anahtarı ekle",
+    "passkeyDefaultName": "Geçiş anahtarı",
+    "passkeyAddedOn": "{{date}} tarihinde eklendi",
+    "passkeyAdded": "Geçiş anahtarı eklendi.",
+    "passkeyAddFailed": "Geçiş anahtarı eklenemedi. Tekrar deneyin.",
+    "passkeyAddUnsupported": "Bu cihaz geçiş anahtarı oluşturamaz.",
+    "passkeyAddCancelled": "Geçiş anahtarı oluşturma iptal edildi.",
+    "passkeyRemoved": "Geçiş anahtarı kaldırıldı.",
+    "passkeyRemoveFailed": "O geçiş anahtarı kaldırılamadı. Tekrar deneyin.",
+    "passkeyRenamed": "Geçiş anahtarı yeniden adlandırıldı.",
+    "passkeyName": "Geçiş anahtarı adı",
+    "renamePasskey": "Geçiş anahtarını yeniden adlandır",
+    "removePasskey": "Geçiş anahtarını kaldır",
+    "removePasskeyTitle": "Geçiş anahtarı kaldırılsın mı?",
+    "removePasskeyMessage": "Artık bu geçiş anahtarıyla oturum açamayacaksınız."
   },
   "preferences": {
     "general": "Genel",
@@ -293,7 +319,7 @@
     "previewFullDescription": "Bildirimler kilit ekranında mesaj metnini gösterir.",
     "previewGenericDescription": "Bildirimler yalnızca yeni bir gelişme olduğunu gösterir. Mesajı okumak için Kilo'yu aç.",
     "channel": {
-      "agent": "Ajan oturumları",
+      "agentProgress": "Ajan ilerlemesi",
       "chat": "Sohbet mesajları",
       "kiloclaw": "KiloClaw etkinliği",
       "balance": "Bakiye uyarıları",
@@ -310,6 +336,15 @@
       "kiloclawActivitySubtitle": "örnek hazır/başarısız, zamanlanmış eylemler",
       "balanceAlertsSubtitle": "düşük kuruluş bakiyesi uyarıları",
       "securityFindingsSubtitle": "yeni bulgular ve SLA hatırlatmaları"
+    },
+    "action": {
+      "openSession": "Oturumu aç"
+    },
+    "needsInputAction": {
+      "approved": "İstek onaylandı",
+      "replied": "Yanıt gönderildi",
+      "failed": "Yanıtlanamadı. Yeniden denemek için tekrar dokunun.",
+      "unavailable": "Bu istek artık beklemiyor."
     }
   },
   "tabs": {
@@ -390,7 +425,9 @@
       "uploadFailed": "Yükleme başarısız oldu.",
       "failedToUploadFile": "Dosya yüklenemedi: {{reason}}.",
       "nothingToPaste": "Yapıştırılacak bir şey yok.",
-      "metadataStripFailed": "Fotoğrafın meta verileri kaldırılamadı."
+      "metadataStripFailed": "Fotoğrafın meta verileri kaldırılamadı.",
+      "limit_one": "En fazla {{displayCount}} dosya ekleyebilirsin.",
+      "limit_other": "En fazla {{displayCount}} dosya ekleyebilirsin."
     },
     "attachmentPreview": {
       "accessibility": "Dosya: {{filename}}, {{status}}",
@@ -1159,7 +1196,11 @@
       "syncNow": "Şimdi eşitle",
       "syncQueued": "Eşitleme kuyruğa alındı",
       "syncStatusUnavailable": "Eşitleme durumu alınamıyor.",
-      "withinDeadline": "Süresi dolmadı"
+      "withinDeadline": "Süresi dolmadı",
+      "daysOverdue_one": "{{displayCount}} gün gecikmiş",
+      "daysOverdue_other": "{{displayCount}} gün gecikmiş",
+      "findingsCount_one": "{{displayCount}} bulgu",
+      "findingsCount_other": "{{displayCount}} bulgu"
     },
     "dashboardMetrics": {
       "openFindings": "Açık bulgular",
@@ -1641,20 +1682,7 @@
       "continueFrom": "{{title}} oturumuna devam ediliyor.",
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam etmeyi desteklemiyor. Cloud Agent veya başka bir CLI seç.",
-      "importFailed": "Bu oturum içe aktarılamadı.",
-      "sandbox": "Korumalı alan",
-      "sandboxAccessibility": "Korumalı alan: {{label}}",
-      "sandboxDefaultWithDestination": "Varsayılan · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Küçük",
-      "sandboxInstanceShared": "Paylaşımlı",
-      "sandboxInstanceLarge": "Büyük",
-      "sandboxInstanceDevcontainer": "Geliştirme kapsayıcısı",
-      "sandboxInstanceProviderDefault": "Sağlayıcı varsayılanı",
-      "sandboxCouldNotLoad": "Korumalı alan seçenekleri yüklenemedi",
-      "sandboxUnavailable": "Bu korumalı alan kullanılamıyor. Başka bir korumalı alan veya Varsayılan seçin.",
-      "sandboxUseDefault": "Varsayılanı kullan"
+      "importFailed": "Bu oturum içe aktarılamadı."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi.",
@@ -1678,7 +1706,13 @@
       "updateTodos": "Görevleri güncelle",
       "linesBadge": "{{displayCount}} satır",
       "filesBadge": "{{displayCount}} dosya",
-      "matchesBadge": "{{displayCount}} eşleşme"
+      "matchesBadge": "{{displayCount}} eşleşme",
+      "filesBadge_one": "{{displayCount}} dosya",
+      "filesBadge_other": "{{displayCount}} dosya",
+      "linesBadge_one": "{{displayCount}} satır",
+      "linesBadge_other": "{{displayCount}} satır",
+      "matchesBadge_one": "{{displayCount}} eşleşme",
+      "matchesBadge_other": "{{displayCount}} eşleşme"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}. satırlar (kısaltıldı)",
@@ -1968,7 +2002,11 @@
       "files": "Dosya",
       "couldNotOpenPhotoPicker": "Fotoğraf seçici açılamadı. Kilo'yu yeniden başlatıp tekrar dene.",
       "maxFilesAllowed": "En fazla {{displayCount}} dosya ekleyebilirsin.",
-      "onlyAddingFiles": "Toplam {{total}} dosyadan yalnızca {{accepted}} dosya ekleniyor (en fazla {{max}})"
+      "onlyAddingFiles": "Toplam {{total}} dosyadan yalnızca {{accepted}} dosya ekleniyor (en fazla {{max}})",
+      "maxFilesAllowed_one": "En fazla {{displayCount}} dosya ekleyebilirsin.",
+      "maxFilesAllowed_other": "En fazla {{displayCount}} dosya ekleyebilirsin.",
+      "onlyAddingFiles_one": "Toplam {{total}} dosyadan yalnızca {{accepted}} dosya ekleniyor (en fazla {{max}})",
+      "onlyAddingFiles_other": "Toplam {{total}} dosyadan yalnızca {{accepted}} dosya ekleniyor (en fazla {{max}})"
     },
     "composer": {
       "addAttachment": "Ek ekle",
@@ -1986,7 +2024,9 @@
       "discardAttachmentsMessage": "Henüz bir mesaja eklenmemiş yüklemeler silinecek.",
       "discardAttachmentsTitle": "Ekler silinsin mi?",
       "charactersRemaining": "{{count}} karakter kaldı",
-      "insertNewline": "Yeni satır ekle"
+      "insertNewline": "Yeni satır ekle",
+      "charactersRemaining_one": "{{count}} karakter kaldı",
+      "charactersRemaining_other": "{{count}} karakter kaldı"
     },
     "chatLink": {
       "linkCopied": "Bağlantı kopyalandı",
@@ -2058,7 +2098,9 @@
       "stepsCount_one": "{{steps}} adım",
       "stepsCount": "{{steps}} adım",
       "stepsCount_other": "{{steps}} adım",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modeller ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Otomatik onayla",
@@ -2098,7 +2140,9 @@
     },
     "toolRun": {
       "sheetTitle": "Araç çağrıları",
-      "condensedLabel": "{{itemCount}} öğe; {{last}}"
+      "condensedLabel": "{{itemCount}} öğe; {{last}}",
+      "condensedLabel_one": "{{itemCount}} öğe; {{last}}",
+      "condensedLabel_other": "{{itemCount}} öğe; {{last}}"
     }
   },
   "bootstrap": {
@@ -2233,7 +2277,9 @@
     "cliCantReceiveFilesTitle": "Bu oturum dosya alamıyor",
     "cliCantReceiveFilesMessage": "Bu oturumu çalıştıran Kilo CLI dosya alamıyor. O makinedeki CLI'yi güncelle veya dosyaları yeni bir oturumda paylaş.",
     "contentlessMessage": "Paylaşılacak bir şey yok — metin veya dosya eklenmedi.",
-    "couldNotReadContent": "Paylaşılan içerik okunamadı."
+    "couldNotReadContent": "Paylaşılan içerik okunamadı.",
+    "onlyFirstFilesAttached_one": "Yalnızca ilk {{displayCount}} dosya eklenecek.",
+    "onlyFirstFilesAttached_other": "Yalnızca ilk {{displayCount}} dosya eklenecek."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2541,7 +2587,9 @@
         "outdatedOnPath": "{{path}} · Güncel değil"
       },
       "deletedUser": "silinen kullanıcı",
-      "replyForbiddenTerm": "Bu {{term}}ne yanıt verme iznin yok."
+      "replyForbiddenTerm": "Bu {{term}}ne yanıt verme iznin yok.",
+      "moreLinesAbove_one": "… yukarıda {{displayCount}} satır daha var.",
+      "moreLinesAbove_other": "… yukarıda {{displayCount}} satır daha var."
     },
     "entry": {
       "eyebrow": "URL ile bir çekme isteği veya birleştirme isteği aç",
@@ -2639,7 +2687,17 @@
       "loadingLines": "Satırlar yükleniyor: {{loaded}}/{{total}}…",
       "loadingMoreFiles": "Daha fazla dosya yükleniyor…",
       "retryLoadingContext": "Bağlamı yüklemeyi tekrar dene",
-      "retryLoadingNextPage": "Sonraki sayfayı yüklemeyi tekrar dene"
+      "retryLoadingNextPage": "Sonraki sayfayı yüklemeyi tekrar dene",
+      "expandAllLines_one": "{{displayCount}} satırın tümünü göster",
+      "expandAllLines_other": "{{displayCount}} satırın tümünü göster",
+      "expandLines_one": "{{displayCount}} satır göster ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} satır göster ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "{{displayCount}} satırlık bağlamı göster",
+      "expandLinesOfContext_other": "{{displayCount}} satırlık bağlamı göster",
+      "expandMoreLines_one": "{{displayCount}} satır daha göster ({{start}}–{{end}})",
+      "expandMoreLines_other": "{{displayCount}} satır daha göster ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}}/{{total}} dosya yüklendi",
+      "loadedOfTotalFiles_other": "{{loaded}}/{{total}} dosya yüklendi"
     },
     "inbox": {
       "couldNotLoad": "Gelen kutusu yüklenemedi.",
@@ -2836,7 +2894,9 @@
       "statusContext": "Bağlam",
       "lineLabel": "{{line}} numaralı satır, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}} satırı: {{text}}",
-      "emptyLine": "(boş)"
+      "emptyLine": "(boş)",
+      "truncationBanner_one": "GitHub API sınırı nedeniyle değiştirilen {{total}} dosyanın ilk {{limit}} tanesi gösteriliyor.",
+      "truncationBanner_other": "GitHub API sınırı nedeniyle değiştirilen {{total}} dosyanın ilk {{limit}} tanesi gösteriliyor."
     },
     "linkPasteClipboardEmpty": "Pano boş.",
     "linkPasteNotAPullRequest": "Bu bir çekme isteği veya birleştirme isteği bağlantısı değil",
@@ -3093,7 +3153,9 @@
     "couldNotApprove": "Onaylanamadı",
     "couldNotStart": "Başlatılamadı",
     "channelName": "Etkin ajanlar",
-    "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç."
+    "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
+    "openSession": "Aç",
+    "approveFailed": "Onaylanamadı. Tekrar denemek için $t(common.approve) öğesine dokun."
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",

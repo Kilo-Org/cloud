@@ -208,6 +208,12 @@ vi.mock('@/lib/active-sessions-live-sync-mount', () => ({
 vi.mock('@/lib/persist/cache-persistence-mount', () => ({
   CachePersistenceMount: 'CachePersistenceMount',
 }));
+vi.mock('@/lib/system-search-index-mount', () => ({
+  SystemSearchIndexMount: 'SystemSearchIndexMount',
+}));
+vi.mock('@/lib/tool-summary-translation/tool-summary-translation-retry-mount', () => ({
+  ToolSummaryTranslationRetryMount: 'ToolSummaryTranslationRetryMount',
+}));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/pr-review/pr-review-connect-gate', () => ({
   PrReviewConnectGate: 'PrReviewConnectGate',

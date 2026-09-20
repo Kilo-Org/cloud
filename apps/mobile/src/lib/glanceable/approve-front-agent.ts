@@ -11,6 +11,7 @@ import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 import { type LiveSessionManagerHandle } from '@/components/agents/live-session-manager-registry';
 
 import { type FrontApprovableRow, pickFrontApprovableSession } from './front-approval';
+import { resolveAnsweredRaises } from './attention-rows';
 
 /**
  * One waiting ask replayed by the wrapper. Only the id matters: the wrist
@@ -233,6 +234,21 @@ async function refreshSurfaces(deps: FrontApprovalDeps, scope: FrontApprovalScop
   }
 }
 
+/**
+ * Rebuild the glanceable surfaces from the tray without approving anything.
+ *
+ * The needs-input notification's headless Approve/Reply runs with no screen
+ * mounted: it acks the raise, and a surface already showing that raise must be
+ * republished at once rather than waiting for the next push (a status-only
+ * raise never produces one). Uses the same default deps as the wrist control's
+ * refresh, so the ack resolution can never disagree with the tray it reads.
+ */
+export async function refreshGlanceableSurfacesFromTray(): Promise<void> {
+  const deps = await defaultFrontApprovalDeps();
+  const scope = await deps.getScope();
+  await refreshSurfaces(deps, scope);
+}
+
 /** Connections created for headless managers, so teardown can close the socket. */
 const headlessConnections = new Map<SessionManager, UserWebConnection>();
 
@@ -354,7 +370,10 @@ async function defaultFrontApprovalDeps(): Promise<FrontApprovalDeps> {
       // persisted one is what every pushed snapshot is fenced against.
       await restorePersistedGlanceable();
       const snapshot = buildGlanceableSnapshot({
-        sessions: rows,
+        // A raise the user answered from the needs-input notification is no
+        // longer waiting: count it the way the in-app list does, or the
+        // republished surface contradicts the result notification.
+        sessions: resolveAnsweredRaises(rows),
         userId: surfaceScope.userId,
         organizationId: surfaceScope.organizationId,
         now,

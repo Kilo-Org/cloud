@@ -34,6 +34,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { allow_fake_login, IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
+import { consumeSignInTicket } from '@/lib/auth/passkey';
 import { redirect } from 'next/navigation';
 import { IMPACT_CLICK_ID_COOKIE } from '@/lib/impact/affiliate-utils';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
@@ -529,6 +530,33 @@ function createEmailAccountInfo(
   };
 }
 
+/**
+ * A passkey sign-in is resolved by its ticket, so the credentials `authorize`
+ * returns the Kilo user id as the account id and this is the identity the
+ * provider carries. A passkey never owns a `user_auth_provider` row: the
+ * credential lives in `passkey_credentials`, keyed by user id.
+ */
+function createPasskeyAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'passkey') return null;
+  assert(user.email, 'User email is required for passkey auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || user.email.split('@')[0],
+    google_user_image_url: user.image || '',
+    // Never used for a passkey: the sign-in callback returns before user
+    // settlement and the jwt callback resolves the account by user id without
+    // rewriting its hosted domain.
+    hosted_domain: getLowerDomainFromEmail(user.email) ?? null,
+    provider: 'passkey',
+    provider_account_id: account.providerAccountId,
+    display_name: null,
+  };
+}
+
 function createAccountInfo(
   account: Account,
   user: NextUser | AdapterUser,
@@ -544,6 +572,7 @@ function createAccountInfo(
     createLinkedInAccountInfo(account, user) ??
     createDiscordAccountInfo(account, user) ??
     createEmailAccountInfo(account, user) ??
+    createPasskeyAccountInfo(account, user) ??
     createFakeAccountInfo(account, user) ??
     createSSOAccountInfo(account, user, profile);
 
@@ -865,6 +894,40 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
+    // Passkey sign-in. The authenticate route verifies the WebAuthn assertion
+    // against a server-stored challenge and mints a one-time ticket; redeeming
+    // that ticket here is the identity proof, so `authorize` only exchanges it.
+    CredentialsProvider({
+      id: 'passkey',
+      name: 'Passkey',
+      credentials: {
+        ticket: { label: 'Ticket', type: 'text' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.ticket) {
+          return null;
+        }
+
+        const ticket = await consumeSignInTicket(credentials.ticket);
+        if (!ticket) {
+          // Unknown, expired, or already redeemed: a replayed ticket yields no
+          // user, so NextAuth mints no session for it.
+          return null;
+        }
+
+        const user = await findUserById(ticket.kilo_user_id);
+        if (!user) {
+          return null;
+        }
+
+        return {
+          id: user.id,
+          email: user.google_user_email,
+          name: user.google_user_name || user.google_user_email.split('@')[0],
+          image: user.google_user_image_url,
+        };
+      },
+    }),
     // Fake login provider for development and testing
     ...(allow_fake_login
       ? [
@@ -1007,6 +1070,15 @@ export const authOptions: NextAuthOptions = {
               return ssoSignInRedirectUrl(domainToCheck);
             }
           }
+        }
+
+        // A redeemed passkey ticket already proved identity, so a passkey skips
+        // both Turnstile and user settlement. This return sits after the domain
+        // blacklist and SSO-authority checks above, so a passkey can never
+        // bypass a domain that enforces SSO. No `user_auth_provider` row is
+        // written for a passkey: the jwt callback resolves it by user id.
+        if (accountInfo.provider === 'passkey') {
+          return true;
         }
 
         const requestHeaders = await headers();

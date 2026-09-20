@@ -163,6 +163,7 @@
     "useDifferentEmail": "Utilizar um e-mail diferente",
     "signInWithApple": "Iniciar sessão com Apple",
     "signInWithGoogle": "Iniciar sessão com Google",
+    "signInWithPasskey": "Iniciar sessão com uma chave de acesso",
     "emailAddress": "Endereço de e-mail",
     "emailPlaceholder": "nome@exemplo.com",
     "continueWithEmail": "Continuar com e-mail",
@@ -175,6 +176,10 @@
     "termsConnector": " e ",
     "termsSuffix": ".",
     "moreSignInOptions": "Mais opções de início de sessão",
+    "passkeyCancelled": "O início de sessão com chave de acesso foi cancelado. Tenta novamente.",
+    "passkeyNotFound": "Não há nenhuma chave de acesso guardada para este dispositivo. Inicia sessão com a Apple, a Google ou o teu email.",
+    "passkeyUnsupported": "As chaves de acesso não estão disponíveis neste dispositivo. Inicia sessão com a Apple, a Google ou o teu email.",
+    "passkeyFailed": "Não foi possível iniciar sessão com uma chave de acesso. Tenta novamente.",
     "couldNotCompleteSignIn": "Não foi possível concluir o início de sessão. Tenta novamente.",
     "sessionEnded": "A tua sessão terminou. Inicia sessão novamente.",
     "signInCodeExpired": "O teu código de início de sessão expirou. Tenta novamente.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Conta de teste",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO empresarial"
+    "providerEnterpriseSso": "SSO empresarial",
+    "passkeysTitle": "Chaves de acesso",
+    "passkeysSubtitle": "Inicia sessão sem palavra-passe",
+    "passkeysEmpty": "Ainda não há chaves de acesso",
+    "passkeysEmptyHint": "$t(profile.addPasskey) para iniciares sessão sem palavra-passe.",
+    "passkeysCouldNotLoad": "Não foi possível carregar as chaves de acesso",
+    "passkeysLoadFailed": "As chaves de acesso ficam indisponíveis até isto carregar.",
+    "addPasskey": "Adicionar uma chave de acesso",
+    "passkeyDefaultName": "Chave de acesso",
+    "passkeyAddedOn": "Adicionada {{date}}",
+    "passkeyAdded": "Chave de acesso adicionada.",
+    "passkeyAddFailed": "Não foi possível adicionar uma chave de acesso. Tenta novamente.",
+    "passkeyAddUnsupported": "Este dispositivo não pode criar chaves de acesso.",
+    "passkeyAddCancelled": "A criação da chave de acesso foi cancelada.",
+    "passkeyRemoved": "Chave de acesso removida.",
+    "passkeyRemoveFailed": "Não foi possível remover essa chave de acesso. Tenta novamente.",
+    "passkeyRenamed": "Chave de acesso renomeada.",
+    "passkeyName": "Nome da chave de acesso",
+    "renamePasskey": "Renomear a chave de acesso",
+    "removePasskey": "Remover a chave de acesso",
+    "removePasskeyTitle": "Remover a chave de acesso?",
+    "removePasskeyMessage": "Já não vais poder iniciar sessão com esta chave de acesso."
   },
   "preferences": {
     "general": "Geral",
@@ -326,7 +352,7 @@
       "expandMoreLines": "Expandir mais {{displayCount}} linhas ({{start}}–{{end}})",
       "expandLinesOfContext": "Expandir {{displayCount}} linhas de contexto",
       "expandAll": "Expandir tudo",
-      "expandAllLines": "Expandir todas as {{displayCount}} linhas",
+      "expandAllLines": "Expandir todas as linhas ({{displayCount}})",
       "loadingMoreFiles": "A carregar mais ficheiros…",
       "retryLoadingNextPage": "Tentar carregar a página seguinte novamente",
       "failedToLoadMoreFiles": "Não foi possível carregar mais ficheiros — toca para tentar novamente",
@@ -345,7 +371,22 @@
       "goToOverview": "Ir para a visão geral",
       "goToOverviewTab": "Ir para o separador de visão geral",
       "fileLoadedCount_many": "{{displayCount}} ficheiros carregados",
-      "fileLoadedOfTotalCount_many": "{{displayCount}} de {{total}} ficheiros carregados"
+      "fileLoadedOfTotalCount_many": "{{displayCount}} de {{total}} ficheiros carregados",
+      "expandAllLines_one": "Expandir todas as linhas ({{displayCount}})",
+      "expandAllLines_other": "Expandir todas as linhas ({{displayCount}})",
+      "expandAllLines_many": "Expandir todas as linhas ({{displayCount}})",
+      "expandLines_one": "Expandir {{displayCount}} linha ({{start}}–{{end}})",
+      "expandLines_other": "Expandir {{displayCount}} linhas ({{start}}–{{end}})",
+      "expandLines_many": "Expandir {{displayCount}} linhas ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Expandir {{displayCount}} linha de contexto",
+      "expandLinesOfContext_other": "Expandir {{displayCount}} linhas de contexto",
+      "expandLinesOfContext_many": "Expandir {{displayCount}} linhas de contexto",
+      "expandMoreLines_one": "Expandir mais {{displayCount}} linha ({{start}}–{{end}})",
+      "expandMoreLines_other": "Expandir mais {{displayCount}} linhas ({{start}}–{{end}})",
+      "expandMoreLines_many": "Expandir mais {{displayCount}} linhas ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} de {{total}} ficheiros carregados",
+      "loadedOfTotalFiles_other": "{{loaded}} de {{total}} ficheiros carregados",
+      "loadedOfTotalFiles_many": "{{loaded}} de {{total}} ficheiros carregados"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "falta uma quebra de linha no fim do ficheiro.",
@@ -538,7 +579,10 @@
         "outdatedOnPath": "Desatualizado em {{path}}"
       },
       "deletedUser": "utilizador eliminado",
-      "replyForbiddenTerm": "Não tens permissão para responder a este {{term}}."
+      "replyForbiddenTerm": "Não tens permissão para responder a este {{term}}.",
+      "moreLinesAbove_one": "… mais {{displayCount}} linha acima",
+      "moreLinesAbove_other": "… mais {{displayCount}} linhas acima",
+      "moreLinesAbove_many": "… mais {{displayCount}} linhas acima"
     },
     "couldNotOpenGitHubAppSettings": "Não foi possível abrir as definições da aplicação GitHub.",
     "installKiloGitHubApp": "Instalar a aplicação do Kilo para o GitHub",
@@ -715,7 +759,10 @@
       "statusContext": "Contexto",
       "lineLabel": "Linha {{line}} — {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}} — {{text}}",
-      "emptyLine": "(vazio)"
+      "emptyLine": "(vazio)",
+      "truncationBanner_one": "São apresentados os primeiros {{limit}} de {{total}} ficheiros alterados devido ao limite da API do GitHub.",
+      "truncationBanner_other": "São apresentados os primeiros {{limit}} de {{total}} ficheiros alterados devido ao limite da API do GitHub.",
+      "truncationBanner_many": "São apresentados os primeiros {{limit}} de {{total}} ficheiros alterados devido ao limite da API do GitHub."
     },
     "linkPasteClipboardEmpty": "A área de transferência está vazia.",
     "linkPasteNotAPullRequest": "Esta ligação não corresponde a um PR ou merge request",
@@ -792,7 +839,7 @@
     "previewFullDescription": "As notificações mostram o texto da mensagem no ecrã bloqueado.",
     "previewGenericDescription": "As notificações indicam que há novidades. Abra o Kilo para ler a mensagem.",
     "channel": {
-      "agent": "Sessões de agente",
+      "agentProgress": "Progresso do agente",
       "chat": "Mensagens da conversa",
       "kiloclaw": "Atividade do KiloClaw",
       "balance": "Alertas de saldo",
@@ -809,6 +856,15 @@
       "kiloclawActivitySubtitle": "instância pronta ou com erro, ações agendadas",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organização",
       "securityFindingsSubtitle": "novas ocorrências e lembretes de SLA"
+    },
+    "action": {
+      "openSession": "Abrir sessão"
+    },
+    "needsInputAction": {
+      "approved": "Pedido aprovado",
+      "replied": "Resposta enviada",
+      "failed": "Não foi possível responder. Toque novamente para tentar de novo.",
+      "unavailable": "Este pedido já não está à espera."
     }
   },
   "tabs": {
@@ -889,7 +945,10 @@
       "uploadFailed": "Não foi possível enviar o anexo.",
       "failedToUploadFile": "Não foi possível enviar o ficheiro: {{reason}}",
       "nothingToPaste": "Não há nada para colar.",
-      "metadataStripFailed": "Não foi possível remover os metadados da fotografia."
+      "metadataStripFailed": "Não foi possível remover os metadados da fotografia.",
+      "limit_one": "Podes anexar até {{displayCount}} ficheiro.",
+      "limit_other": "Podes anexar até {{displayCount}} ficheiros.",
+      "limit_many": "Podes anexar até {{displayCount}} ficheiros."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}: {{status}}",
@@ -1636,7 +1695,13 @@
       "syncFindings": "Sincronizar ocorrências",
       "syncNow": "Sincronizar agora",
       "syncQueued": "Sincronização adicionada à fila",
-      "syncStatusUnavailable": "Não é possível consultar o estado da sincronização."
+      "syncStatusUnavailable": "Não é possível consultar o estado da sincronização.",
+      "daysOverdue_one": "{{displayCount}} dia em atraso",
+      "daysOverdue_other": "{{displayCount}} dias em atraso",
+      "daysOverdue_many": "{{displayCount}} dias em atraso",
+      "findingsCount_one": "{{displayCount}} ocorrência",
+      "findingsCount_other": "{{displayCount}} ocorrências",
+      "findingsCount_many": "{{displayCount}} ocorrências"
     },
     "dashboardMetrics": {
       "openFindings": "Ocorrências abertas",
@@ -2149,20 +2214,7 @@
       "continueFrom": "A sessão {{title}} está a ser retomada.",
       "importingSession": "A importar a sessão",
       "cliCannotContinue": "Esta CLI não permite continuar uma sessão. Escolha o Cloud Agent ou outra CLI.",
-      "importFailed": "Não foi possível importar esta sessão.",
-      "sandbox": "Ambiente isolado",
-      "sandboxAccessibility": "Ambiente isolado: {{label}}",
-      "sandboxDefaultWithDestination": "Padrão · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Pequeno",
-      "sandboxInstanceShared": "Partilhado",
-      "sandboxInstanceLarge": "Grande",
-      "sandboxInstanceDevcontainer": "Contentor de desenvolvimento",
-      "sandboxInstanceProviderDefault": "Padrão do fornecedor",
-      "sandboxCouldNotLoad": "Não foi possível carregar as opções de ambiente isolado",
-      "sandboxUnavailable": "Este ambiente isolado não está disponível. Escolha outro ambiente isolado ou Padrão.",
-      "sandboxUseDefault": "Usar Padrão"
+      "importFailed": "Não foi possível importar esta sessão."
     },
     "partRenderer": {
       "updatedFileCount_one": "Foi atualizado {{displayCount}} ficheiro.",
@@ -2187,7 +2239,16 @@
       "updateTodos": "Atualizar lista de tarefas",
       "linesBadge": "{{displayCount}} linhas",
       "filesBadge": "{{displayCount}} ficheiros",
-      "matchesBadge": "{{displayCount}} correspondências"
+      "matchesBadge": "{{displayCount}} correspondências",
+      "filesBadge_one": "{{displayCount}} ficheiro",
+      "filesBadge_other": "{{displayCount}} ficheiros",
+      "filesBadge_many": "{{displayCount}} ficheiros",
+      "linesBadge_one": "{{displayCount}} linha",
+      "linesBadge_other": "{{displayCount}} linhas",
+      "linesBadge_many": "{{displayCount}} linhas",
+      "matchesBadge_one": "{{displayCount}} correspondência",
+      "matchesBadge_other": "{{displayCount}} correspondências",
+      "matchesBadge_many": "{{displayCount}} correspondências"
     },
     "readToolMarkdown": {
       "linesTruncated": "linhas {{start}}–{{end}} (truncadas)",
@@ -2480,7 +2541,13 @@
       "files": "Ficheiros",
       "couldNotOpenPhotoPicker": "Não foi possível abrir o seletor de fotografias. Reinicie o Kilo e tente novamente.",
       "maxFilesAllowed": "Só pode adicionar até {{displayCount}} ficheiros.",
-      "onlyAddingFiles": "A adicionar apenas {{accepted}} de {{total}} ficheiros (máx. {{max}})"
+      "onlyAddingFiles": "A adicionar apenas {{accepted}} de {{total}} ficheiros (máx. {{max}})",
+      "maxFilesAllowed_one": "Só pode adicionar até {{displayCount}} ficheiro.",
+      "maxFilesAllowed_other": "Só pode adicionar até {{displayCount}} ficheiros.",
+      "maxFilesAllowed_many": "Só pode adicionar até {{displayCount}} ficheiros.",
+      "onlyAddingFiles_one": "A adicionar apenas {{accepted}} de {{total}} ficheiros (máx. {{max}})",
+      "onlyAddingFiles_other": "A adicionar apenas {{accepted}} de {{total}} ficheiros (máx. {{max}})",
+      "onlyAddingFiles_many": "A adicionar apenas {{accepted}} de {{total}} ficheiros (máx. {{max}})"
     },
     "composer": {
       "addAttachment": "Adicionar anexo",
@@ -2498,7 +2565,10 @@
       "discardAttachmentsMessage": "Os ficheiros carregados que não estejam associados a mensagens enviadas serão eliminados.",
       "discardAttachmentsTitle": "Eliminar anexos?",
       "charactersRemaining": "{{count}} caracteres restantes",
-      "insertNewline": "Inserir nova linha"
+      "insertNewline": "Inserir nova linha",
+      "charactersRemaining_one": "{{count}} caractere restante",
+      "charactersRemaining_other": "{{count}} caracteres restantes",
+      "charactersRemaining_many": "{{count}} caracteres restantes"
     },
     "chatLink": {
       "linkCopied": "Ligação copiada",
@@ -2571,7 +2641,10 @@
       "stepsCount": "{{steps}} passos",
       "stepsCount_other": "{{steps}} passos",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "stepsCount_many": "{{steps}} passos"
+      "stepsCount_many": "{{steps}} passos",
+      "modelsCount_one": "Modelo ({{displayCount}})",
+      "modelsCount_other": "Modelos ({{displayCount}})",
+      "modelsCount_many": "Modelos ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Aprovação automática",
@@ -2611,7 +2684,10 @@
     },
     "toolRun": {
       "sheetTitle": "Chamadas de ferramentas",
-      "condensedLabel": "{{itemCount}} itens; {{last}}"
+      "condensedLabel": "{{itemCount}} itens; {{last}}",
+      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_other": "{{itemCount}} itens; {{last}}",
+      "condensedLabel_many": "{{itemCount}} itens; {{last}}"
     }
   },
   "bootstrap": {
@@ -2746,7 +2822,10 @@
     "cliCantReceiveFilesTitle": "Esta sessão não pode receber ficheiros",
     "cliCantReceiveFilesMessage": "A Kilo CLI que executa esta sessão não pode receber ficheiros. Atualiza a CLI nessa máquina ou partilha o conteúdo com uma nova sessão.",
     "contentlessMessage": "Nada para partilhar — não foram incluídos texto nem ficheiros.",
-    "couldNotReadContent": "Não foi possível ler o conteúdo partilhado."
+    "couldNotReadContent": "Não foi possível ler o conteúdo partilhado.",
+    "onlyFirstFilesAttached_one": "Apenas os primeiros {{displayCount}} ficheiro serão anexados.",
+    "onlyFirstFilesAttached_other": "Apenas os primeiros {{displayCount}} ficheiros serão anexados.",
+    "onlyFirstFilesAttached_many": "Apenas os primeiros {{displayCount}} ficheiros serão anexados."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3117,7 +3196,9 @@
     "couldNotApprove": "Não foi possível aprovar",
     "couldNotStart": "Não foi possível iniciar",
     "channelName": "Agentes ativos",
-    "activityKitDisabledBody": "Ativa as atividades em direto nas definições para ver os agentes ativos no ecrã bloqueado."
+    "activityKitDisabledBody": "Ativa as atividades em direto nas definições para ver os agentes ativos no ecrã bloqueado.",
+    "openSession": "Abrir",
+    "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente."
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",

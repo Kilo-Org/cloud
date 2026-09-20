@@ -163,6 +163,7 @@
     "useDifferentEmail": "Басқа электрондық пошта мекенжайын қолдану",
     "signInWithApple": "Apple арқылы кіру",
     "signInWithGoogle": "Google арқылы кіру",
+    "signInWithPasskey": "Кіру кілтімен кіру",
     "emailAddress": "Электрондық пошта мекенжайы",
     "emailPlaceholder": "siz@example.com",
     "continueWithEmail": "Электрондық поштамен жалғастыру",
@@ -175,6 +176,10 @@
     "termsConnector": " және ",
     "termsSuffix": ".",
     "moreSignInOptions": "Басқа кіру тәсілдері",
+    "passkeyCancelled": "Кіру кілтімен кіру тоқтатылды. Қайталап көріңіз.",
+    "passkeyNotFound": "Бұл құрылғы үшін кіру кілті сақталмаған. Оның орнына Apple, Google немесе электрондық поштаңыз арқылы кіріңіз.",
+    "passkeyUnsupported": "Кіру кілттері бұл құрылғыда қолжетімсіз. Оның орнына Apple, Google немесе электрондық поштаңыз арқылы кіріңіз.",
+    "passkeyFailed": "Кіру кілтімен кіру мүмкін болмады. Қайталап көріңіз.",
     "couldNotCompleteSignIn": "Кіруді аяқтау мүмкін болмады. Қайталап көріңіз.",
     "sessionEnded": "Сессияңыз аяқталды. Қайта кіріңіз.",
     "signInCodeExpired": "Кіру кодыңыздың мерзімі өтті. Қайталап көріңіз.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Сынақ тіркелгісі",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Корпоративтік SSO"
+    "providerEnterpriseSso": "Корпоративтік SSO",
+    "passkeysTitle": "Кіру кілттері",
+    "passkeysSubtitle": "Құпия сөзсіз кіру",
+    "passkeysEmpty": "Әзірге кіру кілттері жоқ",
+    "passkeysEmptyHint": "$t(profile.addPasskey) — құпия сөзсіз кіру үшін.",
+    "passkeysCouldNotLoad": "Кіру кілттерін жүктеу мүмкін болмады",
+    "passkeysLoadFailed": "Кіру кілттері осы жүктелмейінше қолжетімсіз.",
+    "addPasskey": "Кіру кілтін қосу",
+    "passkeyDefaultName": "Кіру кілті",
+    "passkeyAddedOn": "{{date}} қосылды",
+    "passkeyAdded": "Кіру кілті қосылды.",
+    "passkeyAddFailed": "Кіру кілтін қосу мүмкін болмады. Қайталап көріңіз.",
+    "passkeyAddUnsupported": "Бұл құрылғы кіру кілттерін жасай алмайды.",
+    "passkeyAddCancelled": "Кіру кілтін жасау тоқтатылды.",
+    "passkeyRemoved": "Кіру кілті жойылды.",
+    "passkeyRemoveFailed": "Ол кіру кілтін жою мүмкін болмады. Қайталап көріңіз.",
+    "passkeyRenamed": "Кіру кілтінің аты өзгертілді.",
+    "passkeyName": "Кіру кілтінің атауы",
+    "renamePasskey": "Кіру кілтінің атауын өзгерту",
+    "removePasskey": "Кіру кілтін жою",
+    "removePasskeyTitle": "Кіру кілті жойылсын ба?",
+    "removePasskeyMessage": "Бұл кіру кілтімен енді кіре алмайсыз."
   },
   "preferences": {
     "general": "Жалпы",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} файлдың {{displayCount}} файлы жүктелді",
       "filesStillLoading": "Файлдар әлі жүктелуде. Жаңарту үшін төмен тартыңыз.",
       "goToOverview": "Шолуға өту",
-      "goToOverviewTab": "Шолу қойындысына өту"
+      "goToOverviewTab": "Шолу қойындысына өту",
+      "expandAllLines_one": "Барлық {{displayCount}} жолды ашу",
+      "expandAllLines_other": "Барлық {{displayCount}} жолды ашу",
+      "expandLines_one": "{{displayCount}} жолды ашу ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} жолды ашу ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Контекстің {{displayCount}} жолын ашу",
+      "expandLinesOfContext_other": "Контекстің {{displayCount}} жолын ашу",
+      "expandMoreLines_one": "Тағы {{displayCount}} жолды ашу ({{start}}–{{end}})",
+      "expandMoreLines_other": "Тағы {{displayCount}} жолды ашу ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}}/{{total}} файл жүктелді",
+      "loadedOfTotalFiles_other": "{{loaded}}/{{total}} файл жүктелді"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ файл соңында жаңа жол жоқ",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Ескірген: {{path}}"
       },
       "deletedUser": "жойылған пайдаланушы",
-      "replyForbiddenTerm": "Бұл {{term}}на жауап беруге рұқсатыңыз жоқ."
+      "replyForbiddenTerm": "Бұл {{term}}на жауап беруге рұқсатыңыз жоқ.",
+      "moreLinesAbove_one": "… жоғарыда тағы {{displayCount}} жол бар.",
+      "moreLinesAbove_other": "… жоғарыда тағы {{displayCount}} жол бар."
     },
     "couldNotOpenGitHubAppSettings": "GitHub қолданбасының параметрлерін ашу мүмкін болмады.",
     "installKiloGitHubApp": "Kilo GitHub қолданбасын орнату",
@@ -706,7 +744,9 @@
       "statusContext": "Контекст",
       "lineLabel": "{{line}}-жол, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(бос)"
+      "emptyLine": "(бос)",
+      "truncationBanner_one": "Өзгертілген {{total}} файлдың алғашқы {{limit}} файлы көрсетілуде — бұл GitHub API шектеуі.",
+      "truncationBanner_other": "Өзгертілген {{total}} файлдың алғашқы {{limit}} файлы көрсетілуде — бұл GitHub API шектеуі."
     },
     "linkPasteClipboardEmpty": "Алмасу буфері бос.",
     "linkPasteNotAPullRequest": "Бұл тарту немесе біріктіру сұрауының сілтемесі емес.",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Хабарландырулар құлыптау экранында хабарлама мәтінін көрсетеді.",
     "previewGenericDescription": "Хабарландырулар оқиғаның болғанын ғана көрсетеді. Хабарламаны оқу үшін Kilo қолданбасын ашыңыз.",
     "channel": {
-      "agent": "Агент сессиялары",
+      "agentProgress": "Агент барысы",
       "chat": "Чат хабарламалары",
       "kiloclaw": "KiloClaw белсенділігі",
       "balance": "Баланс туралы ескертулер",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "дана дайын / істен шықты, жоспарланған әрекеттер",
       "balanceAlertsSubtitle": "ұйым балансының азайғаны туралы ескертулер",
       "securityFindingsSubtitle": "жаңа осалдықтар және SLA туралы еске салулар"
+    },
+    "action": {
+      "openSession": "Сессияны ашу"
+    },
+    "needsInputAction": {
+      "approved": "Сұрау мақұлданды",
+      "replied": "Жауап жіберілді",
+      "failed": "Жауап беру мүмкін болмады. Қайталап көру үшін қайта түртіңіз.",
+      "unavailable": "Бұл сұрау енді күтпейді."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Жүктеп салу мүмкін болмады.",
       "failedToUploadFile": "Файлды жүктеп салу мүмкін болмады: {{reason}}.",
       "nothingToPaste": "Қоятын ештеңе жоқ.",
-      "metadataStripFailed": "Фотосуреттің метадеректерін жою мүмкін болмады."
+      "metadataStripFailed": "Фотосуреттің метадеректерін жою мүмкін болмады.",
+      "limit_one": "{{displayCount}} файлға дейін тіркеуге болады.",
+      "limit_other": "{{displayCount}} файлға дейін тіркеуге болады."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Мәселелерді синхрондау",
       "syncNow": "Қазір синхрондау",
       "syncQueued": "Синхрондау кезекке қойылды",
-      "syncStatusUnavailable": "Синхрондау күйі қолжетімсіз."
+      "syncStatusUnavailable": "Синхрондау күйі қолжетімсіз.",
+      "daysOverdue_one": "Мерзімі {{displayCount}} күнге өтіп кеткен",
+      "daysOverdue_other": "Мерзімі {{displayCount}} күнге өтіп кеткен",
+      "findingsCount_one": "{{displayCount}} мәселе",
+      "findingsCount_other": "{{displayCount}} мәселе"
     },
     "dashboardMetrics": {
       "openFindings": "Ашық мәселелер",
@@ -2131,20 +2186,7 @@
       "continueFrom": "«{{title}}» сессиясы жалғасуда.",
       "importingSession": "Сессия импортталуда",
       "cliCannotContinue": "Бұл CLI сессияны жалғастыра алмайды. Cloud Agent қызметін немесе басқа CLI құралын таңдаңыз.",
-      "importFailed": "Бұл сессияны импорттау мүмкін болмады.",
-      "sandbox": "Сандбокс",
-      "sandboxAccessibility": "Сандбокс: {{label}}",
-      "sandboxDefaultWithDestination": "Әдепкі · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Кішкене",
-      "sandboxInstanceShared": "Ортақ",
-      "sandboxInstanceLarge": "Үлкен",
-      "sandboxInstanceDevcontainer": "Dev контейнері",
-      "sandboxInstanceProviderDefault": "Жеткізушінің әдепкісі",
-      "sandboxCouldNotLoad": "Сандбокс параметрлерін жүктей алмады",
-      "sandboxUnavailable": "Бұл сандбокс қолжетімсіз. Басқа сандбоксты немесе Әдепкіні таңдаңыз.",
-      "sandboxUseDefault": "Әдепкіні пайдалану"
+      "importFailed": "Бұл сессияны импорттау мүмкін болмады."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды.",
@@ -2168,7 +2210,13 @@
       "updateTodos": "Тапсырмалар тізімін жаңарту",
       "linesBadge": "{{displayCount}} жол",
       "filesBadge": "{{displayCount}} файл",
-      "matchesBadge": "{{displayCount}} сәйкестік"
+      "matchesBadge": "{{displayCount}} сәйкестік",
+      "filesBadge_one": "{{displayCount}} файл",
+      "filesBadge_other": "{{displayCount}} файл",
+      "linesBadge_one": "{{displayCount}} жол",
+      "linesBadge_other": "{{displayCount}} жол",
+      "matchesBadge_one": "{{displayCount}} сәйкестік",
+      "matchesBadge_other": "{{displayCount}} сәйкестік"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} жолдары (қысқартылған)",
@@ -2458,7 +2506,11 @@
       "files": "Файл",
       "couldNotOpenPhotoPicker": "Фотосурет таңдау құралын ашу мүмкін болмады. Kilo қолданбасын қайта іске қосып, қайталап көріңіз.",
       "maxFilesAllowed": "Ең көбі {{displayCount}} файл қосуға болады.",
-      "onlyAddingFiles": "Тек {{total}} файлдың {{accepted}}-і қосылуда (ең көбі {{max}})"
+      "onlyAddingFiles": "Тек {{total}} файлдың {{accepted}}-і қосылуда (ең көбі {{max}})",
+      "maxFilesAllowed_one": "Ең көбі {{displayCount}} файл қосуға болады.",
+      "maxFilesAllowed_other": "Ең көбі {{displayCount}} файл қосуға болады.",
+      "onlyAddingFiles_one": "Тек {{total}} файлдың {{accepted}}-і қосылуда (ең көбі {{max}})",
+      "onlyAddingFiles_other": "Тек {{total}} файлдың {{accepted}}-і қосылуда (ең көбі {{max}})"
     },
     "composer": {
       "addAttachment": "Тіркеме қосу",
@@ -2476,7 +2528,9 @@
       "discardAttachmentsMessage": "Ешбір хабарламаға тіркелмеген жүктелген файлдар жойылады.",
       "discardAttachmentsTitle": "Тіркемелерді жою керек пе?",
       "charactersRemaining": "{{count}} таңба қалды",
-      "insertNewline": "Жаңа жол енгізу"
+      "insertNewline": "Жаңа жол енгізу",
+      "charactersRemaining_one": "{{count}} таңба қалды",
+      "charactersRemaining_other": "{{count}} таңба қалды"
     },
     "chatLink": {
       "linkCopied": "Сілтеме көшірілді",
@@ -2548,7 +2602,9 @@
       "stepsCount_one": "{{steps}} қадам",
       "stepsCount": "{{steps}} қадам",
       "stepsCount_other": "{{steps}} қадам",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Модель ({{displayCount}})",
+      "modelsCount_other": "Модельдер ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Автоматты мақұлдау",
@@ -2588,7 +2644,9 @@
     },
     "toolRun": {
       "sheetTitle": "Құрал шақырулары",
-      "condensedLabel": "{{itemCount}} элемент; {{last}}"
+      "condensedLabel": "{{itemCount}} элемент; {{last}}",
+      "condensedLabel_one": "{{itemCount}} элемент; {{last}}",
+      "condensedLabel_other": "{{itemCount}} элемент; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2781,9 @@
     "cliCantReceiveFilesTitle": "Бұл сеанс файл қабылдай алмайды",
     "cliCantReceiveFilesMessage": "Осы сеансты орындайтын Kilo CLI құралы файл қабылдай алмайды. Сол компьютерде CLI құралын жаңартыңыз немесе файлдарды жаңа сеансқа жіберіңіз.",
     "contentlessMessage": "Бөлісетін ештеңе жоқ — мәтін де, файл да қосылмады.",
-    "couldNotReadContent": "Бөлісілген мазмұнды оқу мүмкін болмады."
+    "couldNotReadContent": "Бөлісілген мазмұнды оқу мүмкін болмады.",
+    "onlyFirstFilesAttached_one": "Тек алғашқы {{displayCount}} файл тіркеледі.",
+    "onlyFirstFilesAttached_other": "Тек алғашқы {{displayCount}} файл тіркеледі."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3153,9 @@
     "couldNotApprove": "Мақұлдау сәтсіз аяқталды",
     "couldNotStart": "Бастау сәтсіз аяқталды",
     "channelName": "Белсенді агенттер",
-    "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз."
+    "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз.",
+    "openSession": "Ашыңыз",
+    "approveFailed": "Мақұлдау мүмкін болмады. Қайталап көру үшін $t(common.approve) түртіңіз."
   },
   "transcriptionModel": {
     "title": "Дауысты мәтінге айналдыру моделі",

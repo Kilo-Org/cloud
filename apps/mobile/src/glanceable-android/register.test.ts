@@ -25,6 +25,9 @@ const mocks = vi.hoisted(() => {
         deadline = expiresAt;
       },
       getWidgetSnapshot: () => snapshot,
+      // The sink's restart adoption reads the durable posted-channel marker;
+      // this suite never posts a card, so the marker is absent.
+      getPostedChannel: () => null,
       end: vi.fn(),
     },
     getDeadline: () => deadline,

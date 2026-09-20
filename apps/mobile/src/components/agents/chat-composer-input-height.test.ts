@@ -8,6 +8,7 @@ import {
   NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
   resolveComposerMaxHeight,
   resolveComposerTextContentWidth,
+  SESSION_HEADER_HEIGHT,
   shouldEnableComposerInputScroll,
   STARTER_ROW_HEIGHT,
 } from './chat-composer-input-height';
@@ -48,10 +49,40 @@ describe('resolveComposerTextContentWidth', () => {
 });
 
 describe('composer chrome budgets', () => {
-  it('reserve the starter-row height inside both chrome budgets', () => {
-    // 120 (composer chrome) + STARTER_ROW_HEIGHT = 176, and 176 + STARTER_ROW_HEIGHT = 232.
+  it('keeps the starter-row reserve out of the new-session prompt budget', () => {
+    // The chat composer budget still carries the reserve: 120 + STARTER_ROW_HEIGHT = 232.
     expect(COMPOSER_CHROME_HEIGHT - STARTER_ROW_HEIGHT).toBe(120);
-    expect(NEW_SESSION_PROMPT_CHROME_HEIGHT - STARTER_ROW_HEIGHT).toBe(176);
+    // The new-session prompt budget carries no reserve, so the keyboard-open cap
+    // can reach the input's absolute max instead of flooring at its minimum.
+    expect(NEW_SESSION_PROMPT_CHROME_HEIGHT).toBe(176);
+  });
+});
+
+describe('new-session prompt cap with the keyboard open', () => {
+  // The new-session prompt's own geometry (see `new-session-prompt.tsx`):
+  // 16pt of vertical padding around 24pt lines.
+  const PROMPT_VERTICAL_PADDING = 16;
+  const PROMPT_LINE_HEIGHT = 24;
+  const PROMPT_MIN_HEIGHT = PROMPT_LINE_HEIGHT * 3 + PROMPT_VERTICAL_PADDING;
+  const FOUR_LINE_PROMPT_HEIGHT = PROMPT_LINE_HEIGHT * 4 + PROMPT_VERTICAL_PADDING;
+
+  it('lets a four-line prompt grow past the three-line minimum', () => {
+    // Phone-class window (393x852) with the iOS keyboard up and the composer
+    // focused. A stale starter-row reserve left only 79pt of remaining space,
+    // so the cap floored at the 3-line minimum and clipped the prompt's last
+    // line at the input's bottom edge.
+    const cap = resolveComposerMaxHeight({
+      windowHeight: 852,
+      safeAreaInsetTop: 59,
+      safeAreaInsetBottom: 34,
+      keyboardHeight: 300,
+      sessionHeaderHeight: SESSION_HEADER_HEIGHT,
+      composerChromeHeight: NEW_SESSION_PROMPT_CHROME_HEIGHT,
+      minHeight: PROMPT_MIN_HEIGHT,
+      absoluteMaxHeight: NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
+    });
+
+    expect(cap).toBeGreaterThanOrEqual(FOUR_LINE_PROMPT_HEIGHT);
   });
 });
 

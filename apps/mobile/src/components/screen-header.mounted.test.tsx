@@ -4,6 +4,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import { ScreenHeader } from './screen-header';
 import { OfflineBannerSpaceProvider } from './offline-banner-space';
 
@@ -356,17 +357,23 @@ describe('ScreenHeader mounted', () => {
       { title: 'Sessions', headerRight: 'RIGHT', reserveTitleSpace: true },
       { title: longTitle, titleNumberOfLines: 1, headerRight: 'METRICS' },
       { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
+      { title: longTitle, titleNumberOfLines: 3, headerRight: 'METRICS', reserveTitleSpace: true },
+      { title: longTitle, titleNumberOfLines: 9, reserveTitleSpace: true },
     ];
 
     for (const props of variants) {
       const renderer = renderHeader(props);
       const back = findBackPressable(renderer.root);
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-      expect(title.props.numberOfLines).toBe(props.titleNumberOfLines ?? 2);
+      // The cap is clamped to the three lines the reserved box covers, so a
+      // title can never paint a line the reserve does not hold.
+      const cappedLines = Math.min(props.titleNumberOfLines ?? 2, 3);
+      expect(title.props.numberOfLines).toBe(cappedLines);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);
       if (props.reserveTitleSpace) {
-        expect(title.parent?.props.className).toContain('min-h-14 justify-center');
+        expect(title.parent?.props.className).toContain(cappedLines > 2 ? 'min-h-21' : 'min-h-14');
+        expect(title.parent?.props.className).toContain('justify-center');
       }
       if (props.context) {
         expect(title.parent?.children).toEqual([title, props.context]);
@@ -378,6 +385,25 @@ describe('ScreenHeader mounted', () => {
         expect(title.parent?.parent?.parent).toBe(back.parent);
       }
     }
+  });
+
+  it('gives the session header three title lines so a real session name is not cut mid-word', () => {
+    // 15-session-working: the session header's primary heading was capped at
+    // two lines, so a name like "Tax export formatter test" truncated mid-word
+    // beside the back control and the metrics/copy cluster on a narrow window.
+    const renderer = renderHeader({
+      title: 'Tax export formatter test',
+      titleNumberOfLines: SESSION_HEADER_TITLE_LINES,
+      reserveTitleSpace: true,
+      headerRight: 'METRICS',
+    });
+
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
+    // The reserved box holds the same three lines (3 x the `text-lg` 1.75rem
+    // line height), so the rendered title cannot move the body below it.
+    expect(title.parent?.props.className).toContain('min-h-21');
+    expect(title.parent?.props.className).toContain('justify-center');
   });
 
   it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {

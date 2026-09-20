@@ -62,6 +62,7 @@ import { type Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import { i18n } from '@/i18n';
 import { captureEvent, SESSION_VIEWED_EVENT } from '@/lib/analytics/posthog';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
@@ -840,11 +841,11 @@ describe('SessionDetailContent display scope', () => {
     });
     const header = renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 2,
+      numberOfLines: SESSION_HEADER_TITLE_LINES,
       ellipsizeMode: 'tail',
     });
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
-      'min-h-14'
+      'min-h-21'
     );
     expect(header.props.context).toBeUndefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
@@ -1454,11 +1455,11 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
 
     const header = view.renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 2,
+      numberOfLines: SESSION_HEADER_TITLE_LINES,
       ellipsizeMode: 'tail',
     });
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
-      'min-h-14'
+      'min-h-21'
     );
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(

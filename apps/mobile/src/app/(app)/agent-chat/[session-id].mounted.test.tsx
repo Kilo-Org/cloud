@@ -24,6 +24,7 @@ import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { SessionCopyLinkAction } from '@/components/agents/session-copy-link-action';
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -1408,9 +1409,11 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     );
     const header = renderer.root.findByType(ScreenHeader);
     const title = header.findByProps({ accessibilityRole: 'header' });
-    expect(propOf(title, 'numberOfLines')).toBe(2);
+    // The loading header reserves the loaded header's line cap, so the title
+    // cannot re-wrap when the real session name swaps in.
+    expect(propOf(title, 'numberOfLines')).toBe(SESSION_HEADER_TITLE_LINES);
     expect(propOf(title, 'ellipsizeMode')).toBe('tail');
-    expect(title.parent?.props.className).toContain('min-h-14');
+    expect(title.parent?.props.className).toContain('min-h-21');
     const back = findByType(header, 'Pressable').find(
       node => propOf(node, 'accessibilityLabel') === 'Go back'
     );

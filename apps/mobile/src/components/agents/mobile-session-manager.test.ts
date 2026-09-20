@@ -687,68 +687,6 @@ describe('createMobileAgentSessionManager organization adoption', () => {
   });
 });
 
-describe('createMobileAgentSessionManager organization adoption', () => {
-  beforeEach(() => {
-    configHolder.current = null;
-    mockCreateSessionManager.mockClear();
-    getWithRuntimeStateQuery.mockReset();
-    cancelQueuedMessageMutate.mockReset();
-  });
-
-  function setup(organizationId?: string): SessionManagerConfig {
-    const options = {
-      store: {},
-      userWebConnection: {},
-      ...(organizationId ? { organizationId } : {}),
-    };
-    createMobileAgentSessionManager(options as never);
-    const config = configHolder.current;
-    if (config === null) {
-      throw new Error('createSessionManager did not capture a config');
-    }
-    return config;
-  }
-
-  async function expectCancelOrganization(
-    config: SessionManagerConfig,
-    organizationId: string
-  ): Promise<void> {
-    cancelQueuedMessageMutate.mockResolvedValue({ dropped: true });
-    const cancel = config.api.cancelQueuedMessage;
-    if (!cancel) {
-      throw new Error('expected cancelQueuedMessage api');
-    }
-    const input = { sessionId: 'c-1', messageId: 'm-1' };
-    await cancel(input as never);
-
-    expect(cancelQueuedMessageMutate).toHaveBeenCalledWith(
-      { sessionId: 'c-1', messageId: 'm-1', organizationId },
-      { context: { skipBatch: true } }
-    );
-  }
-
-  it('adopts the organization its metadata read resolves when the route supplied none', async () => {
-    // The route mounted before its metadata read settled (offline or stalled)
-    // and handed in no scope. The manager's own read resolves it a beat later;
-    // org-scoped requests must carry it without recreating the manager.
-    getWithRuntimeStateQuery.mockResolvedValue({ organization_id: 'org-1', runtimeState: null });
-    const config = setup();
-
-    await config.fetchSession(SESSION_ID);
-
-    await expectCancelOrganization(config, 'org-1');
-  });
-
-  it('keeps the explicit route organization over the one its read names', async () => {
-    getWithRuntimeStateQuery.mockResolvedValue({ organization_id: 'org-2', runtimeState: null });
-    const config = setup('org-1');
-
-    await config.fetchSession(SESSION_ID);
-
-    await expectCancelOrganization(config, 'org-1');
-  });
-});
-
 describe('createMobileAgentSessionManager api.respondToPermission', () => {
   beforeEach(() => {
     configHolder.current = null;

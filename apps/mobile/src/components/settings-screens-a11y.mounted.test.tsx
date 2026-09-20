@@ -14,13 +14,13 @@ import { renderWithProviders } from '@/test/render-with-providers';
  * subtree (the explorer's `unlabeled_controls` scan). Its expectation is that
  * every control carries a text or content-desc label.
  *
- * These two screens are mounted for real here -- `ScreenHeader` and
- * `ConfigureRow` included, not stubbed -- and every pressable control in the
- * rendered tree is checked to announce something: either its own
- * `accessibilityLabel` or text somewhere below it, which is the same tree rule
- * the device scan applies. A control that announces nothing fails the test.
- * The non-empty-walk guards matter: a tree that stops rendering controls must
- * fail, not pass vacuously.
+ * These two screens are mounted for real here -- `ScreenHeader`, `ConfigureRow`
+ * and the appearance `SegmentedControl` included, not stubbed -- and every
+ * pressable control in the rendered tree is checked to announce something:
+ * either its own `accessibilityLabel` or text somewhere below it, which is the
+ * same tree rule the device scan applies. A control that announces nothing
+ * fails the test. The non-empty-walk guards matter: a tree that stops rendering
+ * controls must fail, not pass vacuously.
  */
 
 vi.hoisted(() => {
@@ -72,7 +72,9 @@ vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/segmented-control', () => ({ SegmentedControl: 'SegmentedControl' }));
+// The appearance control is mounted for real below, so its selection haptic is
+// reached at import time; the node environment cannot load the native module.
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/offline-banner-space', () => ({ useOfflineBannerSpace: () => false }));
 // The development-only flag surface pulls the Expo application module, which a
@@ -166,7 +168,7 @@ describe('settings screens announce every control', () => {
     const renderer = await mount(<PreferencesScreen />);
     const found = controls(renderer.root);
 
-    // Back, the five hub rows, and the appearance control.
+    // Back, the five hub rows, and the three appearance options.
     expect(found.length).toBeGreaterThanOrEqual(6);
     expect(
       found.map(control => announcedBy(control)).filter(label => label === i18n.t('common.goBack'))
@@ -176,10 +178,22 @@ describe('settings screens announce every control', () => {
       expect(announcedBy(control)).not.toBe('');
     }
 
-    const appearance = renderer.root.findAll(node => Object.is(node.type, 'SegmentedControl'));
-    expect(appearance).toHaveLength(1);
-    const appearanceLabel = appearance[0]?.props.accessibilityLabel;
-    expect(typeof appearanceLabel).toBe('string');
-    expect(String(appearanceLabel).trim()).not.toBe('');
+    // The appearance control is mounted for real: its group carries the visible
+    // section name and every option announces its own label, so a screen reader
+    // hears what each choice is.
+    const appearanceGroup = renderer.root.findAll(
+      node => node.props.accessibilityRole === 'radiogroup'
+    );
+    expect(appearanceGroup).toHaveLength(1);
+    expect(appearanceGroup[0]?.props.accessibilityLabel).toBe(i18n.t('preferences.appearance'));
+
+    const appearanceOptions = renderer.root.findAll(
+      node => node.props.accessibilityRole === 'radio'
+    );
+    expect(appearanceOptions.map(option => announcedBy(option))).toEqual([
+      i18n.t('preferences.appearanceSystem'),
+      i18n.t('preferences.appearanceLight'),
+      i18n.t('preferences.appearanceDark'),
+    ]);
   });
 });

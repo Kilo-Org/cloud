@@ -3155,7 +3155,8 @@
     "channelName": "Aktiva agenter",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen.",
     "openSession": "Öppna",
-    "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen."
+    "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen.",
+    "newestResult": "Nyaste resultatet"
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",

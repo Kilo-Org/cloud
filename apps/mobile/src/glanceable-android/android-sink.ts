@@ -18,11 +18,12 @@ import {
   type GlanceableSink,
   type GlanceableSinkContext,
 } from '@/lib/glanceable/sink-registry';
-import { getWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
-import type * as NotificationsModule from '@/lib/notifications';
+import { getWaitingAsk } from '@/lib/glanceable/waiting-ask';
 
+import { getActionNotice, pruneActionNotice, setGlanceableActionNotice } from './action-notice';
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
-import { formatGlanceableCount, isWidgetRtl } from './count-format';
+import { formatGlanceableAgo, formatGlanceableCount, isWidgetRtl } from './count-format';
+import { ensureAndroidNotificationChannels } from './ensure-notification-channels';
 import {
   buildNotificationActions,
   end as endLiveUpdate,
@@ -41,6 +42,10 @@ import {
   buildOngoingNotificationText,
 } from './widget-props';
 
+// Re-exported because the approve task and the widget suite import it from the
+// sink; the notice state itself now lives in `./action-notice`.
+export { setGlanceableActionNotice };
+
 /**
  * Android owns the widget expiry and notification timeout. The sink supplies
  * translated copy, persists the latest snapshot, and fences pending starts.
@@ -50,25 +55,6 @@ const NOTIFICATION_TITLE_KEY = 'glanceable.channelName';
 
 function translate(key: string): string {
   return i18n.t(key);
-}
-
-/**
- * Create the Android channels before the first post, lazily. `@/lib/notifications`
- * pulls the native notifications graph (expo-notifications → expo-constants),
- * and the importers of this module — the widget / Live-Update headless entry and
- * the pure widget suite — must not load it. The reverse direction already
- * lazy-requires the platform sink registrations (see
- * `ensureGlanceableSinksLoaded`), so this keeps one rule.
- *
- * The dynamic import is memoized so concurrent starts share one load, matching
- * the drafts / encrypted-kv pattern.
- */
-let notificationsModule: Promise<typeof NotificationsModule> | null = null;
-
-async function ensureAndroidNotificationChannels(): Promise<void> {
-  notificationsModule ??= import('@/lib/notifications');
-  const { ensureAndroidNotificationChannels: ensureChannels } = await notificationsModule;
-  await ensureChannels();
 }
 
 let lastWidgetSnapshot: GlanceableAgentsSnapshot | null = null;
@@ -92,44 +78,16 @@ let pending: {
 let startEpoch = 0;
 let terminalExpiresAt: number | null = null;
 
-/**
- * A one-line notice for the next republish: the headless approve task sets it
- * on a retryable failure, the notification text prefixes it, and nothing else
- * reads it. It never outlives its ask — a changed ask or a zero needs-input
- * count clears it — so a failure message cannot describe a new session.
- */
-let actionNotice: string | null = null;
-let noticeAskKey: string | null = null;
-
-/** The recorded ask identity the notice describes; '' means "no ask". */
-function askKey(ask: WaitingAsk | null): string {
-  return ask === null ? '' : `${ask.kiloSessionId}|${ask.status}`;
-}
-
-/**
- * Set (or clear) the notice for the next republish. Records the ask it belongs
- * to, so the drop rules below can tell a stale notice from a current one.
- */
-export function setGlanceableActionNotice(notice: string | null): void {
-  actionNotice = notice;
-  noticeAskKey = notice === null ? null : askKey(getWaitingAsk());
-}
-
-/** Drop the notice once nothing needs input or the recorded ask has changed. */
-function pruneActionNotice(snapshot: GlanceableAgentsSnapshot): void {
-  if (
-    actionNotice !== null &&
-    (snapshot.needsInput === 0 || askKey(getWaitingAsk()) !== noticeAskKey)
-  ) {
-    actionNotice = null;
-    noticeAskKey = null;
-  }
-}
-
 /** The ongoing notification line, carrying the pending notice when one waits. */
 function notificationText(snapshot: GlanceableAgentsSnapshot): string {
   pruneActionNotice(snapshot);
-  return buildOngoingNotificationText(snapshot, {}, translate, formatGlanceableCount, actionNotice);
+  return buildOngoingNotificationText(
+    snapshot,
+    {},
+    translate,
+    formatGlanceableCount,
+    getActionNotice()
+  );
 }
 
 /**
@@ -180,7 +138,12 @@ function postNotification(
 export function getCurrentWidgetProps(): AndroidWidgetProps | null {
   return lastWidgetSnapshot === null
     ? null
-    : buildCurrentWidgetProps(lastWidgetSnapshot, translate, formatGlanceableCount);
+    : buildCurrentWidgetProps(
+        lastWidgetSnapshot,
+        translate,
+        formatGlanceableCount,
+        formatGlanceableAgo
+      );
 }
 
 function renderWidgetNow(props: AndroidWidgetProps): void {
@@ -242,7 +205,7 @@ async function tryStartOrUpdate(
   // A pending notice must reach the surface even when the counts did not
   // change: it is the only carrier of the retryable failure, and the republish
   // that carries it can arrive with the same counts (or not arrive at all).
-  if (notificationActive && snapshot.revision <= revision && actionNotice === null) {
+  if (notificationActive && snapshot.revision <= revision && getActionNotice() === null) {
     return;
   }
   if (notificationActive) {
@@ -377,7 +340,12 @@ export const androidSink: GlanceableSink = {
       }
     }
     setWidgetSnapshot(snapshot);
-    const props = buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount);
+    const props = buildCurrentWidgetProps(
+      snapshot,
+      translate,
+      formatGlanceableCount,
+      formatGlanceableAgo
+    );
     renderWidgetNow(props);
     const eligible = hasCurrentWork(snapshot);
     if (eligible) {
@@ -429,6 +397,5 @@ export function _resetAndroidSinkForTests(): void {
   pending = null;
   startEpoch += 1;
   terminalExpiresAt = null;
-  actionNotice = null;
-  noticeAskKey = null;
+  setGlanceableActionNotice(null);
 }

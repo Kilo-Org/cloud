@@ -3155,7 +3155,8 @@
     "channelName": "Mpanatanteraka mandeha",
     "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy.",
     "openSession": "Sokafy",
-    "approveFailed": "Tsy nahomby ny fanekena. Tsindrio $t(common.approve) hanandramana indray."
+    "approveFailed": "Tsy nahomby ny fanekena. Tsindrio $t(common.approve) hanandramana indray.",
+    "newestResult": "Vokatra vaovao indrindra"
   },
   "transcriptionModel": {
     "title": "Modely fanovana feo ho soratra",

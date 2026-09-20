@@ -115,6 +115,17 @@ describe('classifyPasskeyError', () => {
     expect(classifyPasskeyError({ message: 'nocredentials' })).toBe('no-passkey');
   });
 
+  it.each([
+    ['USERCANCELLED', 'login.passkeyCancelled'],
+    ['NOCREDENTIALS', 'login.passkeyNotFound'],
+    ['NOTALLOWED', 'login.passkeyNotFound'],
+    ['NOTSUPPORTED', 'login.passkeyUnsupported'],
+    ['NOTCONFIGURED', 'login.passkeyUnsupported'],
+    ['UNKNOWNERROR', 'login.passkeyFailed'],
+  ])('maps the normalized native code %s to catalog-owned display copy', (code, key) => {
+    expect(passkeyFailureKey(classifyPasskeyError({ code }))).toBe(key);
+  });
+
   it('falls back to the generic failure for anything else', () => {
     expect(classifyPasskeyError(new Error('socket closed'))).toBe('failed');
     expect(classifyPasskeyError(undefined)).toBe('failed');

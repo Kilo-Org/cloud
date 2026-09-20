@@ -3241,7 +3241,8 @@
     "channelName": "Aktywni agenci",
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady.",
     "openSession": "Otwórz",
-    "approveFailed": "Nie udało się zatwierdzić. Dotknij $t(common.approve), aby spróbować ponownie."
+    "approveFailed": "Nie udało się zatwierdzić. Dotknij $t(common.approve), aby spróbować ponownie.",
+    "newestResult": "Najnowszy wynik"
   },
   "transcriptionModel": {
     "title": "Model transkrypcji",

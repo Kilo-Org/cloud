@@ -3241,7 +3241,8 @@
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
     "openSession": "Atidaryti",
-    "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą."
+    "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą.",
+    "newestResult": "Naujausias rezultatas"
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",

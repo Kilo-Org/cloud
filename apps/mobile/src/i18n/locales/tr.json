@@ -3155,7 +3155,8 @@
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
     "openSession": "Aç",
-    "approveFailed": "Onaylanamadı. Tekrar denemek için $t(common.approve) öğesine dokun."
+    "approveFailed": "Onaylanamadı. Tekrar denemek için $t(common.approve) öğesine dokun.",
+    "newestResult": "En yeni sonuç"
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",

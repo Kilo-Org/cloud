@@ -3155,7 +3155,8 @@
     "channelName": "Actieve agents",
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
     "openSession": "Openen",
-    "approveFailed": "Goedkeuren is niet gelukt. Tik op $t(common.approve) om het opnieuw te proberen."
+    "approveFailed": "Goedkeuren is niet gelukt. Tik op $t(common.approve) om het opnieuw te proberen.",
+    "newestResult": "Nieuwste resultaat"
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",

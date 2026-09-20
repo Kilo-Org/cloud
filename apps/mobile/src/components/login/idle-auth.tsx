@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the idle login screen owns every provider control, the SSO recovery block, and the email/OTP switch in one surface */
 import {
   AppleAuthenticationButton,
   AppleAuthenticationButtonStyle,
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
+import { passkeysSupported } from '@/lib/auth/passkey-client';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 import { setLoginEmailDraft, setSsoRecoveryDraft, type SsoRecoveryDraft } from '@/lib/login-draft';
 
@@ -37,6 +39,7 @@ export function IdleAuth({
     googleConfigured,
     signInWithApple,
     signInWithGoogle,
+    signInWithPasskey,
     requestEmailCode,
     verifyEmailCode,
     ssoRecovery,
@@ -113,7 +116,10 @@ export function IdleAuth({
   };
 
   const showApple = Platform.OS === 'ios' && appleAvailable;
-  const showDivider = showApple || googleConfigured;
+  // A build whose dev client has no native passkey module exposes no control:
+  // the capability is read synchronously, so the button never pops in.
+  const showPasskey = passkeysSupported();
+  const showDivider = showApple || googleConfigured || showPasskey;
   const authBusy = busy !== undefined || browserAuthStarting;
 
   // Report the form's busy state to the login shell so it can disable the
@@ -243,6 +249,31 @@ export function IdleAuth({
             {t('login.signInWithGoogle')}
           </Text>
         </Button>
+      )}
+
+      {showPasskey && (
+        <View
+          className={authBusy ? 'opacity-50' : undefined}
+          pointerEvents={authBusy ? 'none' : 'auto'}
+        >
+          <Button
+            variant="outline"
+            size="lg"
+            // min-h (not fixed h) so Dynamic Type can grow the control, matching
+            // the Google button's Apple-parity 44pt floor.
+            className="min-h-[44px] w-full flex-row flex-wrap gap-2 rounded-[8px] py-2.5"
+            disabled={authBusy}
+            onPress={() => {
+              void signInWithPasskey();
+            }}
+            accessibilityLabel={t('login.signInWithPasskey')}
+          >
+            {busy === 'passkey' ? <ActivityIndicator size="small" /> : null}
+            <Text className="shrink text-center text-[17px] font-medium">
+              {t('login.signInWithPasskey')}
+            </Text>
+          </Button>
+        </View>
       )}
 
       {showDivider && (

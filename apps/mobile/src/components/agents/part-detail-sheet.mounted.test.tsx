@@ -23,10 +23,20 @@ import { PartDetailSheetHost } from './part-detail-sheet-host';
 import { useOpenPartDetail } from './open-part-detail-context';
 import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 
-const { requestMock } = vi.hoisted(() => ({ requestMock: vi.fn() }));
+const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
+  requestMock: vi.fn(),
+  readMock: vi.fn(),
+  writeMock: vi.fn(),
+}));
 
 vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
-  requestToolSummaryTranslation: requestMock,
+  requestToolSummaryTranslations: requestMock,
+}));
+// The encrypted-KV cache is a native module, loaded by the runtime's dynamic
+// import; mock it the same way as the client so this suite stays native-free.
+vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
+  readToolSummaryTranslations: readMock,
+  writeToolSummaryTranslation: writeMock,
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -737,9 +747,9 @@ function makeToolPartWithInput(id: string, tool: string, input: Record<string, u
 async function settleTranslation(): Promise<void> {
   await act(async () => {
     for (let i = 0; i < 5; i += 1) {
-      // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the dynamic import and request
+      // eslint-disable-next-line no-await-in-loop -- real time for the batch window, then the macrotask that settles the dynamic import and request
       await new Promise<void>(resolve => {
-        setImmediate(resolve);
+        setTimeout(resolve, 20);
       });
     }
   });
@@ -748,11 +758,15 @@ async function settleTranslation(): Promise<void> {
 describe('PartDetailSheet tool-summary translation gate', () => {
   beforeEach(() => {
     requestMock.mockReset();
+    readMock.mockReset();
+    writeMock.mockReset();
+    readMock.mockResolvedValue([]);
+    writeMock.mockResolvedValue(undefined);
     setConfig({ enabled: false, model: TRANSLATION_MODEL });
   });
 
   it('never requests a translation for a deliberately non-translatable tool header', async () => {
-    requestMock.mockResolvedValue('Liste des tâches');
+    requestMock.mockResolvedValue(['Liste des tâches']);
     setConfig({ enabled: true, model: TRANSLATION_MODEL });
 
     const renderer = await mountSheet(makeToolPartWithInput('todo-1', 'todoread', {}));
@@ -762,8 +776,23 @@ describe('PartDetailSheet tool-summary translation gate', () => {
     await unmount(renderer);
   });
 
-  it('requests a translation for a content-bearing tool header', async () => {
-    requestMock.mockResolvedValue('lire : app.ts');
+  it('shows the tool name in the header when the row subtitle is empty', async () => {
+    setConfig({ enabled: true, model: TRANSLATION_MODEL });
+
+    // A bash call whose `description` is '' projects an empty subtitle; the
+    // header must fall back to the tool name, never a blank title.
+    const renderer = await mountSheet(makeToolPartWithInput('bash-1', 'bash', { description: '' }));
+    await settleTranslation();
+
+    const headers = findByType(renderer.root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(propOf(headers[0], 'title')).toBe('bash');
+    expect(requestMock).not.toHaveBeenCalled();
+    await unmount(renderer);
+  });
+
+  it('requests a translation for the row subtitle under the content-bearing tool header', async () => {
+    requestMock.mockResolvedValue(['lire : app.ts']);
     setConfig({ enabled: true, model: TRANSLATION_MODEL });
 
     const renderer = await mountSheet(
@@ -771,9 +800,39 @@ describe('PartDetailSheet tool-summary translation gate', () => {
     );
     await settleTranslation();
 
+    // The header asks for the row's own labelled text (`app.ts`), not the
+    // composed `read: app.ts`, so it shares the row's cached entry.
     expect(requestMock).toHaveBeenCalledWith(
-      expect.objectContaining({ text: 'read: app.ts', model: TRANSLATION_MODEL.id })
+      expect.objectContaining({ texts: ['app.ts'], model: TRANSLATION_MODEL.id })
     );
     await unmount(renderer);
+  });
+
+  it('opens the header on the row translation cached under the part id, with no new request', async () => {
+    requestMock.mockResolvedValue(['Fichier cache-me.ts']);
+    setConfig({ enabled: true, model: TRANSLATION_MODEL });
+
+    // A part id this suite does not otherwise use: the runtime caches by item
+    // id and only a test's own entry may serve it.
+    const cachedPart = (): ToolPart =>
+      makeToolPartWithInput('read-cache-1', 'read', { filePath: 'src/cache-me.ts' });
+
+    // First open: the row and the header share the part id, so the one request
+    // resolves the subtitle and the runtime caches it under `read-cache-1`.
+    const first = await mountSheet(cachedPart());
+    await settleTranslation();
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    await unmount(first);
+
+    requestMock.mockClear();
+
+    const second = await mountSheet(cachedPart());
+    await settleTranslation();
+
+    expect(requestMock).not.toHaveBeenCalled();
+    const headers = findByType(second.root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(propOf(headers[0], 'title')).toBe('read: Fichier cache-me.ts');
+    await unmount(second);
   });
 });

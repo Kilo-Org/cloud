@@ -148,6 +148,11 @@ vi.mock('sonner-native', () => ({ Toaster: 'Toaster' }));
 vi.mock('@/lib/auth/auth-context', () => ({ AuthProvider: 'AuthProvider' }));
 vi.mock('@/lib/glanceable/org-fence', () => ({ useGlanceableOrgFence: () => undefined }));
 vi.mock('@/lib/glanceable/mount', () => ({ GlanceablePublisherMount: () => null }));
+// The second OS-surface publisher in the (app) layout. It renders nothing and
+// needs the org/session hooks this harness does not provide, so it is stubbed
+// like the glanceable mount — and the stub keeps its `expo` root import (which
+// needs `__DEV__` and a native binding) out of this DOM-free harness.
+vi.mock('@/components/launcher-surfaces-mount', () => ({ LauncherSurfacesMount: () => null }));
 vi.mock('@/lib/organization-context', () => ({ OrganizationProvider: 'OrganizationProvider' }));
 vi.mock('@/components/offline-banner', () => ({ OfflineBanner: 'OfflineBanner' }));
 vi.mock('@/lib/query-client-lifecycle', () => ({
@@ -202,6 +207,12 @@ vi.mock('@/lib/active-sessions-live-sync-mount', () => ({
 }));
 vi.mock('@/lib/persist/cache-persistence-mount', () => ({
   CachePersistenceMount: 'CachePersistenceMount',
+}));
+vi.mock('@/lib/system-search-index-mount', () => ({
+  SystemSearchIndexMount: 'SystemSearchIndexMount',
+}));
+vi.mock('@/lib/tool-summary-translation/tool-summary-translation-retry-mount', () => ({
+  ToolSummaryTranslationRetryMount: 'ToolSummaryTranslationRetryMount',
 }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/pr-review/pr-review-connect-gate', () => ({

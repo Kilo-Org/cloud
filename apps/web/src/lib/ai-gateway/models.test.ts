@@ -3,6 +3,7 @@ import {
   autoFreeModels,
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviderRestriction,
+  isDisabledKiloExclusiveModel,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
   preferredModels,
@@ -126,11 +127,11 @@ describe('isFreeModel', () => {
       expect(claude_opus_4_6_stealth_model.public_id).toBe('stealth/claude-opus-4.6');
     });
 
-    test('registers the discounted GPT-5.6 Sol OpenAI endpoint', async () => {
-      expect(findKiloExclusiveModel(gpt_5_6_sol_discounted_model.public_id)).toBe(
-        gpt_5_6_sol_discounted_model
-      );
+    test('keeps the discounted GPT-5.6 Sol OpenAI endpoint disabled', async () => {
+      expect(findKiloExclusiveModel(gpt_5_6_sol_discounted_model.public_id)).toBeNull();
+      expect(isDisabledKiloExclusiveModel(gpt_5_6_sol_discounted_model.public_id)).toBe(true);
       expect(gpt_5_6_sol_discounted_model).toMatchObject({
+        status: 'disabled',
         internal_id: 'openai/gpt-5.6-sol',
         gateway: 'vercel',
         flags: ['reasoning', 'vision'],
@@ -419,12 +420,15 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
 
 describe('getKiloExclusiveInferenceProviderRestriction', () => {
   test('returns the routing allow-list for restricted exclusive models', () => {
-    expect(
-      getKiloExclusiveInferenceProviderRestriction(gpt_5_6_sol_discounted_model.public_id)
-    ).toEqual(new Set(['openai']));
+    expect(getKiloExclusiveInferenceProviderRestriction('stepfun/step-3.7-flash:free')).toEqual(
+      new Set(['stepfun'])
+    );
   });
 
   test('does not treat removed or unrestricted exclusives or unknown ids as restricted', () => {
+    expect(
+      getKiloExclusiveInferenceProviderRestriction(gpt_5_6_sol_discounted_model.public_id)
+    ).toBeUndefined();
     expect(getKiloExclusiveInferenceProviderRestriction('tencent/hy3:free')).toBeUndefined();
     expect(
       getKiloExclusiveInferenceProviderRestriction(gemma_4_26b_a4b_it_free_model.public_id)

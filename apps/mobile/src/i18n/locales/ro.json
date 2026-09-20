@@ -163,6 +163,7 @@
     "useDifferentEmail": "Folosește o altă adresă de e-mail",
     "signInWithApple": "Autentifică-te cu Apple",
     "signInWithGoogle": "Autentifică-te cu Google",
+    "signInWithPasskey": "Autentifică-te cu o cheie de acces",
     "emailAddress": "Adresă de e-mail",
     "emailPlaceholder": "tu@exemplu.com",
     "continueWithEmail": "Continuă cu adresa de e-mail",
@@ -175,6 +176,10 @@
     "termsConnector": " și ",
     "termsSuffix": ".",
     "moreSignInOptions": "Mai multe opțiuni de autentificare",
+    "passkeyCancelled": "Autentificarea cu cheie de acces a fost anulată. Încearcă din nou.",
+    "passkeyNotFound": "Nu există nicio cheie de acces salvată pentru acest dispozitiv. Autentifică-te în schimb cu Apple, Google sau e-mailul tău.",
+    "passkeyUnsupported": "Cheile de acces nu sunt disponibile pe acest dispozitiv. Autentifică-te în schimb cu Apple, Google sau e-mailul tău.",
+    "passkeyFailed": "Nu s-a putut face autentificarea cu o cheie de acces. Încearcă din nou.",
     "couldNotCompleteSignIn": "Nu s-a putut finaliza autentificarea. Încearcă din nou.",
     "sessionEnded": "Sesiunea ta s-a încheiat. Autentifică-te din nou.",
     "signInCodeExpired": "Codul tău de autentificare a expirat. Încearcă din nou.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Cont de test",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO pentru companii"
+    "providerEnterpriseSso": "SSO pentru companii",
+    "passkeysTitle": "Chei de acces",
+    "passkeysSubtitle": "Autentifică-te fără parolă",
+    "passkeysEmpty": "Încă nicio cheie de acces",
+    "passkeysEmptyHint": "$t(profile.addPasskey) pentru a te autentifica fără parolă.",
+    "passkeysCouldNotLoad": "Cheile de acces nu au putut fi încărcate",
+    "passkeysLoadFailed": "Cheile de acces sunt indisponibile până când se încarcă.",
+    "addPasskey": "Adaugă o cheie de acces",
+    "passkeyDefaultName": "Cheie de acces",
+    "passkeyAddedOn": "Adăugată {{date}}",
+    "passkeyAdded": "Cheie de acces adăugată.",
+    "passkeyAddFailed": "Nu s-a putut adăuga o cheie de acces. Încearcă din nou.",
+    "passkeyAddUnsupported": "Acest dispozitiv nu poate crea chei de acces.",
+    "passkeyAddCancelled": "Crearea cheii de acces a fost anulată.",
+    "passkeyRemoved": "Cheie de acces eliminată.",
+    "passkeyRemoveFailed": "Nu s-a putut elimina acea cheie de acces. Încearcă din nou.",
+    "passkeyRenamed": "Cheie de acces redenumită.",
+    "passkeyName": "Numele cheii de acces",
+    "renamePasskey": "Redenumește cheia de acces",
+    "removePasskey": "Elimină cheia de acces",
+    "removePasskeyTitle": "Elimini cheia de acces?",
+    "removePasskeyMessage": "Nu te vei mai putea autentifica cu această cheie de acces."
   },
   "preferences": {
     "general": "General",
@@ -326,7 +352,7 @@
       "expandMoreLines": "Afișează încă {{displayCount}} linii ({{start}}–{{end}})",
       "expandLinesOfContext": "Afișează {{displayCount}} linii de context",
       "expandAll": "Extinde tot",
-      "expandAllLines": "Afișează toate cele {{displayCount}} linii",
+      "expandAllLines": "Afișează toate liniile ({{displayCount}})",
       "loadingMoreFiles": "Se încarcă mai multe fișiere…",
       "retryLoadingNextPage": "Reîncearcă încărcarea paginii următoare",
       "failedToLoadMoreFiles": "Nu s-au putut încărca mai multe fișiere — atinge pentru a încerca din nou",
@@ -345,7 +371,22 @@
       "goToOverview": "Mergi la prezentarea generală",
       "goToOverviewTab": "Mergi la fila de prezentare generală",
       "fileLoadedCount_few": "{{displayCount}} fișiere încărcate",
-      "fileLoadedOfTotalCount_few": "{{displayCount}} fișiere încărcate din {{total}}"
+      "fileLoadedOfTotalCount_few": "{{displayCount}} fișiere încărcate din {{total}}",
+      "expandAllLines_one": "Afișează toate liniile ({{displayCount}})",
+      "expandAllLines_other": "Afișează toate liniile ({{displayCount}})",
+      "expandAllLines_few": "Afișează toate liniile ({{displayCount}})",
+      "expandLines_one": "Afișează {{displayCount}} linie ({{start}}–{{end}})",
+      "expandLines_other": "Afișează {{displayCount}} linii ({{start}}–{{end}})",
+      "expandLines_few": "Afișează {{displayCount}} linii ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Afișează {{displayCount}} linie de context",
+      "expandLinesOfContext_other": "Afișează {{displayCount}} linii de context",
+      "expandLinesOfContext_few": "Afișează {{displayCount}} linii de context",
+      "expandMoreLines_one": "Afișează încă {{displayCount}} linie ({{start}}–{{end}})",
+      "expandMoreLines_other": "Afișează încă {{displayCount}} linii ({{start}}–{{end}})",
+      "expandMoreLines_few": "Afișează încă {{displayCount}} linii ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} din {{total}} fișiere încărcate",
+      "loadedOfTotalFiles_other": "{{loaded}} din {{total}} fișiere încărcate",
+      "loadedOfTotalFiles_few": "{{loaded}} din {{total}} fișiere încărcate"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ fără linie nouă la sfârșitul fișierului",
@@ -538,7 +579,10 @@
         "outdatedOnPath": "Depășit: {{path}}"
       },
       "deletedUser": "utilizator șters",
-      "replyForbiddenTerm": "Nu ai permisiunea să răspunzi la acest {{term}}."
+      "replyForbiddenTerm": "Nu ai permisiunea să răspunzi la acest {{term}}.",
+      "moreLinesAbove_one": "… încă {{displayCount}} linie mai sus",
+      "moreLinesAbove_other": "… încă {{displayCount}} linii mai sus",
+      "moreLinesAbove_few": "… încă {{displayCount}} linii mai sus"
     },
     "couldNotOpenGitHubAppSettings": "Nu s-au putut deschide setările aplicației GitHub.",
     "installKiloGitHubApp": "Instalează aplicația Kilo pentru GitHub",
@@ -715,7 +759,10 @@
       "statusContext": "Neschimbat",
       "lineLabel": "linia {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}} — {{text}}",
-      "emptyLine": "(gol)"
+      "emptyLine": "(gol)",
+      "truncationBanner_one": "Se afișează primele {{limit}} din {{total}} fișiere modificate, din cauza limitei API-ului GitHub.",
+      "truncationBanner_other": "Se afișează primele {{limit}} din {{total}} fișiere modificate, din cauza limitei API-ului GitHub.",
+      "truncationBanner_few": "Se afișează primele {{limit}} din {{total}} fișiere modificate, din cauza limitei API-ului GitHub."
     },
     "linkPasteClipboardEmpty": "Clipboardul este gol.",
     "linkPasteNotAPullRequest": "Aceasta nu este o legătură către un PR sau un merge request",
@@ -792,7 +839,7 @@
     "previewFullDescription": "Notificările afișează textul mesajului pe ecranul de blocare.",
     "previewGenericDescription": "Notificările semnalează activitatea fără a afișa textul mesajului. Deschide Kilo pentru a-l citi.",
     "channel": {
-      "agent": "Sesiuni ale agenților",
+      "agentProgress": "Progresul agenților",
       "chat": "Mesaje din conversații",
       "kiloclaw": "Activitate KiloClaw",
       "balance": "Alerte privind soldul",
@@ -809,6 +856,15 @@
       "kiloclawActivitySubtitle": "instanță pregătită sau eșuată, acțiuni programate",
       "balanceAlertsSubtitle": "avertismente de sold scăzut al organizației",
       "securityFindingsSubtitle": "constatări noi și mementouri SLA"
+    },
+    "action": {
+      "openSession": "Deschide sesiunea"
+    },
+    "needsInputAction": {
+      "approved": "Cerere aprobată",
+      "replied": "Răspuns trimis",
+      "failed": "Nu s-a putut răspunde. Atingeți din nou pentru a reîncerca.",
+      "unavailable": "Această cerere nu mai așteaptă."
     }
   },
   "tabs": {
@@ -889,7 +945,10 @@
       "uploadFailed": "Încărcarea a eșuat.",
       "failedToUploadFile": "Nu s-a putut încărca fișierul: {{reason}}.",
       "nothingToPaste": "Nu există nimic de lipit.",
-      "metadataStripFailed": "Nu s-au putut elimina metadatele fotografiei."
+      "metadataStripFailed": "Nu s-au putut elimina metadatele fotografiei.",
+      "limit_one": "Poți atașa cel mult {{displayCount}} fișier.",
+      "limit_other": "Poți atașa cel mult {{displayCount}} fișiere.",
+      "limit_few": "Poți atașa cel mult {{displayCount}} fișiere."
     },
     "attachmentPreview": {
       "accessibility": "Fișier: {{filename}}, stare: {{status}}",
@@ -1636,7 +1695,13 @@
       "syncFindings": "Sincronizează constatările",
       "syncNow": "Sincronizează acum",
       "syncQueued": "Sincronizare în așteptare",
-      "syncStatusUnavailable": "Starea sincronizării nu este disponibilă."
+      "syncStatusUnavailable": "Starea sincronizării nu este disponibilă.",
+      "daysOverdue_one": "{{displayCount}} zi întârziere",
+      "daysOverdue_other": "{{displayCount}} zile întârziere",
+      "daysOverdue_few": "{{displayCount}} zile întârziere",
+      "findingsCount_one": "{{displayCount}} constatare",
+      "findingsCount_other": "{{displayCount}} constatări",
+      "findingsCount_few": "{{displayCount}} constatări"
     },
     "dashboardMetrics": {
       "openFindings": "Constatări deschise",
@@ -2149,20 +2214,7 @@
       "continueFrom": "Se continuă sesiunea {{title}}.",
       "importingSession": "Se importă sesiunea",
       "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
-      "importFailed": "Nu s-a putut importa această sesiune.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Implicit · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Mic",
-      "sandboxInstanceShared": "Partajat",
-      "sandboxInstanceLarge": "Mare",
-      "sandboxInstanceDevcontainer": "Container de dezvoltare",
-      "sandboxInstanceProviderDefault": "Implicit al furnizorului",
-      "sandboxCouldNotLoad": "Nu s-au putut încărca opțiunile pentru sandbox",
-      "sandboxUnavailable": "Acest sandbox nu este disponibil. Alege un alt sandbox sau Implicit.",
-      "sandboxUseDefault": "Folosește Implicit"
+      "importFailed": "Nu s-a putut importa această sesiune."
     },
     "partRenderer": {
       "updatedFileCount_one": "S-a actualizat {{displayCount}} fișier.",
@@ -2188,7 +2240,16 @@
       "updateTodos": "Actualizează sarcinile",
       "linesBadge": "{{displayCount}} linii",
       "filesBadge": "{{displayCount}} fișiere",
-      "matchesBadge": "{{displayCount}} potriviri"
+      "matchesBadge": "{{displayCount}} potriviri",
+      "filesBadge_one": "{{displayCount}} fișier",
+      "filesBadge_other": "{{displayCount}} fișiere",
+      "filesBadge_few": "{{displayCount}} fișiere",
+      "linesBadge_one": "{{displayCount}} linie",
+      "linesBadge_other": "{{displayCount}} linii",
+      "linesBadge_few": "{{displayCount}} linii",
+      "matchesBadge_one": "{{displayCount}} potrivire",
+      "matchesBadge_other": "{{displayCount}} potriviri",
+      "matchesBadge_few": "{{displayCount}} potriviri"
     },
     "readToolMarkdown": {
       "linesTruncated": "liniile {{start}}–{{end}} (trunchiate)",
@@ -2481,7 +2542,13 @@
       "files": "Fișiere",
       "couldNotOpenPhotoPicker": "Selectorul de fotografii nu a putut fi deschis. Repornește Kilo și încearcă din nou.",
       "maxFilesAllowed": "Poți adăuga cel mult {{displayCount}} fișiere.",
-      "onlyAddingFiles": "Se adaugă doar {{accepted}} din {{total}} fișiere (maximum {{max}})"
+      "onlyAddingFiles": "Se adaugă doar {{accepted}} din {{total}} fișiere (maximum {{max}})",
+      "maxFilesAllowed_one": "Poți adăuga cel mult {{displayCount}} fișier.",
+      "maxFilesAllowed_other": "Poți adăuga cel mult {{displayCount}} fișiere.",
+      "maxFilesAllowed_few": "Poți adăuga cel mult {{displayCount}} fișiere.",
+      "onlyAddingFiles_one": "Se adaugă doar {{accepted}} din {{total}} fișiere (maximum {{max}})",
+      "onlyAddingFiles_other": "Se adaugă doar {{accepted}} din {{total}} fișiere (maximum {{max}})",
+      "onlyAddingFiles_few": "Se adaugă doar {{accepted}} din {{total}} fișiere (maximum {{max}})"
     },
     "composer": {
       "addAttachment": "Adaugă un atașament",
@@ -2499,7 +2566,10 @@
       "discardAttachmentsMessage": "Fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
       "discardAttachmentsTitle": "Renunți la atașamente?",
       "charactersRemaining": "{{count}} caractere rămase",
-      "insertNewline": "Inserează o linie nouă"
+      "insertNewline": "Inserează o linie nouă",
+      "charactersRemaining_one": "{{count}} caracter rămas",
+      "charactersRemaining_other": "{{count}} caractere rămase",
+      "charactersRemaining_few": "{{count}} caractere rămase"
     },
     "chatLink": {
       "linkCopied": "Link copiat",
@@ -2572,7 +2642,10 @@
       "stepsCount": "{{steps}} de pași",
       "stepsCount_other": "{{steps}} de pași",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "stepsCount_few": "{{steps}} pași"
+      "stepsCount_few": "{{steps}} pași",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modele ({{displayCount}})",
+      "modelsCount_few": "Modele ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Aprobare automată",
@@ -2612,7 +2685,10 @@
     },
     "toolRun": {
       "sheetTitle": "Apeluri ale instrumentelor",
-      "condensedLabel": "{{itemCount}} elemente; {{last}}"
+      "condensedLabel": "{{itemCount}} elemente; {{last}}",
+      "condensedLabel_one": "{{itemCount}} element; {{last}}",
+      "condensedLabel_other": "{{itemCount}} elemente; {{last}}",
+      "condensedLabel_few": "{{itemCount}} elemente; {{last}}"
     }
   },
   "bootstrap": {
@@ -2747,7 +2823,10 @@
     "cliCantReceiveFilesTitle": "Această sesiune nu poate primi fișiere",
     "cliCantReceiveFilesMessage": "Instanța Kilo CLI care rulează această sesiune nu poate primi fișiere. Actualizează CLI-ul pe sistemul respectiv sau distribuie conținutul într-o sesiune nouă.",
     "contentlessMessage": "Nu există nimic de distribuit — nu s-au inclus nici text, nici fișiere.",
-    "couldNotReadContent": "Nu s-a putut citi conținutul distribuit."
+    "couldNotReadContent": "Nu s-a putut citi conținutul distribuit.",
+    "onlyFirstFilesAttached_one": "Doar primele {{displayCount}} fișier vor fi atașate.",
+    "onlyFirstFilesAttached_other": "Doar primele {{displayCount}} fișiere vor fi atașate.",
+    "onlyFirstFilesAttached_few": "Doar primele {{displayCount}} fișiere vor fi atașate."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3118,7 +3197,9 @@
     "couldNotApprove": "Aprobarea nu a reușit",
     "couldNotStart": "Pornirea nu a reușit",
     "channelName": "Agenți activi",
-    "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare."
+    "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare.",
+    "openSession": "Deschide",
+    "approveFailed": "Aprobarea nu a reușit. Atinge $t(common.approve) pentru a încerca din nou."
   },
   "transcriptionModel": {
     "title": "Model de transcriere",
@@ -3159,5 +3240,8 @@
       "repositoryUnknown": "Kilo nu recunoaște {{repository}} ca depozit GitHub sau GitLab. Alege alt depozit în Kilo.",
       "repositoryUnsupported": "{{repository}} este un depozit Bitbucket — Pornește un agent nu îl poate folosi încă. Alege alt depozit în Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Deschide ultima sesiune"
   }
 }

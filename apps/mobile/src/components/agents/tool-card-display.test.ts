@@ -450,12 +450,12 @@ describe('getToolDisplay badge rules — live CLI shapes', () => {
     ).toBeUndefined();
   });
 
-  it('badges a single glob path as 1 files', () => {
+  it('badges a single glob path as 1 file', () => {
     expect(
       getDisplay(
         makeToolPart('glob', completed({ pattern: '**/*.ts' }, '/repo/apps/mobile/AGENTS.md'))
       ).badge
-    ).toBe('1 files');
+    ).toBe('1 file');
   });
 
   it('does not count the opencode truncated note as a file', () => {

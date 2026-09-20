@@ -749,8 +749,9 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
 /**
  * Decrypts each stored promo code into its runtime `credit_category`.
  *
- * A ciphertext that does not decrypt with the configured key (a rotated or
- * missing `CREDIT_CATEGORIES_ENCRYPTION_KEY_V2`) must not stop this module from
+ * Decrypting the whole catalogue happens at module scope, so a ciphertext that
+ * does not decrypt with the configured key (a rotated or missing
+ * `CREDIT_CATEGORIES_ENCRYPTION_KEY_V2`) must not stop this module from
  * loading. Sign-in and cloud-agent session creation import it transitively, and
  * a throw at module scope takes those routes down with a 500 for every user.
  * Skip only the entries that fail and log them, so a key misconfiguration
@@ -766,8 +767,8 @@ export function buildSelfServicePromos(
       promos.push({ ...rest, credit_category: decrypt(encrypted_credit_category) });
     } catch (error) {
       console.error(
-        '[promoCreditCategories] skipping a promo code that failed to decrypt: %s',
-        error instanceof Error ? error.message : String(error)
+        'Failed to decrypt a self-service promo credit category; skipping it. Check CREDIT_CATEGORIES_ENCRYPTION_KEY_V2 / CREDIT_CATEGORIES_ENCRYPTION_KEY.',
+        error
       );
     }
   }

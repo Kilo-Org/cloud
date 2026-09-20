@@ -163,6 +163,7 @@
     "useDifferentEmail": "Uporabi drug e-poštni naslov",
     "signInWithApple": "Prijavi se z računom Apple",
     "signInWithGoogle": "Prijavi se z računom Google",
+    "signInWithPasskey": "Prijavi se s ključem za dostop",
     "emailAddress": "E-poštni naslov",
     "emailPlaceholder": "ime@example.com",
     "continueWithEmail": "Nadaljuj z e-pošto",
@@ -175,6 +176,10 @@
     "termsConnector": " in ",
     "termsSuffix": ".",
     "moreSignInOptions": "Več možnosti prijave",
+    "passkeyCancelled": "Prijava s ključem za dostop je bila preklicana. Poskusi znova.",
+    "passkeyNotFound": "Za to napravo ni shranjen noben ključ za dostop. Prijavi se namesto tega z Apple, Google ali svojim e-poštnim naslovom.",
+    "passkeyUnsupported": "Ključi za dostop v tej napravi niso na voljo. Prijavi se namesto tega z Apple, Google ali svojim e-poštnim naslovom.",
+    "passkeyFailed": "Prijava s ključem za dostop ni uspela. Poskusi znova.",
     "couldNotCompleteSignIn": "Prijave ni bilo mogoče dokončati. Poskusi znova.",
     "sessionEnded": "Tvoja seja se je končala. Prijavi se znova.",
     "signInCodeExpired": "Tvoja prijavna koda je potekla. Poskusi znova.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Testni račun",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO za podjetja"
+    "providerEnterpriseSso": "SSO za podjetja",
+    "passkeysTitle": "Ključi za dostop",
+    "passkeysSubtitle": "Prijavi se brez gesla",
+    "passkeysEmpty": "Ni še nobenega ključa za dostop",
+    "passkeysEmptyHint": "$t(profile.addPasskey), da se prijaviš brez gesla.",
+    "passkeysCouldNotLoad": "Ključev za dostop ni bilo mogoče naložiti",
+    "passkeysLoadFailed": "Ključi za dostop niso na voljo, dokler se to ne naloži.",
+    "addPasskey": "Dodaj ključ za dostop",
+    "passkeyDefaultName": "Ključ za dostop",
+    "passkeyAddedOn": "Dodano {{date}}",
+    "passkeyAdded": "Ključ za dostop je dodan.",
+    "passkeyAddFailed": "Ključa za dostop ni bilo mogoče dodati. Poskusi znova.",
+    "passkeyAddUnsupported": "Ta naprava ne more ustvariti ključev za dostop.",
+    "passkeyAddCancelled": "Ustvarjanje ključa za dostop je bilo preklicano.",
+    "passkeyRemoved": "Ključ za dostop je odstranjen.",
+    "passkeyRemoveFailed": "Tega ključa za dostop ni bilo mogoče odstraniti. Poskusi znova.",
+    "passkeyRenamed": "Ključ za dostop je preimenovan.",
+    "passkeyName": "Ime ključa za dostop",
+    "renamePasskey": "Preimenuj ključ za dostop",
+    "removePasskey": "Odstrani ključ za dostop",
+    "removePasskeyTitle": "Odstranim ključ za dostop?",
+    "removePasskeyMessage": "S tem ključem za dostop se ne boš več mogel prijaviti."
   },
   "preferences": {
     "general": "Splošno",
@@ -347,7 +373,27 @@
       "fileLoadedCount_two": "Naloženi {{displayCount}} datoteki",
       "fileLoadedCount_few": "Naložene {{displayCount}} datoteke",
       "fileLoadedOfTotalCount_two": "Naloženi {{displayCount}} datoteki od {{total}}",
-      "fileLoadedOfTotalCount_few": "Naložene {{displayCount}} datoteke od {{total}}"
+      "fileLoadedOfTotalCount_few": "Naložene {{displayCount}} datoteke od {{total}}",
+      "expandAllLines_one": "Prikaži vse vrstice: {{displayCount}}",
+      "expandAllLines_other": "Prikaži vse vrstice: {{displayCount}}",
+      "expandAllLines_two": "Prikaži vse vrstice: {{displayCount}}",
+      "expandAllLines_few": "Prikaži vse vrstice: {{displayCount}}",
+      "expandLines_one": "Prikaži vrstice ({{displayCount}}): {{start}}–{{end}}",
+      "expandLines_other": "Prikaži vrstice ({{displayCount}}): {{start}}–{{end}}",
+      "expandLines_two": "Prikaži vrstice ({{displayCount}}): {{start}}–{{end}}",
+      "expandLines_few": "Prikaži vrstice ({{displayCount}}): {{start}}–{{end}}",
+      "expandLinesOfContext_one": "Prikaži vrstice konteksta: {{displayCount}}",
+      "expandLinesOfContext_other": "Prikaži vrstice konteksta: {{displayCount}}",
+      "expandLinesOfContext_two": "Prikaži vrstice konteksta: {{displayCount}}",
+      "expandLinesOfContext_few": "Prikaži vrstice konteksta: {{displayCount}}",
+      "expandMoreLines_one": "Prikaži dodatne vrstice ({{displayCount}}): {{start}}–{{end}}",
+      "expandMoreLines_other": "Prikaži dodatne vrstice ({{displayCount}}): {{start}}–{{end}}",
+      "expandMoreLines_two": "Prikaži dodatne vrstice ({{displayCount}}): {{start}}–{{end}}",
+      "expandMoreLines_few": "Prikaži dodatne vrstice ({{displayCount}}): {{start}}–{{end}}",
+      "loadedOfTotalFiles_one": "naložene datoteke: {{loaded}} od {{total}}",
+      "loadedOfTotalFiles_other": "naložene datoteke: {{loaded}} od {{total}}",
+      "loadedOfTotalFiles_two": "naložene datoteke: {{loaded}} od {{total}}",
+      "loadedOfTotalFiles_few": "naložene datoteke: {{loaded}} od {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ na koncu datoteke ni nove vrstice",
@@ -543,7 +589,11 @@
         "outdatedOnPath": "Zastarelo: {{path}}"
       },
       "deletedUser": "izbrisani uporabnik",
-      "replyForbiddenTerm": "Nimaš dovoljenja za odgovarjanje na ta {{term}}."
+      "replyForbiddenTerm": "Nimaš dovoljenja za odgovarjanje na ta {{term}}.",
+      "moreLinesAbove_one": "… dodatne vrstice zgoraj: {{displayCount}}",
+      "moreLinesAbove_other": "… dodatne vrstice zgoraj: {{displayCount}}",
+      "moreLinesAbove_two": "… dodatne vrstice zgoraj: {{displayCount}}",
+      "moreLinesAbove_few": "… dodatne vrstice zgoraj: {{displayCount}}"
     },
     "couldNotOpenGitHubAppSettings": "Nastavitev aplikacije GitHub ni bilo mogoče odpreti.",
     "installKiloGitHubApp": "Namesti aplikacijo Kilo za GitHub",
@@ -724,7 +774,11 @@
       "statusContext": "Kontekst",
       "lineLabel": "{{status}}, vrstica {{line}}: {{text}}",
       "lineLabelNoNumber": "{{text}} ({{status}})",
-      "emptyLine": "(prazno)"
+      "emptyLine": "(prazno)",
+      "truncationBanner_one": "Zaradi omejitve API-ja GitHub je prikazanih le prvih {{limit}} od {{total}} spremenjenih datotek.",
+      "truncationBanner_other": "Zaradi omejitve API-ja GitHub je prikazanih le prvih {{limit}} od {{total}} spremenjenih datotek.",
+      "truncationBanner_two": "Zaradi omejitve API-ja GitHub je prikazanih le prvih {{limit}} od {{total}} spremenjenih datotek.",
+      "truncationBanner_few": "Zaradi omejitve API-ja GitHub je prikazanih le prvih {{limit}} od {{total}} spremenjenih datotek."
     },
     "linkPasteClipboardEmpty": "Odložišče je prazno.",
     "linkPasteNotAPullRequest": "To ni povezava do zahtevka za združitev ali merge requesta",
@@ -801,7 +855,7 @@
     "previewFullDescription": "Obvestila prikažejo besedilo sporočila na zaklenjenem zaslonu.",
     "previewGenericDescription": "Obvestila sporočijo le, da se je nekaj zgodilo. Za ogled vsebine odpri Kilo.",
     "channel": {
-      "agent": "Seje agentov",
+      "agentProgress": "Napredek agenta",
       "chat": "Sporočila v klepetu",
       "kiloclaw": "Dejavnost v KiloClaw",
       "balance": "Opozorila o stanju dobroimetja",
@@ -818,6 +872,15 @@
       "kiloclawActivitySubtitle": "instanca pripravljena ali neuspešna, načrtovana dejanja",
       "balanceAlertsSubtitle": "opozorila o nizkem stanju organizacije",
       "securityFindingsSubtitle": "nove ugotovitve in opomniki SLA"
+    },
+    "action": {
+      "openSession": "Odpri sejo"
+    },
+    "needsInputAction": {
+      "approved": "Zahteva odobrena",
+      "replied": "Odgovor poslan",
+      "failed": "Odgovoriti ni uspelo. Znova se dotaknite, da poskusite znova.",
+      "unavailable": "Ta zahteva ne čaka več."
     }
   },
   "tabs": {
@@ -898,7 +961,11 @@
       "uploadFailed": "Nalaganje ni uspelo.",
       "failedToUploadFile": "Datoteke ni bilo mogoče naložiti: {{reason}}.",
       "nothingToPaste": "Ničesar ni mogoče prilepiti.",
-      "metadataStripFailed": "Metapodatkov fotografije ni bilo mogoče odstraniti."
+      "metadataStripFailed": "Metapodatkov fotografije ni bilo mogoče odstraniti.",
+      "limit_one": "Pripneš lahko do {{displayCount}} datoteka.",
+      "limit_other": "Pripneš lahko do {{displayCount}} datotek.",
+      "limit_two": "Pripneš lahko do {{displayCount}} datoteki.",
+      "limit_few": "Pripneš lahko do {{displayCount}} datoteke."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1648,7 +1715,15 @@
       "syncFindings": "Sinhroniziraj ugotovitve",
       "syncNow": "Sinhroniziraj zdaj",
       "syncQueued": "Sinhronizacija v čakalni vrsti",
-      "syncStatusUnavailable": "Stanje sinhronizacije ni na voljo."
+      "syncStatusUnavailable": "Stanje sinhronizacije ni na voljo.",
+      "daysOverdue_one": "{{displayCount}} dan po roku",
+      "daysOverdue_other": "{{displayCount}} dni po roku",
+      "daysOverdue_two": "{{displayCount}} dneva po roku",
+      "daysOverdue_few": "{{displayCount}} dni po roku",
+      "findingsCount_one": "Število ugotovitev: {{displayCount}}",
+      "findingsCount_other": "Število ugotovitev: {{displayCount}}",
+      "findingsCount_two": "Število ugotovitev: {{displayCount}}",
+      "findingsCount_few": "Število ugotovitev: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Odprte ugotovitve",
@@ -2167,20 +2242,7 @@
       "continueFrom": "Nadaljuje se seja {{title}}.",
       "importingSession": "Uvažanje seje",
       "cliCannotContinue": "Ta CLI ne podpira nadaljevanja seje. Izberi Cloud Agent ali drug CLI.",
-      "importFailed": "Te seje ni bilo mogoče uvoziti.",
-      "sandbox": "Peskovnik",
-      "sandboxAccessibility": "Peskovnik: {{label}}",
-      "sandboxDefaultWithDestination": "Privzeto · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Malo",
-      "sandboxInstanceShared": "V skupni rabi",
-      "sandboxInstanceLarge": "Veliko",
-      "sandboxInstanceDevcontainer": "Razvojni vsebnik",
-      "sandboxInstanceProviderDefault": "Privzeto ponudnika",
-      "sandboxCouldNotLoad": "Možnosti peskovnika ni bilo mogoče naložiti",
-      "sandboxUnavailable": "Ta peskovnik ni na voljo. Izberite drug peskovnik ali Privzeto.",
-      "sandboxUseDefault": "Uporabi Privzeto"
+      "importFailed": "Te seje ni bilo mogoče uvoziti."
     },
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena je {{displayCount}} datoteka.",
@@ -2207,7 +2269,19 @@
       "updateTodos": "Posodobi naloge",
       "linesBadge": "{{displayCount}} vrstic",
       "filesBadge": "{{displayCount}} datotek",
-      "matchesBadge": "{{displayCount}} zadetkov"
+      "matchesBadge": "{{displayCount}} zadetkov",
+      "filesBadge_one": "{{displayCount}} datoteka",
+      "filesBadge_other": "{{displayCount}} datotek",
+      "filesBadge_two": "{{displayCount}} datoteki",
+      "filesBadge_few": "{{displayCount}} datoteke",
+      "linesBadge_one": "{{displayCount}} vrstica",
+      "linesBadge_other": "{{displayCount}} vrstic",
+      "linesBadge_two": "{{displayCount}} vrstici",
+      "linesBadge_few": "{{displayCount}} vrstice",
+      "matchesBadge_one": "{{displayCount}} zadetek",
+      "matchesBadge_other": "{{displayCount}} zadetkov",
+      "matchesBadge_two": "{{displayCount}} zadetka",
+      "matchesBadge_few": "{{displayCount}} zadetki"
     },
     "readToolMarkdown": {
       "linesTruncated": "vrstice {{start}}–{{end}} (skrajšano)",
@@ -2503,7 +2577,15 @@
       "files": "Datotek",
       "couldNotOpenPhotoPicker": "Izbirnika fotografij ni bilo mogoče odpreti. Znova zaženi Kilo in poskusi znova.",
       "maxFilesAllowed": "Dovoljeno število datotek je največ {{displayCount}}.",
-      "onlyAddingFiles": "Dodajanje datotek: samo {{accepted}} od {{total}} (največ {{max}})"
+      "onlyAddingFiles": "Dodajanje datotek: samo {{accepted}} od {{total}} (največ {{max}})",
+      "maxFilesAllowed_one": "Dovoljeno število datotek je največ {{displayCount}}.",
+      "maxFilesAllowed_other": "Dovoljeno število datotek je največ {{displayCount}}.",
+      "maxFilesAllowed_two": "Dovoljeno število datotek je največ {{displayCount}}.",
+      "maxFilesAllowed_few": "Dovoljeno število datotek je največ {{displayCount}}.",
+      "onlyAddingFiles_one": "Dodajanje datotek: samo {{accepted}} od {{total}} (največ {{max}})",
+      "onlyAddingFiles_other": "Dodajanje datotek: samo {{accepted}} od {{total}} (največ {{max}})",
+      "onlyAddingFiles_two": "Dodajanje datotek: samo {{accepted}} od {{total}} (največ {{max}})",
+      "onlyAddingFiles_few": "Dodajanje datotek: samo {{accepted}} od {{total}} (največ {{max}})"
     },
     "composer": {
       "addAttachment": "Dodaj prilogo",
@@ -2521,7 +2603,11 @@
       "discardAttachmentsMessage": "Naložene datoteke, ki niso priložene poslanim sporočilom, bodo izbrisane.",
       "discardAttachmentsTitle": "Želiš zavreči priponke?",
       "charactersRemaining": "Število preostalih znakov: {{count}}",
-      "insertNewline": "Vstavi novo vrstico"
+      "insertNewline": "Vstavi novo vrstico",
+      "charactersRemaining_one": "Število preostalih znakov: {{count}}",
+      "charactersRemaining_other": "Število preostalih znakov: {{count}}",
+      "charactersRemaining_two": "Število preostalih znakov: {{count}}",
+      "charactersRemaining_few": "Število preostalih znakov: {{count}}"
     },
     "chatLink": {
       "linkCopied": "Povezava kopirana",
@@ -2595,7 +2681,11 @@
       "stepsCount_other": "{{steps}} korakov",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_two": "{{steps}} koraka",
-      "stepsCount_few": "{{steps}} koraki"
+      "stepsCount_few": "{{steps}} koraki",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modeli ({{displayCount}})",
+      "modelsCount_two": "Modeli ({{displayCount}})",
+      "modelsCount_few": "Modeli ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Samodejna odobritev",
@@ -2635,7 +2725,11 @@
     },
     "toolRun": {
       "sheetTitle": "Klici orodij",
-      "condensedLabel": "{{itemCount}} elementov; {{last}}"
+      "condensedLabel": "{{itemCount}} elementov; {{last}}",
+      "condensedLabel_one": "{{itemCount}} element; {{last}}",
+      "condensedLabel_other": "{{itemCount}} elementov; {{last}}",
+      "condensedLabel_two": "{{itemCount}} elementa; {{last}}",
+      "condensedLabel_few": "{{itemCount}} elementi; {{last}}"
     }
   },
   "bootstrap": {
@@ -2770,7 +2864,11 @@
     "cliCantReceiveFilesTitle": "Ta seja ne more prejemati datotek",
     "cliCantReceiveFilesMessage": "Kilo CLI, v katerem poteka ta seja, ne more prejemati datotek. Posodobi CLI na tistem računalniku ali vsebino deli v novo sejo.",
     "contentlessMessage": "Ni vsebine za deljenje — priloženo ni bilo nobeno besedilo ali datoteka.",
-    "couldNotReadContent": "Deljene vsebine ni bilo mogoče prebrati."
+    "couldNotReadContent": "Deljene vsebine ni bilo mogoče prebrati.",
+    "onlyFirstFilesAttached_one": "Priloženih bo samo prvih {{displayCount}} datoteka.",
+    "onlyFirstFilesAttached_other": "Priloženih bo samo prvih {{displayCount}} datotek.",
+    "onlyFirstFilesAttached_two": "Priloženih bo samo prvih {{displayCount}} datoteki.",
+    "onlyFirstFilesAttached_few": "Priloženih bo samo prvih {{displayCount}} datoteke."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3142,7 +3240,9 @@
     "couldNotApprove": "Odobritev ni uspela",
     "couldNotStart": "Zagon ni uspel",
     "channelName": "Aktivni agenti",
-    "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu."
+    "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu.",
+    "openSession": "Odpri",
+    "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus."
   },
   "transcriptionModel": {
     "title": "Model za prepisovanje",
@@ -3183,5 +3283,8 @@
       "repositoryUnknown": "Kilo ne prepozna {{repository}} kot repozitorij GitHub ali GitLab. Izberi drug repozitorij v Kilu.",
       "repositoryUnsupported": "{{repository}} je repozitorij Bitbucket — Zaženi agenta ga še ne more uporabiti. Izberi drug repozitorij v Kilu."
     }
+  },
+  "launcher": {
+    "openLastSession": "Odpri zadnjo sejo"
   }
 }

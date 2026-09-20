@@ -163,6 +163,7 @@
     "useDifferentEmail": "使用其他邮箱",
     "signInWithApple": "使用 Apple 登录",
     "signInWithGoogle": "使用 Google 登录",
+    "signInWithPasskey": "使用通行密钥登录",
     "emailAddress": "邮箱地址",
     "emailPlaceholder": "邮箱地址",
     "continueWithEmail": "通过邮箱继续",
@@ -175,6 +176,10 @@
     "termsConnector": " 和 ",
     "termsSuffix": "。",
     "moreSignInOptions": "更多登录方式",
+    "passkeyCancelled": "通行密钥登录已取消。请重试。",
+    "passkeyNotFound": "此设备未保存通行密钥。请改用 Apple、Google 或电子邮件登录。",
+    "passkeyUnsupported": "此设备无法使用通行密钥。请改用 Apple、Google 或电子邮件登录。",
+    "passkeyFailed": "无法使用通行密钥登录。请重试。",
     "couldNotCompleteSignIn": "无法完成登录。请重试。",
     "sessionEnded": "你的会话已结束。请重新登录。",
     "signInCodeExpired": "你的登录验证码已过期。请重试。",
@@ -225,7 +230,28 @@
     "providerTestAccount": "测试账户",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "企业 SSO"
+    "providerEnterpriseSso": "企业 SSO",
+    "passkeysTitle": "通行密钥",
+    "passkeysSubtitle": "无需密码即可登录",
+    "passkeysEmpty": "还没有通行密钥",
+    "passkeysEmptyHint": "$t(profile.addPasskey)以无需密码登录。",
+    "passkeysCouldNotLoad": "无法加载通行密钥",
+    "passkeysLoadFailed": "在此内容加载完成之前，通行密钥不可用。",
+    "addPasskey": "添加通行密钥",
+    "passkeyDefaultName": "通行密钥",
+    "passkeyAddedOn": "添加于 {{date}}",
+    "passkeyAdded": "已添加通行密钥。",
+    "passkeyAddFailed": "无法添加通行密钥。请重试。",
+    "passkeyAddUnsupported": "此设备无法创建通行密钥。",
+    "passkeyAddCancelled": "通行密钥创建已取消。",
+    "passkeyRemoved": "已移除通行密钥。",
+    "passkeyRemoveFailed": "无法移除该通行密钥。请重试。",
+    "passkeyRenamed": "已重命名通行密钥。",
+    "passkeyName": "通行密钥名称",
+    "renamePasskey": "重命名通行密钥",
+    "removePasskey": "移除通行密钥",
+    "removePasskeyTitle": "移除通行密钥？",
+    "removePasskeyMessage": "您将无法再使用此通行密钥登录。"
   },
   "preferences": {
     "general": "通用",
@@ -293,7 +319,7 @@
     "previewFullDescription": "通知会在锁定屏幕上显示消息文本。",
     "previewGenericDescription": "通知仅提示有新动态。请打开 Kilo 查看详情。",
     "channel": {
-      "agent": "智能体会话",
+      "agentProgress": "智能体进度",
       "chat": "聊天消息",
       "kiloclaw": "KiloClaw 活动",
       "balance": "余额提醒",
@@ -310,6 +336,15 @@
       "kiloclawActivitySubtitle": "实例就绪/失败、计划操作",
       "balanceAlertsSubtitle": "组织余额不足警告",
       "securityFindingsSubtitle": "新发现的安全问题和 SLA 提醒"
+    },
+    "action": {
+      "openSession": "打开会话"
+    },
+    "needsInputAction": {
+      "approved": "请求已批准",
+      "replied": "回复已发送",
+      "failed": "无法回答。再次点按即可重试。",
+      "unavailable": "该请求已不再等待。"
     }
   },
   "tabs": {
@@ -390,7 +425,9 @@
       "uploadFailed": "上传失败。",
       "failedToUploadFile": "上传文件失败：{{reason}}。",
       "nothingToPaste": "没有可粘贴的内容。",
-      "metadataStripFailed": "无法移除照片元数据。"
+      "metadataStripFailed": "无法移除照片元数据。",
+      "limit_one": "最多可附加 {{displayCount}} 个文件。",
+      "limit_other": "最多可附加 {{displayCount}} 个文件。"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}，{{status}}",
@@ -1159,7 +1196,11 @@
       "syncNow": "立即同步",
       "syncQueued": "同步任务已加入队列",
       "syncStatusUnavailable": "无法获取同步状态。",
-      "withinDeadline": "未逾期"
+      "withinDeadline": "未逾期",
+      "daysOverdue_one": "逾期 {{displayCount}} 天",
+      "daysOverdue_other": "逾期 {{displayCount}} 天",
+      "findingsCount_one": "{{displayCount}} 个安全问题",
+      "findingsCount_other": "{{displayCount}} 个安全问题"
     },
     "dashboardMetrics": {
       "openFindings": "未解决的安全问题",
@@ -1641,20 +1682,7 @@
       "continueFrom": "正在继续会话“{{title}}”。",
       "importingSession": "正在导入会话",
       "cliCannotContinue": "此 CLI 无法继续会话。请选择 Cloud Agent 或其他 CLI。",
-      "importFailed": "无法导入此会话。",
-      "sandbox": "沙盒",
-      "sandboxAccessibility": "沙盒：{{label}}",
-      "sandboxDefaultWithDestination": "默认 · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "小型",
-      "sandboxInstanceShared": "共享",
-      "sandboxInstanceLarge": "大型",
-      "sandboxInstanceDevcontainer": "开发容器",
-      "sandboxInstanceProviderDefault": "提供商默认",
-      "sandboxCouldNotLoad": "无法加载沙盒选项",
-      "sandboxUnavailable": "此沙盒不可用。请选择其他沙盒或默认。",
-      "sandboxUseDefault": "使用默认"
+      "importFailed": "无法导入此会话。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件。",
@@ -1679,7 +1707,13 @@
       "updateTodos": "更新待办事项",
       "linesBadge": "{{displayCount}} 行",
       "filesBadge": "{{displayCount}} 个文件",
-      "matchesBadge": "{{displayCount}} 项匹配"
+      "matchesBadge": "{{displayCount}} 项匹配",
+      "filesBadge_one": "{{displayCount}} 个文件",
+      "filesBadge_other": "{{displayCount}} 个文件",
+      "linesBadge_one": "{{displayCount}} 行",
+      "linesBadge_other": "{{displayCount}} 行",
+      "matchesBadge_one": "{{displayCount}} 项匹配",
+      "matchesBadge_other": "{{displayCount}} 项匹配"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截断）",
@@ -1969,7 +2003,11 @@
       "files": "文件",
       "couldNotOpenPhotoPicker": "无法打开照片选择器。请重启 Kilo 后重试。",
       "maxFilesAllowed": "最多可添加 {{displayCount}} 个文件。",
-      "onlyAddingFiles": "仅添加 {{accepted}} 个文件（共 {{total}} 个，最多 {{max}} 个）"
+      "onlyAddingFiles": "仅添加 {{accepted}} 个文件（共 {{total}} 个，最多 {{max}} 个）",
+      "maxFilesAllowed_one": "最多可添加 {{displayCount}} 个文件。",
+      "maxFilesAllowed_other": "最多可添加 {{displayCount}} 个文件。",
+      "onlyAddingFiles_one": "仅添加 {{accepted}} 个文件（共 {{total}} 个，最多 {{max}} 个）",
+      "onlyAddingFiles_other": "仅添加 {{accepted}} 个文件（共 {{total}} 个，最多 {{max}} 个）"
     },
     "composer": {
       "addAttachment": "添加附件",
@@ -1987,7 +2025,9 @@
       "discardAttachmentsMessage": "已上传但尚未用于发送消息的文件将被删除。",
       "discardAttachmentsTitle": "丢弃附件？",
       "charactersRemaining": "还可输入 {{count}} 个字符",
-      "insertNewline": "插入换行"
+      "insertNewline": "插入换行",
+      "charactersRemaining_one": "还可输入 {{count}} 个字符",
+      "charactersRemaining_other": "还可输入 {{count}} 个字符"
     },
     "chatLink": {
       "linkCopied": "链接已复制",
@@ -2059,7 +2099,9 @@
       "stepsCount_one": "{{steps}} 步",
       "stepsCount": "{{steps}} 步",
       "stepsCount_other": "{{steps}} 步",
-      "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}"
+      "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}",
+      "modelsCount_one": "模型（{{displayCount}}）",
+      "modelsCount_other": "模型（{{displayCount}}）"
     },
     "autoApprove": {
       "title": "自动批准",
@@ -2099,7 +2141,9 @@
     },
     "toolRun": {
       "sheetTitle": "工具调用",
-      "condensedLabel": "{{itemCount}} 项; {{last}}"
+      "condensedLabel": "{{itemCount}} 项; {{last}}",
+      "condensedLabel_one": "{{itemCount}} 项; {{last}}",
+      "condensedLabel_other": "{{itemCount}} 项; {{last}}"
     }
   },
   "bootstrap": {
@@ -2234,7 +2278,9 @@
     "cliCantReceiveFilesTitle": "此会话无法接收文件",
     "cliCantReceiveFilesMessage": "运行此会话的 Kilo CLI 无法接收文件。请更新该设备上的 CLI，或改为分享到新会话。",
     "contentlessMessage": "没有可分享的内容，未包含文本或文件。",
-    "couldNotReadContent": "无法读取分享的内容。"
+    "couldNotReadContent": "无法读取分享的内容。",
+    "onlyFirstFilesAttached_one": "仅附加前 {{displayCount}} 个文件。",
+    "onlyFirstFilesAttached_other": "仅附加前 {{displayCount}} 个文件。"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2542,7 +2588,9 @@
         "outdatedOnPath": "{{path}}（已过时）"
       },
       "deletedUser": "已删除的用户",
-      "replyForbiddenTerm": "你无权回复此{{term}}。"
+      "replyForbiddenTerm": "你无权回复此{{term}}。",
+      "moreLinesAbove_one": "上方还有 {{displayCount}} 行。",
+      "moreLinesAbove_other": "上方还有 {{displayCount}} 行。"
     },
     "entry": {
       "eyebrow": "通过 URL 打开拉取请求或合并请求",
@@ -2640,7 +2688,17 @@
       "loadingLines": "正在加载 {{loaded}}/{{total}} 行…",
       "loadingMoreFiles": "正在加载更多文件…",
       "retryLoadingContext": "重新加载上下文",
-      "retryLoadingNextPage": "重新加载下一页"
+      "retryLoadingNextPage": "重新加载下一页",
+      "expandAllLines_one": "展开全部 {{displayCount}} 行",
+      "expandAllLines_other": "展开全部 {{displayCount}} 行",
+      "expandLines_one": "展开 {{displayCount}} 行（{{start}}–{{end}}）",
+      "expandLines_other": "展开 {{displayCount}} 行（{{start}}–{{end}}）",
+      "expandLinesOfContext_one": "展开 {{displayCount}} 行上下文",
+      "expandLinesOfContext_other": "展开 {{displayCount}} 行上下文",
+      "expandMoreLines_one": "再展开 {{displayCount}} 行（{{start}}–{{end}}）",
+      "expandMoreLines_other": "再展开 {{displayCount}} 行（{{start}}–{{end}}）",
+      "loadedOfTotalFiles_one": "已加载 {{loaded}}/{{total}} 个文件",
+      "loadedOfTotalFiles_other": "已加载 {{loaded}}/{{total}} 个文件"
     },
     "inbox": {
       "couldNotLoad": "无法加载收件箱。",
@@ -2837,7 +2895,9 @@
       "statusContext": "上下文",
       "lineLabel": "第 {{line}} 行，{{status}}：{{text}}",
       "lineLabelNoNumber": "{{status}}：{{text}}",
-      "emptyLine": "（空）"
+      "emptyLine": "（空）",
+      "truncationBanner_one": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个。",
+      "truncationBanner_other": "受 GitHub API 限制，仅显示 {{total}} 个变更文件中的前 {{limit}} 个。"
     },
     "linkPasteClipboardEmpty": "剪贴板为空。",
     "linkPasteNotAPullRequest": "不是拉取请求或合并请求链接",
@@ -3094,7 +3154,9 @@
     "couldNotApprove": "无法批准",
     "couldNotStart": "无法启动",
     "channelName": "运行中的智能体",
-    "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。"
+    "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。",
+    "openSession": "打开",
+    "approveFailed": "无法批准。点按$t(common.approve)重试。"
   },
   "transcriptionModel": {
     "title": "转写模型",
@@ -3135,5 +3197,8 @@
       "repositoryUnknown": "Kilo 无法将 {{repository}} 识别为 GitHub 或 GitLab 仓库。请在 Kilo 中选择其他仓库。",
       "repositoryUnsupported": "{{repository}} 是 Bitbucket 仓库——启动智能体暂时无法使用它。请在 Kilo 中选择其他仓库。"
     }
+  },
+  "launcher": {
+    "openLastSession": "打开上次会话"
   }
 }

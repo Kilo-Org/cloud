@@ -163,6 +163,7 @@
     "useDifferentEmail": "Kasuta teist e-posti aadressi",
     "signInWithApple": "Logi sisse Apple'iga",
     "signInWithGoogle": "Logi sisse Google'iga",
+    "signInWithPasskey": "Logi sisse pääsuvõtmega",
     "emailAddress": "E-posti aadress",
     "emailPlaceholder": "sina@example.com",
     "continueWithEmail": "Jätka e-postiga",
@@ -175,6 +176,10 @@
     "termsConnector": " ja ",
     "termsSuffix": ".",
     "moreSignInOptions": "Rohkem sisselogimisvalikuid",
+    "passkeyCancelled": "Pääsuvõtmega sisselogimine tühistati. Proovi uuesti.",
+    "passkeyNotFound": "Selle seadme jaoks ei ole salvestatud ühtegi pääsuvõtit. Logi selle asemel sisse Apple'i, Google'i või oma e-postiga.",
+    "passkeyUnsupported": "Pääsuvõtmed ei ole selles seadmes saadaval. Logi selle asemel sisse Apple'i, Google'i või oma e-postiga.",
+    "passkeyFailed": "Pääsuvõtmega sisse logimine ei õnnestunud. Proovi uuesti.",
     "couldNotCompleteSignIn": "Sisselogimist ei õnnestunud lõpule viia. Proovi uuesti.",
     "sessionEnded": "Sinu seanss lõppes. Logi uuesti sisse.",
     "signInCodeExpired": "Sinu sisselogimiskood on aegunud. Proovi uuesti.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Testikonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Ettevõtte SSO"
+    "providerEnterpriseSso": "Ettevõtte SSO",
+    "passkeysTitle": "Pääsuvõtmed",
+    "passkeysSubtitle": "Logi sisse ilma paroolita",
+    "passkeysEmpty": "Pääsuvõtmeid veel pole",
+    "passkeysEmptyHint": "$t(profile.addPasskey), et sisse logida ilma paroolita.",
+    "passkeysCouldNotLoad": "Pääsuvõtmete laadimine ebaõnnestus",
+    "passkeysLoadFailed": "Pääsuvõtmed pole saadaval, kuni see laaditakse.",
+    "addPasskey": "Lisa pääsuvõti",
+    "passkeyDefaultName": "Pääsuvõti",
+    "passkeyAddedOn": "Lisatud {{date}}",
+    "passkeyAdded": "Pääsuvõti lisatud.",
+    "passkeyAddFailed": "Pääsuvõtit ei õnnestunud lisada. Proovi uuesti.",
+    "passkeyAddUnsupported": "See seade ei saa pääsuvõtmeid luua.",
+    "passkeyAddCancelled": "Pääsuvõtme loomine tühistati.",
+    "passkeyRemoved": "Pääsuvõti eemaldatud.",
+    "passkeyRemoveFailed": "Seda pääsuvõtit ei õnnestunud eemaldada. Proovi uuesti.",
+    "passkeyRenamed": "Pääsuvõti ümber nimetatud.",
+    "passkeyName": "Pääsuvõtme nimi",
+    "renamePasskey": "Nimeta pääsuvõti ümber",
+    "removePasskey": "Eemalda pääsuvõti",
+    "removePasskeyTitle": "Eemaldada pääsuvõti?",
+    "removePasskeyMessage": "Sa ei saa enam selle pääsuvõtmega sisse logida."
   },
   "preferences": {
     "general": "Üldine",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} failist laaditud {{displayCount}}",
       "filesStillLoading": "Failide laadimine kestab veel. Värskendamiseks tõmba alla.",
       "goToOverview": "Mine ülevaatesse",
-      "goToOverviewTab": "Mine ülevaate vahekaardile"
+      "goToOverviewTab": "Mine ülevaate vahekaardile",
+      "expandAllLines_one": "Näita kõiki {{displayCount}} rida",
+      "expandAllLines_other": "Näita kõiki {{displayCount}} rida",
+      "expandLines_one": "Näita {{displayCount}} rida ({{start}}–{{end}})",
+      "expandLines_other": "Näita {{displayCount}} rida ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Näita {{displayCount}} kontekstirida",
+      "expandLinesOfContext_other": "Näita {{displayCount}} kontekstirida",
+      "expandMoreLines_one": "Näita veel {{displayCount}} rida ({{start}}–{{end}})",
+      "expandMoreLines_other": "Näita veel {{displayCount}} rida ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}}/{{total}} faili laaditud",
+      "loadedOfTotalFiles_other": "{{loaded}}/{{total}} faili laaditud"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "faili lõpus puudub reavahetus.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Aegunud: {{path}}"
       },
       "deletedUser": "kustutatud kasutaja",
-      "replyForbiddenTerm": "Sul pole õigust sellele {{term}}ele vastata."
+      "replyForbiddenTerm": "Sul pole õigust sellele {{term}}ele vastata.",
+      "moreLinesAbove_one": "Ülal on veel {{displayCount}} rida.",
+      "moreLinesAbove_other": "Ülal on veel {{displayCount}} rida."
     },
     "couldNotOpenGitHubAppSettings": "GitHubi rakenduse seadeid ei õnnestunud avada.",
     "installKiloGitHubApp": "Installi Kilo GitHubi rakendus",
@@ -574,7 +612,7 @@
       "pending": "{{displayCount}} ootel",
       "skipped": "{{displayCount}} vahele jäetud",
       "checksCount": "{{displayCount}} kontrolli",
-      "checksCount_one": "{{displayCount}} kontroll",
+      "checksCount_one": "{{displayCount}} kontrolli",
       "checksCount_other": "{{displayCount}} kontrolli",
       "checkDetails": "kontrolli üksikasjad"
     },
@@ -706,7 +744,9 @@
       "statusContext": "Kontekst",
       "lineLabel": "{{status}} rida {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} rida: {{text}}",
-      "emptyLine": "(tühi)"
+      "emptyLine": "(tühi)",
+      "truncationBanner_one": "GitHubi API piirangu tõttu kuvatakse {{total}} muudetud failist esimesed {{limit}}.",
+      "truncationBanner_other": "GitHubi API piirangu tõttu kuvatakse {{total}} muudetud failist esimesed {{limit}}."
     },
     "linkPasteClipboardEmpty": "Lõikelaud on tühi.",
     "linkPasteNotAPullRequest": "See pole tõmbetaotluse ega liitmistaotluse link",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Teavitused näitavad sõnumi teksti lukustuskuval.",
     "previewGenericDescription": "Teavitused annavad märku uuest sündmusest. Sõnumi lugemiseks ava Kilo.",
     "channel": {
-      "agent": "Agendi seansid",
+      "agentProgress": "Agendi edenemine",
       "chat": "Vestlussõnumid",
       "kiloclaw": "KiloClaw'i tegevus",
       "balance": "Saldohoiatused",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "eksemplar valmis/ebaõnnestunud, ajastatud toimingud",
       "balanceAlertsSubtitle": "organisatsiooni madala saldo hoiatused",
       "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused"
+    },
+    "action": {
+      "openSession": "Ava seanss"
+    },
+    "needsInputAction": {
+      "approved": "Taotlus kiideti heaks",
+      "replied": "Vastus on saadetud",
+      "failed": "Vastamine ei õnnestunud. Uuesti proovimiseks puuduta uuesti.",
+      "unavailable": "See taotlus ei ole enam ootel."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Üleslaadimine ebaõnnestus.",
       "failedToUploadFile": "Faili üleslaadimine ebaõnnestus: {{reason}}.",
       "nothingToPaste": "Lõikelaual pole midagi kleepimiseks.",
-      "metadataStripFailed": "Foto metaandmete eemaldamine ebaõnnestus."
+      "metadataStripFailed": "Foto metaandmete eemaldamine ebaõnnestus.",
+      "limit_one": "Võid lisada kuni {{displayCount}} faili.",
+      "limit_other": "Võid lisada kuni {{displayCount}} faili."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Sünkrooni leiud",
       "syncNow": "Sünkrooni nüüd",
       "syncQueued": "Sünkroonimine on järjekorras",
-      "syncStatusUnavailable": "Sünkroonimise olek pole saadaval."
+      "syncStatusUnavailable": "Sünkroonimise olek pole saadaval.",
+      "daysOverdue_one": "Tähtaeg ületatud {{displayCount}} päeva",
+      "daysOverdue_other": "Tähtaeg ületatud {{displayCount}} päeva",
+      "findingsCount_one": "{{displayCount}} leidu",
+      "findingsCount_other": "{{displayCount}} leidu"
     },
     "dashboardMetrics": {
       "openFindings": "Avatud leiud",
@@ -2131,20 +2186,7 @@
       "continueFrom": "Jätkub seanss „{{title}}“.",
       "importingSession": "Imporditakse seanssi",
       "cliCannotContinue": "See CLI ei saa seanssi jätkata. Vali Cloud Agent või mõni muu CLI.",
-      "importFailed": "Seda seanssi ei õnnestunud importida.",
-      "sandbox": "Liivakast",
-      "sandboxAccessibility": "Liivakast: {{label}}",
-      "sandboxDefaultWithDestination": "Vaikimisi · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Väike",
-      "sandboxInstanceShared": "Jagatud",
-      "sandboxInstanceLarge": "Suur",
-      "sandboxInstanceDevcontainer": "Arenduskonteiner",
-      "sandboxInstanceProviderDefault": "Pakkuja vaikeseade",
-      "sandboxCouldNotLoad": "Liivakasti valikuid ei õnnestunud laadida",
-      "sandboxUnavailable": "See liivakast ei ole saadaval. Valige teine liivakast või Vaikimisi.",
-      "sandboxUseDefault": "Kasuta Vaikimisi"
+      "importFailed": "Seda seanssi ei õnnestunud importida."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendati {{displayCount}} fail.",
@@ -2169,7 +2211,13 @@
       "updateTodos": "Uuenda ülesannete loendit",
       "linesBadge": "{{displayCount}} rida",
       "filesBadge": "{{displayCount}} faili",
-      "matchesBadge": "{{displayCount}} vastet"
+      "matchesBadge": "{{displayCount}} vastet",
+      "filesBadge_one": "{{displayCount}} faili",
+      "filesBadge_other": "{{displayCount}} faili",
+      "linesBadge_one": "{{displayCount}} rida",
+      "linesBadge_other": "{{displayCount}} rida",
+      "matchesBadge_one": "{{displayCount}} vastet",
+      "matchesBadge_other": "{{displayCount}} vastet"
     },
     "readToolMarkdown": {
       "linesTruncated": "read {{start}}–{{end}} (kärbitud)",
@@ -2459,7 +2507,11 @@
       "files": "Failid",
       "couldNotOpenPhotoPicker": "Fotovalijat ei õnnestunud avada. Taaskäivita Kilo ja proovi uuesti.",
       "maxFilesAllowed": "Lisada saab kuni {{displayCount}} faili.",
-      "onlyAddingFiles": "Lisatakse ainult {{accepted}} faili {{total}} failist (kuni {{max}})"
+      "onlyAddingFiles": "Lisatakse ainult {{accepted}} faili {{total}} failist (kuni {{max}})",
+      "maxFilesAllowed_one": "Lisada saab kuni {{displayCount}} faili.",
+      "maxFilesAllowed_other": "Lisada saab kuni {{displayCount}} faili.",
+      "onlyAddingFiles_one": "Lisatakse ainult {{accepted}} faili {{total}} failist (kuni {{max}})",
+      "onlyAddingFiles_other": "Lisatakse ainult {{accepted}} faili {{total}} failist (kuni {{max}})"
     },
     "composer": {
       "addAttachment": "Lisa manus",
@@ -2477,7 +2529,9 @@
       "discardAttachmentsMessage": "Üles laaditud failid, mida pole ühegi saadetud sõnumiga seotud, kustutatakse.",
       "discardAttachmentsTitle": "Kas loobuda manustest?",
       "charactersRemaining": "{{count}} tähemärki jäänud",
-      "insertNewline": "Lisa reavahetus"
+      "insertNewline": "Lisa reavahetus",
+      "charactersRemaining_one": "{{count}} tähemärki jäänud",
+      "charactersRemaining_other": "{{count}} tähemärki jäänud"
     },
     "chatLink": {
       "linkCopied": "Link kopeeritud",
@@ -2549,7 +2603,9 @@
       "stepsCount_one": "{{steps}} samm",
       "stepsCount": "{{steps}} sammu",
       "stepsCount_other": "{{steps}} sammu",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Mudel ({{displayCount}})",
+      "modelsCount_other": "Mudelid ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Automaatne kinnitamine",
@@ -2589,7 +2645,9 @@
     },
     "toolRun": {
       "sheetTitle": "Tööriistakutsed",
-      "condensedLabel": "{{itemCount}} üksust; {{last}}"
+      "condensedLabel": "{{itemCount}} üksust; {{last}}",
+      "condensedLabel_one": "{{itemCount}} üksust; {{last}}",
+      "condensedLabel_other": "{{itemCount}} üksust; {{last}}"
     }
   },
   "bootstrap": {
@@ -2724,7 +2782,9 @@
     "cliCantReceiveFilesTitle": "See seanss ei saa faile vastu võtta",
     "cliCantReceiveFilesMessage": "Seda seanssi käitav Kilo CLI ei saa faile vastu võtta. Uuenda selle arvuti CLI-d või jaga faile hoopis uude seanssi.",
     "contentlessMessage": "Jagada pole midagi — teksti ega faile ei lisatud.",
-    "couldNotReadContent": "Jagatud sisu ei õnnestunud lugeda."
+    "couldNotReadContent": "Jagatud sisu ei õnnestunud lugeda.",
+    "onlyFirstFilesAttached_one": "Lisatakse ainult esimesed {{displayCount}} faili.",
+    "onlyFirstFilesAttached_other": "Lisatakse ainult esimesed {{displayCount}} faili."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3094,7 +3154,9 @@
     "couldNotApprove": "Kinnitamine ebaõnnestus",
     "couldNotStart": "Käivitamine ebaõnnestus",
     "channelName": "Aktiivsed agendid",
-    "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente."
+    "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
+    "openSession": "Ava",
+    "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve)."
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",
@@ -3135,5 +3197,8 @@
       "repositoryUnknown": "Kilo ei tunne {{repository}} ära GitHubi ega GitLabi hoidlana. Vali Kilos teine hoidla.",
       "repositoryUnsupported": "{{repository}} on Bitbucketi hoidla — Käivita agent ei saa seda veel kasutada. Vali Kilos teine hoidla."
     }
+  },
+  "launcher": {
+    "openLastSession": "Ava viimane seanss"
   }
 }

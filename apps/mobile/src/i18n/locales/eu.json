@@ -163,6 +163,7 @@
     "useDifferentEmail": "Erabili beste helbide elektroniko bat",
     "signInWithApple": "Hasi saioa Apple-rekin",
     "signInWithGoogle": "Hasi saioa Google-rekin",
+    "signInWithPasskey": "Hasi saioa sarbide-gako batekin",
     "emailAddress": "Helbide elektronikoa",
     "emailPlaceholder": "zu@adibidea.com",
     "continueWithEmail": "Jarraitu posta elektronikoarekin",
@@ -175,6 +176,10 @@
     "termsConnector": " eta ",
     "termsSuffix": ".",
     "moreSignInOptions": "Saioa hasteko aukera gehiago",
+    "passkeyCancelled": "Sarbide-gakoarekin saioa hasteari utzi zaio. Saiatu berriro.",
+    "passkeyNotFound": "Ez dago sarbide-gakorik gordeta gailu honetarako. Hasi saioa Apple, Google edo zure posta elektronikoarekin.",
+    "passkeyUnsupported": "Sarbide-gakoak ez daude erabilgarri gailu honetan. Hasi saioa Apple, Google edo zure posta elektronikoarekin.",
+    "passkeyFailed": "Ezin izan da sarbide-gako batekin saioa hasi. Saiatu berriro.",
     "couldNotCompleteSignIn": "Ezin izan da saioa hasteko prozesua amaitu. Saiatu berriro.",
     "sessionEnded": "Zure saioa amaitu da. Hasi saioa berriro.",
     "signInCodeExpired": "Saioa hasteko zure kodea iraungi da. Saiatu berriro.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Probako kontua",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Enpresako SSO"
+    "providerEnterpriseSso": "Enpresako SSO",
+    "passkeysTitle": "Sarbide-gakoak",
+    "passkeysSubtitle": "Hasi saioa pasahitzik gabe",
+    "passkeysEmpty": "Oraindik ez dago sarbide-gakorik",
+    "passkeysEmptyHint": "$t(profile.addPasskey) pasahitzik gabe saioa hasteko.",
+    "passkeysCouldNotLoad": "Ezin izan dira sarbide-gakoak kargatu",
+    "passkeysLoadFailed": "Sarbide-gakoak ez daude erabilgarri hau kargatu arte.",
+    "addPasskey": "Gehitu sarbide-gako bat",
+    "passkeyDefaultName": "Sarbide-gakoa",
+    "passkeyAddedOn": "Gehitua {{date}}",
+    "passkeyAdded": "Sarbide-gakoa gehituta.",
+    "passkeyAddFailed": "Ezin izan da sarbide-gako bat gehitu. Saiatu berriro.",
+    "passkeyAddUnsupported": "Gailu honek ezin ditu sarbide-gakoak sortu.",
+    "passkeyAddCancelled": "Sarbide-gakoaren sorrera bertan behera utzi da.",
+    "passkeyRemoved": "Sarbide-gakoa kenduta.",
+    "passkeyRemoveFailed": "Ezin izan da sarbide-gako hori kendu. Saiatu berriro.",
+    "passkeyRenamed": "Sarbide-gakoari izena aldatu zaio.",
+    "passkeyName": "Sarbide-gakoaren izena",
+    "renamePasskey": "Aldatu sarbide-gakoaren izena",
+    "removePasskey": "Kendu sarbide-gakoa",
+    "removePasskeyTitle": "Sarbide-gakoa kendu?",
+    "removePasskeyMessage": "Ezingo duzu gehiago sarbide-gako honekin saioa hasi."
   },
   "preferences": {
     "general": "Orokorra",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} fitxategitik {{displayCount}} kargatuta",
       "filesStillLoading": "Fitxategiak oraindik kargatzen ari dira. Egin tira behera freskatzeko.",
       "goToOverview": "Joan ikuspegi orokorrera",
-      "goToOverviewTab": "Joan ikuspegi orokorreko fitxara"
+      "goToOverviewTab": "Joan ikuspegi orokorreko fitxara",
+      "expandAllLines_one": "Zabaldu {{displayCount}} lerro guztiak",
+      "expandAllLines_other": "Zabaldu {{displayCount}} lerro guztiak",
+      "expandLines_one": "Zabaldu {{displayCount}} lerro ({{start}}–{{end}})",
+      "expandLines_other": "Zabaldu {{displayCount}} lerro ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Zabaldu {{displayCount}} testuinguru-lerro",
+      "expandLinesOfContext_other": "Zabaldu {{displayCount}} testuinguru-lerro",
+      "expandMoreLines_one": "Zabaldu {{displayCount}} lerro gehiago ({{start}}–{{end}})",
+      "expandMoreLines_other": "Zabaldu {{displayCount}} lerro gehiago ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} / {{total}} fitxategi kargatuta",
+      "loadedOfTotalFiles_other": "{{loaded}} / {{total}} fitxategi kargatuta"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ez dago lerro-jauzirik fitxategiaren amaieran.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Zaharkitua: {{path}}"
       },
       "deletedUser": "erabiltzaile ezabatua",
-      "replyForbiddenTerm": "Ez duzu baimenik {{term}} honi erantzuteko."
+      "replyForbiddenTerm": "Ez duzu baimenik {{term}} honi erantzuteko.",
+      "moreLinesAbove_one": "… Beste {{displayCount}} lerro dago goian.",
+      "moreLinesAbove_other": "… Beste {{displayCount}} lerro daude goian."
     },
     "couldNotOpenGitHubAppSettings": "Ezin izan dira GitHub aplikazioaren ezarpenak ireki.",
     "installKiloGitHubApp": "Instalatu Kilo GitHub aplikazioa",
@@ -706,7 +744,9 @@
       "statusContext": "Testuingurua",
       "lineLabel": "{{line}}. lerroa, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(hutsik)"
+      "emptyLine": "(hutsik)",
+      "truncationBanner_one": "Aldatutako {{total}} fitxategietatik lehenengo {{limit}} erakusten dira, GitHub APIaren muga dela eta.",
+      "truncationBanner_other": "Aldatutako {{total}} fitxategietatik lehenengo {{limit}} erakusten dira, GitHub APIaren muga dela eta."
     },
     "linkPasteClipboardEmpty": "Arbela hutsik dago.",
     "linkPasteNotAPullRequest": "Ez da bateratze-eskaera edo merge-eskaera baten esteka",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Jakinarazpenek mezuen testua erakusten dute blokeo-pantailan.",
     "previewGenericDescription": "Jakinarazpenek zerbait gertatu dela adierazten dute. Ireki Kilo irakurtzeko.",
     "channel": {
-      "agent": "Agente-saioak",
+      "agentProgress": "Agentearen aurrerapena",
       "chat": "Txat-mezuak",
       "kiloclaw": "KiloClaw-en jarduera",
       "balance": "Saldoari buruzko alertak",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "instantzia prest edo huts eginda, programatutako ekintzak",
       "balanceAlertsSubtitle": "erakundearen saldo baxuaren abisuak",
       "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak"
+    },
+    "action": {
+      "openSession": "Ireki saioa"
+    },
+    "needsInputAction": {
+      "approved": "Eskaera onartu da",
+      "replied": "Erantzuna bidali da",
+      "failed": "Ezin izan da erantzun. Ukitu berriro saiatzeko.",
+      "unavailable": "Eskaera honek jada ez du itxaroten."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Igoerak huts egin du.",
       "failedToUploadFile": "Ezin izan da fitxategia igo: {{reason}}.",
       "nothingToPaste": "Ez dago ezer itsasteko.",
-      "metadataStripFailed": "Ezin izan dira argazkiaren metadatuak kendu."
+      "metadataStripFailed": "Ezin izan dira argazkiaren metadatuak kendu.",
+      "limit_one": "Gehienez {{displayCount}} fitxategi erants ditzakezu.",
+      "limit_other": "Gehienez {{displayCount}} fitxategi erants ditzakezu."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Sinkronizatu aurkikuntzak",
       "syncNow": "Sinkronizatu orain",
       "syncQueued": "Sinkronizazioa ilaran",
-      "syncStatusUnavailable": "Sinkronizazioaren egoera ez dago erabilgarri."
+      "syncStatusUnavailable": "Sinkronizazioaren egoera ez dago erabilgarri.",
+      "daysOverdue_one": "{{displayCount}} egun atzeratuta",
+      "daysOverdue_other": "{{displayCount}} egun atzeratuta",
+      "findingsCount_one": "{{displayCount}} aurkikuntza",
+      "findingsCount_other": "{{displayCount}} aurkikuntza"
     },
     "dashboardMetrics": {
       "openFindings": "Aurkikuntza irekiak",
@@ -2131,20 +2186,7 @@
       "continueFrom": "Saio honekin jarraitzen ari zara: {{title}}.",
       "importingSession": "Saioa inportatzen",
       "cliCannotContinue": "CLI honek ezin dio saio bati jarraitu. Aukeratu Cloud Agent edo beste CLI bat.",
-      "importFailed": "Ezin izan da saio hau inportatu.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Lehenetsia · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Txikia",
-      "sandboxInstanceShared": "Partekatua",
-      "sandboxInstanceLarge": "Handia",
-      "sandboxInstanceDevcontainer": "Dev edukiontzia",
-      "sandboxInstanceProviderDefault": "Hornitzailearen lehenetsia",
-      "sandboxCouldNotLoad": "Ezin izan dira sandbox-aukerak kargatu",
-      "sandboxUnavailable": "Sandbox hau ez dago erabilgarri. Aukeratu beste sandbox bat edo Lehenetsia.",
-      "sandboxUseDefault": "Erabili Lehenetsia"
+      "importFailed": "Ezin izan da saio hau inportatu."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxategi eguneratu da.",
@@ -2169,7 +2211,13 @@
       "updateTodos": "Eguneratu zereginak",
       "linesBadge": "{{displayCount}} lerro",
       "filesBadge": "{{displayCount}} fitxategi",
-      "matchesBadge": "{{displayCount}} bat etortze"
+      "matchesBadge": "{{displayCount}} bat etortze",
+      "filesBadge_one": "{{displayCount}} fitxategi",
+      "filesBadge_other": "{{displayCount}} fitxategi",
+      "linesBadge_one": "{{displayCount}} lerro",
+      "linesBadge_other": "{{displayCount}} lerro",
+      "matchesBadge_one": "{{displayCount}} bat etortze",
+      "matchesBadge_other": "{{displayCount}} bat etortze"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} lerroak (moztuta)",
@@ -2459,7 +2507,11 @@
       "files": "Fitxategi",
       "couldNotOpenPhotoPicker": "Ezin izan da argazki-hautatzailea ireki. Berrabiarazi Kilo eta saiatu berriro.",
       "maxFilesAllowed": "Gehienez {{displayCount}} fitxategi onartzen dira.",
-      "onlyAddingFiles": "{{total}} fitxategietatik {{accepted}} bakarrik gehitzen (gehienez {{max}})"
+      "onlyAddingFiles": "{{total}} fitxategietatik {{accepted}} bakarrik gehitzen (gehienez {{max}})",
+      "maxFilesAllowed_one": "Gehienez {{displayCount}} fitxategi onartzen dira.",
+      "maxFilesAllowed_other": "Gehienez {{displayCount}} fitxategi onartzen dira.",
+      "onlyAddingFiles_one": "{{total}} fitxategietatik {{accepted}} bakarrik gehitzen (gehienez {{max}})",
+      "onlyAddingFiles_other": "{{total}} fitxategietatik {{accepted}} bakarrik gehitzen (gehienez {{max}})"
     },
     "composer": {
       "addAttachment": "Gehitu eranskina",
@@ -2477,7 +2529,9 @@
       "discardAttachmentsMessage": "Igotako fitxategietatik mezuei erantsi gabe geratu direnak ezabatuko dira.",
       "discardAttachmentsTitle": "Baztertu eranskinak?",
       "charactersRemaining": "{{count}} karaktere geratzen dira",
-      "insertNewline": "Txertatu lerro-jauzia"
+      "insertNewline": "Txertatu lerro-jauzia",
+      "charactersRemaining_one": "{{count}} karaktere geratzen da",
+      "charactersRemaining_other": "{{count}} karaktere geratzen dira"
     },
     "chatLink": {
       "linkCopied": "Esteka kopiatuta",
@@ -2549,7 +2603,9 @@
       "stepsCount_one": "{{steps}} urrats",
       "stepsCount": "{{steps}} urrats",
       "stepsCount_other": "{{steps}} urrats",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Modelo ({{displayCount}})",
+      "modelsCount_other": "Modeloak ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Onespen automatikoa",
@@ -2589,7 +2645,9 @@
     },
     "toolRun": {
       "sheetTitle": "Tresna-deiak",
-      "condensedLabel": "{{itemCount}} elementu; {{last}}"
+      "condensedLabel": "{{itemCount}} elementu; {{last}}",
+      "condensedLabel_one": "{{itemCount}} elementu; {{last}}",
+      "condensedLabel_other": "{{itemCount}} elementu; {{last}}"
     }
   },
   "bootstrap": {
@@ -2724,7 +2782,9 @@
     "cliCantReceiveFilesTitle": "Saio honek ezin du fitxategirik jaso",
     "cliCantReceiveFilesMessage": "Saio hau exekutatzen duen Kilo CLIak ezin du fitxategirik jaso. Eguneratu CLIa makina horretan edo partekatu edukia saio berri batean.",
     "contentlessMessage": "Ez dago ezer partekatzeko: ez da testurik edo fitxategirik sartu.",
-    "couldNotReadContent": "Ezin izan da partekatutako edukia irakurri."
+    "couldNotReadContent": "Ezin izan da partekatutako edukia irakurri.",
+    "onlyFirstFilesAttached_one": "Lehenengo {{displayCount}} fitxategiak bakarrik erantsiko dira.",
+    "onlyFirstFilesAttached_other": "Lehenengo {{displayCount}} fitxategiak bakarrik erantsiko dira."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3094,7 +3154,9 @@
     "couldNotApprove": "Ezin izan da onartu",
     "couldNotStart": "Ezin izan da hasi",
     "channelName": "Agente aktiboak",
-    "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko."
+    "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko.",
+    "openSession": "Ireki",
+    "approveFailed": "Ezin izan da onartu. Sakatu $t(common.approve) berriro saiatzeko."
   },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",
@@ -3135,5 +3197,8 @@
       "repositoryUnknown": "Kilok ez du {{repository}} GitHub edo GitLab biltegi gisa ezagutzen. Aukeratu beste biltegi bat Kilon.",
       "repositoryUnsupported": "{{repository}} Bitbucket biltegia da — Hasi agentea oraindik ezin du erabili. Aukeratu beste biltegi bat Kilon."
     }
+  },
+  "launcher": {
+    "openLastSession": "Ireki azken saioa"
   }
 }

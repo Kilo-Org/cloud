@@ -70,6 +70,26 @@ export function normalizeMissingPartText(part: Part): Part {
 }
 
 /**
+ * Settle time a stored tool part carries into the lifecycle merge. Snapshot,
+ * history and cached-transcript replays deliver bare parts with no wire event
+ * time, so a settled tool state is ordered by the `time.end` it stamped when it
+ * settled. An unsettled part carries no ordering evidence.
+ *
+ * `state.time` is read defensively: ingest-frame compaction persists a part
+ * with only `state.status` (`services/cloud-agent-next/src/shared/ingest-frame.ts`
+ * `compactMessagePart`), so a replayed terminal can arrive with no time at all.
+ * It then carries no ordering evidence rather than throwing.
+ */
+export function partSettledAt(part: Part): number | undefined {
+  if (part.type !== 'tool') return undefined;
+  const state = part.state;
+  if (state.status === 'completed' || state.status === 'error') {
+    return state.time?.end;
+  }
+  return undefined;
+}
+
+/**
  * The generated `Part` types declare `files: Array<string>` on patch parts, but
  * the wire can omit the field (the per-event schemas are `.passthrough()`), and
  * a files-less part stored verbatim crashes every mobile reader

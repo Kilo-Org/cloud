@@ -163,6 +163,7 @@
     "useDifferentEmail": "Використати іншу адресу електронної пошти",
     "signInWithApple": "Увійти через Apple",
     "signInWithGoogle": "Увійти через Google",
+    "signInWithPasskey": "Увійти з ключем доступу",
     "emailAddress": "Адреса електронної пошти",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "Продовжити через електронну пошту",
@@ -175,6 +176,10 @@
     "termsConnector": " і ",
     "termsSuffix": ".",
     "moreSignInOptions": "Інші способи входу",
+    "passkeyCancelled": "Вхід із ключем доступу скасовано. Спробуйте ще раз.",
+    "passkeyNotFound": "Для цього пристрою не збережено жодного ключа доступу. Увійдіть через Apple, Google або свою електронну пошту.",
+    "passkeyUnsupported": "Ключі доступу недоступні на цьому пристрої. Увійдіть через Apple, Google або свою електронну пошту.",
+    "passkeyFailed": "Не вдалося увійти з ключем доступу. Спробуйте ще раз.",
     "couldNotCompleteSignIn": "Не вдалося завершити вхід. Спробуйте ще раз.",
     "sessionEnded": "Ваш сеанс завершився. Увійдіть ще раз.",
     "signInCodeExpired": "Термін дії вашого коду для входу минув. Спробуйте ще раз.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Тестовий обліковий запис",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Корпоративний SSO"
+    "providerEnterpriseSso": "Корпоративний SSO",
+    "passkeysTitle": "Ключі доступу",
+    "passkeysSubtitle": "Увійти без пароля",
+    "passkeysEmpty": "Ключів доступу поки немає",
+    "passkeysEmptyHint": "$t(profile.addPasskey), щоб увійти без пароля.",
+    "passkeysCouldNotLoad": "Не вдалося завантажити ключі доступу",
+    "passkeysLoadFailed": "Ключі доступу недоступні, поки це не завантажиться.",
+    "addPasskey": "Додати ключ доступу",
+    "passkeyDefaultName": "Ключ доступу",
+    "passkeyAddedOn": "Додано {{date}}",
+    "passkeyAdded": "Ключ доступу додано.",
+    "passkeyAddFailed": "Не вдалося додати ключ доступу. Спробуйте ще раз.",
+    "passkeyAddUnsupported": "Цей пристрій не може створювати ключі доступу.",
+    "passkeyAddCancelled": "Створення ключа доступу скасовано.",
+    "passkeyRemoved": "Ключ доступу видалено.",
+    "passkeyRemoveFailed": "Не вдалося видалити цей ключ доступу. Спробуйте ще раз.",
+    "passkeyRenamed": "Ключ доступу перейменовано.",
+    "passkeyName": "Назва ключа доступу",
+    "renamePasskey": "Перейменувати ключ доступу",
+    "removePasskey": "Видалити ключ доступу",
+    "removePasskeyTitle": "Видалити ключ доступу?",
+    "removePasskeyMessage": "Ви більше не зможете увійти з цим ключем доступу."
   },
   "preferences": {
     "general": "Загальні",
@@ -293,7 +319,7 @@
     "previewFullDescription": "Текст повідомлень відображається у сповіщеннях на екрані блокування.",
     "previewGenericDescription": "Сповіщення повідомляють про події без тексту повідомлень. Відкрийте Kilo, щоб прочитати повідомлення.",
     "channel": {
-      "agent": "Сеанси агента",
+      "agentProgress": "Перебіг виконання агента",
       "chat": "Повідомлення в чаті",
       "kiloclaw": "Активність KiloClaw",
       "balance": "Сповіщення про баланс",
@@ -310,6 +336,15 @@
       "kiloclawActivitySubtitle": "готовність або помилка екземпляра, заплановані дії",
       "balanceAlertsSubtitle": "попередження про низький баланс організації",
       "securityFindingsSubtitle": "нові виявлені проблеми та нагадування про SLA"
+    },
+    "action": {
+      "openSession": "Відкрити сеанс"
+    },
+    "needsInputAction": {
+      "approved": "Запит схвалено",
+      "replied": "Відповідь надіслано",
+      "failed": "Не вдалося відповісти. Торкніться ще раз, щоб повторити.",
+      "unavailable": "Цей запит більше не чекає."
     }
   },
   "tabs": {
@@ -390,7 +425,11 @@
       "uploadFailed": "Не вдалося надіслати вкладення.",
       "failedToUploadFile": "Не вдалося надіслати файл: {{reason}}.",
       "nothingToPaste": "Буфер обміну порожній.",
-      "metadataStripFailed": "Не вдалося видалити метадані фото."
+      "metadataStripFailed": "Не вдалося видалити метадані фото.",
+      "limit_one": "Можна прикріпити до {{displayCount}} файл.",
+      "limit_other": "Можна прикріпити до {{displayCount}} файлів.",
+      "limit_few": "Можна прикріпити до {{displayCount}} файли.",
+      "limit_many": "Можна прикріпити до {{displayCount}} файлів."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}} — {{status}}",
@@ -1165,7 +1204,15 @@
       "syncNow": "Синхронізувати зараз",
       "syncQueued": "Синхронізацію додано до черги",
       "syncStatusUnavailable": "Стан синхронізації недоступний.",
-      "withinDeadline": "У межах терміну"
+      "withinDeadline": "У межах терміну",
+      "daysOverdue_one": "прострочено на {{displayCount}} день",
+      "daysOverdue_other": "прострочено на {{displayCount}} дн.",
+      "daysOverdue_few": "прострочено на {{displayCount}} дні",
+      "daysOverdue_many": "прострочено на {{displayCount}} днів",
+      "findingsCount_one": "Проблема: {{displayCount}}",
+      "findingsCount_other": "Проблем: {{displayCount}}",
+      "findingsCount_few": "Проблеми: {{displayCount}}",
+      "findingsCount_many": "Проблем: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Відкриті проблеми",
@@ -1659,20 +1706,7 @@
       "continueFrom": "Продовжується сеанс «{{title}}».",
       "importingSession": "Імпортування сеансу",
       "cliCannotContinue": "Цей CLI не підтримує продовження сеансів. Виберіть Cloud Agent або інший CLI.",
-      "importFailed": "Не вдалося імпортувати цей сеанс.",
-      "sandbox": "Пісочниця",
-      "sandboxAccessibility": "Пісочниця: {{label}}",
-      "sandboxDefaultWithDestination": "За замовчуванням · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Мала",
-      "sandboxInstanceShared": "Спільна",
-      "sandboxInstanceLarge": "Велика",
-      "sandboxInstanceDevcontainer": "Контейнер розробки",
-      "sandboxInstanceProviderDefault": "За замовчуванням постачальника",
-      "sandboxCouldNotLoad": "Не вдалося завантажити параметри пісочниці",
-      "sandboxUnavailable": "Ця пісочниця недоступна. Виберіть іншу пісочницю або «За замовчуванням».",
-      "sandboxUseDefault": "Використати «За замовчуванням»"
+      "importFailed": "Не вдалося імпортувати цей сеанс."
     },
     "partRenderer": {
       "updatedFileCount_one": "Оновлено {{displayCount}} файл.",
@@ -1699,7 +1733,19 @@
       "updateTodos": "Оновити список завдань",
       "linesBadge": "рядків: {{displayCount}}",
       "filesBadge": "файлів: {{displayCount}}",
-      "matchesBadge": "збігів: {{displayCount}}"
+      "matchesBadge": "збігів: {{displayCount}}",
+      "filesBadge_one": "файл: {{displayCount}}",
+      "filesBadge_other": "файлів: {{displayCount}}",
+      "filesBadge_few": "файли: {{displayCount}}",
+      "filesBadge_many": "файлів: {{displayCount}}",
+      "linesBadge_one": "рядок: {{displayCount}}",
+      "linesBadge_other": "рядків: {{displayCount}}",
+      "linesBadge_few": "рядки: {{displayCount}}",
+      "linesBadge_many": "рядків: {{displayCount}}",
+      "matchesBadge_one": "збіг: {{displayCount}}",
+      "matchesBadge_other": "збігів: {{displayCount}}",
+      "matchesBadge_few": "збіги: {{displayCount}}",
+      "matchesBadge_many": "збігів: {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "рядки {{start}}–{{end}} (скорочено)",
@@ -1995,7 +2041,15 @@
       "files": "Файли",
       "couldNotOpenPhotoPicker": "Не вдалося відкрити вікно вибору фото. Перезапустіть Kilo та спробуйте ще раз.",
       "maxFilesAllowed": "Перевищено максимальну кількість файлів: {{displayCount}}.",
-      "onlyAddingFiles": "Додається лише {{accepted}} із {{total}} файлів (макс. {{max}})"
+      "onlyAddingFiles": "Додається лише {{accepted}} із {{total}} файлів (макс. {{max}})",
+      "maxFilesAllowed_one": "Перевищено максимальну кількість файлів: {{displayCount}}.",
+      "maxFilesAllowed_other": "Перевищено максимальну кількість файлів: {{displayCount}}.",
+      "maxFilesAllowed_few": "Перевищено максимальну кількість файлів: {{displayCount}}.",
+      "maxFilesAllowed_many": "Перевищено максимальну кількість файлів: {{displayCount}}.",
+      "onlyAddingFiles_one": "Додається лише {{accepted}} із {{total}} файлів (макс. {{max}})",
+      "onlyAddingFiles_other": "Додається лише {{accepted}} із {{total}} файлів (макс. {{max}})",
+      "onlyAddingFiles_few": "Додається лише {{accepted}} із {{total}} файлів (макс. {{max}})",
+      "onlyAddingFiles_many": "Додається лише {{accepted}} із {{total}} файлів (макс. {{max}})"
     },
     "composer": {
       "addAttachment": "Додати вкладення",
@@ -2013,7 +2067,11 @@
       "discardAttachmentsMessage": "Завантажені файли, не прикріплені до надісланих повідомлень, буде видалено.",
       "discardAttachmentsTitle": "Видалити вкладення?",
       "charactersRemaining": "Залишилося символів: {{count}}",
-      "insertNewline": "Вставити новий рядок"
+      "insertNewline": "Вставити новий рядок",
+      "charactersRemaining_one": "Залишилося символ: {{count}}",
+      "charactersRemaining_other": "Залишилося символів: {{count}}",
+      "charactersRemaining_few": "Залишилося символи: {{count}}",
+      "charactersRemaining_many": "Залишилося символів: {{count}}"
     },
     "chatLink": {
       "linkCopied": "Посилання скопійовано",
@@ -2087,7 +2145,11 @@
       "stepsCount_other": "Кроків: {{steps}}",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} кроки",
-      "stepsCount_many": "{{steps}} кроків"
+      "stepsCount_many": "{{steps}} кроків",
+      "modelsCount_one": "Модель ({{displayCount}})",
+      "modelsCount_other": "Моделі ({{displayCount}})",
+      "modelsCount_few": "Моделі ({{displayCount}})",
+      "modelsCount_many": "Моделі ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Автосхвалення",
@@ -2127,7 +2189,11 @@
     },
     "toolRun": {
       "sheetTitle": "Виклики інструментів",
-      "condensedLabel": "{{itemCount}} елементів; {{last}}"
+      "condensedLabel": "{{itemCount}} елементів; {{last}}",
+      "condensedLabel_one": "{{itemCount}} елемент; {{last}}",
+      "condensedLabel_other": "{{itemCount}} елементів; {{last}}",
+      "condensedLabel_few": "{{itemCount}} елементи; {{last}}",
+      "condensedLabel_many": "{{itemCount}} елементів; {{last}}"
     }
   },
   "bootstrap": {
@@ -2262,7 +2328,11 @@
     "cliCantReceiveFilesTitle": "Цей сеанс не може отримувати файли",
     "cliCantReceiveFilesMessage": "Kilo CLI, у якому працює цей сеанс, не може отримувати файли. Оновіть CLI на тому комп'ютері або надішліть файли в новий сеанс.",
     "contentlessMessage": "Немає чого надсилати — не додано ні тексту, ні файлів.",
-    "couldNotReadContent": "Не вдалося прочитати вміст для надсилання."
+    "couldNotReadContent": "Не вдалося прочитати вміст для надсилання.",
+    "onlyFirstFilesAttached_one": "Буде вкладено лише перші файли: {{displayCount}}.",
+    "onlyFirstFilesAttached_other": "Буде вкладено лише перші файли: {{displayCount}}.",
+    "onlyFirstFilesAttached_few": "Буде вкладено лише перші файли: {{displayCount}}.",
+    "onlyFirstFilesAttached_many": "Буде вкладено лише перші файли: {{displayCount}}."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2576,7 +2646,11 @@
         "outdatedOnPath": "Неактуально: {{path}}"
       },
       "deletedUser": "видалений користувач",
-      "replyForbiddenTerm": "У вас немає дозволу відповідати в {{term}}."
+      "replyForbiddenTerm": "У вас немає дозволу відповідати в {{term}}.",
+      "moreLinesAbove_one": "… Вище є додаткові рядки: {{displayCount}}.",
+      "moreLinesAbove_other": "… Вище є додаткові рядки: {{displayCount}}.",
+      "moreLinesAbove_few": "… Вище є додаткові рядки: {{displayCount}}.",
+      "moreLinesAbove_many": "… Вище є додаткові рядки: {{displayCount}}."
     },
     "entry": {
       "eyebrow": "Відкрийте запит на злиття або merge-запит за URL",
@@ -2678,7 +2752,27 @@
       "fileLoadedCount_few": "Завантажено {{displayCount}} файли",
       "fileLoadedCount_many": "Завантажено {{displayCount}} файлів",
       "fileLoadedOfTotalCount_few": "Завантажено {{displayCount}} файли з {{total}}",
-      "fileLoadedOfTotalCount_many": "Завантажено {{displayCount}} файлів з {{total}}"
+      "fileLoadedOfTotalCount_many": "Завантажено {{displayCount}} файлів з {{total}}",
+      "expandAllLines_one": "Розгорнути всі рядки: {{displayCount}}",
+      "expandAllLines_other": "Розгорнути всі рядки: {{displayCount}}",
+      "expandAllLines_few": "Розгорнути всі рядки: {{displayCount}}",
+      "expandAllLines_many": "Розгорнути всі рядки: {{displayCount}}",
+      "expandLines_one": "Розгорнути рядки: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_other": "Розгорнути рядки: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_few": "Розгорнути рядки: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_many": "Розгорнути рядки: {{displayCount}} ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Розгорнути рядки контексту: {{displayCount}}",
+      "expandLinesOfContext_other": "Розгорнути рядки контексту: {{displayCount}}",
+      "expandLinesOfContext_few": "Розгорнути рядки контексту: {{displayCount}}",
+      "expandLinesOfContext_many": "Розгорнути рядки контексту: {{displayCount}}",
+      "expandMoreLines_one": "Розгорнути додаткові рядки: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_other": "Розгорнути додаткові рядки: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_few": "Розгорнути додаткові рядки: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_many": "Розгорнути додаткові рядки: {{displayCount}} ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "завантажено {{loaded}} з {{total}} файлів",
+      "loadedOfTotalFiles_other": "завантажено {{loaded}} з {{total}} файлів",
+      "loadedOfTotalFiles_few": "завантажено {{loaded}} з {{total}} файлів",
+      "loadedOfTotalFiles_many": "завантажено {{loaded}} з {{total}} файлів"
     },
     "inbox": {
       "couldNotLoad": "Не вдалося завантажити вхідні запити.",
@@ -2883,7 +2977,11 @@
       "statusContext": "Контекст",
       "lineLabel": "Рядок {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "Рядок, {{status}}: {{text}}",
-      "emptyLine": "(порожньо)"
+      "emptyLine": "(порожньо)",
+      "truncationBanner_one": "Показано лише перші файли: {{limit}} з {{total}} змінених. Це обмеження API GitHub.",
+      "truncationBanner_other": "Показано лише перші файли: {{limit}} з {{total}} змінених. Це обмеження API GitHub.",
+      "truncationBanner_few": "Показано лише перші файли: {{limit}} з {{total}} змінених. Це обмеження API GitHub.",
+      "truncationBanner_many": "Показано лише перші файли: {{limit}} з {{total}} змінених. Це обмеження API GitHub."
     },
     "linkPasteClipboardEmpty": "Буфер обміну порожній.",
     "linkPasteNotAPullRequest": "Це не посилання на запит на злиття або merge-запит",
@@ -3142,7 +3240,9 @@
     "couldNotApprove": "Не вдалося схвалити",
     "couldNotStart": "Не вдалося запустити",
     "channelName": "Активні агенти",
-    "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані."
+    "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані.",
+    "openSession": "Відкрити",
+    "approveFailed": "Не вдалося схвалити. Торкніться $t(common.approve), щоб спробувати ще раз."
   },
   "transcriptionModel": {
     "title": "Модель розпізнавання мовлення",
@@ -3183,5 +3283,8 @@
       "repositoryUnknown": "Kilo не розпізнає {{repository}} як репозиторій GitHub або GitLab. Виберіть інший репозиторій у Kilo.",
       "repositoryUnsupported": "{{repository}} — репозиторій Bitbucket, і Запустити агента поки не може його використовувати. Виберіть інший репозиторій у Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Відкрити останній сеанс"
   }
 }

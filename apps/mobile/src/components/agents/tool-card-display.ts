@@ -80,6 +80,7 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       }
       if (limit !== undefined) {
         badgeParts.push(
+          // i18n-dup-ok: 'agentChat.toolCard.linesBadge_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
           i18n.t('agentChat.toolCard.linesBadge', {
             count: limit,
             displayCount: formatNumber(limit, i18n.language),
@@ -127,6 +128,7 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       const pattern = fields.pattern ?? '';
       const output = status === 'completed' ? part.state.output : undefined;
       const matchCount = output ? countResultRows(output, 'glob') : undefined;
+      // i18n-dup-ok: 'agentChat.toolCard.filesBadge_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
       const badge =
         matchCount !== undefined && matchCount > 0
           ? i18n.t('agentChat.toolCard.filesBadge', {
@@ -150,6 +152,7 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       }
       const output = status === 'completed' ? part.state.output : undefined;
       const matchCount = output ? countResultRows(output, 'grep') : undefined;
+      // i18n-dup-ok: 'agentChat.toolCard.matchesBadge_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
       const badge =
         matchCount !== undefined && matchCount > 0
           ? i18n.t('agentChat.toolCard.matchesBadge', {

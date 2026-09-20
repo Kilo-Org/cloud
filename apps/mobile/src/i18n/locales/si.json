@@ -163,6 +163,7 @@
     "useDifferentEmail": "වෙනත් විද්‍යුත් තැපැල් ලිපිනයක් භාවිතා කරන්න",
     "signInWithApple": "Apple හරහා පිවිසෙන්න",
     "signInWithGoogle": "Google හරහා පිවිසෙන්න",
+    "signInWithPasskey": "ප්‍රවේශ යතුරකින් පිවිසෙන්න",
     "emailAddress": "විද්‍යුත් තැපැල් ලිපිනය",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "විද්‍යුත් තැපෑල හරහා ඉදිරියට යන්න",
@@ -175,6 +176,10 @@
     "termsConnector": " සහ ",
     "termsSuffix": ".",
     "moreSignInOptions": "තවත් පිවිසුම් විකල්ප",
+    "passkeyCancelled": "ප්‍රවේශ යතුරෙන් පිවිසීම අවලංගු කරන ලදි. නැවත උත්සාහ කරන්න.",
+    "passkeyNotFound": "මෙම උපාංගය සඳහා ප්‍රවේශ යතුරක් සුරකින ලද නැත. ඒ වෙනුවට Apple, Google හෝ ඔබගේ ඊමේල් සමඟ පිවිසෙන්න.",
+    "passkeyUnsupported": "මෙම උපාංගයේ ප්‍රවේශ යතුරු නොමැත. ඒ වෙනුවට Apple, Google හෝ ඔබගේ ඊමේල් සමඟ පිවිසෙන්න.",
+    "passkeyFailed": "ප්‍රවේශ යතුරකින් පිවිසිය නොහැකි විය. නැවත උත්සාහ කරන්න.",
     "couldNotCompleteSignIn": "පිවිසුම සම්පූර්ණ කිරීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
     "sessionEnded": "ඔබේ සැසිය අවසන් විය. කරුණාකර නැවත පිවිසෙන්න.",
     "signInCodeExpired": "ඔබේ පිවිසුම් කේතය කල් ඉකුත් වී ඇත. කරුණාකර නැවත උත්සාහ කරන්න.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "පරීක්ෂණ ගිණුම",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "ව්‍යවසාය SSO"
+    "providerEnterpriseSso": "ව්‍යවසාය SSO",
+    "passkeysTitle": "ප්‍රවේශ යතුරු",
+    "passkeysSubtitle": "මුරපදයක් නොමැතිව පිවිසෙන්න",
+    "passkeysEmpty": "තවම ප්‍රවේශ යතුරු නොමැත",
+    "passkeysEmptyHint": "$t(profile.addPasskey) කර මුරපදයක් නොමැතිව පිවිසෙන්න.",
+    "passkeysCouldNotLoad": "ප්‍රවේශ යතුරු පූරණය කළ නොහැකි විය",
+    "passkeysLoadFailed": "මෙය පූරණය වන තෙක් ප්‍රවේශ යතුරු නොමැත.",
+    "addPasskey": "ප්‍රවේශ යතුරක් එක් කරන්න",
+    "passkeyDefaultName": "ප්‍රවේශ යතුර",
+    "passkeyAddedOn": "{{date}} එක් කරන ලදි",
+    "passkeyAdded": "ප්‍රවේශ යතුර එක් කරන ලදි.",
+    "passkeyAddFailed": "ප්‍රවේශ යතුරක් එක් කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
+    "passkeyAddUnsupported": "මෙම උපාංගයට ප්‍රවේශ යතුරු සෑදිය නොහැක.",
+    "passkeyAddCancelled": "ප්‍රවේශ යතුර සෑදීම අවලංගු කරන ලදි.",
+    "passkeyRemoved": "ප්‍රවේශ යතුර ඉවත් කරන ලදි.",
+    "passkeyRemoveFailed": "එම ප්‍රවේශ යතුර ඉවත් කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
+    "passkeyRenamed": "ප්‍රවේශ යතුරට නව නමක් ලබා දෙන ලදි.",
+    "passkeyName": "ප්‍රවේශ යතුරේ නම",
+    "renamePasskey": "ප්‍රවේශ යතුරට නව නමක් දෙන්න",
+    "removePasskey": "ප්‍රවේශ යතුර ඉවත් කරන්න",
+    "removePasskeyTitle": "ප්‍රවේශ යතුර ඉවත් කරන්නද?",
+    "removePasskeyMessage": "ඔබට තවදුරටත් මෙම ප්‍රවේශ යතුරෙන් පිවිසිය නොහැක."
   },
   "preferences": {
     "general": "සාමාන්‍ය",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "ගොනු {{total}}න් {{displayCount}}ක් පූරණය කර ඇත",
       "filesStillLoading": "ගොනු තවමත් පූරණය වෙමින් පවතී. නැවුම් කිරීමට පහළට අදින්න.",
       "goToOverview": "දළ දැක්මට යන්න",
-      "goToOverviewTab": "දළ දැක්ම පටිත්තට යන්න"
+      "goToOverviewTab": "දළ දැක්ම පටිත්තට යන්න",
+      "expandAllLines_one": "පේළි {{displayCount}} ම පෙන්වන්න",
+      "expandAllLines_other": "පේළි {{displayCount}} ම පෙන්වන්න",
+      "expandLines_one": "පේළි {{displayCount}} ක් පෙන්වන්න ({{start}}–{{end}})",
+      "expandLines_other": "පේළි {{displayCount}} ක් පෙන්වන්න ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "අවට කේතයේ පේළි {{displayCount}} ක් පෙන්වන්න",
+      "expandLinesOfContext_other": "අවට කේතයේ පේළි {{displayCount}} ක් පෙන්වන්න",
+      "expandMoreLines_one": "තවත් පේළි {{displayCount}} ක් පෙන්වන්න ({{start}}–{{end}})",
+      "expandMoreLines_other": "තවත් පේළි {{displayCount}} ක් පෙන්වන්න ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "ගොනු {{total}} න් {{loaded}} ක් පූරණය කර ඇත",
+      "loadedOfTotalFiles_other": "ගොනු {{total}} න් {{loaded}} ක් පූරණය කර ඇත"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ගොනුවේ අවසානයේ නව පේළියක් නොමැත",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "{{path}} — යල් පැන ඇත"
       },
       "deletedUser": "මකා දැමූ පරිශීලකයා",
-      "replyForbiddenTerm": "මෙම {{term}}ට පිළිතුරු දීමට ඔබට අවසර නොමැත."
+      "replyForbiddenTerm": "මෙම {{term}}ට පිළිතුරු දීමට ඔබට අවසර නොමැත.",
+      "moreLinesAbove_one": "… ඉහළින් තවත් පේළි {{displayCount}} ක් ඇත.",
+      "moreLinesAbove_other": "… ඉහළින් තවත් පේළි {{displayCount}} ක් ඇත."
     },
     "couldNotOpenGitHubAppSettings": "GitHub යෙදුමේ සැකසුම් විවෘත කළ නොහැකි විය.",
     "installKiloGitHubApp": "Kilo GitHub යෙදුම ස්ථාපනය කරන්න",
@@ -574,7 +612,7 @@
       "pending": "{{displayCount}} ක් තවමත් අවසන් නැත",
       "skipped": "{{displayCount}} ක් මඟ හැර ඇත",
       "checksCount": "පරීක්ෂණ {{displayCount}} ක්",
-      "checksCount_one": "පරීක්ෂණය {{displayCount}} ක්",
+      "checksCount_one": "පරීක්ෂණ {{displayCount}} ක්",
       "checksCount_other": "පරීක්ෂණ {{displayCount}} ක්",
       "checkDetails": "පරීක්ෂණ විස්තර"
     },
@@ -706,7 +744,9 @@
       "statusContext": "අවට කේතය",
       "lineLabel": "{{status}} පේළිය {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(හිස්)"
+      "emptyLine": "(හිස්)",
+      "truncationBanner_one": "වෙනස් කළ ගොනු {{total}} න් පළමු {{limit}} ක් පෙන්වයි — GitHub API සීමාව.",
+      "truncationBanner_other": "වෙනස් කළ ගොනු {{total}} න් පළමු {{limit}} ක් පෙන්වයි — GitHub API සීමාව."
     },
     "linkPasteClipboardEmpty": "පසුරු පුවරුව හිස්ය.",
     "linkPasteNotAPullRequest": "මෙය පුල් ඉල්ලීමක හෝ මර්ජ ඉල්ලීමක සබැඳියක් නොවේ",
@@ -783,7 +823,7 @@
     "previewFullDescription": "දැනුම්දීම් ඔබේ අගුළු තිරයේ පණිවිඩ පෙළ පෙන්වයි.",
     "previewGenericDescription": "දැනුම්දීම් යමක් සිදු වූ බව පෙන්වයි. එය කියවීමට Kilo විවෘත කරන්න.",
     "channel": {
-      "agent": "නියෝජිත සැසි",
+      "agentProgress": "නියෝජිත ප්‍රගතිය",
       "chat": "කතාබස් පණිවිඩ",
       "kiloclaw": "KiloClaw ක්‍රියාකාරකම්",
       "balance": "ශේෂය පිළිබඳ ඇඟවීම්",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "පිටපත සූදානම් හෝ අසාර්ථක වීම, කාලසටහන්ගත ක්‍රියා",
       "balanceAlertsSubtitle": "සංවිධානයේ ශේෂය අඩු වීමේ දැනුම්දීම්",
       "securityFindingsSubtitle": "නව සොයාගැනීම් සහ SLA මතක් කිරීම්"
+    },
+    "action": {
+      "openSession": "සැසිය විවෘත කරන්න"
+    },
+    "needsInputAction": {
+      "approved": "ඉල්ලීම අනුමත විය",
+      "replied": "පිළිතුර යවන ලදී",
+      "failed": "පිළිතුරු දීමට නොහැකි විය. නැවත උත්සාහ කිරීමට නැවත තට්ටු කරන්න.",
+      "unavailable": "මෙම ඉල්ලීම තවදුරටත් බලා නොසිටී."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "උඩුගත කිරීම අසාර්ථක විය.",
       "failedToUploadFile": "ගොනුව උඩුගත කළ නොහැකි විය: {{reason}}",
       "nothingToPaste": "ඇලවීමට කිසිවක් නැත.",
-      "metadataStripFailed": "ඡායාරූපයේ පාරදත්ත ඉවත් කළ නොහැකි විය."
+      "metadataStripFailed": "ඡායාරූපයේ පාරදත්ත ඉවත් කළ නොහැකි විය.",
+      "limit_one": "ඔබට ගොනු {{displayCount}} ක් දක්වා ඇමිණිය හැක.",
+      "limit_other": "ඔබට ගොනු {{displayCount}} ක් දක්වා ඇමිණිය හැක."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "සොයාගැනීම් සමමුහුර්ත කරන්න",
       "syncNow": "දැන් සමමුහුර්ත කරන්න",
       "syncQueued": "සමමුහුර්ත කිරීම පෝලිමට එක් කළා",
-      "syncStatusUnavailable": "සමමුහුර්ත කිරීමේ තත්ත්වය ලබාගත නොහැක."
+      "syncStatusUnavailable": "සමමුහුර්ත කිරීමේ තත්ත්වය ලබාගත නොහැක.",
+      "daysOverdue_one": "දින {{displayCount}} ක් ප්‍රමාදයි",
+      "daysOverdue_other": "දින {{displayCount}} ක් ප්‍රමාදයි",
+      "findingsCount_one": "සොයාගැනීම් {{displayCount}} ක්",
+      "findingsCount_other": "සොයාගැනීම් {{displayCount}} ක්"
     },
     "dashboardMetrics": {
       "openFindings": "විවෘත සොයාගැනීම්",
@@ -2131,20 +2186,7 @@
       "continueFrom": "{{title}} සැසිය දිගටම කරගෙන යමින් පවතී.",
       "importingSession": "සැසිය ආයාත කරමින්",
       "cliCannotContinue": "මෙම CLI අනුවාදයට සැසියක් දිගටම කරගෙන යා නොහැක. Cloud Agent හෝ වෙනත් CLI එකක් තෝරන්න.",
-      "importFailed": "මෙම සැසිය ආයාත කළ නොහැකි විය.",
-      "sandbox": "සෑන්ඩ්බොක්ස්",
-      "sandboxAccessibility": "සෑන්ඩ්බොක්ස්: {{label}}",
-      "sandboxDefaultWithDestination": "පෙරනිමිය · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "කුඩා",
-      "sandboxInstanceShared": "බෙදාහරින ලද",
-      "sandboxInstanceLarge": "විශාල",
-      "sandboxInstanceDevcontainer": "ඩෙව් කන්ටේනරය",
-      "sandboxInstanceProviderDefault": "සපයන්නාගේ පෙරනිමිය",
-      "sandboxCouldNotLoad": "සෑන්ඩ්බොක්ස් විකල්ප පූරණය කළ නොහැක",
-      "sandboxUnavailable": "මෙම සෑන්ඩ්බොක්ස් ලබා ගත නොහැක. වෙනත් සෑන්ඩ්බොක්ස් එකක් හෝ පෙරනිමිය තෝරන්න.",
-      "sandboxUseDefault": "පෙරනිමිය භාවිතා කරන්න"
+      "importFailed": "මෙම සැසිය ආයාත කළ නොහැකි විය."
     },
     "partRenderer": {
       "updatedFileCount_one": "ගොනු {{displayCount}} ක් යාවත්කාලීන කර ඇත.",
@@ -2169,7 +2211,13 @@
       "updateTodos": "කළ යුතු දේ යාවත්කාලීන කරන්න",
       "linesBadge": "පේළි {{displayCount}}",
       "filesBadge": "ගොනු {{displayCount}}",
-      "matchesBadge": "ගැළපීම් {{displayCount}}"
+      "matchesBadge": "ගැළපීම් {{displayCount}}",
+      "filesBadge_one": "ගොනු {{displayCount}}",
+      "filesBadge_other": "ගොනු {{displayCount}}",
+      "linesBadge_one": "පේළි {{displayCount}}",
+      "linesBadge_other": "පේළි {{displayCount}}",
+      "matchesBadge_one": "ගැළපීම් {{displayCount}}",
+      "matchesBadge_other": "ගැළපීම් {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "පේළි {{start}}–{{end}} (කෙටි කර ඇත)",
@@ -2459,7 +2507,11 @@
       "files": "ගොනු",
       "couldNotOpenPhotoPicker": "ඡායාරූප තෝරන තිරය විවෘත කළ නොහැකි විය. Kilo නැවත ආරම්භ කර නැවත උත්සාහ කරන්න.",
       "maxFilesAllowed": "උපරිම ගොනු {{displayCount}} ක් එක් කළ හැක.",
-      "onlyAddingFiles": "ගොනු {{total}} න් {{accepted}} ක් පමණක් එක් කරයි (උපරිම {{max}})"
+      "onlyAddingFiles": "ගොනු {{total}} න් {{accepted}} ක් පමණක් එක් කරයි (උපරිම {{max}})",
+      "maxFilesAllowed_one": "උපරිම ගොනු {{displayCount}} ක් එක් කළ හැක.",
+      "maxFilesAllowed_other": "උපරිම ගොනු {{displayCount}} ක් එක් කළ හැක.",
+      "onlyAddingFiles_one": "ගොනු {{total}} න් {{accepted}} ක් පමණක් එක් කරයි (උපරිම {{max}})",
+      "onlyAddingFiles_other": "ගොනු {{total}} න් {{accepted}} ක් පමණක් එක් කරයි (උපරිම {{max}})"
     },
     "composer": {
       "addAttachment": "ඇමුණුමක් එක් කරන්න",
@@ -2477,7 +2529,9 @@
       "discardAttachmentsMessage": "යැවූ පණිවිඩවලට අමුණා නැති උඩුගත කළ ගොනු මකා දමනු ඇත.",
       "discardAttachmentsTitle": "ඇමුණුම් ඉවතලන්නද?",
       "charactersRemaining": "අක්ෂර {{count}} ක් ඉතිරිව ඇත",
-      "insertNewline": "නව පේළියක් ඇතුළත් කරන්න"
+      "insertNewline": "නව පේළියක් ඇතුළත් කරන්න",
+      "charactersRemaining_one": "අක්ෂර {{count}} ක් ඉතිරිව ඇත",
+      "charactersRemaining_other": "අක්ෂර {{count}} ක් ඉතිරිව ඇත"
     },
     "chatLink": {
       "linkCopied": "සබැඳිය පිටපත් කර ඇත",
@@ -2549,7 +2603,9 @@
       "stepsCount_one": "පියවර {{steps}} ක්",
       "stepsCount": "පියවර {{steps}}ක්",
       "stepsCount_other": "පියවර {{steps}}ක්",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "මාදිලිය ({{displayCount}})",
+      "modelsCount_other": "මාදිලි ({{displayCount}})"
     },
     "autoApprove": {
       "title": "ස්වයංක්‍රීය අනුමැතිය",
@@ -2589,7 +2645,9 @@
     },
     "toolRun": {
       "sheetTitle": "මෙවලම් ඇමතුම්",
-      "condensedLabel": "{{itemCount}} අයිතම; {{last}}"
+      "condensedLabel": "{{itemCount}} අයිතම; {{last}}",
+      "condensedLabel_one": "{{itemCount}} අයිතම; {{last}}",
+      "condensedLabel_other": "{{itemCount}} අයිතම; {{last}}"
     }
   },
   "bootstrap": {
@@ -2724,7 +2782,9 @@
     "cliCantReceiveFilesTitle": "මෙම සැසියට ගොනු ලබා ගත නොහැක",
     "cliCantReceiveFilesMessage": "මෙම සැසිය ක්‍රියාත්මක කරන Kilo CLI වෙත ගොනු ලබා ගත නොහැක. එම යන්ත්‍රයේ CLI යාවත්කාලීන කරන්න, නැතහොත් නව සැසියකට බෙදාගන්න.",
     "contentlessMessage": "බෙදා ගැනීමට කිසිවක් නැත — පෙළ හෝ ගොනු ඇතුළත් නොවීය.",
-    "couldNotReadContent": "බෙදාගත් අන්තර්ගතය කියවීමට නොහැකි විය."
+    "couldNotReadContent": "බෙදාගත් අන්තර්ගතය කියවීමට නොහැකි විය.",
+    "onlyFirstFilesAttached_one": "පළමු ගොනු {{displayCount}} ක් පමණක් අමුණනු ඇත.",
+    "onlyFirstFilesAttached_other": "පළමු ගොනු {{displayCount}} ක් පමණක් අමුණනු ඇත."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3094,7 +3154,9 @@
     "couldNotApprove": "අනුමත කළ නොහැකි විය",
     "couldNotStart": "ආරම්භ කළ නොහැකි විය",
     "channelName": "සක්‍රීය නියෝජිතයන්",
-    "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න."
+    "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න.",
+    "openSession": "විවෘත කරන්න",
+    "approveFailed": "අනුමත කිරීමට නොහැකි විය. නැවත උත්සාහ කිරීමට $t(common.approve) තට්ටු කරන්න."
   },
   "transcriptionModel": {
     "title": "හඬ පෙළට හරවන ආකෘතිය",
@@ -3135,5 +3197,8 @@
       "repositoryUnknown": "Kilo, {{repository}} GitHub හෝ GitLab කේත ගබඩාවක් ලෙසවත් හඳුනා නොගනී. Kilo තුළ තවත් කේත ගබඩාවක් තෝරන්න.",
       "repositoryUnsupported": "{{repository}} යනු Bitbucket කේත ගබඩාවකි — නියෝජිතයා දියත් කරන්නට තවම එය භාවිත කළ නොහැක. Kilo තුළ තවත් කේත ගබඩාවක් තෝරන්න."
     }
+  },
+  "launcher": {
+    "openLastSession": "අවසන් සැසිය විවෘත කරන්න"
   }
 }

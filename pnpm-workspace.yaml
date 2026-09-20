@@ -144,6 +144,15 @@ overrides:
   serialize-javascript: '>=7.0.3'
   hono: 4.12.34
   '@modelcontextprotocol/sdk@1.30.0>@hono/node-server': 2.0.10
+  # @simplewebauthn/server's ASN.1 parser must come from the same
+  # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their
+  # schemas into. apps/web pins asn1-schema/-x509 to 2.8.0 for its Apple App
+  # Attest code, and pnpm deduped the WebAuthn library's ^2.6.0 range onto that
+  # copy while asn1-ecc resolved 2.9.4, so `AsnParser.parse(DER, ECDSASigValue)`
+  # threw "Cannot get schema for 'ECDSASigValue' target" and every ES256
+  # assertion was refused. Scope the newer copy to this dependency only.
+  '@simplewebauthn/server>@peculiar/asn1-schema': 2.9.4
+  '@simplewebauthn/server>@peculiar/asn1-x509': 2.9.4
   undici@^6: 6.28.0
   undici@^8: 8.9.0
   # 1.30.2+ regresses var() round-trip through JS visitors, breaking

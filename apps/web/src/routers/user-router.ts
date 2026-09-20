@@ -17,6 +17,11 @@ import {
   releaseSignInCode,
   reserveSignInCode,
 } from '@/lib/auth/magic-link-tokens';
+import {
+  deletePasskey as deleteOwnedPasskey,
+  listPasskeysForUser,
+  renamePasskey as renameOwnedPasskey,
+} from '@/lib/auth/passkey';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { TRPCError } from '@trpc/server';
@@ -38,6 +43,7 @@ import {
   user_push_tokens,
   user_activity_tokens,
   agent_configs,
+  passkey_credentials,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -62,6 +68,32 @@ import { revokeWebSessions } from '@/lib/web-session-revocation';
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
 const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', 'Auto top-up via stripe'];
+
+/**
+ * Resolve one of the user's passkey credential ids from the opaque row id the
+ * management UI holds.
+ *
+ * The client is never told the public key or the WebAuthn credential id: it
+ * names a row by its database id and the server resolves the credential, always
+ * scoped to the caller, before touching the credential.
+ */
+async function findOwnedPasskeyCredentialId(
+  kiloUserId: string,
+  passkeyRowId: string
+): Promise<string | null> {
+  const [row] = await db
+    .select({ credential_id: passkey_credentials.credential_id })
+    .from(passkey_credentials)
+    .where(
+      and(
+        eq(passkey_credentials.id, passkeyRowId),
+        eq(passkey_credentials.kilo_user_id, kiloUserId)
+      )
+    )
+    .limit(1);
+
+  return row?.credential_id ?? null;
+}
 
 async function assertSelfServiceAccountDeletionAllowed(userId: string): Promise<void> {
   const [user] = await db
@@ -499,6 +531,53 @@ export const userRouter = createTRPCRouter({
       })),
     });
   }),
+
+  // ─── Passkeys ───────────────────────────────────────────────────────
+
+  getPasskeys: baseProcedure.query(async ({ ctx }) => {
+    const passkeys = await listPasskeysForUser(ctx.user.id);
+
+    return successResult({
+      passkeys: passkeys.map(passkey => ({
+        id: passkey.id,
+        name: passkey.name,
+        created_at: passkey.created_at,
+        last_used_at: passkey.last_used_at,
+        device_type: passkey.device_type,
+        backed_up: passkey.backed_up,
+      })),
+    });
+  }),
+
+  renamePasskey: baseProcedure
+    .input(z.object({ id: z.uuid(), name: z.string().trim().min(1).max(64) }))
+    .mutation(async ({ ctx, input }) => {
+      const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
+      if (!credentialId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+      }
+
+      const renamed = await renameOwnedPasskey(ctx.user.id, credentialId, input.name);
+      if (!renamed) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+      }
+      return successResult();
+    }),
+
+  deletePasskey: baseProcedure
+    .input(z.object({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
+      if (!credentialId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+      }
+
+      const deleted = await deleteOwnedPasskey(ctx.user.id, credentialId);
+      if (!deleted) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+      }
+      return successResult();
+    }),
 
   linkAuthProvider: baseProcedure
     .input(LinkAuthProviderInputSchema)
@@ -1279,6 +1358,11 @@ export const userRouter = createTRPCRouter({
         // server row, not a client-side cache, decides whether a re-register
         // is needed. Null means English.
         locale: user_push_tokens.locale,
+        // The client compares this against the running app version so an
+        // upgrade re-registers the row. Without that the push route would keep
+        // classifying an upgraded device by the version it first registered
+        // under, and never address the named Android channel.
+        appVersion: user_push_tokens.app_version,
       })
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, ctx.user.id));

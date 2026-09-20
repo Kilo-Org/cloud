@@ -25,7 +25,6 @@ import { ContextUsageRing } from './context-usage-ring';
 import {
   type ContextTone,
   formatCost,
-  formatExactTokens,
   getArcFraction,
   getContextSheetContent,
   getContextTone,
@@ -39,6 +38,7 @@ import {
   type SessionCostBreakdownModel,
 } from './session-cost-breakdown';
 import { friendlyModelName, resolveModelProviderName } from './session-model-display';
+import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
 import { copySessionId } from './session-row-actions';
 import { type SessionConnectionDisplay } from './session-connection-indicator-state';
@@ -425,26 +425,6 @@ function useRunningOnLabel(
   // row's space while that first lookup is in flight so the rows below it do
   // not jump when the label arrives.
   return isRemote && isPending ? { kind: 'pending' } : { kind: 'hidden' };
-}
-
-function Row({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
-  return (
-    <View className="gap-1">
-      <Text className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Text>
-      {children}
-    </View>
-  );
-}
-
-function TokenRow({ label, value }: Readonly<{ label: string; value: number }>) {
-  return (
-    <View className="flex-row items-center justify-between">
-      <Text className="text-sm text-muted-foreground">{label}</Text>
-      <Text className="text-sm font-medium text-foreground tabular-nums">
-        {formatExactTokens(value)}
-      </Text>
-    </View>
-  );
 }
 
 function ModelRow({

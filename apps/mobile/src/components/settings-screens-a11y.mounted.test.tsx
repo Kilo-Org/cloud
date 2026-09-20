@@ -110,13 +110,19 @@ async function mount(screen: ReactElement): Promise<ReactTestRenderer> {
   return view.renderer;
 }
 
-/** Every pressable control in the tree. */
+/**
+ * Every pressable control in the tree. Rendered (host) nodes only: a
+ * `ConfigureRow` composite element also carries an `onPress` prop, so matching
+ * it as well counted every row twice and let a screen that dropped a row stay
+ * above the per-screen floor below.
+ */
 function controls(root: ReactTestInstance): ReactTestInstance[] {
   return root.findAll(
     node =>
-      Object.is(node.type, 'Pressable') ||
-      node.props.accessibilityRole === 'button' ||
-      typeof node.props.onPress === 'function'
+      typeof node.type === 'string' &&
+      (Object.is(node.type, 'Pressable') ||
+        node.props.accessibilityRole === 'button' ||
+        typeof node.props.onPress === 'function')
   );
 }
 
@@ -168,8 +174,10 @@ describe('settings screens announce every control', () => {
     const renderer = await mount(<PreferencesScreen />);
     const found = controls(renderer.root);
 
-    // Back, the five hub rows, and the three appearance options.
-    expect(found.length).toBeGreaterThanOrEqual(6);
+    // Back, the five hub rows, and the three appearance options. The floor
+    // matches that full count, so a screen that stops rendering a row fails
+    // the walk instead of passing on a lower threshold.
+    expect(found.length).toBeGreaterThanOrEqual(9);
     expect(
       found.map(control => announcedBy(control)).filter(label => label === i18n.t('common.goBack'))
     ).toHaveLength(1);
